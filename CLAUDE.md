@@ -40,14 +40,16 @@ the SVG yet; add one between highway and street if needed.
      pointing north, straight cut ends, identical concave circular-arc edges), re-fitted from its current
      size and position each run, kept on the landmark layer, height label 480 if unlabeled.
    - writes with lxml so Inkscape structure is preserved.
-   After cleanup, the cleaned file should become the new `maps/corporate_core.svg`.
+   `run_pipeline.sh` writes the cleaned result back into the input SVG, and only when something changed.
 2. `svg_to_plan.py`: writes `geometry.json` (render geometry) and `corporate_core_plan.json`
    (box/cylinder primitives for Unreal; plan coords x=east, y=north, meters, origin at canvas center).
 3. `render_map.py`: `map_2d.png`, plan alone and plan over the reference image.
 4. `prep_render.py` + `blender_render.py`: isometric Cycles render from the south (`isometric.png`).
-   Needs Blender; set `BLENDER=/Applications/Blender.app/Contents/MacOS/Blender` on macOS.
+   Needs Blender. On the M4 Mac it is Blender 5.2 at `/Applications/Blender 5.2.app`; the script finds
+   `/Applications/Blender*.app` automatically, or set `BLENDER=/path/to/blender`.
 
-Python deps: shapely, svgelements, lxml, matplotlib, pillow (use a venv).
+Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow), installed in `.venv/`
+(Python 3.13). `run_pipeline.sh` uses `.venv/bin/python` automatically.
 
 ## Unreal
 

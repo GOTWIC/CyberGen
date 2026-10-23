@@ -4,7 +4,7 @@ Inkscape SVG in, cleaned SVG + Unreal plan + 2D map + 3D render out.
 
     ./run_pipeline.sh my_drawing.svg out
 
-Loop: trace in Inkscape -> run pipeline -> keep editing out/corporate_core.svg -> run again.
+Loop: trace in Inkscape -> run pipeline (cleans the input SVG in place) -> keep editing it -> run again.
 The cleanup is idempotent: running it on an already-clean file changes nothing.
 
 Cleanup rules (cleanup_svg.py):
