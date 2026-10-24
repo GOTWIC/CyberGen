@@ -1,0 +1,197 @@
+{
+  "name": "Delta Megacity",
+  "seed": 4412,
+  "stage": "M1a2 (water, districts, waterways)",
+  "passed": true,
+  "variant": 12,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "landmass lm07 (0.50 km2) is open land: marsh 'East Channel Marsh'"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 12.25,
+    "land_km2": 7.857,
+    "district_land_km2": 7.361,
+    "water_share": 0.3586,
+    "sea_share": 0.3,
+    "landmasses": 7,
+    "landmasses_with_districts": 7,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.496,
+    "open_land": [
+      {
+        "name": "East Channel Marsh",
+        "kind": "marsh",
+        "area_km2": 0.496
+      }
+    ],
+    "islands": 2,
+    "river_km": 3.77,
+    "channel_km": {
+      "delta_branch": 2.69,
+      "separation": 3.2
+    },
+    "separation_channels": 2,
+    "waterway_km": 3.64,
+    "waterway_km_by_kind": {
+      "basin": 0.69,
+      "canal": 2.95
+    },
+    "waterways": 8,
+    "quay_km": 7.31,
+    "district_boundary_on_water": 0.9959,
+    "boundary_on_water": 1.0,
+    "boundary_on_water_target": null,
+    "boundary_km": {
+      "water": 8.5,
+      "land": 0.0
+    },
+    "land_boundary_curvature": null,
+    "boundary_curvature": 1.0988,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm05",
+        "area_km2": 0.55,
+        "share": 0.0747,
+        "target": 0.0738,
+        "target_source": "island",
+        "error": 0.0122
+      },
+      {
+        "id": "d02",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm02",
+        "area_km2": 1.558,
+        "share": 0.2116,
+        "target": 0.2327,
+        "target_source": "archetype weight",
+        "error": -0.0904
+      },
+      {
+        "id": "d03",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm04",
+        "area_km2": 1.388,
+        "share": 0.1886,
+        "target": 0.2148,
+        "target_source": "archetype weight",
+        "error": -0.122
+      },
+      {
+        "id": "d04",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm03",
+        "area_km2": 1.473,
+        "share": 0.2002,
+        "target": 0.179,
+        "target_source": "archetype weight",
+        "error": 0.1184
+      },
+      {
+        "id": "d05",
+        "name": "Industrial Port",
+        "archetype": "industrial_port",
+        "landmass": "lm01",
+        "area_km2": 1.892,
+        "share": 0.257,
+        "target": 0.2327,
+        "target_source": "archetype weight",
+        "error": 0.1045
+      },
+      {
+        "id": "d06",
+        "name": "Research Campus",
+        "archetype": "research_campus",
+        "landmass": "lm06",
+        "area_km2": 0.5,
+        "share": 0.0679,
+        "target": 0.0671,
+        "target_source": "island",
+        "error": 0.0122
+      }
+    ],
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.627,
+      "preferred_chains": 0,
+      "planned": 1.0002
+    }
+  },
+  "notes": []
+}

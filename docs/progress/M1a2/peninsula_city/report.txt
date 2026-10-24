@@ -1,0 +1,33 @@
+citygen build report: Greyhook (seed 9081, M1a2 (water, districts, waterways))
+result: PASS  (hydrology variant 0)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+         note: 'Wallgate Heights': separated_by 'wall' is checked from M1b (roads, walls)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+  [pass] land_use: Every landmass holds a district or is named open land (marsh, park); no orphan wedges
+  [pass] canal_quality: Canals and creeks: no crossings below 30 deg, no near-duplicate canals
+
+stats:
+  map 10.8 km2, land 5.159 km2 (districts 5.159 km2, unassigned 0.0 km2)
+  water share 52.2% (sea 50.0%)
+  landmasses 3 (3 with districts), islands 0
+  rivers 3.29 km; channels separation 1.38 km
+  separation channels 2; boundary between districts on water 63% (target 60%), 5.85 km on water, 3.43 km on land
+  district perimeter facing water 70%; boundary curvature (arc / chord over 400 m) 1.1294, land boundaries 1.0344
+  open land 0 km2
+  inner waterways 5 (1.62 km: basin 0.64, canal 0.98), quays 3.47 km
+
+  district                     archetype              landmass  km2    share  target  error
+  Wallgate Heights             residential_heights    lm02      1.070  0.207  0.200   +3.7%  (spec)
+  Neckgate                     transit_hub            lm03      0.587  0.114  0.120   -5.2%  (spec)
+  The Stacks                   megablock_residential  lm01      1.129  0.219  0.220   -0.5%  (spec)
+  Lantern Strip                entertainment_market   lm01      0.675  0.131  0.130   +0.7%  (spec)
+  Eastside Docks               industrial_port        lm01      0.666  0.129  0.130   -0.7%  (spec)
+  Hook Spaceport               spaceport              lm01      1.031  0.200  0.200   -0.1%  (spec)

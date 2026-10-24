@@ -263,7 +263,8 @@ def build_water(spec: CitySpec, lay: Layout) -> None:
         if r.from_at is not None:
             start = edge_point(canvas, r.from_, r.from_at)
         if r.to in by_name:
-            end = by_name[r.to].interpolate(0.55, normalized=True).coords[0]
+            end = by_name[r.to].interpolate(0.55 if r.to_at is None else r.to_at,
+                                            normalized=True).coords[0]
         elif r.to in presets.DIRECTIONS:
             end = _edge_point(canvas, r.to) if r.to_at is None else \
                 edge_point(canvas, r.to, r.to_at)

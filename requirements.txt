@@ -6,4 +6,5 @@ pillow==13.0.0
 # citygen
 pydantic==2.14.1
 numpy==2.5.4
+contourpy==1.4.0
 pytest==9.1.1

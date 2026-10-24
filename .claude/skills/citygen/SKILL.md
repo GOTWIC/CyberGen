@@ -79,27 +79,35 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
   `from`/`to` may pin the point along the edge: `{"edge": "east", "at": 0.3}` (0 to 1: west to
   east on north/south edges, south to north on east/west edges; on a diagonal edge 0 is the
   middle of the first-named side, 0.5 the corner, 1 the middle of the second side). For a
-  `sea`/`bay` mouth, `at` runs along the sea-side edge (`{"edge": "bay", "at": 0.2}`). Leave
+  `sea`/`bay` mouth, `at` runs along the sea-side edge (`{"edge": "bay", "at": 0.2}`); for a
+  tributary, `to: {"edge": "<parent river>", "at": 0.3}` pins the junction along the parent
+  (0 where the parent enters, 1 its mouth; unpinned, it joins a little downstream of its
+  entry, at 45 degrees to the parent's flow). Leave
   `at` out unless the prompt or image places the river: unpinned ends are free parameters the
   build moves to fit the districts. A river splits the land into two banks, so where it runs
   decides how much land each bank has;
   `delta_branches` 0 to 6 with optional `branch_names`. `delta_branches` counts the **extra**
   channels besides the main one, so "splits into four channels" is `3`. `kind: "channel"` for a wide sea channel
   or strait (it counts as coast). Leaving `rivers` out gives one default river; `[]` means no
-  rivers. The land between delta channels becomes small separate landmasses: give one to a
-  `delta` island or expect it to stay without a district.
+  rivers. A delta splits well inland and fans out to the coast (the coast grows a lobe for
+  it); the land between its channels becomes separate landmasses: give one to a `delta`
+  island, let the build place a district there, or it becomes named open land (a marsh).
 - `islands`: `name`, `position` (direction from the center) and `setting` (`offshore`,
   `nearshore`, `mid_river`, `delta`; mid_river and delta need `river`), `area_km2`. Shorthand:
   `"position": "south_west_offshore"`. Offshore and nearshore islands are placed from the middle
-  of the sea toward `position`; a `mid_river` island sits on the river (`center` = nearest the
+  of the sea toward `position` (the report notes an island that had no room there); a
+  `mid_river` island sits on the river (`center` = nearest the
   map center) with the river splitting around it; a `delta` island is the land between two
   delta channels, sized to `area_km2`. Islands must fit: an offshore island needs open sea
   around it (raise `sea_share` or shrink it if the build says it does not fit).
 - `district_separation`: `water_preferred` (default), `water_required` or `none`. The build makes
   it real: `water_required` turns every land boundary between two districts into a canal-scale
   separation channel (every district on its own landmass); `water_preferred` adds such channels
-  where a boundary (or a chain of two) runs from water to water or to the map edge within
-  1.8 km; `none` adds none. A district's own `water_separation` overrides the city setting.
+  on a budget: boundaries that run from water to water (those already near water first) until
+  `boundary_water_share` (default 0.6) of the boundary between neighboring districts runs
+  along water; a boundary that only reaches the map edge is a fallback, never the reason. Set
+  `boundary_water_share` (0 to 1, in `water`) when the prompt says how much water splits the
+  districts; `none` adds none. A district's own `water_separation` overrides the city setting.
 - `bridges`: `density`, `footbridge_density`, `transit_crossing` (`own_bridge`, `shared_deck`,
   `auto`), `named` (each `name`, `kind` road/rail/road_rail/pedestrian, `connects` two of
   district/island/place/megasite/`<direction>_exit`, optional `crosses`).
@@ -178,7 +186,8 @@ or sky_tube line; every hub on two or more lines.
 **When the water cannot do what the prompt asks** (for example "every district on its own
 landmass" with one river): `water_required` makes the build add separation channels between
 districts that share land, so that alone is enough. Use `water_preferred` when the prompt only
-says "mostly" or "split by water"; the build then adds channels where they connect to water.
+says "mostly" or "split by water"; the build then adds channels where they connect to water,
+up to `boundary_water_share`.
 
 ### 3. Validate until it passes
 
@@ -229,16 +238,19 @@ citygen build cities/<slug>/city_spec.json cities/<slug>/out/
 ```
 
 M1a builds the water, districts and inner waterways: coast, rivers, delta branches, islands,
-landmasses, district polygons (with separation channels), canals, creeks, inlets, basins and
-marinas with quays. It writes `city_model.json`, `preview_map.png`, `report.json` and
+landmasses, district polygons (with separation channels), open land (named marshes and parks
+on landmasses without a district), canals, creeks, inlets, harbor slips and marinas with quays. It writes `city_model.json`, `preview_map.png`, `report.json` and
 `report.txt`, and exits 0 when every check passes, 1 when one fails (2 on usage or file errors).
 
 1. Read `report.txt`. Each failed check names the district or island and why: a share off by
    more than 15%, a relation with the actual bearing, an edge or coast not met, an island that
-   does not fit, a waterway that does not connect, a sliver, invalid geometry.
+   does not fit, a waterway that does not connect, a sliver, invalid geometry, land without a
+   district that is not open land, canals that cross too flat or run as near duplicates. The
+   stats also give the boundary between districts on water (against the target).
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
-   where asked, land left without a district (hatched) only where the prompt allows it.
+   where asked, land left without a district (hatched) only where the prompt allows it, open
+   land (marsh, park) only where it makes sense.
 3. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass
@@ -284,4 +296,4 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
-(previews and reports): `docs/progress/M1a/`.
+(previews and reports): `docs/progress/M1a2/` (the M1a versions in `docs/progress/M1a/`).

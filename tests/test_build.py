@@ -1,4 +1,4 @@
-"""M1a build: samples, determinism, each check with a failing case, coast forms, river `at`,
+"""M1a/M1a2 build: samples, determinism, each check with a failing case, coast forms, river `at`,
 water separation, CLI."""
 
 import copy
@@ -73,10 +73,10 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M1a/<city>/report.json is what the current code produces."""
+    """docs/progress/M1a2/<city>/report.json is committed and passes."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M1a" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M1a2" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
@@ -115,7 +115,8 @@ def test_small_city_passes(small_built):
     assert small_built.passed, [f for c in small_built.checks for f in c.failures]
     ids = {c.id for c in small_built.checks}
     assert ids == {"geometry_valid", "waterways_connected", "district_shares", "placement",
-                   "water_required", "district_pieces", "island_sizes", "no_slivers"}
+                   "water_required", "district_pieces", "island_sizes", "no_slivers",
+                   "land_use", "canal_quality"}
 
 
 def test_check_geometry_invalid(small_built):
@@ -286,7 +287,9 @@ def test_river_at_spec_round_trip_and_errors():
     data["water"]["rivers"][0]["from"] = "north"
     data["water"]["rivers"].append({"name": "Trib", "from": "east",
                                     "to": {"edge": "Test River", "at": 0.5}})
-    assert any("to.at only applies" in str(i) for i in validate_spec(data).errors)
+    r = validate_spec(data)  # a tributary's to.at runs along its parent
+    assert r.ok, [str(i) for i in r.errors]
+    assert r.filled.water.rivers[1].to == "Test River" and r.filled.water.rivers[1].to_at == 0.5
 
 
 def test_tributary_and_delta_branches():
@@ -328,9 +331,9 @@ def test_separated_by_named_river(small_built):
     data["districts"][1]["placement"]["separated_by"] = "Test River"
     built = _build(data)
     assert built.passed, [f for c in built.checks for f in c.failures]
-    data["districts"][3]["placement"]["separated_by"] = "Test River"  # Uptown: not on it
+    data["districts"][4]["placement"]["separated_by"] = "Test River"  # an offshore island
     failures = _rerun(data, small_built.model)["placement"].failures
-    assert any("'Uptown' does not border 'Test River'" in f for f in failures), failures
+    assert any("'Test Isle' does not border 'Test River'" in f for f in failures), failures
 
 
 # --- CLI --------------------------------------------------------------------------------

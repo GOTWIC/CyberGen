@@ -279,7 +279,8 @@ class Lot(Entity):
 
 class OpenSpace(Entity):
     TYPE_PREFIX: ClassVar[str] = "open_space"
-    kind: Literal["park", "plaza", "pocket_park", "promenade", "courtyard", "podium_roof"]
+    kind: Literal["park", "plaza", "pocket_park", "promenade", "courtyard", "podium_roof",
+                  "marsh"]
     polygon: Polygon
     z_m: float = 0.0
     name: str | None = None

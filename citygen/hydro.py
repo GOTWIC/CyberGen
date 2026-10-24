@@ -1,14 +1,17 @@
 """Stage 1, coast and hydrology: sea, rivers, sea channels, delta branches, islands, landmasses.
 
 Everything is built in meters on the canvas (origin at the city center). The sea comes from the
-coast form, solved by bisection so it covers `sea_share` of the map. Rivers run from their entry
-edge to their mouth along a straight base line displaced sideways by a bulge and fractal noise
-(the meander); a sideways displacement of a straight line never crosses itself. Tributaries end
-in their parent, delta branches split from the main channel and fan out along the coast, so the
-land between channels becomes separate landmasses. Islands are smooth blobs of exact area:
-offshore and nearshore islands in the sea, mid-river islands on the river with a ring of water
-around them, delta islands are the land between two channels (the split point is bisected so
-the wedge has the asked area).
+coast form, solved by bisection so it covers `sea_share` of the map; a river with a delta
+builds a lobe of land into the sea, so it ends at the coast, not at the map center. Rivers run
+from their entry edge to their mouth as sine-generated curves (meanders of varying size and
+spacing, about 11 widths apart) that widen downstream. Tributaries join their parent downstream
+of their entry at 45 degrees to its flow (or where `to.at` pins it). Deltas split well inland:
+curved distributaries fan out to mouths spread along the coast, the main channel narrowing
+below the split, so the land between channels becomes separate landmasses. Islands are smooth
+blobs of exact area: offshore and nearshore islands in the sea (inside their bearing sector
+when there is room), mid-river islands on the river with a ring of water around them upstream
+of the delta, delta islands are the land between two channels (the delta is scaled by
+bisection so that land has the asked area).
 """
 
 from __future__ import annotations
@@ -123,8 +126,10 @@ def _gauss(x):
     return np.exp(-x * x)
 
 
-def _sea_canonical(form: str, s: float, A: float, Bh: float, noise, b0: float) -> Polygon:
-    """Sea {a > c(b)} in the frame a = toward the sea, b = along the coast."""
+def _sea_canonical(form: str, s: float, A: float, Bh: float, noise, b0: float,
+                   lobe: float = 0.0) -> Polygon:
+    """Sea {a > c(b)} in the frame a = toward the sea, b = along the coast. `lobe` (fraction
+    of the span) pushes the coast seaward around b0: the land a delta builds into the sea."""
     span = 2 * A
     bs = np.arange(-1.6 * Bh, 1.6 * Bh + 10, 10.0)
     n = noise(bs)
@@ -135,10 +140,10 @@ def _sea_canonical(form: str, s: float, A: float, Bh: float, noise, b0: float) -
     elif form == "crescent":
         c = A - s * span * (0.12 + 0.6 * np.clip(1 - (bs / (1.05 * Bh)) ** 2, 0, 1))
     elif form == "delta":
-        c = A - s * span * (0.55 - 0.32 * _gauss((bs - b0) / (0.38 * Bh)))
+        c = A - s * span * (0.6 - 0.42 * _gauss((bs - b0) / (0.6 * Bh)))
     else:  # straight, archipelago
         c = A - s * span * 0.5
-    c = c + n
+    c = c + n + lobe * span * np.exp(-((bs - b0) / (0.3 * Bh)) ** 2)
     pts = list(zip(c, bs)) + [(4 * A, bs[-1]), (4 * A, bs[0])]
     return Polygon(pts)
 
@@ -160,7 +165,8 @@ def _peninsula(w0: float, neck_frac: float, A: float, Bh: float, noise, noise2) 
     return band.difference(tongue)
 
 
-def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | None) -> object:
+def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | None,
+              lobe: float = 0.0) -> object:
     coast = spec.water.coast
     ux, uy, vx, vy = G.frame(coast.side)
     corners = list(canvas.exterior.coords)[:4]
@@ -182,7 +188,7 @@ def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | N
         if coast.form == "peninsula":
             g = _peninsula(param, neck, A, Bh, noise, noise2)
         else:
-            g = _sea_canonical(coast.form, param, A, Bh, noise, b0)
+            g = _sea_canonical(coast.form, param, A, Bh, noise, b0, lobe)
         g = affinity.affine_transform(g, to_world)
         g = g.buffer(COAST_SMOOTH_M).buffer(-2 * COAST_SMOOTH_M).buffer(COAST_SMOOTH_M)
         return G.polygonal(g.intersection(canvas))
@@ -273,27 +279,38 @@ def _first_sea_hit(start, aim, sea, coast) -> tuple[float, float]:
     return (q.x, q.y)
 
 
-def _offset_fn(rng, length: float, meander: float, width: float, bulge: float):
-    lam = min(max(12 * width, 600.0), 1500.0)
-    amp = meander * 0.6 * lam
-    nz = G.noise1d(rng, lam, octaves=2, persistence=0.35)
+def _meander_params(width: float, meander: float) -> tuple[float, float]:
+    """(wavelength m, peak deflection rad): bends about 11 widths apart, as in real rivers."""
+    lam = min(max(11.0 * width, 520.0), 1400.0)
+    return lam, 0.25 + 1.4 * meander
+
+
+def _width_fn(wmin: float, wmax: float, rng):
+    """Width along the course: gradual widening downstream with a little slow variation."""
+    nz = G.noise1d(rng, 0.3, octaves=1)
 
     def f(ts):
-        ts = np.asarray(ts)
-        ramp = np.clip(np.minimum(ts, 1 - ts) * 6, 0, 1)
-        return bulge * length * np.sin(math.pi * ts) + amp * nz(ts * length) * ramp
+        ts = np.asarray(ts, dtype=float)
+        return (wmin + (wmax - wmin) * ts ** 1.3) * (1 + 0.07 * nz(ts))
 
     return f
 
 
+def _widths_at(line: LineString, fn) -> list[float]:
+    cs = np.asarray(line.coords)
+    d = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(cs, axis=0).T))])
+    return [float(round(w, 1)) for w in fn(d / (d[-1] or 1.0))]
+
+
 def _keep_inside(make, canvas: Polygon, margin: float) -> LineString:
-    """Build the path; damp the sideways displacement until it stays on the map."""
+    """Build the path; damp the meander until it stays on the map."""
     inner = canvas.buffer(-margin)
     scale = 1.0
     line = make(scale)
     for _ in range(8):
         pts = G.resample(line, 25.0)
-        mid = pts[2:-2] if len(pts) > 6 else pts
+        k = int(math.ceil(2.5 * margin / 25.0)) + 1  # the ends sit on or past the map edge
+        mid = pts[k:-k] if len(pts) > 2 * k + 2 else pts[len(pts) // 2:len(pts) // 2 + 1]
         if shapely.contains_xy(inner, mid[:, 0], mid[:, 1]).all():
             return line
         scale *= 0.7
@@ -301,50 +318,98 @@ def _keep_inside(make, canvas: Polygon, margin: float) -> LineString:
     return line
 
 
-def build_rivers(spec: CitySpec, canvas: Polygon, sea, variant: Variant) -> list[WaterBody]:
+def _unit(v) -> np.ndarray:
+    v = np.asarray(v, dtype=float)
+    n = float(np.hypot(*v))
+    return v / n if n > 1e-9 else np.array([1.0, 0.0])
+
+
+def _rot(v, ang: float) -> np.ndarray:
+    c, s = math.cos(ang), math.sin(ang)
+    return np.array([v[0] * c - v[1] * s, v[0] * s + v[1] * c])
+
+
+def _tangent(line: LineString, d: float) -> np.ndarray:
+    a = line.interpolate(max(d - 25.0, 0.0))
+    b = line.interpolate(min(d + 25.0, line.length))
+    return _unit((b.x - a.x, b.y - a.y))
+
+
+def width_at(body: WaterBody, d: float) -> float:
+    """Width of a water body `d` meters along its centerline."""
+    cs = np.asarray(body.centerline.coords)
+    cum = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(cs, axis=0).T))])
+    return float(np.interp(d, cum, body.widths[:len(cum)]))
+
+
+def lobe_mouth(canvas: Polygon, sea, side: str, b0: float) -> tuple[float, float]:
+    """Coast point at the tip of a delta lobe centered at b0 (along-coast coordinate)."""
+    ux, uy, vx, vy = G.frame(side)
+    corners = list(canvas.exterior.coords)[:4]
+    A = max(x * ux + y * uy for x, y in corners)
+    inland = (vx * b0 - ux * A, vy * b0 - uy * A)
+    seaward = (vx * b0 + ux * 2 * A, vy * b0 + uy * 2 * A)
+    return _first_sea_hit(inland, seaward, sea, coastline_of(sea, canvas))
+
+
+def build_rivers(spec: CitySpec, canvas: Polygon, sea, variant: Variant,
+                 lobe_b0: float | None = None) -> list[WaterBody]:
+    """Main rivers, sea channels and tributaries (deltas are added by `build_deltas`)."""
     w = spec.water
     coast = coastline_of(sea, canvas)
     ux, uy, vx, vy = G.frame(w.coast.side)
     corners = list(canvas.exterior.coords)[:4]
     A = max(x * ux + y * uy for x, y in corners)
     Bh = max(abs(x * vx + y * vy) for x, y in corners)
-    span = max(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
     bodies: list[WaterBody] = []
     by_name: dict[str, WaterBody] = {}
     same_edge: dict[str, list[str]] = {}
     for r in w.rivers:
         if r.from_at is None:
             same_edge.setdefault(r.from_, []).append(r.name)
-    order = _order_rivers(w.rivers)
-    for k, r in enumerate(order):
+    lobe_river = next((r.name for r in w.rivers if r.to in ("sea", "bay") and r.delta_branches),
+                      None)
+    for r in _order_rivers(w.rivers):
         idx = w.rivers.index(r) + 1
         rid = f"r{idx:02d}" if r.kind == "river" else f"ch{idx:02d}"
-        rng = np.random.default_rng(derive_seed(spec.seed, "hydro.river", r.name))
+        seed = derive_seed(spec.seed, "hydro.river", r.name)
         wmin, wmax = r.width_m
         wmean = (wmin + wmax) / 2
+        parent = by_name.get(r.to)
         if r.from_at is not None:
             at = r.from_at
         else:
             group = same_edge[r.from_]
-            base = 0.5 if "_" not in r.from_ else 0.3  # diagonal: beside the corner, not in it
-            at = base + (group.index(r.name) - (len(group) - 1) / 2) * 0.28
-            at = min(max(at + variant.at_shift.get(r.name, 0.0), 0.12), 0.88)
+            base_at = 0.5 if "_" not in r.from_ else 0.3  # diagonal: beside the corner
+            at = base_at + (group.index(r.name) - (len(group) - 1) / 2) * 0.28
+            shift = variant.at_shift.get(r.name, 0.0) * (0.4 if parent is not None else 1.0)
+            at = min(max(at + shift, 0.12), 0.88)
         start = G.edge_point(canvas, r.from_, at)
         if r.from_at is None:
             start = _onto_land(canvas, sea, r.from_, at)
-        inward = G.edge_tangent_inward(canvas, start)
+        inward = np.array(G.edge_tangent_inward(canvas, start))
         s_out = (start[0] - inward[0] * wmax, start[1] - inward[1] * wmax)
-        parent = by_name.get(r.to)
-        mouth_kind = "sea"
-        flows_into = "sea"
+        mouth_kind, flows_into, base, ramp = "sea", "sea", None, (0.08, 0.08)
         if parent is not None:
+            # Join the parent downstream of the entry point, arriving at 45 degrees to the
+            # parent's flow (an acute downstream angle), unless `to.at` pins the junction.
             pl = parent.centerline
-            # Head for the map center from the entry point and join where that meets the
-            # parent, so tributaries cross the land instead of hugging the parent or an edge.
-            cx, cy = -presets.DIRECTION_VECTORS[r.from_][0], -presets.DIRECTION_VECTORS[r.from_][1]
-            aim = Point(start[0] + cx * 0.6 * span, start[1] + cy * 0.6 * span)
-            t = min(max(pl.project(aim, normalized=True), 0.35), 0.85)
-            end = pl.interpolate(t, normalized=True).coords[0]
+            if r.to_at is not None:
+                t = r.to_at
+            else:
+                t = min(max(pl.project(Point(start), normalized=True) + 0.15, 0.2), 0.85)
+            dj = t * pl.length
+            jp = pl.interpolate(dj)
+            tau = _tangent(pl, dj)
+            rel = np.array([start[0] - jp.x, start[1] - jp.y])
+            side = 1.0 if tau[0] * rel[1] - tau[1] * rel[0] >= 0 else -1.0
+            d_end = _rot(tau, -side * math.radians(45))
+            pw = width_at(parent, dj)
+            end = (jp.x + d_end[0] * 0.5 * pw, jp.y + d_end[1] * 0.5 * pw)
+            ln = math.hypot(end[0] - s_out[0], end[1] - s_out[1])
+            base = G.bezier(s_out, np.array(s_out) + inward * 0.35 * ln,
+                            np.array(end) - d_end * 0.4 * ln, end)
+            ramp = (0.08, 0.18)
             mouth_kind, flows_into = "river", parent.id
         elif r.to in presets.DIRECTIONS or sea.is_empty or coast.is_empty:
             edge = r.to if r.to in presets.DIRECTIONS else presets.opposite(r.from_)
@@ -354,7 +419,9 @@ def build_rivers(spec: CitySpec, canvas: Polygon, sea, variant: Variant) -> list
             end = (e[0] - out[0] * wmax, e[1] - out[1] * wmax)
             mouth_kind, flows_into = "edge", None
         else:
-            if r.to_at is not None:
+            if r.name == lobe_river and lobe_b0 is not None:
+                m = lobe_mouth(canvas, sea, w.coast.side, lobe_b0)
+            elif r.to_at is not None:
                 aim = G.edge_point(canvas, w.coast.side, r.to_at)
                 m = nearest_points(coast, Point(aim))[0].coords[0]
             elif r.to == "bay" and w.coast.form in ("bay", "crescent"):
@@ -363,27 +430,25 @@ def build_rivers(spec: CitySpec, canvas: Polygon, sea, variant: Variant) -> list
                 aim = (start[0] + ux * 2 * A * 1.2, start[1] + uy * 2 * A * 1.2)
                 m = _first_sea_hit(start, aim, sea, coast)
             end = (m[0] + ux * wmax * 2.5, m[1] + uy * wmax * 2.5)
-        length = math.hypot(end[0] - s_out[0], end[1] - s_out[1])
-        off = _offset_fn(rng, length, r.meander, wmean, variant.bulge.get(r.name, 0.0))
+        lam, om = _meander_params(wmean, r.meander)
+        bulge = variant.bulge.get(r.name, 0.0)
 
-        def make(scale, a=s_out, b=end, f=off):
-            return G.wiggle_path(a, b, lambda ts: scale * f(ts))
+        def make(scale, a=s_out, b=end, base=base, lam=lam, om=om, bulge=bulge, seed=seed,
+                 ramp=ramp):
+            return G.course(a, b, np.random.default_rng(seed), wavelength=lam, omega=om,
+                            base=base, bulge=bulge, scale=scale, ramp=ramp)
 
         line = _keep_inside(make, canvas, wmax)
         if mouth_kind == "sea":
             line, _ = _trim_at(line, sea, 2.0 * wmax, skip=wmax * 3)
         elif mouth_kind == "river":
             line, _ = _trim_at(line, parent.polygon, 0.6 * wmax, skip=wmax * 3)
-        widths_fn = lambda ts, a=wmin, b=wmax: a + (b - a) * np.asarray(ts)  # noqa: E731
+        widths_fn = _width_fn(wmin, wmax, np.random.default_rng(seed + 1))
         poly = G.polygonal(G.variable_buffer(line, widths_fn).intersection(canvas))
-        n = len(line.coords)
-        widths = [float(round(wmin + (wmax - wmin) * i / max(n - 1, 1), 1)) for i in range(n)]
         body = WaterBody(rid, "river" if r.kind == "river" else "sea_channel", r.name, line,
-                         widths, poly, mouth_kind, flows_into)
+                         _widths_at(line, widths_fn), poly, mouth_kind, flows_into)
         bodies.append(body)
         by_name[r.name] = body
-        if r.delta_branches and mouth_kind == "sea":
-            bodies += _delta_branches(spec, r, body, sea, coast, span, variant, rng)
     return bodies
 
 
@@ -427,61 +492,149 @@ def _bay_head(coast, ux, uy, vx, vy, Bh) -> tuple[float, float]:
     return best
 
 
-def _delta_branches(spec, r, main: WaterBody, sea, coast, span, variant, rng) -> list[WaterBody]:
-    ux, uy, _, _ = G.frame(spec.water.coast.side)
-    mouth = Point(main.centerline.coords[-1])
+def _coast_hit(line: LineString, sea) -> float:
+    """Distance along `line` where it first enters the sea (its length if it never does)."""
+    pts = G.resample(line, 8.0)
+    ds = np.linspace(0, line.length, len(pts))
+    inside = shapely.contains_xy(sea, pts[:, 0], pts[:, 1])
+    return float(ds[int(np.argmax(inside))]) if inside.any() else line.length
+
+
+def _seaward(cl: LineString, s: float, sea) -> np.ndarray:
+    """Unit normal of the coastline at `s` meters along it, pointing into the sea."""
+    a = cl.interpolate(max(s - 40.0, 0.0))
+    b = cl.interpolate(min(s + 40.0, cl.length))
+    t = _unit((b.x - a.x, b.y - a.y))
+    n = np.array([-t[1], t[0]])
+    p = cl.interpolate(s)
+    if not sea.contains(Point(p.x + n[0] * 30, p.y + n[1] * 30)):
+        n = -n
+    return n
+
+
+def delta_plan(span: float, s_mouth: float, r, variant: Variant, scale: float = 1.0,
+               upstream_limit: float = 0.0) -> tuple[float, float]:
+    """(split distance upstream of the mouth, fan width along the coast) of a delta."""
+    d = min(max(0.3 * span, 500.0), 1300.0) * scale * (1 + variant.split.get(r.name, 0.0))
+    d = max(min(d, 0.65 * s_mouth, s_mouth - upstream_limit - 150.0), 200.0)
+    f = min(max(0.42 * span, 700.0), 1900.0) * scale * (1 + variant.spread.get(r.name, 0.0))
+    return d, f
+
+
+def build_delta(spec: CitySpec, main: WaterBody, sea, canvas: Polygon, variant: Variant,
+                scale: float = 1.0, upstream_limit: float = 0.0) -> list[WaterBody]:
+    """Distributaries of `main`: a fan of curved channels that split well upstream of the
+    mouth. The first branch on each side leaves the main channel `D` meters upstream of the
+    coast; each further branch on a side leaves the previous one part way down. Mouths are
+    spread over a fan of width `F` along the coast and channels arrive roughly square to it.
+    The main channel narrows below the first split (the flow divides)."""
+    r = spec.water.rivers[[x.name for x in spec.water.rivers].index(main.name)]
+    coast = coastline_of(sea, canvas)
+    span = max(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
+    line = main.centerline
+    s_m = _coast_hit(line, sea)
+    mouth = line.interpolate(s_m)
     cl = main_coast(coast, mouth)
     if cl is None:
         return []
+    d_split, fan = delta_plan(span, s_m, r, variant, scale, upstream_limit)
+    gap = min(fan / max(r.delta_branches, 1), 1.1 * d_split)
     s0 = cl.project(mouth)
-    t_split = 0.62 + variant.split.get(r.name, 0.0)
-    split_dist = main.centerline.length * (1 - t_split)
-    spacing = min(max(0.13 * span, 0.5 * split_dist, 300.0), 1000.0)
-    wmin, wmax = r.width_m
-    t_base = 0.62 + variant.split.get(r.name, 0.0)
-    spacing *= 1.0 + variant.spread.get(r.name, 0.0)
-    land_len = main.centerline.length
-    out = []
+    ux, uy, _, _ = G.frame(spec.water.coast.side)
+    rng = np.random.default_rng(derive_seed(spec.seed, "hydro.delta", r.name))
     names = list(r.branch_names)
+    out: list[WaterBody] = []
+    last: dict[int, WaterBody] = {}
+    taken = [s0]
     for j in range(r.delta_branches):
         side = 1 if j % 2 == 0 else -1
         rank = j // 2 + 1
-        s = s0 + side * rank * spacing
-        s = min(max(s, 0.08 * cl.length), 0.92 * cl.length)
-        q = cl.interpolate(s).coords[0]
-        t = max(t_base - 0.07 * (rank - 1), 0.25)
-        bw = max(0.55 * (wmin + (wmax - wmin) * t), 24.0)
-        out.append(_branch(spec, main, j, side, rank, t, q, bw, sea, ux, uy, rng,
-                           names[j] if j < len(names) else None, land_len))
+        s_want = s0 + side * rank * gap * (1 + rng.uniform(-0.12, 0.12))
+        if rank == 1 or side not in last:
+            parent = main
+            d_fork = s_m - d_split * (1.0 if side == 1 else 0.82)
+            # Split inland of the mouth, so the branch runs toward the sea, not along it.
+            q = cl.interpolate(min(max(s_want, 0.04 * cl.length), 0.96 * cl.length))
+            n_q = _seaward(cl, cl.project(q), sea)
+            while d_fork > upstream_limit + 250.0:
+                fp = line.interpolate(d_fork)
+                v = np.array([q.x - fp.x, q.y - fp.y])
+                if float(v @ n_q) >= 0.45 * float(np.hypot(*v)):
+                    break
+                d_fork -= 50.0
+        else:
+            parent = last[side]
+            d_fork = _coast_hit(parent.centerline, sea) * (0.38 + 0.06 * (rank - 2))
+        fp = parent.centerline.interpolate(d_fork)
+        # Pull the mouth toward the main mouth until it lies seaward of the split (a fan on
+        # the delta lobe, not a branch that runs along the coast).
+        s = s_want
+        for _ in range(10 if parent is main else 0):
+            s = min(max(s, 0.04 * cl.length), 0.96 * cl.length)
+            q = cl.interpolate(s)
+            v = np.array([q.x - fp.x, q.y - fp.y])
+            if float(v @ np.array([ux, uy])) >= 0.25 * float(np.hypot(*v)):
+                break
+            s = s0 + (s - s0) * 0.85
+        s = min(max(s, 0.04 * cl.length), 0.96 * cl.length)
+        if min(abs(s - t) for t in taken) < 0.4 * gap:
+            continue  # no room left on this side of the mouth
+        taken.append(s)
+        q = cl.interpolate(s)
+        pl = parent.centerline
+        p = pl.interpolate(d_fork)
+        tau = _tangent(pl, d_fork)
+        n_sea = _seaward(cl, s, sea)
+        bw = max(0.62 * width_at(parent, d_fork), 24.0)
+        end = (q.x + n_sea[0] * 2.5 * bw, q.y + n_sea[1] * 2.5 * bw)
+        ln = math.hypot(end[0] - p.x, end[1] - p.y)
+        base = G.bezier((p.x, p.y), np.array([p.x, p.y]) + tau * 0.4 * ln,
+                        np.array(end) - n_sea * 0.45 * ln, end)
+        lam = min(max(12.0 * bw, 300.0), 900.0)
+        others = [b.centerline for b in [main, *out] if b is not parent]
+        seed = derive_seed(spec.seed, "hydro.branch", main.name, j)
+        for om in (0.1 + 0.5 * r.meander, 0.0):
+            cand = G.course((p.x, p.y), end, np.random.default_rng(seed), wavelength=lam,
+                            omega=om, base=base, ramp=(0.2, 0.15))
+            cand, _ = _trim_at(cand, sea, 2.0 * bw, skip=bw * 2)
+            if not any(cand.crosses(o) for o in others):
+                break
+        wfn = lambda ts, bw=bw: bw * (1 + 0.35 * np.asarray(ts) ** 1.5)  # noqa: E731
+        poly = G.polygonal(G.variable_buffer(cand, wfn).intersection(canvas))
+        body = WaterBody(f"{main.id}.b{j + 1}", "delta_branch",
+                         names[j] if j < len(names) else None, cand, _widths_at(cand, wfn),
+                         poly, "sea", "sea", parent_id=main.id,
+                         attrs={"side": side, "rank": rank, "leaves": parent.id,
+                                "split_t": round(d_fork / line.length, 4)
+                                if parent is main else 1.0,
+                                "coast_s": round(s, 2)})
+        out.append(body)
+        last[side] = body
+    if out:
+        _narrow_below(main, s_m - d_split, canvas)
     return out
 
 
-def _branch(spec, main, j, side, rank, t, q, bw, sea, ux, uy, rng, name, land_len,
-            ) -> WaterBody:
-    p = main.centerline.interpolate(t * land_len).coords[0]
-    end = (q[0] + ux * bw * 2.5, q[1] + uy * bw * 2.5)
-    length = math.hypot(end[0] - p[0], end[1] - p[1])
-    meander = spec.water.rivers[[x.name for x in spec.water.rivers].index(main.name)].meander
-    brng = np.random.default_rng(derive_seed(spec.seed, "hydro.branch", main.name, j))
-    off = _offset_fn(brng, length, 0.5 * meander, bw, 0.0)
-    line = G.wiggle_path(p, end, off)
-    line, _ = _trim_at(line, sea, 2.0 * bw, skip=bw * 2)
-    poly = G.variable_buffer(line, lambda ts: bw * (0.9 + 0.2 * np.asarray(ts)))
-    n = len(line.coords)
-    widths = [float(round(bw * (0.9 + 0.2 * i / max(n - 1, 1)), 1)) for i in range(n)]
-    return WaterBody(f"{main.id}.b{j + 1}", "delta_branch", name, line, widths, poly, "sea",
-                     "sea", parent_id=main.id,
-                     attrs={"side": side, "rank": rank, "split_t": round(t, 4),
-                            "coast_target": (round(q[0], 2), round(q[1], 2))})
+def _narrow_below(main: WaterBody, d0: float, canvas: Polygon) -> None:
+    """Main channel width x0.75 below distance d0 (eased over 200 m): the flow has split."""
+    cs = np.asarray(main.centerline.coords)
+    cum = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(cs, axis=0).T))])
+    base = np.asarray(main.attrs.get("_widths_full", main.widths), dtype=float)
+    main.attrs["_widths_full"] = [float(x) for x in base]
+    k = 1 - 0.25 * G.smoothstep((cum - d0) / 200.0)
+    w = base[:len(cum)] * k
+    main.widths = [float(round(x, 1)) for x in w]
+    fn = lambda ts: np.interp(np.asarray(ts) * cum[-1], cum, w)  # noqa: E731
+    main.polygon = G.polygonal(G.variable_buffer(main.centerline, fn).intersection(canvas))
 
 
-def _rebranch(spec, b: WaterBody, main: WaterBody, t: float, sea, q=None) -> WaterBody:
-    ux, uy, _, _ = G.frame(spec.water.coast.side)
-    q = q or b.attrs["coast_target"]
-    bw = b.widths[0] / 0.9
-    j = int(b.id.rsplit(".b", 1)[1]) - 1
-    return _branch(spec, main, j, b.attrs["side"], b.attrs["rank"], t, q, bw, sea, ux, uy,
-                   None, b.name, main.centerline.length)
+def build_deltas(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBody],
+                 variant: Variant, limits: dict[str, float]) -> None:
+    for r in spec.water.rivers:
+        main = next((b for b in bodies if b.name == r.name and b.kind != "delta_branch"), None)
+        if main is None or not r.delta_branches or main.mouth != "sea":
+            continue
+        bodies += build_delta(spec, main, sea, canvas, variant, 1.0, limits.get(main.id, 0.0))
 
 
 # ---------------------------------------------------------------------------
@@ -508,8 +661,12 @@ def position_reach(canvas: Polygon, direction: str) -> float:
 
 
 def _fit_blob(free, aim: Point, area: float, rng, elong: float, gap: float, canvas: Polygon,
-              beyond) -> Polygon | None:
-    """Island blob nearest to `aim` that stays `gap` meters clear of everything but `free`."""
+              beyond, sector=None, strict: bool = False) -> Polygon | None:
+    """Island blob nearest to `aim` that stays `gap` meters clear of everything but `free`.
+
+    `sector` = (center, unit direction): spots whose bearing from the center is within 35
+    degrees of the direction are tried first, so an island asked for the south west does not
+    slide north round an island placed before it."""
     shapes = [G.blob((0.0, 0.0), area, np.random.default_rng(rng.integers(1 << 31)), elong, ang)
               for ang in (0.0, math.pi / 4, math.pi / 2, 3 * math.pi / 4)]
     rmin = min(math.sqrt(area / math.pi) * 0.8, min(
@@ -528,7 +685,17 @@ def _fit_blob(free, aim: Point, area: float, rng, elong: float, gap: float, canv
     gx, gy = gx[ok], gy[ok]
     if not len(gx):
         return None
-    order = np.argsort(np.hypot(gx - aim.x, gy - aim.y), kind="stable")
+    key = np.hypot(gx - aim.x, gy - aim.y)
+    if sector is not None:
+        (cx, cy), (dx, dy) = sector
+        rx, ry = gx - cx, gy - cy
+        cosang = (rx * dx + ry * dy) / (np.hypot(rx, ry) + 1e-9)
+        outside = cosang < math.cos(math.radians(35))
+        if strict:
+            gx, gy, key = gx[~outside], gy[~outside], key[~outside]
+        else:
+            key = key + outside * 1e7
+    order = np.argsort(key, kind="stable")
     fits = room.intersection(canvas)
     shapely.prepare(fits)
     for i in order[:4000]:
@@ -564,32 +731,71 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
                             presets.DIRECTIONS[int(rng.integers(0, 8))]))
     river_keepout = unary_union([b.polygon.buffer(100) for b in bodies]) if bodies else Polygon()
     beyond = canvas.buffer(4000, join_style="mitre").difference(canvas)
-    taken = Polygon()
     jobs = [(i.name, i.area_km2 * 1e6, i.position, i.setting, False) for i in todo]
     jobs += [(n, a * 1e6, p, "offshore", True) for n, a, p in fillers]
     jobs.sort(key=lambda j: -j[1])
-    for name, area, position, setting, filler in jobs:
-        rng = np.random.default_rng(derive_seed(spec.seed, "hydro.island", name))
-        elong = float(rng.uniform(1.0, 1.25))
-        free = sea.difference(river_keepout).difference(taken)
-        aim = _sea_aim(canvas, sea, position, 0.5 if setting == "nearshore" else 0.7)
-        poly = None
-        gaps = [60.0, 45.0, 30.0] if setting == "nearshore" else [220.0, 150.0, 100.0, 70.0]
-        for gap in gaps:
-            poly = _fit_blob(free, aim, area, rng, elong, gap, canvas, beyond)
-            if poly is not None:
-                break
-        if poly is None:
-            notes.append(f"island '{name}' does not fit in the sea; raise sea_share or shrink it")
-            continue
-        taken = taken.union(poly.buffer(60))
-        out.append(IslandRec(name, setting, area, poly, filler=filler))
+    c = _sea_aim(canvas, sea, "center", 0.0)
+
+    def place(order):
+        out: list[IslandRec] = []
+        msgs, misses = [], []
+        taken = Polygon()
+        for name, area, position, setting, filler in order:
+            rng = np.random.default_rng(derive_seed(spec.seed, "hydro.island", name))
+            elong = float(rng.uniform(1.0, 1.25))
+            free = sea.difference(river_keepout).difference(taken)
+            aim = _sea_aim(canvas, sea, position, 0.5 if setting == "nearshore" else 0.7)
+            sector = None
+            if position != "center":
+                sector = ((c.x, c.y), presets.DIRECTION_VECTORS[position])
+            poly = None
+            gaps = [60.0, 45.0, 30.0] if setting == "nearshore" else [220.0, 150.0, 100.0, 70.0]
+            # Every gap inside the bearing sector first, then anywhere.
+            tries = [(g, True) for g in gaps] if sector is not None else []
+            for gap, strict in tries + [(g, False) for g in gaps]:
+                poly = _fit_blob(free, aim, area, rng, elong, gap, canvas, beyond, sector,
+                                 strict)
+                if poly is not None:
+                    break
+            if poly is None:
+                msgs.append(f"island '{name}' does not fit in the sea; raise sea_share or "
+                            "shrink it")
+                misses.append(name)
+                continue
+            if sector is not None and not filler:
+                q = poly.centroid
+                v = np.array([q.x - c.x, q.y - c.y])
+                if float(v @ np.array(sector[1])) < math.cos(math.radians(45)) * np.hypot(*v):
+                    misses.append(name)
+                    bearing = (90 - math.degrees(math.atan2(v[1], v[0]))) % 360
+                    msgs.append(f"island '{name}' has no room toward '{position}'; it sits at "
+                                f"bearing {bearing:.0f} deg from the middle of the sea")
+            taken = taken.union(poly.buffer(60))
+            out.append(IslandRec(name, setting, area, poly, filler=filler))
+        return out, msgs, misses
+
+    out, msgs, misses = place(jobs)
+    if misses:
+        # An island that did not land toward its position goes first on a second try (a big
+        # island may have taken the only room there); keep the try with fewer misses.
+        retry = [j for j in jobs if j[0] in misses] + [j for j in jobs if j[0] not in misses]
+        out2, msgs2, misses2 = place(retry)
+        if len(misses2) < len(misses):
+            out, msgs = out2, msgs2
+    notes += msgs
     return out
 
 
-def place_river_islands(spec: CitySpec, canvas: Polygon, bodies: list[WaterBody],
-                        notes: list[str]) -> tuple[list[IslandRec], object]:
+def place_river_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBody],
+                        notes: list[str], variant: Variant
+                        ) -> tuple[list[IslandRec], object, dict[str, float]]:
+    """Mid-river islands, upstream of the planned delta split. Returns the islands, the water
+    ring around them and, per river id, how far down the river the rings reach (the delta must
+    split below that)."""
     out, rings = [], []
+    limits: dict[str, float] = {}
+    span = max(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
+    specs = {r.name: r for r in spec.water.rivers}
     for isl in spec.water.islands:
         if isl.setting != "mid_river":
             continue
@@ -602,8 +808,17 @@ def place_river_islands(spec: CitySpec, canvas: Polygon, bodies: list[WaterBody]
         line = body.centerline
         area = isl.area_km2 * 1e6
         half = 1.35 * math.sqrt(area / math.pi) * 1.15
-        split = min([b.attrs.get("split_t", 1.0) for b in bodies if b.parent_id == body.id],
-                    default=1.0) * line.length
+        split = line.length
+        r = specs.get(body.name)
+        if r is not None and r.delta_branches and body.mouth == "sea" and not sea.is_empty:
+            s_m = _coast_hit(line, sea)
+            d_plan = delta_plan(span, s_m, r, variant)[0]
+            split = s_m - d_plan
+            # Leave more room when a delta island has to fit between the channels.
+            room = 0.95 if any(i.setting == "delta" and i.river == r.name
+                               for i in spec.water.islands) else 0.55
+            while split > 0 and sea.distance(line.interpolate(split)) < room * d_plan:
+                split -= 50.0  # the delta splits well inland, not on its own lobe
         lo = min(half + 150, line.length * 0.4)
         hi = max(min(split - half - 200, line.length - half - 150), lo)
         if isl.position == "center":
@@ -618,9 +833,14 @@ def place_river_islands(spec: CitySpec, canvas: Polygon, bodies: list[WaterBody]
         poly = G.blob((c.x, c.y), area, rng, 1.35, angle)
         i = min(int(d / line.length * (len(body.widths) - 1)), len(body.widths) - 1)
         arm = max(0.6 * body.widths[i], 30.0)
-        rings.append(poly.buffer(arm))
+        ring = poly.buffer(arm)
+        rings.append(ring)
+        cut = line.intersection(ring)
+        pts = [c for g in getattr(cut, "geoms", [cut]) for c in getattr(g, "coords", [])]
+        reach = max((line.project(Point(p)) for p in pts), default=d + half)
+        limits[body.id] = max(limits.get(body.id, 0.0), reach)
         out.append(IslandRec(isl.name, "mid_river", area, poly))
-    return out, unary_union(rings) if rings else Polygon()
+    return out, (unary_union(rings) if rings else Polygon()), limits
 
 
 def _wedge(canvas, sea, bodies, rings, probe: Point):
@@ -632,80 +852,72 @@ def _wedge(canvas, sea, bodies, rings, probe: Point):
     return min(ps, key=lambda p: (p.distance(probe), -p.area))
 
 
+def _wedge_probe(cl: LineString, s_a: float, s_b: float, sea) -> Point:
+    """A point on the land between two mouths, a little inland of the coast."""
+    s = (s_a + s_b) / 2
+    p = cl.interpolate(s)
+    n = _seaward(cl, s, sea)
+    return Point(p.x - n[0] * 60, p.y - n[1] * 60)
+
+
 def solve_delta_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBody],
-                        rings, notes: list[str]) -> list[IslandRec]:
+                        rings, notes: list[str], variant: Variant,
+                        limits: dict[str, float]) -> list[IslandRec]:
+    """A delta island is the land between two neighboring mouths of a delta. The pair nearest
+    the island's `position` is chosen and the whole delta is scaled (split distance and fan
+    width together) by bisection until that land has the asked area."""
     out = []
     coast = coastline_of(sea, canvas)
-    used: dict[tuple[str, int], int] = {}
     for isl in spec.water.islands:
         if isl.setting != "delta":
             continue
         main = next((b for b in bodies if b.name == isl.river and b.kind != "delta_branch"),
                     None)
-        branches = [b for b in bodies if main is not None and b.parent_id == main.id]
-        if not branches:
+        if main is None or not any(b.parent_id == main.id for b in bodies):
             notes.append(f"delta island '{isl.name}': river '{isl.river}' has no delta branches")
             continue
         aim = _aim(canvas, isl.position, 0.5, spec.water.coast.side)
-        mouth = Point(main.centerline.coords[-1])
-        choices = []
-        for side in (1, -1):
-            rank = used.get((main.id, side), 0) + 1
-            b = next((x for x in branches if x.attrs["side"] == side and x.attrs["rank"] == rank),
-                     None)
-            if b is None:
-                continue
-            prev = mouth if rank == 1 else Point(next(
-                x for x in branches if x.attrs["side"] == side and x.attrs["rank"] == rank - 1
-            ).centerline.coords[-1])
-            mid = LineString([prev, Point(b.centerline.coords[-1])]).interpolate(0.5,
-                                                                                normalized=True)
-            choices.append((mid.distance(aim), side, rank, b, prev))
-        if not choices:
-            notes.append(f"delta island '{isl.name}': no free wedge between channels")
-            continue
-        _, side, rank, b, prev = min(choices, key=lambda c: (c[0], -c[1]))
-        used[(main.id, side)] = rank
+        mouth = main.centerline.interpolate(_coast_hit(main.centerline, sea))
         cl = main_coast(coast, mouth)
-        s_a = cl.project(prev)
-        s_b0 = cl.project(Point(b.attrs["coast_target"]))
+        s_main = cl.project(mouth)
+        rest = [b for b in bodies if b.parent_id != main.id]
+
+        def pair_of(branches):
+            mouths = sorted([(s_main, main.id)] + [(b.attrs["coast_s"], b.id) for b in branches])
+            return [(mouths[i], mouths[i + 1]) for i in range(len(mouths) - 1)]
+
+        first = [b for b in bodies if b.parent_id == main.id]
+        pairs = pair_of(first)
+        key = min(pairs, key=lambda pr: (_wedge_probe(cl, pr[0][0], pr[1][0], sea).distance(aim),
+                                         pr[0][1]))
+        ids = (key[0][1], key[1][1])
         target = isl.area_km2 * 1e6
-        t_hi = 0.92 if rank == 1 else next(
-            x for x in branches if x.attrs["side"] == side and x.attrs["rank"] == rank - 1
-        ).attrs["split_t"] - 0.03
-        # Keep upstream of mid-river islands (their rings) on this river.
-        ring_d = [main.centerline.project(Point(c.coords[0])) / main.centerline.length
-                  for c in ([rings.centroid] if not rings.is_empty else [])]
-        t_lo = max([0.2] + [d + 0.15 for d in ring_d if d < t_hi])
-        t_lo = min(t_lo, t_hi - 0.05)
-        k = bodies.index(b)
-        sign = 1 if s_b0 >= s_a else -1
-        gap0 = abs(s_b0 - s_a)
+
+        def trial(scale: float):
+            br = build_delta(spec, main, sea, canvas, variant, scale, limits.get(main.id, 0.0))
+            pr = next((p for p in pair_of(br) if (p[0][1], p[1][1]) == ids), None)
+            if pr is None:
+                return 0.0, br, None
+            probe = _wedge_probe(cl, pr[0][0], pr[1][0], sea)
+            return _wedge(canvas, sea, rest + [main] + br, rings, probe).area, br, probe
+
         best = None
-
-        def trial_for(p: float):
-            """p in [0, 1]: 0 = small wedge, 1 = split far upstream and a wide fan."""
-            t = t_hi - (t_hi - t_lo) * p
-            g = gap0 * (0.6 + 2.2 * p)
-            sb = min(max(s_a + sign * g, 0.04 * cl.length), 0.96 * cl.length)
-            q = cl.interpolate(sb).coords[0]
-            nb = _rebranch(spec, b, main, t, sea, q)
-            probe = cl.interpolate((s_a + sb) / 2)
-            trial = bodies[:k] + [nb] + bodies[k + 1:]
-            return _wedge(canvas, sea, trial, rings, probe).area, nb, probe
-
-        lo, hi = 0.0, 1.0
-        for _ in range(16):
+        lo, hi = 0.35, 3.0
+        for _ in range(14):
             mid = (lo + hi) / 2
-            area, nb, probe = trial_for(mid)
-            if best is None or abs(area - target) < abs(best[0] - target):
-                best = (area, nb, probe)
+            area, br, probe = trial(mid)
+            if probe is not None and (best is None or abs(area - target) < abs(best[0] - target)):
+                best = (area, br, probe, mid)
             if area > target:
                 hi = mid
             else:
                 lo = mid
-        bodies[k] = best[1]
-        probe = best[2]
+        if best is None:
+            notes.append(f"delta island '{isl.name}': no land between the delta channels")
+            continue
+        _, _, probe, scale = best
+        br = build_delta(spec, main, sea, canvas, variant, scale, limits.get(main.id, 0.0))
+        bodies[:] = [b for b in bodies if b.parent_id != main.id] + br
         out.append(IslandRec(isl.name, "delta", target, None, probe=(probe.x, probe.y)))
     return out
 
@@ -744,16 +956,31 @@ def rebuild_land(h: Hydro) -> None:
 def build_hydro(spec: CitySpec, canvas: Polygon, variant: Variant) -> Hydro:
     w = spec.water
     notes: list[str] = []
-    b0 = None
+    b0, lobe, lobe_b0 = None, 0.0, None
     first_sea = next((r for r in w.rivers if r.to in ("sea", "bay")), None)
     if w.coast.form == "delta" and first_sea is not None:
         at = first_sea.to_at
         b0 = (G.edge_point(canvas, w.coast.side, at) if at is not None
               else G.edge_point(canvas, first_sea.from_, first_sea.from_at))
-    sea = build_sea(spec, canvas, b0)
-    bodies = build_rivers(spec, canvas, sea, variant)
-    river_isl, rings = place_river_islands(spec, canvas, bodies, notes)
-    delta_isl = solve_delta_islands(spec, canvas, sea, bodies, rings, notes)
+    elif first_sea is not None and first_sea.delta_branches and \
+            w.coast.form in ("bay", "crescent", "straight"):
+        # The delta builds a lobe of land into the sea, so the river crosses most of the
+        # city and the distributaries fan out at the coast instead of at the map center.
+        if first_sea.to_at is not None:
+            b0 = G.edge_point(canvas, w.coast.side, first_sea.to_at)
+        elif w.coast.form == "straight":
+            b0 = G.edge_point(canvas, first_sea.from_, first_sea.from_at)
+        else:
+            b0 = (0.0, 0.0)
+        lobe = 0.1 if w.coast.form == "straight" else 0.17
+        _, _, vx, vy = G.frame(w.coast.side)
+        bh = max(abs(x * vx + y * vy) for x, y in list(canvas.exterior.coords)[:4])
+        lobe_b0 = float(np.clip(b0[0] * vx + b0[1] * vy, -0.5 * bh, 0.5 * bh))
+    sea = build_sea(spec, canvas, b0, lobe)
+    bodies = build_rivers(spec, canvas, sea, variant, lobe_b0)
+    river_isl, rings, limits = place_river_islands(spec, canvas, sea, bodies, notes, variant)
+    build_deltas(spec, canvas, sea, bodies, variant, limits)
+    delta_isl = solve_delta_islands(spec, canvas, sea, bodies, rings, notes, variant, limits)
     sea_isl = place_sea_islands(spec, canvas, sea, bodies, notes)
     h = Hydro(canvas, sea, bodies, sea_isl + river_isl + delta_isl, rings, notes=notes)
     # Keep the spec order for islands (fillers last).

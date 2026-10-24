@@ -97,8 +97,12 @@ writes `city_model.json` (coast, rivers, delta branches, islands, landmasses, di
 separation channels, inner waterways, quays), `preview_map.png`, `report.json` and
 `report.txt`, and exits 1 when a check fails. Stages live in `citygen/hydro.py`,
 `districts.py`, `waterways.py`; checks in `checks.py` (placement rules in `relations.py`);
-driver in `build.py`. Sample builds: `docs/progress/M1a/`. M1b (highways, arterials, bridges,
-road connectivity) is next.
+driver in `build.py`. M1a2 (visual-quality pass) made it organic: warped power-diagram
+districts with curved boundaries, meandering rivers and separation channels, a
+`water.boundary_water_share` budget for `water_preferred`, fan-shaped deltas with named marsh
+or park open land instead of orphan wedges, port slips, marinas, sparse canal trees.
+Sample builds: `docs/progress/M1a2/` (before/after against `docs/progress/M1a/`; the sample
+specs now live in M1a2). M1b (highways, arterials, bridges, road connectivity) is next.
 
 ## Working preferences
 

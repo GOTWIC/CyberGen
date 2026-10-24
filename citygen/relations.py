@@ -118,3 +118,74 @@ def touches(a, b, tol: float = TOUCH_M) -> bool:
     if a is None or b is None or a.is_empty or b.is_empty:
         return False
     return a.distance(b) <= tol
+
+
+def boundary_samples(polys: dict, water, canvas: Polygon, reach: float = 250.0,
+                     step: float = 10.0) -> list[tuple]:
+    """Samples along every district outline (map edges aside), one list per ring:
+    (xy array, sample length, kind array) with kind 1 = dry boundary (another district within
+    2 m, shared land), 2 = wet boundary (the nearest other district within `reach` across
+    water), 0 = neither (open coast, map edge)."""
+    import numpy as np
+    import shapely
+
+    names = [n for n in sorted(polys) if not polys[n].is_empty]
+    edge = canvas.exterior
+    out = []
+    for n in names:
+        others = [polys[m] for m in names if m != n]
+        if not others:
+            continue
+        geom = polys[n]
+        rings = [r for p in getattr(geom, "geoms", [geom]) for r in [p.exterior, *p.interiors]]
+        for ring in rings:
+            line = LineString(ring.coords)
+            k = max(int(line.length / step), 1)
+            seg = line.length / k
+            xy = np.array([line.interpolate((i + 0.5) * seg).coords[0] for i in range(k)])
+            pts = shapely.points(xy)
+            d = np.min([shapely.distance(o, pts) for o in others], axis=0)
+            keep = shapely.distance(edge, pts) > 1.0
+            kind = np.zeros(k, dtype=int)
+            kind[keep & (d <= 2.0)] = 1
+            kind[keep & (d > 2.0) & (d <= reach) & (shapely.distance(water, pts) <= 3.0)] = 2
+            out.append((xy, seg, kind))
+    return out
+
+
+def boundary_water_split(polys: dict, water, canvas: Polygon, reach: float = 250.0,
+                         step: float = 10.0) -> tuple[float, float]:
+    """(wet, dry) length of the boundaries between neighboring districts (see
+    `boundary_samples`). Each boundary is seen from both sides, so wet / (wet + dry) is the
+    share of the district-to-district boundary that runs along water."""
+    wet = dry = 0.0
+    for _, seg, kind in boundary_samples(polys, water, canvas, reach, step):
+        dry += float((kind == 1).sum()) * seg
+        wet += float((kind == 2).sum()) * seg
+    return wet, dry
+
+
+def boundary_curvature(samples, window: float = 400.0, kinds=(1, 2)) -> float | None:
+    """Mean arc length / chord over windows of `window` meters of district-to-district
+    boundary (1.0 = ruler straight). None when no boundary run is that long."""
+    import numpy as np
+
+    ratios = []
+    for xy, seg, kind in samples:
+        ok = np.isin(kind, kinds)
+        n = len(ok)
+        w = max(int(round(window / seg)), 2)
+        if n < w:
+            continue
+        # rotate so a run does not wrap around the ring start
+        start = int(np.argmin(ok)) if not ok.all() else 0
+        ok, pts = np.roll(ok, -start), np.roll(xy, -start, axis=0)
+        i = 0
+        while i + w <= n:
+            if ok[i:i + w].all():
+                chord = float(np.hypot(*(pts[i + w - 1] - pts[i])))
+                ratios.append((w - 1) * seg / max(chord, 1e-6))
+                i += max(w // 4, 1)
+            else:
+                i += 1
+    return float(np.mean(ratios)) if ratios else None

@@ -24,6 +24,9 @@ ISLAND_TOL = 0.10         # island area, relative
 MIN_WIDTH_M = 40.0        # land narrower than this is a sliver
 SLIVER_AREA_M2 = 2000.0   # a removed piece this large counts as a sliver
 LAND_KINDS = ("highway", "ring_road", "rail", "wall")
+CANAL_MIN_ANGLE_DEG = 30.0  # canals and creeks never cross or join at a shallower angle
+CANAL_DUP_GAP_M = 35.0      # two canals closer than this ...
+CANAL_DUP_LEN_M = 100.0     # ... over this length (junctions aside) are near duplicates
 
 
 @dataclass
@@ -287,6 +290,84 @@ def check_islands(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
     return c
 
 
+def check_land_use(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
+    c = Check("land_use", "Every landmass holds a district or is named open land (marsh, park); "
+                          "no orphan wedges")
+    if spec.districts and all(d.placement.on_island for d in spec.districts):
+        c.notes.append("every district is on its own island; the rest of the land is outside "
+                       "the city")
+        return c
+    fillers = {i.landmass_id for i in m.islands if i.type == "island.filler"}
+    open_lm = {o.attrs.get("landmass_id") for o in m.open_spaces}
+    for lm in m.landmasses:
+        if lm.district_ids or lm.id in fillers:
+            continue
+        if lm.id in open_lm:
+            o = next(x for x in m.open_spaces if x.attrs.get("landmass_id") == lm.id)
+            c.notes.append(f"landmass {lm.id} ({g.landmasses[lm.id].area / 1e6:.2f} km2) is "
+                           f"open land: {o.kind} '{o.name}'")
+            continue
+        c.failures.append(f"landmass {lm.id} ({g.landmasses[lm.id].area / 1e6:.2f} km2) has no "
+                          "district and is not open land")
+    return c
+
+
+def _tangent_at(line: LineString, p) -> tuple[float, float]:
+    d = line.project(p)
+    a = line.interpolate(max(d - 15.0, 0.0))
+    b = line.interpolate(min(d + 15.0, line.length))
+    return b.x - a.x, b.y - a.y
+
+
+def meet_angle(a: LineString, b: LineString, p) -> float:
+    """Acute angle (degrees) between two lines at a point where they meet."""
+    ux, uy = _tangent_at(a, p)
+    vx, vy = _tangent_at(b, p)
+    nu, nv = math.hypot(ux, uy), math.hypot(vx, vy)
+    if nu < 1e-6 or nv < 1e-6:
+        return 90.0
+    cos = min(abs(ux * vx + uy * vy) / (nu * nv), 1.0)
+    return math.degrees(math.acos(cos))
+
+
+def canal_problems(m: CityModel) -> list[str]:
+    """Canals and creeks that cross or join at less than 30 degrees, or run within 35 m of
+    each other for more than 100 m away from their junctions (near duplicates)."""
+    lines = [(w.id, LineString(w.centerline)) for w in m.waterways
+             if w.kind in ("canal", "creek") and len(w.centerline) > 1]
+    out = []
+    for i, (ia, a) in enumerate(lines):
+        for ib, b in lines[i + 1:]:
+            if a.distance(b) > CANAL_DUP_GAP_M:
+                continue
+            meet = a.intersection(b.buffer(3.0))
+            pts = []
+            for part in getattr(meet, "geoms", [meet]):
+                if part.is_empty:
+                    continue
+                pts.append(part.interpolate(0.5, normalized=True) if part.length > 0
+                           else part.centroid)
+            for p in pts:
+                ang = meet_angle(a, b, p)
+                if ang < CANAL_MIN_ANGLE_DEG:
+                    out.append(f"{ia} and {ib} meet at {ang:.0f} deg near "
+                               f"({p.x:.0f}, {p.y:.0f})")
+            near = a.intersection(b.buffer(CANAL_DUP_GAP_M))
+            if pts:
+                near = near.difference(unary_union([p.buffer(60.0) for p in pts]))
+            if near.length > CANAL_DUP_LEN_M:
+                out.append(f"{ia} and {ib} run within {CANAL_DUP_GAP_M:.0f} m of each other "
+                           f"for {near.length:.0f} m")
+    return out
+
+
+def check_canals(m: CityModel, g: _Geo) -> Check:
+    c = Check("canal_quality", f"Canals and creeks: no crossings below "
+                               f"{CANAL_MIN_ANGLE_DEG:.0f} deg, no near-duplicate canals")
+    c.failures += canal_problems(m)
+    return c
+
+
 def slivers(poly, min_width: float = MIN_WIDTH_M) -> list[float]:
     removed = poly.difference(G.opening(poly, min_width / 2))
     return [p.area for p in G.parts(removed) if p.area >= SLIVER_AREA_M2]
@@ -332,8 +413,19 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
         b = p.boundary.difference(edge)
         boundary_len += b.length
         wet_len += b.intersection(wet).length
-    unassigned = [lm for lm in m.landmasses if not lm.district_ids]
+    open_lm = {o.attrs.get("landmass_id") for o in m.open_spaces}
+    unassigned = [lm for lm in m.landmasses if not lm.district_ids and lm.id not in open_lm]
+    open_rows = [{"name": o.name, "kind": o.kind,
+                  "area_km2": round(G.from_model_poly(o.polygon).area / 1e6, 3)}
+                 for o in m.open_spaces]
+    samples = R.boundary_samples(g.districts, g.network, g.canvas)
+    b_wet = sum(float((k == 2).sum()) * seg for _, seg, k in samples)
+    b_dry = sum(float((k == 1).sum()) * seg for _, seg, k in samples)
+    curv = R.boundary_curvature(samples, kinds=(1,))
+    curv_all = R.boundary_curvature(samples)
     water = map_area - land
+    preferred = spec.water.district_separation == "water_preferred" or any(
+        d.water_separation == "water_preferred" for d in spec.districts)
     return {
         "map_km2": round(map_area / 1e6, 3),
         "land_km2": round(land / 1e6, 3),
@@ -344,6 +436,8 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
         "landmasses_with_districts": len(m.landmasses) - len(unassigned),
         "unassigned_land_km2": round(sum(g.landmasses[lm.id].area for lm in unassigned) / 1e6,
                                      3),
+        "open_land_km2": round(sum(r["area_km2"] for r in open_rows), 3),
+        "open_land": open_rows,
         "islands": len(m.islands),
         "river_km": round(sum(LineString(r.centerline).length for r in m.rivers) / 1000, 2),
         "channel_km": {k: round(sum(LineString(c.centerline).length for c in m.channels
@@ -355,6 +449,11 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
         "waterways": len(m.waterways),
         "quay_km": round(sum(LineString(q.line).length for q in m.quays) / 1000, 2),
         "district_boundary_on_water": round(wet_len / boundary_len, 4) if boundary_len else 1.0,
+        "boundary_on_water": round(b_wet / (b_wet + b_dry), 4) if b_wet + b_dry else None,
+        "boundary_on_water_target": spec.water.boundary_water_share if preferred else None,
+        "boundary_km": {"water": round(b_wet / 2000, 2), "land": round(b_dry / 2000, 2)},
+        "land_boundary_curvature": round(curv, 4) if curv is not None else None,
+        "boundary_curvature": round(curv_all, 4) if curv_all is not None else None,
         "districts": rows,
     }
 
@@ -370,6 +469,8 @@ def run_checks(spec: CitySpec, m: CityModel) -> tuple[list[Check], dict]:
         check_pieces(spec, m, g),
         check_islands(spec, m, g),
         check_slivers(m, g),
+        check_land_use(spec, m, g),
+        check_canals(m, g),
     ]
     return checks, stats(spec, m, g)
 
@@ -377,10 +478,14 @@ def run_checks(spec: CitySpec, m: CityModel) -> tuple[list[Check], dict]:
 def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
-        "name": spec.name, "seed": spec.seed, "stage": "M1a (water, districts, waterways)",
+        "name": spec.name, "seed": spec.seed, "stage": "M1a2 (water, districts, waterways)",
         "passed": all(c.passed for c in checks), "variant": variant,
         "checks": [c.to_dict() for c in checks], "stats": st, "notes": notes,
     }
+
+
+def _pct(v) -> str:
+    return "n/a" if v is None else f"{v:.0%}"
 
 
 def report_text(rep: dict) -> str:
@@ -402,8 +507,16 @@ def report_text(rep: dict) -> str:
             f" islands {st['islands']}",
             f"  rivers {st['river_km']} km; channels "
             + (", ".join(f"{k} {v} km" for k, v in st["channel_km"].items()) or "none"),
-            f"  separation channels {st['separation_channels']}; district boundary on water "
-            f"{st['district_boundary_on_water']:.0%}",
+            f"  separation channels {st['separation_channels']}; boundary between districts on "
+            f"water {_pct(st['boundary_on_water'])}"
+            + (f" (target {st['boundary_on_water_target']:.0%})"
+               if st.get("boundary_on_water_target") is not None else "")
+            + f", {st['boundary_km']['water']} km on water, {st['boundary_km']['land']} km on land",
+            f"  district perimeter facing water {st['district_boundary_on_water']:.0%}; "
+            f"boundary curvature (arc / chord over 400 m) {st['boundary_curvature']}, land "
+            f"boundaries {st['land_boundary_curvature']}",
+            f"  open land {st['open_land_km2']} km2"
+            + "".join(f"; {r['kind']} '{r['name']}' {r['area_km2']} km2" for r in st["open_land"]),
             f"  inner waterways {st['waterways']} ({st['waterway_km']} km: "
             + (", ".join(f"{k} {v}" for k, v in st["waterway_km_by_kind"].items()) or "none")
             + f"), quays {st['quay_km']} km", "",
