@@ -120,6 +120,15 @@ ULP noise into the district search). `citygen build ... --trace FILE` hashes eve
 process); the result does not depend on it. Sample builds: `docs/progress/M1b/`. M2 (local
 streets, blocks, lots) is next.
 
+### Rules for cloud sessions building citygen milestones
+
+- **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
+  the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
+  and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
+  Keep only images and short notes there; overwrite nothing from earlier milestones.
+- **Root `README.md`:** when the milestone PR is ready, update the Progress table and the
+  "Latest maps" images to point at the new milestone's previews.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.
