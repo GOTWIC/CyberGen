@@ -77,6 +77,14 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
   be mirrored for symmetry.
 - Unreal ground is built from 4 m strips; replace with a real mesh later.
 
+## City generator (citygen)
+
+`docs/citygen_scope.md` is the spec for citygen, the prompt-to-city layout generator that is
+replacing hand tracing (milestones M0 to M7, built in cloud sessions). Hard rule: citygen makes no
+API calls and no network calls, in development or in the final product, and has no LLM SDK
+dependency. The prompt-to-spec step is done by a Claude Code session through the repo's `citygen`
+skill; that session may start other Claude sessions or subagents.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

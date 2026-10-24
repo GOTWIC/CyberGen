@@ -4,15 +4,20 @@ Stage 1 of a three-stage pipeline. One text prompt in; a complete, playable-scal
 layout out, built as a blockout scene in Blender plus structured data for later stages and Unreal.
 
 ```
- prompt (+ optional concept image) ──> [LLM] city spec (JSON) ──> [citygen, deterministic Python] city model (JSON)
-                                                                              │
-                         ┌────────────────────────────────────────────────────┼──────────────────────────────┐
-                         v                                                    v                              v
-               Blender blockout scene                                2D maps + previews             exports for stage 2/3
-               (.blend, per-tile)                                    (PNG/SVG, review)              and Unreal (USD/glTF,
-                                                                                                     instance data, graphs)
- ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- stage 2 (not this project): assets, models, textures               stage 3 (not this project): lighting, looks
+ prompt (+ optional concept image)
+        │
+        v
+ [Claude Code session, citygen skill]  ──>  city_spec.json
+        │
+        v
+ [citygen, offline deterministic Python]  ──>  city model (JSON)
+        │
+        ├──> Blender blockout scene (.blend, per tile)
+        ├──> 2D maps + previews (PNG/SVG, review)
+        └──> exports for stage 2/3 and Unreal (USD/glTF, instance data, graphs)
+
+ stage 2 (not this project): assets, models, textures
+ stage 3 (not this project): lighting, looks
 ```
 
 ## 1. Goal
@@ -23,16 +28,21 @@ layout out, built as a blockout scene in Blender plus structured data for later 
 - Output: the coastline, rivers, channels, canals and islands; every road (highway to alley),
   bridge, elevated road and ramp; every transit line from metro to sky tube, with stations;
   parks and plazas; large sites such as spaceports; every block, lot and building (with type,
-  height and ground-floor stores); and street props (light poles, trash cans, trash, bus shelters,
-  overhead cables, canopies). Everything has a semantic type, so stage 2 can replace each blockout
+  height and ground-floor stores); street props (light poles, trash cans, trash, bus shelters,
+  overhead cables, canopies); and vegetation (street trees, park trees, palms, shrubs, hedges,
+  lawns, green roofs). Everything has a semantic type, so stage 2 can replace each blockout
   with real assets.
 - No human input required after the prompt. Optional overrides exist (section 4.3) but nothing
   depends on them.
 
 ## 2. Design principles
 
-1. **LLM at the top only.** The prompt becomes a structured spec once (cheap, a single API call).
-   Everything after is seeded, deterministic code: same spec + seed = same city, byte for byte.
+1. **No API calls, anywhere.** citygen never calls an LLM API or any other network service, in
+   development or in the final product, and has no LLM SDK dependency. The only model steps
+   (prompt -> spec, and the optional art-direction review) are done by a Claude Code session
+   following the repo's `citygen` skill (section 4.1); that session may start other Claude
+   sessions or subagents to help. Everything after the spec is seeded, deterministic, offline
+   code: same spec + seed = same city, byte for byte.
 2. **Generation core outside Blender.** Pure Python (shapely, networkx, numpy, scipy), testable
    without Blender and runnable in cloud sessions. Blender is a builder and renderer only.
 3. **One canonical city model.** All outputs (Blender, 2D maps, Unreal exports) are views of the
@@ -54,7 +64,7 @@ layout out, built as a blockout scene in Blender plus structured data for later 
 
 | # | Stage | Produces | Method (references in section 14) |
 |---|---|---|---|
-| 0 | Prompt -> spec | `city_spec.json` | Claude API, structured output against the spec schema; optional concept image read for layout hints; unspecified values filled from archetype presets |
+| 0 | Prompt -> spec | `city_spec.json` | a Claude Code session following the `citygen` skill writes the spec, runs `citygen spec validate` and fixes errors until it passes; optional concept image read for layout hints; unspecified values filled from archetype presets; no API call |
 | 1 | Coast and hydrology | sea, coastline, bays, rivers, delta channels, islands, landmasses | coast shape from spec form (bay, peninsula, delta, archipelago, crescent); rivers routed from inland edges to mouths along noise-guided paths, with meanders and distributary branches; islands placed offshore; land minus water = landmasses |
 | 2 | Districts | district polygons with archetype | districts assigned to landmasses by area share and placement constraints; large landmasses split by weighted Voronoi (power diagram), Lloyd relaxed; boundaries follow water where the spec asks for water separation, otherwise highways, ring roads, rail or walls |
 | 3 | Inner waterways | canals, creeks, inlets, harbor basins, marinas, quays | per-district waterway style and density; every waterway connects to a river, channel or the sea (except declared ornamental basins) |
@@ -66,7 +76,7 @@ layout out, built as a blockout scene in Blender plus structured data for later 
 | 9 | Megasites | spaceport, transit nexus, freight terminal, stadium, arcology, temple complex, research campus | site generators placed per spec constraints, run before blocks so the street network flows around them (section 5.7) |
 | 10 | Blocks, lots, open space | blocks, lots, parks, plazas, pocket parks, waterfront promenades, courtyards | polygonize the network; open-space quota per district; lot subdivision by OBB splits and straight-skeleton strips (Vanegas et al. 2012) |
 | 11 | Buildings | building masses, heights, uses, ground-floor units, entrances, rooftop elements, landmarks, complexes, skybridges | per-lot archetype grammar (section 5.5); complexes placed first on merged lots; height field from district profile, distance to center, noise; height limits from megasite flight zones; skybridges matched between facing facades |
-| 12 | Props | street furniture, ground clutter, overhead elements | rule-based placement along sidewalk zones, alleys, plazas, quays, rooftops; Poisson-disk scatter with keep-out zones (section 5.6) |
+| 12 | Props and vegetation | street furniture, ground clutter, overhead elements, trees, palms, shrubs, hedges, lawns, green roofs | rule-based placement along sidewalk zones, medians, alleys, plazas, quays, parks, rooftops; Poisson-disk scatter with keep-out zones (sections 5.6, 5.8) |
 | 13 | Validate | report + pass/fail | section 9 |
 | 14 | Build and export | `.blend`, previews, USD/glTF tiles, instance data, graphs, legacy `plan.json` | section 8 |
 
@@ -83,6 +93,10 @@ after districts so roads and transit can connect to them.)
   their relative positions, where the coast and rivers run, which districts water separates,
   transit routes and landmarks. Geometry is still generated, not traced, so a decorative or
   inconsistent image is fine.
+- How a city is requested: open Claude Code in this repo and ask for a city (or run the
+  `citygen` skill) with the prompt, optionally attaching an image. The skill has the session
+  write `city_spec.json`, run `citygen spec validate` until it passes, run `citygen build`,
+  look at the previews, and report. No API key, no network.
 
 ### 4.2 City spec (generated from the prompt; human-readable, never required to edit)
 
@@ -112,7 +126,7 @@ after districts so roads and transit can connect to them.)
      "placement": {"north_of": "Transit Nexus"}, "grid_angle_deg": 45, "height_m": [80, 320],
      "landmarks": ["megatower"], "places": [{"name": "Sky Garden Plaza", "kind": "plaza"}],
      "complexes": ["twin_towers", "tower_cluster"], "skybridge_density": 0.6,
-     "grime": 0.1, "neon": 0.4},
+     "grime": 0.1, "neon": 0.4, "greenery": 0.3},
     {"name": "Old Town", "archetype": "old_town", "area_share": 0.14,
      "placement": {"coast": true, "south_west_of": "Transit Nexus", "separated_by": "river"},
      "waterways": {"style": "organic_canals", "density": 0.6},
@@ -139,7 +153,7 @@ running into the old town" always have somewhere to land:
   `maps/corporate_core_v*.svg`) as fixed; the generator builds around it.
 - Per-district parameter tweaks, landmark positions, a different seed per district.
 
-### 4.4 District archetypes (presets; the LLM picks and tunes them)
+### 4.4 District archetypes (presets; the spec session picks and tunes them)
 
 | Archetype | Street pattern | Blocks (m) | Heights (m) | Character |
 |---|---|---|---|---|
@@ -277,7 +291,7 @@ AV landing pads (more in corporate and hub districts).
 | vending_machine / kiosk | box (emitter) | shopfronts, stations, plazas |
 | food_stall | box + awning plane | markets, plazas, under decks, quays |
 | bollard / hydrant | cylinders | corners, pedestrian streets, every 100 m |
-| tree / planter | cylinder trunk + sphere crown / box | avenue medians, parks, plazas, promenades |
+| planter | box with shrub spheres | plazas, shopfronts, podium roofs (trees and other plants: section 5.8) |
 | parked_vehicle | box + upper box | parking lanes, lots |
 | boat | box hull + small box cabin | moorings, marinas, harbor berths |
 | barrier / railing | jersey prism, fence and railing segments | highways, quay edges, bridges, gated districts |
@@ -311,6 +325,27 @@ quay edges, fire-hydrant clearance. Props never overlap each other or buildings.
 Named places from the spec (e.g. "Club Row", "Nightfall Plaza", "Freight Terminal") become
 labeled sub-areas with their own features and appear on the 2D map.
 
+### 5.8 Vegetation (blockout primitives, all instanced)
+
+| Type | Blockout | Placement rule |
+|---|---|---|
+| street_tree | cylinder trunk + sphere or ellipsoid crown | tree pits every 8 to 15 m along wide sidewalks, avenue medians, promenades |
+| park_tree | same, larger, size-varied | clustered Poisson scatter in parks and courtyards, open clearings kept |
+| conifer | cylinder trunk + cone crown | parks, residential heights, campus grounds |
+| palm | tall thin cylinder + flattened spheres or cones for fronds | waterfront, boulevards, spaceport and corporate frontage, beaches |
+| shrub / bush | spheres and ellipsoids | park edges, planters, building setbacks, median ends |
+| hedge | long box | park borders, enclave walls, plaza edges |
+| lawn / ground cover | flat polygon (area, not instance) | parks, medians, courtyards, verges |
+| green_roof / roof_garden | flat polygon + small shrubs and trees | podium roofs, terraces, megabuilding decks |
+| facade_greenery / hanging_plants | thin boxes or planes on facades | old town, residential, terraced buildings |
+| overgrowth | low spheres and planes scatter | vacant lots, under decks, grimy districts |
+
+- Each plant carries a class, height, crown size and a species tag for stage 2.
+- A `greenery` value per district (0 to 1) scales density; parks and archetypes set the base.
+- Keep-outs: trunks off roads, the sidewalk clear path, quays and junction sight lines; crowns
+  at least 1 m from facades and at least 1 m below any deck overhead; no trees over metro
+  entrances, stairs or bus stops.
+
 ## 6. City model (canonical output data)
 
 One JSON document per city (split per district if large), versioned schema. Entities:
@@ -321,7 +356,8 @@ for traffic), `walkway` (pedestrian graph, for crowds), `structure` (deck, ramp,
 tube, canopy), `transit_line` (mode, altitude profile), `station` (ground, elevated,
 sky, underground), `megasite`, `block`, `lot`, `open_space`, `property` (owner tag, member buildings, complex type),
 `building` (masses, units, roof items, portals), `skybridge` (end buildings, z, width, levels,
-kind), `prop` (type, position, yaw, scale), `tile` (256 m grid for later World
+kind), `plant` (class, position, height, crown, species tag), `green_area` (lawn, hedge line,
+green roof), `prop` (type, position, yaw, scale), `tile` (256 m grid for later World
 Partition streaming).
 
 Ids are stable and readable: `d03.blk017.lot004.bld`, `d03.prop.street_light.0213`.
@@ -368,8 +404,11 @@ Coordinates: meters, x east, y north, z up, origin at city center (matches today
 - District area shares within 15% of spec; height ranges within archetype bounds.
 - Stats report: road km by class, bridge count, waterway km, transit km by mode, building count,
   floor area, prop counts, open-space and water share.
-- Optional art-direction pass: Claude reviews the previews against the spec (and the concept
-  image, if given), adjusts spec parameters (never code), and reruns, at most N rounds.
+- Vegetation: plants off roads, clear paths, quays and sight lines; crown clearances to facades
+  and decks met.
+- Optional art-direction pass: the Claude Code session reviews the previews against the spec
+  (and the concept image, if given), adjusts spec parameters (never code), and reruns, at most
+  N rounds. No API call.
 
 ## 10. Scale and performance targets
 - Default city 6 to 12 km², 6 to 10 districts (configurable; one district is about today's
@@ -392,13 +431,13 @@ Coordinates: meters, x east, y north, z up, origin at city center (matches today
 
 | M | Deliverable | Done when |
 |---|---|---|
-| M0 | Spec schema (water, transit modes, megasites, places), archetype presets, prompt (+ image) -> spec CLI, city model schema, 2D debug renderer | 3 different prompts and `reference/nexus_city_concept.webp` produce valid specs |
+| M0 | Spec schema (water, transit modes, megasites, places), archetype presets, `citygen spec validate` CLI, `citygen` Claude Code skill for prompt (+ image) -> spec, city model schema, 2D debug renderer | 3 different prompts and `reference/nexus_city_concept.webp` produce valid specs |
 | M1 | Coast, rivers, delta channels, islands, landmasses, districts, inner waterways, highways, arterials, bridges | water-split cities that read like the concept at macro scale; water and connectivity checks pass |
 | M2 | Local streets, alleys, footbridges, junctions, sidewalks, quays, blocks, lots, open space | lots and blocks valid; access checks pass |
 | M3 | Buildings (archetypes, heights, ground-floor units, rooftops), complexes (twin towers, clusters, bridged pairs, straddle buildings), skybridges, landmarks, megasites (spaceport, transit nexus, freight terminal, others) | building, skybridge and megasite checks pass; districts read differently in previews |
 | M4 | Blender builder, previews, labeled 2D map, USD/glTF tile export, legacy plan.json | full city opens in Blender 5.2 and renders; core pipeline complete |
 | M5 | Transit: metro stations, elevated rail, monorail, maglev, sky tubes with tower portals and sky stations; elevated walkways, canopies; skybridges rerouted around sky lines | grade, curve, clearance, portal and access checks pass |
-| M6 | Props and ground clutter | keep-out and overlap checks pass; 100k+ instances build fast |
+| M6 | Props, vegetation and ground clutter | keep-out, clearance and overlap checks pass; 100k+ instances build fast |
 | M7 | Elevated highways with ramps and interchange templates; art-direction loop; Corporate Core pinned import | full validation suite passes on 3 prompts |
 
 M0 to M4 is the core ("prompt -> full blockout city in Blender"). M7 carries the most technical
