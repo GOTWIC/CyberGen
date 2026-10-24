@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citygen"
+version = "0.1.0"
+description = "Offline prompt-to-city layout generator for Nyxllor (no network, no LLM SDK)."
+requires-python = ">=3.13"
+dependencies = ["pydantic>=2.9", "shapely>=2.0", "numpy>=2.0", "matplotlib>=3.8"]
+
+[project.scripts]
+citygen = "citygen.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["citygen*"]
+
+[tool.setuptools.package-data]
+citygen = ["schemas/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

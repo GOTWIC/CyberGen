@@ -1,0 +1,35 @@
+{
+  "name": "Nyxllor", "seed": 1207, "size_km": [3.4, 3.4],
+  "water": {
+    "coast": {"form": "bay", "side": "south_west"},
+    "rivers": [{"name": "Sentinel", "from": "north_east", "to": "bay", "width_m": [60, 120],
+                "meander": 0.4, "delta_branches": 2}],
+    "islands": [{"name": "Silver Island", "position": "south_west_offshore", "area_km2": 0.5}],
+    "district_separation": "water_preferred"
+  },
+  "highways": {"pattern": "ring_plus_spine", "exits": ["north", "east"]},
+  "transit": {
+    "hubs": ["Transit Nexus"],
+    "lines": [
+      {"mode": "metro", "name": "Blue Line", "route": ["Corporate Core", "Transit Nexus", "Midtown"]},
+      {"mode": "maglev", "name": "Magenta Line", "altitude_m": [25, 45],
+       "route": ["Neon Market", "Transit Nexus", "Midtown", "east_exit"]},
+      {"mode": "sky_tube", "name": "Spire Loop", "altitude_m": [70, 120], "through_towers": true,
+       "route": ["Corporate Core", "Aurora Spaceport", "Transit Nexus", "Corporate Core"]}
+    ]
+  },
+  "districts": [
+    {"name": "Corporate Core", "archetype": "corporate_core", "area_share": 0.12,
+     "placement": {"north_of": "Transit Nexus"}, "grid_angle_deg": 45, "height_m": [80, 320],
+     "landmarks": ["megatower"], "places": [{"name": "Sky Garden Plaza", "kind": "plaza"}],
+     "complexes": ["twin_towers", "tower_cluster"], "skybridge_density": 0.6,
+     "grime": 0.1, "neon": 0.4, "greenery": 0.3},
+    {"name": "Old Town", "archetype": "old_town", "area_share": 0.14,
+     "placement": {"coast": true, "south_west_of": "Transit Nexus", "separated_by": "river"},
+     "waterways": {"style": "organic_canals", "density": 0.6},
+     "places": [{"name": "Jade Canal", "kind": "canal"}, {"name": "Temple District", "kind": "temple_complex"}],
+     "grime": 0.7, "neon": 0.6},
+    {"name": "Aurora Spaceport", "archetype": "spaceport", "area_share": 0.08,
+     "placement": {"coast": true, "edge": "north_west"}, "megasites": ["spaceport"]}
+  ]
+}
