@@ -22,9 +22,13 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
     WithJsonSchema,
+    model_serializer,
     model_validator,
 )
+from pydantic.json_schema import SkipJsonSchema
 
 from . import presets
 
@@ -149,15 +153,38 @@ class Coast(_Model):
                           "are carved out of it). Default by form.")
 
 
+_DIRECTION_LIST = ["north", "north_east", "east", "south_east", "south", "south_west", "west",
+                   "north_west"]
+_AT_SCHEMA = {"type": "number", "minimum": 0, "maximum": 1,
+              "description": "Position along the edge, 0 to 1: west to east on the north and "
+                             "south edges, south to north on the east and west edges; on a "
+                             "diagonal edge 0 is the middle of the first-named side, 0.5 the "
+                             "corner, 1 the middle of the second side. Default 0.5."}
+
+
+def _end_schema(edges: list[str], plain: dict) -> dict:
+    return {"anyOf": [plain, {
+        "type": "object", "additionalProperties": False, "required": ["edge"],
+        "properties": {"edge": {"enum": edges}, "at": _AT_SCHEMA}}]}
+
+
 class River(_Model):
     name: Name
     kind: Literal["river", "channel"] = Field(
         "river", description="'channel' is a wide sea channel or strait (sea-class clearance).")
-    from_: Direction = Field(alias="from", description="Map edge where the river enters.")
-    to: str = Field(
+    from_: Annotated[Direction, WithJsonSchema(_end_schema(_DIRECTION_LIST,
+                                                           {"enum": _DIRECTION_LIST}))] = Field(
+        alias="from", description="Map edge where the river enters, or {edge, at} to pin where "
+                                  "along that edge.")
+    to: Annotated[str, WithJsonSchema(_end_schema(_DIRECTION_LIST + ["sea", "bay"],
+                                                  {"type": "string"}))] = Field(
         "sea",
         description="Mouth: 'sea', 'bay', a map edge direction, or the name of another river "
-                    "(tributary).")
+                    "(tributary). {edge, at} pins the mouth along a map edge (for 'sea' and "
+                    "'bay': along the sea-side edge).")
+    # Filled from the {edge, at} forms of `from` and `to`; serialized back into them.
+    from_at: SkipJsonSchema[float | None] = Field(None, exclude=True)
+    to_at: SkipJsonSchema[float | None] = Field(None, exclude=True)
     width_m: Annotated[tuple[float, float], _range(10, 600)] | None = Field(
         None, description="[min, max] width. Default 60 to 120 for rivers, 150 to 300 for channels.")
     meander: Fraction | None = Field(None, description="0 straight, 1 strongly meandering.")
@@ -166,12 +193,50 @@ class River(_Model):
                        "(four channels in total = 3).")
     branch_names: list[Name] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _ends(cls, v: Any) -> Any:
+        """{"edge": "east", "at": 0.3} -> from/to = "east" plus from_at/to_at = 0.3."""
+        if not isinstance(v, dict):
+            return v
+        v = dict(v)
+        for key in ("from", "to"):
+            end = v.get(key)
+            if not isinstance(end, dict):
+                continue
+            unknown = sorted(set(end) - {"edge", "at"})
+            if unknown:
+                raise ValueError(f"{key}: unknown field '{unknown[0]}' (expected 'edge' and 'at')")
+            if "edge" not in end:
+                raise ValueError(f"{key}: missing required field 'edge'")
+            at = end.get("at")
+            if at is not None:
+                if isinstance(at, bool) or not isinstance(at, (int, float)) or not 0 <= at <= 1:
+                    raise ValueError(f"{key}.at must be a number from 0 to 1, got {at!r}")
+                v[f"{key}_at"] = float(at)
+            v[key] = end["edge"]
+        return v
+
+    @model_serializer(mode="wrap")
+    def _nest_ends(self, handler: SerializerFunctionWrapHandler,
+                   info: SerializationInfo) -> dict[str, Any]:
+        data = handler(self)
+        key = "from" if info.by_alias else "from_"
+        if self.from_at is not None and key in data:
+            data[key] = {"edge": data[key], "at": self.from_at}
+        if self.to_at is not None and "to" in data:
+            data["to"] = {"edge": data["to"], "at": self.to_at}
+        return data
+
     @model_validator(mode="after")
     def _branches(self) -> River:
         if len(self.branch_names) > self.delta_branches:
             raise ValueError(
                 f"{len(self.branch_names)} branch_names given but delta_branches is "
                 f"{self.delta_branches}")
+        if self.to_at is not None and self.to not in _DIRECTION_LIST + ["sea", "bay"]:
+            raise ValueError(f"to.at only applies to a map edge, 'sea' or 'bay', not the "
+                             f"tributary mouth '{self.to}'")
         return self
 
 

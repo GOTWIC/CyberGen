@@ -98,8 +98,12 @@ class River(Entity):
 class Channel(Entity):
     TYPE_PREFIX: ClassVar[str] = "channel"
     name: str | None = None
-    kind: Literal["delta_branch", "sea_channel"]
-    river_id: str | None = None
+    kind: Literal["delta_branch", "sea_channel", "separation"] = Field(
+        description="delta_branch: distributary of a river or sea channel; sea_channel: wide "
+                    "channel or strait; separation: canal-scale channel the generator adds "
+                    "between districts.")
+    river_id: str | None = Field(None, description="River or sea channel a delta branch leaves.")
+    flows_into: str | None = Field(None, description="Water entity id it joins (or 'sea').")
     centerline: Line2
     width_m: list[float]
     polygon: Polygon
@@ -120,6 +124,7 @@ class Quay(Entity):
     TYPE_PREFIX: ClassVar[str] = "quay"
     waterway_id: str
     line: Line2
+    width_m: float = 6.0
     deck_z_m: float = 1.5
 
 
@@ -140,7 +145,8 @@ class District(Entity):
     TYPE_PREFIX: ClassVar[str] = "district"
     name: str
     archetype: str
-    polygon: Polygon
+    polygon: Polygon = Field(description="District territory, inner waterways included.")
+    landmass_id: str | None = None
     seed: int
     params: dict[str, Any] = Field(default_factory=dict, description="Filled spec values.")
 

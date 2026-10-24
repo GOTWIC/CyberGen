@@ -1,13 +1,14 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, render its schematic, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts and waterways, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
 
 You are the prompt-to-spec step of citygen (`docs/citygen_scope.md`, section 4.1). You read the
 prompt (and the image, if any), write `city_spec.json`, validate it until it passes, render the
-schematic, look at it, and report. Everything after the spec is deterministic offline code.
+schematic, build the city, read the check report and preview, adjust the spec if needed, and
+report. Everything after the spec is deterministic offline code.
 
 ## Hard rules
 
@@ -42,6 +43,8 @@ place:
   of what you inferred and every default you chose on purpose).
 - `city_spec.json`: the spec.
 - `schematic.png`: the rendered schematic.
+- `out/`: the build (`city_model.json`, `preview_map.png`, `report.json`, `report.txt`); it is
+  regenerated from the spec, so commit only what the user asks for.
 
 Start the spec with `"$schema": "<relative path to>/citygen/schemas/city_spec.schema.json"` so
 editors can check it. Full schema: `citygen spec schema` (or that file).
@@ -73,15 +76,30 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
   and `sea_share` (fraction of the map that is sea; defaults by form, about 0.2 to 0.55).
 - `rivers`: `name`, `from` (edge where it enters), `to` (`sea`, `bay`, an edge, or another river's
   name for a tributary), `width_m` [min, max] (rivers 40 to 150), `meander` 0 to 1,
+  `from`/`to` may pin the point along the edge: `{"edge": "east", "at": 0.3}` (0 to 1: west to
+  east on north/south edges, south to north on east/west edges; on a diagonal edge 0 is the
+  middle of the first-named side, 0.5 the corner, 1 the middle of the second side). For a
+  `sea`/`bay` mouth, `at` runs along the sea-side edge (`{"edge": "bay", "at": 0.2}`). Leave
+  `at` out unless the prompt or image places the river: unpinned ends are free parameters the
+  build moves to fit the districts. A river splits the land into two banks, so where it runs
+  decides how much land each bank has;
   `delta_branches` 0 to 6 with optional `branch_names`. `delta_branches` counts the **extra**
   channels besides the main one, so "splits into four channels" is `3`. `kind: "channel"` for a wide sea channel
-  or strait. Leaving `rivers` out gives one default river; `[]` means no rivers.
+  or strait (it counts as coast). Leaving `rivers` out gives one default river; `[]` means no
+  rivers. The land between delta channels becomes small separate landmasses: give one to a
+  `delta` island or expect it to stay without a district.
 - `islands`: `name`, `position` (direction from the center) and `setting` (`offshore`,
   `nearshore`, `mid_river`, `delta`; mid_river and delta need `river`), `area_km2`. Shorthand:
-  `"position": "south_west_offshore"`. In the schematic, `delta` islands sit near the river
-  mouth and `mid_river` islands at `center` halfway along the river, whatever the direction, so
-  use at most one of each per river.
-- `district_separation`: `water_preferred` (default), `water_required` or `none`.
+  `"position": "south_west_offshore"`. Offshore and nearshore islands are placed from the middle
+  of the sea toward `position`; a `mid_river` island sits on the river (`center` = nearest the
+  map center) with the river splitting around it; a `delta` island is the land between two
+  delta channels, sized to `area_km2`. Islands must fit: an offshore island needs open sea
+  around it (raise `sea_share` or shrink it if the build says it does not fit).
+- `district_separation`: `water_preferred` (default), `water_required` or `none`. The build makes
+  it real: `water_required` turns every land boundary between two districts into a canal-scale
+  separation channel (every district on its own landmass); `water_preferred` adds such channels
+  where a boundary (or a chain of two) runs from water to water or to the map edge within
+  1.8 km; `none` adds none. A district's own `water_separation` overrides the city setting.
 - `bridges`: `density`, `footbridge_density`, `transit_crossing` (`own_bridge`, `shared_deck`,
   `auto`), `named` (each `name`, `kind` road/rail/road_rail/pedestrian, `connects` two of
   district/island/place/megasite/`<direction>_exit`, optional `crosses`).
@@ -105,13 +123,20 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
 | spaceport, launch site | spaceport | 10 to 60 (height limited) |
 
 Then, only where the prompt or image says so:
-- `area_share`: fraction of the **land**. Give all (summing to 1) or some (the rest is split by
-  archetype weight) or none.
+- `area_share`: fraction of the land that holds districts. Give all (summing to 1) or some (the
+  rest is split by archetype weight) or none. A district alone on an island without a stated
+  share gets the island's area; a stated share is checked against the build (within 15%), so a
+  stated share for an island district must match `area_km2` of its island.
 - `placement`: `<direction>_of` (one name or a list), `adjacent_to`, `edge` (a direction or
   `center`), `coast` (true/false), `along_river`, `on_island`, `separated_by` (`water`, `river`,
   `channel`, `canal`, `sea`, `highway`, `ring_road`, `rail`, `wall`, or a river name). Prefer a
   few strong constraints (an edge, the coast, one or two relations to a central anchor district)
-  over many weak ones. References can be districts, places, megasites or islands, not rivers:
+  over many weak ones. The build checks them as: direction = bearing between centroids within
+  67.5 degrees of the direction; `edge` = toward that side of the land (on a sea side, toward
+  the outermost shore); `center` = near the centroid of the land; `coast` = touches the sea or a
+  sea channel; `along_river`, `separated_by` (water kinds or a river name) = borders that water;
+  `separated_by: water` also means no land neighbor; `adjacent_to` = within 300 m. Land kinds
+  (`highway`, `ring_road`, `rail`, `wall`) are checked once roads exist (M1b). References can be districts, places, megasites or islands, not rivers:
   for "the east bank" use `along_river` plus a relation to a district on the other bank or in
   the middle. `on_island` stands alone: do not combine it with `edge` or `coast: false`.
 - `grid_angle_deg`, `street_pattern`, `block_size_m`, `height_m`: only when the prompt implies
@@ -151,11 +176,9 @@ freight terminal on an elevated_rail, metro or monorail line; a transit nexus on
 or sky_tube line; every hub on two or more lines.
 
 **When the water cannot do what the prompt asks** (for example "every district on its own
-landmass" with one river): first try what the spec can say (more `delta_branches`, a second
-river or `channel`, islands with `on_island`) as long as it still matches the prompt's
-hydrology; otherwise accept shared land and say so in the report. Validation does not check
-`water_required` against geometry in M0 (it cannot without the M1 generator); the schematic is
-where you see it.
+landmass" with one river): `water_required` makes the build add separation channels between
+districts that share land, so that alone is enough. Use `water_preferred` when the prompt only
+says "mostly" or "split by water"; the build then adds channels where they connect to water.
 
 ### 3. Validate until it passes
 
@@ -199,12 +222,37 @@ relations, `sea_share`, river `from`/`to`, island `position`) and rerun steps 3 
 three rounds. Unassigned land (dark gray) means the districts' shares did not reach it, usually
 land cut off by a river; that is fine for a schematic.
 
-### 6. Build (placeholder, from M1 on)
+### 6. Build, read the report, look at the preview
 
-> **PLACEHOLDER: not available in M0.** From milestone M1 the skill continues here with
-> `citygen build cities/<slug>/city_spec.json cities/<slug>/out/`, then reads the generated
-> previews and the validation report (scope section 9), and may run the optional art-direction
-> pass (adjust spec parameters only, never code, at most N rounds). Until then, stop after step 5.
+```bash
+citygen build cities/<slug>/city_spec.json cities/<slug>/out/
+```
+
+M1a builds the water, districts and inner waterways: coast, rivers, delta branches, islands,
+landmasses, district polygons (with separation channels), canals, creeks, inlets, basins and
+marinas with quays. It writes `city_model.json`, `preview_map.png`, `report.json` and
+`report.txt`, and exits 0 when every check passes, 1 when one fails (2 on usage or file errors).
+
+1. Read `report.txt`. Each failed check names the district or island and why: a share off by
+   more than 15%, a relation with the actual bearing, an edge or coast not met, an island that
+   does not fit, a waterway that does not connect, a sliver, invalid geometry.
+2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
+   sides of each other and of the water, rivers entering and leaving where asked, islands
+   where asked, land left without a district (hatched) only where the prompt allows it.
+3. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
+   fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
+   so an island fits; give or adjust `area_share` where a district must fill a fixed landmass
+   (an island, a bank between two rivers); drop a placement rule the geometry cannot meet (for
+   example `edge` toward a sea side where the land is a narrow lobe) and keep the stronger ones
+   (`coast`, relations); switch `district_separation` when the prompt wants more or less water
+   between districts.
+4. At most three build rounds. If checks still fail, stop and report them with what you tried;
+   if you believe citygen itself is wrong, say so instead of editing it.
+
+> **Placeholder for M1b (not available yet):** highways, arterials, ring roads, bridges and the
+> connectivity checks (every landmass with a district reachable by road) are added to the same
+> build in M1b; the skill will then also read the road checks. Until then, the build covers
+> water, districts and waterways only.
 
 ### 7. Report
 
@@ -214,7 +262,8 @@ Reply with:
 - what you inferred or defaulted on purpose, and anything from the prompt or image you could not
   express in the spec;
 - the remaining validation warnings, if any;
-- the schematic (attach or link the PNG).
+- the schematic and the build preview (attach or link the PNGs), plus the check result and the
+  stats from `report.txt` (land, water share, landmasses, waterway km, district shares).
 
 ## Minimal example
 
@@ -234,4 +283,5 @@ Reply with:
 }
 ```
 
-Worked examples (prompts, specs and schematics): `docs/progress/M0/`.
+Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
+(previews and reports): `docs/progress/M1a/`.

@@ -92,6 +92,14 @@ schema, schematic renderer), skill `.claude/skills/citygen/SKILL.md`, examples i
 changing `citygen/spec.py` or `citygen/model.py`, regenerate `citygen/schemas/*.json` with the
 schema commands (a test checks they match).
 
+M1a (water and districts) is in place: `.venv/bin/python -m citygen build <spec.json> <out_dir>`
+writes `city_model.json` (coast, rivers, delta branches, islands, landmasses, district polygons,
+separation channels, inner waterways, quays), `preview_map.png`, `report.json` and
+`report.txt`, and exits 1 when a check fails. Stages live in `citygen/hydro.py`,
+`districts.py`, `waterways.py`; checks in `checks.py` (placement rules in `relations.py`);
+driver in `build.py`. Sample builds: `docs/progress/M1a/`. M1b (highways, arterials, bridges,
+road connectivity) is next.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

@@ -311,9 +311,11 @@
           "title": "Name"
         },
         "kind": {
+          "description": "delta_branch: distributary of a river or sea channel; sea_channel: wide channel or strait; separation: canal-scale channel the generator adds between districts.",
           "enum": [
             "delta_branch",
-            "sea_channel"
+            "sea_channel",
+            "separation"
           ],
           "title": "Kind",
           "type": "string"
@@ -328,7 +330,21 @@
             }
           ],
           "default": null,
+          "description": "River or sea channel a delta branch leaves.",
           "title": "River Id"
+        },
+        "flows_into": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Water entity id it joins (or 'sea').",
+          "title": "Flows Into"
         },
         "centerline": {
           "items": {
@@ -480,7 +496,20 @@
           "type": "string"
         },
         "polygon": {
-          "$ref": "#/$defs/Polygon"
+          "$ref": "#/$defs/Polygon",
+          "description": "District territory, inner waterways included."
+        },
+        "landmass_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Landmass Id"
         },
         "seed": {
           "title": "Seed",
@@ -1520,6 +1549,11 @@
           "minItems": 2,
           "title": "Line",
           "type": "array"
+        },
+        "width_m": {
+          "default": 6.0,
+          "title": "Width M",
+          "type": "number"
         },
         "deck_z_m": {
           "default": 1.5,

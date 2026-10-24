@@ -1,0 +1,159 @@
+{
+  "name": "Delta Megacity",
+  "seed": 4412,
+  "stage": "M1a (water, districts, waterways)",
+  "passed": true,
+  "variant": 0,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 12.25,
+    "land_km2": 7.801,
+    "district_land_km2": 7.446,
+    "water_share": 0.3632,
+    "sea_share": 0.3,
+    "landmasses": 8,
+    "landmasses_with_districts": 6,
+    "unassigned_land_km2": 0.355,
+    "islands": 2,
+    "river_km": 3.45,
+    "channel_km": {
+      "delta_branch": 3.47,
+      "separation": 2.91
+    },
+    "separation_channels": 2,
+    "waterway_km": 8.55,
+    "waterway_km_by_kind": {
+      "basin": 0.65,
+      "canal": 7.89
+    },
+    "waterways": 13,
+    "quay_km": 16.26,
+    "district_boundary_on_water": 1.0,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm05",
+        "area_km2": 0.55,
+        "share": 0.0739,
+        "target": 0.073,
+        "target_source": "island",
+        "error": 0.0117
+      },
+      {
+        "id": "d02",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm02",
+        "area_km2": 1.692,
+        "share": 0.2272,
+        "target": 0.2331,
+        "target_source": "archetype weight",
+        "error": -0.0251
+      },
+      {
+        "id": "d03",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm03",
+        "area_km2": 1.561,
+        "share": 0.2096,
+        "target": 0.2152,
+        "target_source": "archetype weight",
+        "error": -0.0257
+      },
+      {
+        "id": "d04",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm04",
+        "area_km2": 1.365,
+        "share": 0.1834,
+        "target": 0.1793,
+        "target_source": "archetype weight",
+        "error": 0.0227
+      },
+      {
+        "id": "d05",
+        "name": "Industrial Port",
+        "archetype": "industrial_port",
+        "landmass": "lm01",
+        "area_km2": 1.778,
+        "share": 0.2388,
+        "target": 0.2331,
+        "target_source": "archetype weight",
+        "error": 0.0244
+      },
+      {
+        "id": "d06",
+        "name": "Research Campus",
+        "archetype": "research_campus",
+        "landmass": "lm06",
+        "area_km2": 0.5,
+        "share": 0.0672,
+        "target": 0.0664,
+        "target_source": "island",
+        "error": 0.0117
+      }
+    ]
+  },
+  "notes": []
+}

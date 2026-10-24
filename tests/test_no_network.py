@@ -9,7 +9,7 @@ import tomllib
 
 import pytest
 
-from conftest import EXAMPLES, ROOT
+from conftest import EXAMPLES, ROOT, SMALL, write
 
 # Top-level modules that are LLM SDKs, HTTP clients or network access.
 FORBIDDEN = {
@@ -78,7 +78,8 @@ def test_import_pulls_in_no_llm_or_http_client():
     test below makes sure nothing ever opens one.
     """
     code = (
-        "import sys, citygen.cli, citygen.schematic, citygen.model, citygen.validate\n"
+        "import sys, citygen.cli, citygen.schematic, citygen.model, citygen.validate, "
+        "citygen.build, citygen.preview\n"
         "print('\\n'.join(sys.modules))"
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
@@ -110,3 +111,6 @@ def test_runtime_makes_no_connections(tmp_path, monkeypatch):
     assert main(["spec", "validate", str(spec), "--filled", str(tmp_path / "f.json")]) == 0
     assert main(["spec", "render", str(spec), str(tmp_path / "s.png")]) == 0
     json.loads((tmp_path / "f.json").read_text())
+    small = write(tmp_path, SMALL, "small.json")
+    assert main(["build", str(small), str(tmp_path / "out")]) == 0
+    json.loads((tmp_path / "out" / "city_model.json").read_text())

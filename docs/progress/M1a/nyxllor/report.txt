@@ -1,0 +1,30 @@
+citygen build report: Nyxllor (seed 2077, M1a (water, districts, waterways))
+result: PASS  (hydrology variant 1)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+
+stats:
+  map 11.9 km2, land 8.31 km2 (districts 8.31 km2, unassigned 0.0 km2)
+  water share 30.2% (sea 25.0%)
+  landmasses 8 (8 with districts), islands 2
+  rivers 2.58 km; channels delta_branch 1.7 km, separation 5.79 km
+  separation channels 6; district boundary on water 100%
+  inner waterways 11 (4.83 km: basin 0.59, canal 4.24), quays 9.24 km
+
+  district                     archetype              landmass  km2    share  target  error
+  Corporate Core               corporate_core         lm04      1.197  0.144  0.156   -7.8%  (archetype weight)
+  The Stacks                   megablock_residential  lm02      1.220  0.147  0.156   -5.9%  (archetype weight)
+  Highcrest                    residential_heights    lm05      0.999  0.120  0.130   -7.6%  (archetype weight)
+  Old Town                     old_town               lm03      1.219  0.147  0.130  +12.8%  (archetype weight)
+  Neon Strand                  entertainment_market   lm06      0.886  0.107  0.117   -8.9%  (archetype weight)
+  Vess Docks                   industrial_port        lm01      1.588  0.191  0.169  +13.0%  (archetype weight)
+  Launch Key                   spaceport              lm08      0.600  0.072  0.071   +2.1%  (island)
+  Scholar Isle                 research_campus        lm07      0.600  0.072  0.071   +2.1%  (island)

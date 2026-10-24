@@ -6,6 +6,29 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
+# The M1a build samples: the four M0 cities (specs as adjusted for M1a) and Nyxllor.
+CITIES = sorted((ROOT / "docs" / "progress" / "M1a").glob("*/city_spec.json")) + [
+    ROOT / "cities" / "nyxllor" / "city_spec.json"]
+
+# A small, fast city for build tests: straight coast, one river, one island district.
+SMALL = {
+    "name": "Testport", "seed": 7, "size_km": [2.4, 2.4],
+    "water": {"coast": {"form": "straight", "side": "south", "sea_share": 0.35},
+              "rivers": [{"name": "Test River", "from": "north", "to": "sea",
+                          "width_m": [50, 80]}],
+              "islands": [{"name": "Test Isle", "position": "south_east",
+                           "setting": "nearshore", "area_km2": 0.15}]},
+    "districts": [
+        {"name": "Core", "archetype": "corporate_core", "placement": {"edge": "center"}},
+        {"name": "Harbor", "archetype": "industrial_port",
+         "placement": {"coast": True, "west_of": "Core"}},
+        {"name": "Old Quarter", "archetype": "old_town",
+         "placement": {"coast": True, "east_of": "Core"}},
+        {"name": "Uptown", "archetype": "residential_heights", "placement": {"north_of": "Core"}},
+        {"name": "Test Isle", "archetype": "research_campus",
+         "placement": {"on_island": "Test Isle"}},
+    ],
+}
 
 MINIMAL = {
     "name": "Harborlight",
@@ -31,6 +54,11 @@ MINIMAL = {
 @pytest.fixture
 def minimal() -> dict:
     return copy.deepcopy(MINIMAL)
+
+
+@pytest.fixture
+def small() -> dict:
+    return copy.deepcopy(SMALL)
 
 
 def write(tmp_path: Path, data, name: str = "spec.json") -> Path:
