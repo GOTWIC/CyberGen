@@ -149,14 +149,14 @@
     "river_km": 0.0,
     "channel_km": {},
     "separation_channels": 0,
-    "waterway_km": 3.86,
+    "waterway_km": 3.79,
     "waterway_km_by_kind": {
       "basin": 0.91,
-      "canal": 0.86,
+      "canal": 0.8,
       "creek": 2.09
     },
     "waterways": 11,
-    "quay_km": 7.88,
+    "quay_km": 7.66,
     "district_boundary_on_water": 1.0,
     "boundary_on_water": 1.0,
     "boundary_on_water_target": null,
@@ -165,7 +165,7 @@
       "land": 0.0
     },
     "land_boundary_curvature": null,
-    "boundary_curvature": 1.0283,
+    "boundary_curvature": 1.0284,
     "districts": [
       {
         "id": "d01",
@@ -224,19 +224,19 @@
       }
     ],
     "road_km": {
-      "avenue": 18.45,
+      "avenue": 18.2,
       "highway": 3.52
     },
     "road_nodes": 29,
     "road_segments": 34,
     "road_components": 1,
-    "bridges": 10,
+    "bridges": 9,
     "bridges_by_class": {
       "sea": 5,
       "river": 0,
-      "canal": 5
+      "canal": 4
     },
-    "bridge_span_km": 1.71,
+    "bridge_span_km": 1.65,
     "named_bridges": [
       "Crown Causeway",
       "Kettle Span",
@@ -251,7 +251,7 @@
     "exits": [
       "north_exit"
     ],
-    "highway_elevated_share": 0.5335,
+    "highway_elevated_share": 0.5338,
     "megasites": 3,
     "separation_budget": {
       "target": 0.6,

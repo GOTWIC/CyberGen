@@ -1043,9 +1043,12 @@ def find_exits(spec: CitySpec, ctx: Ctx) -> None:
 
 
 def _principal_axis(cells_x, cells_y) -> tuple[float, float]:
-    mx, my = float(np.mean(cells_x)), float(np.mean(cells_y))
+    # math.fsum: correctly rounded sums, whatever summation order a numpy build would pick
+    n = max(len(cells_x), 1)
+    mx, my = math.fsum(cells_x.tolist()) / n, math.fsum(cells_y.tolist()) / n
     dx, dy = cells_x - mx, cells_y - my
-    sxx, syy, sxy = float(np.sum(dx * dx)), float(np.sum(dy * dy)), float(np.sum(dx * dy))
+    sxx, syy = math.fsum((dx * dx).tolist()), math.fsum((dy * dy).tolist())
+    sxy = math.fsum((dx * dy).tolist())
     ang = 0.5 * M.atan2(2 * sxy, sxx - syy)
     return (M.cos(ang), M.sin(ang))
 

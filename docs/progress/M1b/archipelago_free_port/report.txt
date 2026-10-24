@@ -28,11 +28,11 @@ stats:
   landmasses 6 (5 with districts), islands 5
   rivers 0.0 km; channels none
   separation channels 0; boundary between districts on water 100%, 1.84 km on water, 0.0 km on land
-  district perimeter facing water 100%; boundary curvature (arc / chord over 400 m) 1.0283, land boundaries None
+  district perimeter facing water 100%; boundary curvature (arc / chord over 400 m) 1.0284, land boundaries None
   open land 0 km2
-  inner waterways 11 (3.86 km: basin 0.91, canal 0.86, creek 2.09), quays 7.88 km
-  roads avenue 18.45 km, highway 3.52 km; 34 segments, 29 nodes, 1 component(s); exits north_exit
-  bridges 10 (sea 5, river 0, canal 5; 1.71 km of span), pedestrian 1; named: Crown Causeway, Kettle Span, Lumen Footbridge, Reef Bridge
+  inner waterways 11 (3.79 km: basin 0.91, canal 0.8, creek 2.09), quays 7.66 km
+  roads avenue 18.2 km, highway 3.52 km; 34 segments, 29 nodes, 1 component(s); exits north_exit
+  bridges 9 (sea 5, river 0, canal 4; 1.65 km of span), pedestrian 1; named: Crown Causeway, Kettle Span, Lumen Footbridge, Reef Bridge
   landmasses with districts connected by road 5 of 5; highway planned elevated 53%; megasite reserves 3; road variant 0
 
   district                     archetype              landmass  km2    share  target  error

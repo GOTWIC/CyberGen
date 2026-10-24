@@ -11,18 +11,22 @@ are unchanged and still live in `docs/progress/M1a2/` (Nyxllor in `cities/nyxllo
 
 | City | Highway km | Avenue km | Bridges sea / river / canal | Footbridges | Bridge span km | Landmasses with districts connected | Exits | Segments / nodes | Highway planned elevated (spec) | Named bridges |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Nyxllor | 7.37 | 27.32 | 1 / 3 / 5 | 0 | 0.59 | 5 of 5 (7 landmasses, 2 marshes) | east, north | 73 / 60 | 22% (20%) | Launch Causeway |
-| Saltreach Free Port | 3.52 | 18.45 | 5 / 0 / 5 | 1 | 1.71 | 5 of 5 (mainland outside the city) | north | 34 / 29 | 53% (50%) | Crown Causeway, Kettle Span, Reef Bridge, Lumen Footbridge |
-| Delta Megacity | 8.59 | 26.38 | 1 / 6 / 6 | 0 | 0.77 | 6 of 6 (7 landmasses, 1 marsh) | east, north, west | 77 / 59 | 20% (20%) | none asked |
-| Nexus City | 9.50 | 27.84 | 4 / 0 / 8 | 0 | 2.39 | 5 of 5 (8 landmasses, 2 marshes, 1 park) | east, north, west | 83 / 69 | 32% (30%) | Baylink Bridge, Horizon Bridge, Silver Span |
-| Greyhook (peninsula) | 2.29 | 17.01 | 0 / 2 / 2 | 0 | 0.19 | 3 of 3 | north | 31 / 27 | 59% (40%) | Wallgate Bridge |
+| Nyxllor | 7.39 | 27.38 | 1 / 3 / 4 | 0 | 0.58 | 5 of 5 (7 landmasses, 2 marshes) | east, north | 73 / 60 | 22% (20%) | Launch Causeway |
+| Saltreach Free Port | 3.52 | 18.20 | 5 / 0 / 4 | 1 | 1.65 | 5 of 5 (mainland outside the city) | north | 34 / 29 | 53% (50%) | Crown Causeway, Kettle Span, Reef Bridge, Lumen Footbridge |
+| Delta Megacity | 8.88 | 27.07 | 0 / 7 / 11 | 0 | 0.83 | 6 of 6 (8 landmasses, 2 marshes) | east, north, west | 70 / 54 | 21% (20%) | none asked |
+| Nexus City | 9.34 | 31.38 | 4 / 2 / 7 | 0 | 2.64 | 5 of 5 (7 landmasses, 2 marshes) | east, north, west | 99 / 83 | 30% (30%) | Baylink Bridge, Horizon Bridge, Silver Span |
+| Greyhook (peninsula) | 2.29 | 16.21 | 0 / 3 / 2 | 0 | 0.24 | 3 of 3 | north | 36 / 32 | 58% (40%) | Wallgate Bridge |
 
-All 18 checks (ten from M1a and M1a2, eight for roads) pass for all five cities, on the first
-road variant. Build times on the cloud container, one city at a time: 4 s (Saltreach) to about
-40 s (Nexus), of which roads take 2 to 9 s; the rest is the M1a2 hydrology search. Sea bridges
-are the long pink spans in the previews: the named ones, a ring or spine crossing of a sea
-channel, and island links. The elevated share is whole segments marked, so short highway
-networks (Greyhook) land off the asked value; it is an attribute only, M7 builds the decks.
+All 18 checks (ten from M1a and M1a2, eight for roads) pass for all five cities. The figures
+above are from the cross-machine determinism pass (`docs/progress/M1b_det/`), which changed
+district boundaries by up to a raster cell and so redrew the roads: Nexus City now uses
+hydrology variant 1 and road variant 1, Delta Megacity hydrology variant 0 and road variant 3
+(the road fallback below), the others their first road variant. Build times on the cloud
+container (4 CPUs), one city at a time: 5 s (Saltreach) to about 28 s (Nexus); variants and
+road attempts run in worker processes. Sea bridges are the long pink spans in the previews:
+the named ones, a ring or spine crossing of a sea channel, and island links. The elevated
+share is whole segments marked, so short highway networks (Greyhook) land off the asked value;
+it is an attribute only, M7 builds the decks.
 
 ## Determinism across machines
 
@@ -31,6 +35,9 @@ The Mac (ARM) and the cloud (x86) differed in small decimals since M1a2 (Nexus C
 different last bits on different CPUs (x86 with AVX512 uses Intel SVML), and the district
 search amplifies such bits into visible differences. Reproduced on the cloud machine by
 switching numpy's AVX512 paths off (`NPY_DISABLE_CPU_FEATURES`): three of five cities changed.
+The fixes below made x86 machines agree; the ARM Mac still differed in four of five cities
+(fused multiply-add in compiled contouring and GEOS). That second pass, with stage traces, is
+in `docs/progress/M1b_det/README.md`.
 
 - `citygen/dmath.py`: sin, cos, exp, log, atan2, hypot, power built from `+ - * /`, `sqrt`,
   `rint` and `ldexp` only (fdlibm kernels and short series after range reduction), which IEEE
@@ -46,9 +53,9 @@ switching numpy's AVX512 paths off (`NPY_DISABLE_CPU_FEATURES`): three of five c
   (`geom.JITTER_M`, a test hook) changes no byte in any of the five cities; real last-bit
   noise at city scale is about 1e-13 m.
 - `tests/data/golden_hashes.json`: sha256 of each sample model, produced on the cloud machine
-  (x86_64 Linux, Python 3.13, numpy 2.5.4, shapely 2.2.0 with GEOS 3.14.1); pytest asserts
-  them. Running `.venv/bin/python -m pytest tests/test_roads.py -k golden` on the M4 Mac
-  confirms them there.
+  (x86_64 Linux, Python 3.13, numpy 2.5.4, shapely 2.2.0 with GEOS 3.14.1) and confirmed
+  under emulated aarch64; pytest asserts them. Running
+  `.venv/bin/python -m pytest tests/test_roads.py -k golden` on the M4 Mac confirms them there.
 
 ## How the roads are built (`citygen/roads.py`)
 
@@ -89,8 +96,9 @@ switching numpy's AVX512 paths off (`NPY_DISABLE_CPU_FEATURES`): three of five c
    separated (no node; both record it), dead ends near the map edge extended to it (they run
    off the map; node kind `edge`, not an exit).
 9. **Road variants.** If a check fails, the roads are rebuilt with up to three other
-   variants (ring radius, ring sector rotation, highway shore cost) and the best kept. All five
-   samples pass on the first.
+   variants (ring radius, ring sector rotation, highway shore cost); if none passes, the same
+   on the next two best hydrology variants that passed the water and district checks. The
+   first attempt that passes wins, else the one with the fewest failures.
 
 Model: `road_segment` has `road_class` (type `road.<class>`), `lanes`, `width_m`, a cross
 section (scope 5.1: highway 2 x 3 lanes 30 m; avenue 2 x 2 lanes 28 m; axis boulevard 2 x 3
@@ -121,13 +129,14 @@ the district boundary).
 ## Still weak
 
 - The road layer is sensitive to small geometry changes: on 12 other seeds of the small test
-  city, 10 pass every check and 2 miss one highway curve (75 to 120 m against 150 m); the road
-  variants did not rescue those. The samples pass on the first variant.
+  city, 10 pass every check and 2 miss one highway curve (75 to 120 m against 150 m). In the
+  determinism pass, road variant 0 passed on 2 of the 6 Nexus City and Delta Megacity
+  hydrology variants that pass the water and district checks (the others miss a highway curve
+  or an exit); the road variants and the hydrology fallback cover the samples.
 - Highways meet at grade (merges and crossings) and sometimes curve hard within 60 m of such a
   junction; the radius check leaves those areas to M7 interchanges.
 - Several spaceport and freight terminal reserves shrink to fit their districts (noted in the
   reports); flight cones are drawn away from the city center, which suits coastal sites.
 - Roads near the map edge run off the map (avenues only); real exits are only the spec's.
-- Ring highways go where the land allows: Nyxllor's runs over Scholar Isle, Nexus's crosses the
-  Sentinel Canal twice.
+- Ring highways go where the land allows: Nyxllor's runs over Scholar Isle.
 - Dead-end avenues remain at megasite gates and on narrow land (Hook Spaceport, Launch Key).

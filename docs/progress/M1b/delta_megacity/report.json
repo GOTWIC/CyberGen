@@ -3,7 +3,7 @@
   "seed": 4412,
   "stage": "M1b (water, districts, waterways, primary roads)",
   "passed": true,
-  "variant": 12,
+  "variant": 0,
   "checks": [
     {
       "id": "geometry_valid",
@@ -67,7 +67,8 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "landmass lm07 (0.50 km2) is open land: marsh 'East Channel Marsh'"
+        "landmass lm07 (0.40 km2) is open land: marsh 'West Channel Marsh'",
+        "landmass lm08 (0.16 km2) is open land: marsh 'West Channel Marsh 2'"
       ]
     },
     {
@@ -83,7 +84,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "land without a district left without roads: lm07"
+        "land without a district left without roads: lm07, lm08"
       ]
     },
     {
@@ -138,44 +139,49 @@
   ],
   "stats": {
     "map_km2": 12.25,
-    "land_km2": 7.858,
-    "district_land_km2": 7.362,
-    "water_share": 0.3585,
+    "land_km2": 7.811,
+    "district_land_km2": 7.258,
+    "water_share": 0.3623,
     "sea_share": 0.3,
-    "landmasses": 7,
-    "landmasses_with_districts": 7,
+    "landmasses": 8,
+    "landmasses_with_districts": 8,
     "unassigned_land_km2": 0.0,
-    "open_land_km2": 0.496,
+    "open_land_km2": 0.553,
     "open_land": [
       {
-        "name": "East Channel Marsh",
+        "name": "West Channel Marsh",
         "kind": "marsh",
-        "area_km2": 0.496
+        "area_km2": 0.396
+      },
+      {
+        "name": "West Channel Marsh 2",
+        "kind": "marsh",
+        "area_km2": 0.157
       }
     ],
     "islands": 2,
-    "river_km": 3.77,
+    "river_km": 3.68,
     "channel_km": {
-      "delta_branch": 2.69,
-      "separation": 3.14
+      "delta_branch": 4.08,
+      "separation": 2.77
     },
     "separation_channels": 2,
-    "waterway_km": 4.37,
+    "waterway_km": 4.32,
     "waterway_km_by_kind": {
       "basin": 0.69,
-      "canal": 3.67
+      "canal": 3.62
     },
-    "waterways": 7,
-    "quay_km": 8.69,
-    "district_boundary_on_water": 0.9974,
+    "waterways": 8,
+    "quay_km": 8.48,
+    "district_boundary_on_water": 0.9998,
     "boundary_on_water": 1.0,
     "boundary_on_water_target": null,
     "boundary_km": {
-      "water": 8.42,
+      "water": 7.78,
       "land": 0.0
     },
     "land_boundary_curvature": null,
-    "boundary_curvature": 1.0991,
+    "boundary_curvature": 1.084,
     "districts": [
       {
         "id": "d01",
@@ -183,54 +189,54 @@
         "archetype": "transit_hub",
         "landmass": "lm05",
         "area_km2": 0.55,
-        "share": 0.0747,
-        "target": 0.0738,
+        "share": 0.0758,
+        "target": 0.075,
         "target_source": "island",
-        "error": 0.012
+        "error": 0.0106
       },
       {
         "id": "d02",
         "name": "Midtown",
         "archetype": "midtown_mixed",
         "landmass": "lm02",
-        "area_km2": 1.558,
-        "share": 0.2116,
-        "target": 0.2327,
+        "area_km2": 1.509,
+        "share": 0.2079,
+        "target": 0.2321,
         "target_source": "archetype weight",
-        "error": -0.0904
+        "error": -0.1043
       },
       {
         "id": "d03",
         "name": "Corporate Core",
         "archetype": "corporate_core",
         "landmass": "lm04",
-        "area_km2": 1.388,
-        "share": 0.1885,
-        "target": 0.2148,
+        "area_km2": 1.355,
+        "share": 0.1868,
+        "target": 0.2142,
         "target_source": "archetype weight",
-        "error": -0.1223
+        "error": -0.1282
       },
       {
         "id": "d04",
         "name": "Old Town",
         "archetype": "old_town",
         "landmass": "lm03",
-        "area_km2": 1.461,
-        "share": 0.1985,
-        "target": 0.179,
+        "area_km2": 1.467,
+        "share": 0.2021,
+        "target": 0.1785,
         "target_source": "archetype weight",
-        "error": 0.1091
+        "error": 0.1323
       },
       {
         "id": "d05",
         "name": "Industrial Port",
         "archetype": "industrial_port",
         "landmass": "lm01",
-        "area_km2": 1.905,
-        "share": 0.2588,
-        "target": 0.2327,
+        "area_km2": 1.877,
+        "share": 0.2586,
+        "target": 0.2321,
         "target_source": "archetype weight",
-        "error": 0.1121
+        "error": 0.1143
       },
       {
         "id": "d06",
@@ -238,26 +244,26 @@
         "archetype": "research_campus",
         "landmass": "lm06",
         "area_km2": 0.5,
-        "share": 0.0679,
-        "target": 0.0671,
+        "share": 0.0689,
+        "target": 0.0682,
         "target_source": "island",
-        "error": 0.012
+        "error": 0.0107
       }
     ],
     "road_km": {
-      "avenue": 26.38,
-      "highway": 8.59
+      "avenue": 27.07,
+      "highway": 8.88
     },
-    "road_nodes": 59,
-    "road_segments": 77,
+    "road_nodes": 54,
+    "road_segments": 70,
     "road_components": 1,
-    "bridges": 13,
+    "bridges": 18,
     "bridges_by_class": {
-      "sea": 1,
-      "river": 6,
-      "canal": 6
+      "sea": 0,
+      "river": 7,
+      "canal": 11
     },
-    "bridge_span_km": 0.77,
+    "bridge_span_km": 0.83,
     "named_bridges": [],
     "pedestrian_bridges": 0,
     "landmasses_connected": [
@@ -269,15 +275,15 @@
       "north_exit",
       "west_exit"
     ],
-    "highway_elevated_share": 0.2049,
+    "highway_elevated_share": 0.2097,
     "megasites": 3,
     "separation_budget": {
       "target": 0.6,
-      "before": 0.6307,
+      "before": 0.6504,
       "preferred_chains": 0,
-      "planned": 0.9999
+      "planned": 1.0006
     },
-    "road_variant": 0
+    "road_variant": 3
   },
   "notes": []
 }

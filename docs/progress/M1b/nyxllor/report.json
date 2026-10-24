@@ -173,48 +173,48 @@
     },
     "waterways": 5,
     "quay_km": 4.52,
-    "district_boundary_on_water": 0.6505,
-    "boundary_on_water": 0.5325,
+    "district_boundary_on_water": 0.6514,
+    "boundary_on_water": 0.5318,
     "boundary_on_water_target": 0.6,
     "boundary_km": {
       "water": 5.07,
-      "land": 4.45
+      "land": 4.46
     },
-    "land_boundary_curvature": 1.0352,
-    "boundary_curvature": 1.0951,
+    "land_boundary_curvature": 1.0365,
+    "boundary_curvature": 1.098,
     "districts": [
       {
         "id": "d01",
         "name": "Corporate Core",
         "archetype": "corporate_core",
         "landmass": "lm01",
-        "area_km2": 1.156,
-        "share": 0.1494,
+        "area_km2": 1.154,
+        "share": 0.1493,
         "target": 0.1538,
         "target_source": "archetype weight",
-        "error": -0.0282
+        "error": -0.0293
       },
       {
         "id": "d02",
         "name": "The Stacks",
         "archetype": "megablock_residential",
         "landmass": "lm01",
-        "area_km2": 1.162,
-        "share": 0.1503,
+        "area_km2": 1.163,
+        "share": 0.1504,
         "target": 0.1538,
         "target_source": "archetype weight",
-        "error": -0.0227
+        "error": -0.0218
       },
       {
         "id": "d03",
         "name": "Highcrest",
         "archetype": "residential_heights",
         "landmass": "lm01",
-        "area_km2": 0.963,
-        "share": 0.1245,
+        "area_km2": 0.962,
+        "share": 0.1244,
         "target": 0.1281,
         "target_source": "archetype weight",
-        "error": -0.0283
+        "error": -0.0292
       },
       {
         "id": "d04",
@@ -232,11 +232,11 @@
         "name": "Neon Strand",
         "archetype": "entertainment_market",
         "landmass": "lm01",
-        "area_km2": 0.875,
-        "share": 0.1132,
+        "area_km2": 0.876,
+        "share": 0.1133,
         "target": 0.1153,
         "target_source": "archetype weight",
-        "error": -0.0187
+        "error": -0.0173
       },
       {
         "id": "d06",
@@ -269,23 +269,23 @@
         "share": 0.0776,
         "target": 0.0772,
         "target_source": "island",
-        "error": 0.0052
+        "error": 0.0051
       }
     ],
     "road_km": {
-      "avenue": 27.32,
-      "highway": 7.37
+      "avenue": 27.38,
+      "highway": 7.39
     },
     "road_nodes": 60,
     "road_segments": 73,
     "road_components": 1,
-    "bridges": 9,
+    "bridges": 8,
     "bridges_by_class": {
       "sea": 1,
       "river": 3,
-      "canal": 5
+      "canal": 4
     },
-    "bridge_span_km": 0.59,
+    "bridge_span_km": 0.58,
     "named_bridges": [
       "Launch Causeway"
     ],
@@ -298,13 +298,13 @@
       "east_exit",
       "north_exit"
     ],
-    "highway_elevated_share": 0.2232,
+    "highway_elevated_share": 0.2233,
     "megasites": 3,
     "separation_budget": {
       "target": 0.6,
-      "before": 0.4112,
+      "before": 0.4119,
       "preferred_chains": 1,
-      "planned": 0.539
+      "planned": 0.5395
     },
     "road_variant": 0
   },

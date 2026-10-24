@@ -329,10 +329,13 @@ def test_every_coordinate_on_the_grid(small_built):
 def test_barriers_absorb_machine_noise():
     """Last-bit noise entering any quantization barrier (1e-9 m, far above the 1e-13 m of
     a few ULP at city scale) changes nothing."""
-    base = _build(copy.deepcopy(SMALL)).model.to_json()
+    def one_process():  # the jitter is set in this process only
+        return build_city(validate_spec(copy.deepcopy(SMALL)), workers=1).model.to_json()
+
+    base = one_process()
     G.JITTER_M = 1e-9
     try:
-        noisy = _build(copy.deepcopy(SMALL)).model.to_json()
+        noisy = one_process()
     finally:
         G.JITTER_M = 0.0
     assert noisy == base

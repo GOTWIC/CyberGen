@@ -184,13 +184,13 @@ def check_waterways(m: CityModel, g: _Geo) -> Check:
 
 
 def district_areas(m: CityModel, g: _Geo) -> dict[str, float]:
-    return {n: p.area for n, p in g.districts.items()}
+    return {n: G.area(p) for n, p in g.districts.items()}
 
 
 def check_shares(m: CityModel, g: _Geo) -> Check:
     c = Check("district_shares", f"District area shares within {SHARE_TOL:.0%} of the spec")
     areas = district_areas(m, g)
-    total = sum(areas.values()) or 1.0
+    total = math.fsum(areas.values()) or 1.0
     for d in m.districts:
         target = d.attrs.get("area_share_target")
         if not target:
@@ -736,9 +736,9 @@ def road_stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
 
 def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
     map_area = g.canvas.area
-    land = sum(G.from_model_poly(p).area for x in m.land for p in x.polygons)
+    land = math.fsum(G.area(G.from_model_poly(p)) for x in m.land for p in x.polygons)
     areas = district_areas(m, g)
-    total = sum(areas.values()) or 1.0
+    total = math.fsum(areas.values()) or 1.0
     rows = []
     for d in m.districts:
         target = d.attrs.get("area_share_target") or 0.0
@@ -780,8 +780,8 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
         "sea_share": round(g.sea.area / map_area, 4),
         "landmasses": len(m.landmasses),
         "landmasses_with_districts": len(m.landmasses) - len(unassigned),
-        "unassigned_land_km2": round(sum(g.landmasses[lm.id].area for lm in unassigned) / 1e6,
-                                     3),
+        "unassigned_land_km2": round(math.fsum(G.area(g.landmasses[lm.id])
+                                               for lm in unassigned) / 1e6, 3),
         "open_land_km2": round(sum(r["area_km2"] for r in open_rows), 3),
         "open_land": open_rows,
         "islands": len(m.islands),

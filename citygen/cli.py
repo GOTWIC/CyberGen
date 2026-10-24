@@ -1,4 +1,5 @@
-"""Command line: `citygen spec validate|render|schema`, `citygen build`, `citygen model schema`.
+"""Command line: `citygen spec validate|render|schema`, `citygen build`, `citygen model schema`,
+`citygen trace diff`.
 
 Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
 2 usage or file error.
@@ -91,10 +92,20 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"INVALID: {args.spec}: {len(result.errors)} error(s); nothing built",
               file=sys.stderr)
         return EXIT_INVALID
+    from . import trace
     from .build import build_city, write_outputs  # shapely, matplotlib only here
 
+    if args.trace:
+        trace.start()
     built = build_city(result, max_variants=args.variants)
+    entries = trace.stop() if args.trace else None
     paths = write_outputs(built, args.out_dir, dpi=args.dpi)
+    if args.trace:
+        import hashlib
+
+        sha = hashlib.sha256((built.model.to_json() + "\n").encode("utf-8")).hexdigest()
+        trace.write(args.trace, built.spec.name, sha, entries)
+        paths.append(Path(args.trace))
     for p in paths:
         print(f"wrote {p}")
     failed = [c for c in built.checks if not c.passed]
@@ -123,6 +134,22 @@ def cmd_spec_schema(args: argparse.Namespace) -> int:
     from .spec import json_schema
 
     return _write_json(json_schema(), args.out)
+
+
+def cmd_trace_diff(args: argparse.Namespace) -> int:
+    from . import trace
+
+    try:
+        a, b = (json.loads(Path(x).read_text(encoding="utf-8")) for x in (args.a, args.b))
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    lines = trace.diff(a, b)
+    if not lines:
+        print(f"identical: {len(a['entries'])} entries, model {a.get('model_sha256')}")
+        return EXIT_OK
+    print("\n".join(lines))
+    return EXIT_INVALID
 
 
 def cmd_model_schema(args: argparse.Namespace) -> int:
@@ -159,7 +186,18 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--dpi", type=int, default=110)
     b.add_argument("--variants", type=int, default=MAX_VARIANTS,
                    help=f"hydrology variants to try at most (default {MAX_VARIANTS})")
+    b.add_argument("--trace", metavar="FILE.json",
+                   help="also write a sha256 of every stage output and of the district "
+                        "search intermediates (compare machines with `citygen trace diff`)")
     b.set_defaults(func=cmd_build)
+
+    tr = sub.add_parser("trace", help="build trace tools")
+    tsub = tr.add_subparsers(dest="command", required=True)
+    td = tsub.add_parser("diff", help="first entry where two build traces differ "
+                                      "(exit 0 identical, 1 different)")
+    td.add_argument("a")
+    td.add_argument("b")
+    td.set_defaults(func=cmd_trace_diff)
 
     model = sub.add_parser("model", help="city model tools")
     msub = model.add_subparsers(dest="command", required=True)

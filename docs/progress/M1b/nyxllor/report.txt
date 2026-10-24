@@ -29,20 +29,20 @@ stats:
   water share 29.4% (sea 25.0%)
   landmasses 7 (7 with districts), islands 2
   rivers 2.93 km; channels delta_branch 3.36 km, separation 1.23 km
-  separation channels 1; boundary between districts on water 53% (target 60%), 5.07 km on water, 4.45 km on land
-  district perimeter facing water 65%; boundary curvature (arc / chord over 400 m) 1.0951, land boundaries 1.0352
+  separation channels 1; boundary between districts on water 53% (target 60%), 5.07 km on water, 4.46 km on land
+  district perimeter facing water 65%; boundary curvature (arc / chord over 400 m) 1.098, land boundaries 1.0365
   open land 0.661 km2; marsh 'Lotus Cut Marsh' 0.488 km2; marsh 'North Reach Marsh' 0.173 km2
   inner waterways 5 (2.21 km: basin 0.65, canal 1.56), quays 4.52 km
-  roads avenue 27.32 km, highway 7.37 km; 73 segments, 60 nodes, 1 component(s); exits east_exit, north_exit
-  bridges 9 (sea 1, river 3, canal 5; 0.59 km of span), pedestrian 0; named: Launch Causeway
+  roads avenue 27.38 km, highway 7.39 km; 73 segments, 60 nodes, 1 component(s); exits east_exit, north_exit
+  bridges 8 (sea 1, river 3, canal 4; 0.58 km of span), pedestrian 0; named: Launch Causeway
   landmasses with districts connected by road 5 of 5; highway planned elevated 22%; megasite reserves 3; road variant 0
 
   district                     archetype              landmass  km2    share  target  error
-  Corporate Core               corporate_core         lm01      1.156  0.149  0.154   -2.8%  (archetype weight)
-  The Stacks                   megablock_residential  lm01      1.162  0.150  0.154   -2.3%  (archetype weight)
-  Highcrest                    residential_heights    lm01      0.963  0.124  0.128   -2.8%  (archetype weight)
+  Corporate Core               corporate_core         lm01      1.154  0.149  0.154   -2.9%  (archetype weight)
+  The Stacks                   megablock_residential  lm01      1.163  0.150  0.154   -2.2%  (archetype weight)
+  Highcrest                    residential_heights    lm01      0.962  0.124  0.128   -2.9%  (archetype weight)
   Old Town                     old_town               lm03      1.028  0.133  0.128   +3.7%  (archetype weight)
-  Neon Strand                  entertainment_market   lm01      0.875  0.113  0.115   -1.9%  (archetype weight)
+  Neon Strand                  entertainment_market   lm01      0.876  0.113  0.115   -1.7%  (archetype weight)
   Vess Docks                   industrial_port        lm02      1.350  0.175  0.167   +4.8%  (archetype weight)
   Launch Key                   spaceport              lm04      0.600  0.078  0.077   +0.5%  (island)
   Scholar Isle                 research_campus        lm05      0.600  0.078  0.077   +0.5%  (island)

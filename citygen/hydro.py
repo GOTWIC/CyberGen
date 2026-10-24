@@ -26,6 +26,7 @@ from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import nearest_points, substring, unary_union
 
 from . import dmath as M
+from . import trace as T
 from . import geom as G
 from . import presets
 from .defaults import derive_seed
@@ -218,8 +219,8 @@ def coastline_of(sea, canvas: Polygon):
     """Sea boundary minus the map edge, as (Multi)LineString."""
     if sea.is_empty:
         return LineString()
-    edge = canvas.exterior.buffer(0.5)
-    return sea.boundary.difference(edge)
+    edge = G.qpoly(canvas.exterior.buffer(0.5))
+    return G.snap(sea.boundary.difference(edge))
 
 
 def _lines(g) -> list[LineString]:
@@ -958,29 +959,30 @@ def quantize(h: Hydro) -> Hydro:
 # ---------------------------------------------------------------------------
 
 def rebuild_land(h: Hydro) -> None:
-    """water = sea + every water body + island rings - islands; land = map - water."""
+    """water = sea + every water body + island rings - islands; land = map - water. Every
+    overlay is snapped to the grid and every measure exact (see `geom.area`)."""
     sea_isl = [i.polygon for i in h.islands if i.setting in ("offshore", "nearshore")]
     river_isl = [i.polygon for i in h.islands if i.setting == "mid_river"]
-    sea = h.sea.difference(unary_union(sea_isl)) if sea_isl else h.sea
-    water = unary_union([sea, h.rings] + [b.polygon for b in h.bodies])
+    sea = G.diff(h.sea, G.union(sea_isl)) if sea_isl else h.sea
+    water = G.union([sea, h.rings] + [b.polygon for b in h.bodies])
     if river_isl:
-        water = water.difference(unary_union(river_isl))
-    water = G.polygonal(water.intersection(h.canvas))
-    land = G.polygonal(h.canvas.difference(water))
+        water = G.diff(water, G.union(river_isl))
+    water = G.inter(water, h.canvas)
+    land = G.diff(h.canvas, water)
     land = G.opening(land, MIN_LAND_WIDTH_M / 2)
     land = G.drop_small(land, MIN_LANDMASS_M2)
     land = G.clean(land)
     h.land = land
-    h.water = G.clean(G.polygonal(h.canvas.difference(land)))
+    h.water = G.clean(G.diff(h.canvas, land))
     h.landmasses = G.parts(land)
     ch = [b.polygon for b in h.bodies if b.kind == "sea_channel"]
-    h.coastline = coastline_of(unary_union([sea, *ch]) if ch else sea, h.canvas)
+    h.coastline = coastline_of(G.union([sea, *ch]) if ch else sea, h.canvas)
     # Island polygons follow the final land.
     for isl in h.islands:
-        ref = isl.polygon if isl.polygon is not None else Point(isl.probe).buffer(5)
-        best = max(h.landmasses, key=lambda p: (p.intersection(ref).area, -p.distance(ref)),
+        ref = isl.polygon if isl.polygon is not None else G.qpoly(Point(isl.probe).buffer(5))
+        best = max(h.landmasses, key=lambda p: (G.area(G.inter(p, ref)), -G.dist(p, ref)),
                    default=None)
-        if best is not None and (best.intersection(ref).area > 0 or isl.polygon is None):
+        if best is not None and (G.area(G.inter(best, ref)) > 0 or isl.polygon is None):
             isl.polygon = best
 
 
@@ -1009,19 +1011,27 @@ def build_hydro(spec: CitySpec, canvas: Polygon, variant: Variant) -> Hydro:
         lobe_b0 = float(np.clip(b0[0] * vx + b0[1] * vy, -0.5 * bh, 0.5 * bh))
     # Every sub-stage hands on coordinates on the 0.01 m grid (determinism across machines).
     sea = G.qpoly(build_sea(spec, canvas, b0, lobe))
+    T.stage("coast", sea)
     bodies = quantize_bodies(build_rivers(spec, canvas, sea, variant, lobe_b0))
+    T.stage("rivers", bodies)
     river_isl, rings, limits = place_river_islands(spec, canvas, sea, bodies, notes, variant)
     river_isl, rings = quantize_islands(river_isl), G.qpoly(rings)
     limits = {k: G.q(v) for k, v in limits.items()}
+    T.stage("river_islands", [river_isl, rings, limits])
     build_deltas(spec, canvas, sea, bodies, variant, limits)
     quantize_bodies(bodies)
+    T.stage("deltas", bodies)
     delta_isl = quantize_islands(
         solve_delta_islands(spec, canvas, sea, bodies, rings, notes, variant, limits))
     quantize_bodies(bodies)
+    T.stage("delta_islands", [delta_isl, bodies])
     sea_isl = quantize_islands(place_sea_islands(spec, canvas, sea, bodies, notes))
+    T.stage("sea_islands", sea_isl)
     h = Hydro(canvas, sea, bodies, sea_isl + river_isl + delta_isl, rings, notes=notes)
     # Keep the spec order for islands (fillers last).
     order = {i.name: k for k, i in enumerate(w.islands)}
     h.islands.sort(key=lambda i: (i.filler, order.get(i.name, 99), i.name))
     rebuild_land(h)
-    return quantize(h)
+    quantize(h)
+    T.stage("landmasses", [h.land, h.water, h.landmasses, h.islands])
+    return h

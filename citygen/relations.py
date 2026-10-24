@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 
 from . import dmath as M
+from . import geom as G
 from . import presets
 
 DIRECTION_TOL_DEG = 67.5
@@ -118,7 +120,7 @@ def edge_score(pos: tuple[float, float], canvas: Polygon, edge: str,
 def touches(a, b, tol: float = TOUCH_M) -> bool:
     if a is None or b is None or a.is_empty or b.is_empty:
         return False
-    return a.distance(b) <= tol
+    return round(float(a.distance(b)), 6) <= tol
 
 
 def boundary_samples(polys: dict, water, canvas: Polygon, reach: float = 250.0,
@@ -141,15 +143,20 @@ def boundary_samples(polys: dict, water, canvas: Polygon, reach: float = 250.0,
         rings = [r for p in getattr(geom, "geoms", [geom]) for r in [p.exterior, *p.interiors]]
         for ring in rings:
             line = LineString(ring.coords)
-            k = max(int(line.length / step), 1)
-            seg = line.length / k
-            xy = np.array([line.interpolate((i + 0.5) * seg).coords[0] for i in range(k)])
+            length = G.length(line)
+            k = max(int(length / step), 1)
+            seg = length / k
+            xy = G.along(line, (np.arange(k) + 0.5) * seg)
             pts = shapely.points(xy)
-            d = np.min([shapely.distance(o, pts) for o in others], axis=0)
-            keep = shapely.distance(edge, pts) > 1.0
+            touch = np.zeros(k, dtype=bool)
+            near = np.zeros(k, dtype=bool)
+            for o in others:
+                touch |= G.within(o, pts, 2.0)
+                near |= G.within(o, pts, reach)
+            keep = ~G.within(edge, pts, 1.0)
             kind = np.zeros(k, dtype=int)
-            kind[keep & (d <= 2.0)] = 1
-            kind[keep & (d > 2.0) & (d <= reach) & (shapely.distance(water, pts) <= 3.0)] = 2
+            kind[keep & touch] = 1
+            kind[keep & ~touch & near & G.within(water, pts, 3.0)] = 2
             out.append((xy, seg, kind))
     return out
 
@@ -159,11 +166,11 @@ def boundary_water_split(polys: dict, water, canvas: Polygon, reach: float = 250
     """(wet, dry) length of the boundaries between neighboring districts (see
     `boundary_samples`). Each boundary is seen from both sides, so wet / (wet + dry) is the
     share of the district-to-district boundary that runs along water."""
-    wet = dry = 0.0
+    wets, drys = [], []
     for _, seg, kind in boundary_samples(polys, water, canvas, reach, step):
-        dry += float((kind == 1).sum()) * seg
-        wet += float((kind == 2).sum()) * seg
-    return wet, dry
+        drys.append(int(np.count_nonzero(kind == 1)) * seg)
+        wets.append(int(np.count_nonzero(kind == 2)) * seg)
+    return math.fsum(wets), math.fsum(drys)
 
 
 def boundary_curvature(samples, window: float = 400.0, kinds=(1, 2)) -> float | None:

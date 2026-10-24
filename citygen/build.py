@@ -6,16 +6,27 @@ delta splits) are tried in a few seeded variants; each variant is built and chec
 first one that passes every check with (worst share error + share of land without a district)
 under 10% wins, else the best one (fewest failures, then that quality figure). Variant 0 uses
 the defaults, so the search only matters when the default does not fit.
-Megasite reserves and the primary road network (M1b) are built once, on the chosen variant.
+Megasite reserves and the primary road network (M1b) are built on the chosen variant; when no
+road variant passes every check there, the roads fall back to the next best variants that
+passed the water and district checks (at most ROAD_CANDIDATES in all).
 Same spec + seed = byte-identical `city_model.json`, on any machine: the generator uses
-deterministic elementary functions (`dmath`) and every stage hands the next one coordinates on
-the 0.01 m grid.
+deterministic elementary functions (`dmath`), exact measures and grid-snapped geometry
+wherever a decision is made, and every stage hands the next one coordinates on the 0.01 m
+grid.
+
+Variants and road attempts run in worker processes when there are several CPUs
+(`CITYGEN_WORKERS` sets how many; 1 runs everything in this process). They are evaluated in
+batches in a fixed order and chosen by the same rules as one at a time, so the result does
+not depend on the number of workers.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
+import os
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +38,7 @@ from . import geom as G
 from . import hydro as H
 from . import megasites as MS
 from . import roads as RD
+from . import trace as T
 from . import waterways as W
 from .model import CityModel
 from .spec import CitySpec
@@ -34,6 +46,7 @@ from .validate import Result, dump_spec
 
 MAX_VARIANTS = 20
 GOOD_QUALITY = 0.10
+ROAD_CANDIDATES = 3
 
 
 @dataclass
@@ -207,14 +220,19 @@ def open_land(spec: CitySpec, h: H.Hydro, lay: D.Layout, landmasses: list[dict],
 
 
 def build_variant(spec: CitySpec, explicit: set[str], index: int) -> Built:
-    canvas = G.canvas_for(spec.size_km)
-    h = H.build_hydro(spec, canvas, H.Variant.make(spec, index))
-    lay = D.layout_districts(spec, h, explicit)
-    D.finalize(spec, h, lay)
-    did = _district_ids(spec)
-    ww = W.build_waterways(spec, h, lay.polygons, did)
+    with T.scope(f"v{index}"):
+        canvas = G.canvas_for(spec.size_km)
+        h = H.build_hydro(spec, canvas, H.Variant.make(spec, index))
+        lay = D.layout_districts(spec, h, explicit)
+        T.stage("districts", lay.polygons)
+        D.finalize(spec, h, lay)
+        T.stage("districts_after_channels", [lay.polygons, h.landmasses])
+        did = _district_ids(spec)
+        ww = W.build_waterways(spec, h, lay.polygons, did)
+        T.stage("waterways", [ww.items, ww.quays])
     model = assemble(spec, h, lay, ww, explicit)
     checks, st = C.run_checks(spec, model, roads=False)
+    T.stage(f"v{index}/checks", [[c.id, c.passed] for c in checks])
     st["separation_budget"] = lay.separation
     notes = h.notes + lay.notes
     return Built(spec, model, h, lay, ww, checks, st, index, notes)
@@ -233,45 +251,144 @@ def _score(b: Built) -> tuple:
     return (fails, round(quality, 4), round(b.layout.assignment_cost, 4))
 
 
-def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True) -> Built:
+def default_workers() -> int:
+    env = os.environ.get("CITYGEN_WORKERS", "").strip()
+    if env:
+        return max(1, int(env))
+    return max(1, min(os.cpu_count() or 1, 8))
+
+
+class _Runner:
+    """Runs jobs and returns their results in order, in worker processes when there are
+    several workers. A job returns (result, trace entries); the entries are recorded here in
+    job order, so a trace does not depend on the number of workers either."""
+
+    def __init__(self, workers: int):
+        self.workers = max(1, workers)
+        self.pool = None
+
+    @property
+    def parallel(self) -> bool:
+        return self.workers > 1
+
+    def map(self, fn, jobs: list) -> list:
+        if not self.parallel or len(jobs) <= 1:
+            return [fn(*job, False) for job in jobs]
+        if self.pool is None:
+            self.pool = ProcessPoolExecutor(self.workers,
+                                            mp_context=multiprocessing.get_context("spawn"))
+        return list(self.pool.map(fn, *zip(*[(*job, True) for job in jobs])))
+
+    def close(self) -> None:
+        if self.pool is not None:
+            self.pool.shutdown()
+
+
+def _collect(trace_here: bool, fn, *args):
+    """(fn(*args), its trace entries): a worker process traces into its own log, which goes
+    back with the result; in this process the entries go straight into the log."""
+    if not trace_here:
+        return fn(*args), None
+    T.start()
+    out = fn(*args)
+    return out, T.stop()
+
+
+def _variant_job(spec: CitySpec, explicit: set[str], index: int, tracing: bool, worker: bool):
+    return _collect(worker and tracing, build_variant, spec, explicit, index)
+
+
+def _good(b: Built) -> bool:
+    return b.passed and _score(b)[1] <= GOOD_QUALITY
+
+
+def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True,
+               workers: int | None = None) -> Built:
     spec = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
-    best: Built | None = None
-    for index in range(max_variants):
-        b = build_variant(spec, explicit, index)
-        if best is None or _score(b) < _score(best):
-            best = b
-        if b.passed and _score(b)[1] <= GOOD_QUALITY:
-            break
-    if roads:
-        add_roads(best, explicit)
-    return best
+    run = _Runner(default_workers() if workers is None else workers)
+    try:
+        built: list[Built] = []
+        for start in range(0, max_variants, run.workers):
+            jobs = [(spec, explicit, i, T.on())
+                    for i in range(start, min(start + run.workers, max_variants))]
+            for b, entries in run.map(_variant_job, jobs):
+                T.extend(entries)
+                built.append(b)
+                if _good(b):
+                    break
+            if _good(built[-1]):
+                break
+        ranked = sorted(built, key=lambda b: (_score(b), b.variant))
+        if not roads:
+            return ranked[0]
+        return add_roads(ranked, explicit, run)
+    finally:
+        run.close()
 
 
-def add_roads(b: Built, explicit: set[str]) -> Built:
-    """Megasite reserves and the primary road network on the chosen variant, then every check
-    again (water, districts and roads)."""
+@dataclass
+class _RoadTry:
+    variant: int
+    sites: list
+    site_notes: list[str]
+    net: object
+    model: CityModel
+    checks: list
+    stats: dict
+
+    @property
+    def fails(self) -> int:
+        return sum(len(c.failures) for c in self.checks)
+
+
+def road_attempt(b: Built, explicit: set[str], k: int) -> _RoadTry:
+    """Megasite reserves and road variant k on hydrology variant b, then every check again
+    (water, districts and roads)."""
     spec = b.spec
     did = _district_ids(spec)
     sites, site_notes = MS.place_megasites(spec, b.layout.polygons, b.hydro, b.waterways, did)
+    T.stage(f"v{b.variant}/megasites", sites)
     opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
-    best = None
-    for k in range(len(RD.ROAD_VARIANTS)):
-        net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,
-                             variant=k)
-        model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, sites, net)
-        checks, st = C.run_checks(spec, model, roads=True)
-        fails = sum(len(c.failures) for c in checks)
-        if best is None or fails < best[0]:
-            best = (fails, net, model, checks, st)
-        if fails == 0:
+    net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,
+                         variant=k)
+    model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, sites, net)
+    T.stage(f"v{b.variant}/roads{k}", [net.nodes, net.segments, net.bridges])
+    checks, st = C.run_checks(spec, model, roads=True)
+    return _RoadTry(b.variant, sites, site_notes, net, model, checks, st)
+
+
+def _road_job(b: Built, explicit: set[str], k: int, tracing: bool, worker: bool):
+    return _collect(worker and tracing, road_attempt, b, explicit, k)
+
+
+def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = None) -> Built:
+    """Roads on the best variant (ranked[0]), trying the road variants in order; if none
+    passes every check, the same on the next best variants that passed the water and
+    district checks. The first attempt that passes wins, else the one with the fewest
+    failures (the earliest of those)."""
+    run = run or _Runner(1)
+    cands = [ranked[0]] + [b for b in ranked[1:] if b.passed][:ROAD_CANDIDATES - 1]
+    attempts = [(b, k) for b in cands for k in range(len(RD.ROAD_VARIANTS))]
+    by_variant = {b.variant: b for b in cands}
+    best: _RoadTry | None = None
+    for start in range(0, len(attempts), run.workers):
+        batch = attempts[start:start + run.workers]
+        for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):
+            T.extend(entries)
+            if best is None or t.fails < best.fails:
+                best = t
+            if best.fails == 0:
+                break
+        if best.fails == 0:
             break
-    _, net, model, checks, st = best
-    b.sites, b.roads, b.model, b.checks = sites, net, model, checks
+    b = by_variant[best.variant]
+    b.sites, b.roads, b.model, b.checks = best.sites, best.net, best.model, best.checks
+    st = best.stats
     st["separation_budget"] = b.stats.get("separation_budget")
-    st["road_variant"] = net.variant
+    st["road_variant"] = best.net.variant
     b.stats = st
-    b.notes = b.notes + site_notes + net.notes
+    b.notes = b.notes + best.site_notes + best.net.notes
     return b
 
 

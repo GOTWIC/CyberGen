@@ -108,11 +108,17 @@ M1b (primary roads) is in place: the same build reserves megasite ground (`megas
 lays highways by `highways.pattern` with exits, avenues and bridges (`roads.py`: 25 m cost
 raster, A* routing, straight crossings at the narrowest point, fillet curves), writes
 `road_nodes`, `road_segments` and `bridges` into the model, and runs eight road checks.
-Builds are byte-identical across machines: the generator uses `dmath.py` (deterministic sin,
-cos, exp, log, atan2) instead of numpy/libm transcendentals, and every stage hands on
-coordinates on the 0.01 m grid. `tests/data/golden_hashes.json` holds the sha256 of each
-sample `city_model.json` (made on the cloud machine; pytest asserts them). Sample builds:
-`docs/progress/M1b/`. M2 (local streets, blocks, lots) is next.
+Builds are byte-identical across machines (x86 and ARM): the generator uses `dmath.py`
+(deterministic sin, cos, exp, log, atan2) instead of numpy/libm transcendentals, every stage
+hands on coordinates on the 0.01 m grid, and decisions only see exact measures and
+grid-snapped GEOS output (`geom.area`, `length`, `inter`, `diff`, `union`; the district
+contours come from the in-repo `marching.py`). `tests/data/golden_hashes.json` holds the sha256
+of each sample `city_model.json` (pytest asserts them; `tests/test_determinism.py` injects
+ULP noise into the district search). `citygen build ... --trace FILE` hashes every stage and
+`citygen trace diff A B` finds the first one where two machines part
+(`docs/progress/M1b_det/`). Variants run in worker processes (`CITYGEN_WORKERS`, 1 = one
+process); the result does not depend on it. Sample builds: `docs/progress/M1b/`. M2 (local
+streets, blocks, lots) is next.
 
 ## Working preferences
 

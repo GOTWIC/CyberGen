@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 import shapely
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
 
 from . import dmath as M
@@ -33,8 +33,11 @@ def parts(geom) -> list[Polygon]:
     nested = [p for g in getattr(geom, "geoms", []) if not isinstance(g, Polygon)
               for p in parts(g)]
     out += nested
-    return sorted(out, key=lambda p: (-round(p.area, 3), round(p.centroid.x, 3),
-                                      round(p.centroid.y, 3)))
+    if len(out) == 1:
+        return out
+    a = areas(np.array(out, dtype=object))
+    keys = [(-a[i],) + qbounds(p) for i, p in enumerate(out)]
+    return [out[i] for i in sorted(range(len(out)), key=lambda i: keys[i])]
 
 
 def polygonal(geom):
@@ -51,7 +54,24 @@ def clean(geom, grid: float = GRID_M):
     g = polygonal(g)
     if g.is_empty:
         return g
-    return polygonal(shapely.set_precision(g, grid))
+    return polygonal(snap(g, grid))
+
+
+def snap(geom, grid: float = GRID_M):
+    """Coordinates on the grid (made valid by GEOS), with a floating precision model.
+
+    `shapely.set_precision` also attaches its grid to the geometry, and GEOS then runs every
+    later overlay on it snap-rounded; WKB and pickling drop that, so the same coordinates
+    would overlay differently in a worker process. Dropping it here keeps every geometry
+    plain coordinates."""
+    return floating(shapely.set_precision(geom, grid))
+
+
+def floating(geom):
+    """The same coordinates with a floating precision model."""
+    if geom is None or shapely.get_precision(geom) == 0:
+        return geom
+    return shapely.set_precision(geom, 0.0, mode="pointwise")
 
 
 # ---------------------------------------------------------------------------
@@ -112,15 +132,209 @@ def qpoly(geom):
 
 
 def opening(geom, half_width: float):
-    """Morphological opening: removes necks and strips narrower than 2 * half_width."""
+    """Morphological opening: removes necks and strips narrower than 2 * half_width
+    (grid output)."""
     if geom.is_empty or half_width <= 0:
         return geom
-    return polygonal(geom.buffer(-half_width, join_style="mitre", mitre_limit=3)
-                     .buffer(half_width, join_style="mitre", mitre_limit=3).intersection(geom))
+    inner = qpoly(geom.buffer(-half_width, join_style="mitre", mitre_limit=3))
+    if inner.is_empty:
+        return Polygon()
+    outer = qpoly(inner.buffer(half_width, join_style="mitre", mitre_limit=3))
+    # Remove only what the opening really removes: where the outer outline runs along the
+    # original one it differs by grid steps, and those hairline slivers (thinner than 0.1 m)
+    # are not removed, so the kept outline is exactly the original one.
+    removed = [p for p in parts(diff(geom, outer))
+               if not p.buffer(-0.05, join_style="mitre").is_empty]
+    return diff(geom, union(removed)) if removed else polygonal(geom)
 
 
 def drop_small(geom, min_area: float):
-    return polygonal(MultiPolygon([p for p in parts(geom) if p.area >= min_area]))
+    return polygonal(MultiPolygon([p for p in parts(geom) if area(p) >= min_area]))
+
+
+# ---------------------------------------------------------------------------
+# Exact measures and grid-snapped operations. GEOS computes areas, lengths, distances and new
+# vertices in floating point, and a compiler may fuse a * b + c into one rounding (ARM does,
+# x86 baseline builds do not), so the same input gives slightly different bits on different
+# machines. Decisions only look at these: areas and lengths computed exactly from the
+# 0.01 m grid coordinates (integer arithmetic, `math.fsum`), distances rounded to 1e-6 m, and
+# GEOS outputs snapped to the grid right away.
+# ---------------------------------------------------------------------------
+
+_SCALE = 100.0  # grid units per meter
+DIST_DIGITS = 6
+
+
+def _icoords(coords) -> np.ndarray:
+    """Coordinates as integer grid units (exact)."""
+    return np.rint(np.asarray(coords, dtype=np.float64)[:, :2] * _SCALE).astype(np.int64)
+
+
+def area(geom) -> float:
+    """Area of the grid-snapped vertices, exact (integer shoelace on grid units)."""
+    if geom is None or geom.is_empty:
+        return 0.0
+    if geom.geom_type == "Polygon":
+        return float(areas(np.array([geom], dtype=object))[0])
+    parts_ = shapely.get_parts(geom)
+    if any(p.geom_type in ("MultiPolygon", "GeometryCollection") for p in parts_):
+        return math.fsum([area(p) for p in parts_])
+    polys = parts_[shapely.get_type_id(parts_) == 3]
+    return math.fsum(areas(polys)) if len(polys) else 0.0
+
+
+def areas(polys) -> np.ndarray:
+    """Exact areas (see `area`) of an array of Polygons, in one pass."""
+    rings, owner = shapely.get_rings(polys, return_index=True)
+    coords, ridx = shapely.get_coordinates(rings, return_index=True)
+    c = np.rint(coords * _SCALE).astype(np.int64)
+    cross = c[:-1, 0] * c[1:, 1] - c[1:, 0] * c[:-1, 1]
+    cross = np.where(ridx[:-1] == ridx[1:], cross, 0)  # no term across two rings
+    starts = np.searchsorted(ridx[:-1], np.arange(len(rings)))
+    per_ring = np.abs(np.add.reduceat(np.append(cross, 0), starts))
+    exterior = np.r_[True, owner[1:] != owner[:-1]]
+    signed = np.where(exterior, per_ring, -per_ring)
+    out = np.zeros(len(polys), dtype=np.int64)
+    np.add.at(out, owner, signed)
+    return out / (2 * _SCALE * _SCALE)
+
+
+def _path_length(coords) -> list[float]:
+    c = _icoords(coords)
+    if len(c) < 2:
+        return []
+    d = np.diff(c, axis=0)
+    return list(np.sqrt((d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1]).astype(np.float64)))
+
+
+def length(geom) -> float:
+    """Length of a line (perimeter of a polygon) on its grid-snapped vertices: exact squared
+    segment lengths, correctly rounded square roots, `math.fsum`."""
+    if geom is None or geom.is_empty:
+        return 0.0
+    segs: list[float] = []
+    for p in shapely.get_parts(geom):
+        if p.geom_type == "Polygon":
+            for r in [p.exterior, *p.interiors]:
+                segs += _path_length(r.coords)
+        elif p.geom_type in ("LineString", "LinearRing"):
+            segs += _path_length(p.coords)
+        elif hasattr(p, "geoms"):
+            segs.append(length(p) * _SCALE)
+    return math.fsum(segs) / _SCALE
+
+
+def qbounds(geom) -> tuple[float, float, float, float]:
+    return tuple(q(v) for v in geom.bounds)
+
+
+def dist(a, b) -> float:
+    """Distance rounded to 1e-6 m (thresholds and ties see the same value everywhere)."""
+    return round(float(a.distance(b)), DIST_DIGITS)
+
+
+def dists(geom, pts) -> np.ndarray:
+    return np.round(shapely.distance(geom, pts), DIST_DIGITS)
+
+
+def within(geom, pts, d: float) -> np.ndarray:
+    """distance(geom, pts) <= d, decided with a 1e-6 m margin (so a distance that is exactly
+    d, common on the grid, counts on every machine); prepared, so fast."""
+    shapely.prepare(geom)
+    return shapely.dwithin(geom, pts, d + 10.0 ** -DIST_DIGITS)
+
+
+def centroid(geom) -> tuple[float, float]:
+    c = geom.centroid
+    return qpoint(c)
+
+
+def nearest(geom, p) -> tuple[float, float]:
+    """Point of `geom` nearest to `p`, on the grid."""
+    from shapely.ops import nearest_points
+
+    return qpoint(nearest_points(geom, p if hasattr(p, "geom_type") else Point(*p))[0])
+
+
+def apart(a, b, pad: float = 0.0) -> bool:
+    """True when the bounding boxes of a and b are more than `pad` apart (a cheap reject)."""
+    ax0, ay0, ax1, ay1 = a.bounds
+    bx0, by0, bx1, by1 = b.bounds
+    return ax1 + pad < bx0 or bx1 + pad < ax0 or ay1 + pad < by0 or by1 + pad < ay0
+
+
+# Overlays run in floating point on grid inputs (GEOS decides the topology with exact
+# predicates, so only the new vertices can carry machine noise) and are snapped to the grid at
+# once. Snap-rounded overlays (`grid_size`) would be as deterministic, but leave zigzags of
+# 0.01 m steps where two boundaries nearly coincide.
+
+def inter(a, b):
+    """Polygonal intersection on the grid."""
+    if a.is_empty or b.is_empty or apart(a, b):
+        return Polygon()
+    return clean(polygonal(shapely.intersection(a, b)))
+
+
+def diff(a, b):
+    if a.is_empty:
+        return Polygon()
+    if b.is_empty or apart(a, b):
+        return clean(a)
+    return clean(polygonal(shapely.difference(a, b)))
+
+
+def union(geoms):
+    geoms = [g for g in geoms if g is not None and not g.is_empty]
+    if not geoms:
+        return Polygon()
+    return clean(polygonal(shapely.union_all(geoms)))
+
+
+def line_union(lines):
+    lines = [g for g in lines if g is not None and not g.is_empty]
+    return floating(shapely.union_all(lines, grid_size=GRID_M)) if lines else LineString()
+
+
+def along(line, ds) -> np.ndarray:
+    """Points at distances `ds` along a line (grid-snapped vertices), on the grid. Segment
+    lengths are exact square roots; positions use separate elementwise operations."""
+    c = _icoords(line.coords)
+    d = np.diff(c, axis=0)
+    seg = np.sqrt((d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1]).astype(np.float64)) / _SCALE
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    ds = np.clip(np.asarray(ds, dtype=np.float64), 0.0, cum[-1])
+    i = np.clip(np.searchsorted(cum, ds, side="right") - 1, 0, max(len(seg) - 1, 0))
+    if not len(seg):
+        return np.repeat(c[:1] / _SCALE, len(ds), axis=0)
+    f = (ds - cum[i]) / np.where(seg[i] > 0, seg[i], 1.0)
+    a = c[i] / _SCALE
+    b = c[i + 1] / _SCALE
+    x = a[:, 0] + f * (b[:, 0] - a[:, 0])
+    y = a[:, 1] + f * (b[:, 1] - a[:, 1])
+    return np.column_stack([np.rint(x * _SCALE) / _SCALE, np.rint(y * _SCALE) / _SCALE])
+
+
+def line_inter(line, poly):
+    """Linework of `line` inside `poly`, on the grid (vertices rounded, so the lines follow
+    the input vertices without grid zigzags)."""
+    if line.is_empty or poly.is_empty or apart(line, poly):
+        return LineString()
+    out = shapely.intersection(line, poly)
+    lines = [qline(g) for g in shapely.get_parts(out)
+             if g.geom_type in ("LineString", "LinearRing")]
+    lines = [g for g in lines if not g.is_empty]
+    if not lines:
+        return LineString()
+    return lines[0] if len(lines) == 1 else MultiLineString(lines)
+
+
+def coverage_simplify(polys: list, tolerance: float) -> list:
+    """`shapely.coverage_simplify` run on integer grid-unit coordinates, where its triangle
+    areas are exact, so its choices are the same on every machine."""
+    arr = np.array([shapely.transform(p, lambda c: np.rint(c * _SCALE)) for p in polys],
+                   dtype=object)
+    out = shapely.coverage_simplify(arr, tolerance * _SCALE)
+    return [shapely.transform(p, lambda c: c / _SCALE) for p in out]
 
 
 def frame(direction: str) -> tuple[float, float, float, float]:

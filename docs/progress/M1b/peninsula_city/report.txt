@@ -23,25 +23,25 @@ checks:
   [pass] road_duplicates: No near-parallel duplicate roads (within 25 m for over 150 m)
 
 stats:
-  map 10.8 km2, land 5.159 km2 (districts 5.159 km2, unassigned 0.0 km2)
-  water share 52.2% (sea 50.0%)
+  map 10.8 km2, land 5.168 km2 (districts 5.168 km2, unassigned 0.0 km2)
+  water share 52.1% (sea 50.0%)
   landmasses 3 (3 with districts), islands 0
-  rivers 3.29 km; channels separation 1.39 km
-  separation channels 2; boundary between districts on water 63% (target 60%), 5.83 km on water, 3.43 km on land
-  district perimeter facing water 70%; boundary curvature (arc / chord over 400 m) 1.128, land boundaries 1.0346
+  rivers 3.29 km; channels separation 0.81 km
+  separation channels 1; boundary between districts on water 57% (target 60%), 5.25 km on water, 3.99 km on land
+  district perimeter facing water 65%; boundary curvature (arc / chord over 400 m) 1.1138, land boundaries 1.0465
   open land 0 km2
-  inner waterways 5 (1.62 km: basin 0.64, canal 0.98), quays 3.47 km
-  roads avenue 17.01 km, highway 2.29 km; 31 segments, 27 nodes, 1 component(s); exits north_exit
-  bridges 4 (sea 0, river 2, canal 2; 0.19 km of span), pedestrian 0; named: Wallgate Bridge
-  landmasses with districts connected by road 3 of 3; highway planned elevated 59%; megasite reserves 3; road variant 0
+  inner waterways 6 (2.17 km: basin 0.64, canal 1.52), quays 4.48 km
+  roads avenue 16.21 km, highway 2.29 km; 36 segments, 32 nodes, 1 component(s); exits north_exit
+  bridges 5 (sea 0, river 3, canal 2; 0.24 km of span), pedestrian 0; named: Wallgate Bridge
+  landmasses with districts connected by road 3 of 3; highway planned elevated 58%; megasite reserves 3; road variant 0
 
   district                     archetype              landmass  km2    share  target  error
-  Wallgate Heights             residential_heights    lm02      1.070  0.207  0.200   +3.7%  (spec)
-  Neckgate                     transit_hub            lm03      0.586  0.114  0.120   -5.3%  (spec)
-  The Stacks                   megablock_residential  lm01      1.136  0.220  0.220   +0.1%  (spec)
-  Lantern Strip                entertainment_market   lm01      0.672  0.130  0.130   +0.2%  (spec)
-  Eastside Docks               industrial_port        lm01      0.663  0.129  0.130   -1.2%  (spec)
-  Hook Spaceport               spaceport              lm01      1.031  0.200  0.200   -0.1%  (spec)
+  Wallgate Heights             residential_heights    lm02      1.070  0.207  0.200   +3.6%  (spec)
+  Neckgate                     transit_hub            lm01      0.619  0.120  0.120   -0.2%  (spec)
+  The Stacks                   megablock_residential  lm01      1.124  0.217  0.220   -1.2%  (spec)
+  Lantern Strip                entertainment_market   lm03      0.652  0.126  0.130   -3.0%  (spec)
+  Eastside Docks               industrial_port        lm01      0.672  0.130  0.130   +0.0%  (spec)
+  Hook Spaceport               spaceport              lm01      1.031  0.200  0.200   -0.2%  (spec)
 
 notes:
   - megasite 'Hook Spaceport' (spaceport) shrunk to 0.31 km2 (asked 0.50) to fit 'Hook Spaceport'
