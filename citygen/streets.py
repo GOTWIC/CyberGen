@@ -596,6 +596,51 @@ class Builder:
             return True
         return False
 
+    def extend_ray(self, li: int, end: int, max_len: float) -> bool:
+        """A dead end continues straight ahead to the first road it meets (up to max_len),
+        where a junction is allowed and nothing (water, reserves, open land) is in between."""
+        ln = self.lines[li]
+        pts = ln.pts if end == -1 else ln.pts[::-1]
+        p = pts[-1]
+        back, _ = _along(pts[::-1], min(8.0, _plen(pts) / 2))
+        d0 = _unit(p[0] - back[0], p[1] - back[1])
+        tip = _pt(p[0] + d0[0] * max_len, p[1] + d0[1] * max_len)
+        hit = None
+        for tj, k in self.index.near(p, tip, pad=1.0):
+            if tj == li or self.lines[tj].dead:
+                continue
+            t = self.lines[tj]
+            r = _cross_exact(p, tip, t.pts[k], t.pts[k + 1])
+            if r is None or r[0] == p:
+                continue
+            if hit is None or r[1] < hit[1] or (r[1] == hit[1] and tj < hit[2]):
+                hit = (r[0], r[1], tj)
+        if hit is None:
+            return False
+        q, _, tj = hit
+        t = self.lines[tj]
+        if t.cls in ("highway", "footbridge"):
+            return False
+        if not self._legal(t, q, _project(t.pts, q)[0]):
+            return False
+        near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
+        if near:
+            q = min(near, key=lambda j: (_dist(j, q), j))
+        angle = min_angle(self.arch[ln.district]) if ln.district else GRID_ANGLE_DEG
+        if _angle_between(_unit(q[0] - p[0], q[1] - p[1]), self._tangent(t.pts, q)) < angle:
+            return False
+        link = LineString([p, q])
+        if self.wet.intersects(link) or (self.closed.intersects(link) and
+                                         link.intersection(self.closed).length > 0.5):
+            return False
+        new = list(pts) + [q]
+        self.replace_pts(li, new if end == -1 else new[::-1])
+        if q not in t.junctions:
+            t.junctions.append(q)
+        t.inserts.append(q)
+        ln.attached[1 if end == -1 else 0] = True
+        return True
+
     def _legal(self, t: Line, q, s: float) -> bool:
         if any(s0 - 5.0 <= s <= s1 + 5.0 for s0, s1 in t.forbid):
             return False
@@ -1214,7 +1259,7 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
     spacing = max(0.6 * lo, 14.0)
     p_branch = 0.8 if market else 0.72
     p_alley = 0.38 if market else 0.42
-    wobble = 3.0 if market else 4.5
+    wobble = 5.0 if market else 6.5
     shapely.prepare(cell)
     # agents: [pts, heading_deg, cls, since_branch, next_branch, max_len, parent, inserts, edge]
     agents: list[dict] = []
@@ -1255,7 +1300,7 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
             k = round(_wrap(a["head"] - fa) / 90.0)
             want = fa + 90.0 * k
             diff = _wrap(want - a["head"])
-            a["head"] = a["head"] + max(-10.0, min(10.0, 0.45 * diff)) + \
+            a["head"] = a["head"] + max(-10.0, min(10.0, 0.35 * diff)) + \
                 float(rng.uniform(-wobble, wobble))
             h = M.radians(a["head"])
             q = _pt(p[0] + step * M.cos(h), p[1] + step * M.sin(h))
@@ -1350,7 +1395,7 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
                         cls = "alley" if rng.uniform() < p_alley else "street"
                         if a["cls"] == "alley":
                             cls = "alley"
-                        new_agent(q, a["head"] + side * (90.0 + float(rng.uniform(-14.0, 14.0))),
+                        new_agent(q, a["head"] + side * (90.0 + float(rng.uniform(-24.0, 24.0))),
                                   cls, (ai, k_new))
                         agents[-1]["inserts"] = []
                         a["inserts"].append(q)
@@ -1455,7 +1500,11 @@ def block_alleys(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
     lines = [B.lines[i] for i in ids if not B.lines[i].dead]
     if not lines:
         return []
-    row = _buffer([ln.pts for ln in lines], [ln.width for ln in lines])
+    cache = getattr(B, "_row_cache", None)
+    if cache is not None and cache[0] is cell and cache[1] == list(ids):
+        row = cache[2]  # the infill pass just built it
+    else:
+        row = _buffer([ln.pts for ln in lines], [ln.width for ln in lines])
     subs = [p for p in G.parts(G.diff(cell, row)) if G.area(p) > 0]
     out = []
     amax = st.lot_area[1]
@@ -1533,8 +1582,8 @@ def block_limits(arch: str, lo: float, hi: float) -> tuple[float, float]:
     """(width, length) beyond which a block gets an infill street: wider than two lots deep
     (interior lots would have no frontage), or much longer than the archetype block."""
     st = style_of(arch)
-    w = max(2.3 * st.lot_depth[1], 1.3 * hi) if st.perimeter else 2.3 * st.lot_depth[1]
-    return w, max(1.8 * hi, w)
+    w = max(2.3 * st.lot_depth[1], hi) if st.perimeter else 2.3 * st.lot_depth[1]
+    return w, max(1.6 * hi, w)
 
 
 def infill(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
@@ -1542,20 +1591,21 @@ def infill(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
     found no connector, grid lines dropped beside an avenue), until every block is within
     the archetype limits: each cut runs across the long side through the middle."""
     arch = B.arch[name]
-    if style_of(arch).pattern == "campus_loops" and B.dspec[name].street_pattern is None:
-        return []  # campus grounds stay open
     lo, hi = _block_range(B.dspec[name])
     w_lim, l_lim = block_limits(arch, lo, hi)
-    sec = cross_section("street", arch)
+    organic = style_of(arch).organic
+    cls = "alley" if organic else "street"  # organic districts: crooked alleys, not streets
+    sec = cross_section(cls, arch)
     w = sec["total_width_m"]
     out: list[int] = []
+    lines = [B.lines[i] for i in ids if not B.lines[i].dead]
+    row = _buffer([ln.pts for ln in lines], [ln.width for ln in lines]) if lines \
+        else Polygon()
     for _ in range(10):
-        lines = [B.lines[i] for i in ids + out if not B.lines[i].dead]
-        row = _buffer([ln.pts for ln in lines], [ln.width for ln in lines]) if lines \
-            else Polygon()
         subs = sorted((p for p in G.parts(G.diff(cell, row)) if G.area1(p) > 0),
                       key=lambda p: (-G.area1(p), G.qbounds(p)))
         added = 0
+        new: list[int] = []
         for sb in subs:
             (cx, cy), u, v, L, W = _obb(sb)
             if L > l_lim or (W > w_lim and L > 1.2 * w_lim):
@@ -1566,20 +1616,30 @@ def infill(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
                 continue
             t = float(rng.uniform(-0.1, 0.1)) * (L if d is u else W)
             ax = (-d[1], d[0])
+            if organic:  # turned and bent a little
+                tw = M.radians(float(rng.uniform(-18.0, 18.0)))
+                ax = (ax[0] * M.cos(tw) - ax[1] * M.sin(tw), ax[0] * M.sin(tw) + ax[1] * M.cos(tw))
             ext = span / 2 + w + 10.0
-            pts = [_pt(cx + d[0] * t - ax[0] * ext, cy + d[1] * t - ax[1] * ext),
-                   _pt(cx + d[0] * t + ax[0] * ext, cy + d[1] * t + ax[1] * ext)]
+            mx, my = cx + d[0] * t, cy + d[1] * t
+            bend = float(rng.uniform(-0.12, 0.12)) * span if organic else 0.0
+            pts = [_pt(mx - ax[0] * ext, my - ax[1] * ext),
+                   _pt(mx + d[0] * bend, my + d[1] * bend),
+                   _pt(mx + ax[0] * ext, my + ax[1] * ext)]
             for piece in _clip(pts, sb):
                 if _plen(piece) < 30.0:
                     continue
-                li = B.add(Line(piece, "street", w, "infill", name, section=sec))
+                li = B.add(Line(piece, cls, w, "infill", name, section=sec))
                 for end in (0, -1):
                     if G.dist(sb.exterior, Point(B.lines[li].pts[end])) <= 0.6:
                         B.attach(li, end, reach=3.0)
                 out.append(li)
                 added += 1
+                new.append(li)
         if not added:
             break
+        news = [B.lines[i] for i in new if not B.lines[i].dead]
+        row = G.union([row, _buffer([ln.pts for ln in news], [ln.width for ln in news])])
+    B._row_cache = (cell, list(ids) + out, row)
     return out
 
 
@@ -1637,12 +1697,15 @@ def fill_district(B: Builder, name: str) -> list[int]:
                                 True, False)
         elif pat == "campus_loops":
             ids = pattern_loops(B, name, cell, crng, 62.0, 3, 12.0, False, True)
+            if not ids:  # a small cell: a tighter loop
+                ids = pattern_loops(B, name, cell, crng, 40.0, 3, 8.0, False, True)
         elif pat == "radial_ring":
             ids = pattern_radial(B, name, cell, center, r0, max(lo + 25.0, 80.0),
                                  max(hi, lo + 50.0), _rng(d.seed, 14), clearance)
         else:
             ids = []
-        ids += infill(B, name, cell, ids, crng)
+        if not (pat == "campus_loops" and ids):  # campus grounds around a loop stay open
+            ids += infill(B, name, cell, ids, crng)
         ids += block_alleys(B, name, cell, ids, crng)
         out += ids
     T.detail(f"streets/{B.did[name]}", [B.lines[i].pts for i in out])
@@ -1735,9 +1798,12 @@ def link_dead_ends(B: Builder) -> None:
         ln = B.lines[li]
         if ln.dead or ln.cls == "footbridge":
             continue
+        grid = ln.district is not None and not style_of(B.arch[ln.district]).organic and \
+            ln.role.startswith(("grid", "infill"))
         for k, end in ((0, 0), (1, -1)):
             if not ln.attached[k]:
-                B.attach(li, end, reach=22.0)
+                if not B.attach(li, end, reach=22.0) and grid:
+                    B.extend_ray(li, end, 150.0)
     deg: dict = {}
     for n in B.roads.nodes:
         if n["attrs"].get("kind") == "end":
@@ -2157,8 +2223,11 @@ def fix_angles(B: Builder, edges) -> tuple[list, int]:
             dirs = sorted((M.atan2(d[1], d[0]), e, a) for e, a in legs
                           for d in [_leg_dir(edges[e][0], a)])
             k = len(dirs)
+            prim = [B.lines[edges[e][1]].primary is not None for _, e, _ in dirs]
             gaps = [(M.degrees((dirs[(i + 1) % k][0] - dirs[i][0]) % (2 * M.PI)), i)
-                    for i in range(k)]
+                    for i in range(k) if not (prim[i] and prim[(i + 1) % k])]
+            if not gaps:
+                continue
             g, i = min(gaps)
             if g >= want - 1.0:
                 continue
@@ -2190,6 +2259,28 @@ def fix_angles(B: Builder, edges) -> tuple[list, int]:
 
 DUP_GAP_M = 4.0     # right-of-way edges closer than this ...
 DUP_LEN_M = 50.0    # ... over more than this (30 m around shared points aside) duplicate
+
+
+def side_by_side_many(a: LineString, wa: float, others: list, widths: list) -> list[float]:
+    """`side_by_side` of road a against many roads, both ways, with one vectorized first
+    pass (only pairs with over DUP_LEN_M - 1 m within the gap are measured exactly)."""
+    if not others:
+        return []
+    arr = np.array(others, dtype=object)
+    gaps = np.array([(wa + w) / 2 + DUP_GAP_M for w in widths])
+    zones_b = shapely.buffer(arr, gaps, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+    fwd = shapely.length(shapely.intersection(a, zones_b))
+    zones_a = shapely.buffer(a, gaps, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+    back = shapely.length(shapely.intersection(arr, zones_a))
+    out = []
+    for k, (b, w) in enumerate(zip(others, widths)):
+        L = 0.0
+        if fwd[k] > DUP_LEN_M - 1.0:
+            L = side_by_side(a, b, wa, w)
+        if L <= DUP_LEN_M and back[k] > DUP_LEN_M - 1.0:
+            L = max(L, side_by_side(b, a, w, wa))
+        out.append(L)
+    return out
 
 
 def side_by_side(a: LineString, b: LineString, wa: float, wb: float) -> float:
@@ -2234,17 +2325,17 @@ def fix_duplicates(B: Builder, edges) -> tuple[list, int]:
             continue
         a = lines[i]
         wa = B.lines[li].width
-        for j in sorted(int(x) for x in tree.query(a, predicate="dwithin", distance=wa / 2 + 24.0)):
-            if j == i or j in drop:
+        pa = B.lines[li].primary is not None
+        js = [j for j in sorted(int(x) for x in tree.query(a, predicate="dwithin",
+                                                           distance=wa / 2 + 24.0))
+              if j != i and j not in drop and not (pa and B.lines[edges[j][1]].primary)]
+        lens = side_by_side_many(a, wa, [lines[j] for j in js],
+                                 [B.lines[edges[j][1]].width for j in js])
+        for j, L in zip(js, lens):
+            if L <= DUP_LEN_M or j in drop:
                 continue
             lj = edges[j][1]
-            pa, pb = B.lines[li].primary is not None, B.lines[lj].primary is not None
-            if pa and pb:
-                continue
-            L1 = side_by_side(a, lines[j], wa, B.lines[lj].width)
-            L2 = side_by_side(lines[j], a, B.lines[lj].width, wa) if L1 <= DUP_LEN_M else L1
-            if max(L1, L2) <= DUP_LEN_M:
-                continue
+            pb = B.lines[lj].primary is not None
             cand = [k for k, prim in ((i, pa), (j, pb)) if not prim]
             k = min(cand, key=lambda k: (RANK[B.lines[edges[k][1]].cls],
                                          _plen(edges[k][0]), k))

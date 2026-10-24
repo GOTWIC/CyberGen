@@ -348,16 +348,20 @@ def check_junction_placement(m: CityModel, n: _Net):
 
 
 def check_junction_angles(m: CityModel, n: _Net):
-    c = _check("junction_angles", f"Minimum angle between roads at a junction of local roads: "
+    c = _check("junction_angles", f"Minimum angle between a local road and its neighbors at a "
+                                  "junction: "
                                   f"{ST.GRID_ANGLE_DEG:g} degrees in grid districts, "
                                   f"{ST.ORGANIC_ANGLE_DEG:g} in organic ones (old town, "
                                   "entertainment market)")
     for nid, legs in _local_junctions(m, n):
-        dirs = sorted((M.atan2(d[1], d[0]), s.id) for s, a in legs
+        dirs = sorted((M.atan2(d[1], d[0]), s.id, s.road_class in PRIMARY) for s, a in legs
                       for d in [n.leg_dir(s, a)])
-        angs = [d for d, _ in dirs]
-        k = len(angs)
-        gaps = [M.degrees((angs[(i + 1) % k] - angs[i]) % (2 * M.PI)) for i in range(k)]
+        k = len(dirs)
+        # angles next to a local road (two primary roads meeting is M1b's alignment)
+        gaps = [M.degrees((dirs[(i + 1) % k][0] - dirs[i][0]) % (2 * M.PI)) for i in range(k)
+                if not (dirs[i][2] and dirs[(i + 1) % k][2])]
+        if not gaps:
+            continue
         did = n.district_at(n.pos[nid])
         want = ST.min_angle(n.arch.get(did, "midtown_mixed")) if did else ST.GRID_ANGLE_DEG
         if min(gaps) < want - ANGLE_TOL_DEG:
@@ -376,15 +380,13 @@ def check_street_duplicates(m: CityModel, n: _Net):
     tree = shapely.STRtree(lines)
     for i, s in enumerate(segs):
         a = lines[i]
-        for j in sorted(int(x) for x in tree.query(a, predicate="dwithin",
-                                                   distance=s.width_m / 2 + 24.0)):
-            if j <= i:
-                continue
+        js = [j for j in sorted(int(x) for x in tree.query(a, predicate="dwithin",
+                                                           distance=s.width_m / 2 + 24.0))
+              if j > i and not (s.road_class in PRIMARY and segs[j].road_class in PRIMARY)]
+        lens = ST.side_by_side_many(a, s.width_m, [lines[j] for j in js],
+                                    [segs[j].width_m for j in js])
+        for j, L in zip(js, lens):
             t = segs[j]
-            if s.road_class in PRIMARY and t.road_class in PRIMARY:
-                continue  # checked by road_duplicates
-            L = max(ST.side_by_side(a, lines[j], s.width_m, t.width_m),
-                    ST.side_by_side(lines[j], a, t.width_m, s.width_m))
             if L > ST.DUP_LEN_M:
                 c.failures.append(f"segments {s.id} ({s.road_class}) and {t.id} "
                                   f"({t.road_class}) run side by side for {L:.0f} m")

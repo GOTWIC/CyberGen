@@ -334,6 +334,8 @@ def _z_at(prof: list[dict], s: float) -> float:
 
 
 def _with_z(pts, base, prof, s0: float) -> list:
+    if all(p["z"] == 0.0 for p in prof):
+        return [(G.q(p[0]), G.q(p[1]), 0.0) for p in pts]
     out = []
     for p in pts:
         s = ST._project(base, p)[0]

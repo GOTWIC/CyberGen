@@ -3,6 +3,7 @@ open space (stage 10), on the primary network that M1b chose. Returns model rows
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -105,6 +106,9 @@ def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list) -> int:
                 if best is None or (round(d, 6), pts[i]) < (round(best[0], 6), best[1]):
                     best = (d, pts[i], pts[j])
             if best is None or best[0] > 150.0:
+                if _path_along_roads(W, [pts[i] for i in groups[r]],
+                                     [pts[i] for i in groups[main]], segments):
+                    n += 1
                 continue
             link = LineString([best[1], best[2]])
             over = big_u is not None and link.crosses(big_u)
@@ -112,6 +116,71 @@ def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list) -> int:
                   z=6.5 if over else 0.0, joins="walkway island")
             n += 1
     return n
+
+
+def _path_along_roads(W: JN.WalkGraph, island: list, main: list, segments: list) -> bool:
+    """A path beside the roads (a highway shoulder path, say) from a cut-off walkway group to
+    the main one: the shortest road route between road nodes within 40 m of each group."""
+    import heapq
+
+    ends: dict = {}
+    adj: dict = {}
+    for s in segments:
+        a, b = tuple(s["centerline"][0]), tuple(s["centerline"][-1])
+        L = s["attrs"]["length_m"]
+        adj.setdefault(a, []).append((b, L, s["id"], False))
+        adj.setdefault(b, []).append((a, L, s["id"], True))
+        ends[s["id"]] = s["centerline"]
+    rnodes = sorted(adj)
+    if not rnodes:
+        return False
+    rarr = shapely.points(np.array(rnodes, dtype=np.float64))
+    rtree = shapely.STRtree(rarr)
+
+    def near(group):
+        out = {}
+        garr = shapely.points(np.array(group, dtype=np.float64))
+        gi, ri = rtree.query(garr, predicate="dwithin", distance=40.0)
+        for g, k in zip(gi.tolist(), ri.tolist()):
+            d = STR._dist(group[g], rnodes[k])
+            key = rnodes[k]
+            if key not in out or (round(d, 6), group[g]) < out[key]:
+                out[key] = (round(d, 6), group[g])
+        return out
+
+    src, dst = near(island), near(main)
+    if not src or not dst:
+        return False
+    dist = {k: 0.0 for k in src}
+    prev: dict = {}
+    heap = [(0.0, k) for k in sorted(src)]
+    hit = None
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d > dist.get(u, math.inf):
+            continue
+        if u in dst:
+            hit = u
+            break
+        for v, L, sid, rev in adj.get(u, []):
+            nd = d + L
+            if nd < dist.get(v, math.inf) - 1e-9:
+                dist[v] = nd
+                prev[v] = (u, sid, rev)
+                heapq.heappush(heap, (nd, v))
+    if hit is None:
+        return False
+    chain = []
+    v = hit
+    while v in prev:
+        u, sid, rev = prev[v]
+        line = ends[sid] if not rev else ends[sid][::-1]
+        chain = [tuple(p) for p in line] + chain[1:]
+        v = u
+    start, goal = v, hit
+    pts = [src[start][1]] + ([tuple(p) for p in chain] if chain else [start]) + [dst[goal][1]]
+    W.add("path", pts, 2.0, joins="walkway island", beside="roads")
+    return True
 
 
 def build_local(spec, b, did: dict, mapper=None) -> Local:

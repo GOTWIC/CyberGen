@@ -262,6 +262,21 @@ class Splitter:
                         for k in front:
                             out += self.split(k, depth + 2)
                         return out
+            # last resort: the strip within the deepest lot of the street is the lot, the
+            # rest a back garden
+            edge = shapely.intersection(poly.exterior, self.zone)
+            if not edge.is_empty:
+                strip = G.qpoly(edge.buffer(self.st.lot_depth[1], cap_style="flat",
+                                            join_style="mitre"))
+                front = [k for k in G.parts(G.inter(poly, strip))
+                         if G.area1(k) >= 0.8 * self.amin and self.frontage(k) >= self.fmin]
+                if front and G.area1(front[0]) < 0.9 * A:
+                    rest = G.diff(poly, G.union(front))
+                    self.courts += G.parts(rest)
+                    out = []
+                    for k in front:
+                        out += self.split(k, depth + 2)
+                    return out
         return [poly]
 
 
@@ -469,7 +484,7 @@ def _ensure_frontage(recs: list, front: Frontage) -> tuple[list, list]:
     return recs, extra
 
 
-CHUNK_LOTS = 400.0   # about this many lots per worker job
+CHUNK_LOTS = 250.0   # about this many lots per worker job
 
 
 def build_blocks(spec, B, net, J, mapper=None) -> dict:
@@ -493,7 +508,12 @@ def build_blocks(spec, B, net, J, mapper=None) -> dict:
                      "cores": G.inter(cores, clip) if not cores.is_empty else Polygon(),
                      "segments": segs})
     mapper = mapper or (lambda fn, js: [fn(j) for j in js])
-    results = mapper(district_lots, jobs)
+    # the biggest districts first (the slowest jobs start early); results back in spec order
+    order = sorted(range(len(jobs)), key=lambda k: (-G.area1(jobs[k]["polygon"]), k))
+    done = mapper(district_lots, [jobs[k] for k in order])
+    results = [None] * len(jobs)
+    for k, r in zip(order, done):
+        results[k] = r
     # lots: blocks in chunks of about CHUNK_LOTS lots (the result does not depend on how
     # they are grouped: each block's lots depend only on the block, its seed and its roads)
     flat = []

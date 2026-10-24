@@ -193,7 +193,7 @@ def render(b, out, dpi: int = 110) -> None:
     w, h = maxx - minx, maxy - miny
     fig_w, ax_w = 12.0, 8.4
     ax_h = ax_w * h / w
-    fig_h = max(ax_h + 1.1, 7.5)
+    fig_h = max(ax_h + (1.35 if m.blocks else 1.1), 7.5)
     fig = plt.figure(figsize=(fig_w, fig_h), facecolor=BG, dpi=dpi)
     ax = fig.add_axes([0.02, 0.3 / fig_h, ax_w / fig_w, ax_h / fig_h])
     top = 1 - 0.25 / fig_h

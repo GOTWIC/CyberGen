@@ -1,14 +1,15 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways and primary roads, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots and open space, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
 
 You are the prompt-to-spec step of citygen (`docs/citygen_scope.md`, section 4.1). You read the
 prompt (and the image, if any), write `city_spec.json`, validate it until it passes, render the
-schematic, build the city (water, districts, waterways, primary roads and bridges), read the
-check report and preview, adjust the spec if needed, and report. Everything after the spec is deterministic offline code.
+schematic, build the city (water, districts, waterways, primary roads and bridges, local
+streets, junctions, blocks, lots and open space), read the check report and previews, adjust the
+spec if needed, and report. Everything after the spec is deterministic offline code.
 
 ## Hard rules
 
@@ -43,8 +44,9 @@ place:
   of what you inferred and every default you chose on purpose).
 - `city_spec.json`: the spec.
 - `schematic.png`: the rendered schematic.
-- `out/`: the build (`city_model.json`, `preview_map.png`, `report.json`, `report.txt`); it is
-  regenerated from the spec, so commit only what the user asks for.
+- `out/`: the build (`city_model.json`, `preview_map.png`, `preview_detail.png`,
+  `report.json`, `report.txt`); it is regenerated from the spec, so commit only what the user
+  asks for.
 
 Start the spec with `"$schema": "<relative path to>/citygen/schemas/city_spec.schema.json"` so
 editors can check it. Full schema: `citygen spec schema` (or that file).
@@ -232,7 +234,7 @@ relations, `sea_share`, river `from`/`to`, island `position`) and rerun steps 3 
 three rounds. Unassigned land (dark gray) means the districts' shares did not reach it, usually
 land cut off by a river; that is fine for a schematic.
 
-### 6. Build, read the report, look at the preview
+### 6. Build, read the report, look at the previews
 
 ```bash
 citygen build cities/<slug>/city_spec.json cities/<slug>/out/
@@ -247,7 +249,17 @@ network: highways in the `highways.pattern` with the `exits` leaving the map, av
 rotated grids, ring roads around transit hubs and central parks, and chords at each district's
 grid angle until its archetype spacing is met), and bridges wherever a road crosses water
 (sea channel and port approach 25 m clearance, river 10 to 15 m, canal 3 to 4 m, with approach
-ramps at 6%). It writes `city_model.json`, `preview_map.png`, `report.json` and `report.txt`,
+ramps at 6%). Then the local network (M2): streets by archetype (rotated grids in the corporate
+core, superblocks with service lanes, a grid with a park ring in midtown, organic streets with
+alleys and dead ends in the old town and markets, long-block grids and quay roads in the port,
+loops and cul-de-sacs in residential heights, campus loops, radial and ring streets around a
+transit hub, service rings around megasite reserves), frontage streets along highways,
+streets on land boundaries between districts, waterfront promenades, footbridges over canals
+every 150 to 300 m; junction polygons with corner radii, sidewalks, signals and crosswalks;
+the lane graph and the walkway graph; blocks, lots (narrow shopfront lots in old towns and
+markets, large lots in the corporate core and port, merged lot groups for complexes), and
+open space (parks, plazas, pocket parks, courtyards, the spec's named places). It writes
+`city_model.json`, `preview_map.png`, `preview_detail.png`, `report.json` and `report.txt`,
 and exits 0 when every check passes, 1 when one fails (2 on usage or file errors).
 
 1. Read `report.txt`. Each failed check names the district, island, segment or bridge and why:
@@ -258,8 +270,15 @@ and exits 0 when every check passes, 1 when one fails (2 on usage or file errors
    no avenue, a named bridge not built, a bridge whose clearance does not match its water, a
    road through a megasite, a flight cone, a marsh or a park, a curve under the minimum radius
    (highway 150 m, avenue 40 m), a segment that is too short, two roads running as near
-   duplicates. The stats give the boundary between districts on water (against the target),
-   road km by class, bridges by class, named bridges and exits.
+   duplicates. M2 checks: the street, lane and walkway graphs connected, every lot with street
+   frontage, lot and block sizes in the archetype range, no sliver lots or blocks, sidewalk
+   clear path at least 1.8 m, crosswalks at signalized junctions, no junction on a bridge or
+   ramp, minimum junction angles (60 degrees in grids, 35 in organic districts), no
+   near-duplicate local streets, open space share in the archetype range, every named place
+   built. The stats give the boundary between districts on water (against the target),
+   road km by class, bridges by class, named bridges and exits, and for M2 junctions by type,
+   crosswalks, lanes, walkways, blocks, lots, the lot size distribution per archetype and the
+   open space share per district.
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
    where asked, land left without a district (hatched) only where the prompt allows it, open
@@ -268,8 +287,19 @@ and exits 0 when every check passes, 1 when one fails (2 on usage or file errors
    every district; bridges colored by class (pink sea, orange river, teal canal) with named
    bridges labeled where the prompt or image puts them; few long pink bridges; megasite
    reserves (cross-hatched) and flight cones (dotted) kept free of roads. Roads that end at
-   the map edge continue beyond the map; they are not exits.
-3. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
+   the map edge continue beyond the map; they are not exits. Then the local layer: blocks
+   tinted by district with lot lines, streets drawn to scale (light gray), alleys, service
+   lanes (tan), promenades (pale green), footbridges (pink), open space (green parks, sand
+   plazas). Each district should read differently: a regular grid at the asked angle in the
+   corporate core, dense irregular blocks with many small lots in the old town and markets,
+   long blocks in the port, curving loops in residential heights. Large empty areas inside a
+   district, or the same grid everywhere, mean something is wrong.
+3. Open `preview_detail.png`: four 400 m insets of contrasting districts at street level
+   (asphalt with curbs, sidewalks, medians, lane markings, zebra crosswalks, one-way arrows,
+   lots, open space). Look for believable junctions (rounded corners, crosswalks at the big
+   ones), lots that face their street, shopfront rows in the old town, and no streets that
+   stop just short of another.
+4. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass
    (an island, a bank between two rivers); drop a placement rule the geometry cannot meet (for
@@ -278,8 +308,13 @@ and exits 0 when every check passes, 1 when one fails (2 on usage or file errors
    between districts. For roads: change `highways.pattern` or `exits` when the highways read
    wrong; name a bridge in `water.bridges.named` (with `connects` and `crosses`) to put a major
    crossing where the prompt wants it; check that each named bridge connects places that are
-   really across the named water.
-4. At most three build rounds. If checks still fail, stop and report them with what you tried;
+   really across the named water. For local streets: `street_pattern` (one of the archetype
+   patterns: rotated_grid, grid, large_grid, superblocks, grid_ring_park, organic,
+   curvilinear, campus_loops, radial_ring, service_roads), `grid_angle_deg` and
+   `block_size_m` per district; named `places` (plaza, park, garden, market, promenade,
+   waterfront, street, pedestrian_street, ...) with a `position` put them where the prompt
+   wants.
+5. At most three build rounds. If checks still fail, stop and report them with what you tried;
    if you believe citygen itself is wrong, say so instead of editing it.
 
 ### 7. Report
@@ -292,7 +327,8 @@ Reply with:
 - the remaining validation warnings, if any;
 - the schematic and the build preview (attach or link the PNGs), plus the check result and the
   stats from `report.txt` (land, water share, landmasses, waterway km, district shares, road
-  km by class, bridges by class, named bridges, exits).
+  km by class, bridges by class, named bridges, exits, blocks, lots, junctions, open space
+  share), and `preview_detail.png`.
 
 ## Minimal example
 
@@ -313,5 +349,6 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
-(previews and reports): `docs/progress/M1b/` with roads (specs in `docs/progress/M1a2/`, the
-water and district builds there and in `docs/progress/M1a/`).
+(previews and reports): `docs/progress/M2/` with local streets, blocks and lots,
+`docs/progress/M1b/` with primary roads (specs in `docs/progress/M1a2/`, the water and
+district builds there and in `docs/progress/M1a/`).
