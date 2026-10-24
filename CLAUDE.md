@@ -11,9 +11,12 @@ Assets can be built with Claude (Blender, PCG) or sourced (Fab, MetaHuman) where
 - `reference/corporate_core_reference.png`: AI-generated concept map of the district. It is drawn in a
   planometric style: the ground plan is true shape (seen straight down) and buildings rise straight up
   the screen. Buildings in this district sit on a 45-degree grid.
-- `maps/corporate_core.svg`: THE working file. Swagnik traces the reference in Inkscape 1.4, Claude
-  cleans it up, and he keeps editing the cleaned file. Never replace it with a fresh export; always
-  edit in place so his layers, labels and reference image survive. Do not make backup copies.
+- `maps/corporate_core_v<version>.svg`: the working file is the highest version (compared numerically,
+  so v1.10 is newer than v1.9). Swagnik traces the reference in Inkscape 1.4 and saves new versions
+  himself; Claude's cleanup output becomes the next patch version (v1.0 traced -> v1.0.1 cleaned), and
+  he keeps editing from there. Never overwrite or delete an existing version, and never replace one
+  with a fresh export, so his layers, labels and reference image survive. All versions are committed.
+  No other backup copies.
 - The island is about 1019 x 1059 m. Canvas is 1200 x 1200, 1 SVG unit = 1 meter.
 
 ### SVG conventions (layers matched by name, case and spaces ignored)
@@ -31,7 +34,8 @@ the SVG yet; add one between highway and street if needed.
 
 ## Pipeline (`pipeline/`)
 
-`./pipeline/run_pipeline.sh maps/corporate_core.svg out` runs, in order:
+`./pipeline/run_pipeline.sh` (newest `maps/corporate_core_v*.svg` into `out/`; an explicit
+`input.svg` and output dir can be passed) runs, in order:
 
 1. `cleanup_svg.py`: idempotent cleanup (a second run changes nothing).
    - building/landmark: open 3-point and closed 4-point paths become exact rectangles; angles within
@@ -40,7 +44,9 @@ the SVG yet; add one between highway and street if needed.
      pointing north, straight cut ends, identical concave circular-arc edges), re-fitted from its current
      size and position each run, kept on the landmark layer, height label 480 if unlabeled.
    - writes with lxml so Inkscape structure is preserved.
-   `run_pipeline.sh` writes the cleaned result back into the input SVG, and only when something changed.
+   If cleanup changed anything, `run_pipeline.sh` saves the result as the next patch version
+   (`map_version.py`) and runs the rest on it; it refuses to overwrite an existing file. An unchanged
+   file produces no new version.
 2. `svg_to_plan.py`: writes `geometry.json` (render geometry) and `corporate_core_plan.json`
    (box/cylinder primitives for Unreal; plan coords x=east, y=north, meters, origin at canvas center).
 3. `render_map.py`: `map_2d.png`, plan alone and plan over the reference image.

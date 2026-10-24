@@ -3,7 +3,7 @@
   "name": "Corporate Core (traced)",
   "units": "meters",
   "axes": "x=east, y=north, z=up",
-  "source": "corporate_core.svg",
+  "source": "corporate_core_v1.0.1.svg",
   "player_start": [
    0,
    -300,
