@@ -1,6 +1,7 @@
-"""Command line: `citygen spec validate|render|schema`, `citygen model schema`.
+"""Command line: `citygen spec validate|render|schema`, `citygen build`, `citygen model schema`.
 
-Exit codes: 0 valid, 1 invalid spec (errors printed), 2 usage or file error.
+Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
+2 usage or file error.
 """
 
 from __future__ import annotations
@@ -79,6 +80,33 @@ def cmd_render(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_build(args: argparse.Namespace) -> int:
+    result = _load(args.spec)
+    if isinstance(result, int):
+        return result
+    _print_issues(result, quiet=True)
+    if not result.ok:
+        print(f"INVALID: {args.spec}: {len(result.errors)} error(s); nothing built",
+              file=sys.stderr)
+        return EXIT_INVALID
+    from .build import build_city, write_outputs  # shapely, matplotlib only here
+
+    built = build_city(result, max_variants=args.variants)
+    paths = write_outputs(built, args.out_dir, dpi=args.dpi)
+    for p in paths:
+        print(f"wrote {p}")
+    failed = [c for c in built.checks if not c.passed]
+    if failed:
+        for c in failed:
+            for f in c.failures:
+                print(f"check failed: {c.id}: {f}", file=sys.stderr)
+        print(f"FAIL: {built.spec.name}: {len(failed)} check(s) failed; see "
+              f"{Path(args.out_dir) / 'report.txt'}", file=sys.stderr)
+        return EXIT_INVALID
+    print(f"PASS: {built.spec.name}: all {len(built.checks)} checks passed")
+    return EXIT_OK
+
+
 def _write_json(data: dict, out: str | None) -> int:
     text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if out:
@@ -121,6 +149,15 @@ def build_parser() -> argparse.ArgumentParser:
     sc = ssub.add_parser("schema", help="print or write the spec JSON Schema")
     sc.add_argument("out", nargs="?")
     sc.set_defaults(func=cmd_spec_schema)
+
+    b = sub.add_parser("build", help="build the city model, checks and preview (M1a: water, "
+                                     "districts, waterways)")
+    b.add_argument("spec")
+    b.add_argument("out_dir")
+    b.add_argument("--dpi", type=int, default=110)
+    b.add_argument("--variants", type=int, default=12,
+                   help="hydrology variants to try at most (default 12)")
+    b.set_defaults(func=cmd_build)
 
     model = sub.add_parser("model", help="city model tools")
     msub = model.add_subparsers(dest="command", required=True)

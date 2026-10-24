@@ -1,0 +1,160 @@
+{
+  "name": "Greyhook",
+  "seed": 9081,
+  "stage": "M1a (water, districts, waterways)",
+  "passed": true,
+  "variant": 9,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "'Wallgate Heights': separated_by 'wall' is checked from M1b (roads, walls)"
+      ]
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 10.8,
+    "land_km2": 5.083,
+    "district_land_km2": 5.083,
+    "water_share": 0.5293,
+    "sea_share": 0.5,
+    "landmasses": 6,
+    "landmasses_with_districts": 6,
+    "unassigned_land_km2": 0.0,
+    "islands": 0,
+    "river_km": 3.16,
+    "channel_km": {
+      "separation": 4.06
+    },
+    "separation_channels": 5,
+    "waterway_km": 1.89,
+    "waterway_km_by_kind": {
+      "basin": 0.48,
+      "canal": 1.41
+    },
+    "waterways": 6,
+    "quay_km": 4.1,
+    "district_boundary_on_water": 0.999,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Wallgate Heights",
+        "archetype": "residential_heights",
+        "landmass": "lm02",
+        "area_km2": 1.084,
+        "share": 0.2133,
+        "target": 0.2,
+        "target_source": "spec",
+        "error": 0.0664
+      },
+      {
+        "id": "d02",
+        "name": "Neckgate",
+        "archetype": "transit_hub",
+        "landmass": "lm06",
+        "area_km2": 0.601,
+        "share": 0.1182,
+        "target": 0.12,
+        "target_source": "spec",
+        "error": -0.0152
+      },
+      {
+        "id": "d03",
+        "name": "The Stacks",
+        "archetype": "megablock_residential",
+        "landmass": "lm01",
+        "area_km2": 1.087,
+        "share": 0.2138,
+        "target": 0.22,
+        "target_source": "spec",
+        "error": -0.0282
+      },
+      {
+        "id": "d04",
+        "name": "Lantern Strip",
+        "archetype": "entertainment_market",
+        "landmass": "lm05",
+        "area_km2": 0.635,
+        "share": 0.1248,
+        "target": 0.13,
+        "target_source": "spec",
+        "error": -0.0396
+      },
+      {
+        "id": "d05",
+        "name": "Eastside Docks",
+        "archetype": "industrial_port",
+        "landmass": "lm04",
+        "area_km2": 0.657,
+        "share": 0.1291,
+        "target": 0.13,
+        "target_source": "spec",
+        "error": -0.0065
+      },
+      {
+        "id": "d06",
+        "name": "Hook Spaceport",
+        "archetype": "spaceport",
+        "landmass": "lm03",
+        "area_km2": 1.021,
+        "share": 0.2008,
+        "target": 0.2,
+        "target_source": "spec",
+        "error": 0.0038
+      }
+    ]
+  },
+  "notes": []
+}

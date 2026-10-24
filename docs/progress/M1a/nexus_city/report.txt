@@ -1,0 +1,31 @@
+citygen build report: Nexus City (seed 1207, M1a (water, districts, waterways))
+result: PASS  (hydrology variant 2)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+
+stats:
+  map 11.56 km2, land 8.258 km2 (districts 8.258 km2, unassigned 0.0 km2)
+  water share 28.6% (sea 20.1%)
+  landmasses 9 (9 with districts), islands 1
+  rivers 2.52 km; channels delta_branch 2.76 km, sea_channel 3.51 km, separation 6.97 km
+  separation channels 6; district boundary on water 100%
+  inner waterways 17 (7.08 km: canal 4.63, creek 2.44), quays 13.51 km
+
+  district                     archetype              landmass  km2    share  target  error
+  Corporate Core               corporate_core         lm04      1.064  0.129  0.140   -7.9%  (spec)
+  Transit Nexus                transit_hub            lm08      0.539  0.065  0.070   -6.8%  (spec)
+  Aurora Spaceport             spaceport              lm06      0.765  0.093  0.100   -7.4%  (spec)
+  Neon Market                  entertainment_market   lm07      0.754  0.091  0.100   -8.6%  (spec)
+  Northridge                   residential_heights    lm05      0.847  0.102  0.110   -6.8%  (spec)
+  Midtown                      midtown_mixed          lm01      1.339  0.162  0.150   +8.1%  (spec)
+  Old Town                     old_town               lm02      1.266  0.153  0.140   +9.5%  (spec)
+  Harbor Industrial            industrial_port        lm03      1.234  0.149  0.140   +6.8%  (spec)
+  Silver Island                research_campus        lm09      0.450  0.054  0.050   +9.0%  (spec)

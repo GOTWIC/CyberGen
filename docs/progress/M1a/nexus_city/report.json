@@ -1,0 +1,193 @@
+{
+  "name": "Nexus City",
+  "seed": 1207,
+  "stage": "M1a (water, districts, waterways)",
+  "passed": true,
+  "variant": 2,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 11.56,
+    "land_km2": 8.258,
+    "district_land_km2": 8.258,
+    "water_share": 0.2856,
+    "sea_share": 0.2011,
+    "landmasses": 9,
+    "landmasses_with_districts": 9,
+    "unassigned_land_km2": 0.0,
+    "islands": 1,
+    "river_km": 2.52,
+    "channel_km": {
+      "delta_branch": 2.76,
+      "sea_channel": 3.51,
+      "separation": 6.97
+    },
+    "separation_channels": 6,
+    "waterway_km": 7.08,
+    "waterway_km_by_kind": {
+      "canal": 4.63,
+      "creek": 2.44
+    },
+    "waterways": 17,
+    "quay_km": 13.51,
+    "district_boundary_on_water": 0.9999,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm04",
+        "area_km2": 1.064,
+        "share": 0.1289,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": -0.0794
+      },
+      {
+        "id": "d02",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm08",
+        "area_km2": 0.539,
+        "share": 0.0652,
+        "target": 0.07,
+        "target_source": "spec",
+        "error": -0.0684
+      },
+      {
+        "id": "d03",
+        "name": "Aurora Spaceport",
+        "archetype": "spaceport",
+        "landmass": "lm06",
+        "area_km2": 0.765,
+        "share": 0.0926,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0738
+      },
+      {
+        "id": "d04",
+        "name": "Neon Market",
+        "archetype": "entertainment_market",
+        "landmass": "lm07",
+        "area_km2": 0.754,
+        "share": 0.0914,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0864
+      },
+      {
+        "id": "d05",
+        "name": "Northridge",
+        "archetype": "residential_heights",
+        "landmass": "lm05",
+        "area_km2": 0.847,
+        "share": 0.1025,
+        "target": 0.11,
+        "target_source": "spec",
+        "error": -0.0679
+      },
+      {
+        "id": "d06",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm01",
+        "area_km2": 1.339,
+        "share": 0.1622,
+        "target": 0.15,
+        "target_source": "spec",
+        "error": 0.0813
+      },
+      {
+        "id": "d07",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm02",
+        "area_km2": 1.266,
+        "share": 0.1532,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0946
+      },
+      {
+        "id": "d08",
+        "name": "Harbor Industrial",
+        "archetype": "industrial_port",
+        "landmass": "lm03",
+        "area_km2": 1.234,
+        "share": 0.1495,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0676
+      },
+      {
+        "id": "d09",
+        "name": "Silver Island",
+        "archetype": "research_campus",
+        "landmass": "lm09",
+        "area_km2": 0.45,
+        "share": 0.0545,
+        "target": 0.05,
+        "target_source": "spec",
+        "error": 0.0898
+      }
+    ]
+  },
+  "notes": []
+}

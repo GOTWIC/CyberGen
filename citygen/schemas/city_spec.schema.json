@@ -1102,25 +1102,88 @@
           "type": "string"
         },
         "from": {
-          "description": "Map edge where the river enters.",
-          "enum": [
-            "north",
-            "north_east",
-            "east",
-            "south_east",
-            "south",
-            "south_west",
-            "west",
-            "north_west"
+          "anyOf": [
+            {
+              "enum": [
+                "north",
+                "north_east",
+                "east",
+                "south_east",
+                "south",
+                "south_west",
+                "west",
+                "north_west"
+              ]
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "edge": {
+                  "enum": [
+                    "north",
+                    "north_east",
+                    "east",
+                    "south_east",
+                    "south",
+                    "south_west",
+                    "west",
+                    "north_west"
+                  ]
+                },
+                "at": {
+                  "description": "Position along the edge, 0 to 1: west to east on the north and south edges, south to north on the east and west edges; on a diagonal edge 0 is the middle of the first-named side, 0.5 the corner, 1 the middle of the second side. Default 0.5.",
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "edge"
+              ],
+              "type": "object"
+            }
           ],
-          "title": "From",
-          "type": "string"
+          "description": "Map edge where the river enters, or {edge, at} to pin where along that edge.",
+          "title": "From"
         },
         "to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "edge": {
+                  "enum": [
+                    "north",
+                    "north_east",
+                    "east",
+                    "south_east",
+                    "south",
+                    "south_west",
+                    "west",
+                    "north_west",
+                    "sea",
+                    "bay"
+                  ]
+                },
+                "at": {
+                  "description": "Position along the edge, 0 to 1: west to east on the north and south edges, south to north on the east and west edges; on a diagonal edge 0 is the middle of the first-named side, 0.5 the corner, 1 the middle of the second side. Default 0.5.",
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "edge"
+              ],
+              "type": "object"
+            }
+          ],
           "default": "sea",
-          "description": "Mouth: 'sea', 'bay', a map edge direction, or the name of another river (tributary).",
-          "title": "To",
-          "type": "string"
+          "description": "Mouth: 'sea', 'bay', a map edge direction, or the name of another river (tributary). {edge, at} pins the mouth along a map edge (for 'sea' and 'bay': along the sea-side edge).",
+          "title": "To"
         },
         "width_m": {
           "anyOf": [

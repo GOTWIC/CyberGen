@@ -1,0 +1,29 @@
+citygen build report: Greyhook (seed 9081, M1a (water, districts, waterways))
+result: PASS  (hydrology variant 9)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+         note: 'Wallgate Heights': separated_by 'wall' is checked from M1b (roads, walls)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+
+stats:
+  map 10.8 km2, land 5.083 km2 (districts 5.083 km2, unassigned 0.0 km2)
+  water share 52.9% (sea 50.0%)
+  landmasses 6 (6 with districts), islands 0
+  rivers 3.16 km; channels separation 4.06 km
+  separation channels 5; district boundary on water 100%
+  inner waterways 6 (1.89 km: basin 0.48, canal 1.41), quays 4.1 km
+
+  district                     archetype              landmass  km2    share  target  error
+  Wallgate Heights             residential_heights    lm02      1.084  0.213  0.200   +6.6%  (spec)
+  Neckgate                     transit_hub            lm06      0.601  0.118  0.120   -1.5%  (spec)
+  The Stacks                   megablock_residential  lm01      1.087  0.214  0.220   -2.8%  (spec)
+  Lantern Strip                entertainment_market   lm05      0.635  0.125  0.130   -4.0%  (spec)
+  Eastside Docks               industrial_port        lm04      0.657  0.129  0.130   -0.7%  (spec)
+  Hook Spaceport               spaceport              lm03      1.021  0.201  0.200   +0.4%  (spec)

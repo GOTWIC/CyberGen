@@ -27,6 +27,7 @@ from shapely.ops import nearest_points, unary_union  # noqa: E402
 
 from . import presets  # noqa: E402
 from .defaults import derive_seed  # noqa: E402
+from .geom import edge_point  # noqa: E402
 from .spec import EXIT_RE, CitySpec  # noqa: E402
 
 ARCHETYPE_COLORS = {
@@ -259,14 +260,19 @@ def build_water(spec: CitySpec, lay: Layout) -> None:
         group = same_side[r.from_]
         k = group.index(r.name)
         start = _edge_point(canvas, r.from_, (k - (len(group) - 1) / 2) * 0.28 * edge_len)
+        if r.from_at is not None:
+            start = edge_point(canvas, r.from_, r.from_at)
         if r.to in by_name:
             end = by_name[r.to].interpolate(0.55, normalized=True).coords[0]
         elif r.to in presets.DIRECTIONS:
-            end = _edge_point(canvas, r.to)
+            end = _edge_point(canvas, r.to) if r.to_at is None else \
+                edge_point(canvas, r.to, r.to_at)
         elif coast_line.is_empty:
             end = _edge_point(canvas, presets.opposite(r.from_))
         else:
-            if r.to == "bay":
+            if r.to_at is not None:
+                aim = edge_point(canvas, spec.water.coast.side, r.to_at)
+            elif r.to == "bay":
                 aim = (ux * lay.ext * 0.8, uy * lay.ext * 0.8)
             else:
                 aim = (start[0] + ux * 2 * lay.ext, start[1] + uy * 2 * lay.ext)
