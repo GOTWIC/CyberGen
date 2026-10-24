@@ -70,6 +70,13 @@ def test_ranges(minimal):
     assert_error(minimal, "grime", "less than or equal to 1", "min <= max")
 
 
+def test_size_is_width_height_not_range(minimal):
+    minimal["size_km"] = [3.5, 3.0]  # wider than tall is fine
+    assert validate_spec(minimal).ok
+    minimal["size_km"] = [3.0, 25]
+    assert_error(minimal, "size_km", "each side must lie within 0.5 to 20 km")
+
+
 def test_transit_altitude_outside_mode(minimal):
     minimal["transit"]["lines"][1]["altitude_m"] = [20, 90]
     assert_error(minimal, "outside the maglev range 15 to 60 m")

@@ -108,6 +108,16 @@ def _range(lo: float, hi: float, unit: str = "m"):
     return AfterValidator(check)
 
 
+def _size(lo: float, hi: float):
+    """[width, height]: two independent extents, not a [min, max] range."""
+    def check(v: tuple[float, float]) -> tuple[float, float]:
+        if not all(lo <= x <= hi for x in v):
+            raise ValueError(f"each side must lie within {lo:g} to {hi:g} km, got [{v[0]:g}, {v[1]:g}]")
+        return (float(v[0]), float(v[1]))
+
+    return AfterValidator(check)
+
+
 def _to_list(v: Any) -> Any:
     return [v] if isinstance(v, str) else v
 
@@ -419,7 +429,8 @@ class CitySpec(_Model):
     name: Name
     seed: Annotated[int, Field(ge=0, lt=2**31)] | None = Field(
         None, description="Default: derived from the name.")
-    size_km: Annotated[tuple[float, float], _range(0.5, 20, "km")] = (3.0, 3.0)
+    size_km: Annotated[tuple[float, float], _size(0.5, 20)] = Field(
+        (3.0, 3.0), description="[width east-west, height north-south] in km.")
     source: Source | None = None
     water: Water = Field(default_factory=Water)
     highways: Highways = Field(default_factory=Highways)

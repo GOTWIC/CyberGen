@@ -1487,6 +1487,7 @@
         3.0,
         3.0
       ],
+      "description": "[width east-west, height north-south] in km.",
       "maxItems": 2,
       "minItems": 2,
       "prefixItems": [
