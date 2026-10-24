@@ -1,0 +1,1541 @@
+{
+  "$defs": {
+    "Bridges": {
+      "additionalProperties": false,
+      "properties": {
+        "density": {
+          "default": 0.5,
+          "description": "Road bridges per crossing opportunity.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Density",
+          "type": "number"
+        },
+        "footbridge_density": {
+          "default": 0.5,
+          "description": "Low footbridges over canals.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Footbridge Density",
+          "type": "number"
+        },
+        "transit_crossing": {
+          "default": "auto",
+          "description": "Transit lines on their own bridges or as a second deck.",
+          "enum": [
+            "own_bridge",
+            "shared_deck",
+            "auto"
+          ],
+          "title": "Transit Crossing",
+          "type": "string"
+        },
+        "named": {
+          "items": {
+            "$ref": "#/$defs/NamedBridge"
+          },
+          "title": "Named",
+          "type": "array"
+        }
+      },
+      "title": "Bridges",
+      "type": "object"
+    },
+    "Coast": {
+      "additionalProperties": false,
+      "properties": {
+        "form": {
+          "description": "Overall shape of the coast.",
+          "enum": [
+            "bay",
+            "peninsula",
+            "delta",
+            "archipelago",
+            "crescent",
+            "straight"
+          ],
+          "title": "Form",
+          "type": "string"
+        },
+        "side": {
+          "description": "Side of the map where the open sea is.",
+          "enum": [
+            "north",
+            "north_east",
+            "east",
+            "south_east",
+            "south",
+            "south_west",
+            "west",
+            "north_west"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the sea or bay, e.g. 'West Bay'.",
+          "title": "Name"
+        },
+        "sea_share": {
+          "anyOf": [
+            {
+              "maximum": 0.8,
+              "minimum": 0.05,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fraction of the map that is sea, offshore islands included (they are carved out of it). Default by form.",
+          "title": "Sea Share"
+        }
+      },
+      "required": [
+        "form",
+        "side"
+      ],
+      "title": "Coast",
+      "type": "object"
+    },
+    "Complex": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "twin_towers",
+            "tower_cluster",
+            "megabuilding_campus",
+            "bridged_pair",
+            "straddle_building",
+            "campus"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "count": {
+          "default": 1,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Complex",
+      "type": "object"
+    },
+    "District": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "archetype": {
+          "enum": [
+            "corporate_core",
+            "megablock_residential",
+            "midtown_mixed",
+            "entertainment_market",
+            "old_town",
+            "industrial_port",
+            "residential_heights",
+            "research_campus",
+            "transit_hub",
+            "spaceport"
+          ],
+          "title": "Archetype",
+          "type": "string"
+        },
+        "area_share": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 1.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fraction of the land area. Missing shares split the remainder by archetype weight.",
+          "title": "Area Share"
+        },
+        "placement": {
+          "$ref": "#/$defs/Placement"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 2147483648,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Per-district seed; default derived from the city seed and the name.",
+          "title": "Seed"
+        },
+        "street_pattern": {
+          "anyOf": [
+            {
+              "enum": [
+                "rotated_grid",
+                "grid",
+                "large_grid",
+                "superblocks",
+                "grid_ring_park",
+                "organic",
+                "curvilinear",
+                "campus_loops",
+                "radial_ring",
+                "service_roads"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Street Pattern"
+        },
+        "grid_angle_deg": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 90,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grid Angle Deg"
+        },
+        "block_size_m": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Size M"
+        },
+        "height_m": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height M"
+        },
+        "water_separation": {
+          "anyOf": [
+            {
+              "enum": [
+                "water_preferred",
+                "water_required",
+                "none"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default: the city setting.",
+          "title": "Water Separation"
+        },
+        "waterways": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Waterways"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "landmarks": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Landmark"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Landmarks",
+          "type": "array"
+        },
+        "places": {
+          "items": {
+            "$ref": "#/$defs/Place"
+          },
+          "title": "Places",
+          "type": "array"
+        },
+        "complexes": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Complex"
+                  },
+                  {
+                    "enum": [
+                      "twin_towers",
+                      "tower_cluster",
+                      "megabuilding_campus",
+                      "bridged_pair",
+                      "straddle_building",
+                      "campus"
+                    ],
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Complexes"
+        },
+        "megasites": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Megasite"
+                  },
+                  {
+                    "enum": [
+                      "spaceport",
+                      "skyport",
+                      "transit_nexus",
+                      "freight_terminal",
+                      "stadium",
+                      "arcology",
+                      "temple_complex",
+                      "central_park",
+                      "grand_plaza",
+                      "attraction"
+                    ],
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Megasites"
+        },
+        "skybridge_density": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skybridge Density"
+        },
+        "grime": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grime"
+        },
+        "neon": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Neon"
+        },
+        "greenery": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Greenery"
+        }
+      },
+      "required": [
+        "name",
+        "archetype"
+      ],
+      "title": "District",
+      "type": "object"
+    },
+    "Highways": {
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "default": "ring_plus_spine",
+          "enum": [
+            "ring",
+            "ring_plus_spine",
+            "spine",
+            "grid",
+            "radial",
+            "coastal",
+            "none"
+          ],
+          "title": "Pattern",
+          "type": "string"
+        },
+        "exits": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "north",
+                  "north_east",
+                  "east",
+                  "south_east",
+                  "south",
+                  "south_west",
+                  "west",
+                  "north_west"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Off-map exits. Default: land edges.",
+          "title": "Exits"
+        },
+        "elevated_share": {
+          "default": 0.2,
+          "description": "Share of highway length on viaducts.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Elevated Share",
+          "type": "number"
+        },
+        "named": {
+          "items": {
+            "$ref": "#/$defs/NamedHighway"
+          },
+          "title": "Named",
+          "type": "array"
+        }
+      },
+      "title": "Highways",
+      "type": "object"
+    },
+    "Island": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "position": {
+          "description": "Where on the map, relative to the center. Shorthand 'south_west_offshore' sets position and setting together.",
+          "pattern": "^(north|north_east|east|south_east|south|south_west|west|north_west|center)(_(offshore|nearshore|mid_river|delta))?$",
+          "title": "Position",
+          "type": "string"
+        },
+        "setting": {
+          "default": "offshore",
+          "enum": [
+            "offshore",
+            "nearshore",
+            "mid_river",
+            "delta"
+          ],
+          "title": "Setting",
+          "type": "string"
+        },
+        "river": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "River for mid_river and delta islands.",
+          "title": "River"
+        },
+        "area_km2": {
+          "default": 0.5,
+          "exclusiveMinimum": 0.0,
+          "maximum": 20.0,
+          "title": "Area Km2",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "position"
+      ],
+      "title": "Island",
+      "type": "object"
+    },
+    "Landmark": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "snake_case generator kind, e.g. megatower, spire, arcology, ferris_wheel.",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "height_m": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1500,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height M"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Landmark",
+      "type": "object"
+    },
+    "Megasite": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "spaceport",
+            "skyport",
+            "transit_nexus",
+            "freight_terminal",
+            "stadium",
+            "arcology",
+            "temple_complex",
+            "central_park",
+            "grand_plaza",
+            "attraction"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default: '<District> <Kind>'.",
+          "title": "Name"
+        },
+        "area_km2": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 10,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Area Km2"
+        },
+        "edge": {
+          "anyOf": [
+            {
+              "enum": [
+                "north",
+                "north_east",
+                "east",
+                "south_east",
+                "south",
+                "south_west",
+                "west",
+                "north_west",
+                "center"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where in the district.",
+          "title": "Edge"
+        },
+        "coast": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Coast"
+        },
+        "height_limit_m": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Building height cap around the site (spaceport flight cone).",
+          "title": "Height Limit M"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Megasite",
+      "type": "object"
+    },
+    "NamedBridge": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "default": "road",
+          "enum": [
+            "road",
+            "rail",
+            "road_rail",
+            "pedestrian"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "connects": {
+          "description": "Two districts, islands, places or exits ('west_exit') it joins.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Connects",
+          "type": "array"
+        },
+        "crosses": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "River, channel or 'sea'/'bay' it spans.",
+          "title": "Crosses"
+        },
+        "landmark": {
+          "default": true,
+          "title": "Landmark",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "connects"
+      ],
+      "title": "NamedBridge",
+      "type": "object"
+    },
+    "NamedHighway": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "route": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Route",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "route"
+      ],
+      "title": "NamedHighway",
+      "type": "object"
+    },
+    "Place": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "plaza",
+                "park",
+                "garden",
+                "street",
+                "pedestrian_street",
+                "market",
+                "canal",
+                "creek",
+                "waterfront",
+                "promenade",
+                "pier",
+                "docks",
+                "marina",
+                "beach",
+                "gate",
+                "neighborhood",
+                "monument",
+                "station"
+              ],
+              "type": "string"
+            },
+            {
+              "enum": [
+                "spaceport",
+                "skyport",
+                "transit_nexus",
+                "freight_terminal",
+                "stadium",
+                "arcology",
+                "temple_complex",
+                "central_park",
+                "grand_plaza",
+                "attraction"
+              ],
+              "type": "string"
+            }
+          ],
+          "description": "Place kind. A megasite kind (e.g. temple_complex) turns the place into a named megasite when defaults are filled.",
+          "title": "Kind"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "enum": [
+                "north",
+                "north_east",
+                "east",
+                "south_east",
+                "south",
+                "south_west",
+                "west",
+                "north_west",
+                "center"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "waterfront",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Where in the district.",
+          "title": "Position"
+        }
+      },
+      "required": [
+        "name",
+        "kind"
+      ],
+      "title": "Place",
+      "type": "object"
+    },
+    "Placement": {
+      "additionalProperties": false,
+      "properties": {
+        "north_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "North Of"
+        },
+        "north_east_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "North East Of"
+        },
+        "east_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "East Of"
+        },
+        "south_east_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "South East Of"
+        },
+        "south_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "South Of"
+        },
+        "south_west_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "South West Of"
+        },
+        "west_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "West Of"
+        },
+        "north_west_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "North West Of"
+        },
+        "adjacent_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Adjacent To"
+        },
+        "edge": {
+          "anyOf": [
+            {
+              "enum": [
+                "north",
+                "north_east",
+                "east",
+                "south_east",
+                "south",
+                "south_west",
+                "west",
+                "north_west",
+                "center"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map edge or 'center'.",
+          "title": "Edge"
+        },
+        "coast": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "True: on the sea coast. False: inland.",
+          "title": "Coast"
+        },
+        "along_river": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Along River"
+        },
+        "on_island": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Island"
+        },
+        "separated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Boundary kind (water, river, channel, canal, sea, highway, ring_road, rail, wall) or the name of a river.",
+          "title": "Separated By"
+        }
+      },
+      "title": "Placement",
+      "type": "object"
+    },
+    "River": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "default": "river",
+          "description": "'channel' is a wide sea channel or strait (sea-class clearance).",
+          "enum": [
+            "river",
+            "channel"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "from": {
+          "description": "Map edge where the river enters.",
+          "enum": [
+            "north",
+            "north_east",
+            "east",
+            "south_east",
+            "south",
+            "south_west",
+            "west",
+            "north_west"
+          ],
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "default": "sea",
+          "description": "Mouth: 'sea', 'bay', a map edge direction, or the name of another river (tributary).",
+          "title": "To",
+          "type": "string"
+        },
+        "width_m": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "[min, max] width. Default 60 to 120 for rivers, 150 to 300 for channels.",
+          "title": "Width M"
+        },
+        "meander": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "0 straight, 1 strongly meandering.",
+          "title": "Meander"
+        },
+        "delta_branches": {
+          "default": 0,
+          "description": "Extra distributary channels near the mouth, besides the main channel (four channels in total = 3).",
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Delta Branches",
+          "type": "integer"
+        },
+        "branch_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Branch Names",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "from"
+      ],
+      "title": "River",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Repo path of the concept image, if any.",
+          "title": "Image"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "title": "Source",
+      "type": "object"
+    },
+    "Transit": {
+      "additionalProperties": false,
+      "properties": {
+        "hubs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Interchange names (districts, places or megasites). Default: transit hub districts and transit_nexus sites.",
+          "title": "Hubs"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/TransitLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        }
+      },
+      "title": "Transit",
+      "type": "object"
+    },
+    "TransitLine": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "metro",
+            "elevated_rail",
+            "monorail",
+            "maglev",
+            "sky_tube"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "route": {
+          "description": "Stops in order: districts, hubs, places, megasites, islands or '<direction>_exit'. Repeat the first stop at the end for a loop.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Route",
+          "type": "array"
+        },
+        "altitude_m": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "[min, max] track altitude; default by mode, checked against mode limits.",
+          "title": "Altitude M"
+        },
+        "through_towers": {
+          "default": false,
+          "description": "sky_tube only: passes through tower portals.",
+          "title": "Through Towers",
+          "type": "boolean"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        }
+      },
+      "required": [
+        "mode",
+        "name",
+        "route"
+      ],
+      "title": "TransitLine",
+      "type": "object"
+    },
+    "Water": {
+      "additionalProperties": false,
+      "properties": {
+        "coast": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Coast"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rivers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/River"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Left out: one default river.",
+          "title": "Rivers"
+        },
+        "islands": {
+          "items": {
+            "$ref": "#/$defs/Island"
+          },
+          "title": "Islands",
+          "type": "array"
+        },
+        "district_separation": {
+          "default": "water_preferred",
+          "enum": [
+            "water_preferred",
+            "water_required",
+            "none"
+          ],
+          "title": "District Separation",
+          "type": "string"
+        },
+        "bridges": {
+          "$ref": "#/$defs/Bridges"
+        }
+      },
+      "title": "Water",
+      "type": "object"
+    },
+    "Waterways": {
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "anyOf": [
+            {
+              "enum": [
+                "canal_grid",
+                "organic_canals",
+                "creeks",
+                "inlets",
+                "harbor_basins",
+                "marina"
+              ],
+              "type": "string"
+            },
+            {
+              "items": {
+                "enum": [
+                  "canal_grid",
+                  "organic_canals",
+                  "creeks",
+                  "inlets",
+                  "harbor_basins",
+                  "marina"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "One style or a list.",
+          "title": "Style"
+        },
+        "density": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Density",
+          "type": "number"
+        },
+        "named": {
+          "description": "Named canals or basins.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Named",
+          "type": "array"
+        }
+      },
+      "title": "Waterways",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "exclusiveMaximum": 2147483648,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default: derived from the name.",
+      "title": "Seed"
+    },
+    "size_km": {
+      "default": [
+        3.0,
+        3.0
+      ],
+      "description": "[width east-west, height north-south] in km.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Size Km",
+      "type": "array"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Source"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "water": {
+      "$ref": "#/$defs/Water"
+    },
+    "highways": {
+      "$ref": "#/$defs/Highways"
+    },
+    "transit": {
+      "$ref": "#/$defs/Transit"
+    },
+    "districts": {
+      "items": {
+        "$ref": "#/$defs/District"
+      },
+      "maxItems": 24,
+      "minItems": 1,
+      "title": "Districts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "districts"
+  ],
+  "title": "citygen city spec",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

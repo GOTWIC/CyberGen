@@ -8,3 +8,4 @@ __pycache__/
 
 # Pipeline intermediates (regenerated every run)
 out/render_geo.json
+.pytest_cache/

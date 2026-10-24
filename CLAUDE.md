@@ -85,6 +85,13 @@ API calls and no network calls, in development or in the final product, and has 
 dependency. The prompt-to-spec step is done by a Claude Code session through the repo's `citygen`
 skill; that session may start other Claude sessions or subagents.
 
+M0 is in place: package `citygen/` (spec schema, archetype presets, fill-defaults, city model
+schema, schematic renderer), skill `.claude/skills/citygen/SKILL.md`, examples in
+`docs/progress/M0/`, tests in `tests/` (`.venv/bin/python -m pytest`). Commands:
+`.venv/bin/python -m citygen spec validate|render|schema ...` and `... model schema`. After
+changing `citygen/spec.py` or `citygen/model.py`, regenerate `citygen/schemas/*.json` with the
+schema commands (a test checks they match).
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

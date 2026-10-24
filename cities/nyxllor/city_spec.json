@@ -1,0 +1,69 @@
+{
+  "$schema": "../../citygen/schemas/city_spec.schema.json",
+  "name": "Nyxllor",
+  "seed": 2077,
+  "size_km": [3.5, 3.4],
+  "source": {
+    "prompt": "See prompt.md: coastal megacity on a west bay, river delta from the east, 45-degree Corporate Core with a megatower, canal Old Town, waterfront neon strip, southwest port, island spaceport and mid-river research campus, rail ring, metro, maglev and sky-tube loop.",
+    "notes": "Three delta channels expressed as delta_branches 2. Palms on the strip expressed as greenery only."
+  },
+  "water": {
+    "coast": {"form": "bay", "side": "west", "name": "Nyx Bay"},
+    "rivers": [
+      {"name": "Vess River", "from": "east", "to": "bay", "width_m": [70, 140], "meander": 0.4,
+       "delta_branches": 2, "branch_names": ["North Reach", "Lotus Cut"]}
+    ],
+    "islands": [
+      {"name": "Launch Key", "position": "west", "setting": "offshore", "area_km2": 0.6},
+      {"name": "Scholar Isle", "position": "center", "setting": "mid_river", "river": "Vess River", "area_km2": 0.6}
+    ],
+    "district_separation": "water_preferred",
+    "bridges": {
+      "named": [
+        {"name": "Launch Causeway", "kind": "road_rail", "connects": ["Neon Strand", "Launch Key"],
+         "crosses": "bay"}
+      ]
+    }
+  },
+  "highways": {"pattern": "ring_plus_spine", "exits": ["east", "north"]},
+  "transit": {
+    "hubs": ["Corporate Core"],
+    "lines": [
+      {"mode": "elevated_rail", "name": "Halo Line",
+       "route": ["Neon Strand", "The Stacks", "Highcrest", "Old Town", "Neon Strand"]},
+      {"mode": "metro", "name": "Spine Line",
+       "route": ["The Stacks", "Corporate Core", "Old Town", "Vess Docks"]},
+      {"mode": "maglev", "name": "Launch Express",
+       "route": ["east_exit", "Corporate Core", "Neon Strand", "Launch Key"]},
+      {"mode": "sky_tube", "name": "Crown Loop", "through_towers": true,
+       "route": ["Corporate Core", "The Stacks", "Highcrest", "Corporate Core"]}
+    ]
+  },
+  "districts": [
+    {"name": "Corporate Core", "archetype": "corporate_core",
+     "placement": {"edge": "center"}, "grid_angle_deg": 45,
+     "landmarks": ["megatower"],
+     "places": [{"name": "Meridian Plaza", "kind": "plaza", "position": "center"}],
+     "complexes": ["twin_towers", "tower_cluster"], "skybridge_density": 0.8, "greenery": 0.3},
+    {"name": "The Stacks", "archetype": "megablock_residential",
+     "placement": {"north_of": "Corporate Core"}},
+    {"name": "Highcrest", "archetype": "residential_heights",
+     "placement": {"edge": "north_east", "east_of": "The Stacks"}},
+    {"name": "Old Town", "archetype": "old_town",
+     "placement": {"south_of": "Corporate Core", "separated_by": "Vess River"},
+     "waterways": {"style": "organic_canals", "density": 0.7},
+     "places": [{"name": "Ember Market", "kind": "market"},
+                {"name": "Lotus Temples", "kind": "temple_complex"}],
+     "grime": 0.7},
+    {"name": "Neon Strand", "archetype": "entertainment_market",
+     "placement": {"coast": true, "west_of": "Corporate Core"},
+     "places": [{"name": "Strand Promenade", "kind": "promenade", "position": "west"}],
+     "neon": 1.0, "greenery": 0.4},
+    {"name": "Vess Docks", "archetype": "industrial_port",
+     "placement": {"coast": true, "edge": "south_west", "west_of": "Old Town"},
+     "waterways": {"style": "harbor_basins", "density": 0.6},
+     "megasites": [{"kind": "freight_terminal", "name": "Vess Freight Terminal"}]},
+    {"name": "Launch Key", "archetype": "spaceport", "placement": {"on_island": "Launch Key"}},
+    {"name": "Scholar Isle", "archetype": "research_campus", "placement": {"on_island": "Scholar Isle"}}
+  ]
+}
