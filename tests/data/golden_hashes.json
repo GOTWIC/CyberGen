@@ -1,0 +1,18 @@
+{
+  "about": "sha256 of each sample city's city_model.json (citygen build output). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux) and confirmed under emulated aarch64 Linux (same pins); traces of every stage are in docs/progress/M1b_det/. tests/test_roads.py asserts them on every run.",
+  "produced_on": {
+    "machine": "x86_64",
+    "system": "Linux",
+    "python": "3.13.17",
+    "numpy": "2.5.4",
+    "shapely": "2.2.0",
+    "geos": "3.14.1"
+  },
+  "cities": {
+    "archipelago_free_port": "9dc08512dd7408ebee953f6b111043ee4481c756597ee097688c2cc623d95832",
+    "delta_megacity": "9e57bb01c326f7943b8725417e7a96d5af41cc576b3c494f1137453dd9e7b008",
+    "nexus_city": "1a725ee5acf7f627ced6088fbab2587fab8be6cc125721b0b6e410c17fddb1c1",
+    "nyxllor": "60221a5a24138eb175681b2e52bdc64404cbe70680dab32261ec832a4af5b535",
+    "peninsula_city": "309dcb0bd14f97bf0186b266b1e2181a8654afa23714db71a5c7ede2cb05bffa"
+  }
+}

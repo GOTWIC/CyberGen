@@ -18,8 +18,11 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 from shapely.geometry import LineString, Point, Polygon
 
+from . import dmath as M
+from . import geom as G
 from . import presets
 
 DIRECTION_TOL_DEG = 67.5
@@ -29,21 +32,21 @@ ADJACENT_M = 300.0
 
 def direction_ok(a: tuple[float, float], b: tuple[float, float], direction: str) -> bool:
     dx, dy = a[0] - b[0], a[1] - b[1]
-    d = math.hypot(dx, dy)
+    d = M.hypot(dx, dy)
     if d < 1e-6:
         return False
     ux, uy = presets.DIRECTION_VECTORS[direction]
-    return (dx * ux + dy * uy) / d >= math.cos(math.radians(DIRECTION_TOL_DEG)) - 1e-9
+    return (dx * ux + dy * uy) / d >= M.cos(M.radians(DIRECTION_TOL_DEG)) - 1e-9
 
 
 def direction_excess(a, b, direction: str) -> float:
     """How far (radians) the relation is outside its tolerance; 0 when satisfied."""
     dx, dy = a[0] - b[0], a[1] - b[1]
-    if math.hypot(dx, dy) < 1e-6:
+    if M.hypot(dx, dy) < 1e-6:
         return math.pi / 2
     ux, uy = presets.DIRECTION_VECTORS[direction]
-    ang = abs(math.atan2(ux * dy - uy * dx, ux * dx + uy * dy))
-    return max(0.0, ang - math.radians(DIRECTION_TOL_DEG))
+    ang = abs(M.atan2(ux * dy - uy * dx, ux * dx + uy * dy))
+    return max(0.0, ang - M.radians(DIRECTION_TOL_DEG))
 
 
 def reach(canvas: Polygon, direction: str) -> float:
@@ -90,7 +93,7 @@ def edge_ok(poly, canvas: Polygon, edge: str, land=None) -> bool:
     if edge == "center":
         w = min(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
         cx, cy = city_center(land)
-        return math.hypot(c.x - cx, c.y - cy) <= 0.25 * w or poly.contains(Point(cx, cy))
+        return M.hypot(c.x - cx, c.y - cy) <= 0.25 * w or poly.contains(Point(cx, cy))
     ux, uy = presets.DIRECTION_VECTORS[edge]
     r = land_reach(land, canvas, edge)
     proj = c.x * ux + c.y * uy
@@ -107,7 +110,7 @@ def edge_score(pos: tuple[float, float], canvas: Polygon, edge: str,
     """0 when a point is well inside the edge zone, growing outside (for the solver)."""
     if edge == "center":
         w = min(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
-        return max(0.0, math.hypot(pos[0] - center[0], pos[1] - center[1]) / (0.25 * w) - 0.7)
+        return max(0.0, M.hypot(pos[0] - center[0], pos[1] - center[1]) / (0.25 * w) - 0.7)
     ux, uy = presets.DIRECTION_VECTORS[edge]
     r = reach_m or reach(canvas, edge)
     proj = pos[0] * ux + pos[1] * uy
@@ -117,7 +120,7 @@ def edge_score(pos: tuple[float, float], canvas: Polygon, edge: str,
 def touches(a, b, tol: float = TOUCH_M) -> bool:
     if a is None or b is None or a.is_empty or b.is_empty:
         return False
-    return a.distance(b) <= tol
+    return round(float(a.distance(b)), 6) <= tol
 
 
 def boundary_samples(polys: dict, water, canvas: Polygon, reach: float = 250.0,
@@ -140,15 +143,20 @@ def boundary_samples(polys: dict, water, canvas: Polygon, reach: float = 250.0,
         rings = [r for p in getattr(geom, "geoms", [geom]) for r in [p.exterior, *p.interiors]]
         for ring in rings:
             line = LineString(ring.coords)
-            k = max(int(line.length / step), 1)
-            seg = line.length / k
-            xy = np.array([line.interpolate((i + 0.5) * seg).coords[0] for i in range(k)])
+            length = G.length(line)
+            k = max(int(length / step), 1)
+            seg = length / k
+            xy = G.along(line, (np.arange(k) + 0.5) * seg)
             pts = shapely.points(xy)
-            d = np.min([shapely.distance(o, pts) for o in others], axis=0)
-            keep = shapely.distance(edge, pts) > 1.0
+            touch = np.zeros(k, dtype=bool)
+            near = np.zeros(k, dtype=bool)
+            for o in others:
+                touch |= G.within(o, pts, 2.0)
+                near |= G.within(o, pts, reach)
+            keep = ~G.within(edge, pts, 1.0)
             kind = np.zeros(k, dtype=int)
-            kind[keep & (d <= 2.0)] = 1
-            kind[keep & (d > 2.0) & (d <= reach) & (shapely.distance(water, pts) <= 3.0)] = 2
+            kind[keep & touch] = 1
+            kind[keep & ~touch & near & G.within(water, pts, 3.0)] = 2
             out.append((xy, seg, kind))
     return out
 
@@ -158,11 +166,11 @@ def boundary_water_split(polys: dict, water, canvas: Polygon, reach: float = 250
     """(wet, dry) length of the boundaries between neighboring districts (see
     `boundary_samples`). Each boundary is seen from both sides, so wet / (wet + dry) is the
     share of the district-to-district boundary that runs along water."""
-    wet = dry = 0.0
+    wets, drys = [], []
     for _, seg, kind in boundary_samples(polys, water, canvas, reach, step):
-        dry += float((kind == 1).sum()) * seg
-        wet += float((kind == 2).sum()) * seg
-    return wet, dry
+        drys.append(int(np.count_nonzero(kind == 1)) * seg)
+        wets.append(int(np.count_nonzero(kind == 2)) * seg)
+    return math.fsum(wets), math.fsum(drys)
 
 
 def boundary_curvature(samples, window: float = 400.0, kinds=(1, 2)) -> float | None:
@@ -183,7 +191,7 @@ def boundary_curvature(samples, window: float = 400.0, kinds=(1, 2)) -> float | 
         i = 0
         while i + w <= n:
             if ok[i:i + w].all():
-                chord = float(np.hypot(*(pts[i + w - 1] - pts[i])))
+                chord = float(M.hypot(*(pts[i + w - 1] - pts[i])))
                 ratios.append((w - 1) * seg / max(chord, 1e-6))
                 i += max(w // 4, 1)
             else:

@@ -102,6 +102,7 @@ class _NoNetwork(socket.socket):
 def test_runtime_makes_no_connections(tmp_path, monkeypatch):
     from citygen.cli import main
 
+    monkeypatch.setenv("CITYGEN_WORKERS", "1")  # the whole build in this (patched) process
     monkeypatch.setattr(socket, "socket", _NoNetwork)
     monkeypatch.setattr(socket, "create_connection",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("network")))

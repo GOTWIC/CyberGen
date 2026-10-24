@@ -1,0 +1,46 @@
+citygen build report: Delta Megacity (seed 4412, M1b (water, districts, waterways, primary roads))
+result: PASS  (hydrology variant 0)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+  [pass] land_use: Every landmass holds a district or is named open land (marsh, park); no orphan wedges
+         note: landmass lm07 (0.40 km2) is open land: marsh 'West Channel Marsh'
+         note: landmass lm08 (0.16 km2) is open land: marsh 'West Channel Marsh 2'
+  [pass] canal_quality: Canals and creeks: no crossings below 30 deg, no near-duplicate canals
+  [pass] road_graph: Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built
+         note: land without a district left without roads: lm07, lm08
+  [pass] districts_served: Every district is touched by an avenue (at least 50 m within 25 m of it)
+  [pass] named_bridges: Every named bridge is built
+  [pass] bridge_clearance: Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge
+  [pass] road_avoidance: No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)
+  [pass] curve_radius: Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)
+  [pass] segment_length: No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)
+  [pass] road_duplicates: No near-parallel duplicate roads (within 25 m for over 150 m)
+
+stats:
+  map 12.25 km2, land 7.811 km2 (districts 7.258 km2, unassigned 0.0 km2)
+  water share 36.2% (sea 30.0%)
+  landmasses 8 (8 with districts), islands 2
+  rivers 3.68 km; channels delta_branch 4.08 km, separation 2.77 km
+  separation channels 2; boundary between districts on water 100%, 7.78 km on water, 0.0 km on land
+  district perimeter facing water 100%; boundary curvature (arc / chord over 400 m) 1.084, land boundaries None
+  open land 0.553 km2; marsh 'West Channel Marsh' 0.396 km2; marsh 'West Channel Marsh 2' 0.157 km2
+  inner waterways 8 (4.32 km: basin 0.69, canal 3.62), quays 8.48 km
+  roads avenue 27.07 km, highway 8.88 km; 70 segments, 54 nodes, 1 component(s); exits east_exit, north_exit, west_exit
+  bridges 18 (sea 0, river 7, canal 11; 0.83 km of span), pedestrian 0; named: none
+  landmasses with districts connected by road 6 of 6; highway planned elevated 21%; megasite reserves 3; road variant 3
+
+  district                     archetype              landmass  km2    share  target  error
+  Transit Nexus                transit_hub            lm05      0.550  0.076  0.075   +1.1%  (island)
+  Midtown                      midtown_mixed          lm02      1.509  0.208  0.232  -10.4%  (archetype weight)
+  Corporate Core               corporate_core         lm04      1.355  0.187  0.214  -12.8%  (archetype weight)
+  Old Town                     old_town               lm03      1.467  0.202  0.178  +13.2%  (archetype weight)
+  Industrial Port              industrial_port        lm01      1.877  0.259  0.232  +11.4%  (archetype weight)
+  Research Campus              research_campus        lm06      0.500  0.069  0.068   +1.1%  (island)

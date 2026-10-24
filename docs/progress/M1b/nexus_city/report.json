@@ -1,0 +1,331 @@
+{
+  "name": "Nexus City",
+  "seed": 1207,
+  "stage": "M1b (water, districts, waterways, primary roads)",
+  "passed": true,
+  "variant": 1,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "landmass lm06 (0.20 km2) is open land: marsh 'Jade Reach Marsh'",
+        "landmass lm07 (0.11 km2) is open land: marsh 'Temple Cut Marsh'"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "land without a district left without roads: lm06"
+      ]
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 11.56,
+    "land_km2": 8.417,
+    "district_land_km2": 8.103,
+    "water_share": 0.2719,
+    "sea_share": 0.2011,
+    "landmasses": 7,
+    "landmasses_with_districts": 7,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.314,
+    "open_land": [
+      {
+        "name": "Jade Reach Marsh",
+        "kind": "marsh",
+        "area_km2": 0.204
+      },
+      {
+        "name": "Temple Cut Marsh",
+        "kind": "marsh",
+        "area_km2": 0.11
+      }
+    ],
+    "islands": 1,
+    "river_km": 2.91,
+    "channel_km": {
+      "delta_branch": 2.27,
+      "sea_channel": 3.79,
+      "separation": 1.52
+    },
+    "separation_channels": 3,
+    "waterway_km": 3.88,
+    "waterway_km_by_kind": {
+      "basin": 0.9,
+      "canal": 2.66,
+      "creek": 0.32
+    },
+    "waterways": 8,
+    "quay_km": 7.98,
+    "district_boundary_on_water": 0.6694,
+    "boundary_on_water": 0.586,
+    "boundary_on_water_target": 0.6,
+    "boundary_km": {
+      "water": 6.78,
+      "land": 4.79
+    },
+    "land_boundary_curvature": 1.0255,
+    "boundary_curvature": 1.0916,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm01",
+        "area_km2": 1.118,
+        "share": 0.1379,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": -0.0147
+      },
+      {
+        "id": "d02",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm04",
+        "area_km2": 0.526,
+        "share": 0.065,
+        "target": 0.07,
+        "target_source": "spec",
+        "error": -0.0718
+      },
+      {
+        "id": "d03",
+        "name": "Aurora Spaceport",
+        "archetype": "spaceport",
+        "landmass": "lm01",
+        "area_km2": 0.8,
+        "share": 0.0988,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0124
+      },
+      {
+        "id": "d04",
+        "name": "Neon Market",
+        "archetype": "entertainment_market",
+        "landmass": "lm01",
+        "area_km2": 0.782,
+        "share": 0.0964,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0355
+      },
+      {
+        "id": "d05",
+        "name": "Northridge",
+        "archetype": "residential_heights",
+        "landmass": "lm01",
+        "area_km2": 0.876,
+        "share": 0.1081,
+        "target": 0.11,
+        "target_source": "spec",
+        "error": -0.0174
+      },
+      {
+        "id": "d06",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm03",
+        "area_km2": 1.15,
+        "share": 0.1419,
+        "target": 0.15,
+        "target_source": "spec",
+        "error": -0.0538
+      },
+      {
+        "id": "d07",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm02",
+        "area_km2": 1.201,
+        "share": 0.1482,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0589
+      },
+      {
+        "id": "d08",
+        "name": "Harbor Industrial",
+        "archetype": "industrial_port",
+        "landmass": "lm02",
+        "area_km2": 1.2,
+        "share": 0.1481,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0578
+      },
+      {
+        "id": "d09",
+        "name": "Silver Island",
+        "archetype": "research_campus",
+        "landmass": "lm05",
+        "area_km2": 0.45,
+        "share": 0.0555,
+        "target": 0.05,
+        "target_source": "spec",
+        "error": 0.1107
+      }
+    ],
+    "road_km": {
+      "avenue": 31.38,
+      "highway": 9.34
+    },
+    "road_nodes": 83,
+    "road_segments": 99,
+    "road_components": 1,
+    "bridges": 13,
+    "bridges_by_class": {
+      "sea": 4,
+      "river": 2,
+      "canal": 7
+    },
+    "bridge_span_km": 2.64,
+    "named_bridges": [
+      "Baylink Bridge",
+      "Horizon Bridge",
+      "Silver Span"
+    ],
+    "pedestrian_bridges": 0,
+    "landmasses_connected": [
+      5,
+      5
+    ],
+    "exits": [
+      "east_exit",
+      "north_exit",
+      "west_exit"
+    ],
+    "highway_elevated_share": 0.3028,
+    "megasites": 7,
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.459,
+      "preferred_chains": 1,
+      "planned": 0.588
+    },
+    "road_variant": 1
+  },
+  "notes": [
+    "megasite 'Aurora Spaceport' (spaceport) shrunk to 0.26 km2 (asked 0.50) to fit 'Aurora Spaceport'",
+    "megasite 'Freight Terminal' (freight_terminal) shrunk to 0.29 km2 (asked 0.40) to fit 'Harbor Industrial'"
+  ]
+}

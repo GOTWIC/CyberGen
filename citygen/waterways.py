@@ -29,6 +29,7 @@ from shapely import affinity
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points, substring, unary_union
 
+from . import dmath as M
 from . import geom as G
 from . import hydro as H
 from .defaults import derive_seed
@@ -86,7 +87,7 @@ def _inward(poly, p: Point, depth: float = 80.0) -> np.ndarray:
         inner = poly.buffer(-depth / 4)
     q = nearest_points(inner if not inner.is_empty else poly.centroid, p)[0]
     v = np.array([q.x - p.x, q.y - p.y])
-    n = np.linalg.norm(v)
+    n = M.norm(v)
     return v / n if n > 1e-6 else np.array([0.0, 1.0])
 
 
@@ -125,14 +126,14 @@ def _canal_grid(d, poly, allowed, density, rng, wet):
     """Straight canals on the district grid angle. Every canal ends at open water or at a
     cross canal: dead ends at the land margin are trimmed back to the last junction, so the
     grid stops cleanly at its quays instead of fraying out."""
-    theta = math.radians(d.grid_angle_deg or 0.0)
+    theta = M.radians(d.grid_angle_deg or 0.0)
     spacing = 600.0 - 380.0 * density
     c = poly.centroid
     minx, miny, maxx, maxy = poly.bounds
-    reach = math.hypot(maxx - minx, maxy - miny)
+    reach = M.hypot(maxx - minx, maxy - miny)
     fams: list[list[LineString]] = []
     for ang, sp in ((theta, spacing), (theta + math.pi / 2, 2 * spacing)):
-        ux, uy = math.cos(ang), math.sin(ang)
+        ux, uy = M.cos(ang), M.sin(ang)
         nx, ny = -uy, ux
         phase = rng.uniform(0, sp)
         m = int(reach / sp) + 2
@@ -199,11 +200,11 @@ def _angle_at(a: LineString, b: LineString, p: Point) -> float:
         q1 = line.interpolate(min(d + 15.0, line.length))
         return np.array([q1.x - q0.x, q1.y - q0.y])
     u, v = tan(a), tan(b)
-    nu, nv = np.hypot(*u), np.hypot(*v)
+    nu, nv = M.hypot(*u), M.hypot(*v)
     if nu < 1e-6 or nv < 1e-6:
         return 90.0
-    c = abs(float(u @ v)) / (nu * nv)
-    return math.degrees(math.acos(min(c, 1.0)))
+    c = abs(M.dot(u, v)) / (nu * nv)
+    return M.degrees(M.acos(min(c, 1.0)))
 
 
 class _Net:
@@ -296,9 +297,9 @@ def _organic(style, d, poly, allowed, frontage, density, rng, avoid, net: _Net):
             nxt = main.interpolate(min(main.project(at) + 10, main.length))
             tx, ty = nxt.x - at.x, nxt.y - at.y
             sgn = 1 if (j + k) % 2 == 0 else -1
-            ang = math.atan2(ty, tx) + sgn * math.radians(rng.uniform(50, 75))
+            ang = M.atan2(ty, tx) + sgn * M.radians(rng.uniform(50, 75))
             blen = rng.uniform(140, 260) if creek else rng.uniform(180, 340)
-            end = Point(at.x + math.cos(ang) * blen, at.y + math.sin(ang) * blen)
+            end = Point(at.x + M.cos(ang) * blen, at.y + M.sin(ang) * blen)
             br = _meander_to(at, end, 0.12, 180.0, rng)
             br = _piece_from(br.intersection(allowed.union(at.buffer(width))), at)
             if br is None:
@@ -321,7 +322,8 @@ def _inlets(d, poly, allowed, frontage, density, rng, avoid):
         end = Point(p.x + v[0] * length, p.y + v[1] * length)
         line = _meander_to(start, end, 0.08, 300.0, rng)
         w0, w1 = rng.uniform(55, 85), rng.uniform(14, 22)
-        poly_i = G.variable_buffer(line, lambda ts: w0 + (w1 - w0) * np.asarray(ts) ** 0.8)
+        poly_i = G.variable_buffer(
+            line, lambda ts: w0 + (w1 - w0) * M.power(np.asarray(ts), 0.8))
         poly_i = G.polygonal(poly_i.intersection(allowed.union(start.buffer(w0))))
         main = G.parts(poly_i)[0] if G.parts(poly_i) else None
         if main is None or main.area < 4000:
@@ -336,7 +338,7 @@ def _shore_frame(f: LineString, s: float, poly) -> tuple[Point, np.ndarray, np.n
     a = f.interpolate(max(s - 60.0, 0.0))
     b = f.interpolate(min(s + 60.0, f.length))
     t = np.array([b.x - a.x, b.y - a.y])
-    t = t / (np.hypot(*t) or 1.0)
+    t = t / (M.hypot(*t) or 1.0)
     n = np.array([-t[1], t[0]])
     if not poly.contains(Point(p.x + n[0] * 25, p.y + n[1] * 25)):
         n = -n
@@ -365,9 +367,9 @@ def _harbor(d, poly, allowed, frontage, density, rng, avoid):
         f = f.simplify(15.0)
         mid = f.length / 2
         p, t, n = _shore_frame(f, mid, poly)
-        tilt = math.radians(float(rng.choice([0.0, 0.0, 20.0, -20.0])))
-        axis = np.array([n[0] * math.cos(tilt) - n[1] * math.sin(tilt),
-                         n[0] * math.sin(tilt) + n[1] * math.cos(tilt)])
+        tilt = M.radians(float(rng.choice([0.0, 0.0, 20.0, -20.0])))
+        axis = np.array([n[0] * M.cos(tilt) - n[1] * M.sin(tilt),
+                         n[0] * M.sin(tilt) + n[1] * M.cos(tilt)])
         ws, wp = float(rng.uniform(70, 95)), float(rng.uniform(110, 150))
         depth = float(rng.uniform(240, 360))
         pitch = ws + wp
@@ -378,7 +380,7 @@ def _harbor(d, poly, allowed, frontage, density, rng, avoid):
             if s < 40 or s > f.length - 40:
                 continue
             q, _, nq = _shore_frame(f, s, poly)
-            if float(nq @ n) < 0.8:
+            if M.dot(nq, n) < 0.8:
                 continue  # the shore turns here; keep the row on the straight stretch
             dep = depth
             slip = None
@@ -419,7 +421,7 @@ def _marinas(d, poly, allowed, frontage, density, rng, avoid):
             dep = float(rng.uniform(120, 160)) * scale
             c = Point(q.x + nrm[0] * (dep / 2 + 25), q.y + nrm[1] * (dep / 2 + 25))
             ell = affinity.scale(Point(0, 0).buffer(1.0, quad_segs=24), w / 2, dep / 2)
-            ang = math.degrees(math.atan2(t[1], t[0]))
+            ang = M.degrees(M.atan2(t[1], t[0]))
             ell = affinity.translate(affinity.rotate(ell, ang, origin=(0, 0)), c.x, c.y)
             mouth = _rect(q, nrm, 45.0 * scale, 30.0, 40.0)
             cand = unary_union([ell, mouth])
@@ -534,6 +536,11 @@ def build_waterways(spec: CitySpec, h: H.Hydro, polygons: dict[str, object],
                                     name_of.get(i), conn))
         out.items += recs
     _quays(h, out)
+    for w in out.items:  # stage boundary: hand on grid coordinates
+        w.polygon = G.qpoly(w.polygon)
+        w.centerline = G.qline(w.centerline)
+    for qy in out.quays:
+        qy.line = G.qline(qy.line)
     return out
 
 

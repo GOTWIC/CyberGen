@@ -1,4 +1,5 @@
-"""Preview map of a built city (`preview_map.png`): water, landmasses, districts, waterways.
+"""Preview map of a built city (`preview_map.png`): water, landmasses, districts, waterways,
+megasite reserves, highways, avenues, bridges and exits.
 
 Sea with a shallow-water band along the shore, rivers and channels, thin district borders,
 open land (marsh, park), and labels placed so that none overlap (each label tries a few spots
@@ -32,6 +33,11 @@ SHALLOW_2 = "#0c2039"
 MARSH = "#4d6b4a"
 PARK = "#3f7a4a"
 HALO = [pe.withStroke(linewidth=3, foreground=BG)]
+HIGHWAY = "#f2c14e"
+AVENUE = "#dfe3ea"
+CASING = "#11141b"
+BRIDGE = {"sea": "#ff6b8a", "river": "#ff9f43", "canal": "#7ee0c3"}
+RESERVE = "#e8e8e8"
 
 
 def _patch(poly, **kw) -> PathPatch:
@@ -170,6 +176,7 @@ def render(b, out, dpi: int = 110) -> None:
     for q in m.quays:
         xs, ys = zip(*q.line)
         ax.plot(xs, ys, color=QUAY, lw=0.4, alpha=0.7, zorder=5)
+    _draw_roads(ax, m)
     for isl in m.islands:
         ax.add_patch(_patch(P(isl.polygon), facecolor="none", edgecolor=INK, lw=0.6,
                             alpha=0.7, linestyle=(0, (4, 3)), zorder=6))
@@ -208,6 +215,7 @@ def render(b, out, dpi: int = 110) -> None:
     for o in m.open_spaces:
         lab.place(_spots(P(o.polygon)), o.name or o.kind, (7, 6, 5), color="#b9d4a8",
                   ha="center", va="center", style="italic", path_effects=HALO, zorder=9)
+    _road_labels(lab, m)
     isl_zone = unary_union([P(i.polygon).buffer(150) for i in m.islands]) if m.islands else None
     labeled = set()
     waters = list(m.rivers) + [c for c in m.channels if c.kind != "separation" and c.name]
@@ -226,11 +234,14 @@ def render(b, out, dpi: int = 110) -> None:
                   m.seas[0].name, (10, 9, 8), color="#7fa6c9", style="italic", ha="center",
                   va="center", path_effects=HALO, zorder=9)
     status = "checks PASS" if b.passed else "checks FAIL"
-    fig.text(0.02, top, f"{spec.name}: water, districts and waterways (M1a2)",
+    fig.text(0.02, top, f"{spec.name}: water, districts and primary roads (M1b)",
              color=INK, fontsize=14, fontweight="bold", va="top")
+    rk = st.get("road_km", {})
+    bc = st.get("bridges_by_class", {})
     fig.text(0.02, top - 0.3 / fig_h, f"seed {spec.seed}, {w / 1000:g} x {h / 1000:g} km, "
              f"land {st['land_km2']} km2, water {st['water_share']:.0%}, "
-             f"{st['landmasses']} landmasses, waterways {st['waterway_km']} km, {status}",
+             f"{st['landmasses']} landmasses, highways {rk.get('highway', 0)} km, avenues "
+             f"{rk.get('avenue', 0)} km, bridges {sum(bc.values())}, {status}",
              color=MUTED, fontsize=9, va="top")
     handles = [Patch(facecolor=col, alpha=0.55, edgecolor=col, label=a.replace("_", " "))
                for a, col in sorted(arche.items())]
@@ -240,6 +251,14 @@ def render(b, out, dpi: int = 110) -> None:
                 Patch(facecolor=CANAL, label="inner waterway"),
                 Line2D([], [], color=QUAY, lw=1, label="quay"),
                 Patch(facecolor=MARSH, alpha=0.55, label="marsh / park (open land)"),
+                Line2D([], [], color=HIGHWAY, lw=2.4, label="highway"),
+                Line2D([], [], color=AVENUE, lw=1.2, label="avenue"),
+                Line2D([], [], color=BRIDGE["sea"], lw=3.2, label="bridge, sea class (25 m)"),
+                Line2D([], [], color=BRIDGE["river"], lw=3.2,
+                       label="bridge, river class (10 to 15 m)"),
+                Line2D([], [], color=BRIDGE["canal"], lw=3.2,
+                       label="bridge, canal class (3 to 4 m)"),
+                Patch(facecolor="none", edgecolor=RESERVE, hatch="xx", label="megasite reserve"),
                 Line2D([], [], color=INK, lw=0.8, linestyle=(0, (4, 3)), label="island"),
                 Line2D([], [], color="#000000", lw=0.8, label="landmass edge"),
                 Patch(facecolor=LAND, edgecolor=MUTED, hatch="///", label="no district")]
@@ -251,7 +270,7 @@ def render(b, out, dpi: int = 110) -> None:
     leg.get_title().set_color(INK)
     rows = [f"{r['name'][:22]:<22} {r['share']:.3f} / {r['target']:.3f}"
             for r in st["districts"]]
-    y_tab = (0.3 + ax_h - 4.9) / fig_h
+    y_tab = (0.3 + ax_h - 6.3) / fig_h
     fig.text(x_side + 0.005, y_tab, "district share / target\n" + "\n".join(rows), color=INK,
              fontsize=7, family="monospace", va="top")
     _water_inset(fig, st, x_side + 0.005, y_tab - (len(rows) + 3) * 0.155 / fig_h, fig_h)
@@ -281,3 +300,61 @@ def _water_inset(fig, st, x: float, y: float, fig_h: float) -> None:
     fig.text(x, y + 0.03 / fig_h, txt, color=INK, fontsize=7, va="bottom")
     fig.text(x, y - h - 0.05 / fig_h, f"water {km.get('water', 0)} km, land "
              f"{km.get('land', 0)} km", color=MUTED, fontsize=7, va="top")
+
+
+def _draw_roads(ax, m) -> None:
+    P = G.from_model_poly
+    for site in m.megasites:
+        if site.flight_cone is not None:
+            ax.add_patch(_patch(P(site.flight_cone), facecolor="none", edgecolor=RESERVE,
+                                lw=0.5, alpha=0.5, linestyle=(0, (2, 2)), zorder=6.2))
+        ax.add_patch(_patch(P(site.polygon), facecolor="none", edgecolor=RESERVE, hatch="xx",
+                            lw=0.6, alpha=0.55, zorder=6.2))
+    order = sorted(m.road_segments, key=lambda s: (s.road_class == "highway", s.id))
+    for s in order:
+        hw = s.road_class == "highway"
+        xs, ys = zip(*s.centerline)
+        lw = 2.4 if hw else (1.5 if s.attrs.get("role") == "axis_boulevard" else 1.1)
+        ax.plot(xs, ys, color=CASING, lw=lw + 1.2, solid_capstyle="round", zorder=7 + hw)
+        ax.plot(xs, ys, color=HIGHWAY if hw else AVENUE, lw=lw, solid_capstyle="round",
+                zorder=7.1 + hw)
+    for b in m.bridges:
+        xs, ys = [p[0] for p in b.line], [p[1] for p in b.line]
+        col = BRIDGE.get(b.water_class or "sea", BRIDGE["sea"])
+        lw = 3.8 if b.water_class == "sea" else 3.2
+        if b.bridge_class == "pedestrian":
+            ax.plot(xs, ys, color=col, lw=1.2, linestyle=(0, (2, 1)), zorder=9.2)
+            continue
+        ax.plot(xs, ys, color=CASING, lw=lw + 1.4, solid_capstyle="butt", zorder=9)
+        ax.plot(xs, ys, color=col, lw=lw, solid_capstyle="butt", zorder=9.1)
+    for n in m.road_nodes:
+        if n.attrs.get("kind") == "exit":
+            ax.plot([n.position[0]], [n.position[1]], marker="o", ms=7, color=HIGHWAY,
+                    mec=CASING, mew=1.2, zorder=11)
+
+
+def _road_labels(lab, m) -> None:
+    """Exit and named-bridge labels (most important first), then highway names."""
+    minx, miny, maxx, maxy = m.bounds
+    for n in m.road_nodes:
+        ex = n.attrs.get("exit")
+        if not ex:
+            continue
+        x, y = n.position[0], n.position[1]
+        dx = 0.0 if abs(x - minx) > 1 and abs(x - maxx) > 1 else (1 if abs(x - minx) <= 1 else -1)
+        dy = 0.0 if abs(y - miny) > 1 and abs(y - maxy) > 1 else (1 if abs(y - miny) <= 1 else -1)
+        text = ex.replace("_", " ").replace(" exit", " exit")
+        spots = [(x + dx * 140 + (60 if not dx else 0), y + dy * 90), (x + dx * 220, y + dy * 160),
+                 (x + dx * 140 - (220 if not dx else 0), y + dy * 90)]
+        lab.place(spots, text, (8, 7), color=HIGHWAY, ha="center", va="center",
+                  fontweight="bold", path_effects=HALO, zorder=12)
+    for b in m.bridges:
+        if not b.name:
+            continue
+        xs, ys = [p[0] for p in b.line], [p[1] for p in b.line]
+        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+        spots = [(mx, my + 70), (mx, my - 70), (mx + 160, my), (mx - 160, my),
+                 (mx + 120, my + 120), (mx - 120, my - 120)]
+        lab.place(spots, b.name, (7, 6), color=BRIDGE.get(b.water_class or "sea"),
+                  ha="center", va="center", style="italic", fontweight="bold",
+                  path_effects=HALO, zorder=12)

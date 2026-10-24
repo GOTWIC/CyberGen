@@ -1,17 +1,32 @@
-"""`citygen build`: spec -> city model (M1a: water, districts, inner waterways), checks, preview.
+"""`citygen build`: spec -> city model (water, districts, inner waterways, megasite reserves,
+primary roads and bridges), checks, preview.
 
 The free hydrology parameters (where an unpinned river enters, how its course bulges, where a
 delta splits) are tried in a few seeded variants; each variant is built and checked, and the
 first one that passes every check with (worst share error + share of land without a district)
 under 10% wins, else the best one (fewest failures, then that quality figure). Variant 0 uses
 the defaults, so the search only matters when the default does not fit.
-Same spec + seed = byte-identical `city_model.json`.
+Megasite reserves and the primary road network (M1b) are built on the chosen variant; when no
+road variant passes every check there, the roads fall back to the next best variants that
+passed the water and district checks (at most ROAD_CANDIDATES in all).
+Same spec + seed = byte-identical `city_model.json`, on any machine: the generator uses
+deterministic elementary functions (`dmath`), exact measures and grid-snapped geometry
+wherever a decision is made, and every stage hands the next one coordinates on the 0.01 m
+grid.
+
+Variants and road attempts run in worker processes when there are several CPUs
+(`CITYGEN_WORKERS` sets how many; 1 runs everything in this process). They are evaluated in
+batches in a fixed order and chosen by the same rules as one at a time, so the result does
+not depend on the number of workers.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
+import os
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,6 +36,9 @@ from . import checks as C
 from . import districts as D
 from . import geom as G
 from . import hydro as H
+from . import megasites as MS
+from . import roads as RD
+from . import trace as T
 from . import waterways as W
 from .model import CityModel
 from .spec import CitySpec
@@ -28,6 +46,7 @@ from .validate import Result, dump_spec
 
 MAX_VARIANTS = 20
 GOOD_QUALITY = 0.10
+ROAD_CANDIDATES = 3
 
 
 @dataclass
@@ -41,6 +60,8 @@ class Built:
     stats: dict
     variant: int
     notes: list[str]
+    sites: list = None
+    roads: object = None
 
     @property
     def passed(self) -> bool:
@@ -55,7 +76,8 @@ def _district_ids(spec: CitySpec) -> dict[str, str]:
 
 
 def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
-             explicit: set[str]) -> CityModel:
+             explicit: set[str], sites: list | None = None,
+             roads: RD.RoadNet | None = None) -> CityModel:
     P = G.to_model_poly
     did = _district_ids(spec)
     lm_ids = {k: f"lm{k + 1:02d}" for k in range(len(h.landmasses))}
@@ -136,6 +158,25 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         "channels": channels, "waterways": waterways, "quays": quays, "districts": districts,
         "open_spaces": open_spaces,
     }
+    if sites:
+        data["megasites"] = [{
+            "id": s.id, "type": f"megasite.{s.kind}", "kind": s.kind, "name": s.name,
+            "district_id": did[s.district], "polygon": P(s.polygon),
+            "height_limit_m": s.height_limit_m,
+            "flight_cone": P(s.flight_cone) if s.flight_cone is not None else None,
+            "attrs": {"area_m2": round(s.polygon.area, 1), "target_area_m2": round(s.target_m2, 1),
+                      "reserve": True}} for s in sites]
+    if roads is not None:
+        data["road_nodes"] = roads.nodes
+        data["road_segments"] = roads.segments
+        data["bridges"] = [{k: v for k, v in b.items() if k not in ("s0", "s1")}
+                           for b in roads.bridges]
+        for b in data["bridges"]:
+            a = b["attrs"]
+            b["water_class"] = a.pop("water_class")
+            b["span_m"] = a.pop("span_m")
+            b["ramp_length_m"] = a.pop("ramp_length_m")
+            b.pop("road_class", None)
     return CityModel.model_validate(data)
 
 
@@ -179,14 +220,19 @@ def open_land(spec: CitySpec, h: H.Hydro, lay: D.Layout, landmasses: list[dict],
 
 
 def build_variant(spec: CitySpec, explicit: set[str], index: int) -> Built:
-    canvas = G.canvas_for(spec.size_km)
-    h = H.build_hydro(spec, canvas, H.Variant.make(spec, index))
-    lay = D.layout_districts(spec, h, explicit)
-    D.finalize(spec, h, lay)
-    did = _district_ids(spec)
-    ww = W.build_waterways(spec, h, lay.polygons, did)
+    with T.scope(f"v{index}"):
+        canvas = G.canvas_for(spec.size_km)
+        h = H.build_hydro(spec, canvas, H.Variant.make(spec, index))
+        lay = D.layout_districts(spec, h, explicit)
+        T.stage("districts", lay.polygons)
+        D.finalize(spec, h, lay)
+        T.stage("districts_after_channels", [lay.polygons, h.landmasses])
+        did = _district_ids(spec)
+        ww = W.build_waterways(spec, h, lay.polygons, did)
+        T.stage("waterways", [ww.items, ww.quays])
     model = assemble(spec, h, lay, ww, explicit)
-    checks, st = C.run_checks(spec, model)
+    checks, st = C.run_checks(spec, model, roads=False)
+    T.stage(f"v{index}/checks", [[c.id, c.passed] for c in checks])
     st["separation_budget"] = lay.separation
     notes = h.notes + lay.notes
     return Built(spec, model, h, lay, ww, checks, st, index, notes)
@@ -205,17 +251,145 @@ def _score(b: Built) -> tuple:
     return (fails, round(quality, 4), round(b.layout.assignment_cost, 4))
 
 
-def build_city(result: Result, max_variants: int = MAX_VARIANTS) -> Built:
+def default_workers() -> int:
+    env = os.environ.get("CITYGEN_WORKERS", "").strip()
+    if env:
+        return max(1, int(env))
+    return max(1, min(os.cpu_count() or 1, 8))
+
+
+class _Runner:
+    """Runs jobs and returns their results in order, in worker processes when there are
+    several workers. A job returns (result, trace entries); the entries are recorded here in
+    job order, so a trace does not depend on the number of workers either."""
+
+    def __init__(self, workers: int):
+        self.workers = max(1, workers)
+        self.pool = None
+
+    @property
+    def parallel(self) -> bool:
+        return self.workers > 1
+
+    def map(self, fn, jobs: list) -> list:
+        if not self.parallel or len(jobs) <= 1:
+            return [fn(*job, False) for job in jobs]
+        if self.pool is None:
+            self.pool = ProcessPoolExecutor(self.workers,
+                                            mp_context=multiprocessing.get_context("spawn"))
+        return list(self.pool.map(fn, *zip(*[(*job, True) for job in jobs])))
+
+    def close(self) -> None:
+        if self.pool is not None:
+            self.pool.shutdown()
+
+
+def _collect(trace_here: bool, fn, *args):
+    """(fn(*args), its trace entries): a worker process traces into its own log, which goes
+    back with the result; in this process the entries go straight into the log."""
+    if not trace_here:
+        return fn(*args), None
+    T.start()
+    out = fn(*args)
+    return out, T.stop()
+
+
+def _variant_job(spec: CitySpec, explicit: set[str], index: int, tracing: bool, worker: bool):
+    return _collect(worker and tracing, build_variant, spec, explicit, index)
+
+
+def _good(b: Built) -> bool:
+    return b.passed and _score(b)[1] <= GOOD_QUALITY
+
+
+def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True,
+               workers: int | None = None) -> Built:
     spec = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
-    best: Built | None = None
-    for index in range(max_variants):
-        b = build_variant(spec, explicit, index)
-        if best is None or _score(b) < _score(best):
-            best = b
-        if b.passed and _score(b)[1] <= GOOD_QUALITY:
+    run = _Runner(default_workers() if workers is None else workers)
+    try:
+        built: list[Built] = []
+        for start in range(0, max_variants, run.workers):
+            jobs = [(spec, explicit, i, T.on())
+                    for i in range(start, min(start + run.workers, max_variants))]
+            for b, entries in run.map(_variant_job, jobs):
+                T.extend(entries)
+                built.append(b)
+                if _good(b):
+                    break
+            if _good(built[-1]):
+                break
+        ranked = sorted(built, key=lambda b: (_score(b), b.variant))
+        if not roads:
+            return ranked[0]
+        return add_roads(ranked, explicit, run)
+    finally:
+        run.close()
+
+
+@dataclass
+class _RoadTry:
+    variant: int
+    sites: list
+    site_notes: list[str]
+    net: object
+    model: CityModel
+    checks: list
+    stats: dict
+
+    @property
+    def fails(self) -> int:
+        return sum(len(c.failures) for c in self.checks)
+
+
+def road_attempt(b: Built, explicit: set[str], k: int) -> _RoadTry:
+    """Megasite reserves and road variant k on hydrology variant b, then every check again
+    (water, districts and roads)."""
+    spec = b.spec
+    did = _district_ids(spec)
+    sites, site_notes = MS.place_megasites(spec, b.layout.polygons, b.hydro, b.waterways, did)
+    T.stage(f"v{b.variant}/megasites", sites)
+    opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
+    net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,
+                         variant=k)
+    model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, sites, net)
+    T.stage(f"v{b.variant}/roads{k}", [net.nodes, net.segments, net.bridges])
+    checks, st = C.run_checks(spec, model, roads=True)
+    return _RoadTry(b.variant, sites, site_notes, net, model, checks, st)
+
+
+def _road_job(b: Built, explicit: set[str], k: int, tracing: bool, worker: bool):
+    return _collect(worker and tracing, road_attempt, b, explicit, k)
+
+
+def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = None) -> Built:
+    """Roads on the best variant (ranked[0]), trying the road variants in order; if none
+    passes every check, the same on the next best variants that passed the water and
+    district checks. The first attempt that passes wins, else the one with the fewest
+    failures (the earliest of those)."""
+    run = run or _Runner(1)
+    cands = [ranked[0]] + [b for b in ranked[1:] if b.passed][:ROAD_CANDIDATES - 1]
+    attempts = [(b, k) for b in cands for k in range(len(RD.ROAD_VARIANTS))]
+    by_variant = {b.variant: b for b in cands}
+    best: _RoadTry | None = None
+    for start in range(0, len(attempts), run.workers):
+        batch = attempts[start:start + run.workers]
+        for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):
+            T.extend(entries)
+            if best is None or t.fails < best.fails:
+                best = t
+            if best.fails == 0:
+                break
+        if best.fails == 0:
             break
-    return best
+    b = by_variant[best.variant]
+    b.sites, b.roads, b.model, b.checks = best.sites, best.net, best.model, best.checks
+    st = best.stats
+    st["separation_budget"] = b.stats.get("separation_budget")
+    st["road_variant"] = best.net.variant
+    b.stats = st
+    b.notes = b.notes + best.site_notes + best.net.notes
+    return b
 
 
 def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:

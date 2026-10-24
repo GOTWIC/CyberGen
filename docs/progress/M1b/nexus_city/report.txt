@@ -1,0 +1,53 @@
+citygen build report: Nexus City (seed 1207, M1b (water, districts, waterways, primary roads))
+result: PASS  (hydrology variant 1)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+  [pass] land_use: Every landmass holds a district or is named open land (marsh, park); no orphan wedges
+         note: landmass lm06 (0.20 km2) is open land: marsh 'Jade Reach Marsh'
+         note: landmass lm07 (0.11 km2) is open land: marsh 'Temple Cut Marsh'
+  [pass] canal_quality: Canals and creeks: no crossings below 30 deg, no near-duplicate canals
+  [pass] road_graph: Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built
+         note: land without a district left without roads: lm06
+  [pass] districts_served: Every district is touched by an avenue (at least 50 m within 25 m of it)
+  [pass] named_bridges: Every named bridge is built
+  [pass] bridge_clearance: Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge
+  [pass] road_avoidance: No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)
+  [pass] curve_radius: Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)
+  [pass] segment_length: No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)
+  [pass] road_duplicates: No near-parallel duplicate roads (within 25 m for over 150 m)
+
+stats:
+  map 11.56 km2, land 8.417 km2 (districts 8.103 km2, unassigned 0.0 km2)
+  water share 27.2% (sea 20.1%)
+  landmasses 7 (7 with districts), islands 1
+  rivers 2.91 km; channels delta_branch 2.27 km, sea_channel 3.79 km, separation 1.52 km
+  separation channels 3; boundary between districts on water 59% (target 60%), 6.78 km on water, 4.79 km on land
+  district perimeter facing water 67%; boundary curvature (arc / chord over 400 m) 1.0916, land boundaries 1.0255
+  open land 0.314 km2; marsh 'Jade Reach Marsh' 0.204 km2; marsh 'Temple Cut Marsh' 0.11 km2
+  inner waterways 8 (3.88 km: basin 0.9, canal 2.66, creek 0.32), quays 7.98 km
+  roads avenue 31.38 km, highway 9.34 km; 99 segments, 83 nodes, 1 component(s); exits east_exit, north_exit, west_exit
+  bridges 13 (sea 4, river 2, canal 7; 2.64 km of span), pedestrian 0; named: Baylink Bridge, Horizon Bridge, Silver Span
+  landmasses with districts connected by road 5 of 5; highway planned elevated 30%; megasite reserves 7; road variant 1
+
+  district                     archetype              landmass  km2    share  target  error
+  Corporate Core               corporate_core         lm01      1.118  0.138  0.140   -1.5%  (spec)
+  Transit Nexus                transit_hub            lm04      0.526  0.065  0.070   -7.2%  (spec)
+  Aurora Spaceport             spaceport              lm01      0.800  0.099  0.100   -1.2%  (spec)
+  Neon Market                  entertainment_market   lm01      0.782  0.096  0.100   -3.5%  (spec)
+  Northridge                   residential_heights    lm01      0.876  0.108  0.110   -1.7%  (spec)
+  Midtown                      midtown_mixed          lm03      1.150  0.142  0.150   -5.4%  (spec)
+  Old Town                     old_town               lm02      1.201  0.148  0.140   +5.9%  (spec)
+  Harbor Industrial            industrial_port        lm02      1.200  0.148  0.140   +5.8%  (spec)
+  Silver Island                research_campus        lm05      0.450  0.056  0.050  +11.1%  (spec)
+
+notes:
+  - megasite 'Aurora Spaceport' (spaceport) shrunk to 0.26 km2 (asked 0.50) to fit 'Aurora Spaceport'
+  - megasite 'Freight Terminal' (freight_terminal) shrunk to 0.29 km2 (asked 0.40) to fit 'Harbor Industrial'

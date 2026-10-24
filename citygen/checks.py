@@ -1,4 +1,4 @@
-"""Checks and stats for a built city (scope section 9, water and district parts).
+"""Checks and stats for a built city (scope section 9: water, district and primary road parts).
 
 Every check reads only the city model and the filled spec, so a model can be loaded from JSON
 and re-checked, and tests can break a model on purpose. A failed check means the city is not
@@ -27,6 +27,20 @@ LAND_KINDS = ("highway", "ring_road", "rail", "wall")
 CANAL_MIN_ANGLE_DEG = 30.0  # canals and creeks never cross or join at a shallower angle
 CANAL_DUP_GAP_M = 35.0      # two canals closer than this ...
 CANAL_DUP_LEN_M = 100.0     # ... over this length (junctions aside) are near duplicates
+# Primary roads (M1b).
+ROAD_MIN_RADIUS_M = {"highway": 150.0, "avenue": 40.0}
+ROAD_MIN_SEGMENT_M = {"highway": 60.0, "avenue": 40.0}
+RADIUS_BASE_M = {"highway": 20.0, "avenue": 10.0}   # chord used to measure curvature
+# The stretch next to a junction is junction geometry, not alignment: M2 builds avenue
+# junctions; at-grade highway junctions become interchanges in M7.
+JUNCTION_SKIP_M = {"highway": 60.0, "avenue": 25.0}
+ROAD_DUP_GAP_M = 25.0       # two roads closer than this ...
+ROAD_DUP_LEN_M = 150.0      # ... over this length (60 m around shared points aside)
+SERVED_M = 50.0             # an avenue runs at least this long along (within 25 m of) a district
+WATER_CLASS_OF = {"sea": "sea", "sea_channel": "sea", "basin": "sea", "river": "river",
+                  "delta_branch": "river", "separation": "canal", "canal": "canal",
+                  "creek": "canal", "inlet": "canal", "marina": "canal"}
+CLEARANCE_RANGE_M = {"sea": (25.0, 80.0), "river": (10.0, 15.0), "canal": (3.0, 4.0)}
 
 
 @dataclass
@@ -67,6 +81,17 @@ class _Geo:
         self.network = unary_union([self.sea, *self.rivers.values(), *self.channels.values()])
         self.coastal = unary_union([self.sea] + [self.channels[c.id] for c in m.channels
                                                  if c.kind == "sea_channel"])
+        # Water by navigable class (bridges), and road geometry.
+        cls_geoms: dict[str, list] = {"sea": [self.sea], "river": [], "canal": []}
+        for r in m.rivers:
+            cls_geoms["river"].append(self.rivers[r.id])
+        for c in m.channels:
+            cls_geoms[WATER_CLASS_OF[c.kind]].append(self.channels[c.id])
+        for w in m.waterways:
+            cls_geoms[WATER_CLASS_OF[w.kind]].append(self.waterways[w.id])
+        self.water_by_class = {k: unary_union(v) for k, v in cls_geoms.items()}
+        self.all_water = unary_union(list(self.water_by_class.values()))
+        self.roads = {s.id: LineString(s.centerline) for s in m.road_segments}
 
     def named_water(self, name: str):
         ids = [r.id for r in self.m.rivers if r.name == name]
@@ -159,13 +184,13 @@ def check_waterways(m: CityModel, g: _Geo) -> Check:
 
 
 def district_areas(m: CityModel, g: _Geo) -> dict[str, float]:
-    return {n: p.area for n, p in g.districts.items()}
+    return {n: G.area(p) for n, p in g.districts.items()}
 
 
 def check_shares(m: CityModel, g: _Geo) -> Check:
     c = Check("district_shares", f"District area shares within {SHARE_TOL:.0%} of the spec")
     areas = district_areas(m, g)
-    total = sum(areas.values()) or 1.0
+    total = math.fsum(areas.values()) or 1.0
     for d in m.districts:
         target = d.attrs.get("area_share_target")
         if not target:
@@ -229,8 +254,13 @@ def check_placement(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
                     poly.distance(other) > R.ADJACENT_M:
                 c.failures.append(f"'{d.name}' is not adjacent to '{ref}'")
         sep = pl.separated_by
-        if sep and sep in LAND_KINDS:
-            c.notes.append(f"'{d.name}': separated_by '{sep}' is checked from M1b (roads, walls)")
+        if sep in ("highway", "ring_road") and m.road_segments:
+            if _road_along(m, g, poly, sep) < 200.0:
+                c.failures.append(f"'{d.name}' is not bordered by a {sep.replace('_', ' ')} "
+                                  "(separated_by)")
+        elif sep and sep in LAND_KINDS:
+            later = {"rail": "transit (M5)", "wall": "walls (M3)"}.get(sep, "roads")
+            c.notes.append(f"'{d.name}': separated_by '{sep}' is checked once {later} exist")
         elif sep:
             wat = g.kind_water(sep) if sep in BoundaryKind.__args__ else g.named_water(sep)
             if wat is None or not R.touches(poly, wat):
@@ -240,6 +270,18 @@ def check_placement(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
                                   f"{', '.join(_land_neighbors(m, g, d.name))} "
                                   "(separated_by water)")
     return c
+
+
+def _road_along(m: CityModel, g: _Geo, poly, kind: str) -> float:
+    """Length of highway (or ring road) running within 60 m of a district's boundary."""
+    if kind == "highway":
+        segs = [s for s in m.road_segments if s.road_class == "highway"]
+    else:
+        segs = [s for s in m.road_segments if s.attrs.get("role") in ("ring", "ring_road")]
+    if not segs:
+        return 0.0
+    edge = poly.boundary.buffer(60.0)
+    return sum(LineString(s.centerline).intersection(edge).length for s in segs)
 
 
 def _land_neighbors(m: CityModel, g: _Geo, name: str) -> list[str]:
@@ -385,14 +427,318 @@ def check_slivers(m: CityModel, g: _Geo) -> Check:
 
 
 # ---------------------------------------------------------------------------
+# Primary roads (M1b)
+# ---------------------------------------------------------------------------
+
+def _road_components(m: CityModel) -> list[set[str]]:
+    parent = {n.id: n.id for n in m.road_nodes}
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for s in m.road_segments:
+        if s.start in parent and s.end in parent:
+            parent[find(s.start)] = find(s.end)
+    comps: dict[str, set[str]] = {}
+    for n in m.road_nodes:
+        comps.setdefault(find(n.id), set()).add(n.id)
+    return sorted(comps.values(), key=lambda c: (-len(c), sorted(c)[0]))
+
+
+def _segment_landmasses(m: CityModel, g: _Geo) -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for s in m.road_segments:
+        line = g.roads[s.id]
+        out[s.id] = {lid for lid, lm in g.landmasses.items()
+                     if line.intersection(lm.buffer(2.0)).length > 5.0}
+    return out
+
+
+def check_road_graph(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
+    c = Check("road_graph", "Road graph connected: one component reaching every landmass with "
+                            "a district (islands by bridge or causeway), every exit built")
+    ids = {n.id for n in m.road_nodes}
+    for s in m.road_segments:
+        for end in (s.start, s.end):
+            if end not in ids:
+                c.failures.append(f"segment {s.id}: unknown node {end}")
+    comps = _road_components(m)
+    if not m.road_segments:
+        c.failures.append("no roads")
+        return c
+    if len(comps) > 1:
+        c.failures.append(f"{len(comps)} road components (sizes "
+                          f"{', '.join(str(len(x)) for x in comps)})")
+    main = comps[0]
+    seg_lm = _segment_landmasses(m, g)
+    reached: set[str] = set()
+    for s in m.road_segments:
+        if s.start in main:
+            reached |= seg_lm[s.id]
+    for lm in m.landmasses:
+        if lm.district_ids and lm.id not in reached:
+            names = ", ".join(g.district_by_id[d].name for d in lm.district_ids)
+            c.failures.append(f"landmass {lm.id} ({names}) is not reached by the road network")
+    exits = {n.attrs.get("exit") for n in m.road_nodes if n.attrs.get("kind") == "exit"}
+    for d in spec.highways.exits or []:
+        if f"{d}_exit" not in exits:
+            c.failures.append(f"exit '{d}' was not built")
+    unconnected = [lm.id for lm in m.landmasses if not lm.district_ids and lm.id not in reached]
+    if unconnected:
+        c.notes.append(f"land without a district left without roads: {', '.join(unconnected)}")
+    return c
+
+
+def check_districts_served(m: CityModel, g: _Geo) -> Check:
+    c = Check("districts_served", f"Every district is touched by an avenue (at least "
+                                  f"{SERVED_M:.0f} m within 25 m of it)")
+    avenues = unary_union([g.roads[s.id] for s in m.road_segments if s.road_class == "avenue"])
+    for d in m.districts:
+        poly = g.districts[d.name]
+        if avenues.is_empty or avenues.intersection(poly.buffer(25.0)).length < SERVED_M:
+            c.failures.append(f"'{d.name}' is not served by an avenue")
+    return c
+
+
+def check_named_bridges(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
+    c = Check("named_bridges", "Every named bridge is built")
+    built = {b.name for b in m.bridges if b.name}
+    for nb in spec.water.bridges.named:
+        if nb.name not in built:
+            c.failures.append(f"named bridge '{nb.name}' ({nb.kind}, "
+                              f"{' to '.join(nb.connects)}) was not built")
+    return c
+
+
+def bridge_water_class(g: _Geo, line: LineString) -> str | None:
+    """Highest navigable class of the water a line crosses (more than 0.5 m)."""
+    for cls in ("sea", "river", "canal"):
+        geom = g.water_by_class[cls]
+        if not geom.is_empty and line.intersection(geom).length > 0.5:
+            return cls
+    return None
+
+
+def check_bridges(m: CityModel, g: _Geo) -> Check:
+    c = Check("bridge_clearance", "Every bridge has the clearance of the water it crosses (sea "
+                                  "channel and port approach 25 m+, river 10 to 15 m, canal 3 "
+                                  "to 4 m), every road over water is a bridge, no junction on "
+                                  "a bridge")
+    spans: dict[str, float] = {}
+    for b in m.bridges:
+        line = LineString([(x, y) for x, y, _ in b.line])
+        cls = bridge_water_class(g, line)
+        if cls is None:
+            c.failures.append(f"bridge {b.id} crosses no water")
+            continue
+        if b.water_class != cls:
+            c.failures.append(f"bridge {b.id}: class {b.water_class} but crosses {cls} water")
+        lo, hi = CLEARANCE_RANGE_M[cls]
+        if not lo - 1e-6 <= b.clearance_m <= hi + 1e-6:
+            c.failures.append(f"bridge {b.id}: clearance {b.clearance_m:g} m over {cls} water "
+                              f"(needs {lo:g} to {hi:g} m)")
+        want = (b.clearance_m + 1.5) / 0.06
+        if b.ramp_length_m is not None and abs(b.ramp_length_m - want) > 0.05:
+            c.failures.append(f"bridge {b.id}: ramp {b.ramp_length_m} m, expected {want:.2f} m")
+        for sid in b.segment_ids:
+            spans[sid] = spans.get(sid, 0.0) + line.length
+    deg: dict[str, int] = {}
+    for s in m.road_segments:
+        deg[s.start] = deg.get(s.start, 0) + 1
+        deg[s.end] = deg.get(s.end, 0) + 1
+    inner = g.all_water.buffer(-3.0)
+    for n in m.road_nodes:
+        if deg.get(n.id, 0) >= 3 and inner.contains(shapely.Point(n.position[:2])):
+            c.failures.append(f"junction {n.id} is out on the water (on a bridge)")
+    for s in m.road_segments:
+        wet = g.roads[s.id].intersection(g.all_water).length
+        if wet - spans.get(s.id, 0.0) > 3.0:
+            c.failures.append(f"segment {s.id} runs {wet - spans.get(s.id, 0.0):.0f} m over "
+                              "water without a bridge")
+    return c
+
+
+def check_road_avoidance(m: CityModel, g: _Geo) -> Check:
+    c = Check("road_avoidance", "No road through megasite reserves or spaceport flight cones, "
+                                "nor through marsh or park open land (declared causeways aside)")
+    zones = [(f"megasite '{s.name}'", G.from_model_poly(s.polygon)) for s in m.megasites]
+    zones += [(f"flight cone of '{s.name}'", G.from_model_poly(s.flight_cone))
+              for s in m.megasites if s.flight_cone is not None]
+    opens = [(f"{o.kind} '{o.name}'", G.from_model_poly(o.polygon)) for o in m.open_spaces
+             if o.kind in ("marsh", "park")]
+    for s in m.road_segments:
+        line = g.roads[s.id]
+        for label, poly in zones:
+            inside = line.intersection(poly).length
+            if inside > 1.0:
+                c.failures.append(f"segment {s.id} ({s.road_class}) runs {inside:.0f} m through "
+                                  f"{label}")
+        if s.attrs.get("causeway"):
+            continue
+        for label, poly in opens:
+            inside = line.intersection(poly).length
+            if inside > 1.0:
+                c.failures.append(f"segment {s.id} ({s.road_class}) runs {inside:.0f} m through "
+                                  f"{label}")
+    return c
+
+
+def min_radius(line: LineString, base: float, skip0: float = 0.0, skip1: float = 0.0
+               ) -> tuple[float, float]:
+    """Smallest circumradius of points `base` apart along a line (and where), ignoring the
+    first `skip0` and last `skip1` meters."""
+    import numpy as np
+
+    L = line.length
+    n = int(L // base)
+    if n < 2:
+        return math.inf, 0.0
+    ds = np.arange(n + 1) * base
+    xy = np.array([line.interpolate(d).coords[0] for d in ds])
+    a, b, cc = xy[:-2], xy[1:-1], xy[2:]
+    ab = np.sqrt(((b - a) ** 2).sum(axis=1))
+    bc = np.sqrt(((cc - b) ** 2).sum(axis=1))
+    ca = np.sqrt(((a - cc) ** 2).sum(axis=1))
+    cross = np.abs((b[:, 0] - a[:, 0]) * (cc[:, 1] - a[:, 1])
+                   - (b[:, 1] - a[:, 1]) * (cc[:, 0] - a[:, 0]))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = np.where(cross > 1e-9, ab * bc * ca / (2 * cross), np.inf)
+    mid = ds[1:-1]
+    keep = (mid >= skip0 + base) & (mid <= L - skip1 - base)
+    if not keep.any():
+        return math.inf, 0.0
+    r = np.where(keep, r, np.inf)
+    k = int(np.argmin(r))
+    return float(r[k]), float(mid[k])
+
+
+def check_curve_radius(m: CityModel, g: _Geo) -> Check:
+    c = Check("curve_radius", "Minimum curve radius per class (highway "
+                              f"{ROAD_MIN_RADIUS_M['highway']:.0f} m, avenue "
+                              f"{ROAD_MIN_RADIUS_M['avenue']:.0f} m), outside junction areas "
+                              f"({JUNCTION_SKIP_M['avenue']:.0f} m from an avenue junction, M2; "
+                              f"{JUNCTION_SKIP_M['highway']:.0f} m from a highway junction, "
+                              "an interchange in M7)")
+    deg: dict[str, int] = {}
+    for s in m.road_segments:
+        deg[s.start] = deg.get(s.start, 0) + 1
+        deg[s.end] = deg.get(s.end, 0) + 1
+    for s in m.road_segments:
+        rmin = ROAD_MIN_RADIUS_M.get(s.road_class)
+        if rmin is None:
+            continue
+        skip = JUNCTION_SKIP_M[s.road_class]
+        skip0 = skip if deg.get(s.start, 0) >= 3 else 0.0
+        skip1 = skip if deg.get(s.end, 0) >= 3 else 0.0
+        r, at = min_radius(g.roads[s.id], RADIUS_BASE_M[s.road_class], skip0, skip1)
+        if r < 0.95 * rmin:
+            p = g.roads[s.id].interpolate(at)
+            c.failures.append(f"segment {s.id} ({s.road_class}): radius {r:.0f} m near "
+                              f"({p.x:.0f}, {p.y:.0f}), minimum {rmin:.0f} m")
+    return c
+
+
+def check_segment_length(m: CityModel, g: _Geo) -> Check:
+    c = Check("segment_length", "No highway segment under "
+                                f"{ROAD_MIN_SEGMENT_M['highway']:.0f} m, no avenue segment under "
+                                f"{ROAD_MIN_SEGMENT_M['avenue']:.0f} m (a stretch that leaves "
+                                "the map is cut by the map border and not counted)")
+    off_map = {n.id for n in m.road_nodes if n.attrs.get("kind") in ("exit", "edge")}
+    for s in m.road_segments:
+        if s.start in off_map or s.end in off_map:
+            continue
+        lmin = ROAD_MIN_SEGMENT_M.get(s.road_class)
+        if lmin is not None and g.roads[s.id].length < lmin - 1e-6:
+            c.failures.append(f"segment {s.id} ({s.road_class}) is "
+                              f"{g.roads[s.id].length:.0f} m long")
+    return c
+
+
+def road_duplicates(m: CityModel, g: _Geo) -> list[str]:
+    ids = [s.id for s in m.road_segments]
+    lines = [g.roads[i] for i in ids]
+    if not lines:
+        return []
+    tree = shapely.STRtree(lines)
+    out = []
+    for i, a in enumerate(lines):
+        for j in sorted(int(x) for x in tree.query(a.buffer(ROAD_DUP_GAP_M))):
+            if j <= i:
+                continue
+            b = lines[j]
+            near = a.intersection(b.buffer(ROAD_DUP_GAP_M))
+            if near.length <= ROAD_DUP_LEN_M:
+                continue
+            meet = a.intersection(b)
+            shared = [p for p in (a.coords[0], a.coords[-1]) if b.distance(shapely.Point(p)) < 1.0]
+            shared += [p for p in (b.coords[0], b.coords[-1]) if a.distance(shapely.Point(p)) < 1.0]
+            spots = [shapely.Point(p) for p in shared]
+            if not meet.is_empty:
+                spots.append(meet)
+            if spots:
+                near = near.difference(unary_union([p.buffer(60.0) for p in spots]))
+            if near.length > ROAD_DUP_LEN_M:
+                out.append(f"segments {ids[i]} and {ids[j]} run within {ROAD_DUP_GAP_M:.0f} m "
+                           f"of each other for {near.length:.0f} m")
+    return out
+
+
+def check_road_duplicates(m: CityModel, g: _Geo) -> Check:
+    c = Check("road_duplicates", f"No near-parallel duplicate roads (within "
+                                 f"{ROAD_DUP_GAP_M:.0f} m for over {ROAD_DUP_LEN_M:.0f} m)")
+    c.failures += road_duplicates(m, g)
+    return c
+
+
+def road_stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
+    km: dict[str, float] = {}
+    for s in m.road_segments:
+        km[s.road_class] = km.get(s.road_class, 0.0) + g.roads[s.id].length / 1000
+    by_cls = {"sea": 0, "river": 0, "canal": 0}
+    for b in m.bridges:
+        if b.bridge_class != "pedestrian" and b.water_class:
+            by_cls[b.water_class] += 1
+    with_d = [lm.id for lm in m.landmasses if lm.district_ids]
+    comps = _road_components(m)
+    seg_lm = _segment_landmasses(m, g)
+    reached: set[str] = set()
+    if comps:
+        for s in m.road_segments:
+            if s.start in comps[0]:
+                reached |= seg_lm[s.id]
+    hw = [s for s in m.road_segments if s.road_class == "highway"]
+    hw_len = sum(g.roads[s.id].length for s in hw)
+    elev = sum(g.roads[s.id].length for s in hw if s.attrs.get("elevated"))
+    return {
+        "road_km": {k: round(v, 2) for k, v in sorted(km.items())},
+        "road_nodes": len(m.road_nodes),
+        "road_segments": len(m.road_segments),
+        "road_components": len(comps),
+        "bridges": sum(by_cls.values()),
+        "bridges_by_class": by_cls,
+        "bridge_span_km": round(sum(b.span_m or 0.0 for b in m.bridges
+                                    if b.bridge_class != "pedestrian") / 1000, 2),
+        "named_bridges": sorted(b.name for b in m.bridges if b.name),
+        "pedestrian_bridges": sum(1 for b in m.bridges if b.bridge_class == "pedestrian"),
+        "landmasses_connected": [len(set(with_d) & reached), len(with_d)],
+        "exits": sorted(n.attrs.get("exit") for n in m.road_nodes if n.attrs.get("exit")),
+        "highway_elevated_share": round(elev / hw_len, 4) if hw_len else 0.0,
+        "megasites": len(m.megasites),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Stats and report
 # ---------------------------------------------------------------------------
 
 def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
     map_area = g.canvas.area
-    land = sum(G.from_model_poly(p).area for x in m.land for p in x.polygons)
+    land = math.fsum(G.area(G.from_model_poly(p)) for x in m.land for p in x.polygons)
     areas = district_areas(m, g)
-    total = sum(areas.values()) or 1.0
+    total = math.fsum(areas.values()) or 1.0
     rows = []
     for d in m.districts:
         target = d.attrs.get("area_share_target") or 0.0
@@ -434,8 +780,8 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
         "sea_share": round(g.sea.area / map_area, 4),
         "landmasses": len(m.landmasses),
         "landmasses_with_districts": len(m.landmasses) - len(unassigned),
-        "unassigned_land_km2": round(sum(g.landmasses[lm.id].area for lm in unassigned) / 1e6,
-                                     3),
+        "unassigned_land_km2": round(math.fsum(G.area(g.landmasses[lm.id])
+                                               for lm in unassigned) / 1e6, 3),
         "open_land_km2": round(sum(r["area_km2"] for r in open_rows), 3),
         "open_land": open_rows,
         "islands": len(m.islands),
@@ -458,8 +804,13 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
     }
 
 
-def run_checks(spec: CitySpec, m: CityModel) -> tuple[list[Check], dict]:
+def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
+               ) -> tuple[list[Check], dict]:
+    """All checks. Road checks run when the model has roads (or `roads` is True); the variant
+    search runs without them (roads are built once, on the chosen variant)."""
     g = _Geo(m)
+    if roads is None:
+        roads = bool(m.road_segments or m.road_nodes or m.bridges or m.megasites)
     checks = [
         check_geometry(m, g),
         check_waterways(m, g),
@@ -472,13 +823,29 @@ def run_checks(spec: CitySpec, m: CityModel) -> tuple[list[Check], dict]:
         check_land_use(spec, m, g),
         check_canals(m, g),
     ]
-    return checks, stats(spec, m, g)
+    if roads:
+        checks += [
+            check_road_graph(spec, m, g),
+            check_districts_served(m, g),
+            check_named_bridges(spec, m, g),
+            check_bridges(m, g),
+            check_road_avoidance(m, g),
+            check_curve_radius(m, g),
+            check_segment_length(m, g),
+            check_road_duplicates(m, g),
+        ]
+    st = stats(spec, m, g)
+    if m.road_segments:
+        st.update(road_stats(spec, m, g))
+    return checks, st
 
 
 def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
-        "name": spec.name, "seed": spec.seed, "stage": "M1a2 (water, districts, waterways)",
+        "name": spec.name, "seed": spec.seed,
+        "stage": ("M1b (water, districts, waterways, primary roads)" if "road_km" in st
+                  else "M1a2 (water, districts, waterways)"),
         "passed": all(c.passed for c in checks), "variant": variant,
         "checks": [c.to_dict() for c in checks], "stats": st, "notes": notes,
     }
@@ -519,7 +886,21 @@ def report_text(rep: dict) -> str:
             + "".join(f"; {r['kind']} '{r['name']}' {r['area_km2']} km2" for r in st["open_land"]),
             f"  inner waterways {st['waterways']} ({st['waterway_km']} km: "
             + (", ".join(f"{k} {v}" for k, v in st["waterway_km_by_kind"].items()) or "none")
-            + f"), quays {st['quay_km']} km", "",
+            + f"), quays {st['quay_km']} km"]
+    if "road_km" in st:
+        bc = st["bridges_by_class"]
+        lc = st["landmasses_connected"]
+        out += [
+            "  roads " + ", ".join(f"{k} {v} km" for k, v in st["road_km"].items())
+            + f"; {st['road_segments']} segments, {st['road_nodes']} nodes, "
+            f"{st['road_components']} component(s); exits {', '.join(st['exits']) or 'none'}",
+            f"  bridges {st['bridges']} (sea {bc['sea']}, river {bc['river']}, canal "
+            f"{bc['canal']}; {st['bridge_span_km']} km of span), pedestrian "
+            f"{st['pedestrian_bridges']}; named: {', '.join(st['named_bridges']) or 'none'}",
+            f"  landmasses with districts connected by road {lc[0]} of {lc[1]}; highway "
+            f"planned elevated {st['highway_elevated_share']:.0%}; megasite reserves "
+            f"{st['megasites']}; road variant {st.get('road_variant', 0)}"]
+    out += ["",
             "  district                     archetype              landmass  km2    share  "
             "target  error"]
     for r in st["districts"]:

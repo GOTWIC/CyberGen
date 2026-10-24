@@ -1,0 +1,315 @@
+{
+  "name": "Nyxllor",
+  "seed": 2077,
+  "stage": "M1b (water, districts, waterways, primary roads)",
+  "passed": true,
+  "variant": 18,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "landmass lm06 (0.49 km2) is open land: marsh 'Lotus Cut Marsh'",
+        "landmass lm07 (0.17 km2) is open land: marsh 'North Reach Marsh'"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "land without a district left without roads: lm06, lm07"
+      ]
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 11.9,
+    "land_km2": 8.395,
+    "district_land_km2": 7.734,
+    "water_share": 0.2945,
+    "sea_share": 0.2496,
+    "landmasses": 7,
+    "landmasses_with_districts": 7,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.661,
+    "open_land": [
+      {
+        "name": "Lotus Cut Marsh",
+        "kind": "marsh",
+        "area_km2": 0.488
+      },
+      {
+        "name": "North Reach Marsh",
+        "kind": "marsh",
+        "area_km2": 0.173
+      }
+    ],
+    "islands": 2,
+    "river_km": 2.93,
+    "channel_km": {
+      "delta_branch": 3.36,
+      "separation": 1.23
+    },
+    "separation_channels": 1,
+    "waterway_km": 2.21,
+    "waterway_km_by_kind": {
+      "basin": 0.65,
+      "canal": 1.56
+    },
+    "waterways": 5,
+    "quay_km": 4.52,
+    "district_boundary_on_water": 0.6514,
+    "boundary_on_water": 0.5318,
+    "boundary_on_water_target": 0.6,
+    "boundary_km": {
+      "water": 5.07,
+      "land": 4.46
+    },
+    "land_boundary_curvature": 1.0365,
+    "boundary_curvature": 1.098,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm01",
+        "area_km2": 1.154,
+        "share": 0.1493,
+        "target": 0.1538,
+        "target_source": "archetype weight",
+        "error": -0.0293
+      },
+      {
+        "id": "d02",
+        "name": "The Stacks",
+        "archetype": "megablock_residential",
+        "landmass": "lm01",
+        "area_km2": 1.163,
+        "share": 0.1504,
+        "target": 0.1538,
+        "target_source": "archetype weight",
+        "error": -0.0218
+      },
+      {
+        "id": "d03",
+        "name": "Highcrest",
+        "archetype": "residential_heights",
+        "landmass": "lm01",
+        "area_km2": 0.962,
+        "share": 0.1244,
+        "target": 0.1281,
+        "target_source": "archetype weight",
+        "error": -0.0292
+      },
+      {
+        "id": "d04",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm03",
+        "area_km2": 1.028,
+        "share": 0.1329,
+        "target": 0.1281,
+        "target_source": "archetype weight",
+        "error": 0.0374
+      },
+      {
+        "id": "d05",
+        "name": "Neon Strand",
+        "archetype": "entertainment_market",
+        "landmass": "lm01",
+        "area_km2": 0.876,
+        "share": 0.1133,
+        "target": 0.1153,
+        "target_source": "archetype weight",
+        "error": -0.0173
+      },
+      {
+        "id": "d06",
+        "name": "Vess Docks",
+        "archetype": "industrial_port",
+        "landmass": "lm02",
+        "area_km2": 1.35,
+        "share": 0.1746,
+        "target": 0.1666,
+        "target_source": "archetype weight",
+        "error": 0.048
+      },
+      {
+        "id": "d07",
+        "name": "Launch Key",
+        "archetype": "spaceport",
+        "landmass": "lm04",
+        "area_km2": 0.6,
+        "share": 0.0776,
+        "target": 0.0772,
+        "target_source": "island",
+        "error": 0.0051
+      },
+      {
+        "id": "d08",
+        "name": "Scholar Isle",
+        "archetype": "research_campus",
+        "landmass": "lm05",
+        "area_km2": 0.6,
+        "share": 0.0776,
+        "target": 0.0772,
+        "target_source": "island",
+        "error": 0.0051
+      }
+    ],
+    "road_km": {
+      "avenue": 27.38,
+      "highway": 7.39
+    },
+    "road_nodes": 60,
+    "road_segments": 73,
+    "road_components": 1,
+    "bridges": 8,
+    "bridges_by_class": {
+      "sea": 1,
+      "river": 3,
+      "canal": 4
+    },
+    "bridge_span_km": 0.58,
+    "named_bridges": [
+      "Launch Causeway"
+    ],
+    "pedestrian_bridges": 0,
+    "landmasses_connected": [
+      5,
+      5
+    ],
+    "exits": [
+      "east_exit",
+      "north_exit"
+    ],
+    "highway_elevated_share": 0.2233,
+    "megasites": 3,
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.4119,
+      "preferred_chains": 1,
+      "planned": 0.5395
+    },
+    "road_variant": 0
+  },
+  "notes": [
+    "island 'Launch Key' has no room toward 'west'; it sits at bearing 351 deg from the middle of the sea",
+    "megasite 'Launch Key Spaceport' (spaceport) shrunk to 0.22 km2 (asked 0.50) to fit 'Launch Key'"
+  ]
+}
