@@ -171,7 +171,7 @@ under two seeds, and all five samples were also rebuilt under two seeds with the
   where they meet curved district edges. The leftover triangles mostly become plazas.
 - **Cut-backs.** The junction angle rule is enforced by cutting a road back, not by re-routing
   it: 29 to 82 local roads per city are shortened.
-- **Dropped segments.** 4 to 9 km of local segments per city end up outside the network and are
+- **Dropped segments.** 3.5 to 8.5 km of local segments per city end up outside the network and are
   dropped. 9 to 65 lanes per city are reached only over pedestrian streets, so they become
   pedestrian.
 - **Unconnected loops.** A few residential loops find no connector to the frame; the reports
