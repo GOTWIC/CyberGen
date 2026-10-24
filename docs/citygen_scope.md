@@ -1,0 +1,437 @@
+# citygen: prompt-to-city layout generator (scope, v1)
+
+Stage 1 of a three-stage pipeline. One text prompt in; a complete, playable-scale cyberpunk city
+layout out, built as a blockout scene in Blender plus structured data for later stages and Unreal.
+
+```
+ prompt (+ optional concept image) ──> [LLM] city spec (JSON) ──> [citygen, deterministic Python] city model (JSON)
+                                                                              │
+                         ┌────────────────────────────────────────────────────┼──────────────────────────────┐
+                         v                                                    v                              v
+               Blender blockout scene                                2D maps + previews             exports for stage 2/3
+               (.blend, per-tile)                                    (PNG/SVG, review)              and Unreal (USD/glTF,
+                                                                                                     instance data, graphs)
+ ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ stage 2 (not this project): assets, models, textures               stage 3 (not this project): lighting, looks
+```
+
+## 1. Goal
+
+- Input: a prompt such as "coastal megacity on a bay, districts split by a river delta, canal-laced
+  old town, corporate core with a megatower, spaceport on the northwest coast, maglev and sky-tube
+  lines linking the districts, container port in the southeast". Nothing traced, nothing drawn.
+- Output: the coastline, rivers, channels, canals and islands; every road (highway to alley),
+  bridge, elevated road and ramp; every transit line from metro to sky tube, with stations;
+  parks and plazas; large sites such as spaceports; every block, lot and building (with type,
+  height and ground-floor stores); and street props (light poles, trash cans, trash, bus shelters,
+  overhead cables, canopies). Everything has a semantic type, so stage 2 can replace each blockout
+  with real assets.
+- No human input required after the prompt. Optional overrides exist (section 4.3) but nothing
+  depends on them.
+
+## 2. Design principles
+
+1. **LLM at the top only.** The prompt becomes a structured spec once (cheap, a single API call).
+   Everything after is seeded, deterministic code: same spec + seed = same city, byte for byte.
+2. **Generation core outside Blender.** Pure Python (shapely, networkx, numpy, scipy), testable
+   without Blender and runnable in cloud sessions. Blender is a builder and renderer only.
+3. **One canonical city model.** All outputs (Blender, 2D maps, Unreal exports) are views of the
+   same JSON model. Nothing is generated inside a builder.
+4. **Semantic everything.** Every object has a type, an id, and attributes (`prop.trash_can`,
+   `building.podium_tower`, `road.avenue`). Blockout geometry is a placeholder for stage 2.
+5. **Local regeneration.** Seeds are per stage and per district, so changing one district does
+   not reshuffle the others.
+6. **Validated, not eyeballed.** Every run ends with automatic checks (section 9); previews exist
+   for art direction, not for catching bugs.
+7. **Water first.** The water network (sea, bays, rivers, delta channels, islands) is generated
+   before anything else and decides the landmasses; districts, roads and bridges follow from it.
+   This is how both Night City and the Nexus City concept read: a coastal city whose districts
+   are split by rivers, with smaller waterways reaching into them.
+8. **Flat ground (v1).** Land at z = 0, sea below. Verticality comes from structures (elevated
+   roads, sky transit, walkways, megabuildings, skybridges).
+
+## 3. Pipeline stages
+
+| # | Stage | Produces | Method (references in section 14) |
+|---|---|---|---|
+| 0 | Prompt -> spec | `city_spec.json` | Claude API, structured output against the spec schema; optional concept image read for layout hints; unspecified values filled from archetype presets |
+| 1 | Coast and hydrology | sea, coastline, bays, rivers, delta channels, islands, landmasses | coast shape from spec form (bay, peninsula, delta, archipelago, crescent); rivers routed from inland edges to mouths along noise-guided paths, with meanders and distributary branches; islands placed offshore; land minus water = landmasses |
+| 2 | Districts | district polygons with archetype | districts assigned to landmasses by area share and placement constraints; large landmasses split by weighted Voronoi (power diagram), Lloyd relaxed; boundaries follow water where the spec asks for water separation, otherwise highways, ring roads, rail or walls |
+| 3 | Inner waterways | canals, creeks, inlets, harbor basins, marinas, quays | per-district waterway style and density; every waterway connects to a river, channel or the sea (except declared ornamental basins) |
+| 4 | Primary network | highways, arterials, ring roads, axis boulevards, bridges, off-map exits | graph over district centers, hubs and exit portals (Delaunay, pruned, MST plus loops), fitted with minimum curve radii; bridges wherever it crosses water, with clearance by waterway class |
+| 5 | Local network | streets, alleys, pedestrian streets, service lanes, footbridges | tensor-field streamlines per district (grid at angle, radial or ring around hubs and landmarks, water-following along rivers and canals); L-system growth for organic districts; alleys from block-interior splits |
+| 6 | Junctions and cross-sections | intersection polygons, sidewalks, curbs, medians, crosswalks, lane graph, sidewalk graph | road graph buffered by cross-section; corner radii; signal placement by junction class |
+| 7 | Elevated roads | elevated highways, ramps, interchanges, overpasses, viaducts, support columns, elevated walkways, covered sections | road levels plus z-profiles; interchange templates (diamond, partial cloverleaf, trumpet); grade and clearance solver (section 5.2) |
+| 8 | Transit | metro, elevated rail, monorail, maglev, sky tubes; stations, sky stations, hubs, bus stops, ferry piers | lines routed as graph paths through district centers, hubs and megasites; mode-specific altitude, grade, curve radius and support rules (section 5.3) |
+| 9 | Megasites | spaceport, transit nexus, freight terminal, stadium, arcology, temple complex, research campus | site generators placed per spec constraints, run before blocks so the street network flows around them (section 5.7) |
+| 10 | Blocks, lots, open space | blocks, lots, parks, plazas, pocket parks, waterfront promenades, courtyards | polygonize the network; open-space quota per district; lot subdivision by OBB splits and straight-skeleton strips (Vanegas et al. 2012) |
+| 11 | Buildings | building masses, heights, uses, ground-floor units, entrances, rooftop elements, landmarks, complexes, skybridges | per-lot archetype grammar (section 5.5); complexes placed first on merged lots; height field from district profile, distance to center, noise; height limits from megasite flight zones; skybridges matched between facing facades |
+| 12 | Props | street furniture, ground clutter, overhead elements | rule-based placement along sidewalk zones, alleys, plazas, quays, rooftops; Poisson-disk scatter with keep-out zones (section 5.6) |
+| 13 | Validate | report + pass/fail | section 9 |
+| 14 | Build and export | `.blend`, previews, USD/glTF tiles, instance data, graphs, legacy `plan.json` | section 8 |
+
+(Stage 9 is listed after transit for readability; in the run order megasites are reserved right
+after districts so roads and transit can connect to them.)
+
+## 4. Inputs
+
+### 4.1 Prompt and optional concept image
+- Free text, one line or a page. Can name districts, sub-areas, water features, landmarks,
+  transit lines, moods.
+- Optional concept image (for example an AI-generated city map like the Nexus City concept).
+  The spec stage reads it with Claude's vision for layout hints only: which districts exist,
+  their relative positions, where the coast and rivers run, which districts water separates,
+  transit routes and landmarks. Geometry is still generated, not traced, so a decorative or
+  inconsistent image is fine.
+
+### 4.2 City spec (generated from the prompt; human-readable, never required to edit)
+
+```json
+{
+  "name": "Nyxllor", "seed": 1207, "size_km": [3.4, 3.4],
+  "water": {
+    "coast": {"form": "bay", "side": "south_west"},
+    "rivers": [{"name": "Sentinel", "from": "north_east", "to": "bay", "width_m": [60, 120],
+                "meander": 0.4, "delta_branches": 2}],
+    "islands": [{"name": "Silver Island", "position": "south_west_offshore", "area_km2": 0.5}],
+    "district_separation": "water_preferred"
+  },
+  "highways": {"pattern": "ring_plus_spine", "exits": ["north", "east"]},
+  "transit": {
+    "hubs": ["Transit Nexus"],
+    "lines": [
+      {"mode": "metro", "name": "Blue Line", "route": ["Corporate Core", "Transit Nexus", "Midtown"]},
+      {"mode": "maglev", "name": "Magenta Line", "altitude_m": [25, 45],
+       "route": ["Neon Market", "Transit Nexus", "Midtown", "east_exit"]},
+      {"mode": "sky_tube", "name": "Spire Loop", "altitude_m": [70, 120], "through_towers": true,
+       "route": ["Corporate Core", "Aurora Spaceport", "Transit Nexus", "Corporate Core"]}
+    ]
+  },
+  "districts": [
+    {"name": "Corporate Core", "archetype": "corporate_core", "area_share": 0.12,
+     "placement": {"north_of": "Transit Nexus"}, "grid_angle_deg": 45, "height_m": [80, 320],
+     "landmarks": ["megatower"], "places": [{"name": "Sky Garden Plaza", "kind": "plaza"}],
+     "complexes": ["twin_towers", "tower_cluster"], "skybridge_density": 0.6,
+     "grime": 0.1, "neon": 0.4},
+    {"name": "Old Town", "archetype": "old_town", "area_share": 0.14,
+     "placement": {"coast": true, "south_west_of": "Transit Nexus", "separated_by": "river"},
+     "waterways": {"style": "organic_canals", "density": 0.6},
+     "places": [{"name": "Jade Canal", "kind": "canal"}, {"name": "Temple District", "kind": "temple_complex"}],
+     "grime": 0.7, "neon": 0.6},
+    {"name": "Aurora Spaceport", "archetype": "spaceport", "area_share": 0.08,
+     "placement": {"coast": true, "edge": "north_west"}, "megasites": ["spaceport"]}
+  ]
+}
+```
+
+What the spec can express about water, so prompts like "districts split by rivers, canals
+running into the old town" always have somewhere to land:
+- coast form and side: bay, peninsula, delta, archipelago, crescent, straight coast
+- rivers: count, names, entry and mouth, width range, meander, delta branches
+- islands: count, names, position, size, which district sits on each
+- district separation: by water (preferred, required, none) per district or for the whole city
+- inner waterways per district: style (canal grid, organic canals, creeks, inlets, harbor
+  basins, marina), density, named canals
+- bridges: density per crossing, named landmark bridges, rail and pedestrian bridges
+
+### 4.3 Optional overrides (never required)
+- Pinned geometry: import an existing SVG/JSON district (e.g. today's traced
+  `maps/corporate_core_v*.svg`) as fixed; the generator builds around it.
+- Per-district parameter tweaks, landmark positions, a different seed per district.
+
+### 4.4 District archetypes (presets; the LLM picks and tunes them)
+
+| Archetype | Street pattern | Blocks (m) | Heights (m) | Character |
+|---|---|---|---|---|
+| corporate_core | rotated grid, axis boulevard, wide avenues | 120 to 200 | 80 to 320, landmark 450+ | plazas, podium towers, skybridges, sky stations, clean |
+| megablock_residential | superblocks | 150 to 250 | 120 to 250 | megabuildings with atriums, elevated decks |
+| midtown_mixed | grid with ring road and central park | 80 to 140 | 30 to 150 | culture, living, commerce, big central plaza |
+| entertainment_market | dense organic, canals | 30 to 80 | 10 to 60 | clubs, covered alleys, stalls, billboards, heavy neon |
+| old_town | organic, many dead ends, canals and creeks | 20 to 60 | 6 to 30 | markets, food, heritage, temples, stacked shanties, grime |
+| industrial_port | large grid, rail spurs | 150 to 300 | 8 to 25 | warehouses, container yards, cranes, berths, freight terminal |
+| residential_heights | curvilinear, gated | 80 to 150 | 10 to 60 | lower density, parks, walls, guard gates |
+| research_campus | campus loops on an island | 100 to 200 | 15 to 90 | labs, medical, R&D, landscaped grounds |
+| transit_hub | radial and ring around a central station | 60 to 120 | 20 to 120 | multi-level station, bus bays, maglev and metro interchange |
+| spaceport | service roads around pads | site-driven | 10 to 60, height-limited zone | launch pads, terminal, hangars, cargo (section 5.7) |
+
+## 5. Feature catalog
+
+### 5.1 Roads (cross-sections, defaults per class)
+
+| Class | Lanes | Lane (m) | Median | Parking | Sidewalk (m) | Total (m) |
+|---|---|---|---|---|---|---|
+| highway | 2 x 3 | 3.6 | barrier, shoulders | no | none | 26 to 32 |
+| avenue | 2 x 2 or 2 x 3 | 3.3 | 2 to 6 m, trees | sometimes | 4 to 6 | 26 to 40 |
+| street | 2 x 1 | 3.2 | no | one or both sides | 2.5 to 4 | 12 to 20 |
+| alley / service | shared 1 | 4 to 6 | no | no | none | 4 to 6 |
+| pedestrian street | none | | | | full width | 6 to 15 |
+
+Curbs 0.15 m. Corner radii by class. One-way flags for narrow streets. Every road has a level
+(0 = ground, 1, 2, ...) and a z-profile. Ring roads and axis boulevards are explicit patterns.
+
+### 5.2 Elevated roads, ramps and interchanges
+- Levels: ground; level 1 deck top about 8 to 10 m; level 2 about 16 to 20 m; sky level
+  (transit only) 25 to 150 m.
+- Clearance under any road deck at least 5.5 m; deck thickness 1.5 to 2 m.
+- Ramp length from rise and maximum grade, $L = \dfrac{\Delta h}{g}$; for example rising
+  $\Delta h = 9\,\text{m}$ at $g = 0.06$ needs $L = 150\,\text{m}$ of run, plus vertical curves.
+- Max grade 6% for roads; pedestrians use stairs, escalators or elevators.
+- Interchanges from templates (diamond, partial cloverleaf, trumpet; stack is v2), fitted where
+  highways meet highways or arterials. Free-form solving is out of scope.
+- Supports: columns every 25 to 40 m, never inside a lane, sidewalk clear path or navigable channel.
+- Covered sections: canopies over walkways and roads under decks (cyberpunk "underpass streets").
+
+### 5.3 Transit, including sky lines
+
+| Mode | Altitude | Structure (blockout) | Stations | Grade, curves |
+|---|---|---|---|---|
+| metro | underground | none, line as data | entrance kiosks + concourse box; spacing 600 to 1000 m | n/a |
+| elevated rail | 8 to 20 m | viaduct deck on columns every 25 to 40 m | platforms on the deck, stairs and elevators | at most 4%, radius at least 150 m |
+| monorail | 10 to 30 m | single beam on T-pylons every 20 to 30 m | compact platforms | at most 6%, radius at least 100 m |
+| maglev | 15 to 60 m | high guideway on pylons every 30 to 60 m, long sweeping curves | large hub stations, often in a terminal building | at most 10%, radius at least 500 m |
+| sky tube | 40 to 150 m | enclosed tube (cylinder or rounded box) on tall pylons, or hung between towers on trusses | sky stations inside towers, reached by elevator cores | at most 8%, radius at least 300 m |
+
+- Sky lines either clear everything below by at least 10 m or pass through a tower via a
+  declared portal (the building gets a matching void and, where it stops, a sky station floor).
+- Every elevated or sky station has vertical access to the street (stairs, escalators, elevator
+  core) and is placed next to a walkway or plaza.
+- Lines cross water on their own bridges or share road bridges as a second deck.
+- Bus stops every 300 to 400 m on avenues; ferry piers and water-taxi stops on rivers and canals.
+
+### 5.4 Water and waterfront
+- Sea, coastline, bays, harbor basins, breakwaters, piers and docks.
+- Rivers 40 to 150 m wide, meandering, with delta channels that separate districts.
+- Islands offshore or mid-river, each linked by at least one bridge.
+- Inner waterways reaching into districts from rivers or the sea:
+  - canal grids (straight, 10 to 30 m, stone quays)
+  - organic canals and creeks (old town)
+  - inlets, harbor basins and marinas (port, waterfront districts)
+- Bridges at every road or rail crossing; navigable clearance by waterway class: sea channel
+  and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m. High clearance means long
+  approach ramps, so major bridges are few and named; canals get many low footbridges.
+- Quays and promenades along waterways, with stairs down to the water and boat moorings.
+- Street-level pools, fountains, reflecting basins in plazas.
+
+### 5.5 Open space and buildings
+Open space: parks (lawns, path network, tree clusters), plazas (paving, fountain, seating),
+pocket parks in leftover lots, podium-roof plazas linked by skybridges, waterfront promenades.
+
+Each building is a list of masses (extruded polygons with $z_0, z_1$) plus attributes:
+archetype, use (office, residential, retail, hotel, industrial, parking, civic), floor height,
+style tags (grime, neon, era) for stage 2.
+
+| Archetype | Shape |
+|---|---|
+| podium_tower | 2 to 6 floor podium on the lot, setback tower(s) on top |
+| slab | long bar, 8 to 30 floors |
+| courtyard_block | perimeter block with inner courtyard |
+| megabuilding | block-filling, 150 m+, internal atrium void, elevated decks |
+| terraced | stacked setback tiers |
+| shopfront_row | narrow lots, 2 to 6 floors, continuous street wall |
+| shanty_stack | irregular stacked boxes, overhangs, balconies |
+| warehouse / shed | large low box, loading docks |
+| parking_structure | open-deck box with ramp |
+| station | per transit rules, including sky-station floors inside towers |
+| landmark | spec-defined generator (e.g. the three-armed megatower) |
+
+**Complexes (one property, several buildings).** A `property` groups buildings that belong
+together, on one lot or on lots across a street:
+
+| Complex | Shape |
+|---|---|
+| twin_towers | two mirrored towers on a shared podium, linked by one or more skybridges (e.g. the Petronas Towers, linked at floors 41 and 42) |
+| tower_cluster | three or more towers of stepped heights on a shared podium, bridges between neighbors |
+| megabuilding_campus | megabuilding with satellite towers, linked by decks and bridges |
+| bridged_pair | two buildings of one owner on facing lots, joined by skybridges across the street |
+| straddle_building | a building whose upper floors span a street on a bridge structure (clearance at least 5.5 m) |
+| campus | low buildings around landscaped grounds, joined by covered walkways (research, civic) |
+
+**Skybridges** connect buildings across streets, alleys, canals and plazas, whether or not they
+share an owner:
+- Endpoints on facing facades of two masses that both reach that height; ends land on a floor
+  (z matches the floor grid of both buildings).
+- Clearance over roads at least 5.5 m, over waterways at least the waterway class clearance.
+- Length 8 to 80 m, roughly perpendicular to both facades; never through another building, a
+  sky line or a sky tube corridor.
+- Kinds: enclosed walkway, open deck, multi-level stack, and in grimy districts improvised
+  catwalks and cable bridges between shanties at low height.
+- Density per district (corporate and megablock high, old town low and improvised).
+- Every skybridge joins the pedestrian graph, so crowds can use it later.
+
+Ground floors: street-facing edges split into units (4 to 12 m) with use tags (food,
+convenience, bar, clinic, cyberware, pawn, club, arcade, laundromat), entrance positions,
+awning and sign blocks. Rooftops: AC units, water tanks, antennas, billboards, helipads and
+AV landing pads (more in corporate and hub districts).
+
+### 5.6 Props (blockout primitives, all instanced)
+
+| Type | Blockout | Placement rule |
+|---|---|---|
+| street_light | box pole 8 m + arm + head (light emitter tag) | furniture zone, every 25 to 35 m, staggered |
+| traffic_signal | pole + box heads | signalized junction corners |
+| trash_can | cylinder r 0.3, h 0.9 | near crossings, shop entrances, bus stops |
+| trash_scatter | small spheres (bags), boxes and planes (cardboard), tiny cylinders (cans) | Poisson scatter; density by grime; gutters, alleys, corners |
+| dumpster | box 2 x 1.2 x 1.3 | alleys, service lanes, building backs |
+| bench | box | parks, plazas, bus stops, quays |
+| bus_shelter | frame boxes + roof plane | bus stops |
+| vending_machine / kiosk | box (emitter) | shopfronts, stations, plazas |
+| food_stall | box + awning plane | markets, plazas, under decks, quays |
+| bollard / hydrant | cylinders | corners, pedestrian streets, every 100 m |
+| tree / planter | cylinder trunk + sphere crown / box | avenue medians, parks, plazas, promenades |
+| parked_vehicle | box + upper box | parking lanes, lots |
+| boat | box hull + small box cabin | moorings, marinas, harbor berths |
+| barrier / railing | jersey prism, fence and railing segments | highways, quay edges, bridges, gated districts |
+| overhead_cable | thin cylinders between facades | alleys and narrow streets, density by grime |
+| sign / billboard | planes on facades and roofs (emitter) | density by neon |
+| ac_unit | box on facades and roofs | buildings |
+| shipping_container / crane | boxes | port, freight terminal |
+| scaffolding | box frames | random buildings |
+| arch / gate | boxes with opening | market entrances, temple gates, enclave gates |
+| canopy / bridge_cover | roof plane on posts | walkways, stall rows, station approaches, covered bridges |
+| column / pylon | cylinder or box, up to 150 m for sky lines | under every elevated deck and line |
+| stairs / elevator_core | stepped boxes / tall box | stations, quays, elevated walkways, sky stations |
+
+Keep-outs: crosswalks, driveways, entrances, sidewalk clear path (at least 1.8 m), lanes,
+quay edges, fire-hydrant clearance. Props never overlap each other or buildings.
+
+### 5.7 Megasites (site generators)
+
+| Site | Contents (blockout) | Placement and rules |
+|---|---|---|
+| spaceport | circular launch pads, launch towers, terminal, hangars, control tower, cargo yard, fuel tanks | coast or city edge, large flat area, linked to a highway and a maglev or sky line; flight cone over the pads limits building heights nearby |
+| skyport / AV hub | VTOL pads on a raised deck, terminal | corporate and hub districts, rooftops of tall podiums |
+| transit nexus | multi-level station building, ring roads, bus bays, maglev, metro and sky-tube platforms | city center or district junction; all lines meet here |
+| freight terminal / container port | berths, gantry cranes, container stacks, rail yard, truck gates | coast or river mouth, deep basin, linked to highway and rail |
+| stadium / arena | bowl, plaza, parking | large lot, near transit |
+| arcology / landmark tower | spec-defined generator (e.g. megatower) | district focus, axis boulevard |
+| temple complex | courtyards, gates, walls, halls | old town, waterside |
+| central park / grand plaza | lawns, water, paths, radial walkways | midtown, corporate core |
+| attraction | Ferris wheel, observation tower | entertainment districts, waterfront |
+
+Named places from the spec (e.g. "Club Row", "Nightfall Plaza", "Freight Terminal") become
+labeled sub-areas with their own features and appear on the 2D map.
+
+## 6. City model (canonical output data)
+
+One JSON document per city (split per district if large), versioned schema. Entities:
+`land`, `landmass`, `island`, `sea`, `river`, `channel`, `waterway` (canal, creek, inlet,
+basin), `quay`, `bridge` (class, clearance, deck levels), `district`, `place`, `road_node`,
+`road_segment` (class, lanes, level, z-profile, cross-section), `junction`, `lane` (lane graph,
+for traffic), `walkway` (pedestrian graph, for crowds), `structure` (deck, ramp, column, pylon,
+tube, canopy), `transit_line` (mode, altitude profile), `station` (ground, elevated,
+sky, underground), `megasite`, `block`, `lot`, `open_space`, `property` (owner tag, member buildings, complex type),
+`building` (masses, units, roof items, portals), `skybridge` (end buildings, z, width, levels,
+kind), `prop` (type, position, yaw, scale), `tile` (256 m grid for later World
+Partition streaming).
+
+Ids are stable and readable: `d03.blk017.lot004.bld`, `d03.prop.street_light.0213`.
+Coordinates: meters, x east, y north, z up, origin at city center (matches today's `plan.json`).
+
+## 7. Interfaces to later stages
+- Stage 2 (assets): every object's semantic type, footprint, bounds, id, style tags and material
+  slot names; it swaps blockouts for real meshes without touching layout.
+- Stage 3 (looks): light emitter points (street lights, signs, vending machines, windows, transit
+  lines), neon and grime fields per district, sky exposure of streets under decks, water surfaces.
+- Unreal: lane graph and pedestrian graph (for ZoneGraph and Mass traffic/crowds later), transit
+  line splines, tiles for World Partition, prop instances as transforms (for instanced meshes or
+  PCG points).
+
+## 8. Builders and outputs
+- **Blender blockout** (`blender -b -P citygen/blender/build.py -- city.json`, Blender 5.2):
+  collections per district and category; meshes built with bmesh; props as geometry-nodes
+  instances on point clouds (one object per prop type per tile, so 100k+ props stay fast);
+  flat-color materials by category; custom properties carry type, id and attributes;
+  saved `.blend` per city plus optional per-tile files.
+- **Previews:** top-down orthographic map, isometric render per district, street-level views
+  from a few generated camera points.
+- **2D maps:** layered SVG (same layer names as today, plus water, transit and megasite layers)
+  and PNG, with district and place labels and a legend, for review and for the old workflow.
+- **Exports:** USD (preferred for Unreal) or glTF per tile; prop instances as JSON/CSV;
+  lane, walkway and transit graphs as JSON; legacy `corporate_core_plan.json` format for the
+  existing Unreal greybox script.
+
+## 9. Validation (runs every time; a failure means the city is not delivered)
+- Water: every waterway connects to a river, channel or the sea (except declared basins);
+  every district's landmass is reachable by road (bridges); bridge clearance meets the waterway
+  class; no columns or pylons inside navigable channels.
+- Road graph connected (one component per level system, ramps linking levels).
+- Every lot touches a street or alley; every building has an entrance on a walkway.
+- No overlaps: building/road, building/water, prop/prop, prop/building, column/lane.
+- Elevated roads: grades at most the class maximum, clearances at least 5.5 m, ramps land on roads.
+- Transit: grades and curve radii within mode limits; sky lines clear buildings by 10 m or pass
+  through a declared portal; every station has street access; every hub is served by its lines.
+- Megasites: nothing inside a spaceport flight cone above its height limit; each site linked to
+  the transit and road connections its rules require.
+- Skybridges and straddle buildings: both ends on floors of buildings tall enough, clearances
+  met, no intersection with other buildings or sky lines, length within limits.
+- Sidewalk clear path at least 1.8 m everywhere; crosswalks at every signalized junction.
+- District area shares within 15% of spec; height ranges within archetype bounds.
+- Stats report: road km by class, bridge count, waterway km, transit km by mode, building count,
+  floor area, prop counts, open-space and water share.
+- Optional art-direction pass: Claude reviews the previews against the spec (and the concept
+  image, if given), adjusts spec parameters (never code), and reruns, at most N rounds.
+
+## 10. Scale and performance targets
+- Default city 6 to 12 km², 6 to 10 districts (configurable; one district is about today's
+  1 km² Corporate Core).
+- Rough counts at that size: 3k to 8k buildings, 200 to 400 km of road edges, 100 to 300 bridges,
+  a few hundred thousand prop instances.
+- Generation under 10 minutes on the M4 Mac; Blender build under 10 minutes; one district
+  regenerates in under a minute.
+
+## 11. Out of scope (v1)
+- Textures, detailed models, facades, interiors, materials beyond flat category colors.
+- Lighting, atmospherics, post-processing (stage 3).
+- Terrain relief (hills); tunnels and underground metro geometry beyond station boxes.
+- Gameplay, AI, traffic simulation, Unreal-side import tooling beyond the existing greybox
+  script (data for it is produced).
+- Free-form interchange design (templates only); stack interchanges.
+- Moving parts (trains, ships, AVs); their routes are exported as data only.
+
+## 12. Milestones (each ends with tests passing, previews committed, and a short report)
+
+| M | Deliverable | Done when |
+|---|---|---|
+| M0 | Spec schema (water, transit modes, megasites, places), archetype presets, prompt (+ image) -> spec CLI, city model schema, 2D debug renderer | 3 different prompts and `reference/nexus_city_concept.webp` produce valid specs |
+| M1 | Coast, rivers, delta channels, islands, landmasses, districts, inner waterways, highways, arterials, bridges | water-split cities that read like the concept at macro scale; water and connectivity checks pass |
+| M2 | Local streets, alleys, footbridges, junctions, sidewalks, quays, blocks, lots, open space | lots and blocks valid; access checks pass |
+| M3 | Buildings (archetypes, heights, ground-floor units, rooftops), complexes (twin towers, clusters, bridged pairs, straddle buildings), skybridges, landmarks, megasites (spaceport, transit nexus, freight terminal, others) | building, skybridge and megasite checks pass; districts read differently in previews |
+| M4 | Blender builder, previews, labeled 2D map, USD/glTF tile export, legacy plan.json | full city opens in Blender 5.2 and renders; core pipeline complete |
+| M5 | Transit: metro stations, elevated rail, monorail, maglev, sky tubes with tower portals and sky stations; elevated walkways, canopies; skybridges rerouted around sky lines | grade, curve, clearance, portal and access checks pass |
+| M6 | Props and ground clutter | keep-out and overlap checks pass; 100k+ instances build fast |
+| M7 | Elevated highways with ramps and interchange templates; art-direction loop; Corporate Core pinned import | full validation suite passes on 3 prompts |
+
+M0 to M4 is the core ("prompt -> full blockout city in Blender"). M7 carries the most technical
+risk, so it is last: if the budget runs out there, elevated highways fall back to straight
+viaducts with simple end ramps from M5.
+
+## 13. Running it with cloud sessions
+- Push this repo to a private GitHub repository (cloud sessions start from it).
+- One milestone per cloud session (two for M1, M2 and M7). Brief: "Read docs/citygen_scope.md,
+  implement milestone Mn, run tests and validation, commit previews to `docs/progress/Mn/`,
+  open a PR with the report."
+- Blender may not be available in the cloud; M0 to M3 do not need it. M4+ Blender work is
+  verified on the Mac (Blender 5.2) or with a Linux Blender build if the cloud environment
+  allows the download.
+- Budget control: check spend after M0 and M1, extrapolate, and cut from the end of the list.
+
+## 14. References
+- Parish and Müller, "Procedural Modeling of Cities", SIGGRAPH 2001 (L-system road networks with
+  global goals and local constraints, land and water maps as input): https://history.siggraph.org/?p=116923
+- Chen et al., "Interactive Procedural Street Modeling", SIGGRAPH 2008 (tensor-field streets):
+  https://www.sci.utah.edu/~chengu/street_sig08/street_project.htm
+- ProbableTrain City Generator (open-source tensor-field city maps with coastlines and rivers,
+  SVG/STL export): https://probabletrain.itch.io/city-generator and its algorithm overview
+  https://probabletrain.itch.io/city-generator/devlog/140896/algorithm-overview
+- Vanegas et al., "Procedural Generation of Parcels in Urban Modeling", Eurographics 2012
+  (OBB and straight-skeleton lot subdivision): https://www.cs.purdue.edu/cgvlab/papers/aliaga/eg2012.pdf
+- Purdue SIGGRAPH 2011 course, urban layouts: https://www.cs.purdue.edu/cgvlab/urban/sg_2011_course/umc_SG11_02_urban_layouts.pdf
+- Epic City Sample, Houdini city and freeway generation (zones, freeway network, data for Mass
+  traffic): https://dev.epicgames.com/documentation/unreal-engine/city-sample-quick-start-for-generating-a-city-and-freeway-using-houdini
+- Infinigen Indoors (Blender-based procedural generator, constraint placement, USD export):
+  https://arxiv.org/pdf/2406.11824
+- CityCraft (LLM land-use planning + layout + Blender assembly): https://arxiv.org/abs/2406.04983
+- SceneCraft (LLM agent writing Blender code for scenes): https://arxiv.org/abs/2403.01248
+- Buildify (geometry-nodes building kit, Blender): https://www.cgchannel.com/2022/07/download-free-blender-3d-building-generator-buildify/
+- Visual reference: the Nexus City concept map, `reference/nexus_city_concept.webp` (AI-generated, layout inspiration only), and
+  Cyberpunk 2077's Night City (coastal, districts split by water, layered transit).
