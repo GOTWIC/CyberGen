@@ -499,3 +499,23 @@ def test_report_has_local_stats(small):
         assert k in st, k
     text = C.report_text(small.report())
     assert "lots by archetype" in text and "junctions by type" in text
+
+
+def test_same_model_across_hash_seeds(tmp_path):
+    """String hashing changes with every process (PYTHONHASHSEED): set order must never
+    reach the model (junction classes once came out of a set)."""
+    import os
+    import subprocess
+    import sys
+
+    spec = tmp_path / "small.json"
+    spec.write_text(json.dumps(SMALL))
+    outs = []
+    for seed in ("1", "777"):
+        out = tmp_path / f"out{seed}"
+        env = {**os.environ, "PYTHONHASHSEED": seed}
+        proc = subprocess.run([sys.executable, "-m", "citygen", "build", str(spec), str(out)],
+                              cwd=ROOT, env=env, capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
+        outs.append((out / "city_model.json").read_bytes())
+    assert outs[0] == outs[1]

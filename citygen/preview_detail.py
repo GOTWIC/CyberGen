@@ -69,7 +69,7 @@ def pick_insets(m, n: int = 4) -> list[tuple[str, tuple[float, float]]]:
             c = poly.representative_point()
         cands = sorted(nid for nid in local if deg.get(nid, 0) >= 3 and
                        poly.contains(Point(pos[nid])))
-        lots = np.array([G.centroid(G.from_model_poly(lt.polygon)) for lt in m.lots
+        lots = np.array([G.centroid(_P(lt.polygon)) for lt in m.lots
                          if lt.district_id == d.id] or [(c.x, c.y)])
         if cands:
             # the busiest spot: most lots within the inset, then nearest the middle
@@ -118,6 +118,17 @@ def _strip(line: LineString, a: float, b: float):
     return shapely.make_valid(shapely.Polygon(coords))
 
 
+_SHAPES: dict = {}
+
+
+def _P(poly):
+    """A model polygon as shapely, converted once per render (the insets share them)."""
+    g = _SHAPES.get(id(poly))
+    if g is None:
+        g = _SHAPES[id(poly)] = G.from_model_poly(poly)
+    return g
+
+
 def draw_inset(ax, m, did: str, center, idx) -> None:
     cx, cy = center
     win = box(cx - HALF_M, cy - HALF_M, cx + HALF_M, cy + HALF_M)
@@ -129,7 +140,7 @@ def draw_inset(ax, m, did: str, center, idx) -> None:
     ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_color(MUTED)
-    P = G.from_model_poly
+    P = _P
     land = [P(p) for x in m.land for p in x.polygons]
     ax.add_collection(PolyCollection(_poly_paths(_clip_polys(land, win)), facecolors=LAND,
                                      edgecolors="none", zorder=1))
@@ -311,6 +322,7 @@ def _pt_per_m(ax) -> float:
 
 def render(b, out, dpi: int = 110) -> None:
     m = b.model
+    _SHAPES.clear()
     picks = pick_insets(m)
     if not picks:
         return
@@ -337,5 +349,6 @@ def render(b, out, dpi: int = 110) -> None:
         ax = fig.add_axes([(0.2 + q * size) / W, (0.1 + (rows - 1 - r) * size) / H,
                            (size - 0.2) / W, (size - 0.2) / H])
         draw_inset(ax, m, did, c, k + 1)
+    _SHAPES.clear()
     fig.savefig(out, dpi=dpi, facecolor=BG)
     plt.close(fig)

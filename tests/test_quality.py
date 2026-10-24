@@ -244,13 +244,14 @@ def test_delta_splits_inland_and_fans_out(delta):
 
 def test_no_unassigned_delta_wedges(delta):
     m = delta.model
-    open_lm = {o.attrs["landmass_id"] for o in m.open_spaces}
+    land = [o for o in m.open_spaces if not o.attrs.get("m2")]  # M1 open land, not M2 parks
+    open_lm = {o.attrs["landmass_id"] for o in land}
     branches = [G.from_model_poly(c.polygon) for c in m.channels if c.kind == "delta_branch"]
     for lm in m.landmasses:
         poly = G.from_model_poly(lm.polygon)
         if any(poly.distance(b) < 5 for b in branches):
             assert lm.district_ids or lm.id in open_lm, lm.id
-    for o in m.open_spaces:
+    for o in land:
         assert o.name and o.kind in ("marsh", "park")
     assert delta.stats["unassigned_land_km2"] == 0.0
 

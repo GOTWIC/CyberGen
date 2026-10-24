@@ -79,7 +79,7 @@ def test_all_scope_entities_present():
     """Section 6 entity list."""
     expected = {"land", "landmasses", "islands", "seas", "rivers", "channels", "waterways",
                 "quays", "bridges", "districts", "places", "road_nodes", "road_segments",
-                "junctions", "lanes", "walkways", "structures", "transit_lines", "stations",
+                "junctions", "crosswalks", "sidewalks", "lanes", "walkways", "structures", "transit_lines", "stations",
                 "megasites", "blocks", "lots", "open_spaces", "properties", "buildings",
                 "skybridges", "plants", "green_areas", "props", "tiles"}
     assert set(COLLECTIONS) == expected

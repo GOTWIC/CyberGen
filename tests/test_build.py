@@ -119,7 +119,12 @@ def test_small_city_passes(small_built):
                    "water_required", "district_pieces", "island_sizes", "no_slivers",
                    "land_use", "canal_quality", "road_graph", "districts_served",
                    "named_bridges", "bridge_clearance", "road_avoidance", "curve_radius",
-                   "segment_length", "road_duplicates"}
+                   "segment_length", "road_duplicates",
+                   # M2
+                   "street_graph", "lane_graph", "walkway_graph", "lot_frontage",
+                   "lot_block_sizes", "lot_slivers", "sidewalk_clear_path", "crosswalks",
+                   "junction_placement", "junction_angles", "street_duplicates",
+                   "open_space_share", "places_built"}
 
 
 def test_check_geometry_invalid(small_built):

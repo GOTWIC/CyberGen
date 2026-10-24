@@ -616,7 +616,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                                     "corner_radius_m": min(x.r for x in lg),
                                     "archetype": node_arch[nid],
                                     "classes": sorted({x.cls for x in lg},
-                                                      key=lambda c: -ST.RANK[c])}})
+                                                      key=lambda c: (-ST.RANK[c], c))}})
     for nid, poly in turnarounds:
         junctions.append({"id": f"jn{len(junctions) + 1:05d}", "node_id": nid, "polygon": poly,
                           "signalized": False, "crosswalk_ids": [], "row_polygon": poly,

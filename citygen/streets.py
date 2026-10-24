@@ -1082,9 +1082,10 @@ def _attachable(B: Builder, p, reach: float = 3.0) -> bool:
 
 
 def pattern_loops(B: Builder, name: str, cell, rng, offset: float, smooth: int, amp: float,
-                  culs: bool, campus: bool, depth: int = 0) -> list[int]:
+                  culs: bool, campus: bool, depth: int = 0, core_k: float = 0.8) -> list[int]:
     """Curvilinear loop streets at lot depth inside the cell, connectors to the frame, and
-    cul-de-sacs (residential) or service drives and a landscaped core (campus)."""
+    cul-de-sacs (residential) or service drives and a landscaped core (campus), inset
+    `core_k * offset` inside the loop."""
     arch = B.arch[name]
     sec = cross_section("street", arch)
     w = sec["total_width_m"]
@@ -1145,7 +1146,7 @@ def pattern_loops(B: Builder, name: str, cell, rng, offset: float, smooth: int, 
                     B.lines[cj].dead = True
             if not got:
                 B.notes.append(f"'{name}': a loop street found no connector")
-        core = G.qpoly(part.buffer(-offset * (0.8 if campus else 1.0), join_style="mitre"))
+        core = G.qpoly(part.buffer(-offset * (core_k if campus else 1.0), join_style="mitre"))
         if campus:
             for c in G.parts(core):
                 if G.area(c) > 3000.0:
@@ -1698,7 +1699,7 @@ def fill_district(B: Builder, name: str) -> list[int]:
         elif pat == "campus_loops":
             ids = pattern_loops(B, name, cell, crng, 62.0, 3, 12.0, False, True)
             if not ids:  # a small cell: a tighter loop
-                ids = pattern_loops(B, name, cell, crng, 40.0, 3, 8.0, False, True)
+                ids = pattern_loops(B, name, cell, crng, 40.0, 3, 8.0, False, True, core_k=0.5)
         elif pat == "radial_ring":
             ids = pattern_radial(B, name, cell, center, r0, max(lo + 25.0, 80.0),
                                  max(hi, lo + 50.0), _rng(d.seed, 14), clearance)

@@ -702,9 +702,11 @@ def check_segment_length(m: CityModel, g: _Geo) -> Check:
 
 
 def road_duplicates(m: CityModel, g: _Geo) -> list[str]:
-    """Primary roads only (local roads: `street_duplicates`)."""
-    ids = [s.id for s in m.road_segments if s.road_class in ROAD_MIN_RADIUS_M]
-    lines = [g.roads[i] for i in ids]
+    """Primary roads only, as M1b laid them (`primary_chains`; local roads:
+    `street_duplicates`)."""
+    chains = primary_chains(m, g)
+    ids = [c[0] for c in chains]
+    lines = [c[2] for c in chains]
     if not lines:
         return []
     tree = shapely.STRtree(lines)
