@@ -139,7 +139,29 @@ same model; every stage writes trace entries (`streets`, `junctions`, `lanes`, `
 
 ## Cross-machine check (ARM)
 
-ARM_RESULT
+All five sample cities were rebuilt from the final code under emulated aarch64 Linux: qemu-user,
+Python 3.13.7, and the same pinned numpy 2.5.4 and shapely 2.2.0 with GEOS 3.14.1, from the
+aarch64 wheels on PyPI. The run used one worker process.
+
+Every `city_model.json` is byte-identical to the x86_64 build (Python 3.13.17, 4 workers). So
+is every stage trace: `citygen trace diff` reports no difference in 53 (Saltreach), 244
+(Greyhook), 2766 (Delta), 5897 (Nyxllor) and 8544 (Nexus) entries.
+
+| City | sha256 (both machines) |
+|---|---|
+| Nyxllor | `9930f72c750e3e41...` |
+| Saltreach Free Port | `41227c37a60e0a8f...` |
+| Delta Megacity | `48df64bb0a20f3c7...` |
+| Nexus City | `498393da84634d0f...` |
+| Greyhook | `84cfa61bda09be48...` |
+
+Emulated build times were 25 min (Greyhook) to 113 min (Nexus).
+
+During this pass a second source of drift turned up and was fixed. Junction classes of equal
+rank (pedestrian, footbridge) came out of a Python set of strings, and string hashes change with
+every process (`PYTHONHASHSEED`). The same machine could therefore write different bytes on two
+runs. Classes are now sorted by rank, then name. `test_same_model_across_hash_seeds` builds
+under two seeds, and all five samples were also rebuilt under two seeds with the same bytes.
 
 ## Still weak
 
