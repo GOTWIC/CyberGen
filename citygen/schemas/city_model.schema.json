@@ -31,14 +31,32 @@
           "title": "District Id",
           "type": "string"
         },
+        "archetype": {
+          "title": "Archetype",
+          "type": "string"
+        },
         "polygon": {
           "$ref": "#/$defs/Polygon"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "number"
+        },
+        "frontage_ids": {
+          "description": "Road segment ids.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Frontage Ids",
+          "type": "array"
         }
       },
       "required": [
         "id",
         "district_id",
-        "polygon"
+        "archetype",
+        "polygon",
+        "area_m2"
       ],
       "title": "Block",
       "type": "object"
@@ -494,6 +512,18 @@
           "default": 0.15,
           "title": "Curb M",
           "type": "number"
+        },
+        "furniture_m": {
+          "default": 1.5,
+          "description": "Furniture zone of each sidewalk (trees, lights); clear path = sidewalk - furniture - curb.",
+          "title": "Furniture M",
+          "type": "number"
+        },
+        "shared": {
+          "default": false,
+          "description": "One lane shared by both directions (alleys).",
+          "title": "Shared",
+          "type": "boolean"
         }
       },
       "required": [
@@ -503,6 +533,81 @@
         "lanes_backward"
       ],
       "title": "CrossSection",
+      "type": "object"
+    },
+    "Crosswalk": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "junction_id": {
+          "title": "Junction Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "description": "The road it crosses.",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "line": {
+          "description": "Curb to curb.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Line",
+          "type": "array"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "signalized": {
+          "default": false,
+          "title": "Signalized",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "junction_id",
+        "segment_id",
+        "line",
+        "width_m"
+      ],
+      "title": "Crosswalk",
       "type": "object"
     },
     "District": {
@@ -575,6 +680,50 @@
         "seed"
       ],
       "title": "District",
+      "type": "object"
+    },
+    "Frontage": {
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": {
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "road_class": {
+          "title": "Road Class",
+          "type": "string"
+        },
+        "length_m": {
+          "title": "Length M",
+          "type": "number"
+        },
+        "line": {
+          "description": "The lot edge along the road.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Line",
+          "type": "array"
+        }
+      },
+      "required": [
+        "segment_id",
+        "road_class",
+        "length_m",
+        "line"
+      ],
+      "title": "Frontage",
       "type": "object"
     },
     "GreenArea": {
@@ -723,6 +872,7 @@
     },
     "Junction": {
       "additionalProperties": false,
+      "description": "Intersection area of a node where three or more roads meet (curb lines with corner\nfillets), or a cul-de-sac turning bulb. `type` is `junction.<class pair>`, e.g.\n`junction.avenue_street`.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -755,37 +905,44 @@
         "polygon": {
           "$ref": "#/$defs/Polygon"
         },
+        "shape": {
+          "enum": [
+            "T",
+            "X",
+            "multi",
+            "cul_de_sac"
+          ],
+          "title": "Shape",
+          "type": "string"
+        },
+        "legs": {
+          "title": "Legs",
+          "type": "integer"
+        },
         "signalized": {
           "default": false,
           "title": "Signalized",
           "type": "boolean"
         },
-        "crosswalks": {
+        "corner_radius_m": {
+          "title": "Corner Radius M",
+          "type": "number"
+        },
+        "crosswalk_ids": {
           "items": {
-            "items": {
-              "maxItems": 2,
-              "minItems": 2,
-              "prefixItems": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "number"
-                }
-              ],
-              "type": "array"
-            },
-            "minItems": 2,
-            "type": "array"
+            "type": "string"
           },
-          "title": "Crosswalks",
+          "title": "Crosswalk Ids",
           "type": "array"
         }
       },
       "required": [
         "id",
         "node_id",
-        "polygon"
+        "polygon",
+        "shape",
+        "legs",
+        "corner_radius_m"
       ],
       "title": "Junction",
       "type": "object"
@@ -879,6 +1036,7 @@
     },
     "Lane": {
       "additionalProperties": false,
+      "description": "Lane graph (for ZoneGraph and Mass traffic): driving lanes of each road (index 0 next to\nthe center line or median) and connector lanes through each node.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -904,15 +1062,46 @@
           "title": "Attrs",
           "type": "object"
         },
-        "segment_id": {
-          "title": "Segment Id",
+        "kind": {
+          "default": "lane",
+          "enum": [
+            "lane",
+            "connector"
+          ],
+          "title": "Kind",
           "type": "string"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segment Id"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Connectors: the node they cross.",
+          "title": "Node Id"
         },
         "index": {
           "title": "Index",
           "type": "integer"
         },
         "forward": {
+          "description": "Lanes: travels start to end of its segment.",
           "title": "Forward",
           "type": "boolean"
         },
@@ -947,11 +1136,18 @@
           },
           "title": "Successors",
           "type": "array"
+        },
+        "adjacent_ids": {
+          "description": "Lanes of the same road and direction next to this one (lane changes).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Adjacent Ids",
+          "type": "array"
         }
       },
       "required": [
         "id",
-        "segment_id",
         "index",
         "forward",
         "centerline",
@@ -991,8 +1187,28 @@
           "title": "Block Id",
           "type": "string"
         },
+        "district_id": {
+          "title": "District Id",
+          "type": "string"
+        },
+        "archetype": {
+          "title": "Archetype",
+          "type": "string"
+        },
         "polygon": {
           "$ref": "#/$defs/Polygon"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "number"
+        },
+        "frontage": {
+          "description": "Longest first.",
+          "items": {
+            "$ref": "#/$defs/Frontage"
+          },
+          "title": "Frontage",
+          "type": "array"
         },
         "frontage_ids": {
           "description": "Road segment ids.",
@@ -1001,12 +1217,28 @@
           },
           "title": "Frontage Ids",
           "type": "array"
+        },
+        "merged_group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Lots that M3 builds as one complex (twin towers, cluster, ...).",
+          "title": "Merged Group Id"
         }
       },
       "required": [
         "id",
         "block_id",
-        "polygon"
+        "district_id",
+        "archetype",
+        "polygon",
+        "area_m2"
       ],
       "title": "Lot",
       "type": "object"
@@ -1159,7 +1391,11 @@
             "promenade",
             "courtyard",
             "podium_roof",
-            "marsh"
+            "marsh",
+            "market",
+            "garden",
+            "green",
+            "beach"
           ],
           "title": "Kind",
           "type": "string"
@@ -1183,6 +1419,18 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
         }
       },
       "required": [
@@ -1195,6 +1443,7 @@
     },
     "Place": {
       "additionalProperties": false,
+      "description": "A named place of the spec, built as a labeled sub-area (M2): a plaza, park, garden or\nmarket carved out of lots; a named promenade, waterfront or street; a waterway; a shore\nstrip (pier, docks, beach); a gate where an avenue enters; a neighborhood of blocks; or\na megasite.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -1255,6 +1504,14 @@
             }
           ],
           "title": "Label At",
+          "type": "array"
+        },
+        "feature_ids": {
+          "description": "Road segments, waterways, blocks or megasites that make it.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Feature Ids",
           "type": "array"
         }
       },
@@ -1821,7 +2078,8 @@
             "street",
             "alley",
             "service",
-            "pedestrian"
+            "pedestrian",
+            "footbridge"
           ],
           "title": "Road Class",
           "type": "string"
@@ -2036,6 +2294,96 @@
         "polygons"
       ],
       "title": "Sea",
+      "type": "object"
+    },
+    "Sidewalk": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "segment_id": {
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "side": {
+          "description": "Seen along the segment, start to end.",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "line": {
+          "description": "Sidewalk center line, between the junction corners.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Line",
+          "type": "array"
+        },
+        "width_m": {
+          "description": "Curb to property line.",
+          "title": "Width M",
+          "type": "number"
+        },
+        "clear_path_m": {
+          "title": "Clear Path M",
+          "type": "number"
+        },
+        "curb_m": {
+          "default": 0.15,
+          "title": "Curb M",
+          "type": "number"
+        },
+        "furniture_m": {
+          "default": 0.0,
+          "title": "Furniture M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "segment_id",
+        "side",
+        "line",
+        "width_m",
+        "clear_path_m"
+      ],
+      "title": "Sidewalk",
       "type": "object"
     },
     "Skybridge": {
@@ -2566,6 +2914,7 @@
     },
     "Walkway": {
       "additionalProperties": false,
+      "description": "Pedestrian graph edge (for crowds); edges meet at shared end points.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -2595,8 +2944,11 @@
           "enum": [
             "sidewalk",
             "crosswalk",
+            "crossing",
             "pedestrian_street",
+            "promenade",
             "footbridge",
+            "alley",
             "skybridge",
             "elevated",
             "stairs",
@@ -2927,6 +3279,20 @@
         "$ref": "#/$defs/Junction"
       },
       "title": "Junctions",
+      "type": "array"
+    },
+    "crosswalks": {
+      "items": {
+        "$ref": "#/$defs/Crosswalk"
+      },
+      "title": "Crosswalks",
+      "type": "array"
+    },
+    "sidewalks": {
+      "items": {
+        "$ref": "#/$defs/Sidewalk"
+      },
+      "title": "Sidewalks",
       "type": "array"
     },
     "lanes": {

@@ -449,11 +449,25 @@ def _road_components(m: CityModel) -> list[set[str]]:
 
 
 def _segment_landmasses(m: CityModel, g: _Geo) -> dict[str, set[str]]:
-    out: dict[str, set[str]] = {}
-    for s in m.road_segments:
-        line = g.roads[s.id]
-        out[s.id] = {lid for lid, lm in g.landmasses.items()
-                     if line.intersection(lm.buffer(2.0)).length > 5.0}
+    if getattr(g, "_seg_lm", None) is not None:
+        return g._seg_lm
+    import numpy as np
+
+    ids = [s.id for s in m.road_segments]
+    lines = np.array([g.roads[i] for i in ids], dtype=object)
+    out: dict[str, set[str]] = {i: set() for i in ids}
+    if len(lines):
+        tree = shapely.STRtree(lines)
+        for lid, lm in g.landmasses.items():
+            zone = lm.buffer(2.0)
+            hit = np.array(sorted(int(k) for k in tree.query(zone)), dtype=int)
+            if not len(hit):
+                continue
+            lens = shapely.length(shapely.intersection(lines[hit], zone))
+            for k, L in zip(hit.tolist(), lens.tolist()):
+                if L > 5.0:
+                    out[ids[k]].add(lid)
+    g._seg_lm = out
     return out
 
 
@@ -615,6 +629,38 @@ def min_radius(line: LineString, base: float, skip0: float = 0.0, skip1: float =
     return float(r[k]), float(mid[k])
 
 
+def primary_chains(m: CityModel, g: _Geo) -> list[tuple[str, str, LineString, str, str]]:
+    """Primary roads as M1b laid them: (label, class, line, start node, end node). M2 splits a
+    primary segment wherever a local street joins it; the pieces of one M1b segment (attrs
+    `m1b_segment`) are joined back here, so alignment checks see the primary road itself."""
+    groups: dict[str, list] = {}
+    for s in m.road_segments:
+        if s.road_class not in ROAD_MIN_RADIUS_M:
+            continue
+        groups.setdefault(s.attrs.get("m1b_segment", s.id), []).append(s)
+    out = []
+    for key in sorted(groups):
+        segs = groups[key]
+        if len(segs) == 1:
+            s = segs[0]
+            out.append((s.id, s.road_class, g.roads[s.id], s.start, s.end))
+            continue
+        by_start = {s.start: s for s in segs}
+        ends = {s.end for s in segs}
+        first = next((s for s in segs if s.start not in ends), segs[0])
+        chain, coords, cur = [first], list(first.centerline), first
+        while cur.end in by_start and len(chain) < len(segs):
+            cur = by_start[cur.end]
+            chain.append(cur)
+            coords += list(cur.centerline)[1:]
+        if len(chain) != len(segs):  # not one chain: check the pieces one by one
+            out += [(s.id, s.road_class, g.roads[s.id], s.start, s.end) for s in segs]
+            continue
+        out.append((f"{chain[0].id}..{chain[-1].id}", first.road_class, LineString(coords),
+                    chain[0].start, chain[-1].end))
+    return out
+
+
 def check_curve_radius(m: CityModel, g: _Geo) -> Check:
     c = Check("curve_radius", "Minimum curve radius per class (highway "
                               f"{ROAD_MIN_RADIUS_M['highway']:.0f} m, avenue "
@@ -624,19 +670,18 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
                               "an interchange in M7)")
     deg: dict[str, int] = {}
     for s in m.road_segments:
-        deg[s.start] = deg.get(s.start, 0) + 1
-        deg[s.end] = deg.get(s.end, 0) + 1
-    for s in m.road_segments:
-        rmin = ROAD_MIN_RADIUS_M.get(s.road_class)
-        if rmin is None:
-            continue
-        skip = JUNCTION_SKIP_M[s.road_class]
-        skip0 = skip if deg.get(s.start, 0) >= 3 else 0.0
-        skip1 = skip if deg.get(s.end, 0) >= 3 else 0.0
-        r, at = min_radius(g.roads[s.id], RADIUS_BASE_M[s.road_class], skip0, skip1)
+        if s.road_class in ROAD_MIN_RADIUS_M:
+            deg[s.start] = deg.get(s.start, 0) + 1
+            deg[s.end] = deg.get(s.end, 0) + 1
+    for label, cls, line, a, b in primary_chains(m, g):
+        rmin = ROAD_MIN_RADIUS_M[cls]
+        skip = JUNCTION_SKIP_M[cls]
+        skip0 = skip if deg.get(a, 0) >= 3 else 0.0
+        skip1 = skip if deg.get(b, 0) >= 3 else 0.0
+        r, at = min_radius(line, RADIUS_BASE_M[cls], skip0, skip1)
         if r < 0.95 * rmin:
-            p = g.roads[s.id].interpolate(at)
-            c.failures.append(f"segment {s.id} ({s.road_class}): radius {r:.0f} m near "
+            p = line.interpolate(at)
+            c.failures.append(f"segment {label} ({cls}): radius {r:.0f} m near "
                               f"({p.x:.0f}, {p.y:.0f}), minimum {rmin:.0f} m")
     return c
 
@@ -647,18 +692,18 @@ def check_segment_length(m: CityModel, g: _Geo) -> Check:
                                 f"{ROAD_MIN_SEGMENT_M['avenue']:.0f} m (a stretch that leaves "
                                 "the map is cut by the map border and not counted)")
     off_map = {n.id for n in m.road_nodes if n.attrs.get("kind") in ("exit", "edge")}
-    for s in m.road_segments:
-        if s.start in off_map or s.end in off_map:
+    for label, cls, line, a, b in primary_chains(m, g):
+        if a in off_map or b in off_map:
             continue
-        lmin = ROAD_MIN_SEGMENT_M.get(s.road_class)
-        if lmin is not None and g.roads[s.id].length < lmin - 1e-6:
-            c.failures.append(f"segment {s.id} ({s.road_class}) is "
-                              f"{g.roads[s.id].length:.0f} m long")
+        lmin = ROAD_MIN_SEGMENT_M[cls]
+        if line.length < lmin - 1e-6:
+            c.failures.append(f"segment {label} ({cls}) is {line.length:.0f} m long")
     return c
 
 
 def road_duplicates(m: CityModel, g: _Geo) -> list[str]:
-    ids = [s.id for s in m.road_segments]
+    """Primary roads only (local roads: `street_duplicates`)."""
+    ids = [s.id for s in m.road_segments if s.road_class in ROAD_MIN_RADIUS_M]
     lines = [g.roads[i] for i in ids]
     if not lines:
         return []
@@ -834,9 +879,17 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
             check_segment_length(m, g),
             check_road_duplicates(m, g),
         ]
+    if m.lots or m.blocks or m.junctions:
+        from . import street_checks as SC
+
+        checks += SC.run(spec, m, g)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
+    if m.lots or m.blocks or m.junctions:
+        from . import street_checks as SC
+
+        st["local"] = SC.stats(spec, m)
     return checks, st
 
 
@@ -844,7 +897,9 @@ def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
         "name": spec.name, "seed": spec.seed,
-        "stage": ("M1b (water, districts, waterways, primary roads)" if "road_km" in st
+        "stage": ("M2 (water, districts, waterways, roads, local streets, blocks, lots)"
+                  if "local" in st else
+                  "M1b (water, districts, waterways, primary roads)" if "road_km" in st
                   else "M1a2 (water, districts, waterways)"),
         "passed": all(c.passed for c in checks), "variant": variant,
         "checks": [c.to_dict() for c in checks], "stats": st, "notes": notes,
@@ -900,6 +955,35 @@ def report_text(rep: dict) -> str:
             f"  landmasses with districts connected by road {lc[0]} of {lc[1]}; highway "
             f"planned elevated {st['highway_elevated_share']:.0%}; megasite reserves "
             f"{st['megasites']}; road variant {st.get('road_variant', 0)}"]
+    lo = st.get("local")
+    if lo:
+        rk = st.get("road_km", {})
+        out += [
+            "  local roads " + ", ".join(f"{k} {rk[k]} km" for k in
+                                         ("street", "alley", "service", "pedestrian",
+                                          "footbridge") if k in rk)
+            + f"; {lo['one_way_segments']} one-way segments, {lo['footbridges']} footbridges",
+            f"  junctions {lo['junctions']} ({lo['junctions_signalized']} signalized), "
+            f"crosswalks {lo['crosswalks']}, sidewalks {lo['sidewalk_km']} km, lanes "
+            f"{lo['lanes']} + {lo['lane_connectors']} connectors, walkways {lo['walkways']} ("
+            + ", ".join(f"{k} {v} km" for k, v in lo["walkway_km"].items()) + ")",
+            "  junctions by type: " + ", ".join(f"{k} {v}" for k, v in
+                                                list(lo["junctions_by_type"].items())[:12]),
+            f"  blocks {lo['blocks']}, lots {lo['lots']} ({lo['merged_lot_groups']} merged "
+            f"groups), open space {lo['open_share']:.1%} of net land ("
+            + ", ".join(f"{k} {v}" for k, v in lo["open_spaces_by_kind"].items()) + "), "
+            f"named places {lo['places']}",
+            "",
+            "  lots by archetype            count   min m2   p10    median    p90      max"
+            "  median frontage m"]
+        for k, r in lo["lot_area_m2_by_archetype"].items():
+            out.append(f"  {k[:26]:<26} {r['count']:>7} {r['min']:>8.0f} {r['p10']:>6.0f} "
+                       f"{r['median']:>8.0f} {r['p90']:>7.0f} {r['max']:>8.0f}  "
+                       f"{r['median_frontage_m'] or 0:>6.1f}")
+        out += ["", "  blocks and open space by district  blocks  median block m  open share"]
+        for name, r in lo["block_size_m_by_district"].items():
+            out.append(f"  {name[:32]:<32} {r.get('count', 0):>7} {r.get('median', 0):>14.0f}"
+                       f"  {lo['open_share_by_district'].get(name, 0):>9.1%}")
     out += ["",
             "  district                     archetype              landmass  km2    share  "
             "target  error"]

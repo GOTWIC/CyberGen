@@ -29,6 +29,90 @@ _C = (4.16666666666666019037e-02, -1.38888888888741095749e-03, 2.480158728947672
       -2.75573143513906633035e-07, 2.08757232129817482790e-09, -1.13596475577881948265e-11)
 
 
+import math as _m
+
+
+def _scalar(x) -> bool:
+    return isinstance(x, (float, int, np.floating, np.integer))
+
+
+# Scalar paths: the same operations in the same order on Python floats (IEEE 754 doubles, one
+# rounding per operation, like the numpy element-wise loops), so they return the same bits as
+# the array paths, without the numpy call overhead.
+
+def _ksin_s(r: float) -> float:
+    z = r * r
+    p = _S[4] + z * _S[5]
+    p = _S[3] + z * p
+    p = _S[2] + z * p
+    p = _S[1] + z * p
+    p = _S[0] + z * p
+    return r + (r * z) * p
+
+
+def _kcos_s(r: float) -> float:
+    z = r * r
+    p = _C[4] + z * _C[5]
+    p = _C[3] + z * p
+    p = _C[2] + z * p
+    p = _C[1] + z * p
+    p = _C[0] + z * p
+    return 1.0 - 0.5 * z + (z * z) * p
+
+
+def _reduce_s(x: float):
+    k = float(round(x * (2.0 / PI)))
+    r = (x - k * _PIO2_1) - k * _PIO2_1T
+    return r, k % 4.0
+
+
+def _sin_s(x: float) -> float:
+    r, q = _reduce_s(float(x))
+    if q == 0:
+        return _ksin_s(r)
+    if q == 1:
+        return _kcos_s(r)
+    if q == 2:
+        return -_ksin_s(r)
+    return -_kcos_s(r)
+
+
+def _cos_s(x: float) -> float:
+    r, q = _reduce_s(float(x))
+    if q == 0:
+        return _kcos_s(r)
+    if q == 1:
+        return -_ksin_s(r)
+    if q == 2:
+        return -_kcos_s(r)
+    return _ksin_s(r)
+
+
+def _atan_unit_s(t: float) -> float:
+    for _ in range(3):
+        t = t / (1.0 + _m.sqrt(1.0 + t * t))
+    z = t * t
+    q = 1.0 / 25.0
+    for n in range(23, 0, -2):
+        q = 1.0 / n - z * q
+    return 8.0 * t * q
+
+
+def _atan2_s(y: float, x: float) -> float:
+    y, x = float(y), float(x)
+    ax, ay = abs(x), abs(y)
+    big = ay > ax
+    den = ay if big else ax
+    num = ax if big else ay
+    t = num / den if den > 0 else 0.0
+    base = _atan_unit_s(t)
+    if big:
+        base = HALF_PI - base
+    if x < 0:
+        base = PI - base
+    return -base if y < 0 else base
+
+
 def _arr(x):
     a = np.asarray(x, dtype=np.float64)
     return a, a.ndim == 0
@@ -65,6 +149,8 @@ def _reduce(x):
 
 
 def sin(x):
+    if _scalar(x):
+        return _sin_s(x)
     a, sc = _arr(x)
     r, q = _reduce(a)
     s, c = _ksin(r), _kcos(r)
@@ -73,6 +159,8 @@ def sin(x):
 
 
 def cos(x):
+    if _scalar(x):
+        return _cos_s(x)
     a, sc = _arr(x)
     r, q = _reduce(a)
     s, c = _ksin(r), _kcos(r)
@@ -128,6 +216,8 @@ def _atan_unit(t):
 
 
 def atan2(y, x):
+    if _scalar(y) and _scalar(x):
+        return _atan2_s(y, x)
     ya, s1 = _arr(y)
     xa, s2 = _arr(x)
     ya, xa = np.broadcast_arrays(ya, xa)

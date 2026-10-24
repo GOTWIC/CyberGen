@@ -16,6 +16,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.patheffects as pe  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.collections import LineCollection, PolyCollection  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import PathPatch, Patch, Rectangle  # noqa: E402
 from matplotlib.path import Path as MPath  # noqa: E402
@@ -38,6 +39,64 @@ AVENUE = "#dfe3ea"
 CASING = "#11141b"
 BRIDGE = {"sea": "#ff6b8a", "river": "#ff9f43", "canal": "#7ee0c3"}
 RESERVE = "#e8e8e8"
+STREET = "#c9cfd9"
+ALLEY = "#8d96a6"
+SERVICE = "#b9a37a"
+PEDESTRIAN = "#a9cfa0"
+FOOTBRIDGE = "#ff8fe0"
+OPEN_COLORS = {"park": "#3f7a4a", "pocket_park": "#4f9a58", "garden": "#5aa862",
+               "plaza": "#cbbf9f", "market": "#e0a94a", "promenade": "#9fb7a4",
+               "courtyard": "#56685a", "green": "#33553a", "beach": "#e6d39a",
+               "marsh": MARSH, "podium_roof": "#888888"}
+
+
+def _polys(geoms) -> list:
+    """Exterior rings of polygons (for PolyCollection)."""
+    out = []
+    for g in geoms:
+        for p in G.parts(g):
+            out.append(list(p.exterior.coords))
+    return out
+
+
+def draw_local(ax, m, pt_per_m: float, detail: bool = False) -> None:
+    """Blocks (district tint), lots, open space and local roads (to scale)."""
+    P = G.from_model_poly
+    tint = {d.id: ARCHETYPE_COLORS.get(d.archetype, "#888888") for d in m.districts}
+    blocks = [(P(b.polygon), tint[b.district_id]) for b in m.blocks]
+    ax.add_collection(PolyCollection([list(p.exterior.coords) for p, _ in blocks],
+                                     facecolors=[c for _, c in blocks], alpha=0.62,
+                                     edgecolors="none", zorder=2.3))
+    lots = [list(P(lt.polygon).exterior.coords) for lt in m.lots]
+    ax.add_collection(PolyCollection(lots, facecolors="none", edgecolors=BG,
+                                     linewidths=0.12 if not detail else 0.5,
+                                     alpha=0.55 if not detail else 0.7, zorder=2.4))
+    opens = [(P(o.polygon), OPEN_COLORS.get(o.kind, PARK)) for o in m.open_spaces
+             if o.district_id]
+    ax.add_collection(PolyCollection([list(p.exterior.coords) for p, _ in opens],
+                                     facecolors=[c for _, c in opens], edgecolors="none",
+                                     alpha=0.9, zorder=2.5))
+    if detail:
+        return
+    by: dict = {}
+    for s in m.road_segments:
+        if s.road_class in ("highway", "avenue"):
+            continue
+        by.setdefault(s.road_class, []).append(s)
+    style = {"street": (STREET, 1.0), "alley": (ALLEY, 1.0), "service": (SERVICE, 1.0),
+             "pedestrian": (PEDESTRIAN, 0.9), "footbridge": (FOOTBRIDGE, 1.0)}
+    for cls in ("service", "alley", "pedestrian", "street", "footbridge"):
+        segs = by.get(cls, [])
+        if not segs:
+            continue
+        col, k = style[cls]
+        lw = [max(s.width_m * pt_per_m * k, 0.25) for s in segs]
+        ax.add_collection(LineCollection([s.centerline for s in segs], colors=col,
+                                         linewidths=lw, capstyle="butt", zorder=6.5))
+    xw = [c.line for c in m.crosswalks]
+    if xw:
+        ax.add_collection(LineCollection(xw, colors="#ffffff", linewidths=0.35, alpha=0.8,
+                                         zorder=6.6))
 
 
 def _patch(poly, **kw) -> PathPatch:
@@ -153,14 +212,20 @@ def render(b, out, dpi: int = 110) -> None:
               zorder=0.6)
     _fill(ax, land, facecolor=LAND, edgecolor="none", zorder=1)
     arche = {}
+    local = bool(m.blocks)
     for d in m.districts:
         poly = P(d.polygon)
         col = ARCHETYPE_COLORS.get(d.archetype, "#888888")
         arche[d.archetype] = col
-        ax.add_patch(_patch(poly, facecolor=col, alpha=0.55, edgecolor="none", zorder=2))
+        ax.add_patch(_patch(poly, facecolor=col, alpha=0.16 if local else 0.55,
+                            edgecolor="none", zorder=2))
         ax.add_patch(_patch(poly, facecolor="none", edgecolor=col, lw=0.5, alpha=0.9,
                             zorder=2.1))
+    if local:
+        draw_local(ax, m, ax_w * 72.0 / w)
     for o in m.open_spaces:
+        if o.district_id:
+            continue
         poly = P(o.polygon)
         col = MARSH if o.kind == "marsh" else PARK
         ax.add_patch(_patch(poly, facecolor=col, alpha=0.55, edgecolor="none", zorder=2))
@@ -213,7 +278,15 @@ def render(b, out, dpi: int = 110) -> None:
         lab.place(_spots(P(isl.polygon)), isl.name, (7, 6), color=MUTED, ha="center",
                   va="center", style="italic", path_effects=HALO, zorder=9)
     for o in m.open_spaces:
+        if o.district_id and not o.name:
+            continue
         lab.place(_spots(P(o.polygon)), o.name or o.kind, (7, 6, 5), color="#b9d4a8",
+                  ha="center", va="center", style="italic", path_effects=HALO, zorder=9)
+    for pl in m.places:
+        if any(o.name == pl.name for o in m.open_spaces):
+            continue
+        x, y = pl.label_at
+        lab.place([(x, y), (x, y + 60), (x, y - 60)], pl.name, (7, 6), color="#ffe9a8",
                   ha="center", va="center", style="italic", path_effects=HALO, zorder=9)
     _road_labels(lab, m)
     isl_zone = unary_union([P(i.polygon).buffer(150) for i in m.islands]) if m.islands else None
@@ -234,15 +307,28 @@ def render(b, out, dpi: int = 110) -> None:
                   m.seas[0].name, (10, 9, 8), color="#7fa6c9", style="italic", ha="center",
                   va="center", path_effects=HALO, zorder=9)
     status = "checks PASS" if b.passed else "checks FAIL"
-    fig.text(0.02, top, f"{spec.name}: water, districts and primary roads (M1b)",
-             color=INK, fontsize=14, fontweight="bold", va="top")
     rk = st.get("road_km", {})
     bc = st.get("bridges_by_class", {})
-    fig.text(0.02, top - 0.3 / fig_h, f"seed {spec.seed}, {w / 1000:g} x {h / 1000:g} km, "
-             f"land {st['land_km2']} km2, water {st['water_share']:.0%}, "
-             f"{st['landmasses']} landmasses, highways {rk.get('highway', 0)} km, avenues "
-             f"{rk.get('avenue', 0)} km, bridges {sum(bc.values())}, {status}",
-             color=MUTED, fontsize=9, va="top")
+    if local:
+        lo = st.get("local", {})
+        fig.text(0.02, top, f"{spec.name}: streets, blocks, lots and open space (M2)",
+                 color=INK, fontsize=14, fontweight="bold", va="top")
+        fig.text(0.02, top - 0.3 / fig_h, f"seed {spec.seed}, {w / 1000:g} x {h / 1000:g} km, "
+                 f"land {st['land_km2']} km2; {lo.get('blocks', 0)} blocks, "
+                 f"{lo.get('lots', 0)} lots, open space {lo.get('open_share', 0):.0%} of net "
+                 f"land; {lo.get('junctions', 0)} junctions, {lo.get('crosswalks', 0)} "
+                 f"crosswalks, {lo.get('footbridges', 0)} footbridges; {status}",
+                 color=MUTED, fontsize=9, va="top")
+        fig.text(0.02, top - 0.52 / fig_h, "roads (km): " + ", ".join(
+            f"{k} {v:g}" for k, v in rk.items()), color=MUTED, fontsize=9, va="top")
+    else:
+        fig.text(0.02, top, f"{spec.name}: water, districts and primary roads (M1b)",
+                 color=INK, fontsize=14, fontweight="bold", va="top")
+        fig.text(0.02, top - 0.3 / fig_h, f"seed {spec.seed}, {w / 1000:g} x {h / 1000:g} km, "
+                 f"land {st['land_km2']} km2, water {st['water_share']:.0%}, "
+                 f"{st['landmasses']} landmasses, highways {rk.get('highway', 0)} km, avenues "
+                 f"{rk.get('avenue', 0)} km, bridges {sum(bc.values())}, {status}",
+                 color=MUTED, fontsize=9, va="top")
     handles = [Patch(facecolor=col, alpha=0.55, edgecolor=col, label=a.replace("_", " "))
                for a, col in sorted(arche.items())]
     handles += [Patch(facecolor=SEA, label="sea"), Patch(facecolor=SHALLOW, label="shallows"),
@@ -252,7 +338,22 @@ def render(b, out, dpi: int = 110) -> None:
                 Line2D([], [], color=QUAY, lw=1, label="quay"),
                 Patch(facecolor=MARSH, alpha=0.55, label="marsh / park (open land)"),
                 Line2D([], [], color=HIGHWAY, lw=2.4, label="highway"),
-                Line2D([], [], color=AVENUE, lw=1.2, label="avenue"),
+                Line2D([], [], color=AVENUE, lw=1.2, label="avenue")]
+    if local:
+        handles += [Line2D([], [], color=STREET, lw=1.6, label="street (to scale)"),
+                    Line2D([], [], color=ALLEY, lw=0.8, label="alley"),
+                    Line2D([], [], color=SERVICE, lw=1.0, label="service lane"),
+                    Line2D([], [], color=PEDESTRIAN, lw=1.4,
+                           label="pedestrian street, promenade"),
+                    Line2D([], [], color=FOOTBRIDGE, lw=1.4, label="footbridge"),
+                    Line2D([], [], color="#ffffff", lw=0.6, label="crosswalk"),
+                    Patch(facecolor="#777777", edgecolor=BG, label="block (district tint), lot"),
+                    Patch(facecolor=OPEN_COLORS["park"], label="park, pocket park"),
+                    Patch(facecolor=OPEN_COLORS["plaza"], label="plaza"),
+                    Patch(facecolor=OPEN_COLORS["market"], label="market"),
+                    Patch(facecolor=OPEN_COLORS["courtyard"], label="courtyard"),
+                    Patch(facecolor=OPEN_COLORS["green"], label="green verge")]
+    handles += [
                 Line2D([], [], color=BRIDGE["sea"], lw=3.2, label="bridge, sea class (25 m)"),
                 Line2D([], [], color=BRIDGE["river"], lw=3.2,
                        label="bridge, river class (10 to 15 m)"),
@@ -265,12 +366,16 @@ def render(b, out, dpi: int = 110) -> None:
     x_side = 0.03 + ax_w / fig_w
     leg = fig.legend(handles=handles, loc="upper left",
                      bbox_to_anchor=(x_side, (0.3 + ax_h) / fig_h),
-                     frameon=False, fontsize=8, labelcolor=INK, title="legend",
-                     title_fontsize=9)
+                     frameon=False, fontsize=7 if local else 8, labelcolor=INK,
+                     title="legend", title_fontsize=9, ncol=2 if local else 1,
+                     columnspacing=0.8, handlelength=1.6)
     leg.get_title().set_color(INK)
     rows = [f"{r['name'][:22]:<22} {r['share']:.3f} / {r['target']:.3f}"
             for r in st["districts"]]
     y_tab = (0.3 + ax_h - 6.3) / fig_h
+    if local:
+        fig.canvas.draw()
+        y_tab = leg.get_window_extent().transformed(fig.transFigure.inverted()).y0 - 0.015
     fig.text(x_side + 0.005, y_tab, "district share / target\n" + "\n".join(rows), color=INK,
              fontsize=7, family="monospace", va="top")
     _water_inset(fig, st, x_side + 0.005, y_tab - (len(rows) + 3) * 0.155 / fig_h, fig_h)
@@ -312,6 +417,8 @@ def _draw_roads(ax, m) -> None:
                             lw=0.6, alpha=0.55, zorder=6.2))
     order = sorted(m.road_segments, key=lambda s: (s.road_class == "highway", s.id))
     for s in order:
+        if s.road_class not in ("highway", "avenue"):
+            continue
         hw = s.road_class == "highway"
         xs, ys = zip(*s.centerline)
         lw = 2.4 if hw else (1.5 if s.attrs.get("role") == "axis_boulevard" else 1.1)
@@ -323,7 +430,8 @@ def _draw_roads(ax, m) -> None:
         col = BRIDGE.get(b.water_class or "sea", BRIDGE["sea"])
         lw = 3.8 if b.water_class == "sea" else 3.2
         if b.bridge_class == "pedestrian":
-            ax.plot(xs, ys, color=col, lw=1.2, linestyle=(0, (2, 1)), zorder=9.2)
+            if not b.attrs.get("footbridge"):
+                ax.plot(xs, ys, color=col, lw=1.2, linestyle=(0, (2, 1)), zorder=9.2)
             continue
         ax.plot(xs, ys, color=CASING, lw=lw + 1.4, solid_capstyle="butt", zorder=9)
         ax.plot(xs, ys, color=col, lw=lw, solid_capstyle="butt", zorder=9.1)

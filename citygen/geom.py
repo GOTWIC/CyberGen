@@ -16,6 +16,24 @@ GRID_M = 0.01  # output precision
 # Tests set this (meters) to jitter every geometry entering a quantization barrier, to show that
 # the barriers absorb last-bit differences between machines. Always 0 in a real build.
 JITTER_M = 0.0
+# M2 stages (streets, junctions, blocks) put every snapped polygon in canonical form (rings
+# start at their lowest vertex, parts sorted; `shapely.normalize`): GEOS's snap-rounding can
+# return the same rings starting at another vertex when its input differs in the last bits.
+# Off for the M1 stages, whose output is unchanged.
+CANONICAL = [False]
+
+
+class canonical:
+    """Context: snapped polygons in canonical form (see CANONICAL)."""
+
+    def __enter__(self):
+        self.prev = CANONICAL[0]
+        CANONICAL[0] = True
+        return self
+
+    def __exit__(self, *exc):
+        CANONICAL[0] = self.prev
+        return False
 
 
 def canvas_for(size_km: tuple[float, float]) -> Polygon:
@@ -54,7 +72,8 @@ def clean(geom, grid: float = GRID_M):
     g = polygonal(g)
     if g.is_empty:
         return g
-    return polygonal(snap(g, grid))
+    out = polygonal(snap(g, grid))
+    return shapely.normalize(out) if CANONICAL[0] and not out.is_empty else out
 
 
 def snap(geom, grid: float = GRID_M):
@@ -64,7 +83,30 @@ def snap(geom, grid: float = GRID_M):
     later overlay on it snap-rounded; WKB and pickling drop that, so the same coordinates
     would overlay differently in a worker process. Dropping it here keeps every geometry
     plain coordinates."""
+    if CANONICAL[0]:
+        return _round(geom, grid)
     return floating(shapely.set_precision(geom, grid))
+
+
+def _round(geom, grid: float = GRID_M):
+    """M2 snapping: every coordinate rounded on its own (no snap-rounding, whose hot-pixel
+    tests on grid-aligned input can depend on the last bits), then repaired by make_valid
+    and rounded again where the repair added vertices."""
+    g = floating(shapely.set_precision(geom, grid, mode="pointwise"))
+    dim = int(shapely.get_dimensions(geom))
+    for k in range(5):
+        if g.is_empty or g.is_valid:
+            break
+        if k == 4:  # rare: rounding keeps breaking the repair; snap-round instead
+            return floating(shapely.set_precision(geom, grid))
+        g = shapely.make_valid(g)
+        if dim == 2:
+            g = polygonal(g)
+        elif dim == 1:
+            ls = [p for p in shapely.get_parts(g) if p.geom_type == "LineString"]
+            g = MultiLineString(ls) if len(ls) > 1 else (ls[0] if ls else LineString())
+        g = floating(shapely.set_precision(g, grid, mode="pointwise"))
+    return g
 
 
 def floating(geom):
@@ -143,9 +185,21 @@ def opening(geom, half_width: float):
     # Remove only what the opening really removes: where the outer outline runs along the
     # original one it differs by grid steps, and those hairline slivers (thinner than 0.1 m)
     # are not removed, so the kept outline is exactly the original one.
-    removed = [p for p in parts(diff(geom, outer))
-               if not p.buffer(-0.05, join_style="mitre").is_empty]
+    if CANONICAL[0]:  # M2: an exact width, not an inner buffer, decides what a hairline is
+        removed = [p for p in parts(diff(geom, outer)) if _strip_width(p) > 0.1]
+    else:
+        removed = [p for p in parts(diff(geom, outer))
+                   if not p.buffer(-0.05, join_style="mitre").is_empty]
     return diff(geom, union(removed)) if removed else polygonal(geom)
+
+
+def _strip_width(p) -> float:
+    """Width of a strip with the exact area and perimeter of p (a long w x L rectangle gives
+    about w)."""
+    A = area1(p)
+    half = length1(p.exterior) / 2.0
+    disc = half * half - 4.0 * A
+    return math.sqrt(A) if disc < 0 else (half - math.sqrt(disc)) / 2.0
 
 
 def drop_small(geom, min_area: float):
@@ -268,10 +322,18 @@ def apart(a, b, pad: float = 0.0) -> bool:
 # once. Snap-rounded overlays (`grid_size`) would be as deterministic, but leave zigzags of
 # 0.01 m steps where two boundaries nearly coincide.
 
+def _fixed(out):
+    """M2: output of a fixed-precision (grid_size) overlay, valid and on the grid already."""
+    out = polygonal(floating(out))
+    return shapely.normalize(out) if not out.is_empty else out
+
+
 def inter(a, b):
     """Polygonal intersection on the grid."""
     if a.is_empty or b.is_empty or apart(a, b):
         return Polygon()
+    if CANONICAL[0]:
+        return _fixed(shapely.intersection(a, b, grid_size=GRID_M))
     return clean(polygonal(shapely.intersection(a, b)))
 
 
@@ -280,6 +342,8 @@ def diff(a, b):
         return Polygon()
     if b.is_empty or apart(a, b):
         return clean(a)
+    if CANONICAL[0]:
+        return _fixed(shapely.difference(a, b, grid_size=GRID_M))
     return clean(polygonal(shapely.difference(a, b)))
 
 
@@ -287,6 +351,8 @@ def union(geoms):
     geoms = [g for g in geoms if g is not None and not g.is_empty]
     if not geoms:
         return Polygon()
+    if CANONICAL[0]:
+        return _fixed(shapely.union_all(geoms, grid_size=GRID_M))
     return clean(polygonal(shapely.union_all(geoms)))
 
 
@@ -595,3 +661,67 @@ def from_model_poly(d) -> Polygon:
 
 def line_coords(line) -> list[tuple[float, float]]:
     return [(round(x, 2) + 0.0, round(y, 2) + 0.0) for x, y in line.coords]
+
+
+# ---------------------------------------------------------------------------
+# Fast exact measures for one geometry (the same arithmetic as `area` and `length`, without
+# the array machinery; the street, junction and block stages call them very often)
+# ---------------------------------------------------------------------------
+
+def area1(poly) -> float:
+    """Exact area of a Polygon on its grid-snapped vertices (equal to `area`)."""
+    if poly is None or poly.is_empty:
+        return 0.0
+    if poly.geom_type != "Polygon":
+        return math.fsum(area1(p) for p in shapely.get_parts(poly)
+                         if p.geom_type == "Polygon")
+    tot = 0
+    for k, ring in enumerate([poly.exterior, *poly.interiors]):
+        c = np.rint(shapely.get_coordinates(ring) * _SCALE).astype(np.int64)
+        cr = abs(int((c[:-1, 0] * c[1:, 1] - c[1:, 0] * c[:-1, 1]).sum()))
+        tot += cr if k == 0 else -cr
+    return tot / (2 * _SCALE * _SCALE)
+
+
+def length1(geom) -> float:
+    """Exact length of the linework of a geometry on grid-rounded vertices (equal to
+    `length` for lines; polygons count their rings, points nothing)."""
+    if geom is None or geom.is_empty:
+        return 0.0
+    if geom.geom_type in ("LineString", "LinearRing"):
+        c = np.rint(shapely.get_coordinates(geom) * _SCALE).astype(np.int64)
+        d = np.diff(c, axis=0)
+        seg = np.sqrt((d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1]).astype(np.float64))
+        return math.fsum(seg.tolist()) / _SCALE
+    parts = shapely.get_parts(geom)
+    lines = []
+    for p in parts:
+        t = p.geom_type
+        if t in ("LineString", "LinearRing"):
+            lines.append(p)
+        elif t == "Polygon":
+            lines += [p.exterior, *p.interiors]
+        elif t in ("MultiLineString", "MultiPolygon", "GeometryCollection"):
+            lines += [x for x in shapely.get_parts(p) if x.geom_type == "LineString"]
+    if not lines:
+        return 0.0
+    coords, idx = shapely.get_coordinates(np.array(lines, dtype=object), return_index=True)
+    c = np.rint(coords * _SCALE).astype(np.int64)
+    same = idx[1:] == idx[:-1]
+    d = np.diff(c, axis=0)[same]
+    seg = np.sqrt((d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1]).astype(np.float64))
+    return math.fsum(seg.tolist()) / _SCALE
+
+
+def snap_many(geoms):
+    """Array of geometries snapped to the grid (floating precision model), in one call."""
+    arr = np.asarray(geoms, dtype=object)
+    if CANONICAL[0]:
+        out = shapely.set_precision(arr, GRID_M, mode="pointwise")
+        out = shapely.set_precision(out, 0.0, mode="pointwise")
+        bad = ~shapely.is_valid(out)
+        for i in np.nonzero(bad)[0].tolist():
+            out[i] = _round(out[i])
+        return out
+    arr = shapely.set_precision(arr, GRID_M)
+    return shapely.set_precision(arr, 0.0, mode="pointwise")
