@@ -117,8 +117,19 @@ of each sample `city_model.json` (pytest asserts them; `tests/test_determinism.p
 ULP noise into the district search). `citygen build ... --trace FILE` hashes every stage and
 `citygen trace diff A B` finds the first one where two machines part
 (`docs/progress/M1b_det/`). Variants run in worker processes (`CITYGEN_WORKERS`, 1 = one
-process); the result does not depend on it. Sample builds: `docs/progress/M1b/`. M2 (local
-streets, blocks, lots) is next.
+process); the result does not depend on it. Sample builds: `docs/progress/M1b/`.
+
+M2 (local streets, blocks, lots) is in place: the same build lays local streets by archetype
+pattern (`streets.py`: frame of frontage and boundary streets, promenades and quay roads, then
+rotated grids, superblocks, organic growth, loops, campus loops, radial rings, reserve service
+roads, infill and alleys, footbridges; exact noding), junctions with corner fillets, signals,
+crosswalks, sidewalks, the lane graph and the walkway graph (`junctions.py`), blocks, OBB-split
+lots with frontage and open space (`blocks.py`), driver `local.py`, 13 checks in
+`street_checks.py`, and `preview_detail.png` (four 400 m street-level insets,
+`preview_detail.py`). M2 stages run in `geom.canonical()` (pointwise grid rounding,
+fixed-precision overlays); never let set or dict order of strings reach the model (string
+hashes change per process; a test builds under two `PYTHONHASHSEED` values). Sample builds:
+`docs/progress/M2/`. M3 (buildings) is next.
 
 ### Rules for cloud sessions building citygen milestones
 

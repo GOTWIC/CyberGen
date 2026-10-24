@@ -1,0 +1,580 @@
+{
+  "name": "Delta Megacity",
+  "seed": 4412,
+  "stage": "M2 (water, districts, waterways, roads, local streets, blocks, lots)",
+  "passed": true,
+  "variant": 0,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "landmass lm07 (0.40 km2) is open land: marsh 'West Channel Marsh'",
+        "landmass lm08 (0.16 km2) is open land: marsh 'West Channel Marsh 2'"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "land without a district left without roads: lm07, lm08"
+      ]
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_graph",
+      "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lane_graph",
+      "title": "Lane graph strongly connected (every lane reaches every other through junction connectors and lane changes) and every vehicle road has lanes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "walkway_graph",
+      "title": "Walkway graph connected on every landmass with districts (sidewalks, crossings, crosswalks, pedestrian streets, promenades, footbridges, alleys, paths into open space)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "2 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)"
+      ]
+    },
+    {
+      "id": "lot_frontage",
+      "title": "Every lot fronts a street, alley, service lane or pedestrian street (at least 2 m) and records its frontage and district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lot_block_sizes",
+      "title": "Lot areas within the archetype range (0.75 x min to 1.6 x max) and each district's median block size (square root of area) within the archetype block range (0.5 x lo to 1.8 x hi)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lot_slivers",
+      "title": "No lot narrower than 3 m and no block narrower than 6 m (strip width from exact area and perimeter)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "sidewalk_clear_path",
+      "title": "Sidewalk clear path at least 1.8 m (width minus furniture zone and curb)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "crosswalks",
+      "title": "A crosswalk on every approach of every signalized junction, and on the side street approaches of unsignalized junctions on avenues",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "junction_placement",
+      "title": "No junction of a local road on a bridge or on a bridge approach ramp (z profile above ground)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "junction_angles",
+      "title": "Minimum angle between a local road and its neighbors at a junction: 60 degrees in grid districts, 35 in organic ones (old town, entertainment market)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_duplicates",
+      "title": "No near-duplicate local roads: right-of-way edges closer than 4 m over more than 50 m (30 m around shared points aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "open_space_share",
+      "title": "Open space share of each district's net land (open space over open space plus lots) within the archetype target",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "places_built",
+      "title": "Every named place of the spec is built in its district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 12.25,
+    "land_km2": 7.811,
+    "district_land_km2": 7.258,
+    "water_share": 0.3623,
+    "sea_share": 0.3,
+    "landmasses": 8,
+    "landmasses_with_districts": 8,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.553,
+    "open_land": [
+      {
+        "name": "West Channel Marsh",
+        "kind": "marsh",
+        "area_km2": 0.396
+      },
+      {
+        "name": "West Channel Marsh 2",
+        "kind": "marsh",
+        "area_km2": 0.157
+      }
+    ],
+    "islands": 2,
+    "river_km": 3.68,
+    "channel_km": {
+      "delta_branch": 4.08,
+      "separation": 2.77
+    },
+    "separation_channels": 2,
+    "waterway_km": 4.32,
+    "waterway_km_by_kind": {
+      "basin": 0.69,
+      "canal": 3.62
+    },
+    "waterways": 8,
+    "quay_km": 8.48,
+    "district_boundary_on_water": 0.9998,
+    "boundary_on_water": 1.0,
+    "boundary_on_water_target": null,
+    "boundary_km": {
+      "water": 7.78,
+      "land": 0.0
+    },
+    "land_boundary_curvature": null,
+    "boundary_curvature": 1.084,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm05",
+        "area_km2": 0.55,
+        "share": 0.0758,
+        "target": 0.075,
+        "target_source": "island",
+        "error": 0.0106
+      },
+      {
+        "id": "d02",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm02",
+        "area_km2": 1.509,
+        "share": 0.2079,
+        "target": 0.2321,
+        "target_source": "archetype weight",
+        "error": -0.1043
+      },
+      {
+        "id": "d03",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm04",
+        "area_km2": 1.355,
+        "share": 0.1868,
+        "target": 0.2142,
+        "target_source": "archetype weight",
+        "error": -0.1282
+      },
+      {
+        "id": "d04",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm03",
+        "area_km2": 1.467,
+        "share": 0.2021,
+        "target": 0.1785,
+        "target_source": "archetype weight",
+        "error": 0.1323
+      },
+      {
+        "id": "d05",
+        "name": "Industrial Port",
+        "archetype": "industrial_port",
+        "landmass": "lm01",
+        "area_km2": 1.877,
+        "share": 0.2586,
+        "target": 0.2321,
+        "target_source": "archetype weight",
+        "error": 0.1143
+      },
+      {
+        "id": "d06",
+        "name": "Research Campus",
+        "archetype": "research_campus",
+        "landmass": "lm06",
+        "area_km2": 0.5,
+        "share": 0.0689,
+        "target": 0.0682,
+        "target_source": "island",
+        "error": 0.0107
+      }
+    ],
+    "road_km": {
+      "alley": 21.08,
+      "avenue": 27.07,
+      "footbridge": 0.37,
+      "highway": 8.88,
+      "pedestrian": 16.41,
+      "service": 7.36,
+      "street": 86.78
+    },
+    "road_nodes": 1930,
+    "road_segments": 2755,
+    "road_components": 1,
+    "bridges": 18,
+    "bridges_by_class": {
+      "sea": 0,
+      "river": 7,
+      "canal": 11
+    },
+    "bridge_span_km": 0.83,
+    "named_bridges": [],
+    "pedestrian_bridges": 11,
+    "landmasses_connected": [
+      6,
+      6
+    ],
+    "exits": [
+      "east_exit",
+      "north_exit",
+      "west_exit"
+    ],
+    "highway_elevated_share": 0.2097,
+    "megasites": 3,
+    "local": {
+      "junctions": 1580,
+      "junctions_signalized": 365,
+      "junctions_by_type": {
+        "street_street T": 623,
+        "street_street X": 245,
+        "avenue_avenue T": 196,
+        "street T": 130,
+        "alley_alley T": 126,
+        "avenue_avenue X": 61,
+        "pedestrian T": 59,
+        "alley_alley X": 31,
+        "street_alley T": 22,
+        "alley T": 19,
+        "street_service T": 19,
+        "highway_highway X": 10,
+        "avenue_avenue multi": 7,
+        "street_street multi": 7,
+        "highway_highway T": 6,
+        "pedestrian X": 6,
+        "service_service T": 4,
+        "highway_highway multi": 3,
+        "street X": 3,
+        "alley X": 1,
+        "alley_alley multi": 1,
+        "street_alley X": 1
+      },
+      "crosswalks": 1271,
+      "sidewalks": 3705,
+      "sidewalk_km": 148.98,
+      "lanes": 5536,
+      "lane_connectors": 11232,
+      "one_way_segments": 114,
+      "walkways": 12916,
+      "walkway_km": {
+        "alley": 28.45,
+        "crossing": 69.35,
+        "crosswalk": 44.44,
+        "footbridge": 0.37,
+        "path": 46.61,
+        "pedestrian_street": 2.84,
+        "promenade": 13.57,
+        "sidewalk": 190.42
+      },
+      "footbridges": 11,
+      "blocks": 984,
+      "lots": 5453,
+      "merged_lot_groups": 4,
+      "lot_area_m2_by_archetype": {
+        "corporate_core": {
+          "count": 261,
+          "min": 962.7,
+          "p10": 1503.3,
+          "median": 2678.9,
+          "p90": 4968.5,
+          "max": 7484.8,
+          "median_frontage_m": 61.6
+        },
+        "industrial_port": {
+          "count": 110,
+          "min": 2255.1,
+          "p10": 2830.6,
+          "median": 7054.3,
+          "p90": 15868.4,
+          "max": 50175.0,
+          "median_frontage_m": 130.6
+        },
+        "midtown_mixed": {
+          "count": 842,
+          "min": 289.5,
+          "p10": 506.6,
+          "median": 891.8,
+          "p90": 1663.1,
+          "max": 2680.7,
+          "median_frontage_m": 29.5
+        },
+        "old_town": {
+          "count": 4049,
+          "min": 36.1,
+          "p10": 77.3,
+          "median": 161.0,
+          "p90": 313.6,
+          "max": 628.8,
+          "median_frontage_m": 13.7
+        },
+        "research_campus": {
+          "count": 57,
+          "min": 1433.6,
+          "p10": 2295.4,
+          "median": 4275.2,
+          "p90": 7932.4,
+          "max": 13943.5,
+          "median_frontage_m": 78.1
+        },
+        "transit_hub": {
+          "count": 134,
+          "min": 408.0,
+          "p10": 720.5,
+          "median": 1419.7,
+          "p90": 3080.7,
+          "max": 3938.3,
+          "median_frontage_m": 49.0
+        }
+      },
+      "block_size_m_by_district": {
+        "Transit Nexus": {
+          "count": 36,
+          "min": 23.0,
+          "p10": 48.2,
+          "median": 76.2,
+          "p90": 123.4,
+          "max": 143.2
+        },
+        "Midtown": {
+          "count": 113,
+          "min": 18.3,
+          "p10": 45.3,
+          "median": 87.6,
+          "p90": 115.0,
+          "max": 198.5
+        },
+        "Corporate Core": {
+          "count": 69,
+          "min": 31.5,
+          "p10": 52.3,
+          "median": 103.8,
+          "p90": 147.1,
+          "max": 199.6
+        },
+        "Old Town": {
+          "count": 713,
+          "min": 8.3,
+          "p10": 16.2,
+          "median": 29.4,
+          "p90": 44.7,
+          "max": 75.6
+        },
+        "Industrial Port": {
+          "count": 46,
+          "min": 49.4,
+          "p10": 58.6,
+          "median": 138.0,
+          "p90": 229.8,
+          "max": 274.8
+        },
+        "Research Campus": {
+          "count": 7,
+          "min": 108.3,
+          "p10": 122.8,
+          "median": 225.9,
+          "p90": 265.4,
+          "max": 341.6
+        }
+      },
+      "open_spaces_by_kind": {
+        "courtyard": 8,
+        "green": 58,
+        "market": 1,
+        "park": 86,
+        "plaza": 36,
+        "pocket_park": 82,
+        "promenade": 3
+      },
+      "open_share_by_district": {
+        "Transit Nexus": 0.0989,
+        "Midtown": 0.1625,
+        "Corporate Core": 0.1151,
+        "Old Town": 0.0621,
+        "Industrial Port": 0.0306,
+        "Research Campus": 0.2748
+      },
+      "open_share": 0.1097,
+      "places": 4,
+      "generator": {
+        "one_way_loops": 24,
+        "open_paths": 532,
+        "walkway_links": 0,
+        "angles": {
+          "d01": 87.5,
+          "d02": 2.5,
+          "d03": 45.0,
+          "d04": 2.5,
+          "d05": 87.5,
+          "d06": 87.5
+        }
+      }
+    },
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.6504,
+      "preferred_chains": 0,
+      "planned": 1.0006
+    },
+    "road_variant": 3
+  },
+  "notes": [
+    "1 local roads stopped short of a primary road they crossed where no junction is allowed",
+    "54 local roads cut back at junctions sharper than the district minimum",
+    "7 local roads running alongside another road removed",
+    "49 lanes reached only over pedestrian streets became pedestrian",
+    "54 local segments (8.53 km) not connected to the network were dropped"
+  ]
+}
