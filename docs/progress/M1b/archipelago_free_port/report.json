@@ -1,0 +1,264 @@
+{
+  "name": "Saltreach Free Port",
+  "seed": 3301,
+  "stage": "M1b (water, districts, waterways, primary roads)",
+  "passed": true,
+  "variant": 0,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "every district is on its own island; the rest of the land is outside the city"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 11.56,
+    "land_km2": 6.762,
+    "district_land_km2": 4.45,
+    "water_share": 0.4151,
+    "sea_share": 0.4151,
+    "landmasses": 6,
+    "landmasses_with_districts": 5,
+    "unassigned_land_km2": 2.312,
+    "open_land_km2": 0,
+    "open_land": [],
+    "islands": 5,
+    "river_km": 0.0,
+    "channel_km": {},
+    "separation_channels": 0,
+    "waterway_km": 3.86,
+    "waterway_km_by_kind": {
+      "basin": 0.91,
+      "canal": 0.86,
+      "creek": 2.09
+    },
+    "waterways": 11,
+    "quay_km": 7.88,
+    "district_boundary_on_water": 1.0,
+    "boundary_on_water": 1.0,
+    "boundary_on_water_target": null,
+    "boundary_km": {
+      "water": 1.84,
+      "land": 0.0
+    },
+    "land_boundary_curvature": null,
+    "boundary_curvature": 1.0283,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Crown Island",
+        "archetype": "corporate_core",
+        "landmass": "lm02",
+        "area_km2": 1.5,
+        "share": 0.3371,
+        "target": 0.34,
+        "target_source": "spec",
+        "error": -0.0086
+      },
+      {
+        "id": "d02",
+        "name": "Kettle Island",
+        "archetype": "industrial_port",
+        "landmass": "lm03",
+        "area_km2": 1.0,
+        "share": 0.2247,
+        "target": 0.22,
+        "target_source": "spec",
+        "error": 0.0215
+      },
+      {
+        "id": "d03",
+        "name": "Westreef",
+        "archetype": "old_town",
+        "landmass": "lm04",
+        "area_km2": 0.9,
+        "share": 0.2022,
+        "target": 0.2,
+        "target_source": "spec",
+        "error": 0.0112
+      },
+      {
+        "id": "d04",
+        "name": "Lumen Key",
+        "archetype": "research_campus",
+        "landmass": "lm06",
+        "area_km2": 0.35,
+        "share": 0.0787,
+        "target": 0.08,
+        "target_source": "spec",
+        "error": -0.0169
+      },
+      {
+        "id": "d05",
+        "name": "Palm Key",
+        "archetype": "residential_heights",
+        "landmass": "lm05",
+        "area_km2": 0.7,
+        "share": 0.1573,
+        "target": 0.16,
+        "target_source": "spec",
+        "error": -0.0169
+      }
+    ],
+    "road_km": {
+      "avenue": 18.45,
+      "highway": 3.52
+    },
+    "road_nodes": 29,
+    "road_segments": 34,
+    "road_components": 1,
+    "bridges": 10,
+    "bridges_by_class": {
+      "sea": 5,
+      "river": 0,
+      "canal": 5
+    },
+    "bridge_span_km": 1.71,
+    "named_bridges": [
+      "Crown Causeway",
+      "Kettle Span",
+      "Lumen Footbridge",
+      "Reef Bridge"
+    ],
+    "pedestrian_bridges": 1,
+    "landmasses_connected": [
+      5,
+      5
+    ],
+    "exits": [
+      "north_exit"
+    ],
+    "highway_elevated_share": 0.5335,
+    "megasites": 3,
+    "separation_budget": {
+      "target": 0.6,
+      "before": 1.0,
+      "preferred_chains": 0
+    },
+    "road_variant": 0
+  },
+  "notes": []
+}

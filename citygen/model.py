@@ -132,10 +132,16 @@ class Bridge(Entity):
     TYPE_PREFIX: ClassVar[str] = "bridge"
     name: str | None = None
     bridge_class: Literal["road", "rail", "road_rail", "pedestrian"]
-    crosses: str = Field(description="Water entity id.")
+    crosses: str = Field(description="Water entity id (the highest class crossed).")
+    water_class: Literal["sea", "river", "canal"] | None = Field(
+        None, description="Navigable class of the water crossed (scope 5.4): sea channel and "
+                          "port approach 25 m+, river 10 to 15 m, canal 3 to 4 m.")
     clearance_m: float
+    span_m: float | None = Field(None, description="Length over water.")
+    ramp_length_m: float | None = Field(
+        None, description="Approach ramp per side, L = (clearance + deck) / 0.06.")
     deck_levels: list[int] = Field(default_factory=lambda: [0])
-    line: Line3
+    line: Line3 = Field(description="Deck line from bank to bank (z = deck top).")
     segment_ids: list[str] = Field(default_factory=list)
 
 
@@ -179,17 +185,38 @@ class RoadNode(Entity):
     level: int = 0
 
 
+RoadClass = Literal["highway", "avenue", "street", "alley", "service", "pedestrian"]
+
+
 class RoadSegment(Entity):
+    """A road between two nodes (junctions, ends, exits). `type` is `road.<road_class>`."""
     TYPE_PREFIX: ClassVar[str] = "road"
     start: str
     end: str
+    road_class: RoadClass
+    lanes: int = Field(description="Total lanes, both directions.")
+    width_m: float = Field(description="Total cross-section width.")
     centerline: Line2
     level: int = 0
-    z_profile: list[ZSample] = Field(default_factory=list)
+    z_profile: list[ZSample] = Field(
+        default_factory=list, description="Placeholder until M7: ground, bridge ramps at 6%, "
+                                          "deck z over water.")
     cross_section: CrossSection
     one_way: bool = False
-    bridge_id: str | None = None
+    bridge: bool = False
+    bridge_ids: list[str] = Field(default_factory=list)
+    clearance_m: float | None = Field(None, description="Highest bridge clearance on it.")
+    district_ids: list[str] = Field(default_factory=list, description="Districts it serves.")
     name: str | None = None
+
+    @model_validator(mode="after")
+    def _class_type(self) -> RoadSegment:
+        want = f"road.{self.road_class}"
+        if self.type == "road":
+            self.type = want
+        elif self.type != want and not self.type.startswith(want + "."):
+            raise ValueError(f"type '{self.type}' does not match road_class '{self.road_class}'")
+        return self
 
 
 class Junction(Entity):
@@ -257,8 +284,10 @@ class Megasite(Entity):
     kind: str
     name: str
     district_id: str
-    polygon: Polygon
+    polygon: Polygon = Field(description="Reserved ground (M1b); the site generator fills it.")
     height_limit_m: float | None = None
+    flight_cone: Polygon | None = Field(
+        None, description="Spaceports: ground footprint of the flight cone (kept free of roads).")
     member_ids: list[str] = Field(default_factory=list)
 
 

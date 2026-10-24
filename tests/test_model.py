@@ -16,7 +16,8 @@ def tiny() -> dict:
         "road_nodes": [{"id": "d01.n001", "position": [0, 0, 0]},
                        {"id": "d01.n002", "position": [50, 0, 0]}],
         "road_segments": [{"id": "d01.road.0001", "type": "road.avenue", "start": "d01.n001",
-                           "end": "d01.n002", "centerline": [[0, 0], [50, 0]],
+                           "end": "d01.n002", "road_class": "avenue", "lanes": 4,
+                           "width_m": 28, "centerline": [[0, 0], [50, 0]],
                            "cross_section": {"total_width_m": 30, "lane_width_m": 3.3,
                                              "lanes_forward": 2, "lanes_backward": 2}}],
         "buildings": [{"id": "d01.blk001.lot001.bld", "type": "building.podium_tower",
@@ -48,6 +49,15 @@ def test_type_prefix_enforced():
     data = tiny()
     data["props"][0]["type"] = "building.street_light"
     with pytest.raises(ValidationError, match="must be 'prop' or start with 'prop.'"):
+        CityModel.model_validate(data)
+
+
+def test_road_type_follows_class():
+    data = tiny()
+    data["road_segments"][0]["type"] = None
+    assert CityModel.model_validate(data).road_segments[0].type == "road.avenue"
+    data["road_segments"][0]["type"] = "road.highway"
+    with pytest.raises(ValidationError, match="road_class"):
         CityModel.model_validate(data)
 
 

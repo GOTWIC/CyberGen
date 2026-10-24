@@ -9,9 +9,13 @@ import shapely
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
 
+from . import dmath as M
 from . import presets
 
 GRID_M = 0.01  # output precision
+# Tests set this (meters) to jitter every geometry entering a quantization barrier, to show that
+# the barriers absorb last-bit differences between machines. Always 0 in a real build.
+JITTER_M = 0.0
 
 
 def canvas_for(size_km: tuple[float, float]) -> Polygon:
@@ -48,6 +52,63 @@ def clean(geom, grid: float = GRID_M):
     if g.is_empty:
         return g
     return polygonal(shapely.set_precision(g, grid))
+
+
+# ---------------------------------------------------------------------------
+# Quantization barriers: every stage hands the next one coordinates on the 0.01 m grid, so
+# last-bit differences between machines (libm, SIMD, fused multiply-add in GEOS) cannot reach
+# a later decision.
+# ---------------------------------------------------------------------------
+
+def q(v: float) -> float:
+    """A number on the output grid (0.01)."""
+    return round(float(v), 2) + 0.0
+
+
+def _jitter(geom):
+    if not JITTER_M or geom is None or geom.is_empty or shapely.get_precision(geom) > 0:
+        return geom  # (a geometry that carries the grid precision is exact grid output)
+
+    # Only inexact values move (machine noise cannot change a value computed exactly from
+    # grid inputs, such as a midpoint), by a function of the point itself (rings stay closed).
+    def move(c):
+        exact = np.abs(c * 1000.0 - np.rint(c * 1000.0)) < 1e-6
+        h = np.mod(c[:, :1] * 12.9898 + c[:, 1:2] * 78.233, 1.0)
+        d = JITTER_M * (2.0 * np.hstack([h, np.mod(h * 7.0, 1.0)]) - 1.0)
+        return np.where(exact, c, c + d)
+
+    return shapely.transform(geom, move)
+
+
+def qpoint(p) -> tuple[float, float]:
+    x, y = (p.x, p.y) if hasattr(p, "x") else (p[0], p[1])
+    if JITTER_M:
+        if abs(x * 1000.0 - round(x * 1000.0)) >= 1e-6:
+            x += JITTER_M * 0.37
+        if abs(y * 1000.0 - round(y * 1000.0)) >= 1e-6:
+            y -= JITTER_M * 0.61
+    return (q(x), q(y))
+
+
+def qline(line, dedupe: bool = True):
+    """LineString with coordinates on the grid (repeated points dropped unless `dedupe` is
+    False, which keeps one vertex per input vertex)."""
+    if line is None or line.is_empty:
+        return line
+    line = _jitter(line)
+    pts = []
+    for x, y in np.asarray(line.coords)[:, :2]:
+        p = (q(x), q(y))
+        if not dedupe or not pts or p != pts[-1]:
+            pts.append(p)
+    return LineString(pts) if len(pts) > 1 else LineString()
+
+
+def qpoly(geom):
+    """Polygonal geometry snapped to the grid (valid, polygonal)."""
+    if geom is None or geom.is_empty:
+        return geom
+    return clean(_jitter(geom))
 
 
 def opening(geom, half_width: float):
@@ -100,7 +161,7 @@ def edge_tangent_inward(canvas: Polygon, p: tuple[float, float]) -> tuple[float,
     x, y = p
     dx = (1.0 if abs(x - minx) < 1 else -1.0 if abs(x - maxx) < 1 else 0.0)
     dy = (1.0 if abs(y - miny) < 1 else -1.0 if abs(y - maxy) < 1 else 0.0)
-    n = math.hypot(dx, dy) or 1.0
+    n = M.hypot(dx, dy) or 1.0
     return (dx / n, dy / n)
 
 
@@ -113,7 +174,8 @@ def noise1d(rng: np.random.Generator, wavelength: float, octaves: int = 3,
     """Smooth fractal 1D value noise f(t) in about [-1, 1] (t in meters or any unit)."""
     tables = []
     for o in range(octaves):
-        tables.append((wavelength / (2 ** o), persistence ** o, rng.uniform(-1, 1, 4096),
+        amp = math.prod([persistence] * o)
+        tables.append((wavelength / (2 ** o), amp, rng.uniform(-1, 1, 4096),
                        rng.uniform(0, 4096)))
     norm = sum(a for _, a, _, _ in tables)
 
@@ -138,7 +200,8 @@ def noise2d(rng: np.random.Generator, wavelength: float, octaves: int = 2,
     """Smooth fractal 2D value noise f(x, y) in about [-1, 1] (x, y in meters)."""
     tables = []
     for o in range(octaves):
-        tables.append((wavelength / (2 ** o), persistence ** o, rng.uniform(-1, 1, (256, 256)),
+        amp = math.prod([persistence] * o)
+        tables.append((wavelength / (2 ** o), amp, rng.uniform(-1, 1, (256, 256)),
                        rng.uniform(0, 256, 2)))
     norm = sum(a for _, a, _, _ in tables)
 
@@ -168,8 +231,8 @@ def smoothstep(x):
 def bezier(p0, p1, p2, p3, n: int = 200) -> np.ndarray:
     t = np.linspace(0, 1, n)[:, None]
     p0, p1, p2, p3 = (np.asarray(p, dtype=float) for p in (p0, p1, p2, p3))
-    return ((1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t * t * p2
-            + t ** 3 * p3)
+    u = 1 - t
+    return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
 
 
 def course(a, b, rng: np.random.Generator, *, wavelength: float, omega: float,
@@ -187,15 +250,15 @@ def course(a, b, rng: np.random.Generator, *, wavelength: float, omega: float,
     chord, + = left); `scale` multiplies omega (used to damp a path back onto the map).
     """
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    chord = float(np.hypot(*(b - a))) or 1.0
-    ang0 = math.atan2(b[1] - a[1], b[0] - a[0])
+    chord = float(M.hypot(*(b - a))) or 1.0
+    ang0 = M.atan2(b[1] - a[1], b[0] - a[0])
     if base is None:
         base = np.array([a, b])
     base = np.asarray(base, dtype=float)
-    seg = np.hypot(*np.diff(base, axis=0).T)
+    seg = M.hypot(*np.diff(base, axis=0).T)
     cum = np.concatenate([[0.0], np.cumsum(seg)])
     blen = float(cum[-1]) or chord
-    head = np.unwrap(np.arctan2(*np.diff(base, axis=0).T[::-1]))
+    head = np.unwrap(M.atan2(*np.diff(base, axis=0).T[::-1]))
     mids = (cum[:-1] + cum[1:]) / 2 / blen
     n_amp = noise1d(rng, 1.7 * wavelength, octaves=2)
     n_ph = noise1d(rng, 1.3 * wavelength, octaves=2)
@@ -209,16 +272,16 @@ def course(a, b, rng: np.random.Generator, *, wavelength: float, omega: float,
         th_base = np.interp(s, mids, head) if len(head) > 1 else np.full(n, head[0])
         om = omega * scale * (0.45 + 0.55 * (0.5 + 0.5 * np.clip(1.8 * n_amp(sm), -1, 1)))
         om = om * smoothstep(s / max(ramp[0], 1e-6)) * smoothstep((1 - s) / max(ramp[1], 1e-6))
-        th = th_base + om * np.sin(2 * math.pi * sm / wavelength + ph0 + 4.5 * n_ph(sm))
-        th = th + math.pi * bulge * np.cos(math.pi * s) * 1.2
-        d = np.column_stack([np.cos(th), np.sin(th)]) * (length / n)
+        th = th_base + om * M.sin(2 * math.pi * sm / wavelength + ph0 + 4.5 * n_ph(sm))
+        th = th + math.pi * bulge * M.cos(math.pi * s) * 1.2
+        d = np.column_stack([M.cos(th), M.sin(th)]) * (length / n)
         pts = np.vstack([[0.0, 0.0], np.cumsum(d, axis=0)])
-        span = float(np.hypot(*pts[-1])) or 1.0
+        span = float(M.hypot(*pts[-1])) or 1.0
         length = length * chord / span
-    span_ang = math.atan2(pts[-1][1], pts[-1][0])
-    k = chord / (float(np.hypot(*pts[-1])) or 1.0)
+    span_ang = M.atan2(pts[-1][1], pts[-1][0])
+    k = chord / (float(M.hypot(*pts[-1])) or 1.0)
     rot = ang0 - span_ang
-    c, sn = math.cos(rot), math.sin(rot)
+    c, sn = M.cos(rot), M.sin(rot)
     out = np.column_stack([pts[:, 0] * c - pts[:, 1] * sn, pts[:, 0] * sn + pts[:, 1] * c]) * k
     out = out + a
     out[-1] = b
@@ -236,7 +299,7 @@ def wiggle_path(a: tuple[float, float], b: tuple[float, float], offset_fn,
     """Path from a to b displaced sideways by offset_fn(t) (t = 0..1, meters, + = left)."""
     ax, ay = a
     bx, by = b
-    length = math.hypot(bx - ax, by - ay) or 1.0
+    length = M.hypot(bx - ax, by - ay) or 1.0
     nx, ny = -(by - ay) / length, (bx - ax) / length
     n = max(8, int(length / step))
     ts = np.linspace(0, 1, n + 1)
@@ -254,7 +317,7 @@ def variable_buffer(line: LineString, widths_fn, step: float = 12.0) -> Polygon:
     ts = np.linspace(0, 1, len(pts))
     w = np.asarray(widths_fn(ts), dtype=float) / 2
     d = np.gradient(pts, axis=0)
-    norm = np.hypot(d[:, 0], d[:, 1])
+    norm = M.hypot(d[:, 0], d[:, 1])
     norm[norm == 0] = 1
     nx, ny = -d[:, 1] / norm, d[:, 0] / norm
     left = np.column_stack([pts[:, 0] + nx * w, pts[:, 1] + ny * w])
@@ -270,10 +333,10 @@ def blob(center: tuple[float, float], area: float, rng: np.random.Generator,
     """Smooth noisy island-like shape with exactly `area` square meters."""
     ph = rng.uniform(0, 2 * math.pi, 4)
     th = np.linspace(0, 2 * math.pi, n, endpoint=False)
-    rr = (1 + 0.10 * np.sin(2 * th + ph[0]) + 0.08 * np.sin(3 * th + ph[1])
-          + 0.05 * np.sin(5 * th + ph[2]) + 0.025 * np.sin(8 * th + ph[3]))
-    xs, ys = rr * np.cos(th) * elong, rr * np.sin(th) / elong
-    ca, sa = math.cos(angle), math.sin(angle)
+    rr = (1 + 0.10 * M.sin(2 * th + ph[0]) + 0.08 * M.sin(3 * th + ph[1])
+          + 0.05 * M.sin(5 * th + ph[2]) + 0.025 * M.sin(8 * th + ph[3]))
+    xs, ys = rr * M.cos(th) * elong, rr * M.sin(th) / elong
+    ca, sa = M.cos(angle), M.sin(angle)
     pts = np.column_stack([xs * ca - ys * sa, xs * sa + ys * ca])
     unit = Polygon(pts)
     k = math.sqrt(area / unit.area)

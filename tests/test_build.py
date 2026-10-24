@@ -1,12 +1,11 @@
-"""M1a/M1a2 build: samples, determinism, each check with a failing case, coast forms, river `at`,
-water separation, CLI."""
+"""M1a/M1a2/M1b build: samples, determinism, each check with a failing case, coast forms, river
+`at`, water separation, CLI. Road-specific tests are in test_roads.py."""
 
 import copy
 import json
 import os
 import subprocess
 import sys
-import time
 
 import pytest
 import shapely
@@ -19,9 +18,9 @@ from citygen import hydro as H
 from citygen.build import build_city, build_variant
 from citygen.cli import EXIT_INVALID, EXIT_OK, main
 from citygen.model import CityModel
-from citygen.validate import load_spec, validate_spec
+from citygen.validate import validate_spec
 
-from conftest import CITIES, ROOT, SMALL, write
+from conftest import CITIES, ROOT, SMALL, built_sample, write
 
 
 def _build(data):
@@ -59,9 +58,7 @@ def test_five_sample_cities():
 
 @pytest.mark.parametrize("path", CITIES, ids=lambda p: p.parent.name)
 def test_sample_city_builds_and_passes(path):
-    t = time.perf_counter()
-    built = build_city(load_spec(path))
-    took = time.perf_counter() - t
+    built, took, _ = built_sample(path)
     failed = [f for c in built.checks for f in c.failures]
     assert not failed, failed
     assert took < 60, f"{path.parent.name} took {took:.1f} s"
@@ -73,13 +70,16 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M1a2/<city>/report.json is committed and passes."""
+    """docs/progress/M1b/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M1a2" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M1b" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
+        assert (ROOT / "docs" / "progress" / "M1b" / slug / "preview_map.png").is_file()
+        built, _, _ = built_sample(path)
+        assert rep == json.loads(json.dumps(built.report())), slug
 
 
 # --- determinism ---------------------------------------------------------------------
@@ -116,7 +116,9 @@ def test_small_city_passes(small_built):
     ids = {c.id for c in small_built.checks}
     assert ids == {"geometry_valid", "waterways_connected", "district_shares", "placement",
                    "water_required", "district_pieces", "island_sizes", "no_slivers",
-                   "land_use", "canal_quality"}
+                   "land_use", "canal_quality", "road_graph", "districts_served",
+                   "named_bridges", "bridge_clearance", "road_avoidance", "curve_radius",
+                   "segment_length", "road_duplicates"}
 
 
 def test_check_geometry_invalid(small_built):

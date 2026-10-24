@@ -1,11 +1,15 @@
-"""`citygen build`: spec -> city model (M1a: water, districts, inner waterways), checks, preview.
+"""`citygen build`: spec -> city model (water, districts, inner waterways, megasite reserves,
+primary roads and bridges), checks, preview.
 
 The free hydrology parameters (where an unpinned river enters, how its course bulges, where a
 delta splits) are tried in a few seeded variants; each variant is built and checked, and the
 first one that passes every check with (worst share error + share of land without a district)
 under 10% wins, else the best one (fewest failures, then that quality figure). Variant 0 uses
 the defaults, so the search only matters when the default does not fit.
-Same spec + seed = byte-identical `city_model.json`.
+Megasite reserves and the primary road network (M1b) are built once, on the chosen variant.
+Same spec + seed = byte-identical `city_model.json`, on any machine: the generator uses
+deterministic elementary functions (`dmath`) and every stage hands the next one coordinates on
+the 0.01 m grid.
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ from . import checks as C
 from . import districts as D
 from . import geom as G
 from . import hydro as H
+from . import megasites as MS
+from . import roads as RD
 from . import waterways as W
 from .model import CityModel
 from .spec import CitySpec
@@ -41,6 +47,8 @@ class Built:
     stats: dict
     variant: int
     notes: list[str]
+    sites: list = None
+    roads: object = None
 
     @property
     def passed(self) -> bool:
@@ -55,7 +63,8 @@ def _district_ids(spec: CitySpec) -> dict[str, str]:
 
 
 def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
-             explicit: set[str]) -> CityModel:
+             explicit: set[str], sites: list | None = None,
+             roads: RD.RoadNet | None = None) -> CityModel:
     P = G.to_model_poly
     did = _district_ids(spec)
     lm_ids = {k: f"lm{k + 1:02d}" for k in range(len(h.landmasses))}
@@ -136,6 +145,25 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         "channels": channels, "waterways": waterways, "quays": quays, "districts": districts,
         "open_spaces": open_spaces,
     }
+    if sites:
+        data["megasites"] = [{
+            "id": s.id, "type": f"megasite.{s.kind}", "kind": s.kind, "name": s.name,
+            "district_id": did[s.district], "polygon": P(s.polygon),
+            "height_limit_m": s.height_limit_m,
+            "flight_cone": P(s.flight_cone) if s.flight_cone is not None else None,
+            "attrs": {"area_m2": round(s.polygon.area, 1), "target_area_m2": round(s.target_m2, 1),
+                      "reserve": True}} for s in sites]
+    if roads is not None:
+        data["road_nodes"] = roads.nodes
+        data["road_segments"] = roads.segments
+        data["bridges"] = [{k: v for k, v in b.items() if k not in ("s0", "s1")}
+                           for b in roads.bridges]
+        for b in data["bridges"]:
+            a = b["attrs"]
+            b["water_class"] = a.pop("water_class")
+            b["span_m"] = a.pop("span_m")
+            b["ramp_length_m"] = a.pop("ramp_length_m")
+            b.pop("road_class", None)
     return CityModel.model_validate(data)
 
 
@@ -186,7 +214,7 @@ def build_variant(spec: CitySpec, explicit: set[str], index: int) -> Built:
     did = _district_ids(spec)
     ww = W.build_waterways(spec, h, lay.polygons, did)
     model = assemble(spec, h, lay, ww, explicit)
-    checks, st = C.run_checks(spec, model)
+    checks, st = C.run_checks(spec, model, roads=False)
     st["separation_budget"] = lay.separation
     notes = h.notes + lay.notes
     return Built(spec, model, h, lay, ww, checks, st, index, notes)
@@ -205,7 +233,7 @@ def _score(b: Built) -> tuple:
     return (fails, round(quality, 4), round(b.layout.assignment_cost, 4))
 
 
-def build_city(result: Result, max_variants: int = MAX_VARIANTS) -> Built:
+def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True) -> Built:
     spec = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
     best: Built | None = None
@@ -215,7 +243,36 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS) -> Built:
             best = b
         if b.passed and _score(b)[1] <= GOOD_QUALITY:
             break
+    if roads:
+        add_roads(best, explicit)
     return best
+
+
+def add_roads(b: Built, explicit: set[str]) -> Built:
+    """Megasite reserves and the primary road network on the chosen variant, then every check
+    again (water, districts and roads)."""
+    spec = b.spec
+    did = _district_ids(spec)
+    sites, site_notes = MS.place_megasites(spec, b.layout.polygons, b.hydro, b.waterways, did)
+    opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
+    best = None
+    for k in range(len(RD.ROAD_VARIANTS)):
+        net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,
+                             variant=k)
+        model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, sites, net)
+        checks, st = C.run_checks(spec, model, roads=True)
+        fails = sum(len(c.failures) for c in checks)
+        if best is None or fails < best[0]:
+            best = (fails, net, model, checks, st)
+        if fails == 0:
+            break
+    _, net, model, checks, st = best
+    b.sites, b.roads, b.model, b.checks = sites, net, model, checks
+    st["separation_budget"] = b.stats.get("separation_budget")
+    st["road_variant"] = net.variant
+    b.stats = st
+    b.notes = b.notes + site_notes + net.notes
+    return b
 
 
 def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:

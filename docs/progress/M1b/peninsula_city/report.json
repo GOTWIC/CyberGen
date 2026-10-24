@@ -1,0 +1,276 @@
+{
+  "name": "Greyhook",
+  "seed": 9081,
+  "stage": "M1b (water, districts, waterways, primary roads)",
+  "passed": true,
+  "variant": 0,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "'Wallgate Heights': separated_by 'wall' is checked once walls (M3) exist"
+      ]
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 10.8,
+    "land_km2": 5.159,
+    "district_land_km2": 5.159,
+    "water_share": 0.5223,
+    "sea_share": 0.5,
+    "landmasses": 3,
+    "landmasses_with_districts": 3,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0,
+    "open_land": [],
+    "islands": 0,
+    "river_km": 3.29,
+    "channel_km": {
+      "separation": 1.39
+    },
+    "separation_channels": 2,
+    "waterway_km": 1.62,
+    "waterway_km_by_kind": {
+      "basin": 0.64,
+      "canal": 0.98
+    },
+    "waterways": 5,
+    "quay_km": 3.47,
+    "district_boundary_on_water": 0.6968,
+    "boundary_on_water": 0.6299,
+    "boundary_on_water_target": 0.6,
+    "boundary_km": {
+      "water": 5.83,
+      "land": 3.43
+    },
+    "land_boundary_curvature": 1.0346,
+    "boundary_curvature": 1.128,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Wallgate Heights",
+        "archetype": "residential_heights",
+        "landmass": "lm02",
+        "area_km2": 1.07,
+        "share": 0.2075,
+        "target": 0.2,
+        "target_source": "spec",
+        "error": 0.0374
+      },
+      {
+        "id": "d02",
+        "name": "Neckgate",
+        "archetype": "transit_hub",
+        "landmass": "lm03",
+        "area_km2": 0.586,
+        "share": 0.1136,
+        "target": 0.12,
+        "target_source": "spec",
+        "error": -0.0533
+      },
+      {
+        "id": "d03",
+        "name": "The Stacks",
+        "archetype": "megablock_residential",
+        "landmass": "lm01",
+        "area_km2": 1.136,
+        "share": 0.2202,
+        "target": 0.22,
+        "target_source": "spec",
+        "error": 0.0009
+      },
+      {
+        "id": "d04",
+        "name": "Lantern Strip",
+        "archetype": "entertainment_market",
+        "landmass": "lm01",
+        "area_km2": 0.672,
+        "share": 0.1303,
+        "target": 0.13,
+        "target_source": "spec",
+        "error": 0.0024
+      },
+      {
+        "id": "d05",
+        "name": "Eastside Docks",
+        "archetype": "industrial_port",
+        "landmass": "lm01",
+        "area_km2": 0.663,
+        "share": 0.1285,
+        "target": 0.13,
+        "target_source": "spec",
+        "error": -0.0116
+      },
+      {
+        "id": "d06",
+        "name": "Hook Spaceport",
+        "archetype": "spaceport",
+        "landmass": "lm01",
+        "area_km2": 1.031,
+        "share": 0.1999,
+        "target": 0.2,
+        "target_source": "spec",
+        "error": -0.0005
+      }
+    ],
+    "road_km": {
+      "avenue": 17.01,
+      "highway": 2.29
+    },
+    "road_nodes": 27,
+    "road_segments": 31,
+    "road_components": 1,
+    "bridges": 4,
+    "bridges_by_class": {
+      "sea": 0,
+      "river": 2,
+      "canal": 2
+    },
+    "bridge_span_km": 0.19,
+    "named_bridges": [
+      "Wallgate Bridge"
+    ],
+    "pedestrian_bridges": 0,
+    "landmasses_connected": [
+      3,
+      3
+    ],
+    "exits": [
+      "north_exit"
+    ],
+    "highway_elevated_share": 0.5868,
+    "megasites": 3,
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.4852,
+      "preferred_chains": 1,
+      "planned": 0.6324
+    },
+    "road_variant": 0
+  },
+  "notes": [
+    "megasite 'Hook Spaceport' (spaceport) shrunk to 0.31 km2 (asked 0.50) to fit 'Hook Spaceport'"
+  ]
+}

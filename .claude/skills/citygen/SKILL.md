@@ -1,14 +1,14 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts and waterways, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways and primary roads, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
 
 You are the prompt-to-spec step of citygen (`docs/citygen_scope.md`, section 4.1). You read the
 prompt (and the image, if any), write `city_spec.json`, validate it until it passes, render the
-schematic, build the city, read the check report and preview, adjust the spec if needed, and
-report. Everything after the spec is deterministic offline code.
+schematic, build the city (water, districts, waterways, primary roads and bridges), read the
+check report and preview, adjust the spec if needed, and report. Everything after the spec is deterministic offline code.
 
 ## Hard rules
 
@@ -143,8 +143,9 @@ Then, only where the prompt or image says so:
   67.5 degrees of the direction; `edge` = toward that side of the land (on a sea side, toward
   the outermost shore); `center` = near the centroid of the land; `coast` = touches the sea or a
   sea channel; `along_river`, `separated_by` (water kinds or a river name) = borders that water;
-  `separated_by: water` also means no land neighbor; `adjacent_to` = within 300 m. Land kinds
-  (`highway`, `ring_road`, `rail`, `wall`) are checked once roads exist (M1b). References can be districts, places, megasites or islands, not rivers:
+  `separated_by: water` also means no land neighbor; `adjacent_to` = within 300 m;
+  `highway` and `ring_road` = at least 200 m of highway (or ring road) within 60 m of the
+  district's boundary; `rail` and `wall` are checked once transit (M5) and walls (M3) exist. References can be districts, places, megasites or islands, not rivers:
   for "the east bank" use `along_river` plus a relation to a district on the other bank or in
   the middle. `on_island` stands alone: do not combine it with `edge` or `coast: false`.
 - `grid_angle_deg`, `street_pattern`, `block_size_m`, `height_m`: only when the prompt implies
@@ -237,34 +238,49 @@ land cut off by a river; that is fine for a schematic.
 citygen build cities/<slug>/city_spec.json cities/<slug>/out/
 ```
 
-M1a builds the water, districts and inner waterways: coast, rivers, delta branches, islands,
-landmasses, district polygons (with separation channels), open land (named marshes and parks
-on landmasses without a district), canals, creeks, inlets, harbor slips and marinas with quays. It writes `city_model.json`, `preview_map.png`, `report.json` and
-`report.txt`, and exits 0 when every check passes, 1 when one fails (2 on usage or file errors).
+The build makes the water, districts and inner waterways (coast, rivers, delta branches,
+islands, landmasses, district polygons with separation channels, open land such as named
+marshes and parks, canals, creeks, inlets, harbor slips and marinas with quays), reserves the
+ground of every megasite (a spaceport also gets its flight cone), and lays the primary road
+network: highways in the `highways.pattern` with the `exits` leaving the map, avenues
+(waterfront avenues, avenues on the land boundaries between districts, axis boulevards in
+rotated grids, ring roads around transit hubs and central parks, and chords at each district's
+grid angle until its archetype spacing is met), and bridges wherever a road crosses water
+(sea channel and port approach 25 m clearance, river 10 to 15 m, canal 3 to 4 m, with approach
+ramps at 6%). It writes `city_model.json`, `preview_map.png`, `report.json` and `report.txt`,
+and exits 0 when every check passes, 1 when one fails (2 on usage or file errors).
 
-1. Read `report.txt`. Each failed check names the district or island and why: a share off by
-   more than 15%, a relation with the actual bearing, an edge or coast not met, an island that
-   does not fit, a waterway that does not connect, a sliver, invalid geometry, land without a
-   district that is not open land, canals that cross too flat or run as near duplicates. The
-   stats also give the boundary between districts on water (against the target).
+1. Read `report.txt`. Each failed check names the district, island, segment or bridge and why:
+   a share off by more than 15%, a relation with the actual bearing, an edge or coast not met,
+   an island that does not fit, a waterway that does not connect, a sliver, invalid geometry,
+   land without a district that is not open land, canals that cross too flat or run as near
+   duplicates; and for roads: a landmass with a district that no road reaches, a district with
+   no avenue, a named bridge not built, a bridge whose clearance does not match its water, a
+   road through a megasite, a flight cone, a marsh or a park, a curve under the minimum radius
+   (highway 150 m, avenue 40 m), a segment that is too short, two roads running as near
+   duplicates. The stats give the boundary between districts on water (against the target),
+   road km by class, bridges by class, named bridges and exits.
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
    where asked, land left without a district (hatched) only where the prompt allows it, open
-   land (marsh, park) only where it makes sense.
+   land (marsh, park) only where it makes sense. Then the roads: highways (amber) in the asked
+   pattern and leaving at the asked exits (labeled at the map edge); avenues (white) reaching
+   every district; bridges colored by class (pink sea, orange river, teal canal) with named
+   bridges labeled where the prompt or image puts them; few long pink bridges; megasite
+   reserves (cross-hatched) and flight cones (dotted) kept free of roads. Roads that end at
+   the map edge continue beyond the map; they are not exits.
 3. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass
    (an island, a bank between two rivers); drop a placement rule the geometry cannot meet (for
    example `edge` toward a sea side where the land is a narrow lobe) and keep the stronger ones
    (`coast`, relations); switch `district_separation` when the prompt wants more or less water
-   between districts.
+   between districts. For roads: change `highways.pattern` or `exits` when the highways read
+   wrong; name a bridge in `water.bridges.named` (with `connects` and `crosses`) to put a major
+   crossing where the prompt wants it; check that each named bridge connects places that are
+   really across the named water.
 4. At most three build rounds. If checks still fail, stop and report them with what you tried;
    if you believe citygen itself is wrong, say so instead of editing it.
-
-> **Placeholder for M1b (not available yet):** highways, arterials, ring roads, bridges and the
-> connectivity checks (every landmass with a district reachable by road) are added to the same
-> build in M1b; the skill will then also read the road checks. Until then, the build covers
-> water, districts and waterways only.
 
 ### 7. Report
 
@@ -275,7 +291,8 @@ Reply with:
   express in the spec;
 - the remaining validation warnings, if any;
 - the schematic and the build preview (attach or link the PNGs), plus the check result and the
-  stats from `report.txt` (land, water share, landmasses, waterway km, district shares).
+  stats from `report.txt` (land, water share, landmasses, waterway km, district shares, road
+  km by class, bridges by class, named bridges, exits).
 
 ## Minimal example
 
@@ -296,4 +313,5 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
-(previews and reports): `docs/progress/M1a2/` (the M1a versions in `docs/progress/M1a/`).
+(previews and reports): `docs/progress/M1b/` with roads (specs in `docs/progress/M1a2/`, the
+water and district builds there and in `docs/progress/M1a/`).

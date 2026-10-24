@@ -93,13 +93,57 @@
           "type": "string"
         },
         "crosses": {
-          "description": "Water entity id.",
+          "description": "Water entity id (the highest class crossed).",
           "title": "Crosses",
           "type": "string"
+        },
+        "water_class": {
+          "anyOf": [
+            {
+              "enum": [
+                "sea",
+                "river",
+                "canal"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Navigable class of the water crossed (scope 5.4): sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m.",
+          "title": "Water Class"
         },
         "clearance_m": {
           "title": "Clearance M",
           "type": "number"
+        },
+        "span_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Length over water.",
+          "title": "Span M"
+        },
+        "ramp_length_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Approach ramp per side, L = (clearance + deck) / 0.06.",
+          "title": "Ramp Length M"
         },
         "deck_levels": {
           "items": {
@@ -109,6 +153,7 @@
           "type": "array"
         },
         "line": {
+          "description": "Deck line from bank to bank (z = deck top).",
           "items": {
             "maxItems": 3,
             "minItems": 3,
@@ -1034,7 +1079,8 @@
           "type": "string"
         },
         "polygon": {
-          "$ref": "#/$defs/Polygon"
+          "$ref": "#/$defs/Polygon",
+          "description": "Reserved ground (M1b); the site generator fills it."
         },
         "height_limit_m": {
           "anyOf": [
@@ -1047,6 +1093,18 @@
           ],
           "default": null,
           "title": "Height Limit M"
+        },
+        "flight_cone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Spaceports: ground footprint of the flight cone (kept free of roads)."
         },
         "member_ids": {
           "items": {
@@ -1722,6 +1780,7 @@
     },
     "RoadSegment": {
       "additionalProperties": false,
+      "description": "A road between two nodes (junctions, ends, exits). `type` is `road.<road_class>`.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -1755,6 +1814,28 @@
           "title": "End",
           "type": "string"
         },
+        "road_class": {
+          "enum": [
+            "highway",
+            "avenue",
+            "street",
+            "alley",
+            "service",
+            "pedestrian"
+          ],
+          "title": "Road Class",
+          "type": "string"
+        },
+        "lanes": {
+          "description": "Total lanes, both directions.",
+          "title": "Lanes",
+          "type": "integer"
+        },
+        "width_m": {
+          "description": "Total cross-section width.",
+          "title": "Width M",
+          "type": "number"
+        },
         "centerline": {
           "items": {
             "maxItems": 2,
@@ -1779,6 +1860,7 @@
           "type": "integer"
         },
         "z_profile": {
+          "description": "Placeholder until M7: ground, bridge ramps at 6%, deck z over water.",
           "items": {
             "$ref": "#/$defs/ZSample"
           },
@@ -1793,17 +1875,38 @@
           "title": "One Way",
           "type": "boolean"
         },
-        "bridge_id": {
+        "bridge": {
+          "default": false,
+          "title": "Bridge",
+          "type": "boolean"
+        },
+        "bridge_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Bridge Ids",
+          "type": "array"
+        },
+        "clearance_m": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "number"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Bridge Id"
+          "description": "Highest bridge clearance on it.",
+          "title": "Clearance M"
+        },
+        "district_ids": {
+          "description": "Districts it serves.",
+          "items": {
+            "type": "string"
+          },
+          "title": "District Ids",
+          "type": "array"
         },
         "name": {
           "anyOf": [
@@ -1822,6 +1925,9 @@
         "id",
         "start",
         "end",
+        "road_class",
+        "lanes",
+        "width_m",
         "centerline",
         "cross_section"
       ],

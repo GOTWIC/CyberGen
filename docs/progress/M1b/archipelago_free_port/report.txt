@@ -1,0 +1,43 @@
+citygen build report: Saltreach Free Port (seed 3301, M1b (water, districts, waterways, primary roads))
+result: PASS  (hydrology variant 0)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+  [pass] land_use: Every landmass holds a district or is named open land (marsh, park); no orphan wedges
+         note: every district is on its own island; the rest of the land is outside the city
+  [pass] canal_quality: Canals and creeks: no crossings below 30 deg, no near-duplicate canals
+  [pass] road_graph: Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built
+  [pass] districts_served: Every district is touched by an avenue (at least 50 m within 25 m of it)
+  [pass] named_bridges: Every named bridge is built
+  [pass] bridge_clearance: Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge
+  [pass] road_avoidance: No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)
+  [pass] curve_radius: Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7)
+  [pass] segment_length: No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted)
+  [pass] road_duplicates: No near-parallel duplicate roads (within 25 m for over 150 m)
+
+stats:
+  map 11.56 km2, land 6.762 km2 (districts 4.45 km2, unassigned 2.312 km2)
+  water share 41.5% (sea 41.5%)
+  landmasses 6 (5 with districts), islands 5
+  rivers 0.0 km; channels none
+  separation channels 0; boundary between districts on water 100%, 1.84 km on water, 0.0 km on land
+  district perimeter facing water 100%; boundary curvature (arc / chord over 400 m) 1.0283, land boundaries None
+  open land 0 km2
+  inner waterways 11 (3.86 km: basin 0.91, canal 0.86, creek 2.09), quays 7.88 km
+  roads avenue 18.45 km, highway 3.52 km; 34 segments, 29 nodes, 1 component(s); exits north_exit
+  bridges 10 (sea 5, river 0, canal 5; 1.71 km of span), pedestrian 1; named: Crown Causeway, Kettle Span, Lumen Footbridge, Reef Bridge
+  landmasses with districts connected by road 5 of 5; highway planned elevated 53%; megasite reserves 3; road variant 0
+
+  district                     archetype              landmass  km2    share  target  error
+  Crown Island                 corporate_core         lm02      1.500  0.337  0.340   -0.9%  (spec)
+  Kettle Island                industrial_port        lm03      1.000  0.225  0.220   +2.1%  (spec)
+  Westreef                     old_town               lm04      0.900  0.202  0.200   +1.1%  (spec)
+  Lumen Key                    research_campus        lm06      0.350  0.079  0.080   -1.7%  (spec)
+  Palm Key                     residential_heights    lm05      0.700  0.157  0.160   -1.7%  (spec)

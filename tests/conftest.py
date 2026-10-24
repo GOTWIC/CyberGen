@@ -9,6 +9,25 @@ EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
 # The build samples: the four M0 cities (specs as adjusted for M1a and M1a2) and Nyxllor.
 CITIES = sorted((ROOT / "docs" / "progress" / "M1a2").glob("*/city_spec.json")) + [
     ROOT / "cities" / "nyxllor" / "city_spec.json"]
+GOLDEN = ROOT / "tests" / "data" / "golden_hashes.json"
+
+_BUILT: dict = {}
+
+
+def built_sample(path: Path):
+    """Build a sample city once per test session: (Built, seconds, city_model.json bytes)."""
+    import time
+
+    from citygen.build import build_city
+    from citygen.validate import load_spec
+
+    key = str(path)
+    if key not in _BUILT:
+        t = time.perf_counter()
+        b = build_city(load_spec(path))
+        took = time.perf_counter() - t
+        _BUILT[key] = (b, took, (b.model.to_json() + "\n").encode("utf-8"))
+    return _BUILT[key]
 
 # A small, fast city for build tests: straight coast, one river, one island district.
 SMALL = {

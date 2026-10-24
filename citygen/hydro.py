@@ -25,6 +25,7 @@ from shapely import affinity
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import nearest_points, substring, unary_union
 
+from . import dmath as M
 from . import geom as G
 from . import presets
 from .defaults import derive_seed
@@ -123,7 +124,7 @@ class Variant:
 # ---------------------------------------------------------------------------
 
 def _gauss(x):
-    return np.exp(-x * x)
+    return M.exp(-x * x)
 
 
 def _sea_canonical(form: str, s: float, A: float, Bh: float, noise, b0: float,
@@ -136,14 +137,14 @@ def _sea_canonical(form: str, s: float, A: float, Bh: float, noise, b0: float,
     if form == "peninsula":
         raise ValueError("peninsula is built by _peninsula")
     if form == "bay":
-        c = A - s * span * (0.3 + 0.3 * np.exp(-(bs / (0.55 * Bh)) ** 4))
+        c = A - s * span * (0.3 + 0.3 * M.exp(-np.square(np.square(bs / (0.55 * Bh)))))
     elif form == "crescent":
         c = A - s * span * (0.12 + 0.6 * np.clip(1 - (bs / (1.05 * Bh)) ** 2, 0, 1))
     elif form == "delta":
         c = A - s * span * (0.6 - 0.42 * _gauss((bs - b0) / (0.6 * Bh)))
     else:  # straight, archipelago
         c = A - s * span * 0.5
-    c = c + n + lobe * span * np.exp(-((bs - b0) / (0.3 * Bh)) ** 2)
+    c = c + n + lobe * span * M.exp(-((bs - b0) / (0.3 * Bh)) ** 2)
     pts = list(zip(c, bs)) + [(4 * A, bs[-1]), (4 * A, bs[0])]
     return Polygon(pts)
 
@@ -291,14 +292,14 @@ def _width_fn(wmin: float, wmax: float, rng):
 
     def f(ts):
         ts = np.asarray(ts, dtype=float)
-        return (wmin + (wmax - wmin) * ts ** 1.3) * (1 + 0.07 * nz(ts))
+        return (wmin + (wmax - wmin) * M.power(ts, 1.3)) * (1 + 0.07 * nz(ts))
 
     return f
 
 
 def _widths_at(line: LineString, fn) -> list[float]:
     cs = np.asarray(line.coords)
-    d = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(cs, axis=0).T))])
+    d = np.concatenate([[0.0], np.cumsum(M.hypot(*np.diff(cs, axis=0).T))])
     return [float(round(w, 1)) for w in fn(d / (d[-1] or 1.0))]
 
 
@@ -320,12 +321,12 @@ def _keep_inside(make, canvas: Polygon, margin: float) -> LineString:
 
 def _unit(v) -> np.ndarray:
     v = np.asarray(v, dtype=float)
-    n = float(np.hypot(*v))
+    n = float(M.hypot(*v))
     return v / n if n > 1e-9 else np.array([1.0, 0.0])
 
 
 def _rot(v, ang: float) -> np.ndarray:
-    c, s = math.cos(ang), math.sin(ang)
+    c, s = M.cos(ang), M.sin(ang)
     return np.array([v[0] * c - v[1] * s, v[0] * s + v[1] * c])
 
 
@@ -338,7 +339,7 @@ def _tangent(line: LineString, d: float) -> np.ndarray:
 def width_at(body: WaterBody, d: float) -> float:
     """Width of a water body `d` meters along its centerline."""
     cs = np.asarray(body.centerline.coords)
-    cum = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(cs, axis=0).T))])
+    cum = np.concatenate([[0.0], np.cumsum(M.hypot(*np.diff(cs, axis=0).T))])
     return float(np.interp(d, cum, body.widths[:len(cum)]))
 
 
@@ -403,10 +404,10 @@ def build_rivers(spec: CitySpec, canvas: Polygon, sea, variant: Variant,
             tau = _tangent(pl, dj)
             rel = np.array([start[0] - jp.x, start[1] - jp.y])
             side = 1.0 if tau[0] * rel[1] - tau[1] * rel[0] >= 0 else -1.0
-            d_end = _rot(tau, -side * math.radians(45))
+            d_end = _rot(tau, -side * M.radians(45))
             pw = width_at(parent, dj)
             end = (jp.x + d_end[0] * 0.5 * pw, jp.y + d_end[1] * 0.5 * pw)
-            ln = math.hypot(end[0] - s_out[0], end[1] - s_out[1])
+            ln = M.hypot(end[0] - s_out[0], end[1] - s_out[1])
             base = G.bezier(s_out, np.array(s_out) + inward * 0.35 * ln,
                             np.array(end) - d_end * 0.4 * ln, end)
             ramp = (0.08, 0.18)
@@ -559,7 +560,7 @@ def build_delta(spec: CitySpec, main: WaterBody, sea, canvas: Polygon, variant: 
             while d_fork > upstream_limit + 250.0:
                 fp = line.interpolate(d_fork)
                 v = np.array([q.x - fp.x, q.y - fp.y])
-                if float(v @ n_q) >= 0.45 * float(np.hypot(*v)):
+                if M.dot(v, n_q) >= 0.45 * float(M.hypot(*v)):
                     break
                 d_fork -= 50.0
         else:
@@ -573,7 +574,7 @@ def build_delta(spec: CitySpec, main: WaterBody, sea, canvas: Polygon, variant: 
             s = min(max(s, 0.04 * cl.length), 0.96 * cl.length)
             q = cl.interpolate(s)
             v = np.array([q.x - fp.x, q.y - fp.y])
-            if float(v @ np.array([ux, uy])) >= 0.25 * float(np.hypot(*v)):
+            if M.dot(v, (ux, uy)) >= 0.25 * float(M.hypot(*v)):
                 break
             s = s0 + (s - s0) * 0.85
         s = min(max(s, 0.04 * cl.length), 0.96 * cl.length)
@@ -587,7 +588,7 @@ def build_delta(spec: CitySpec, main: WaterBody, sea, canvas: Polygon, variant: 
         n_sea = _seaward(cl, s, sea)
         bw = max(0.62 * width_at(parent, d_fork), 24.0)
         end = (q.x + n_sea[0] * 2.5 * bw, q.y + n_sea[1] * 2.5 * bw)
-        ln = math.hypot(end[0] - p.x, end[1] - p.y)
+        ln = M.hypot(end[0] - p.x, end[1] - p.y)
         base = G.bezier((p.x, p.y), np.array([p.x, p.y]) + tau * 0.4 * ln,
                         np.array(end) - n_sea * 0.45 * ln, end)
         lam = min(max(12.0 * bw, 300.0), 900.0)
@@ -599,7 +600,7 @@ def build_delta(spec: CitySpec, main: WaterBody, sea, canvas: Polygon, variant: 
             cand, _ = _trim_at(cand, sea, 2.0 * bw, skip=bw * 2)
             if not any(cand.crosses(o) for o in others):
                 break
-        wfn = lambda ts, bw=bw: bw * (1 + 0.35 * np.asarray(ts) ** 1.5)  # noqa: E731
+        wfn = lambda ts, bw=bw: bw * (1 + 0.35 * M.power(np.asarray(ts), 1.5))  # noqa: E731
         poly = G.polygonal(G.variable_buffer(cand, wfn).intersection(canvas))
         body = WaterBody(f"{main.id}.b{j + 1}", "delta_branch",
                          names[j] if j < len(names) else None, cand, _widths_at(cand, wfn),
@@ -618,7 +619,7 @@ def build_delta(spec: CitySpec, main: WaterBody, sea, canvas: Polygon, variant: 
 def _narrow_below(main: WaterBody, d0: float, canvas: Polygon) -> None:
     """Main channel width x0.75 below distance d0 (eased over 200 m): the flow has split."""
     cs = np.asarray(main.centerline.coords)
-    cum = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(cs, axis=0).T))])
+    cum = np.concatenate([[0.0], np.cumsum(M.hypot(*np.diff(cs, axis=0).T))])
     base = np.asarray(main.attrs.get("_widths_full", main.widths), dtype=float)
     main.attrs["_widths_full"] = [float(x) for x in base]
     k = 1 - 0.25 * G.smoothstep((cum - d0) / 200.0)
@@ -685,12 +686,12 @@ def _fit_blob(free, aim: Point, area: float, rng, elong: float, gap: float, canv
     gx, gy = gx[ok], gy[ok]
     if not len(gx):
         return None
-    key = np.hypot(gx - aim.x, gy - aim.y)
+    key = M.hypot(gx - aim.x, gy - aim.y)
     if sector is not None:
         (cx, cy), (dx, dy) = sector
         rx, ry = gx - cx, gy - cy
-        cosang = (rx * dx + ry * dy) / (np.hypot(rx, ry) + 1e-9)
-        outside = cosang < math.cos(math.radians(35))
+        cosang = (rx * dx + ry * dy) / (M.hypot(rx, ry) + 1e-9)
+        outside = cosang < M.cos(M.radians(35))
         if strict:
             gx, gy, key = gx[~outside], gy[~outside], key[~outside]
         else:
@@ -765,9 +766,9 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
             if sector is not None and not filler:
                 q = poly.centroid
                 v = np.array([q.x - c.x, q.y - c.y])
-                if float(v @ np.array(sector[1])) < math.cos(math.radians(45)) * np.hypot(*v):
+                if M.dot(v, sector[1]) < M.cos(M.radians(45)) * M.hypot(*v):
                     misses.append(name)
-                    bearing = (90 - math.degrees(math.atan2(v[1], v[0]))) % 360
+                    bearing = (90 - M.degrees(M.atan2(v[1], v[0]))) % 360
                     msgs.append(f"island '{name}' has no room toward '{position}'; it sits at "
                                 f"bearing {bearing:.0f} deg from the middle of the sea")
             taken = taken.union(poly.buffer(60))
@@ -829,7 +830,7 @@ def place_river_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[Water
         c = line.interpolate(d)
         a = line.interpolate(max(d - 60, 0))
         b = line.interpolate(min(d + 60, line.length))
-        angle = math.atan2(b.y - a.y, b.x - a.x)
+        angle = M.atan2(b.y - a.y, b.x - a.x)
         poly = G.blob((c.x, c.y), area, rng, 1.35, angle)
         i = min(int(d / line.length * (len(body.widths) - 1)), len(body.widths) - 1)
         arm = max(0.6 * body.widths[i], 30.0)
@@ -923,6 +924,36 @@ def solve_delta_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[Water
 
 
 # ---------------------------------------------------------------------------
+# Quantization (stage boundaries, see geom.qpoly)
+# ---------------------------------------------------------------------------
+
+def quantize_bodies(bodies: list[WaterBody]) -> list[WaterBody]:
+    for b in bodies:
+        b.centerline = G.qline(b.centerline, dedupe=False)
+        b.widths = [G.q(w) for w in b.widths]
+        b.polygon = G.qpoly(b.polygon)
+    return bodies
+
+
+def quantize_islands(islands: list[IslandRec]) -> list[IslandRec]:
+    for i in islands:
+        i.polygon = G.qpoly(i.polygon)
+        if i.probe is not None:
+            i.probe = G.qpoint(i.probe)
+    return islands
+
+
+def quantize(h: Hydro) -> Hydro:
+    h.sea = G.qpoly(h.sea)
+    quantize_bodies(h.bodies)
+    quantize_islands(h.islands)
+    h.rings = G.qpoly(h.rings)
+    h.water, h.land = G.qpoly(h.water), G.qpoly(h.land)
+    h.landmasses = [G.qpoly(p) for p in h.landmasses]
+    return h
+
+
+# ---------------------------------------------------------------------------
 # Land
 # ---------------------------------------------------------------------------
 
@@ -976,15 +1007,21 @@ def build_hydro(spec: CitySpec, canvas: Polygon, variant: Variant) -> Hydro:
         _, _, vx, vy = G.frame(w.coast.side)
         bh = max(abs(x * vx + y * vy) for x, y in list(canvas.exterior.coords)[:4])
         lobe_b0 = float(np.clip(b0[0] * vx + b0[1] * vy, -0.5 * bh, 0.5 * bh))
-    sea = build_sea(spec, canvas, b0, lobe)
-    bodies = build_rivers(spec, canvas, sea, variant, lobe_b0)
+    # Every sub-stage hands on coordinates on the 0.01 m grid (determinism across machines).
+    sea = G.qpoly(build_sea(spec, canvas, b0, lobe))
+    bodies = quantize_bodies(build_rivers(spec, canvas, sea, variant, lobe_b0))
     river_isl, rings, limits = place_river_islands(spec, canvas, sea, bodies, notes, variant)
+    river_isl, rings = quantize_islands(river_isl), G.qpoly(rings)
+    limits = {k: G.q(v) for k, v in limits.items()}
     build_deltas(spec, canvas, sea, bodies, variant, limits)
-    delta_isl = solve_delta_islands(spec, canvas, sea, bodies, rings, notes, variant, limits)
-    sea_isl = place_sea_islands(spec, canvas, sea, bodies, notes)
+    quantize_bodies(bodies)
+    delta_isl = quantize_islands(
+        solve_delta_islands(spec, canvas, sea, bodies, rings, notes, variant, limits))
+    quantize_bodies(bodies)
+    sea_isl = quantize_islands(place_sea_islands(spec, canvas, sea, bodies, notes))
     h = Hydro(canvas, sea, bodies, sea_isl + river_isl + delta_isl, rings, notes=notes)
     # Keep the spec order for islands (fillers last).
     order = {i.name: k for k, i in enumerate(w.islands)}
     h.islands.sort(key=lambda i: (i.filler, order.get(i.name, 99), i.name))
     rebuild_land(h)
-    return h
+    return quantize(h)

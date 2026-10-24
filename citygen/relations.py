@@ -20,6 +20,7 @@ import math
 
 from shapely.geometry import LineString, Point, Polygon
 
+from . import dmath as M
 from . import presets
 
 DIRECTION_TOL_DEG = 67.5
@@ -29,21 +30,21 @@ ADJACENT_M = 300.0
 
 def direction_ok(a: tuple[float, float], b: tuple[float, float], direction: str) -> bool:
     dx, dy = a[0] - b[0], a[1] - b[1]
-    d = math.hypot(dx, dy)
+    d = M.hypot(dx, dy)
     if d < 1e-6:
         return False
     ux, uy = presets.DIRECTION_VECTORS[direction]
-    return (dx * ux + dy * uy) / d >= math.cos(math.radians(DIRECTION_TOL_DEG)) - 1e-9
+    return (dx * ux + dy * uy) / d >= M.cos(M.radians(DIRECTION_TOL_DEG)) - 1e-9
 
 
 def direction_excess(a, b, direction: str) -> float:
     """How far (radians) the relation is outside its tolerance; 0 when satisfied."""
     dx, dy = a[0] - b[0], a[1] - b[1]
-    if math.hypot(dx, dy) < 1e-6:
+    if M.hypot(dx, dy) < 1e-6:
         return math.pi / 2
     ux, uy = presets.DIRECTION_VECTORS[direction]
-    ang = abs(math.atan2(ux * dy - uy * dx, ux * dx + uy * dy))
-    return max(0.0, ang - math.radians(DIRECTION_TOL_DEG))
+    ang = abs(M.atan2(ux * dy - uy * dx, ux * dx + uy * dy))
+    return max(0.0, ang - M.radians(DIRECTION_TOL_DEG))
 
 
 def reach(canvas: Polygon, direction: str) -> float:
@@ -90,7 +91,7 @@ def edge_ok(poly, canvas: Polygon, edge: str, land=None) -> bool:
     if edge == "center":
         w = min(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
         cx, cy = city_center(land)
-        return math.hypot(c.x - cx, c.y - cy) <= 0.25 * w or poly.contains(Point(cx, cy))
+        return M.hypot(c.x - cx, c.y - cy) <= 0.25 * w or poly.contains(Point(cx, cy))
     ux, uy = presets.DIRECTION_VECTORS[edge]
     r = land_reach(land, canvas, edge)
     proj = c.x * ux + c.y * uy
@@ -107,7 +108,7 @@ def edge_score(pos: tuple[float, float], canvas: Polygon, edge: str,
     """0 when a point is well inside the edge zone, growing outside (for the solver)."""
     if edge == "center":
         w = min(canvas.bounds[2] - canvas.bounds[0], canvas.bounds[3] - canvas.bounds[1])
-        return max(0.0, math.hypot(pos[0] - center[0], pos[1] - center[1]) / (0.25 * w) - 0.7)
+        return max(0.0, M.hypot(pos[0] - center[0], pos[1] - center[1]) / (0.25 * w) - 0.7)
     ux, uy = presets.DIRECTION_VECTORS[edge]
     r = reach_m or reach(canvas, edge)
     proj = pos[0] * ux + pos[1] * uy
@@ -183,7 +184,7 @@ def boundary_curvature(samples, window: float = 400.0, kinds=(1, 2)) -> float | 
         i = 0
         while i + w <= n:
             if ok[i:i + w].all():
-                chord = float(np.hypot(*(pts[i + w - 1] - pts[i])))
+                chord = float(M.hypot(*(pts[i + w - 1] - pts[i])))
                 ratios.append((w - 1) * seg / max(chord, 1e-6))
                 i += max(w // 4, 1)
             else:

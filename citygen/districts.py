@@ -27,6 +27,7 @@ import shapely
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import nearest_points, unary_union
 
+from . import dmath as M
 from . import geom as G
 from . import hydro as H
 from . import presets
@@ -181,7 +182,7 @@ def ideal_positions(spec: CitySpec, h: H.Hydro, pool, total: float) -> dict[str,
                 u = np.array(presets.DIRECTION_VECTORS[direction])
                 margin = 0.75 * (radius[a] + radius.get(b, radius[a]))
                 rel = pts[a] - pb
-                along = float(rel @ u)
+                along = M.dot(rel, u)
                 viol = margin - along
                 if viol > 0:
                     moves[a] += u * viol * 0.5
@@ -189,24 +190,24 @@ def ideal_positions(spec: CitySpec, h: H.Hydro, pool, total: float) -> dict[str,
                         moves[b] -= u * viol * 0.5
                 # keep inside the angular sector: damp the sideways part
                 side = rel - along * u
-                lim = max(along, 0) * math.tan(math.radians(R.DIRECTION_TOL_DEG - 15))
-                sn = float(np.linalg.norm(side))
+                lim = max(along, 0) * M.tan(M.radians(R.DIRECTION_TOL_DEG - 15))
+                sn = float(M.norm(side))
                 if sn > lim and sn > 1e-6:
                     moves[a] -= side / sn * (sn - lim) * 0.3
             for ref in pl.adjacent_to:
                 pb, b = pos(ref)
                 if pb is None or b == a:
                     continue
-                gap = np.linalg.norm(pts[a] - pb) - (radius[a] + radius.get(b, radius[a]))
+                gap = M.norm(pts[a] - pb) - (radius[a] + radius.get(b, radius[a]))
                 if gap > 0:
-                    dvec = (pb - pts[a]) / (np.linalg.norm(pb - pts[a]) + 1e-9)
+                    dvec = (pb - pts[a]) / (M.norm(pb - pts[a]) + 1e-9)
                     moves[a] += dvec * gap * 0.3
             if a in targets:
                 moves[a] += (targets[a] - pts[a]) * 0.25
             if pl.coast is not None and coast is not None and not coast.is_empty:
                 p = Point(*pts[a])
                 q = np.array(nearest_points(coast, p)[0].coords[0])
-                dist = np.linalg.norm(pts[a] - q)
+                dist = M.norm(pts[a] - q)
                 if pl.coast and dist > 0.7 * radius[a]:
                     moves[a] += (q - pts[a]) * (1 - 0.7 * radius[a] / dist) * 0.4
                 elif pl.coast is False and dist < 1.5 * radius[a]:
@@ -215,14 +216,14 @@ def ideal_positions(spec: CitySpec, h: H.Hydro, pool, total: float) -> dict[str,
                 if rivers[key].is_empty:
                     continue
                 q = np.array(nearest_points(rivers[key], Point(*pts[a]))[0].coords[0])
-                dist = np.linalg.norm(q - pts[a])
+                dist = M.norm(q - pts[a])
                 if dist > 0.6 * radius[a]:
                     moves[a] += (q - pts[a]) * (1 - 0.6 * radius[a] / dist) * 0.3
         names = list(pts)
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 dvec = pts[a] - pts[b]
-                dist = np.linalg.norm(dvec) + 1e-9
+                dist = M.norm(dvec) + 1e-9
                 want = 0.9 * (radius[a] + radius[b])
                 if dist < want:
                     push = dvec / dist * (want - dist) * 0.25
@@ -238,7 +239,7 @@ def ideal_positions(spec: CitySpec, h: H.Hydro, pool, total: float) -> dict[str,
                     inner = pool.buffer(-0.3 * radius[n])
                     inner_pool[n] = inner if not inner.is_empty else pool
                 pts[n] = np.array(nearest_points(inner_pool[n], p)[0].coords[0])
-    return pts
+    return {n: np.array(G.qpoint(p)) for n, p in pts.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +297,7 @@ def local_ideal(ctx: _Ctx, n: str, k: int) -> np.ndarray:
     coast = ctx.h.coastline
 
     def cost(p):
-        c = 0.3 * float(np.linalg.norm(p - ctx.ideal[n])) / r
+        c = 0.3 * float(M.norm(p - ctx.ideal[n])) / r
         for direction, ref in pl.relations():
             hit = resolve(ctx.spec, ref)
             if hit is None or hit[1] == n:
@@ -341,7 +342,7 @@ def _positions(ctx: _Ctx, assign: dict[str, int]) -> dict[str, np.ndarray]:
             seeds = np.array([local_ideal(ctx, n, k) for n in key[1]], dtype=float)
             for i in range(len(seeds)):
                 for j in range(i):
-                    if np.linalg.norm(seeds[i] - seeds[j]) < 1.0:
+                    if M.norm(seeds[i] - seeds[j]) < 1.0:
                         seeds[i] += np.array([5.0 * (i + 1), -3.0 * (i + 1)])
             minx, miny, maxx, maxy = lm.bounds
             pad = max(maxx - minx, maxy - miny)
@@ -373,7 +374,7 @@ def assignment_cost(ctx: _Ctx, assign: dict[str, int], parts: dict | None = None
     cost = 0.0
     for k, names in by_lm.items():
         want = sum(shares[n] for n in names) * total
-        cost += _add(parts, "area", 25.0 * math.log(max(areas[k], 1.0) / max(want, 1.0)) ** 2)
+        cost += _add(parts, "area", 25.0 * M.log(max(areas[k], 1.0) / max(want, 1.0)) ** 2)
     mean_t = total / max(len(assign), 1)
     for k in ctx.pool:
         if k not in by_lm:
@@ -589,7 +590,7 @@ def partition(lm: Polygon, names: list[str], seeds: dict[str, np.ndarray],
     s = np.array([seeds[k] for k in names], dtype=float)
     for i in range(n):  # separate coincident seeds
         for j in range(i):
-            if np.linalg.norm(s[i] - s[j]) < 1.0:
+            if M.norm(s[i] - s[j]) < 1.0:
                 s[i] += np.array([3.0 * (i + 1), -2.0 * (i + 1)])
     s0 = s.copy()
     t = np.array([targets[k] for k in names], dtype=float)
@@ -632,8 +633,8 @@ def partition(lm: Polygon, names: list[str], seeds: dict[str, np.ndarray],
         t *= lm.area / t.sum()
     _, out, s = best
     for k in names:
-        seeds[k] = s[names.index(k)]
-    return out
+        seeds[k] = np.array(G.qpoint(s[names.index(k)]))
+    return {k: G.qpoly(p) for k, p in out.items()}
 
 
 def _cells(lm: Polygon, names: list[str], s, w, step: float, warp) -> dict[str, object]:
@@ -765,7 +766,7 @@ def separation_lines(spec: CitySpec, h: H.Hydro, lay: Layout) -> list[tuple[str,
     def key(p) -> int:
         """Endpoints within 6 m are one node (boundaries meet at triple points)."""
         for i, q in enumerate(nodes):
-            if math.hypot(p[0] - q[0], p[1] - q[1]) <= 6.0:
+            if M.hypot(p[0] - q[0], p[1] - q[1]) <= 6.0:
                 return i
         nodes.append((p[0], p[1]))
         return len(nodes) - 1
@@ -1032,8 +1033,9 @@ def finalize(spec: CitySpec, h: H.Hydro, lay: Layout) -> None:
     """Add separation channels, rebuild the land, and clip districts to it."""
     seps = add_separation_channels(spec, h, lay)
     if seps:
-        h.bodies += seps
+        h.bodies += H.quantize_bodies(seps)
         H.rebuild_land(h)
+        H.quantize(h)
     land = h.land
     polys = {n: G.polygonal(p.intersection(land)) for n, p in lay.polygons.items()}
     # A district must not straddle landmasses: keep its largest part, hand the rest over.

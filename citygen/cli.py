@@ -152,8 +152,8 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("out", nargs="?")
     sc.set_defaults(func=cmd_spec_schema)
 
-    b = sub.add_parser("build", help="build the city model, checks and preview (M1a2: water, "
-                                     "districts, waterways)")
+    b = sub.add_parser("build", help="build the city model, checks and preview (water, "
+                                     "districts, waterways, primary roads)")
     b.add_argument("spec")
     b.add_argument("out_dir")
     b.add_argument("--dpi", type=int, default=110)
