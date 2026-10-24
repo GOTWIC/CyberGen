@@ -133,6 +133,98 @@ def noise1d(rng: np.random.Generator, wavelength: float, octaves: int = 3,
     return f
 
 
+def noise2d(rng: np.random.Generator, wavelength: float, octaves: int = 2,
+            persistence: float = 0.4):
+    """Smooth fractal 2D value noise f(x, y) in about [-1, 1] (x, y in meters)."""
+    tables = []
+    for o in range(octaves):
+        tables.append((wavelength / (2 ** o), persistence ** o, rng.uniform(-1, 1, (256, 256)),
+                       rng.uniform(0, 256, 2)))
+    norm = sum(a for _, a, _, _ in tables)
+
+    def f(x, y):
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+        out = np.zeros(np.broadcast(x, y).shape)
+        for lam, amp, tab, off in tables:
+            u, v = x / lam + off[0], y / lam + off[1]
+            i, j = np.floor(u).astype(int), np.floor(v).astype(int)
+            fu, fv = u - i, v - j
+            wu, wv = fu * fu * (3 - 2 * fu), fv * fv * (3 - 2 * fv)
+            i0, j0, i1, j1 = i % 256, j % 256, (i + 1) % 256, (j + 1) % 256
+            a = tab[i0, j0] + (tab[i1, j0] - tab[i0, j0]) * wu
+            b = tab[i0, j1] + (tab[i1, j1] - tab[i0, j1]) * wu
+            out += amp * (a + (b - a) * wv)
+        return out / norm
+
+    return f
+
+
+def smoothstep(x):
+    x = np.clip(np.asarray(x, dtype=float), 0.0, 1.0)
+    return x * x * (3 - 2 * x)
+
+
+def bezier(p0, p1, p2, p3, n: int = 200) -> np.ndarray:
+    t = np.linspace(0, 1, n)[:, None]
+    p0, p1, p2, p3 = (np.asarray(p, dtype=float) for p in (p0, p1, p2, p3))
+    return ((1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t * t * p2
+            + t ** 3 * p3)
+
+
+def course(a, b, rng: np.random.Generator, *, wavelength: float, omega: float,
+           base: np.ndarray | None = None, bulge: float = 0.0, step: float = 10.0,
+           ramp: tuple[float, float] = (0.08, 0.08), scale: float = 1.0) -> LineString:
+    """Meandering path from a to b as a sine-generated curve (Langbein and Leopold 1966).
+
+    The heading is theta(s) = base(s) + omega(s) sin(phi(s)): `base` is the heading of an
+    optional curved base path (points from a to b; default the straight chord), `omega` the
+    peak deflection in radians (varied along the path by slow noise between 45% and 100%),
+    and phi a phase with noisy wavelength, so bends differ in size and spacing. The heading is
+    integrated and the result is fitted to a and b by a similarity transform. Below about 2
+    radians a sine-generated curve never crosses itself. `ramp` fades the meander in and out
+    over those fractions of the length; `bulge` bows the whole path sideways (fraction of the
+    chord, + = left); `scale` multiplies omega (used to damp a path back onto the map).
+    """
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    chord = float(np.hypot(*(b - a))) or 1.0
+    ang0 = math.atan2(b[1] - a[1], b[0] - a[0])
+    if base is None:
+        base = np.array([a, b])
+    base = np.asarray(base, dtype=float)
+    seg = np.hypot(*np.diff(base, axis=0).T)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    blen = float(cum[-1]) or chord
+    head = np.unwrap(np.arctan2(*np.diff(base, axis=0).T[::-1]))
+    mids = (cum[:-1] + cum[1:]) / 2 / blen
+    n_amp = noise1d(rng, 1.7 * wavelength, octaves=2)
+    n_ph = noise1d(rng, 1.3 * wavelength, octaves=2)
+    ph0 = rng.uniform(0, 2 * math.pi)
+    length = blen
+    pts = None
+    for _ in range(2):  # second pass: the step that gives the wavelength in final meters
+        n = max(int(length / step), 16)
+        s = (np.arange(n) + 0.5) / n
+        sm = s * length
+        th_base = np.interp(s, mids, head) if len(head) > 1 else np.full(n, head[0])
+        om = omega * scale * (0.45 + 0.55 * (0.5 + 0.5 * np.clip(1.8 * n_amp(sm), -1, 1)))
+        om = om * smoothstep(s / max(ramp[0], 1e-6)) * smoothstep((1 - s) / max(ramp[1], 1e-6))
+        th = th_base + om * np.sin(2 * math.pi * sm / wavelength + ph0 + 4.5 * n_ph(sm))
+        th = th + math.pi * bulge * np.cos(math.pi * s) * 1.2
+        d = np.column_stack([np.cos(th), np.sin(th)]) * (length / n)
+        pts = np.vstack([[0.0, 0.0], np.cumsum(d, axis=0)])
+        span = float(np.hypot(*pts[-1])) or 1.0
+        length = length * chord / span
+    span_ang = math.atan2(pts[-1][1], pts[-1][0])
+    k = chord / (float(np.hypot(*pts[-1])) or 1.0)
+    rot = ang0 - span_ang
+    c, sn = math.cos(rot), math.sin(rot)
+    out = np.column_stack([pts[:, 0] * c - pts[:, 1] * sn, pts[:, 0] * sn + pts[:, 1] * c]) * k
+    out = out + a
+    out[-1] = b
+    return LineString(out)
+
+
 def resample(line: LineString, step: float) -> np.ndarray:
     n = max(2, int(math.ceil(line.length / step)) + 1)
     ds = np.linspace(0, line.length, n)

@@ -6,8 +6,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
-# The M1a build samples: the four M0 cities (specs as adjusted for M1a) and Nyxllor.
-CITIES = sorted((ROOT / "docs" / "progress" / "M1a").glob("*/city_spec.json")) + [
+# The build samples: the four M0 cities (specs as adjusted for M1a and M1a2) and Nyxllor.
+CITIES = sorted((ROOT / "docs" / "progress" / "M1a2").glob("*/city_spec.json")) + [
     ROOT / "cities" / "nyxllor" / "city_spec.json"]
 
 # A small, fast city for build tests: straight coast, one river, one island district.

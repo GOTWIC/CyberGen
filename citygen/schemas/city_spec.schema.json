@@ -1155,18 +1155,7 @@
               "additionalProperties": false,
               "properties": {
                 "edge": {
-                  "enum": [
-                    "north",
-                    "north_east",
-                    "east",
-                    "south_east",
-                    "south",
-                    "south_west",
-                    "west",
-                    "north_west",
-                    "sea",
-                    "bay"
-                  ]
+                  "type": "string"
                 },
                 "at": {
                   "description": "Position along the edge, 0 to 1: west to east on the north and south edges, south to north on the east and west edges; on a diagonal edge 0 is the middle of the first-named side, 0.5 the corner, 1 the middle of the second side. Default 0.5.",
@@ -1182,7 +1171,7 @@
             }
           ],
           "default": "sea",
-          "description": "Mouth: 'sea', 'bay', a map edge direction, or the name of another river (tributary). {edge, at} pins the mouth along a map edge (for 'sea' and 'bay': along the sea-side edge).",
+          "description": "Mouth: 'sea', 'bay', a map edge direction, or the name of another river (tributary). {edge, at} pins the mouth along a map edge (for 'sea' and 'bay': along the sea-side edge; for a tributary: along the parent, 0 = where the parent enters, 1 = its mouth).",
           "title": "To"
         },
         "width_m": {
@@ -1444,6 +1433,14 @@
           ],
           "title": "District Separation",
           "type": "string"
+        },
+        "boundary_water_share": {
+          "default": 0.6,
+          "description": "water_preferred: target share of the boundary between neighboring districts that runs along water (rivers, channels, separation canals). The build adds separation channels, preferring boundaries that already run near water, until the share is reached.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Boundary Water Share",
+          "type": "number"
         },
         "bridges": {
           "$ref": "#/$defs/Bridges"

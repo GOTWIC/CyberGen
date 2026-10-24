@@ -162,10 +162,11 @@ _AT_SCHEMA = {"type": "number", "minimum": 0, "maximum": 1,
                              "corner, 1 the middle of the second side. Default 0.5."}
 
 
-def _end_schema(edges: list[str], plain: dict) -> dict:
+def _end_schema(edges: list[str] | None, plain: dict) -> dict:
+    edge = {"enum": edges} if edges else {"type": "string"}
     return {"anyOf": [plain, {
         "type": "object", "additionalProperties": False, "required": ["edge"],
-        "properties": {"edge": {"enum": edges}, "at": _AT_SCHEMA}}]}
+        "properties": {"edge": edge, "at": _AT_SCHEMA}}]}
 
 
 class River(_Model):
@@ -176,12 +177,12 @@ class River(_Model):
                                                            {"enum": _DIRECTION_LIST}))] = Field(
         alias="from", description="Map edge where the river enters, or {edge, at} to pin where "
                                   "along that edge.")
-    to: Annotated[str, WithJsonSchema(_end_schema(_DIRECTION_LIST + ["sea", "bay"],
-                                                  {"type": "string"}))] = Field(
+    to: Annotated[str, WithJsonSchema(_end_schema(None, {"type": "string"}))] = Field(
         "sea",
         description="Mouth: 'sea', 'bay', a map edge direction, or the name of another river "
                     "(tributary). {edge, at} pins the mouth along a map edge (for 'sea' and "
-                    "'bay': along the sea-side edge).")
+                    "'bay': along the sea-side edge; for a tributary: along the parent, 0 = "
+                    "where the parent enters, 1 = its mouth).")
     # Filled from the {edge, at} forms of `from` and `to`; serialized back into them.
     from_at: SkipJsonSchema[float | None] = Field(None, exclude=True)
     to_at: SkipJsonSchema[float | None] = Field(None, exclude=True)
@@ -234,9 +235,6 @@ class River(_Model):
             raise ValueError(
                 f"{len(self.branch_names)} branch_names given but delta_branches is "
                 f"{self.delta_branches}")
-        if self.to_at is not None and self.to not in _DIRECTION_LIST + ["sea", "bay"]:
-            raise ValueError(f"to.at only applies to a map edge, 'sea' or 'bay', not the "
-                             f"tributary mouth '{self.to}'")
         return self
 
 
@@ -301,6 +299,11 @@ class Water(_Model):
     rivers: list[River] | None = Field(None, description="Left out: one default river.")
     islands: list[Island] = Field(default_factory=list)
     district_separation: Separation = "water_preferred"
+    boundary_water_share: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        0.6, description="water_preferred: target share of the boundary between neighboring "
+                         "districts that runs along water (rivers, channels, separation "
+                         "canals). The build adds separation channels, preferring boundaries "
+                         "that already run near water, until the share is reached.")
     bridges: Bridges = Field(default_factory=Bridges)
 
 

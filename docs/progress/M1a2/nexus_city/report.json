@@ -1,0 +1,244 @@
+{
+  "name": "Nexus City",
+  "seed": 1207,
+  "stage": "M1a2 (water, districts, waterways)",
+  "passed": true,
+  "variant": 11,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "landmass lm06 (0.14 km2) is open land: marsh 'Jade Reach Marsh'",
+        "landmass lm07 (0.08 km2) is open land: marsh 'Temple Cut Marsh'",
+        "landmass lm08 (0.06 km2) is open land: park 'Northridge Park'"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    }
+  ],
+  "stats": {
+    "map_km2": 11.56,
+    "land_km2": 8.458,
+    "district_land_km2": 8.177,
+    "water_share": 0.2683,
+    "sea_share": 0.2011,
+    "landmasses": 8,
+    "landmasses_with_districts": 8,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.281,
+    "open_land": [
+      {
+        "name": "Jade Reach Marsh",
+        "kind": "marsh",
+        "area_km2": 0.137
+      },
+      {
+        "name": "Temple Cut Marsh",
+        "kind": "marsh",
+        "area_km2": 0.079
+      },
+      {
+        "name": "Northridge Park",
+        "kind": "park",
+        "area_km2": 0.065
+      }
+    ],
+    "islands": 1,
+    "river_km": 2.77,
+    "channel_km": {
+      "delta_branch": 2.17,
+      "sea_channel": 3.78,
+      "separation": 3.59
+    },
+    "separation_channels": 5,
+    "waterway_km": 3.79,
+    "waterway_km_by_kind": {
+      "basin": 0.9,
+      "canal": 2.57,
+      "creek": 0.32
+    },
+    "waterways": 8,
+    "quay_km": 7.82,
+    "district_boundary_on_water": 0.6619,
+    "boundary_on_water": 0.5844,
+    "boundary_on_water_target": 0.6,
+    "boundary_km": {
+      "water": 6.07,
+      "land": 4.31
+    },
+    "land_boundary_curvature": 1.0222,
+    "boundary_curvature": 1.0916,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm01",
+        "area_km2": 1.114,
+        "share": 0.1362,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": -0.027
+      },
+      {
+        "id": "d02",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm04",
+        "area_km2": 0.514,
+        "share": 0.0629,
+        "target": 0.07,
+        "target_source": "spec",
+        "error": -0.1018
+      },
+      {
+        "id": "d03",
+        "name": "Aurora Spaceport",
+        "archetype": "spaceport",
+        "landmass": "lm01",
+        "area_km2": 0.798,
+        "share": 0.0976,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0243
+      },
+      {
+        "id": "d04",
+        "name": "Neon Market",
+        "archetype": "entertainment_market",
+        "landmass": "lm03",
+        "area_km2": 0.776,
+        "share": 0.0949,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0506
+      },
+      {
+        "id": "d05",
+        "name": "Northridge",
+        "archetype": "residential_heights",
+        "landmass": "lm01",
+        "area_km2": 0.885,
+        "share": 0.1082,
+        "target": 0.11,
+        "target_source": "spec",
+        "error": -0.0164
+      },
+      {
+        "id": "d06",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm01",
+        "area_km2": 1.21,
+        "share": 0.148,
+        "target": 0.15,
+        "target_source": "spec",
+        "error": -0.0134
+      },
+      {
+        "id": "d07",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm02",
+        "area_km2": 1.214,
+        "share": 0.1485,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0607
+      },
+      {
+        "id": "d08",
+        "name": "Harbor Industrial",
+        "archetype": "industrial_port",
+        "landmass": "lm02",
+        "area_km2": 1.216,
+        "share": 0.1487,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0619
+      },
+      {
+        "id": "d09",
+        "name": "Silver Island",
+        "archetype": "research_campus",
+        "landmass": "lm05",
+        "area_km2": 0.45,
+        "share": 0.055,
+        "target": 0.05,
+        "target_source": "spec",
+        "error": 0.1007
+      }
+    ],
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.25,
+      "preferred_chains": 2,
+      "planned": 0.5886
+    }
+  },
+  "notes": []
+}

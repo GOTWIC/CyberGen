@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 
 from . import __version__
+
+MAX_VARIANTS = 20  # same as citygen.build.MAX_VARIANTS (kept here so `spec` stays light)
 from .validate import Result, SpecError, dump_spec, load_spec
 
 EXIT_OK, EXIT_INVALID, EXIT_USAGE = 0, 1, 2
@@ -150,13 +152,13 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("out", nargs="?")
     sc.set_defaults(func=cmd_spec_schema)
 
-    b = sub.add_parser("build", help="build the city model, checks and preview (M1a: water, "
+    b = sub.add_parser("build", help="build the city model, checks and preview (M1a2: water, "
                                      "districts, waterways)")
     b.add_argument("spec")
     b.add_argument("out_dir")
     b.add_argument("--dpi", type=int, default=110)
-    b.add_argument("--variants", type=int, default=12,
-                   help="hydrology variants to try at most (default 12)")
+    b.add_argument("--variants", type=int, default=MAX_VARIANTS,
+                   help=f"hydrology variants to try at most (default {MAX_VARIANTS})")
     b.set_defaults(func=cmd_build)
 
     model = sub.add_parser("model", help="city model tools")

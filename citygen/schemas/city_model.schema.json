@@ -1100,7 +1100,8 @@
             "pocket_park",
             "promenade",
             "courtyard",
-            "podium_roof"
+            "podium_roof",
+            "marsh"
           ],
           "title": "Kind",
           "type": "string"

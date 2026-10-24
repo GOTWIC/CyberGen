@@ -6,13 +6,16 @@ starts at the district's water frontage (sea, river, channel) or at another wate
 them connect to the network; anything that would end up floating is dropped. District polygons
 keep covering their inner waterways: subtract the waterways for buildable land.
 
-- canal_grid: straight canals on the district grid angle, spacing from density.
-- organic_canals: meandering canals from the frontage inward, some running through to another
-  frontage point, with side branches.
-- creeks: narrower, more meandering dead-end channels with small branches.
+- canal_grid: straight canals on the district grid angle, spacing from density; every canal
+  ends at open water or at a cross canal (no frayed dead ends).
+- organic_canals: smooth meandering canals from the frontage inward with a few side branches,
+  a mostly tree-like network: a canal stops before it comes within 70 m of another one, unless
+  it meets it at 50 degrees or more and closes one of at most two loops per district.
+- creeks: narrower, more meandering dead-end channels with small branches, same spacing rule.
 - inlets: tapering arms of water reaching in from the frontage.
-- harbor_basins: rectangular basins cut into the shore, perpendicular to it.
-- marina: rounded basins at the shore.
+- harbor_basins: a row of parallel rectangular slips cut into the longest straight stretch of
+  deep-water frontage, separated by piers (a port layout).
+- marina: rounded basins just behind the shore, each with a short entrance channel.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ import numpy as np
 import shapely
 from shapely import affinity
 from shapely.geometry import LineString, Point, Polygon
-from shapely.ops import nearest_points, unary_union
+from shapely.ops import nearest_points, substring, unary_union
 
 from . import geom as G
 from . import hydro as H
@@ -118,45 +121,148 @@ def _piece_from(geom, start: Point):
     return best
 
 
-def _canal_grid(d, poly, allowed, density, rng):
+def _canal_grid(d, poly, allowed, density, rng, wet):
+    """Straight canals on the district grid angle. Every canal ends at open water or at a
+    cross canal: dead ends at the land margin are trimmed back to the last junction, so the
+    grid stops cleanly at its quays instead of fraying out."""
     theta = math.radians(d.grid_angle_deg or 0.0)
     spacing = 600.0 - 380.0 * density
     c = poly.centroid
     minx, miny, maxx, maxy = poly.bounds
     reach = math.hypot(maxx - minx, maxy - miny)
-    out = []
-    for k, (ang, sp) in enumerate(((theta, spacing), (theta + math.pi / 2, 2 * spacing))):
+    fams: list[list[LineString]] = []
+    for ang, sp in ((theta, spacing), (theta + math.pi / 2, 2 * spacing)):
         ux, uy = math.cos(ang), math.sin(ang)
         nx, ny = -uy, ux
         phase = rng.uniform(0, sp)
         m = int(reach / sp) + 2
+        fam = []
         for i in range(-m, m + 1):
             off = i * sp + phase
             a = (c.x + nx * off - ux * reach, c.y + ny * off - uy * reach)
             b = (c.x + nx * off + ux * reach, c.y + ny * off + uy * reach)
-            for seg in _lines(LineString([a, b]).intersection(allowed)):
-                if seg.length >= 120:
-                    out.append(("canal_grid", seg, seg.buffer(WIDTH_M["canal_grid"] / 2,
-                                                              cap_style="flat")))
+            fam += [s for s in _lines(LineString([a, b]).intersection(allowed)) if s.length >= 60]
+        fams.append(fam)
+    for _ in range(3):
+        new = []
+        for k, fam in enumerate(fams):
+            cross = unary_union(fams[1 - k]) if fams[1 - k] else LineString()
+            kept = []
+            for seg in fam:
+                anchors = []
+                for end in (0.0, seg.length):
+                    if wet.distance(seg.interpolate(end)) <= 3.0:
+                        anchors.append(end)
+                hit = seg.intersection(cross)
+                anchors += [seg.project(Point(p)) for g in getattr(hit, "geoms", [hit])
+                            for p in getattr(g, "coords", [])]
+                if len(anchors) < 2 and not (anchors and anchors[0] in (0.0, seg.length)
+                                             and wet.distance(seg.interpolate(anchors[0])) <= 3):
+                    continue
+                lo, hi = (min(anchors), max(anchors)) if len(anchors) >= 2 else (0.0, seg.length)
+                if hi - lo >= 100:
+                    kept.append(substring(seg, lo, hi))
+            new.append(kept)
+        fams = new
+    out = []
+    for fam in fams:
+        for seg in fam:
+            seg = _extend_into(seg, wet, 10.0)
+            out.append(("canal_grid", seg, seg.buffer(WIDTH_M["canal_grid"] / 2, cap_style="flat",
+                                                      join_style="mitre")))
     return out
 
 
+def _extend_into(seg: LineString, wet, by: float) -> LineString:
+    """Extend the ends of a straight segment that touch water a little into it."""
+    cs = list(seg.coords)
+    (x0, y0), (x1, y1) = cs[0], cs[-1]
+    ln = seg.length or 1.0
+    ux, uy = (x1 - x0) / ln, (y1 - y0) / ln
+    if wet.distance(Point(cs[0])) <= 3.0:
+        cs[0] = (x0 - ux * by, y0 - uy * by)
+    if wet.distance(Point(cs[-1])) <= 3.0:
+        cs[-1] = (x1 + ux * by, y1 + uy * by)
+    return LineString(cs)
+
+
 def _meander_to(a: Point, b: Point, amp_frac: float, lam: float, rng) -> LineString:
-    length = a.distance(b)
-    nz = G.noise1d(rng, lam, octaves=2)
-
-    def off(ts):
-        ts = np.asarray(ts)
-        return amp_frac * length * nz(ts * length) * np.sin(math.pi * ts)
-
-    return G.wiggle_path((a.x, a.y), (b.x, b.y), off, step=10.0)
+    return G.course((a.x, a.y), (b.x, b.y), rng, wavelength=lam,
+                    omega=min(0.25 + 3.0 * amp_frac, 1.0), step=8.0, ramp=(0.15, 0.15))
 
 
-def _organic(style, d, poly, allowed, frontage, density, rng, avoid):
+def _angle_at(a: LineString, b: LineString, p: Point) -> float:
+    """Acute angle (degrees) between two lines where they meet at p."""
+    def tan(line):
+        d = line.project(p)
+        q0 = line.interpolate(max(d - 15.0, 0.0))
+        q1 = line.interpolate(min(d + 15.0, line.length))
+        return np.array([q1.x - q0.x, q1.y - q0.y])
+    u, v = tan(a), tan(b)
+    nu, nv = np.hypot(*u), np.hypot(*v)
+    if nu < 1e-6 or nv < 1e-6:
+        return 90.0
+    c = abs(float(u @ v)) / (nu * nv)
+    return math.degrees(math.acos(min(c, 1.0)))
+
+
+class _Net:
+    """Accepted canal centerlines of one district: a new canal stops before it comes within
+    `gap` of the network (no near duplicates), unless it meets it steeply enough to close a
+    loop (a few per district)."""
+
+    def __init__(self, gap: float, loops: int):
+        self.lines: list[LineString] = []
+        self.gap = gap
+        self.loops = loops
+        self.shore = None  # the district's water frontage: canals do not run along it
+
+    def fit(self, line: LineString, skip: float, allowed) -> LineString | None:
+        pts = G.resample(line, 8.0)
+        ds = np.linspace(0, line.length, len(pts))
+        sp = shapely.points(pts)
+        if self.shore is not None and not self.shore.is_empty:
+            near_shore = (shapely.distance(self.shore, sp) < 0.8 * self.gap) & (ds > 90.0)
+            if near_shore.any():
+                d = max(float(ds[int(np.argmax(near_shore))]) - 20.0, 0.0)
+                if d < 100.0:
+                    return None
+                line = substring(line, 0, d)
+                pts, ds, sp = pts[ds <= d], ds[ds <= d], sp[ds <= d]
+        if not self.lines:
+            return line
+        net = unary_union(self.lines)
+        dist = shapely.distance(net, sp)
+        close = (dist < self.gap) & (ds > skip)
+        if not close.any():
+            return line
+        i = int(np.argmax(close))
+        if self.loops > 0 and i > 0:
+            # Close a loop if the canal heads into the network steeply.
+            j = min(i + int(self.gap / 8.0) + 2, len(pts) - 1)
+            probe = LineString(pts[:j + 1])
+            hit = probe.intersection(net)
+            if not hit.is_empty:
+                p = nearest_points(hit, Point(pts[0]))[0]
+                d = probe.project(p)
+                other = min(self.lines, key=lambda g: g.distance(p))
+                if _angle_at(probe, other, p) >= 50.0 and d > skip:
+                    self.loops -= 1
+                    return substring(probe, 0, d + 4.0)
+        d = max(float(ds[i]) - self.gap * 0.6, 0.0)
+        return substring(line, 0, d) if d > 0 else None
+
+    def add(self, line: LineString) -> None:
+        self.lines.append(line)
+
+
+def _organic(style, d, poly, allowed, frontage, density, rng, avoid, net: _Net):
+    """A sparse, smooth, mostly tree-like canal network: main canals from the water frontage
+    inward, a few side branches at 50 to 75 degrees, spacing kept by `net`."""
     creek = style == "creeks"
     width = WIDTH_M[style]
     total = sum(f.length for f in frontage)
-    n = int(np.clip(round(density * total / (350.0 if creek else 450.0)), 1, 7 if creek else 6))
+    n = int(np.clip(round(density * total / (380.0 if creek else 420.0)), 1, 6 if creek else 5))
     entries = _entries(frontage, n, rng, avoid)
     inner = poly.buffer(-120)
     if inner.is_empty:
@@ -164,43 +270,43 @@ def _organic(style, d, poly, allowed, frontage, density, rng, avoid):
     if inner.is_empty:
         return []
     out = []
-    minx, miny, maxx, maxy = inner.bounds
     for k, p in enumerate(entries):
         v = _inward(poly, p)
         start = Point(p.x - v[0] * 12, p.y - v[1] * 12)
-        length = rng.uniform(220, 520) if creek else rng.uniform(350, 900)
+        length = rng.uniform(260, 520) if creek else rng.uniform(400, 850)
         target = Point(p.x + v[0] * length, p.y + v[1] * length)
         if not inner.contains(target):
             target = nearest_points(inner, target)[0]
-        through = (not creek) and len(entries) > 1 and rng.uniform() < density
-        if through:
-            other = entries[(k + 1) % len(entries)]
-            line = _meander_to(start, target, 0.12, 260.0, rng)
-            back = _meander_to(target, other, 0.12, 260.0, rng)
-            line = LineString(list(line.coords) + list(back.coords)[1:])
-        else:
-            line = _meander_to(start, target, 0.22 if creek else 0.14, 180.0 if creek else 260.0,
-                               rng)
+        if start.distance(target) < 80:
+            continue
+        line = _meander_to(start, target, 0.16 if creek else 0.1, 200.0 if creek else 320.0,
+                           rng)
         main = _piece_from(line.intersection(allowed.union(start.buffer(14))), start)
+        if main is None:
+            continue
+        main = net.fit(main, 40.0, allowed)
         if main is None or main.length < 100:
             continue
+        net.add(main)
         out.append((style, main, main.buffer(width / 2, cap_style="round")))
-        branches = 2 if creek else 1
-        for j in range(branches):
-            if rng.uniform() > density + 0.2 or main.length < 220:
+        for j in range(2):
+            if rng.uniform() > density + 0.25 or main.length < 260:
                 continue
-            at = main.interpolate(rng.uniform(0.35, 0.75), normalized=True)
+            at = main.interpolate(rng.uniform(0.4, 0.75), normalized=True)
             nxt = main.interpolate(min(main.project(at) + 10, main.length))
             tx, ty = nxt.x - at.x, nxt.y - at.y
             sgn = 1 if (j + k) % 2 == 0 else -1
-            ang = math.atan2(ty, tx) + sgn * math.radians(rng.uniform(45, 75))
-            blen = rng.uniform(120, 260) if creek else rng.uniform(150, 320)
+            ang = math.atan2(ty, tx) + sgn * math.radians(rng.uniform(50, 75))
+            blen = rng.uniform(140, 260) if creek else rng.uniform(180, 340)
             end = Point(at.x + math.cos(ang) * blen, at.y + math.sin(ang) * blen)
-            br = _meander_to(at, end, 0.18, 160.0, rng)
+            br = _meander_to(at, end, 0.12, 180.0, rng)
             br = _piece_from(br.intersection(allowed.union(at.buffer(width))), at)
-            if br is not None and br.length >= 80:
-                bw = width * 0.8
-                out.append((style, br, br.buffer(bw / 2, cap_style="round")))
+            if br is None:
+                continue
+            br = net.fit(br, 45.0, allowed)
+            if br is not None and br.length >= 90:
+                net.add(br)
+                out.append((style, br, br.buffer(width * 0.4, cap_style="round")))
     return out
 
 
@@ -224,41 +330,111 @@ def _inlets(d, poly, allowed, frontage, density, rng, avoid):
     return out
 
 
-def _basins(style, d, poly, allowed, frontage, density, rng, avoid):
-    total = sum(f.length for f in frontage)
-    marina = style == "marina"
-    n = int(np.clip(round(density * total / (900.0 if marina else 600.0)), 1, 2 if marina else 4))
+def _shore_frame(f: LineString, s: float, poly) -> tuple[Point, np.ndarray, np.ndarray]:
+    """Point, unit tangent and unit inland normal of a frontage line at s."""
+    p = f.interpolate(s)
+    a = f.interpolate(max(s - 60.0, 0.0))
+    b = f.interpolate(min(s + 60.0, f.length))
+    t = np.array([b.x - a.x, b.y - a.y])
+    t = t / (np.hypot(*t) or 1.0)
+    n = np.array([-t[1], t[0]])
+    if not poly.contains(Point(p.x + n[0] * 25, p.y + n[1] * 25)):
+        n = -n
+    return p, t, n
+
+
+def _rect(p: Point, axis: np.ndarray, width: float, back: float, depth: float) -> Polygon:
+    """Rectangle across `width`, from `back` meters behind p to `depth` meters along axis."""
+    q = np.array([-axis[1], axis[0]]) * width / 2
+    o = np.array([p.x, p.y])
+    return Polygon([o - axis * back - q, o + axis * depth - q, o + axis * depth + q,
+                    o - axis * back + q])
+
+
+def _harbor(d, poly, allowed, frontage, density, rng, avoid):
+    """Port docks: a row of parallel rectangular slips cut square (or at a common angle) into
+    the longest straight stretch of deep-water frontage, separated by piers, like a real
+    container or break-bulk port."""
+    fronts = sorted([f for f in frontage if f.length >= 300], key=lambda f: -f.length)
     out = []
     taken = Polygon()
-    for p in _entries(frontage, n, rng, avoid, min_len=200.0):
-        v = _inward(poly, p, 120.0)
-        ang = math.atan2(v[1], v[0])
-        if marina:
-            w, depth = rng.uniform(140, 200), rng.uniform(100, 150)
-            shape = affinity.scale(Point(0, 0).buffer(1.0, quad_segs=24), depth, w / 2)
-            shape = shape.intersection(Polygon([(-20, -w), (2 * depth, -w), (2 * depth, w),
-                                                (-20, w)]))
-        else:
-            w, depth = rng.uniform(120, 200), rng.uniform(220, 380)
-            shape = Polygon([(-20, -w / 2), (depth, -w / 2), (depth, w / 2), (-20, w / 2)])
-        for _ in range(4):
-            cand = affinity.translate(affinity.rotate(shape, ang, origin=(0, 0),
-                                                      use_radians=True), p.x, p.y)
-            land_part = cand.intersection(poly)
-            if land_part.area > 0 and \
-                    cand.intersection(allowed).area >= 0.85 * land_part.area and \
-                    (taken.is_empty or cand.distance(taken) > 60):
+    budget = int(np.clip(round(1 + density * 4), 2, 6))
+    for f in fronts[:2]:
+        if budget <= 0:
+            break
+        f = f.simplify(15.0)
+        mid = f.length / 2
+        p, t, n = _shore_frame(f, mid, poly)
+        tilt = math.radians(float(rng.choice([0.0, 0.0, 20.0, -20.0])))
+        axis = np.array([n[0] * math.cos(tilt) - n[1] * math.sin(tilt),
+                         n[0] * math.sin(tilt) + n[1] * math.cos(tilt)])
+        ws, wp = float(rng.uniform(70, 95)), float(rng.uniform(110, 150))
+        depth = float(rng.uniform(240, 360))
+        pitch = ws + wp
+        k = int(min(budget, max(1, (f.length - 2 * 80) // pitch)))
+        s0 = mid - (k - 1) * pitch / 2
+        for i in range(k):
+            s = s0 + i * pitch
+            if s < 40 or s > f.length - 40:
+                continue
+            q, _, nq = _shore_frame(f, s, poly)
+            if float(nq @ n) < 0.8:
+                continue  # the shore turns here; keep the row on the straight stretch
+            dep = depth
+            slip = None
+            for _ in range(5):
+                cand = _rect(q, axis, ws, 30.0, dep)
+                land = cand.intersection(poly)
+                if land.area > 0 and cand.intersection(allowed).area >= 0.97 * land.area and \
+                        (taken.is_empty or cand.distance(taken) > 0.9 * wp):
+                    slip = cand
+                    break
+                dep *= 0.8
+            if slip is None or dep < 120:
+                continue
+            main = G.polygonal(slip.intersection(poly.union(q.buffer(35))))
+            main = G.parts(main)[0] if G.parts(main) else None
+            if main is None or main.area < 6000:
+                continue
+            taken = taken.union(main)
+            line = LineString([(q.x, q.y), (q.x + axis[0] * dep, q.y + axis[1] * dep)])
+            out.append(("harbor_basins", line, main))
+            budget -= 1
+    return out
+
+
+def _marinas(d, poly, allowed, frontage, density, rng, avoid):
+    """Rounded marina basins set just behind the shore, each opening onto the water through
+    a short entrance channel."""
+    fronts = [f for f in frontage if f.length >= 250]
+    total = sum(f.length for f in fronts)
+    n = int(np.clip(round(density * total / 1200.0), 1, 2))
+    out = []
+    taken = Polygon()
+    for p in _entries(fronts, n, rng, avoid, min_len=250.0):
+        f = min(fronts, key=lambda g: g.distance(p))
+        q, t, nrm = _shore_frame(f, f.project(p), poly)
+        for scale in (1.0, 0.8, 0.65):
+            w = float(rng.uniform(170, 230)) * scale
+            dep = float(rng.uniform(120, 160)) * scale
+            c = Point(q.x + nrm[0] * (dep / 2 + 25), q.y + nrm[1] * (dep / 2 + 25))
+            ell = affinity.scale(Point(0, 0).buffer(1.0, quad_segs=24), w / 2, dep / 2)
+            ang = math.degrees(math.atan2(t[1], t[0]))
+            ell = affinity.translate(affinity.rotate(ell, ang, origin=(0, 0)), c.x, c.y)
+            mouth = _rect(q, nrm, 45.0 * scale, 30.0, 40.0)
+            cand = unary_union([ell, mouth])
+            land = cand.intersection(poly)
+            if land.area > 0 and cand.intersection(allowed).area >= 0.95 * land.area and \
+                    (taken.is_empty or cand.distance(taken) > 80):
                 break
-            shape = affinity.scale(shape, 0.8, 0.85, origin=(0, 0))
         else:
             continue
-        cand = G.polygonal(cand.intersection(poly.union(p.buffer(25))))
-        main = G.parts(cand)[0] if G.parts(cand) else None
+        main = G.polygonal(cand.intersection(poly.union(q.buffer(35))))
+        main = G.parts(main)[0] if G.parts(main) else None
         if main is None or main.area < 6000:
             continue
         taken = taken.union(main)
-        line = LineString([(p.x, p.y), (p.x + v[0] * depth * 0.9, p.y + v[1] * depth * 0.9)])
-        out.append((style, line, main))
+        out.append(("marina", LineString([(q.x, q.y), (c.x, c.y)]), main))
     return out
 
 
@@ -295,15 +471,25 @@ def build_waterways(spec: CitySpec, h: H.Hydro, polygons: dict[str, object],
         wide = wide_water.buffer(2.0)
         wide_front = [f for f in _lines(poly.boundary.intersection(wide)) if f.length > 20]
         cands = []
+        canals = _Net(70.0, 2)
+        canals.shore = unary_union(frontage)
         for style in ww.style:
             if style == "canal_grid":
-                cands += _canal_grid(d, poly, allowed, density, rng)
+                # The map border is not a quay: a canal stopping there is a dead end.
+                grid = _canal_grid(d, poly, allowed, density, rng,
+                                   wet.difference(h.canvas.exterior.buffer(8.0)))
+                cands += grid
+                for _, line, _ in grid:
+                    canals.add(line)
             elif style in ("organic_canals", "creeks"):
-                cands += _organic(style, d, poly, allowed, frontage, density, rng, land_edge)
+                cands += _organic(style, d, poly, allowed, frontage, density, rng, land_edge,
+                                  canals)
             elif style == "inlets":
                 cands += _inlets(d, poly, allowed, frontage, density, rng, land_edge)
+            elif style == "marina":
+                cands += _marinas(d, poly, allowed, wide_front, density, rng, land_edge)
             else:
-                cands += _basins(style, d, poly, allowed, wide_front, density, rng, land_edge)
+                cands += _harbor(d, poly, allowed, wide_front, density, rng, land_edge)
         cands = [(s, line, G.clean(G.polygonal(p.intersection(poly.buffer(30)))))
                  for s, line, p in cands]
         cands = [c for c in cands if not c[2].is_empty]

@@ -1,0 +1,38 @@
+citygen build report: Nexus City (seed 1207, M1a2 (water, districts, waterways))
+result: PASS  (hydrology variant 11)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+  [pass] land_use: Every landmass holds a district or is named open land (marsh, park); no orphan wedges
+         note: landmass lm06 (0.14 km2) is open land: marsh 'Jade Reach Marsh'
+         note: landmass lm07 (0.08 km2) is open land: marsh 'Temple Cut Marsh'
+         note: landmass lm08 (0.06 km2) is open land: park 'Northridge Park'
+  [pass] canal_quality: Canals and creeks: no crossings below 30 deg, no near-duplicate canals
+
+stats:
+  map 11.56 km2, land 8.458 km2 (districts 8.177 km2, unassigned 0.0 km2)
+  water share 26.8% (sea 20.1%)
+  landmasses 8 (8 with districts), islands 1
+  rivers 2.77 km; channels delta_branch 2.17 km, sea_channel 3.78 km, separation 3.59 km
+  separation channels 5; boundary between districts on water 58% (target 60%), 6.07 km on water, 4.31 km on land
+  district perimeter facing water 66%; boundary curvature (arc / chord over 400 m) 1.0916, land boundaries 1.0222
+  open land 0.281 km2; marsh 'Jade Reach Marsh' 0.137 km2; marsh 'Temple Cut Marsh' 0.079 km2; park 'Northridge Park' 0.065 km2
+  inner waterways 8 (3.79 km: basin 0.9, canal 2.57, creek 0.32), quays 7.82 km
+
+  district                     archetype              landmass  km2    share  target  error
+  Corporate Core               corporate_core         lm01      1.114  0.136  0.140   -2.7%  (spec)
+  Transit Nexus                transit_hub            lm04      0.514  0.063  0.070  -10.2%  (spec)
+  Aurora Spaceport             spaceport              lm01      0.798  0.098  0.100   -2.4%  (spec)
+  Neon Market                  entertainment_market   lm03      0.776  0.095  0.100   -5.1%  (spec)
+  Northridge                   residential_heights    lm01      0.885  0.108  0.110   -1.6%  (spec)
+  Midtown                      midtown_mixed          lm01      1.210  0.148  0.150   -1.3%  (spec)
+  Old Town                     old_town               lm02      1.214  0.148  0.140   +6.1%  (spec)
+  Harbor Industrial            industrial_port        lm02      1.216  0.149  0.140   +6.2%  (spec)
+  Silver Island                research_campus        lm05      0.450  0.055  0.050  +10.1%  (spec)
