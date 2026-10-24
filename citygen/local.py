@@ -183,6 +183,14 @@ def _path_along_roads(W: JN.WalkGraph, island: list, main: list, segments: list)
     return True
 
 
+def _dedupe(notes: list[str]) -> list[str]:
+    """Repeated notes once each, in first-seen order, with a count."""
+    n: dict = {}
+    for t in notes:
+        n[t] = n.get(t, 0) + 1
+    return [t if k == 1 else f"{t} ({k} times)" for t, k in n.items()]
+
+
 def build_local(spec, b, did: dict, mapper=None) -> Local:
     with G.canonical():
         return _build_local(spec, b, did, mapper)
@@ -197,7 +205,7 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])
     T.stage("lanes", jx["lanes"])
     blk = BK.build_blocks(spec, net.builder, net, jx, mapper)
-    out = Local(notes=list(net.notes) + list(blk["notes"]))
+    out = Local(notes=_dedupe(list(net.notes) + list(blk["notes"])))
     P = G.to_model_poly
     # open space (named places first, then by district)
     k_by: dict = {}

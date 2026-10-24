@@ -1798,7 +1798,9 @@ def link_dead_ends(B: Builder) -> None:
         ln = B.lines[li]
         if ln.dead or ln.cls == "footbridge":
             continue
+        # grid dead ends run on to the next road; port and spaceport stubs stay as yard spurs
         grid = ln.district is not None and not style_of(B.arch[ln.district]).organic and \
+            B.arch[ln.district] not in ("industrial_port", "spaceport") and \
             ln.role.startswith(("grid", "infill"))
         for k, end in ((0, 0), (1, -1)):
             if not ln.attached[k]:

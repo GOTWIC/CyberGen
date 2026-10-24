@@ -808,7 +808,7 @@ def stats(spec: CitySpec, m: CityModel, g: _Geo) -> dict:
     unassigned = [lm for lm in m.landmasses if not lm.district_ids and lm.id not in open_lm]
     open_rows = [{"name": o.name, "kind": o.kind,
                   "area_km2": round(G.from_model_poly(o.polygon).area / 1e6, 3)}
-                 for o in m.open_spaces]
+                 for o in m.open_spaces if not o.attrs.get("m2")]  # M2 parks are in stats["local"]
     samples = R.boundary_samples(g.districts, g.network, g.canvas)
     b_wet = sum(float((k == 2).sum()) * seg for _, seg, k in samples)
     b_dry = sum(float((k == 1).sum()) * seg for _, seg, k in samples)
