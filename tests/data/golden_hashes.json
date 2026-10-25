@@ -1,5 +1,5 @@
 {
-  "about": "sha256 of each sample city's city_model.json (citygen build output, M3p: M3 buildings, skybridges and megasites after the polish pass). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p). tests/test_roads.py asserts them on every run.",
+  "about": "sha256 of each sample city's city_model.json (citygen build output, M3p: M3 buildings, skybridges and megasites after the polish pass). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
   "produced_on": {
     "machine": "x86_64",
     "system": "Linux",
@@ -14,5 +14,12 @@
     "nexus_city": "efbd3ddc9d971b1a96ba510223235b908ec472db048f440dcafc337179a8a76b",
     "nyxllor": "b560152efa4cff7e00819d6097db499a5ca18775aa303007528e2324d1178a25",
     "peninsula_city": "181ee3aa143098d0acddb29a6885dc1d53c4ffb5dab94eff7d0dd92c4e2afb00"
+  },
+  "blockout_plans": {
+    "archipelago_free_port": "b34c7dd2399651e62259af255cd16d3602982db38fbf73ddb063393b2d2c706e",
+    "delta_megacity": "191ab9a1ffad4aa87f7e1748fabe6492d801b2b5cd030d221cf390455b3d8d4b",
+    "nexus_city": "d615a36530d4887a4e6634dc0278bf7ca23aa1580b9b9ebe6af4e2ce46bc65c1",
+    "nyxllor": "4bb5c6a3ed27072cfc777f2d59de358bbf7d9ff59bec05a75f9ebec8de715605",
+    "peninsula_city": "875595f11c1c1e232b2577f66a6ed06e19ebcc5c4a012a8142a41b8aa553c256"
   }
 }
