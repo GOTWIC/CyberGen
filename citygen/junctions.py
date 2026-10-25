@@ -385,6 +385,11 @@ def build_lanes(net, legs: dict, cut: dict) -> list[dict]:
         specs = []
         if shared:
             specs = [(True, 0, 0.0), (False, 0, 0.0)]
+        elif s.get("one_way") and cs["lanes_backward"] == 0:
+            # M7 ramps: one-way lanes centered on the road
+            n_f = cs["lanes_forward"]
+            for i in range(n_f):
+                specs.append((True, i, (n_f / 2 - (i + 0.5)) * lw))
         else:
             for i in range(cs["lanes_forward"]):
                 specs.append((True, i, -(med / 2 + (i + 0.5) * lw)))

@@ -116,7 +116,9 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
   district/island/place/megasite/`<direction>_exit`, optional `crosses`).
 
 **Highways** (`highways`): `pattern` (`ring`, `ring_plus_spine`, `spine`, `grid`, `radial`,
-`coastal`, `none`), `exits` (default: land edges), `elevated_share`, `named` routes.
+`coastal`, `none`), `exits` (default: land edges), `elevated_share` (the share of highway
+length lifted onto viaducts, M7: the densest stretches with room for ramps go up first),
+`named` routes.
 
 **Districts** (`districts`, usually 6 to 10). Each needs `name` and `archetype`:
 
@@ -311,14 +313,20 @@ errors).
    shrubs out of lanes, crosswalks, junctions, buildings, water, entrances and the sidewalk
    clear path, nothing on the ground overlapping, tree crowns 1 m from facades and 1 m under
    decks, trunks off junction sight lines and station stairs, street or wall lights within
-   25 m of 85% of every district's sidewalks, plants in every park, boats afloat. The stats
+   25 m of 85% of every district's sidewalks, plants in every park, boats afloat. M7 checks:
+   every road at most 6% steep, every road meeting its nodes at their height, 5.5 m clear
+   under a deck where roads cross without a node (3 m over a pedestrian street), every ramp
+   one-way from a viaduct deck to a ground road, columns under every raised deck over land at
+   most 60 m apart and out of lanes, roads, buildings, water and transit structures. The stats
    give the boundary between districts on water (against the target),
    road km by class, bridges by class, named bridges and exits, and for M2 junctions by type,
    crosswalks, lanes, walkways, blocks, lots, the lot size distribution per archetype and the
    open space share per district, and for M3 buildings by type, heights, coverage and floor
    area per district, skybridges, units, roof items, landmarks and megasite contents, and for
    M5 transit km by mode, stations by kind, supports, tower portals and the buildings removed
-   for the lines, and for M6 props and plants by kind, lawns and hedges.
+   for the lines, for M6 props and plants by kind, lawns and hedges, and for M7 viaduct km,
+   runs, ramps, interchanges by template, overpasses, the highest deck, other raised roads,
+   underpass streets and road columns.
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
    where asked, land left without a district (hatched) only where the prompt allows it, open
@@ -359,6 +367,12 @@ errors).
    line the wide sidewalks and medians, parks should have clusters with clearings, old towns
    wall lights, awnings and cables; density follows each district's `greenery`, `grime` and
    `neon` (set them per district to change it).
+4d. Open `preview_elevated.png` (M7): every raised road colored by deck height, the
+   interchanges labeled (D diamond, T tee stub, B direct branch, O overpass), columns,
+   underpass streets, an interchange inset and the profile of one viaduct. Viaducts should
+   run through the dense districts with ramps down to the avenues; the notes list ramps and
+   underpass streets that could not be built. More viaduct: raise `highways.elevated_share`;
+   none: set it to 0.
 5. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass

@@ -324,6 +324,9 @@ def _merge_small_(lots: list, splitter: Splitter) -> list:
     return lots
 
 
+OVERSIZE = 1.55    # lots above this many times the archetype maximum stay open (M7)
+
+
 def subdivide(block, st: ST.Style, front_geom, rng) -> tuple[list, object]:
     """Lots of one block, and its courtyard (or an empty polygon)."""
     sp = Splitter(st, front_geom, rng)
@@ -340,6 +343,14 @@ def subdivide(block, st: ST.Style, front_geom, rng) -> tuple[list, object]:
     for part in G.parts(body):
         lots += sp.split(part)
     lots = _merge_small(lots, sp)
+    # a remnant no cut could split (its street is a viaduct or an approach): landscaped
+    keep = []
+    for p in lots:
+        if G.area1(p) > OVERSIZE * st.lot_area[1]:
+            sp.courts.append(p)
+        else:
+            keep.append(p)
+    lots = keep
     if sp.courts:
         court = G.union([court] + sp.courts) if not court.is_empty else G.union(sp.courts)
     return lots, court
@@ -874,9 +885,14 @@ def _probe_shared(cx: Ctx) -> dict:
     cwl = [LineString(cw["line"]) for cw in cx.J["crosswalks"]]
     cwp = [G.qpoly(ln.buffer(cw["width_m"] / 2.0, cap_style="flat", join_style="mitre"))
            for ln, cw in zip(cwl, cx.J["crosswalks"])]
+    swl = [LineString(w["line"]) for w in cx.J["sidewalks"]]
+    swp = list(G.snap_many(shapely.buffer(
+        np.array(swl, dtype=object), np.array([w["width_m"] / 2.0 for w in cx.J["sidewalks"]]),
+        cap_style="flat", join_style="mitre"))) if swl else []
     return {"lines": lines, "ltree": shapely.STRtree(lines), "jpolys": jpolys,
             "jtree": shapely.STRtree(jpolys) if jpolys else None, "cwp": cwp,
-            "cwtree": shapely.STRtree(cwl) if cwl else None}
+            "cwtree": shapely.STRtree(cwl) if cwl else None, "swp": swp,
+            "swtree": shapely.STRtree(swp) if swp else None}
 
 
 def _probe_ctx(cx: Ctx, d, did: str, out: dict, shared: dict):
@@ -891,15 +907,18 @@ def _probe_ctx(cx: Ctx, d, did: str, out: dict, shared: dict):
     roads = []
     for k in sorted(int(i) for i in shared["ltree"].query(zone, predicate="intersects")):
         sg = cx.net.segments[k]
-        zmax = max((z["z"] for z in sg["z_profile"]), default=0.0) \
-            if isinstance(sg["z_profile"], list) else 0.0
+        prof = tuple((float(z["s"]), float(z["z"])) for z in sg["z_profile"]) \
+            if isinstance(sg["z_profile"], list) else ()
         roads.append((sg["id"], sg["road_class"], [tuple(p) for p in sg["centerline"]],
-                      sg["width_m"], float(zmax)))
+                      sg["width_m"], prof))
     jt, ct = shared["jtree"], shared["cwtree"]
     junctions = [shared["jpolys"][int(i)]
                  for i in sorted(jt.query(zone, predicate="intersects"))] if jt else []
     junctions += [shared["cwp"][int(i)]
                   for i in sorted(ct.query(zone, predicate="intersects"))] if ct else []
+    st_ = shared["swtree"]
+    junctions += [shared["swp"][int(i)]
+                  for i in sorted(st_.query(zone, predicate="intersects"))] if st_ else []
     junctions += [o["polygon"] for o in out["open"] if o.get("district_id") == did and
                   o["polygon"].geom_type == "Polygon"]
     water = []

@@ -6,9 +6,11 @@ import re
 import xml.etree.ElementTree as ET
 
 import pytest
+from shapely.geometry import Polygon
 
 from citygen import blockout as BO
 from citygen import exports as X
+from citygen import geom as G
 from citygen.build import build_city
 from citygen.validate import validate_spec
 
@@ -191,8 +193,10 @@ def test_map_svg_reads_in_the_traced_map_pipeline(small, tmp_path):
     assert proc.returncode == 0, proc.stderr
     line = next(x for x in proc.stdout.splitlines() if x.startswith("{"))
     stats = json.loads(line[:line.rindex("}") + 1])
-    # it skips footprints under 4 m2 (kiosks), nothing else
-    want = sum(1 for b in small.buildings if b.footprint is not None)
+    # it skips footprints under 4 m2 (kiosks), nothing else; it reads a courtyard ring as an
+    # outline of its own
+    want = sum(1 + sum(1 for h in b.footprint.holes if G.area(Polygon(h)) >= 4.0)
+               for b in small.buildings if b.footprint is not None)
     assert 0.99 * want <= stats["buildings"] <= want
     geo = json.loads((tmp_path / "legacy" / "geometry.json").read_text())
     assert sum(1 for b in geo["buildings"] if b.get("height_source") == "label") == \

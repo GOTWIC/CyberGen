@@ -12,6 +12,7 @@ import pytest
 import shapely
 
 from citygen import checks as C
+from citygen import geom as G
 from citygen import transit as TR
 from citygen.build import build_city
 from citygen.model import CityModel
@@ -109,7 +110,7 @@ def test_report_has_transit_stats(lines):
     assert set(st["by_mode"]) == {"metro", "elevated_rail", "sky_tube"}
     assert st["km"] > 1.0 and st["supports"] > 0
     rep = lines.report()
-    assert rep["stage"].startswith("M6") and "transit" in rep["stage"]
+    assert rep["stage"].startswith("M7") and "transit" in rep["stage"]
     assert "transit" in C.report_text(rep)
 
 
@@ -144,10 +145,12 @@ def test_check_altitude_fails(lines):
 def test_check_clearance_fails(lines):
     def fn(d):
         t = _line(d, "sky_tube")
-        b = next(b for b in d["buildings"] if b["portals"])
-        b["portals"] = []
-        for p in t["path"]:
-            p[2] = 60.0
+        for b in d["buildings"]:
+            b["portals"] = []
+        # a vertex of the tube in the tallest building, under its roof
+        b = max(d["buildings"], key=lambda b: (b["height_m"], b["id"]))
+        x, y = G.from_model_poly(b["masses"][0]["footprint"]).representative_point().coords[0]
+        t["path"][len(t["path"]) // 2] = [x, y, b["height_m"] / 2.0]
     assert not _rerun(_mutate(lines.model, fn))["transit_clearance"].passed
 
 

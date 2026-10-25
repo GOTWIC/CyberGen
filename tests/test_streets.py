@@ -95,7 +95,7 @@ def test_new_checks_pass(small, small2):
                 "lot_block_sizes", "lot_slivers", "sidewalk_clear_path", "crosswalks",
                 "junction_placement", "junction_angles", "street_duplicates",
                 "open_space_share", "places_built"} <= ids
-        assert len(b.checks) == 50  # 31 to M2, 13 M3, 6 M6 (no transit lines)
+        assert len(b.checks) == 55  # 31 to M2, 13 M3, 6 M6, 5 M7 (no transit lines)
 
 
 # --- street patterns by archetype ------------------------------------------------------

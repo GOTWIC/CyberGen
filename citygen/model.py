@@ -211,8 +211,10 @@ class RoadSegment(Entity):
     centerline: Line2
     level: int = 0
     z_profile: list[ZSample] = Field(
-        default_factory=list, description="Placeholder until M7: ground, bridge ramps at 6%, "
-                                          "deck z over water.")
+        default_factory=list, description="Road surface height (top of the deck) along the "
+                                          "centerline: viaducts, ramps, bridge approaches at "
+                                          "5.5%, streets ramping to raised junctions; at most "
+                                          "6% steep.")
     cross_section: CrossSection
     one_way: bool = False
     bridge: bool = False

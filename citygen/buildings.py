@@ -46,6 +46,7 @@ DOOR_RANK = {"avenue": 0, "street": 1, "pedestrian": 2, "alley": 3, "service": 4
              "footbridge": 5, "highway": 9}
 SERVICE_CLASSES = ("alley", "service")
 ANCILLARY = ("parking_structure",)
+MIN_HOLE_M2 = 20.0              # a hole in a ground footprint smaller than this is a gap
 ROAD_CLEARANCE_M = 5.5
 UNIT_MIN_M, UNIT_MAX_M = 4.0, 12.0
 FACADE_TOL_M = 4.6   # a facade faces a frontage up to setback + this (front fits step back 4 m)
@@ -492,10 +493,13 @@ class Bld:
         polys = [p for p, z0, _, _, _ in self.masses if z0 <= 0.0]
         if not polys:
             return Polygon()
-        if len(polys) == 1:
-            return polys[0]
-        ps = G.parts(G.union(polys))
-        return ps[0] if ps else Polygon()
+        ps = polys if len(polys) == 1 else G.parts(G.union(polys))
+        if not ps:
+            return Polygon()
+        # a gap left in or between masses is no courtyard
+        holes = [h for h in ps[0].interiors if G.area(Polygon(h)) >= MIN_HOLE_M2]
+        return ps[0] if len(holes) == len(ps[0].interiors) else \
+            G.qpoly(Polygon(ps[0].exterior, holes))
 
     def top(self):
         """Roof of the tallest prism mass: (polygon, z)."""

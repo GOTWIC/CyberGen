@@ -33,7 +33,8 @@ import time
 from pathlib import Path
 
 import shapely
-from shapely.geometry import LineString, Point, box
+import shapely.ops
+from shapely.geometry import LineString, Point, Polygon, box
 
 from . import dmath as M
 from . import geom as G
@@ -55,6 +56,7 @@ Z_CROSSWALK = 0.07
 Z_OPEN = 0.1
 CURB_M = 0.15
 DECK_M = 1.2           # bridge and elevated deck thickness
+EMBANKMENT_M = 3.0     # a raised street no higher than this is drawn as a solid embankment
 PIER_STEP_M = 40.0
 
 ROAD_COLORS = {"highway": "#2c3038", "avenue": "#353a44", "street": "#3b404b",
@@ -63,7 +65,8 @@ ROAD_COLORS = {"highway": "#2c3038", "avenue": "#353a44", "street": "#3b404b",
 MATERIALS = {
     "sea": SEA, "water": RIVER, "ground": LAND, "lot": "#2c3140",
     "junction": ROAD, "crosswalk": "#c9ccd2", "sidewalk": "#8d929c", "quay": "#9a9384",
-    "bridge_deck": "#5e636e", "pier": "#6c717c", "landmark": "#eef0f4",
+    "bridge_deck": "#5e636e", "pier": "#6c717c", "embankment": "#6a6f79",
+    "road_support": "#767b86", "landmark": "#eef0f4",
     "bld_accent": "#c8ccd6", "bld_deck": "#7a7f8a", "roof_item": "#8f949e",
     "skybridge": SKYBRIDGE, "green_roof": "#4f8a55", "canopy": "#9fb0c4",
     "site_default": "#b0b6c0", "rail": "#8a7a6a",
@@ -219,6 +222,16 @@ class _Plan:
             shapely.prepare(p)
         self.dpolys = dpolys
         self.city = m.name
+        wet = [G.from_model_poly(w.polygon) for w in m.waterways]
+        wet += [G.from_model_poly(r.polygon) for r in m.rivers]
+        wet += [G.from_model_poly(c.polygon) for c in m.channels]
+        wet += [G.from_model_poly(p) for sea in m.seas for p in sea.polygons]
+        self.wet = G.union(wet) if wet else Polygon()
+        shapely.prepare(self.wet)
+
+    def wet_at(self, x: float, y: float) -> bool:
+        """Over the water (bridge piers stand there; road columns over land)."""
+        return bool(shapely.contains_xy(self.wet, x, y)) if not self.wet.is_empty else False
 
     # -- placement helpers ----------------------------------------------------------------
 
@@ -324,25 +337,36 @@ def _streets(P: _Plan) -> None:
             continue
         mid = pts[len(pts) // 2]
         if raised or s.bridge:
-            # a deck with its own object: thickness, and piers down to the water or ground
-            cat = "bridge"
-            part = {"k": "ribbon", "m": "bridge_deck", "l": r[0], "rr": r[1], "t": DECK_M}
+            # a deck with its own object: thickness, and piers down to the water (M7: the
+            # columns over land are model structures); a low raised street (a ramp up to a
+            # raised junction, an approach's foot) is a solid embankment
+            elev = bool(s.attrs.get("elevated")) or s.attrs.get("role") == "ramp"
+            low = not elev and not s.bridge and max(zs) <= EMBANKMENT_M
+            cat = "elevated" if elev else ("embankment" if low else "bridge")
+            t_deck = q(max(zs) + 0.3) if low else DECK_M
+            part = {"k": "ribbon", "m": "embankment" if low else "bridge_deck", "l": r[0],
+                    "rr": r[1], "t": t_deck}
             road = {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
                     "t": 0.0}
             t = tile_key(*mid)
-            parts = [part, road] + _piers(_dedupe(pts), zs)
-            P.add(f"{s.id}.deck", P.collection(did, "Waterfront"), t, cat, parts,
+            parts = [part, road] + ([] if low else _piers(_dedupe(pts), zs, P.wet_at))
+            P.add(f"{s.id}.deck", P.collection(did, "Elevated" if elev else "Waterfront"), t,
+                  cat, parts,
                   {"citygen_id": s.id, "citygen_type": s.type, "road_class": s.road_class,
-                   "name": s.name or "", "clearance_m": s.clearance_m or 0.0})
+                   "name": s.name or "", "clearance_m": s.clearance_m or 0.0,
+                   "level": s.level})
             continue
         P.join(did, f"road_{s.road_class}", mid[0], mid[1],
                {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1], "t": 0.0},
                s.id)
+    nz = {n.id: n.position[2] for n in m.road_nodes}
     for j in m.junctions:
         ext, holes = _poly_rings(j.polygon)
         cx, cy = _center(ext)
+        # (M7: a junction on a viaduct or an approach sits at its node's height)
         P.join(P.district_at(cx, cy), "junction", cx, cy,
-               {"k": "flat", "m": "junction", "z": Z_JUNCTION, "r": ext, "h": holes}, j.id)
+               {"k": "flat", "m": "junction", "z": q(Z_JUNCTION + nz.get(j.node_id, 0.0)),
+                "r": ext, "h": holes}, j.id)
     for c in m.crosswalks:
         r = ribbon(c.line, c.width_m, z=Z_CROSSWALK)
         if r is None:
@@ -359,8 +383,9 @@ def _streets(P: _Plan) -> None:
                {"k": "ribbon", "m": "sidewalk", "l": r[0], "rr": r[1], "t": CURB_M}, w.id)
 
 
-def _piers(pts, zs) -> list[dict]:
-    """Square piers every PIER_STEP_M under a raised deck (from below the water line)."""
+def _piers(pts, zs, wet_at=None) -> list[dict]:
+    """Square piers every PIER_STEP_M under a raised deck over the water (from below the
+    water line); over land the road columns of the model carry it (M7)."""
     out = []
     acc, nxt = 0.0, PIER_STEP_M / 2.0
     for i, (a, b) in enumerate(zip(pts, pts[1:])):
@@ -368,8 +393,8 @@ def _piers(pts, zs) -> list[dict]:
         while L > 0 and acc + L >= nxt:
             f = (nxt - acc) / L
             z = zs[i] + (zs[i + 1] - zs[i]) * f
-            if z > DECK_M + 1.0:
-                x, y = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+            x, y = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+            if z > DECK_M + 1.0 and (wet_at is None or wet_at(x, y)):
                 out.append({"k": "box", "m": "pier", "c": [q(x), q(y), Z_SEA],
                             "d": [2.0, 2.0, q(z - DECK_M - Z_SEA)], "yaw": 0.0})
             nxt += PIER_STEP_M
@@ -501,7 +526,8 @@ def _sites(P: _Plan) -> None:
         if s.footprint is not None:
             mat = ("canopy" if s.kind == "canopy" else "transit_support"
                    if s.kind in ("column", "pylon") and transit else
-                   "transit_deck" if transit else "bld_deck")
+                   "transit_deck" if transit else
+                   "road_support" if a.get("road_id") else "bld_deck")
             ext, holes = _poly_rings(s.footprint)
             parts.append({"k": "prism", "m": mat, "z0": q(s.z0_m),
                           "z1": q(max(s.z1_m, s.z0_m + 0.3)), "r": ext, "h": holes,
@@ -518,7 +544,8 @@ def _sites(P: _Plan) -> None:
             continue
         pts = parts[0].get("r") or parts[0].get("l")
         cx, cy = _center(pts)
-        P.add(s.id, P.collection(P.district_at(cx, cy), "Transit" if transit else "Structures"),
+        P.add(s.id, P.collection(P.district_at(cx, cy), "Transit" if transit else
+                                 "Elevated" if a.get("road_id") else "Structures"),
               tile_key(cx, cy), f"structure_{s.kind}", parts,
               {"citygen_id": s.id, "citygen_type": s.type, "line_id": a.get("line_id", ""),
                "station_id": a.get("station", "")})
@@ -719,6 +746,9 @@ def _street_views(P: _Plan, n: int = 4) -> list[dict]:
                               "eye": [q(p[0]), q(p[1]), 1.7],
                               "target": [q(c[0]), q(c[1]), q(tz)], "lens_mm": 28})
                 break
+    v = _viaduct_view(m, roads, tree, foot)
+    if v is not None:
+        views.append({**v, "name": f"view_{len(views) + 1}_{v['name']}"})
     dense = [d.id for d in m.districts if d.archetype in ("old_town", "entertainment_market")]
     for did in dense[:1]:
         cand = [s for s in roads if did in s.district_ids and len(s.centerline) >= 2]
@@ -733,6 +763,86 @@ def _street_views(P: _Plan, n: int = 4) -> list[dict]:
                           "eye": [q(a[0]), q(a[1]), 1.7], "target": [q(tgt[0]), q(tgt[1]), 6.0],
                           "lens_mm": 28})
     return views
+
+
+def _viaduct_view(m, roads, tree, foot) -> dict | None:
+    """M7: from a ground road 70 to 140 m off the longest viaduct, looking at its deck where it
+    is at least 8 m up and no building or tree crown blocks the view."""
+    el = sorted((s for s in m.road_segments if s.attrs.get("elevated")),
+                key=lambda s: (-s.attrs.get("length_m", 0.0), s.id))
+    if not el or not roads:
+        return None
+    gl = [LineString(s.centerline) for s in roads]
+    gtree = shapely.STRtree(gl)
+    plants = [p for p in m.plants if p.position[2] <= 0.5]
+    ptree = shapely.STRtree([Point(p.position[0], p.position[1]) for p in plants]) \
+        if plants else None
+    # (no deck over the eye or right beside it)
+    up = [LineString(s.centerline) for s in m.road_segments
+          if any(z.z > 0.5 for z in s.z_profile)]
+    utree = shapely.STRtree(up) if up else None
+    for s in el[:3]:
+        line = LineString(s.centerline)
+        prof = [(z.s, z.z) for z in s.z_profile]
+        L = line.length
+        for f in (0.5, 0.4, 0.6, 0.3, 0.7):
+            d = f * L
+            zs = [z for s_, z in prof]
+            # deck height at d (linear in the profile)
+            z = zs[0]
+            for (s0, z0), (s1, z1) in zip(prof, prof[1:]):
+                if s0 <= d <= s1:
+                    z = z0 + (z1 - z0) * (d - s0) / (s1 - s0 or 1.0)
+                    break
+            if z < 8.0:
+                continue
+            a, b = line.interpolate(max(d - 5.0, 0.0)), line.interpolate(min(d + 5.0, L))
+            n = _dist((a.x, a.y), (b.x, b.y)) or 1.0
+            ux, uy = (b.x - a.x) / n, (b.y - a.y) / n
+            p = line.interpolate(d)
+            for side in (1.0, -1.0):
+                for off in (100.0, 80.0, 130.0):
+                    want = Point(p.x - uy * off * side, p.y + ux * off * side)
+                    best = None
+                    for i in sorted(gtree.query(want, predicate="dwithin", distance=30.0)
+                                    .tolist()):
+                        e = shapely.ops.nearest_points(gl[i], want)[0]
+                        k = (round(e.distance(want), 2), roads[i].id)
+                        if best is None or k < best[0]:
+                            best = (k, (q(e.x), q(e.y)))
+                    if best is None:
+                        continue
+                    eye = best[1]
+                    dd = _dist(eye, (p.x, p.y))
+                    if not 70.0 <= dd <= 140.0 or (utree is not None and len(utree.query(
+                            Point(eye), predicate="dwithin", distance=15.0))) or \
+                            (tree is not None and len(tree.query(
+                                Point(eye), predicate="dwithin", distance=7.0))):
+                        continue      # (nor a facade filling the frame)
+                    sight = LineString([eye, (eye[0] + (p.x - eye[0]) * 0.9,
+                                              eye[1] + (p.y - eye[1]) * 0.9)])
+                    blocked = False
+                    if tree is not None:
+                        for j in sorted(tree.query(sight, predicate="intersects").tolist()):
+                            bl, fp = foot[j]
+                            near = fp.distance(Point(eye))
+                            if bl.height_m > 1.7 + (z - 1.7) * near / dd:
+                                blocked = True
+                                break
+                    if not blocked and ptree is not None:
+                        for j in sorted(ptree.query(sight, predicate="dwithin",
+                                                    distance=12.0).tolist()):
+                            pl = plants[j]
+                            pp = Point(pl.position[0], pl.position[1])
+                            near = Point(eye).distance(pp)
+                            if pl.height_m > 1.7 + (z - 1.7) * near / dd and \
+                                    sight.distance(pp) < pl.crown_radius_m + 0.5:
+                                blocked = True
+                                break
+                    if not blocked:
+                        return {"name": f"{s.id}_viaduct", "eye": [eye[0], eye[1], 1.7],
+                                "target": [q(p.x), q(p.y), q(z - 1.0)], "lens_mm": 24}
+    return None
 
 
 def _visible(tree, foot, target, eye, c, d, tz) -> bool:

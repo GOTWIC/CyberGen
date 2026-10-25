@@ -16,6 +16,7 @@ from shapely.ops import unary_union
 
 from . import geom as G
 from . import relations as R
+from .elevated import APPROACH_GRADE
 from .model import CityModel
 from .spec import BoundaryKind, CitySpec
 
@@ -554,7 +555,7 @@ def check_bridges(m: CityModel, g: _Geo) -> Check:
         if not lo - 1e-6 <= b.clearance_m <= hi + 1e-6:
             c.failures.append(f"bridge {b.id}: clearance {b.clearance_m:g} m over {cls} water "
                               f"(needs {lo:g} to {hi:g} m)")
-        want = (b.clearance_m + 1.5) / 0.06
+        want = (b.clearance_m + 1.5) / APPROACH_GRADE
         if b.ramp_length_m is not None and abs(b.ramp_length_m - want) > 0.05:
             c.failures.append(f"bridge {b.id}: ramp {b.ramp_length_m} m, expected {want:.2f} m")
         for sid in b.segment_ids:
@@ -600,10 +601,11 @@ def check_road_avoidance(m: CityModel, g: _Geo) -> Check:
     return c
 
 
-def min_radius(line: LineString, base: float, skip0: float = 0.0, skip1: float = 0.0
-               ) -> tuple[float, float]:
+def min_radius(line: LineString, base: float, skip0: float = 0.0, skip1: float = 0.0,
+               skips: tuple = (), skip: float = 0.0) -> tuple[float, float]:
     """Smallest circumradius of points `base` apart along a line (and where), ignoring the
-    first `skip0` and last `skip1` meters."""
+    first `skip0` and last `skip1` meters and `skip` meters around each arc length in
+    `skips` (M7: where a junction became an overpass)."""
     import numpy as np
 
     L = line.length
@@ -622,6 +624,8 @@ def min_radius(line: LineString, base: float, skip0: float = 0.0, skip1: float =
         r = np.where(cross > 1e-9, ab * bc * ca / (2 * cross), np.inf)
     mid = ds[1:-1]
     keep = (mid >= skip0 + base) & (mid <= L - skip1 - base)
+    for at in skips:
+        keep &= np.abs(mid - at) > skip + base
     if not keep.any():
         return math.inf, 0.0
     r = np.where(keep, r, np.inf)
@@ -635,9 +639,10 @@ def primary_chains(m: CityModel, g: _Geo) -> list[tuple[str, str, LineString, st
     `m1b_segment`) are joined back here, so alignment checks see the primary road itself."""
     groups: dict[str, list] = {}
     for s in m.road_segments:
-        if s.road_class not in ROAD_MIN_RADIUS_M:
+        if s.road_class not in ROAD_MIN_RADIUS_M or s.attrs.get("role") == "ramp":
             continue
-        groups.setdefault(s.attrs.get("m1b_segment", s.id), []).append(s)
+        groups.setdefault(s.attrs.get("split_of") or s.attrs.get("m1b_segment", s.id),
+                          []).append(s)
     out = []
     for key in sorted(groups):
         segs = groups[key]
@@ -673,12 +678,15 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
         if s.road_class in ROAD_MIN_RADIUS_M:
             deg[s.start] = deg.get(s.start, 0) + 1
             deg[s.end] = deg.get(s.end, 0) + 1
+    over = [tuple(p) for s in m.road_segments for p in s.attrs.get("overpass_at", [])]
     for label, cls, line, a, b in primary_chains(m, g):
         rmin = ROAD_MIN_RADIUS_M[cls]
         skip = JUNCTION_SKIP_M[cls]
         skip0 = skip if deg.get(a, 0) >= 3 else 0.0
         skip1 = skip if deg.get(b, 0) >= 3 else 0.0
-        r, at = min_radius(line, RADIUS_BASE_M[cls], skip0, skip1)
+        ats = tuple(line.project(shapely.Point(p)) for p in over
+                    if line.distance(shapely.Point(p)) < 1.0)
+        r, at = min_radius(line, RADIUS_BASE_M[cls], skip0, skip1, ats, skip)
         if r < 0.95 * rmin:
             p = line.interpolate(at)
             c.failures.append(f"segment {label} ({cls}): radius {r:.0f} m near "
@@ -881,6 +889,9 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
             check_segment_length(m, g),
             check_road_duplicates(m, g),
         ]
+        from . import elevated_checks as EC
+
+        checks += EC.run(m, supports=bool(m.buildings))
     if m.lots or m.blocks or m.junctions:
         from . import street_checks as SC
 
@@ -900,6 +911,9 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
+        from . import elevated_checks as EC
+
+        st["elevated"] = EC.stats(m)
     if m.lots or m.blocks or m.junctions:
         from . import street_checks as SC
 
@@ -923,7 +937,10 @@ def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
         "name": spec.name, "seed": spec.seed,
-        "stage": ("M6 (water, districts, waterways, roads, local streets, blocks, lots, "
+        "stage": ("M7 (water, districts, waterways, roads, elevated highways, local streets, "
+                  "blocks, lots, buildings, skybridges, megasites, transit, props, vegetation)"
+                  if "props" in st and "elevated" in st else
+                  "M6 (water, districts, waterways, roads, local streets, blocks, lots, "
                   "buildings, skybridges, megasites, transit, props, vegetation)"
                   if "props" in st else
                   "M5 (water, districts, waterways, roads, local streets, blocks, lots, "
@@ -1051,6 +1068,15 @@ def report_text(rep: dict) -> str:
                     f"{ps['hedge_km']} km",
                 "  props: " + ", ".join(f"{k} {v}" for k, v in ps["props_by_kind"].items()),
                 "  plants: " + ", ".join(f"{k} {v}" for k, v in ps["plants_by_kind"].items())]
+    es = st.get("elevated")
+    if es and es["elevated_km"]:
+        out += ["", f"  elevated highways {es['elevated_km']} km ({es['elevated_runs']} runs, "
+                    f"{es['direct_branches']} direct branches), deck up to {es['max_deck_m']:g} m;"
+                    f" ramps {es['ramps']} ({es['ramp_km']} km); interchanges "
+                + (", ".join(f"{k} {v}" for k, v in es["interchanges"].items()) or "none")
+                + f"; overpasses {es['overpasses']}",
+                f"  other raised roads {es['raised_other_km']} km, underpass streets "
+                f"{es['underpass_streets']}, road columns {es['road_columns']}"]
     ts = st.get("transit")
     if ts:
         out += ["", f"  transit {ts['km']} km, supports {ts['supports']}, portals "

@@ -232,7 +232,12 @@ def _span(c, b, mass, poly, bx: _B, water: dict) -> None:
             if road.road_class not in SPAN_STREETS:
                 _limit(c, c.failures, f"{b.id}: span over '{x}' (not a street)")
                 continue
-            zmax = max((z.z for z in road.z_profile), default=0.0)
+            fp = G.union([G.from_model_poly(ms_.footprint) for ms_ in b.masses
+                          if ms_.z0_m > 0.5]) if any(ms_.z0_m > 0.5 for ms_ in b.masses) \
+                else G.from_model_poly(b.footprint)
+            zmax = G.road_z_over([tuple(p) for p in road.centerline],
+                                 [(z.s, z.z) for z in road.z_profile],
+                                 fp if fp.geom_type == "Polygon" else fp.envelope)
             if under - zmax < ROAD_CLEAR_M - 1e-6:
                 _limit(c, c.failures, f"{b.id}: span {under - zmax:.1f} m over street '{x}' "
                                       f"(needs {ROAD_CLEAR_M} m)")
@@ -608,7 +613,8 @@ def check_skybridges(m: CityModel, bx: _B):
     P = G.from_model_poly
     roads = [(s.id, G.qpoly(LineString(s.centerline).buffer(s.width_m / 2.0, cap_style="flat",
                                                             join_style="mitre")),
-              max((z.z for z in s.z_profile), default=0.0)) for s in m.road_segments]
+              ([tuple(p) for p in s.centerline], [(z.s, z.z) for z in s.z_profile]))
+             for s in m.road_segments]
     rtree = shapely.STRtree([r[1] for r in roads]) if roads else None
     water = []
     for r in m.rivers:
@@ -662,7 +668,8 @@ def check_skybridges(m: CityModel, bx: _B):
         under = s.z_m - DECK_M
         if rtree is not None:
             for k in sorted(int(i) for i in rtree.query(deck, predicate="intersects")):
-                rid, rp, zmax = roads[k]
+                rid, rp, (line_, prof_) = roads[k]
+                zmax = G.road_z_over(line_, prof_, deck)
                 if under - zmax < ROAD_CLEAR_M - 1e-6:
                     _limit(c, c.failures, f"{s.id}: {under - zmax:.1f} m over road {rid}")
         if wtree is not None:

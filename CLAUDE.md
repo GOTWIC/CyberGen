@@ -204,8 +204,22 @@ accepts them in a fixed order; randomness is a blake2b hash of ids (`props._u`);
 fitted to facades and overhead decks. Six checks in `prop_checks.py`, `preview_props.png`
 (`preview_props.py`). The blockout draws props and plants as geometry-nodes instances of
 per-kind prototypes (one object per kind and tile; USD point instancers; left out of the glTF
-tiles, which `props.csv` complements). Sample builds: `docs/progress/M6/`. M7 (elevated
-highways, ramps, interchanges) is next.
+tiles, which `props.csv` complements). Sample builds: `docs/progress/M6/`.
+
+M7a (elevated highways) is in place: at the end of M1b, `citygen/elevated.py` lifts highway
+windows chosen by ramp room and district density (`highways.elevated_share`) onto viaducts
+(deck top 9 m, ramps at 5%, at most 6%, 40 m vertical curves, humps over raised roads or the
+other road lifted), classifies the nodes on a run (plain, cross, tee, branch, split), builds
+diamonds and tee stubs (one-lane one-way ramps that follow the deck through a 60 m taper and
+land on an avenue leg at grade), and re-nodes the network (`attrs.split_of`, `overpass_at`,
+ramps `road.highway.ramp`). `solve_grades` replaces M1b's bridge ramps with a network
+envelope at 5.5% and keeps crossing roads 7 m apart. M2 passes local streets under decks,
+adds underpass streets every 200 m, and lets local streets join primary roads up to 3 m up;
+after transit, `road_supports` puts columns every 32 m under every raised deck over land.
+Five checks in `elevated_checks.py` (65 in all), `preview_elevated.png`; `build_city`
+retries a failing city with other layout salts on the same roads, then other road networks.
+Sample builds: `docs/progress/M7/`. M7b (trumpet and partial cloverleaf templates,
+art-direction loop, Corporate Core pinned import) is next.
 
 ### Rules for cloud sessions building citygen milestones
 

@@ -518,11 +518,13 @@ class Builder:
         bridges = {b["id"]: b for b in self.roads.bridges}
         for s in segs:
             pts = [(G.q(x), G.q(y)) for x, y in s["centerline"]]
+            # no local junction on a bridge or where the road is more than 3 m up (its
+            # approach; M7: lower, the street ramps up to it)
             forbid = []
             for bid in s["bridge_ids"]:
                 b = bridges[bid]
-                ramp = b["attrs"]["ramp_length_m"]
-                forbid.append((b["s0"] - ramp, b["s1"] + ramp))
+                forbid.append((b["s0"], b["s1"]))
+            forbid += _raised_spans(s["z_profile"], LOCAL_JUNCTION_Z_M)
             ln = Line(pts, s["road_class"], s["width_m"], s["attrs"].get("role", "primary"),
                       name=s.get("name"), section=s["cross_section"], primary=s, forbid=forbid)
             for end in (s["start"], s["end"]):
@@ -826,6 +828,119 @@ def district_angle(B: Builder, name: str) -> float:
 # Frame: reserve rings, district boundary streets, waterfront promenades
 # ---------------------------------------------------------------------------
 
+UNDERPASS_STEP_M = 200.0       # M7: a street under a viaduct about this often
+UNDERPASS_CLEAR_M = 7.8        # deck top over it: 5.5 m clear, 1.8 m deck, a margin
+
+
+def _z_on(prof, s: float) -> float:
+    pts = [(p["s"], p["z"]) for p in prof] if isinstance(prof, list) else []
+    if not pts:
+        return 0.0
+    if s <= pts[0][0]:
+        return pts[0][1]
+    for (s0, z0), (s1, z1) in zip(pts, pts[1:]):
+        if s <= s1:
+            return max(z0, z1) if s1 <= s0 else z0 + (z1 - z0) * (s - s0) / (s1 - s0)
+    return pts[-1][1]
+
+
+def under_deck(ln: "Line", p) -> bool:
+    """A primary road whose deck at p (on it) clears a street passing under it."""
+    if ln.primary is None:
+        return False
+    return _z_on(ln.primary["z_profile"], _project(ln.pts, p)[0]) >= UNDERPASS_CLEAR_M - 0.5
+
+
+def underpasses(B: Builder, frontage: dict, free_all) -> list[int]:
+    """Streets straight across under the elevated highways, every 200 m or so, where the
+    deck is high enough, joined to the frontage streets on both sides (scope 5.2: covered
+    sections); none within 60 m of a road passing under it or 40 m of a ramp."""
+    added: list[int] = []
+    why: dict = {}
+
+    def no(k):
+        why[k] = why.get(k, 0) + 1
+    prim = B.lines[:B.n_primary]
+    ramps = [ln.line for ln in prim if ln.role == "ramp"]
+    for hi_ in sorted(frontage):
+        hw = B.lines[hi_]
+        if not (hw.primary or {}).get("attrs", {}).get("elevated"):
+            continue
+        fr = set(frontage[hi_])
+        over = [tuple(p) for p in hw.primary["attrs"].get("overpass_at", [])]
+        L = _plen(hw.pts)
+        s = UNDERPASS_STEP_M / 2.0
+        while s < L - 40.0:
+            here = s
+            s += UNDERPASS_STEP_M
+            if here < 40.0 or _z_on(hw.primary["z_profile"], here) < UNDERPASS_CLEAR_M:
+                no("deck too low")
+                continue
+            c, u = _along(hw.pts, here)
+            if any(_dist(c, p) < 60.0 for p in over):
+                no("near a road under the deck")
+                continue
+            pc = Point(c)
+            if any(G.dist(r, pc) < 40.0 for r in ramps):
+                no("near a ramp")
+                continue
+            sides = []
+            for sg in (1.0, -1.0):
+                # to just inside the nearest frontage street on this side
+                best = None
+                for li in sorted(fr):
+                    t = B.lines[li]
+                    if t.dead:
+                        continue
+                    d, q_, _ = _seg_dist(c, *min(
+                        ((t.pts[k], t.pts[k + 1]) for k in range(len(t.pts) - 1)),
+                        key=lambda ab: _seg_dist(c, ab[0], ab[1])[0]))
+                    side = (q_[0] - c[0]) * -u[1] + (q_[1] - c[1]) * u[0]
+                    if side * sg <= 0 or d > hw.width / 2 + FRONTAGE_VERGE_M + t.width + 2.0:
+                        continue
+                    if best is None or (d, li) < best[:2]:
+                        best = (d, li, t)
+                if best is None:
+                    break
+                d, li, t = best
+                o = d - t.width / 2 + 1.0
+                sides.append(_pt(c[0] - u[1] * o * sg, c[1] + u[0] * o * sg))
+            if len(sides) < 2:
+                no("no frontage street on both sides")
+                continue
+            a, b = sides
+            seg = LineString([a, b])
+            if not (free_all.contains(Point(a)) and free_all.contains(Point(b))):
+                no("ends off the free land")
+                continue
+            if B.wet.intersects(seg):
+                no("water")
+                continue
+            if any(t is not hw and G.dist(t.line, seg) < t.width / 2 + 6.0 for t in prim):
+                no("another primary road")
+                continue
+            # the district of either end (the middle is under the highway)
+            n = next((d for d in sorted(B.free, key=lambda d: B.did[d])
+                      for e in (a, b) if B.free[d].buffer(1.0).contains(Point(e))), None)
+            if n is None:
+                no("no district")
+                continue
+            sec = cross_section("street", B.arch[n])
+            li = B.add(Line([a, b], "street", sec["total_width_m"], "underpass", n,
+                            section=sec))
+            if B.attach(li, 0, 3.0, targets=fr) and B.attach(li, -1, 3.0, targets=fr):
+                added.append(li)
+            else:
+                no("no junction allowed")
+                B.lines[li].dead = True
+                B.index.remove_line(li)
+    if added or why:
+        B.notes.append(f"{len(added)} underpass streets under the viaducts" + (
+            " (not built: " + ", ".join(f"{v} {k}" for k, v in sorted(why.items())) + ")"
+            if why else ""))
+    return added
+
+
 def build_frame(B: Builder) -> None:
     free = {n: B.free_area(n) for n in sorted(B.polygons, key=lambda n: B.did[n])}
     B.free = free
@@ -850,8 +965,9 @@ def build_frame(B: Builder) -> None:
                 added.append(B.add(Line(run, cls, w, "reserve_ring", s.district,
                                         section=cross_section(cls, arch))))
     # frontage streets along highways (local streets never join a highway)
+    frontage: dict[int, list[int]] = {}
     for hi_, hw in enumerate(B.lines[:B.n_primary]):
-        if hw.cls != "highway":
+        if hw.cls != "highway" or hw.role == "ramp":
             continue
         for n in sorted(free, key=lambda n: B.did[n]):
             if G.apart(hw.line, free[n], hw.width + 40.0):
@@ -865,6 +981,9 @@ def build_frame(B: Builder) -> None:
                         for run in B.parallel_runs(piece, w, 10.0, {hi_}, 60.0):
                             added.append(B.add(Line(run, "street", w, "frontage", n,
                                                     section=sec)))
+                            frontage.setdefault(hi_, []).append(added[-1])
+    # M7: streets under the viaducts, from frontage street to frontage street
+    added += underpasses(B, frontage, free_all)
     # streets on the land boundaries between districts without a primary road
     names = sorted(free, key=lambda n: B.did[n])
     wet15_ = G.qpoly(B.wet.buffer(15.0, join_style="mitre"))
@@ -2043,6 +2162,7 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
     a_idx, b_idx = _pairs(tree.query(geoms, predicate="intersects"))
     crossings = 0
     cuts: dict[int, list] = {}
+    self_cuts: dict[int, list] = {}
     for x, y in zip(a_idx.tolist(), b_idx.tolist()):
         if x >= y:
             continue
@@ -2068,10 +2188,17 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
                 break
         if not snapped and (li < B.n_primary) != (lj < B.n_primary):
             # a local road crossing a primary road where no junction was allowed: it stops
-            # on both sides instead (cut below), no node
+            # on both sides instead (cut below), no node; under a viaduct it passes under
             loc, prim = (lj, li) if li < B.n_primary else (li, lj)
+            if under_deck(B.lines[prim], p):
+                continue
             cuts.setdefault(loc, []).append((p, B.lines[prim].width / 2 + 3.0))
             crossings += 1
+            continue
+        if li == lj and not snapped:
+            # a line crossing itself is cut at both places (an insert is found only once)
+            self_cuts.setdefault(li, []).append((seg_k[x], p))
+            self_cuts.setdefault(li, []).append((seg_k[y], p))
             continue
         B.lines[li].inserts.append(p)
         B.lines[lj].inserts.append(p)
@@ -2095,6 +2222,17 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
                 notes.append(f"junction point {P} is not on its road; skipped")
                 continue
             marks.setdefault(loc[0], []).append((loc[1], P))
+        for k, P in sorted(self_cuts.get(i, [])):
+            if P in pts:
+                cuts_at_vertex.add(pts.index(P))
+                continue
+            A, Bq, Pi = _icoord(pts[k]), _icoord(pts[k + 1]), _icoord(P)
+            dx, dy = Bq[0] - A[0], Bq[1] - A[1]
+            L2 = dx * dx + dy * dy
+            if L2 == 0:
+                continue
+            t = Fraction((Pi[0] - A[0]) * dx + (Pi[1] - A[1]) * dy, L2)
+            marks.setdefault(k, []).append((min(max(t, Fraction(0)), Fraction(1)), P))
         new: list = []
         cut_idx = []
         for k in range(len(pts)):
@@ -2407,6 +2545,33 @@ def pedestrianize_islands(B: Builder, edges) -> int:
     return n
 
 
+def drop_unnoded_crossings(B: Builder, edges) -> tuple[list, int]:
+    """A local road that still crosses another local road without a junction (two nearly
+    collinear streets that cross again a centimeter off a vertex) is a leftover of the
+    cleanup: the shorter of the two goes, until none is left."""
+    n = 0
+    for _ in range(20):
+        idx = [k for k, (pts, li) in enumerate(edges) if li >= B.n_primary]
+        if len(idx) < 2:
+            break
+        lines = [LineString(edges[k][0]) for k in idx]
+        tree = shapely.STRtree(lines)
+        worst = None
+        for a, la in enumerate(lines):
+            for b in sorted(int(x) for x in tree.query(la, predicate="crosses")):
+                if b <= a:
+                    continue
+                pa, pb = edges[idx[a]][0], edges[idx[b]][0]
+                k = idx[a] if (_plen(pa), idx[a]) < (_plen(pb), idx[b]) else idx[b]
+                if worst is None or k < worst:
+                    worst = k
+        if worst is None:
+            break
+        edges = [e for k, e in enumerate(edges) if k != worst]
+        n += 1
+    return edges, n
+
+
 def clean_graph(B: Builder, edges):
     notes = []
     edges = _merge_and_trim(B, edges)
@@ -2425,6 +2590,15 @@ def clean_graph(B: Builder, edges):
     edges, n_dup2 = fix_duplicates(B, edges)  # merged roads are measured whole again
     if n_dup2:
         notes.append(f"{n_dup2} more local roads running alongside another road removed")
+
+    # a lane whose way onto the network ran along a road removed or cut back since
+    n_ped2 = pedestrianize_islands(B, edges)
+    if n_ped2:
+        notes.append(f"{n_ped2} more lanes became pedestrian")
+        edges = _merge_and_trim(B, edges)
+    edges, n_x = drop_unnoded_crossings(B, edges)
+    if n_x:
+        notes.append(f"{n_x} local roads crossing another without a junction removed")
     # split self loops (a closed street with one junction) at their far vertex
     out = []
     for pts, li in edges:
@@ -2460,6 +2634,27 @@ def clean_graph(B: Builder, edges):
                          "network were dropped")
         edges = [(p, li) for p, li in edges if find(p[0]) == main]
     return edges, notes
+
+
+LOCAL_JUNCTION_Z_M = 3.0      # M7: highest primary road a local street ramps up to
+LOCAL_GRADE = 0.05            # M7: local streets ramping to a raised junction
+
+
+def _raised_spans(prof, z_min: float = 0.05) -> list[tuple[float, float]]:
+    """Stretches of a z profile more than z_min above the ground (M7: approaches,
+    viaducts, ramps)."""
+    out = []
+    pts = [(p["s"], p["z"]) for p in prof] if prof and isinstance(prof, list) else []
+    for (s0, z0), (s1, z1) in zip(pts, pts[1:]):
+        if max(z0, z1) <= z_min or s1 <= s0:
+            continue
+        a = s0 if z0 > z_min else s0 + (s1 - s0) * (z_min - z0) / (z1 - z0)
+        b = s1 if z1 > z_min else s0 + (s1 - s0) * (z0 - z_min) / (z0 - z1)
+        if out and a <= out[-1][1] + 0.01:
+            out[-1] = (out[-1][0], b)
+        else:
+            out.append((a, b))
+    return out
 
 
 def _slice_profile(prof: list[dict], a: float, b: float) -> list[dict]:
@@ -2499,8 +2694,9 @@ def build_output(B: Builder, edges) -> None:
         attrs = {"kind": kind, "degree": deg[c], "primary_degree": prim_deg.get(c, 0)}
         if old and old["attrs"].get("exit"):
             attrs["exit"] = old["attrs"]["exit"]
-        net.nodes.append({"id": node_id[c], "position": (c[0], c[1], 0.0), "level": 0,
-                          "attrs": attrs})
+        z = old["position"][2] if old else 0.0
+        net.nodes.append({"id": node_id[c], "position": (c[0], c[1], z),
+                          "level": old.get("level", 0) if old else 0, "attrs": attrs})
     rows = []
     for pts, li in edges:
         ln = B.lines[li]
@@ -2586,7 +2782,61 @@ def build_output(B: Builder, edges) -> None:
                       "access": "stairs"}}
     net.segments = seg_out
     net.bridges = [bridges[k] for k in sorted(bridges)]
+    _local_grades(net)
     _grade_separations(net)
+
+
+def _local_grades(net: StreetNet) -> None:
+    """M7: a local street that meets a raised primary road (at most 3 m up) ramps up to it
+    at 5%: node heights from the primary roads, carried along the local streets by a
+    max-plus envelope (a short street lifts its far end too), then each local profile."""
+    import heapq
+
+    z: dict = {}
+    for sg in net.segments:
+        if sg["road_class"] in PRIMARY:
+            prof = sg["z_profile"]
+            for nid, zz in ((sg["start"], prof[0]["z"]), (sg["end"], prof[-1]["z"])):
+                z[nid] = max(z.get(nid, 0.0), zz)
+    fixed = {n for n, v in z.items()}
+    local = [sg for sg in net.segments if sg["road_class"] not in PRIMARY and
+             sg["road_class"] != "footbridge"]
+    adj: dict = {}
+    for sg in local:
+        L = sg["attrs"]["length_m"]
+        adj.setdefault(sg["start"], []).append((sg["end"], L))
+        adj.setdefault(sg["end"], []).append((sg["start"], L))
+    heap = [(-v, n) for n, v in sorted(z.items()) if v > 0.0]
+    heapq.heapify(heap)
+    while heap:
+        v, n = heapq.heappop(heap)
+        v = -v
+        if v < z.get(n, 0.0):
+            continue
+        for m_, L in sorted(adj.get(n, [])):
+            w = v - LOCAL_GRADE * L
+            if w > z.get(m_, 0.0) + 1e-9 and m_ not in fixed:
+                z[m_] = w
+                heapq.heappush(heap, (-w, m_))
+    for sg in local:
+        za, zb = G.q(z.get(sg["start"], 0.0)), G.q(z.get(sg["end"], 0.0))
+        if za <= 0.0 and zb <= 0.0:
+            continue
+        L = sg["attrs"]["length_m"]
+        pts = {0.0, L}
+        if za > 0.0:
+            pts.add(min(za / LOCAL_GRADE, L))
+        if zb > 0.0:
+            pts.add(max(L - zb / LOCAL_GRADE, 0.0))
+        prof = []
+        for x in sorted(pts):
+            zz = max(0.0, za - LOCAL_GRADE * x, zb - LOCAL_GRADE * (L - x))
+            prof.append({"s": G.q(x), "z": G.q(zz)})
+        sg["z_profile"] = prof
+    for n in net.nodes:
+        if n["id"] in z and z[n["id"]] > 0.0:
+            x, y, _ = n["position"]
+            n["position"] = (x, y, G.q(z[n["id"]]))
 
 
 def _first_wet(pts, wet) -> float:

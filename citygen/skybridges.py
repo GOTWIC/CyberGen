@@ -130,8 +130,8 @@ class Space:
                 self.masses.append((r["id"], i, m))
         self.tree = shapely.STRtree([m[2][0] for m in self.masses]) if self.masses else None
         self.roads = [(rid, G.qpoly(LineString(line).buffer(w / 2.0, cap_style="flat",
-                                                            join_style="mitre")), zmax)
-                      for rid, cls, line, w, zmax in cx.roads]
+                                                            join_style="mitre")), (line, prof))
+                      for rid, cls, line, w, prof in cx.roads]
         self.rtree = shapely.STRtree([r[1] for r in self.roads]) if self.roads else None
         self.water = list(cx.water)
         self.wtree = shapely.STRtree([w[1] for w in self.water]) if self.water else None
@@ -156,10 +156,11 @@ class Space:
         under = 0.0
         if self.rtree is not None:
             for k in sorted(int(i) for i in self.rtree.query(poly, predicate="intersects")):
-                rid, rp, zmax = self.roads[k]
+                rid, rp, (line, prof) = self.roads[k]
                 crosses.append(rid)
-                need = max(need, zmax + ROAD_CLEAR_M + DECK_M)
-                under = max(under, zmax)
+                zr = G.road_z_over(line, prof, poly)
+                need = max(need, zr + ROAD_CLEAR_M + DECK_M)
+                under = max(under, zr)
         if self.wtree is not None:
             for k in sorted(int(i) for i in self.wtree.query(poly, predicate="intersects")):
                 wid, wp, clear = self.water[k]
@@ -231,6 +232,15 @@ def district_skybridges(cx, out: dict) -> None:
             sb = connect(space, ra, rb, f["z"], "enclosed", 1, f["width"])
         if sb is None:
             sb = connect(space, ra, rb, f["z"], "enclosed", 1, 3.5)
+        if sb is None:
+            # another building of the same complex (a satellite joins through its neighbor)
+            for o in sorted({x["b"] for x in out.get("forced", [])
+                             if x["property_id"] == f["property_id"]} - {f["a"], f["b"]}):
+                ro = by_id.get(o)
+                if ro is not None:
+                    sb = connect(space, ro, rb, f["z"], "enclosed", 1, 3.5)
+                    if sb is not None:
+                        break
         if sb is None:
             cx.notes.append(f"{f['why']}: no skybridge fits between {f['a']} and {f['b']}")
             continue
