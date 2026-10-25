@@ -21,33 +21,32 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M3 | Buildings, complexes, skybridges, landmarks, megasites | Done | [`docs/progress/M3`](docs/progress/M3) |
 | M3p | Polish: megablocks as towers on podiums, complexes in place, canal straddles, boulevard skylines | Done | [`docs/progress/M3p`](docs/progress/M3p) |
 | M4 | Blender blockout (.blend, USD, glTF tiles), renders, labeled 2D map, Unreal and graph exports | Done | [`docs/progress/M4`](docs/progress/M4) |
-| M5 | Transit (metro to sky tubes), elevated walkways | Planned | |
+| M5 | Transit: metro, elevated rail, monorail, maglev, sky tubes through towers; stations, supports, station walkways | Done | [`docs/progress/M5`](docs/progress/M5) |
 | M6 | Props, vegetation, ground clutter | Planned | |
 | M7 | Elevated highways, ramps, interchanges | Planned | |
 
-## Latest maps (M4)
+## Latest maps (M5)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
-different coast forms, not one map. Blender blockout renders (EEVEE, walls tinted by district
-archetype, landmarks white, skybridges gold):
+different coast forms, not one map. Transit maps (each line in its color, stations as rings,
+metro dashed, sky tubes with a light casing):
 
-| Nyxllor, Corporate Core (bay, river delta) | Nexus City from the top (from the concept image) |
+| Nexus City (from the concept image) | Nyxllor (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M4/nyxllor/render_iso_d01.jpg" width="420"> | <img src="docs/progress/M4/nexus_city/render_top.jpg" width="420"> |
+| <img src="docs/progress/M5/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M5/nyxllor/preview_transit.png" width="420"> |
 
-| Delta Megacity (delta) | Saltreach Free Port (archipelago) | Greyhook, The Stacks (peninsula) |
+| Delta Megacity (delta) | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|---|
-| <img src="docs/progress/M4/delta_megacity/render_top.jpg" width="280"> | <img src="docs/progress/M4/archipelago_free_port/render_top.jpg" width="280"> | <img src="docs/progress/M4/peninsula_city/render_iso_d03.jpg" width="280"> |
+| <img src="docs/progress/M5/delta_megacity/preview_transit.png" width="280"> | <img src="docs/progress/M5/archipelago_free_port/preview_transit.png" width="280"> | <img src="docs/progress/M5/peninsula_city/preview_transit.png" width="280"> |
 
-Eye level in Saltreach's old town, toward the Crown Island towers:
+Blender blockout with the transit decks, sky tubes and supports (Nyxllor, Corporate Core):
 
-<img src="docs/progress/M4/archipelago_free_port/render_street_3.jpg" width="840">
+<img src="docs/progress/M5/nyxllor/render_iso_d01.jpg" width="840">
 
-Each M4 city folder has one isometric render per district (`render_iso_<district>.jpg`),
-street views, the labeled 2D map (`map_2d.png`, and `map_2d.svg` with Inkscape layers) and
-`blockout_report.txt`. The generator's own previews (`preview_map.png`,
-`preview_detail.png`, `preview_massing.png`, reports and stage traces) are in
-`docs/progress/M3p/`. Sample specs live in `docs/progress/M1a2/<city>/city_spec.json` and
+Each M5 city folder has the transit map, the massing preview with the transit structures,
+Blender renders, the build report and the stage trace. The street-level renders and the 2D
+maps are in `docs/progress/M4/`, the other generator previews in `docs/progress/M3p/`. Sample
+specs live in `docs/progress/M1a2/<city>/city_spec.json` and
 `cities/nyxllor/city_spec.json`.
 
 ## Where things are

@@ -187,6 +187,12 @@ Megasite links (validation warns when missing): a spaceport on a maglev or sky_t
 freight terminal on an elevated_rail, metro or monorail line; a transit nexus on a metro, maglev
 or sky_tube line; every hub on two or more lines.
 
+Route order matters for the fast modes. A maglev (500 m curves) or a sky tube (300 m) cannot
+turn sharply at a stop: order the stops so the line runs roughly straight through them (turns
+under about 60 degrees), and leave a stop that sits off to the side to another line. A loop
+should visit its stops in order around them, not zigzag across. Elevated rail and monorail
+follow the avenues, so a stop off the way between its neighbors makes the line double back.
+
 **When the water cannot do what the prompt asks** (for example "every district on its own
 landmass" with one river): `water_required` makes the build add separation channels between
 districts that share land, so that alone is enough. Use `water_preferred` when the prompt only
@@ -295,11 +301,19 @@ errors).
    12 m on the street facade, roof items on roofs, every merged lot group built as its complex,
    skybridges (8 to 80 m, on both floor grids, 5.5 m over roads, joined to the walkways), every
    landmark built at its height, every megasite filled with its parts, nothing above a flight
-   cone's limit. The stats give the boundary between districts on water (against the target),
+   cone's limit. M5 checks: every line built along its whole route, every stop served by a
+   station (in the district, within 150 m of a site, place or island), curve radii and grades
+   within the mode's limits, track altitude in the line's range (higher only to clear
+   navigable water or a road deck), elevated decks 2 m over the roofs under them and 5.5 m
+   over road decks, sky tubes 10 m over the roofs or through a tower portal, supports off
+   lanes, sidewalk clear paths, buildings and water, every station with stairs or an elevator
+   joined to the street walkways, no skybridge across a track. The stats give the boundary between districts on water (against the target),
    road km by class, bridges by class, named bridges and exits, and for M2 junctions by type,
    crosswalks, lanes, walkways, blocks, lots, the lot size distribution per archetype and the
    open space share per district, and for M3 buildings by type, heights, coverage and floor
-   area per district, skybridges, units, roof items, landmarks and megasite contents.
+   area per district, skybridges, units, roof items, landmarks and megasite contents, and for
+   M5 transit km by mode, stations by kind, supports, tower portals and the buildings removed
+   for the lines.
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
    where asked, land left without a district (hatched) only where the prompt allows it, open
@@ -328,6 +342,12 @@ errors).
    buildings: `height_m`, `landmarks` (kind, name, height), `complexes` and
    `skybridge_density` per district; a landmark that does not fit or is capped by a flight
    cone is reported in the notes.
+4b. Open `preview_transit.png` (M5): every line in its color over the plan (metro dashed,
+   sky tubes with a light casing), stations as rings with names, supports as dots, towers
+   with a portal outlined, lots cleared for a line dotted red. Each line should visit its
+   stops in order without doubling back, run along the avenues (elevated rail, monorail),
+   and keep its stations in the districts it names. The massing preview shows the decks,
+   tubes and columns.
 5. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass
@@ -342,7 +362,10 @@ errors).
    curvilinear, campus_loops, radial_ring, service_roads), `grid_angle_deg` and
    `block_size_m` per district; named `places` (plaza, park, garden, market, promenade,
    waterfront, street, pedestrian_street, ...) with a `position` put them where the prompt
-   wants.
+   wants. For transit: reorder a line's `route` when a note says the track passes a stop by
+   (its curves cut the turn there) or a curve is too tight; drop a stop that sits off the
+   line's way (another line can serve it); raise `altitude_m` within the mode's range when a
+   line climbs over too much.
 6. At most three build rounds. If checks still fail, stop and report them with what you tried;
    if you believe citygen itself is wrong, say so instead of editing it.
 

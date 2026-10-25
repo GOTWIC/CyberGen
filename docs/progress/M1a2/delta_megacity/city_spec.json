@@ -70,7 +70,7 @@
         "mode": "maglev",
         "name": "Maglev Line",
         "route": [
-          "north_exit",
+          "east_exit",
           "Midtown",
           "Transit Nexus",
           "Industrial Port"
@@ -93,8 +93,8 @@
         "route": [
           "Transit Nexus",
           "Old Town",
-          "Research Campus",
           "Industrial Port",
+          "Research Campus",
           "Transit Nexus"
         ]
       },

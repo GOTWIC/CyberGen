@@ -41,11 +41,11 @@
       {"mode": "metro", "name": "Blue Line",
        "route": ["Neon Market", "Corporate Core", "Northridge", "Midtown", "Transit Nexus", "Neon Market"]},
       {"mode": "maglev", "name": "Magenta Line", "altitude_m": [25, 45],
-       "route": ["Neon Market", "Transit Nexus", "Midtown", "east_exit"]},
+       "route": ["north_exit", "Corporate Core", "Transit Nexus"]},
       {"mode": "elevated_rail", "name": "Harbor Line",
-       "route": ["Aurora Spaceport", "Neon Market", "Transit Nexus", "Harbor Industrial"]},
-      {"mode": "sky_tube", "name": "Spire Loop", "altitude_m": [70, 120], "through_towers": true,
-       "route": ["Corporate Core", "Aurora Spaceport", "Transit Nexus", "Corporate Core"]}
+       "route": ["Aurora Spaceport", "Transit Nexus", "Harbor Industrial"]},
+      {"mode": "sky_tube", "name": "Spire Line", "altitude_m": [70, 120], "through_towers": true,
+       "route": ["Corporate Core", "Transit Nexus"]}
     ]
   },
   "districts": [

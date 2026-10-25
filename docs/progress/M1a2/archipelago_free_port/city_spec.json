@@ -34,7 +34,7 @@
     "hubs": ["Crown Exchange"],
     "lines": [
       {"mode": "monorail", "name": "Island Hopper",
-       "route": ["Lumen Key", "Westreef", "Crown Exchange", "Kettle Island", "Palm Key"]},
+       "route": ["Westreef", "Lumen Key", "Crown Exchange", "Kettle Island", "Palm Key"]},
       {"mode": "maglev", "name": "Mainland Express", "route": ["Crown Exchange", "north_exit"]}
     ]
   },

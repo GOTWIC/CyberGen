@@ -66,6 +66,7 @@ MATERIALS = {
     "bld_accent": "#c8ccd6", "bld_deck": "#7a7f8a", "roof_item": "#8f949e",
     "skybridge": SKYBRIDGE, "green_roof": "#4f8a55", "canopy": "#9fb0c4",
     "site_default": "#b0b6c0", "rail": "#8a7a6a",
+    "transit_deck": "#a4abb8", "transit_tube": "#bfe3f2", "transit_support": "#6f7480",
 }
 MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
 MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
@@ -483,23 +484,35 @@ def _sites(P: _Plan) -> None:
               {"citygen_type": f"site_element.{kind}", "megasite_id": owner,
                "citygen_ids": [e.id for e, _ in items]})
     for s in m.structures:
+        a = s.attrs or {}
+        transit = bool(a.get("line_id") or a.get("station"))
+        if s.z1_m <= 0.0:
+            continue    # underground (metro concourses): not in the blockout
         parts = []
         if s.footprint is not None:
+            mat = ("canopy" if s.kind == "canopy" else "transit_support"
+                   if s.kind in ("column", "pylon") and transit else
+                   "transit_deck" if transit else "bld_deck")
             ext, holes = _poly_rings(s.footprint)
-            parts.append({"k": "prism", "m": "canopy" if s.kind == "canopy" else "bld_deck",
-                          "z0": q(s.z0_m), "z1": q(max(s.z1_m, s.z0_m + 0.3)), "r": ext,
-                          "h": holes, "s": "prism"})
+            parts.append({"k": "prism", "m": mat, "z0": q(s.z0_m),
+                          "z1": q(max(s.z1_m, s.z0_m + 0.3)), "r": ext, "h": holes,
+                          "s": "prism"})
         elif len(s.line) >= 2:
-            r = ribbon([(p[0], p[1]) for p in s.line], 4.0, [p[2] for p in s.line])
+            w = a.get("width_m", 4.0)
+            t = a.get("deck_m", max(s.z1_m - s.z0_m, 0.5))
+            mat = "transit_tube" if s.kind == "tube" else "transit_deck" if transit else \
+                "bld_deck"
+            r = ribbon([(p[0], p[1]) for p in s.line], w, [p[2] for p in s.line])
             if r is not None:
-                parts.append({"k": "ribbon", "m": "bld_deck", "l": r[0], "rr": r[1],
-                              "t": q(max(s.z1_m - s.z0_m, 0.5))})
+                parts.append({"k": "ribbon", "m": mat, "l": r[0], "rr": r[1], "t": q(t)})
         if not parts:
             continue
         pts = parts[0].get("r") or parts[0].get("l")
         cx, cy = _center(pts)
-        P.add(s.id, P.collection(P.district_at(cx, cy), "Structures"), tile_key(cx, cy),
-              f"structure_{s.kind}", parts, {"citygen_id": s.id, "citygen_type": s.type})
+        P.add(s.id, P.collection(P.district_at(cx, cy), "Transit" if transit else "Structures"),
+              tile_key(cx, cy), f"structure_{s.kind}", parts,
+              {"citygen_id": s.id, "citygen_type": s.type, "line_id": a.get("line_id", ""),
+               "station_id": a.get("station", "")})
 
 
 # --- cameras ----------------------------------------------------------------------------------

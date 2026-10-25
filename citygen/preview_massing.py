@@ -3,9 +3,10 @@
 
 The height map uses one blue ramp, dark for low buildings and light for tall ones (on the
 dark map ground), on a square-root scale so that the low districts still separate. The
-massing views extrude every mass (buildings, skybridges, megasite elements) and draw them
-back to front from a camera in the south-south-west, 35 degrees up; walls are shaded by their
-orientation and tinted by district archetype, roofs are lighter, landmarks are labeled.
+massing views extrude every mass (buildings, skybridges, megasite elements, transit decks,
+tubes and supports) and draw them back to front from a camera in the south-south-west, 35
+degrees up; walls are shaded by their orientation and tinted by district archetype, roofs
+are lighter, landmarks are labeled.
 Previews are for review only (not part of the model hash).
 """
 
@@ -306,6 +307,22 @@ def _solids(m, window=None):
         poly = Polygon([(ax_ + nx, ay_ + ny), (bx_ + nx, by_ + ny), (bx_ - nx, by_ - ny),
                         (ax_ - nx, ay_ - ny)])
         add(poly, s.z_m - 1.0, s.z_m + s.levels * s.level_height_m, to_rgb(SKYBRIDGE))
+    for s in m.structures:
+        a = s.attrs or {}
+        if s.z1_m <= 0.0:
+            continue
+        rgb = to_rgb(a.get("color", "#a4abb8"))
+        if s.footprint is not None:
+            add(P(s.footprint), s.z0_m, max(s.z1_m, s.z0_m + 0.3),
+                (0.44, 0.46, 0.5) if s.kind in ("column", "pylon") else rgb)
+        elif len(s.line) >= 2:
+            # decks and tubes in short pieces, so that they sort among the buildings
+            w, t = a.get("width_m", 4.0), a.get("deck_m", 1.0)
+            for k in range(0, len(s.line) - 1, 3):
+                run = s.line[k:k + 4]
+                piece = LineString([(p[0], p[1]) for p in run]).buffer(w / 2.0, cap_style=2)
+                top = max(p[2] for p in run)
+                add(piece, top - t, top, rgb)
     out.sort(key=lambda t: (-t[0], t[1]))
     return out
 
