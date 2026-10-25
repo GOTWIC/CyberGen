@@ -108,10 +108,14 @@ def test_bridge_classes_and_ramps(small_built):
     for b in m.bridges:
         lo, hi = C.CLEARANCE_RANGE_M[b.water_class]
         assert lo <= b.clearance_m <= hi
+        if b.attrs.get("footbridge"):  # M2 footbridges: stairs, no ramps
+            assert b.ramp_length_m is None and b.attrs["access"] == "stairs"
+            continue
         assert b.ramp_length_m == pytest.approx((b.clearance_m + 1.5) / 0.06, abs=0.01)
         assert all(z == pytest.approx(b.clearance_m + 1.5) for _, _, z in b.line)
     # sea crossings stay few: only where a landmass needs one
-    assert sum(1 for b in m.bridges if b.water_class == "sea") <= 2
+    assert sum(1 for b in m.bridges if b.water_class == "sea" and
+               not b.attrs.get("footbridge")) <= 2
 
 
 def test_clearance_by_width():
@@ -208,6 +212,8 @@ def test_roads_avoid_reserves_cones_marsh_park(path):
         if site.flight_cone is not None:
             assert not _through(m, G.from_model_poly(site.flight_cone)), site.name
     for o in m.open_spaces:
+        if o.kind not in ("marsh", "park"):  # plazas and promenades carry pedestrian streets
+            continue
         hits = [sid for sid in _through(m, G.from_model_poly(o.polygon))
                 if not next(s for s in m.road_segments if s.id == sid).attrs.get("causeway")]
         assert not hits, (o.name, hits)
@@ -268,7 +274,8 @@ def test_check_curve_radius_fails_on_a_kink(small_built):
     for s in m.road_segments:
         deg[s.start] = deg.get(s.start, 0) + 1
         deg[s.end] = deg.get(s.end, 0) + 1
-    k, seg = max(enumerate(m.road_segments),
+    k, seg = max(((i, s) for i, s in enumerate(m.road_segments)
+                  if s.road_class in ("highway", "avenue")),
                  key=lambda t: LineString(t[1].centerline).length)
     (x0, y0), (x1, y1) = seg.centerline[0], seg.centerline[-1]
     mx, my = (x0 + x1) / 2, (y0 + y1) / 2
@@ -282,19 +289,42 @@ def test_check_curve_radius_fails_on_a_kink(small_built):
 def test_check_segment_length_and_duplicates(small_built):
     m = small_built.model
     ordinary = {n.id for n in m.road_nodes if n.attrs.get("kind") == "junction"}
-    k = next(i for i, s in enumerate(m.road_segments)
-             if s.road_class == "avenue" and s.start in ordinary and s.end in ordinary)
-    seg = m.road_segments[k]
-    a = seg.centerline[0]
-    short = _mutate(m, lambda d: d["road_segments"][k].update(
-        centerline=[a, (a[0] + 10.0, a[1])]))
-    assert not _checks(SMALL, short)["segment_length"].passed
+    # an avenue as M1b laid it: its pieces between M2 street junctions share `m1b_segment`
+    groups: dict = {}
+    for i, s in enumerate(m.road_segments):
+        if s.road_class == "avenue":
+            groups.setdefault(s.attrs.get("m1b_segment", s.id), []).append(i)
+    def ordered(idx):
+        by_start = {m.road_segments[i].start: i for i in idx}
+        ends = {m.road_segments[i].end for i in idx}
+        cur = next(i for i in idx if m.road_segments[i].start not in ends)
+        out = [cur]
+        while m.road_segments[cur].end in by_start and len(out) < len(idx):
+            cur = by_start[m.road_segments[cur].end]
+            out.append(cur)
+        return out
+
+    chains = [ordered(v) for _, v in sorted(groups.items())]
+    idx = max((c for c in chains if m.road_segments[c[0]].start in ordinary
+               and m.road_segments[c[-1]].end in ordinary), key=len)
+    k = idx[0]
+    chain = list(m.road_segments[k].centerline)
+    for i in idx[1:]:
+        chain += list(m.road_segments[i].centerline)[1:]
+    a = m.road_segments[k].centerline[0]
+
+    def shorten(d):
+        d["road_segments"][k].update(centerline=[a, (a[0] + 10.0, a[1])])
+        d["road_segments"] = [s for j, s in enumerate(d["road_segments"])
+                              if j not in idx[1:]]
+    assert not _checks(SMALL, _mutate(m, shorten))["segment_length"].passed
     twin = json.loads(m.road_segments[k].model_dump_json())
     twin["id"] = "rs9999"
-    twin["centerline"] = [(x + 8.0, y + 8.0) for x, y in seg.centerline]
+    twin["attrs"].pop("m1b_segment", None)
+    twin["centerline"] = [(x + 8.0, y + 8.0) for x, y in LineString(chain).coords]
     dup = _mutate(m, lambda d: d["road_segments"].append(twin))
-    if LineString(seg.centerline).length > C.ROAD_DUP_LEN_M + 150:
-        assert not _checks(SMALL, dup)["road_duplicates"].passed
+    assert LineString(chain).length > C.ROAD_DUP_LEN_M + 150
+    assert not _checks(SMALL, dup)["road_duplicates"].passed
 
 
 # --- quantization and determinism ------------------------------------------------------------
@@ -365,10 +395,14 @@ def test_golden_hashes():
     x86_64 Linux; the same bytes are expected on the M4 Mac)."""
     golden = json.loads(GOLDEN.read_text())
     assert set(golden["cities"]) == {p.parent.name for p in CITIES}
+    wrong = []
     for path in CITIES:
         _, _, data = built_sample(path)
-        assert hashlib.sha256(data).hexdigest() == golden["cities"][path.parent.name], \
-            path.parent.name
+        got, want = hashlib.sha256(data).hexdigest(), golden["cities"][path.parent.name]
+        if got != want:
+            wrong.append(f"{path.parent.name}: {got} (golden {want})")
+    # every city is built and compared, so one run names all that differ
+    assert not wrong, "sample cities differ from the golden hashes:\n" + "\n".join(wrong)
 
 
 def test_dmath_matches_libm():

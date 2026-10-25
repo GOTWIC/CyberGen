@@ -1,4 +1,4 @@
-"""M1a/M1a2/M1b build: samples, determinism, each check with a failing case, coast forms, river
+"""M1a/M1a2/M1b/M2 build: samples, determinism, each check with a failing case, coast forms, river
 `at`, water separation, CLI. Road-specific tests are in test_roads.py."""
 
 import copy
@@ -70,14 +70,15 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M1b/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M2/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M1b" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M2" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        assert (ROOT / "docs" / "progress" / "M1b" / slug / "preview_map.png").is_file()
+        for png in ("preview_map.png", "preview_detail.png"):
+            assert (ROOT / "docs" / "progress" / "M2" / slug / png).is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
@@ -118,7 +119,12 @@ def test_small_city_passes(small_built):
                    "water_required", "district_pieces", "island_sizes", "no_slivers",
                    "land_use", "canal_quality", "road_graph", "districts_served",
                    "named_bridges", "bridge_clearance", "road_avoidance", "curve_radius",
-                   "segment_length", "road_duplicates"}
+                   "segment_length", "road_duplicates",
+                   # M2
+                   "street_graph", "lane_graph", "walkway_graph", "lot_frontage",
+                   "lot_block_sizes", "lot_slivers", "sidewalk_clear_path", "crosswalks",
+                   "junction_placement", "junction_angles", "street_duplicates",
+                   "open_space_share", "places_built"}
 
 
 def test_check_geometry_invalid(small_built):

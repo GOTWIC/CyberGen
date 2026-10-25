@@ -36,6 +36,7 @@ from . import checks as C
 from . import districts as D
 from . import geom as G
 from . import hydro as H
+from . import local as LC
 from . import megasites as MS
 from . import roads as RD
 from . import trace as T
@@ -62,6 +63,7 @@ class Built:
     notes: list[str]
     sites: list = None
     roads: object = None
+    local: object = None
 
     @property
     def passed(self) -> bool:
@@ -77,7 +79,7 @@ def _district_ids(spec: CitySpec) -> dict[str, str]:
 
 def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
              explicit: set[str], sites: list | None = None,
-             roads: RD.RoadNet | None = None) -> CityModel:
+             roads: RD.RoadNet | None = None, local: LC.Local | None = None) -> CityModel:
     P = G.to_model_poly
     did = _district_ids(spec)
     lm_ids = {k: f"lm{k + 1:02d}" for k in range(len(h.landmasses))}
@@ -172,11 +174,28 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         data["bridges"] = [{k: v for k, v in b.items() if k not in ("s0", "s1")}
                            for b in roads.bridges]
         for b in data["bridges"]:
-            a = b["attrs"]
+            a = b["attrs"] = dict(b["attrs"])  # the road network keeps its own attrs
             b["water_class"] = a.pop("water_class")
             b["span_m"] = a.pop("span_m")
             b["ramp_length_m"] = a.pop("ramp_length_m")
             b.pop("road_class", None)
+    if local is not None:
+        data["road_nodes"] = local.nodes
+        data["road_segments"] = local.segments
+        bridges = []
+        for b in local.bridges:
+            b = {k: v for k, v in b.items() if k not in ("s0", "s1", "road_class")}
+            a = dict(b["attrs"])
+            for key in ("water_class", "span_m", "ramp_length_m"):
+                if key in a:
+                    b[key] = a.pop(key)
+            b["attrs"] = a
+            bridges.append(b)
+        data["bridges"] = bridges
+        for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
+                    "lots", "places"):
+            data[key] = getattr(local, key)
+        data["open_spaces"] = data["open_spaces"] + local.open_spaces
     return CityModel.model_validate(data)
 
 
@@ -303,7 +322,7 @@ def _good(b: Built) -> bool:
 
 
 def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True,
-               workers: int | None = None) -> Built:
+               workers: int | None = None, local: bool = True) -> Built:
     spec = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
     run = _Runner(default_workers() if workers is None else workers)
@@ -322,7 +341,10 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
         ranked = sorted(built, key=lambda b: (_score(b), b.variant))
         if not roads:
             return ranked[0]
-        return add_roads(ranked, explicit, run)
+        b = add_roads(ranked, explicit, run)
+        if local:
+            add_local(b, explicit, run)
+        return b
     finally:
         run.close()
 
@@ -392,6 +414,35 @@ def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = Non
     return b
 
 
+def _blocks_job(fn_name: str, job: dict, worker: bool = False):
+    from . import blocks as BK
+
+    return getattr(BK, fn_name)(job)
+
+
+def add_local(b: Built, explicit: set[str], run: _Runner | None = None) -> Built:
+    """M2 on the chosen variant and roads: local streets, junctions, sidewalks, crosswalks,
+    lanes, walkways, blocks, lots, open space and places; then every check again."""
+    run = run or _Runner(1)
+    spec = b.spec
+    did = _district_ids(spec)
+
+    def mapper(fn, jobs):
+        return run.map(_blocks_job, [(fn.__name__, j) for j in jobs])
+
+    loc = LC.build_local(spec, b, did, mapper)
+    b.local = loc
+    b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
+    checks, st = C.run_checks(spec, b.model, roads=True)
+    T.stage("checks", [[c.id, c.passed] for c in checks])
+    st["separation_budget"] = b.stats.get("separation_budget")
+    st["road_variant"] = b.stats.get("road_variant")
+    st.setdefault("local", {})["generator"] = loc.info
+    b.checks, b.stats = checks, st
+    b.notes = b.notes + loc.notes
+    return b
+
+
 def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
     from .preview import render  # matplotlib only here
 
@@ -403,5 +454,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
     rep = b.report()
     paths[1].write_text(json.dumps(rep, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     paths[2].write_text(C.report_text(rep), encoding="utf-8")
-    render(b, paths[3], dpi=dpi)
+    local = bool(b.model.blocks)
+    render(b, paths[3], dpi=150 if local else dpi)
+    if local:
+        from .preview_detail import render as render_detail
+
+        paths.append(out / "preview_detail.png")
+        render_detail(b, paths[4], dpi=dpi)
     return paths

@@ -158,12 +158,19 @@ class District(Entity):
 
 
 class Place(Entity):
+    """A named place of the spec, built as a labeled sub-area (M2): a plaza, park, garden or
+    market carved out of lots; a named promenade, waterfront or street; a waterway; a shore
+    strip (pier, docks, beach); a gate where an avenue enters; a neighborhood of blocks; or
+    a megasite."""
     TYPE_PREFIX: ClassVar[str] = "place"
     name: str
     kind: str
     district_id: str
     polygon: Polygon | None = None
     label_at: Point2
+    feature_ids: list[str] = Field(default_factory=list,
+                                   description="Road segments, waterways, blocks or megasites "
+                                               "that make it.")
 
 
 # --- roads -----------------------------------------------------------------
@@ -177,6 +184,10 @@ class CrossSection(_Model):
     sidewalk_m: tuple[float, float] = (0.0, 0.0)
     parking: tuple[bool, bool] = (False, False)
     curb_m: float = 0.15
+    furniture_m: float = Field(1.5, description="Furniture zone of each sidewalk (trees, "
+                                                "lights); clear path = sidewalk - furniture - "
+                                                "curb.")
+    shared: bool = Field(False, description="One lane shared by both directions (alleys).")
 
 
 class RoadNode(Entity):
@@ -185,7 +196,8 @@ class RoadNode(Entity):
     level: int = 0
 
 
-RoadClass = Literal["highway", "avenue", "street", "alley", "service", "pedestrian"]
+RoadClass = Literal["highway", "avenue", "street", "alley", "service", "pedestrian",
+                    "footbridge"]
 
 
 class RoadSegment(Entity):
@@ -220,27 +232,62 @@ class RoadSegment(Entity):
 
 
 class Junction(Entity):
+    """Intersection area of a node where three or more roads meet (curb lines with corner
+    fillets), or a cul-de-sac turning bulb. `type` is `junction.<class pair>`, e.g.
+    `junction.avenue_street`."""
     TYPE_PREFIX: ClassVar[str] = "junction"
     node_id: str
     polygon: Polygon
+    shape: Literal["T", "X", "multi", "cul_de_sac"]
+    legs: int
     signalized: bool = False
-    crosswalks: list[Line2] = Field(default_factory=list)
+    corner_radius_m: float
+    crosswalk_ids: list[str] = Field(default_factory=list)
+
+
+class Crosswalk(Entity):
+    TYPE_PREFIX: ClassVar[str] = "crosswalk"
+    junction_id: str
+    segment_id: str = Field(description="The road it crosses.")
+    line: Line2 = Field(description="Curb to curb.")
+    width_m: float
+    signalized: bool = False
+
+
+class Sidewalk(Entity):
+    TYPE_PREFIX: ClassVar[str] = "sidewalk"
+    segment_id: str
+    side: Literal["left", "right"] = Field(description="Seen along the segment, start to end.")
+    line: Line2 = Field(description="Sidewalk center line, between the junction corners.")
+    width_m: float = Field(description="Curb to property line.")
+    clear_path_m: float
+    curb_m: float = 0.15
+    furniture_m: float = 0.0
 
 
 class Lane(Entity):
+    """Lane graph (for ZoneGraph and Mass traffic): driving lanes of each road (index 0 next to
+    the center line or median) and connector lanes through each node."""
     TYPE_PREFIX: ClassVar[str] = "lane"
-    segment_id: str
+    kind: Literal["lane", "connector"] = "lane"
+    segment_id: str | None = None
+    node_id: str | None = Field(None, description="Connectors: the node they cross.")
     index: int
-    forward: bool
+    forward: bool = Field(description="Lanes: travels start to end of its segment.")
     centerline: Line3
     width_m: float
     successors: list[str] = Field(default_factory=list)
+    adjacent_ids: list[str] = Field(default_factory=list,
+                                    description="Lanes of the same road and direction next to "
+                                                "this one (lane changes).")
 
 
 class Walkway(Entity):
+    """Pedestrian graph edge (for crowds); edges meet at shared end points."""
     TYPE_PREFIX: ClassVar[str] = "walkway"
-    kind: Literal["sidewalk", "crosswalk", "pedestrian_street", "footbridge", "skybridge",
-                  "elevated", "stairs", "escalator", "elevator", "path"]
+    kind: Literal["sidewalk", "crosswalk", "crossing", "pedestrian_street", "promenade",
+                  "footbridge", "alley", "skybridge", "elevated", "stairs", "escalator",
+                  "elevator", "path"]
     line: Line3
     width_m: float
     neighbors: list[str] = Field(default_factory=list)
@@ -296,23 +343,40 @@ class Megasite(Entity):
 class Block(Entity):
     TYPE_PREFIX: ClassVar[str] = "block"
     district_id: str
+    archetype: str
     polygon: Polygon
+    area_m2: float
+    frontage_ids: list[str] = Field(default_factory=list, description="Road segment ids.")
+
+
+class Frontage(_Model):
+    segment_id: str
+    road_class: str
+    length_m: float
+    line: Line2 = Field(description="The lot edge along the road.")
 
 
 class Lot(Entity):
     TYPE_PREFIX: ClassVar[str] = "lot"
     block_id: str
+    district_id: str
+    archetype: str
     polygon: Polygon
+    area_m2: float
+    frontage: list[Frontage] = Field(default_factory=list, description="Longest first.")
     frontage_ids: list[str] = Field(default_factory=list, description="Road segment ids.")
+    merged_group_id: str | None = Field(
+        None, description="Lots that M3 builds as one complex (twin towers, cluster, ...).")
 
 
 class OpenSpace(Entity):
     TYPE_PREFIX: ClassVar[str] = "open_space"
     kind: Literal["park", "plaza", "pocket_park", "promenade", "courtyard", "podium_roof",
-                  "marsh"]
+                  "marsh", "market", "garden", "green", "beach"]
     polygon: Polygon
     z_m: float = 0.0
     name: str | None = None
+    district_id: str | None = None
 
 
 class Property(Entity):
@@ -411,7 +475,8 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "land": Land, "landmasses": Landmass, "islands": Island, "seas": Sea, "rivers": River,
     "channels": Channel, "waterways": Waterway, "quays": Quay, "bridges": Bridge,
     "districts": District, "places": Place, "road_nodes": RoadNode, "road_segments": RoadSegment,
-    "junctions": Junction, "lanes": Lane, "walkways": Walkway, "structures": Structure,
+    "junctions": Junction, "crosswalks": Crosswalk, "sidewalks": Sidewalk, "lanes": Lane,
+    "walkways": Walkway, "structures": Structure,
     "transit_lines": TransitLine, "stations": Station, "megasites": Megasite, "blocks": Block,
     "lots": Lot, "open_spaces": OpenSpace, "properties": Property, "buildings": Building,
     "skybridges": Skybridge, "plants": Plant, "green_areas": GreenArea, "props": Prop,
@@ -442,6 +507,8 @@ class CityModel(_Model):
     road_nodes: list[RoadNode] = Field(default_factory=list)
     road_segments: list[RoadSegment] = Field(default_factory=list)
     junctions: list[Junction] = Field(default_factory=list)
+    crosswalks: list[Crosswalk] = Field(default_factory=list)
+    sidewalks: list[Sidewalk] = Field(default_factory=list)
     lanes: list[Lane] = Field(default_factory=list)
     walkways: list[Walkway] = Field(default_factory=list)
     structures: list[Structure] = Field(default_factory=list)
