@@ -403,7 +403,7 @@ CLOSE_ORDER = ("corporate_core", "old_town", "industrial_port", "megablock_resid
 
 def _close_ups(m, n: int = 4, half: float = 260.0):
     """(district id, name, archetype, window) for up to n districts of different archetypes,
-    each window around the densest spot of the district."""
+    each window around the middle of the district's buildings."""
     by_arch: dict = {}
     for d in m.districts:
         by_arch.setdefault(d.archetype, []).append(d)
@@ -413,8 +413,14 @@ def _close_ups(m, n: int = 4, half: float = 260.0):
             bs = [x for x in m.buildings if x.district_id == d.id and x.footprint is not None]
             if not bs:
                 continue
-            best = max(bs, key=lambda x: (x.height_m, x.id))
-            c = G.from_model_poly(best.footprint).centroid
+            cs = [G.from_model_poly(x.footprint).centroid for x in bs]
+            mx = sum(c.x for c in cs) / len(cs)
+            my = sum(c.y for c in cs) / len(cs)
+            # the building nearest the middle of the district's buildings, else the tallest
+            # one when the district is a ring (its middle empty)
+            k = min(range(len(bs)), key=lambda i: ((cs[i].x - mx) ** 2 + (cs[i].y - my) ** 2,
+                                                   bs[i].id))
+            c = cs[k]
             out.append((d.id, d.name, arch, box(c.x - half, c.y - half, c.x + half,
                                                 c.y + half)))
         if len(out) >= n:

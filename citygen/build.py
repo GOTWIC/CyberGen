@@ -520,7 +520,9 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         st[key] = b.stats.get(key)
     if "local" in st and b.local is not None:
         st["local"]["generator"] = b.local.info
-    st.setdefault("buildings", {})["generator"] = out.info
+    # wall-clock timings stay on b.m3.info["seconds"]: the report must not depend on the run
+    st.setdefault("buildings", {})["generator"] = {k: v for k, v in out.info.items()
+                                                   if k != "seconds"}
     b.checks, b.stats = checks, st
     b.notes = b.notes + out.notes
     return b
