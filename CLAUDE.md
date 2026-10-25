@@ -67,6 +67,9 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
   `<UnrealProject>/Greybox/`, open a level, Tools > Execute Python Script. Clears and rebuilds its own
   actors (tag `CorporateCoreGreybox`), Ctrl+Z undoes a run. Buildings are currently oriented boxes, so
   the megatower becomes its bounding box; true footprint meshes are a planned upgrade.
+- citygen's blockout exports `city.usdc` (whole city) and one `tiles/<tile>.glb` per 256 m tile
+  (custom properties as glTF extras) for World Partition style imports, plus
+  `unreal/corporate_core_plan.json`, which `build_greybox_unreal.py` reads unchanged.
 - Keep gameplay logic in C++ where reasonable.
 
 ## Known open items
@@ -163,7 +166,21 @@ straddle buildings also span a canal and its quay roads at the navigable clearan
 footprint check verifies every road and water body a span crosses, `span_crosses`); heights
 rise along the boulevard through a district's center (`buildings.boulevards`); and
 `roads._merge_degree2` no longer breaks when a smoothed joint collapses or drifts off its
-node (`roads._on_ends`). Sample builds: `docs/progress/M3p/`. M4 (Blender blockout) is next.
+node (`roads._on_ends`). Sample builds: `docs/progress/M3p/`.
+
+M4 (Blender blockout) is in place: `.venv/bin/python -m citygen blockout <city_model.json>
+<out_dir>` (or `citygen build ... --blockout`) makes the blockout plan in the venv
+(`citygen/blockout.py`: every coordinate, in canonical geometry, its sha256 in
+`tests/data/golden_hashes.json` under `blockout_plans`; land and water clipped to 256 m tiles,
+streets joined per district, category and tile, one object per building, skybridge, deck and
+megasite element group), then runs Blender (`citygen/blender/build.py`, stdlib and bpy only,
+it only triangulates and draws): `city.blend`, `city.usdc`, `tiles/<tile>.glb`, EEVEE renders
+(`render_top.jpg`, `render_iso_<district>.jpg`, `render_street_<n>.jpg`), then reopens the
+.blend in a fresh Blender and checks its objects, tiles and renders (`blockout_report.txt`).
+`citygen/exports.py` writes the layered `map_2d.svg` (readable by `pipeline/svg_to_plan.py`)
+and `map_2d.png`, `unreal/corporate_core_plan.json` for the greybox script, `graphs.json`,
+`tiles.json` and `props.csv`. The Blender test skips when Blender is missing. Sample builds:
+`docs/progress/M4/`. M5 (transit, elevated walkways) is next.
 
 ### Rules for cloud sessions building citygen milestones
 

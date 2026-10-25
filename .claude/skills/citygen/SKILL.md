@@ -1,6 +1,6 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, build the Blender blockout (.blend, USD, glTF tiles, renders, 2D map), and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
@@ -9,7 +9,8 @@ You are the prompt-to-spec step of citygen (`docs/citygen_scope.md`, section 4.1
 prompt (and the image, if any), write `city_spec.json`, validate it until it passes, render the
 schematic, build the city (water, districts, waterways, primary roads and bridges, local
 streets, junctions, blocks, lots and open space, buildings, complexes, skybridges, landmarks and
-megasites), read the check report and previews, adjust the spec if needed, and report. Everything after the spec is deterministic offline code.
+megasites), read the check report and previews, adjust the spec if needed, build the Blender
+blockout of the passing city, and report. Everything after the spec is deterministic offline code.
 
 ## Hard rules
 
@@ -345,6 +346,29 @@ errors).
 6. At most three build rounds. If checks still fail, stop and report them with what you tried;
    if you believe citygen itself is wrong, say so instead of editing it.
 
+### 6b. Blender blockout (M4)
+
+Once the build passes:
+
+```bash
+citygen blockout cities/<slug>/out/city_model.json cities/<slug>/out/blockout/
+```
+
+(or `citygen build ... --blockout` in one go). It needs Blender 5.2 (found at
+`/Applications/Blender*.app`, `$BLENDER` or `blender` on PATH; `--blender PATH` to pick one)
+and takes about a minute for a 12 km2 city. It writes `city.blend` (collections per district
+and category, one object per building, skybridge, bridge deck and megasite element group,
+ground surfaces joined per 256 m tile, custom properties `citygen_id`, `citygen_type`,
+`citygen_tile` and more), `city.usdc`, `tiles/<tile>.glb`, the renders `render_top.jpg`,
+`render_iso_<district>.jpg` (one per district) and `render_street_<n>.jpg` (eye level),
+`map_2d.svg` (Inkscape layers named like the hand-traced maps) and `map_2d.png`,
+`unreal/corporate_core_plan.json` (for `unreal/build_greybox_unreal.py`), `graphs.json`
+(lane and walkway graphs), `tiles.json`, `props.csv` and `blockout_report.txt`. Open the
+renders: every district should read in its isometric view as it does in
+`preview_massing.png`. A failed blockout check (the .blend does not reopen, an object or tile
+missing, a render missing, over the 10 minute budget) is a citygen problem: report it, do not
+work around it in the spec.
+
 ### 7. Report
 
 Reply with:
@@ -357,7 +381,9 @@ Reply with:
   stats from `report.txt` (land, water share, landmasses, waterway km, district shares, road
   km by class, bridges by class, named bridges, exits, blocks, lots, junctions, open space
   share, buildings, tallest building, skybridges, landmarks, megasites), and
-  `preview_detail.png`, `preview_heights.png` and `preview_massing.png`.
+  `preview_detail.png`, `preview_heights.png` and `preview_massing.png`;
+- the blockout result from `blockout_report.txt` (objects, tiles, file sizes, time), with
+  `render_top.jpg`, two or three `render_iso_*.jpg` and a street view.
 
 ## Minimal example
 
@@ -378,7 +404,8 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
-(previews and reports): `docs/progress/M3p/` with buildings, skybridges, landmarks and
+(previews and reports): `docs/progress/M4/` with the Blender blockout renders and 2D maps,
+`docs/progress/M3p/` with buildings, skybridges, landmarks and
 megasites (the M3 polish; `docs/progress/M3/` before it), `docs/progress/M2/` with local streets, blocks and lots,
 `docs/progress/M1b/` with primary roads (specs in `docs/progress/M1a2/`, the water and
 district builds there and in `docs/progress/M1a/`).

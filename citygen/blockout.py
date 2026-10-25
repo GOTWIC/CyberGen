@@ -1,0 +1,809 @@
+"""M4 blockout plan: the city model as Blender-ready objects (scope sections 7 and 8).
+
+`make_plan(model)` turns a `CityModel` into plain data that `citygen/blender/build.py` (run by
+Blender, stdlib and bpy only) turns into meshes. Everything that decides geometry happens here,
+in the canonical geometry of the generator, so the plan is the same bytes on every machine
+and its sha256 sits next to the model's in `tests/data/golden_hashes.json`; Blender only
+triangulates and draws.
+
+Objects:
+- one object per building (its masses and roof items), per skybridge, per bridge and per
+  megasite element group;
+- ground surfaces joined per district, category and 256 m tile (roads by class, junctions,
+  crosswalks, sidewalks, open space, green roofs, quays);
+- land and water clipped to the tiles.
+
+Every object names its tile, so per-tile exports (glTF for World Partition style streaming)
+are a selection. Parts are prisms (ring, holes, z0, z1, shape), flats (ring, holes, z),
+ribbons (left and right edge, z per vertex, thickness), boxes (base center, size, yaw) and
+beams (two end points, width, height). Coordinates: meters, x east, y north, z up.
+"""
+
+from __future__ import annotations
+
+import glob
+import hashlib
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+import shapely
+from shapely.geometry import LineString, Point, box
+
+from . import geom as G
+from .model import CityModel
+from .preview import OPEN_COLORS
+from .preview_massing import ELEMENT_COLORS, FLAT_COLORS, ROAD, SKYBRIDGE
+from .schematic import ARCHETYPE_COLORS, LAND, RIVER, SEA
+
+PLAN_VERSION = 1
+TILE_M = 256.0
+
+# levels (m): water below the ground, the ground slab, surfaces just above it
+Z_SEA = -1.2
+Z_WATER = -0.9
+Z_BASE = -4.0          # bottom of the ground slab (quay and canal walls show to here)
+Z_ROAD = 0.05
+Z_JUNCTION = 0.06
+Z_CROSSWALK = 0.07
+Z_OPEN = 0.1
+CURB_M = 0.15
+DECK_M = 1.2           # bridge and elevated deck thickness
+PIER_STEP_M = 40.0
+
+ROAD_COLORS = {"highway": "#2c3038", "avenue": "#353a44", "street": "#3b404b",
+               "alley": "#43474f", "service": "#43474f", "pedestrian": "#7d786a",
+               "footbridge": "#8a6a4a"}
+MATERIALS = {
+    "sea": SEA, "water": RIVER, "ground": LAND, "lot": "#2c3140",
+    "junction": ROAD, "crosswalk": "#c9ccd2", "sidewalk": "#8d929c", "quay": "#9a9384",
+    "bridge_deck": "#5e636e", "pier": "#6c717c", "landmark": "#eef0f4",
+    "bld_accent": "#c8ccd6", "bld_deck": "#7a7f8a", "roof_item": "#8f949e",
+    "skybridge": SKYBRIDGE, "green_roof": "#4f8a55", "canopy": "#9fb0c4",
+    "site_default": "#b0b6c0", "rail": "#8a7a6a",
+}
+MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
+MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
+MATERIALS.update({f"bld_{k}": v for k, v in ARCHETYPE_COLORS.items()})
+MATERIALS.update({f"site_{k}": v for k, v in {**ELEMENT_COLORS, **FLAT_COLORS}.items()})
+
+ACCENT_ROLES = {"crown", "spire", "mechanical"}
+DECK_ROLES = {"deck", "span"}
+SKYBRIDGE_H = {"enclosed": None, "stack": None, "open_deck": 0.6, "catwalk": 0.4, "cable": 0.3}
+
+# camera directions (unit vectors, plain constants): the isometric views look north, 20
+# degrees east, 35 degrees down, like preview_massing.png
+ISO_DIR = (0.280167, 0.769751, -0.573576)
+
+
+def q(v: float) -> float:
+    return round(float(v), 2)
+
+
+def tile_key(x: float, y: float) -> tuple[int, int]:
+    return math.floor(x / TILE_M), math.floor(y / TILE_M)
+
+
+def tile_name(ix: int, iy: int) -> str:
+    return f"t{ix:+03d}{iy:+03d}"
+
+
+def _ring(coords) -> list[list[float]]:
+    pts = [[q(x), q(y)] for x, y in coords]
+    if len(pts) > 1 and pts[0] == pts[-1]:
+        pts.pop()
+    return pts
+
+
+def _poly_rings(p) -> tuple[list, list]:
+    """(exterior, holes) of a model polygon, exterior counterclockwise, holes clockwise."""
+    ext = _ring(p.exterior)
+    holes = [_ring(h) for h in p.holes]
+    if _signed_area(ext) < 0:
+        ext.reverse()
+    holes = [h[::-1] if _signed_area(h) > 0 else h for h in holes]
+    return ext, holes
+
+
+def _shapely_rings(poly) -> tuple[list, list]:
+    poly = shapely.geometry.polygon.orient(poly, 1.0)
+    return (_ring(poly.exterior.coords), [_ring(r.coords) for r in poly.interiors])
+
+
+def _signed_area(ring) -> float:
+    s = 0.0
+    for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
+        s += x0 * y1 - x1 * y0
+    return s / 2.0
+
+
+def _bbox(pts) -> tuple[float, float, float, float]:
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _center(pts) -> tuple[float, float]:
+    x0, y0, x1, y1 = _bbox(pts)
+    return (x0 + x1) / 2.0, (y0 + y1) / 2.0
+
+
+def _dist(a, b) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    return math.sqrt(dx * dx + dy * dy)
+
+
+def _dedupe(pts) -> list:
+    out = []
+    for p in pts:
+        if not out or _dist(out[-1], p) > 0.005:
+            out.append(p)
+    return out
+
+
+def _z_along(pts, profile) -> list[float]:
+    """z at each vertex of a polyline from (s, z) samples (linear between samples)."""
+    if not profile:
+        return [0.0] * len(pts)
+    ss = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        ss.append(ss[-1] + _dist(a, b))
+    samples = [(z.s, z.z) for z in profile]
+    out = []
+    for s in ss:
+        z = samples[-1][1]
+        if s <= samples[0][0]:
+            z = samples[0][1]
+        else:
+            for (s0, z0), (s1, z1) in zip(samples, samples[1:]):
+                if s0 <= s <= s1:
+                    z = z0 if s1 - s0 <= 1e-9 else z0 + (z1 - z0) * (s - s0) / (s1 - s0)
+                    break
+        out.append(z)
+    return out
+
+
+def ribbon(pts, width: float, zs=None, z: float = 0.0) -> tuple[list, list] | None:
+    """Left and right edges of a strip `width` wide along a polyline (mitered joints, the
+    miter capped at twice the half width), z per vertex. None for a degenerate line."""
+    pts = _dedupe([(float(x), float(y)) for x, y in pts])
+    if len(pts) < 2:
+        return None
+    if zs is None or len(zs) != len(pts):
+        zs = [z] * len(pts)
+    dirs = []
+    for a, b in zip(pts, pts[1:]):
+        L = _dist(a, b)
+        dirs.append(((b[0] - a[0]) / L, (b[1] - a[1]) / L))
+    h = width / 2.0
+    left, right = [], []
+    for i, p in enumerate(pts):
+        d0 = dirs[max(i - 1, 0)]
+        d1 = dirs[min(i, len(dirs) - 1)]
+        nx, ny = -d0[1] - d1[1], d0[0] + d1[0]
+        n = math.sqrt(nx * nx + ny * ny)
+        if n < 1e-9:  # a U-turn: use the outgoing normal
+            nx, ny, n = -d1[1], d1[0], 1.0
+        nx, ny = nx / n, ny / n
+        k = h / max(nx * -d1[1] + ny * d1[0], 0.5)
+        left.append([q(p[0] + nx * k), q(p[1] + ny * k), q(zs[i])])
+        right.append([q(p[0] - nx * k), q(p[1] - ny * k), q(zs[i])])
+    return left, right
+
+
+class _Plan:
+    def __init__(self, m: CityModel):
+        self.m = m
+        self.objects: list[dict] = []
+        self.joined: dict[tuple, dict] = {}
+        self.tiles: set[tuple[int, int]] = set()
+        self.dname = {d.id: d.name for d in m.districts}
+        self.darch = {d.id: d.archetype for d in m.districts}
+        dpolys = [(d.id, G.from_model_poly(d.polygon)) for d in m.districts]
+        for _, p in dpolys:
+            shapely.prepare(p)
+        self.dpolys = dpolys
+        self.city = m.name
+
+    # -- placement helpers ----------------------------------------------------------------
+
+    def district_at(self, x: float, y: float) -> str | None:
+        pt = Point(x, y)
+        for did, p in self.dpolys:
+            if p.covers(pt):
+                return did
+        return None
+
+    def collection(self, did: str | None, category: str) -> list[str]:
+        group = self.dname.get(did, "City") if did else "City"
+        return [self.city, group, category]
+
+    def add(self, name: str, collection: list[str], tile: tuple[int, int], category: str,
+            parts: list[dict], props: dict) -> dict:
+        self.tiles.add(tile)
+        obj = {"name": name, "collection": collection, "tile": tile_name(*tile),
+               "category": category, "parts": parts, "props": props}
+        self.objects.append(obj)
+        return obj
+
+    def join(self, did: str | None, category: str, x: float, y: float, part: dict,
+             eid: str) -> None:
+        """Add a part to the joined object of (district, category, tile)."""
+        t = tile_key(x, y)
+        key = (did or "city", category, t)
+        obj = self.joined.get(key)
+        if obj is None:
+            obj = self.add(f"{did or 'city'}.{category}.{tile_name(*t)}",
+                           self.collection(did, _group_of(category)), t, category, [],
+                           {"citygen_type": f"joined.{category}", "citygen_ids": []})
+            self.joined[key] = obj
+        obj["parts"].append(part)
+        obj["props"]["citygen_ids"].append(eid)
+
+
+def _group_of(category: str) -> str:
+    if category.startswith("road_") or category in ("junction", "crosswalk", "sidewalk"):
+        return "Streets"
+    if category.startswith("open_") or category == "green_roof":
+        return "Open space"
+    if category in ("quay", "bridge"):
+        return "Waterfront"
+    return category.capitalize()
+
+
+# --- land and water ------------------------------------------------------------------------
+
+def _land_and_water(P: _Plan) -> None:
+    m = P.m
+    land = G.union([G.from_model_poly(p) for lnd in m.land for p in lnd.polygons])
+    wet = G.union([G.from_model_poly(w.polygon) for w in [*m.rivers, *m.channels,
+                                                         *m.waterways]])
+    ground = G.diff(land, wet) if not wet.is_empty else land
+    x0, y0, x1, y1 = m.bounds
+    ix0, iy0 = tile_key(x0, y0)
+    ix1, iy1 = tile_key(x1 - 1e-6, y1 - 1e-6)
+    for ix in range(ix0, ix1 + 1):
+        for iy in range(iy0, iy1 + 1):
+            tb = box(max(ix * TILE_M, x0), max(iy * TILE_M, y0),
+                     min((ix + 1) * TILE_M, x1), min((iy + 1) * TILE_M, y1))
+            t = (ix, iy)
+            sea_ring = _ring(tb.exterior.coords)
+            if _signed_area(sea_ring) < 0:
+                sea_ring.reverse()
+            P.add(f"city.sea.{tile_name(*t)}", [P.city, "Water"], t, "sea",
+                  [{"k": "flat", "m": "sea", "z": Z_SEA, "r": sea_ring, "h": []}],
+                  {"citygen_type": "sea"})
+            for cat, geom, part in (("ground", ground, "prism"), ("water", wet, "flat")):
+                if geom.is_empty:
+                    continue
+                parts = []
+                for p in G.parts(G.inter(geom, tb)):
+                    ext, holes = _shapely_rings(p)
+                    if len(ext) < 3:
+                        continue
+                    if part == "prism":
+                        parts.append({"k": "prism", "m": "ground", "z0": Z_BASE, "z1": 0.0,
+                                      "r": ext, "h": holes, "s": "prism"})
+                    else:
+                        parts.append({"k": "flat", "m": "water", "z": Z_WATER, "r": ext,
+                                      "h": holes})
+                if parts:
+                    P.add(f"city.{cat}.{tile_name(*t)}",
+                          [P.city, "Ground" if cat == "ground" else "Water"], t, cat, parts,
+                          {"citygen_type": cat})
+
+
+# --- streets -----------------------------------------------------------------------------
+
+def _streets(P: _Plan) -> None:
+    m = P.m
+    seg_district = {}
+    for s in m.road_segments:
+        did = s.district_ids[0] if s.district_ids else None
+        seg_district[s.id] = did
+        pts = [(x, y) for x, y in s.centerline]
+        zs = _z_along(_dedupe(pts), s.z_profile)
+        raised = max(zs) > 0.5 if zs else False
+        r = ribbon(pts, s.width_m, [z + Z_ROAD for z in zs])
+        if r is None:
+            continue
+        mid = pts[len(pts) // 2]
+        if raised or s.bridge:
+            # a deck with its own object: thickness, and piers down to the water or ground
+            cat = "bridge"
+            part = {"k": "ribbon", "m": "bridge_deck", "l": r[0], "rr": r[1], "t": DECK_M}
+            road = {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
+                    "t": 0.0}
+            t = tile_key(*mid)
+            parts = [part, road] + _piers(_dedupe(pts), zs)
+            P.add(f"{s.id}.deck", P.collection(did, "Waterfront"), t, cat, parts,
+                  {"citygen_id": s.id, "citygen_type": s.type, "road_class": s.road_class,
+                   "name": s.name or "", "clearance_m": s.clearance_m or 0.0})
+            continue
+        P.join(did, f"road_{s.road_class}", mid[0], mid[1],
+               {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1], "t": 0.0},
+               s.id)
+    for j in m.junctions:
+        ext, holes = _poly_rings(j.polygon)
+        cx, cy = _center(ext)
+        P.join(P.district_at(cx, cy), "junction", cx, cy,
+               {"k": "flat", "m": "junction", "z": Z_JUNCTION, "r": ext, "h": holes}, j.id)
+    for c in m.crosswalks:
+        r = ribbon(c.line, c.width_m, z=Z_CROSSWALK)
+        if r is None:
+            continue
+        cx, cy = _center(c.line)
+        P.join(P.district_at(cx, cy), "crosswalk", cx, cy,
+               {"k": "ribbon", "m": "crosswalk", "l": r[0], "rr": r[1], "t": 0.0}, c.id)
+    for w in m.sidewalks:
+        r = ribbon(w.line, w.width_m, z=CURB_M)
+        if r is None:
+            continue
+        cx, cy = _center(w.line)
+        P.join(seg_district.get(w.segment_id), "sidewalk", cx, cy,
+               {"k": "ribbon", "m": "sidewalk", "l": r[0], "rr": r[1], "t": CURB_M}, w.id)
+
+
+def _piers(pts, zs) -> list[dict]:
+    """Square piers every PIER_STEP_M under a raised deck (from below the water line)."""
+    out = []
+    acc, nxt = 0.0, PIER_STEP_M / 2.0
+    for i, (a, b) in enumerate(zip(pts, pts[1:])):
+        L = _dist(a, b)
+        while L > 0 and acc + L >= nxt:
+            f = (nxt - acc) / L
+            z = zs[i] + (zs[i + 1] - zs[i]) * f
+            if z > DECK_M + 1.0:
+                x, y = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+                out.append({"k": "box", "m": "pier", "c": [q(x), q(y), Z_SEA],
+                            "d": [2.0, 2.0, q(z - DECK_M - Z_SEA)], "yaw": 0.0})
+            nxt += PIER_STEP_M
+        acc += L
+    return out
+
+
+# --- open space, quays ------------------------------------------------------------------------
+
+def _open_space(P: _Plan) -> None:
+    m = P.m
+    for o in m.open_spaces:
+        ext, holes = _poly_rings(o.polygon)
+        cx, cy = _center(ext)
+        did = o.district_id or P.district_at(cx, cy)
+        P.join(did, f"open_{o.kind}", cx, cy,
+               {"k": "flat", "m": f"open_{o.kind}" if f"open_{o.kind}" in MATERIALS
+                else "open_park", "z": q(max(o.z_m, 0.0) + Z_OPEN), "r": ext, "h": holes},
+               o.id)
+    bdist = {b.id: b.district_id for b in m.buildings}
+    for g in m.green_areas:
+        if g.polygon is None:
+            continue
+        ext, holes = _poly_rings(g.polygon)
+        cx, cy = _center(ext)
+        P.join(bdist.get(g.building_id) or P.district_at(cx, cy), "green_roof", cx, cy,
+               {"k": "flat", "m": "green_roof", "z": q(g.z_m + 0.05), "r": ext, "h": holes},
+               g.id)
+    wdist = {w.id: w.district_id for w in m.waterways}
+    for qy in m.quays:
+        r = ribbon(qy.line, qy.width_m, z=0.02)
+        if r is None:
+            continue
+        cx, cy = _center(qy.line)
+        P.join(wdist.get(qy.waterway_id), "quay", cx, cy,
+               {"k": "ribbon", "m": "quay", "l": r[0], "rr": r[1], "t": 0.0}, qy.id)
+
+
+# --- buildings ----------------------------------------------------------------------------
+
+def _mass_part(ms, mat: str) -> dict:
+    ext, holes = _poly_rings(ms.footprint)
+    return {"k": "prism", "m": mat, "z0": q(ms.z0_m), "z1": q(ms.z1_m), "r": ext,
+            "h": holes, "s": ms.shape}
+
+
+def _buildings(P: _Plan) -> None:
+    m = P.m
+    for b in m.buildings:
+        arch = P.darch.get(b.district_id, "")
+        wall = "landmark" if b.landmark else (f"bld_{arch}" if f"bld_{arch}" in MATERIALS
+                                              else "site_default")
+        parts = []
+        for ms in b.masses:
+            if ms.role == "void" or ms.z1_m <= ms.z0_m:
+                continue
+            mat = wall
+            if ms.role in ACCENT_ROLES and not b.landmark:
+                mat = "bld_accent"
+            elif ms.role in DECK_ROLES:
+                mat = "bld_deck"
+            parts.append(_mass_part(ms, mat))
+        for it in b.roof_items:
+            x, y, z = it.position
+            parts.append({"k": "box", "m": "roof_item", "c": [q(x), q(y), q(z)],
+                          "d": [q(it.size[0]), q(it.size[1]), q(it.size[2])],
+                          "yaw": q(it.yaw_deg)})
+        if not parts:
+            continue
+        pts = [p for part in parts if part["k"] == "prism" for p in part["r"]]
+        cx, cy = _center(pts) if pts else (0.0, 0.0)
+        did = b.district_id or P.district_at(cx, cy)
+        cat = "landmark" if b.landmark else "building"
+        P.add(b.id, P.collection(did, "Landmarks" if b.landmark else "Buildings"),
+              tile_key(cx, cy), cat, parts,
+              {"citygen_id": b.id, "citygen_type": b.type, "use": b.use,
+               "height_m": q(b.height_m), "floors": b.floors, "district": did or "",
+               "archetype": arch, "name": b.name or "", "property_id": b.property_id or "",
+               "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or ""})
+    for s in m.skybridges:
+        (ax, ay), (bx, by) = s.line[0], s.line[-1]
+        hh = SKYBRIDGE_H.get(s.kind) or s.levels * s.level_height_m
+        cx, cy = (ax + bx) / 2.0, (ay + by) / 2.0
+        did = P.district_at(cx, cy)
+        P.add(s.id, P.collection(did, "Skybridges"), tile_key(cx, cy), "skybridge",
+              [{"k": "beam", "m": "skybridge", "a": [q(ax), q(ay), q(s.z_m)],
+                "b": [q(bx), q(by), q(s.z_m)], "w": q(s.width_m), "h": q(hh)}],
+              {"citygen_id": s.id, "citygen_type": s.type, "kind": s.kind,
+               "z_m": q(s.z_m), "buildings": ",".join(s.building_ids)})
+
+
+# --- megasites, structures --------------------------------------------------------------------
+
+def _sites(P: _Plan) -> None:
+    m = P.m
+    sdist = {s.id: s.district_id for s in m.megasites}
+    groups: dict[tuple, list] = {}
+    for e in m.site_elements:
+        mat = f"site_{e.kind}" if f"site_{e.kind}" in MATERIALS else "site_default"
+        parts = [_mass_part(ms, mat) for ms in e.masses if ms.z1_m > ms.z0_m]
+        if e.footprint is not None and not e.masses:
+            ext, holes = _poly_rings(e.footprint)
+            parts.append({"k": "flat", "m": mat, "z": q(e.z_m + 0.08), "r": ext, "h": holes})
+        if len(e.line) >= 2:
+            r = ribbon(e.line, 3.0, z=q(e.z_m + 0.1))
+            if r is not None:
+                parts.append({"k": "ribbon", "m": "rail" if e.kind == "rail_track" else mat,
+                              "l": r[0], "rr": r[1], "t": 0.0})
+        if not parts:
+            continue
+        pts = [p for part in parts for p in (part.get("r") or part.get("l") or [])]
+        cx, cy = _center(pts)
+        groups.setdefault((e.megasite_id or e.lot_id or "site", e.kind, tile_key(cx, cy)),
+                          []).append((e, parts))
+    for (owner, kind, t), items in sorted(groups.items()):
+        did = sdist.get(owner) or P.district_at(*_center(
+            [p for _, parts in items for part in parts for p in (part.get("r") or
+                                                                  part.get("l"))]))
+        P.add(f"{owner}.{kind}.{tile_name(*t)}", P.collection(did, "Megasites"), t,
+              f"site_{kind}", [p for _, parts in items for p in parts],
+              {"citygen_type": f"site_element.{kind}", "megasite_id": owner,
+               "citygen_ids": [e.id for e, _ in items]})
+    for s in m.structures:
+        parts = []
+        if s.footprint is not None:
+            ext, holes = _poly_rings(s.footprint)
+            parts.append({"k": "prism", "m": "canopy" if s.kind == "canopy" else "bld_deck",
+                          "z0": q(s.z0_m), "z1": q(max(s.z1_m, s.z0_m + 0.3)), "r": ext,
+                          "h": holes, "s": "prism"})
+        elif len(s.line) >= 2:
+            r = ribbon([(p[0], p[1]) for p in s.line], 4.0, [p[2] for p in s.line])
+            if r is not None:
+                parts.append({"k": "ribbon", "m": "bld_deck", "l": r[0], "rr": r[1],
+                              "t": q(max(s.z1_m - s.z0_m, 0.5))})
+        if not parts:
+            continue
+        pts = parts[0].get("r") or parts[0].get("l")
+        cx, cy = _center(pts)
+        P.add(s.id, P.collection(P.district_at(cx, cy), "Structures"), tile_key(cx, cy),
+              f"structure_{s.kind}", parts, {"citygen_id": s.id, "citygen_type": s.type})
+
+
+# --- cameras ----------------------------------------------------------------------------------
+
+def _cameras(P: _Plan) -> dict:
+    m = P.m
+    x0, y0, x1, y1 = m.bounds
+    top = {"center": [q((x0 + x1) / 2), q((y0 + y1) / 2)], "size": [q(x1 - x0), q(y1 - y0)]}
+    tall: dict[str, float] = {}
+    for b in m.buildings:
+        if b.district_id:
+            tall[b.district_id] = max(tall.get(b.district_id, 0.0), b.height_m)
+    districts = []
+    for d in m.districts:
+        ext, _ = _poly_rings(d.polygon)
+        bx0, by0, bx1, by1 = _bbox(ext)
+        districts.append({"id": d.id, "name": d.name, "archetype": d.archetype,
+                          "box": [q(bx0), q(by0), 0.0, q(bx1), q(by1),
+                                  q(tall.get(d.id, 30.0))]})
+    return {"top": top, "iso_dir": list(ISO_DIR), "districts": districts,
+            "street": _street_views(P)}
+
+
+def _street_views(P: _Plan, n: int = 4) -> list[dict]:
+    """Eye-level views: from a ground road 150 to 450 m from each of the tallest buildings
+    (one per district), looking at the tower, plus one along an old town or market street."""
+    m = P.m
+    roads = [s for s in m.road_segments if not s.bridge and s.road_class in
+             ("avenue", "street", "pedestrian") and not any(z.z > 0.5 for z in s.z_profile)]
+    seen, views = set(), []
+    foot = []
+    for b in m.buildings:
+        if b.footprint is not None:
+            foot.append((b, G.from_model_poly(b.footprint)))
+    tree = shapely.STRtree([f for _, f in foot]) if foot else None
+    for b in sorted(m.buildings, key=lambda b: (-b.height_m, b.id)):
+        if len(views) >= n - 1 or b.height_m < 60:
+            break
+        if b.district_id in seen:
+            continue
+        pts = [p for ms in b.masses for p in ms.footprint.exterior]
+        c = _center(pts)
+        cands = []
+        for s in roads:
+            cl = _dedupe([(x, y) for x, y in s.centerline])
+            for a, nb in zip(cl, cl[1:]):
+                # looking down the road toward the tower: the road runs within 25 degrees
+                # of the line of sight, either way
+                d = _dist(c, a)
+                if not 180.0 <= d <= 520.0:
+                    continue
+                L = _dist(a, nb)
+                ux, uy = (nb[0] - a[0]) / L, (nb[1] - a[1]) / L
+                along = abs(ux * (c[0] - a[0]) + uy * (c[1] - a[1])) / d
+                if along >= 0.906:
+                    cands.append((round(abs(d - 320.0) * (2.0 - along), 2), s.id, a, d))
+        cands.sort(key=lambda k: (k[0], k[1], k[2]))
+        for _, _, p, d in cands[:200]:
+            # pitch at most about 12 degrees, aimed a third of the way up the tower
+            tz = min(0.33 * b.height_m, 1.7 + 0.21 * d)
+            if _visible(tree, foot, b, p, c, d, tz):
+                seen.add(b.district_id)
+                views.append({"name": f"view_{len(views) + 1}_{b.id}",
+                              "eye": [q(p[0]), q(p[1]), 1.7],
+                              "target": [q(c[0]), q(c[1]), q(tz)], "lens_mm": 28})
+                break
+    dense = [d.id for d in m.districts if d.archetype in ("old_town", "entertainment_market")]
+    for did in dense[:1]:
+        cand = [s for s in roads if did in s.district_ids and len(s.centerline) >= 2]
+        cand.sort(key=lambda s: (-_plen(s.centerline), s.id))
+        if cand:
+            pts = cand[0].centerline
+            a, b = pts[0], pts[-1]
+            L = _dist(a, b) or 1.0
+            ahead = min(80.0, L)
+            tgt = (a[0] + (b[0] - a[0]) / L * ahead, a[1] + (b[1] - a[1]) / L * ahead)
+            views.append({"name": f"view_{len(views) + 1}_{did}_street",
+                          "eye": [q(a[0]), q(a[1]), 1.7], "target": [q(tgt[0]), q(tgt[1]), 6.0],
+                          "lens_mm": 28})
+    return views
+
+
+def _visible(tree, foot, target, eye, c, d, tz) -> bool:
+    """No other building rises above the line of sight over the first 85% of it."""
+    if tree is None:
+        return True
+    end = (eye[0] + (c[0] - eye[0]) * 0.85, eye[1] + (c[1] - eye[1]) * 0.85)
+    line = LineString([eye, end])
+    e = Point(eye)
+    for i in sorted(tree.query(line, predicate="intersects").tolist()):
+        b, f = foot[i]
+        if b.id == target.id or (b.property_id and b.property_id == target.property_id):
+            continue
+        near = round(f.distance(e), 1)
+        if b.height_m > 1.7 + (tz - 1.7) * near / d:
+            return False
+    return True
+
+
+def _plen(pts) -> float:
+    return sum(_dist(a, b) for a, b in zip(pts, pts[1:]))
+
+
+# --- the plan ---------------------------------------------------------------------------------
+
+def make_plan(m: CityModel) -> dict:
+    with G.canonical():
+        P = _Plan(m)
+        _land_and_water(P)
+        _streets(P)
+        _open_space(P)
+        _buildings(P)
+        _sites(P)
+        cams = _cameras(P)
+    for o in P.objects:
+        ids = o["props"].get("citygen_ids")
+        if isinstance(ids, list):
+            o["props"]["citygen_ids"] = ";".join(ids)
+            o["props"]["count"] = len(ids)
+    used = sorted({p["m"] for o in P.objects for p in o["parts"]})
+    tiles = sorted(P.tiles)
+    x0, y0, x1, y1 = m.bounds
+    counts: dict[str, int] = {}
+    for o in P.objects:
+        counts[o["category"]] = counts.get(o["category"], 0) + 1
+    return {
+        "version": PLAN_VERSION, "city": m.name, "seed": m.seed, "bounds": list(m.bounds),
+        "tile_size_m": TILE_M,
+        "materials": {k: MATERIALS[k] for k in used},
+        "tiles": [{"name": tile_name(ix, iy), "ix": ix, "iy": iy,
+                   "bounds": [max(ix * TILE_M, x0), max(iy * TILE_M, y0),
+                              min((ix + 1) * TILE_M, x1), min((iy + 1) * TILE_M, y1)]}
+                  for ix, iy in tiles],
+        "cameras": cams,
+        "objects": P.objects,
+        "stats": {"objects": len(P.objects), "by_category": dict(sorted(counts.items())),
+                  "parts": sum(len(o["parts"]) for o in P.objects), "tiles": len(tiles),
+                  "buildings": sum(1 for o in P.objects if o["category"] in
+                                   ("building", "landmark"))},
+    }
+
+
+def plan_json(plan: dict) -> str:
+    return json.dumps(plan, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+
+
+def plan_sha256(plan: dict) -> str:
+    return hashlib.sha256((plan_json(plan) + "\n").encode("utf-8")).hexdigest()
+
+
+# --- running Blender ------------------------------------------------------------------------
+
+BLENDER_SCRIPT = Path(__file__).resolve().parent / "blender" / "build.py"
+BUDGET_S = 600.0  # scope section 10: the Blender build under 10 minutes
+VERIFY = ("import bpy, json\n"
+          "objs = [o for o in bpy.data.objects if 'citygen_category' in o]\n"
+          "print('CITYGEN_VERIFY ' + json.dumps({'objects': len(objs), 'buildings': sum(1 for o"
+          " in objs if o['citygen_category'] in ('building', 'landmark')), 'faces': sum(len("
+          "o.data.polygons) for o in objs if o.type == 'MESH'), 'tiles': len({o['citygen_tile']"
+          " for o in objs})}))\n")
+
+
+def _version_key(path: str) -> tuple:
+    nums = re.findall(r"\d+", Path(path).name)
+    return tuple(int(n) for n in nums) or (0,)
+
+
+def find_blender(explicit: str | None = None) -> str | None:
+    """Blender: `explicit`, $BLENDER, the newest /Applications/Blender*.app, or `blender`."""
+    for cand in (explicit, os.environ.get("BLENDER")):
+        if cand:
+            return cand if Path(cand).exists() else None
+    apps = sorted(glob.glob("/Applications/Blender*.app"), key=_version_key, reverse=True)
+    for app in apps:
+        exe = Path(app) / "Contents" / "MacOS" / "Blender"
+        if exe.exists():
+            return str(exe)
+    return shutil.which("blender")
+
+
+def _run(cmd: list[str], marker: str, timeout: float) -> tuple[dict | None, str]:
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    out = proc.stdout + proc.stderr
+    for line in out.splitlines():
+        if line.startswith(marker + " "):
+            return json.loads(line[len(marker) + 1:]), out
+    return None, out
+
+
+def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | None = None,
+                 render: bool = True, export: bool = True, res: int = 1600,
+                 samples: int = 16) -> dict:
+    """Plan, 2D map and exports here, then the .blend, USD, glTF tiles and renders in
+    Blender, then the .blend reopened in a fresh Blender to count what it holds. Returns the
+    report (also written as blockout_report.json and .txt)."""
+    from . import exports as X
+
+    t0 = time.perf_counter()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    m = CityModel.from_json(Path(model_path).read_text(encoding="utf-8"))
+    plan = make_plan(m)
+    text = plan_json(plan) + "\n"
+    (out / "blockout_plan.json").write_text(text, encoding="utf-8")
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    t_plan = time.perf_counter() - t0
+    X.map_svg(m, out / "map_2d.svg")
+    X.map_png(m, out / "map_2d.png")
+    (out / "unreal").mkdir(exist_ok=True)
+    views = plan["cameras"]["street"]
+    start = views[0]["eye"] if views else None
+    (out / "unreal" / "corporate_core_plan.json").write_text(
+        json.dumps(X.legacy_plan(m, start), indent=1) + "\n", encoding="utf-8")
+    (out / "graphs.json").write_text(json.dumps(X.graphs(m)) + "\n", encoding="utf-8")
+    (out / "tiles.json").write_text(json.dumps({"tile_size_m": TILE_M, "tiles": plan["tiles"]},
+                                               indent=1) + "\n", encoding="utf-8")
+    (out / "props.csv").write_text(X.props_csv(m), encoding="utf-8")
+    t_exports = time.perf_counter() - t0 - t_plan
+    exe = find_blender(blender)
+    checks = []
+    blender_rep, verify = None, None
+    if exe is None:
+        checks.append(("blender_found", False, "no Blender (set BLENDER or --blender)"))
+    else:
+        cmd = [exe, "-b", "--factory-startup", "-P", str(BLENDER_SCRIPT), "--",
+               str(out / "blockout_plan.json"), str(out), "--res", str(res), "--samples",
+               str(samples)]
+        if not render:
+            cmd.append("--no-render")
+        if not export:
+            cmd.append("--no-export")
+        done, log = _run(cmd, "CITYGEN_BLOCKOUT_DONE", timeout=3 * BUDGET_S)
+        (out / "blender_log.txt").write_text(log, encoding="utf-8")
+        if done is not None and (out / "blender_report.json").is_file():
+            blender_rep = json.loads((out / "blender_report.json").read_text())
+        checks.append(("blender_build", blender_rep is not None,
+                       "built" if blender_rep else "Blender failed; see blender_log.txt"))
+        if blender_rep is not None:
+            verify, vlog = _run([exe, "-b", str(out / "city.blend"), "--python-expr", VERIFY],
+                                "CITYGEN_VERIFY", timeout=BUDGET_S)
+            checks += _checks(m, plan, blender_rep, verify, out, render, export)
+    total = time.perf_counter() - t0
+    if blender_rep is not None:
+        checks.append(("blender_budget", blender_rep["timings"]["total_s"] <= BUDGET_S,
+                       f"Blender {blender_rep['timings']['total_s']} s (budget "
+                       f"{BUDGET_S:.0f} s)"))
+    report = {
+        "city": m.name, "passed": all(ok for _, ok, _ in checks),
+        "checks": [{"id": i, "passed": ok, "detail": d} for i, ok, d in checks],
+        "plan_sha256": sha, "plan": plan["stats"],
+        "blender": blender_rep, "verify": verify,
+        "timings": {"plan_s": round(t_plan, 1), "exports_s": round(t_exports, 1),
+                    "total_s": round(total, 1)},
+    }
+    (out / "blockout_report.json").write_text(json.dumps(report, indent=2) + "\n",
+                                              encoding="utf-8")
+    (out / "blockout_report.txt").write_text(report_text(report), encoding="utf-8")
+    return report
+
+
+def _checks(m, plan, rep, verify, out: Path, render: bool, export: bool) -> list:
+    out_checks = []
+    n_bld = sum(1 for b in m.buildings if any(ms.z1_m > ms.z0_m and ms.role != "void"
+                                              for ms in b.masses) or b.roof_items)
+    ok = verify is not None
+    out_checks.append(("blend_opens", ok, "city.blend reopened in a fresh Blender" if ok else
+                       "city.blend did not open"))
+    if ok:
+        out_checks.append(("blend_objects", verify["objects"] == len(plan["objects"]),
+                           f"{verify['objects']} objects in the .blend, "
+                           f"{len(plan['objects'])} in the plan"))
+        out_checks.append(("blend_buildings", verify["buildings"] == n_bld,
+                           f"{verify['buildings']} building objects, {n_bld} buildings with "
+                           f"masses in the model"))
+    if export:
+        tiles = rep["files"].get("gltf_tiles", [])
+        want = len({o["tile"] for o in plan["objects"]})
+        out_checks.append(("gltf_tiles", len(tiles) == want and all(
+            (out / t).is_file() and (out / t).stat().st_size > 0 for t in tiles),
+            f"{len(tiles)} tile files for {want} tiles with objects"))
+        usd = rep["files"].get("usd")
+        out_checks.append(("usd_export", bool(usd) and (out / usd).is_file() and
+                           (out / usd).stat().st_size > 0, f"{usd}"))
+    if render:
+        want = 1 + len(plan["cameras"]["districts"]) + len(plan["cameras"]["street"])
+        got = [r for r in rep["files"].get("renders", []) if (out / r).is_file()]
+        out_checks.append(("renders", len(got) == want, f"{len(got)} of {want} renders"))
+    return out_checks
+
+
+def report_text(rep: dict) -> str:
+    lines = [f"citygen blockout: {rep['city']}",
+             f"result: {'PASS' if rep['passed'] else 'FAIL'}", ""]
+    for c in rep["checks"]:
+        lines.append(f"  [{'pass' if c['passed'] else 'FAIL'}] {c['id']}: {c['detail']}")
+    p = rep["plan"]
+    lines += ["", f"plan: {p['objects']} objects, {p['parts']} parts, {p['tiles']} tiles, "
+              f"{p['buildings']} buildings (sha256 {rep['plan_sha256'][:16]})"]
+    b = rep.get("blender")
+    if b:
+        mb = {k: round(v / 1e6, 1) for k, v in b["bytes"].items()}
+        lines += [f"blender {b['blender']}: {b['vertices']} vertices, {b['faces']} faces, "
+                  f"{b['materials']} materials, {b['collections']} collections",
+                  f"files (MB): {json.dumps(mb)}",
+                  f"timings (s): {json.dumps(b['timings'])}"]
+    lines.append(f"total (s): {json.dumps(rep['timings'])}")
+    return "\n".join(lines) + "\n"

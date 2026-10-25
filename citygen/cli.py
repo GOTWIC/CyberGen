@@ -1,5 +1,5 @@
-"""Command line: `citygen spec validate|render|schema`, `citygen build`, `citygen model schema`,
-`citygen trace diff`.
+"""Command line: `citygen spec validate|render|schema`, `citygen build`, `citygen blockout`,
+`citygen model schema`, `citygen trace diff`.
 
 Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
 2 usage or file error.
@@ -117,7 +117,49 @@ def cmd_build(args: argparse.Namespace) -> int:
               f"{Path(args.out_dir) / 'report.txt'}", file=sys.stderr)
         return EXIT_INVALID
     print(f"PASS: {built.spec.name}: all {len(built.checks)} checks passed")
+    if args.blockout:
+        return _blockout(Path(args.out_dir) / "city_model.json", args.out_dir, args)
     return EXIT_OK
+
+
+def _blockout(model: Path, out_dir: str, args: argparse.Namespace) -> int:
+    from .blockout import run_blockout
+
+    rep = run_blockout(model, out_dir, blender=args.blender, render=not args.no_render,
+                       export=not args.no_export, res=args.res, samples=args.samples)
+    for c in rep["checks"]:
+        if not c["passed"]:
+            print(f"blockout check failed: {c['id']}: {c['detail']}", file=sys.stderr)
+    out = Path(out_dir)
+    b = rep.get("blender") or {}
+    for f in ["blockout_plan.json", "map_2d.svg", "map_2d.png", "graphs.json", "tiles.json",
+              "props.csv", "unreal/corporate_core_plan.json"]:
+        print(f"wrote {out / f}")
+    for k, v in (b.get("files") or {}).items():
+        print(f"wrote {out / v}" if isinstance(v, str) else f"wrote {len(v)} {k} in {out}")
+    if not rep["passed"]:
+        print(f"FAIL: blockout of {rep['city']}; see {out / 'blockout_report.txt'}",
+              file=sys.stderr)
+        return EXIT_INVALID
+    print(f"PASS: blockout of {rep['city']}: {rep['plan']['objects']} objects, "
+          f"{rep['plan']['tiles']} tiles, {rep['timings']['total_s']} s")
+    return EXIT_OK
+
+
+def cmd_blockout(args: argparse.Namespace) -> int:
+    if not Path(args.model).is_file():
+        print(f"error: {args.model}: file not found", file=sys.stderr)
+        return EXIT_USAGE
+    return _blockout(Path(args.model), args.out_dir, args)
+
+
+def _blockout_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--blender", help="Blender executable (default: $BLENDER, the newest "
+                                     "/Applications/Blender*.app, or blender on PATH)")
+    p.add_argument("--no-render", action="store_true", help="skip the preview renders")
+    p.add_argument("--no-export", action="store_true", help="skip USD and glTF tiles")
+    p.add_argument("--res", type=int, default=1600, help="render width in pixels")
+    p.add_argument("--samples", type=int, default=16, help="EEVEE render samples")
 
 
 def _write_json(data: dict, out: str | None) -> int:
@@ -179,8 +221,8 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("out", nargs="?")
     sc.set_defaults(func=cmd_spec_schema)
 
-    b = sub.add_parser("build", help="build the city model, checks and preview (water, "
-                                     "districts, waterways, primary roads)")
+    b = sub.add_parser("build", help="build the city model, checks and previews (water, "
+                                     "districts, roads, streets, lots, buildings)")
     b.add_argument("spec")
     b.add_argument("out_dir")
     b.add_argument("--dpi", type=int, default=110)
@@ -189,7 +231,17 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--trace", metavar="FILE.json",
                    help="also write a sha256 of every stage output and of the district "
                         "search intermediates (compare machines with `citygen trace diff`)")
+    b.add_argument("--blockout", action="store_true",
+                   help="after a passing build, also build the Blender blockout (M4)")
+    _blockout_args(b)
     b.set_defaults(func=cmd_build)
+
+    bo = sub.add_parser("blockout", help="Blender blockout of a built city: .blend, USD, "
+                                         "glTF tiles, renders, 2D map, exports")
+    bo.add_argument("model", help="city_model.json from `citygen build`")
+    bo.add_argument("out_dir")
+    _blockout_args(bo)
+    bo.set_defaults(func=cmd_blockout)
 
     tr = sub.add_parser("trace", help="build trace tools")
     tsub = tr.add_subparsers(dest="command", required=True)
