@@ -203,7 +203,9 @@ branch) builds Nexus City in 60.4 s under `tests/test_build.py` here (the M3 ses
 picking (about 0.6 s, mostly the M3 builder tries); run-to-run noise here is of the same
 size (M3 alone measured 61.4 to 64.8 s for `build_city`). On the M3 session's machine
 that projects to about 55.5 s, within the 60 s budget; on this container the budget assertion
-fails for both M3 and M3p.
+fails for both M3 and M3p. The full suite here: 259 passed, 1 failed, the Nexus City budget
+assertion (63.1 s in a full run, where the other samples are built in the same process
+first).
 
 | City | CLI build here (with previews and `--trace`), M3p |
 |---|---|
