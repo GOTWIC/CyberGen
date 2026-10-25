@@ -1478,10 +1478,10 @@ def _too_close_frame(B: Builder, q, cls: str, gap: float, dirv) -> bool:
 def _obb(poly):
     """(center, long axis unit u, short axis unit v, length, width) of the minimum rotated
     rectangle (snapped)."""
-    # GEOS's rotating calipers compare a NaN for a degenerate caliper (the result does not
-    # use it); arm64 raises the IEEE invalid flag on such a comparison and numpy turns the
-    # flag into a RuntimeWarning, thousands per build on an M-series Mac
-    with np.errstate(invalid="ignore"):
+    # GEOS's rotating calipers divide by zero and compare a NaN for a degenerate caliper
+    # (the result does not use either); arm64 raises the IEEE flags there and numpy turns
+    # them into RuntimeWarnings, hundreds per build on the M4 Mac
+    with np.errstate(divide="ignore", invalid="ignore"):
         r = G.qpoly(shapely.minimum_rotated_rectangle(poly))
     c = _dedupe(r.exterior.coords) if not r.is_empty and r.geom_type == "Polygon" else []
     if len(c) < 4:

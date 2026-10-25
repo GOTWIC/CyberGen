@@ -103,7 +103,9 @@ def _round(geom, grid: float = GRID_M):
         if dim == 2:
             g = polygonal(g)
         elif dim == 1:
-            ls = [p for p in shapely.get_parts(g) if p.geom_type == "LineString"]
+            # make_valid nests the lines in a collection (beside collapsed points): flatten
+            ls = [p for q in shapely.get_parts(g) for p in shapely.get_parts(q)
+                  if p.geom_type == "LineString"]
             g = MultiLineString(ls) if len(ls) > 1 else (ls[0] if ls else LineString())
         g = floating(shapely.set_precision(g, grid, mode="pointwise"))
     return g
