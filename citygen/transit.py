@@ -59,6 +59,8 @@ SIDE_PAD_M = 2.0
 DECK_M = {"metro": 0.0, "elevated_rail": 1.6, "monorail": 1.8, "maglev": 2.0, "sky_tube": 7.0}
 SKY_CLEAR_M = 10.0          # sky lines clear buildings by this much (scope 5.3)
 ROAD_CLEAR_M = 5.5          # under any deck over a road (scope 5.2)
+ROAD_DECK_M = 2.0           # depth under a road deck (viaducts 1.8 m, bridges 1.5 m)
+UNDER_PAD_M = 1.0           # a track passing under a road deck stays this far below it
 PORTAL_HEADROOM_M = 8.0     # a portal tower rises at least this far above the tube's top
 STATION_LEN_M = {"metro": 120.0, "elevated_rail": 110.0, "monorail": 60.0, "maglev": 160.0,
                  "sky_tube": 50.0}
@@ -93,7 +95,12 @@ ROAD_W = {
     "maglev": {"highway": 1.0, "avenue": 1.5, "street": 3.2},
 }
 RAISED_W = 6.0
+RAISED_MIN_M = 4.0    # a road deck higher than this counts as raised for the road graph
 CLIMB_W = 6.0         # raster: over a building the line climbs to clear (within its altitude)
+RESTOP_TRIES = 6      # avenue nodes a missed road-line stop tries
+EXIT_RUN_M = 400.0    # a line that leaves the map is fitted as if it ran on this far
+RESTOP_BUDGET = 4     # routes the stop retry may try in all, per line
+MAX_TURN_COS = -0.5   # road-graph routes turn at most 120 degrees at a node
 REUSE_W = 2.0         # a later leg of the same line on a segment an earlier leg used
 REUSE_PAD_M = 120.0   # raster: cells this close to an earlier leg cost REUSE_W times more
 TURN_M = {"elevated_rail": 450.0, "monorail": 350.0, "maglev": 1600.0}  # at a 90 degree turn
@@ -188,6 +195,11 @@ def raised_roads(m) -> list:
     return out
 
 
+def road_underside(z: float) -> float:
+    """Underside of a road deck whose surface is at z."""
+    return z - ROAD_DECK_M
+
+
 def _z_at(prof, s: float) -> float:
     if s <= prof[0][0]:
         return prof[0][1]
@@ -197,9 +209,10 @@ def _z_at(prof, s: float) -> float:
     return prof[-1][1]
 
 
-def deck_heights(decks, tree, arr, pad: float) -> list[tuple[int, float]]:
+def deck_heights(decks, tree, arr, pad: float, which: bool = False) -> list[tuple]:
     """(point index, road deck z) for the points over a raised road (within its half width
-    plus pad), the deck z where the point projects on its centerline."""
+    plus pad), the deck z where the point projects on its centerline (with `which`, the
+    deck's index too)."""
     if tree is None:
         return []
     out = []
@@ -209,8 +222,47 @@ def deck_heights(decks, tree, arr, pad: float) -> list[tuple[int, float]]:
         line, hw, prof = decks[l_]
         p = arr[i]
         if line.distance(p) <= hw + pad:
-            out.append((i, _z_at(prof, line.project(p))))
+            z = _z_at(prof, line.project(p))
+            out.append((i, z, l_) if which else (i, z))
     return out
+
+
+def _envelope(pts, need: list[float], g: float) -> list[float]:
+    """The lowest profile over `need` with grades of at most g."""
+    lo = list(need)
+    for i in range(1, len(lo)):
+        lo[i] = max(lo[i], lo[i - 1] - g * _d(pts[i - 1], pts[i]))
+    for i in range(len(lo) - 2, -1, -1):
+        lo[i] = max(lo[i], lo[i + 1] - g * _d(pts[i], pts[i + 1]))
+    return lo
+
+
+def deck_crossings(decks, tree, arr, pad: float) -> list[list[tuple[int, float]]]:
+    """The track points over each raised road, grouped by crossing (one road, consecutive
+    points): [[(point index, deck z), ...], ...]."""
+    by: dict = {}
+    for i, z, l_ in deck_heights(decks, tree, arr, pad, which=True):
+        by.setdefault(l_, []).append((i, z))
+    out = []
+    for l_ in sorted(by):
+        run = []
+        for i, z in sorted(by[l_]):
+            if run and i > run[-1][0] + 1:
+                out.append(run)
+                run = []
+            run.append((i, z))
+        if run:
+            out.append(run)
+    return out
+
+
+def passes_under(mode: str, zs: list[float], z0: float) -> bool:
+    """A crossing of road decks at heights zs that the track passes under: over it would
+    take the track above its mode's altitude, under it keeps the track at its base."""
+    lo_alt, hi_alt = presets.TRANSIT_MODES[mode].altitude_m
+    over = max(zs) + ROAD_CLEAR_M + below(mode)
+    under = road_underside(min(zs)) - above(mode) - UNDER_PAD_M
+    return over > hi_alt and under >= max(lo_alt, z0 - 0.01) - 1e-9
 
 
 def context(spec, m) -> Ctx:
@@ -244,9 +296,13 @@ def context(spec, m) -> Ctx:
             for p_, l_ in zip(idx_p[ok].tolist(), idx_l[ok].tolist()):
                 s = segs[l_]
                 if s.bridge or any(z.z > 0.5 for z in s.z_profile):
-                    zmax = max((z.z for z in s.z_profile), default=0.0)
-                    if zmax > c.road_z[p_]:
-                        c.road_z[p_] = zmax
+                    # the road's height at this cell (M7: a long road raised at one end)
+                    prof = [(z.s, z.z) for z in s.z_profile]
+                    zc = _z_at(prof, lines[l_].project(c.pts[p_]))
+                    if zc <= 0.5:
+                        continue
+                    if zc > c.road_z[p_]:
+                        c.road_z[p_] = zc
                     raised[p_] = True
         c.cls[name] = mask
     c.cls["raised"] = raised
@@ -455,7 +511,7 @@ def sky_pass(b, z: float, alt: tuple, through: bool) -> str:
 
 
 def costs(c: Ctx, mode: str, z: float, through: bool, extra_block=None, hi: float = 0.0,
-          lo: float = 0.0) -> tuple:
+          lo: float = 0.0, tall_scale: float = 1.0) -> tuple:
     """(cost per meter of each cell, portal cell mask). A building the line cannot clear at
     z but could by climbing (up to its altitude limit hi) costs CLIMB_W; one it can neither
     clear nor take out (nor pass through, sky tubes) is forbidden."""
@@ -492,7 +548,7 @@ def costs(c: Ctx, mode: str, z: float, through: bool, extra_block=None, hi: floa
                 cost[p_] = max(cost[p_], CLIMB_W) if how == "climb" else INF
             continue
         if b.removable:
-            cost[p_] = max(cost[p_], k["tall"])
+            cost[p_] = max(cost[p_], k["tall"] * tall_scale)
         else:
             cost[p_] = max(cost[p_], CLIMB_W) if b.top <= hi - clear else INF
     if mode == "sky_tube":
@@ -809,6 +865,7 @@ class Line:
     conflicts: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     names: set = field(default_factory=set)      # station names used on the line
+    tall_scale: float = 1.0                      # raster: cost of the towers it would clear
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -834,21 +891,37 @@ class RoadGraph:
         self.adj: dict = {}
         self.major: set = set()     # nodes on avenues and highways
         for k, s in enumerate(c.m.road_segments):
-            if s.road_class not in w:
+            if s.road_class not in w or s.attrs.get("role") == "ramp":
                 continue
             pts = [tuple(p) for p in s.centerline]
             a = self.pos.get(s.start)
             if a is not None and _d(pts[-1], a) < _d(pts[0], a):
                 pts = pts[::-1]
-            raised = not s.bridge and any(z.z > 0.5 for z in s.z_profile)
-            wt = _plen(pts) * w[s.road_class] * (RAISED_W if raised and mode != "maglev"
-                                                  else 1.0)
-            self.adj.setdefault(s.start, []).append((s.end, k, wt, pts))
-            self.adj.setdefault(s.end, []).append((s.start, k, wt, pts[::-1]))
-            if s.road_class in ("avenue", "highway"):
-                self.major.update((s.start, s.end))
+            # a deck the track must climb over (M7: not a low approach or a ramp's foot)
+            raised = not s.bridge and any(z.z > RAISED_MIN_M for z in s.z_profile)
+            f = w[s.road_class] * (RAISED_W if raised and mode != "maglev" else 1.0)
+            # M7: a highway and the avenue under it still meet at the overpass for a track
+            # above both (a node of the graph there)
+            cuts = [0]
+            for ov in s.attrs.get("overpass_at", []):
+                ov = (q(ov[0]), q(ov[1]))
+                if ov in pts[1:-1]:
+                    cuts.append(pts.index(ov))
+                    self.pos[f"ov{ov[0]:.2f}_{ov[1]:.2f}"] = ov
+            cuts = sorted(set(cuts)) + [len(pts) - 1]
+            ids = [s.start] + [f"ov{pts[i][0]:.2f}_{pts[i][1]:.2f}" for i in cuts[1:-1]] + \
+                [s.end]
+            for part, (a_, b_, na, nb) in enumerate(zip(cuts, cuts[1:], ids, ids[1:])):
+                sub = pts[a_:b_ + 1]
+                wt = _plen(sub) * f
+                key = k if len(cuts) == 2 else (k, part)
+                self.adj.setdefault(na, []).append((nb, key, wt, sub))
+                self.adj.setdefault(nb, []).append((na, key, wt, sub[::-1]))
+                if s.road_class in ("avenue", "highway"):
+                    self.major.update((na, nb))
         for key in self.adj:
-            self.adj[key].sort(key=lambda e: (e[0], e[1]))
+            self.adj[key].sort(key=lambda e: (e[0], e[1] if isinstance(e[1], tuple)
+                                              else (e[1], -1)))
         self.turn = TURN_M[mode]
 
     def node_near(self, st: Stop, c: Ctx, limit: float = 450.0) -> str | None:
@@ -911,6 +984,8 @@ class RoadGraph:
                 if din is not None:
                     dout = self._dir(pts)
                     cosang = max(-1.0, min(1.0, din[0] * dout[0] + din[1] * dout[1]))
+                    if cosang < MAX_TURN_COS:
+                        continue      # a train does not turn back (its curves would cut it)
                     if cosang < 0.94:
                         step += self.turn * (1.0 - cosang)
                 nk = (v, k)
@@ -982,7 +1057,15 @@ def route_line(c: Ctx, ln: Line) -> None:
 
     def missed():
         return sum(1 for s in stops if not _served(ln.pts, s))
+    r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
+
+    def tight():
+        return ln.min_radius < 0.95 * r_min
     if moved == home or not missed():
+        if (missed() or tight()) and mode in ROAD_MODES:
+            _restop(c, ln, missed, notes, conflicts)
+        elif tight() and mode not in ROAD_MODES:
+            _straighter(c, ln, missed, notes, conflicts)
         return
     first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, missed())
     for s, p in zip(stops, home):
@@ -992,6 +1075,82 @@ def route_line(c: Ctx, ln: Line) -> None:
     if missed() >= first[5]:
         ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
         for s, p in zip(stops, moved):
+            s.p = p
+    if (missed() or tight()) and mode in ROAD_MODES:
+        _restop(c, ln, missed, notes, conflicts)
+
+
+def _straighter(c: Ctx, ln: Line, missed, notes: list, conflicts: list) -> None:
+    """A flying line whose curves came out too tight (it wound between towers): routed
+    again with the towers it would clear costing a quarter, so it takes a straighter way
+    and clears more of them; kept when that serves as many stops with wider curves."""
+    first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, missed())
+    ln.tall_scale = 0.25
+    ln.notes, ln.conflicts = list(notes), list(conflicts)
+    _route(c, ln)
+    if missed() > first[5] or ln.min_radius <= first[1]:
+        ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
+        ln.tall_scale = 1.0
+
+
+def _restop(c: Ctx, ln: Line, missed, notes: list, conflicts: list) -> None:
+    """A road-following line that still misses a district stop (it turns back there, and its
+    curves cut the turn) or keeps a curve tighter than its radius: each stop tries the next
+    avenue nodes of its district, nearest first; the route that serves the most stops wins,
+    then the one without a tight curve, then the one with the widest."""
+    stops = ln.stops
+    graph = RoadGraph(c, ln.mode)
+    dist = {d.id: d for d in c.m.districts}
+
+    r_min = presets.TRANSIT_MODES[ln.mode].min_curve_radius_m or 0.0
+
+    def snap():
+        return (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts,
+                [s.p for s in stops])
+
+    def score():
+        return (missed(), 1 if ln.min_radius < 0.95 * r_min else 0,
+                -round(min(ln.min_radius, r_min), 1))
+    best = (score(), snap())
+    budget = [RESTOP_BUDGET]
+    for st in list(stops):
+        if best[0][:2] == (0, 0):
+            break
+        if st.kind != "district" or st.z is not None or st.district_id not in dist:
+            continue
+        if _served(ln.pts, st) and best[0][1] == 0:
+            continue
+        poly = G.from_model_poly(dist[st.district_id].polygon)
+        twins = [s for s in stops if s.name == st.name and s.kind == st.kind]
+        here = st.p
+        cands = sorted((round(_d(graph.pos[n], here), 2), n) for n in sorted(graph.major)
+                       if not n.startswith("ov") and poly.contains(Point(graph.pos[n])))
+        pts = [graph.pos[nid] for _, nid in cands[:RESTOP_TRIES]]
+        # first, for a loop: the district point nearest the chord between its neighbors
+        # (where the loop passes through instead of turning back at the stop)
+        k = stops.index(st)
+        if ln.loop and len(stops) > 3:
+            prev = stops[k - 1] if k > 0 else stops[-2]
+            nxt = stops[k + 1] if k + 1 < len(stops) - 1 or k == 0 else stops[1]
+            chord = LineString([prev.p, nxt.p])
+            if chord.length > 1.0:
+                pts = [_district_point(c, dist[st.district_id], ln.mode, chord)] + pts
+        for p in pts:
+            if p == here:
+                continue
+            if budget[0] <= 0:
+                break
+            budget[0] -= 1
+            for s in twins:
+                s.p = p
+            ln.notes, ln.conflicts = list(notes), list(conflicts)
+            _route(c, ln)
+            if score() < best[0]:
+                best = (score(), snap())
+                if best[0][:2] == (0, 0):
+                    break
+        ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = best[1][:5]
+        for s, p in zip(stops, best[1][5]):
             s.p = p
 
 
@@ -1004,7 +1163,8 @@ def _route(c: Ctx, ln: Line) -> None:
     block = None
     dense, rmin, ok = [], INF, True
     for attempt in range(ATTEMPTS):
-        cost, portal = costs(c, mode, ln.z0, ln.through, block, ln.alt[1], ln.alt[0])
+        cost, portal = costs(c, mode, ln.z0, ln.through, block, ln.alt[1], ln.alt[0],
+                             ln.tall_scale)
         if graph is None:
             # a stop in a forbidden area (a flight cone, a tower the line cannot pass) moves
             # to the nearest passable cell; its station goes there
@@ -1060,6 +1220,19 @@ def _route(c: Ctx, ln: Line) -> None:
         # simplified between stops (a loop would collapse as one run), then arcs at the
         # mode's radius with only the ends fixed: curves may pass beside a stop
         pts, _ = simplify_runs(raw, at_stop, SIMPLIFY_M[mode])
+        # a line that leaves the map runs on straight beyond its exit: its last curve may use
+        # the room past the edge (cut back to the exit below)
+        cut_ends = []
+        if not ln.loop and r_min > 0 and len(pts) >= 2:
+            for end in (0, -1):
+                if stops[end].kind == "exit":
+                    a_, b_ = (pts[1], pts[0]) if end == 0 else (pts[-2], pts[-1])
+                    L_ = _d(a_, b_)
+                    if L_ > 1.0:
+                        far = (q(b_[0] + (b_[0] - a_[0]) / L_ * EXIT_RUN_M),
+                               q(b_[1] + (b_[1] - a_[1]) / L_ * EXIT_RUN_M))
+                        pts = [far] + pts[1:] if end == 0 else pts[:-1] + [far]
+                        cut_ends.append((end, b_))
         if r_min > 0:
             def ok_cut(run, cost=cost):
                 for p, r in zip(run, run[1:]):
@@ -1077,6 +1250,7 @@ def _route(c: Ctx, ln: Line) -> None:
                 fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min, pins)
             if ln.loop and fitted[0] != fitted[-1]:
                 fitted = fitted + [fitted[0]]
+            fitted = _cut_to_exits(fitted, cut_ends)
             dense = _densify(fitted)
         else:
             dense, rmin = _densify(pts), INF
@@ -1106,6 +1280,22 @@ def _route(c: Ctx, ln: Line) -> None:
                             f"route that runs through its stops keeps them)")
     if not ok:
         ln.conflicts.append("route")
+
+
+def _cut_to_exits(pts: list, cut_ends: list) -> list:
+    """The fitted line cut back to its exits (where it was run on past the map edge)."""
+    for end, e in sorted(cut_ends, key=lambda t: -t[0]):   # the far end first
+        line = LineString(pts)
+        s_e = line.project(Point(e))
+        L = line.length
+        if end == -1 and s_e < L:
+            keep = shapely.ops.substring(line, 0.0, s_e)
+        elif end == 0 and s_e > 0:
+            keep = shapely.ops.substring(line, s_e, L)
+        else:
+            continue
+        pts = [(q(x), q(y)) for x, y in keep.coords]
+    return pts
 
 
 def _hull_loop(c: Ctx, ln: Line, cost, r_min: float):
@@ -1308,8 +1498,46 @@ def profile(c: Ctx, ln: Line, gone: set) -> None:
             continue
         for i in np.nonzero(shapely.contains(poly, arr))[0].tolist():
             need[i] = max(need[i], clr + deck + 1.0)
-    for i, z in deck_heights(c.decks, c.dtree, arr, WIDTH_M[mode] / 2.0):
-        need[i] = max(need[i], z + ROAD_CLEAR_M + deck)
+    g = (presets.TRANSIT_MODES[mode].max_grade or 0.05) * 0.95
+    low = _envelope(ln.pts, need, g)     # what the water already needs, at the grade
+    runs = deck_crossings(c.decks, c.dtree, arr, WIDTH_M[mode] / 2.0)
+    need0 = list(need)
+    over_runs: set = set()
+    for _attempt in range(4):
+        need = list(need0)
+        zs = _profile_pass(c, ln, gone, arr, need, runs, over_runs, low)
+        # a deck the track was to pass under but other needs lift it into: over it instead
+        late = set()
+        for k, run in enumerate(runs):
+            if k in over_runs:
+                continue
+            if any(zs[i] > road_underside(z) - above(mode) - UNDER_PAD_M + 0.01
+                   for i, z in run) and _under_choice(mode, run, ln.z0, low):
+                late.add(k)
+        if not late:
+            break
+        over_runs |= late
+    ln.zs = zs
+
+
+def _under_choice(mode: str, run, z0: float, low) -> bool:
+    ucap = min(road_underside(z) - above(mode) - UNDER_PAD_M for _, z in run)
+    return passes_under(mode, [z for _, z in run], z0) and all(low[i] <= ucap for i, _ in run)
+
+
+def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs: set,
+                  low) -> list[float]:
+    mode = ln.mode
+    n = len(ln.pts)
+    deck = below(mode)
+    unders = []
+    for k, run in enumerate(runs):
+        if k not in over_runs and _under_choice(mode, run, ln.z0, low):
+            # M7: a high road deck (an approach viaduct) the track passes under
+            unders += [(i, road_underside(z) - above(mode) - UNDER_PAD_M) for i, z in run]
+        else:
+            for i, z in run:
+                need[i] = max(need[i], z + ROAD_CLEAR_M + deck)
     if c.btree is not None:
         half = WIDTH_M[mode] / 2.0 + SIDE_PAD_M
         ip, ib = c.btree.query(arr, predicate="dwithin", distance=half)
@@ -1322,8 +1550,11 @@ def profile(c: Ctx, ln: Line, gone: set) -> None:
     for s, i in zip(ln.stops, ln.stop_at):
         if s.z is not None:
             need[i] = max(need[i], s.z + (0.0 if mode == "sky_tube" else 1.0))
-    # upper bounds: the towers a sky tube passes through (8 m of headroom under the roof)
+    # upper bounds: the towers a sky tube passes through (8 m of headroom under the roof),
+    # high road decks passed under
     cap = [INF] * n
+    for i, z in unders:
+        cap[i] = min(cap[i], z)
     # the skybridges of complexes (kept): over or under, whichever is nearer the base
     # altitude, 3 m clear
     for line, z0, z1, cx, _, w in c.skyb:
@@ -1361,7 +1592,7 @@ def profile(c: Ctx, ln: Line, gone: set) -> None:
         L = g * _d(ln.pts[i], ln.pts[i + 1])
         lo[i] = max(lo[i], lo[i + 1] - L)
         hi[i] = min(hi[i], hi[i + 1] + L)
-    ln.zs = [q(max(a, min(b, ln.z0))) for a, b in zip(lo, hi)]
+    return [q(max(a, min(b, ln.z0))) for a, b in zip(lo, hi)]
 
 
 # ---------------------------------------------------------------------------
@@ -1691,6 +1922,13 @@ class Builder:
             return
         _, bid, e, b = best
         tgt = G.qpoint(shapely.ops.nearest_points(b.poly, Point(e))[0])
+        # the building stands on the landmass the station's stairs reach (a platform over
+        # the water between two would leave the skywalk's end apart from its own streets)
+        lm_e = _landmass_index(self.lms, [e])[0]
+        k = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of, Point(e),
+                        lm_e)
+        if _landmass_index(self.lms, [tgt])[0] != self.land_of[k]:
+            return
         seg2 = LineString([e, tgt])
         for i in c.btree.query(seg2, predicate="intersects").tolist():
             o = c.blds[i]

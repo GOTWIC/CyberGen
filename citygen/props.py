@@ -1013,6 +1013,31 @@ def build(spec, m) -> Out:
         return _build(spec, m)
 
 
+def _headroom(c: Ctx, oh):
+    """A filter: ground props that fit under what is over them (M7: a street light under a
+    viaduct deck is too tall, so it becomes a lamp hung under the deck)."""
+    polys, under = oh
+    tree = shapely.STRtree(polys) if polys else None
+
+    def ok(cands: list[Cand]) -> list[Cand]:
+        if tree is None or not cands:
+            return cands
+        pts = shapely.points(np.array([(x.x, x.y) for x in cands], dtype=np.float64))
+        ip, ig = tree.query(pts, predicate="intersects")
+        low = np.full(len(cands), np.inf)
+        np.minimum.at(low, ip, np.asarray(under)[ig])
+        out = []
+        for x, u in zip(cands, low.tolist()):
+            h = KINDS.get(x.kind, (None, (0.0, 0.0, 0.0)))[1][2]
+            if x.z > 0.5 or u >= h + 0.3:
+                out.append(x)
+            elif x.kind == "street_light" and u >= 3.0:
+                out.append(Cand("wall_light", x.x, x.y, z=q(u - 0.5), yaw=x.yaw, r=0.0,
+                                keep=0, attrs={**x.attrs, "mount": "deck", "emitter": True}))
+        return out
+    return ok
+
+
 def _build(spec, m) -> Out:
     import shapely.ops  # noqa: F401  (nearest_points)
 
@@ -1021,10 +1046,11 @@ def _build(spec, m) -> Out:
     c = Ctx(spec, m)
     placed: list[Cand] = []
     info: dict = {}
+    under_ok = _headroom(c, V.overhead(c))
     # ground things in priority order: what the street needs first, clutter last; the trees
     # go between the street furniture and the clutter (vegetation.py)
     for name, fn in GENERATORS[:7]:
-        got = c.place(fn(c))
+        got = c.place(under_ok(fn(c)))
         info[name] = len(got)
         placed += got
         if name == "street_lights":
@@ -1039,7 +1065,7 @@ def _build(spec, m) -> Out:
     info["street_trees"] = len(got)
     placed += got
     for name, fn in GENERATORS[7:]:
-        got = c.place(fn(c))
+        got = c.place(under_ok(fn(c)))
         info[name] = len(got)
         placed += got
     for name, fn in V.GENERATORS:

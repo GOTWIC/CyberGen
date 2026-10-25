@@ -800,3 +800,36 @@ def from_model_polys(polys) -> list:
         for i, p in zip(which, ps):
             out[i] = p
     return out
+
+
+def profile_max(prof, a: float, b: float) -> float:
+    """Highest z of a profile [(s, z), ...] over the stretch a..b."""
+    if not prof:
+        return 0.0
+    if not isinstance(prof, (list, tuple)):
+        return float(prof)
+
+    def at(s):
+        if s <= prof[0][0]:
+            return prof[0][1]
+        for (s0, z0), (s1, z1) in zip(prof, prof[1:]):
+            if s <= s1:
+                return max(z0, z1) if s1 <= s0 else z0 + (z1 - z0) * (s - s0) / (s1 - s0)
+        return prof[-1][1]
+    return max([at(a), at(b)] + [z for s, z in prof if a < s < b])
+
+
+def road_z_over(line_pts, prof, poly, pad: float = 2.0) -> float:
+    """M7: the highest point of a road (centerline points, z profile [(s, z)]) under a
+    footprint, over the stretch of the road the footprint covers (a pad either side), not
+    the whole road: a street that rises onto a bridge approach far away is low here."""
+    if not isinstance(prof, (list, tuple)):
+        return float(prof)
+    if not prof or max(z for _, z in prof) <= 0.0:
+        return 0.0
+    line = LineString(line_pts)
+    pts = [Point(x, y) for x, y in poly.exterior.coords] if hasattr(poly, "exterior") else \
+        [Point(x, y) for x, y in poly.coords]
+    ss = [line.project(p) for p in pts]
+    a, b = round(min(ss), 2) - pad, round(max(ss), 2) + pad
+    return profile_max(prof, max(a, 0.0), min(b, line.length))

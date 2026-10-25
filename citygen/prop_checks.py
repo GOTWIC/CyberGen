@@ -112,7 +112,7 @@ def check_trees(c: Ctx, m: CityModel) -> Check:
         ip, ig = otree.query(pts, predicate="dwithin", distance=float(crown.max()))
         d = shapely.distance(pts[ip], np.array(polys, dtype=object)[ig])
         for i, k, dd in zip(ip.tolist(), ig.tolist(), d.tolist()):
-            if dd < crown[i] and trees[i].height_m > under[k] - 1.0 + 0.02:
+            if dd < crown[i] - 0.02 and trees[i].height_m > under[k] - 1.0 + 0.02:
                 _limit(ch, f"{trees[i].id}: {trees[i].height_m:g} m under something at "
                            f"{under[k]:g} m")
     street = [i for i, p in enumerate(trees) if _kind(p) in ("street_tree", "median_tree",

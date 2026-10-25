@@ -137,6 +137,7 @@ class RoadNet:
     notes: list[str] = field(default_factory=list)
     exits: dict[str, tuple[float, float]] = field(default_factory=dict)
     variant: int = 0
+    elevated: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -2120,6 +2121,13 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
             "attrs": {"water_class": cls_w, "span_m": G.q(p["line"].length),
                       "ramp_length_m": G.q((clear + DECK_M) / RAMP_GRADE), "major": True,
                       "named": True, "causeway": False}})
+    # M7: viaducts, ramps and interchanges
+    from . import elevated as EL
+
+    net.elevated = EL.elevate(spec, ctx, net)
+    ctx.notes += net.elevated.pop("notes", [])
+    if net.elevated.get("runs"):
+        _grade_separations(ctx, net)
     return net
 
 

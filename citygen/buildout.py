@@ -96,6 +96,12 @@ def contexts(spec, m) -> list[dict]:
         np.array([c.width_m / 2.0 for c in m.crosswalks]), cap_style="flat",
         join_style="mitre"))) if m.crosswalks else []
     cwtree = shapely.STRtree(cwpolys) if cwpolys else None
+    # sidewalks too (a sidewalk line can run past its road's end, around a corner)
+    swpolys = list(G.snap_many(shapely.buffer(
+        np.array([LineString(w.line) for w in m.sidewalks], dtype=object),
+        np.array([w.width_m / 2.0 for w in m.sidewalks]), cap_style="flat",
+        join_style="mitre"))) if m.sidewalks else []
+    swtree = shapely.STRtree(swpolys) if swpolys else None
     opens_by: dict = {}
     bopen_by: dict = {}
     dopen: dict = {}
@@ -125,13 +131,15 @@ def contexts(spec, m) -> list[dict]:
         roads = []
         for k in ks:
             s = m.road_segments[k]
-            zmax = max((z.z for z in s.z_profile), default=0.0)
+            # (M7: the z profile, so a clearance over it is the road's height where crossed)
             roads.append((s.id, s.road_class, [tuple(p) for p in s.centerline], s.width_m,
-                          float(zmax)))
+                          tuple((float(z.s), float(z.z)) for z in s.z_profile)))
         junctions = [jpolys[int(i)] for i in sorted(jtree.query(zone, predicate="intersects"))
                      ] if jtree is not None else []
         junctions += [cwpolys[int(i)] for i in sorted(cwtree.query(zone, predicate="intersects"))
                       ] if cwtree is not None else []
+        junctions += [swpolys[int(i)] for i in sorted(swtree.query(zone, predicate="intersects"))
+                      ] if swtree is not None else []
         junctions += [p for _, p in dopen.get(d.id, [])]
         wat = [water[int(i)] for i in sorted(wtree.query(zone, predicate="intersects"))] \
             if wtree is not None else []

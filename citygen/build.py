@@ -22,6 +22,7 @@ not depend on the number of workers.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import multiprocessing
@@ -48,6 +49,8 @@ from .validate import Result, dump_spec
 MAX_VARIANTS = 20
 GOOD_QUALITY = 0.10
 ROAD_CANDIDATES = 3
+CITY_RETRIES = 4       # M7: layouts or road networks a failing full city tries next
+LAYOUT_SALTS = 3       # of them, local layouts on the same roads first
 
 
 @dataclass
@@ -358,11 +361,47 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
         if not roads:
             return ranked[0]
         b = add_roads(ranked, explicit, run)
-        if local:
+        if not local:
+            return b
+        # the whole city on these roads; when a later stage fails a check, again with the
+        # local layout drawn again (district seeds salted, LAYOUT_SALTS times), then on the
+        # next road network that passes, at most CITY_RETRIES more tries in all; the try
+        # with the fewest failures wins
+        tried = {(b.variant, b.stats["road_variant"])}
+        base = _pristine(b)
+        best = None
+        salt = 0
+        for attempt in range(CITY_RETRIES + 1):
             add_local(b, explicit, run, check=not buildings)
             if buildings:
                 add_buildings(b, explicit, run)
-        return b
+            fails = sum(len(c.failures) for c in b.checks)
+            T.stage(f"city_try{attempt}", [b.variant, b.stats.get("road_variant"), salt, fails])
+            if best is None or fails < best[0]:
+                best = (fails, b)
+            if not fails or attempt == CITY_RETRIES:
+                break
+            what = f"road variant {b.variant}/{b.stats.get('road_variant')}" + (
+                f", layout salt {salt}" if salt else "")
+            # the local layout drawn again first (the roads are the best ones), then the next
+            # road network
+            nxt = add_roads(ranked, explicit, run, frozenset(tried)) \
+                if salt >= LAYOUT_SALTS else None
+            if nxt is not None:
+                tried.add((nxt.variant, nxt.stats["road_variant"]))
+                salt = 0
+                base = _pristine(nxt)
+                b = nxt
+                again = f"road variant {nxt.variant}/{nxt.stats.get('road_variant')}"
+            else:
+                salt += 1
+                b = _pristine(base)
+                b.spec = _salted(base.spec, salt)
+                b.stats["layout_salt"] = salt
+                again = f"the same roads with the local layout drawn again (salt {salt})"
+            b.notes = [f"{what} left {fails} check failures in the full city; built again on "
+                       f"{again}"] + b.notes
+        return best[1]
     finally:
         run.close()
 
@@ -398,18 +437,39 @@ def road_attempt(b: Built, explicit: set[str], k: int) -> _RoadTry:
     return _RoadTry(b.variant, sites, site_notes, net, model, checks, st)
 
 
+def _pristine(b: Built) -> Built:
+    """A copy of a city with its roads, to build the later stages on again."""
+    out = copy.copy(b)
+    out.roads = copy.deepcopy(b.roads)
+    out.notes = list(b.notes)
+    out.stats = dict(b.stats)
+    out.local = out.m3 = None
+    return out
+
+
+def _salted(spec: CitySpec, salt: int) -> CitySpec:
+    """The spec with every district seed moved (the local layout drawn again)."""
+    return spec.model_copy(update={"districts": [
+        d.model_copy(update={"seed": int(d.seed) + 7919 * salt}) for d in spec.districts]})
+
+
 def _road_job(b: Built, explicit: set[str], k: int, tracing: bool, worker: bool):
     return _collect(worker and tracing, road_attempt, b, explicit, k)
 
 
-def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = None) -> Built:
+def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = None,
+              skip: frozenset = frozenset()) -> Built | None:
     """Roads on the best variant (ranked[0]), trying the road variants in order; if none
     passes every check, the same on the next best variants that passed the water and
     district checks. The first attempt that passes wins, else the one with the fewest
-    failures (the earliest of those)."""
+    failures (the earliest of those). `skip`: (variant, road variant) pairs already tried
+    for the whole city (M7: `build_city` tries the next one when the full city fails)."""
     run = run or _Runner(1)
     cands = [ranked[0]] + [b for b in ranked[1:] if b.passed][:ROAD_CANDIDATES - 1]
-    attempts = [(b, k) for b in cands for k in range(len(RD.ROAD_VARIANTS))]
+    attempts = [(b, k) for b in cands for k in range(len(RD.ROAD_VARIANTS))
+                if (b.variant, k) not in skip]
+    if not attempts:
+        return None
     by_variant = {b.variant: b for b in cands}
     best: _RoadTry | None = None
     for start in range(0, len(attempts), run.workers):
@@ -422,7 +482,10 @@ def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = Non
                 break
         if best.fails == 0:
             break
-    b = by_variant[best.variant]
+    if skip and best.fails:
+        return None      # a retry only takes a road network that passes
+    # a copy: a later retry starts again from the variant as it was
+    b = copy.copy(by_variant[best.variant])
     b.sites, b.roads, b.model, b.checks = best.sites, best.net, best.model, best.checks
     st = best.stats
     st["separation_budget"] = b.stats.get("separation_budget")
@@ -480,6 +543,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
 
     from . import building_checks as BC
     from . import buildout as BO
+    from . import elevated as EL
     from . import street_checks as SC
     from . import prop_checks as PC
     from . import props as PR
@@ -513,16 +577,23 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     if spec.transit.lines:
         tr = TR.build(spec, m)
         m = with_rows(m, tr.rows)
+    # M7: columns under the raised road decks (after the transit structures they avoid)
+    m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     pr = PR.build(spec, m)
     m = with_rows(m, pr.rows)
     b.model = m
     lms = SimpleNamespace(landmasses={lm.id: G.from_model_poly(lm.polygon)
                                       for lm in m.landmasses})
     bx = BC._B(m)
+    from . import elevated_checks as EC
+
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
               for c in early["checks"]] + BC.run(spec, m, None, bx) + TC.run(spec, m) + \
         PC.run(spec, m)
+    with G.canonical():
+        checks.append(EC.check_supports(m))
     st = early["stats"]
+    st["elevated"] = EC.stats(m)
     if "local" in st:
         st["local"] = SC.stats(spec, m)
     st["buildings"] = BC.stats(spec, m, bx)
@@ -588,4 +659,9 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_transit.png")
         render_transit(b, paths[-1])
+    if any(s.attrs.get("elevated") for s in b.model.road_segments):
+        from .preview_elevated import render_elevated
+
+        paths.append(out / "preview_elevated.png")
+        render_elevated(b, paths[-1])
     return paths

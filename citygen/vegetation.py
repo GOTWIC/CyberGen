@@ -24,6 +24,7 @@ import math
 
 import numpy as np
 import shapely
+import shapely.ops
 from shapely.geometry import LineString
 
 from . import geom as G
@@ -384,6 +385,17 @@ GENERATORS = [("median_trees", median_trees), ("promenade_trees", promenade_tree
 # Crowns: clear of facades and overhead
 # ---------------------------------------------------------------------------
 
+def _z_on(prof, s: float) -> float:
+    if not prof:
+        return 0.0
+    if s <= prof[0][0]:
+        return prof[0][1]
+    for (s0, z0), (s1, z1) in zip(prof, prof[1:]):
+        if s <= s1:
+            return max(z0, z1) if s1 <= s0 else z0 + (z1 - z0) * (s - s0) / (s1 - s0)
+    return prof[-1][1]
+
+
 def overhead(c: Ctx) -> tuple:
     """(footprints, underside z) of everything above the ground a tree could grow into."""
     m = c.m
@@ -404,10 +416,22 @@ def overhead(c: Ctx) -> tuple:
         under.append(sb.z_m - 1.0)
     for s in m.road_segments:
         zs = [z.z for z in s.z_profile]
-        if s.bridge or any(z > 0.5 for z in zs):
-            polys.append(LineString(s.centerline).buffer(s.width_m / 2.0 + 1.0,
-                                                         cap_style="flat"))
-            under.append(max(0.0, min([z for z in zs if z > 0.5] or [6.0]) - 1.5))
+        if not (s.bridge or any(z > 0.5 for z in zs)):
+            continue
+        # in 20 m pieces, each with its lowest underside (M7: a ramp or an approach falls
+        # to an embankment, which is ground, not a deck over a tree)
+        line = LineString(s.centerline)
+        prof = [(z.s, z.z) for z in s.z_profile]
+        L = line.length
+        n = max(int(math.ceil(L / 20.0)), 1)
+        for k in range(n):
+            a, b = L * k / n, L * (k + 1) / n
+            lo = min([_z_on(prof, a), _z_on(prof, b)] + [z for t, z in prof if a < t < b])
+            if lo - 1.8 < 2.0:
+                continue
+            piece = shapely.ops.substring(line, a, b)
+            polys.append(piece.buffer(s.width_m / 2.0 + 1.0, cap_style="flat"))
+            under.append(lo - 1.8)
     for b in m.buildings:
         for ms in b.masses:
             if ms.z0_m > 0.5:
@@ -442,7 +466,7 @@ def fit_crowns(c: Ctx, cands: list[Cand]) -> list[Cand]:
         ip, ig = otree.query(pts, predicate="dwithin", distance=float(crown.max()))
         if len(ip):
             d = shapely.distance(pts[ip], ogeoms[ig])
-            hit = d < crown[ip]
+            hit = d < crown[ip] + 0.02     # (positions and crowns are on the 1 cm grid)
             np.minimum.at(cap, ip[hit], under[ig[hit]] - 1.0)
     drop = set()
     for i, t in enumerate(trees):

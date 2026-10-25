@@ -20,6 +20,7 @@ import pytest
 from shapely.geometry import LineString, Point, box
 
 from citygen import checks as C
+from citygen import elevated as EL
 from citygen import dmath as M
 from citygen import geom as G
 from citygen import roads as RD
@@ -91,7 +92,10 @@ def test_named_highway_route():
 
 def test_elevated_share_is_an_attribute(small_built):
     hw = [s for s in small_built.model.road_segments if s.road_class == "highway"]
-    assert all(s.level == 0 for s in small_built.model.road_segments)
+    # M7: viaducts and their ramps are on level 1 or 2, every other road on level 0
+    for s in small_built.model.road_segments:
+        up = bool(s.attrs.get("elevated")) or s.attrs.get("role") == "ramp"
+        assert (s.level >= 1) == up, s.id
     total = sum(LineString(s.centerline).length for s in hw)
     elev = sum(LineString(s.centerline).length for s in hw if s.attrs.get("elevated"))
     want = small_built.spec.highways.elevated_share
@@ -111,8 +115,10 @@ def test_bridge_classes_and_ramps(small_built):
         if b.attrs.get("footbridge"):  # M2 footbridges: stairs, no ramps
             assert b.ramp_length_m is None and b.attrs["access"] == "stairs"
             continue
-        assert b.ramp_length_m == pytest.approx((b.clearance_m + 1.5) / 0.06, abs=0.01)
-        assert all(z == pytest.approx(b.clearance_m + 1.5) for _, _, z in b.line)
+        assert b.ramp_length_m == pytest.approx((b.clearance_m + 1.5) / EL.APPROACH_GRADE,
+                                                abs=0.01)
+        # (M7 raises a deck that carries a viaduct or crosses another bridge)
+        assert all(z >= b.clearance_m + 1.5 - 0.01 for _, _, z in b.line)
     # sea crossings stay few: only where a landmass needs one
     assert sum(1 for b in m.bridges if b.water_class == "sea" and
                not b.attrs.get("footbridge")) <= 2
@@ -290,10 +296,12 @@ def test_check_segment_length_and_duplicates(small_built):
     m = small_built.model
     ordinary = {n.id for n in m.road_nodes if n.attrs.get("kind") == "junction"}
     # an avenue as M1b laid it: its pieces between M2 street junctions share `m1b_segment`
+    # (and the pieces M7 split it into, `split_of`)
     groups: dict = {}
     for i, s in enumerate(m.road_segments):
         if s.road_class == "avenue":
-            groups.setdefault(s.attrs.get("m1b_segment", s.id), []).append(i)
+            groups.setdefault(s.attrs.get("split_of") or s.attrs.get("m1b_segment", s.id),
+                              []).append(i)
     def ordered(idx):
         by_start = {m.road_segments[i].start: i for i in idx}
         ends = {m.road_segments[i].end for i in idx}

@@ -16,6 +16,7 @@ from . import blocks as BK
 from . import dmath as M
 from . import geom as G
 from . import streets as ST
+from .streets import LOCAL_JUNCTION_Z_M
 from .model import CityModel
 from .spec import CitySpec
 
@@ -320,8 +321,9 @@ def _local_junctions(m: CityModel, n: _Net):
 
 
 def check_junction_placement(m: CityModel, n: _Net):
-    c = _check("junction_placement", "No junction of a local road on a bridge or on a bridge "
-                                     "approach ramp (z profile above ground)")
+    c = _check("junction_placement", "No junction of a local road on a bridge, nor where the "
+                                     f"primary road is more than {LOCAL_JUNCTION_Z_M:g} m above "
+                                     "ground (the local street ramps up to a lower one)")
     br = {b.id: b for b in m.bridges}
     for nid, legs in _local_junctions(m, n):
         p = n.pos[nid]
@@ -333,16 +335,14 @@ def check_junction_placement(m: CityModel, n: _Net):
                 s0 = line.project(Point(bl.coords[0]))
                 s1 = line.project(Point(bl.coords[-1]))
                 lo, hi = min(s0, s1), max(s0, s1)
-                ramp = b.ramp_length_m or 0.0
                 at = 0.0 if at_start else line.length
                 gap = (lo - at) if at_start else (at - hi)
-                if gap < ramp - 1.0:
-                    c.failures.append(f"node {nid} at ({p[0]:.0f}, {p[1]:.0f}) is "
-                                      f"{max(gap, 0):.0f} m from bridge {bid} (ramp "
-                                      f"{ramp:.0f} m)")
+                if gap < (1.0 if b.ramp_length_m else -1.0):
+                    c.failures.append(f"node {nid} at ({p[0]:.0f}, {p[1]:.0f}) is on bridge "
+                                      f"{bid}")
             z0 = s.z_profile[0].z if at_start and s.z_profile else (
                 s.z_profile[-1].z if s.z_profile else 0.0)
-            if z0 > 0.05:
+            if z0 > LOCAL_JUNCTION_Z_M + 0.05 and s.road_class in ("highway", "avenue"):
                 c.failures.append(f"node {nid}: segment {s.id} is {z0:g} m above ground there")
     return c
 

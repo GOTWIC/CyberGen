@@ -23,32 +23,45 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M4 | Blender blockout (.blend, USD, glTF tiles), renders, labeled 2D map, Unreal and graph exports | Done | [`docs/progress/M4`](docs/progress/M4) |
 | M5 | Transit: metro, elevated rail, monorail, maglev, sky tubes through towers; stations, supports, station walkways | Done | [`docs/progress/M5`](docs/progress/M5) |
 | M6 | Props, vegetation, ground clutter (instanced in the blockout) | Done | [`docs/progress/M6`](docs/progress/M6) |
-| M7 | Elevated highways, ramps, interchanges | Planned | |
+| M7a | Elevated highways: viaducts, diamond ramps, overpasses, bridge approach grades, underpass streets, road columns | Done | [`docs/progress/M7`](docs/progress/M7) |
+| M7b | Trumpet and partial cloverleaf interchanges, art-direction loop, Corporate Core pinned import | Planned | |
 
-## Latest maps (M6)
+## Latest maps (M7a)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
-different coast forms, not one map. M6 dresses the streets: street lights, signals, bus
-shelters, parked cars, signs, awnings, litter, trees, palms, shrubs and hedges, all instanced
-in the Blender blockout.
+different coast forms, not one map. M7a lifts the busiest highway stretches onto viaducts,
+with ramps down to the avenues, roads passing under, and columns under every raised deck.
 
-| Nyxllor, old town at street level | Saltreach, Crown Island |
+Whole cities in the Blender blockout:
+
+| Nexus City (from the concept image) | Nyxllor (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M6/nyxllor/render_street_4.jpg" width="420"> | <img src="docs/progress/M6/archipelago_free_port/render_street_1.jpg" width="420"> |
+| <img src="docs/progress/M7/nexus_city/render_top.jpg" width="420"> | <img src="docs/progress/M7/nyxllor/render_top.jpg" width="420"> |
 
-Props and plants at street level (Nyxllor, 180 m insets):
+At street level, beside the viaducts:
+
+| Delta Megacity, viaduct and monorail | Nyxllor, corporate core |
+|---|---|
+| <img src="docs/progress/M7/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M7/nyxllor/render_street_4.jpg" width="420"> |
+
+Road levels (Nexus City): every raised road by deck height, interchanges, columns, and the
+profile of one viaduct:
+
+<img src="docs/progress/M7/nexus_city/preview_elevated.png" width="840">
+
+Props and plants at street level (M6, Nyxllor, 180 m insets):
 
 <img src="docs/progress/M6/nyxllor/preview_props.png" width="840">
 
 Transit maps (M5):
 
-| Nexus City (from the concept image) | Nyxllor (bay, river delta) |
+| Nexus City | Nyxllor |
 |---|---|
 | <img src="docs/progress/M5/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M5/nyxllor/preview_transit.png" width="420"> |
 
-Each M6 city folder has the props preview, Blender renders with the instances, the build
-report and the stage trace. The transit maps are in `docs/progress/M5/`, the street-level
-renders without props and the 2D maps in `docs/progress/M4/`, the other generator previews in
+Each M7 city folder has the road-level preview, the Blender renders, the build report and the
+stage trace. The props previews are in `docs/progress/M6/`, the transit maps in
+`docs/progress/M5/`, the 2D maps in `docs/progress/M4/`, the other generator previews in
 `docs/progress/M3p/`. Sample specs live in `docs/progress/M1a2/<city>/city_spec.json` and
 `cities/nyxllor/city_spec.json`.
 

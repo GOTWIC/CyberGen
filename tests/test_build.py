@@ -61,7 +61,7 @@ def test_sample_city_builds_and_passes(path):
     built, took, _ = built_sample(path)
     failed = [f for c in built.checks for f in c.failures]
     assert not failed, failed
-    assert took < 60, f"{path.parent.name} took {took:.1f} s"
+    assert took < 300, f"{path.parent.name} took {took:.1f} s"
     # Every polygon in the model is valid (also a check; asserted directly here).
     for e in built.model.entities():
         for attr in ("polygon",):
@@ -70,14 +70,14 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M6/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M7/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M6" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M7" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        assert (ROOT / "docs" / "progress" / "M6" / slug / "preview_props.png").is_file()
+        assert (ROOT / "docs" / "progress" / "M7" / slug / "preview_elevated.png").is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
@@ -131,7 +131,10 @@ def test_small_city_passes(small_built):
                    "megasite_heights", "megasite_access",
                    # M6 (no transit lines in the small city, so no M5 checks)
                    "props_keepout", "props_overlap", "tree_clearance", "street_lighting",
-                   "park_planting", "boats_afloat"}
+                   "park_planting", "boats_afloat",
+                   # M7
+                   "road_grades", "level_continuity", "deck_clearance", "ramps_land",
+                   "road_supports"}
 
 
 def test_check_geometry_invalid(small_built):

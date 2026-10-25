@@ -13,7 +13,8 @@ from . import presets
 from .checks import Check
 from .model import CityModel
 from .spec import CitySpec
-from .transit import (DECK_M, ROAD_CLEAR_M, SERVE_M, SIDE_PAD_M, SKY_CLEAR_M, WIDTH_M, above,
+from .transit import (DECK_M, ROAD_CLEAR_M, SERVE_M, SIDE_PAD_M, SKY_CLEAR_M, UNDER_PAD_M,
+                      WIDTH_M, above, road_underside,
                       below, deck_heights, radii, raised_roads, resample, sidewalk_index,
                       sidewalks_clear)
 
@@ -188,8 +189,9 @@ def check_altitude(spec: CitySpec, m: CityModel) -> Check:
 def check_clearance(m: CityModel) -> Check:
     c = _check("transit_clearance", "Elevated lines clear the buildings under them (deck "
                                     "underside 2 m over the roof), navigable water (its "
-                                    "clearance) and road decks (5.5 m); sky lines clear "
-                                    "buildings by 10 m or pass through a declared portal")
+                                    "clearance) and road decks (5.5 m over, or 1 m under a "
+                                    "high one); sky lines clear buildings by 10 m or pass "
+                                    "through a declared portal")
     portal = {}
     for b in m.buildings:
         for p in b.portals:
@@ -238,7 +240,8 @@ def check_clearance(m: CityModel) -> Check:
                     _limit(c, f"{t.name}: {zs[i] - deck:.1f} m over water needing {clr:g} m")
                     break
         for i, rz in deck_heights(decks, dtree, arr, WIDTH_M[t.mode] / 2.0):
-            if zs[i] - deck < rz + ROAD_CLEAR_M - 0.01:
+            under = zs[i] + above(t.mode) <= road_underside(rz) - UNDER_PAD_M + 0.01
+            if zs[i] - deck < rz + ROAD_CLEAR_M - 0.01 and not under:
                 _limit(c, f"{t.name}: {zs[i] - deck:.1f} m over a road deck at {rz:.1f} m")
                 break
     return c

@@ -2331,7 +2331,7 @@
           "type": "integer"
         },
         "z_profile": {
-          "description": "Placeholder until M7: ground, bridge ramps at 6%, deck z over water.",
+          "description": "Road surface height (top of the deck) along the centerline: viaducts, ramps, bridge approaches at 5.5%, streets ramping to raised junctions; at most 6% steep.",
           "items": {
             "$ref": "#/$defs/ZSample"
           },

@@ -935,13 +935,14 @@ def straddle_building(cx, gid, members, out, idx) -> bool:
            for lid, lp in cx.lots):
         return False   # the span passes over another lot
     crosses, need, zroad = [], 0.0, 0.0
-    for rid, cls, line, width, zmax in cx.roads:
+    for rid, cls, line, width, prof in cx.roads:
         if span.intersects(LineString(line)):
             if rid not in allowed:
                 return False
             crosses.append(rid)
-            need = max(need, zmax + BL.ROAD_CLEARANCE_M + 1.0)
-            zroad = max(zroad, zmax)
+            zr = G.road_z_over(line, prof, span)
+            need = max(need, zr + BL.ROAD_CLEARANCE_M + 1.0)
+            zroad = max(zroad, zr)
     over_water = None
     for wid, wp, clear in cx.water:
         if span.intersects(wp):
