@@ -16,7 +16,7 @@ committed; a build regenerates it byte for byte). The specs are unchanged
 (`docs/progress/M1a2/`, Nyxllor in `cities/nyxllor/`). All 44 checks pass on all five
 cities. `compare/` holds before and after crops; `docs/progress/M3/` is untouched.
 
-| City | Buildings | Floor area km2 (M3) | Tallest m | Skybridges (km), M3 | Complexes in place, M3 | Landmarks | Megasites |
+| City | Buildings | Floor area km2: M3p (M3) | Tallest m | Skybridges (km): M3p, M3 | Complexes in place: M3p, M3 | Landmarks | Megasites |
 |---|---|---|---|---|---|---|---|
 | Nyxllor | 5887 | 24.0 (29.7) | 480 | 291 (3.61), 230 (2.57) | 5 of 5, 4 of 5 | 1 | 3 |
 | Saltreach Free Port | 3182 | 14.2 (14.0) | 292 | 180 (1.95), 180 (1.95) | 2 of 2, 2 of 2 | 0 | 3 |
@@ -35,12 +35,12 @@ from afar. Now every megablock lot gets:
   for two rows of towers.
 - **Separate towers on the podium**: one or two rows (front and back) of one to three towers,
   spread to the corners and ends, 30 to 64 m long and 24 to 36 m deep, at least 16 to 22 m
-  apart (the gap is a light well at sky level). One ring of four sometimes loses a tower.
+  apart (the gap is a light well at sky level). A layout of four sometimes leaves one out.
   Curved lots try the region's own long axis; lots too small for two take one tower.
 - **Height contrast**: the tallest tower reaches the lot's height (120 to 250 m from the
   district height field, which now weighs its smooth noise more, so tall lots cluster); the
-  others step down to 64 to 94% of it, all far above the 16 to 26 m podium carpet. Every tower has a mid setback on one or two sides (at 42 to 66% of
-  its rise) and a crown tier.
+  others step down to 64 to 94% of it, all far above the 16 to 26 m podium carpet. Every
+  tower has a mid setback on one or two sides (at 42 to 66% of its rise) and a crown tier.
 - **Elevated decks**: open decks (6 m wide) between neighboring towers of one building at
   one or two levels, and a street-scale deck network between buildings: open decks between
   neighboring podiums across streets and courts, a level below the lower podium's roof, at
@@ -58,8 +58,8 @@ from afar. Now every megablock lot gets:
 
 Coverage rises from about 53% to about 77% (the podiums), while the floor area ratio falls
 from about 20 to about 13: the towers no longer fill the lot to full height. That is still a
-very dense district (Hong Kong's densest blocks run about 10 to 12) with legible masses; the
-lost floor area is the price of the gaps. The previews also tint every building a few
+very dense, tall district, now with legible masses; the lost floor area (Nyxllor 29.7 to
+24.0 km2 in all, Greyhook 19.4 to 15.1 km2) is the price of the gaps. The previews also tint every building a few
 percent lighter or darker (by id), so neighbors separate in the massing views.
 
 <img src="compare/peninsula_city_stacks.png" width="840">
@@ -104,8 +104,9 @@ frontages nearest each other, the line between their midpoints crossing the cana
 60 m apart), each leg stands on its lot's quay frontage, and the span (three floors, at most
 50 m) starts on the first floor above both clearances: 5.5 m over every road it crosses and
 the canal's navigable clearance (4 m), each plus the 1 m structure. Nothing else may lie
-under it: no junction, no road but the two quay roads, no other water and no other lot. The first straddle
-building of a district with canals goes over a canal, the next over a street, and so on.
+under it: no junction, no road but the two quay roads, no other water and no other lot. The
+first straddle building of a district with canals goes over a canal, the next over a
+street, and so on.
 All three samples with a straddle building (Nyxllor's Neon Strand, Nexus City's Neon Market,
 Greyhook's Lantern Strip) now span a canal.
 
@@ -198,8 +199,9 @@ one worker and another `PYTHONHASHSEED` (`citygen trace diff`: no difference in 
 
 Speed. This cloud container is slower than the one M3 was measured on: M3 itself (the `main`
 branch) builds Nexus City in 60.4 s under `tests/test_build.py` here (the M3 session measured
-54 s), and M3p in 61.9 s, so the M3p cost is about 1.5 s (2.5%): M2's group picking (about
-0.6 s, mostly the M3 builder tries) and the extra deck search. On the M3 session's machine
+54 s), and M3p in 61.9 s, so the M3p cost is about 1.5 s (2.5%), most of it M2's group
+picking (about 0.6 s, mostly the M3 builder tries); run-to-run noise here is of the same
+size (M3 alone measured 61.4 to 64.8 s for `build_city`). On the M3 session's machine
 that projects to about 55.5 s, within the 60 s budget; on this container the budget assertion
 fails for both M3 and M3p.
 
