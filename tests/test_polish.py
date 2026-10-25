@@ -196,3 +196,35 @@ def test_merge_degree2_smooths_a_normal_joint():
     (line, _), = RD._merge_degree2(pieces, Ok())
     assert len(line.coords) > 3
     assert G.qpoint(line.coords[0]) == (0.0, 0.0) and G.qpoint(line.coords[-1]) == (200.0, 200.0)
+
+
+def test_merge_degree2_keeps_nodes_on_greyhook_seed_5(monkeypatch):
+    """Greyhook with seed 5 (found by building the samples' roads over seeds and road
+    variants): a smoothed joint used to end 3 cm off its node, so merging made a new dead
+    end there (later dropped as a dangle, taking a road piece with it). Merging must keep
+    every other node with its degree."""
+    from citygen import build as B
+    from citygen import megasites as MSI
+    from citygen.validate import validate_spec
+
+    data = _spec_data(GREYHOOK)
+    data["seed"] = 5
+    real = RD._merge_degree2
+    moved = []
+
+    def checked(pieces, fitter=None):
+        before = RD._endpoints(pieces)
+        out = real(pieces, fitter)
+        moved.extend(c for c, d in RD._endpoints(out).items() if before.get(c) != d)
+        return out
+
+    monkeypatch.setattr(RD, "_merge_degree2", checked)
+    b = B.build_city(validate_spec(data), max_variants=2, roads=False, workers=1)
+    s = b.spec
+    did = B._district_ids(s)
+    sites, _ = MSI.place_megasites(s, b.layout.polygons, b.hydro, b.waterways, did)
+    opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
+    net = RD.build_roads(s, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,
+                         variant=0)
+    assert net.segments
+    assert not moved, moved

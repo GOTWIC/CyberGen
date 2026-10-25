@@ -346,8 +346,9 @@ def pick_height(cx: Ctx, p, area: float, front_cls: str, rng, lo_f: float = 0.0,
     if wx > 0 and cx.axis is not None:
         d_ax = min(MS.line_dist(p, pts)[0] for pts in cx.axis)
         fx = max(0.0, 1.0 - d_ax / AXIS_REACH_M)
-    f = wc * fc + wn * fn + ws * fs + wa * fa + wx * fx + 0.16 * (float(rng.random()) - 0.5)
-    f = f / (wc + wn + ws + wa * 0.5 + wx * 0.4 + 0.02) if (wc + wn + ws + wa) > 0 else 0.5
+    f = wc * fc + wn * fn + ws * fs + wa * fa + 0.16 * (float(rng.random()) - 0.5)
+    f = f / (wc + wn + ws + wa * 0.5 + 0.02) if (wc + wn + ws + wa) > 0 else 0.5
+    f += 0.5 * wx * fx   # the ridge raises the boulevard without lowering the rest
     f = min(1.0, max(0.0, f))
     sk = cx.prog.skew
     if sk >= 1.95:
