@@ -65,7 +65,7 @@ stats:
   bridges 8 (sea 1, river 3, canal 4; 0.58 km of span), pedestrian 7; named: Launch Causeway
   landmasses with districts connected by road 5 of 5; highway planned elevated 22%; megasite reserves 3; road variant 0
   local roads street 94.62 km, alley 24.45 km, service 12.3 km, pedestrian 9.94 km, footbridge 0.29 km; 88 one-way segments, 7 footbridges
-  junctions 1688 (345 signalized), crosswalks 1155, sidewalks 159.68 km, lanes 6174 + 12185 connectors, walkways 16741 (alley 36.75 km, crossing 83.71 km, crosswalk 41.81 km, elevator 0.0 km, footbridge 0.29 km, path 87.97 km, pedestrian_street 2.61 km, promenade 7.33 km, sidewalk 206.98 km, skybridge 3.6 km)
+  junctions 1688 (345 signalized), crosswalks 1155, sidewalks 159.68 km, lanes 6174 + 12185 connectors, walkways 16743 (alley 36.75 km, crossing 83.71 km, crosswalk 41.81 km, elevator 0.0 km, footbridge 0.29 km, path 87.91 km, pedestrian_street 2.61 km, promenade 7.33 km, sidewalk 206.98 km, skybridge 3.61 km)
   junctions by type: street_street T 808, avenue_avenue T 234, street_street X 177, alley_alley T 141, avenue_avenue X 76, street T 74, pedestrian T 42, street_alley T 25, alley_alley X 21, street_service T 12, alley T 11, avenue_avenue multi 11
   blocks 1030, lots 5877 (5 merged groups), open space 11.4% of net land (courtyard 11, green 45, market 1, park 192, plaza 151, pocket_park 175, promenade 1), named places 3
 
@@ -89,16 +89,16 @@ stats:
   Launch Key                             3            284      15.4%
   Scholar Isle                          14            164      27.5%
 
-  buildings 5887 (24.131 km2 floor area), properties 5868, tallest 480 m; complexes campus 1, landmark 1, megabuilding_campus 1, megasite 3, straddle_building 1, tower_cluster 1, twin_towers 1
+  buildings 5887 (24.001 km2 floor area), properties 5868, tallest 480 m; complexes campus 1, landmark 1, megabuilding_campus 1, megasite 3, straddle_building 1, tower_cluster 1, twin_towers 1
   by type: shopfront_row 2839, shanty_stack 1742, villa 601, podium_tower 240, courtyard_block 99, megabuilding 98, warehouse 56, lab 45, slab 40, terraced 30, tower 27, yard 24, shed 16, parking_structure 12, hangar 7, temple_hall 3, straddle_building 2, control_tower 1, gate_house 1, landmark.megatower 1, office 1, pagoda 1, terminal 1
-  skybridges 291 (3.6 km: cable 46, catwalk 81, enclosed 61, open_deck 102, stack 1), ground-floor units 17567 (food 4831, bar 2160, convenience 2002, cyberware 1863, club 1675, arcade 1341, pawn 1244, laundromat 1091, clinic 887, lobby 473)
-  roof items: ac_unit 12517, billboard 1340, water_tank 1169, antenna 860, mechanical 256, av_pad 45, helipad 17; green roofs 541 (395607 m2)
+  skybridges 291 (3.61 km: cable 46, catwalk 81, enclosed 61, open_deck 102, stack 1), ground-floor units 17567 (food 4831, bar 2160, convenience 2002, cyberware 1863, club 1675, arcade 1341, pawn 1244, laundromat 1091, clinic 887, lobby 473)
+  roof items: ac_unit 12522, billboard 1340, water_tank 1169, antenna 860, mechanical 256, av_pad 45, helipad 17; green roofs 542 (396524 m2)
   landmarks: Corporate Core Megatower (megatower, 480 m)
   megasites: Lotus Temples (temple_complex: courtyard 1, gate 1, pagoda 1, temple_hall 3, wall 1); Vess Freight Terminal (freight_terminal: berth 2, container_stack 335, gantry_crane 6, gate_house 1, office 1, rail_track 2, truck_gate 1, warehouse 2); Launch Key Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 4, launch_tower 4, terminal 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
   Corporate Core                   206     132.0   208.0   480.0       80%  13.3      7.989
-  The Stacks                       127     153.6   182.4   224.0       77%  13.3      9.831
+  The Stacks                       127     153.6   182.4   224.0       77%  13.1      9.701
   Highcrest                        627      20.4    23.8    44.2       33%   1.9      1.045
   Old Town                        2864      15.0    20.6    26.6       96%   3.4      1.783
   Neon Strand                     1881      21.0    28.0    42.0       96%   4.7      2.271

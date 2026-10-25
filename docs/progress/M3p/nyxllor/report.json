@@ -525,18 +525,18 @@
       "lanes": 6174,
       "lane_connectors": 12185,
       "one_way_segments": 88,
-      "walkways": 16741,
+      "walkways": 16743,
       "walkway_km": {
         "alley": 36.75,
         "crossing": 83.71,
         "crosswalk": 41.81,
         "elevator": 0.0,
         "footbridge": 0.29,
-        "path": 87.97,
+        "path": 87.91,
         "pedestrian_street": 2.61,
         "promenade": 7.33,
         "sidewalk": 206.98,
-        "skybridge": 3.6
+        "skybridge": 3.61
       },
       "footbridges": 7,
       "blocks": 1030,
@@ -721,7 +721,7 @@
     },
     "buildings": {
       "count": 5887,
-      "floor_area_km2": 24.131,
+      "floor_area_km2": 24.001,
       "by_type": {
         "shopfront_row": 2839,
         "shanty_stack": 1742,
@@ -777,9 +777,9 @@
           "p90": 182.4,
           "max": 224.0,
           "archetype": "megablock_residential",
-          "floor_area_km2": 9.831,
+          "floor_area_km2": 9.701,
           "coverage": 0.771,
-          "far": 13.26
+          "far": 13.08
         },
         "Highcrest": {
           "count": 627,
@@ -866,7 +866,7 @@
         "open_deck": 102,
         "stack": 1
       },
-      "skybridge_km": 3.6,
+      "skybridge_km": 3.61,
       "units": 17567,
       "units_by_use": {
         "food": 4831,
@@ -881,7 +881,7 @@
         "lobby": 473
       },
       "roof_items": {
-        "ac_unit": 12517,
+        "ac_unit": 12522,
         "billboard": 1340,
         "water_tank": 1169,
         "antenna": 860,
@@ -889,8 +889,8 @@
         "av_pad": 45,
         "helipad": 17
       },
-      "green_roofs": 541,
-      "green_roof_m2": 395607,
+      "green_roofs": 542,
+      "green_roof_m2": 396524,
       "landmarks": [
         {
           "name": "Corporate Core Megatower",
@@ -941,7 +941,7 @@
       "structures": 2,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2414
+        "walkways_added": 2416
       }
     },
     "separation_budget": {

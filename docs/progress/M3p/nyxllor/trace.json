@@ -9,7 +9,7 @@
     "shapely": "2.2.0",
     "geos": "3.14.1"
   },
-  "model_sha256": "288e5b01bb88f384b9dae732008204290884c9ad36bdbe12b4fb2e5c44eeb510",
+  "model_sha256": "b560152efa4cff7e00819d6097db499a5ca18775aa303007528e2324d1178a25",
   "entries": [
     ["v0/coast", "52e08d6f5339293286b826b2d91e76f7f1fbc35f358ee7af1bbe0d21bfab4879"],
     ["v0/rivers", "5ef0fec11f0303e099d15c73175d477bcb08c66dbb6dec9d8bb82ebcad39cc1b"],
@@ -5908,7 +5908,7 @@
     ["walkways", "e3fb11e507c17d7eeb7fd6180f3c25f6150a273f7a43a7a0dabffddf2da9d7b0"],
     ["blocks", "2ed772d0a768723ea5865eb8c8571425acb26d383f9d28ab6cf46947d12ba128"],
     ["buildings/d01", "6048942793fdb3555a7a55fedfd62f010cff066e8cf6fb8498ebcab5e39c70c5"],
-    ["buildings/d02", "a459eb8a98a4c69f64498145e8fbb3df88c4cde57b3927268e7155fc597b2e6a"],
+    ["buildings/d02", "72bbf5b3edb4aeb967d63a102770760a40c08fd27a40a6ad436050f343a75d0f"],
     ["buildings/d03", "0fa24a50a1289b65e4344bc8bc7223dfea68cc826a08bab7458e3c7f8fc75ffd"],
     ["buildings/d04", "d463e04b88a23cf4e1701daf13b6529639b2906ec9ae8d1c2cf790f206e903ea"],
     ["buildings/d05", "51a163a681a4bc71dd60539428efabb81f9149b42df0002e54bc18d82cab215a"],
@@ -5917,7 +5917,7 @@
     ["buildings/d08", "5bd7190f4a09ab2e67da53289ee0a36716eb3f60305ecfc5b7663d79f91e7dbd"],
     ["buildings", "0e1081232ab869f1cc1b996e031222c2fbcca290ffa37facf141340a339fdfb7"],
     ["megasites_m3", "b9024b6d6857f45e54d659e97fa76f2aaa179e1e2bb6fc54b2b0d3b8764be5e0"],
-    ["walkways_m3", "d74ddb883becda3b27c8d6f680428c4b2cb5e24ff745996edba74bc6ca23681a"],
+    ["walkways_m3", "4572a4c1e06ec0857f416f01a83fbde95950d08d508352d90939788c9ba1e37c"],
     ["checks_m3", "f7ad7a0fbe2bc4081ae94479288cdec6c25a00352fcedc1760fd31730a0cfefb"]
   ]
 }

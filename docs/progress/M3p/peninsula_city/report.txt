@@ -63,7 +63,7 @@ stats:
   bridges 5 (sea 0, river 3, canal 2; 0.24 km of span), pedestrian 6; named: Wallgate Bridge
   landmasses with districts connected by road 3 of 3; highway planned elevated 58%; megasite reserves 3; road variant 0
   local roads street 50.54 km, alley 7.52 km, service 11.96 km, pedestrian 9.45 km, footbridge 0.21 km; 49 one-way segments, 6 footbridges
-  junctions 720 (143 signalized), crosswalks 453, sidewalks 93.37 km, lanes 2443 + 4598 connectors, walkways 6959 (alley 19.48 km, crossing 37.79 km, crosswalk 17.23 km, elevator 0.0 km, footbridge 0.21 km, path 51.27 km, pedestrian_street 0.28 km, promenade 9.18 km, sidewalk 116.36 km, skybridge 2.55 km)
+  junctions 720 (143 signalized), crosswalks 453, sidewalks 93.37 km, lanes 2443 + 4598 connectors, walkways 6973 (alley 19.48 km, crossing 37.79 km, crosswalk 17.23 km, elevator 0.0 km, footbridge 0.21 km, path 51.82 km, pedestrian_street 0.28 km, promenade 9.18 km, sidewalk 116.36 km, skybridge 2.6 km)
   junctions by type: street_street T 344, avenue_avenue T 119, street T 81, street_street X 62, alley_alley T 36, pedestrian T 19, alley T 10, avenue_avenue X 10, alley_alley X 8, street_alley T 8, street_service T 7, highway_highway T 3
   blocks 410, lots 2459 (5 merged groups), open space 12.4% of net land (courtyard 1, green 13, park 196, plaza 133, pocket_park 1), named places 1
 
@@ -83,17 +83,17 @@ stats:
   Eastside Docks                        19            136       6.3%
   Hook Spaceport                        12            194      20.3%
 
-  buildings 2455 (15.226 km2 floor area), properties 2440, tallest 233.6 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
+  buildings 2455 (15.082 km2 floor area), properties 2440, tallest 233.6 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
   by type: shopfront_row 890, villa 681, shanty_stack 434, podium_tower 161, megabuilding 94, slab 53, warehouse 27, perimeter 18, hangar 17, parking_structure 17, terraced 17, yard 13, shed 10, tower 8, courtyard_block 7, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
-  skybridges 148 (2.55 km: enclosed 28, open_deck 120), ground-floor units 6838 (food 1468, bar 1066, club 977, convenience 734, cyberware 724, arcade 616, pawn 490, lobby 299, laundromat 287, clinic 177)
-  roof items: ac_unit 5577, water_tank 621, billboard 523, mechanical 185, antenna 62, av_pad 3; green roofs 359 (200054 m2)
+  skybridges 151 (2.6 km: enclosed 28, open_deck 123), ground-floor units 6838 (food 1468, bar 1066, club 977, convenience 734, cyberware 724, arcade 616, pawn 490, lobby 299, laundromat 287, clinic 177)
+  roof items: ac_unit 5581, water_tank 621, billboard 523, mechanical 185, antenna 63, av_pad 3; green roofs 362 (202912 m2)
   landmarks: Lantern Wheel (ferris_wheel, 120 m)
   megasites: Neckgate Transit Nexus (transit_nexus: bus_bay 10, drop_off 1, metro_entrance 2, platform 2, plaza 2, station 1, station_tower 1); Neck Arena (stadium: parking_structure 2, pitch 1, plaza 1, stadium 1); Hook Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 3, launch_tower 3, terminal 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
   Wallgate Heights                 719      20.4    23.8    47.6       34%   2.0      1.251
   Neckgate                         139      31.5    59.5   112.0       72%   5.1      1.257
-  The Stacks                       122     156.8   185.6   233.6       76%  13.9     10.233
+  The Stacks                       122     156.8   185.6   233.6       76%  13.8     10.089
   Lantern Strip                   1382      21.0    31.5   120.0       97%   4.7      1.705
   Eastside Docks                    47      11.0    16.0    16.0       31%   0.3      0.131
   Hook Spaceport                    36      24.0    36.0    40.0       24%   0.7      0.287

@@ -482,18 +482,18 @@
       "lanes": 2443,
       "lane_connectors": 4598,
       "one_way_segments": 49,
-      "walkways": 6959,
+      "walkways": 6973,
       "walkway_km": {
         "alley": 19.48,
         "crossing": 37.79,
         "crosswalk": 17.23,
         "elevator": 0.0,
         "footbridge": 0.21,
-        "path": 51.27,
+        "path": 51.82,
         "pedestrian_street": 0.28,
         "promenade": 9.18,
         "sidewalk": 116.36,
-        "skybridge": 2.55
+        "skybridge": 2.6
       },
       "footbridges": 6,
       "blocks": 410,
@@ -638,7 +638,7 @@
     },
     "buildings": {
       "count": 2455,
-      "floor_area_km2": 15.226,
+      "floor_area_km2": 15.082,
       "by_type": {
         "shopfront_row": 890,
         "villa": 681,
@@ -703,9 +703,9 @@
           "p90": 185.6,
           "max": 233.6,
           "archetype": "megablock_residential",
-          "floor_area_km2": 10.233,
+          "floor_area_km2": 10.089,
           "coverage": 0.764,
-          "far": 13.94
+          "far": 13.75
         },
         "Lantern Strip": {
           "count": 1382,
@@ -749,12 +749,12 @@
         "straddle_building": 1,
         "tower_cluster": 1
       },
-      "skybridges": 148,
+      "skybridges": 151,
       "skybridges_by_kind": {
         "enclosed": 28,
-        "open_deck": 120
+        "open_deck": 123
       },
-      "skybridge_km": 2.55,
+      "skybridge_km": 2.6,
       "units": 6838,
       "units_by_use": {
         "food": 1468,
@@ -769,15 +769,15 @@
         "clinic": 177
       },
       "roof_items": {
-        "ac_unit": 5577,
+        "ac_unit": 5581,
         "water_tank": 621,
         "billboard": 523,
         "mechanical": 185,
-        "antenna": 62,
+        "antenna": 63,
         "av_pad": 3
       },
-      "green_roofs": 359,
-      "green_roof_m2": 200054,
+      "green_roofs": 362,
+      "green_roof_m2": 202912,
       "landmarks": [
         {
           "name": "Lantern Wheel",
@@ -826,7 +826,7 @@
       "structures": 1,
       "tallest_m": 233.6,
       "generator": {
-        "walkways_added": 1103
+        "walkways_added": 1117
       }
     },
     "separation_budget": {
