@@ -25,6 +25,7 @@ the most awkward blocks first.
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import numpy as np
@@ -813,13 +814,16 @@ def _merged_groups(cx: Ctx, out: dict) -> None:
     by_d: dict = {}
     for r in out["lots"]:
         by_d.setdefault(r["district_id"], []).append(r)
+    shared = None
     for d in spec.districts:
         did = cx.did.get(d.name)
         lots = by_d.get(did, [])
         if not lots or not d.complexes:
             continue
         c = G.centroid(cx.B.polygons[d.name])
-        pcx = BL._prepare(_probe_ctx(cx, d, did, out))
+        if shared is None:
+            shared = _probe_shared(cx)
+        pcx = BL._prepare(_probe_ctx(cx, d, did, out, shared))
         order = sorted(lots, key=lambda r: r["id"])
         idx = {id(r): k for k, r in enumerate(order)}
         views = {id(r): _lot_view(r) for r in lots}
@@ -832,16 +836,19 @@ def _merged_groups(cx: Ctx, out: dict) -> None:
                 canal_first = cplx.kind == "straddle_building" and n_straddle % 2 == 0
                 if cplx.kind == "straddle_building":
                     n_straddle += 1
-                cands = _candidates(lots, used, n_lots, c, cplx.kind, pcx, canal_first)
-                if not cands:
-                    cx.notes.append(f"complex {cplx.kind} in '{d.name}': no lots to merge")
-                    continue
-                group = cands[0]
-                for cand in cands[:PROBES]:
+                group = None
+                for t, cand in enumerate(_candidates(lots, used, n_lots, c, cplx.kind, pcx,
+                                                     canal_first)):
+                    if t >= PROBES:
+                        break
+                    group = group or cand
                     mem = sorted(cand, key=lambda r: r["id"])
                     if CX.probe(pcx, cplx.kind, [views[id(r)] for r in mem], idx[id(mem[0])]):
                         group = cand
                         break
+                if group is None:
+                    cx.notes.append(f"complex {cplx.kind} in '{d.name}': no lots to merge")
+                    continue
                 k += 1
                 gid = f"{did}.mg{k:02d}"
                 for r in group:
@@ -857,7 +864,21 @@ def _lot_view(r: dict) -> dict:
             "frontage": r["frontage"]}
 
 
-def _probe_ctx(cx: Ctx, d, did: str, out: dict):
+def _probe_shared(cx: Ctx) -> dict:
+    """What every district's probe context draws from: road lines, junction and crosswalk
+    polygons (with STRtrees)."""
+    segs = cx.net.segments
+    lines = [LineString(sg["centerline"]) for sg in segs]
+    jpolys = [j["polygon"] for j in cx.J["junctions"] if not j["polygon"].is_empty]
+    cwl = [LineString(cw["line"]) for cw in cx.J["crosswalks"]]
+    cwp = [G.qpoly(ln.buffer(cw["width_m"] / 2.0, cap_style="flat", join_style="mitre"))
+           for ln, cw in zip(cwl, cx.J["crosswalks"])]
+    return {"lines": lines, "ltree": shapely.STRtree(lines), "jpolys": jpolys,
+            "jtree": shapely.STRtree(jpolys) if jpolys else None, "cwp": cwp,
+            "cwtree": shapely.STRtree(cwl) if cwl else None}
+
+
+def _probe_ctx(cx: Ctx, d, did: str, out: dict, shared: dict):
     """The district as M3's builders see it (roads, junctions, crosswalks, open space, water,
     flight cones), for trying merged groups."""
     from . import buildings as BL
@@ -867,20 +888,17 @@ def _probe_ctx(cx: Ctx, d, did: str, out: dict):
     poly = B.polygons[d.name]
     zone = G.qpoly(poly.buffer(80.0, join_style="mitre"))
     roads = []
-    for sg in cx.net.segments:
-        ln = LineString(sg["centerline"])
-        if ln.intersects(zone):
-            zmax = max((z["z"] for z in sg["z_profile"]), default=0.0) \
-                if isinstance(sg["z_profile"], list) else 0.0
-            roads.append((sg["id"], sg["road_class"], [tuple(p) for p in sg["centerline"]],
-                          sg["width_m"], float(zmax)))
-    junctions = [j["polygon"] for j in cx.J["junctions"]
-                 if not j["polygon"].is_empty and j["polygon"].intersects(zone)]
-    for cw in cx.J["crosswalks"]:
-        ln = LineString(cw["line"])
-        if ln.intersects(zone):
-            junctions.append(G.qpoly(ln.buffer(cw["width_m"] / 2.0, cap_style="flat",
-                                               join_style="mitre")))
+    for k in sorted(int(i) for i in shared["ltree"].query(zone, predicate="intersects")):
+        sg = cx.net.segments[k]
+        zmax = max((z["z"] for z in sg["z_profile"]), default=0.0) \
+            if isinstance(sg["z_profile"], list) else 0.0
+        roads.append((sg["id"], sg["road_class"], [tuple(p) for p in sg["centerline"]],
+                      sg["width_m"], float(zmax)))
+    jt, ct = shared["jtree"], shared["cwtree"]
+    junctions = [shared["jpolys"][int(i)]
+                 for i in sorted(jt.query(zone, predicate="intersects"))] if jt else []
+    junctions += [shared["cwp"][int(i)]
+                  for i in sorted(ct.query(zone, predicate="intersects"))] if ct else []
     junctions += [o["polygon"] for o in out["open"] if o.get("district_id") == did and
                   o["polygon"].geom_type == "Polygon"]
     water = []
@@ -918,7 +936,8 @@ def _candidates(lots, used, n: int, c, kind: str, pcx, canal_first: bool) -> lis
         if kind != "straddle_building":
             return streets
         canals = _canal_pairs(free, c, pcx)
-        return canals + streets if canal_first else streets + canals
+        return itertools.chain(canals, streets) if canal_first else \
+            itertools.chain(streets, canals)
     # adjacent lots in one block, nearest the center, biggest blocks preferred; each seed
     # grows by the biggest neighbor and by the neighbor it shares the longest edge with
     seeds = sorted(free, key=lambda r: (ST._dist(G.centroid(r["polygon"]), c) /
@@ -994,14 +1013,16 @@ def _street_pairs(free, c) -> list:
     return [t[4] for t in cands]
 
 
-def _canal_pairs(free, c, pcx) -> list:
+def _canal_pairs(free, c, pcx):
     """Two lots facing each other across a canal (see complexes._canal_fronts), nearest the
-    district center first."""
+    district center first (yielded lazily: the pairs are ordered by a cheap score and tested
+    only as far as they are needed)."""
     from . import complexes as CX
 
     if not any(clear <= 4.0 + 1e-9 for _, _, clear in pcx.water):
-        return []
+        return
     polys = [r["polygon"] for r in free]
+    cs = [G.centroid(p) for p in polys]
     tree = shapely.STRtree(polys)
     ia, ib = tree.query(polys, predicate="dwithin", distance=CX.CANAL_REACH_M * 0.75)
     pairs = sorted({(min(a, b), max(a, b)) for a, b in zip(ia.tolist(), ib.tolist())
@@ -1011,12 +1032,13 @@ def _canal_pairs(free, c, pcx) -> list:
         a, b = free[i], free[j]
         if a["block"] == b["block"] or a["area_m2"] < 150.0 or b["area_m2"] < 150.0:
             continue
-        if CX._canal_fronts(pcx, [_lot_view(a), _lot_view(b)]) is None:
-            continue
-        da, db = G.centroid(a["polygon"]), G.centroid(b["polygon"])
-        cands.append((round(ST._dist(da, c) + ST._dist(db, c), 6), a["id"], b["id"], [a, b]))
-    cands.sort(key=lambda t: t[:3])
-    return [t[3] for t in cands]
+        cands.append((round(ST._dist(cs[i], c) + ST._dist(cs[j], c), 6), a["id"], b["id"],
+                      i, j))
+    cands.sort()
+    for _, _, _, i, j in cands:
+        a, b = free[i], free[j]
+        if CX._canal_fronts(pcx, [_lot_view(a), _lot_view(b)]) is not None:
+            yield [a, b]
 
 
 def finish_lots(out: dict) -> None:

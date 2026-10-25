@@ -1,5 +1,5 @@
 {
-  "about": "sha256 of each sample city's city_model.json (citygen build output, M3: buildings, skybridges, megasites). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2) and docs/progress/M3/<city>/trace.json (M3). tests/test_roads.py asserts them on every run.",
+  "about": "sha256 of each sample city's city_model.json (citygen build output, M3p: M3 buildings, skybridges and megasites after the polish pass). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p). tests/test_roads.py asserts them on every run.",
   "produced_on": {
     "machine": "x86_64",
     "system": "Linux",
@@ -9,10 +9,10 @@
     "geos": "3.14.1"
   },
   "cities": {
-    "archipelago_free_port": "92b71ab7985c37f6f811f92711d80ab2064b75236ce1d588ab4f630c64cc356f",
-    "delta_megacity": "d7df4db62d678b96d4e86443c01a7d1509fccb2a0eafbb74cc66554bb0c39103",
-    "nexus_city": "cf095fc347ed855cc845a07b216dd1b6c9332eb9381db091b5fa2bd5489b7e25",
-    "nyxllor": "11586629e5b833b74fd9928a280030753c4975342d757d951391c4df1e86e333",
-    "peninsula_city": "13e3a3000db8c7f5843a0fe5d836c508130c48ec51ac1f8de3e2a3d5475fe2f6"
+    "archipelago_free_port": "66c3803bd314ec7e25e454526bc113c5d66f9d6bd1104a681ed76ebdc15ea08e",
+    "delta_megacity": "b23ae6ea83eb425ada5e0c06066761556ed800b88c3f39290f80f06ae0be5177",
+    "nexus_city": "efbd3ddc9d971b1a96ba510223235b908ec472db048f440dcafc337179a8a76b",
+    "nyxllor": "288e5b01bb88f384b9dae732008204290884c9ad36bdbe12b4fb2e5c44eeb510",
+    "peninsula_city": "c277482a42829cbbadc30824887ed0f6ebb87954095d8d0c790055f4170a0736"
   }
 }
