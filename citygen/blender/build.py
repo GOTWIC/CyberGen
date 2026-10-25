@@ -269,7 +269,71 @@ class MeshData:
             self.face([ia[i], ia[j], ib[j], ib[i]], mat)
 
 
-def build_object(o, mats, cols):
+def build_prototypes(plan, mats, cols):
+    """One mesh object per prop and plant kind, 5 km under the city and out of the renders;
+    a geometry-nodes group per kind instances it on the points of an instancing object."""
+    groups = {}
+    for kind, parts in sorted(plan.get("prototypes", {}).items()):
+        ob, _, _ = build_object({"name": f"proto.{kind}", "parts": parts, "props": {},
+                                 "collection": ["Prototypes"], "tile": "", "category": ""},
+                                mats, cols, tag=False)
+        ob.location = (0.0, 0.0, -5000.0)
+        ob.hide_render = True
+        groups[kind] = instance_group(kind, ob)
+    return groups
+
+
+def instance_group(kind, proto):
+    ng = bpy.data.node_groups.new(f"citygen_instances.{kind}", "GeometryNodeTree")
+    ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    N, L = ng.nodes, ng.links
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    iop = N.new("GeometryNodeInstanceOnPoints")
+    oi = N.new("GeometryNodeObjectInfo")
+    oi.transform_space = "ORIGINAL"
+    oi.inputs["As Instance"].default_value = True   # USD point instancers
+    oi.inputs["Object"].default_value = proto
+    rot = N.new("GeometryNodeInputNamedAttribute")
+    rot.data_type = "FLOAT_VECTOR"
+    rot.inputs["Name"].default_value = "rot"
+    scl = N.new("GeometryNodeInputNamedAttribute")
+    scl.data_type = "FLOAT_VECTOR"
+    scl.inputs["Name"].default_value = "scl"
+    L.new(gi.outputs["Geometry"], iop.inputs["Points"])
+    L.new(oi.outputs["Geometry"], iop.inputs["Instance"])
+    L.new(rot.outputs["Attribute"], iop.inputs["Rotation"])
+    L.new(scl.outputs["Attribute"], iop.inputs["Scale"])
+    L.new(iop.outputs["Instances"], go.inputs["Geometry"])
+    return ng
+
+
+def build_instances(o, groups, cols):
+    """An instancing object: a point per prop or plant (position, yaw, scale attributes) and
+    the geometry-nodes group of its kind."""
+    p = o["parts"][0]
+    pts = p["pts"]
+    mesh = bpy.data.meshes.new(o["name"])
+    mesh.vertices.add(len(pts))
+    mesh.vertices.foreach_set("co", [v for x in pts for v in x[:3]])
+    a = mesh.attributes.new("rot", "FLOAT_VECTOR", "POINT")
+    a.data.foreach_set("vector", [v for x in pts for v in (0.0, 0.0, math.radians(x[3]))])
+    b = mesh.attributes.new("scl", "FLOAT_VECTOR", "POINT")
+    b.data.foreach_set("vector", [v for x in pts for v in x[4:7]])
+    mesh.update()
+    obj = bpy.data.objects.new(o["name"], mesh)
+    mod = obj.modifiers.new("instances", "NODES")
+    mod.node_group = groups[p["proto"]]
+    for k, v in o["props"].items():
+        obj[k] = v
+    obj["citygen_tile"] = o["tile"]
+    obj["citygen_category"] = o["category"]
+    obj["citygen_instances"] = len(pts)
+    collection_for(o["collection"], cols).objects.link(obj)
+    return obj, len(pts)
+
+
+def build_object(o, mats, cols, tag=True):
     md = MeshData()
     slots = []
     index = {}
@@ -301,8 +365,9 @@ def build_object(o, mats, cols):
     obj = bpy.data.objects.new(o["name"], mesh)
     for k, v in o["props"].items():
         obj[k] = v
-    obj["citygen_tile"] = o["tile"]
-    obj["citygen_category"] = o["category"]
+    if tag:
+        obj["citygen_tile"] = o["tile"]
+        obj["citygen_category"] = o["category"]
     collection_for(o["collection"], cols).objects.link(obj)
     return obj, len(md.verts), len(md.faces)
 
@@ -435,11 +500,19 @@ def main():
     cols = {}
     by_tile, verts, faces = {}, 0, 0
     counts = {}
+    groups = build_prototypes(plan, mats, cols)
+    instances = 0
     for o in plan["objects"]:
-        ob, nv, nf = build_object(o, mats, cols)
-        by_tile.setdefault(o["tile"], []).append(ob)
-        verts += nv
-        faces += nf
+        if o["parts"] and o["parts"][0]["k"] == "inst":
+            # props and plants: instanced, in the .blend and the USD (point instancers), not
+            # in the glTF tiles (props.csv carries them for engines)
+            ob, n = build_instances(o, groups, cols)
+            instances += n
+        else:
+            ob, nv, nf = build_object(o, mats, cols)
+            by_tile.setdefault(o["tile"], []).append(ob)
+            verts += nv
+            faces += nf
         counts[o["category"]] = counts.get(o["category"], 0) + 1
     timings["build_s"] = round(time.perf_counter() - t, 1)
     files = {}
@@ -452,7 +525,7 @@ def main():
         t = time.perf_counter()
         usd = os.path.join(out, "city.usdc")
         bpy.ops.wm.usd_export(filepath=usd, export_materials=True, selected_objects_only=False,
-                              export_cameras=False, export_lights=False)
+                              export_cameras=False, export_lights=False, use_instancing=True)
         files["usd"] = usd
         timings["usd_s"] = round(time.perf_counter() - t, 1)
         t = time.perf_counter()
@@ -471,7 +544,7 @@ def main():
     report = {
         "city": plan["city"], "blender": bpy.app.version_string,
         "objects": len(plan["objects"]), "by_category": dict(sorted(counts.items())),
-        "vertices": verts, "faces": faces, "materials": len(mats),
+        "vertices": verts, "faces": faces, "instances": instances, "materials": len(mats),
         "collections": len(cols), "tiles": len(plan["tiles"]),
         "files": {k: ([os.path.relpath(p, out) for p in v] if isinstance(v, list)
                       else os.path.relpath(v, out)) for k, v in files.items()},

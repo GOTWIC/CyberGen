@@ -307,13 +307,18 @@ errors).
    navigable water or a road deck), elevated decks 2 m over the roofs under them and 5.5 m
    over road decks, sky tubes 10 m over the roofs or through a tower portal, supports off
    lanes, sidewalk clear paths, buildings and water, every station with stairs or an elevator
-   joined to the street walkways, no skybridge across a track. The stats give the boundary between districts on water (against the target),
+   joined to the street walkways, no skybridge across a track. M6 checks: props, trunks and
+   shrubs out of lanes, crosswalks, junctions, buildings, water, entrances and the sidewalk
+   clear path, nothing on the ground overlapping, tree crowns 1 m from facades and 1 m under
+   decks, trunks off junction sight lines and station stairs, street or wall lights within
+   25 m of 85% of every district's sidewalks, plants in every park, boats afloat. The stats
+   give the boundary between districts on water (against the target),
    road km by class, bridges by class, named bridges and exits, and for M2 junctions by type,
    crosswalks, lanes, walkways, blocks, lots, the lot size distribution per archetype and the
    open space share per district, and for M3 buildings by type, heights, coverage and floor
    area per district, skybridges, units, roof items, landmarks and megasite contents, and for
    M5 transit km by mode, stations by kind, supports, tower portals and the buildings removed
-   for the lines.
+   for the lines, and for M6 props and plants by kind, lawns and hedges.
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
    where asked, land left without a district (hatched) only where the prompt allows it, open
@@ -348,6 +353,12 @@ errors).
    stops in order without doubling back, run along the avenues (elevated rail, monorail),
    and keep its stations in the districts it names. The massing preview shows the decks,
    tubes and columns.
+4c. Open `preview_props.png` (M6): four 180 m insets at street level with every prop to
+   size (street lights with their glow, parked cars, bus shelters, benches, stalls,
+   dumpsters, signs, awnings, cables) and the plants (crowns to scale). Street trees should
+   line the wide sidewalks and medians, parks should have clusters with clearings, old towns
+   wall lights, awnings and cables; density follows each district's `greenery`, `grime` and
+   `neon` (set them per district to change it).
 5. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass

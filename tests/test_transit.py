@@ -109,7 +109,7 @@ def test_report_has_transit_stats(lines):
     assert set(st["by_mode"]) == {"metro", "elevated_rail", "sky_tube"}
     assert st["km"] > 1.0 and st["supports"] > 0
     rep = lines.report()
-    assert rep["stage"].startswith("M5")
+    assert rep["stage"].startswith("M6") and "transit" in rep["stage"]
     assert "transit" in C.report_text(rep)
 
 

@@ -8,7 +8,7 @@
 - `legacy_plan`: the box/cylinder primitives of `corporate_core_plan.json`, for
   `unreal/build_greybox_unreal.py` (unchanged).
 - `graphs`: lane graph, pedestrian graph and transit lines as JSON (ZoneGraph and Mass later).
-- `props_csv`: prop instances (none before M6; the header is the format).
+- `props_csv`: prop and plant instances (M6), one row each, for instanced meshes in an engine.
 """
 
 from __future__ import annotations
@@ -383,7 +383,8 @@ def graphs(m: CityModel) -> dict:
     }
 
 
-PROP_FIELDS = ["id", "type", "x", "y", "z", "yaw_deg", "sx", "sy", "sz", "tile"]
+PROP_FIELDS = ["id", "type", "x", "y", "z", "yaw_deg", "sx", "sy", "sz", "tile", "height_m",
+               "crown_radius_m", "species"]
 
 
 def props_csv(m: CityModel) -> str:
@@ -394,5 +395,12 @@ def props_csv(m: CityModel) -> str:
     w.writerow(PROP_FIELDS)
     for p in m.props:
         x, y, z = p.position
-        w.writerow([p.id, p.type, x, y, z, p.yaw_deg, *p.scale, tile_name(*tile_key(x, y))])
+        w.writerow([p.id, p.type, x, y, z, p.yaw_deg, *p.scale, tile_name(*tile_key(x, y)),
+                    "", "", ""])
+    for p in m.plants:
+        x, y, z = p.position
+        a = p.attrs or {}
+        w.writerow([p.id, p.type, x, y, z, a.get("yaw_deg", 0.0), a.get("length_m", 1.0), 1.0,
+                    1.0, tile_name(*tile_key(x, y)), p.height_m, p.crown_radius_m,
+                    p.species or ""])
     return buf.getvalue()

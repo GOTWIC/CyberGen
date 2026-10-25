@@ -63,7 +63,9 @@ def test_plan_covers_the_model(small, small_plan):
     joined_ids = ";".join(o["props"].get("citygen_ids", "") for o in plan["objects"])
     for s in small.sidewalks[:50]:
         assert s.id in joined_ids
-    assert set(plan["materials"]) == {p["m"] for o in plan["objects"] for p in o["parts"]}
+    used = {p["m"] for o in plan["objects"] for p in o["parts"] if p["k"] != "inst"}
+    used |= {p["m"] for parts in plan.get("prototypes", {}).values() for p in parts}
+    assert set(plan["materials"]) == used
     for color in plan["materials"].values():
         assert re.fullmatch(r"#[0-9a-fA-F]{6}", color)
     for o in plan["objects"]:

@@ -481,6 +481,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     from . import building_checks as BC
     from . import buildout as BO
     from . import street_checks as SC
+    from . import prop_checks as PC
+    from . import props as PR
     from . import transit as TR
     from . import transit_checks as TC
 
@@ -511,18 +513,22 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     if spec.transit.lines:
         tr = TR.build(spec, m)
         m = with_rows(m, tr.rows)
+    pr = PR.build(spec, m)
+    m = with_rows(m, pr.rows)
     b.model = m
     lms = SimpleNamespace(landmasses={lm.id: G.from_model_poly(lm.polygon)
                                       for lm in m.landmasses})
     bx = BC._B(m)
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
-              for c in early["checks"]] + BC.run(spec, m, None, bx) + TC.run(spec, m)
+              for c in early["checks"]] + BC.run(spec, m, None, bx) + TC.run(spec, m) + \
+        PC.run(spec, m)
     st = early["stats"]
     if "local" in st:
         st["local"] = SC.stats(spec, m)
     st["buildings"] = BC.stats(spec, m, bx)
     if tr is not None:
         st["transit"] = {**TC.stats(m), "generator": tr.info}
+    st["props"] = {**PC.stats(m), "generator": pr.info}
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)
@@ -532,7 +538,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st.setdefault("buildings", {})["generator"] = {k: v for k, v in out.info.items()
                                                    if k != "seconds"}
     b.checks, b.stats = checks, st
-    b.notes = b.notes + out.notes + (tr.notes if tr is not None else [])
+    b.notes = b.notes + out.notes + (tr.notes if tr is not None else []) + pr.notes
     return b
 
 
@@ -572,6 +578,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
         paths += [out / "preview_heights.png", out / "preview_massing.png"]
         render_heights(b, paths[-2])
         render_massing(b, paths[-1])
+    if b.model.props or b.model.plants:
+        from .preview_props import render_props
+
+        paths.append(out / "preview_props.png")
+        render_props(b, paths[-1])
     if b.model.transit_lines:
         from .preview_transit import render_transit
 

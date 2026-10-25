@@ -35,6 +35,7 @@ from pathlib import Path
 import shapely
 from shapely.geometry import LineString, Point, box
 
+from . import dmath as M
 from . import geom as G
 from .model import CityModel
 from .preview import OPEN_COLORS
@@ -67,6 +68,14 @@ MATERIALS = {
     "skybridge": SKYBRIDGE, "green_roof": "#4f8a55", "canopy": "#9fb0c4",
     "site_default": "#b0b6c0", "rail": "#8a7a6a",
     "transit_deck": "#a4abb8", "transit_tube": "#bfe3f2", "transit_support": "#6f7480",
+    "prop_metal": "#5d636e", "prop_light": "#ffe9a0", "prop_signal": "#d0453a",
+    "prop_glass": "#8fd3ff", "prop_wood": "#a77b52", "prop_neon": "#ff4fd8",
+    "prop_awning": "#e8a23a", "prop_car": "#c8ccd4", "prop_dumpster": "#3f7a4a",
+    "prop_trash": "#6b6455", "prop_boat": "#eeeeee", "prop_concrete": "#9a9fa8",
+    "prop_scaffold": "#d9b25a", "prop_kiosk": "#3a4150", "plant_trunk": "#6b4f3a",
+    "plant_crown": "#3f8a47", "plant_conifer": "#2f6e45", "plant_palm": "#7fae45",
+    "plant_shrub": "#5aa060", "plant_scrub": "#7a8a4a", "plant_ivy": "#5fae55",
+    "hedge": "#2f6e45", "lawn": "#4f8a57",
 }
 MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
 MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
@@ -515,6 +524,137 @@ def _sites(P: _Plan) -> None:
                "station_id": a.get("station", "")})
 
 
+# --- props and plants (M6): one instancing object per kind and tile --------------------------
+
+def _cyl(r: float, z0: float, z1: float, mat: str, shape: str = "prism", n: int = 8,
+         cx: float = 0.0, cy: float = 0.0) -> dict:
+    ring = [[q(cx + r * float(M.cos(2 * math.pi * k / n))),
+             q(cy + r * float(M.sin(2 * math.pi * k / n)))] for k in range(n)]
+    return {"k": "prism", "m": mat, "z0": q(z0), "z1": q(z1), "r": ring, "h": [], "s": shape}
+
+
+def _bx(c, d, mat: str, yaw: float = 0.0) -> dict:
+    return {"k": "box", "m": mat, "c": [q(v) for v in c], "d": [q(v) for v in d], "yaw": yaw}
+
+
+def _tree_proto(crown_mat: str) -> list[dict]:
+    return [_cyl(0.25, 0.0, 4.5, "plant_trunk", n=6), _cyl(3.0, 3.5, 6.5, crown_mat),
+            _cyl(3.0, 6.5, 10.0, crown_mat, "dome")]
+
+
+# Local frame: x along the thing's yaw, z up from its position; plants at a base size (crown
+# radius, height) the instance scale stretches: trees 3 and 10 m, shrubs 1 and 1 m.
+PROTOTYPES = {
+    "street_light": [_bx((0, 0, 0), (0.25, 0.25, 8.0), "prop_metal"),
+                     _bx((0.8, 0, 7.75), (1.6, 0.15, 0.15), "prop_metal"),
+                     _bx((1.5, 0, 7.55), (0.7, 0.35, 0.2), "prop_light")],
+    "wall_light": [_bx((0.15, 0, -0.1), (0.3, 0.12, 0.12), "prop_metal"),
+                   _bx((0.35, 0, -0.35), (0.3, 0.3, 0.25), "prop_light")],
+    "traffic_signal": [_bx((0, 0, 0), (0.2, 0.2, 5.5), "prop_metal"),
+                       _bx((0.3, 0, 4.2), (0.35, 0.35, 1.1), "prop_signal")],
+    "trash_can": [_cyl(0.3, 0.0, 0.9, "prop_metal")],
+    "bus_stop": [_bx((0, 0, 2.5), (4.0, 1.6, 0.12), "prop_metal"),
+                 _bx((0, 0.65, 0.1), (4.0, 0.08, 2.4), "prop_glass"),
+                 _bx((-1.95, 0, 0), (0.1, 0.1, 2.5), "prop_metal"),
+                 _bx((1.95, 0, 0), (0.1, 0.1, 2.5), "prop_metal"),
+                 _bx((0, 0.35, 0), (3.0, 0.4, 0.45), "prop_wood")],
+    "hydrant": [_cyl(0.18, 0.0, 0.65, "prop_signal"), _cyl(0.18, 0.65, 0.8, "prop_signal",
+                                                           "dome")],
+    "bollard": [_cyl(0.1, 0.0, 0.9, "prop_concrete", n=6)],
+    "bench": [_bx((0, 0, 0.38), (1.8, 0.5, 0.08), "prop_wood"),
+              _bx((-0.75, 0, 0), (0.08, 0.45, 0.38), "prop_metal"),
+              _bx((0.75, 0, 0), (0.08, 0.45, 0.38), "prop_metal"),
+              _bx((0, 0.22, 0.46), (1.8, 0.06, 0.45), "prop_wood")],
+    "kiosk": [_bx((0, 0, 0), (2.2, 2.2, 2.6), "prop_kiosk"),
+              _bx((0, 0, 2.6), (2.6, 2.6, 0.15), "prop_neon")],
+    "vending_machine": [_bx((0, 0, 0), (1.0, 0.8, 1.9), "prop_neon")],
+    "food_stall": [_bx((0, 0, 0), (3.0, 2.0, 1.0), "prop_wood"),
+                   _bx((0, 0, 2.4), (3.4, 2.4, 0.1), "prop_awning"),
+                   _bx((-1.5, -1.0, 0), (0.08, 0.08, 2.4), "prop_metal"),
+                   _bx((1.5, -1.0, 0), (0.08, 0.08, 2.4), "prop_metal"),
+                   _bx((-1.5, 1.0, 0), (0.08, 0.08, 2.4), "prop_metal"),
+                   _bx((1.5, 1.0, 0), (0.08, 0.08, 2.4), "prop_metal")],
+    "planter": [_bx((0, 0, 0), (1.2, 1.2, 0.6), "prop_concrete"),
+                _cyl(0.5, 0.6, 1.1, "plant_shrub", "dome")],
+    "parked_vehicle": [_bx((0, 0, 0.25), (4.6, 1.9, 0.75), "prop_car"),
+                       _bx((-0.2, 0, 1.0), (2.4, 1.7, 0.55), "prop_glass")],
+    "boat": [_bx((0, 0, -0.5), (8.0, 3.0, 1.3), "prop_boat"),
+             _bx((-1.0, 0, 0.8), (3.0, 2.0, 1.1), "prop_boat")],
+    "barrier": [_bx((0, 0, 0), (4.0, 0.6, 0.85), "prop_concrete")],
+    "railing": [_bx((0, 0, 1.0), (3.0, 0.06, 0.06), "prop_metal"),
+                _bx((-1.45, 0, 0), (0.06, 0.06, 1.05), "prop_metal")],
+    "overhead_cable": [_bx((0, 0, 0), (1.0, 0.04, 0.04), "prop_metal")],
+    "sign": [_bx((0, 0, 0), (0.2, 1.2, 1.8), "prop_neon")],
+    "awning": [_bx((0, 0, 0), (1.0, 1.0, 0.15), "prop_awning")],
+    "ac_unit": [_bx((0, 0, 0), (1.0, 0.6, 0.8), "prop_metal")],
+    "scaffolding": [_bx((0, 0, 0), (1.0, 1.5, 1.0), "prop_scaffold")],
+    "gate": [_bx((-0.45, 0, 0), (0.1, 1.0, 6.0), "prop_signal"),
+             _bx((0.45, 0, 0), (0.1, 1.0, 6.0), "prop_signal"),
+             _bx((0, 0, 5.0), (1.0, 1.2, 1.0), "prop_signal")],
+    "dumpster": [_bx((0, 0, 0), (2.0, 1.2, 1.3), "prop_dumpster")],
+    "trash": [_bx((0, 0, 0), (0.5, 0.5, 0.4), "prop_trash")],
+    "street_tree": _tree_proto("plant_crown"), "median_tree": _tree_proto("plant_crown"),
+    "park_tree": _tree_proto("plant_crown"), "roof_tree": _tree_proto("plant_crown"),
+    "conifer": [_cyl(0.25, 0.0, 2.0, "plant_trunk", n=6),
+                _cyl(3.0, 2.0, 10.0, "plant_conifer", "cone")],
+    "palm": [_cyl(0.2, 0.0, 9.0, "plant_trunk", n=6),
+             _cyl(3.0, 8.6, 10.0, "plant_palm", "dome")],
+    "shrub": [_cyl(1.0, 0.0, 1.0, "plant_shrub", "dome")],
+    "overgrowth": [_cyl(1.0, 0.0, 1.0, "plant_scrub", "dome", n=6)],
+    "facade_greenery": [_bx((0, 0, 0), (1.0, 0.3, 2.0), "plant_ivy")],
+}
+PLANT_BASE = {"conifer": (3.0, 10.0), "palm": (3.0, 10.0), "shrub": (1.0, 1.0),
+              "overgrowth": (1.0, 1.0)}
+
+
+def _dressing(P: _Plan) -> None:
+    m = P.m
+    groups: dict = {}
+    for p in m.props:
+        kind = p.type.split(".", 1)[1]
+        if kind not in PROTOTYPES:
+            continue
+        x, y, z = p.position
+        groups.setdefault(("prop", kind, tile_key(x, y)), []).append(
+            (p.id, [q(x), q(y), q(z), q(p.yaw_deg), q(p.scale[0]), q(p.scale[1]),
+                    q(p.scale[2])]))
+    for p in m.plants:
+        kind = p.type.split(".", 1)[1]
+        if kind not in PROTOTYPES:
+            continue
+        x, y, z = p.position
+        a = p.attrs or {}
+        if kind == "facade_greenery":
+            pt = [q(x), q(y), q(z), q(a.get("yaw_deg", 0.0)), q(a.get("length_m", 1.0)), 1.0,
+                  1.0]
+        else:
+            r0, h0 = PLANT_BASE.get(kind, (3.0, 10.0))
+            k = p.crown_radius_m / r0
+            yaw = q(360.0 * (int(hashlib.sha256(p.id.encode()).hexdigest()[:6], 16) % 3600)
+                    / 3600.0)
+            pt = [q(x), q(y), q(z), yaw, q(k), q(k), q(p.height_m / h0)]
+        groups.setdefault(("plant", kind, tile_key(x, y)), []).append((p.id, pt))
+    for (cls, kind, t), items in sorted(groups.items()):
+        P.add(f"{cls}.{kind}.{tile_name(*t)}",
+              [P.city, "Props" if cls == "prop" else "Vegetation", kind], t,
+              f"{cls}_{kind}", [{"k": "inst", "proto": kind, "pts": [pt for _, pt in items]}],
+              {"citygen_type": f"{cls}.{kind}", "count": len(items),
+               "citygen_ids": ";".join(i for i, _ in items)})
+    for g in m.green_areas:
+        if g.kind == "lawn" and g.polygon is not None:
+            ext, holes = _poly_rings(g.polygon)
+            cx, cy = _center(ext)
+            P.join(P.district_at(cx, cy), "lawn", cx, cy,
+                   {"k": "flat", "m": "lawn", "z": q(g.z_m + 0.12), "r": ext, "h": holes}, g.id)
+        elif g.kind == "hedge_line" and len(g.line) >= 2:
+            r = ribbon(g.line, 1.0, z=q(g.z_m + (g.attrs or {}).get("height_m", 1.2)))
+            if r is not None:
+                cx, cy = _center(g.line)
+                P.join(P.district_at(cx, cy), "hedge", cx, cy,
+                       {"k": "ribbon", "m": "hedge", "l": r[0], "rr": r[1],
+                        "t": q((g.attrs or {}).get("height_m", 1.2))}, g.id)
+
+
 # --- cameras ----------------------------------------------------------------------------------
 
 def _cameras(P: _Plan) -> dict:
@@ -626,13 +766,16 @@ def make_plan(m: CityModel) -> dict:
         _open_space(P)
         _buildings(P)
         _sites(P)
+        _dressing(P)
         cams = _cameras(P)
     for o in P.objects:
         ids = o["props"].get("citygen_ids")
         if isinstance(ids, list):
             o["props"]["citygen_ids"] = ";".join(ids)
             o["props"]["count"] = len(ids)
-    used = sorted({p["m"] for o in P.objects for p in o["parts"]})
+    protos = sorted({p["proto"] for o in P.objects for p in o["parts"] if p["k"] == "inst"})
+    used = sorted({p["m"] for o in P.objects for p in o["parts"] if p["k"] != "inst"} |
+                  {p["m"] for k in protos for p in PROTOTYPES[k]})
     tiles = sorted(P.tiles)
     x0, y0, x1, y1 = m.bounds
     counts: dict[str, int] = {}
@@ -647,11 +790,14 @@ def make_plan(m: CityModel) -> dict:
                               min((ix + 1) * TILE_M, x1), min((iy + 1) * TILE_M, y1)]}
                   for ix, iy in tiles],
         "cameras": cams,
+        "prototypes": {k: PROTOTYPES[k] for k in protos},
         "objects": P.objects,
         "stats": {"objects": len(P.objects), "by_category": dict(sorted(counts.items())),
                   "parts": sum(len(o["parts"]) for o in P.objects), "tiles": len(tiles),
                   "buildings": sum(1 for o in P.objects if o["category"] in
-                                   ("building", "landmark"))},
+                                   ("building", "landmark")),
+                  "instances": sum(len(p["pts"]) for o in P.objects for p in o["parts"]
+                                   if p["k"] == "inst")},
     }
 
 
@@ -672,7 +818,9 @@ VERIFY = ("import bpy, json\n"
           "print('CITYGEN_VERIFY ' + json.dumps({'objects': len(objs), 'buildings': sum(1 for o"
           " in objs if o['citygen_category'] in ('building', 'landmark')), 'faces': sum(len("
           "o.data.polygons) for o in objs if o.type == 'MESH'), 'tiles': len({o['citygen_tile']"
-          " for o in objs})}))\n")
+          " for o in objs}), 'instances': sum(int(o.get('citygen_instances', 0)) for o in objs),"
+          " 'evaluated': sum(1 for i in bpy.context.evaluated_depsgraph_get().object_instances"
+          " if i.is_instance)}))\n")
 
 
 def _version_key(path: str) -> tuple:
@@ -787,9 +935,15 @@ def _checks(m, plan, rep, verify, out: Path, render: bool, export: bool) -> list
         out_checks.append(("blend_buildings", verify["buildings"] == n_bld,
                            f"{verify['buildings']} building objects, {n_bld} buildings with "
                            f"masses in the model"))
+        want = plan["stats"].get("instances", 0)
+        out_checks.append(("blend_instances", verify.get("instances", 0) == want and
+                           verify.get("evaluated", 0) == want,
+                           f"{verify.get('evaluated', 0)} prop and plant instances evaluated "
+                           f"in the .blend, {want} in the plan"))
     if export:
         tiles = rep["files"].get("gltf_tiles", [])
-        want = len({o["tile"] for o in plan["objects"]})
+        want = len({o["tile"] for o in plan["objects"]
+                    if not (o["parts"] and o["parts"][0]["k"] == "inst")})
         out_checks.append(("gltf_tiles", len(tiles) == want and all(
             (out / t).is_file() and (out / t).stat().st_size > 0 for t in tiles),
             f"{len(tiles)} tile files for {want} tiles with objects"))
@@ -815,6 +969,7 @@ def report_text(rep: dict) -> str:
     if b:
         mb = {k: round(v / 1e6, 1) for k, v in b["bytes"].items()}
         lines += [f"blender {b['blender']}: {b['vertices']} vertices, {b['faces']} faces, "
+                  f"{b.get('instances', 0)} instances, "
                   f"{b['materials']} materials, {b['collections']} collections",
                   f"files (MB): {json.dumps(mb)}",
                   f"timings (s): {json.dumps(b['timings'])}"]
