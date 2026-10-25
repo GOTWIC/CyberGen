@@ -70,16 +70,16 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M3/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M3p/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M3" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M3p" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
         for png in ("preview_map.png", "preview_detail.png", "preview_heights.png",
                     "preview_massing.png"):
-            assert (ROOT / "docs" / "progress" / "M3" / slug / png).is_file()
+            assert (ROOT / "docs" / "progress" / "M3p" / slug / png).is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 

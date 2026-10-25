@@ -151,7 +151,19 @@ gains buildings, properties, skybridges, site elements and `Mass.shape`; 13 chec
 `building_checks.py` (44 in all); previews `preview_heights.png` and `preview_massing.png`
 (`preview_massing.py`). Any shape decision is an exact predicate on grid geometry or plain
 arithmetic; oriented boxes come from `massing.obb_angle`, never GEOS's minimum rotated
-rectangle. Sample builds: `docs/progress/M3/`. M4 (Blender blockout) is next.
+rectangle. Sample builds: `docs/progress/M3/`.
+
+M3p (polish of M3) is in place: megablock megabuildings are a podium with a court open to the
+sky and separate towers on it (at least 16 m apart, stepped heights, mid and crown setbacks,
+open decks between them), joined to neighbors by podium-level open decks
+(`skybridges._podium_decks`); M2 picks each merged lot group by trying candidates with M3's
+own complex builder (`complexes.probe`, masses only, on a district context built from M2's
+roads, junctions and water in `blocks._probe_ctx`), so complexes stand where they were grouped;
+straddle buildings also span a canal and its quay roads at the navigable clearance (the
+footprint check verifies every road and water body a span crosses, `span_crosses`); heights
+rise along the boulevard through a district's center (`buildings.boulevards`); and
+`roads._merge_degree2` no longer breaks when a smoothed joint collapses or drifts off its
+node (`roads._on_ends`). Sample builds: `docs/progress/M3p/`. M4 (Blender blockout) is next.
 
 ### Rules for cloud sessions building citygen milestones
 

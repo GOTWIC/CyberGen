@@ -260,12 +260,16 @@ the lane graph and the walkway graph; blocks, lots (narrow shopfront lots in old
 markets, large lots in the corporate core and port, merged lot groups for complexes), and
 open space (parks, plazas, pocket parks, courtyards, the spec's named places). Then the
 buildings (M3): one per lot by the district archetype (podium towers and slabs in the
-corporate core, megabuildings with atriums in megablocks, perimeter blocks in midtown,
+corporate core, megabuildings in megablocks: a podium with a court open to the sky and
+separate towers of stepped heights on it, joined by open decks, perimeter blocks in midtown,
 shopfront rows and shanty stacks in the old town and markets, warehouses and container yards
 in the port, villas and terraced houses in residential heights, labs on campuses, hangars at
 spaceports), heights from the district's `height_m` (taller near the district focus and on
-avenues, capped near spaceport flight cones), ground-floor units with uses along the street,
-entrances, rooftop items and green roofs; complexes on merged lots (`complexes`); landmarks
+avenues and along the boulevard through the district center, capped near spaceport flight
+cones), ground-floor units with uses along the street, entrances, rooftop items and green
+roofs; complexes on merged lots (`complexes`; M2 tries each candidate group with the M3
+builder, so complexes stand where they were grouped; straddle buildings span a street or a
+canal); landmarks
 (`landmarks`, e.g. the three-armed megatower); skybridges by `skybridge_density`; and every
 megasite reserve filled by its generator. It writes `city_model.json`, `preview_map.png`,
 `preview_detail.png`, `preview_heights.png`, `preview_massing.png`, `report.json` and
@@ -374,7 +378,7 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
-(previews and reports): `docs/progress/M3/` with buildings, skybridges, landmarks and
-megasites, `docs/progress/M2/` with local streets, blocks and lots,
+(previews and reports): `docs/progress/M3p/` with buildings, skybridges, landmarks and
+megasites (the M3 polish; `docs/progress/M3/` before it), `docs/progress/M2/` with local streets, blocks and lots,
 `docs/progress/M1b/` with primary roads (specs in `docs/progress/M1a2/`, the water and
 district builds there and in `docs/progress/M1a/`).

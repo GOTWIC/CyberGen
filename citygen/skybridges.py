@@ -9,7 +9,8 @@ building mass. Complexes ask for their bridges first (twin towers, clusters, bri
 megabuilding campuses); then each district adds bridges between its tall buildings by its
 `skybridge_density`, shortest first, at most two or three per building and never crossing
 another bridge at the same level. Grimy districts get low catwalks and cable bridges, the
-megablocks open decks. Bridges join the walkway graph later (the driver adds the deck and
+megablocks open decks, plus open decks between neighboring podiums below their roofs (the
+street-scale deck network). Bridges join the walkway graph later (the driver adds the deck and
 an elevator at each end).
 """
 
@@ -244,9 +245,58 @@ def district_skybridges(cx, out: dict) -> None:
         tall = [r for r in recs if r["height"] >= h_min and not r.get("landmark")]
         want = int(round(dens * len(tall) * 0.3))
         _density(cx, space, tall, by_id, chosen, deg, kind, f0, f1, max_deg, max_len, want)
+    if cx.archetype in PODIUM_DECKS and dens > 0:
+        _podium_decks(cx, space, recs, chosen, int(round(dens * len(recs) * 0.8)))
     for k, sb in enumerate(chosen):
         sb["id"] = f"{cx.did}.sb{k + 1:03d}"
     out["skybridges"] = chosen
+
+
+PODIUM_DECKS = ("megablock_residential",)
+
+
+def _podium_decks(cx, space, recs, chosen, want) -> None:
+    """Open decks between the podium roofs of neighbors (across a street or a court), a
+    level below the lower podium's top: the street-level deck network of the megablocks.
+    At most two per building, shortest first."""
+    pods = []
+    for r in recs:
+        ps = [m for m in r["masses"] if m[3] == "podium" and m[1] <= 0.0]
+        if ps:
+            pods.append((r, ps[0][0], ps[0][2]))
+    if want <= 0 or len(pods) < 2:
+        return
+    arr = np.array([p[1] for p in pods], dtype=object)
+    tree = shapely.STRtree(arr)
+    ia, ib = tree.query(arr, predicate="dwithin", distance=40.0)
+    pairs = sorted({(min(a, b), max(a, b)) for a, b in zip(ia.tolist(), ib.tolist()) if a != b})
+    cands = []
+    for a, b in pairs:
+        d = G.dist(pods[a][1], pods[b][1])
+        if d < MIN_LEN_M - 0.5:
+            continue
+        rng = cx.rng(81, a, b)
+        cands.append((round(d + 8.0 * float(rng.random()), 6), a, b))
+    cands.sort()
+    pdeg: dict = {}
+    n = 0
+    for d, a, b in cands:
+        if n >= want:
+            break
+        ra, rb = pods[a][0], pods[b][0]
+        if pdeg.get(ra["id"], 0) >= 2 or pdeg.get(rb["id"], 0) >= 2:
+            continue
+        zt = min(pods[a][2], pods[b][2]) - LEVEL_M["open_deck"] - 1.0
+        sb = connect(space, ra, rb, zt, "open_deck", 1, WIDTH_M["open_deck"], max_len=40.0,
+                     z_any=False)
+        if sb is None or sb["z_m"] + LEVEL_M["open_deck"] > min(pods[a][2], pods[b][2]):
+            continue
+        sb["property_id"] = None
+        space.decks.append((sb["poly"], sb["span"][0], sb["span"][1]))
+        chosen.append(sb)
+        for x in (ra["id"], rb["id"]):
+            pdeg[x] = pdeg.get(x, 0) + 1
+        n += 1
 
 
 def _accept(space, chosen, deg, sb) -> None:
