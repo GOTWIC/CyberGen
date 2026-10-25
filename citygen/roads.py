@@ -2144,6 +2144,23 @@ def _smooth_joint(fitter, ca: list, cb: list, cls: str) -> LineString:
     return G.qline(line)
 
 
+def _on_ends(ln, a, b):
+    """The line with its ends exactly at a and b when they lie within 10 cm of them (and
+    it keeps at least one point between), else None."""
+    if ln.is_empty or len(ln.coords) < 2:
+        return None
+    c = [tuple(p) for p in ln.coords]
+    if M.hypot(c[0][0] - a[0], c[0][1] - a[1]) > 0.1 or \
+            M.hypot(c[-1][0] - b[0], c[-1][1] - b[1]) > 0.1:
+        return None
+    if c[0] == tuple(a) and c[-1] == tuple(b):
+        return ln
+    inner = c[1:-1]
+    if not inner:
+        return None
+    return G.qline(LineString([tuple(a)] + inner + [tuple(b)]))
+
+
 def _merge_degree2(pieces, fitter=None):
     """Join pieces that meet end to end at a node of degree 2 (same class); a sharp joint
     is refitted as a curve."""
@@ -2171,7 +2188,13 @@ def _merge_degree2(pieces, fitter=None):
                 continue  # would close a loop on itself; keep the node
             merged = LineString(ca + cb[1:])
             if fitter is not None and _turn(ca[-2], ca[-1], cb[1]) > M.radians(12.0):
-                merged = _smooth_joint(fitter, ca, cb, ra.cls if ra.cls == rb.cls else "avenue")
+                sm = _smooth_joint(fitter, ca, cb, ra.cls if ra.cls == rb.cls else "avenue")
+                # the arc's 5 cm cleanup can drop an end point (the line then ends a few cm
+                # off its node) or, on pieces a few cm long, every point: put the ends back
+                # on the nodes, or keep the plain joint
+                sm = _on_ends(sm, ca[0], cb[-1])
+                if sm is not None:
+                    merged = sm
             keep = ra if la.length >= lb.length else rb
             pieces = [p for k, p in enumerate(pieces) if k not in (i, j)] + [(merged, keep)]
             changed = True

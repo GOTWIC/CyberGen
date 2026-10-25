@@ -9,7 +9,8 @@ building mass. Complexes ask for their bridges first (twin towers, clusters, bri
 megabuilding campuses); then each district adds bridges between its tall buildings by its
 `skybridge_density`, shortest first, at most two or three per building and never crossing
 another bridge at the same level. Grimy districts get low catwalks and cable bridges, the
-megablocks open decks. Bridges join the walkway graph later (the driver adds the deck and
+megablocks open decks, plus open decks between neighboring podiums below their roofs (the
+street-scale deck network). Bridges join the walkway graph later (the driver adds the deck and
 an elevator at each end).
 """
 

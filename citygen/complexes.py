@@ -13,8 +13,10 @@ podium, a two-level skybridge between them), tower clusters (three or four tower
 heights on a shared podium, bridges between neighbors), megabuilding campuses (a
 megabuilding with satellite towers, linked by open decks and bridges), campuses (low
 buildings around a lawn, joined by covered walkways), bridged pairs (two buildings on facing
-lots, skybridges across the street) and straddle buildings (upper floors spanning the street
-on a span at least 5.5 m clear of it).
+lots, skybridges across the street) and straddle buildings (upper floors spanning the street,
+or a canal and its quay roads, at least 5.5 m clear of the roads and at the navigable
+clearance over the water). M2 tries its candidate groups with these builders (`probe`), so a
+complex is built on its own group; the relocation below is the fallback.
 """
 
 from __future__ import annotations
