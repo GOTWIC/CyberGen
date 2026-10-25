@@ -1,6 +1,6 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots and open space, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
@@ -8,8 +8,8 @@ description: Turn a city prompt (and an optional concept image) into a validated
 You are the prompt-to-spec step of citygen (`docs/citygen_scope.md`, section 4.1). You read the
 prompt (and the image, if any), write `city_spec.json`, validate it until it passes, render the
 schematic, build the city (water, districts, waterways, primary roads and bridges, local
-streets, junctions, blocks, lots and open space), read the check report and previews, adjust the
-spec if needed, and report. Everything after the spec is deterministic offline code.
+streets, junctions, blocks, lots and open space, buildings, complexes, skybridges, landmarks and
+megasites), read the check report and previews, adjust the spec if needed, and report. Everything after the spec is deterministic offline code.
 
 ## Hard rules
 
@@ -258,9 +258,19 @@ streets on land boundaries between districts, waterfront promenades, footbridges
 every 150 to 300 m; junction polygons with corner radii, sidewalks, signals and crosswalks;
 the lane graph and the walkway graph; blocks, lots (narrow shopfront lots in old towns and
 markets, large lots in the corporate core and port, merged lot groups for complexes), and
-open space (parks, plazas, pocket parks, courtyards, the spec's named places). It writes
-`city_model.json`, `preview_map.png`, `preview_detail.png`, `report.json` and `report.txt`,
-and exits 0 when every check passes, 1 when one fails (2 on usage or file errors).
+open space (parks, plazas, pocket parks, courtyards, the spec's named places). Then the
+buildings (M3): one per lot by the district archetype (podium towers and slabs in the
+corporate core, megabuildings with atriums in megablocks, perimeter blocks in midtown,
+shopfront rows and shanty stacks in the old town and markets, warehouses and container yards
+in the port, villas and terraced houses in residential heights, labs on campuses, hangars at
+spaceports), heights from the district's `height_m` (taller near the district focus and on
+avenues, capped near spaceport flight cones), ground-floor units with uses along the street,
+entrances, rooftop items and green roofs; complexes on merged lots (`complexes`); landmarks
+(`landmarks`, e.g. the three-armed megatower); skybridges by `skybridge_density`; and every
+megasite reserve filled by its generator. It writes `city_model.json`, `preview_map.png`,
+`preview_detail.png`, `preview_heights.png`, `preview_massing.png`, `report.json` and
+`report.txt`, and exits 0 when every check passes, 1 when one fails (2 on usage or file
+errors).
 
 1. Read `report.txt`. Each failed check names the district, island, segment or bridge and why:
    a share off by more than 15%, a relation with the actual bearing, an edge or coast not met,
@@ -275,10 +285,16 @@ and exits 0 when every check passes, 1 when one fails (2 on usage or file errors
    clear path at least 1.8 m, crosswalks at signalized junctions, no junction on a bridge or
    ramp, minimum junction angles (60 degrees in grids, 35 in organic districts), no
    near-duplicate local streets, open space share in the archetype range, every named place
-   built. The stats give the boundary between districts on water (against the target),
+   built. M3 checks: buildings inside their lots and off roads, sidewalks, water and open
+   space, no overlaps, heights in the district range, an entrance near a walkway, units 4 to
+   12 m on the street facade, roof items on roofs, every merged lot group built as its complex,
+   skybridges (8 to 80 m, on both floor grids, 5.5 m over roads, joined to the walkways), every
+   landmark built at its height, every megasite filled with its parts, nothing above a flight
+   cone's limit. The stats give the boundary between districts on water (against the target),
    road km by class, bridges by class, named bridges and exits, and for M2 junctions by type,
    crosswalks, lanes, walkways, blocks, lots, the lot size distribution per archetype and the
-   open space share per district.
+   open space share per district, and for M3 buildings by type, heights, coverage and floor
+   area per district, skybridges, units, roof items, landmarks and megasite contents.
 2. Open `preview_map.png` and compare it with the prompt (and image): districts on the right
    sides of each other and of the water, rivers entering and leaving where asked, islands
    where asked, land left without a district (hatched) only where the prompt allows it, open
@@ -299,7 +315,15 @@ and exits 0 when every check passes, 1 when one fails (2 on usage or file errors
    lots, open space). Look for believable junctions (rounded corners, crosswalks at the big
    ones), lots that face their street, shopfront rows in the old town, and no streets that
    stop just short of another.
-4. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
+4. Open `preview_heights.png` (footprints shaded by height) and `preview_massing.png`
+   (isometric massing with four district close-ups): each district should read differently,
+   towers clustered at the corporate core's focus with the landmarks above them, a fine low
+   grain in the old town, large low sheds in the port, the megasites recognizable (launch
+   pads, container stacks and cranes, a station with platform decks, a stadium bowl). For
+   buildings: `height_m`, `landmarks` (kind, name, height), `complexes` and
+   `skybridge_density` per district; a landmark that does not fit or is capped by a flight
+   cone is reported in the notes.
+5. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass
    (an island, a bank between two rivers); drop a placement rule the geometry cannot meet (for
@@ -314,7 +338,7 @@ and exits 0 when every check passes, 1 when one fails (2 on usage or file errors
    `block_size_m` per district; named `places` (plaza, park, garden, market, promenade,
    waterfront, street, pedestrian_street, ...) with a `position` put them where the prompt
    wants.
-5. At most three build rounds. If checks still fail, stop and report them with what you tried;
+6. At most three build rounds. If checks still fail, stop and report them with what you tried;
    if you believe citygen itself is wrong, say so instead of editing it.
 
 ### 7. Report
@@ -328,7 +352,8 @@ Reply with:
 - the schematic and the build preview (attach or link the PNGs), plus the check result and the
   stats from `report.txt` (land, water share, landmasses, waterway km, district shares, road
   km by class, bridges by class, named bridges, exits, blocks, lots, junctions, open space
-  share), and `preview_detail.png`.
+  share, buildings, tallest building, skybridges, landmarks, megasites), and
+  `preview_detail.png`, `preview_heights.png` and `preview_massing.png`.
 
 ## Minimal example
 
@@ -349,6 +374,7 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
-(previews and reports): `docs/progress/M2/` with local streets, blocks and lots,
+(previews and reports): `docs/progress/M3/` with buildings, skybridges, landmarks and
+megasites, `docs/progress/M2/` with local streets, blocks and lots,
 `docs/progress/M1b/` with primary roads (specs in `docs/progress/M1a2/`, the water and
 district builds there and in `docs/progress/M1a/`).

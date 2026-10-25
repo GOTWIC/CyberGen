@@ -773,3 +773,30 @@ def snap_many(geoms):
         return out
     arr = shapely.set_precision(arr, GRID_M)
     return shapely.set_precision(arr, 0.0, mode="pointwise")
+
+
+def from_model_polys(polys) -> list:
+    """Shapely polygons of many model polygons at once (rings built in one vectorized call;
+    polygons with holes one by one)."""
+    out = [None] * len(polys)
+    flat, idx, which = [], [], []
+    k = 0
+    for i, d in enumerate(polys):
+        if d is None:
+            continue
+        holes = d.holes if hasattr(d, "holes") else d.get("holes", [])
+        if holes:
+            out[i] = from_model_poly(d)
+            continue
+        ext = d.exterior if hasattr(d, "exterior") else d["exterior"]
+        flat.extend(ext)
+        idx.extend([k] * len(ext))
+        which.append(i)
+        k += 1
+    if which:
+        rings = shapely.linearrings(np.asarray(flat, dtype=np.float64),
+                                    indices=np.asarray(idx, dtype=np.int64))
+        ps = shapely.polygons(rings)
+        for i, p in zip(which, ps):
+            out[i] = p
+    return out

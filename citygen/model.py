@@ -380,30 +380,57 @@ class OpenSpace(Entity):
 
 
 class Property(Entity):
+    """One owner's buildings: a single building on a lot, a complex on merged lots (twin
+    towers, tower cluster, ...), a landmark, or the buildings of a megasite."""
     TYPE_PREFIX: ClassVar[str] = "property"
     owner: str
     complex: Literal["twin_towers", "tower_cluster", "megabuilding_campus", "bridged_pair",
-                     "straddle_building", "campus", "single"] = "single"
+                     "straddle_building", "campus", "single", "landmark", "megasite"] = "single"
     building_ids: list[str]
+    district_id: str | None = None
+    lot_ids: list[str] = Field(default_factory=list)
+    name: str | None = None
 
 
 class Mass(_Model):
+    """An extruded footprint from z0 to z1. `shape` tells the blockout builder how to read it:
+    prism (the footprint extruded), cylinder (footprint is a circle), dome and cone (rise
+    from the footprint to a point or cap), ring (a vertical wheel whose diameter is z1 - z0,
+    its footprint the thin plan of the rim)."""
     footprint: Polygon
     z0_m: float
     z1_m: float
-    role: str = "body"  # podium, tower, tier, void, ...
+    role: str = Field("body", description="podium, tower, tier, crown, spire, mechanical, "
+                                          "body, void, deck, span, leg, dock, ramp, roof, ...")
+    shape: Literal["prism", "cylinder", "dome", "cone", "ring"] = "prism"
 
 
 class Unit(_Model):
+    """A ground-floor unit along a street facade (4 to 12 m wide)."""
     edge: tuple[Point2, Point2]
     use: str
     entrance: Point2 | None = None
+    width_m: float = 0.0
+    segment_id: str | None = Field(None, description="Road segment the unit faces.")
+    awning_m: float = Field(0.0, description="Awning depth over the sidewalk (0: none).")
+    sign: bool = False
+
+
+class Entrance(_Model):
+    position: Point2 = Field(description="On the facade, ground level.")
+    kind: Literal["main", "service", "loading", "garage", "gate"] = "main"
+    segment_id: str | None = Field(None, description="Road segment it faces.")
+    walkway_id: str | None = Field(None, description="Nearest ground walkway (crowds enter "
+                                                     "and leave here).")
+    link_m: float | None = Field(None, description="Distance from the entrance to that "
+                                                   "walkway.")
 
 
 class RoofItem(_Model):
-    kind: str  # ac_unit, water_tank, antenna, billboard, helipad, av_pad
-    position: Point3
-    size: Point3
+    kind: str  # ac_unit, water_tank, antenna, billboard, helipad, av_pad, mechanical, ...
+    position: Point3 = Field(description="Center of the item's base (z = the roof it sits on).")
+    size: Point3 = Field(description="Extent along the building axis, across it, and up.")
+    yaw_deg: float = Field(0.0, description="Building axis, degrees counterclockwise from east.")
 
 
 class Portal(_Model):
@@ -414,30 +441,61 @@ class Portal(_Model):
 
 
 class Building(Entity):
+    """`type` is `building.<archetype>` (podium_tower, slab, courtyard_block, megabuilding,
+    terraced, shopfront_row, shanty_stack, warehouse, shed, parking_structure, lab, station,
+    terminal, hangar, ...), or `building.landmark.<kind>` for landmarks."""
     TYPE_PREFIX: ClassVar[str] = "building"
+    name: str | None = None
     lot_id: str | None = None
     property_id: str | None = None
+    district_id: str | None = None
+    megasite_id: str | None = None
     use: Literal["office", "residential", "retail", "hotel", "industrial", "parking", "civic",
-                 "mixed", "station"]
+                 "mixed", "station", "transport", "entertainment", "religious"]
     floor_height_m: float = 3.5
+    floors: int = Field(1, description="Floors of the tallest mass.")
+    height_m: float = Field(0.0, description="Top of the tallest mass (spires included).")
+    footprint: Polygon | None = Field(None, description="Ground footprint (masses from z 0).")
     masses: Annotated[list[Mass], Field(min_length=1)]
+    entrances: list[Entrance] = Field(default_factory=list)
     units: list[Unit] = Field(default_factory=list)
     roof_items: list[RoofItem] = Field(default_factory=list)
     portals: list[Portal] = Field(default_factory=list)
+    landmark: bool = False
     style: dict[str, float | str] = Field(default_factory=dict, description="grime, neon, era.")
 
 
 class Skybridge(Entity):
     TYPE_PREFIX: ClassVar[str] = "skybridge"
     building_ids: tuple[str, str]
-    line: Line2
-    z_m: float
+    line: Line2 = Field(description="Facade to facade.")
+    z_m: float = Field(description="Deck level (a floor of both buildings).")
     width_m: float
     levels: int = 1
+    level_height_m: float = 4.0
     kind: Literal["enclosed", "open_deck", "stack", "catwalk", "cable"] = "enclosed"
+    length_m: float = 0.0
+    clearance_m: float | None = Field(None, description="Deck underside over what it "
+                                                        "crosses (road or water level).")
+    crosses: list[str] = Field(default_factory=list, description="Road segments, water and "
+                                                                "open space below.")
+    walkway_ids: list[str] = Field(default_factory=list)
+    property_id: str | None = None
 
 
-# --- vegetation and props ------------------------------------------------------
+class SiteElement(Entity):
+    """A part of a megasite or a lot that is not a building: launch pads, fuel tanks, cranes,
+    container stacks, berths, rail tracks, platforms, bus bays, lawns, ponds, paths, walls,
+    gates. Flat ones carry a footprint (or line) at z_m; raised ones carry masses."""
+    TYPE_PREFIX: ClassVar[str] = "site_element"
+    kind: str
+    megasite_id: str | None = None
+    lot_id: str | None = None
+    footprint: Polygon | None = None
+    line: list[Point2] = Field(default_factory=list)
+    z_m: float = 0.0
+    masses: list[Mass] = Field(default_factory=list)
+
 
 class Plant(Entity):
     TYPE_PREFIX: ClassVar[str] = "plant"
@@ -453,6 +511,7 @@ class GreenArea(Entity):
     polygon: Polygon | None = None
     line: list[Point2] = Field(default_factory=list)
     z_m: float = 0.0
+    building_id: str | None = Field(None, description="Green roofs: the building it tops.")
 
 
 class Prop(Entity):
@@ -479,7 +538,7 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "walkways": Walkway, "structures": Structure,
     "transit_lines": TransitLine, "stations": Station, "megasites": Megasite, "blocks": Block,
     "lots": Lot, "open_spaces": OpenSpace, "properties": Property, "buildings": Building,
-    "skybridges": Skybridge, "plants": Plant, "green_areas": GreenArea, "props": Prop,
+    "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
     "tiles": Tile,
 }
 
@@ -521,6 +580,7 @@ class CityModel(_Model):
     properties: list[Property] = Field(default_factory=list)
     buildings: list[Building] = Field(default_factory=list)
     skybridges: list[Skybridge] = Field(default_factory=list)
+    site_elements: list[SiteElement] = Field(default_factory=list)
     plants: list[Plant] = Field(default_factory=list)
     green_areas: list[GreenArea] = Field(default_factory=list)
     props: list[Prop] = Field(default_factory=list)
