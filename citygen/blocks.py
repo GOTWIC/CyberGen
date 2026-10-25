@@ -824,6 +824,7 @@ def _merged_groups(cx: Ctx, out: dict) -> None:
         if shared is None:
             shared = _probe_shared(cx)
         pcx = BL._prepare(_probe_ctx(cx, d, did, out, shared))
+        pcx.lots = [(r["id"], r["polygon"]) for r in sorted(lots, key=lambda r: r["id"])]
         order = sorted(lots, key=lambda r: r["id"])
         idx = {id(r): k for k, r in enumerate(order)}
         views = {id(r): _lot_view(r) for r in lots}
@@ -1019,7 +1020,17 @@ def _canal_pairs(free, c, pcx):
     only as far as they are needed)."""
     from . import complexes as CX
 
-    if not any(clear <= 4.0 + 1e-9 for _, _, clear in pcx.water):
+    canals = [wp for _, wp, clear in pcx.water if clear <= 4.0 + 1e-9]
+    if not canals:
+        return
+    # only lots within reach of a canal can face each other across one (exact: a pair's
+    # frontage midpoints lie within CANAL_REACH_M of each other with the canal between)
+    ctree = shapely.STRtree(canals)
+    hit = ctree.query([r["polygon"] for r in free], predicate="dwithin",
+                      distance=CX.CANAL_REACH_M)[0]
+    near = sorted(set(int(i) for i in hit.tolist()))
+    free = [free[i] for i in near]
+    if len(free) < 2:
         return
     polys = [r["polygon"] for r in free]
     cs = [G.centroid(p) for p in polys]

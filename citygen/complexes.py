@@ -930,6 +930,10 @@ def straddle_building(cx, gid, members, out, idx) -> bool:
     span = span[0]
     if any(span.intersects(j) for j in cx.junctions):
         return False
+    own = {lots[0]["id"], lots[1]["id"]}
+    if any(lid not in own and not G.apart(span, lp) and G.area1(G.inter(span, lp)) > 0.5
+           for lid, lp in cx.lots):
+        return False   # the span passes over another lot
     crosses, need, zroad = [], 0.0, 0.0
     for rid, cls, line, width, zmax in cx.roads:
         if span.intersects(LineString(line)):

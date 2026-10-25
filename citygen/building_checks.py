@@ -220,7 +220,7 @@ SPAN_STREETS = ("street", "alley", "pedestrian", "service")
 def _span(c, b, mass, poly, bx: _B, water: dict) -> None:
     """A straddle span: over a street (or a canal and its quay roads), every road it crosses
     a street listed in `span_crosses` and cleared by 5.5 m, the water by its navigable
-    clearance (both under a 1 m structure)."""
+    clearance (both under a 1 m structure), and over no lot but its own two."""
     sid = b.attrs.get("span_over")
     crosses = list(b.attrs.get("span_crosses") or [sid])
     if sid not in crosses:
@@ -250,6 +250,13 @@ def _span(c, b, mass, poly, bx: _B, water: dict) -> None:
         wp = water[x][0]
         if x not in crosses and poly.intersects(wp) and G.area1(G.inter(poly, wp)) > 0.01:
             _limit(c, c.failures, f"{b.id}: span over water '{x}' it does not list")
+    p = bx.prop.get(b.property_id)
+    own = set(p.lot_ids) if p is not None else set()
+    for lid in sorted(bx.lot):
+        lp = bx.lot[lid]
+        if lid not in own and not G.apart(poly, lp) and \
+                G.area1(G.inter(poly, lp)) > AREA_TOL_M2:
+            _limit(c, c.failures, f"{b.id}: span over lot {lid} (not its own)")
 
 
 def check_clear_zones(m: CityModel, bx: _B):

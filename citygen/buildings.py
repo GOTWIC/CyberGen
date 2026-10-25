@@ -270,6 +270,7 @@ class Ctx:
     noise: object = None
     clear: object = None
     axis: object = None      # boulevards (see `boulevards`)
+    lots: list = field(default_factory=list)          # (id, polygon) of the district's lots
     probe: bool = False      # M2 trying a merged group: masses only, no ground floor or roof
 
     @property
@@ -674,7 +675,17 @@ def megabuilding(b: Bld, region, H: float, cx: Ctx, rng):
         if lay is not None:
             break
     if lay is None:
-        b.add(region, 0.0, H, "body")
+        # no rectangle fits (an odd lot): a tower following the lot, 5 m in from the podium
+        t = MS.inset(region, 5.0)
+        if t.is_empty or G.area1(t) < 150.0:
+            b.add(region, 0.0, H, "body")
+            return
+        b.add(region, 0.0, P, "podium")
+        zc = H - max(2, int((H - P) * MS.uniform(rng, 0.07, 0.14) / fh)) * fh
+        b.add(t, P, zc, "tower")
+        c = _tier(b.fr, t, 3.0)
+        b.add(c if c is not None else t, zc, H, "crown")
+        b.attrs["towers"] = 1
         return
     fr, podium, court, towers = lay
     if len(towers) >= 4 and float(rng.random()) < 0.3:
@@ -1466,6 +1477,7 @@ def phase_a(job: dict) -> dict:
         out = {"buildings": [], "properties": [], "structures": [], "elements": [],
                "forced": []}
         used: set = set()
+        cx.lots = [(lt["id"], lt["polygon"]) for lt in job["lots"]]
         CX.landmarks(cx, job["lots"], used, out)
         CX.complexes(cx, job["lots"], used, out)
         res = _rows_and_sky(out, cx.did)
