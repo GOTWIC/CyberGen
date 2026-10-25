@@ -207,6 +207,11 @@ fails for both M3 and M3p. The full suite here: 259 passed, 1 failed, the Nexus 
 assertion (63.1 s in a full run, where the other samples are built in the same process
 first).
 
+On the owner's M4 Mac (macOS arm64, 4 workers) the full suite passes, the Nexus City budget
+included: 259 passed, 1 skipped (the x86-only SIMD test). All five models there are
+byte-identical to a local x86_64 Linux build (Docker `linux/amd64`) and to the golden hashes,
+and all 44 checks pass on both.
+
 | City | CLI build here (with previews and `--trace`), M3p |
 |---|---|
 | Nyxllor | 84 s |
