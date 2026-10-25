@@ -398,17 +398,22 @@ def freight_terminal(site: Site, lay: Lay) -> None:
         fp = lay.rect(-a * 0.9, v - 1.0, a * 0.5, v + 1.0)
         if lay.fits(fp):
             site.element("rail_track", footprint=fp, line=line, attrs={"gauge_m": 1.435})
-    g0 = a * 0.58
-    gate = lay.rect(g0, -b, g0 + 30.0, -b + 22.0)
-    if lay.fits(gate):
-        site.element("truck_gate", footprint=gate, attrs={"lanes": 4})
-        site.canopy(gate, 6.5, {"over": "truck_gate"})
-    gh = lay.rect(g0 + 34.0, -b + 2.0, g0 + 44.0, -b + 10.0)
-    site.building("gate_house", "industrial", 3.5, lay.fr, [(gh, 0.0, 3.5, "body", "prism")],
-                  lay=lay)
-    adm = lay.rect(a * 0.62, -b + 30.0, a - 2.0, -b + 50.0)
-    site.building("office", "office", 4.0, lay.fr, [(adm, 0.0, 16.0, "body", "prism")],
-                  name=f"{site.rec.name} Office", lay=lay)
+    # truck gate with its gate house, then the office, where they fit along the land side
+    for f in (0.58, 0.4, 0.2, 0.0, -0.2, -0.4, -0.6, 0.7):
+        g0 = a * f
+        gate = lay.rect(g0, -b, g0 + 30.0, -b + 22.0)
+        gh = lay.rect(g0 + 34.0, -b + 2.0, g0 + 44.0, -b + 10.0)
+        if lay.fits(gate) and site.free(gate) and lay.fits(gh) and site.free(gh):
+            site.element("truck_gate", footprint=gate, attrs={"lanes": 4})
+            site.canopy(gate, 6.5, {"over": "truck_gate"})
+            site.building("gate_house", "industrial", 3.5, lay.fr,
+                          [(gh, 0.0, 3.5, "body", "prism")], lay=lay)
+            break
+    for f in (0.62, 0.3, 0.0, -0.3, -0.62):
+        adm = lay.rect(a * f, -b + 30.0, a * f + min(40.0, a * 0.38), -b + 50.0)
+        if site.building("office", "office", 4.0, lay.fr, [(adm, 0.0, 16.0, "body", "prism")],
+                         name=f"{site.rec.name} Office", lay=lay) is not None:
+            break
     for i in range(2):
         w = lay.rect(-a * 0.9 + i * 120.0, -b + 36.0, -a * 0.9 + i * 120.0 + 100.0, -b + 64.0)
         site.building("warehouse", "industrial", 14.0, lay.fr,

@@ -212,6 +212,7 @@
     },
     "Building": {
       "additionalProperties": false,
+      "description": "`type` is `building.<archetype>` (podium_tower, slab, courtyard_block, megabuilding,\nterraced, shopfront_row, shanty_stack, warehouse, shed, parking_structure, lab, station,\nterminal, hangar, ...), or `building.landmark.<kind>` for landmarks.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -237,6 +238,18 @@
           "title": "Attrs",
           "type": "object"
         },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
         "lot_id": {
           "anyOf": [
             {
@@ -261,6 +274,30 @@
           "default": null,
           "title": "Property Id"
         },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
+        },
+        "megasite_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Megasite Id"
+        },
         "use": {
           "enum": [
             "office",
@@ -271,7 +308,10 @@
             "parking",
             "civic",
             "mixed",
-            "station"
+            "station",
+            "transport",
+            "entertainment",
+            "religious"
           ],
           "title": "Use",
           "type": "string"
@@ -281,12 +321,43 @@
           "title": "Floor Height M",
           "type": "number"
         },
+        "floors": {
+          "default": 1,
+          "description": "Floors of the tallest mass.",
+          "title": "Floors",
+          "type": "integer"
+        },
+        "height_m": {
+          "default": 0.0,
+          "description": "Top of the tallest mass (spires included).",
+          "title": "Height M",
+          "type": "number"
+        },
+        "footprint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Ground footprint (masses from z 0)."
+        },
         "masses": {
           "items": {
             "$ref": "#/$defs/Mass"
           },
           "minItems": 1,
           "title": "Masses",
+          "type": "array"
+        },
+        "entrances": {
+          "items": {
+            "$ref": "#/$defs/Entrance"
+          },
+          "title": "Entrances",
           "type": "array"
         },
         "units": {
@@ -309,6 +380,11 @@
           },
           "title": "Portals",
           "type": "array"
+        },
+        "landmark": {
+          "default": false,
+          "title": "Landmark",
+          "type": "boolean"
         },
         "style": {
           "additionalProperties": {
@@ -682,6 +758,82 @@
       "title": "District",
       "type": "object"
     },
+    "Entrance": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "description": "On the facade, ground level.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "kind": {
+          "default": "main",
+          "enum": [
+            "main",
+            "service",
+            "loading",
+            "garage",
+            "gate"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Road segment it faces.",
+          "title": "Segment Id"
+        },
+        "walkway_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Nearest ground walkway (crowds enter and leave here).",
+          "title": "Walkway Id"
+        },
+        "link_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Distance from the entrance to that walkway.",
+          "title": "Link M"
+        }
+      },
+      "required": [
+        "position"
+      ],
+      "title": "Entrance",
+      "type": "object"
+    },
     "Frontage": {
       "additionalProperties": false,
       "properties": {
@@ -795,6 +947,19 @@
           "default": 0.0,
           "title": "Z M",
           "type": "number"
+        },
+        "building_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Green roofs: the building it tops.",
+          "title": "Building Id"
         }
       },
       "required": [
@@ -1245,6 +1410,7 @@
     },
     "Mass": {
       "additionalProperties": false,
+      "description": "An extruded footprint from z0 to z1. `shape` tells the blockout builder how to read it:\nprism (the footprint extruded), cylinder (footprint is a circle), dome and cone (rise\nfrom the footprint to a point or cap), ring (a vertical wheel whose diameter is z1 - z0,\nits footprint the thin plan of the rim).",
       "properties": {
         "footprint": {
           "$ref": "#/$defs/Polygon"
@@ -1259,7 +1425,20 @@
         },
         "role": {
           "default": "body",
+          "description": "podium, tower, tier, crown, spire, mechanical, body, void, deck, span, leg, dock, ramp, roof, ...",
           "title": "Role",
+          "type": "string"
+        },
+        "shape": {
+          "default": "prism",
+          "enum": [
+            "prism",
+            "cylinder",
+            "dome",
+            "cone",
+            "ring"
+          ],
+          "title": "Shape",
           "type": "string"
         }
       },
@@ -1758,6 +1937,7 @@
     },
     "Property": {
       "additionalProperties": false,
+      "description": "One owner's buildings: a single building on a lot, a complex on merged lots (twin\ntowers, tower cluster, ...), a landmark, or the buildings of a megasite.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -1796,7 +1976,9 @@
             "bridged_pair",
             "straddle_building",
             "campus",
-            "single"
+            "single",
+            "landmark",
+            "megasite"
           ],
           "title": "Complex",
           "type": "string"
@@ -1807,6 +1989,37 @@
           },
           "title": "Building Ids",
           "type": "array"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
+        },
+        "lot_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lot Ids",
+          "type": "array"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         }
       },
       "required": [
@@ -2200,6 +2413,7 @@
           "type": "string"
         },
         "position": {
+          "description": "Center of the item's base (z = the roof it sits on).",
           "maxItems": 3,
           "minItems": 3,
           "prefixItems": [
@@ -2217,6 +2431,7 @@
           "type": "array"
         },
         "size": {
+          "description": "Extent along the building axis, across it, and up.",
           "maxItems": 3,
           "minItems": 3,
           "prefixItems": [
@@ -2232,6 +2447,12 @@
           ],
           "title": "Size",
           "type": "array"
+        },
+        "yaw_deg": {
+          "default": 0.0,
+          "description": "Building axis, degrees counterclockwise from east.",
+          "title": "Yaw Deg",
+          "type": "number"
         }
       },
       "required": [
@@ -2386,6 +2607,110 @@
       "title": "Sidewalk",
       "type": "object"
     },
+    "SiteElement": {
+      "additionalProperties": false,
+      "description": "A part of a megasite or a lot that is not a building: launch pads, fuel tanks, cranes,\ncontainer stacks, berths, rail tracks, platforms, bus bays, lawns, ponds, paths, walls,\ngates. Flat ones carry a footprint (or line) at z_m; raised ones carry masses.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "megasite_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Megasite Id"
+        },
+        "lot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lot Id"
+        },
+        "footprint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "line": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Line",
+          "type": "array"
+        },
+        "z_m": {
+          "default": 0.0,
+          "title": "Z M",
+          "type": "number"
+        },
+        "masses": {
+          "items": {
+            "$ref": "#/$defs/Mass"
+          },
+          "title": "Masses",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "SiteElement",
+      "type": "object"
+    },
     "Skybridge": {
       "additionalProperties": false,
       "properties": {
@@ -2428,6 +2753,7 @@
           "type": "array"
         },
         "line": {
+          "description": "Facade to facade.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -2446,6 +2772,7 @@
           "type": "array"
         },
         "z_m": {
+          "description": "Deck level (a floor of both buildings).",
           "title": "Z M",
           "type": "number"
         },
@@ -2458,6 +2785,11 @@
           "title": "Levels",
           "type": "integer"
         },
+        "level_height_m": {
+          "default": 4.0,
+          "title": "Level Height M",
+          "type": "number"
+        },
         "kind": {
           "default": "enclosed",
           "enum": [
@@ -2469,6 +2801,51 @@
           ],
           "title": "Kind",
           "type": "string"
+        },
+        "length_m": {
+          "default": 0.0,
+          "title": "Length M",
+          "type": "number"
+        },
+        "clearance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deck underside over what it crosses (road or water level).",
+          "title": "Clearance M"
+        },
+        "crosses": {
+          "description": "Road segments, water and open space below.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Crosses",
+          "type": "array"
+        },
+        "walkway_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Walkway Ids",
+          "type": "array"
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Property Id"
         }
       },
       "required": [
@@ -2843,6 +3220,7 @@
     },
     "Unit": {
       "additionalProperties": false,
+      "description": "A ground-floor unit along a street facade (4 to 12 m wide).",
       "properties": {
         "edge": {
           "maxItems": 2,
@@ -2903,6 +3281,35 @@
           ],
           "default": null,
           "title": "Entrance"
+        },
+        "width_m": {
+          "default": 0.0,
+          "title": "Width M",
+          "type": "number"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Road segment the unit faces.",
+          "title": "Segment Id"
+        },
+        "awning_m": {
+          "default": 0.0,
+          "description": "Awning depth over the sidewalk (0: none).",
+          "title": "Awning M",
+          "type": "number"
+        },
+        "sign": {
+          "default": false,
+          "title": "Sign",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3377,6 +3784,13 @@
         "$ref": "#/$defs/Skybridge"
       },
       "title": "Skybridges",
+      "type": "array"
+    },
+    "site_elements": {
+      "items": {
+        "$ref": "#/$defs/SiteElement"
+      },
+      "title": "Site Elements",
       "type": "array"
     },
     "plants": {

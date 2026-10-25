@@ -274,7 +274,7 @@ FRONT_SHRINK = tuple(sorted(((fw, fd) for fw in (1.0, 0.9, 0.8, 0.7, 0.6, 0.5)
 
 def front_rect(region, fr: Frame, depth: float, w_max: float | None = None,
                gaps=(0.1, 0.8, 2.0, 4.0), min_w: float = 8.0, min_d: float = 6.0,
-               v_front: float | None = None):
+               v_front: float | None = None, u_lim: tuple | None = None):
     """A rectangle along the street front of `region` (from v_front, or the region's front
     when that is not given or lies in front of it), `depth` deep (or less) and as wide as the
     region is at both its front and back lines (at most w_max), or None. `region` should be
@@ -282,11 +282,15 @@ def front_rect(region, fr: Frame, depth: float, w_max: float | None = None,
     u0, v0, u1, v1 = fr.bounds(region)
     if v_front is not None and v_front > v0:
         v0 = v_front
+    if u_lim is not None:   # along the main frontage only (big, irregular lots)
+        u0, u1 = max(u0, u_lim[0]), min(u1, u_lim[1])
+        if u1 - u0 < min_w:
+            return None
     spans: dict = {}
 
     def span(v):
         if v not in spans:
-            cut = G.inter(region, fr.rect(u0 - 10.0, v - 0.2, u1 + 10.0, v + 0.2))
+            cut = G.inter(region, fr.rect(u0 - 0.5, v - 0.2, u1 + 0.5, v + 0.2))
             ps = G.parts(cut)
             spans[v] = (fr.bounds(ps[0])[0], fr.bounds(ps[0])[2]) if ps else None
         return spans[v]
@@ -319,12 +323,29 @@ def front_rect(region, fr: Frame, depth: float, w_max: float | None = None,
 
 
 def obb_angle(poly) -> float:
-    """Direction of the long side of a polygon's minimum rotated rectangle (grid coordinates,
-    dmath angle)."""
-    r = G.qpoly(shapely.minimum_rotated_rectangle(poly))
-    if r is None or r.is_empty or r.geom_type != "Polygon":
+    """Direction of the long side of a polygon's minimum-area bounding rectangle: tried along
+    every edge of its convex hull (grid vertices in canonical order, dmath angles, plain
+    arithmetic; the first of equal areas wins), so every machine picks the same one."""
+    hull = G.qpoly(shapely.convex_hull(poly))
+    ps = G.parts(hull)
+    if not ps:
         return 0.0
-    return edge_angle(list(r.exterior.coords))
+    pts = [(x, y) for x, y in shapely.normalize(ps[0]).exterior.coords]
+    best = None
+    for a, b in zip(pts, pts[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L = math.sqrt(dx * dx + dy * dy)
+        if L <= 0:
+            continue
+        ux, uy = dx / L, dy / L
+        us = [x * ux + y * uy for x, y in pts]
+        vs = [y * ux - x * uy for x, y in pts]
+        W, D = max(us) - min(us), max(vs) - min(vs)
+        area = round(W * D, 6)
+        if best is None or area < best[0]:
+            ang = float(M.atan2(dy, dx))
+            best = (area, ang if W >= D else ang + M.HALF_PI)
+    return best[1] if best else 0.0
 
 
 # ---------------------------------------------------------------------------

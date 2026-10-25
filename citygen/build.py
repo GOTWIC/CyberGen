@@ -508,12 +508,13 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     b.model = m
     lms = SimpleNamespace(landmasses={lm.id: G.from_model_poly(lm.polygon)
                                       for lm in m.landmasses})
+    bx = BC._B(m)
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
-              for c in early["checks"]] + BC.run(spec, m, None)
+              for c in early["checks"]] + BC.run(spec, m, None, bx)
     st = early["stats"]
     if "local" in st:
         st["local"] = SC.stats(spec, m)
-    st["buildings"] = BC.stats(spec, m)
+    st["buildings"] = BC.stats(spec, m, bx)
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)

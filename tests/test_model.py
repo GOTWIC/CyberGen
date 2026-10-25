@@ -81,5 +81,5 @@ def test_all_scope_entities_present():
                 "quays", "bridges", "districts", "places", "road_nodes", "road_segments",
                 "junctions", "crosswalks", "sidewalks", "lanes", "walkways", "structures", "transit_lines", "stations",
                 "megasites", "blocks", "lots", "open_spaces", "properties", "buildings",
-                "skybridges", "plants", "green_areas", "props", "tiles"}
+                "skybridges", "site_elements", "plants", "green_areas", "props", "tiles"}
     assert set(COLLECTIONS) == expected

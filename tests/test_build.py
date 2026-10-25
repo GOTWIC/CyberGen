@@ -1,4 +1,4 @@
-"""M1a/M1a2/M1b/M2 build: samples, determinism, each check with a failing case, coast forms, river
+"""M1a/M1a2/M1b/M2/M3 build: samples, determinism, each check with a failing case, coast forms, river
 `at`, water separation, CLI. Road-specific tests are in test_roads.py."""
 
 import copy
@@ -70,15 +70,16 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M2/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M3/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M2" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M3" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        for png in ("preview_map.png", "preview_detail.png"):
-            assert (ROOT / "docs" / "progress" / "M2" / slug / png).is_file()
+        for png in ("preview_map.png", "preview_detail.png", "preview_heights.png",
+                    "preview_massing.png"):
+            assert (ROOT / "docs" / "progress" / "M3" / slug / png).is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
@@ -124,7 +125,12 @@ def test_small_city_passes(small_built):
                    "street_graph", "lane_graph", "walkway_graph", "lot_frontage",
                    "lot_block_sizes", "lot_slivers", "sidewalk_clear_path", "crosswalks",
                    "junction_placement", "junction_angles", "street_duplicates",
-                   "open_space_share", "places_built"}
+                   "open_space_share", "places_built",
+                   # M3
+                   "building_footprints", "building_clear_zones", "building_overlaps",
+                   "building_heights", "building_entrances", "ground_floor_units",
+                   "roof_items", "complexes", "skybridges", "landmarks", "megasite_contents",
+                   "megasite_heights", "megasite_access"}
 
 
 def test_check_geometry_invalid(small_built):

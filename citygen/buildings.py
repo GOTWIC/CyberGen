@@ -417,6 +417,7 @@ class Bld:
         self.name = None
         self.landmark = False
         self.front_v = None       # local v of the street front (frontage line + setback)
+        self.front_u = None       # local u range of the main frontage (plus a margin)
         self.front_line = None    # (line points, setback) of the main frontage
 
     def add(self, poly, z0: float, z1: float, role: str = "body", shape: str = "prism",
@@ -549,7 +550,8 @@ def slab(b: Bld, region, H: float, cx: Ctx, rng):
     u0, v0, u1, v1 = b.fr.bounds(region)
     D = v1 - v0
     depth = min(D, MS.uniform(rng, 14.0, 22.0))
-    bar = MS.front_rect(region, b.fr, depth, min_w=8.0, min_d=8.0, v_front=b.front_v)
+    bar = MS.front_rect(region, b.fr, depth, min_w=8.0, min_d=8.0, v_front=b.front_v,
+                        u_lim=b.front_u)
     if bar is None:
         bar = front_poly(b, region, depth)
     if bar is None:
@@ -600,14 +602,21 @@ def megabuilding(b: Bld, region, H: float, cx: Ctx, rng):
         body = G.parts(G.diff(region, atrium))[0]
     else:
         body = region
-    n_top = max(2, int(H / fh * 0.15))
-    z_top = H - n_top * fh
-    b.add(body, 0.0, z_top, "body")
-    tier = _tier(b.fr, body, 6.0)
-    if tier is not None and len(getattr(tier, "interiors", [])) == (1 if has_atrium else 0):
-        b.add(tier, z_top, H, "tier")
-    else:
-        b.add(body, z_top, H, "body")
+    # stepped mass: the full block to 55 to 70% of the height, then tiers set back 7 m each
+    z1 = max(2 * fh, int(H * MS.uniform(rng, 0.55, 0.7) / fh) * fh)
+    z2 = max(z1 + fh, int(H * MS.uniform(rng, 0.8, 0.9) / fh) * fh)
+    b.add(body, 0.0, z1, "body")
+    prev = body
+    for z0_, zt_, d in ((z1, z2, 7.0), (z2, H, 14.0)):
+        if zt_ <= z0_:
+            continue
+        tier = _tier(b.fr, body, d)
+        holes = len(getattr(tier, "interiors", [])) if tier is not None else -1
+        if tier is not None and holes == (1 if has_atrium else 0) and prev.covers(tier):
+            b.add(tier, z0_, zt_, "tier")
+            prev = tier
+        else:
+            b.add(prev, z0_, zt_, "tier")
     if has_atrium:
         b.attrs["atrium_m2"] = q(G.area1(atrium))
         u0, v0, u1, v1 = b.fr.bounds(atrium)
@@ -616,7 +625,7 @@ def megabuilding(b: Bld, region, H: float, cx: Ctx, rng):
         ps = G.parts(deck)
         if ps:
             for frac in (0.33, 0.66):
-                z = int(z_top * frac / fh) * fh
+                z = int(z1 * frac / fh) * fh   # decks across the atrium of the full block
                 b.add(ps[0], z, z + 2.0, "deck", roof=False)
 
 
@@ -750,7 +759,7 @@ def box(b: Bld, region, H: float, cx: Ctx, rng, cover: float, role: str = "body"
     W = (b.fr.bounds(bp[0])[2] - b.fr.bounds(bp[0])[0]) if bp else u1 - u0
     r = MS.front_rect(region, b.fr, min(D * s, dmax), w_max=min(W * s * 1.05, wmax),
                       gaps=(front_gap + 0.1, front_gap + 1.0, front_gap + 3.0),
-                      v_front=b.front_v)
+                      v_front=b.front_v, u_lim=b.front_u)
     if r is None:
         r = front_poly(b, region, max(min(D * s, dmax), 8.0))
     if r is None:
@@ -906,6 +915,8 @@ def set_front(b: Bld, f: dict, prog: Program) -> None:
     sb = prog.front.get(f["road_class"], 2.0)
     if best is not None:
         b.front_v = b.fr.local(*best[1])[1] + max(sb, prog.side)
+        us = [b.fr.local(x, y)[0] for x, y in line]
+        b.front_u = (min(us) - 6.0, max(us) + 6.0)
     b.front_line = (line, max(sb, prog.side))
 
 
@@ -951,7 +962,9 @@ def lot_building(cx: Ctx, lot: dict, k: int, notes: list) -> Bld | None:
     fill(b, kind, region, H, cx, rng, fronts, front_cls)
     if not b.masses:
         return None
-    if kind in REFIT_KINDS and not facades(b.ground(), fronts, prog):
+    street = [f for f in fronts if f["road_class"] != "highway"]
+    if kind in REFIT_KINDS and street and not any(
+            r["road_class"] != "highway" for r in facades(b.ground(), fronts, prog)):
         # no facade on a street (curved frontage, a deep or odd lot): follow the frontage
         u0, v0, u1, v1 = fr.bounds(region)
         dmax = BOX_MAX.get(kind, (1e9, 30.0))[1]

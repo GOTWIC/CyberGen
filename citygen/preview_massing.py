@@ -20,7 +20,8 @@ import matplotlib.patheffects as pe  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import shapely  # noqa: E402
-from matplotlib.collections import LineCollection, PolyCollection  # noqa: E402
+from matplotlib.collections import LineCollection, PathCollection, PolyCollection  # noqa: E402
+from matplotlib.path import Path as MPath  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, to_rgb  # noqa: E402
 from shapely.geometry import LineString, Polygon, box  # noqa: E402
 
@@ -52,14 +53,28 @@ def _sqrt_norm(h, hmax):
     return np.sqrt(np.clip(np.asarray(h, dtype=float), 0, hmax) / hmax)
 
 
-def _ground(ax, m, xf=lambda c: c) -> None:
+def _paths(polys, xf):
+    """Matplotlib paths of polygons with their holes (xf maps an (n, 2) array)."""
+    out = []
+    for poly in polys:
+        verts, codes = [], []
+        for ring in [poly.exterior, *poly.interiors]:
+            c = xf(np.asarray(ring.coords)[:, :2])
+            verts.append(c)
+            codes += [MPath.MOVETO] + [MPath.LINETO] * (len(c) - 2) + [MPath.CLOSEPOLY]
+        out.append(MPath(np.concatenate(verts), codes))
+    return out
+
+
+def _ground(ax, m, xf=lambda c: c, z: float = 1.0) -> None:
     P = G.from_model_poly
-    land = [xf(np.asarray(P(p).exterior.coords)) for x in m.land for p in x.polygons]
-    ax.add_collection(PolyCollection(land, facecolors=LAND, edgecolors="none", zorder=1))
-    water = [xf(np.asarray(P(r.polygon).exterior.coords)) for r in m.rivers] + \
-        [xf(np.asarray(P(c.polygon).exterior.coords)) for c in m.channels] + \
-        [xf(np.asarray(P(w.polygon).exterior.coords)) for w in m.waterways]
-    ax.add_collection(PolyCollection(water, facecolors=RIVER, edgecolors="none", zorder=1.2))
+    land = [P(p) for x in m.land for p in x.polygons]
+    ax.add_collection(PathCollection(_paths(land, xf), facecolors=LAND, edgecolors="none",
+                                     zorder=z))
+    water = [P(r.polygon) for r in m.rivers] + [P(c.polygon) for c in m.channels] + \
+        [P(w.polygon) for w in m.waterways]
+    ax.add_collection(PathCollection(_paths(water, xf), facecolors=RIVER, edgecolors="none",
+                                     zorder=z + 0.2))
 
 
 def render_heights(b, out, dpi: int = 150) -> None:
@@ -67,8 +82,9 @@ def render_heights(b, out, dpi: int = 150) -> None:
     x0, y0, x1, y1 = m.bounds
     W, H = x1 - x0, y1 - y0
     fig_w = 12.0
-    fig = plt.figure(figsize=(fig_w, fig_w * H / W + 0.9), facecolor=BG, dpi=dpi)
-    ax = fig.add_axes([0.0, 0.0, 1.0, (fig_w * H / W) / (fig_w * H / W + 0.9)])
+    head = 1.1
+    fig = plt.figure(figsize=(fig_w, fig_w * H / W + head), facecolor=BG, dpi=dpi)
+    ax = fig.add_axes([0.0, 0.0, 1.0, (fig_w * H / W) / (fig_w * H / W + head)])
     ax.set_facecolor(SEA)
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
@@ -115,7 +131,8 @@ def render_heights(b, out, dpi: int = 150) -> None:
                 ax.text(c.x, c.y, f"  {x.name} {x.height_m:.0f} m", color=INK, fontsize=6.5,
                         zorder=7, path_effects=HALO, va="center")
     # color scale
-    cax = fig.add_axes([0.06, 1.0 - 0.45 / (fig_w * H / W + 0.9), 0.4, 0.012])
+    fh_in = fig_w * H / W + head
+    cax = fig.add_axes([0.06, 1.0 - 0.78 / fh_in, 0.4, 0.1 / fh_in])
     ticks = [t for t in (10, 30, 60, 120, 250, 480) if t <= hmax] + [round(hmax)]
     grad = np.linspace(0, 1, 256)[None, :]
     cax.imshow(grad, aspect="auto", cmap=HEIGHT_CMAP, extent=(0, 1, 0, 1))
@@ -126,10 +143,10 @@ def render_heights(b, out, dpi: int = 150) -> None:
     for s in cax.spines.values():
         s.set_visible(False)
     st = b.stats.get("buildings", {})
-    fig.text(0.06, 1.0 - 0.18 / (fig_w * H / W + 0.9),
+    fig.text(0.06, 1.0 - 0.12 / fh_in,
              f"{b.spec.name}: building heights (M3)", color=INK, fontsize=13,
              fontweight="bold", va="top")
-    fig.text(0.5, 1.0 - 0.2 / (fig_w * H / W + 0.9),
+    fig.text(0.06, 1.0 - 0.42 / fh_in,
              f"{st.get('count', len(m.buildings))} buildings, {len(m.skybridges)} skybridges "
              f"(gold), height scale in m (square root); tallest {hmax:.0f} m",
              color=MUTED, fontsize=8.5, va="top")
@@ -205,6 +222,40 @@ def _prism_faces(poly, z0, z1, rgb, faces):
         faces.append((_proj_ring(piece.exterior.coords, z1), _shade(rgb, 1.08)))
 
 
+def _is_ring(poly, h) -> bool:
+    """A thin plan as long as the mass is tall: a vertical wheel (shape ring)."""
+    r = poly.minimum_rotated_rectangle
+    c = list(r.exterior.coords)
+    a = math.dist(c[0], c[1])
+    b = math.dist(c[1], c[2])
+    return min(a, b) < 6.0 and abs(max(a, b) - h) < 2.0
+
+
+def _ring_faces(poly, z0, z1, rgb, faces):
+    """A vertical wheel: rim, spokes and hub as thin quads in its plane."""
+    r = poly.minimum_rotated_rectangle
+    c = list(r.exterior.coords)
+    if math.dist(c[0], c[1]) < math.dist(c[1], c[2]):
+        c = c[1:] + c[1:2]
+    (x0, y0), (x1, y1) = c[0], c[1]
+    L = math.dist(c[0], c[1])
+    ux, uy = (x1 - x0) / L, (y1 - y0) / L
+    cx, cy = poly.centroid.x, poly.centroid.y
+    R = (z1 - z0) / 2.0
+    zc = z0 + R
+    n = 36
+    pts = [(cx + ux * R * math.cos(2 * math.pi * k / n), cy + uy * R * math.cos(2 * math.pi * k / n),
+            zc + R * math.sin(2 * math.pi * k / n)) for k in range(n + 1)]
+    col = _shade(rgb, 1.05)
+    for a, b in zip(pts, pts[1:]):
+        q = [_proj(*a), _proj(*b), _proj(b[0], b[1], b[2] - 3.0), _proj(a[0], a[1], a[2] - 3.0)]
+        faces.append((q, col))
+    for k in range(0, n, 3):
+        a = pts[k]
+        q = [_proj(cx, cy, zc), _proj(*a), _proj(a[0], a[1], a[2] + 1.0), _proj(cx, cy, zc + 1.0)]
+        faces.append((q, _shade(rgb, 0.8)))
+
+
 def _solids(m, window=None):
     """(depth key, z0, polygon, z0, z1, rgb) of every mass to draw."""
     P = G.from_model_poly
@@ -257,14 +308,8 @@ def _solids(m, window=None):
 
 def _draw_massing(ax, m, window=None, lw=0.0):
     P = G.from_model_poly
+    _ground(ax, m, xf=lambda c: _proj_ring(c, 0.0), z=0.8)
     ground = []
-    for x in m.land:
-        for p in x.polygons:
-            ground.append((_proj_ring(P(p).exterior.coords, 0.0), LAND))
-    water = [r.polygon for r in m.rivers] + [c.polygon for c in m.channels] + \
-        [w.polygon for w in m.waterways]
-    for wp in water:
-        ground.append((_proj_ring(P(wp).exterior.coords, 0.0), RIVER))
     for o in m.open_spaces:
         if o.district_id:
             ground.append((_proj_ring(P(o.polygon).exterior.coords, 0.0),
@@ -286,6 +331,9 @@ def _draw_massing(ax, m, window=None, lw=0.0):
                                          if lw else 0.4, zorder=1.5, capstyle="butt"))
     faces = []
     for _, _, poly, z0, z1, rgb in _solids(m, window):
+        if z1 - z0 > 20.0 and _is_ring(poly, z1 - z0):
+            _ring_faces(poly, z0, z1, rgb, faces)
+            continue
         _prism_faces(poly, z0, z1, rgb, faces)
     ax.add_collection(PolyCollection([f[0] for f in faces], facecolors=[f[1] for f in faces],
                                      edgecolors=(0, 0, 0, 0.25), linewidths=0.05 if not lw

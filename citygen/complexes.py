@@ -80,6 +80,21 @@ def prop(out, pid, kind, bids, lot_ids, owner, name=None):
                               "lot_ids": lot_ids, "owner": owner, "name": name})
 
 
+def bridgeable(cx, ra: dict, rb: dict, z: float, kind: str = "enclosed",
+               width: float = 5.0) -> bool:
+    """Whether a skybridge fits between two new buildings (their own masses, the roads and
+    the water as obstacles)."""
+    from . import skybridges as SB
+
+    space = SB.Space(cx, [ra, rb])
+    return SB.connect(space, ra, rb, z, kind, 1, width) is not None or \
+        SB.connect(space, ra, rb, z, "enclosed", 1, 3.5) is not None
+
+
+def _drop(out, bids) -> None:
+    out["buildings"] = [r for r in out["buildings"] if r["id"] not in bids]
+
+
 def force(out, a: str, b: str, z: float, kind: str = "enclosed", levels: int = 1,
           width: float = 5.0, pid: str | None = None, why: str = "") -> None:
     out.setdefault("forced", []).append({"a": a, "b": b, "z": z, "kind": kind,
@@ -635,8 +650,10 @@ def megabuilding_campus(cx, gid, members, out, idx) -> bool:
                          [lt["id"] for lt in lots], pid, lots=lots))
         recs[-1]["lot_id"] = lot["id"]
         bids.append(bid)
-    if len(bids) < 2:
-        out["buildings"] = [r for r in out["buildings"] if r["id"] not in bids]
+    if len(bids) < 2 or not all(
+            bridgeable(cx, recs[0], recs[j], min(recs[0]["height"], recs[j]["height"]) * 0.33,
+                       "open_deck", 8.0) for j in range(1, len(recs))):
+        _drop(out, bids)
         return False
     prop(out, pid, "megabuilding_campus", bids, [lt["id"] for lt in lots],
          BL.owner(cx, 800 + idx))
@@ -702,18 +719,27 @@ def campus(cx, gid, members, out, idx) -> bool:
     fr = MS.lot_frame(region, front["line"])
     u0, v0, u1, v1 = fr.bounds(region)
     W, D = u1 - u0, v1 - v0
-    if min(W, D) < 60.0:
+    if min(W, D) < 34.0:
         return False
-    d = min(24.0, max(14.0, 0.2 * min(W, D)))
-    bars = [(u0, v0, u1, v0 + d), (u0, v1 - d, u1, v1),
-            (u0, v0 + d + 8.0, u0 + d, v1 - d - 8.0), (u1 - d, v0 + d + 8.0, u1, v1 - d - 8.0)]
+    d = min(24.0, max(10.0, 0.22 * min(W, D)))
+    if min(W, D) >= 60.0:     # four labs around the lawn
+        bars = [(u0, v0, u1, v0 + d), (u0, v1 - d, u1, v1),
+                (u0, v0 + d + 8.0, u0 + d, v1 - d - 8.0),
+                (u1 - d, v0 + d + 8.0, u1, v1 - d - 8.0)]
+    elif W >= 70.0:           # three labs in a U, the lawn open to the street
+        bars = [(u0, v1 - d, u1, v1), (u0, v0, u0 + d, v1 - d - 6.0),
+                (u1 - d, v0, u1, v1 - d - 6.0)]
+    else:                     # three labs in a row behind a front lawn
+        w3 = (W - 12.0) / 3.0
+        bars = [(u0 + k * (w3 + 6.0), v0 + D * 0.35, u0 + k * (w3 + 6.0) + w3, v1)
+                for k in range(3)]
     rng = cx.rng(60, idx)
     lo, hi = cx.height
     pid = f"{gid}.prop"
     bids, polys = [], []
     for i, (a0, b0, a1, b1) in enumerate(bars):
         ps = G.parts(G.inter(region, fr.rect(a0, b0, a1, b1)))
-        if not ps or G.area1(ps[0]) < 300.0:
+        if not ps or G.area1(ps[0]) < 150.0:
             continue
         p = ps[0]
         H = lo + (hi - lo) * (MS.uniform(rng, 0.1, 0.35) if i else MS.uniform(rng, 0.45, 0.8))
@@ -736,9 +762,9 @@ def campus(cx, gid, members, out, idx) -> bool:
         out["elements"].append({"id": f"{gid}.el01", "kind": "lawn", "lot_id": lots[0]["id"],
                                 "footprint": ps[0], "z_m": 0.0, "masses": [],
                                 "attrs": {"campus": gid}})
-    loop = [fr.world(u0 + d + 4.0, v0 + d + 4.0), fr.world(u1 - d - 4.0, v0 + d + 4.0),
-            fr.world(u1 - d - 4.0, v1 - d - 4.0), fr.world(u0 + d + 4.0, v1 - d - 4.0)]
-    loop.append(loop[0])
+    # covered walkway: a loop through the building faces that look onto the lawn
+    cs = [G.nearest(p.exterior, G.centroid(region)) for p in polys]
+    loop = cs + [cs[0]]
     out["structures"].append({"id": f"{gid}.st01", "kind": "canopy", "line": loop,
                               "z0_m": 0.0, "z1_m": 3.5, "attrs": {"covered_walkway": True,
                                                                    "campus": gid,
@@ -772,7 +798,16 @@ def bridged_pair(cx, gid, members, out, idx) -> bool:
                          BL.height_cap(cx.cones, region)) * prog.fh
         b = BL.Bld("slab", prog.use, prog.fh, fr)
         BL.set_front(b, f, prog)
+        if recs:
+            # the second slab opposite the first: along the street where the first one is
+            us = [fr.local(x, y)[0] for x, y in recs[0][0].ground().exterior.coords]
+            lo_u, hi_u = max(min(us), b.front_u[0]), min(max(us), b.front_u[1])
+            if hi_u - lo_u < 12.0:
+                return False
+            b.front_u = (lo_u, hi_u)
         BL.fill(b, "slab", MS.prep(region), H, cx, rng, fronts, f["road_class"])
+        if not b.masses:
+            return False
         recs.append((b, fronts, lot))
     for i, (b, fronts, lot) in enumerate(recs):
         bid = f"{gid}.bld{i + 1}"
@@ -780,8 +815,11 @@ def bridged_pair(cx, gid, members, out, idx) -> bool:
                    pid)
         rec["lot_id"] = lot["id"]
         bids.append(bid)
-    prop(out, pid, "bridged_pair", bids, [lt["id"] for lt in lots], BL.owner(cx, 500 + idx))
     h = min(b.height for b, _, _ in recs)
+    if not bridgeable(cx, out["buildings"][-2], out["buildings"][-1], h * 0.4):
+        _drop(out, bids)
+        return False
+    prop(out, pid, "bridged_pair", bids, [lt["id"] for lt in lots], BL.owner(cx, 500 + idx))
     force(out, bids[0], bids[1], h * 0.4, "enclosed", 1, 5.0, pid, "bridged_pair")
     if h >= 40.0:
         force(out, bids[0], bids[1], h * 0.7, "enclosed", 1, 5.0, pid, "bridged_pair")

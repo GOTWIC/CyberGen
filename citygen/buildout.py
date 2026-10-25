@@ -30,6 +30,7 @@ GROUND_WALKS = ("sidewalk", "pedestrian_street", "promenade", "alley", "path", "
                 "crosswalk", "footbridge")
 WATER_CLEAR = {"sea": 25.0, "river": 15.0, "canal": 4.0}
 HOST_KINDS = ("park", "plaza", "promenade", "beach", "green", "pocket_park")
+DOOR_LINK_M = 18.0   # entrances farther than this from a walkway get a path to it
 
 
 @dataclass
@@ -44,6 +45,7 @@ class Out:
     megasites: list = field(default_factory=list)
     site_walks: list = field(default_factory=list)   # (megasite id, (kind, pts, width))
     site_links: list = field(default_factory=list)   # (megasite id, point to join)
+    landmasses: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     info: dict = field(default_factory=dict)
 
@@ -257,6 +259,7 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     lap("megasites")
     T.stage("megasites_m3", [[x["id"], len(x["member_ids"])] for x in out.megasites])
     walks = [w.model_dump(mode="python") for w in m.walkways]
+    out.landmasses = list(b.hydro.landmasses)
     out.walkways = link_entrances(out, walks)
     lap("walkways")
     out.info["seconds"] = secs
@@ -292,11 +295,12 @@ def link_entrances(out: Out, walks: list) -> list:
         for e in rec.entrances:
             ents.append((rec, e))
     line_of: dict = {}
+    land_of = _landmass_index(out.landmasses, [l.coords[0] for l in lines])
     if ents:
         pts = shapely.points(np.array([e.position for _, e in ents], dtype=np.float64))
+        ent_land = _landmass_index(out.landmasses, [e.position for _, e in ents])
         for k, (rec, e) in enumerate(ents):
-            hits = tree.query_nearest(pts[k], all_matches=True).tolist()
-            best = min(hits, key=lambda h: (G.dist(lines[h], pts[k]), walks[gi[h]]["id"]))
+            best = _nearest_on(tree, lines, walks, gi, land_of, pts[k], ent_land[k])
             e.walkway_id = walks[gi[best]]["id"]
             e.link_m = G.q(G.dist(lines[best], pts[k]))
             line_of[id(e)] = best
@@ -316,8 +320,7 @@ def link_entrances(out: Out, walks: list) -> list:
         e = main_entrance(rec)
         if e is None:
             return
-        line = lines[line_of[id(e)]]
-        foot = G.qpoint(line.interpolate(line.project(Point(e.position))))
+        foot = _foot(lines, walks, gi, line_of[id(e)], e.position)
         splits.setdefault(line_of[id(e)], []).append(foot)
         new.append(("path", [tuple(e.position), foot], 2.0, 0.0,
                     {"building": rec.id, "door": True}))
@@ -341,14 +344,15 @@ def link_entrances(out: Out, walks: list) -> list:
             door(rec)
         sb["_walk"] = ids
     for rec in out.buildings:
-        if rec.megasite_id or rec.landmark:
-            door(rec)
+        e = main_entrance(rec)
+        if rec.megasite_id or rec.landmark or (e is not None and e.link_m > DOOR_LINK_M):
+            door(rec)   # (a far entrance on a big lot gets a path, like a driveway)
     for sid, (kind, pts, width) in out.site_walks:
         new.append((kind, [tuple(p) for p in pts], width, 0.0, {"megasite": sid}))
-    for sid, p in out.site_links:
-        h = tree.query_nearest(Point(p), all_matches=True).tolist()
-        best = min(h, key=lambda i: (G.dist(lines[i], Point(p)), walks[gi[i]]["id"]))
-        foot = G.qpoint(lines[best].interpolate(lines[best].project(Point(p))))
+    link_land = _landmass_index(out.landmasses, [p for _, p in out.site_links])
+    for (sid, p), lm in zip(out.site_links, link_land):
+        best = _nearest_on(tree, lines, walks, gi, land_of, Point(p), lm)
+        foot = _foot(lines, walks, gi, best, p)
         splits.setdefault(best, []).append(foot)
         if foot != tuple(p):
             new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True}))
@@ -370,6 +374,51 @@ def link_entrances(out: Out, walks: list) -> list:
     _neighbors(walks)
     out.info["walkways_added"] = len(walks) - n0 + sum(len(v) for v in splits.values())
     return walks
+
+
+def _landmass_index(landmasses, pts) -> list:
+    """Index of the landmass each point lies on (or within 2 m of), -1 for none."""
+    out = [-1] * len(pts)
+    if not pts:
+        return out
+    arr = shapely.points(np.array([p[:2] for p in pts], dtype=np.float64))
+    for k, lm in enumerate(landmasses):
+        zone = G.qpoly(lm.buffer(2.0, join_style="mitre"))
+        shapely.prepare(zone)
+        for i in np.nonzero(shapely.contains(zone, arr))[0].tolist():
+            if out[i] < 0:
+                out[i] = k
+    return out
+
+
+def _nearest_on(tree, lines, walks, gi, land_of, pt, land: int) -> int:
+    """The nearest ground walkway to pt on the same landmass (any, when pt is on none);
+    ties by walkway id."""
+    hits = tree.query_nearest(pt, all_matches=True).tolist()
+    if land < 0 or any(land_of[h] == land for h in hits):
+        cand = [h for h in hits if land < 0 or land_of[h] == land]
+    else:
+        cand = []
+        for r in (60.0, 200.0, 600.0, 2000.0):
+            ks = [int(i) for i in tree.query(pt, predicate="dwithin", distance=r)]
+            cand = [h for h in ks if land_of[h] == land]
+            if cand:
+                break
+        cand = cand or hits
+    return min(cand, key=lambda h: (G.dist(lines[h], pt), walks[gi[h]]["id"]))
+
+
+def _foot(lines, walks, gi, k: int, p) -> tuple:
+    """Where a path from p meets ground walkway k: the nearest point, or the walkway's end
+    when it is that close to one (walkways are only split away from their ends)."""
+    line = lines[k]
+    d = line.project(Point(p))
+    pts = walks[gi[k]]["line"]
+    if d <= 0.05:
+        return (pts[0][0], pts[0][1])
+    if d >= line.length - 0.05:
+        return (pts[-1][0], pts[-1][1])
+    return G.qpoint(line.interpolate(d))
 
 
 def _split(walks, gi, lines, splits) -> list:

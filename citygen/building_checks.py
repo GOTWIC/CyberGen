@@ -380,8 +380,8 @@ def _ground_walks(m: CityModel):
 def check_entrances(m: CityModel, bx: _B):
     c = _check("building_entrances", "Every building has a main entrance on its facade, "
                                      "within 20 m of a ground walkway or a shared alley, service "
-                                     "lane or pedestrian street (megasite buildings and "
-                                     "landmarks: joined to the walkway graph by a path)")
+                                     "lane or pedestrian street, or joined to the walkway graph "
+                                     "by a path (megasite buildings and landmarks always)")
     ws, lines = _ground_walks(m)
     lines += [LineString(s.centerline) for s in m.road_segments
               if s.road_class in ("alley", "service", "pedestrian")]
@@ -405,6 +405,8 @@ def check_entrances(m: CityModel, bx: _B):
             if b.id not in doors:
                 _limit(c, c.failures, f"{b.id}: megasite building not joined to the walkways")
             continue
+        if b.id in doors:
+            continue   # a path joins the entrance to the walkways
         pts.append(Point(e.position))
         owners.append(b.id)
     if tree is not None and pts:
@@ -643,7 +645,7 @@ def _perpendicular(poly, p, ux, uy) -> bool:
         return False
     _, dx, dy, L = best
     cosang = abs((dx * ux + dy * uy) / L)
-    return cosang <= math.sin(math.radians(PERP_TOL_DEG)) + 1e-9
+    return cosang <= float(M.sin(M.radians(PERP_TOL_DEG))) + 1e-9
 
 
 def _walk_components(m: CityModel) -> dict:
@@ -763,8 +765,8 @@ def check_megasite_access(m: CityModel, bx: _B):
     return c
 
 
-def run(spec: CitySpec, m: CityModel, g) -> list:
-    bx = _B(m)
+def run(spec: CitySpec, m: CityModel, g, bx: _B | None = None) -> list:
+    bx = bx or _B(m)
     return [
         check_footprints(m, bx),
         check_clear_zones(m, bx),
@@ -809,7 +811,7 @@ def floor_area(b, areas) -> float:
     return tot
 
 
-def stats(spec: CitySpec, m: CityModel) -> dict:
+def stats(spec: CitySpec, m: CityModel, bx: _B | None = None) -> dict:
     names = {d.id: d.name for d in m.districts}
     arch = {d.id: d.archetype for d in m.districts}
     by_type: dict = {}
@@ -820,11 +822,17 @@ def stats(spec: CitySpec, m: CityModel) -> dict:
     units: dict = {}
     roof: dict = {}
     total_fa = 0.0
-    refs = [mass.footprint for b in m.buildings for mass in b.masses]
-    mareas = G.areas(np.array(G.from_model_polys(refs), dtype=object)).tolist() if refs else []
-    fareas = dict(zip([b.id for b in m.buildings], G.areas(np.array(
-        [G.from_model_poly(b.footprint) if b.footprint else Polygon() for b in m.buildings],
-        dtype=object)).tolist())) if m.buildings else {}
+    if bx is not None:
+        mpolys = [x[4] for x in bx.masses if x[1] == "building"]
+        fpolys = [bx.foot[b.id] if bx.foot.get(b.id) is not None else Polygon()
+                  for b in m.buildings]
+    else:
+        mpolys = G.from_model_polys([mass.footprint for b in m.buildings for mass in b.masses])
+        fpolys = [G.from_model_poly(b.footprint) if b.footprint else Polygon()
+                  for b in m.buildings]
+    mareas = G.areas(np.array(mpolys, dtype=object)).tolist() if mpolys else []
+    fareas = dict(zip([b.id for b in m.buildings],
+                      G.areas(np.array(fpolys, dtype=object)).tolist())) if fpolys else {}
     pos = 0
     for b in m.buildings:
         t = b.type.split(".", 1)[1]

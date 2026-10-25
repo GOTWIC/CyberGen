@@ -133,8 +133,25 @@ built against libc++, on Linux against libstdc++, and their `std::sort` orders t
 differently: never let the order of GEOS output (parts, STRtree hits, a many-input
 `union_all`) reach a decision (`geom.union` merges in its own fixed order; normalize or sort
 otherwise). Emulated aarch64 Linux does not catch this; a GEOS rebuilt with clang and libc++
-does (`docs/progress/M2/README.md`). Sample builds: `docs/progress/M2/`. M3 (buildings) is
-next.
+does (`docs/progress/M2/README.md`). Sample builds: `docs/progress/M2/`.
+
+M3 (buildings) is in place: the same build fills every lot (`buildings.py`: a program per
+archetype with setbacks by frontage class, podium towers, slabs, megabuildings with atriums and
+stepped tiers, courtyard and perimeter blocks, terraced, shopfront rows, shanty stacks,
+warehouses with docks, container yards, villas, labs, hangars; facade on the main frontage,
+heights from a district height field within `height_m`, capped near spaceport flight cones;
+ground-floor units 4 to 12 m with uses, entrances, rooftop items, green roofs), builds
+landmarks and complexes (`complexes.py`: three-armed megatower, spires, arcology, wheel; twin
+towers, clusters, megabuilding campuses, campuses, bridged pairs, straddle buildings),
+skybridges (`skybridges.py`) and the megasite generators (`sites.py`), with shape helpers in
+`massing.py` and the driver `buildout.py` (three rounds of worker jobs: landmarks and
+complexes per district, lots in chunks of 300, skybridges and rows per district; the M1/M2
+checks run on the M2 model meanwhile, the walkway graph is rechecked at the end). The model
+gains buildings, properties, skybridges, site elements and `Mass.shape`; 13 checks in
+`building_checks.py` (44 in all); previews `preview_heights.png` and `preview_massing.png`
+(`preview_massing.py`). Any shape decision is an exact predicate on grid geometry or plain
+arithmetic; oriented boxes come from `massing.obb_angle`, never GEOS's minimum rotated
+rectangle. Sample builds: `docs/progress/M3/`. M4 (Blender blockout) is next.
 
 ### Rules for cloud sessions building citygen milestones
 
