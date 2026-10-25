@@ -259,8 +259,8 @@ under two seeds, and all five samples were also rebuilt under two seeds with the
   interchanges.
 - **Footbridges and walkways.** Footbridges have stairs, not ramps. Landmasses with no
   pedestrian bridge keep their own walkway graph (3 components in Nyxllor).
-- **Build time.** Nexus City is 6 s under the 60 s budget without the trace. `--trace` adds
-  about 4 s on M2 data, because it hashes about 18,000 lanes recursively.
+- **Build time.** Nexus City, the slowest, takes 48 s of the 60 s budget with previews and
+  `--trace` on the 4-CPU container; the trace hashes about 18,000 lanes recursively.
 
 ## What M3 needs from lots and frontage
 
