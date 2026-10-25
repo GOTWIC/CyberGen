@@ -152,6 +152,7 @@ def check_footprints(m: CityModel, bx: _B):
     loose_lots = dict(zip(lot_ids, G.snap_many(shapely.buffer(
         np.array([bx.lot[i] for i in lot_ids], dtype=object), 0.05, join_style="mitre")))) \
         if lot_ids else {}
+    water = _water_clear(m)
     for b in m.buildings:
         allowed = bx.allowed(b)
         p = bx.prop.get(b.property_id)
@@ -167,16 +168,7 @@ def check_footprints(m: CityModel, bx: _B):
         for k, mass in enumerate(b.masses):
             poly = bx.mass_of[(b.id, k)]
             if mass.role in SPAN_ROLES:
-                sid = b.attrs.get("span_over")
-                road = bx.roads.get(sid)
-                if road is None or road.road_class not in ("street", "alley", "pedestrian",
-                                                           "service"):
-                    _limit(c, c.failures, f"{b.id}: span over '{sid}' (not a street)")
-                    continue
-                zmax = max((z.z for z in road.z_profile), default=0.0)
-                if mass.z0_m - DECK_M - zmax < ROAD_CLEAR_M - 1e-6:
-                    _limit(c, c.failures, f"{b.id}: span {mass.z0_m - DECK_M - zmax:.1f} m "
-                                          f"over its street (needs {ROAD_CLEAR_M} m)")
+                _span(c, b, mass, poly, bx, water)
                 if jtree is not None:
                     for j in sorted(int(i) for i in jtree.query(poly, predicate="intersects")):
                         if G.area1(G.inter(poly, junctions[j])) > AREA_TOL_M2:
@@ -202,6 +194,62 @@ def check_footprints(m: CityModel, bx: _B):
                 _limit(c, c.failures, f"{e.id}: {e.kind} {out:.1f} m2 outside its "
                                       f"{'reserve' if e.megasite_id else 'lot'}")
     return c
+
+
+def _water_clear(m: CityModel) -> dict:
+    """Water body id -> (polygon, navigable clearance)."""
+    P = G.from_model_poly
+    out = {}
+    for r in m.rivers:
+        out[r.id] = (P(r.polygon), WATER_CLEAR["river"])
+    for ch in m.channels:
+        cls = "sea" if ch.kind == "sea_channel" else "river" if ch.kind == "delta_branch" \
+            else "canal"
+        out[ch.id] = (P(ch.polygon), WATER_CLEAR[cls])
+    for w in m.waterways:
+        out[w.id] = (P(w.polygon), WATER_CLEAR["sea" if w.kind == "basin" else "canal"])
+    for se in m.seas:
+        for k, p in enumerate(se.polygons):
+            out[se.id if k == 0 else f"{se.id}{k}"] = (P(p), WATER_CLEAR["sea"])
+    return out
+
+
+SPAN_STREETS = ("street", "alley", "pedestrian", "service")
+
+
+def _span(c, b, mass, poly, bx: _B, water: dict) -> None:
+    """A straddle span: over a street (or a canal and its quay roads), every road it crosses
+    a street listed in `span_crosses` and cleared by 5.5 m, the water by its navigable
+    clearance (both under a 1 m structure)."""
+    sid = b.attrs.get("span_over")
+    crosses = list(b.attrs.get("span_crosses") or [sid])
+    if sid not in crosses:
+        _limit(c, c.failures, f"{b.id}: span over '{sid}' not among what it crosses")
+    under = mass.z0_m - DECK_M
+    for x in crosses:
+        road = bx.roads.get(x)
+        if road is not None:
+            if road.road_class not in SPAN_STREETS:
+                _limit(c, c.failures, f"{b.id}: span over '{x}' (not a street)")
+                continue
+            zmax = max((z.z for z in road.z_profile), default=0.0)
+            if under - zmax < ROAD_CLEAR_M - 1e-6:
+                _limit(c, c.failures, f"{b.id}: span {under - zmax:.1f} m over street '{x}' "
+                                      f"(needs {ROAD_CLEAR_M} m)")
+        elif x in water:
+            if under < water[x][1] - 1e-6:
+                _limit(c, c.failures, f"{b.id}: span {under:.1f} m over '{x}' (navigable "
+                                      f"clearance {water[x][1]:g} m)")
+        else:
+            _limit(c, c.failures, f"{b.id}: span over '{x}' (neither a street nor water)")
+    for x in sorted(bx.roads):
+        s = bx.roads[x]
+        if x not in crosses and poly.intersects(LineString(s.centerline)):
+            _limit(c, c.failures, f"{b.id}: span over road '{x}' it does not list")
+    for x in sorted(water):
+        wp = water[x][0]
+        if x not in crosses and poly.intersects(wp) and G.area1(G.inter(poly, wp)) > 0.01:
+            _limit(c, c.failures, f"{b.id}: span over water '{x}' it does not list")
 
 
 def check_clear_zones(m: CityModel, bx: _B):

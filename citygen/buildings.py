@@ -264,6 +264,7 @@ class Ctx:
     notes: list = field(default_factory=list)
     noise: object = None
     clear: object = None
+    probe: bool = False      # M2 trying a merged group: masses only, no ground floor or roof
 
     @property
     def prog(self) -> Program:

@@ -68,6 +68,13 @@ def _lot_of(poly, lots) -> str:
 
 def emit(cx, out, b, fronts, rng, bid: str, lot_ids: list, pid: str, shops=None,
          lots=None) -> dict:
+    if cx.probe:
+        rec = {"kind": b.kind, "fh": b.fh, "height": q(b.height), "masses": b.masses,
+               "footprint": b.ground(), "attrs": dict(b.attrs)}
+        rec.update({"id": bid, "lot_id": lot_ids[0], "property_id": pid,
+                    "lot_ids": list(lot_ids)})
+        out["buildings"].append(rec)
+        return rec
     rec = BL.finish(b, cx, fronts, rng, shops)
     lot_id = _lot_of(rec["footprint"], lots) if lots and len(lots) > 1 else lot_ids[0]
     rec.update({"id": bid, "lot_id": lot_id, "property_id": pid, "lot_ids": list(lot_ids)})
@@ -464,6 +471,22 @@ def complexes(cx, lots, used: set, out: dict) -> None:
             cx.notes.append(f"complex {kind} {gid}: did not fit; lots built one by one")
 
 
+def probe(cx, kind: str, lots: list, idx: int) -> bool:
+    """Whether M3 builds this merged group as its complex (M2 asks while it picks groups):
+    the builder runs on a throwaway record, masses only."""
+    fn = COMPLEXES.get(kind)
+    if fn is None:
+        return True
+    notes = list(cx.notes)
+    out = {"buildings": [], "properties": [], "structures": [], "elements": [], "forced": []}
+    cx.probe = True
+    try:
+        return bool(fn(cx, "probe", list(enumerate(lots, idx)), out, idx))
+    finally:
+        cx.probe = False
+        cx.notes[:] = notes
+
+
 def _relocations(cx, lots, used, kind, c0, limit: int = 12):
     free = [lot for lot in lots if lot["id"] not in used and not lot.get("merged_group_id")]
     if kind in ("straddle_building", "bridged_pair"):
@@ -837,42 +860,67 @@ def _shared_segment(lots):
     return best
 
 
+STRADDLE_ROADS = ("street", "alley", "pedestrian", "service")
+SPAN_MAX_M = 50.0
+
+
 def straddle_building(cx, gid, members, out, idx) -> bool:
+    """Two legs facing each other and a span (three floors) over what lies between them: the
+    street the two lots share, or a canal with the quay roads on both sides of it. The span
+    clears every road it crosses by 5.5 m and the water by its navigable clearance (both
+    plus a 1 m structure), and no junction or other road lies under it."""
     lots = [lt for _, lt in members]
     if len(lots) != 2:
         return False
     sh = _shared_segment(lots)
-    if sh is None:
-        return False
-    (_, sid), fa, fb = sh
-    road = next((r for r in cx.roads if r[0] == sid), None)
-    if road is None or road[1] not in ("street", "alley", "pedestrian", "service"):
+    if sh is not None:
+        (_, sid), fa, fb = sh
+        allowed = {sid}
+    else:
+        cp = _canal_fronts(cx, lots)
+        if cp is None:
+            return False
+        fa, fb = cp
+        allowed = {fa["segment_id"], fb["segment_id"]}
+    roads = {r[0]: r for r in cx.roads}
+    if any(roads.get(x) is None or roads[x][1] not in STRADDLE_ROADS for x in allowed):
         return False
     prog = cx.prog
     fh = prog.fh
     lo, hi = cx.height
-    legs = []
+    regions = []
     for lot, f in ((lots[0], fa), (lots[1], fb)):
         fr = MS.lot_frame(lot["polygon"], f["line"])
-        fronts = lot["frontage"]
-        region = BL.buildable(lot["polygon"], fronts, prog, clear=cx.clear)
+        region = BL.buildable(lot["polygon"], lot["frontage"], prog, clear=cx.clear)
         if region.is_empty:
             return False
-        MS.prep(region)
+        regions.append((lot, fr, MS.prep(region)))
+    frA = regions[0][1]
+    # the legs face each other: both along the stretch where the two lots overlap
+    ra, rb = frA.bounds(regions[0][2]), frA.bounds(regions[1][2])
+    ov = (max(ra[0], rb[0]), min(ra[2], rb[2]))
+    legs = []
+    for i, (lot, fr, region) in enumerate(regions):
         u0, v0, u1, v1 = fr.bounds(region)
         w = min(36.0, (u1 - u0) * 0.9)
         dd = min(16.0, (v1 - v0) * 0.9)
-        cu = (u0 + u1) / 2.0
-        r = MS.front_rect(region, fr, dd, w_max=w, min_w=8.0, min_d=6.0)
+        if i == 0:
+            lim = (ov[0], ov[1]) if ov[1] - ov[0] >= 10.0 else None
+        else:
+            au0, _, au1, _ = fr.bounds(legs[0][3])
+            lim = (au0 - 2.0, au1 + 2.0)
+        r = MS.front_rect(region, fr, dd, w_max=w, min_w=8.0, min_d=6.0, u_lim=lim) \
+            if lim is not None else None
+        if r is None:
+            r = MS.front_rect(region, fr, dd, w_max=w, min_w=8.0, min_d=6.0)
         if r is None:
             return False
         legs.append((lot, fr, region, r))
-    frA = legs[0][1]
     A, B = legs[0][3], legs[1][3]
     au0, av0, au1, av1 = frA.bounds(A)
     bu0, bv0, bu1, bv1 = frA.bounds(B)
     us0, us1 = max(au0, bu0) + 1.0, min(au1, bu1) - 1.0
-    if us1 - us0 < 6.0 or bv1 >= av0:
+    if us1 - us0 < 6.0 or bv1 >= av0 or av0 - bv1 > SPAN_MAX_M:
         return False
     span = G.parts(G.diff(frA.rect(us0, bv1 - 0.5, us1, av0 + 0.5), G.union([A, B])))
     if not span:
@@ -880,11 +928,25 @@ def straddle_building(cx, gid, members, out, idx) -> bool:
     span = span[0]
     if any(span.intersects(j) for j in cx.junctions):
         return False
+    crosses, need, zroad = [], 0.0, 0.0
     for rid, cls, line, width, zmax in cx.roads:
-        if rid != sid and span.intersects(LineString(line)):
-            return False
-    zmax = road[4]
-    n0 = int(math.ceil((zmax + BL.ROAD_CLEARANCE_M + 1.0) / fh - 1e-9))
+        if span.intersects(LineString(line)):
+            if rid not in allowed:
+                return False
+            crosses.append(rid)
+            need = max(need, zmax + BL.ROAD_CLEARANCE_M + 1.0)
+            zroad = max(zroad, zmax)
+    over_water = None
+    for wid, wp, clear in cx.water:
+        if span.intersects(wp):
+            if not G.area1(G.inter(span, wp)) > 0.01:
+                continue
+            crosses.append(wid)
+            need = max(need, clear + 1.0)
+            over_water = over_water or wid
+    if sh is None and over_water is None:
+        return False
+    n0 = int(math.ceil(need / fh - 1e-9))
     z0 = n0 * fh
     z1 = z0 + 3 * fh
     rng = cx.rng(70, idx)
@@ -903,8 +965,9 @@ def straddle_building(cx, gid, members, out, idx) -> bool:
         b.add(r, 0.0, Hi, "leg")
         if i == 0:
             b.add(span, z0, z1, "span")
-            b.attrs["span_over"] = sid
-            b.attrs["span_clearance_m"] = q(z0 - 1.0 - zmax)
+            b.attrs["span_over"] = over_water if sh is None else sid
+            b.attrs["span_crosses"] = sorted(crosses)
+            b.attrs["span_clearance_m"] = q(z0 - 1.0 - zroad)
         bid = f"{gid}.bld{i + 1}"
         emit(cx, out, b, lot["frontage"], cx.rng(71, idx, i), bid, [lt["id"] for lt in lots],
              pid)
@@ -913,6 +976,34 @@ def straddle_building(cx, gid, members, out, idx) -> bool:
     prop(out, pid, "straddle_building", bids, [lt["id"] for lt in lots],
          BL.owner(cx, 400 + idx))
     return True
+
+
+CANAL_REACH_M = 60.0
+
+
+def _canal_fronts(cx, lots):
+    """(front of lot 0, front of lot 1) when the two lots face each other across a canal: the
+    frontage of each nearest the other lot, the segment between their midpoints crossing a
+    canal (an inner waterway) and no farther than CANAL_REACH_M."""
+    canals = [(wid, wp) for wid, wp, clear in cx.water if clear <= 4.0 + 1e-9]
+    if not canals:
+        return None
+    best = []
+    for k in (0, 1):
+        other = G.centroid(lots[1 - k]["polygon"])
+        fs = [f for f in lots[k]["frontage"] if len(f["line"]) >= 2]
+        if not fs:
+            return None
+        best.append(min(fs, key=lambda f: (round(MS.line_dist(other, f["line"])[0], 6),
+                                           f["segment_id"])))
+    ma = MS.lerp(best[0]["line"][0], best[0]["line"][-1], 0.5)
+    mb = MS.lerp(best[1]["line"][0], best[1]["line"][-1], 0.5)
+    if ST._dist(ma, mb) > CANAL_REACH_M or best[0]["segment_id"] == best[1]["segment_id"]:
+        return None
+    link = LineString([ma, mb])
+    if not any(link.intersects(wp) for _, wp in canals):
+        return None
+    return best[0], best[1]
 
 
 COMPLEXES = {"twin_towers": twin_towers, "tower_cluster": tower_cluster,
