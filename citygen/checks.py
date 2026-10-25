@@ -885,6 +885,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import street_checks as SC
 
         checks += SC.run(spec, m, g)
+    if m.buildings:
+        from . import building_checks as BC
+
+        checks += BC.run(spec, m, g)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
@@ -892,6 +896,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import street_checks as SC
 
         st["local"] = SC.stats(spec, m)
+    if m.buildings:
+        from . import building_checks as BC
+
+        st["buildings"] = BC.stats(spec, m)
     return checks, st
 
 
@@ -899,7 +907,9 @@ def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
         "name": spec.name, "seed": spec.seed,
-        "stage": ("M2 (water, districts, waterways, roads, local streets, blocks, lots)"
+        "stage": ("M3 (water, districts, waterways, roads, local streets, blocks, lots, "
+                  "buildings, skybridges, megasites)" if "buildings" in st else
+                  "M2 (water, districts, waterways, roads, local streets, blocks, lots)"
                   if "local" in st else
                   "M1b (water, districts, waterways, primary roads)" if "road_km" in st
                   else "M1a2 (water, districts, waterways)"),
@@ -986,6 +996,33 @@ def report_text(rep: dict) -> str:
         for name, r in lo["block_size_m_by_district"].items():
             out.append(f"  {name[:32]:<32} {r.get('count', 0):>7} {r.get('median', 0):>14.0f}"
                        f"  {lo['open_share_by_district'].get(name, 0):>9.1%}")
+    bs = st.get("buildings")
+    if bs:
+        out += ["",
+                f"  buildings {bs['count']} ({bs['floor_area_km2']} km2 floor area), properties "
+                f"{bs['properties']}, tallest {bs['tallest_m']:g} m; complexes "
+                + (", ".join(f"{k} {v}" for k, v in bs["complexes"].items()) or "none"),
+                "  by type: " + ", ".join(f"{k} {v}" for k, v in bs["by_type"].items()),
+                f"  skybridges {bs['skybridges']} ({bs['skybridge_km']} km: "
+                + (", ".join(f"{k} {v}" for k, v in bs["skybridges_by_kind"].items()) or "none")
+                + f"), ground-floor units {bs['units']} ("
+                + ", ".join(f"{k} {v}" for k, v in list(bs["units_by_use"].items())[:10]) + ")",
+                "  roof items: " + (", ".join(f"{k} {v}" for k, v in bs["roof_items"].items())
+                                    or "none")
+                + f"; green roofs {bs['green_roofs']} ({bs['green_roof_m2']} m2)",
+                "  landmarks: " + (", ".join(f"{x['name']} ({x['kind']}, {x['height_m']:g} m)"
+                                             for x in bs["landmarks"]) or "none"),
+                "  megasites: " + ("; ".join(
+                    f"{n} ({r['kind']}: " + ", ".join(f"{k} {v}" for k, v in
+                                                      r["contents"].items()) + ")"
+                    for n, r in bs["megasites"].items()) or "none"),
+                "",
+                "  buildings by district          count  median m   p90 m   max m  coverage"
+                "   FAR  floor km2"]
+        for name, r in bs["by_district"].items():
+            out.append(f"  {name[:28]:<28} {r.get('count', 0):>7} {r.get('median', 0):>9.1f}"
+                       f" {r.get('p90', 0):>7.1f} {r.get('max', 0):>7.1f} {r['coverage']:>9.0%}"
+                       f" {r['far']:>5.1f} {r['floor_area_km2']:>10.3f}")
     out += ["",
             "  district                     archetype              landmass  km2    share  "
             "target  error"]

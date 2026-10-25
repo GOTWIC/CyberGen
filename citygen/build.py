@@ -64,6 +64,7 @@ class Built:
     sites: list = None
     roads: object = None
     local: object = None
+    m3: object = None
 
     @property
     def passed(self) -> bool:
@@ -79,7 +80,8 @@ def _district_ids(spec: CitySpec) -> dict[str, str]:
 
 def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
              explicit: set[str], sites: list | None = None,
-             roads: RD.RoadNet | None = None, local: LC.Local | None = None) -> CityModel:
+             roads: RD.RoadNet | None = None, local: LC.Local | None = None,
+             m3: dict | None = None) -> CityModel:
     P = G.to_model_poly
     did = _district_ids(spec)
     lm_ids = {k: f"lm{k + 1:02d}" for k in range(len(h.landmasses))}
@@ -196,6 +198,8 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
                     "lots", "places"):
             data[key] = getattr(local, key)
         data["open_spaces"] = data["open_spaces"] + local.open_spaces
+    if m3 is not None:
+        data.update(m3)
     return CityModel.model_validate(data)
 
 
@@ -298,6 +302,17 @@ class _Runner:
                                             mp_context=multiprocessing.get_context("spawn"))
         return list(self.pool.map(fn, *zip(*[(*job, True) for job in jobs])))
 
+    def submit(self, fn, jobs: list):
+        """Start the jobs and return a function that waits for their results (in order); this
+        process can work on something else meanwhile."""
+        if not self.parallel or len(jobs) <= 1:
+            return lambda: [fn(*job, False) for job in jobs]
+        if self.pool is None:
+            self.pool = ProcessPoolExecutor(self.workers,
+                                            mp_context=multiprocessing.get_context("spawn"))
+        futs = [self.pool.submit(fn, *job, True) for job in jobs]
+        return lambda: [f.result() for f in futs]
+
     def close(self) -> None:
         if self.pool is not None:
             self.pool.shutdown()
@@ -322,7 +337,8 @@ def _good(b: Built) -> bool:
 
 
 def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True,
-               workers: int | None = None, local: bool = True) -> Built:
+               workers: int | None = None, local: bool = True,
+               buildings: bool = True) -> Built:
     spec = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
     run = _Runner(default_workers() if workers is None else workers)
@@ -343,7 +359,9 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
             return ranked[0]
         b = add_roads(ranked, explicit, run)
         if local:
-            add_local(b, explicit, run)
+            add_local(b, explicit, run, check=not buildings)
+            if buildings:
+                add_buildings(b, explicit, run)
         return b
     finally:
         run.close()
@@ -420,9 +438,11 @@ def _blocks_job(fn_name: str, job: dict, worker: bool = False):
     return getattr(BK, fn_name)(job)
 
 
-def add_local(b: Built, explicit: set[str], run: _Runner | None = None) -> Built:
+def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
+              check: bool = True) -> Built:
     """M2 on the chosen variant and roads: local streets, junctions, sidewalks, crosswalks,
-    lanes, walkways, blocks, lots, open space and places; then every check again."""
+    lanes, walkways, blocks, lots, open space and places; then every check again (unless M3
+    follows, which checks everything at its end)."""
     run = run or _Runner(1)
     spec = b.spec
     did = _district_ids(spec)
@@ -433,14 +453,88 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None) -> Built
     loc = LC.build_local(spec, b, did, mapper)
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
+    b.notes = b.notes + loc.notes
+    if not check:
+        return b
     checks, st = C.run_checks(spec, b.model, roads=True)
     T.stage("checks", [[c.id, c.passed] for c in checks])
     st["separation_budget"] = b.stats.get("separation_budget")
     st["road_variant"] = b.stats.get("road_variant")
     st.setdefault("local", {})["generator"] = loc.info
     b.checks, b.stats = checks, st
-    b.notes = b.notes + loc.notes
     return b
+
+
+def _buildings_job(fn_name: str, job: dict, worker: bool = False):
+    from . import buildings as BL
+
+    return getattr(BL, fn_name)(job)
+
+
+def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> Built:
+    """M3 on the M2 city: buildings, complexes, landmarks, skybridges and megasites; then
+    every check again. The water, district, road and street checks do not depend on M3 (the
+    walkway graph aside, which M3 extends), so they run on the M2 model while the workers
+    build the lots; the walkway graph and the M3 checks run on the final model."""
+    from types import SimpleNamespace
+
+    from . import building_checks as BC
+    from . import buildout as BO
+    from . import street_checks as SC
+
+    run = run or _Runner(1)
+    spec = b.spec
+    early: dict = {}
+
+    def mapper(fn_name, jobs):
+        return run.map(_buildings_job, [(fn_name, j) for j in jobs])
+
+    def submit(fn_name, jobs):
+        return run.submit(_buildings_job, [(fn_name, j) for j in jobs])
+
+    def side():
+        prev = G.CANONICAL[0]
+        G.CANONICAL[0] = False
+        try:
+            early["checks"], early["stats"] = C.run_checks(spec, b.model, roads=True)
+        finally:
+            G.CANONICAL[0] = prev
+
+    out = BO.build(spec, b, mapper, submit=submit, side=side)
+    if "checks" not in early:
+        side()
+    b.m3 = out
+    m = with_rows(b.model, BO.rows(out))
+    b.model = m
+    lms = SimpleNamespace(landmasses={lm.id: G.from_model_poly(lm.polygon)
+                                      for lm in m.landmasses})
+    checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
+              for c in early["checks"]] + BC.run(spec, m, None)
+    st = early["stats"]
+    if "local" in st:
+        st["local"] = SC.stats(spec, m)
+    st["buildings"] = BC.stats(spec, m)
+    T.stage("checks_m3", [[c.id, c.passed] for c in checks])
+    for key in ("separation_budget", "road_variant"):
+        st[key] = b.stats.get(key)
+    if "local" in st and b.local is not None:
+        st["local"]["generator"] = b.local.info
+    st.setdefault("buildings", {})["generator"] = out.info
+    b.checks, b.stats = checks, st
+    b.notes = b.notes + out.notes
+    return b
+
+
+def with_rows(model: CityModel, rows: dict) -> CityModel:
+    """The model with these collections replaced by validated rows (the other collections are
+    validated already); ids stay unique across the model."""
+    from .model import COLLECTIONS
+
+    upd = {k: [r if isinstance(r, COLLECTIONS[k]) else COLLECTIONS[k].model_validate(r)
+               for r in v] for k, v in rows.items()}
+    out = model.model_copy(update=upd)
+    out._unique_ids()
+    return out
 
 
 def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
@@ -461,4 +555,10 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_detail.png")
         render_detail(b, paths[4], dpi=dpi)
+    if b.model.buildings:
+        from .preview_massing import render_heights, render_massing
+
+        paths += [out / "preview_heights.png", out / "preview_massing.png"]
+        render_heights(b, paths[-2])
+        render_massing(b, paths[-1])
     return paths
