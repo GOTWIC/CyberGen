@@ -12,6 +12,7 @@ Previews are for review only (not part of the model hash).
 from __future__ import annotations
 
 import math
+import zlib
 
 import matplotlib
 
@@ -272,6 +273,9 @@ def _solids(m, window=None):
         base = ARCHETYPE_COLORS.get(arch.get(x.district_id), "#888888")
         rgb = to_rgb(base)
         rgb = tuple(0.35 + 0.55 * v for v in rgb)
+        # a slight shade per building, so that neighbors read as separate masses
+        k = 0.9 + 0.2 * (zlib.crc32(x.id.encode()) % 1000) / 999.0
+        rgb = _shade(rgb, k)
         if x.landmark:
             rgb = (0.93, 0.93, 0.97)
         for mass in x.masses:
@@ -336,7 +340,7 @@ def _draw_massing(ax, m, window=None, lw=0.0):
             continue
         _prism_faces(poly, z0, z1, rgb, faces)
     ax.add_collection(PolyCollection([f[0] for f in faces], facecolors=[f[1] for f in faces],
-                                     edgecolors=(0, 0, 0, 0.25), linewidths=0.05 if not lw
+                                     edgecolors=(0, 0, 0, 0.3), linewidths=0.08 if not lw
                                      else 0.15, zorder=2))
 
 

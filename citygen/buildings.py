@@ -110,12 +110,11 @@ PROGRAMS: dict[str, Program] = {
         field=(0.55, 0.2, 0.15, 0.1), skew=1.6, green=0.9,
         roof=("mechanical", "helipad", "av_pad", "antenna", "ac_unit")),
     "megablock_residential": Program(
-        mix=(("megabuilding", 0.45), ("slab", 0.3), ("courtyard_block", 0.15),
-             ("podium_tower", 0.10)),
+        mix=(("megabuilding", 0.8), ("podium_tower", 0.2)),
         use="residential", fh=3.2, front=_front(5.0, 4.0, 2.0, 1.0), side=4.0,
         podium_floors=(2, 3), tower_side=(22.0, 40.0), coverage=0.45, unit_w=(6.0, 10.0),
         unit_uses=SHOP_USES["megablock_residential"], awning=(0.4, 1.0, 2.0), sign=0.4,
-        field=(0.35, 0.35, 0.2, 0.1), skew=1.2, green=0.6,
+        field=(0.3, 0.5, 0.15, 0.05), skew=2.0, green=0.6,
         roof=("mechanical", "water_tank", "antenna", "ac_unit", "billboard")),
     "midtown_mixed": Program(
         mix=(("perimeter", 0.5), ("podium_tower", 0.3), ("terraced", 0.2)),
@@ -485,6 +484,10 @@ def podium_tower(b: Bld, region, H: float, cx: Ctx, rng, podium_floors: int | No
     if t is None or H - P < 2 * fh:
         b.masses.clear()
         b.roofs.clear()
+        if cx.archetype == "megablock_residential" and H - P >= 2 * fh:
+            b.kind = "megabuilding"
+            megabuilding(b, region, H, cx, rng)
+            return
         b.add(region, 0.0, H, "body")
         b.kind = "tower" if H >= 40.0 else b.kind
         return
@@ -593,40 +596,169 @@ def courtyard_block(b: Bld, region, H: float, cx: Ctx, rng, depth: float | None 
     b.attrs["courtyard_m2"] = q(G.area1(inner))
 
 
+MEGA_GAP_M = 16.0        # least clear gap between two towers of a megabuilding
+MEGA_SIDE_M = (30.0, 60.0)
+MEGA_BAND_M = (22.0, 30.0)
+MEGA_STEPS = (0.84, 0.68, 0.76, 0.58, 0.9)
+
+
 def megabuilding(b: Bld, region, H: float, cx: Ctx, rng):
-    """Block-filling body with an atrium void, elevated decks across it and a stepped top."""
+    """A podium (four to seven floors) with a court through it that opens to the sky, and
+    separate towers on it at its corners and along its edges, at least 16 m apart: the
+    tallest reaches H, the others step down (58 to 90% of it), each with a mid setback and
+    a crown; open decks join neighboring towers across the gaps and the court."""
     fh = b.fh
-    atrium = MS.inset(region, MS.uniform(rng, 20.0, 26.0))
-    has_atrium = not atrium.is_empty and G.area1(atrium) >= 400.0
-    if has_atrium:
-        body = G.parts(G.diff(region, atrium))[0]
-    else:
-        body = region
-    # stepped mass: the full block to 55 to 70% of the height, then tiers set back 7 m each
-    z1 = max(2 * fh, int(H * MS.uniform(rng, 0.55, 0.7) / fh) * fh)
-    z2 = max(z1 + fh, int(H * MS.uniform(rng, 0.8, 0.9) / fh) * fh)
-    b.add(body, 0.0, z1, "body")
-    prev = body
-    for z0_, zt_, d in ((z1, z2, 7.0), (z2, H, 14.0)):
-        if zt_ <= z0_:
-            continue
-        tier = _tier(b.fr, body, d)
-        holes = len(getattr(tier, "interiors", [])) if tier is not None else -1
-        if tier is not None and holes == (1 if has_atrium else 0) and prev.covers(tier):
-            b.add(tier, z0_, zt_, "tier")
-            prev = tier
+    MS.prep(region)
+    g = MEGA_GAP_M + 6.0 * float(rng.random())
+    band = MS.uniform(rng, *MEGA_BAND_M)
+    sv1 = MS.uniform(rng, 22.0, 32.0)
+    front_row = float(rng.random()) < 0.6
+    npod = 4 + int(float(rng.random()) * 4)
+    npod = max(2, min(npod, int(H / fh) - 12))
+    P = npod * fh
+    lay = None
+    # the lot frame first, then the frame of the region's own long side (curved lots)
+    frames = (b.fr, MS.Frame(b.fr.ox, b.fr.oy, MS.obb_angle(region)))
+    for single in (False, True):
+        for fr in frames:
+            lay = _mega_layout(fr, region, g, band, sv1, front_row, single)
+            if lay is not None:
+                break
+        if lay is not None:
+            break
+    if lay is None:
+        b.add(region, 0.0, H, "body")
+        return
+    fr, podium, court, towers = lay
+    if len(towers) >= 4 and float(rng.random()) < 0.3:
+        towers.pop(1 + int(float(rng.random()) * (len(towers) - 1)))   # a gap in the ring
+    main = int(float(rng.random()) * len(towers))
+    steps = list(MEGA_STEPS)
+    k0 = int(float(rng.random()) * len(steps))
+    steps = steps[k0:] + steps[:k0]
+    b.add(podium, 0.0, P, "podium")
+    tops = []
+    lo, hi = cx.height
+    for i, (t, _) in enumerate(towers):
+        f = 1.0 if i == main else steps[(i - (i > main)) % len(steps)]
+        n = max(npod + 10, int(H * f / fh + 1e-9))
+        Hi = min(H, n * fh)
+        _mega_tower(b, fr, t, P, Hi, rng)
+        tops.append(Hi)
+    _mega_decks(b, fr, region, towers, tops, P)
+    b.attrs["towers"] = len(towers)
+    if not court.is_empty:
+        b.attrs["atrium_m2"] = q(G.area1(court))
+
+
+def _mega_layout(fr, region, g: float, band: float, sv1: float, front_row: bool,
+                 single: bool):
+    """(frame, podium, court, towers) of a megabuilding in frame fr, or None when no tower
+    fits: towers in one or two rows (front and back) of one to three, spread to the ends."""
+    u0, v0, u1, v1 = fr.bounds(region)
+    W, D = u1 - u0, v1 - v0
+    s_lo, s_hi = MEGA_SIDE_M
+    n_u = 1 if W < 2 * s_lo + g else 2 if W < 2 * s_hi + g + 0.6 * s_lo else 3
+    n_v = 1 if D < 2 * band + g else 2
+    # the court: what lies deeper than the tower band from every edge
+    court = MS.inset(region, band + 2.0) if n_v == 2 else Polygon()
+    podium = region
+    if not court.is_empty and G.area1(court) >= 250.0:
+        ps = G.parts(G.diff(region, court))
+        if ps and len(ps[0].interiors) == 1:
+            podium = ps[0]
         else:
-            b.add(prev, z0_, zt_, "tier")
-    if has_atrium:
-        b.attrs["atrium_m2"] = q(G.area1(atrium))
-        u0, v0, u1, v1 = b.fr.bounds(atrium)
-        cv = (v0 + v1) / 2.0
-        deck = G.inter(b.fr.rect(u0 - 30.0, cv - 4.0, u1 + 30.0, cv + 4.0), atrium)
-        ps = G.parts(deck)
-        if ps:
-            for frac in (0.33, 0.66):
-                z = int(z1 * frac / fh) * fh   # decks across the atrium of the full block
-                b.add(ps[0], z, z + 2.0, "deck", roof=False)
+            court = Polygon()
+    else:
+        court = Polygon()
+    base = MS.inset(podium, 1.5)
+    if base.is_empty:
+        return None
+    MS.prep(base)
+    su = min(s_hi, (W - 3.0 - (n_u - 1) * g) / n_u)
+    sv = min(band, D - 3.0) if n_v == 2 else min(sv1, D - 3.0)
+    rows = (v0 + 1.5 + sv / 2.0, v1 - 1.5 - sv / 2.0) if n_v == 2 else \
+        ((v0 + 1.5 + sv / 2.0) if front_row else (v1 - 1.5 - sv / 2.0),)
+    cols = [(u0 + u1) / 2.0] if n_u == 1 else \
+        [u0 + 1.5 + su / 2.0 + i * (W - 3.0 - su) / (n_u - 1) for i in range(n_u)]
+    towers = []
+    if su >= 16.0 and sv >= 14.0:
+        for cv in rows:
+            for cu in cols:
+                t = MS.fit_rect(base, fr, su, sv, cu, cv, min_w=16.0, min_d=14.0)
+                if t is None:
+                    continue
+                gp = G.qpoly(t.buffer(g - 0.5, join_style="mitre"))
+                if any(gp.intersects(o) for o, _ in towers):
+                    continue
+                towers.append((t, (cu, cv)))
+    if not towers:
+        if not single:
+            return None
+        found = MS.fit_rect_any(base, fr, min(W - 3.0, 40.0), min(D - 3.0, 26.0),
+                                MS.anchors_of(base, fr), min_w=16.0, min_d=14.0)
+        if found is None:
+            return None
+        towers = [found]
+    return fr, podium, court, towers
+
+
+def _mega_tower(b: Bld, fr, t, P: float, Hi: float, rng) -> None:
+    """A tower on the podium with a mid setback (one or two sides) and a crown tier."""
+    fh = b.fh
+    rise = Hi - P
+    zm = P + max(4, int(rise * MS.uniform(rng, 0.42, 0.66) / fh)) * fh
+    zc = Hi - max(2, int(rise * MS.uniform(rng, 0.07, 0.14) / fh)) * fh
+    tu0, tv0, tu1, tv1 = fr.bounds(t)
+    d = MS.uniform(rng, 3.0, 6.0)
+    k = int(float(rng.random()) * 4)
+    cut = ((tu0 + d, tv0, tu1, tv1), (tu0, tv0 + d, tu1, tv1), (tu0, tv0, tu1 - d, tv1),
+           (tu0 + d, tv0, tu1 - d, tv1))[k]
+    upper = fr.rect(*cut) if (cut[2] - cut[0]) >= 12.0 and (cut[3] - cut[1]) >= 10.0 \
+        else t
+    if zm >= zc - fh:
+        zm = zc
+    b.add(t, P, zm, "tower")
+    if zm < zc:
+        b.add(upper, zm, zc, "tower")
+    c = _tier(fr, upper, MS.uniform(rng, 2.5, 4.0))
+    b.add(c if c is not None else upper, zc, Hi, "crown")
+
+
+def _mega_decks(b: Bld, fr, region, towers, tops, P: float) -> None:
+    """Open decks (6 m wide) across the gaps between neighboring towers, at one or two
+    levels within the lower one's height."""
+    fh = b.fh
+    bx = [fr.bounds(t) for t, _ in towers]
+    n = 0
+    for i in range(len(towers)):
+        for j in range(i + 1, len(towers)):
+            a, c = bx[i], bx[j]
+            lo_v, hi_v = max(a[1], c[1]), min(a[3], c[3])
+            lo_u, hi_u = max(a[0], c[0]), min(a[2], c[2])
+            if hi_v - lo_v >= 8.0 and (c[0] > a[2] or a[0] > c[2]):
+                ua, ub = (a[2], c[0]) if c[0] > a[2] else (c[2], a[0])
+                m = (lo_v + hi_v) / 2.0
+                deck = fr.rect(ua - 0.3, m - 3.0, ub + 0.3, m + 3.0)
+            elif hi_u - lo_u >= 8.0 and (c[1] > a[3] or a[1] > c[3]):
+                va, vb = (a[3], c[1]) if c[1] > a[3] else (c[3], a[1])
+                m = (lo_u + hi_u) / 2.0
+                deck = fr.rect(m - 3.0, va - 0.3, m + 3.0, vb + 0.3)
+            else:
+                continue
+            if not region.covers(deck) or any(
+                    k not in (i, j) and G.area1(G.inter(deck, towers[k][0])) > 0.01
+                    for k in range(len(towers))):
+                continue
+            top = min(tops[i], tops[j])
+            levels = (0.38, 0.72) if top - P > 24 * fh else (0.5,)
+            for f in levels:
+                z = P + max(3, int((top - P) * f / fh)) * fh
+                if z + 2.0 < top - fh:
+                    b.add(deck, z, z + 2.0, "deck", roof=False)
+                    n += 1
+    if n:
+        b.attrs["decks"] = n
 
 
 def terraced(b: Bld, region, H: float, cx: Ctx, rng):
@@ -840,7 +972,7 @@ def choose_kind(cx: Ctx, region, area: float, front_cls: str, rng) -> str:
     prog = cx.prog
     mix = list(prog.mix)
     a = G.area1(region)
-    if cx.archetype == "megablock_residential" and a < 6000.0:
+    if cx.archetype == "megablock_residential" and a < 1800.0:
         mix = [(k, w) for k, w in mix if k != "megabuilding"]
     if cx.archetype == "corporate_core" and front_cls == "avenue":
         mix = [(k, w) for k, w in mix if k != "parking_structure"]
