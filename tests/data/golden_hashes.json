@@ -1,5 +1,5 @@
 {
-  "about": "sha256 of each sample city's city_model.json (citygen build output, M5: M3p buildings plus transit lines, stations, supports and station walkways). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) and docs/progress/M5/<city>/trace.json (M5). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
+  "about": "sha256 of each sample city's city_model.json (citygen build output, M6: M5 transit plus props, plants, median lawns and park hedges). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) and docs/progress/M6/<city>/trace.json (M6). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
   "produced_on": {
     "machine": "x86_64",
     "system": "Linux",
@@ -9,17 +9,17 @@
     "geos": "3.14.1"
   },
   "cities": {
-    "archipelago_free_port": "bf907594565fcf75282c4d711b0e06767a06c06668245d418554f0057a69b7bc",
-    "delta_megacity": "663be3d7ebc4db42295c717e7ca6a6137b9ab6c639fc78beb96359db141732ea",
-    "nexus_city": "ebd14b2dba6926afe40850ca2430ffa6decd2c292d64a1a2cfff143a6c87ef17",
-    "nyxllor": "a5772cf50694dba47f35e168b3fd21cb02739f0aab4140f56302135a78c5b137",
-    "peninsula_city": "04a0d4a57f510b8087cb38ab7b7834886dd13e2ca706d2b1d3b0d02476ea7595"
+    "archipelago_free_port": "f64b4cdffb31d4450c2e3030c0cb286693aac41790c47afc39907a74c61a23fa",
+    "delta_megacity": "4d6ca52ff999fa9414289d3c416b3ae7b6b2502033f6ce3b3086a5f7a8559b37",
+    "nexus_city": "3eb5491b9680adf7435c934db9e6351b87cfe7491bf2afa71f93c7aefa4890cb",
+    "nyxllor": "7db5f5341847828bfda3647d6c1d78b7e7bedbdaabcd206882c21c2c20fbbae7",
+    "peninsula_city": "ee52c92bcedd42b09e063e77215fee3231fbfa0dd92252f0810c0f0901c93175"
   },
   "blockout_plans": {
-    "archipelago_free_port": "94b81aa5b0c40ce7deb43ebfca2f22bb8706d8db3b76ab9c18f1200336280425",
-    "delta_megacity": "488268b2f314c919d001a76a7125dd698ed8a0926d96caa9c2723afd0eb63819",
-    "nexus_city": "b381a03cb8ef2e382be5b2f0fbac63bc65ed2c82cad70169494f9f4f27f4a0cd",
-    "nyxllor": "fbeea7bc2d103c5104d7254c54b220563202e296e99ef4c9eeb1b1b61932c767",
-    "peninsula_city": "5cd70632b19431b1d0049bad122f271a8f70b75864d33f35e63e054eb7a49391"
+    "archipelago_free_port": "d58f196408e3f09620bf51e072bd2dd8ba2ef5f6fa8007cd422850952b3c621e",
+    "delta_megacity": "11d1a7a6c49e496a97298d51cf2717c39045d215c5291d49a3a5f8d3c0d56478",
+    "nexus_city": "e1418528cff5ba7855b586add6eb7a655cbf2e4c8cdd2c79280babfbf617d9dc",
+    "nyxllor": "929c7dfa4ea3446daa8ba095c4f85bf4cf160214f15c0a43650f09b8f991f175",
+    "peninsula_city": "2f25a3d6be18edb7719835a55166ba522924f1a428cef235fa4f47212d20e933"
   }
 }

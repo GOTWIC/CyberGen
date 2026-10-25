@@ -70,15 +70,14 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M5/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M6/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M5" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M6" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        for png in ("preview_transit.png", "preview_massing.png"):
-            assert (ROOT / "docs" / "progress" / "M5" / slug / png).is_file()
+        assert (ROOT / "docs" / "progress" / "M6" / slug / "preview_props.png").is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
@@ -129,7 +128,10 @@ def test_small_city_passes(small_built):
                    "building_footprints", "building_clear_zones", "building_overlaps",
                    "building_heights", "building_entrances", "ground_floor_units",
                    "roof_items", "complexes", "skybridges", "landmarks", "megasite_contents",
-                   "megasite_heights", "megasite_access"}
+                   "megasite_heights", "megasite_access",
+                   # M6 (no transit lines in the small city, so no M5 checks)
+                   "props_keepout", "props_overlap", "tree_clearance", "street_lighting",
+                   "park_planting", "boats_afloat"}
 
 
 def test_check_geometry_invalid(small_built):

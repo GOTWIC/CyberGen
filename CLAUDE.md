@@ -190,7 +190,22 @@ road decks, roofs) and upper bounds (tower portals); stations with stairs, eleva
 canopies and walkways split onto the sidewalks; decks, tubes and supports in medians or at
 the curbs) and ten transit checks (`citygen/transit_checks.py`), and writes
 `preview_transit.png`. Route order matters for the fast modes: the spec, not the code, fixes
-a line that turns back. Sample builds: `docs/progress/M5/`. M6 (props, vegetation) is next.
+a line that turns back. Sample builds: `docs/progress/M5/`.
+
+M6 (props and vegetation) is in place: the build ends with `citygen/props.py` (street
+lights, wall lights where a sidewalk is too narrow, signals, bus shelters, hydrants, trash
+cans, bollards, benches, kiosks, stalls, parked cars, boats, barriers, railings, cables,
+signs, awnings, facade AC units, scaffolding, dumpsters, litter) and `citygen/vegetation.py`
+(street, median, promenade and park trees, conifers, palms, shrubs, roof plants, facade
+greenery, overgrowth, median lawns, park hedges). Every generator proposes candidates; the
+keep-outs (lanes, crosswalks, junctions, buildings, water, entrances, ground structures, park
+paths, quay edges, the 1.8 m sidewalk clear path) are tested in bulk, then an occupancy grid
+accepts them in a fixed order; randomness is a blake2b hash of ids (`props._u`); crowns are
+fitted to facades and overhead decks. Six checks in `prop_checks.py`, `preview_props.png`
+(`preview_props.py`). The blockout draws props and plants as geometry-nodes instances of
+per-kind prototypes (one object per kind and tile; USD point instancers; left out of the glTF
+tiles, which `props.csv` complements). Sample builds: `docs/progress/M6/`. M7 (elevated
+highways, ramps, interchanges) is next.
 
 ### Rules for cloud sessions building citygen milestones
 

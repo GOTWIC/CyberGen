@@ -893,6 +893,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import transit_checks as TC
 
         checks += TC.run(spec, m)
+    if m.props or m.plants:
+        from . import prop_checks as PC
+
+        checks += PC.run(spec, m)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
@@ -908,6 +912,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import transit_checks as TC
 
         st["transit"] = TC.stats(m)
+    if m.props or m.plants:
+        from . import prop_checks as PC
+
+        st["props"] = PC.stats(m)
     return checks, st
 
 
@@ -915,7 +923,10 @@ def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
         "name": spec.name, "seed": spec.seed,
-        "stage": ("M5 (water, districts, waterways, roads, local streets, blocks, lots, "
+        "stage": ("M6 (water, districts, waterways, roads, local streets, blocks, lots, "
+                  "buildings, skybridges, megasites, transit, props, vegetation)"
+                  if "props" in st else
+                  "M5 (water, districts, waterways, roads, local streets, blocks, lots, "
                   "buildings, skybridges, megasites, transit)" if "transit" in st else
                   "M3 (water, districts, waterways, roads, local streets, blocks, lots, "
                   "buildings, skybridges, megasites)" if "buildings" in st else
@@ -1033,6 +1044,13 @@ def report_text(rep: dict) -> str:
             out.append(f"  {name[:28]:<28} {r.get('count', 0):>7} {r.get('median', 0):>9.1f}"
                        f" {r.get('p90', 0):>7.1f} {r.get('max', 0):>7.1f} {r['coverage']:>9.0%}"
                        f" {r['far']:>5.1f} {r['floor_area_km2']:>10.3f}")
+    ps = st.get("props")
+    if ps:
+        out += ["", f"  props {ps['props']}, plants {ps['plants']} ({ps['trees']} trees), "
+                    f"{ps['instances']} instances; lawns {ps['lawn_m2']} m2, hedges "
+                    f"{ps['hedge_km']} km",
+                "  props: " + ", ".join(f"{k} {v}" for k, v in ps["props_by_kind"].items()),
+                "  plants: " + ", ".join(f"{k} {v}" for k, v in ps["plants_by_kind"].items())]
     ts = st.get("transit")
     if ts:
         out += ["", f"  transit {ts['km']} km, supports {ts['supports']}, portals "
