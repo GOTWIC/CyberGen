@@ -816,7 +816,7 @@ def check_megasite_access(m: CityModel, bx: _B):
             _limit(c, c.failures, f"{s.id} '{s.name}': site paths not joined to the walkways")
         if not has_b and not paths and s.member_ids:
             c.notes.append(f"{s.id} '{s.name}': no buildings")
-    c.notes.append("transit links of megasites are checked in M5 (no transit lines yet)")
+    c.notes.append("transit links of megasites: see transit_hubs")
     return c
 
 

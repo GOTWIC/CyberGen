@@ -34,7 +34,7 @@
       {"mode": "metro", "name": "Spine Line",
        "route": ["The Stacks", "Corporate Core", "Old Town", "Vess Docks"]},
       {"mode": "maglev", "name": "Launch Express",
-       "route": ["east_exit", "Corporate Core", "Neon Strand", "Launch Key"]},
+       "route": ["east_exit", "Corporate Core", "Launch Key"]},
       {"mode": "sky_tube", "name": "Crown Loop", "through_towers": true,
        "route": ["Corporate Core", "The Stacks", "Highcrest", "Corporate Core"]}
     ]

@@ -180,7 +180,17 @@ it only triangulates and draws): `city.blend`, `city.usdc`, `tiles/<tile>.glb`, 
 `citygen/exports.py` writes the layered `map_2d.svg` (readable by `pipeline/svg_to_plan.py`)
 and `map_2d.png`, `unreal/corporate_core_plan.json` for the greybox script, `graphs.json`,
 `tiles.json` and `props.csv`. The Blender test skips when Blender is missing. Sample builds:
-`docs/progress/M4/`. M5 (transit, elevated walkways) is next.
+`docs/progress/M4/`.
+
+M5 (transit) is in place: the same build runs `citygen/transit.py` after the buildings (stops
+resolved to junctions, nexus platforms or sites; elevated rail and monorail routed on the road
+graph, maglev, sky tubes and metro on a 15 m raster; curves fitted at 1.15 times the mode's
+minimum radius with obstacle-checked arcs; a height profile between lower bounds (water,
+road decks, roofs) and upper bounds (tower portals); stations with stairs, elevators,
+canopies and walkways split onto the sidewalks; decks, tubes and supports in medians or at
+the curbs) and ten transit checks (`citygen/transit_checks.py`), and writes
+`preview_transit.png`. Route order matters for the fast modes: the spec, not the code, fixes
+a line that turns back. Sample builds: `docs/progress/M5/`. M6 (props, vegetation) is next.
 
 ### Rules for cloud sessions building citygen milestones
 
