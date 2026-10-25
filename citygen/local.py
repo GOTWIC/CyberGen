@@ -100,8 +100,10 @@ def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list) -> int:
                 continue
             best = None
             for i in groups[r]:
-                k = int(tree.nearest(arr[i]))
-                j = groups[main][k]
+                # every equally near point, the lowest wins (the tree's own pick among
+                # ties follows its std::sort order, which differs between C++ libraries)
+                ks = tree.query_nearest(arr[i], all_matches=True).tolist()
+                j = min((groups[main][int(k)] for k in ks), key=lambda j: pts[j])
                 d = STR._dist(pts[i], pts[j])
                 if best is None or (round(d, 6), pts[i]) < (round(best[0], 6), best[1]):
                     best = (d, pts[i], pts[j])

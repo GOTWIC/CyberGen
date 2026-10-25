@@ -51,19 +51,19 @@ stats:
   bridges 13 (sea 4, river 2, canal 7; 2.64 km of span), pedestrian 12; named: Baylink Bridge, Horizon Bridge, Silver Span
   landmasses with districts connected by road 5 of 5; highway planned elevated 30%; megasite reserves 7; road variant 1
   local roads street 98.14 km, alley 20.94 km, service 5.76 km, pedestrian 20.33 km, footbridge 0.36 km; 108 one-way segments, 12 footbridges
-  junctions 1774 (423 signalized), crosswalks 1425, sidewalks 166.58 km, lanes 6380 + 12396 connectors, walkways 14295 (alley 26.7 km, crossing 79.37 km, crosswalk 52.69 km, footbridge 0.36 km, path 53.46 km, pedestrian_street 1.49 km, promenade 18.84 km, sidewalk 218.45 km)
+  junctions 1774 (423 signalized), crosswalks 1425, sidewalks 166.56 km, lanes 6380 + 12396 connectors, walkways 14294 (alley 26.7 km, crossing 79.37 km, crosswalk 52.69 km, footbridge 0.36 km, path 53.44 km, pedestrian_street 1.49 km, promenade 18.84 km, sidewalk 218.45 km)
   junctions by type: street_street T 809, avenue_avenue T 269, street_street X 203, street T 145, alley_alley T 112, avenue_avenue X 68, pedestrian T 39, street_alley T 24, alley T 17, alley_alley X 17, highway_highway X 15, street_service T 12
-  blocks 1058, lots 6404 (6 merged groups), open space 14.1% of net land (courtyard 8, green 55, park 165, plaza 92, pocket_park 143), named places 7
+  blocks 1058, lots 6412 (6 merged groups), open space 14.1% of net land (courtyard 8, green 55, park 165, plaza 92, pocket_park 142), named places 7
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
-  corporate_core                 214      994   1335     2730    4771     6016    56.8
-  entertainment_market          1592       56    111      222     435      797    16.0
+  corporate_core                 214      994   1335     2730    4770     6016    56.8
+  entertainment_market          1601       56    110      222     433      797    15.9
   industrial_port                 68     2151   3693     7757   16376    22465   137.5
   midtown_mixed                  615      283    444      869    1759     4519    30.1
-  old_town                      3187       36     77      162     325      530    13.8
+  old_town                      3186       36     77      162     325      530    13.9
   research_campus                 42     1793   2531     5732   10044    11544   132.2
   residential_heights            557      281    434      791    1403     2084    28.7
-  spaceport                       23     4128   4774     8120   19385    21710    99.1
+  spaceport                       23     4128   4774     8120   19385    21710    99.0
   transit_hub                    106      402    834     1440    3587     4699    51.4
 
   blocks and open space by district  blocks  median block m  open share

@@ -395,10 +395,14 @@ def test_golden_hashes():
     x86_64 Linux; the same bytes are expected on the M4 Mac)."""
     golden = json.loads(GOLDEN.read_text())
     assert set(golden["cities"]) == {p.parent.name for p in CITIES}
+    wrong = []
     for path in CITIES:
         _, _, data = built_sample(path)
-        assert hashlib.sha256(data).hexdigest() == golden["cities"][path.parent.name], \
-            path.parent.name
+        got, want = hashlib.sha256(data).hexdigest(), golden["cities"][path.parent.name]
+        if got != want:
+            wrong.append(f"{path.parent.name}: {got} (golden {want})")
+    # every city is built and compared, so one run names all that differ
+    assert not wrong, "sample cities differ from the golden hashes:\n" + "\n".join(wrong)
 
 
 def test_dmath_matches_libm():

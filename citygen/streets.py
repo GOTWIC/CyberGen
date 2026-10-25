@@ -254,8 +254,7 @@ def _unit(dx: float, dy: float) -> tuple[float, float]:
 
 
 def _plen(pts) -> float:
-    return math.fsum(math.sqrt((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2)
-                     for i in range(len(pts) - 1))
+    return math.fsum(_dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
 
 
 def _dedupe(pts) -> list[tuple[float, float]]:
@@ -275,7 +274,7 @@ def _seg_dist(p, a, b) -> tuple[float, tuple[float, float], float]:
     t = 0.0 if L2 == 0 else ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2
     t = min(max(t, 0.0), 1.0)
     q = (a[0] + t * dx, a[1] + t * dy)
-    return math.sqrt((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2), q, t
+    return _dist(p, q), q, t
 
 
 def _along(pts, s: float) -> tuple[tuple[float, float], tuple[float, float]]:
@@ -283,7 +282,7 @@ def _along(pts, s: float) -> tuple[tuple[float, float], tuple[float, float]]:
     acc = 0.0
     for i in range(len(pts) - 1):
         a, b = pts[i], pts[i + 1]
-        L = math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+        L = _dist(a, b)
         if L > 0 and (acc + L >= s or i == len(pts) - 2):
             f = min(max((s - acc) / L, 0.0), 1.0)
             return (a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])), _unit(b[0] - a[0],
@@ -298,7 +297,7 @@ def _project(pts, p) -> tuple[float, float, tuple[float, float], int]:
     acc = 0.0
     for i in range(len(pts) - 1):
         d, q, t = _seg_dist(p, pts[i], pts[i + 1])
-        L = math.sqrt((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2)
+        L = _dist(pts[i], pts[i + 1])
         if best is None or d < best[1] - 1e-9:
             best = (acc + t * L, d, q, i)
         acc += L
@@ -782,6 +781,15 @@ def _rng(seed: int, *salt: int) -> np.random.Generator:
     return np.random.default_rng([int(seed) % (2 ** 32)] + [int(x) % (2 ** 32) for x in salt])
 
 
+def uniform(rng: np.random.Generator, lo: float, hi: float) -> float:
+    """A uniform draw in [lo, hi) as `uniform(rng, lo, hi)` makes it, but in separate Python
+    operations: numpy evaluates lo + (hi - lo) * u in compiled code, which clang (macOS)
+    contracts into one fused multiply-add and gcc (Linux) does not. rng.random() is exact
+    (53 random bits times 2**-53) and consumes the same bits."""
+    lo, hi = float(lo), float(hi)
+    return lo + (hi - lo) * float(rng.random())
+
+
 def _block_range(d) -> tuple[float, float]:
     lo, hi = d.block_size_m if d.block_size_m else (80.0, 140.0)
     return float(lo), float(hi)
@@ -936,9 +944,9 @@ def district_cells(B: Builder, name: str) -> list:
 # ---------------------------------------------------------------------------
 
 def _offsets(rng, lo: float, hi: float, span: float) -> list[float]:
-    out = [-span + float(rng.uniform(0.0, hi))]
+    out = [-span + float(uniform(rng, 0.0, hi))]
     while out[-1] < span:
-        out.append(out[-1] + float(rng.uniform(lo, hi)))
+        out.append(out[-1] + float(uniform(rng, lo, hi)))
     return out
 
 
@@ -1028,18 +1036,18 @@ def pattern_radial(B: Builder, name: str, cell, center, r0: float, lo: float, hi
     poly = B.polygons[name]
     x0, y0, x1, y1 = poly.bounds
     far = max(_dist(center, (x, y)) for x in (x0, x1) for y in (y0, y1)) + 20.0
-    radii = [r0 + float(rng.uniform(lo, hi))]
+    radii = [r0 + float(uniform(rng, lo, hi))]
     while radii[-1] < far:
-        radii.append(radii[-1] + float(rng.uniform(lo, hi)))
-    a0 = float(rng.uniform(0.0, 45.0))
+        radii.append(radii[-1] + float(uniform(rng, lo, hi)))
+    a0 = float(uniform(rng, 0.0, 45.0))
     cands = [("ring", _ring_pts(center, r)) for r in radii]
     # radials: eight spokes, doubled wherever the arc between them grows past ~1.8 rings
-    level = [(a0 + 45.0 * j + float(rng.uniform(-5.0, 5.0)), r0 - 2.0) for j in range(8)]
+    level = [(a0 + 45.0 * j + float(uniform(rng, -5.0, 5.0)), r0 - 2.0) for j in range(8)]
     n = 8
     for k, r in enumerate(radii):
         if 2 * math.pi * r / n > 1.8 * (hi + lo) / 2 and k + 1 < len(radii):
             step = 360.0 / n
-            level += [(a0 + step * (j + 0.5) + float(rng.uniform(-4.0, 4.0)), r)
+            level += [(a0 + step * (j + 0.5) + float(uniform(rng, -4.0, 4.0)), r)
                       for j in range(n)]
             n *= 2
     for ang, rs in level:
@@ -1161,14 +1169,14 @@ def pattern_loops(B: Builder, name: str, cell, rng, offset: float, smooth: int, 
         for li in loop_ids:
             ln = B.lines[li]
             L = _plen(ln.pts)
-            s = float(rng.uniform(40.0, 90.0))
+            s = float(uniform(rng, 40.0, 90.0))
             n_spur = 0
             while s < L - 40.0 and (not campus or n_spur < 2):
                 a, t = _along(ln.pts, s)
                 a = _pt(*a)
                 nrm = (-t[1], t[0])  # loops run counterclockwise: left is inside
-                length = float(rng.uniform(55.0, 110.0)) if not campus else \
-                    float(rng.uniform(50.0, 90.0))
+                length = float(uniform(rng, 55.0, 110.0)) if not campus else \
+                    float(uniform(rng, 50.0, 90.0))
                 b = _pt(a[0] + nrm[0] * length, a[1] + nrm[1] * length)
                 spur = [a, b]
                 okd = G.qpoly(part.buffer(-10.0, join_style="mitre"))
@@ -1187,8 +1195,8 @@ def pattern_loops(B: Builder, name: str, cell, rng, offset: float, smooth: int, 
                         B.lines[cj].attached[0] = True
                         out.append(cj)
                         n_spur += 1
-                s += float(rng.uniform(95.0, 150.0)) if not campus else \
-                    float(rng.uniform(L / 3, L / 2))
+                s += float(uniform(rng, 95.0, 150.0)) if not campus else \
+                    float(uniform(rng, L / 3, L / 2))
     return out
 
 
@@ -1267,16 +1275,16 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
     local = SegIndex(30.0)
 
     def new_agent(p, head, cls, parent):
-        ml = float(rng.uniform(2.5 * lo, 7.0 * hi)) if cls == "street" else \
-            float(rng.uniform(0.6 * lo, 1.6 * hi))
+        ml = float(uniform(rng, 2.5 * lo, 7.0 * hi)) if cls == "street" else \
+            float(uniform(rng, 0.6 * lo, 1.6 * hi))
         agents.append({"pts": [p], "head": head, "cls": cls, "since": 0.0,
-                       "next": float(rng.uniform(lo, hi)), "max": ml, "parent": parent,
+                       "next": float(uniform(rng, lo, hi)), "max": ml, "parent": parent,
                        "inserts": [], "end": None, "alive": True, "len": 0.0})
         return len(agents) - 1
 
     ring = _ccw(_dedupe(cell.exterior.coords))
     L = _plen(ring)
-    s = float(rng.uniform(0.0, hi))
+    s = float(uniform(rng, 0.0, hi))
     while s < L - 5.0:
         p, t = _along(ring, s)
         p = _pt(*p)
@@ -1287,8 +1295,8 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
             head = fa + 90.0 * k
             if abs(_wrap(head - inward)) > 35.0:
                 head = inward
-            new_agent(p, head + float(rng.uniform(-8.0, 8.0)), "street", None)
-        s += float(rng.uniform(1.0 * lo, 1.9 * hi))
+            new_agent(p, head + float(uniform(rng, -8.0, 8.0)), "street", None)
+        s += float(uniform(rng, 1.0 * lo, 1.9 * hi))
     budget = 40000
     qi = 0
     while qi < len(agents) and budget > 0:
@@ -1302,7 +1310,7 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
             want = fa + 90.0 * k
             diff = _wrap(want - a["head"])
             a["head"] = a["head"] + max(-10.0, min(10.0, 0.35 * diff)) + \
-                float(rng.uniform(-wobble, wobble))
+                float(uniform(rng, -wobble, wobble))
             h = M.radians(a["head"])
             q = _pt(p[0] + step * M.cos(h), p[1] + step * M.sin(h))
             dirv = _unit(q[0] - p[0], q[1] - p[1])
@@ -1390,13 +1398,13 @@ def pattern_organic(B: Builder, name: str, cell, field: CrossField, rng,
                 break
             if a["since"] >= a["next"]:
                 a["since"] = 0.0
-                a["next"] = float(rng.uniform(lo, hi))
+                a["next"] = float(uniform(rng, lo, hi))
                 for side in (1.0, -1.0):
                     if rng.uniform() < p_branch:
                         cls = "alley" if rng.uniform() < p_alley else "street"
                         if a["cls"] == "alley":
                             cls = "alley"
-                        new_agent(q, a["head"] + side * (90.0 + float(rng.uniform(-24.0, 24.0))),
+                        new_agent(q, a["head"] + side * (90.0 + float(uniform(rng, -24.0, 24.0))),
                                   cls, (ai, k_new))
                         agents[-1]["inserts"] = []
                         a["inserts"].append(q)
@@ -1470,7 +1478,11 @@ def _too_close_frame(B: Builder, q, cls: str, gap: float, dirv) -> bool:
 def _obb(poly):
     """(center, long axis unit u, short axis unit v, length, width) of the minimum rotated
     rectangle (snapped)."""
-    r = G.qpoly(shapely.minimum_rotated_rectangle(poly))
+    # GEOS's rotating calipers compare a NaN for a degenerate caliper (the result does not
+    # use it); arm64 raises the IEEE invalid flag on such a comparison and numpy turns the
+    # flag into a RuntimeWarning, thousands per build on an M-series Mac
+    with np.errstate(invalid="ignore"):
+        r = G.qpoly(shapely.minimum_rotated_rectangle(poly))
     c = _dedupe(r.exterior.coords) if not r.is_empty and r.geom_type == "Polygon" else []
     if len(c) < 4:
         x0, y0, x1, y1 = poly.bounds
@@ -1478,8 +1490,8 @@ def _obb(poly):
     c = c[:4]
     e0 = (c[1][0] - c[0][0], c[1][1] - c[0][1])
     e1 = (c[2][0] - c[1][0], c[2][1] - c[1][1])
-    l0 = math.sqrt(e0[0] ** 2 + e0[1] ** 2)
-    l1 = math.sqrt(e1[0] ** 2 + e1[1] ** 2)
+    l0 = math.sqrt(e0[0] * e0[0] + e0[1] * e0[1])
+    l1 = math.sqrt(e1[0] * e1[0] + e1[1] * e1[1])
     cx = (c[0][0] + c[2][0]) / 2
     cy = (c[0][1] + c[2][1]) / 2
     if l0 >= l1:
@@ -1516,7 +1528,7 @@ def block_alleys(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
         if st.organic:
             if A < 3.0 * amax or rng.uniform() > st.alley_rate:
                 continue
-            off = float(rng.uniform(-0.15, 0.15)) * W
+            off = float(uniform(rng, -0.15, 0.15)) * W
             if L > 1.9 * W:
                 cands.append(("alley", [_pt(cx - u[0] * (L / 2 + 8) + v[0] * off,
                                             cy - u[1] * (L / 2 + 8) + v[1] * off),
@@ -1524,7 +1536,7 @@ def block_alleys(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
                                             cy + u[1] * (L / 2 + 8) + v[1] * off)]))
             else:
                 side = 1.0 if rng.uniform() < 0.5 else -1.0
-                du = float(rng.uniform(-0.2, 0.2)) * L
+                du = float(uniform(rng, -0.2, 0.2)) * L
                 a = (cx + u[0] * du - side * v[0] * (W / 2 + 8),
                      cy + u[1] * du - side * v[1] * (W / 2 + 8))
                 b = (cx + u[0] * du + side * v[0] * W * 0.08,
@@ -1548,7 +1560,7 @@ def block_alleys(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
             limit = {"large_grid": 230.0, "service_roads": 300.0}.get(pat, 1.1 * hi)
             if L < limit or W < 0.7 * lo or rng.uniform() > st.alley_rate:
                 continue
-            off = float(rng.uniform(-0.1, 0.1)) * W
+            off = float(uniform(rng, -0.1, 0.1)) * W
             cls = "service" if pat in ("large_grid", "service_roads") else "alley"
             cands.append(("service_lane" if cls == "service" else "alley",
                           [_pt(cx - u[0] * (L / 2 + 8) + v[0] * off,
@@ -1615,14 +1627,14 @@ def infill(B: Builder, name: str, cell, ids: list[int], rng) -> list[int]:
                 d, span = v, L        # a long, wide block: cut along it
             else:
                 continue
-            t = float(rng.uniform(-0.1, 0.1)) * (L if d is u else W)
+            t = float(uniform(rng, -0.1, 0.1)) * (L if d is u else W)
             ax = (-d[1], d[0])
             if organic:  # turned and bent a little
-                tw = M.radians(float(rng.uniform(-18.0, 18.0)))
+                tw = M.radians(float(uniform(rng, -18.0, 18.0)))
                 ax = (ax[0] * M.cos(tw) - ax[1] * M.sin(tw), ax[0] * M.sin(tw) + ax[1] * M.cos(tw))
             ext = span / 2 + w + 10.0
             mx, my = cx + d[0] * t, cy + d[1] * t
-            bend = float(rng.uniform(-0.12, 0.12)) * span if organic else 0.0
+            bend = float(uniform(rng, -0.12, 0.12)) * span if organic else 0.0
             pts = [_pt(mx - ax[0] * ext, my - ax[1] * ext),
                    _pt(mx + d[0] * bend, my + d[1] * bend),
                    _pt(mx + ax[0] * ext, my + ax[1] * ext)]
@@ -1735,7 +1747,7 @@ def footbridges(B: Builder) -> list[int]:
             continue
         rng = _rng(B.spec.seed or 0, 17, bi)
         L = _plen(cl)
-        s = float(rng.uniform(60.0, 140.0))
+        s = float(uniform(rng, 60.0, 140.0))
         while s < L - 30.0:
             p, t = _along(cl, s)
             p = _pt(*p)
@@ -1783,7 +1795,7 @@ def footbridges(B: Builder) -> list[int]:
                 continue
             placed.append(p)
             out.append(li)
-            s += float(rng.uniform(*FOOTBRIDGE_STEP_M))
+            s += float(uniform(rng, *FOOTBRIDGE_STEP_M))
     T.detail("streets/footbridges", [B.lines[i].pts for i in out])
     return out
 
@@ -1842,6 +1854,15 @@ def link_dead_ends(B: Builder) -> None:
             t.junctions.append(q)
 
 
+def _pairs(idx):
+    """STRtree query pairs in index order: the tree returns each input's hits in tree order,
+    which follows a C++ std::sort of the envelopes and so the standard library's tie order
+    (libc++ on macOS, libstdc++ on Linux)."""
+    a, b = idx
+    k = np.lexsort((b, a))
+    return a[k], b[k]
+
+
 def _components(B: Builder) -> tuple[list[int], dict[int, int]]:
     """Connected groups of lines (by their shared points, before noding): the line indices
     of the group that holds the primary network, and every line's group root."""
@@ -1869,7 +1890,7 @@ def _components(B: Builder) -> tuple[list[int], dict[int, int]]:
             seg_line.append(i)
             coords.append([pts[k], pts[k + 1]])
     geoms = shapely.linestrings(np.array(coords, dtype=np.float64))
-    a_idx, b_idx = shapely.STRtree(geoms).query(geoms, predicate="intersects")
+    a_idx, b_idx = _pairs(shapely.STRtree(geoms).query(geoms, predicate="intersects"))
     for x, y in zip(a_idx.tolist(), b_idx.tolist()):
         li, lj = seg_line[x], seg_line[y]
         if li != lj and not (li < B.n_primary and lj < B.n_primary):
@@ -2019,7 +2040,7 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
             coords.append([pts[k], pts[k + 1]])
     geoms = shapely.linestrings(np.array(coords, dtype=np.float64))
     tree = shapely.STRtree(geoms)
-    a_idx, b_idx = tree.query(geoms, predicate="intersects")
+    a_idx, b_idx = _pairs(tree.query(geoms, predicate="intersects"))
     crossings = 0
     cuts: dict[int, list] = {}
     for x, y in zip(a_idx.tolist(), b_idx.tolist()):

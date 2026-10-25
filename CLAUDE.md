@@ -128,8 +128,13 @@ lots with frontage and open space (`blocks.py`), driver `local.py`, 13 checks in
 `street_checks.py`, and `preview_detail.png` (four 400 m street-level insets,
 `preview_detail.py`). M2 stages run in `geom.canonical()` (pointwise grid rounding,
 fixed-precision overlays); never let set or dict order of strings reach the model (string
-hashes change per process; a test builds under two `PYTHONHASHSEED` values). Sample builds:
-`docs/progress/M2/`. M3 (buildings) is next.
+hashes change per process; a test builds under two `PYTHONHASHSEED` values). GEOS on macOS is
+built against libc++, on Linux against libstdc++, and their `std::sort` orders ties
+differently: never let the order of GEOS output (parts, STRtree hits, a many-input
+`union_all`) reach a decision (`geom.union` merges in its own fixed order; normalize or sort
+otherwise). Emulated aarch64 Linux does not catch this; a GEOS rebuilt with clang and libc++
+does (`docs/progress/M2/README.md`). Sample builds: `docs/progress/M2/`. M3 (buildings) is
+next.
 
 ### Rules for cloud sessions building citygen milestones
 

@@ -419,6 +419,27 @@ def test_canonical_snapping():
     assert shapely.get_coordinates(qa).tolist()[0] == [0.0, 0.0]
 
 
+def test_canonical_union_ignores_input_order():
+    """Snap rounding is not associative, so a union of many pieces depends on the order they
+    are merged in. GEOS's union_all takes that order from its STRtree, which sorts with the
+    C++ standard library (tied envelopes come out differently on macOS and Linux): the M2
+    union fixes the order itself, so a permuted input gives the same bytes."""
+    rng = np.random.default_rng(5)
+    pieces = []
+    for k in range(60):
+        x, y = rng.uniform(0.0, 300.0, 2)
+        ang = rng.uniform(0.0, 180.0)
+        pieces.append(shapely.affinity.rotate(
+            shapely.box(x, y, x + rng.uniform(20.0, 90.0), y + rng.uniform(6.0, 14.0)), ang))
+    with G.canonical():
+        pieces = [G.qpoly(p) for p in pieces]
+        ref = G.union(pieces).wkb
+        for seed in range(4):
+            perm = np.random.default_rng(seed).permutation(len(pieces)).tolist()
+            assert G.union([pieces[i] for i in perm]).wkb == ref
+    assert G.area(shapely.from_wkb(ref)) > 0
+
+
 _ACTIVE = [False]
 
 

@@ -352,8 +352,8 @@
       "service": 7.36,
       "street": 86.78
     },
-    "road_nodes": 1930,
-    "road_segments": 2755,
+    "road_nodes": 1931,
+    "road_segments": 2756,
     "road_components": 1,
     "bridges": 18,
     "bridges_by_class": {
@@ -376,11 +376,11 @@
     "highway_elevated_share": 0.2097,
     "megasites": 3,
     "local": {
-      "junctions": 1580,
+      "junctions": 1581,
       "junctions_signalized": 365,
       "junctions_by_type": {
-        "street_street T": 623,
-        "street_street X": 245,
+        "street_street T": 625,
+        "street_street X": 244,
         "avenue_avenue T": 196,
         "street T": 130,
         "alley_alley T": 126,
@@ -403,25 +403,25 @@
         "street_alley X": 1
       },
       "crosswalks": 1271,
-      "sidewalks": 3705,
-      "sidewalk_km": 148.98,
-      "lanes": 5536,
+      "sidewalks": 3707,
+      "sidewalk_km": 149.02,
+      "lanes": 5538,
       "lane_connectors": 11232,
       "one_way_segments": 114,
       "walkways": 12916,
       "walkway_km": {
         "alley": 28.45,
-        "crossing": 69.35,
+        "crossing": 69.38,
         "crosswalk": 44.44,
         "footbridge": 0.37,
-        "path": 46.61,
+        "path": 46.49,
         "pedestrian_street": 2.84,
         "promenade": 13.57,
-        "sidewalk": 190.42
+        "sidewalk": 190.47
       },
       "footbridges": 11,
       "blocks": 984,
-      "lots": 5453,
+      "lots": 5454,
       "merged_lot_groups": 4,
       "lot_area_m2_by_archetype": {
         "corporate_core": {
@@ -430,7 +430,7 @@
           "p10": 1503.3,
           "median": 2678.9,
           "p90": 4968.5,
-          "max": 7484.8,
+          "max": 7485.0,
           "median_frontage_m": 61.6
         },
         "industrial_port": {
@@ -439,14 +439,14 @@
           "p10": 2830.6,
           "median": 7054.3,
           "p90": 15868.4,
-          "max": 50175.0,
+          "max": 50175.1,
           "median_frontage_m": 130.6
         },
         "midtown_mixed": {
-          "count": 842,
+          "count": 843,
           "min": 289.5,
           "p10": 506.6,
-          "median": 891.8,
+          "median": 890.1,
           "p90": 1663.1,
           "max": 2680.7,
           "median_frontage_m": 29.5
@@ -456,7 +456,7 @@
           "min": 36.1,
           "p10": 77.3,
           "median": 161.0,
-          "p90": 313.6,
+          "p90": 313.2,
           "max": 628.8,
           "median_frontage_m": 13.7
         },
@@ -474,7 +474,7 @@
           "min": 408.0,
           "p10": 720.5,
           "median": 1419.7,
-          "p90": 3080.7,
+          "p90": 3080.6,
           "max": 3938.3,
           "median_frontage_m": 49.0
         }
@@ -531,11 +531,11 @@
       },
       "open_spaces_by_kind": {
         "courtyard": 8,
-        "green": 58,
+        "green": 59,
         "market": 1,
         "park": 86,
         "plaza": 36,
-        "pocket_park": 82,
+        "pocket_park": 81,
         "promenade": 3
       },
       "open_share_by_district": {
@@ -550,7 +550,7 @@
       "places": 4,
       "generator": {
         "one_way_loops": 24,
-        "open_paths": 532,
+        "open_paths": 528,
         "walkway_links": 0,
         "angles": {
           "d01": 87.5,

@@ -432,20 +432,20 @@
       "lanes": 6174,
       "lane_connectors": 12185,
       "one_way_segments": 88,
-      "walkways": 14344,
+      "walkways": 14329,
       "walkway_km": {
         "alley": 36.75,
         "crossing": 83.71,
         "crosswalk": 41.81,
         "footbridge": 0.29,
-        "path": 70.59,
+        "path": 70.16,
         "pedestrian_street": 2.61,
         "promenade": 7.33,
         "sidewalk": 206.98
       },
       "footbridges": 7,
       "blocks": 1030,
-      "lots": 5881,
+      "lots": 5877,
       "merged_lot_groups": 5,
       "lot_area_m2_by_archetype": {
         "corporate_core": {
@@ -460,7 +460,7 @@
         "entertainment_market": {
           "count": 1881,
           "min": 56.2,
-          "p10": 108.2,
+          "p10": 108.4,
           "median": 227.9,
           "p90": 435.6,
           "max": 1177.9,
@@ -468,7 +468,7 @@
         },
         "industrial_port": {
           "count": 93,
-          "min": 2231.4,
+          "min": 2231.5,
           "p10": 3002.6,
           "median": 6214.9,
           "p90": 12449.2,
@@ -477,18 +477,18 @@
         },
         "megablock_residential": {
           "count": 127,
-          "min": 2011.2,
+          "min": 2012.2,
           "p10": 2964.8,
           "median": 4996.0,
-          "p90": 9740.7,
+          "p90": 9741.4,
           "max": 17644.0,
           "median_frontage_m": 91.2
         },
         "old_town": {
-          "count": 2869,
+          "count": 2864,
           "min": 36.9,
-          "p10": 76.9,
-          "median": 162.0,
+          "p10": 76.8,
+          "median": 162.9,
           "p90": 315.8,
           "max": 592.3,
           "median_frontage_m": 13.9
@@ -503,11 +503,11 @@
           "median_frontage_m": 87.8
         },
         "residential_heights": {
-          "count": 626,
+          "count": 627,
           "min": 284.1,
-          "p10": 455.6,
-          "median": 803.9,
-          "p90": 1402.0,
+          "p10": 456.0,
+          "median": 803.1,
+          "p90": 1396.0,
           "max": 3663.7,
           "median_frontage_m": 28.8
         },
@@ -549,7 +549,7 @@
         "Old Town": {
           "count": 480,
           "min": 8.1,
-          "p10": 17.2,
+          "p10": 17.3,
           "median": 30.5,
           "p90": 46.3,
           "max": 96.2
@@ -591,26 +591,26 @@
         "courtyard": 11,
         "green": 45,
         "market": 1,
-        "park": 193,
+        "park": 192,
         "plaza": 151,
-        "pocket_park": 180,
+        "pocket_park": 175,
         "promenade": 1
       },
       "open_share_by_district": {
         "Corporate Core": 0.1171,
         "The Stacks": 0.0949,
-        "Highcrest": 0.177,
-        "Old Town": 0.0624,
+        "Highcrest": 0.176,
+        "Old Town": 0.0622,
         "Neon Strand": 0.0623,
         "Vess Docks": 0.0324,
         "Launch Key": 0.1541,
         "Scholar Isle": 0.2749
       },
-      "open_share": 0.1142,
+      "open_share": 0.114,
       "places": 3,
       "generator": {
         "one_way_loops": 18,
-        "open_paths": 1271,
+        "open_paths": 1256,
         "walkway_links": 0,
         "angles": {
           "d01": 45.0,

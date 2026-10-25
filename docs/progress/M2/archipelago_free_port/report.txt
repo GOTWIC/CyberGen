@@ -49,21 +49,21 @@ stats:
   bridges 9 (sea 5, river 0, canal 4; 1.65 km of span), pedestrian 6; named: Crown Causeway, Kettle Span, Lumen Footbridge, Reef Bridge
   landmasses with districts connected by road 5 of 5; highway planned elevated 53%; megasite reserves 3; road variant 0
   local roads street 50.39 km, alley 9.75 km, service 6.16 km, pedestrian 16.88 km, footbridge 0.1 km; 71 one-way segments, 5 footbridges
-  junctions 1006 (213 signalized), crosswalks 726, sidewalks 88.42 km, lanes 3171 + 6263 connectors, walkways 8373 (alley 15.9 km, crossing 41.19 km, crosswalk 25.06 km, footbridge 0.1 km, path 43.79 km, pedestrian_street 4.54 km, promenade 12.34 km, sidewalk 113.72 km)
+  junctions 1006 (213 signalized), crosswalks 726, sidewalks 88.42 km, lanes 3171 + 6263 connectors, walkways 8367 (alley 15.9 km, crossing 41.19 km, crosswalk 25.06 km, footbridge 0.1 km, path 43.63 km, pedestrian_street 4.54 km, promenade 12.34 km, sidewalk 113.72 km)
   junctions by type: street_street T 408, avenue_avenue T 128, street_street X 108, street T 98, pedestrian T 70, alley_alley T 52, avenue_avenue X 45, alley T 19, pedestrian X 15, street_alley T 10, alley_alley X 9, avenue_avenue multi 9
-  blocks 599, lots 3279 (2 merged groups), open space 13.6% of net land (beach 1, courtyard 2, green 19, park 12, plaza 26, pocket_park 201), named places 2
+  blocks 598, lots 3282 (2 merged groups), open space 13.6% of net land (beach 1, courtyard 2, green 19, park 12, plaza 26, pocket_park 198), named places 2
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
   corporate_core                 295      968   1444     2485    4309     6976    57.6
   industrial_port                 49     2117   3407     6274   16509    24346   170.5
-  old_town                      2330       36     81      164     310      541    14.4
+  old_town                      2333       36     80      164     310      541    14.5
   research_campus                 34     1635   2543     5131    8055    10847   125.2
   residential_heights            571      282    425      761    1372     2131    26.2
 
   blocks and open space by district  blocks  median block m  open share
   Crown Island                          79             96      11.5%
   Kettle Island                         13            147       7.8%
-  Westreef                             445             30       6.3%
+  Westreef                             444             30       6.2%
   Lumen Key                             15            100      28.8%
   Palm Key                              47             82      20.4%
 

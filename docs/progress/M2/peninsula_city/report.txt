@@ -49,7 +49,7 @@ stats:
   bridges 5 (sea 0, river 3, canal 2; 0.24 km of span), pedestrian 6; named: Wallgate Bridge
   landmasses with districts connected by road 3 of 3; highway planned elevated 58%; megasite reserves 3; road variant 0
   local roads street 50.54 km, alley 7.52 km, service 11.96 km, pedestrian 9.45 km, footbridge 0.21 km; 49 one-way segments, 6 footbridges
-  junctions 720 (143 signalized), crosswalks 453, sidewalks 93.41 km, lanes 2443 + 4598 connectors, walkways 5859 (alley 19.48 km, crossing 37.79 km, crosswalk 17.23 km, footbridge 0.21 km, path 35.86 km, pedestrian_street 0.28 km, promenade 9.18 km, sidewalk 116.36 km)
+  junctions 720 (143 signalized), crosswalks 453, sidewalks 93.37 km, lanes 2443 + 4598 connectors, walkways 5859 (alley 19.48 km, crossing 37.79 km, crosswalk 17.23 km, footbridge 0.21 km, path 35.86 km, pedestrian_street 0.28 km, promenade 9.18 km, sidewalk 116.36 km)
   junctions by type: street_street T 344, avenue_avenue T 119, street T 81, street_street X 62, alley_alley T 36, pedestrian T 19, alley T 10, avenue_avenue X 10, alley_alley X 8, street_alley T 8, street_service T 7, highway_highway T 3
   blocks 410, lots 2459 (5 merged groups), open space 12.4% of net land (courtyard 1, green 13, park 196, plaza 133, pocket_park 1), named places 1
 
@@ -59,7 +59,7 @@ stats:
   megablock_residential          122     2049   2919     5032   10613    13289    96.7
   residential_heights            719      303    467      820    1396     2133    28.3
   spaceport                       36     2931   3982     9626   24270    27076    92.4
-  transit_hub                    139      484    747     1637    3019     4541    45.2
+  transit_hub                    139      484    747     1637    3019     4542    45.2
 
   blocks and open space by district  blocks  median block m  open share
   Wallgate Heights                      81             90      17.6%

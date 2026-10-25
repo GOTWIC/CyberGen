@@ -383,26 +383,26 @@
       "lanes": 3171,
       "lane_connectors": 6263,
       "one_way_segments": 71,
-      "walkways": 8373,
+      "walkways": 8367,
       "walkway_km": {
         "alley": 15.9,
         "crossing": 41.19,
         "crosswalk": 25.06,
         "footbridge": 0.1,
-        "path": 43.79,
+        "path": 43.63,
         "pedestrian_street": 4.54,
         "promenade": 12.34,
         "sidewalk": 113.72
       },
       "footbridges": 5,
-      "blocks": 599,
-      "lots": 3279,
+      "blocks": 598,
+      "lots": 3282,
       "merged_lot_groups": 2,
       "lot_area_m2_by_archetype": {
         "corporate_core": {
           "count": 295,
           "min": 968.2,
-          "p10": 1443.5,
+          "p10": 1443.6,
           "median": 2485.2,
           "p90": 4308.7,
           "max": 6976.5,
@@ -418,13 +418,13 @@
           "median_frontage_m": 170.5
         },
         "old_town": {
-          "count": 2330,
+          "count": 2333,
           "min": 36.3,
-          "p10": 81.2,
-          "median": 164.4,
+          "p10": 80.3,
+          "median": 164.3,
           "p90": 310.2,
           "max": 540.6,
-          "median_frontage_m": 14.4
+          "median_frontage_m": 14.5
         },
         "research_campus": {
           "count": 34,
@@ -463,10 +463,10 @@
           "max": 331.1
         },
         "Westreef": {
-          "count": 445,
+          "count": 444,
           "min": 9.5,
-          "p10": 15.9,
-          "median": 29.6,
+          "p10": 16.0,
+          "median": 29.7,
           "p90": 43.7,
           "max": 64.3
         },
@@ -493,12 +493,12 @@
         "green": 19,
         "park": 12,
         "plaza": 26,
-        "pocket_park": 201
+        "pocket_park": 198
       },
       "open_share_by_district": {
         "Crown Island": 0.1145,
         "Kettle Island": 0.0778,
-        "Westreef": 0.0628,
+        "Westreef": 0.0624,
         "Lumen Key": 0.2884,
         "Palm Key": 0.204
       },
@@ -506,7 +506,7 @@
       "places": 2,
       "generator": {
         "one_way_loops": 15,
-        "open_paths": 778,
+        "open_paths": 772,
         "walkway_links": 0,
         "angles": {
           "d01": 45.0,

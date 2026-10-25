@@ -51,24 +51,24 @@ stats:
   bridges 8 (sea 1, river 3, canal 4; 0.58 km of span), pedestrian 7; named: Launch Causeway
   landmasses with districts connected by road 5 of 5; highway planned elevated 22%; megasite reserves 3; road variant 0
   local roads street 94.62 km, alley 24.45 km, service 12.3 km, pedestrian 9.94 km, footbridge 0.29 km; 88 one-way segments, 7 footbridges
-  junctions 1688 (345 signalized), crosswalks 1155, sidewalks 159.68 km, lanes 6174 + 12185 connectors, walkways 14344 (alley 36.75 km, crossing 83.71 km, crosswalk 41.81 km, footbridge 0.29 km, path 70.59 km, pedestrian_street 2.61 km, promenade 7.33 km, sidewalk 206.98 km)
+  junctions 1688 (345 signalized), crosswalks 1155, sidewalks 159.68 km, lanes 6174 + 12185 connectors, walkways 14329 (alley 36.75 km, crossing 83.71 km, crosswalk 41.81 km, footbridge 0.29 km, path 70.16 km, pedestrian_street 2.61 km, promenade 7.33 km, sidewalk 206.98 km)
   junctions by type: street_street T 808, avenue_avenue T 234, street_street X 177, alley_alley T 141, avenue_avenue X 76, street T 74, pedestrian T 42, street_alley T 25, alley_alley X 21, street_service T 12, alley T 11, avenue_avenue multi 11
-  blocks 1030, lots 5881 (5 merged groups), open space 11.4% of net land (courtyard 11, green 45, market 1, park 193, plaza 151, pocket_park 180, promenade 1), named places 3
+  blocks 1030, lots 5877 (5 merged groups), open space 11.4% of net land (courtyard 11, green 45, market 1, park 192, plaza 151, pocket_park 175, promenade 1), named places 3
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
   corporate_core                 209      992   1466     2636    4701     8173    61.3
   entertainment_market          1881       56    108      228     436     1178    15.7
-  industrial_port                 93     2231   3003     6215   12449    18536   111.7
-  megablock_residential          127     2011   2965     4996    9741    17644    91.2
-  old_town                      2869       37     77      162     316      592    13.9
+  industrial_port                 93     2232   3003     6215   12449    18536   111.7
+  megablock_residential          127     2012   2965     4996    9741    17644    91.2
+  old_town                      2864       37     77      163     316      592    13.9
   research_campus                 65     1444   2229     3874    8555    12875    87.8
-  residential_heights            626      284    456      804    1402     3664    28.8
+  residential_heights            627      284    456      803    1396     3664    28.8
   spaceport                       11     7050   7798    14352   35765    63928   105.8
 
   blocks and open space by district  blocks  median block m  open share
   Corporate Core                        62             96      11.7%
   The Stacks                            58            114       9.5%
-  Highcrest                             93             83      17.7%
+  Highcrest                             93             83      17.6%
   Old Town                             480             30       6.2%
   Neon Strand                          286             37       6.2%
   Vess Docks                            34            130       3.2%

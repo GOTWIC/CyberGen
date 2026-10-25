@@ -47,19 +47,19 @@ stats:
   district perimeter facing water 100%; boundary curvature (arc / chord over 400 m) 1.084, land boundaries None
   open land 0.553 km2; marsh 'West Channel Marsh' 0.396 km2; marsh 'West Channel Marsh 2' 0.157 km2
   inner waterways 8 (4.32 km: basin 0.69, canal 3.62), quays 8.48 km
-  roads alley 21.08 km, avenue 27.07 km, footbridge 0.37 km, highway 8.88 km, pedestrian 16.41 km, service 7.36 km, street 86.78 km; 2755 segments, 1930 nodes, 1 component(s); exits east_exit, north_exit, west_exit
+  roads alley 21.08 km, avenue 27.07 km, footbridge 0.37 km, highway 8.88 km, pedestrian 16.41 km, service 7.36 km, street 86.78 km; 2756 segments, 1931 nodes, 1 component(s); exits east_exit, north_exit, west_exit
   bridges 18 (sea 0, river 7, canal 11; 0.83 km of span), pedestrian 11; named: none
   landmasses with districts connected by road 6 of 6; highway planned elevated 21%; megasite reserves 3; road variant 3
   local roads street 86.78 km, alley 21.08 km, service 7.36 km, pedestrian 16.41 km, footbridge 0.37 km; 114 one-way segments, 11 footbridges
-  junctions 1580 (365 signalized), crosswalks 1271, sidewalks 148.98 km, lanes 5536 + 11232 connectors, walkways 12916 (alley 28.45 km, crossing 69.35 km, crosswalk 44.44 km, footbridge 0.37 km, path 46.61 km, pedestrian_street 2.84 km, promenade 13.57 km, sidewalk 190.42 km)
-  junctions by type: street_street T 623, street_street X 245, avenue_avenue T 196, street T 130, alley_alley T 126, avenue_avenue X 61, pedestrian T 59, alley_alley X 31, street_alley T 22, alley T 19, street_service T 19, highway_highway X 10
-  blocks 984, lots 5453 (4 merged groups), open space 11.0% of net land (courtyard 8, green 58, market 1, park 86, plaza 36, pocket_park 82, promenade 3), named places 4
+  junctions 1581 (365 signalized), crosswalks 1271, sidewalks 149.02 km, lanes 5538 + 11232 connectors, walkways 12916 (alley 28.45 km, crossing 69.38 km, crosswalk 44.44 km, footbridge 0.37 km, path 46.49 km, pedestrian_street 2.84 km, promenade 13.57 km, sidewalk 190.47 km)
+  junctions by type: street_street T 625, street_street X 244, avenue_avenue T 196, street T 130, alley_alley T 126, avenue_avenue X 61, pedestrian T 59, alley_alley X 31, street_alley T 22, alley T 19, street_service T 19, highway_highway X 10
+  blocks 984, lots 5454 (4 merged groups), open space 11.0% of net land (courtyard 8, green 59, market 1, park 86, plaza 36, pocket_park 81, promenade 3), named places 4
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
   corporate_core                 261      963   1503     2679    4968     7485    61.6
   industrial_port                110     2255   2831     7054   15868    50175   130.6
-  midtown_mixed                  842      290    507      892    1663     2681    29.5
-  old_town                      4049       36     77      161     314      629    13.7
+  midtown_mixed                  843      290    507      890    1663     2681    29.5
+  old_town                      4049       36     77      161     313      629    13.7
   research_campus                 57     1434   2295     4275    7932    13944    78.1
   transit_hub                    134      408    720     1420    3081     3938    49.0
 

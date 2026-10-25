@@ -352,13 +352,59 @@ def union(geoms):
     if not geoms:
         return Polygon()
     if CANONICAL[0]:
-        return _fixed(shapely.union_all(geoms, grid_size=GRID_M))
+        return _fixed(_union_fixed(geoms))
     return clean(polygonal(shapely.union_all(geoms)))
+
+
+def _zorder(ix: int, iy: int) -> int:
+    """Morton (Z-order) code of two non-negative integers."""
+    z = 0
+    for b in range(max(ix.bit_length(), iy.bit_length())):
+        z |= ((ix >> b) & 1) << (2 * b) | ((iy >> b) & 1) << (2 * b + 1)
+    return z
+
+
+def _union_fixed(geoms):
+    """Snap-rounded union of many geometries in an order fixed here.
+
+    Snap rounding is not associative, so the result depends on the order in which the
+    pieces are merged. `union_all` merges them in the order of its STRtree, which packs
+    the pieces after a `std::sort` of their envelopes: equal keys come out in an order
+    that differs between C++ standard libraries (libc++ on macOS, libstdc++ on Linux).
+    Here the pieces are sorted by the Z-order of their bounding box centers in grid units
+    (exact integers; input order breaks ties) and merged pairwise, level by level, with
+    binary snap-rounded unions, whose result does not depend on any such order. Only the
+    polygonal parts count (the caller keeps only those)."""
+    polys = [polygonal(g) for g in geoms]
+    polys = [g for g in polys if not g.is_empty]
+    if not polys:
+        return Polygon()
+    geoms = polys
+    if len(geoms) == 1:
+        return shapely.union(geoms[0], geoms[0], grid_size=GRID_M)
+    b = np.rint(shapely.bounds(np.array(geoms, dtype=object)) * _SCALE).astype(np.int64)
+    cx = (b[:, 0] + b[:, 2]).tolist()
+    cy = (b[:, 1] + b[:, 3]).tolist()
+    x0, y0 = min(cx), min(cy)
+    order = sorted(range(len(geoms)), key=lambda i: (_zorder(cx[i] - x0, cy[i] - y0), i))
+    arr = np.empty(len(geoms), dtype=object)
+    arr[:] = [geoms[i] for i in order]
+    while len(arr) > 1:
+        n = len(arr) // 2 * 2
+        u = shapely.union(arr[0:n:2], arr[1:n:2], grid_size=GRID_M)
+        for i in np.nonzero(shapely.get_type_id(u) > 6)[0].tolist():
+            u[i] = polygonal(u[i])  # a collection with collapsed linework
+        arr = np.concatenate([u, arr[n:]])
+    return arr[0]
 
 
 def line_union(lines):
     lines = [g for g in lines if g is not None and not g.is_empty]
-    return floating(shapely.union_all(lines, grid_size=GRID_M)) if lines else LineString()
+    if not lines:
+        return LineString()
+    out = floating(shapely.union_all(lines, grid_size=GRID_M))
+    # M2: parts in canonical order (GEOS's own order can follow its std::sort ties)
+    return shapely.normalize(out) if CANONICAL[0] else out
 
 
 def along(line, ds) -> np.ndarray:

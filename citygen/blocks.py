@@ -126,6 +126,9 @@ def _fast_lines(g) -> list[list[tuple[float, float]]]:
     if g.geom_type in ("MultiLineString", "GeometryCollection"):
         g = shapely.line_merge(shapely.union_all([x for x in shapely.get_parts(g)
                                                   if x.geom_type == "LineString"]))
+    # parts and their directions in canonical order: callers take the first of equally long
+    # edges, and the order GEOS returns pieces in can follow its std::sort ties
+    g = shapely.normalize(g)
     out = []
     for part in shapely.get_parts(g):
         if part.geom_type not in ("LineString", "LinearRing"):
@@ -206,12 +209,12 @@ class Splitter:
 
     def split(self, poly, depth: int = 0) -> list:
         A = G.area1(poly)
-        target = float(self.rng.uniform(1.3 * self.amin, 0.85 * self.amax))
+        target = float(ST.uniform(self.rng, 1.3 * self.amin, 0.85 * self.amax))
         if A <= max(target, 1.6 * self.amin) or depth > 14:
             return [poly]
         c, u, v, L, W = ST._obb(poly)
         # a lot as wide as the archetype frontage: cut across the frontage first
-        jit = float(self.rng.uniform(-0.1, 0.1))
+        jit = float(ST.uniform(self.rng, -0.1, 0.1))
         big = A > 1.5 * self.amax
         offsets = (0.0, 0.16, -0.16, 0.3, -0.3) if big else (0.0, 0.16, -0.16)
         axes = [(u, L, c), (v, W, c)]
@@ -365,7 +368,7 @@ def _anchor(poly, position: str | None, wet) -> tuple[float, float]:
         return G.nearest(poly, G.nearest(wet, Point(c))) if not wet.is_empty else c
     ux, uy = DIRECTION_VECTORS[position]
     x0, y0, x1, y1 = poly.bounds
-    R = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+    R = ST._dist((x0, y0), (x1, y1))
     far = Point(c[0] + ux * R, c[1] + uy * R)
     return G.nearest(poly, far)
 
@@ -851,7 +854,7 @@ def _pick_group(lots, used, n: int, c, kind: str):
         return best[1] if best else None
     # adjacent lots in one block, nearest the center, biggest blocks preferred
     seeds = sorted(free, key=lambda r: (ST._dist(G.centroid(r["polygon"]), c) /
-                                        max(G.area1(r["polygon"]), 1.0) ** 0.25,
+                                        math.sqrt(math.sqrt(max(G.area1(r["polygon"]), 1.0))),
                                         r["block"], r["k"]))
     for s in seeds[:12]:
         group = [s]
