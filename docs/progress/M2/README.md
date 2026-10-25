@@ -205,7 +205,19 @@ hashes; Python 3.13.17, 4 workers), x86_64 with the libc++ GEOS, and emulated aa
 (qemu-user, conda-forge Python 3.13.17 for aarch64, the PyPI aarch64 wheels of numpy 2.5.4
 and shapely 2.2.0 with GEOS 3.14.1, worker processes emulated too, 4 workers).
 
-ARM_TABLE
+Every model and every stage trace is identical across the three (`citygen trace diff`: no
+difference in any entry). Emulated build times were 7 to 18 minutes per city.
+
+| City | Trace entries | x86_64 (libstdc++ GEOS) | x86_64, libc++ GEOS | emulated aarch64 |
+|---|---|---|---|---|
+| Nyxllor | 5897 | `f6a35536c06a9d17dfa754aedcca4477428169e881202f30e5c3dadde0a9006d` | same | same |
+| Saltreach Free Port | 53 | `6b2701d4107a1b05f08676e6b9bcb00c369b1b60e4f0bfa25676dee7eaa90b23` | same | same |
+| Delta Megacity | 2766 | `4bfce90b33071689b89ed332b360b15889ebcc5de73c757af3a0ae6ca3edafe8` | same | same |
+| Nexus City | 8544 | `d2fe5ce9c22aa448e23e5a0e2bd0f9eb04553612a3df0fd8e1ef0107f16698b2` | same | same |
+| Greyhook | 244 | `ef0fa87de02cfc3c76dd18cc709ff43c3527b8e3e368ffeaf7bfb1ad42600072` | same | same |
+
+Before the fix (`48eaba0`), the libc++ GEOS gave `d86b5839...` for Delta Megacity, `48597f0a...`
+for Nyxllor and `d9774745...` for Nexus City instead of the x86 models.
 
 Not covered here: Apple's libm. No M2 decision calls libm directly (angles come from `dmath`,
 squares are products), and GEOS uses it only for round buffer joins, whose vertices are
