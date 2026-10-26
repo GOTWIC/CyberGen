@@ -179,7 +179,23 @@ blockout renders (`render_iso_city.jpg` at 8K).
 - **Visual review:** previews were looked at for the failing builds and the known defects (the
   hook at the map edge, now pinned by a test); passing builds were not reviewed one by one, so
   visual defects that no check measures may remain.
-- **One unexplained test failure:** one full `pytest` run failed `test_committed_reports_match`
-  on archipelago_free_port (report `checks` and `stats` differed from the committed report while
-  the model hash matched). It did not come back in three later runs (the test alone, after a
-  SMALL build in the same process, and the full suite: 359 passed, 1 skipped).
+
+## One failed test run, explained
+
+One full `pytest` run failed `test_committed_reports_match` on archipelago_free_port: the report's
+`checks`, `stats` and `notes` differed from the committed report while the model hash matched.
+It was not nondeterminism. During that run `tests/test_build.py` was edited to read
+`docs/progress/M8a` instead of `docs/progress/M7b`. pytest had imported the old module, so it
+compared the fresh M8a build with the M7b report. Its traceback prints source from disk, which
+showed the new path. A scratch test that reads the M7b report gives the same message and
+truncation ("Omitting 5 identical items": name, seed, stage, passed and variant are the same in
+both reports).
+
+Repeat builds found no difference from the committed reports:
+- archipelago_free_port 36 times: 12 processes, three builds each, `CITYGEN_WORKERS` 1, 2 and 3,
+  `PYTHONHASHSEED` 0, 1, 5 to 10, 99, 777, 4242 and 31337, with nothing, a SMALL build, or a SMALL
+  build plus its blockout plan and 2D map first in the same process;
+- SMALL, then all five samples and the pinned demo in one process (the suite's order), twice
+  (`CITYGEN_WORKERS` 2 and 3, hash seeds 2024 and 55);
+- the sweep's own-seed builds (one worker per process), the native and the x86 builds, and the test
+  itself in two later `pytest` runs (alone and in the full suite, `CITYGEN_WORKERS` 4).
