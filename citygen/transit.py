@@ -75,6 +75,7 @@ ROAD_CLEAR_M = 5.5          # under any deck over a road (scope 5.2)
 ROAD_DECK_M = 2.0           # depth under a road deck (viaducts 1.8 m, bridges 1.5 m)
 UNDER_PAD_M = 1.0           # a track passing under a road deck stays this far below it
 PORTAL_HEADROOM_M = 8.0     # a portal tower rises at least this far above the tube's top
+PORTAL_TIGHT_M = 3.0        # ... or this far, where the line could not climb over it
 STATION_LEN_M = {"metro": 120.0, "elevated_rail": 110.0, "monorail": 60.0, "maglev": 160.0,
                  "sky_tube": 50.0}
 PLATFORM_M = {"metro": 4.0, "elevated_rail": 4.0, "monorail": 3.0, "maglev": 5.0,
@@ -1171,6 +1172,7 @@ class Line:
     tall_scale: float = 1.0                      # raster: cost of the towers it would clear
     on_roads: bool = True                        # road modes: legs on the road graph
     corners: dict = field(default_factory=dict)  # stop index -> guide corner (fast lines)
+    keep_free: bool = False                      # legs may run back along the line
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -1458,6 +1460,8 @@ def route_line(c: Ctx, ln: Line) -> None:
     # (a loop on the roads is routed off them next instead of trying other junctions)
     if (flaws() != (0, 0) or tight()) and mode in ROAD_MODES and not ln.loop:
         _restop(c, ln, flaws, notes, conflicts)
+    if ln.min_radius < r_min and mode in ROAD_MODES and not ln.loop:
+        _spurs(c, ln, flaws, notes, conflicts)
     if ln.loop and mode in ROAD_MODES:
         _off_roads(c, ln, flaws, moved, notes, conflicts)
 
@@ -1527,6 +1531,21 @@ def _straighter(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
     if flaws() > first[5] or ln.min_radius <= first[1]:
         ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
         ln.tall_scale = 1.0
+
+
+def _spurs(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
+    """M8b: an open road line whose curves are still too tight (a leg that keeps off the
+    line's earlier legs loops round the blocks past a stop it cannot turn at, a hub's
+    platform say) routed again with its legs free to run back along the line, as before
+    M8b (the curves then cut the spur); kept when that serves as many stops, meets itself
+    no more and has wider curves."""
+    first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, flaws())
+    ln.keep_free = True
+    ln.notes, ln.conflicts = list(notes), list(conflicts)
+    _route(c, ln)
+    if flaws() > first[5] or ln.min_radius <= first[1]:
+        ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
+        ln.keep_free = False
 
 
 def _restop(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
@@ -1624,7 +1643,8 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
         here = raw[-1] if raw else a.p
         # M8b: a leg keeps off the line's earlier legs (it would cross or run along them),
         # but near where it starts and, closing a loop, near where the loop started
-        keep_off = _keep_off(raw, here, raw[0] if closing and raw else None)
+        keep_off = None if ln.keep_free else \
+            _keep_off(raw, here, raw[0] if closing and raw else None)
         if graph is not None:
             na = cur if cur is not None else graph.node_near(a, c)
             goal = ({first} if closing and first is not None else graph.targets(b, c))
@@ -2353,6 +2373,12 @@ def _fit_portals(c: Ctx, ln: Line) -> bool:
             ln.portals[bid] = (q(z0 - r - 1.0), q(z1 + r + 1.0))
         elif b.top <= z0 - SKY_CLEAR_M + 0.01:
             del ln.portals[bid]  # the track clears it after all
+        elif b.top + SKY_CLEAR_M > ln.alt[1] and b.top >= z1 + r + PORTAL_TIGHT_M - 0.01 \
+                and b.bottom <= z0 - r - 1.0:
+            # M8b: a tower the line could not climb within its altitude range keeps its
+            # portal with less headroom (climbing over it would lift the line out of its
+            # range and its neighbors out of their portals, one after another)
+            ln.portals[bid] = (q(z0 - r - 1.0), q(z1 + r + 1.0))
         else:
             misfit.append((b.top, bid))
     if not misfit:
