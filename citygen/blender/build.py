@@ -7,7 +7,7 @@ Run by Blender 5.2, stdlib and bpy only (citygen itself is not importable inside
 
 Writes OUT_DIR/city.blend, OUT_DIR/city.usdc (the whole city), OUT_DIR/tiles/<tile>.glb (one
 per 256 m tile, custom properties as glTF extras), the renders OUT_DIR/render_top.jpg,
-render_iso_<district>.jpg and render_street_<n>.jpg, and OUT_DIR/blender_report.json.
+render_iso_city.jpg, render_iso_<district>.jpg and render_street_<n>.jpg, and OUT_DIR/blender_report.json.
 `citygen blockout` runs it; the plan decides every coordinate, this file only builds meshes
 (caps with holes triangulated by `mathutils.geometry.tessellate_polygon`).
 """
@@ -424,6 +424,19 @@ def render(scene, path, w, h):
     return path
 
 
+def iso_frame(box, d, aspect):
+    """Center and ortho width that frame a box (x0, y0, z0, x1, y1, z1) seen along d."""
+    x0, y0, z0, x1, y1, z1 = box
+    side = d.cross(Vector((0, 0, 1))).normalized()
+    up = side.cross(d).normalized()
+    corners = [Vector((x, y, z)) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+    c = Vector(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 4))
+    us = [(p - c).dot(side) for p in corners]
+    vs = [(p - c).dot(up) for p in corners]
+    c = c + side * ((max(us) + min(us)) / 2) + up * ((max(vs) + min(vs)) / 2)
+    return c, max(max(us) - min(us), (max(vs) - min(vs)) * aspect) * 1.06
+
+
 def renders(scene, plan, out, res):
     cams = plan["cameras"]
     done = []
@@ -436,19 +449,20 @@ def renders(scene, plan, out, res):
     rw = int(res * 1.25)
     done.append(render(scene, os.path.join(out, "render_top.jpg"), rw, int(rw * h / w)))
     d = Vector(cams["iso_dir"]).normalized()
-    side = d.cross(Vector((0, 0, 1))).normalized()
-    up = side.cross(d).normalized()
     aspect = 1.6
+    boxes = [dist["box"] for dist in cams["districts"]]
+    if boxes:
+        # the whole city, isometric
+        box = [min(b[i] for b in boxes) for i in range(3)] + \
+            [max(b[i] for b in boxes) for i in range(3, 6)]
+        c, width = iso_frame(box, d, aspect)
+        cam = camera(scene, "cam_iso_city", True)
+        cam.data.ortho_scale = width
+        look(cam, c - d * 8000.0, c)
+        done.append(render(scene, os.path.join(out, "render_iso_city.jpg"), rw,
+                           int(rw / aspect)))
     for dist in cams["districts"]:
-        x0, y0, z0, x1, y1, z1 = dist["box"]
-        corners = [Vector((x, y, z)) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
-        c = Vector(((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 4))
-        us = [(p - c).dot(side) for p in corners]
-        vs = [(p - c).dot(up) for p in corners]
-        cu = (max(us) + min(us)) / 2
-        cv = (max(vs) + min(vs)) / 2
-        c = c + side * cu + up * cv
-        width = max(max(us) - min(us), (max(vs) - min(vs)) * aspect) * 1.06
+        c, width = iso_frame(dist["box"], d, aspect)
         cam = camera(scene, f"cam_iso_{dist['id']}", True)
         cam.data.ortho_scale = width
         look(cam, c - d * 4000.0, c)

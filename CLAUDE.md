@@ -175,7 +175,7 @@ M4 (Blender blockout) is in place: `.venv/bin/python -m citygen blockout <city_m
 streets joined per district, category and tile, one object per building, skybridge, deck and
 megasite element group), then runs Blender (`citygen/blender/build.py`, stdlib and bpy only,
 it only triangulates and draws): `city.blend`, `city.usdc`, `tiles/<tile>.glb`, EEVEE renders
-(`render_top.jpg`, `render_iso_<district>.jpg`, `render_street_<n>.jpg`), then reopens the
+(`render_top.jpg`, `render_iso_city.jpg`, `render_iso_<district>.jpg`, `render_street_<n>.jpg`), then reopens the
 .blend in a fresh Blender and checks its objects, tiles and renders (`blockout_report.txt`).
 `citygen/exports.py` writes the layered `map_2d.svg` (readable by `pipeline/svg_to_plan.py`)
 and `map_2d.png`, `unreal/corporate_core_plan.json` for the greybox script, `graphs.json`,

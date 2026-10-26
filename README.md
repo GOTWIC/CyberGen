@@ -33,15 +33,15 @@ different coast forms, not one map. M7b adds loop interchanges (partial cloverle
 trumpet) and imports the hand-traced Corporate Core as fixed geometry, with the city built
 around it.
 
-Whole cities in the Blender blockout:
+Whole cities in the Blender blockout, seen isometrically from the south:
 
 | Nexus City (from the concept image) | Nyxllor (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M7b/nexus_city/render_top.jpg" width="420"> | <img src="docs/progress/M7b/nyxllor/render_top.jpg" width="420"> |
+| <img src="docs/progress/M7b/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M7b/nyxllor/render_iso_city.jpg" width="420"> |
 
 | Nyxllor with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
-| <img src="docs/progress/M7b/nyxllor_pinned/render_top.jpg" width="420"> | <img src="docs/progress/M7b/delta_megacity/render_top.jpg" width="420"> |
+| <img src="docs/progress/M7b/nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M7b/delta_megacity/render_iso_city.jpg" width="420"> |
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 

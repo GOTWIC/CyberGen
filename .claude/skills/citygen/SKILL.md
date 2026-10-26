@@ -425,7 +425,7 @@ and takes about a minute for a 12 km2 city. It writes `city.blend` (collections 
 and category, one object per building, skybridge, bridge deck and megasite element group,
 ground surfaces joined per 256 m tile, custom properties `citygen_id`, `citygen_type`,
 `citygen_tile` and more), `city.usdc`, `tiles/<tile>.glb`, the renders `render_top.jpg`,
-`render_iso_<district>.jpg` (one per district) and `render_street_<n>.jpg` (eye level),
+`render_iso_city.jpg` (the whole city), `render_iso_<district>.jpg` (one per district) and `render_street_<n>.jpg` (eye level),
 `map_2d.svg` (Inkscape layers named like the hand-traced maps) and `map_2d.png`,
 `unreal/corporate_core_plan.json` (for `unreal/build_greybox_unreal.py`), `graphs.json`
 (lane and walkway graphs), `tiles.json`, `props.csv` and `blockout_report.txt`. Open the
@@ -448,7 +448,8 @@ Reply with:
   share, buildings, tallest building, skybridges, landmarks, megasites), and
   `preview_detail.png`, `preview_heights.png` and `preview_massing.png`;
 - the blockout result from `blockout_report.txt` (objects, tiles, file sizes, time), with
-  `render_top.jpg`, two or three `render_iso_*.jpg` and a street view.
+  `render_iso_city.jpg`, `render_top.jpg`, two or three `render_iso_<district>.jpg` and a
+  street view.
 
 ## Minimal example
 
