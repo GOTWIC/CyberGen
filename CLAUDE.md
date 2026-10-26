@@ -275,6 +275,27 @@ seeds. Fixes from it, in short:
 Transit loop routing is M8b's. Sweep tables before and after, fixes and open items:
 `docs/progress/M8a/README.md`.
 
+M8b (transit loops) is in place, in `citygen/transit.py`: a loop is one simple ring through
+its stops in route order. `_loop_points` moves a loop's district stops to junctions that come
+in route order around the stops' middle (a star-shaped ring is simple; a dynamic program over
+one junction per 10 degree sector, both ways round, near a circle and evenly spaced), and
+`_deepen` pushes a stop deeper where the 1.15 r_min curve at its corner would leave its
+district. Every leg keeps off the line's earlier legs (`_keep_off`, but within 60 m of its
+own start); a road leg may end at any junction within 150 m of a district stop
+(`RoadGraph.targets`), runs on the raster where the roads cannot keep it off (one bridge both
+ways) or where it winds round the blocks, and a loop's last leg arrives to go on as its
+first left. A road-mode loop is also routed off the roads (`_off_roads`) and kept so when
+that serves more stops, meets itself less, or the road ring is 1.35 times longer; a loop off
+the roads is also drawn along its guide ring (`_guide_loop`: the stop polygon with arcs,
+waypoints every 120 m). Stations follow route order (`ordered_stops`; a loop's track starts
+at its first stop), heights are graded round a loop's seam (`_graded`). Check
+`transit_self_crossing` (66 in all): parts of a line more than 100 m apart along it stay a
+structure width apart in plan or 5.5 m plus the structure apart in height, a loop closes,
+stations in route order; the transit preview marks where a line meets itself and numbers a
+loop's stops. A line's track does not depend on the other lines (its heights see the
+buildings they remove); a whole-city retry (`build_city`) after any failed check still moves
+every line. Sample builds: `docs/progress/M8b/`.
+
 ### Rules for cloud sessions building citygen milestones
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
