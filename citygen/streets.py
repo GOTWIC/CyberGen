@@ -985,7 +985,9 @@ def build_frame(B: Builder) -> None:
         cls = "service" if s.kind in ("spaceport", "freight_terminal") else "street"
         arch = B.arch[s.district]
         w = cross_section(cls, arch)["total_width_m"]
-        for piece in _clip(ring, G.qpoly(free_all.buffer(0.5, join_style="mitre"))):
+        # (the 0.5 m margin never reaches over the water: a ring grazing a bank is cut there)
+        for piece in _clip(ring, G.diff(G.qpoly(free_all.buffer(0.5, join_style="mitre")),
+                                        B.wet)):
             for run in B.parallel_runs(piece, w, 6.0, set(), 40.0):
                 added.append(B.add(Line(run, cls, w, "reserve_ring", s.district,
                                         section=cross_section(cls, arch))))
@@ -2741,6 +2743,14 @@ def build_output(B: Builder, edges) -> None:
             par = ln.primary
             s0 = _project(ln.pts, pts[0])[0]
             s1 = _project(ln.pts, pts[-1])[0]
+            Lp = _plen(ln.pts)
+            if tuple(ln.pts[0]) == tuple(ln.pts[-1]) and abs(s1 - s0) > L + 1.0:
+                # a loop road: the piece's end at the seam is at 0 or at the loop length,
+                # whichever keeps the piece its own length
+                if min(s0, Lp - s0) < 0.01:
+                    s0 = Lp - s0 if abs(s1 - (Lp - s0)) < abs(s1 - s0) else s0
+                elif min(s1, Lp - s1) < 0.01:
+                    s1 = Lp - s1 if abs(s0 - (Lp - s1)) < abs(s0 - s1) else s1
             lo, hi = min(s0, s1), max(s0, s1)
             b_ids = []
             for bid in par["bridge_ids"]:
@@ -2859,6 +2869,16 @@ def _local_grades(net: StreetNet) -> None:
             zz = max(0.0, za - LOCAL_GRADE * x, zb - LOCAL_GRADE * (L - x))
             prof.append({"s": G.q(x), "z": G.q(zz)})
         sg["z_profile"] = prof
+    # a footbridge (stairs up to its deck) starts where its node now stands
+    for sg in net.segments:
+        if sg["road_class"] != "footbridge":
+            continue
+        prof = [dict(p) for p in sg["z_profile"]]
+        for k, nid in ((0, sg["start"]), (-1, sg["end"])):
+            zz = G.q(z.get(nid, 0.0))
+            if zz > prof[k]["z"]:
+                prof[k]["z"] = zz
+        sg["z_profile"] = prof
     for n in net.nodes:
         if n["id"] in z and z[n["id"]] > 0.0:
             x, y, _ = n["position"]
@@ -2880,8 +2900,9 @@ def _foot_profile(L: float, s_in: float, wet_len: float, deck: float) -> list[di
     run = deck * 2.0
     a = max(s_in - 1.0, 0.0)
     b = min(s_in + wet_len + 1.0, L)
-    pts = [(0.0, 0.0), (max(a - run, 0.0), 0.0), (a, deck), (b, deck),
-           (min(b + run, L), 0.0), (L, 0.0)]
+    inner = [(max(a - run, 0.0), 0.0), (a, deck), (b, deck), (min(b + run, L), 0.0)]
+    # both ends stand on the ground (steeper stairs where the water reaches an end)
+    pts = [(0.0, 0.0)] + [(min(max(s, 0.01), L - 0.01), z) for s, z in inner] + [(L, 0.0)]
     out = []
     for s, z in pts:
         s, z = G.q(s), G.q(z)

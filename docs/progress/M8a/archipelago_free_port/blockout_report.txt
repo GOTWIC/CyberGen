@@ -1,0 +1,18 @@
+citygen blockout: Saltreach Free Port
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 6231 objects in the .blend, 6231 in the plan
+  [pass] blend_buildings: 3137 building objects, 3137 buildings with masses in the model
+  [pass] blend_instances: 43964 prop and plant instances evaluated in the .blend, 43964 in the plan
+  [pass] gltf_tiles: 196 tile files for 196 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 11 of 11 renders
+  [pass] blender_budget: Blender 43.6 s (budget 600 s)
+
+plan: 6231 objects, 24754 parts, 196 tiles, 3137 buildings (sha256 9839f103ea950501)
+blender 5.2.0 LTS: 439874 vertices, 180636 faces, 43964 instances, 71 materials, 93 collections
+files (MB): {"blend": 7.6, "usd": 18.9, "gltf_tiles": 26.0, "renders": 2.7}
+timings (s): {"build_s": 0.8, "save_s": 0.4, "usd_s": 4.7, "gltf_s": 24.9, "render_s": 12.7, "total_s": 43.6}
+total (s): {"plan_s": 1.9, "exports_s": 1.6, "total_s": 49.7}

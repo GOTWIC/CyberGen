@@ -1178,13 +1178,15 @@ class Elev:
                 # the stem runs on under the deck to the stub's end; the far ramps land on it
                 self.stubs[(trumpet["leg"], n)] = trumpet["end"]
                 continue
+            if sigma not in terminals:
+                continue      # loops only on this side (its diamond terminal failed)
             T, sT, leg = terminals[sigma]
             if sigma == stub_side:
                 self.stubs[(leg["id"], n)] = T
         for T, lid in sorted({(tuple(rp["T"]), rp["leg"]) for rp in built if not rp["stub"]}):
             self.avenue_cuts.setdefault(lid, []).append(T)
         if kd == "tee" and stub_side is not None and stub_side not in sides_used:
-            near = [s for s in sides_used if s != stub_side]
+            near = [s for s in sides_used if s != stub_side and s in terminals]
             if near:
                 T, _, leg = terminals[near[0]]
                 self.trim[(leg["id"], n)] = T
@@ -1370,6 +1372,13 @@ def rebuild(E: Elev) -> None:
                 e = e.oriented_to_end(p)
                 stub = E.stubs.get((legs[0]["id"], n))
                 trim = E.trim.get((legs[0]["id"], n))
+                if stub is None and trim is None and E.avenue_cuts.get(legs[0]["id"]):
+                    # ramps land on this leg and nothing continues under the deck: the tail
+                    # past the nearest terminal would end right under the viaduct (where M2
+                    # would join it to the deck)
+                    near = min((tuple(T) for T in E.avenue_cuts[legs[0]["id"]]),
+                               key=lambda T: (round(_d(p, T), 2), T))
+                    trim = near if _d(p, near) < 300.0 else None
                 if stub is not None:
                     L = e.L
                     e = Edge(e.pts + [stub], e.prof + [(L + _d(p, stub), 0.0)], e.row, e.key,

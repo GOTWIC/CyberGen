@@ -334,7 +334,8 @@ class Fitter:
         self.ctx = ctx
 
     def crossing(self, a: tuple[float, float], b: tuple[float, float],
-                 causeway: bool = False, run: list[tuple] | None = None) -> tuple[tuple, tuple]:
+                 causeway: bool = False, run: list[tuple] | None = None,
+                 cls: str = "avenue") -> tuple[tuple, tuple]:
         """Shortest straight crossing between the bank near `a` and the bank near `b` that
         passes where the raster path crossed (`run`, its water cells)."""
         ctx = self.ctx
@@ -371,16 +372,48 @@ class Fitter:
         # a bridge may pass over a small land tip or islet (up to 40 m of land)
         touch = shapely.intersects(arr, inner)
         ok = ~touch
+        clips = np.zeros(len(lines), bool)
         if touch.any():
             idx = np.nonzero(touch)[0]
             ok[idx] = shapely.length(shapely.intersection(arr[idx], inner)) <= 40.0
+            # last choice: a span over the tip of a district's land (another road would meet
+            # it out on the water there)
+            dl = ctx.district_land.buffer(-3.0)
+            for i in idx:
+                if ok[i]:
+                    p, r = meta[i]
+                    tip = shapely.intersection(arr[i], dl)
+                    clips[i] = not tip.is_empty and tip.length > 1.0 and \
+                        tip.distance(Point(p)) > 1.0 and tip.distance(Point(r)) > 1.0
         if ctx.closed is not None and not ctx.closed.is_empty:
             closed = ctx.closed if causeway else ctx.closed_all
             ok &= ~shapely.intersects(arr, closed)
         if run:
             zone = (LineString(run) if len(run) > 1 else Point(run[0])).buffer(CELL_M * 0.75)
             ok &= shapely.intersects(arr, zone)
-        for good, ln, (p, r) in zip(ok, lines, meta):
+        # room on the bridge axis past both banks for the straight approach and the start of
+        # the turn after it (a landing beside a port slip or a reserve kinks at the bank)
+        cramped = np.zeros(len(lines), bool)
+        if ok.any():
+            need = CLASSES[cls]["approach"] + 0.25 * CLASSES[cls]["r_min"]
+            if not hasattr(ctx, "_wet_closed"):
+                ctx._wet_closed = unary_union([ctx.wet, ctx.closed_all])
+            stop = ctx.wet if causeway else ctx._wet_closed
+            idx = np.nonzero(ok)[0]
+            rays = []
+            for i in idx:
+                (px, py), (rx, ry) = meta[i]
+                ux, uy = _unit(rx - px, ry - py)
+                rays.append(LineString([(px - ux * 2.0, py - uy * 2.0),
+                                        (px - ux * need, py - uy * need)]))
+                rays.append(LineString([(rx + ux * 2.0, ry + uy * 2.0),
+                                        (rx + ux * need, ry + uy * need)]))
+            hit = shapely.intersects(np.array(rays, dtype=object), stop).reshape(-1, 2)
+            # an end on the water (an exit) has no approach to keep
+            wet_a, wet_b = not dry.contains(Point(a)), not dry.contains(Point(b))
+            for i, (h0, h1) in zip(idx, hit):
+                cramped[i] = (h0 and not wet_a) or (h1 and not wet_b)
+        for good, tight, clip, ln, (p, r) in zip(ok, cramped, clips, lines, meta):
             if not good:
                 continue
             da = M.hypot(p[0] - a[0], p[1] - a[1])
@@ -388,7 +421,8 @@ class Fitter:
                     M.hypot(r[0] - b[0], r[1] - b[1]) > M.hypot(r[0] - a[0], r[1] - a[1]):
                 continue
             c = ln.length + 0.12 * (M.hypot(p[0] - a[0], p[1] - a[1])
-                                    + M.hypot(r[0] - b[0], r[1] - b[1]))
+                                    + M.hypot(r[0] - b[0], r[1] - b[1])) + 1e6 * tight \
+                + 1e6 * clip
             if c < best_cost:
                 best_cost, best = c, (p, r)
         return best
@@ -401,12 +435,13 @@ class Fitter:
         no curve ever starts on a bridge. Returns (points, fixed index set)."""
         pts = [grid.xy(k) for k in path]
         wet = [int(grid.wcls[k]) > 0 for k in path]
+        # an exit lies on the map border, which `contains` leaves out: `covers`
         if start is not None:
             pts[0] = start
-            wet[0] = not self.ctx.dry.contains(Point(start))
+            wet[0] = not self.ctx.dry.covers(Point(start))
         if end is not None:
             pts[-1] = end
-            wet[-1] = not self.ctx.dry.contains(Point(end))
+            wet[-1] = not self.ctx.dry.covers(Point(end))
         a_len = CLASSES[cls]["approach"]
         n = len(pts)
         out: list[tuple] = []
@@ -432,9 +467,10 @@ class Fitter:
             b = pts[j] if j < n else pts[-1]
             run = pts[i:j]
             if out:
-                cr = self.crossing(a, b, causeway, run) if j < n else (a, b)
+                cr = self.crossing(a, b, causeway, run, cls) if j < n else (a, b)
             else:
-                cr = self.crossing(pts[0], b, causeway, run) if j < n else (pts[0], pts[-1])
+                cr = self.crossing(pts[0], b, causeway, run, cls) if j < n \
+                    else (pts[0], pts[-1])
                 cr = (pts[0], cr[1]) if cr is not None else None
             if cr is None:
                 # no clear straight crossing: keep the raster course over the water
@@ -489,7 +525,46 @@ class Fitter:
             i = k
         if out:
             fixed |= {0, len(out) - 1}
+            out, fixed = self._edge_entry(out, fixed, start, cls, causeway, 0)
+            out, fixed = self._edge_entry(out, fixed, end, cls, causeway, -1)
         return out, fixed
+
+    def _edge_entry(self, out: list[tuple], fixed: set[int], p, cls: str, causeway: bool,
+                    end: int):
+        """A chain that starts (or ends) at a point on the map edge (an exit) enters the map
+        square to the edge: a fixed straight of the class approach plus the tangent of the
+        turn that follows, as at a bridge bank. Without it the first leg can run along the
+        edge and the road hooks where it leaves the map."""
+        ctx = self.ctx
+        if p is None or len(out) < 2 or tuple(out[end]) != tuple(p):
+            return out, fixed
+        if ctx.canvas.exterior.distance(Point(p)) > 0.5:
+            return out, fixed
+        minx, miny, maxx, maxy = ctx.canvas.bounds
+        sides = [(p[0] - minx, (1.0, 0.0)), (maxx - p[0], (-1.0, 0.0)),
+                 (p[1] - miny, (0.0, 1.0)), (maxy - p[1], (0.0, -1.0))]
+        u = min(sides, key=lambda t: t[0])[1]
+        if not ctx.dry.contains(Point(p[0] + u[0] * 3.0, p[1] + u[1] * 3.0)):
+            return out, fixed           # an exit on a bridge: the crossing sets the axis
+        pts = out if end == 0 else out[::-1]
+        fx = set(fixed) if end == 0 else {len(out) - 1 - f for f in fixed}
+        toward = next((q for q in pts[1:] if M.hypot(q[0] - p[0], q[1] - p[1]) > 150.0),
+                      pts[-1])
+        L = self._approach(p, u, toward, cls, causeway)
+        ax, ay = p[0] + u[0] * L, p[1] + u[1] * L
+        k = 1
+        while k < len(pts) - 1 and k not in fx and (
+                M.hypot(pts[k][0] - p[0], pts[k][1] - p[1]) < L + CELL_M or
+                (pts[k][0] - ax) * u[0] + (pts[k][1] - ay) * u[1] < 1.0):
+            k += 1
+        if M.hypot(pts[k][0] - p[0], pts[k][1] - p[1]) <= L + 1.0:
+            return out, fixed           # the chain is shorter than the entry
+        new = [pts[0], (ax, ay)] + pts[k:]
+        nfx = {0, 1} | {f - k + 2 for f in fx if f >= k}
+        if end == -1:
+            new = new[::-1]
+            nfx = {len(new) - 1 - f for f in nfx}
+        return new, nfx
 
     def _approach(self, bank, u, toward, cls: str, causeway: bool) -> float:
         """Straight approach length from a bank point inland along u (the bridge axis): the
@@ -1032,6 +1107,15 @@ def find_exits(spec: CitySpec, ctx: Ctx) -> None:
 
         ok = [p for p in pts if land.contains(inward(p)) and land.contains(inward(p, 60.0))
               and not ctx.closed_all.contains(inward(p))]
+        # where the highway can enter square to the edge (150 m straight on dry, open land),
+        # not squeezed beside a river mouth or a reserve
+        nx, ny = -presets.DIRECTION_VECTORS[d][0], -presets.DIRECTION_VECTORS[d][1]
+        room = [p for p in ok
+                if land.covers(LineString([(p.x + nx * 3.0, p.y + ny * 3.0),
+                                           (p.x + nx * 150.0, p.y + ny * 150.0)]))
+                and not LineString([(p.x, p.y), (p.x + nx * 150.0, p.y + ny * 150.0)]
+                                   ).intersects(ctx.closed_all)]
+        ok = room or ok
         target = named_to.get(d)
         region = _resolve(spec, ctx, target) if target else None
         if region is not None:
@@ -1120,7 +1204,10 @@ def _waypoint_route(ctx: Ctx, pts: list[tuple], cls: str, role: str, name: str,
             cells.append(k)
     if start_exit:
         ec = ctx.exit_cells[start_exit]
-        if cells and cells[0] == ec:
+        # waypoints snapped next to the exit (the exit itself moved onto deep land) would make
+        # a first leg along the map edge, a hook: the route starts at the exit cell instead
+        ex, ey = ctx.exits[start_exit]
+        while cells and M.hypot(g.xs[cells[0]] - ex, g.ys[cells[0]] - ey) < 200.0:
             cells = cells[1:]
         cells.insert(0, ec)
     if closed and len(cells) > 2:
@@ -1572,6 +1659,21 @@ def _landmass_of(ctx: Ctx, p) -> int | None:
     return None
 
 
+def _lms_on(ctx: Ctx, ln: LineString) -> set[int]:
+    """Landmasses a road runs on (over 45 m of it on dry land), not those whose tip a bridge
+    only clips."""
+    out = set()
+    dry = ln.difference(ctx.wet)
+    for run in G_lines(shapely.line_merge(dry) if not dry.is_empty else dry):
+        if run.length <= 45.0 and ln.length > 45.0:
+            continue
+        for p in G.resample(run, 60.0):
+            k = _landmass_of(ctx, p)
+            if k is not None:
+                out.add(k)
+    return out
+
+
 def _district_landmasses(ctx: Ctx) -> set[int]:
     if not hasattr(ctx, "_dlm"):
         ctx._dlm = {k for k, lm in enumerate(ctx.h.landmasses)
@@ -1601,8 +1703,9 @@ def build_named_bridges(spec: CitySpec, ctx: Ctx) -> list[dict]:
             ctx.named.append(NamedRoute(nb.name, nb.kind, span, tuple(nb.connects), nb.crosses,
                                         causeway))
             continue
-        src = set(ctx.free_cells(ra, causeway=causeway).tolist())
-        dst = set(ctx.free_cells(rb, causeway=causeway).tolist())
+        # ends on the regions' own land, not on a tip another bridge clips
+        src = set(ctx.free_cells(ra, causeway=causeway, inset=40.0).tolist())
+        dst = set(ctx.free_cells(rb, causeway=causeway, inset=40.0).tolist())
         if not src or not dst:
             ctx.notes.append(f"named bridge '{nb.name}': no free land at one end")
             continue
@@ -1625,7 +1728,8 @@ def build_named_bridges(spec: CitySpec, ctx: Ctx) -> list[dict]:
         line = LineString([g.xy(k) for k in run])
         ctx.named.append(NamedRoute(nb.name, nb.kind, line, tuple(nb.connects), nb.crosses,
                                     causeway))
-        for r in _new_runs(full, g.reuse):
+        # (a road it only crosses out on the water does not split it: no junction there)
+        for r in _new_runs(full, g.reuse & (g.wcls == 0)):
             ctx.add_path(r, "avenue", "named_bridge", None, None, None, causeway, None)
     return peds
 
@@ -1667,11 +1771,24 @@ def _existing_crossing(ctx: Ctx, ra, rb, crosses: str | None) -> LineString | No
     best = None
     for r in ctx.roads:
         wet = r.line.intersection(ctx.wet)
+        dry = r.line.difference(ctx.wet)
+        dry_runs = G_lines(shapely.line_merge(dry) if not dry.is_empty else dry)
+        ends = [Point(r.line.coords[0]), Point(r.line.coords[-1])]
+
+        def lands(e):
+            # the road goes on over the land at this bank (not over a tip it clips)
+            # (every land run at the bank, so the order of GEOS's parts does not matter)
+            return any(x.distance(e) < 1.0 and (x.length > 45.0 or
+                                                any(x.distance(q) < 1.0 for q in ends))
+                       for x in dry_runs)
+
         for piece in G_lines(shapely.line_merge(wet) if not wet.is_empty else wet):
             if piece.length < 3.0:
                 continue
             e0, e1 = Point(piece.coords[0]), Point(piece.coords[-1])
             if not ((za.contains(e0) and zb.contains(e1)) or (za.contains(e1) and zb.contains(e0))):
+                continue
+            if not (lands(e0) and lands(e1)):
                 continue
             if not _water_matches(ctx, piece.interpolate(0.5, normalized=True), crosses):
                 continue
@@ -1759,11 +1876,15 @@ def _road_groups(ctx: Ctx) -> list[tuple[set[int], set[int]]]:
 
     lines = [r.line for r in ctx.roads]
     tree = shapely.STRtree(lines)
+    # roads that cross out on the water do not meet (the assembly grade-separates them)
+    inner = ctx.wet.buffer(-3.0)
     for i, ln in enumerate(lines):
         for j in tree.query(ln.buffer(0.05)):
             j = int(j)
             if j > i and lines[j].distance(ln) < 0.05:
-                parent[find(i)] = find(j)
+                meet = ln.buffer(0.05).intersection(lines[j].buffer(0.05))
+                if not inner.covers(meet):
+                    parent[find(i)] = find(j)
     groups: dict[int, set[int]] = {}
     for i in range(n):
         groups.setdefault(find(i), set()).add(i)
@@ -1771,10 +1892,7 @@ def _road_groups(ctx: Ctx) -> list[tuple[set[int], set[int]]]:
     for g in groups.values():
         lms = set()
         for i in g:
-            for p in G.resample(lines[i], 60.0):
-                k = _landmass_of(ctx, p)
-                if k is not None:
-                    lms.add(k)
+            lms |= _lms_on(ctx, lines[i])
         out.append((g, lms))
     return sorted(out, key=lambda t: (-len(t[1] & _district_landmasses(ctx)), -len(t[0]),
                                       min(t[0])))
@@ -2057,6 +2175,7 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
     pieces = _merge_degree2(pieces, ctx.fit)
     pieces = _refit(pieces, ctx)
     pieces = _trim_hooks(pieces, keep)
+    pieces = _merge_forks(pieces)
     for _ in range(4):  # until nothing changes
         before = sorted((G.qpoint(ln.coords[0]), G.qpoint(ln.coords[-1]), round(ln.length, 2))
                         for ln, _ in pieces)
@@ -2311,6 +2430,25 @@ def _unnode_water(pieces, ctx: Ctx):
         for i in at:
             by_src.setdefault(id(pieces[i][1]), []).append(i)
         pairs = [v for v in by_src.values() if len(v) == 2]
+        if len(pairs) != 2 and len(at) == 4:
+            # pieces of more than two roads: the straightest continuations go on together
+            def away(i):
+                ln = pieces[i][0]
+                cs = list(ln.coords)
+                q = ln.interpolate(min(10.0, ln.length)) if G.qpoint(cs[0]) == hit else \
+                    ln.interpolate(max(ln.length - 10.0, 0.0))
+                return _unit(q.x - hit[0], q.y - hit[1])
+
+            u = {i: away(i) for i in at}
+            a0 = at[0]
+            best = None
+            for b0 in at[1:]:
+                rest = [i for i in at[1:] if i != b0]
+                s = (u[a0][0] * u[b0][0] + u[a0][1] * u[b0][1]
+                     + u[rest[0]][0] * u[rest[1]][0] + u[rest[0]][1] * u[rest[1]][1])
+                if best is None or s < best[0] - 1e-9:
+                    best = (s, [[a0, b0], rest])
+            pairs = best[1]
         if len(pairs) != 2:
             return pieces
         new = []
@@ -2346,13 +2484,7 @@ def _main_network(pieces, keep: set, ctx: Ctx):
         return pieces
 
     def lms(ks):
-        out = set()
-        for k in ks:
-            for p in G.resample(pieces[k][0], 60.0):
-                j = _landmass_of(ctx, p)
-                if j is not None:
-                    out.add(j)
-        return out
+        return set().union(*(_lms_on(ctx, pieces[k][0]) for k in ks))
 
     order = sorted(groups.values(), key=lambda ks: (-sum(pieces[k][0].length for k in ks),
                                                     min(ks)))
@@ -2503,6 +2635,59 @@ def _cut_tight(pieces):
             if s1 - s0 >= 40.0:
                 todo.append((G.qline(shapely.ops.substring(ln, s0, s1)), r))
     return out + todo
+
+
+def _merge_forks(pieces):
+    """Two primary roads that leave a node together and run side by side (within 25 m for
+    150 m or more: a duplicate) become one there: the lesser one (class, then an optional
+    role, then the shorter) starts where they part, from a junction on the other."""
+    rank = {"highway": 2, "avenue": 1}
+    for _ in range(20):
+        ends: dict = {}
+        for i, (ln, r) in enumerate(pieces):
+            for e in (0, -1):
+                ends.setdefault(G.qpoint(ln.coords[e]), []).append((i, e))
+        hit = None
+        for c in sorted(ends):
+            for i, _ in ends[c]:
+                for j, ej in ends[c]:
+                    A, ra = pieces[i]
+                    Bl, rb = pieces[j]
+                    if i == j or "pinned" in (ra.role, rb.role):
+                        continue
+                    key = lambda ln, r: (rank[r.cls], r.role not in OPTIONAL_ROLES + (
+                        "connector",), round(ln.length, 2))
+                    if key(Bl, rb) >= key(A, ra):
+                        continue
+                    b = Bl if ej == 0 else LineString(list(Bl.coords)[::-1])
+                    s = 0.0
+                    while s + 10.0 <= b.length and A.distance(b.interpolate(s + 10.0)) < 25.0:
+                        s += 10.0
+                    if s < 150.0 or s > b.length - 40.0:
+                        continue
+                    # the junction a little before they part, so the branch leaves at an angle
+                    q = G.qpoint(nearest_points(A, b.interpolate(s - 50.0))[0])
+                    t = A.project(Point(q))
+                    if t < 40.0 or t > A.length - 40.0:
+                        continue
+                    hit = (i, j, b, s, q, t)
+                    break
+                if hit:
+                    break
+            if hit:
+                break
+        if hit is None:
+            return pieces
+        i, j, b, s, q, t = hit
+        A, ra = pieces[i]
+        rb = pieces[j][1]
+        a1 = list(shapely.ops.substring(A, 0.0, t).coords)[:-1] + [q]
+        a2 = [q] + list(shapely.ops.substring(A, t, A.length).coords)[1:]
+        nb = [q] + list(shapely.ops.substring(b, s, b.length).coords)
+        new = [(G.qline(LineString(a1)), ra), (G.qline(LineString(a2)), ra),
+               (G.qline(LineString(nb)), rb)]
+        pieces = [p for k, p in enumerate(pieces) if k not in (i, j)] + new
+    return pieces
 
 
 def _trim_hooks(pieces, keep: set):
@@ -2727,11 +2912,16 @@ def _name_bridges(spec: CitySpec, ctx: Ctx, net: RoadNet) -> None:
         for b in net.bridges:
             if b["id"] in taken:
                 continue
-            mid = LineString([(x, y) for x, y, _ in b["line"]]).interpolate(0.5, normalized=True)
+            bl = LineString([(x, y) for x, y, _ in b["line"]])
+            mid = bl.interpolate(0.5, normalized=True)
             d = nr.line.distance(mid)
-            if d > 60.0:
+            # a bridge that runs along the route first (not one that only crosses it); the
+            # route is the raster course, so a long straight span may bow away from it
+            along = max(nr.line.distance(Point(bl.coords[0])),
+                        nr.line.distance(Point(bl.coords[-1]))) <= 120.0
+            if d > 60.0 and not (along and d <= 150.0):
                 continue
-            rank = ({"sea": 3, "river": 2, "canal": 1}[b["attrs"]["water_class"]],
+            rank = (along, {"sea": 3, "river": 2, "canal": 1}[b["attrs"]["water_class"]],
                     b["attrs"]["span_m"])
             if best is None or rank > best[0]:
                 best = (rank, b["id"])

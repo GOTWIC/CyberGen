@@ -239,6 +239,24 @@ def cmd_review(args: argparse.Namespace) -> int:
     return EXIT_OK if rec["passed"] else EXIT_INVALID
 
 
+def cmd_sweep(args: argparse.Namespace) -> int:
+    from . import sweep as SW
+
+    extra = SW.EXTRA_SEEDS[:args.extra] if args.extra is not None else SW.EXTRA_SEEDS
+    seeds = [int(s) for s in args.seeds.split(",")] if args.seeds else None
+    jobs = SW.spec_jobs(args.specs, seeds, extra) if args.specs else \
+        SW.suite_jobs(args.suite, extra)
+    if seeds and not args.specs:
+        jobs = [(lab, data, s) for lab, data in {(j[0]): j[1] for j in jobs}.items()
+                for s in seeds]
+    if args.only:
+        jobs = [j for j in jobs if args.only in j[0]]
+    rows = SW.sweep(jobs, args.out, workers=args.workers, upto=args.upto,
+                    previews=not args.no_previews, keep_model=args.keep_model)
+    print(f"wrote {Path(args.out) / 'sweep.md'}")
+    return EXIT_OK if all(r["status"] == "pass" for r in rows) else EXIT_INVALID
+
+
 def cmd_model_schema(args: argparse.Namespace) -> int:
     from .model import json_schema
 
@@ -317,6 +335,26 @@ def build_parser() -> argparse.ArgumentParser:
     td.add_argument("a")
     td.add_argument("b")
     td.set_defaults(func=cmd_trace_diff)
+
+    sw = sub.add_parser("sweep", help="build many specs at many seeds (no blockout) and "
+                                      "tabulate passes, failing checks, retries and crashes")
+    sw.add_argument("specs", nargs="*", help="spec files (default: the --suite)")
+    sw.add_argument("--suite", default="m8a",
+                    help="built-in set of specs and seeds when no spec is given (m8a: the "
+                         "samples, the pinned demo and the test specs)")
+    sw.add_argument("--seeds", help="comma-separated seeds instead of each spec's own seed "
+                                    "plus the extra seeds")
+    sw.add_argument("--extra", type=int, default=None,
+                    help="how many of the built-in extra seeds to add (default all)")
+    sw.add_argument("--only", help="keep only builds whose label contains this text")
+    sw.add_argument("--out", default="out/sweep", help="output folder (default out/sweep)")
+    sw.add_argument("--workers", type=int, default=4,
+                    help="builds at once, one process each (default 4)")
+    sw.add_argument("--upto", choices=["roads", "local", "full"], default="full",
+                    help="last stage to build (default full)")
+    sw.add_argument("--no-previews", action="store_true", help="reports only, no previews")
+    sw.add_argument("--keep-model", action="store_true", help="keep city_model.json")
+    sw.set_defaults(func=cmd_sweep)
 
     model = sub.add_parser("model", help="city model tools")
     msub = model.add_subparsers(dest="command", required=True)
