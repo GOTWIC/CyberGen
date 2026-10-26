@@ -264,10 +264,10 @@ def render_elevated(b, out, dpi: int = 140) -> None:
                 if fz[0] < fz[-1]:
                     L = s.attrs["length_m"]
                     fx, fz = [L - x for x in reversed(fx)], fz[::-1]
-                ax3.plot(fx, fz, color=CMAP(0.75), lw=1.4, ls="--")
+                ax3.plot(fx, fz, color=CMAP(0.75), lw=1.4, ls="--",
+                         label=f"flyover of {s.attrs.get('interchange')} (along itself)")
                 top = max(top, max(fz))
-                title = f"viaduct {key} ({acc / 1000:.2f} km), dashed: flyover " \
-                        f"{s.attrs.get('interchange')}; dotted: roads under the viaduct"
+                ax3.legend(loc="upper right", fontsize=7, frameon=False, labelcolor=INK)
         ax3.set_title(title, color=INK, fontsize=9)
         ax3.set_ylim(0, max(top * 1.15, 12.0))
     else:
