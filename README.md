@@ -30,10 +30,12 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8c | Transit that passes on a city's first layout (Delta Megacity), remaining sweep transit failures | In progress (paused) | |
 | M8d | Trumpet interchange with one loop and one flyover | In progress (paused) | |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
-| M10 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
-| M11 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
-| M12 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
-| M13 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
+| M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
+| M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
+| M12 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
+| M13 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
+| M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
+| M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
 ## Latest maps (M8b)
 
