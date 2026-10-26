@@ -677,13 +677,17 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
                               f"{ROAD_MIN_RADIUS_M['avenue']:.0f} m), outside junction areas "
                               f"({JUNCTION_SKIP_M['avenue']:.0f} m from an avenue junction, M2; "
                               f"{JUNCTION_SKIP_M['highway']:.0f} m from a highway junction, "
-                              "an interchange in M7; traced roads as drawn)")
+                              "an interchange in M7, also inside a joined chain; traced roads "
+                              "as drawn)")
     deg: dict[str, int] = {}
     for s in m.road_segments:
         if s.road_class in ROAD_MIN_RADIUS_M:
             deg[s.start] = deg.get(s.start, 0) + 1
             deg[s.end] = deg.get(s.end, 0) + 1
     over = [tuple(p) for s in m.road_segments for p in s.attrs.get("overpass_at", [])]
+    # junctions inside a chain (M7 joins the pieces of an elevated run through its tees)
+    pos = {n.id: (n.position[0], n.position[1]) for n in m.road_nodes}
+    hubs = [pos[k] for k in sorted(deg) if deg[k] >= 3 and k in pos]
     for label, cls, line, a, b in primary_chains(m, g, pinned=False):
         rmin = ROAD_MIN_RADIUS_M[cls]
         skip = JUNCTION_SKIP_M[cls]
@@ -691,6 +695,9 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
         skip1 = skip if deg.get(b, 0) >= 3 else 0.0
         ats = tuple(line.project(shapely.Point(p)) for p in over
                     if line.distance(shapely.Point(p)) < 1.0)
+        if ".." in label:
+            ats += tuple(line.project(shapely.Point(p)) for p in hubs
+                         if line.distance(shapely.Point(p)) < 0.05)
         r, at = min_radius(line, RADIUS_BASE_M[cls], skip0, skip1, ats, skip)
         if r < 0.95 * rmin:
             p = line.interpolate(at)

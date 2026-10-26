@@ -752,7 +752,7 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
 
     def place(order):
         out: list[IslandRec] = []
-        msgs, misses = [], []
+        msgs, misses, lost = [], [], []
         taken = Polygon()
         for name, area, position, setting, filler in order:
             rng = np.random.default_rng(derive_seed(spec.seed, "hydro.island", name))
@@ -764,18 +764,35 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
                 sector = ((c.x, c.y), presets.DIRECTION_VECTORS[position])
             poly = None
             gaps = [60.0, 45.0, 30.0] if setting == "nearshore" else [220.0, 150.0, 100.0, 70.0]
-            # Every gap inside the bearing sector first, then anywhere.
-            tries = [(g, True) for g in gaps] if sector is not None else []
+            # Every gap inside the bearing sector first, then anywhere: the island as drawn,
+            # then (squeezed between islands placed before and the coast, so it would not be
+            # built at all) the same area as a longer island, the strip it fits in setting its
+            # direction.
             shapes = [pins[name]] if name in pins else None
-            for gap, strict in tries + [(g, False) for g in gaps]:
+            tries = [(g, True) for g in gaps] if sector is not None else []
+            tries += [(g, False) for g in gaps]
+            for gap, strict in tries:
                 poly = _fit_blob(free, aim, area, rng, elong, gap, canvas, beyond, sector,
                                  strict, shapes)
                 if poly is not None:
                     break
+            if poly is None and name not in pins:
+                seed = derive_seed(spec.seed, "hydro.island.long", name)
+                for st in (1.4, 1.65):
+                    longs = [G.blob((0.0, 0.0), area, np.random.default_rng(seed), st,
+                                    k * math.pi / 8) for k in range(8)]
+                    for gap, strict in tries:
+                        poly = _fit_blob(free, aim, area, rng, st, gap, canvas, beyond,
+                                         sector, strict, longs)
+                        if poly is not None:
+                            break
+                    if poly is not None:
+                        break
             if poly is None:
                 msgs.append(f"island '{name}' does not fit in the sea; raise sea_share or "
                             "shrink it")
                 misses.append(name)
+                lost.append(name)
                 continue
             if sector is not None and not filler:
                 q = poly.centroid
@@ -794,16 +811,24 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
             taken = taken.union(poly.buffer(60))
             out.append(IslandRec(name, setting, area, poly, filler=filler,
                                  pinned=poly if name in pins else None, pin_at=pin_at))
-        return out, msgs, misses
+        return out, msgs, misses, lost
 
-    out, msgs, misses = place(jobs)
+    out, msgs, misses, lost = place(jobs)
     if misses:
-        # An island that did not land toward its position goes first on a second try (a big
-        # island may have taken the only room there); keep the try with fewer misses.
-        retry = [j for j in jobs if j[0] in misses] + [j for j in jobs if j[0] not in misses]
-        out2, msgs2, misses2 = place(retry)
-        if len(misses2) < len(misses):
-            out, msgs = out2, msgs2
+        # Islands that did not land toward their position go first on another try (a big
+        # island may have taken the only room there): all of them, then each alone; keep the
+        # try with the fewest islands left out, then the fewest misses (the first of those).
+        best = (len(lost), len(misses))
+        firsts = [list(misses)] + ([[n] for n in misses] if len(misses) > 1 else [])
+        for first in firsts:
+            retry = [j for n in first for j in jobs if j[0] == n] + \
+                [j for j in jobs if j[0] not in first]
+            out2, msgs2, misses2, lost2 = place(retry)
+            if (len(lost2), len(misses2)) < best:
+                best = (len(lost2), len(misses2))
+                out, msgs = out2, msgs2
+            if not misses2:
+                break
     notes += msgs
     return out
 

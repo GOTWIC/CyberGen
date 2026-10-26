@@ -391,13 +391,20 @@ def freight_terminal(site: Site, lay: Lay) -> None:
                              masses=[(p, 0.0, q(h), "stack", "prism")])
             v -= 12.0 + 6.0
         u += 40.0 + 8.0
-    # rail yard and truck gates on the land side
-    for t in range(4):
-        v = -b + 10.0 + t * 6.0
-        line = [lay.fr.world(-a * 0.9, v), lay.fr.world(a * 0.5, v)]
-        fp = lay.rect(-a * 0.9, v - 1.0, a * 0.5, v + 1.0)
-        if lay.fits(fp):
-            site.element("rail_track", footprint=fp, line=line, attrs={"gauge_m": 1.435})
+    # rail yard and truck gates on the land side; a reserve whose land side is cut back
+    # gets a shorter yard where it fits
+    for f0, f1 in ((-0.9, 0.5), (-0.7, 0.7), (-0.75, 0.25), (-0.25, 0.75), (-0.5, 0.5),
+                   (-0.35, 0.35)):
+        laid = 0
+        for t in range(4):
+            v = -b + 10.0 + t * 6.0
+            line = [lay.fr.world(a * f0, v), lay.fr.world(a * f1, v)]
+            fp = lay.rect(a * f0, v - 1.0, a * f1, v + 1.0)
+            if lay.fits(fp):
+                site.element("rail_track", footprint=fp, line=line, attrs={"gauge_m": 1.435})
+                laid += 1
+        if laid:
+            break
     # truck gate with its gate house, then the office, where they fit along the land side
     for f in (0.58, 0.4, 0.2, 0.0, -0.2, -0.4, -0.6, 0.7):
         g0 = a * f

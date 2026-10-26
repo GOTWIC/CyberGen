@@ -84,9 +84,11 @@ def spec_jobs(paths: list[str], seeds: list[int] | None, extra: list[int]):
 
 
 def _retries(b) -> dict:
-    tries = [int(m.group(1)) for n in b.notes for m in [RETRY_NOTE.search(n)] if m]
+    tries = b.stats.get("city_tries")
+    fails = [t["failures"] for t in tries[:-1]] if tries else \
+        [int(m.group(1)) for n in b.notes for m in [RETRY_NOTE.search(n)] if m]
     return {"hydro_variant": b.variant, "road_variant": b.stats.get("road_variant"),
-            "city_retries": len(tries), "retry_fails": tries,
+            "city_retries": len(fails), "retry_fails": fails,
             "layout_salt": b.stats.get("layout_salt", 0)}
 
 

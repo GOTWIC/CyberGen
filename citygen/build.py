@@ -49,7 +49,8 @@ from .validate import Result, dump_spec
 MAX_VARIANTS = 20
 GOOD_QUALITY = 0.10
 ROAD_CANDIDATES = 3
-CITY_RETRIES = 4       # M7: layouts or road networks a failing full city tries next
+CITY_RETRIES = 8       # M7: layouts or road networks a failing full city tries next (M8a: 8,
+                       # so the next road network gets its own layouts too)
 LAYOUT_SALTS = 3       # of them, local layouts on the same roads first
 
 
@@ -371,12 +372,15 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
         base = _pristine(b)
         best = None
         salt = 0
+        tries = []
         for attempt in range(CITY_RETRIES + 1):
             add_local(b, explicit, run, check=not buildings)
             if buildings:
                 add_buildings(b, explicit, run)
             fails = sum(len(c.failures) for c in b.checks)
             T.stage(f"city_try{attempt}", [b.variant, b.stats.get("road_variant"), salt, fails])
+            tries.append({"variant": b.variant, "road_variant": b.stats.get("road_variant"),
+                          "layout_salt": salt, "failures": fails})
             if best is None or fails < best[0]:
                 best = (fails, b)
             if not fails or attempt == CITY_RETRIES:
@@ -401,6 +405,7 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
                 again = f"the same roads with the local layout drawn again (salt {salt})"
             b.notes = [f"{what} left {fails} check failures in the full city; built again on "
                        f"{again}"] + b.notes
+        best[1].stats["city_tries"] = tries
         return best[1]
     finally:
         run.close()

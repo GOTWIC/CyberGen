@@ -1030,10 +1030,53 @@ def _repair_relations(spec, lm, names, seeds, targets, part, warp=None):
                 if f < bad and (best is None or f < best[0]):
                     best = (f, trial, trial_seeds)
         if best is None:
+            # no swap helps: move the two seeds of a failing relation apart along its
+            # direction (the cells follow their seeds)
+            inner = G.qpoly(lm.buffer(-30.0))
+            inner = inner if not inner.is_empty else lm
+            reach = math.sqrt(G.area(lm) / math.pi)
+            for n in names:
+                for direction, ref in spec.district(n).placement.relations():
+                    hit = resolve(spec, ref)
+                    if not (hit and hit[0] == "district" and hit[1] in names and hit[1] != n):
+                        continue
+                    o = hit[1]
+                    if not (part[n].is_empty or part[o].is_empty) and R.direction_ok(
+                            G.centroid(part[n]), G.centroid(part[o]), direction):
+                        continue
+                    ux, uy = presets.DIRECTION_VECTORS[direction]
+                    ox, oy = float(seeds[o][0]), float(seeds[o][1])
+                    dist = max(M.hypot(float(seeds[n][0]) - ox, float(seeds[n][1]) - oy),
+                               0.5 * reach)
+                    moves = [{n: (float(seeds[n][0]) + ux * k * reach,
+                                  float(seeds[n][1]) + uy * k * reach),
+                              o: (ox - ux * k * reach, oy - uy * k * reach)}
+                             for k in (0.2, 0.4, 0.6)]
+                    # or straight that way from the other district's seed
+                    moves += [{n: (ox + ux * dist * f, oy + uy * dist * f)} for f in (1.0, 0.7)]
+                    for mv in moves:
+                        trial_seeds = dict(seeds)
+                        for name in sorted(mv):
+                            q = mv[name]
+                            if not inner.contains(Point(q)):
+                                q = G.nearest(inner, Point(q))
+                            trial_seeds[name] = np.array(G.qpoint(q))
+                        # (partition moves the seeds it is given: a copy)
+                        trial = partition(lm, names, dict(trial_seeds), targets, warp,
+                                          fine=False)
+                        f = _relation_failures(spec, trial, names)
+                        if f < bad and (best is None or f < best[0]):
+                            best = (f, trial, trial_seeds)
+        if best is None:
             break
         _, _, new_seeds = best
-        seeds.update(new_seeds)
-        part = partition(lm, names, seeds, targets, warp)
+        trial_seeds = dict(seeds)
+        trial_seeds.update(new_seeds)
+        trial = partition(lm, names, trial_seeds, targets, warp)
+        if _relation_failures(spec, trial, names) >= bad:
+            break         # better on the coarse raster only: keep what there is
+        seeds.update(trial_seeds)
+        part = trial
     return part
 
 
