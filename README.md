@@ -33,6 +33,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M10 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
 | M11 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
 | M12 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
+| M13 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
 ## Latest maps (M8b)
 
