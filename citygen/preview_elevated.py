@@ -28,7 +28,8 @@ GROUND = "#4a505c"
 FOOT = "#2b303a"
 CMAP = plt.get_cmap("plasma")
 ZMAX = 30.0
-TEMPLATE = {"diamond": "D", "diamond_stub": "T", "direct": "B", "overpass": "O"}
+TEMPLATE = {"diamond": "D", "diamond_stub": "T", "direct": "B", "overpass": "O", "parclo": "P",
+            "trumpet": "Tr"}
 
 
 def _z_at(prof, s: float) -> float:

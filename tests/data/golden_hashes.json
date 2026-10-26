@@ -1,5 +1,5 @@
 {
-  "about": "sha256 of each sample city's city_model.json (citygen build output, M7a: M6 plus elevated highways, ramps, interchanges, bridge approach profiles and road columns). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6) and docs/progress/M7/<city>/trace.json (M7a). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
+  "about": "sha256 of each sample city's city_model.json (citygen build output, M7b: M7a plus partial cloverleaf and trumpet interchanges and the pinned import). The same bytes on every machine with the pinned requirements: produced on the cloud machine (x86_64 Linux), confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) and docs/progress/M7b/<city>/trace.json (M7b). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
   "produced_on": {
     "machine": "x86_64",
     "system": "Linux",
@@ -9,17 +9,17 @@
     "geos": "3.14.1"
   },
   "cities": {
-    "archipelago_free_port": "9d134ec8740e4662fbacf1c718f1af320d0d96d5cb3f17cb2fe01e6974388d4e",
-    "delta_megacity": "71c1e8055af3fa1f9030fa3b7e9af52c73f970c4e1b96c0198a5f9285e1ed0f5",
-    "nexus_city": "468877920eac3cc73c2f7ab7b204016487043764b5be3e552ae3c91e448d337d",
-    "nyxllor": "99a66025e3684b6d892d7bec648f962675fd42fd42fdaa983442e08cb0192b0f",
-    "peninsula_city": "23a6758a84087bccf385bc436db53464379d8653bdabffbb8c35f270d3f29f70"
+    "archipelago_free_port": "5deccb25ffa3c60150458b394dd64e4ccfa3e2eea7e7010dc8733d6d248a5fa8",
+    "delta_megacity": "a8a4c6f893df9366d6c11c6b2a9c1ca1a5b1f0b47ddd6af78f407699c26908c6",
+    "nexus_city": "d8c5f2dfef46346add5e59d0d7074410d3331943f19215a089585e982ea3a39b",
+    "nyxllor": "f7c38d51fcb611287fcacadaf94b874bab2ff5a8527328de205ee59d5feb69d4",
+    "peninsula_city": "5e399f7408faa3aab7043d25c91f1b282850b300c89b488da2810bb8630df57d"
   },
   "blockout_plans": {
-    "archipelago_free_port": "90ea1dbb5cd70e2ca89e77c9774e228ca1332bae4a61457e39b4e77f360ee3b4",
-    "delta_megacity": "49205479bd954d33d3da0cc9ab9db0eb6aee5045dbc3aa06464c9a89d3f597d3",
-    "nexus_city": "1cfb2d8d5ca83162fc1e5e419006e3905dd151b79d8b4d9719858fd2ab3b4b04",
-    "nyxllor": "f8c13799f404360af77912c4680035bf5b5b7090e68a34e149cf68afb43e92ef",
-    "peninsula_city": "e12465e37e871f615aa41c4b0018e21bee58f1c1bb56a950160acc08fef32478"
+    "archipelago_free_port": "ec756da97d1ddd72095b9ef50053c1d7f59baec14c5b615ba782be20b3d4b92d",
+    "delta_megacity": "ef2d50c7e9c198ec72b9c38629d6e0a3d5deec7b081370fa241edcb22619cd93",
+    "nexus_city": "7288120f9f1e503aa24964b170d2b28bdf8359c6c8cfec94550ec1d07ecba7ee",
+    "nyxllor": "61e593d81b9092b2254c8d95949cce75845caf705243668312165cef579c4771",
+    "peninsula_city": "1c912faa7bc6e044dc9819a34eac820ee97f097fe534dba91faaeb43a0ded6a8"
   }
 }

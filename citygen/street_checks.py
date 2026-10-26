@@ -223,9 +223,11 @@ def check_walkway_graph(m: CityModel, n: _Net, g):
 def check_lot_frontage(m: CityModel, n: _Net):
     c = _check("lot_frontage", f"Every lot fronts a street, alley, service lane or pedestrian "
                                f"street (at least {FRONTAGE_MIN_M:g} m) and records its "
-                               "frontage and district")
+                               "frontage and district (a traced building's lot as drawn)")
     bad = 0
     for lt in m.lots:
+        if lt.attrs.get("pinned"):
+            continue
         L = math.fsum(f.length_m for f in lt.frontage if f.road_class in ACCESS)
         if L < FRONTAGE_MIN_M or not lt.district_id or not lt.frontage_ids:
             bad += 1
@@ -241,9 +243,13 @@ def check_sizes(m: CityModel, n: _Net):
     c = _check("lot_block_sizes", f"Lot areas within the archetype range ({lo_a:g} x min to "
                                   f"{hi_a:g} x max) and each district's median block size "
                                   "(square root of area) within the archetype block range "
-                                  f"({BLOCK_SIZE_TOL[0]:g} x lo to {BLOCK_SIZE_TOL[1]:g} x hi)")
+                                  f"({BLOCK_SIZE_TOL[0]:g} x lo to {BLOCK_SIZE_TOL[1]:g} x hi; "
+                                  "traced buildings' lots and the blocks of a traced district "
+                                  "aside)")
     out = 0
     for lt in m.lots:
+        if lt.attrs.get("pinned"):
+            continue
         st = ST.style_of(lt.archetype)
         a0, a1 = st.lot_area
         A = G.area1(G.from_model_poly(lt.polygon))
@@ -256,9 +262,14 @@ def check_sizes(m: CityModel, n: _Net):
         c.failures.append(f"... {out} lots in all")
     by: dict = {}
     for bk in m.blocks:
+        if bk.attrs.get("pinned"):
+            continue
         by.setdefault(bk.district_id, []).append(math.sqrt(bk.area_m2))
     spec_blocks = {d.id: d.params.get("block_size_m") for d in m.districts}
+    traced = {bk.district_id for bk in m.blocks if bk.attrs.get("pinned")}
     for did, sizes in sorted(by.items()):
+        if did in traced:
+            continue      # the land left between traced buildings
         rng_ = spec_blocks.get(did) or (80.0, 140.0)
         med = float(np.median(np.array(sorted(sizes))))
         lo, hi = rng_
@@ -271,13 +282,17 @@ def check_sizes(m: CityModel, n: _Net):
 def check_slivers(m: CityModel, n: _Net):
     c = _check("lot_slivers", f"No lot narrower than {LOT_MIN_W_M:g} m and no block narrower "
                               f"than {BLOCK_MIN_W_M:g} m (strip width from exact area and "
-                              "perimeter)")
+                              "perimeter; traced buildings' lots aside)")
     for lt in m.lots:
+        if lt.attrs.get("pinned"):
+            continue
         p = G.from_model_poly(lt.polygon)
         w = BK.width_est(G.area1(p), G.length1(p.exterior))
         if w < LOT_MIN_W_M:
             c.failures.append(f"lot {lt.id}: {w:.1f} m wide")
     for bk in m.blocks:
+        if bk.attrs.get("pinned"):
+            continue
         p = G.from_model_poly(bk.polygon)
         w = BK.width_est(G.area1(p), G.length1(p.exterior))
         if w < BLOCK_MIN_W_M:
@@ -417,8 +432,12 @@ def open_shares(spec: CitySpec, m: CityModel) -> dict[str, tuple[float, float, f
 
 def check_open_share(spec: CitySpec, m: CityModel, n: _Net):
     c = _check("open_space_share", "Open space share of each district's net land (open space "
-                                   "over open space plus lots) within the archetype target")
+                                   "over open space plus lots) within the archetype target "
+                                   "(a traced district aside)")
+    traced = {bk.district_id for bk in m.blocks if bk.attrs.get("pinned")}
     for d in m.districts:
+        if d.id in traced:
+            continue
         share, o, l_ = open_shares(spec, m)[d.id]
         lo, hi = ST.style_of(d.archetype).open_share
         if not (lo - OPEN_SHARE_TOL <= share <= hi + OPEN_SHARE_TOL):

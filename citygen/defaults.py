@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import zlib
 
+from shapely.geometry import Polygon
+
 from . import presets
 from .spec import (
     CitySpec,
@@ -143,6 +145,12 @@ def fill_defaults(spec: CitySpec) -> CitySpec:
             "name": f"{s.name} River"[:60], "from": presets.opposite(w.coast.side),
             "to": "bay" if w.coast.form in ("bay", "crescent") else "sea",
         })]
+    for isl in w.islands:
+        if isl.pinned is not None:
+            from . import pinned as PN
+
+            land = PN.load_cached(isl.pinned.source).land
+            isl.area_km2 = round(Polygon(land.exterior).area / 1e6, 4)
     for r in w.rivers:
         if r.width_m is None:
             r.width_m = (presets.CHANNEL_WIDTH_DEFAULT_M if r.kind == "channel"

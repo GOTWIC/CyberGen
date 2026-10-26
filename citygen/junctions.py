@@ -46,6 +46,7 @@ from . import trace as T
 CORNER_R = {"highway": 15.0, "avenue": 12.0, "service": 6.0, "alley": 3.0, "pedestrian": 1.0,
             "footbridge": 1.0}
 ROW_CORNER_MIN_M = 1.0
+CORNER_RUN_MAX_M = 60.0      # longest corner (fillet or sharp) along a leg
 CROSSWALK_W = 4.0
 CROSSWALK_SETBACK_M = 1.5
 SIGNAL_STREET_ARCH = ("corporate_core", "transit_hub", "midtown_mixed")
@@ -84,7 +85,7 @@ class Leg:
         self.d = _unit(q[0] - p[0], q[1] - p[1])
         self.ang = M.atan2(self.d[1], self.d[0])
         cs = seg["cross_section"]
-        self.cls = seg["road_class"]
+        self.cls = ST.street_class(seg)
         total = seg["width_m"]
         side = cs["sidewalk_m"][0] if cs.get("sidewalk_m") else 0.0
         if self.cls in ST.PEDESTRIAN:
@@ -108,7 +109,11 @@ class Leg:
 def _corner(P, a: Leg, b: Leg, ha: float, hb: float, r: float):
     """Fillet between leg a's left edge (offset ha) and leg b's right edge (offset hb), b
     counterclockwise from a. Returns (ta, tb, tangent point on a, on b, center, gap deg) or
-    None when the edges do not converge (a gap of 180 degrees or more)."""
+    None when the edges do not converge (a gap of 180 degrees or more). A fillet whose run
+    does not fit on the legs (0.45 of each, at most CORNER_RUN_MAX_M) becomes the sharp
+    corner where the edges meet (center None); where that does not fit either (a ramp gore,
+    whose edges meet hundreds of meters out), the corner is the node itself.
+    """
     da, db = a.d, b.d
     na, nb = _left(da), _left(db)
     sinp = da[0] * db[1] - da[1] * db[0]
@@ -125,6 +130,13 @@ def _corner(P, a: Leg, b: Leg, ha: float, hb: float, r: float):
     tl = r * (1.0 + cosp) / sinp
     ta = max(t1 + tl, 0.0)
     tb = max(t2 + tl, 0.0)
+    ra = min(0.45 * a.L, CORNER_RUN_MAX_M)
+    rb = min(0.45 * b.L, CORNER_RUN_MAX_M)
+    if ta > ra or tb > rb:
+        if t1 <= ra and t2 <= rb:
+            X = (P[0] + ha * na[0] + t1 * da[0], P[1] + ha * na[1] + t1 * da[1])
+            return max(t1, 0.0), max(t2, 0.0), X, X, None, gap
+        return 0.0, 0.0, P, P, None, gap
     Ta = (P[0] + ha * na[0] + ta * da[0], P[1] + ha * na[1] + ta * da[1])
     Tb = (P[0] - hb * nb[0] + tb * db[0], P[1] - hb * nb[1] + tb * db[1])
     O = (Ta[0] + r * na[0], Ta[1] + r * na[1])
@@ -200,8 +212,9 @@ def junction_polygon(legs: list[Leg], row: bool = False) -> Polygon:
         if c is not None:
             _, _, Ta, Tb, O, _ = c
             ring.append(Ta)
-            ring += _arc(O, Ta, Tb, r)
-            ring.append(Tb)
+            if O is not None:
+                ring += _arc(O, Ta, Tb, r)
+                ring.append(Tb)
         ring.append((P[0] + cb * b.d[0] - hb * nb[0], P[1] + cb * b.d[1] - hb * nb[1]))
     pts = ST._dedupe(ring)
     if len(pts) < 3:
@@ -630,7 +643,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                                     "archetype": node_arch[nid], "classes": ["street"]}})
     # sidewalks and centerline walkways
     for s in net.segments:
-        cls = s["road_class"]
+        cls = ST.street_class(s)
         pts = [tuple(p) for p in s["centerline"]]
         L = ST._plen(pts)
         a = cut.get((s["id"], s["start"]), 0.0)

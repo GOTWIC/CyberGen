@@ -40,6 +40,7 @@ from .presets import DIRECTION_VECTORS
 
 VERGE_W_M = 6.0
 MIN_BLOCK_M2 = 40.0
+PIN_LOT_GAP_M = 3.0             # lots keep this far from a traced building
 PLACE_AREA_M2 = {"plaza": (2500.0, 9000.0), "market": (1800.0, 6000.0),
                  "park": (9000.0, 40000.0), "garden": (1500.0, 6000.0),
                  "monument": (800.0, 2500.0), "station": (1500.0, 5000.0)}
@@ -399,7 +400,7 @@ def _district_lots(job: dict) -> dict:
     front = Frontage(job["segments"])
     land = G.diff(job["polygon"], job["wet"])
     row = G.union(job["row"])
-    for g in (row, job["reserves"], job["cones"], job["open_land"]):
+    for g in (row, job["reserves"], job["cones"], job["open_land"], job["pinned"]):
         land = G.diff(land, g)
     blocks, opens = [], []
     pieces = []
@@ -520,6 +521,10 @@ def build_blocks(spec, B, net, J, mapper=None) -> dict:
                      "wet": G.inter(B.wet, clip),
                      "row": [pieces[i] for i in sorted(int(k) for k in ptree.query(clip))],
                      "reserves": B.reserves, "cones": B.cones, "open_land": B.open_land,
+                     # traced buildings stand on their own ground, PIN_LOT_GAP_M around them
+                     "pinned": G.qpoly(G.inter(B.pin_feet, clip).buffer(
+                         PIN_LOT_GAP_M, join_style="mitre")) if not B.pin_feet.is_empty
+                     else Polygon(),
                      "cores": G.inter(cores, clip) if not cores.is_empty else Polygon(),
                      "segments": segs})
     mapper = mapper or (lambda fn, js: [fn(j) for j in js])
@@ -567,10 +572,57 @@ def build_blocks(spec, B, net, J, mapper=None) -> dict:
             lots_by_block.append((blk, fr, lots))
         T.detail(f"blocks/{did}", [b for b, _, _ in lots_by_block])
         _district_out(cx, out, d, did, st, lots_by_block, opens, ST._rng(d.seed, 41))
+    _pinned_lots(cx, out, net, pieces, ptree)
     finish_lots(out)
     _merged_groups(cx, out)
     T.detail("blocks/lots", [(l["id"], l["polygon"]) for l in out["lots"]])
     return out
+
+
+def _pinned_lots(cx: Ctx, out: dict, net, pieces, ptree) -> None:
+    """Every traced building gets a lot of its own: its footprint and PIN_LOT_GAP_M around it
+    (off the right of way and the water; where two grounds meet, the earlier keeps it), all
+    in one block per district (attrs `pinned`). M3 builds nothing else on them."""
+    from . import pinned as PN
+
+    B = cx.B
+    pins = PN.placed_islands(cx.spec, B.h)
+    for name in sorted(pins):
+        pin, dist = pins[name]
+        d = cx.spec.district(dist) if dist else None
+        if d is None or d.name not in B.polygons:
+            continue
+        did = B.did[d.name]
+        poly = B.polygons[d.name]
+        clip = G.qpoly(poly.buffer(30.0, join_style="mitre"))
+        row = G.union([pieces[i] for i in sorted(int(k) for k in ptree.query(clip))])
+        front = Frontage([s for s in net.segments
+                          if not G.apart(LineString(s["centerline"]), poly, s["width_m"])])
+        bid = f"{did}.blk000"
+        feet = G.union([pb.footprint for pb in pin.buildings])
+        taken = Polygon()
+        grounds = []
+        for pb in pin.buildings:
+            # the footprint, and the gap around it no other footprint or ground has
+            g = G.qpoly(pb.footprint.buffer(PIN_LOT_GAP_M, join_style="mitre"))
+            for cut in (B.wet, row, taken, feet):
+                g = G.diff(g, cut)
+            g = G.union([G.inter(g, poly), pb.footprint])
+            parts = sorted(G.parts(g), key=lambda x: (-G.area1(x), G.qbounds(x)))
+            if not parts:
+                continue
+            g = parts[0]
+            taken = G.union([taken, g])
+            grounds.append(g)
+            out["lots"].append({"block": bid, "polygon": g, "k": len(grounds) - 1,
+                                "fr": front.of(g), "district_id": did,
+                                "archetype": d.archetype, "merged_group_id": None,
+                                "attrs": {"pinned": pb.id}})
+        if grounds:
+            blk = G.union(grounds)
+            out["blocks"].append({"id": bid, "district_id": did, "archetype": d.archetype,
+                                  "polygon": blk, "area_m2": G.q(G.area1(blk)),
+                                  "frontage_ids": [], "attrs": {"pinned": name}})
 
 
 def _small_kind(arch: str, A: float) -> str:

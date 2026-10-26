@@ -1,5 +1,5 @@
-"""Command line: `citygen spec validate|render|schema`, `citygen build`, `citygen blockout`,
-`citygen model schema`, `citygen trace diff`.
+"""Command line: `citygen spec validate|render|schema|diff`, `citygen build`, `citygen
+blockout`, `citygen review`, `citygen model schema`, `citygen trace diff`.
 
 Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
 2 usage or file error.
@@ -194,6 +194,32 @@ def cmd_trace_diff(args: argparse.Namespace) -> int:
     return EXIT_INVALID
 
 
+def cmd_spec_diff(args: argparse.Namespace) -> int:
+    from .review import spec_diff
+
+    try:
+        a, b = (json.loads(Path(x).read_text(encoding="utf-8")) for x in (args.a, args.b))
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    lines = spec_diff(a, b)
+    print("\n".join(lines) if lines else "no changes")
+    return EXIT_OK
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    from .review import review
+
+    if not (Path(args.out_dir) / "report.json").is_file():
+        print(f"error: {args.out_dir}: no report.json (build first)", file=sys.stderr)
+        return EXIT_USAGE
+    rec = review(args.out_dir, args.spec, args.prev)
+    print(f"wrote {Path(args.out_dir) / 'review.md'} (round {rec['round']} of at most "
+          f"{rec['max_rounds']}; checks {'PASS' if rec['passed'] else 'FAIL'}; "
+          f"{len(rec['spec_changes'])} spec changes)")
+    return EXIT_OK if rec["passed"] else EXIT_INVALID
+
+
 def cmd_model_schema(args: argparse.Namespace) -> int:
     from .model import json_schema
 
@@ -220,6 +246,10 @@ def build_parser() -> argparse.ArgumentParser:
     sc = ssub.add_parser("schema", help="print or write the spec JSON Schema")
     sc.add_argument("out", nargs="?")
     sc.set_defaults(func=cmd_spec_schema)
+    sd = ssub.add_parser("diff", help="parameter changes between two specs")
+    sd.add_argument("a")
+    sd.add_argument("b")
+    sd.set_defaults(func=cmd_spec_diff)
 
     b = sub.add_parser("build", help="build the city model, checks and previews (water, "
                                      "districts, roads, streets, lots, buildings)")
@@ -242,6 +272,13 @@ def build_parser() -> argparse.ArgumentParser:
     bo.add_argument("out_dir")
     _blockout_args(bo)
     bo.set_defaults(func=cmd_blockout)
+
+    rv = sub.add_parser("review", help="art-direction review sheet of a build (review.md): "
+                                       "checks, numbers, changes since the last round")
+    rv.add_argument("out_dir", help="a `citygen build` output folder")
+    rv.add_argument("--spec", help="the spec it was built from (kept for the next round)")
+    rv.add_argument("--prev", metavar="PREV_OUT_DIR", help="the previous round's folder")
+    rv.set_defaults(func=cmd_review)
 
     tr = sub.add_parser("trace", help="build trace tools")
     tsub = tr.add_subparsers(dest="command", required=True)

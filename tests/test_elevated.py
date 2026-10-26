@@ -14,7 +14,7 @@ from citygen.build import build_city
 from citygen.model import CityModel
 from citygen.validate import validate_spec
 
-from conftest import SMALL
+from conftest import MINIMAL, SMALL
 
 M7_CHECKS = {"road_grades", "level_continuity", "deck_clearance", "ramps_land",
              "road_supports"}
@@ -83,6 +83,19 @@ def test_ramps_are_one_way_single_lane(city):
         assert s.one_way, s.id
         assert s.road_class == "highway" and s.type == "road.highway.ramp"
         assert s.attrs.get("interchange") and s.attrs.get("template")
+
+
+def test_junctions_stay_at_their_node(city):
+    # a ramp leaves its deck at a few degrees: the corner fillet there would run for
+    # hundreds of meters, so it is dropped and the junction closes across the gore
+    from citygen import geom as G
+    m = city.model
+    at = {n.id: n.position for n in m.road_nodes}
+    assert any(s.attrs.get("role") == "ramp" for s in m.road_segments)
+    for j in m.junctions:
+        x, y = at[j.node_id][:2]
+        x0, y0, x1, y1 = G.from_model_poly(j.polygon).bounds
+        assert max(x - x0, x1 - x, y - y0, y1 - y) < 120.0, j.id
 
 
 def test_report_has_elevated_stats(city):
@@ -202,3 +215,106 @@ def test_blockout_draws_viaducts_and_columns(city):
     plan = BO.make_plan(city.model)
     assert "elevated" in {o["category"] for o in plan["objects"]}
     assert "road_support" in plan["materials"]
+
+
+# --- M7b: partial cloverleaf and trumpet --------------------------------------------------
+
+def test_loops_where_diamonds_do_not_fit(monkeypatch):
+    """With no diamond ramp possible, crossings take loop ramps (a partial cloverleaf): every
+    M7 check still passes, and each loop climbs at most 6% over its 270 degree turn."""
+    monkeypatch.setattr(EL.Elev, "_ramp", lambda self, *a, **k: (None, "test: no diamond"))
+    b = _build(copy.deepcopy(SMALL))
+    failed = [(c.id, c.failures[:3]) for c in b.checks if not c.passed]
+    assert not failed, failed
+    st = b.stats["elevated"]
+    assert st["interchanges"].get("parclo", 0) >= 1
+    loops = [s for s in b.model.road_segments if s.attrs.get("template") == "parclo"]
+    assert loops and all(s.one_way and s.attrs["role"] == "ramp" for s in loops)
+
+    def ratio(s):
+        a, z = s.centerline[0], s.centerline[-1]
+        return LineString(s.centerline).length / max(
+            ((a[0] - z[0]) ** 2 + (a[1] - z[1]) ** 2) ** 0.5, 1.0)
+    # a loop turns about 270 degrees: much longer than the distance between its ends
+    assert max(ratio(s) for s in loops) > 2.5
+
+
+def test_trumpet_geometry(monkeypatch):
+    """A ground highway stem at a crossing of a test city's viaduct: the stem's stub runs
+    under the deck to the far side, where two loops (the left turns) come down to its end;
+    each loop clears the deck and the stub, at most 6% steep."""
+    seen = {}
+    orig = EL.Elev.interchanges
+
+    def keep(self):
+        seen["E"] = self
+        return orig(self)
+
+    monkeypatch.setattr(EL.Elev, "interchanges", keep)
+    build_city(validate_spec(copy.deepcopy(MINIMAL)), local=False, buildings=False, workers=1)
+    E = seen["E"]
+    found = None
+    for r in sorted(E.runs, key=lambda r: r.id):
+        hw_w = max(s["width_m"] for s, _ in r.segs)
+        for k in range(1, len(r.nodes) - 1):
+            n = r.nodes[k]
+            on = {r.segs[k - 1][0]["id"], r.segs[k][0]["id"]}
+            legs = [s for s in E.inc[n] if s["id"] not in on]
+            C, u = EL._at(r.pts, r.cum, r.s_nodes[k])
+            for leg in legs:
+                v = E.leg_dir(leg, n)
+                sigma = 1 if u[0] * v[1] - u[1] * v[0] > 0 else -1
+                ic = {"id": "ic99"}
+                tr = E._trumpet(r, k, n, leg, -sigma, hw_w, legs, ic, C, u, v)
+                if tr is not None:
+                    found = (r, tr, hw_w)
+                    break
+            if found:
+                break
+        if found:
+            break
+    assert found is not None, "no crossing of the minimal test city takes a trumpet"
+    r, tr, hw_w = found
+    loops = tr["ramps"]
+    assert sorted(rp["kind"] for rp in loops) == ["off", "on"]
+    assert all(rp["loop"] and rp["stub"] for rp in loops)
+    assert tuple(loops[0]["T"]) == tuple(loops[1]["T"]) == tuple(tr["end"])
+    for rp in loops:
+        for (s0, z0), (s1, z1) in zip(rp["prof"], rp["prof"][1:]):
+            assert (abs(z1 - z0) - 0.01) / (s1 - s0) <= EL.MAX_GRADE + 1e-6
+        ends = [rp["prof"][0][1], rp["prof"][-1][1]]
+        assert min(ends) == 0.0 and max(ends) > 2.0
+
+
+# --- M7b: art-direction loop ----------------------------------------------------------------
+
+def test_spec_diff_matches_named_items():
+    from citygen.review import spec_diff
+
+    a = {"seed": 1, "districts": [{"name": "A", "height_m": [10, 40]}, {"name": "B"}]}
+    b = {"seed": 2, "districts": [{"name": "B"}, {"name": "A", "height_m": [12, 50]}]}
+    out = spec_diff(a, b)
+    assert "seed: 1 -> 2" in out
+    assert "districts[A].height_m: [10, 40] -> [12, 50]" in out
+    assert "districts: order changed" in out
+    assert spec_diff(a, a) == []
+
+
+def test_review_rounds(city, tmp_path):
+    from citygen import review as RV
+
+    r1, r2 = tmp_path / "r1", tmp_path / "r2"
+    for d in (r1, r2):
+        d.mkdir()
+        (d / "report.json").write_text(json.dumps(city.report()))
+    spec = tmp_path / "spec.json"
+    spec.write_text(json.dumps(SMALL))
+    a = RV.review(r1, spec)
+    assert a["round"] == 1 and a["passed"] and (r1 / "review.md").is_file()
+    changed = copy.deepcopy(SMALL)
+    changed["seed"] = 8
+    spec.write_text(json.dumps(changed))
+    b = RV.review(r2, spec, prev=r1)
+    assert b["round"] == 2 and b["spec_changes"] == ["seed: 7 -> 8"]
+    md = (r2 / "review.md").read_text()
+    assert "round 2 of at most 3" in md and "`seed: 7 -> 8`" in md

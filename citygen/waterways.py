@@ -535,6 +535,7 @@ def build_waterways(spec: CitySpec, h: H.Hydro, polygons: dict[str, object],
             recs.append(WaterwayRec(ids[i], KIND[style], style, d.name, cl, p,
                                     name_of.get(i), conn))
         out.items += recs
+    _pinned_pools(spec, h, district_ids, out)
     _quays(h, out)
     for w in out.items:  # stage boundary: hand on grid coordinates
         w.polygon = G.qpoly(w.polygon)
@@ -542,6 +543,26 @@ def build_waterways(spec: CitySpec, h: H.Hydro, polygons: dict[str, object],
     for qy in out.quays:
         qy.line = G.qline(qy.line)
     return out
+
+
+def _pinned_pools(spec: CitySpec, h: H.Hydro, district_ids: dict[str, str],
+                  out: Waterways) -> None:
+    """The water pockets of a traced island (holes in its coast, polygons on its water layer):
+    ornamental basins at sea level in the district on it."""
+    from . import pinned as PN
+
+    pins = PN.placed_islands(spec, h)
+    for name in sorted(pins):
+        pin, dist = pins[name]
+        if dist is None or dist not in district_ids:
+            continue
+        did = district_ids[dist]
+        polys = [Polygon(r) for r in pin.land.interiors] + \
+            [a.polygon for a in pin.areas if a.kind == "water"]
+        k0 = sum(1 for w in out.items if w.district == dist)
+        for k, pg in enumerate(polys):
+            out.items.append(WaterwayRec(f"{did}.ww{k0 + k + 1:02d}", "basin", "pinned", dist,
+                                         None, G.qpoly(pg), None, None, ornamental=True))
 
 
 def _quays(h: H.Hydro, ww: Waterways) -> None:

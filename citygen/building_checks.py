@@ -107,6 +107,9 @@ class _B:
         host open spaces."""
         if b.megasite_id:
             return self.site_poly.get(b.megasite_id)
+        if b.attrs.get("pinned") and not b.lot_id and b.district_id in self.district:
+            # a traced building stands where it was drawn, on its district's land
+            return G.from_model_poly(self.district[b.district_id].polygon)
         polys = []
         p = self.prop.get(b.property_id)
         ids = list(p.lot_ids) if p is not None and p.lot_ids else ([b.lot_id] if b.lot_id
@@ -408,11 +411,11 @@ def check_overlaps(m: CityModel, bx: _B):
 def check_heights(spec: CitySpec, m: CityModel, bx: _B):
     c = _check("building_heights", "Building heights within the district's archetype range "
                                    "(under a flight-cone cap where one applies; parking "
-                                   "structures only under the top); landmarks and megasites "
-                                   "aside")
+                                   "structures only under the top); landmarks, megasites "
+                                   "and traced buildings aside")
     rng = {d.name: d.height_m for d in spec.districts}
     for b in m.buildings:
-        if b.landmark or b.megasite_id or not b.district_id:
+        if b.landmark or b.megasite_id or not b.district_id or b.attrs.get("pinned"):
             continue
         d = bx.district[b.district_id]
         lo, hi = rng[d.name]

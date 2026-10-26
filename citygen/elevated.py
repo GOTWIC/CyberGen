@@ -45,6 +45,7 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString, Point
 
+from . import dmath as M
 from . import geom as G
 
 LEVEL_Z = {1: 9.0, 2: 18.0}     # deck tops
@@ -64,6 +65,10 @@ TERMINAL_GAP_M = 30.0           # a terminal from the avenue's other nodes
 PLATEAU_M = 60.0                # shortest full-height stretch of a run
 DIAMOND_ROOM_M = 280.0          # run on each side of a crossing for its diamond
 MIN_SKEW_SIN = 0.7              # ramps only where the avenue crosses at 45 degrees or more
+LOOP_SKEW_SIN = 0.7             # loop ramps (partial cloverleaf): as diamonds (the clearance test does the rest)
+LOOP_MIN_R = 35.0               # loop ramp radius (from the climb: about 45 m for a 9 m deck)
+LOOP_LEAD_M = 30.0              # straight from the loop to its terminal on the avenue
+LOOP_CLEAR_M = 2.0              # between a loop's lead and the avenue edge
 STRAIGHT_COS = 0.819            # an avenue passes under straight on (35 degrees at most)
 OVERPASS_SKEW_SIN = 0.574       # and crosses under at 35 degrees or more (columns fit)
 
@@ -308,6 +313,8 @@ class Elev:
                     key=lambda s: s["id"])
         for s in hw:
             s["attrs"]["elevated"] = False
+        # traced roads stay as drawn (their own `elevated road` layer marks decks)
+        hw = [s for s in hw if "pinned" not in s["attrs"]]
         share = spec.highways.elevated_share
         total = sum(s["attrs"]["length_m"] for s in hw)
         if not hw or share <= 0:
@@ -490,6 +497,11 @@ class Elev:
                     skew >= OVERPASS_SKEW_SIN else "split"
             return "split"
         if cls == {"highway"}:
+            if len(others) == 1 and not self.is_elev(others[0]):
+                # a ground highway stem crossing under at 45 degrees or more: a trumpet
+                v = self.leg_dir(others[0], n)
+                if abs(u[0] * v[1] - u[1] * v[0]) >= MIN_SKEW_SIN:
+                    return "tee"
             return "branch"
         return "split"
 
@@ -824,8 +836,10 @@ class Elev:
             return (pts, prof, s_far), None
         return None, why
 
-    def _ramp_clear(self, pts, r: Run, legs, T, hw_w: float) -> str | None:
-        """Why a ramp polyline does not fit (None when it does)."""
+    def _ramp_clear(self, pts, r: Run, legs, T, hw_w: float, tail_m: float | None = None
+                    ) -> str | None:
+        """Why a ramp polyline does not fit (None when it does). Its last `tail_m` toward the
+        terminal may come near the avenue it lands on (a loop's lead runs beside it)."""
         ctx = self.ctx
         line = LineString(pts)
         half = RAMP_W / 2.0
@@ -844,7 +858,7 @@ class Elev:
             need = s["width_m"] / 2.0 + half + 2.0
             if s["id"] in leg_ids:
                 # the terminal end crosses the avenue: only the last stretch may
-                d = need / MIN_SKEW_SIN + 2.0
+                d = need / MIN_SKEW_SIN + 2.0 if tail_m is None else tail_m
                 tail = _tail_off(pts, d) if tuple(pts[-1]) == tuple(T) else \
                     _tail_off(pts[::-1], d)
                 if tail is not None and G.dist(LineString(tail), ln) < need:
@@ -858,6 +872,180 @@ class Elev:
             if G.dist(line, LineString(rp["pts"])) < RAMP_W + 1.0:
                 return "another ramp"
         return None
+
+    def _loop(self, r: Run, k: int, leg, sigma: int, kind: str, hw_w: float):
+        """A 270 degree loop ramp (partial cloverleaf) on side sigma: an off loop leaves the
+        deck just past the avenue and turns right round the quadrant beyond it down to the
+        avenue; an on loop is its mirror before the avenue. Its radius is the one the climb
+        needs. Returns ((polyline in driving direction, profile, run station of its deck end,
+        terminal), None) or (None, reason)."""
+        n = r.nodes[k]
+        sN = r.s_nodes[k]
+        _, u = _at(r.pts, r.cum, sN)
+        v = self.leg_dir(leg, n)
+        if abs(u[0] * v[1] - u[1] * v[0]) < LOOP_SKEW_SIN:
+            return None, "loop: skewed crossing"
+        dirn = 1 if sigma == -1 else -1             # right-hand traffic on side sigma
+        o = hw_w / 2.0 + RAMP_GAP + RAMP_W / 2.0
+        av = leg["width_m"] / 2.0
+        x_d = av + RAMP_GAP + 2.0                   # diverge just past the avenue's edge
+        mirror = 1.0 if kind == "off" else -1.0
+        s_far = sN + dirn * mirror * x_d
+        if not 0.0 < s_far < r.L:
+            return None, "loop: off the run"
+        z_d = r.z(s_far)
+        if z_d < 2.0:
+            return None, "loop: deck too low"
+        R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(z_d) - LOOP_LEAD_M) /
+                                            (1.5 * math.pi) / 5.0))
+        # the tightest loop: its start moves along the deck (5 m at a time) until the circle
+        # clears the run and the avenue it comes back to
+        leg_line = LineString(leg["centerline"])
+        run_line = LineString(r.pts)
+        need_av = av + RAMP_W / 2.0 + LOOP_CLEAR_M
+        need_run = hw_w / 2.0 + RAMP_W / 2.0 + 1.0
+        found = None
+        x1 = x_d + 30.0
+        while x1 <= x_d + 30.0 + 3.0 * R:
+            s1 = sN + dirn * mirror * x1
+            if not 0.0 < s1 < r.L:
+                break
+            nt = max(int((x1 - x_d) / STEP_M), 2)
+            pts = []
+            for i in range(nt + 1):
+                st = s_far + (s1 - s_far) * i / nt
+                Cs, us = _at(r.pts, r.cum, st)
+                off = o * _smoothstep(i / nt)
+                pts.append((Cs[0] - us[1] * off * sigma, Cs[1] + us[0] * off * sigma))
+            C1, u1 = _at(r.pts, r.cum, s1)
+            hx, hy = dirn * u1[0], dirn * u1[1]        # traffic heading there
+            if mirror < 0:
+                hx, hy = -hx, -hy                       # built backwards from the merge
+            rx, ry = -u1[1] * sigma, u1[0] * sigma      # outward there
+            P1 = pts[-1]
+            cx_, cy_ = P1[0] + rx * R, P1[1] + ry * R
+            for deg in range(5, 271, 5):
+                a = M.radians(float(deg))
+                # from P1 (radial -r) round toward the heading and outward
+                pts.append((cx_ + R * (M.sin(a) * hx - M.cos(a) * rx),
+                            cy_ + R * (M.sin(a) * hy - M.cos(a) * ry)))
+            arc = LineString(pts[nt + 2:])
+            if G.dist(arc, run_line) >= need_run and G.dist(arc, leg_line) >= need_av:
+                found = (pts, nt, rx, ry)
+                break
+            x1 += 5.0
+        if found is None:
+            return None, "loop: no room beside the avenue"
+        pts, nt, rx, ry = found
+        end = pts[-1]
+        y_T = o + R - LOOP_LEAD_M
+        t_ = self._terminal(r, k, leg, sigma, y_T)
+        if t_ is None:
+            return None, "loop: avenue leg too short"
+        T, _, _, along = t_
+        why = self._terminal_ok(leg, n, T, along)
+        if why:
+            return None, "loop: " + why
+        # 10 m on straight off the loop (inward, toward the run), then to the terminal
+        pts.append((end[0] - rx * 10.0, end[1] - ry * 10.0))
+        pts = [G.qpoint(p) for p in pts]
+        pts[0] = G.qpoint(_at(r.pts, r.cum, s_far)[0])
+        arc = [G.qpoint(p) for p in found[0][nt:-1]]   # the loop alone
+        pts = _dedupe(pts + [T])
+        body = pts[nt:]          # off the deck (the taper is on it, over the avenue)
+        # the profile in the off direction: on the deck along the taper, then down at the
+        # design grade to the terminal
+        Lr = _cum(pts)[-1]
+        cum = _cum(pts)
+        q1 = cum[nt]
+        qs = _stations(Lr)
+        raw = []
+        for qd in qs:
+            if qd <= q1:
+                f = qd / q1 if q1 > 0 else 0.0
+                raw.append(r.z(sN + dirn * mirror * (x_d + (x1 - x_d) * f)))
+            else:
+                raw.append(min(r.z(sN + dirn * mirror * x1), GRADE * max(0.0, Lr - qd - FLAT_M)))
+        z = smooth(raw)
+        for i, qd in enumerate(qs):
+            if qd <= q1 - CURVE_M / 2.0:
+                z[i] = raw[i]
+        z[0], z[-1] = z_d, 0.0
+        prof = compress(list(zip(qs, z)))
+        if any(s1 > s0 and abs(z1 - z0) / (s1 - s0) > MAX_GRADE - 1e-9
+               for (s0, z0), (s1, z1) in zip(prof, prof[1:])):
+            return None, "loop: too steep"
+        if kind == "on":
+            pts, body = pts[::-1], body[::-1]
+            prof = [(G.q(Lr - qd), zz) for qd, zz in reversed(prof)]
+            prof[0] = (0.0, prof[0][1])
+        return (pts, prof, s_far, T, body, arc), None
+
+    def _loops(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs, ic) -> list:
+        """The loop ramps that fit on side sigma (not yet added)."""
+        out = []
+        for kind in ("off", "on"):
+            res, why = self._loop(r, k, leg, sigma, kind, hw_w)
+            if res is not None:
+                pts, prof, s_far, TL, body, arc = res
+                why = self._ramp_clear(body, r, legs, TL, hw_w, LOOP_LEAD_M + 5.0)
+                if why is None and G.dist(LineString(pts), self.ctx.wet) < RAMP_W / 2.0 + 1.0:
+                    why = "water"
+                if why is None and any(abs(sn - s_far) < 1.0 for sn in
+                                       self.cut_pts.get(r.id, [])):
+                    why = "loop: another ramp end there"
+                if why is None and any(G.dist(LineString(arc), LineString(o["arc"])) <
+                                       RAMP_W + 1.0 for o in out):
+                    why = "loop: the other loop"     # (their leads meet at the terminal)
+            if why is not None:
+                why = why.split(" rs")[0]
+                self.failed[why] = self.failed.get(why, 0) + 1
+                continue
+            out.append({"pts": pts, "prof": prof, "kind": kind, "T": TL, "run": r.id,
+                        "s_far": s_far, "ic": ic["id"], "sigma": sigma, "leg": leg["id"],
+                        "node": n, "stub": False, "loop": True, "arc": arc})
+        for rp in out:
+            rp.pop("arc")
+        return out
+
+    def _trumpet(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs, ic, C, u,
+                 v) -> dict | None:
+        """A ground highway stem meeting the run at a T: the stem runs on under the deck to a
+        stub on the far side (sigma), where a loop in each far quadrant comes down to it (the
+        two left turns: far lanes to the stem, stem to the far lanes; one ramp cannot fly over
+        another yet, so the classic trumpet's flyover is a second loop). The near lanes take
+        the near ramps. Returns the far loops, the stub's end (their shared terminal) and the
+        stem id, or None."""
+        sN = r.s_nodes[k]
+        skew = abs(u[0] * v[1] - u[1] * v[0])
+        o = hw_w / 2.0 + RAMP_GAP + RAMP_W / 2.0
+        top = r.z(sN)
+        R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(top) - LOOP_LEAD_M) /
+                                            (1.5 * math.pi) / 5.0))
+        # a stub past the loops (they must clear it all the way; it is cut back to their
+        # terminal once they are built)
+        y_e = o + 2.0 * R + 20.0
+        Te = G.qpoint((C[0] - v[0] * y_e / skew, C[1] - v[1] * y_e / skew))
+        stub = LineString([G.qpoint(C), Te])
+        ctx = self.ctx
+        if not ctx.dry_inner.contains(Point(Te)) or G.dist(stub, ctx.wet) <= 8.0 or (
+                not ctx.closed_all.is_empty and G.dist(stub, ctx.closed_all) <= 8.0):
+            self.failed["trumpet: no room for the stub"] = \
+                self.failed.get("trumpet: no room for the stub", 0) + 1
+            return None
+        L = _d(G.qpoint(C), Te)
+        virt = {"id": leg["id"], "centerline": [G.qpoint(C), Te], "start": n, "end": "",
+                "width_m": leg["width_m"], "road_class": leg["road_class"],
+                "attrs": {"length_m": G.q(L)}, "z_profile": [{"s": 0.0, "z": 0.0},
+                                                            {"s": G.q(L), "z": 0.0}]}
+        loops = self._loops(r, k, n, virt, sigma, hw_w, legs, ic)
+        if len(loops) < 2 or tuple(loops[0]["T"]) != tuple(loops[1]["T"]):
+            self.failed["trumpet: the far loops do not fit"] = \
+                self.failed.get("trumpet: the far loops do not fit", 0) + 1
+            return None
+        for rp in loops:
+            rp["stub"] = True
+        return {"ramps": loops, "end": tuple(loops[0]["T"]), "leg": leg["id"]}
 
     def interchange(self, r: Run, k: int, kd: str) -> None:
         n = r.nodes[k]
@@ -890,7 +1078,18 @@ class Elev:
                 continue
             terminals[sigma] = (T, sT, leg)
         stub_side = None
-        if kd == "tee":
+        trumpet = None
+        if kd == "tee" and sides[0][1]["road_class"] == "highway":
+            sigma_a, leg = sides[0]
+            v = self.leg_dir(leg, n)
+            trumpet = self._trumpet(r, k, n, leg, -sigma_a, hw_w, legs, ic, C, u, v)
+            if trumpet is not None:
+                stub_side = -sigma_a
+                for rp in trumpet["ramps"]:
+                    self.ramps.append(rp)
+                    self.cut_pts[r.id].append(rp["s_far"])
+                built += trumpet["ramps"]
+        if kd == "tee" and trumpet is None:
             sigma_a, leg = sides[0]
             v = self.leg_dir(leg, n)
             skew = abs(u[0] * v[1] - u[1] * v[0])
@@ -908,6 +1107,7 @@ class Elev:
                     stub_side = -sigma_a
         for sigma in sorted(terminals, reverse=True):
             T, sT, leg = terminals[sigma]
+            side = []
             for kind in ("off", "on"):
                 res, why = self._ramp(r, T, sT, sigma, kind, hw_w)
                 if res is not None:
@@ -919,10 +1119,32 @@ class Elev:
                     continue
                 rp = {"pts": pts, "prof": prof, "kind": kind, "T": T, "run": r.id,
                       "s_far": s_far, "ic": ic["id"], "sigma": sigma, "leg": leg["id"],
-                      "node": n, "stub": sigma == stub_side}
+                      "node": n, "stub": sigma == stub_side, "loop": False}
                 self.ramps.append(rp)
-                built.append(rp)
+                side.append(rp)
                 self.cut_pts[r.id].append(s_far)
+            if kd == "cross" and len(side) < 2:
+                # partial cloverleaf: loops in the two quadrants of this side instead
+                loops = self._loops(r, k, n, leg, sigma, hw_w, legs, ic)
+                if len(loops) > len(side):
+                    for rp in side:
+                        self.ramps.remove(rp)
+                        self.cut_pts[r.id].remove(rp["s_far"])
+                    side = []
+                    for rp in loops:
+                        self.ramps.append(rp)
+                        side.append(rp)
+                        self.cut_pts[r.id].append(rp["s_far"])
+            built += side
+        if kd == "cross":
+            # a side whose diamond terminal does not work may still take loops
+            for sigma, leg in sides:
+                if sigma in terminals:
+                    continue
+                for rp in self._loops(r, k, n, leg, sigma, hw_w, legs, ic):
+                    self.ramps.append(rp)
+                    built.append(rp)
+                    self.cut_pts[r.id].append(rp["s_far"])
         # an avenue that ends at a terminal (a stub, or a T whose stub failed) needs both
         # ramps there: its lanes turn back nowhere else
         def unbuild(rps, why):
@@ -943,17 +1165,24 @@ class Elev:
             ic["template"] = "none"
             self.icx.append(ic)
             return
-        ic["ramps"] = [f"{rp['kind']}:{rp['sigma']}" for rp in built]
-        ic["template"] = ("diamond" if kd == "cross" else "diamond_stub") if built else \
+        ic["ramps"] = [f"{rp['kind']}:{rp['sigma']}{':loop' if rp['loop'] else ''}"
+                       for rp in built]
+        ic["template"] = ("trumpet" if trumpet is not None else
+                          "parclo" if any(rp["loop"] for rp in built) else
+                          "diamond" if kd == "cross" else "diamond_stub") if built else \
             "overpass"
         self.icx.append(ic)
         sides_used = sorted({rp["sigma"] for rp in built})
         for sigma in sides_used:
+            if trumpet is not None and sigma == stub_side:
+                # the stem runs on under the deck to the stub's end; the far ramps land on it
+                self.stubs[(trumpet["leg"], n)] = trumpet["end"]
+                continue
             T, sT, leg = terminals[sigma]
             if sigma == stub_side:
                 self.stubs[(leg["id"], n)] = T
-            else:
-                self.avenue_cuts.setdefault(leg["id"], []).append(T)
+        for T, lid in sorted({(tuple(rp["T"]), rp["leg"]) for rp in built if not rp["stub"]}):
+            self.avenue_cuts.setdefault(lid, []).append(T)
         if kd == "tee" and stub_side is not None and stub_side not in sides_used:
             near = [s for s in sides_used if s != stub_side]
             if near:
@@ -1399,6 +1628,21 @@ def _envelope(net, apart: dict | None = None, extra: dict | None = None) -> None
         s["z_profile"] = _rows(compress(prof))
 
 
+def _node_heights(net) -> None:
+    """Without a viaduct (no rebuild): every node at the height its roads meet it (a bridge
+    approach can reach a node)."""
+    zs: dict = {}
+    for s in net.segments:
+        prof = _tuples(s["z_profile"])
+        if not prof:
+            continue
+        for nid, z in ((s["start"], prof[0][1]), (s["end"], prof[-1][1])):
+            zs[nid] = max(zs.get(nid, 0.0), G.q(z))
+    for n in net.nodes:
+        x, y = n["position"][0], n["position"][1]
+        n["position"] = (x, y, zs.get(n["id"], 0.0))
+
+
 def _weights(spec, ctx, net) -> dict:
     """Per highway segment: the tallest archetype height among the districts it serves
     (dense districts get the viaducts)."""
@@ -1420,6 +1664,7 @@ def elevate(spec, ctx, net) -> dict:
     if spec.highways.elevated_share <= 0 or not any(
             s["road_class"] == "highway" for s in net.segments):
         solve_grades(net)
+        _node_heights(net)
         return {"runs": 0, "notes": []}
     E = Elev(ctx, net)
     E.select(spec, _weights(spec, ctx, net))
@@ -1447,6 +1692,7 @@ def elevate(spec, ctx, net) -> dict:
         E.forced |= set(bad)
     E.icx = [ic for ic in E.icx if ic["template"] != "none"]
     if not E.runs:
+        _node_heights(net)
         return {"runs": 0, "notes": E.notes}
     rebuild(E)
     if E.failed:
@@ -1598,11 +1844,99 @@ def road_supports(m) -> list[dict]:
                 h = size / 2.0
                 ring = [G.qpoint((P[0] + ca * a - sa * b, P[1] + sa * a + ca * b))
                         for a, b in ((-h, -h), (h, -h), (h, h), (-h, h))]
-                out.append({"id": f"{s.id}.col{n:03d}", "type": "structure", "kind": "column",
-                            "z0_m": 0.0, "z1_m": G.q(top),
-                            "footprint": G.to_model_poly(shapely.Polygon(ring)),
-                            "supports": [s.id],
-                            "attrs": {"road_id": s.id, "road_class": s.road_class,
-                                      "s_m": G.q(sx)}})
+                out.append(_column(s, n, P, u, size, top, sx))
                 break
+    _fill_gaps(cx, out, m)
     return out
+
+
+def _column(s, n: int, P, u, size: float, top: float, sx: float) -> dict:
+    ca, sa = u[0], u[1]
+    h = size / 2.0
+    ring = [G.qpoint((P[0] + ca * a - sa * b, P[1] + sa * a + ca * b))
+            for a, b in ((-h, -h), (h, -h), (h, h), (-h, h))]
+    return {"id": f"{s.id}.col{n:03d}", "type": "structure", "kind": "column",
+            "z0_m": 0.0, "z1_m": G.q(top), "footprint": G.to_model_poly(shapely.Polygon(ring)),
+            "supports": [s.id],
+            "attrs": {"road_id": s.id, "road_class": s.road_class, "s_m": G.q(sx)}}
+
+
+def _fill_gaps(cx: dict, out: list, m) -> None:
+    """Where the regular spots are all taken (a crossing crowded by the road under it and the
+    ramps beside it), a stretch of deck left more than half the largest span from any column
+    gets one at the nearest free spot within 30 m along it (across the whole deck width),
+    past its end nodes onto the raised segments there when the segment is short."""
+    half = SUPPORT_MAX_GAP_M / 2.0
+    wet = cx["wtree"]
+    cols = [G.from_model_poly(c["footprint"]).centroid for c in out]
+    ctree = shapely.STRtree(cols) if cols else None
+    added: list = []
+    raised = raised_segments(m)
+    geo = {}
+    at_node: dict = {}
+    for s in raised:
+        pts = [tuple(p) for p in s.centerline]
+        geo[s.id] = (pts, _cum(pts), [(z.s, z.z) for z in s.z_profile])
+        at_node.setdefault(s.start, []).append(s)
+        at_node.setdefault(s.end, []).append(s)
+    count: dict = {}
+    for c in out:
+        count[c["attrs"]["road_id"]] = count.get(c["attrs"]["road_id"], 0) + 1
+
+    def spots(s, here: float, k: int):
+        """Positions k m from `here` along s, or past its ends on the raised segments
+        there, as (segment, s along it)."""
+        L = geo[s.id][1][-1]
+        for sx in sorted({here + k, here - k}):
+            if 2.0 < sx < L - 2.0:
+                yield s, sx
+        for nid, rest in ((s.start, k - here), (s.end, k - (L - here))):
+            if rest <= 2.0:
+                continue
+            for o in sorted(at_node.get(nid, []), key=lambda x: x.id):
+                if o.id == s.id:
+                    continue
+                Lo = geo[o.id][1][-1]
+                sx = rest if o.start == nid else Lo - rest
+                if 2.0 < sx < Lo - 2.0:
+                    yield o, sx
+
+    for s in raised:
+        pts, cum, prof = geo[s.id]
+        L = cum[-1]
+        d = 2.5
+        while d < L:
+            here, d = d, d + 5.0
+            if under_m(_z_at(prof, here)) < SUPPORT_MIN_UNDER_M:
+                continue
+            P0, _ = _at(pts, cum, here)
+            p0 = Point(P0)
+            if wet is not None and len(wet.query(p0.buffer(3.0), predicate="intersects")):
+                continue
+            if (ctree is not None and len(ctree.query(p0, predicate="dwithin",
+                                                      distance=half))) or \
+                    any(G.dist(q, p0) <= half for q in added):
+                continue
+            done = False
+            for k in range(0, 31, 2):
+                for o, sx in spots(s, here, k):
+                    opts, ocum, oprof = geo[o.id]
+                    top = under_m(_z_at(oprof, sx))
+                    if top < SUPPORT_MIN_UNDER_M:
+                        continue
+                    size = COLUMN_DEFAULT_M if o.attrs.get("role") == "ramp" else \
+                        COLUMN_M.get(o.road_class, COLUMN_DEFAULT_M)
+                    lat = o.width_m / 2.0 - size / 2.0 - 0.5
+                    P, u = _at(opts, ocum, sx)
+                    for side in (0.0, lat / 2.0, -lat / 2.0, lat, -lat):
+                        Q = G.qpoint((P[0] - u[1] * side, P[1] + u[0] * side))
+                        if column_free(cx, o, Q, size, top):
+                            count[o.id] = count.get(o.id, 0) + 1
+                            out.append(_column(o, count[o.id], Q, u, size, top, sx))
+                            added.append(Point(Q))
+                            done = True
+                            break
+                    if done:
+                        break
+                if done:
+                    break

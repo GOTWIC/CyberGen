@@ -558,6 +558,18 @@
           "maximum": 20.0,
           "title": "Area Km2",
           "type": "number"
+        },
+        "pinned": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pinned"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The island is a traced district (its coast, roads and buildings kept as drawn); area_km2 then comes from the tracing."
         }
       },
       "required": [
@@ -788,6 +800,30 @@
         "route"
       ],
       "title": "NamedHighway",
+      "type": "object"
+    },
+    "Pinned": {
+      "additionalProperties": false,
+      "description": "A traced district imported as fixed (scope 4.3).",
+      "properties": {
+        "source": {
+          "description": "Repo path of the traced SVG, in the conventions of maps/corporate_core_v*.svg (coast, highway, building, landmark layers).",
+          "title": "Source",
+          "type": "string"
+        },
+        "rotation_deg": {
+          "default": 0.0,
+          "description": "Counterclockwise turn of the traced map.",
+          "maximum": 360.0,
+          "minimum": -360.0,
+          "title": "Rotation Deg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "Pinned",
       "type": "object"
     },
     "Place": {

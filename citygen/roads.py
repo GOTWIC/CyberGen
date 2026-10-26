@@ -107,6 +107,7 @@ class Road:
     name: str | None = None
     district: str | None = None
     causeway: bool = False
+    pin: dict | None = None       # a traced road (role "pinned"): kept as drawn
 
 
 @dataclass
@@ -761,7 +762,15 @@ class Ctx:
         site_polys = [s.polygon.buffer(12.0) for s in sites]
         cones = [s.flight_cone for s in sites if s.flight_cone is not None]
         self.site_zone = unary_union(site_polys) if site_polys else Polygon()
-        self.closed = unary_union(site_polys + cones) if site_polys or cones else Polygon()
+        from . import pinned as PN
+
+        # a pinned island has its traced roads only: routing stays off it
+        self.pins = PN.placed_islands(spec, h)
+        pin_land = [Polygon(pn.land.exterior) for pn, _ in
+                    (self.pins[k] for k in sorted(self.pins))]
+        self.pin_land = unary_union(pin_land) if pin_land else Polygon()
+        closed = site_polys + cones + pin_land
+        self.closed = unary_union(closed) if closed else Polygon()
         self.marsh_parks = unary_union(open_polys) if open_polys else Polygon()
         self.closed_all = unary_union([self.closed, self.marsh_parks])
         shapely.prepare(self.closed_all)
@@ -1787,7 +1796,8 @@ def _cells_of(ctx: Ctx, roads: list[Road]) -> list[int]:
     for r in roads:
         for x, y in G.resample(r.line, CELL_M / 2):
             k = g.idx((x, y))
-            if free[k] and g.wcls[k] == 0:
+            # (a traced road on its closed island counts: links start where it leaves)
+            if (free[k] or r.pin is not None) and g.wcls[k] == 0:
                 out.append(k)
     return sorted(set(out))
 
@@ -1838,7 +1848,8 @@ def connect_landmasses(spec: CitySpec, ctx: Ctx) -> None:
                     f"lm{k + 1:02d}" for k in sorted(lms)) + " cannot be connected")
                 want -= lms
             for i in sorted(roads, reverse=True):
-                del ctx.roads[i]
+                if ctx.roads[i].pin is None:      # traced roads stay
+                    del ctx.roads[i]
             _remark(ctx)
 
 
@@ -1884,7 +1895,7 @@ def _remark(ctx: Ctx) -> None:
 def close_highway_ends(ctx: Ctx) -> None:
     """A highway that ends short of an exit continues as an avenue to the nearest road."""
     exits = {G.qpoint(e) for e in ctx.exits.values()}
-    for r in [x for x in ctx.roads if x.cls == "highway"]:
+    for r in [x for x in ctx.roads if x.cls == "highway" and x.pin is None]:
         for c in (r.line.coords[0], r.line.coords[-1]):
             p = Point(c)
             if G.qpoint(c) in exits:
@@ -1993,9 +2004,21 @@ def clearance_for(cls: int, width: float) -> float:
     return G.q(lo + (hi - lo) * t)
 
 
-def _cross_section(cls: str, role: str) -> dict:
+def _cross_section(cls: str, role: str, pin: dict | None = None) -> dict:
     c = CLASSES[cls]
     lanes, median, side, width = c["lanes"], c["median"], c["sidewalk"], c["width"]
+    if pin is not None:
+        # a traced road is as wide as drawn and at grade: its lanes, then sidewalks
+        width = float(pin["width_m"])
+        lanes = (2, 2) if width < 26.0 else (3, 3)
+        median = 0.0 if width < 22.0 else 2.0
+        s = max(2.0, G.q((width - sum(lanes) * c["lane"] - median) / 2.0 - 0.15))
+        side = (s, s)
+        # the furniture zone leaves the 1.8 m clear path
+        return {"total_width_m": width, "lane_width_m": c["lane"], "lanes_forward": lanes[0],
+                "lanes_backward": lanes[1], "median_m": median, "sidewalk_m": side,
+                "parking": (False, False), "curb_m": 0.15,
+                "furniture_m": G.q(min(1.5, max(0.0, s - 1.8 - 0.15 - 0.1)))}
     if role == "axis_boulevard":
         lanes, median, side, width = (BOULEVARD["lanes"], BOULEVARD["median"],
                                       BOULEVARD["sidewalk"], BOULEVARD["width"])
@@ -2089,10 +2112,11 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
         row = {
             "id": sid, "type": f"road.{road.cls}", "start": node_ids[a], "end": node_ids[b],
             "centerline": [(x, y) for x, y in ln.coords], "level": 0, "z_profile": prof,
-            "cross_section": _cross_section(road.cls, road.role), "name": road.name,
-            "road_class": road.cls, "lanes": sum(_cross_section(road.cls, road.role)[k]
-                                                  for k in ("lanes_forward", "lanes_backward")),
-            "width_m": _cross_section(road.cls, road.role)["total_width_m"],
+            "cross_section": _cross_section(road.cls, road.role, road.pin),
+            "name": road.name, "road_class": road.cls,
+            "lanes": sum(_cross_section(road.cls, road.role, road.pin)[k]
+                         for k in ("lanes_forward", "lanes_backward")),
+            "width_m": _cross_section(road.cls, road.role, road.pin)["total_width_m"],
             "bridge": bool(spans), "bridge_ids": b_ids, "clearance_m": clearance,
             "district_ids": districts,
             "attrs": {"role": road.role, "length_m": G.q(ln.length),
@@ -2100,6 +2124,8 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
         }
         if road.causeway:
             row["attrs"]["causeway"] = True
+        if road.pin is not None:
+            row["attrs"]["pinned"] = dict(road.pin)
         seg_rows.append(row)
     net.segments = seg_rows
     _grade_separations(ctx, net)
@@ -2185,7 +2211,8 @@ def _merge_degree2(pieces, fitter=None):
                 continue
             i, j = at
             (la, ra), (lb, rb) = pieces[i], pieces[j]
-            if ra.cls != rb.cls or la.equals(lb):
+            if ra.cls != rb.cls or la.equals(lb) or \
+                    (ra.role == "pinned") != (rb.role == "pinned"):
                 continue
             ca, cb = list(la.coords), list(lb.coords)
             if G.qpoint(ca[0]) == c:
@@ -2195,7 +2222,8 @@ def _merge_degree2(pieces, fitter=None):
             if ca[0] == cb[-1] and G.qpoint(ca[0]) != c:
                 continue  # would close a loop on itself; keep the node
             merged = LineString(ca + cb[1:])
-            if fitter is not None and _turn(ca[-2], ca[-1], cb[1]) > M.radians(12.0):
+            if fitter is not None and ra.role != "pinned" and \
+                    _turn(ca[-2], ca[-1], cb[1]) > M.radians(12.0):
                 sm = _smooth_joint(fitter, ca, cb, ra.cls if ra.cls == rb.cls else "avenue")
                 # the arc's 5 cm cleanup can drop an end point (the line then ends a few cm
                 # off its node) or, on pieces a few cm long, every point: put the ends back
@@ -2223,6 +2251,9 @@ def _drop_dangles(pieces, keep: set, ctx: Ctx):
         out = []
         for ln, r in pieces:
             a, b = G.qpoint(ln.coords[0]), G.qpoint(ln.coords[-1])
+            if r.role == "pinned":
+                out.append((ln, r))
+                continue
             if a == b and ln.length < 150.0:
                 changed = True
                 continue
@@ -2349,7 +2380,7 @@ def _refit(pieces, ctx: Ctx):
         base = 10.0 if r.cls == "avenue" else 20.0
         js = JUNCTION_SKIP_M[r.cls]
         rad, _ = min_radius(ln, base, js, js)
-        if rad >= 0.97 * c["r_min"] or ln.length < 3 * base:
+        if rad >= 0.97 * c["r_min"] or ln.length < 3 * base or r.role == "pinned":
             out.append((ln, r))
             continue
         # vertex chain: land runs simplified, bridge spans as fixed straight pieces
@@ -2485,6 +2516,8 @@ def _trim_hooks(pieces, keep: set):
         rmin = CLASSES[r.cls]["r_min"]
         base = 10.0 if r.cls == "avenue" else 20.0
         for end in (0, -1):
+            if r.role == "pinned":
+                break
             c = G.qpoint(ln.coords[end])
             if deg.get(c, 0) != 1 or c in keep or ln.length < 60.0:
                 continue
@@ -2547,10 +2580,12 @@ def _collapse_short(pieces):
     middle and the piece disappears."""
     for _ in range(50):
         deg = _endpoints(pieces)
+        pin_pts = {G.qpoint(ln.coords[e]) for ln, r in pieces if r.role == "pinned"
+                   for e in (0, -1)}
         short = None
         for i, (ln, r) in enumerate(pieces):
             a, b = G.qpoint(ln.coords[0]), G.qpoint(ln.coords[-1])
-            if a == b:
+            if a == b or r.role == "pinned" or a in pin_pts or b in pin_pts:
                 continue
             if ln.length < CLASSES[r.cls]["min_len"] and deg[a] >= 2 and deg[b] >= 2:
                 short = (i, a, b, ln)
@@ -2717,6 +2752,153 @@ def _name_bridges(spec: CitySpec, ctx: Ctx, net: RoadNet) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Pinned roads (scope 4.3)
+# ---------------------------------------------------------------------------
+
+PIN_SNAP_M = 5.0                # a traced road end this near another traced road joins it
+SPOKE_REACH_M = 900.0           # a traced road leaving its island runs on this far to land
+SPOKE_JOIN_M = 120.0            # and joins a road this near its landing directly
+
+
+def add_pinned_roads(spec: CitySpec, ctx: Ctx) -> None:
+    """The traced roads of every pinned island, as drawn (role "pinned": the clean-up keeps
+    their geometry). An end within PIN_SNAP_M of another traced road joins it there (cut
+    where it crosses it)."""
+    for name in sorted(ctx.pins):
+        pin, dist = ctx.pins[name]
+        roads = [[r, list(r.line.coords)] for r in pin.roads]
+        for k, (r, cs) in enumerate(roads):
+            if r.closed:
+                continue
+            for end in (0, -1):
+                p = Point(cs[end])
+                best = None
+                for j, (o, oc) in enumerate(roads):
+                    if j == k:
+                        continue
+                    ol = LineString(oc)
+                    d = ol.distance(p)
+                    if d <= PIN_SNAP_M and (best is None or d < best[0]):
+                        best = (d, j)
+                if best is None:
+                    continue
+                ol = LineString(roads[best[1]][1])
+                me = LineString(cs)
+                hit = [tuple(q) for q in shapely.get_coordinates(me.intersection(ol))]
+                if hit:
+                    # cut at the crossing nearest this end
+                    s_end = 0.0 if end == 0 else me.length
+                    q = min(hit, key=lambda q: abs(me.project(Point(q)) - s_end))
+                    s = me.project(Point(q))
+                    piece = shapely.ops.substring(me, s, me.length) if end == 0 else \
+                        shapely.ops.substring(me, 0.0, s)
+                    cs = list(piece.coords)
+                else:
+                    q = nearest_points(ol, p)[0].coords[0]
+                    cs = [q] + cs if end == 0 else cs + [q]
+                q = G.qpoint(cs[end])
+                cs[end] = q
+                # the joint is a vertex of the other road
+                oc = roads[best[1]][1]
+                olq = LineString(oc)
+                if not any(G.qpoint(c) == q for c in oc):
+                    d = olq.project(Point(q))
+                    acc = 0.0
+                    for i in range(len(oc) - 1):
+                        seg = M.hypot(oc[i + 1][0] - oc[i][0], oc[i + 1][1] - oc[i][1])
+                        if acc + seg >= d - 1e-9:
+                            oc.insert(i + 1, q)
+                            break
+                        acc += seg
+            roads[k][1] = cs
+        for r, cs in roads:
+            line = G.qline(LineString(cs))
+            road = Road(r.road_class, line, "pinned", None, dist, False,
+                        pin={"id": r.id, "island": name, "width_m": r.width_m,
+                             "elevated": r.elevated})
+            ctx.roads.append(road)
+            ctx.grid.mark(line, r.road_class == "highway")
+
+
+def land_pinned_spokes(ctx: Ctx) -> None:
+    """A traced road that ends out on the water (a bridge drawn leaving the island) runs on
+    straight to the next land within SPOKE_REACH_M and joins the network there; one that
+    finds no land, or would cross a closed area, ends at its island's coast."""
+    for name in sorted(getattr(ctx, "pins", {})):
+        pin, _ = ctx.pins[name]
+        land = pin.land.buffer(1.0)
+        for road in [r for r in ctx.roads if r.pin is not None and r.pin["island"] == name]:
+            cs = list(road.line.coords)
+            if road.line.is_closed or land.contains(Point(cs[-1])):
+                continue
+            x, y = cs[-1]
+            prev = cs[-2]
+            ux, uy = _unit(x - prev[0], y - prev[1])
+            ray = LineString([(x, y), (x + ux * SPOKE_REACH_M, y + uy * SPOKE_REACH_M)])
+            # onto district land (not marsh or a megasite), not back onto the island
+            dry = ctx.dry.intersection(ctx.district_land).difference(
+                ctx.closed_all.buffer(10.0))
+            hit = ray.intersection(dry)
+            landing = None
+            for part in sorted(G_lines(hit) if not hit.is_empty else [],
+                               key=lambda g: ray.project(Point(g.coords[0]))):
+                if part.length >= 30.0:
+                    landing = part.coords[0]
+                    break
+            ok = landing is not None
+            if ok:
+                ext = LineString([(x, y), landing])
+                ok = not ext.intersects(ctx.closed_all)
+            if not ok:
+                # the stretch over the water goes; the road ends at the coast
+                inside = road.line.intersection(land)
+                keep = max(G_lines(inside), key=lambda g: (g.length, g.coords[0]),
+                           default=None) if not inside.is_empty else None
+                ctx.notes.append(f"traced road {road.pin['id']} on {name} finds no land to "
+                                 "reach; it ends at the coast")
+                if keep is None or keep.length < 5.0:
+                    ctx.roads.remove(road)
+                else:
+                    road.line = G.qline(keep)
+                continue
+            # a road near the landing: straight on to it (a short connector would be a
+            # stub); else 60 m onto the land, then the shortest way into the network
+            lp = Point(landing)
+            near = sorted((G.dist(r.line, lp), k) for k, r in enumerate(ctx.roads)
+                          if r.pin is None and G.dist(r.line, lp) <= SPOKE_JOIN_M)
+            joined = False
+            for _, k in near:
+                # (an existing junction within 40 m rather than a short piece beside it)
+                q = Point(G.qpoint(ctx._snap_to_junction(
+                    ctx.roads[k], nearest_points(ctx.roads[k].line, lp)[0])))
+                link = LineString([landing, (q.x, q.y)])
+                if link.length > 0.01 and (link.intersects(ctx.closed_all) or
+                                           link.intersection(ctx.wet).length > 1.0):
+                    continue
+                ctx._insert_vertex(ctx.roads[k], q)
+                road.line = G.qline(LineString(cs + [landing, (q.x, q.y)]))
+                ctx.grid.mark(road.line, road.cls == "highway")
+                joined = True
+                break
+            if joined:
+                continue
+            foot = (landing[0] + ux * 60.0, landing[1] + uy * 60.0)
+            road.line = G.qline(LineString(cs + [landing, foot]))
+            ctx.grid.mark(road.line, road.cls == "highway")
+            cell = ctx.nearest_cell(foot)
+            g = ctx.grid
+            net = np.array(sorted(ctx.network_cells()), dtype=np.int64)
+            if cell is None or not len(net):
+                continue
+            pts = shapely.points(g.xs[net], g.ys[net])
+            away = ~shapely.contains(land.buffer(60.0), pts) & \
+                (shapely.distance(road.line, pts) > 40.0)
+            targets = set(net[away].tolist())
+            if targets:
+                ctx.route([cell], targets, road.cls, "connector", start=G.qpoint(foot))
+
+
+# ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
 
@@ -2724,8 +2906,10 @@ def build_roads(spec: CitySpec, h, polygons: dict, district_ids: dict, waterways
                 open_polys: list, variant: int = 0) -> RoadNet:
     ctx = Ctx(spec, h, polygons, district_ids, waterways, sites, open_polys, variant)
     find_exits(spec, ctx)
+    add_pinned_roads(spec, ctx)
     build_highways(spec, ctx)
     build_arterials(spec, ctx)
+    land_pinned_spokes(ctx)
     peds = build_named_bridges(spec, ctx)
     connect_landmasses(spec, ctx)
     extra_crossings(spec, ctx)
