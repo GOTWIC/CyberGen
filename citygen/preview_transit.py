@@ -1,8 +1,9 @@
 """M5 preview: `preview_transit.png`, the transit map. The city plan in muted tones (land,
 water, roads, building footprints) under every transit line in its color (metro dashed,
 elevated solid, sky tubes with a light casing), stations as rings with their names, supports
-as dots, removed buildings outlined in red and tower portals marked. Previews are for review
-only (not part of the model hash).
+as dots, removed buildings outlined in red and tower portals marked; M8b: a red cross where a
+line meets itself at the same level (`transit_self_crossing`) and stop numbers in route order
+on the stations of a loop. Previews are for review only (not part of the model hash).
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from matplotlib.collections import LineCollection, PolyCollection  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 from . import geom as G  # noqa: E402
+from . import transit as TR  # noqa: E402
 from .preview_massing import _ground  # noqa: E402
 from .schematic import BG, INK, MUTED, SEA  # noqa: E402
 
@@ -85,7 +87,22 @@ def render_transit(b, out, dpi: int = 150) -> None:
             f"{a.get('length_m', 0) / 1000:.1f} km, {len(t.station_ids)} stations, z "
             f"{min(p[2] for p in t.path):g} to {max(p[2] for p in t.path):g} m"
             + (f", radius {r:g} m" if r else ""))))
+    meet = []
+    for t in m.transit_lines:
+        pts = [(p[0], p[1]) for p in t.path]
+        zs = [p[2] for p in t.path]
+        meet += [(x, y) for _, x, y in TR.self_meets(pts, t.loop, TR.WIDTH_M[t.mode], zs,
+                                                      TR.self_clear_m(t.mode))]
+    if meet:
+        c = np.asarray(meet)
+        ax.scatter(c[:, 0], c[:, 1], s=140, marker="x", c="#ff3b30", linewidths=2.2, zorder=8)
     labeled: dict = {}
+    order: dict = {}
+    for t in m.transit_lines:
+        if t.loop:
+            stops = t.attrs.get("stops", [])
+            for k, name in enumerate(stops[:-1] if len(stops) > 1 else stops):
+                order.setdefault((t.id, name), k + 1)
     for s in m.stations:
         x, y = s.position[0], s.position[1]
         col = next((t.color for t in m.transit_lines if t.id in s.line_ids), INK)
@@ -94,18 +111,22 @@ def render_transit(b, out, dpi: int = 150) -> None:
         if any(math.dist((x, y), p) < 400.0 for p in labeled.get(s.name, [])):
             continue
         labeled.setdefault(s.name, []).append((x, y))
-        ax.text(x + 22, y + 22, s.name, fontsize=5.5, color=INK, zorder=7,
-                path_effects=HALO)
+        k = next((order[(lid, s.attrs.get("stop"))] for lid in s.line_ids
+                  if (lid, s.attrs.get("stop")) in order), None)
+        ax.text(x + 22, y + 22, f"{k}. {s.name}" if k else s.name, fontsize=5.5, color=INK,
+                zorder=7, path_effects=HALO)
     handles += [Line2D([], [], marker="o", ls="", markerfacecolor=BG, markeredgecolor=INK,
                        label="station"),
                 Line2D([], [], marker=".", ls="", color="#9aa0aa", label="column, pylon"),
                 Line2D([], [], color="#e8e8f0", lw=1, label="tower with a portal"),
                 Line2D([], [], color="#d0453a", lw=1, ls=":",
-                       label="lot cleared for a line")]
+                       label="lot cleared for a line")] + \
+        ([Line2D([], [], marker="x", ls="", color="#ff3b30", label="line meets itself")]
+         if meet else [])
     ax.legend(handles=handles, loc="lower left", fontsize=6.5, frameon=True, facecolor=BG,
               edgecolor=MUTED, labelcolor=INK, framealpha=0.85)
     st = b.stats.get("transit", {})
-    fig.text(0.04, 1.0 - 0.15 / fh, f"{b.spec.name}: transit (M5)", color=INK, fontsize=13,
+    fig.text(0.04, 1.0 - 0.15 / fh, f"{b.spec.name}: transit (M5, M8b loops)", color=INK, fontsize=13,
              fontweight="bold", va="top")
     stations = ", ".join(f"{k} {v}" for k, v in st.get("stations", {}).items())
     fig.text(0.04, 1.0 - 0.48 / fh,

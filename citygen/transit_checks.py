@@ -19,10 +19,6 @@ from .transit import (DECK_M, ROAD_CLEAR_M, SELF_GAP_M, SERVE_M, SIDE_PAD_M, SKY
                       self_meets, sidewalk_index, sidewalks_clear)
 
 LIMIT = 12
-CHECK_IDS = frozenset({"transit_routes", "transit_stops", "transit_curves",
-                       "transit_self_crossing", "transit_grades", "transit_altitude",
-                       "transit_clearance", "transit_supports", "station_access",
-                       "transit_skybridges", "transit_hubs"})
 RADIUS_TOL = 0.98    # radius measured on 30 m chords of a polyline arc
 GRADE_TOL = 0.002
 EXIT_M = 300.0

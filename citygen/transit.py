@@ -14,6 +14,14 @@ Runs after M3, on the city with its buildings, so every line sees what it passes
    line cannot clear, skybridges of complexes, spaceport flight cones above their limit. Then
    Douglas-Peucker between the stops and straight runs joined by arcs at the mode's radius
    (`arc_path`), with every change and every arc kept clear of what the line cannot pass.
+   M8b: each leg keeps off the line's earlier legs (on the roads, else on the raster), a
+   road leg may end at any junction near a district stop, and a loop is one simple ring:
+   its district stops move to junctions that put them in route order around the middle
+   (`_loop_points`), deep enough in their districts for the curves (`_deepen`); a loop
+   on the roads that would cross or wind round itself is routed off them, and every loop
+   off the roads also along its guide ring (`_guide_loop`). Stations follow the route
+   order (`ordered_stops`); a line's track does not depend on the other lines (only its
+   heights see the buildings they remove).
 3. **Profile.** z from the mode's altitude between two envelopes limited to the grade: from
    below navigable water, road decks, the roofs under the line and kept skybridges passed
    over; from above the towers a sky tube passes through and skybridges passed under.
@@ -1501,6 +1509,12 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
                 else:
                     dend = dstart if closing else None
                     res = graph.route(na, goal, din, used_segs, graph.touching(keep_off), dend)
+                    if res is not None and _winds(res[0]):
+                        # M8b: a leg that winds round the blocks (a stop at a road's end,
+                        # the way on blocked by the line itself): the raster's when shorter
+                        ras = _raster_leg(c, ln, cost, here, b.p, keep_off, din)
+                        if ras is not None and _plen(ras) * WIND_SHORTER < _plen(res[0]):
+                            res = None
                 if res is not None:
                     run, ks, cur = res
                     used_segs |= ks
@@ -1510,13 +1524,10 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
             end = raw[0] if closing and raw else b.p
             pa = snap_cell(c, cost, here)
             pb = snap_cell(c, cost, end)
-            if keep_off is not None:
-                off = shapely.dwithin(keep_off, c.pts, WIDTH_M[mode] + CELL_M)
-                path = search(c, np.where(off, INF, cost), pa, pb, TURN_COST_M.get(mode, 0.0),
-                              din)
-            if path is not None:
-                run = [here] + [cell_xy(c, k) for k in path] + [end]
-            elif graph is not None:
+            if keep_off is not None or graph is not None:
+                run = _raster_leg(c, ln, cost, here, end, keep_off, din)
+                path = run and run[1:-1]
+            if run is None and graph is not None:
                 # the roads again, over the earlier legs (the curves may still part them)
                 na = cur if cur is not None else graph.node_near(a, c)
                 goal = ({first} if closing and first is not None else graph.targets(b, c))
@@ -1636,7 +1647,11 @@ def _route(c: Ctx, ln: Line) -> None:
     # (M8b: only for a curve the check would fail, as for a loop that meets itself)
     if ln.loop and r_min > 0 and len(stops) >= 3 and \
             (rmin < HULL_BELOW * r_min or meets(dense, True, mode)):
-        alt = _hull_loop(c, ln, cost, r_min)
+        alt = None
+        for pad in HULL_PADS:
+            alt = _hull_loop(c, ln, cost, r_min, pad)
+            if alt is None or alt[1] >= HULL_BELOW * r_min:
+                break
         if alt is not None and in_order(alt[0], stops, True):
             m0, m1 = meets(dense, True, mode), meets(alt[0], True, mode)
             if m1 < m0 or (m1 == m0 and alt[1] > rmin):
@@ -1661,7 +1676,25 @@ def _route(c: Ctx, ln: Line) -> None:
 
 
 KEEP_END_M = 60.0   # a leg may meet the line's earlier legs this near its own ends
+WIND_M = (1.5, 300.0)   # a road leg longer than 1.5 times its chord plus 300 m winds
+WIND_SHORTER = 1.3      # ... and runs on the raster where that is this much shorter
+
+
+def _winds(run: list) -> bool:
+    return _plen(run) > WIND_M[0] * _d(run[0], run[-1]) + WIND_M[1]
+
+
+def _raster_leg(c: Ctx, ln: Line, cost, a, b, keep_off, din) -> list | None:
+    """A leg from a to b on the raster, off keep_off (the line so far)."""
+    leg_cost = cost
+    if keep_off is not None:
+        leg_cost = np.where(shapely.dwithin(keep_off, c.pts, WIDTH_M[ln.mode] + CELL_M), INF,
+                            cost)
+    path = search(c, leg_cost, snap_cell(c, cost, a), snap_cell(c, cost, b),
+                  TURN_COST_M.get(ln.mode, 0.0), din)
+    return None if path is None else [a] + [cell_xy(c, k) for k in path] + [b]
 HULL_BELOW = 0.98   # a loop with a curve this much tighter than its radius tries its hull
+HULL_PADS = (1.1, 1.25)  # its hull widened by this times the radius (more, if still tight)
 
 
 def _keep_off(raw: list, a, b=None):
@@ -1746,12 +1779,12 @@ def _guide_loop(c: Ctx, ln: Line, cost, r_min: float):
     return _densify(fitted), rmin
 
 
-def _hull_loop(c: Ctx, ln: Line, cost, r_min: float):
-    """A loop around its stops: the outline of their convex hull widened by 1.1 r_min
+def _hull_loop(c: Ctx, ln: Line, cost, r_min: float, pad: float = 1.1):
+    """A loop around its stops: the outline of their convex hull widened by pad r_min
     (every curve of it at least that wide), as waypoints every 120 m routed on the raster
     around what the line cannot pass, then arcs."""
     hull = shapely.convex_hull(shapely.multipoints([s.p for s in ln.stops]))
-    ring = G.qpoly(hull.buffer(1.1 * r_min, quad_segs=16))
+    ring = G.qpoly(hull.buffer(pad * r_min, quad_segs=16))
     if ring.is_empty:
         return None
     # M8b: around the way the route goes round
