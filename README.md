@@ -30,6 +30,9 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8c | Transit that passes on a city's first layout (Delta Megacity), remaining sweep transit failures | In progress (paused) | |
 | M8d | Trumpet interchange with one loop and one flyover | In progress (paused) | |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
+| M10 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
+| M11 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
+| M12 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 
 ## Latest maps (M8b)
 

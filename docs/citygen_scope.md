@@ -421,11 +421,11 @@ Coordinates: meters, x east, y north, z up, origin at city center (matches today
 ## 11. Out of scope (v1)
 - Textures, detailed models, facades, interiors, materials beyond flat category colors.
 - Lighting, atmospherics, post-processing (stage 3).
-- Terrain relief (hills). (Tunnels and underground metro geometry, once listed here, are now
-  milestone M9 below.)
+- (Tunnels and underground metro geometry, terrain relief, stack interchanges and districts on
+  several street levels, once listed here, are now milestones M9 to M12 below.)
 - Gameplay, AI, traffic simulation, Unreal-side import tooling beyond the existing greybox
   script (data for it is produced).
-- Free-form interchange design (templates only); stack interchanges.
+- Free-form interchange design (templates only).
 - Moving parts (trains, ships, AVs); their routes are exported as data only.
 
 ## 12. Milestones (each ends with tests passing, previews committed, and a short report)
@@ -454,6 +454,9 @@ viaducts with simple end ramps from M5.
 | M8c | Transit that passes on a city's first layout (Delta Megacity: 9 tries) and the sweep's remaining transit failures | Delta in at most 2 tries; sweep above 51 of 68 | in progress (paused) |
 | M8d | Trumpet interchange with one loop and one flyover (two-loop fallback) | samples pass; Mac = x86; sweep breaks nothing | in progress (paused) |
 | M9 | Tunnels: road tunnels (cut-and-cover under districts and plazas, immersed tubes under rivers, channels and the bay where a bridge does not fit or the spec asks for one) with portals, approach ramps and ventilation buildings; metro tunnel geometry between the station boxes; pedestrian underpasses. Spec: `highways.tunnels` and a per-crossing `tunnel` preference. Checks: grades within the class maximum, cover under ground and under the water bed, portal clearance, no clash with the metro, foundations or basements. Blockout: tube and box geometry, portals, a cutaway render | samples with tunnel crossings pass the full suite; Mac = x86 | planned |
+| M10 | Stack interchanges: four-level highway-highway crossings (both highways, two levels of directional flyovers at about 18 and 27 m, no loops), plus the turbine variant; chosen where two highways cross and the stack's footprint fits; columns placed among all levels | samples with a highway-highway crossing build a stack; grades, clearances and column checks pass; Mac = x86 | planned |
+| M11 | Terrain: a height field per city (spec: hills, ridges, cliffs, flat districts), water bodies at their own levels, roads that follow the ground within their grade (cuts, fills, retaining walls, tunnels from M9 through hills), lots and building bases on slopes (terraces, stepped podiums), terrain-aware props and plants, a ground mesh in the blockout | hilly sample cities pass the full suite with every grade and clearance check measured from the ground; Mac = x86 | planned |
+| M12 | Layered districts: districts stacked on several street levels (an upper deck city over a lower one, Night City style): deck slabs on columns, upper streets, lots and buildings on decks, ramps, stairs and elevators between levels, light wells, a level on every street, lot, walkway and prop, per-level lane and walkway graphs, per-level previews | a layered sample district passes the full suite on every level; walkways connect all levels; Mac = x86 | planned |
 
 ## 13. Running it with cloud sessions
 - Push this repo to a private GitHub repository (cloud sessions start from it).
