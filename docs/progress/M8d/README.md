@@ -143,7 +143,36 @@ In `tests/test_elevated.py`:
 
 ## Sweep
 
-SWEEP_PLACEHOLDER
+`citygen sweep --suite m8a --workers 4` (the five samples and the pinned demo at their own
+seed and seven more, the test specs at five seeds), on `main` before M8d and on this branch:
+`sweep_before.md` and `sweep_after.md` (with their `.json`).
+
+| | builds that pass | same sha256 as before | trumpets | with a flyover |
+|---|---|---|---|---|
+| before (`main`, M8b on M8a) | 51 of 68 | | 5 | 0 |
+| after (M8d) | 51 of 68 | 63 of 68 | 5 | 5 |
+
+The 63 builds without a trumpet are byte-identical. All five trumpets now take the flyover;
+none needed the two-loop fallback. No build changed its result:
+
+| build | before | after | flyover crest |
+|---|---|---|---|
+| nyxllor, seed 2077 (the sample) | pass | pass | 16.6 m |
+| nyxllor, seed 27182 | pass | pass | 16.6 m |
+| test_pinned, seed 1999 | pass | pass | 16.6 m |
+| delta_megacity, seed 27182 | fail: `transit_curves` (Delta Loop, sky tube, 46 m radius) | the same | 16.6 m |
+| nyxllor, seed 3141 | fail: `open_space_share` (Launch Key 67% open) | the same check (71%) | 16.6 m |
+
+The two failing builds fail as on `main`, after the same 8 whole-city tries, for reasons
+outside the interchanges (a sky tube loop's curve, a spaceport's open share). Their road
+levels with the flyover are in `sweep_trumpets/`:
+
+| test_pinned, seed 1999 | delta_megacity, seed 27182 |
+|---|---|
+| <img src="sweep_trumpets/test_pinned_s1999_elevated.png" width="420"> | <img src="sweep_trumpets/delta_megacity_s27182_elevated.png" width="420"> |
+
+In Delta the flyover leaves the run where it still climbs (5.6 m): its taper follows the
+deck there, as any ramp's does.
 
 ## Open items
 

@@ -28,7 +28,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 | M8c | Transit that passes on a city's first layout (Delta Megacity), remaining sweep transit failures | In progress (paused) | |
-| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Nyxllor), the two-loop form as the fallback; SWEEP_ROW | Done | [`docs/progress/M8d`](docs/progress/M8d) |
+| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](docs/progress/M8d) |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
