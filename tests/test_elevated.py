@@ -357,8 +357,11 @@ def test_trumpet_flyover_geometry(nyx_roads):
     line = LineString(pts)
     run_line = LineString(r.pts)
     hw = max(s["width_m"] for s, _ in r.segs)
+    # (past the taper, which runs on the deck itself)
+    off_deck = (lambda q: q > EL.TAPER_M) if fly["kind"] == "off" else \
+        (lambda q: q < cum[-1] - EL.TAPER_M)
     over = [q for q in np.arange(0.0, cum[-1], 2.5).tolist()
-            if run_line.distance(line.interpolate(q)) < hw / 2.0]
+            if off_deck(q) and run_line.distance(line.interpolate(q)) < hw / 2.0]
     assert over, "the flyover does not cross its run"
     for q in over:
         P = line.interpolate(q)
