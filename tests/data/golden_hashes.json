@@ -1,5 +1,5 @@
 {
-  "about": "sha256 of each sample city's city_model.json (citygen build output, M8b stacked on M8a: M7b plus the robustness fixes of M8a, transit loops as one simple ring and the transit_self_crossing check). The same bytes on every machine with the pinned requirements: produced for M8b on the M4 Mac and, byte for byte, on x86_64 Linux (docker, linux/amd64); earlier milestones confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) docs/progress/M7b/<city>/trace.json (M7b), docs/progress/M8a/<city>/trace.json (M8a) and docs/progress/M8b/<city>/trace.json (M8b on M8a). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
+  "about": "sha256 of each sample city's city_model.json (citygen build output, M8d: M8b on M8a plus the trumpet with one loop and one flyover; only nyxllor has a trumpet, the other four are unchanged from M8b). The same bytes on every machine with the pinned requirements: produced for M8b on the M4 Mac and, byte for byte, on x86_64 Linux (docker, linux/amd64); earlier milestones confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) docs/progress/M7b/<city>/trace.json (M7b), docs/progress/M8a/<city>/trace.json (M8a) and docs/progress/M8b/<city>/trace.json (M8b on M8a) and docs/progress/M8d/<city>/trace.json (M8d). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
   "produced_on": {
     "machine": "arm64 (M4 Mac), confirmed on x86_64 Linux (docker, linux/amd64)",
     "system": "Darwin and Linux",
@@ -7,20 +7,20 @@
     "numpy": "2.5.4",
     "shapely": "2.2.0",
     "geos": "3.14.1",
-    "confirmed_on": "x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo)"
+    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed"
   },
   "cities": {
     "archipelago_free_port": "dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a",
     "delta_megacity": "3800f2104d3183d5d606912e617365f80e51e63f5115f2af18a3a05251f508fb",
     "nexus_city": "f97e5177e235278914648449f39fa922b37f16d67fc833a3291eb6b7e1be1d76",
-    "nyxllor": "29a57fe579da2683dd0a993f9b12e2fbb4af3716cab129b5a13bf9f58c6ea31c",
+    "nyxllor": "23bfe34f8529cbae3de4a19fec793a2cc3c515d9934527d0eb4be5354b2fe60a",
     "peninsula_city": "0e6533f5821182e12fc690f788032c197230aaa2e2448d58e016b916255db5b2"
   },
   "blockout_plans": {
     "archipelago_free_port": "12a66c4a75da521fac65b7dded6d66d87fea540de4ddc934568c776dcf37dd97",
     "delta_megacity": "f2d3786895fd584755d26f47cfeddb77875b8d9e6d7004beced8af90d5373fe0",
     "nexus_city": "90f9b813e89d8c8a3db6be645d1701bdb3cba0bbe2166ab4b1ed72c993f8c474",
-    "nyxllor": "ab72de045249ef8698aec974688fbdcc5dc0914d6473e3e480e2aaf1a84682cd",
+    "nyxllor": "e064c0878514ce1ea083bdf9fce06dd6838ae79796938227b3d8114e490b64a6",
     "peninsula_city": "e34b9ef21436d25d9ab0e0687e10b5a7110a50376237e1b7bea310be6b38883e"
   }
 }
