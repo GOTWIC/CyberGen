@@ -26,17 +26,18 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M7a | Elevated highways: viaducts, diamond ramps, overpasses, bridge approach grades, underpass streets, road columns | Done | [`docs/progress/M7`](docs/progress/M7) |
 | M7b | Trumpet and partial cloverleaf interchanges, art-direction loop, Corporate Core pinned import | Done | [`docs/progress/M7b`](docs/progress/M7b) |
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
-| M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines that pass on the first layout, faster transit routing | Done | [`docs/progress/M8b`](docs/progress/M8b) |
+| M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 
 ## Latest maps (M8b)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
-different coast forms, not one map. M8a swept them and the test specs over many seeds and fixed
-what failed: highways that hooked along the map edge at exits, islands that did not fit,
-islands cut off from the roads, level steps on loop roads and footbridges, side-by-side
-duplicate roads, a crash (see [`docs/progress/M8a`](docs/progress/M8a)). M8b makes every transit loop one simple ring through its stops in route order,
-and fast lines (maglev, sky tube) pass on the first layout, so no sample city is redrawn
-for a transit failure.
+different coast forms, not one map. M8a swept them and the test specs over many seeds and
+fixed what failed: highways that hooked along the map edge at exits, islands that did not
+fit, islands cut off from the roads, level steps on loop roads and footbridges, side-by-side
+duplicate roads, a crash (see [`docs/progress/M8a`](docs/progress/M8a)). M8b makes every
+transit loop one simple ring through its stops in route order, places fast lines (maglev,
+sky tube) so that their curves fit, and routes transit in about 3 to 13 s per city; on M8a's
+code it takes nyxllor from 8 full-city tries to 1.
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):

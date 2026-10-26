@@ -301,9 +301,12 @@ site's zone begins (`_site_point`, `RoadGraph.targets`), not at its middle. The 
 search uses flat integer states, an exact turn-free cost to go (`_togo`) over 600 m, and a
 reachability flood fill (`reachable`) after 20000 steps. A line's track does not depend on
 the other lines (its heights see the buildings they remove); a whole-city retry
-(`build_city`) after any failed check still moves every line, but every sample line now
-passes on its first layout (the pinned demo retries once, for `level_continuity`). Sample
-builds: `docs/progress/M8b/`.
+(`build_city`) after any failed check still moves every line. A sky tube tower it cannot
+climb within its altitude range keeps its portal with 3 m headroom (`_fit_portals`), and an
+open road line still under its radius is tried with legs free to run back along the line
+(`_spurs`). M8b is stacked on M8a: nyxllor builds on its first layout (8 tries on M8a
+alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
+builds and the sweep on the combined code: `docs/progress/M8b/`.
 
 ### Rules for cloud sessions building citygen milestones
 

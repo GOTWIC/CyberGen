@@ -6,23 +6,27 @@ a line's track no longer depends on the other lines. The new check `transit_self
 (66 checks in all) and red crosses on `preview_transit.png` show any place where a line
 meets itself.
 
-Every build below passes all 66 checks. Each `city_model.json` is byte-identical on the M4
-Mac (arm64) and on x86_64 Linux (docker, `linux/amd64`, `CITYGEN_WORKERS=4`):
+M8b is stacked on M8a (`claude/m8a-robustness-24d520`, PR 16): merge order PR 14, PR 16,
+PR 15. Every build below is made with the combined code and passes all 66 checks. Each
+`city_model.json` is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker,
+`linux/amd64`, `CITYGEN_WORKERS=4`):
 
 | City | sha256 of `city_model.json` (both machines) |
 |---|---|
-| archipelago_free_port | `8b0d4841ba5de81b65129cd10b8958c3c7fc05a24dbcbbc18d9c21d08124bc40` |
-| delta_megacity | `fabc65e73cf2389cddd80b6b83a9398498da24bd7bb90e68223c7e247ae93e5f` |
-| nexus_city | `621756ff6d71ed4109eb37e2b79cdde04ef2dc20bec21d802bc81e5589bda410` |
-| nyxllor | `70bc3e8353f426be20bc219ff7394deae753769a9f318e01315c460d59789fb3` |
-| peninsula_city | `e6ebad53f3dc66f0dca74a6dc3e7e60017b5d9cabef0e224bce02091af00b774` |
-| nyxllor_pinned (M7b demo, round 3 order) | `d5c9335841f68954dff464e6419ba4b7b04841c729bb367a80a323d8df79e7d4` |
-| nyxllor_pinned_round1 (round 1 maglev) | `e3bcc9d140efa5ce9513b1e0e6cfdcc186a0dc2de81aed7a009ea2a716576a63` |
-| nyxllor_pinned_round2 (round 2 order) | `e29f8fea3cfc81b4a7cadc2b8891bd4d86fa24c294f5c598845ae56f1dabfa6b` |
+| archipelago_free_port | `dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a` |
+| delta_megacity | `3800f2104d3183d5d606912e617365f80e51e63f5115f2af18a3a05251f508fb` |
+| nexus_city | `f97e5177e235278914648449f39fa922b37f16d67fc833a3291eb6b7e1be1d76` |
+| nyxllor | `29a57fe579da2683dd0a993f9b12e2fbb4af3716cab129b5a13bf9f58c6ea31c` |
+| peninsula_city | `0e6533f5821182e12fc690f788032c197230aaa2e2448d58e016b916255db5b2` |
+| nyxllor_pinned (M7b demo, round 3 order) | `fb773f4e722378be5eb972ecb67eb9adbc7f921fca51598c8e413325f1493afb` |
+| nyxllor_pinned_round1 (round 1 maglev) | `d1d2eb0da7860e87124ea78cde270dd42d62f0105169d4c7e55ca93f83d13c79` |
+| nyxllor_pinned_round2 (round 2 order) | `7ef74e76d156d0e0bfb172bc291de672a10f5999737a27de70c68d9a57354f9d` |
 
-The PR has two parts: the loop rings (first review) and a polish round after it (fast lines
-on their first layout, transit time, Greyhook's East Shore Line), described in
-[Polish round](#polish-round). The images and figures below are from the final code.
+The PR has three parts: the loop rings (first review), a polish round after it (fast lines
+on their first layout, transit time, Greyhook's East Shore Line), both measured on PR 14's
+code, and the stack on M8a with its sweep ([Stacked on M8a](#stacked-on-m8a)). The images
+are from the combined code; the "before" maps and the figures of the first two parts are
+from PR 14's base, where the layouts differ slightly.
 
 ## Before and after
 
@@ -76,17 +80,17 @@ Greyhook (peninsula) has no loop. Its open lines changed in the polish round (se
 Each figure is the number of places where the line meets itself at the same level (the
 `transit_self_crossing` rule), then the length.
 
-| City | Line | Before | After |
-|---|---|---|---|
-| pinned, round 2 | Halo Line (loop) | 31, 8.3 km | 0, 5.0 km |
-| pinned, round 3 | Halo Line (loop) | 13, 10.3 km | 0, 6.3 km |
-| nyxllor | Halo Line (loop) | 17, 6.7 km | 0, 7.6 km |
-| nyxllor | Crown Loop (sky tube loop) | 0, 3.7 km | 0, 4.7 km |
-| delta_megacity | Skyline Loop, Delta Loop (sky tube loops) | 0, 4.7 and 4.8 km | 0, 4.9 and 4.3 km |
-| nexus_city | Blue Line (metro loop) | 0, 4.3 km | 0, 4.1 km |
-| archipelago_free_port | Island Hopper (monorail) | 3, 9.8 km | 0, 5.9 km |
-| peninsula_city | East Shore Line (elevated rail, open) | 0, 5.3 km | 0, 3.9 km |
-| peninsula_city | Spine Tube (sky tube, open) | 0, 2.8 km | 0, 2.2 km |
+| City | Line | Before (PR 14 base) | After, PR 14 base | After, on M8a |
+|---|---|---|---|---|
+| pinned, round 2 | Halo Line (loop) | 31, 8.3 km | 0, 5.0 km | 0, 5.6 km |
+| pinned, round 3 | Halo Line (loop) | 13, 10.3 km | 0, 6.3 km | 0, 5.9 km |
+| nyxllor | Halo Line (loop) | 17, 6.7 km | 0, 7.6 km | 0, 7.8 km |
+| nyxllor | Crown Loop (sky tube loop) | 0, 3.7 km | 0, 4.7 km | 0, 4.8 km |
+| delta_megacity | Skyline Loop, Delta Loop (sky tube loops) | 0, 4.7 and 4.8 km | 0, 4.9 and 4.3 km | 0, 4.7 and 4.3 km |
+| nexus_city | Blue Line (metro loop) | 0, 4.3 km | 0, 4.1 km | 0, 4.3 km |
+| archipelago_free_port | Island Hopper (monorail) | 3, 9.8 km | 0, 5.9 km | 0, 5.9 km |
+| peninsula_city | East Shore Line (elevated rail, open) | 0, 5.3 km | 0, 3.9 km | 0, 3.9 km |
+| peninsula_city | Spine Tube (sky tube, open) | 0, 2.8 km | 0, 2.2 km | 0, 2.2 km |
 
 In M7b, a loop's last stop shared the vertex of its first, so the stops of the delta and
 nexus loops read as out of order. In M8b a loop's track starts at its first stop and ends
@@ -211,22 +215,26 @@ Fixes:
   better by `_line_key` (stops in order, places where it meets itself, curves too tight,
   corridor conflicts); the report notes "drawn along its stops with 500 m curves".
 
-| City | Line | Base code (`510dc70`) | First review | Now |
+| City | Line | Base code (`510dc70`) | First review | Polish round |
 |---|---|---|---|---|
 | delta_megacity | Maglev Line | city passes on layout salt 2 | 130 m curve on layout 1; passes on salt 1 | 539 m on layout 1 |
 | nyxllor | Launch Express | city passes on layout salt 3 | 508 m on layout 1 | 611 m on layout 1 |
 | pinned, round 1 | Launch Express | 548 m, but the city passes on layout salt 4 (Halo Line meets itself in 6 places) | fails `transit_curves` and `transit_altitude`; city moves to another layout | 550 m, same layout as rounds 2 and 3 |
 
-No sample city retries for transit now. delta_megacity, nyxllor and the three other samples
-build on their first layout. The pinned demo still retries once, in all three rounds, for
-`level_continuity` (`rs01479` at 0.16 m, M8a's area), so all three end on the same layout.
+On PR 14's base, no sample city retried for transit after the polish round: delta_megacity,
+nyxllor and the three other samples built on their first layout, and the pinned demo
+retried once in all three rounds for `level_continuity` (`rs01479` at 0.16 m), so all three
+ended on the same layout. M8a changes the layouts, and on the combined code Delta and Nexus
+retry for transit again ([Stacked on M8a](#stacked-on-m8a)).
 
-**Rounds 1 and 2 of the pinned demo now differ only in the maglev.** Their roads, districts,
+**Rounds 1 and 2 of the pinned demo differ only in the maglev** (on the combined code too:
+both retry once, round 1's maglev passes on layout salt 1, as in round 2). Their roads, districts,
 lots, buildings and the Halo, Spine and Crown lines are identical, in plan and in height.
-What differs is Launch Express itself (track, its two stations, their walkways and
-supports), the 6 buildings its corridor removes (and their green areas, plants and props),
-the corridor marks on 6 lots, and the walkway ids listed on three Crown Line stations (the
-walkways are numbered in one sequence).
+What differs is Launch Express itself (track, its stations, their walkways and supports),
+the buildings its corridor removes (and their green areas, plants and props), the corridor
+marks on those lots, and the ids of the stations and walkways numbered after it (one
+sequence per kind). On the combined code that is 3 buildings and 3 lots; round 1's maglev
+has three stations, round 2's one.
 
 | Round 1: maglev `east_exit`, Corporate Core, Launch Key | Round 2 |
 |---|---|
@@ -279,20 +287,120 @@ The turn round Neckgate stays: Neckgate is the transit nexus, and its platform i
 east end of the neck, so a line from Wallgate Heights to Eastside Docks has to go east to it
 and come back. That is the spec's order, not the routing.
 
+## Stacked on M8a
+
+The branch is rebased onto M8a (`claude/m8a-robustness-24d520`, PR 16). The only conflict
+in code was `build.py`, where M8b's net change is nothing (a retry change tried in the first
+part was reverted); it is M8a's. Goldens, the README and CLAUDE.md keep both milestones.
+
+### Full-city tries per sample
+
+From each report's `city_tries` stat (one try per layout salt and road network):
+
+| City | M8a alone | M8a + M8b |
+|---|---|---|
+| archipelago_free_port | 1 | 1 |
+| delta_megacity | 9 | 9 |
+| nexus_city | 3 | 4 |
+| nyxllor | 8 | 1 |
+| nyxllor_pinned | 2 | 2 |
+| peninsula_city | 1 | 1 |
+
+What each failing try failed on, with the combined code:
+
+- **delta_megacity** (all transit but one): Delta Loop curve 276, 231 and 228 m (sky tube,
+  minimum 300) on layouts 1 to 3, with Waterfront Monorail 74 m and 56.5 m altitude; then
+  a podium on open space (`building_clear_zones`); Delta Loop missing Research Campus
+  (317 m); Skyline Loop at an 8.3% grade; Skyline Loop missing the Transit Nexus platform
+  (103 and 176 m). Layout 9 passes.
+- **nexus_city:** `level_continuity` on layouts 1 and 2 (M8a's area), with the Magenta Line
+  at 489 m and the Harbor Line at 121 m on layout 2; the Harbor Line at 117 m on layout 3.
+- **nyxllor:** none. Its first layout failed only the Crown Loop's altitude before the fix
+  below.
+- **nyxllor_pinned** (all three rounds): `junction_placement` on layout 1 (a segment 12 m
+  over its node, M8a's area); round 1's maglev also climbs to 60.8 m there.
+
+So the transit fixes bring nyxllor from 8 tries to 1 (about 50 s instead of 7 min). Delta
+still needs 9, mostly for its two sky tube loops and the monorail on M8a's new layouts.
+
+### Fixes for the combined code
+
+- **Tight portals (`_fit_portals`).** A sky tube through towers dropped the portal of a
+  tower its profile left less than 8 m of headroom in, and climbed over it. Each climb
+  lifted the neighbors out of their portals, one after another: nyxllor's Crown Loop rose
+  to 183 m on M8a's first layout (check limit 150 m). A tower the line could not climb
+  within its altitude range now keeps its portal with 3 m of headroom (the clearance check
+  asks only that the tube be inside the portal).
+- **Spurs back along the line (`_spurs`).** An open road line still under its minimum
+  radius after `_restop` is routed once more with its legs free to run back along the line
+  (as before M8b; the curves then cut the spur), and kept only when it serves as many stops,
+  meets itself no more and has wider curves. On peninsula s11 this fixes the East Shore
+  Line on the first layout (108 m), not on the third (139 m, a loop the road graph's turn
+  rule makes at the Neckgate hub).
+
+Tried and left out: corners beside a narrow district for sky tube loops, guide rings whose
+arcs pass through the stops, and rerouting the fast guide line around its corridor
+conflicts. Each fixed one Delta layout and broke another (raster detours round the guide
+made tighter jogs), so none is in.
+
+### Sweep
+
+`citygen sweep --suite m8a --workers 4` on the combined code, next to M8a's
+(`docs/progress/M8a/sweep_after.md`). The full table is
+[`sweep_on_m8a.md`](sweep_on_m8a.md).
+
+| | M8a alone | M8a + M8b |
+|---|---|---|
+| builds passing every check | 49 of 68 (72%) | 51 of 68 (75%) |
+| passing apart from transit checks | 57 (84%) | 57 (84%) |
+| builds with a transit failure | 9 | 6 |
+| crashes | 0 | 0 |
+| full-city tries, all 68 builds | 282 | 261 |
+| build time, all 68 builds (one process each) | 10733 s | 8634 s |
+
+Passing builds per spec (the test specs pass the same 17 of 20 in both):
+
+| spec | M8a alone | M8a + M8b |
+|---|---|---|
+| archipelago_free_port | 6 of 8 | 5 of 8 |
+| delta_megacity | 3 of 8 | 4 of 8 |
+| nexus_city | 6 of 8 | 7 of 8 |
+| peninsula_city | 6 of 8 | 7 of 8 |
+| nyxllor | 7 of 8 | 7 of 8 |
+| nyxllor_pinned | 4 of 8 | 4 of 8 |
+
+Changed builds:
+- **Fixed:** delta s11 (Delta Loop radius; now on its first try), nexus s5077 (passes on
+  its first try; on M8a alone its best try kept a `level_continuity` step), peninsula
+  s8128 and s27182 (East Shore Line radius and altitude).
+- **Broken:** archipelago s3141 (Island Hopper hooks at the Crown Exchange hub, 26 m, on
+  every layout; M8a alone passed on its second try, where M8b's route hooks too) and
+  peninsula s11 (its best try now fails `building_overlaps`, a wheel and a megasite leg,
+  M8a's area; the East Shore Line still loops at the Neckgate hub on two of its layouts).
+
+Transit failures left: the Island Hopper at archipelago s3141 and s27182 (26 and 32 m, a
+monorail hooking at a hub platform), Delta's Maglev Line at s3141 (484 m against 500), and
+the Delta Loop at s5077, s8128 and s27182 (168, 83 and 46 m).
+
 ## Coupling, what is left
 
 Within one build, a line's track (in plan) does not depend on the other lines (a test checks
 this). Its heights do see the buildings other lines remove from its corridor, which is a
 physical dependence. A spec edit that makes any line fail a check still moves every line,
-through the whole-city retry; with every sample line now passing on its first layout, that
-no longer happens for the sample specs and the demo rounds.
+through the whole-city retry. On PR 14's base no sample line failed on its first layout;
+on M8a's layouts Delta and Nexus still retry for transit, and the pinned demo's rounds
+retry once for a road check, so they still share their layout.
 
 ## Open items
 
-- **Retry coupling, in general.** A future spec whose line fails a check still retries the
-  whole city. Options: pin the previous round's layout salt and road variant in the
+- **Retry coupling, in general.** A spec whose line fails a check still retries the whole
+  city. Options: pin the previous round's layout salt and road variant in the
   art-direction loop (`citygen review`), or retry only the transit stage for transit-only
-  failures (now possible without breaking the samples).
+  failures.
+- **Delta's sky tube loops and monorail on M8a's layouts.** Eight of Delta's nine tries
+  fail, seven of them on transit (see above); the Delta Loop's turn at the narrow Research
+  Campus tongue and the monorail's hook at the hub are the main ones. Fixing them would
+  take Delta from about 6 minutes to under one.
 - **A road-mode loop off the roads.** When the roads cannot make a ring (the pinned Halo
   Line), the ring runs across blocks and the river on its own viaducts. More buildings come
   out of its corridor than along the avenues.
@@ -300,9 +408,8 @@ no longer happens for the sample specs and the demo rounds.
   district, often near its edge.
 - **A fast line's corner beside a district.** Round 1's Corporate Core maglev station is at
   the island's north-east edge, where the guide corner leaves room for the curve.
-- **Other seeds.** M8a's sweep found transit failures at other seeds (Delta Loop radius and
-  service, nyxllor Halo radius at seed 1999, maglev and sky tube radii). I did not rerun
-  that sweep on this branch.
+- **Other seeds.** The transit failures left in the sweep on the combined code are listed
+  there.
 
 ## Files
 

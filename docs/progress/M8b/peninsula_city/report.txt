@@ -18,7 +18,7 @@ checks:
   [pass] named_bridges: Every named bridge is built
   [pass] bridge_clearance: Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge
   [pass] road_avoidance: No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)
-  [pass] curve_radius: Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7; traced roads as drawn)
+  [pass] curve_radius: Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7, also inside a joined chain; traced roads as drawn)
   [pass] segment_length: No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted; traced roads as drawn)
   [pass] road_duplicates: No near-parallel duplicate roads (within 25 m for over 150 m)
   [pass] road_grades: Every road at most 6% steep along its z profile (viaducts, ramps, bridge approaches, streets ramping up to a raised junction; footbridge stairs aside)
@@ -67,7 +67,7 @@ checks:
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 18411 things on the ground
+         note: 18486 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
@@ -80,7 +80,7 @@ checks:
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
-         note: 106 road columns under 22 raised segments
+         note: 107 road columns under 22 raised segments
 
 stats:
   map 10.8 km2, land 5.168 km2 (districts 5.168 km2, unassigned 0.0 km2)
@@ -91,53 +91,53 @@ stats:
   district perimeter facing water 65%; boundary curvature (arc / chord over 400 m) 1.1138, land boundaries 1.0465
   open land 0 km2
   inner waterways 6 (2.17 km: basin 0.64, canal 1.52), quays 4.48 km
-  roads alley 7.43 km, avenue 16.21 km, footbridge 0.21 km, highway 2.29 km, pedestrian 9.77 km, service 11.83 km, street 52.18 km; 1263 segments, 933 nodes, 1 component(s); exits north_exit
+  roads alley 7.43 km, avenue 16.21 km, footbridge 0.21 km, highway 2.29 km, pedestrian 9.77 km, service 11.83 km, street 52.89 km; 1279 segments, 943 nodes, 1 component(s); exits north_exit
   bridges 5 (sea 0, river 3, canal 2; 0.24 km of span), pedestrian 6; named: Wallgate Bridge
   landmasses with districts connected by road 3 of 3; highway planned elevated 51%; megasite reserves 3; road variant 0
-  local roads street 52.18 km, alley 7.43 km, service 11.83 km, pedestrian 9.77 km, footbridge 0.21 km; 49 one-way segments, 6 footbridges
-  junctions 742 (135 signalized), crosswalks 424, sidewalks 97.85 km, lanes 2509 + 4724 connectors, walkways 7188 (alley 19.26 km, crossing 39.48 km, crosswalk 15.92 km, elevated 0.99 km, elevator 0.0 km, footbridge 0.21 km, path 50.39 km, pedestrian_street 0.4 km, promenade 9.37 km, sidewalk 120.12 km, skybridge 2.36 km, stairs 0.3 km)
-  junctions by type: street_street T 367, avenue_avenue T 116, street T 80, street_street X 65, alley_alley T 36, pedestrian T 21, alley T 10, street_service T 9, alley_alley X 8, street_alley T 8, avenue_avenue X 6, highway_highway T 3
-  blocks 419, lots 2475 (5 merged groups), open space 12.4% of net land (courtyard 1, green 20, park 188, plaza 129, pocket_park 2), named places 1
+  local roads street 52.89 km, alley 7.43 km, service 11.83 km, pedestrian 9.77 km, footbridge 0.21 km; 49 one-way segments, 6 footbridges
+  junctions 753 (137 signalized), crosswalks 430, sidewalks 98.6 km, lanes 2545 + 4793 connectors, walkways 7289 (alley 19.26 km, crossing 40.06 km, crosswalk 16.13 km, elevated 0.99 km, elevator 0.0 km, footbridge 0.21 km, path 51.71 km, pedestrian_street 0.4 km, promenade 9.37 km, sidewalk 121.2 km, skybridge 2.35 km, stairs 0.29 km)
+  junctions by type: street_street T 376, avenue_avenue T 118, street T 80, street_street X 65, alley_alley T 36, pedestrian T 21, alley T 10, street_service T 9, alley_alley X 8, street_alley T 8, avenue_avenue X 6, highway_highway T 3
+  blocks 423, lots 2485 (5 merged groups), open space 12.4% of net land (courtyard 1, green 20, park 209, plaza 129, pocket_park 2), named places 1
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
   entertainment_market          1407       56    113      223     457      756    15.8
   industrial_port                 45     2109   3136     8708   16781    24218   162.0
   megablock_residential          121     2330   3188     4771    9594    16614   103.1
-  residential_heights            724      289    439      802    1426     2111    28.1
+  residential_heights            734      285    457      800    1353     2048    27.7
   spaceport                       33     2723   3800    10238   24720    33352    94.8
   transit_hub                    145      413    648     1512    2934     4056    43.5
 
   blocks and open space by district  blocks  median block m  open share
-  Wallgate Heights                      80             88      17.6%
+  Wallgate Heights                      84             88      17.6%
   Neckgate                              39             75      10.0%
   The Stacks                            63             95       9.6%
   Lantern Strip                        207             37       6.2%
   Eastside Docks                        19            136       6.3%
   Hook Spaceport                        11            194      20.2%
 
-  buildings 2450 (14.484 km2 floor area), properties 2436, tallest 227.2 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
-  by type: shopfront_row 904, villa 690, shanty_stack 412, podium_tower 170, megabuilding 93, slab 52, warehouse 22, terraced 18, hangar 17, perimeter 17, parking_structure 15, yard 12, tower 10, shed 7, courtyard_block 3, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
-  skybridges 143 (2.36 km: enclosed 26, open_deck 117), ground-floor units 6997 (food 1514, bar 1081, club 943, convenience 770, cyberware 677, arcade 652, pawn 497, laundromat 337, lobby 304, clinic 222)
-  roof items: ac_unit 5585, water_tank 644, billboard 545, mechanical 199, antenna 40, av_pad 6; green roofs 369 (193340 m2)
+  buildings 2460 (14.433 km2 floor area), properties 2446, tallest 227.2 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
+  by type: shopfront_row 904, villa 709, shanty_stack 412, podium_tower 170, megabuilding 93, slab 47, warehouse 22, hangar 17, perimeter 17, parking_structure 15, terraced 12, yard 12, tower 10, shed 7, courtyard_block 5, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
+  skybridges 142 (2.35 km: enclosed 25, open_deck 117), ground-floor units 6968 (food 1501, bar 1081, club 943, convenience 762, cyberware 677, arcade 652, pawn 497, laundromat 337, lobby 301, clinic 217)
+  roof items: ac_unit 5651, water_tank 646, billboard 545, mechanical 199, antenna 40, av_pad 6; green roofs 364 (193397 m2)
   landmarks: Lantern Wheel (ferris_wheel, 120 m)
   megasites: Neckgate Transit Nexus (transit_nexus: bus_bay 10, drop_off 1, metro_entrance 2, platform 2, plaza 2, station 1, station_tower 1); Neck Arena (stadium: parking_structure 2, pitch 1, plaza 1, stadium 1); Hook Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 3, launch_tower 3, terminal 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
-  Wallgate Heights                 722      20.4    23.8    30.6       34%   1.9      1.212
+  Wallgate Heights                 732      20.4    23.8    34.0       33%   1.9      1.162
   Neckgate                         136      31.5    59.5   112.0       67%   4.9      1.215
   The Stacks                       117     156.8   182.4   227.2       74%  13.5      9.570
   Lantern Strip                   1393      21.0    31.5   120.0       97%   4.8      1.736
   Eastside Docks                    39      11.3    16.0    16.0       24%   0.2      0.103
   Hook Spaceport                    33      24.5    36.0    40.0       23%   0.7      0.284
 
-  props 24759, plants 12635 (3620 trees), 37394 instances; lawns 31095 m2, hedges 2.09 km
-  props: sign 5758, awning 4021, ac_unit 3113, street_light 2941, trash 1884, railing 1489, bollard 1312, traffic_signal 639, parked_vehicle 588, barrier 570, hydrant 556, overhead_cable 509, trash_can 447, bench 426, dumpster 313, wall_light 57, bus_stop 53, boat 41, scaffolding 15, food_stall 11, planter 9, vending_machine 5, kiosk 2
-  plants: shrub 6088, overgrowth 1781, park_tree 1447, street_tree 906, facade_greenery 751, palm 742, roof_tree 395, conifer 374, median_tree 151
+  props 24837, plants 12594 (3709 trees), 37431 instances; lawns 31033 m2, hedges 0.63 km
+  props: sign 5753, awning 4021, ac_unit 3103, street_light 2959, trash 1904, railing 1489, bollard 1312, traffic_signal 646, barrier 570, parked_vehicle 569, hydrant 561, overhead_cable 504, bench 475, trash_can 475, dumpster 305, wall_light 56, bus_stop 52, boat 41, scaffolding 15, food_stall 11, planter 9, vending_machine 5, kiosk 2
+  plants: shrub 5975, overgrowth 1775, park_tree 1522, street_tree 887, facade_greenery 741, palm 738, conifer 412, roof_tree 394, median_tree 150
 
   elevated highways 1.17 km (1 runs, 0 direct branches), deck up to 10.34 m; ramps 0 (0.0 km); interchanges none; overpasses 0
-  other raised roads 4.95 km, underpass streets 4, road columns 106
+  other raised roads 4.9 km, underpass streets 4, road columns 107
 
-  transit 9.18 km, supports 102, portals 11, buildings removed 21; stations elevated 7, sky 3, underground 5
+  transit 9.19 km, supports 102, portals 11, buildings removed 21; stations elevated 7, sky 3, underground 5
   by mode: elevated_rail 1 lines 3.86 km 7 stations, metro 1 lines 3.17 km 5 stations, sky_tube 1 lines 2.16 km 3 stations
 
   district                     archetype              landmass  km2    share  target  error
@@ -152,10 +152,9 @@ notes:
   - megasite 'Hook Spaceport' (spaceport) shrunk to 0.31 km2 (asked 0.50) to fit 'Hook Spaceport'
   - 4 underpass streets under the viaducts (not built: 2 deck too low)
   - 'Wallgate Heights': a loop street found no connector
-  - 26 local roads cut back at junctions sharper than the district minimum
+  - 28 local roads cut back at junctions sharper than the district minimum
   - 5 local roads running alongside another road removed
   - 11 lanes reached only over pedestrian streets became pedestrian
-  - 1 more local roads running alongside another road removed
   - 2 local roads crossing another without a junction removed
   - 6 local segments (3.34 km) not connected to the network were dropped
   - lot under a wheel rim left open (2 times)

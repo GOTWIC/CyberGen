@@ -1,26 +1,26 @@
 {
-  "about": "sha256 of each sample city's city_model.json (citygen build output, M8b: M7b plus transit loops as one simple ring and the transit_self_crossing check). The same bytes on every machine with the pinned requirements: produced for M8b on the M4 Mac and, byte for byte, on x86_64 Linux (docker, linux/amd64); earlier milestones confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) docs/progress/M7b/<city>/trace.json (M7b) and docs/progress/M8b/<city>/trace.json (M8b). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
+  "about": "sha256 of each sample city's city_model.json (citygen build output, M8b stacked on M8a: M7b plus the robustness fixes of M8a, transit loops as one simple ring and the transit_self_crossing check). The same bytes on every machine with the pinned requirements: produced for M8b on the M4 Mac and, byte for byte, on x86_64 Linux (docker, linux/amd64); earlier milestones confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) docs/progress/M7b/<city>/trace.json (M7b), docs/progress/M8a/<city>/trace.json (M8a) and docs/progress/M8b/<city>/trace.json (M8b on M8a). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
   "produced_on": {
     "machine": "arm64 (M4 Mac), confirmed on x86_64 Linux (docker, linux/amd64)",
     "system": "Darwin and Linux",
-    "python": "3.13.17",
+    "python": "3.13.1 (Mac), 3.13.17 (container)",
     "numpy": "2.5.4",
     "shapely": "2.2.0",
     "geos": "3.14.1",
     "confirmed_on": "x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo)"
   },
   "cities": {
-    "archipelago_free_port": "8b0d4841ba5de81b65129cd10b8958c3c7fc05a24dbcbbc18d9c21d08124bc40",
-    "delta_megacity": "fabc65e73cf2389cddd80b6b83a9398498da24bd7bb90e68223c7e247ae93e5f",
-    "nexus_city": "621756ff6d71ed4109eb37e2b79cdde04ef2dc20bec21d802bc81e5589bda410",
-    "nyxllor": "70bc3e8353f426be20bc219ff7394deae753769a9f318e01315c460d59789fb3",
-    "peninsula_city": "e6ebad53f3dc66f0dca74a6dc3e7e60017b5d9cabef0e224bce02091af00b774"
+    "archipelago_free_port": "dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a",
+    "delta_megacity": "3800f2104d3183d5d606912e617365f80e51e63f5115f2af18a3a05251f508fb",
+    "nexus_city": "f97e5177e235278914648449f39fa922b37f16d67fc833a3291eb6b7e1be1d76",
+    "nyxllor": "29a57fe579da2683dd0a993f9b12e2fbb4af3716cab129b5a13bf9f58c6ea31c",
+    "peninsula_city": "0e6533f5821182e12fc690f788032c197230aaa2e2448d58e016b916255db5b2"
   },
   "blockout_plans": {
-    "archipelago_free_port": "2f33f56edfdd63229a2e6d80ef6eb006b419b5dc1024337cb2e48a4512590710",
-    "delta_megacity": "528731a1bc2f2d3e4206156b5b551b929e152d06db739408943ccfaa211a0e20",
-    "nexus_city": "67aff4b5e1d2ee5f38b6b680a83084806e964b8b1b60535586445047a683afa7",
-    "nyxllor": "5db6ae4ca9f15e9abd6a37f7fac8c83304c64ca0d02704d845d7cfb88068d90e",
-    "peninsula_city": "3b5b185741dbad13e0e5d5ec310cef71eee194b7b4ae7c4cc9a5127858c4659a"
+    "archipelago_free_port": "12a66c4a75da521fac65b7dded6d66d87fea540de4ddc934568c776dcf37dd97",
+    "delta_megacity": "f2d3786895fd584755d26f47cfeddb77875b8d9e6d7004beced8af90d5373fe0",
+    "nexus_city": "90f9b813e89d8c8a3db6be645d1701bdb3cba0bbe2166ab4b1ed72c993f8c474",
+    "nyxllor": "ab72de045249ef8698aec974688fbdcc5dc0914d6473e3e480e2aaf1a84682cd",
+    "peninsula_city": "e34b9ef21436d25d9ab0e0687e10b5a7110a50376237e1b7bea310be6b38883e"
   }
 }

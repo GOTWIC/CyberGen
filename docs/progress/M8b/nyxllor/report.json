@@ -117,7 +117,7 @@
     },
     {
       "id": "curve_radius",
-      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7; traced roads as drawn)",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7, also inside a joined chain; traced roads as drawn)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -186,7 +186,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "3 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)"
+        "2 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)"
       ]
     },
     {
@@ -407,7 +407,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "276 columns and pylons"
+        "287 columns and pylons"
       ]
     },
     {
@@ -437,7 +437,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "27532 things on the ground"
+        "28004 things on the ground"
       ]
     },
     {
@@ -461,9 +461,9 @@
       "failures": [],
       "notes": [
         "Corporate Core: 96% lit",
-        "The Stacks: 98% lit",
+        "The Stacks: 97% lit",
         "Highcrest: 98% lit",
-        "Old Town: 94% lit",
+        "Old Town: 95% lit",
         "Neon Strand: 94% lit",
         "Vess Docks: 97% lit",
         "Launch Key: 99% lit",
@@ -490,7 +490,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "275 road columns under 53 raised segments"
+        "285 road columns under 55 raised segments"
       ]
     }
   ],
@@ -630,28 +630,28 @@
       }
     ],
     "road_km": {
-      "alley": 24.03,
-      "avenue": 27.38,
-      "footbridge": 0.29,
-      "highway": 10.22,
-      "pedestrian": 10.71,
-      "service": 11.53,
-      "street": 91.66
+      "alley": 24.08,
+      "avenue": 27.72,
+      "footbridge": 0.22,
+      "highway": 10.21,
+      "pedestrian": 9.3,
+      "service": 11.28,
+      "street": 92.06
     },
-    "road_nodes": 2101,
-    "road_segments": 2902,
+    "road_nodes": 2085,
+    "road_segments": 2880,
     "road_components": 1,
-    "bridges": 8,
+    "bridges": 10,
     "bridges_by_class": {
       "sea": 1,
-      "river": 3,
-      "canal": 4
+      "river": 4,
+      "canal": 5
     },
-    "bridge_span_km": 0.58,
+    "bridge_span_km": 0.75,
     "named_bridges": [
       "Launch Causeway"
     ],
-    "pedestrian_bridges": 7,
+    "pedestrian_bridges": 6,
     "landmasses_connected": [
       5,
       5
@@ -660,14 +660,14 @@
       "east_exit",
       "north_exit"
     ],
-    "highway_elevated_share": 0.1973,
+    "highway_elevated_share": 0.1859,
     "megasites": 3,
     "elevated": {
-      "elevated_km": 2.02,
+      "elevated_km": 1.9,
       "elevated_runs": 1,
       "direct_branches": 0,
       "ramps": 10,
-      "ramp_km": 2.8,
+      "ramp_km": 2.79,
       "interchanges": {
         "diamond": 1,
         "parclo": 1,
@@ -675,72 +675,72 @@
       },
       "overpasses": 3,
       "max_deck_m": 9.0,
-      "raised_other_km": 10.66,
+      "raised_other_km": 11.0,
       "underpass_streets": 1,
-      "road_columns": 275
+      "road_columns": 285
     },
     "local": {
-      "junctions": 1672,
-      "junctions_signalized": 329,
+      "junctions": 1656,
+      "junctions_signalized": 332,
       "junctions_by_type": {
-        "street_street T": 816,
-        "avenue_avenue T": 216,
-        "street_street X": 155,
+        "street_street T": 820,
+        "avenue_avenue T": 218,
+        "street_street X": 157,
         "alley_alley T": 136,
-        "avenue_avenue X": 77,
-        "street T": 69,
-        "pedestrian T": 55,
+        "avenue_avenue X": 76,
+        "street T": 68,
+        "pedestrian T": 36,
         "street_alley T": 25,
         "alley_alley X": 24,
-        "highway_highway T": 14,
+        "highway_highway T": 15,
         "street_alley X": 14,
         "highway_highway X": 13,
         "street_service T": 12,
         "avenue_avenue multi": 11,
-        "street cul_de_sac": 8,
         "street_street multi": 8,
-        "pedestrian X": 6,
+        "street cul_de_sac": 6,
+        "pedestrian X": 5,
         "alley T": 4,
-        "service_service T": 3,
         "street X": 3,
+        "service_service T": 2,
         "alley_alley multi": 1,
         "highway_avenue T": 1,
         "highway_highway multi": 1
       },
-      "crosswalks": 1109,
-      "sidewalks": 3974,
-      "sidewalk_km": 161.78,
-      "lanes": 6101,
-      "lane_connectors": 11997,
+      "crosswalks": 1118,
+      "sidewalks": 4006,
+      "sidewalk_km": 162.91,
+      "lanes": 6141,
+      "lane_connectors": 12066,
       "one_way_segments": 95,
-      "walkways": 16394,
+      "walkways": 16128,
       "walkway_km": {
-        "alley": 35.56,
-        "crossing": 80.37,
-        "crosswalk": 37.0,
-        "elevated": 1.95,
+        "alley": 35.36,
+        "crossing": 80.53,
+        "crosswalk": 37.33,
+        "elevated": 1.73,
         "elevator": 0.0,
-        "footbridge": 0.29,
-        "path": 85.15,
-        "pedestrian_street": 3.39,
-        "promenade": 7.31,
-        "sidewalk": 204.18,
-        "skybridge": 3.05,
-        "stairs": 0.86
+        "footbridge": 0.22,
+        "path": 77.07,
+        "pedestrian_street": 2.42,
+        "promenade": 6.87,
+        "sidewalk": 205.52,
+        "skybridge": 3.33,
+        "stairs": 0.73
       },
-      "footbridges": 7,
-      "blocks": 1017,
-      "lots": 5879,
+      "footbridges": 6,
+      "blocks": 1005,
+      "lots": 5924,
       "merged_lot_groups": 5,
       "lot_area_m2_by_archetype": {
         "corporate_core": {
-          "count": 215,
-          "min": 991.5,
-          "p10": 1443.4,
-          "median": 2523.5,
-          "p90": 4763.4,
-          "max": 8173.0,
-          "median_frontage_m": 61.0
+          "count": 217,
+          "min": 989.0,
+          "p10": 1457.3,
+          "median": 2672.0,
+          "p90": 4421.3,
+          "max": 6577.8,
+          "median_frontage_m": 58.8
         },
         "entertainment_market": {
           "count": 1856,
@@ -752,13 +752,13 @@
           "median_frontage_m": 16.3
         },
         "industrial_port": {
-          "count": 94,
+          "count": 93,
           "min": 2166.4,
-          "p10": 3002.6,
-          "median": 6092.6,
+          "p10": 3008.5,
+          "median": 6281.3,
           "p90": 12982.2,
           "max": 18536.1,
-          "median_frontage_m": 123.6
+          "median_frontage_m": 121.5
         },
         "megablock_residential": {
           "count": 116,
@@ -770,13 +770,13 @@
           "median_frontage_m": 104.2
         },
         "old_town": {
-          "count": 2893,
-          "min": 36.7,
-          "p10": 76.2,
-          "median": 161.2,
+          "count": 2951,
+          "min": 37.3,
+          "p10": 76.1,
+          "median": 161.4,
           "p90": 315.1,
-          "max": 856.2,
-          "median_frontage_m": 13.9
+          "max": 952.6,
+          "median_frontage_m": 13.7
         },
         "research_campus": {
           "count": 65,
@@ -788,13 +788,13 @@
           "median_frontage_m": 88.0
         },
         "residential_heights": {
-          "count": 626,
-          "min": 281.1,
-          "p10": 457.4,
-          "median": 805.7,
-          "p90": 1389.4,
-          "max": 3672.6,
-          "median_frontage_m": 28.4
+          "count": 612,
+          "min": 291.2,
+          "p10": 499.6,
+          "median": 854.6,
+          "p90": 1356.2,
+          "max": 3044.6,
+          "median_frontage_m": 29.5
         },
         "spaceport": {
           "count": 14,
@@ -808,12 +808,12 @@
       },
       "block_size_m_by_district": {
         "Corporate Core": {
-          "count": 57,
+          "count": 58,
           "min": 36.9,
           "p10": 57.3,
-          "median": 99.5,
-          "p90": 147.0,
-          "max": 225.7
+          "median": 105.4,
+          "p90": 145.9,
+          "max": 202.9
         },
         "The Stacks": {
           "count": 57,
@@ -824,20 +824,20 @@
           "max": 321.6
         },
         "Highcrest": {
-          "count": 89,
+          "count": 90,
           "min": 20.7,
-          "p10": 57.7,
-          "median": 83.6,
-          "p90": 110.2,
-          "max": 154.3
+          "p10": 57.9,
+          "median": 81.6,
+          "p90": 109.2,
+          "max": 167.2
         },
         "Old Town": {
-          "count": 479,
+          "count": 467,
           "min": 8.3,
-          "p10": 17.1,
-          "median": 31.4,
-          "p90": 46.6,
-          "max": 86.1
+          "p10": 17.2,
+          "median": 31.5,
+          "p90": 46.7,
+          "max": 113.2
         },
         "Neon Strand": {
           "count": 283,
@@ -848,10 +848,10 @@
           "max": 88.5
         },
         "Vess Docks": {
-          "count": 34,
-          "min": 47.2,
-          "p10": 55.2,
-          "median": 129.5,
+          "count": 32,
+          "min": 52.1,
+          "p10": 62.2,
+          "median": 131.0,
           "p90": 198.6,
           "max": 282.5
         },
@@ -873,30 +873,30 @@
         }
       },
       "open_spaces_by_kind": {
-        "courtyard": 8,
-        "green": 36,
+        "courtyard": 12,
+        "green": 40,
         "market": 1,
         "park": 199,
-        "plaza": 133,
-        "pocket_park": 180,
+        "plaza": 138,
+        "pocket_park": 74,
         "promenade": 1
       },
       "open_share_by_district": {
-        "Corporate Core": 0.1148,
+        "Corporate Core": 0.12,
         "The Stacks": 0.0971,
-        "Highcrest": 0.1765,
-        "Old Town": 0.0622,
+        "Highcrest": 0.177,
+        "Old Town": 0.062,
         "Neon Strand": 0.0623,
-        "Vess Docks": 0.0305,
+        "Vess Docks": 0.0304,
         "Launch Key": 0.1772,
-        "Scholar Isle": 0.2745
+        "Scholar Isle": 0.2744
       },
-      "open_share": 0.1151,
+      "open_share": 0.1157,
       "places": 3,
       "generator": {
         "one_way_loops": 18,
-        "open_paths": 1236,
-        "walkway_links": 3,
+        "open_paths": 942,
+        "walkway_links": 1,
         "angles": {
           "d01": 45.0,
           "d02": 2.5,
@@ -910,24 +910,24 @@
       }
     },
     "buildings": {
-      "count": 5760,
-      "floor_area_km2": 22.582,
+      "count": 5790,
+      "floor_area_km2": 22.818,
       "by_type": {
-        "shopfront_row": 2790,
-        "shanty_stack": 1723,
-        "villa": 570,
-        "podium_tower": 242,
-        "courtyard_block": 91,
+        "shopfront_row": 2827,
+        "shanty_stack": 1740,
+        "villa": 552,
+        "podium_tower": 248,
+        "courtyard_block": 83,
         "megabuilding": 79,
         "warehouse": 52,
-        "lab": 42,
-        "slab": 39,
-        "terraced": 35,
-        "tower": 28,
-        "yard": 22,
-        "shed": 17,
-        "parking_structure": 10,
+        "slab": 41,
+        "lab": 40,
+        "terraced": 33,
+        "tower": 30,
+        "yard": 24,
+        "shed": 14,
         "hangar": 9,
+        "parking_structure": 7,
         "temple_hall": 3,
         "straddle_building": 2,
         "control_tower": 1,
@@ -938,82 +938,82 @@
         "terminal": 1
       },
       "by_use": {
-        "retail": 2790,
-        "residential": 2506,
-        "office": 200,
-        "industrial": 92,
+        "retail": 2827,
+        "residential": 2497,
+        "office": 207,
+        "industrial": 91,
         "entertainment": 82,
-        "civic": 61,
+        "civic": 60,
         "transport": 15,
-        "parking": 10,
+        "parking": 7,
         "religious": 4
       },
       "by_district": {
         "Corporate Core": {
-          "count": 207,
+          "count": 211,
           "min": 12.0,
           "median": 128.0,
-          "p90": 212.0,
+          "p90": 204.0,
           "max": 480.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 8.298,
-          "coverage": 0.779,
-          "far": 13.46
+          "floor_area_km2": 8.842,
+          "coverage": 0.794,
+          "far": 14.47
         },
         "The Stacks": {
           "count": 103,
           "min": 121.6,
           "median": 153.6,
-          "p90": 182.4,
+          "p90": 188.8,
           "max": 230.4,
           "archetype": "megablock_residential",
-          "floor_area_km2": 8.174,
-          "coverage": 0.704,
-          "far": 10.97
+          "floor_area_km2": 7.84,
+          "coverage": 0.665,
+          "far": 10.53
         },
         "Highcrest": {
-          "count": 591,
+          "count": 578,
           "min": 10.2,
           "median": 20.4,
           "p90": 23.8,
-          "max": 47.6,
+          "max": 44.2,
           "archetype": "residential_heights",
-          "floor_area_km2": 0.959,
-          "coverage": 0.305,
-          "far": 1.73
+          "floor_area_km2": 1.0,
+          "coverage": 0.312,
+          "far": 1.82
         },
         "Old Town": {
-          "count": 2861,
+          "count": 2912,
           "min": 6.0,
           "median": 15.0,
           "p90": 20.6,
           "max": 26.6,
           "archetype": "old_town",
-          "floor_area_km2": 1.753,
-          "coverage": 0.946,
-          "far": 3.35
+          "floor_area_km2": 1.752,
+          "coverage": 0.945,
+          "far": 3.29
         },
         "Neon Strand": {
-          "count": 1823,
+          "count": 1813,
           "min": 10.5,
           "median": 21.0,
           "p90": 28.0,
           "max": 42.0,
           "archetype": "entertainment_market",
-          "floor_area_km2": 2.247,
-          "coverage": 0.946,
-          "far": 4.68
+          "floor_area_km2": 2.231,
+          "coverage": 0.941,
+          "far": 4.65
         },
         "Vess Docks": {
-          "count": 88,
-          "min": 8.1,
-          "median": 11.5,
-          "p90": 15.7,
+          "count": 87,
+          "min": 8.0,
+          "median": 11.7,
+          "p90": 15.4,
           "max": 16.0,
           "archetype": "industrial_port",
-          "floor_area_km2": 0.185,
-          "coverage": 0.287,
-          "far": 0.29
+          "floor_area_km2": 0.177,
+          "coverage": 0.275,
+          "far": 0.27
         },
         "Launch Key": {
           "count": 13,
@@ -1027,18 +1027,18 @@
           "far": 0.53
         },
         "Scholar Isle": {
-          "count": 61,
+          "count": 60,
           "min": 16.0,
-          "median": 32.0,
+          "median": 28.0,
           "p90": 40.0,
           "max": 72.0,
           "archetype": "research_campus",
-          "floor_area_km2": 0.72,
-          "coverage": 0.29,
-          "far": 2.24
+          "floor_area_km2": 0.731,
+          "coverage": 0.298,
+          "far": 2.28
         }
       },
-      "properties": 5741,
+      "properties": 5771,
       "complexes": {
         "campus": 1,
         "landmark": 1,
@@ -1048,39 +1048,39 @@
         "tower_cluster": 1,
         "twin_towers": 1
       },
-      "skybridges": 249,
+      "skybridges": 267,
       "skybridges_by_kind": {
-        "cable": 36,
-        "catwalk": 80,
+        "cable": 33,
+        "catwalk": 97,
         "enclosed": 62,
-        "open_deck": 70,
+        "open_deck": 74,
         "stack": 1
       },
-      "skybridge_km": 3.05,
-      "units": 16778,
+      "skybridge_km": 3.33,
+      "units": 16822,
       "units_by_use": {
-        "food": 4580,
-        "bar": 2116,
-        "convenience": 1897,
-        "cyberware": 1774,
-        "club": 1619,
-        "arcade": 1261,
-        "pawn": 1227,
-        "laundromat": 1055,
-        "clinic": 799,
-        "lobby": 450
+        "food": 4555,
+        "bar": 2145,
+        "convenience": 1958,
+        "cyberware": 1828,
+        "club": 1573,
+        "arcade": 1311,
+        "pawn": 1213,
+        "laundromat": 1003,
+        "clinic": 782,
+        "lobby": 454
       },
       "roof_items": {
-        "ac_unit": 12079,
-        "billboard": 1332,
-        "water_tank": 1112,
-        "antenna": 835,
-        "mechanical": 232,
-        "av_pad": 50,
-        "helipad": 14
+        "ac_unit": 12053,
+        "billboard": 1310,
+        "water_tank": 1083,
+        "antenna": 823,
+        "mechanical": 227,
+        "av_pad": 46,
+        "helipad": 19
       },
-      "green_roofs": 491,
-      "green_roof_m2": 354414,
+      "green_roofs": 495,
+      "green_roof_m2": 353675,
       "landmarks": [
         {
           "name": "Corporate Core Megatower",
@@ -1127,127 +1127,127 @@
           }
         }
       },
-      "site_elements": 634,
-      "structures": 657,
+      "site_elements": 638,
+      "structures": 675,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2254
+        "walkways_added": 2407
       }
     },
     "transit": {
       "by_mode": {
         "elevated_rail": {
           "lines": 1,
-          "km": 7.57,
+          "km": 7.75,
           "stations": 11
         },
         "maglev": {
           "lines": 1,
-          "km": 3.21,
-          "stations": 3
+          "km": 3.23,
+          "stations": 2
         },
         "metro": {
           "lines": 1,
-          "km": 3.17,
+          "km": 3.18,
           "stations": 5
         },
         "sky_tube": {
           "lines": 1,
-          "km": 4.69,
+          "km": 4.81,
           "stations": 3
         }
       },
       "stations": {
-        "elevated": 14,
+        "elevated": 13,
         "sky": 3,
         "underground": 5
       },
-      "supports": 276,
-      "portals": 34,
-      "buildings_removed": 129,
-      "km": 18.64,
+      "supports": 287,
+      "portals": 25,
+      "buildings_removed": 146,
+      "km": 18.96,
       "generator": {
         "lines": 4,
-        "stations": 22,
-        "removed_buildings": 129,
-        "removed_skybridges": 24,
-        "portals": 40,
-        "structures": 380,
-        "walkways_added": 90
+        "stations": 21,
+        "removed_buildings": 146,
+        "removed_skybridges": 21,
+        "portals": 32,
+        "structures": 388,
+        "walkways_added": 84
       }
     },
     "props": {
-      "props": 50674,
-      "plants": 24728,
-      "trees": 6232,
-      "instances": 75402,
+      "props": 50504,
+      "plants": 25518,
+      "trees": 6280,
+      "instances": 76022,
       "props_by_kind": {
-        "sign": 13230,
-        "awning": 10752,
-        "ac_unit": 7503,
-        "street_light": 3895,
-        "trash": 2243,
-        "barrier": 1841,
-        "overhead_cable": 1776,
-        "bollard": 1775,
+        "sign": 13204,
+        "awning": 10779,
+        "ac_unit": 7490,
+        "street_light": 3908,
+        "trash": 2273,
+        "overhead_cable": 1844,
+        "barrier": 1840,
         "railing": 1507,
-        "traffic_signal": 1427,
-        "parked_vehicle": 1228,
-        "hydrant": 812,
-        "trash_can": 793,
-        "wall_light": 757,
+        "bollard": 1482,
+        "traffic_signal": 1441,
+        "parked_vehicle": 1139,
+        "hydrant": 848,
+        "trash_can": 809,
+        "wall_light": 807,
         "bench": 604,
-        "dumpster": 302,
-        "bus_stop": 82,
-        "scaffolding": 45,
+        "dumpster": 285,
+        "bus_stop": 85,
+        "scaffolding": 51,
         "boat": 42,
-        "vending_machine": 22,
-        "planter": 18,
-        "food_stall": 12,
-        "kiosk": 7,
+        "planter": 30,
+        "vending_machine": 14,
+        "food_stall": 13,
+        "kiosk": 8,
         "gate": 1
       },
       "plants_by_kind": {
-        "shrub": 8965,
-        "facade_greenery": 5329,
-        "overgrowth": 3408,
-        "park_tree": 2098,
-        "street_tree": 2060,
-        "conifer": 900,
-        "roof_tree": 794,
-        "palm": 776,
-        "median_tree": 398
+        "shrub": 8860,
+        "facade_greenery": 5311,
+        "overgrowth": 4230,
+        "street_tree": 2128,
+        "park_tree": 2119,
+        "conifer": 871,
+        "roof_tree": 837,
+        "palm": 754,
+        "median_tree": 408
       },
-      "lawn_m2": 46788,
-      "hedge_km": 9.8,
+      "lawn_m2": 46599,
+      "hedge_km": 9.86,
       "generator": {
-        "traffic_signals": 1427,
-        "bus_stops": 165,
-        "street_lights": 3645,
-        "narrow_lights": 1007,
-        "hydrants": 812,
-        "crosswalk_cans": 320,
-        "bollards": 1775,
-        "station_props": 17,
-        "street_trees": 2060,
-        "plaza_props": 100,
-        "park_benches": 844,
-        "parked_vehicles": 1228,
-        "alley_clutter": 2545,
-        "median_trees": 1147,
-        "promenade_trees": 27,
-        "park_trees": 7762,
-        "roof_plants": 4995,
-        "facade_greenery": 5329,
-        "overgrowth": 3408,
+        "traffic_signals": 1441,
+        "bus_stops": 173,
+        "street_lights": 3689,
+        "narrow_lights": 1026,
+        "hydrants": 848,
+        "crosswalk_cans": 319,
+        "bollards": 1482,
+        "station_props": 12,
+        "street_trees": 2128,
+        "plaza_props": 105,
+        "park_benches": 862,
+        "parked_vehicles": 1139,
+        "alley_clutter": 2558,
+        "median_trees": 1141,
+        "promenade_trees": 21,
+        "park_trees": 7637,
+        "roof_plants": 5050,
+        "facade_greenery": 5311,
+        "overgrowth": 4230,
         "quay_props": 1641,
-        "highway_barriers": 1841,
-        "overhead_cables": 1776,
-        "unit_dressing": 31485,
-        "scaffolding": 45,
+        "highway_barriers": 1840,
+        "overhead_cables": 1844,
+        "unit_dressing": 31473,
+        "scaffolding": 51,
         "market_gates": 1,
-        "props": 50674,
-        "plants": 24728
+        "props": 50504,
+        "plants": 25518
       }
     },
     "separation_budget": {
@@ -1256,21 +1256,28 @@
       "preferred_chains": 1,
       "planned": 0.5395
     },
-    "road_variant": 0
+    "road_variant": 0,
+    "city_tries": [
+      {
+        "variant": 18,
+        "road_variant": 0,
+        "layout_salt": 0,
+        "failures": 0
+      }
+    ]
   },
   "notes": [
     "island 'Launch Key' has no room toward 'west'; it sits at bearing 351 deg from the middle of the sea",
     "megasite 'Launch Key Spaceport' (spaceport) shrunk to 0.22 km2 (asked 0.50) to fit 'Launch Key'",
     "ramps not built: 3 too near another node, 2 meets, 1 off the run",
-    "1 underpass streets under the viaducts (not built: 1 deck too low, 3 near a ramp, 1 near a road under the deck)",
+    "1 underpass streets under the viaducts (not built: 3 near a ramp, 1 near a road under the deck)",
     "'Highcrest': a loop street found no connector (5 times)",
-    "87 local roads cut back at junctions sharper than the district minimum",
+    "88 local roads cut back at junctions sharper than the district minimum",
     "4 local roads running alongside another road removed",
-    "62 lanes reached only over pedestrian streets became pedestrian",
+    "59 lanes reached only over pedestrian streets became pedestrian",
     "3 local roads crossing another without a junction removed",
-    "22 local segments (6.74 km) not connected to the network were dropped",
+    "53 local segments (7.85 km) not connected to the network were dropped",
     "Halo Line: loop drawn around its stops (it met itself)",
-    "Launch Express: drawn along its stops with 500 m curves",
     "Crown Loop: loop drawn around its stops (their order makes turns tighter than 300 m)"
   ]
 }
