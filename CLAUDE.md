@@ -308,6 +308,21 @@ open road line still under its radius is tried with legs free to run back along 
 alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
 builds and the sweep on the combined code: `docs/progress/M8b/`.
 
+M8d (trumpet flyover) is in place, in `citygen/elevated.py`: a trumpet is the textbook one
+loop and one flyover (`Elev._trumpet_flyover`), with M7b's two far loops (`_trumpet`) as the
+fallback. The loop runs on from its stub terminal under the deck along the stem to the stem's
+near terminal (the stem ends there, no stub). The flyover (`_flyover`, `_fly_fit`) leaves the
+far lanes, turns square off the deck, runs round the loop's outside (the bell; a diagonal
+over the loop as a second shape), crosses the deck square beside the stem, comes down beside
+it and turns into it at its own terminal. Its profile (`_fly_profile`) clears every road and
+ramp under it by 5.5 m plus the deck (`_fly_needs`), level between crests, at 5% with 40 m
+vertical curves, at most 6%. Its stretches with no room for a column stay within 50 m
+(`_fly_span`). Ramps built later test a flyover in height (`_apart_in_z`). The ramp has
+`attrs.flyover` and `level` 2; the stats gain `flyovers` and `max_flyover_m`;
+`preview_elevated.png` casts it on top, puts a flyover trumpet in its inset and its profile in
+the profile panel. Only Nyxllor has a trumpet among the samples (crest 16.6 m). Sample builds:
+`docs/progress/M8d/`.
+
 ### Rules for cloud sessions building citygen milestones
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
