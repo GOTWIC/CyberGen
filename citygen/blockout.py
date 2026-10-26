@@ -922,6 +922,8 @@ def plan_sha256(plan: dict) -> str:
 # --- running Blender ------------------------------------------------------------------------
 
 BLENDER_SCRIPT = Path(__file__).resolve().parent / "blender" / "build.py"
+RERENDER_SCRIPT = Path(__file__).resolve().parent / "blender" / "rerender.py"
+README_WIDTH = 7680  # README images: 8K wide
 BUDGET_S = 600.0  # scope section 10: the Blender build under 10 minutes
 VERIFY = ("import bpy, json\n"
           "objs = [o for o in bpy.data.objects if 'citygen_category' in o]\n"
@@ -958,6 +960,24 @@ def _run(cmd: list[str], marker: str, timeout: float) -> tuple[dict | None, str]
         if line.startswith(marker + " "):
             return json.loads(line[len(marker) + 1:]), out
     return None, out
+
+
+def rerender(blockout_dir: str | Path, to_dir: str | Path, views: list[str],
+             width: int = README_WIDTH, blender: str | None = None,
+             samples: int = 16) -> list[str]:
+    """Render chosen views of a blockout (`top`, `iso_city`, `iso_<district>`, `street_<n>`)
+    again from its city.blend, `width` pixels wide, as to_dir/render_<view>.jpg (same cameras
+    as the build). Returns the files written."""
+    exe = find_blender(blender)
+    if exe is None:
+        raise RuntimeError("no Blender (set BLENDER or --blender)")
+    cmd = [exe, "-b", "--factory-startup", "-P", str(RERENDER_SCRIPT), "--",
+           str(Path(blockout_dir)), str(Path(to_dir)), "--width", str(width), "--samples",
+           str(samples), *views]
+    done, log = _run(cmd, "CITYGEN_RERENDER_DONE", timeout=BUDGET_S)
+    if done is None:
+        raise RuntimeError("Blender rerender failed:\n" + log[-2000:])
+    return done["files"]
 
 
 def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | None = None,
