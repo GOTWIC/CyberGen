@@ -38,6 +38,7 @@ distances from `geom.dist`, every list in a fixed order.
 
 from __future__ import annotations
 
+import bisect
 import math
 from dataclasses import dataclass, field
 
@@ -69,6 +70,11 @@ LOOP_SKEW_SIN = 0.7             # loop ramps (partial cloverleaf): as diamonds (
 LOOP_MIN_R = 35.0               # loop ramp radius (from the climb: about 45 m for a 9 m deck)
 LOOP_LEAD_M = 30.0              # straight from the loop to its terminal on the avenue
 LOOP_CLEAR_M = 2.0              # between a loop's lead and the avenue edge
+FLY_R = (60.0, 45.0)            # M8d flyover turns: off the deck line, then round to the stem
+FLY_GAP_M = 3.0                 # between the flyover's descent and the stem's edge
+FLY_SAMPLE_M = 2.5              # clearance samples along a flyover
+FLY_SPAN_M = 50.0               # longest stretch over roads with no spot for a column
+FLY_TOP_M = LEVEL_Z[2] + 4.0    # highest flyover deck
 STRAIGHT_COS = 0.819            # an avenue passes under straight on (35 degrees at most)
 OVERPASS_SKEW_SIN = 0.574       # and crosses under at 35 degrees or more (columns fit)
 
@@ -213,6 +219,79 @@ def _stations(L: float, step: float = STEP_M) -> list[float]:
 def _smoothstep(t: float) -> float:
     t = min(max(t, 0.0), 1.0)
     return t * t * (3.0 - 2.0 * t)
+
+
+def _turn(Q, a, b, R: float):
+    """The fillet of radius R at corner Q, coming in along unit a and leaving along unit b:
+    (its tangent length, its points from start to end)."""
+    phi = M.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1])
+    if abs(phi) < 1e-9:
+        return 0.0, [tuple(Q)]
+    t = R * M.tan(abs(phi) / 2.0)
+    S = (Q[0] - a[0] * t, Q[1] - a[1] * t)
+    side = 1.0 if phi > 0 else -1.0
+    K = (S[0] - a[1] * R * side, S[1] + a[0] * R * side)
+    rx, ry = S[0] - K[0], S[1] - K[1]
+    n = max(int(abs(phi) * R / STEP_M) + 1, 2)
+    pts = []
+    for i in range(n + 1):
+        al = phi * i / n
+        c, s = M.cos(al), M.sin(al)
+        pts.append((K[0] + rx * c - ry * s, K[1] + rx * s + ry * c))
+    return t, pts
+
+
+def _fillet_path(a0, corners: list, end, radii) -> list | None:
+    """A path through `corners` rounded with the given radii, from the first fillet's start
+    (coming in along unit a0) to `end`; None when two fillets do not fit on a leg."""
+    pts: list = []
+    a = a0
+    prev = None
+    nxt = corners[1:] + [end]
+    for Q, N, R in zip(corners, nxt, radii):
+        L = _d(Q, N)
+        if L <= 1.0:
+            return None
+        b = ((N[0] - Q[0]) / L, (N[1] - Q[1]) / L)
+        t, arc = _turn(Q, a, b, R)
+        if prev is not None and prev[1] + t > _d(prev[0], Q) - 1.0:
+            return None
+        pts += arc
+        prev = (Q, t)
+        a = b
+    if prev[1] > _d(prev[0], end) - 1.0:
+        return None
+    pts.append(tuple(end))
+    return pts
+
+
+def _near(P: np.ndarray, pts, cum) -> tuple[np.ndarray, np.ndarray]:
+    """For points P (k x 2): the distance to the polyline pts (rounded to 1e-6 m) and the arc
+    length of its nearest point (the first segment on a tie)."""
+    A = np.asarray(pts[:-1], dtype=float)
+    D = np.asarray(pts[1:], dtype=float) - A
+    L2 = D[:, 0] * D[:, 0] + D[:, 1] * D[:, 1]
+    PX = P[:, 0][:, None] - A[:, 0][None, :]
+    PY = P[:, 1][:, None] - A[:, 1][None, :]
+    t = (PX * D[:, 0][None, :] + PY * D[:, 1][None, :]) / np.where(L2 > 0, L2, 1.0)[None, :]
+    t = np.where(L2[None, :] > 0, np.clip(t, 0.0, 1.0), 0.0)
+    X = PX - t * D[:, 0][None, :]
+    Y = PY - t * D[:, 1][None, :]
+    dd = np.round(np.sqrt(X * X + Y * Y), 6)
+    j = np.argmin(dd, axis=1)
+    k = np.arange(len(P))
+    seg = np.asarray(cum[1:], dtype=float) - np.asarray(cum[:-1], dtype=float)
+    return dd[k, j], np.asarray(cum[:-1], dtype=float)[j] + t[k, j] * seg[j]
+
+
+def _samples(pts, step: float = FLY_SAMPLE_M) -> tuple[list[float], np.ndarray]:
+    """Stations every `step` m along a polyline (and its end) and the points there."""
+    cum = _cum(pts)
+    qs = [i * step for i in range(int(cum[-1] / step) + 1)]
+    if cum[-1] - qs[-1] > 0.01:
+        qs.append(cum[-1])
+    P = np.asarray([_at(pts, cum, q)[0] for q in qs], dtype=float)
+    return qs, P
 
 
 # ---------------------------------------------------------------------------
@@ -836,10 +915,11 @@ class Elev:
             return (pts, prof, s_far), None
         return None, why
 
-    def _ramp_clear(self, pts, r: Run, legs, T, hw_w: float, tail_m: float | None = None
-                    ) -> str | None:
+    def _ramp_clear(self, pts, r: Run, legs, T, hw_w: float, tail_m: float | None = None,
+                    full=None) -> str | None:
         """Why a ramp polyline does not fit (None when it does). Its last `tail_m` toward the
-        terminal may come near the avenue it lands on (a loop's lead runs beside it)."""
+        terminal may come near the avenue it lands on (a loop's lead runs beside it). `full`
+        (the whole ramp and its profile) lets it pass under or over a flyover."""
         ctx = self.ctx
         line = LineString(pts)
         half = RAMP_W / 2.0
@@ -869,9 +949,26 @@ class Elev:
         for rp in self.ramps:
             if rp["T"] == T:
                 continue
+            if rp.get("flyover") and full is not None:
+                if not self._apart_in_z(full[0], full[1], rp):
+                    return "another ramp"
+                continue
             if G.dist(line, LineString(rp["pts"])) < RAMP_W + 1.0:
                 return "another ramp"
         return None
+
+    def _apart_in_z(self, pts, prof, rp) -> bool:
+        """A ramp (pts, profile) and a flyover: wherever they come within a ramp's width plus
+        1 m of each other, one passes over the other with the clearance and the deck."""
+        if G.apart(LineString(pts), LineString(rp["pts"]), RAMP_W + 1.0):
+            return True
+        qs, P = _samples(pts)
+        d, s_o = _near(P, rp["pts"], _cum(rp["pts"]))
+        for i in np.nonzero(d < RAMP_W + 1.0)[0].tolist():
+            dz = abs(_z_at(rp["prof"], float(s_o[i])) - _z_at(prof, qs[i]))
+            if dz < CLEAR_M + DECK_M - 0.05:
+                return False
+        return True
 
     def _loop(self, r: Run, k: int, leg, sigma: int, kind: str, hw_w: float):
         """A 270 degree loop ramp (partial cloverleaf) on side sigma: an off loop leaves the
@@ -981,14 +1078,16 @@ class Elev:
             prof[0] = (0.0, prof[0][1])
         return (pts, prof, s_far, T, body, arc), None
 
-    def _loops(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs, ic) -> list:
+    def _loops(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs, ic,
+               kinds=("off", "on")) -> list:
         """The loop ramps that fit on side sigma (not yet added)."""
         out = []
-        for kind in ("off", "on"):
+        for kind in kinds:
             res, why = self._loop(r, k, leg, sigma, kind, hw_w)
             if res is not None:
                 pts, prof, s_far, TL, body, arc = res
-                why = self._ramp_clear(body, r, legs, TL, hw_w, LOOP_LEAD_M + 5.0)
+                why = self._ramp_clear(body, r, legs, TL, hw_w, LOOP_LEAD_M + 5.0,
+                                       full=(pts, prof))
                 if why is None and G.dist(LineString(pts), self.ctx.wet) < RAMP_W / 2.0 + 1.0:
                     why = "water"
                 if why is None and any(abs(sn - s_far) < 1.0 for sn in
@@ -1008,22 +1107,16 @@ class Elev:
             rp.pop("arc")
         return out
 
-    def _trumpet(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs, ic, C, u,
-                 v) -> dict | None:
-        """A ground highway stem meeting the run at a T: the stem runs on under the deck to a
-        stub on the far side (sigma), where a loop in each far quadrant comes down to it (the
-        two left turns: far lanes to the stem, stem to the far lanes; one ramp cannot fly over
-        another yet, so the classic trumpet's flyover is a second loop). The near lanes take
-        the near ramps. Returns the far loops, the stub's end (their shared terminal) and the
-        stem id, or None."""
+    def _stub_leg(self, r: Run, k: int, n: str, leg, hw_w: float, C, u, v) -> dict | None:
+        """A trumpet's stem run on under the deck to the far side, as a leg the far loops come
+        down to (past them: they must clear it all the way; it is cut back to their terminal
+        once they are built), or None when there is no room for it."""
         sN = r.s_nodes[k]
         skew = abs(u[0] * v[1] - u[1] * v[0])
         o = hw_w / 2.0 + RAMP_GAP + RAMP_W / 2.0
         top = r.z(sN)
         R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(top) - LOOP_LEAD_M) /
                                             (1.5 * math.pi) / 5.0))
-        # a stub past the loops (they must clear it all the way; it is cut back to their
-        # terminal once they are built)
         y_e = o + 2.0 * R + 20.0
         Te = G.qpoint((C[0] - v[0] * y_e / skew, C[1] - v[1] * y_e / skew))
         stub = LineString([G.qpoint(C), Te])
@@ -1034,10 +1127,18 @@ class Elev:
                 self.failed.get("trumpet: no room for the stub", 0) + 1
             return None
         L = _d(G.qpoint(C), Te)
-        virt = {"id": leg["id"], "centerline": [G.qpoint(C), Te], "start": n, "end": "",
+        return {"id": leg["id"], "centerline": [G.qpoint(C), Te], "start": n, "end": "",
                 "width_m": leg["width_m"], "road_class": leg["road_class"],
                 "attrs": {"length_m": G.q(L)}, "z_profile": [{"s": 0.0, "z": 0.0},
                                                             {"s": G.q(L), "z": 0.0}]}
+
+    def _trumpet(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs, ic,
+                 virt) -> dict | None:
+        """The two-loop trumpet (M7b, the fallback of `_trumpet_flyover`): the stem runs on
+        under the deck to a stub on the far side (sigma), where a loop in each far quadrant
+        comes down to it (the two left turns: far lanes to the stem, stem to the far lanes).
+        The near lanes take the near ramps. Returns the far loops, the stub's end (their
+        shared terminal) and the stem id, or None."""
         loops = self._loops(r, k, n, virt, sigma, hw_w, legs, ic)
         if len(loops) < 2 or tuple(loops[0]["T"]) != tuple(loops[1]["T"]):
             self.failed["trumpet: the far loops do not fit"] = \
@@ -1046,6 +1147,358 @@ class Elev:
         for rp in loops:
             rp["stub"] = True
         return {"ramps": loops, "end": tuple(loops[0]["T"]), "leg": leg["id"]}
+
+    # -- M8d: the trumpet's flyover ------------------------------------------------------------
+
+    def _trumpet_flyover(self, r: Run, k: int, n: str, leg, sigma: int, hw_w: float, legs,
+                         ic, virt, T_n) -> dict | None:
+        """The textbook trumpet's far side (sigma): one loop and one flyover for the two left
+        turns. The loop starts (or ends) at the stem's near terminal T_n, passes under the deck
+        along the stem and turns round its quadrant to the far lanes; the flyover
+        (`_flyover`) takes the other turn over the loop, the deck and the stem. The on loop
+        with the off flyover first, then the reverse. Returns the two ramps and the near
+        terminal (the stem ends there), or None."""
+        for lk, fk in (("on", "off"), ("off", "on")):
+            loops = self._loops(r, k, n, virt, sigma, hw_w, legs, ic, kinds=(lk,))
+            if not loops:
+                continue
+            lp = self._through(loops[0], T_n)
+            self.ramps.append(lp)
+            fly, why = self._flyover(r, k, n, leg, sigma, fk, hw_w, T_n, ic)
+            self.ramps.remove(lp)
+            if fly is None:
+                self.failed[why] = self.failed.get(why, 0) + 1
+                continue
+            return {"ramps": [lp, fly], "trim": tuple(T_n), "leg": leg["id"]}
+        return None
+
+    def _through(self, lp: dict, T_n) -> dict:
+        """A trumpet loop run on from its terminal on the stub, under the deck along the stem,
+        to the stem's near terminal (the ramp takes the stub's place)."""
+        lp = dict(lp)
+        D = G.q(_d(lp["T"], T_n))
+        if lp["kind"] == "on":
+            lp["pts"] = [tuple(T_n)] + [tuple(p) for p in lp["pts"]]
+            lp["prof"] = [(0.0, 0.0)] + [(G.q(s + D), z) for s, z in lp["prof"]]
+        else:
+            L = lp["prof"][-1][0]
+            lp["pts"] = [tuple(p) for p in lp["pts"]] + [tuple(T_n)]
+            lp["prof"] = list(lp["prof"]) + [(G.q(L + D), 0.0)]
+        lp["T"] = tuple(T_n)
+        return lp
+
+    def _flyover(self, r: Run, k: int, n: str, stem, sigma: int, kind: str, hw_w: float, T_n,
+                 ic) -> tuple:
+        """A trumpet's flyover on far side sigma (the loop is the last ramp so far). An off
+        flyover leaves the far lanes before the stem (beyond the loop, which lies on that side
+        too), climbs beside the deck, turns away from it over the loop (corner Q0), round
+        (corner Q1) onto a line beside the stem on the side away from the loop, crosses the
+        deck square, comes down beside the stem and turns into it at a terminal T_f (corner
+        K2). An on flyover is its mirror (built the same way, then reversed). Its deck clears
+        every road and ramp it passes over (`_fly_needs`), at the design grade with vertical
+        curves, at most 6%; its own columns find room within `FLY_SPAN_M` (`_fly_span`).
+        Returns (ramp, None) or (None, reason)."""
+        sN = r.s_nodes[k]
+        C, u = _at(r.pts, r.cum, sN)
+        dirn = 1 if sigma == -1 else -1             # far lanes' traffic along u
+        c = dirn * (1 if kind == "off" else -1)
+        g = (c * u[0], c * u[1])                    # along the deck toward the stem
+        f = (-u[1] * sigma, u[0] * sigma)           # to the far side
+        v = self.leg_dir(stem, n)
+        vf = -(v[0] * f[0] + v[1] * f[1])
+        if vf < MIN_SKEW_SIN:
+            return None, "flyover: skewed stem"
+        m = (-v[1], v[0])                           # off the stem, away from the loop
+        if m[0] * g[0] + m[1] * g[1] < 0:
+            m = (-m[0], -m[1])
+        o = hw_w / 2.0 + RAMP_GAP + RAMP_W / 2.0
+        dd = stem["width_m"] / 2.0 + RAMP_W / 2.0 + FLY_GAP_M
+        loop = self.ramps[-1]
+        x_lo = min((p[0] - C[0]) * g[0] + (p[1] - C[1]) * g[1] for p in loop["pts"])
+        y_hi = max((p[0] - C[0]) * f[0] + (p[1] - C[1]) * f[1] for p in loop["pts"])
+        cl = [tuple(p) for p in stem["centerline"]]
+        cl = cl if stem["start"] == n else cl[::-1]
+        obst = self._fly_obstacles(C)
+        mf = m[0] * f[0] + m[1] * f[1]
+        why = "flyover: no room"
+        # the bell (round the loop's outside) first, then the diagonal over the loop
+        for shape, Y1, dx in (("bell", y_hi + 20.0, 25.0), ("bell", y_hi + 40.0, 45.0),
+                              ("over", y_hi + 15.0, 15.0), ("over", y_hi + 35.0, 40.0)):
+            t1 = (Y1 - dd * mf) / vf
+            Q1 = (C[0] + dd * m[0] - t1 * v[0], C[1] + dd * m[1] - t1 * v[1])
+            # in the node's frame (the deck may curve): the bell turns out square off the deck
+            # (Q0) to its corner Qb dx short of the loop, round the loop to Q1; the diagonal
+            # leaves the deck where its offset line is dx short of the loop
+            Qb = (C[0] + (x_lo - dx) * g[0] + Y1 * f[0], C[1] + (x_lo - dx) * g[1] + Y1 * f[1])
+            sQ0 = None
+            if shape == "bell":
+                st = _project(r.pts, r.cum, Qb)[0]
+                if c * (st - sN) < 0.0 and 0.0 < st < r.L:
+                    sQ0 = st
+            else:
+                for i in range(1, 400):
+                    st = sN - c * 5.0 * i
+                    if not 0.0 < st < r.L:
+                        break
+                    P, uu = _at(r.pts, r.cum, st)
+                    x0 = (P[0] - uu[1] * o * sigma - C[0]) * g[0] + \
+                        (P[1] + uu[0] * o * sigma - C[1]) * g[1]
+                    if x0 <= x_lo - dx:
+                        sQ0 = st
+                        break
+            if sQ0 is None:
+                why = "flyover: off the run"
+                continue
+            P, uu = _at(r.pts, r.cum, sQ0)
+            Q0 = (P[0] - uu[1] * o * sigma, P[1] + uu[0] * o * sigma)
+            if shape == "bell":
+                # out far enough for both turns (the bell and Q1 move out together)
+                L0 = _d(Q0, Qb)
+                need = FLY_R[0] + FLY_R[1] + 5.0
+                if L0 < need:
+                    Qb = (Q0[0] + (Qb[0] - Q0[0]) * need / L0,
+                          Q0[1] + (Qb[1] - Q0[1]) * need / L0)
+                    t1 = ((Qb[0] - C[0]) * f[0] + (Qb[1] - C[1]) * f[1] - dd * mf) / vf
+                    Q1 = (C[0] + dd * m[0] - t1 * v[0], C[1] + dd * m[1] - t1 * v[1])
+                mids, radii = [Qb, Q1], (FLY_R[0], FLY_R[1], FLY_R[1])
+            else:
+                mids, radii = [Q1], (FLY_R[0], FLY_R[1])
+            res, why = self._fly_fit(r, k, c, sigma, o, (c * uu[0], c * uu[1]), Q0, sQ0, mids,
+                                     radii, m, dd, cl, stem, n, obst, kind, ic, T_n)
+            if res is not None:
+                res["shape"] = shape
+                return res, None
+        return None, why
+
+    def _fly_fit(self, r: Run, k: int, c: int, sigma: int, o: float, h0, Q0, sQ0: float, mids,
+                 radii, m, dd: float, cl, stem, n: str, obst, kind: str, ic, T_n) -> tuple:
+        """One flyover shape (its corners from Q0 to the stem's side): the landing T_f as near
+        the deck as its fall allows, the diverge as near as its climb allows; checked whole."""
+        ccum = _cum(cl)
+        t_max = ccum[-1] - TERMINAL_GAP_M - 1.0
+        tail = (dd - 1.0) * math.pi / 2.0 + 6.0
+
+        def core_at(t2):
+            Tp, ut = _at(cl, ccum, t2)
+            Tf = G.qpoint(Tp)
+            mt = (-ut[1], ut[0])
+            if mt[0] * m[0] + mt[1] * m[1] < 0:
+                mt = (-mt[0], -mt[1])
+            K2 = (Tf[0] + dd * mt[0], Tf[1] + dd * mt[1])
+            return Tf, _fillet_path(h0, [Q0] + mids + [K2], Tf, list(radii) + [dd - 1.0])
+
+        if t_max < 100.0:
+            return None, "flyover: stem too short"
+        Tf, core = core_at(t_max)
+        if core is None:
+            return None, "flyover: turns do not fit"
+        qs, need, _ = self._fly_needs(core, obst, r.id, stem["id"], 0.0, tail, own=True)
+        L_core = qs[-1]
+        L_req = max((q + FLAT_M + CURVE_M / 2.0 + z / GRADE + 5.0
+                     for q, z in zip(qs, need) if z > 0.0), default=0.0)
+        if L_req > L_core:
+            return None, "flyover: stem too short"
+        t2 = t_max - 5.0 * math.floor((L_core - L_req) / 5.0)
+        Tf, core = core_at(t2)
+        if core is None:
+            return None, "flyover: turns do not fit"
+        why = self._terminal_ok(stem, n, Tf, t2)
+        if why:
+            return None, "flyover: " + why
+        qs, need, _ = self._fly_needs(core, obst, r.id, stem["id"], 0.0, tail, own=True)
+        sF0 = sQ0 - c * _d(Q0, core[0])
+        z0 = r.z(sF0)
+        A = max([TAPER_M + 10.0] + [TAPER_M + CURVE_M / 2.0 + (z - z0) / GRADE - q + 5.0
+                                    for q, z in zip(qs, need) if z > 0.0])
+        A = 10.0 * math.ceil(A / 10.0)
+        why = "flyover: no profile"
+        for extra in (0.0, 20.0, 40.0):
+            s_div = sF0 - c * (A + extra)
+            if not 0.0 < s_div < r.L:
+                return None, "flyover: off the run"
+            if r.z(s_div) < 2.0:
+                return None, "flyover: diverge too low"
+            if any(abs(sn - s_div) < NODE_GAP_M for sn in r.s_nodes +
+                   self.cut_pts.get(r.id, [])):
+                why = "flyover: too near another node"
+                continue
+            P, _ = _at(r.pts, r.cum, s_div)
+            if G.dist(Point(P), self.ctx.wet) < 30.0:
+                return None, "flyover: diverge over water"
+            n_st = max(int((A + extra) / 10.0), 2)
+            app = []
+            for i in range(n_st):
+                st = s_div + (sF0 - s_div) * i / n_st
+                Cs, us = _at(r.pts, r.cum, st)
+                off = o * _smoothstep(abs(st - s_div) / TAPER_M)
+                app.append((Cs[0] - us[1] * off * sigma, Cs[1] + us[0] * off * sigma))
+            path = _dedupe([G.qpoint(p) for p in app + core])
+            L_app = _cum(path[:n_st + 1])[-1]
+            qs, need, under = self._fly_needs(path, obst, r.id, stem["id"], L_app, tail)
+            prof = self._fly_profile(r, s_div, c, qs, need)
+            if prof is None:
+                continue
+            why = self._fly_clear(path)
+            if why:
+                return None, "flyover: " + why
+            if self._fly_span(qs, prof, under, path, T_n, stem["width_m"]) > FLY_SPAN_M:
+                return None, "flyover: no room for its columns"
+            if kind == "on":
+                Lr = qs[-1]
+                path = path[::-1]
+                prof = [(G.q(Lr - q), z) for q, z in reversed(prof)]
+                prof[0] = (0.0, prof[0][1])
+            return {"pts": path, "prof": prof, "kind": kind, "T": tuple(Tf), "run": r.id,
+                    "s_far": s_div, "ic": ic["id"], "sigma": sigma, "leg": stem["id"],
+                    "node": r.nodes[k], "stub": False, "loop": False, "flyover": True,
+                    "level": 2}, None
+        return None, why
+
+    def _fly_obstacles(self, C) -> list:
+        """What a flyover near C may pass over: the runs (with their profiles), the other
+        primary roads, the ramps so far, as (key, points, arc lengths, profile, width, margin
+        beside it)."""
+        out = []
+        on_runs = set()
+        for ro in sorted(self.runs, key=lambda x: x.id):
+            on_runs |= {s["id"] for s, _ in ro.segs}
+            w = max(s["width_m"] for s, _ in ro.segs)
+            out.append((("run", ro.id), ro.pts, ro.cum, ro.prof, w, 0.5))
+        for i in sorted(int(x) for x in self.prim_tree.query(Point(C).buffer(1500.0))):
+            s = self.prim[i][1]
+            if s["id"] in on_runs:
+                continue
+            cl = [tuple(p) for p in s["centerline"]]
+            out.append((("seg", s["id"]), cl, _cum(cl), _tuples(s["z_profile"]), s["width_m"],
+                        2.0))
+        for j, rp in enumerate(self.ramps):
+            out.append((("ramp", j), rp["pts"], _cum(rp["pts"]), _tuples(rp["prof"]), RAMP_W,
+                        1.0))
+        return out
+
+    def _fly_needs(self, path, obst, run_id: str, stem_id: str, app_m: float, tail_m: float,
+                   own: bool = False) -> tuple:
+        """Along a flyover path, every 2.5 m: the height its deck must reach there (the highest
+        road or ramp it passes over, the clearance and its own deck; -inf over nothing) and
+        what passes under it [(distance, width, z)]. The run itself is beside the path along
+        its first `app_m` (the taper and the climb beside the deck), the stem under its last
+        `tail_m` (where it lands). `own`: a stretch without its approach, which starts beside
+        the run."""
+        qs, P = _samples(path)
+        L = qs[-1]
+        need = [-math.inf] * len(qs)
+        under: list = [[] for _ in qs]
+        line = LineString(path)
+        for key, pts, cum, prof, w, margin in obst:
+            lim = w / 2.0 + RAMP_W / 2.0 + margin
+            if len(pts) < 2 or G.apart(line, LineString(pts), lim):
+                continue
+            d, so = _near(P, pts, cum)
+            for i in np.nonzero(d < lim)[0].tolist():
+                q = qs[i]
+                if key == ("run", run_id) and (q <= app_m or (own and q <= 1.0)):
+                    continue
+                if key == ("seg", stem_id) and q >= L - tail_m:
+                    continue
+                zo = _z_at(prof, float(so[i]))
+                need[i] = max(need[i], zo + CLEAR_M + DECK_M + 0.3)
+                under[i].append((float(d[i]), w, zo))
+        return qs, need, under
+
+    def _fly_profile(self, r: Run, s_div: float, c: int, qs, need) -> list | None:
+        """A flyover's profile (in the off direction): on the deck along the taper, then over
+        every need with a 40 m crest at the design grade, down to the landing; None where it
+        cannot (a need on the taper, too steep, too high)."""
+        L = qs[-1]
+        hump = [(q, z) for q, z in zip(qs, need) if z > 0.0]
+        z_te = r.z(s_div + c * TAPER_M)
+        st = _stations(L)
+        # level between crests: the lower of the highest needs before and after
+        left, right = [], []
+        for q, z in hump:
+            left.append(max(left[-1], z) if left else z)
+        for q, z in reversed(hump):
+            right.append(max(right[-1], z) if right else z)
+        right = right[::-1]
+        hq = [q for q, _ in hump]
+
+        def crest(x):
+            h = -math.inf
+            for q, z in hump:
+                h = max(h, z - GRADE * max(0.0, abs(x - q) - CURVE_M / 2.0))
+            i = bisect.bisect_right(hq, x)
+            if 0 < i < len(hq):
+                h = max(h, min(left[i - 1], right[i]))
+            return h
+        raw = []
+        for x in st:
+            if x <= TAPER_M:
+                zr = r.z(s_div + c * x)
+                if crest(x) > zr + 0.01:
+                    return None
+                raw.append(zr)
+            else:
+                raw.append(max(min(z_te, GRADE * max(0.0, L - x - FLAT_M)), crest(x)))
+        z = smooth(raw)
+        for i, x in enumerate(st):
+            if x <= TAPER_M - CURVE_M / 2.0:
+                z[i] = raw[i]
+        z[0], z[-1] = r.z(s_div), 0.0
+        prof = compress(list(zip(st, z)))
+        if any(s1 > s0 and abs(z1 - z0) / (s1 - s0) > MAX_GRADE - 1e-9
+               for (s0, z0), (s1, z1) in zip(prof, prof[1:])):
+            return None
+        if max(zz for _, zz in prof) > FLY_TOP_M:
+            return None
+        if any(_z_at(prof, q) < z - 0.02 for q, z in hump):
+            return None
+        return prof
+
+    def _fly_clear(self, path) -> str | None:
+        """Why a flyover path does not fit the ground (None when it does): water, reserves, the
+        map edge."""
+        ctx = self.ctx
+        line = LineString(path)
+        if G.dist(line, ctx.wet) < RAMP_W / 2.0 + 1.0:
+            return "water"
+        if not ctx.closed_all.is_empty and G.dist(line, ctx.closed_all) < RAMP_W / 2.0:
+            return "reserve or open land"
+        if not ctx.canvas_inner.contains(line):
+            return "map edge"
+        return None
+
+    def _fly_span(self, qs, prof, under, path, T_n, stem_w: float) -> float:
+        """The longest stretch of a flyover with no spot for a column (`column_free`): over a
+        road or ramp lower than its deck, or a junction (a disc at each ground node near it,
+        and at the stem's near terminal)."""
+        cum = _cum(path)
+        line = LineString(path)
+        discs = [(tuple(T_n), 0.7 * stem_w + 2.0)]
+        over = {x for ro in self.runs for x in ro.nodes[1:-1]}
+        for nid in sorted(self.inc):
+            if nid in over:
+                continue
+            p = self.pos[nid]
+            w = max(s["width_m"] for s in self.inc[nid])
+            if len(self.inc[nid]) < 2 or G.apart(line, Point(p), 0.7 * w + 2.0):
+                continue
+            if any(_z_at(_tuples(s["z_profile"]), 0.0 if s["start"] == nid else
+                         _cum(s["centerline"])[-1]) > 0.5 for s in self.inc[nid]):
+                continue
+            discs.append((p, 0.7 * w + 2.0))
+        size = COLUMN_DEFAULT_M
+        best = run = 0.0
+        prev = None
+        for q, u in zip(qs, under):
+            top = under_m(_z_at(prof, q))
+            P, _ = _at(path, cum, q)
+            blocked = top >= SUPPORT_MIN_UNDER_M and (
+                any(zo < top - 1.0 and dist < w / 2.0 + size / 2.0 + 0.5 for dist, w, zo in u)
+                or any(_d(P, D) < rad for D, rad in discs))
+            run = run + (q - prev) if blocked and prev is not None else 0.0
+            best = max(best, run)
+            prev = q
+        return best
 
     def interchange(self, r: Run, k: int, kd: str) -> None:
         n = r.nodes[k]
@@ -1082,9 +1535,15 @@ class Elev:
         if kd == "tee" and sides[0][1]["road_class"] == "highway":
             sigma_a, leg = sides[0]
             v = self.leg_dir(leg, n)
-            trumpet = self._trumpet(r, k, n, leg, -sigma_a, hw_w, legs, ic, C, u, v)
+            virt = self._stub_leg(r, k, n, leg, hw_w, C, u, v)
+            if virt is not None and sigma_a in terminals:
+                # M8d: one loop and a flyover, else the two loops of M7b
+                trumpet = self._trumpet_flyover(r, k, n, leg, -sigma_a, hw_w, legs, ic, virt,
+                                                terminals[sigma_a][0])
+            if virt is not None and trumpet is None:
+                trumpet = self._trumpet(r, k, n, leg, -sigma_a, hw_w, legs, ic, virt)
             if trumpet is not None:
-                stub_side = -sigma_a
+                stub_side = None if "trim" in trumpet else -sigma_a
                 for rp in trumpet["ramps"]:
                     self.ramps.append(rp)
                     self.cut_pts[r.id].append(rp["s_far"])
@@ -1112,7 +1571,7 @@ class Elev:
                 res, why = self._ramp(r, T, sT, sigma, kind, hw_w)
                 if res is not None:
                     pts, prof, s_far = res
-                    why = self._ramp_clear(pts, r, legs, T, hw_w)
+                    why = self._ramp_clear(pts, r, legs, T, hw_w, full=(pts, prof))
                 if why is not None:
                     why = why.split(" rs")[0]
                     self.failed[why] = self.failed.get(why, 0) + 1
@@ -1166,7 +1625,7 @@ class Elev:
             self.icx.append(ic)
             return
         ic["ramps"] = [f"{rp['kind']}:{rp['sigma']}{':loop' if rp['loop'] else ''}"
-                       for rp in built]
+                       f"{':flyover' if rp.get('flyover') else ''}" for rp in built]
         ic["template"] = ("trumpet" if trumpet is not None else
                           "parclo" if any(rp["loop"] for rp in built) else
                           "diamond" if kd == "cross" else "diamond_stub") if built else \
@@ -1185,6 +1644,9 @@ class Elev:
                 self.stubs[(leg["id"], n)] = T
         for T, lid in sorted({(tuple(rp["T"]), rp["leg"]) for rp in built if not rp["stub"]}):
             self.avenue_cuts.setdefault(lid, []).append(T)
+        if trumpet is not None and "trim" in trumpet:
+            # the stem ends at its near terminal: the loop runs on under the deck
+            self.trim[(trumpet["leg"], n)] = trumpet["trim"]
         if kd == "tee" and stub_side is not None and stub_side not in sides_used:
             near = [s for s in sides_used if s != stub_side and s in terminals]
             if near:
@@ -1433,8 +1895,10 @@ def rebuild(E: Elev) -> None:
                "one_way": True, "district_ids": list(src["district_ids"]),
                "attrs": {"role": "ramp", "ramp": rp["kind"], "interchange": rp["ic"],
                          "template": ic["template"], "stub": rp["stub"]}}
+        if rp.get("flyover"):
+            row["attrs"]["flyover"] = True
         out.append(Edge(rp["pts"], rp["prof"], row, rp["ic"], False,
-                        extra={"level": 1, "ramp": True}))
+                        extra={"level": rp.get("level", 1), "ramp": True}))
     # nodes by coordinate
     old = {(G.q(n["position"][0]), G.q(n["position"][1])): n for n in net.nodes}
     deg: dict = {}

@@ -4,6 +4,7 @@ failing case, the profile helpers, the grade solver, the blockout categories."""
 import copy
 import json
 
+import numpy as np
 import pytest
 from shapely.geometry import LineString
 
@@ -12,9 +13,9 @@ from citygen import checks as C
 from citygen import elevated as EL
 from citygen.build import build_city
 from citygen.model import CityModel
-from citygen.validate import validate_spec
+from citygen.validate import load_spec, validate_spec
 
-from conftest import MINIMAL, SMALL
+from conftest import MINIMAL, ROOT, SMALL, built_sample
 
 M7_CHECKS = {"road_grades", "level_continuity", "deck_clearance", "ramps_land",
              "road_supports"}
@@ -240,9 +241,10 @@ def test_loops_where_diamonds_do_not_fit(monkeypatch):
 
 
 def test_trumpet_geometry(monkeypatch):
-    """A ground highway stem at a crossing of a test city's viaduct: the stem's stub runs
-    under the deck to the far side, where two loops (the left turns) come down to its end;
-    each loop clears the deck and the stub, at most 6% steep."""
+    """The two-loop trumpet (the fallback): a ground highway stem at a crossing of a test
+    city's viaduct: the stem's stub runs under the deck to the far side, where two loops (the
+    left turns) come down to its end; each loop clears the deck and the stub, at most 6%
+    steep."""
     seen = {}
     orig = EL.Elev.interchanges
 
@@ -265,7 +267,9 @@ def test_trumpet_geometry(monkeypatch):
                 v = E.leg_dir(leg, n)
                 sigma = 1 if u[0] * v[1] - u[1] * v[0] > 0 else -1
                 ic = {"id": "ic99"}
-                tr = E._trumpet(r, k, n, leg, -sigma, hw_w, legs, ic, C, u, v)
+                virt = E._stub_leg(r, k, n, leg, hw_w, C, u, v)
+                tr = None if virt is None else E._trumpet(r, k, n, leg, -sigma, hw_w, legs,
+                                                          ic, virt)
                 if tr is not None:
                     found = (r, tr, hw_w)
                     break
@@ -284,6 +288,183 @@ def test_trumpet_geometry(monkeypatch):
             assert (abs(z1 - z0) - 0.01) / (s1 - s0) <= EL.MAX_GRADE + 1e-6
         ends = [rp["prof"][0][1], rp["prof"][-1][1]]
         assert min(ends) == 0.0 and max(ends) > 2.0
+
+
+# --- M8d: the trumpet's flyover ------------------------------------------------------------
+
+NYXLLOR = ROOT / "cities" / "nyxllor" / "city_spec.json"
+
+
+def _roads_with_elev(monkeypatch, spec_path):
+    """Nyxllor's roads alone (no local streets or buildings) and the M7 stage that made them."""
+    seen = {}
+    orig = EL.Elev.interchanges
+
+    def keep(self):
+        seen["E"] = self
+        return orig(self)
+
+    monkeypatch.setattr(EL.Elev, "interchanges", keep)
+    b = build_city(load_spec(spec_path), local=False, buildings=False, workers=1)
+    return b, seen["E"]
+
+
+def _grade_ok(prof) -> bool:
+    return all((abs(z1 - z0) - 0.01) / (s1 - s0) <= EL.MAX_GRADE + 1e-6
+               for (s0, z0), (s1, z1) in zip(prof, prof[1:]) if s1 > s0)
+
+
+@pytest.fixture(scope="module")
+def nyx_roads():
+    mp = pytest.MonkeyPatch()
+    try:
+        yield _roads_with_elev(mp, NYXLLOR)
+    finally:
+        mp.undo()
+
+
+def test_trumpet_flyover_geometry(nyx_roads):
+    """Nyxllor's trumpet in its textbook form: on the far side one loop (from the stem's near
+    terminal, under the deck, round its quadrant) and one flyover for the other left turn.
+    The flyover is a level-2 ramp: it leaves the far lanes at the deck, wraps round the
+    loop's outside, crosses the deck square with the clearance and the deck under it, comes
+    down beside the stem and lands on it at grade; at most 6% steep everywhere."""
+    _, E = nyx_roads
+    ic = next(i for i in E.icx if i["template"] == "trumpet")
+    rps = [rp for rp in E.ramps if rp["ic"] == ic["id"]]
+    fly = [rp for rp in rps if rp.get("flyover")]
+    loops = [rp for rp in rps if rp["loop"]]
+    assert len(fly) == 1 and len(loops) == 1, ic["ramps"]
+    fly, loop = fly[0], loops[0]
+    assert fly["sigma"] == loop["sigma"] and {fly["kind"], loop["kind"]} == {"off", "on"}
+    assert fly["level"] == 2 and not fly["stub"] and not loop["stub"]
+    r = next(r for r in E.runs if r.id == ic["run"])
+    # the loop starts (or ends) at the stem's near terminal, where the near ramps land, and
+    # the stem ends there
+    near = [rp for rp in rps if not rp["loop"] and not rp.get("flyover")]
+    assert near and all(tuple(rp["T"]) == tuple(loop["T"]) for rp in near)
+    assert E.trim[(fly["leg"], ic["node"])] == tuple(loop["T"])
+    # ends: on the deck at its height, on the stem at grade
+    prof = fly["prof"]
+    deck_end, ground_end = (0, -1) if fly["kind"] == "off" else (-1, 0)
+    assert prof[deck_end][1] == pytest.approx(r.z(fly["s_far"]), abs=0.02)
+    assert prof[ground_end][1] == 0.0
+    assert tuple(fly["T"]) == tuple(fly["pts"][ground_end])
+    assert _grade_ok(prof) and _grade_ok(loop["prof"])
+    # over the deck it clears the run by the clearance and both decks
+    pts = fly["pts"]
+    cum = EL._cum(pts)
+    line = LineString(pts)
+    run_line = LineString(r.pts)
+    hw = max(s["width_m"] for s, _ in r.segs)
+    over = [q for q in np.arange(0.0, cum[-1], 2.5).tolist()
+            if run_line.distance(line.interpolate(q)) < hw / 2.0]
+    assert over, "the flyover does not cross its run"
+    for q in over:
+        P = line.interpolate(q)
+        z_run = r.z(run_line.project(P))
+        assert EL._z_at(prof, q) - z_run >= EL.CLEAR_M + EL.DECK_M - 0.05
+    assert max(z for _, z in prof) >= EL.LEVEL_Z[1] + EL.CLEAR_M + EL.DECK_M
+    # it wraps round the loop: never over it
+    assert line.distance(LineString(loop["pts"])) >= EL.RAMP_W + 1.0
+
+
+def test_trumpet_falls_back_to_two_loops(monkeypatch):
+    """Where the flyover does not fit, the trumpet keeps the two far loops of M7b, both on the
+    stub that runs on under the deck."""
+    monkeypatch.setattr(EL.Elev, "_flyover", lambda self, *a, **k: (None, "test: no room"))
+    _, E = _roads_with_elev(monkeypatch, NYXLLOR)
+    ic = next(i for i in E.icx if i["template"] == "trumpet")
+    rps = [rp for rp in E.ramps if rp["ic"] == ic["id"]]
+    assert not any(rp.get("flyover") for rp in rps)
+    far = [rp for rp in rps if rp["loop"]]
+    assert sorted(rp["kind"] for rp in far) == ["off", "on"]
+    assert all(rp["stub"] for rp in far) and tuple(far[0]["T"]) == tuple(far[1]["T"])
+    assert E.stubs[(far[0]["leg"], ic["node"])] == tuple(far[0]["T"])
+    assert E.failed.get("test: no room", 0) >= 1
+
+
+@pytest.fixture(scope="module")
+def nyx_city():
+    built, _, _ = built_sample(NYXLLOR)
+    return built
+
+
+def _flyover_seg(m):
+    return next(s for s in m.road_segments if s.attrs.get("flyover"))
+
+
+def test_flyover_in_the_city(nyx_city):
+    """The built city: the flyover is a one-way, single-lane ramp at level 2 on its own
+    columns (none in the deck or a road under it), every M7 check passes, and the blockout
+    draws it as a raised deck."""
+    m = nyx_city.model
+    fly = _flyover_seg(m)
+    assert fly.one_way and fly.lanes == 1 and fly.level == 2
+    assert fly.attrs["template"] == "trumpet" and fly.attrs["role"] == "ramp"
+    failed = [(c.id, c.failures[:3]) for c in nyx_city.checks
+              if c.id in M7_CHECKS and not c.passed]
+    assert not failed, failed
+    cols = [s for s in m.structures if (s.attrs or {}).get("road_id") == fly.id]
+    assert len(cols) >= 10
+    assert max(c.z1_m for c in cols) >= EL.LEVEL_Z[1] + EL.CLEAR_M
+    st = nyx_city.stats["elevated"]
+    assert st["flyovers"] == 1 and st["max_flyover_m"] > EL.LEVEL_Z[1] + EL.CLEAR_M
+    plan = BO.make_plan(m)
+    deck = [o for o in plan["objects"] if o["name"] == f"{fly.id}.deck"]
+    assert deck and deck[0]["category"] == "elevated"
+
+
+def _nyx_rerun(model: CityModel) -> dict:
+    spec = load_spec(NYXLLOR).filled
+    checks, _ = C.run_checks(spec, model)
+    return {c.id: c for c in checks}
+
+
+def _on_fly(m, fn) -> CityModel:
+    fid = _flyover_seg(m).id
+
+    def go(d):
+        fn(d, next(s for s in d["road_segments"] if s["id"] == fid))
+    return _mutate(m, go)
+
+
+def test_flyover_checks_fail_on_a_broken_copy(nyx_city):
+    """Each M7 check fails on a copy of the city with the flyover broken: its crest lowered
+    onto the deck it passes over (clearance), a 30 m spike (grade), its deck end lifted off
+    the viaduct (continuity), its ground end lifted off the stem (ramps land), its columns
+    gone (supports)."""
+    m = nyx_city.model
+
+    def low(d, s):
+        top = max(z["z"] for z in s["z_profile"])
+        for z in s["z_profile"]:
+            z["z"] = round(min(z["z"], EL.LEVEL_Z[1]), 2) if z["z"] > top - 8.0 else z["z"]
+    assert not _nyx_rerun(_on_fly(m, low))["deck_clearance"].passed
+
+    def spike(d, s):
+        p = s["z_profile"]
+        p[len(p) // 2]["z"] += 30.0
+    assert not _nyx_rerun(_on_fly(m, spike))["road_grades"].passed
+
+    def step(d, s):
+        hi = s["start"] if s["z_profile"][0]["z"] > s["z_profile"][-1]["z"] else s["end"]
+        n = next(n for n in d["road_nodes"] if n["id"] == hi)
+        n["position"][2] += 2.0
+    assert not _nyx_rerun(_on_fly(m, step))["level_continuity"].passed
+
+    def lift(d, s):
+        lo_first = s["z_profile"][0]["z"] < s["z_profile"][-1]["z"]
+        lo = s["start"] if lo_first else s["end"]
+        n = next(n for n in d["road_nodes"] if n["id"] == lo)
+        n["position"][2] = 6.0
+        (s["z_profile"][0] if lo_first else s["z_profile"][-1])["z"] = 6.0
+    assert not _nyx_rerun(_on_fly(m, lift))["ramps_land"].passed
+
+    def bare(d, s):
+        d["structures"] = [x for x in d["structures"]
+                           if (x.get("attrs") or {}).get("road_id") != s["id"]]
+    assert not _nyx_rerun(_on_fly(m, bare))["road_supports"].passed
 
 
 # --- M7b: art-direction loop ----------------------------------------------------------------
