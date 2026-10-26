@@ -61,8 +61,9 @@ def test_sample_city_builds_and_passes(path):
     built, took, _ = built_sample(path)
     failed = [f for c in built.checks for f in c.failures]
     assert not failed, failed
-    # M8a: 300 -> 600 s; Delta Megacity and Nyxllor pass on their 9th and 8th full-city try
-    assert took < 600, f"{path.parent.name} took {took:.1f} s"
+    # M8a: 300 -> 600 s (Delta Megacity and Nyxllor passed on their 9th and 8th full-city
+    # try); M8c: back to 300 s, every sample passes on its first to third try
+    assert took < 300, f"{path.parent.name} took {took:.1f} s"
     # Every polygon in the model is valid (also a check; asserted directly here).
     for e in built.model.entities():
         for attr in ("polygon",):
@@ -71,14 +72,14 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M8b/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M8c/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M8b" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M8c" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        assert (ROOT / "docs" / "progress" / "M8b" / slug / "preview_transit.png").is_file()
+        assert (ROOT / "docs" / "progress" / "M8c" / slug / "preview_transit.png").is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
