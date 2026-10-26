@@ -172,9 +172,16 @@ def test_blender_build_small_city(small, tmp_path):
             "renders"} <= ids
     out = tmp_path / "out"
     assert (out / "city.blend").is_file() and (out / "city.usdc").is_file()
-    assert (out / "render_top.jpg").is_file()
+    assert (out / "render_top.jpg").is_file() and (out / "render_iso_city.jpg").is_file()
     assert len(list((out / "tiles").glob("*.glb"))) == len(
         {o["tile"] for o in json.loads((out / "blockout_plan.json").read_text())["objects"]})
+    # README images: chosen views again from the saved .blend, at another width
+    files = BO.rerender(out, tmp_path / "hires", ["iso_city", "street_1"], width=480,
+                        samples=1)
+    from PIL import Image
+    assert [Image.open(f).size for f in files] == [(480, 300), (480, 270)]
+    with pytest.raises(RuntimeError):
+        BO.rerender(out, tmp_path / "hires", ["no_such_view"], width=480, samples=1)
 
 
 def test_map_svg_reads_in_the_traced_map_pipeline(small, tmp_path):

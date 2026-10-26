@@ -179,7 +179,9 @@ it only triangulates and draws): `city.blend`, `city.usdc`, `tiles/<tile>.glb`, 
 .blend in a fresh Blender and checks its objects, tiles and renders (`blockout_report.txt`).
 `citygen/exports.py` writes the layered `map_2d.svg` (readable by `pipeline/svg_to_plan.py`)
 and `map_2d.png`, `unreal/corporate_core_plan.json` for the greybox script, `graphs.json`,
-`tiles.json` and `props.csv`. The Blender test skips when Blender is missing. Sample builds:
+`tiles.json` and `props.csv`. `citygen rerender <blockout_dir> VIEW... [--width 7680] [--to DIR]`
+(`citygen/blender/rerender.py`) renders chosen views (`top`, `iso_city`, `iso_<district>`,
+`street_<n>`) again from the saved `city.blend` with the build's cameras. The Blender test skips when Blender is missing. Sample builds:
 `docs/progress/M4/`.
 
 M5 (transit) is in place: the same build runs `citygen/transit.py` after the buildings (stops
@@ -254,7 +256,10 @@ Demo: `docs/progress/M7b/nyxllor_pinned/`. Sample builds: `docs/progress/M7b/`.
   and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
   Keep only images and short notes there; overwrite nothing from earlier milestones.
 - **Root `README.md`:** when the milestone PR is ready, update the Progress table and the
-  "Latest maps" images to point at the new milestone's previews.
+  "Latest maps" images to point at the new milestone's previews. Every 3D render shown in the root
+  README is 8K: `citygen rerender <blockout_dir> iso_city ... --to docs/progress/<M>/<city>`
+  (7680 px wide by default, a few seconds each; fall back to 3840 or 2048 only if 8K fails).
+  Always include the whole-city isometric views (`render_iso_city.jpg`).
 
 ## Working preferences
 

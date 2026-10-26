@@ -1,5 +1,5 @@
 """Command line: `citygen spec validate|render|schema|diff`, `citygen build`, `citygen
-blockout`, `citygen review`, `citygen model schema`, `citygen trace diff`.
+blockout`, `citygen rerender`, `citygen review`, `citygen model schema`, `citygen trace diff`.
 
 Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
 2 usage or file error.
@@ -153,6 +153,25 @@ def cmd_blockout(args: argparse.Namespace) -> int:
     return _blockout(Path(args.model), args.out_dir, args)
 
 
+def cmd_rerender(args: argparse.Namespace) -> int:
+    from .blockout import rerender
+
+    src = Path(args.blockout_dir)
+    if not (src / "city.blend").is_file() or not (src / "blockout_plan.json").is_file():
+        print(f"error: {src}: no city.blend and blockout_plan.json (run citygen blockout)",
+              file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        files = rerender(src, args.to or src, args.views, width=args.width,
+                         blender=args.blender, samples=args.samples)
+    except RuntimeError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    for f in files:
+        print(f"wrote {f}")
+    return EXIT_OK
+
+
 def _blockout_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--blender", help="Blender executable (default: $BLENDER, the newest "
                                      "/Applications/Blender*.app, or blender on PATH)")
@@ -272,6 +291,17 @@ def build_parser() -> argparse.ArgumentParser:
     bo.add_argument("out_dir")
     _blockout_args(bo)
     bo.set_defaults(func=cmd_blockout)
+
+    rr = sub.add_parser("rerender", help="render chosen blockout views again from city.blend "
+                                         "at another width (README images: 8K)")
+    rr.add_argument("blockout_dir", help="a citygen blockout output (city.blend, "
+                                         "blockout_plan.json)")
+    rr.add_argument("views", nargs="+", help="top, iso_city, iso_<district> or street_<n>")
+    rr.add_argument("--to", help="output folder (default: blockout_dir)")
+    rr.add_argument("--width", type=int, default=7680, help="width in pixels (default 7680)")
+    rr.add_argument("--samples", type=int, default=16, help="EEVEE render samples")
+    rr.add_argument("--blender", help="Blender executable")
+    rr.set_defaults(func=cmd_rerender)
 
     rv = sub.add_parser("review", help="art-direction review sheet of a build (review.md): "
                                        "checks, numbers, changes since the last round")

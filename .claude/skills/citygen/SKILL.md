@@ -449,7 +449,8 @@ Reply with:
   `preview_detail.png`, `preview_heights.png` and `preview_massing.png`;
 - the blockout result from `blockout_report.txt` (objects, tiles, file sizes, time), with
   `render_iso_city.jpg`, `render_top.jpg`, two or three `render_iso_<district>.jpg` and a
-  street view.
+  street view. For images meant for the README, render them again at 8K with
+  `citygen rerender <blockout_dir> iso_city [iso_<district>] [street_<n>] --to <folder>`.
 
 ## Minimal example
 

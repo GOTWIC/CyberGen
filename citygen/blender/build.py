@@ -437,17 +437,18 @@ def iso_frame(box, d, aspect):
     return c, max(max(us) - min(us), (max(vs) - min(vs)) * aspect) * 1.06
 
 
-def renders(scene, plan, out, res):
+def views(plan, res):
+    """Every render as (name, ortho, ortho scale or lens mm, eye, target, width, height):
+    the top view, the whole city isometric, one isometric view per district, the street
+    views. `citygen rerender` renders a chosen few of them again at another width."""
     cams = plan["cameras"]
-    done = []
+    out = []
     top = cams["top"]
     w, h = top["size"]
-    cam = camera(scene, "cam_top", True)
-    cam.data.ortho_scale = max(w, h) * 1.02
-    look(cam, (top["center"][0], top["center"][1], 3000.0),
-         (top["center"][0], top["center"][1], 0.0))
     rw = int(res * 1.25)
-    done.append(render(scene, os.path.join(out, "render_top.jpg"), rw, int(rw * h / w)))
+    cx, cy = top["center"]
+    out.append(("top", True, max(w, h) * 1.02, (cx, cy, 3000.0), (cx, cy, 0.0), rw,
+                int(rw * h / w)))
     d = Vector(cams["iso_dir"]).normalized()
     aspect = 1.6
     boxes = [dist["box"] for dist in cams["districts"]]
@@ -456,25 +457,34 @@ def renders(scene, plan, out, res):
         box = [min(b[i] for b in boxes) for i in range(3)] + \
             [max(b[i] for b in boxes) for i in range(3, 6)]
         c, width = iso_frame(box, d, aspect)
-        cam = camera(scene, "cam_iso_city", True)
-        cam.data.ortho_scale = width
-        look(cam, c - d * 8000.0, c)
-        done.append(render(scene, os.path.join(out, "render_iso_city.jpg"), rw,
-                           int(rw / aspect)))
+        out.append(("iso_city", True, width, c - d * 8000.0, c, rw, int(rw / aspect)))
     for dist in cams["districts"]:
         c, width = iso_frame(dist["box"], d, aspect)
-        cam = camera(scene, f"cam_iso_{dist['id']}", True)
-        cam.data.ortho_scale = width
-        look(cam, c - d * 4000.0, c)
-        done.append(render(scene, os.path.join(out, f"render_iso_{dist['id']}.jpg"), res,
-                           int(res / aspect)))
+        out.append((f"iso_{dist['id']}", True, width, c - d * 4000.0, c, res,
+                    int(res / aspect)))
     for k, v in enumerate(cams["street"], 1):
-        cam = camera(scene, f"cam_street_{k}", False)
-        cam.data.lens = v["lens_mm"]
-        look(cam, v["eye"], v["target"])
-        done.append(render(scene, os.path.join(out, f"render_street_{k}.jpg"), res,
-                           int(res * 9 / 16)))
-    return done
+        out.append((f"street_{k}", False, v["lens_mm"], v["eye"], v["target"], res,
+                    int(res * 9 / 16)))
+    return out
+
+
+def render_view(scene, view, path, width=None):
+    """Render one view (from `views`) to path, at its own size or at `width` pixels wide."""
+    name, ortho, scale, eye, target, w, h = view
+    cam = camera(scene, f"cam_{name}", ortho)
+    if ortho:
+        cam.data.ortho_scale = scale
+    else:
+        cam.data.lens = scale
+    look(cam, eye, target)
+    if width:
+        w, h = width, int(round(width * h / w))
+    return render(scene, path, w, h)
+
+
+def renders(scene, plan, out, res):
+    return [render_view(scene, v, os.path.join(out, f"render_{v[0]}.jpg"))
+            for v in views(plan, res)]
 
 
 # --- exports ------------------------------------------------------------------------------------
@@ -571,4 +581,5 @@ def main():
                                                  "faces": faces, **timings}))
 
 
-main()
+if __name__ == "__main__":
+    main()
