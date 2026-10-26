@@ -421,7 +421,8 @@ Coordinates: meters, x east, y north, z up, origin at city center (matches today
 ## 11. Out of scope (v1)
 - Textures, detailed models, facades, interiors, materials beyond flat category colors.
 - Lighting, atmospherics, post-processing (stage 3).
-- Terrain relief (hills); tunnels and underground metro geometry beyond station boxes.
+- Terrain relief (hills). (Tunnels and underground metro geometry, once listed here, are now
+  milestone M9 below.)
 - Gameplay, AI, traffic simulation, Unreal-side import tooling beyond the existing greybox
   script (data for it is produced).
 - Free-form interchange design (templates only); stack interchanges.
@@ -443,6 +444,16 @@ Coordinates: meters, x east, y north, z up, origin at city center (matches today
 M0 to M4 is the core ("prompt -> full blockout city in Blender"). M7 carries the most technical
 risk, so it is last: if the budget runs out there, elevated highways fall back to straight
 viaducts with simple end ramps from M5.
+
+### After v1
+
+| M | Deliverable | Done when | Status |
+|---|---|---|---|
+| M8a | Robustness sweep (`citygen sweep`) and fixes of what it finds | sweep pass rate up, no crashes | done |
+| M8b | Transit loops as one simple ring, lines independent of each other, `transit_self_crossing` check | loops simple in every sample; Mac = x86 | done |
+| M8c | Transit that passes on a city's first layout (Delta Megacity: 9 tries) and the sweep's remaining transit failures | Delta in at most 2 tries; sweep above 51 of 68 | in progress (paused) |
+| M8d | Trumpet interchange with one loop and one flyover (two-loop fallback) | samples pass; Mac = x86; sweep breaks nothing | in progress (paused) |
+| M9 | Tunnels: road tunnels (cut-and-cover under districts and plazas, immersed tubes under rivers, channels and the bay where a bridge does not fit or the spec asks for one) with portals, approach ramps and ventilation buildings; metro tunnel geometry between the station boxes; pedestrian underpasses. Spec: `highways.tunnels` and a per-crossing `tunnel` preference. Checks: grades within the class maximum, cover under ground and under the water bed, portal clearance, no clash with the metro, foundations or basements. Blockout: tube and box geometry, portals, a cutaway render | samples with tunnel crossings pass the full suite; Mac = x86 | planned |
 
 ## 13. Running it with cloud sessions
 - Push this repo to a private GitHub repository (cloud sessions start from it).

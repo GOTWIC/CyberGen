@@ -27,6 +27,9 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M7b | Trumpet and partial cloverleaf interchanges, art-direction loop, Corporate Core pinned import | Done | [`docs/progress/M7b`](docs/progress/M7b) |
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
+| M8c | Transit that passes on a city's first layout (Delta Megacity), remaining sweep transit failures | In progress (paused) | |
+| M8d | Trumpet interchange with one loop and one flyover | In progress (paused) | |
+| M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 
 ## Latest maps (M8b)
 
