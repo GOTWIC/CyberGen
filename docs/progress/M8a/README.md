@@ -179,3 +179,7 @@ blockout renders (`render_iso_city.jpg` at 8K).
 - **Visual review:** previews were looked at for the failing builds and the known defects (the
   hook at the map edge, now pinned by a test); passing builds were not reviewed one by one, so
   visual defects that no check measures may remain.
+- **One unexplained test failure:** one full `pytest` run failed `test_committed_reports_match`
+  on archipelago_free_port (report `checks` and `stats` differed from the committed report while
+  the model hash matched). It did not come back in three later runs (the test alone, after a
+  SMALL build in the same process, and the full suite: 359 passed, 1 skipped).
