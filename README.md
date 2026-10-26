@@ -28,7 +28,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 | M8c | Transit that passes on a city's first layout (Delta Megacity), remaining sweep transit failures | In progress (paused) | |
-| M8d | Trumpet interchange with one loop and one flyover | In progress (paused) | |
+| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Nyxllor), the two-loop form as the fallback; SWEEP_ROW | Done | [`docs/progress/M8d`](docs/progress/M8d) |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
@@ -37,7 +37,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
-## Latest maps (M8b)
+## Latest maps (M8b, road levels M8d)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M8a swept them and the test specs over many seeds and
@@ -49,7 +49,8 @@ sky tube) so that their curves fit, and routes transit in about 3 to 13 s per ci
 code it takes nyxllor from 8 full-city tries to 1.
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
-for full size):
+for full size). These are M8b's renders: M8d changes only Nyxllor's trumpet and was built
+where no Blender was available, so its renders are still to come:
 
 | Nexus City (from the concept image) | Nyxllor (bay, river delta) |
 |---|---|
@@ -73,10 +74,12 @@ At street level, beside the viaducts:
 |---|---|
 | <img src="docs/progress/M8b/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8b/nyxllor/render_street_4.jpg" width="420"> |
 
-Road levels (Nyxllor): every raised road by deck height, the interchanges (a diamond, a
-partial cloverleaf and a trumpet), columns, and the profile of one viaduct:
+Road levels (Nyxllor, M8d): every raised road by deck height, the interchanges (a diamond, a
+partial cloverleaf and a trumpet), columns, and the profile of one viaduct. The trumpet
+(inset) now has one loop and a flyover that wraps round it, crosses the deck at 16.6 m
+beside the stem and comes down to it:
 
-<img src="docs/progress/M8b/nyxllor/preview_elevated.png" width="840">
+<img src="docs/progress/M8d/nyxllor/preview_elevated.png" width="840">
 
 Props and plants at street level (Nyxllor, 180 m insets):
 
