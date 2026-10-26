@@ -165,6 +165,14 @@ FRONTAGE_VERGE_M = 5.0        # landscaped strip between a highway and its front
 CLOSED_PAD_M = 4.0
 
 
+def street_class(seg) -> str:
+    """The class a road has at street level: a traced highway is at grade (no ramps were
+    drawn), with sidewalks, crosswalks and junctions like an avenue."""
+    attrs = seg["attrs"] if isinstance(seg, dict) else seg.attrs
+    cls = seg["road_class"] if isinstance(seg, dict) else seg.road_class
+    return "avenue" if cls == "highway" and "pinned" in attrs else cls
+
+
 def style_of(archetype: str) -> Style:
     return STYLES.get(archetype, STYLES["midtown_mixed"])
 
@@ -217,6 +225,15 @@ class Line:
     @property
     def line(self) -> LineString:
         return LineString(self.pts)
+
+    @property
+    def no_junction(self) -> bool:
+        """A highway takes no local street (a traced one does: the tracing has no ramps, it
+        is at grade); nor does a footbridge."""
+        if self.cls == "footbridge":
+            return True
+        return self.cls == "highway" and not (self.primary is not None and
+                                              "pinned" in self.primary["attrs"])
 
 
 @dataclass
@@ -490,8 +507,16 @@ class Builder:
         cones = [s.flight_cone for s in sites if s.flight_cone is not None]
         self.cones = G.union(cones) if cones else Polygon()
         self.open_land = G.union(open_polys) if open_polys else Polygon()
+        from . import pinned as PN
+
+        # traced buildings stand as drawn: local streets keep PIN_CLEAR_M from them
+        pins = PN.placed_islands(spec, h)
+        feet = [b.footprint for k in sorted(pins) for b in pins[k][0].buildings]
+        self.pin_feet = G.union(feet) if feet else Polygon()
+        self.pinned = G.qpoly(G.union(feet).buffer(PIN_CLEAR_M, join_style="mitre")) \
+            if feet else Polygon()
         self.closed = G.union([G.qpoly(self.reserves.buffer(CLOSED_PAD_M, join_style="mitre")),
-                               self.cones, self.open_land])
+                               self.cones, self.open_land, self.pinned])
         shapely.prepare(self.closed)
         self.lines: list[Line] = []
         self.index = SegIndex()
@@ -581,7 +606,7 @@ class Builder:
                 best[tj] = gap
         for tj in sorted(best, key=lambda j: (best[j], j)):
             t = self.lines[tj]
-            if (t.cls == "highway" and not allow_highway) or t.cls == "footbridge":
+            if t.no_junction and not (allow_highway and t.cls == "highway"):
                 continue
             new = self._attach_to(pts, t, angle, reach, ln.inserts)
             if new is None:
@@ -620,7 +645,7 @@ class Builder:
             return False
         q, _, tj = hit
         t = self.lines[tj]
-        if t.cls in ("highway", "footbridge"):
+        if t.no_junction:
             return False
         if not self._legal(t, q, _project(t.pts, q)[0]):
             return False
@@ -967,7 +992,7 @@ def build_frame(B: Builder) -> None:
     # frontage streets along highways (local streets never join a highway)
     frontage: dict[int, list[int]] = {}
     for hi_, hw in enumerate(B.lines[:B.n_primary]):
-        if hw.cls != "highway" or hw.role == "ramp":
+        if not hw.no_junction or hw.cls != "highway" or hw.role == "ramp":
             continue
         for n in sorted(free, key=lambda n: B.did[n]):
             if G.apart(hw.line, free[n], hw.width + 40.0):
@@ -1200,7 +1225,7 @@ def _wobble(pts, rng, amp: float, wavelength: float):
 def _attachable(B: Builder, p, reach: float = 3.0) -> bool:
     for tj, k in B.index.near(p, pad=reach + 40.0):
         t = B.lines[tj]
-        if t.dead or t.cls in ("highway", "footbridge"):
+        if t.dead or t.no_junction:
             continue
         d, _, _ = _seg_dist(p, t.pts[k], t.pts[k + 1])
         if d - t.width / 2 <= reach:
@@ -2081,7 +2106,7 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
                 if tj not in main_set:
                     continue
                 t = B.lines[tj]
-                if t.dead or t.cls in ("highway", "footbridge"):
+                if t.dead or t.no_junction:
                     continue
                 d, q, _ = _seg_dist(a, t.pts[kk], t.pts[kk + 1])
                 if d - t.width / 2 <= 40.0 and (best is None or d < best[0] - 1e-9):
@@ -2636,6 +2661,7 @@ def clean_graph(B: Builder, edges):
     return edges, notes
 
 
+PIN_CLEAR_M = 15.0              # street centerline to a traced building (a 20 m street keeps 5 m)
 LOCAL_JUNCTION_Z_M = 3.0      # M7: highest primary road a local street ramps up to
 LOCAL_GRADE = 0.05            # M7: local streets ramping to a raised junction
 

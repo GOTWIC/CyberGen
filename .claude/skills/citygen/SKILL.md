@@ -96,7 +96,15 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
   it); the land between its channels becomes separate landmasses: give one to a `delta`
   island, let the build place a district there, or it becomes named open land (a marsh).
 - `islands`: `name`, `position` (direction from the center) and `setting` (`offshore`,
-  `nearshore`, `mid_river`, `delta`; mid_river and delta need `river`), `area_km2`. Shorthand:
+  `nearshore`, `mid_river`, `delta`; mid_river and delta need `river`), `area_km2`. A traced
+  district goes in as `"pinned": {"source": "maps/corporate_core_v1.0.1.svg",
+  "rotation_deg": 0}` on an offshore or nearshore island (area from the tracing; put the
+  district on it with `on_island`): its coast, water pockets, roads and buildings are kept as
+  drawn (heights from the object labels, else by the legacy rule within the district's
+  `height_m`), the traced roads that run off the coast continue straight to the next land as
+  bridges, and the generator fills the rest around them. Leave out spec `landmarks` the
+  tracing already has (its megatower). Pick the newest map version (compare numerically, v1.10
+  after v1.9). Shorthand:
   `"position": "south_west_offshore"`. Offshore and nearshore islands are placed from the middle
   of the sea toward `position` (the report notes an island that had no room there); a
   `mid_river` island sits on the river (`center` = nearest the
@@ -368,7 +376,8 @@ errors).
    wall lights, awnings and cables; density follows each district's `greenery`, `grime` and
    `neon` (set them per district to change it).
 4d. Open `preview_elevated.png` (M7): every raised road colored by deck height, the
-   interchanges labeled (D diamond, T tee stub, B direct branch, O overpass), columns,
+   interchanges labeled (D diamond, P partial cloverleaf, Tr trumpet, T tee stub, B direct
+   branch, O overpass), columns,
    underpass streets, an interchange inset and the profile of one viaduct. Viaducts should
    run through the dense districts with ramps down to the avenues; the notes list ramps and
    underpass streets that could not be built. More viaduct: raise `highways.elevated_share`;
@@ -391,8 +400,16 @@ errors).
    (its curves cut the turn there) or a curve is too tight; drop a stop that sits off the
    line's way (another line can serve it); raise `altitude_m` within the mode's range when a
    line climbs over too much.
-6. At most three build rounds. If checks still fail, stop and report them with what you tried;
-   if you believe citygen itself is wrong, say so instead of editing it.
+6. At most three build rounds (the art-direction loop). Build each round into its own folder
+   (`out/<city>/round_01`, `round_02`, ...), then write its review sheet:
+   `.venv/bin/python -m citygen review out/<city>/round_02 --spec <spec> --prev
+   out/<city>/round_01`. `review.md` lists the failed checks, the numbers per district with
+   last round's beside them, the spec changes since the last round
+   (`citygen spec diff A B` shows them for any two specs), the previews to open and the spec
+   parameters that answer what you may see. Read it with the previews and the concept image,
+   change spec parameters only, and build the next round. Stop when the checks pass and the
+   previews match the prompt, or after the third round; if checks still fail, report them
+   with what you tried; if you believe citygen itself is wrong, say so instead of editing it.
 
 ### 6b. Blender blockout (M4)
 
@@ -451,7 +468,9 @@ Reply with:
 }
 ```
 
-Worked examples (prompts, specs and schematics): `docs/progress/M0/`. Builds of the same cities
+Worked examples (prompts, specs and schematics): `docs/progress/M0/`. A pinned import:
+`docs/progress/M7b/nyxllor_pinned/city_spec.json` (Nyxllor with the traced Corporate Core as an
+island in Nyx Bay). Builds of the same cities
 (previews and reports): `docs/progress/M4/` with the Blender blockout renders and 2D maps,
 `docs/progress/M3p/` with buildings, skybridges, landmarks and
 megasites (the M3 polish; `docs/progress/M3/` before it), `docs/progress/M2/` with local streets, blocks and lots,

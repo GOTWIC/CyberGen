@@ -509,8 +509,10 @@ def check_road_graph(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
 
 def check_districts_served(m: CityModel, g: _Geo) -> Check:
     c = Check("districts_served", f"Every district is touched by an avenue (at least "
-                                  f"{SERVED_M:.0f} m within 25 m of it)")
-    avenues = unary_union([g.roads[s.id] for s in m.road_segments if s.road_class == "avenue"])
+                                  f"{SERVED_M:.0f} m within 25 m of it; a traced road of any "
+                                  "class serves its pinned district)")
+    avenues = unary_union([g.roads[s.id] for s in m.road_segments if s.road_class == "avenue"
+                           or "pinned" in s.attrs])
     for d in m.districts:
         poly = g.districts[d.name]
         if avenues.is_empty or avenues.intersection(poly.buffer(25.0)).length < SERVED_M:
@@ -633,7 +635,8 @@ def min_radius(line: LineString, base: float, skip0: float = 0.0, skip1: float =
     return float(r[k]), float(mid[k])
 
 
-def primary_chains(m: CityModel, g: _Geo) -> list[tuple[str, str, LineString, str, str]]:
+def primary_chains(m: CityModel, g: _Geo, pinned: bool = True
+                   ) -> list[tuple[str, str, LineString, str, str]]:
     """Primary roads as M1b laid them: (label, class, line, start node, end node). M2 splits a
     primary segment wherever a local street joins it; the pieces of one M1b segment (attrs
     `m1b_segment`) are joined back here, so alignment checks see the primary road itself."""
@@ -641,6 +644,8 @@ def primary_chains(m: CityModel, g: _Geo) -> list[tuple[str, str, LineString, st
     for s in m.road_segments:
         if s.road_class not in ROAD_MIN_RADIUS_M or s.attrs.get("role") == "ramp":
             continue
+        if not pinned and "pinned" in s.attrs:
+            continue      # a traced road, as drawn
         groups.setdefault(s.attrs.get("split_of") or s.attrs.get("m1b_segment", s.id),
                           []).append(s)
     out = []
@@ -672,14 +677,14 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
                               f"{ROAD_MIN_RADIUS_M['avenue']:.0f} m), outside junction areas "
                               f"({JUNCTION_SKIP_M['avenue']:.0f} m from an avenue junction, M2; "
                               f"{JUNCTION_SKIP_M['highway']:.0f} m from a highway junction, "
-                              "an interchange in M7)")
+                              "an interchange in M7; traced roads as drawn)")
     deg: dict[str, int] = {}
     for s in m.road_segments:
         if s.road_class in ROAD_MIN_RADIUS_M:
             deg[s.start] = deg.get(s.start, 0) + 1
             deg[s.end] = deg.get(s.end, 0) + 1
     over = [tuple(p) for s in m.road_segments for p in s.attrs.get("overpass_at", [])]
-    for label, cls, line, a, b in primary_chains(m, g):
+    for label, cls, line, a, b in primary_chains(m, g, pinned=False):
         rmin = ROAD_MIN_RADIUS_M[cls]
         skip = JUNCTION_SKIP_M[cls]
         skip0 = skip if deg.get(a, 0) >= 3 else 0.0
@@ -698,9 +703,10 @@ def check_segment_length(m: CityModel, g: _Geo) -> Check:
     c = Check("segment_length", "No highway segment under "
                                 f"{ROAD_MIN_SEGMENT_M['highway']:.0f} m, no avenue segment under "
                                 f"{ROAD_MIN_SEGMENT_M['avenue']:.0f} m (a stretch that leaves "
-                                "the map is cut by the map border and not counted)")
+                                "the map is cut by the map border and not counted; traced "
+                                "roads as drawn)")
     off_map = {n.id for n in m.road_nodes if n.attrs.get("kind") in ("exit", "edge")}
-    for label, cls, line, a, b in primary_chains(m, g):
+    for label, cls, line, a, b in primary_chains(m, g, pinned=False):
         if a in off_map or b in off_map:
             continue
         lmin = ROAD_MIN_SEGMENT_M[cls]

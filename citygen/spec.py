@@ -249,6 +249,15 @@ def _island_position(v: Any) -> Any:
     return v
 
 
+class Pinned(_Model):
+    """A traced district imported as fixed (scope 4.3)."""
+    source: str = Field(description="Repo path of the traced SVG, in the conventions of "
+                                    "maps/corporate_core_v*.svg (coast, highway, building, "
+                                    "landmark layers).")
+    rotation_deg: Annotated[float, Field(ge=-360.0, le=360.0)] = Field(
+        0.0, description="Counterclockwise turn of the traced map.")
+
+
 class Island(_Model):
     name: Name
     position: Annotated[Direction | Literal["center"], WithJsonSchema({
@@ -261,11 +270,20 @@ class Island(_Model):
     setting: IslandSetting = "offshore"
     river: Name | None = Field(None, description="River for mid_river and delta islands.")
     area_km2: Annotated[float, Field(gt=0.0, le=20.0)] = 0.5
+    pinned: Pinned | None = Field(
+        None, description="The island is a traced district (its coast, roads and buildings "
+                          "kept as drawn); area_km2 then comes from the tracing.")
 
     @model_validator(mode="before")
     @classmethod
     def _shorthand(cls, v: Any) -> Any:
         return _island_position(v)
+
+    @model_validator(mode="after")
+    def _pinned_at_sea(self) -> Island:
+        if self.pinned is not None and self.setting not in ("offshore", "nearshore"):
+            raise ValueError("a pinned island sits in the sea (offshore or nearshore)")
+        return self
 
     @model_validator(mode="after")
     def _river_needed(self) -> Island:

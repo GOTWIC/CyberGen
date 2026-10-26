@@ -83,10 +83,10 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 ## City generator (citygen)
 
 `docs/citygen_scope.md` is the spec for citygen, the prompt-to-city layout generator that is
-replacing hand tracing (milestones M0 to M7, built in cloud sessions). Hard rule: citygen makes no
-API calls and no network calls, in development or in the final product, and has no LLM SDK
-dependency. The prompt-to-spec step is done by a Claude Code session through the repo's `citygen`
-skill; that session may start other Claude sessions or subagents.
+replacing hand tracing (milestones M0 to M7, built in cloud sessions and locally). Hard rule:
+citygen makes no API calls and no network calls, in development or in the final product, and
+has no LLM SDK dependency. The prompt-to-spec step is done by a Claude Code session through
+the repo's `citygen` skill; that session may start other Claude sessions or subagents.
 
 M0 is in place: package `citygen/` (spec schema, archetype presets, fill-defaults, city model
 schema, schematic renderer), skill `.claude/skills/citygen/SKILL.md`, examples in
@@ -218,8 +218,34 @@ adds underpass streets every 200 m, and lets local streets join primary roads up
 after transit, `road_supports` puts columns every 32 m under every raised deck over land.
 Five checks in `elevated_checks.py` (65 in all), `preview_elevated.png`; `build_city`
 retries a failing city with other layout salts on the same roads, then other road networks.
-Sample builds: `docs/progress/M7/`. M7b (trumpet and partial cloverleaf templates,
-art-direction loop, Corporate Core pinned import) is next.
+Sample builds: `docs/progress/M7/`.
+
+M7b is in place, which completes the scope's milestones:
+- **Pinned import** (`citygen/pinned.py`, scope 4.3): `water.islands[].pinned` (`source` SVG,
+  `rotation_deg`) imports a traced district in the `maps/` conventions with its own
+  deterministic path parser (arcs through `dmath`).
+  - Hydro places the island with its exact traced outline (kept through the land opening);
+    its holes become ornamental basins.
+  - M1b adds the traced roads as drawn (role `pinned`, kept by every clean-up, exempt from
+    the curve and length checks and from viaducts). Roads drawn off the coast run straight to
+    the next district land and join the network; routing stays off the island.
+  - M2 gives each traced building its own lot (block `blk000`, attrs `pinned`), keeps local
+    streets 15 m from traced buildings, and treats traced highways as at-grade avenues
+    (`streets.street_class`).
+  - M3 builds traced buildings as prisms (label heights, else the legacy rule within the
+    district range); transit never removes them.
+- **Interchanges:** partial cloverleaf loops (`Elev._loop`: 270 degree loops in the two
+  quadrants of a side whose diamond ramps do not fit) and trumpets (a ground highway stem
+  passes under to a stub where two far loops land).
+- **Art-direction loop:** `citygen review <out_dir> --spec S --prev P` writes `review.md`;
+  `citygen spec diff A B`; rounds as in the skill.
+- **Junction corners:** `junctions._corner` uses the fillet only when its run fits
+  min(0.45 L, 60 m) on both legs, else the sharp curb corner, else the node (ramp gores
+  leave at a few degrees), so junction polygons stay at their node.
+- **Columns:** `elevated._fill_gaps` fills any column gap over 60 m, searching past a short
+  segment's end nodes.
+
+Demo: `docs/progress/M7b/nyxllor_pinned/`. Sample builds: `docs/progress/M7b/`.
 
 ### Rules for cloud sessions building citygen milestones
 

@@ -59,6 +59,8 @@ class IslandRec:
     polygon: object
     filler: bool = False
     probe: tuple[float, float] | None = None  # for delta wedges: a point on the wedge's coast
+    pinned: object = None         # the traced outline, placed (kept exactly by rebuild_land)
+    pin_at: tuple[float, float] | None = None   # where the traced map's origin went
 
 
 @dataclass
@@ -663,14 +665,15 @@ def position_reach(canvas: Polygon, direction: str) -> float:
 
 
 def _fit_blob(free, aim: Point, area: float, rng, elong: float, gap: float, canvas: Polygon,
-              beyond, sector=None, strict: bool = False) -> Polygon | None:
+              beyond, sector=None, strict: bool = False, shapes=None) -> Polygon | None:
     """Island blob nearest to `aim` that stays `gap` meters clear of everything but `free`.
 
     `sector` = (center, unit direction): spots whose bearing from the center is within 35
     degrees of the direction are tried first, so an island asked for the south west does not
     slide north round an island placed before it."""
-    shapes = [G.blob((0.0, 0.0), area, np.random.default_rng(rng.integers(1 << 31)), elong, ang)
-              for ang in (0.0, math.pi / 4, math.pi / 2, 3 * math.pi / 4)]
+    if shapes is None:
+        shapes = [G.blob((0.0, 0.0), area, np.random.default_rng(rng.integers(1 << 31)), elong,
+                         ang) for ang in (0.0, math.pi / 4, math.pi / 2, 3 * math.pi / 4)]
     rmin = min(math.sqrt(area / math.pi) * 0.8, min(
         Point(0, 0).distance(sh.exterior) for sh in shapes))
     room = free.union(beyond).buffer(-gap)
@@ -735,6 +738,15 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
     beyond = canvas.buffer(4000, join_style="mitre").difference(canvas)
     jobs = [(i.name, i.area_km2 * 1e6, i.position, i.setting, False) for i in todo]
     jobs += [(n, a * 1e6, p, "offshore", True) for n, a, p in fillers]
+    pins, pin_src, pin_rot = {}, {}, {}
+    for i in todo:
+        if i.pinned is not None:
+            from . import pinned as PN
+
+            pin_src[i.name] = PN.load_cached(i.pinned.source)
+            pin_rot[i.name] = i.pinned.rotation_deg
+            pl = pin_src[i.name].placed((0.0, 0.0), i.pinned.rotation_deg)
+            pins[i.name] = Polygon(pl.land.exterior)
     jobs.sort(key=lambda j: -j[1])
     c = _sea_aim(canvas, sea, "center", 0.0)
 
@@ -754,9 +766,10 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
             gaps = [60.0, 45.0, 30.0] if setting == "nearshore" else [220.0, 150.0, 100.0, 70.0]
             # Every gap inside the bearing sector first, then anywhere.
             tries = [(g, True) for g in gaps] if sector is not None else []
+            shapes = [pins[name]] if name in pins else None
             for gap, strict in tries + [(g, False) for g in gaps]:
                 poly = _fit_blob(free, aim, area, rng, elong, gap, canvas, beyond, sector,
-                                 strict)
+                                 strict, shapes)
                 if poly is not None:
                     break
             if poly is None:
@@ -772,8 +785,15 @@ def place_sea_islands(spec: CitySpec, canvas: Polygon, sea, bodies: list[WaterBo
                     bearing = (90 - M.degrees(M.atan2(v[1], v[0]))) % 360
                     msgs.append(f"island '{name}' has no room toward '{position}'; it sits at "
                                 f"bearing {bearing:.0f} deg from the middle of the sea")
+            pin_at = None
+            if name in pins:
+                # every traced layer is placed with this one offset (pinned.placed_islands)
+                pin_at = G.qpoint((poly.bounds[0] - pins[name].bounds[0],
+                                   poly.bounds[1] - pins[name].bounds[1]))
+                poly = Polygon(pin_src[name].placed(pin_at, pin_rot[name]).land.exterior)
             taken = taken.union(poly.buffer(60))
-            out.append(IslandRec(name, setting, area, poly, filler=filler))
+            out.append(IslandRec(name, setting, area, poly, filler=filler,
+                                 pinned=poly if name in pins else None, pin_at=pin_at))
         return out, msgs, misses
 
     out, msgs, misses = place(jobs)
@@ -939,6 +959,8 @@ def quantize_bodies(bodies: list[WaterBody]) -> list[WaterBody]:
 def quantize_islands(islands: list[IslandRec]) -> list[IslandRec]:
     for i in islands:
         i.polygon = G.qpoly(i.polygon)
+        if i.pinned is not None:
+            i.pinned = G.qpoly(i.pinned)
         if i.probe is not None:
             i.probe = G.qpoint(i.probe)
     return islands
@@ -972,6 +994,10 @@ def rebuild_land(h: Hydro) -> None:
     land = G.opening(land, MIN_LAND_WIDTH_M / 2)
     land = G.drop_small(land, MIN_LANDMASS_M2)
     land = G.clean(land)
+    pins = [i.pinned for i in h.islands if i.pinned is not None]
+    if pins:
+        # a traced coast stays as drawn (the opening rounds its corners)
+        land = G.clean(G.union([land, *pins]))
     h.land = land
     h.water = G.clean(G.diff(h.canvas, land))
     h.landmasses = G.parts(land)

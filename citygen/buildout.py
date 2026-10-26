@@ -17,9 +17,11 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import shapely
+import shapely.ops
 from shapely.geometry import LineString, Point
 
 from . import buildings as BL
+from . import dmath as M
 from . import geom as G
 from . import junctions as JN
 from . import sites as SI
@@ -82,6 +84,8 @@ def contexts(spec, m) -> list[dict]:
     by_name = {d.name: d for d in spec.districts}
     lots_by: dict = {}
     for lt in m.lots:
+        if lt.attrs.get("pinned"):
+            continue      # a traced building's lot (pinned_buildings)
         lots_by.setdefault(lt.district_id, []).append(lt)
     cones = [(G.from_model_poly(s.flight_cone), float(s.height_limit_m))
              for s in m.megasites if s.flight_cone is not None and s.height_limit_m]
@@ -266,6 +270,7 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     out.notes += site.notes
     lap("megasites")
     T.stage("megasites_m3", [[x["id"], len(x["member_ids"])] for x in out.megasites])
+    pinned_buildings(spec, b, out)
     walks = [w.model_dump(mode="python") for w in m.walkways]
     out.landmasses = list(b.hydro.landmasses)
     out.walkways = link_entrances(out, walks)
@@ -274,6 +279,77 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     T.stage("walkways_m3", [[w["id"], w["kind"], w["neighbors"]] for w in out.walkways])
     out.notes = JN_dedupe(out.notes)
     return out
+
+
+PIN_FLOOR_M = 4.0               # floor height of a traced building
+
+
+def _pin_height(pb, focus, lo: float, hi: float) -> float:
+    """A traced building's height: its label, else the legacy pipeline's rule (tallest near
+    the district's landmark, by footprint size, 20% either way by a hash of its id), within
+    the district's range, in 5 m steps."""
+    if pb.height_m:
+        return G.q(pb.height_m)
+    from .props import _u
+
+    c = pb.footprint.centroid
+    d = M.hypot(c.x - focus[0], c.y - focus[1])
+    size = min(1.4, max(0.6, math.sqrt(G.area1(pb.footprint)) / 32.0))
+    h = (45.0 + 230.0 * M.exp(-d / 330.0)) * size * (0.8 + 0.4 * _u("pin", pb.id))
+    return G.q(round(min(max(h, lo), hi) / 5.0) * 5.0)
+
+
+def pinned_buildings(spec, b, out: Out) -> None:
+    """The traced buildings of every pinned island, as drawn: one prism each, its height from
+    the label (or `_pin_height`), its main entrance on the facade nearest a ground walkway."""
+    from . import pinned as PN
+    from .model import COLLECTIONS
+
+    pins = PN.placed_islands(spec, b.hydro)
+    if not pins:
+        return
+    m = b.model
+    did_of = {d.name: d.id for d in m.districts}
+    lot_of = {(lt.district_id, lt.attrs["pinned"]): lt.id for lt in m.lots
+              if lt.attrs.get("pinned")}
+    ws = [LineString([p[:2] for p in w.line]) for w in m.walkways
+          if w.kind in GROUND_WALKS and all(abs(p[2]) < 1e-9 for p in w.line)]
+    wtree = shapely.STRtree(ws) if ws else None
+    for name in sorted(pins):
+        pin, dist = pins[name]
+        out.notes += [f"{name}: {w}" for w in pin.warnings]
+        did = did_of.get(dist)
+        d = spec.district(dist) if dist else None
+        lo, hi = d.height_m if d is not None else (20.0, 320.0)
+        marks = [x for x in pin.buildings if x.kind == "landmark"]
+        fc = (marks[0].footprint if marks else pin.land).centroid
+        for pb in pin.buildings:
+            foot = pb.footprint
+            h = _pin_height(pb, (fc.x, fc.y), lo, hi)
+            mark = pb.kind == "landmark"
+            ents = []
+            if wtree is not None:
+                # the nearest walkway, ties to the lowest index (never GEOS's order)
+                near = sorted(int(i) for i in wtree.query(foot, predicate="dwithin",
+                                                          distance=2000.0))
+                if near:
+                    k = min(near, key=lambda i: (G.dist(foot, ws[i]), i))
+                    q = shapely.ops.nearest_points(foot.exterior, ws[k])[0]
+                    ents.append({"position": G.qpoint((q.x, q.y)), "kind": "main"})
+            row = {"id": f"{did or 'pin'}.pin.{pb.id}", "lot_id": lot_of.get((did, pb.id)),
+                   "type": "building.landmark.traced" if mark else "building.traced",
+                   "district_id": did, "use": "mixed" if mark else "office",
+                   "floor_height_m": PIN_FLOOR_M, "floors": max(1, int(h / PIN_FLOOR_M + 0.5)),
+                   "height_m": h, "footprint": G.to_model_poly(foot),
+                   "masses": [{"footprint": G.to_model_poly(foot), "z0_m": 0.0, "z1_m": h,
+                               "role": "tower", "shape": "prism"}],
+                   "entrances": ents, "landmark": mark,
+                   "style": {"grime": 0.1, "neon": 0.4, "era": "corporate_glass"},
+                   "attrs": {"pinned": {"island": name, "source": pin.source, "id": pb.id,
+                                        "height": "label" if pb.height_m else "auto"}}}
+            out.buildings.append(COLLECTIONS["buildings"].model_validate(row))
+    out.notes.append(f"{sum(len(p.buildings) for p, _ in pins.values())} traced buildings "
+                     "placed as drawn")
 
 
 def JN_dedupe(notes):

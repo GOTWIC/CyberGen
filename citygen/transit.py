@@ -340,7 +340,9 @@ def context(spec, m) -> Ctx:
             continue
         p = prop.get(b.property_id)
         complex_member = p is not None and p.complex not in ("single",)
-        removable = not (b.landmark or b.megasite_id or complex_member)
+        # traced (pinned) buildings stay as drawn
+        removable = not (b.landmark or b.megasite_id or complex_member or
+                         "pinned" in b.attrs)
         bottom = min(ms.z0_m for ms in b.masses if ms.z1_m > ms.z0_m)
         w = G._strip_width(G.parts(poly)[0]) if G.parts(poly) else 0.0
         c.blds.append(Bld(b.id, poly, b.height_m, removable, bottom, w >= 12.0 and
