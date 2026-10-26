@@ -199,7 +199,9 @@ or sky_tube line; every hub on two or more lines.
 
 Route order matters for the fast modes. A maglev (500 m curves) or a sky tube (300 m) cannot
 turn sharply at a stop: order the stops so the line runs roughly straight through them (turns
-under about 60 degrees), and leave a stop that sits off to the side to another line. A loop
+under about 60 degrees), and leave a stop that sits off to the side to another line. (Since
+M8b a fast line that must turn at a district may take the curve beside it, over the water
+say, with its station on the stretch inside; the report notes "drawn along its stops".) A loop
 should visit its stops in order around them, not zigzag across: the generator (M8b) places
 each district stop of a loop where the stops come in route order around the loop's middle,
 so any order that can go round once draws one simple ring; an order that cannot (no

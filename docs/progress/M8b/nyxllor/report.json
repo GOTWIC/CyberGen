@@ -407,7 +407,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "280 columns and pylons"
+        "276 columns and pylons"
       ]
     },
     {
@@ -437,7 +437,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "27625 things on the ground"
+        "27532 things on the ground"
       ]
     },
     {
@@ -467,7 +467,7 @@
         "Neon Strand: 94% lit",
         "Vess Docks: 97% lit",
         "Launch Key: 99% lit",
-        "Scholar Isle: 98% lit"
+        "Scholar Isle: 99% lit"
       ]
     },
     {
@@ -713,20 +713,20 @@
       "lanes": 6101,
       "lane_connectors": 11997,
       "one_way_segments": 95,
-      "walkways": 16386,
+      "walkways": 16394,
       "walkway_km": {
         "alley": 35.56,
         "crossing": 80.37,
         "crosswalk": 37.0,
-        "elevated": 1.79,
+        "elevated": 1.95,
         "elevator": 0.0,
         "footbridge": 0.29,
-        "path": 85.11,
+        "path": 85.15,
         "pedestrian_street": 3.39,
         "promenade": 7.31,
         "sidewalk": 204.18,
         "skybridge": 3.05,
-        "stairs": 0.77
+        "stairs": 0.86
       },
       "footbridges": 7,
       "blocks": 1017,
@@ -910,13 +910,13 @@
       }
     },
     "buildings": {
-      "count": 5757,
-      "floor_area_km2": 22.54,
+      "count": 5760,
+      "floor_area_km2": 22.582,
       "by_type": {
         "shopfront_row": 2790,
         "shanty_stack": 1723,
         "villa": 570,
-        "podium_tower": 239,
+        "podium_tower": 242,
         "courtyard_block": 91,
         "megabuilding": 79,
         "warehouse": 52,
@@ -940,7 +940,7 @@
       "by_use": {
         "retail": 2790,
         "residential": 2506,
-        "office": 197,
+        "office": 200,
         "industrial": 92,
         "entertainment": 82,
         "civic": 61,
@@ -950,15 +950,15 @@
       },
       "by_district": {
         "Corporate Core": {
-          "count": 204,
+          "count": 207,
           "min": 12.0,
-          "median": 132.0,
+          "median": 128.0,
           "p90": 212.0,
           "max": 480.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 8.255,
-          "coverage": 0.768,
-          "far": 13.39
+          "floor_area_km2": 8.298,
+          "coverage": 0.779,
+          "far": 13.46
         },
         "The Stacks": {
           "count": 103,
@@ -1038,7 +1038,7 @@
           "far": 2.24
         }
       },
-      "properties": 5738,
+      "properties": 5741,
       "complexes": {
         "campus": 1,
         "landmark": 1,
@@ -1057,30 +1057,30 @@
         "stack": 1
       },
       "skybridge_km": 3.05,
-      "units": 16752,
+      "units": 16778,
       "units_by_use": {
-        "food": 4568,
-        "bar": 2119,
-        "convenience": 1892,
-        "cyberware": 1767,
+        "food": 4580,
+        "bar": 2116,
+        "convenience": 1897,
+        "cyberware": 1774,
         "club": 1619,
         "arcade": 1261,
         "pawn": 1227,
         "laundromat": 1055,
-        "clinic": 797,
-        "lobby": 447
+        "clinic": 799,
+        "lobby": 450
       },
       "roof_items": {
-        "ac_unit": 12069,
+        "ac_unit": 12079,
         "billboard": 1332,
         "water_tank": 1112,
-        "antenna": 834,
+        "antenna": 835,
         "mechanical": 232,
-        "av_pad": 47,
+        "av_pad": 50,
         "helipad": 14
       },
-      "green_roofs": 487,
-      "green_roof_m2": 345637,
+      "green_roofs": 491,
+      "green_roof_m2": 354414,
       "landmarks": [
         {
           "name": "Corporate Core Megatower",
@@ -1128,7 +1128,7 @@
         }
       },
       "site_elements": 634,
-      "structures": 658,
+      "structures": 657,
       "tallest_m": 480.0,
       "generator": {
         "walkways_added": 2254
@@ -1143,8 +1143,8 @@
         },
         "maglev": {
           "lines": 1,
-          "km": 3.26,
-          "stations": 2
+          "km": 3.21,
+          "stations": 3
         },
         "metro": {
           "lines": 1,
@@ -1158,96 +1158,96 @@
         }
       },
       "stations": {
-        "elevated": 13,
+        "elevated": 14,
         "sky": 3,
         "underground": 5
       },
-      "supports": 280,
+      "supports": 276,
       "portals": 34,
-      "buildings_removed": 132,
-      "km": 18.69,
+      "buildings_removed": 129,
+      "km": 18.64,
       "generator": {
         "lines": 4,
-        "stations": 21,
-        "removed_buildings": 132,
+        "stations": 22,
+        "removed_buildings": 129,
         "removed_skybridges": 24,
         "portals": 40,
-        "structures": 381,
-        "walkways_added": 86
+        "structures": 380,
+        "walkways_added": 90
       }
     },
     "props": {
-      "props": 50636,
-      "plants": 24692,
-      "trees": 6234,
-      "instances": 75328,
+      "props": 50674,
+      "plants": 24728,
+      "trees": 6232,
+      "instances": 75402,
       "props_by_kind": {
-        "sign": 13216,
-        "awning": 10741,
+        "sign": 13230,
+        "awning": 10752,
         "ac_unit": 7503,
-        "street_light": 3894,
+        "street_light": 3895,
         "trash": 2243,
         "barrier": 1841,
         "overhead_cable": 1776,
         "bollard": 1775,
         "railing": 1507,
-        "traffic_signal": 1428,
+        "traffic_signal": 1427,
         "parked_vehicle": 1228,
-        "hydrant": 811,
-        "trash_can": 789,
+        "hydrant": 812,
+        "trash_can": 793,
         "wall_light": 757,
-        "bench": 599,
-        "dumpster": 301,
+        "bench": 604,
+        "dumpster": 302,
         "bus_stop": 82,
         "scaffolding": 45,
         "boat": 42,
-        "vending_machine": 20,
+        "vending_machine": 22,
         "planter": 18,
         "food_stall": 12,
         "kiosk": 7,
         "gate": 1
       },
       "plants_by_kind": {
-        "shrub": 8844,
+        "shrub": 8965,
         "facade_greenery": 5329,
-        "overgrowth": 3513,
-        "park_tree": 2102,
-        "street_tree": 2058,
+        "overgrowth": 3408,
+        "park_tree": 2098,
+        "street_tree": 2060,
         "conifer": 900,
+        "roof_tree": 794,
         "palm": 776,
-        "roof_tree": 772,
         "median_tree": 398
       },
       "lawn_m2": 46788,
       "hedge_km": 9.8,
       "generator": {
-        "traffic_signals": 1428,
+        "traffic_signals": 1427,
         "bus_stops": 165,
-        "street_lights": 3644,
+        "street_lights": 3645,
         "narrow_lights": 1007,
-        "hydrants": 811,
+        "hydrants": 812,
         "crosswalk_cans": 320,
         "bollards": 1775,
-        "station_props": 15,
-        "street_trees": 2058,
+        "station_props": 17,
+        "street_trees": 2060,
         "plaza_props": 100,
-        "park_benches": 835,
+        "park_benches": 844,
         "parked_vehicles": 1228,
-        "alley_clutter": 2544,
-        "median_trees": 1148,
-        "promenade_trees": 26,
-        "park_trees": 7765,
-        "roof_plants": 4853,
+        "alley_clutter": 2545,
+        "median_trees": 1147,
+        "promenade_trees": 27,
+        "park_trees": 7762,
+        "roof_plants": 4995,
         "facade_greenery": 5329,
-        "overgrowth": 3513,
+        "overgrowth": 3408,
         "quay_props": 1641,
         "highway_barriers": 1841,
         "overhead_cables": 1776,
-        "unit_dressing": 31460,
+        "unit_dressing": 31485,
         "scaffolding": 45,
         "market_gates": 1,
-        "props": 50636,
-        "plants": 24692
+        "props": 50674,
+        "plants": 24728
       }
     },
     "separation_budget": {
@@ -1269,7 +1269,8 @@
     "62 lanes reached only over pedestrian streets became pedestrian",
     "3 local roads crossing another without a junction removed",
     "22 local segments (6.74 km) not connected to the network were dropped",
-    "Halo Line: loop drawn around its stops (their order makes turns tighter than 150 m)",
+    "Halo Line: loop drawn around its stops (it met itself)",
+    "Launch Express: drawn along its stops with 500 m curves",
     "Crown Loop: loop drawn around its stops (their order makes turns tighter than 300 m)"
   ]
 }

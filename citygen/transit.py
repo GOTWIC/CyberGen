@@ -21,7 +21,11 @@ Runs after M3, on the city with its buildings, so every line sees what it passes
    on the roads that would cross or wind round itself is routed off them, and every loop
    off the roads also along its guide ring (`_guide_loop`). Stations follow the route
    order (`ordered_stops`); a line's track does not depend on the other lines (only its
-   heights see the buildings they remove).
+   heights see the buildings they remove). A fast line (maglev, sky tube) puts a middle
+   stop where its curve stays in the district and clear, or turns beside the district
+   (`_fast_point`), and is also drawn along its guide line (`_guide_line`); a line ends at a
+   site where the zone its station serves begins (`_site_point`). The raster search skips
+   what it cannot reach and, over 600 m, is guided by the exact turn-free cost to go.
 3. **Profile.** z from the mode's altitude between two envelopes limited to the grade: from
    below navigable water, road decks, the roofs under the line and kept skybridges passed
    over; from above the towers a sky tube passes through and skybridges passed under.
@@ -776,42 +780,127 @@ def cell_of(c: Ctx, p) -> int:
     return j * c.nx + i
 
 
+def reachable(c: Ctx, cost: np.ndarray, a: int, b: int) -> bool:
+    """Whether the 16 moves of `search` lead from cell a to cell b over passable cells (a
+    numpy flood fill: a search that cannot arrive returns at once instead of visiting every
+    cell in every direction)."""
+    nx, ny = c.nx, c.ny
+    ok = (cost != INF).reshape(ny, nx)
+    ok.flat[a] = ok.flat[b] = True
+    reach = np.zeros((ny, nx), bool)
+    reach.flat[a] = True
+    by, bx = divmod(b, nx)
+    while not reach[by, bx]:
+        grown = reach.copy()
+        for dx, dy, _ in _MOVES:
+            # cells (x + dx, y + dy) reached from reached cells (x, y)
+            ys, yd = (slice(0, ny - dy), slice(dy, ny)) if dy >= 0 else \
+                (slice(-dy, ny), slice(0, ny + dy))
+            xs, xd = (slice(0, nx - dx), slice(dx, nx)) if dx >= 0 else \
+                (slice(-dx, nx), slice(0, nx + dx))
+            grown[yd, xd] |= reach[ys, xs]
+        grown &= ok
+        if (grown == reach).all():
+            return False
+        reach = grown
+    return True
+
+
+TOGO_M = 600.0   # a search longer than this is guided by the exact cost to go (`_togo`)
+
+
+def _togo(c: Ctx, cl: list, b: int) -> list:
+    """The cost from every cell to cell b over the 16 moves, turns left out (numpy
+    relaxation until nothing changes): a lower bound of `search`'s cost, so a heuristic
+    that never overestimates and leads the search along the cheap ground."""
+    nx, ny = c.nx, c.ny
+    C = np.array(cl, dtype=np.float64).reshape(ny, nx)
+    bad = ~np.isfinite(C)
+    D = np.full((ny, nx), INF)
+    D.flat[b] = 0.0
+    while True:
+        N = D.copy()
+        for dx, dy, L in _MOVES:
+            # from (x, y) to (x + dx, y + dy): D(x, y) <= w + D(x + dx, y + dy)
+            ys, yd = (slice(0, ny - dy), slice(dy, ny)) if dy >= 0 else \
+                (slice(-dy, ny), slice(0, ny + dy))
+            xs, xd = (slice(0, nx - dx), slice(dx, nx)) if dx >= 0 else \
+                (slice(-dx, nx), slice(0, nx + dx))
+            w = L * CELL_M * (C[ys, xs] + C[yd, xd]) / 2.0
+            np.minimum(N[ys, xs], D[yd, xd] + w, out=N[ys, xs])
+        N[bad] = INF
+        N.flat[b] = 0.0
+        if np.array_equal(N, D):
+            return D.ravel().tolist()
+        D = N
+
+
+REACH_POPS = 20000   # a search this long checks first whether it can arrive at all
+
+
 def search(c: Ctx, cost: np.ndarray, a: int, b: int, turn: float, din=None
            ) -> list[int] | None:
     """A* from cell a to cell b (both always passable); 16 moves; a turn penalty for every
     change of direction above 45 degrees, from the arrival direction din at a (the previous
-    leg's), so a line does not turn back at a stop."""
+    leg's), so a line does not turn back at a stop. M8b: integer states (flat arrays for a
+    long search), over TOGO_M the exact turn-free cost to go as the heuristic (the straight
+    distance at the cheapest cost otherwise), and a search that has run REACH_POPS steps
+    stops at once if b cannot be reached (`reachable`)."""
     nx, ny = c.nx, c.ny
     cl = cost.tolist()
     cl[a] = min(cl[a], 2.0) if cl[a] == INF else cl[a]
     cl[b] = min(cl[b], 2.0) if cl[b] == INF else cl[b]
     bx, by = b % nx, b // nx
-    cmin = min(x for x in cl if x > 0)
+    pos = cost[cost > 0]
+    cmin = min(float(pos.min()) if pos.size else INF, *(x for x in (cl[a], cl[b]) if x > 0))
     d0 = -1
     if din is not None:
         d0 = max(range(len(_MOVES)), key=lambda k: ((_MOVES[k][0] * din[0] + _MOVES[k][1] *
                                                       din[1]) / _MOVES[k][2], -k))
-    start = (a, d0)
-    g = {start: 0.0}
-    came: dict = {}
+    nm = len(_MOVES)
+    ns = nm + 1                       # a state: cell * ns + arrival move (nm: none)
+    moves = [(k, dx, dy, L * CELL_M) for k, (dx, dy, L) in enumerate(_MOVES)]
+    pen = [[0.0] * nm for _ in range(nm)]
+    if turn > 0:
+        for du, (ddx, ddy, dL) in enumerate(_MOVES):
+            for k, (dx, dy, L) in enumerate(_MOVES):
+                cosang = (ddx * dx + ddy * dy) / (dL * L)
+                if cosang < 0.70:
+                    pen[du][k] = turn * (1.0 - cosang)
+    far = math.hypot(a % nx - bx, a // nx - by) * CELL_M > TOGO_M
+    togo = _togo(c, cl, b) if far else None
+    if far:
+        g = [INF] * (nx * ny * ns)
+        came = [-1] * (nx * ny * ns)
+        done = bytearray(nx * ny * ns)
+    else:
+        g, came, done = _Table(INF), _Table(-1), _Table(0)
+    start = a * ns + (d0 if d0 >= 0 else nm)
+    g[start] = 0.0
     heap = [(0.0, 0, a, d0)]
     cnt = 1
-    done = set()
+    pops = 0
+    push, pop, sqrt = heapq.heappush, heapq.heappop, math.sqrt
     while heap:
-        _, _, u, du = heapq.heappop(heap)
-        key = (u, du)
-        if key in done:
+        _, _, u, du = pop(heap)
+        key = u * ns + (du if du >= 0 else nm)
+        if done[key]:
             continue
-        done.add(key)
+        done[key] = 1
+        pops += 1
+        if pops == REACH_POPS and not reachable(c, cost, a, b):
+            return None
         if u == b:
             path = [u]
-            while key in came:
+            while came[key] >= 0:
                 key = came[key]
-                path.append(key[0])
+                path.append(key // ns)
             return path[::-1]
         ux, uy = u % nx, u // nx
         gu = g[key]
-        for k, (dx, dy, L) in enumerate(_MOVES):
+        cu = cl[u]
+        pu = pen[du] if du >= 0 else None
+        for k, dx, dy, LC in moves:
             vx, vy = ux + dx, uy + dy
             if vx < 0 or vy < 0 or vx >= nx or vy >= ny:
                 continue
@@ -819,21 +908,31 @@ def search(c: Ctx, cost: np.ndarray, a: int, b: int, turn: float, din=None
             cv = cl[v]
             if cv == INF:
                 continue
-            step = L * CELL_M * (cl[u] + cv) / 2.0
-            if du >= 0 and turn > 0:
-                ddx, ddy, dL = _MOVES[du]
-                cosang = (ddx * dx + ddy * dy) / (dL * L)
-                if cosang < 0.70:
-                    step += turn * (1.0 - cosang)
-            nk = (v, k)
+            step = LC * (cu + cv) / 2.0
+            if pu is not None and turn > 0:
+                step += pu[k]
+            nk = v * ns + k
             nd = gu + step
-            if nd < g.get(nk, INF):
+            if nd < g[nk]:
                 g[nk] = nd
                 came[nk] = key
-                h = math.sqrt((vx - bx) ** 2 + (vy - by) ** 2) * CELL_M * cmin
-                heapq.heappush(heap, (nd + h, cnt, v, k))
+                h = togo[v] if togo is not None else \
+                    sqrt((vx - bx) ** 2 + (vy - by) ** 2) * CELL_M * cmin
+                push(heap, (nd + h, cnt, v, k))
                 cnt += 1
     return None
+
+
+class _Table(dict):
+    """A sparse array: a dict whose missing entries read as the default (a short search
+    touches few of the cell and direction states)."""
+
+    def __init__(self, default):
+        super().__init__()
+        self.default = default
+
+    def __missing__(self, key):
+        return self.default
 
 
 def cell_xy(c: Ctx, k: int) -> tuple[float, float]:
@@ -1071,6 +1170,7 @@ class Line:
     names: set = field(default_factory=set)      # station names used on the line
     tall_scale: float = 1.0                      # raster: cost of the towers it would clear
     on_roads: bool = True                        # road modes: legs on the road graph
+    corners: dict = field(default_factory=dict)  # stop index -> guide corner (fast lines)
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -1157,6 +1257,13 @@ class RoadGraph:
                     if not nid.startswith("ov") and _d(x, st.p) <= STOP_REACH_M and \
                             dpoly.covers(Point(x)):
                         out.add(nid)
+        elif _site_end(st):
+            # M8b: a site at a line's end, reached where its zone begins (an avenue or
+            # highway junction in it), not round the site to the node beside its middle
+            zone = _site_zone(st)
+            for nid in sorted(self.major):
+                if not nid.startswith("ov") and zone.covers(Point(self.pos[nid])):
+                    out.add(nid)
         return out
 
     def touching(self, geom) -> set:
@@ -1296,15 +1403,31 @@ def route_line(c: Ctx, ln: Line) -> None:
     stops = ln.stops
     dist = {d.id: d for d in c.m.districts}
     home = [s.p for s in stops]
+    r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
+    fast_cost = None
     for k in range(1, len(stops) - 1):
         st = stops[k]
         # (a loop's stops move below: the chord between its neighbors crosses the loop)
         if not ln.loop and st.kind == "district" and st.z is None and \
                 st.district_id in dist:
             chord = LineString([stops[k - 1].p, stops[k + 1].p])
-            if chord.length > 1.0:
+            if chord.length > 1.0 and r_min >= FAST_R:
+                if fast_cost is None:
+                    fast_cost = costs(c, mode, ln.z0, ln.through, None, ln.alt[1],
+                                      ln.alt[0], ln.tall_scale)[0]
+                st.p, corner = _fast_point(c, dist[st.district_id], mode, stops[k - 1].p,
+                                           stops[k + 1].p, fast_cost)
+                if corner is not None:
+                    ln.corners[k] = corner
+            elif chord.length > 1.0:
                 st.p = _district_point(c, dist[st.district_id], mode, chord)
-    r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
+    if not ln.loop and len(stops) >= 2:
+        for k, nb in ((0, 1), (len(stops) - 1, len(stops) - 2)):
+            if _site_end(stops[k]):
+                if fast_cost is None:
+                    fast_cost = costs(c, mode, ln.z0, ln.through, None, ln.alt[1],
+                                      ln.alt[0], ln.tall_scale)[0]
+                stops[k].p = _site_point(c, stops[k], stops[nb].p, fast_cost)
     if ln.loop:
         ring = _loop_points(c, ln)
         if ring is not None:
@@ -1332,7 +1455,8 @@ def route_line(c: Ctx, ln: Line) -> None:
     elif moved == home or flaws() == (0, 0):
         if tight() and mode not in ROAD_MODES:
             _straighter(c, ln, flaws, notes, conflicts)
-    if (flaws() != (0, 0) or tight()) and mode in ROAD_MODES:
+    # (a loop on the roads is routed off them next instead of trying other junctions)
+    if (flaws() != (0, 0) or tight()) and mode in ROAD_MODES and not ln.loop:
         _restop(c, ln, flaws, notes, conflicts)
     if ln.loop and mode in ROAD_MODES:
         _off_roads(c, ln, flaws, moved, notes, conflicts)
@@ -1479,7 +1603,8 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
       last leg back to where its first left, arriving the way that one went on;
     - where the roads cannot keep it off the earlier legs (one bridge both ways, say), the
       leg runs on the raster instead (its own viaduct), and only where that fails too on
-      the roads again, over the earlier legs;
+      the roads again, over the earlier legs (a loop on the roads takes the roads again at
+      once: `_off_roads` routes it on the raster as a whole);
     - the other modes search the raster, off the earlier legs where they can."""
     mode = ln.mode
     stops = ln.stops
@@ -1509,7 +1634,7 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
                 else:
                     dend = dstart if closing else None
                     res = graph.route(na, goal, din, used_segs, graph.touching(keep_off), dend)
-                    if res is not None and _winds(res[0]):
+                    if res is not None and not ln.loop and _winds(res[0]):
                         # M8b: a leg that winds round the blocks (a stop at a road's end,
                         # the way on blocked by the line itself): the raster's when shorter
                         ras = _raster_leg(c, ln, cost, here, b.p, keep_off, din)
@@ -1524,7 +1649,8 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
             end = raw[0] if closing and raw else b.p
             pa = snap_cell(c, cost, here)
             pb = snap_cell(c, cost, end)
-            if keep_off is not None or graph is not None:
+            # (a loop on the roads goes to the raster as a whole instead, `_off_roads`)
+            if (keep_off is not None or graph is not None) and not (graph and ln.loop):
                 run = _raster_leg(c, ln, cost, here, end, keep_off, din)
                 path = run and run[1:-1]
             if run is None and graph is not None:
@@ -1571,6 +1697,54 @@ def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
     return raw, at_stop, hit, ok
 
 
+def _fit(c: Ctx, ln: Line, raw: list, at_stop: set, hit, cost, graph) -> tuple[list, float]:
+    """The track through a route (raw, reaching the stops at `at_stop`): simplified, then
+    arcs at the mode's radius (`arc_path`), cut back to its exits; (points every 10 m at
+    most, the smallest arc radius). `hit`: the index in raw of each stop (pinned where the
+    curves would cut it away), or None."""
+    mode = ln.mode
+    stops = ln.stops
+    r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
+    # simplified between stops (a loop would collapse as one run), then arcs at the
+    # mode's radius with only the ends fixed: curves may pass beside a stop
+    pts, _ = simplify_runs(raw, at_stop, SIMPLIFY_M[mode])
+    # a line that leaves the map runs on straight beyond its exit: its last curve may use
+    # the room past the edge (cut back to the exit below)
+    cut_ends = []
+    if not ln.loop and r_min > 0 and len(pts) >= 2:
+        for end in (0, -1):
+            if stops[end].kind == "exit":
+                a_, b_ = (pts[1], pts[0]) if end == 0 else (pts[-2], pts[-1])
+                L_ = _d(a_, b_)
+                if L_ > 1.0:
+                    far = (q(b_[0] + (b_[0] - a_[0]) / L_ * EXIT_RUN_M),
+                           q(b_[1] + (b_[1] - a_[1]) / L_ * EXIT_RUN_M))
+                    pts = [far] + pts[1:] if end == 0 else pts[:-1] + [far]
+                    cut_ends.append((end, b_))
+    if r_min > 0:
+        def ok_cut(run, cost=cost):
+            for p, r in zip(run, run[1:]):
+                if graph is not None:
+                    if not _segment_clear(c, ln, p, r):
+                        return False
+                elif not _segment_free(c, cost, p, r):
+                    return False
+            return True
+        fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min)
+        # a platform (a nexus) the curves cut away stays on the track
+        # a stop the curves cut away keeps the point where the route reached it
+        pins = frozenset(raw[i] for s, i in zip(stops, hit or ()) if not _served(fitted, s))
+        if pins:
+            fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min, pins)
+        if ln.loop and fitted[0] != fitted[-1]:
+            fitted = fitted + [fitted[0]]
+        fitted = _cut_to_exits(fitted, cut_ends)
+        dense = _densify(fitted)
+    else:
+        dense, rmin = _densify(pts), INF
+    return dense, rmin
+
+
 def _route(c: Ctx, ln: Line) -> None:
     mode = ln.mode
     stops = ln.stops
@@ -1592,43 +1766,7 @@ def _route(c: Ctx, ln: Line) -> None:
                     st.p = (G.q(st.p[0]), G.q(st.p[1]))
         raw, at_stop, hit, legs_ok = _legs(c, ln, graph, cost)
         ok = ok and legs_ok
-        # simplified between stops (a loop would collapse as one run), then arcs at the
-        # mode's radius with only the ends fixed: curves may pass beside a stop
-        pts, _ = simplify_runs(raw, at_stop, SIMPLIFY_M[mode])
-        # a line that leaves the map runs on straight beyond its exit: its last curve may use
-        # the room past the edge (cut back to the exit below)
-        cut_ends = []
-        if not ln.loop and r_min > 0 and len(pts) >= 2:
-            for end in (0, -1):
-                if stops[end].kind == "exit":
-                    a_, b_ = (pts[1], pts[0]) if end == 0 else (pts[-2], pts[-1])
-                    L_ = _d(a_, b_)
-                    if L_ > 1.0:
-                        far = (q(b_[0] + (b_[0] - a_[0]) / L_ * EXIT_RUN_M),
-                               q(b_[1] + (b_[1] - a_[1]) / L_ * EXIT_RUN_M))
-                        pts = [far] + pts[1:] if end == 0 else pts[:-1] + [far]
-                        cut_ends.append((end, b_))
-        if r_min > 0:
-            def ok_cut(run, cost=cost):
-                for p, r in zip(run, run[1:]):
-                    if graph is not None:
-                        if not _segment_clear(c, ln, p, r):
-                            return False
-                    elif not _segment_free(c, cost, p, r):
-                        return False
-                return True
-            fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min)
-            # a platform (a nexus) the curves cut away stays on the track
-            # a stop the curves cut away keeps the point where the route reached it
-            pins = frozenset(raw[i] for s, i in zip(stops, hit) if not _served(fitted, s))
-            if pins:
-                fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min, pins)
-            if ln.loop and fitted[0] != fitted[-1]:
-                fitted = fitted + [fitted[0]]
-            fitted = _cut_to_exits(fitted, cut_ends)
-            dense = _densify(fitted)
-        else:
-            dense, rmin = _densify(pts), INF
+        dense, rmin = _fit(c, ln, raw, at_stop, hit, cost, graph)
         conflicts = _corridor(c, ln, dense, check_only=True)
         if not conflicts or attempt == ATTEMPTS - 1 or graph is not None:
             break
@@ -1638,6 +1776,13 @@ def _route(c: Ctx, ln: Line) -> None:
             block |= shapely.dwithin(b.poly, c.pts, WIDTH_M[mode] / 2.0 + SIDE_PAD_M +
                                      CELL_M * (1 + 2 * attempt))
         ln.notes.append(f"{ln.name}: rerouted around {len(conflicts)} building(s)")
+    if not ln.loop and r_min >= FAST_R and graph is None and len(stops) >= 2:
+        # M8b: a fast line also along its guide line; kept only when it is better
+        alt = _guide_line(c, ln, cost, r_min)
+        if alt is not None and _line_key(c, ln, alt[0], alt[1], r_min) < \
+                _line_key(c, ln, dense, rmin, r_min):
+            dense, rmin = alt
+            ln.notes.append(f"{ln.name}: drawn along its stops with {r_min:g} m curves")
     if ln.loop and r_min > 0 and graph is None and len(_ring_of(stops)) >= 3:
         # M8b: a loop off the roads also along its guide ring; the better of the two
         alt = _guide_loop(c, ln, cost, r_min)
@@ -1743,6 +1888,136 @@ def _loop_key(pts, rmin: float, stops, mode: str, r_min: float) -> tuple:
             1 if rmin < HULL_BELOW * r_min else 0)
 
 
+FAST_R = 300.0   # modes with curves at least this wide (maglev, sky tube) are fast lines
+
+
+def _line_key(c: Ctx, ln: Line, pts, rmin: float, r_min: float) -> tuple:
+    """How good an open line is, lower better: its stops served in route order, where it
+    meets itself, a curve too tight, a building in its corridor it cannot pass."""
+    return (0 if in_order(pts, ln.stops, False) else 1, meets(pts, False, ln.mode),
+            1 if rmin < HULL_BELOW * r_min else 0,
+            1 if _corridor(c, ln, pts, check_only=True) else 0)
+
+
+def _guide_line(c: Ctx, ln: Line, cost, r_min: float):
+    """M8b: a fast line along its guide line, the polyline of its stops with curves of
+    1.15 r_min (`_fast_point` puts a middle stop where the curve at its corner stays in its
+    district), as waypoints every GUIDE_STEP_M routed on the raster around what the line
+    cannot pass, then fitted like any route. Legs from stop to stop may reach a stop off
+    the line's way as a spur the curves cannot follow."""
+    stops = ln.stops
+    pts = [ln.corners.get(k, s.p) for k, s in enumerate(stops)]
+    if len(pts) > 2:
+        guide, _ = arc_path(pts, r_min, False, lambda run: True, 2.0 * r_min)
+    else:
+        guide = pts
+    if len(guide) < 2 or _plen(guide) < 1.0:
+        return None
+    # the guide at each stop: its point in the stop's zone nearest the stop, in order
+    dense = _densify(guide)
+    arr = shapely.points(np.array(dense, dtype=np.float64))
+    at = [0]
+    for s in stops[1:-1]:
+        zone = _zone(s)
+        idx = list(range(at[-1], len(dense)))
+        if zone is not None:
+            ins = [at[-1] + i for i in np.nonzero(shapely.covers(zone, arr[at[-1]:]))[0].tolist()]
+            idx = ins or idx
+        at.append(min(idx, key=lambda i: (round(_d(dense[i], s.p), 3), i)))
+    at.append(len(dense) - 1)
+    raw: list = []
+    hit = []
+    din = None
+    turn = TURN_COST_M.get(ln.mode, 0.0)
+    for i0, i1 in zip(at, at[1:]):
+        part = dense[i0:i1 + 1]
+        way = resample(part, GUIDE_STEP_M) if len(part) > 1 and _plen(part) > 1.0 else part
+        if not raw:
+            raw.append((G.q(way[0][0]), G.q(way[0][1])))
+            hit.append(0)
+        for a, b in zip(way, way[1:]):
+            path = search(c, cost, snap_cell(c, cost, a), snap_cell(c, cost, b), turn, din)
+            run = [cell_xy(c, k) for k in path][1:-1] if path else []
+            for p in run + [b]:
+                p = (G.q(p[0]), G.q(p[1]))
+                if _d(raw[-1], p) > 0.01:
+                    raw.append(p)
+            if len(raw) >= 2:
+                din = RoadGraph._dir(raw, rev=True)
+        hit.append(len(raw) - 1)
+    if len(raw) < 2:
+        return None
+    return _fit(c, ln, raw, set(hit), hit, cost, None)
+
+
+CORNER_STEP_M = 60.0   # the grid a fast line's corner beside a stop is searched on
+CORNER_IN_M = 40.0     # its guide runs a station's length this far inside the district
+
+
+def _fast_point(c: Ctx, d, mode: str, prev, nxt, cost) -> tuple[tuple, tuple | None]:
+    """M8b: a fast line's stop between two others, and the corner of its guide line there
+    when that is not the stop itself:
+
+    - the junction nearest the chord between them (avenues first, as `_district_point`)
+      where a curve of 1.15 times the mode's radius at the corner stays in the district
+      (`_apex_in`) and clear of what the line cannot pass;
+    - else a corner on a CORNER_STEP_M grid within twice that radius of the district, the
+      nearest the way (the shortest run through it) whose guide (straight runs and the
+      curve) is clear and runs a station's length CORNER_IN_M inside the district; the
+      stop goes to the middle of that stretch (the line turns beside the district, over
+      the water say, instead of in it);
+    - else `_district_point`'s junction."""
+    r = 1.15 * (presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0)
+    zone = G.from_model_poly(d.polygon)
+    shapely.prepare(zone)
+    chord = LineString([prev, nxt])
+
+    def free(run):
+        return all(_segment_free(c, cost, a, b) for a, b in zip(run, run[1:]))
+    cands = sorted(((round(chord.distance(Point(p)) + 150.0 * rank, 2), p)
+                    for p, rank in _district_cands(c, d, mode, inset=False)))
+    for _, p in cands:
+        if _apex_in(prev, p, nxt, r, zone) and free(_corner_arc(prev, p, nxt, r)):
+            return p, None
+    # (the route and its curves drift from the guide by a few cells: deep enough in)
+    deep = G.qpoly(zone.buffer(-CORNER_IN_M))
+    if deep.is_empty:
+        return _district_point(c, d, mode, chord), None
+    shapely.prepare(deep)
+    x0, y0, x1, y1 = G.qbounds(zone)
+    i0, i1 = int(math.floor((x0 - 2 * r) / CORNER_STEP_M)), int(math.ceil((x1 + 2 * r) /
+                                                                         CORNER_STEP_M))
+    j0, j1 = int(math.floor((y0 - 2 * r) / CORNER_STEP_M)), int(math.ceil((y1 + 2 * r) /
+                                                                         CORNER_STEP_M))
+    need = STATION_LEN_M[mode]
+    grid = []
+    for j in range(j0, j1 + 1):
+        for i in range(i0, i1 + 1):
+            qp = (q(i * CORNER_STEP_M), q(j * CORNER_STEP_M))
+            grid.append((round(_d(prev, qp) + _d(qp, nxt), 2), qp))
+    best = None
+    for _, qp in sorted(grid):
+        if cost[cell_of(c, qp)] == INF:
+            continue
+        guide = _corner_arc(prev, qp, nxt, r)
+        dense = _densify(guide)
+        inside = shapely.covers(deep, shapely.points(np.array(dense, dtype=np.float64)))
+        run, longest = [], []
+        for k, f in enumerate(inside.tolist()):
+            run = run + [k] if f else []
+            if len(run) > len(longest):
+                longest = run
+        if len(longest) < 2 or _plen(dense[longest[0]:longest[-1] + 1]) < need:
+            continue
+        if not free(guide):
+            continue
+        best = (None, qp, dense[longest[len(longest) // 2]])
+        break
+    if best is not None:
+        return best[2], best[1]
+    return _district_point(c, d, mode, chord), None
+
+
 def _guide_loop(c: Ctx, ln: Line, cost, r_min: float):
     """M8b: a loop along its guide ring, the polygon of its stops in route order with curves
     of 1.15 r_min (`_loop_points` places the stops so that these pass in their districts),
@@ -1839,6 +2114,32 @@ def _segment_free(c: Ctx, cost, p, r) -> bool:
 
 
 SERVE_M = 150.0  # a station within this of a stop's district, site or place serves it
+SITE_IN_M = 30.0  # a line ends at a site this far inside the zone its station serves
+
+
+def _site_end(s: Stop) -> bool:
+    """A stop at a site (a spaceport, a terminal) without a platform or tower of its own."""
+    return s.kind == "megasite" and s.z is None and s.tower_id is None and s.area is not None
+
+
+def _site_zone(s: Stop):
+    return G.qpoly(s.area.buffer(SERVE_M - SITE_IN_M))
+
+
+def _site_point(c: Ctx, s: Stop, toward, cost) -> tuple[float, float]:
+    """M8b: where a line that begins or ends at a site meets it: the passable cell of the
+    zone its station serves (SITE_IN_M inside) nearest the neighboring stop, not the site's
+    middle (inside its terminal, say, which the line would wind round)."""
+    zone = _site_zone(s)
+    if zone.is_empty:
+        return s.p
+    shapely.prepare(zone)
+    ins = np.nonzero(shapely.contains_xy(zone, c.xs, c.ys) & np.isfinite(cost))[0].tolist()
+    if not ins:
+        return s.p
+    k = min(ins, key=lambda k: (round(_d(cell_xy(c, k), toward), 2), k))
+    p = cell_xy(c, k)
+    return (q(p[0]), q(p[1]))
 
 
 def _zone(s: Stop):

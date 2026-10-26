@@ -292,9 +292,18 @@ at its first stop), heights are graded round a loop's seam (`_graded`). Check
 `transit_self_crossing` (66 in all): parts of a line more than 100 m apart along it stay a
 structure width apart in plan or 5.5 m plus the structure apart in height, a loop closes,
 stations in route order; the transit preview marks where a line meets itself and numbers a
-loop's stops. A line's track does not depend on the other lines (its heights see the
-buildings they remove); a whole-city retry (`build_city`) after any failed check still moves
-every line. Sample builds: `docs/progress/M8b/`.
+loop's stops. Fast open lines (maglev, sky tube: r_min at least 300 m) place a middle stop
+with `_fast_point` (a junction where the curve's apex stays inside, else a corner on a 60 m
+grid beside the district whose guide runs a station length 40 m inside it) and are also
+drawn along their guide line (`_guide_line`: the stops with arcs at those corners, waypoints
+every 120 m), kept when better by `_line_key`. A line ending at a megasite stops where the
+site's zone begins (`_site_point`, `RoadGraph.targets`), not at its middle. The raster
+search uses flat integer states, an exact turn-free cost to go (`_togo`) over 600 m, and a
+reachability flood fill (`reachable`) after 20000 steps. A line's track does not depend on
+the other lines (its heights see the buildings they remove); a whole-city retry
+(`build_city`) after any failed check still moves every line, but every sample line now
+passes on its first layout (the pinned demo retries once, for `level_continuity`). Sample
+builds: `docs/progress/M8b/`.
 
 ### Rules for cloud sessions building citygen milestones
 

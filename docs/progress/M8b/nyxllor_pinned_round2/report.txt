@@ -31,7 +31,7 @@ checks:
   [pass] street_graph: Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it
   [pass] lane_graph: Lane graph strongly connected (every lane reaches every other through junction connectors and lane changes) and every vehicle road has lanes
   [pass] walkway_graph: Walkway graph connected on every landmass with districts (sidewalks, crossings, crosswalks, pedestrian streets, promenades, footbridges, alleys, paths into open space)
-         note: 2 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)
+         note: 3 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)
   [pass] lot_frontage: Every lot fronts a street, alley, service lane or pedestrian street (at least 2 m) and records its frontage and district (a traced building's lot as drawn)
   [pass] lot_block_sizes: Lot areas within the archetype range (0.75 x min to 1.6 x max) and each district's median block size (square root of area) within the archetype block range (0.5 x lo to 1.8 x hi; traced buildings' lots and the blocks of a traced district aside)
   [pass] lot_slivers: No lot narrower than 3 m and no block narrower than 6 m (strip width from exact area and perimeter; traced buildings' lots aside)
@@ -64,12 +64,12 @@ checks:
   [pass] transit_altitude: Track altitude within the mode's range (scope 5.3), higher only where it climbs, at the mode's grade, to clear navigable water or a road deck
   [pass] transit_clearance: Elevated lines clear the buildings under them (deck underside 2 m over the roof), navigable water (its clearance) and road decks (5.5 m over, or 1 m under a high one); sky lines clear buildings by 10 m or pass through a declared portal
   [pass] transit_supports: Columns and pylons stand outside lanes, buildings, water and road decks, and leave 1.8 m of every sidewalk clear (in medians, just inside the curbs or off the street)
-         note: 144 columns and pylons
+         note: 124 columns and pylons
   [pass] station_access: Every station has stairs, escalators or an elevator to the street and joins the walkway graph (elevated and sky stations next to a sidewalk or plaza)
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 26547 things on the ground
+         note: 26422 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
@@ -99,7 +99,7 @@ stats:
   bridges 8 (sea 4, river 3, canal 1; 1.31 km of span), pedestrian 1; named: Launch Causeway
   landmasses with districts connected by road 5 of 5; highway planned elevated 14%; megasite reserves 3; road variant 3
   local roads street 94.28 km, alley 28.45 km, service 12.27 km, pedestrian 6.14 km, footbridge 0.02 km; 156 one-way segments, 1 footbridges
-  junctions 1815 (282 signalized), crosswalks 928, sidewalks 162.4 km, lanes 6616 + 13087 connectors, walkways 17792 (alley 40.71 km, crossing 97.68 km, crosswalk 30.59 km, elevated 1.39 km, elevator 0.0 km, footbridge 0.02 km, path 97.88 km, pedestrian_street 0.7 km, promenade 5.44 km, sidewalk 208.06 km, skybridge 3.26 km, stairs 0.95 km)
+  junctions 1815 (282 signalized), crosswalks 928, sidewalks 162.4 km, lanes 6616 + 13087 connectors, walkways 17784 (alley 40.71 km, crossing 97.68 km, crosswalk 30.59 km, elevated 1.29 km, elevator 0.0 km, footbridge 0.02 km, path 98.15 km, pedestrian_street 0.7 km, promenade 5.44 km, sidewalk 208.06 km, skybridge 3.16 km, stairs 0.78 km)
   junctions by type: street_street T 981, street_street X 202, avenue_avenue T 201, alley_alley T 172, avenue_avenue X 60, street T 38, street_alley T 34, alley_alley X 27, pedestrian T 17, highway_highway T 14, street_service T 13, service_service T 11
   blocks 1085, lots 6621 (3 merged groups), open space 20.9% of net land (courtyard 9, green 44, market 2, park 255, plaza 127, pocket_park 240, promenade 1), named places 3
 
@@ -123,32 +123,32 @@ stats:
   Launch Key                             7            130      45.2%
   Scholar Isle                          15            153      28.1%
 
-  buildings 6544 (20.518 km2 floor area), properties 6472, tallest 480 m; complexes campus 1, megabuilding_campus 1, megasite 3, straddle_building 1
-  by type: shopfront_row 3219, shanty_stack 2057, villa 709, podium_tower 116, megabuilding 98, courtyard_block 89, traced 56, warehouse 50, terraced 36, lab 33, slab 28, shed 17, hangar 10, yard 10, tower 5, temple_hall 3, straddle_building 2, control_tower 1, gate_house 1, landmark.traced 1, office 1, pagoda 1, terminal 1
-  skybridges 251 (3.26 km: cable 40, catwalk 94, enclosed 16, open_deck 101), ground-floor units 16739 (food 4297, bar 2303, convenience 1874, club 1813, cyberware 1661, arcade 1431, pawn 1324, laundromat 1115, clinic 627, lobby 294)
-  roof items: ac_unit 13653, billboard 1504, water_tank 1323, antenna 984, mechanical 138, av_pad 1; green roofs 518 (294831 m2)
+  buildings 6575 (20.386 km2 floor area), properties 6503, tallest 480 m; complexes campus 1, megabuilding_campus 1, megasite 3, straddle_building 1
+  by type: shopfront_row 3242, shanty_stack 2065, villa 702, podium_tower 112, megabuilding 104, courtyard_block 90, traced 56, warehouse 52, terraced 37, lab 32, slab 30, shed 17, hangar 10, yard 10, tower 5, temple_hall 3, straddle_building 2, control_tower 1, gate_house 1, landmark.traced 1, office 1, pagoda 1, terminal 1
+  skybridges 249 (3.16 km: cable 40, catwalk 94, enclosed 15, open_deck 100), ground-floor units 16765 (food 4312, bar 2317, convenience 1871, club 1827, cyberware 1640, arcade 1439, pawn 1336, laundromat 1103, clinic 623, lobby 297)
+  roof items: ac_unit 13717, billboard 1520, water_tank 1322, antenna 986, mechanical 134, av_pad 1; green roofs 515 (280968 m2)
   landmarks: None (None, 480 m)
   megasites: Lotus Temples (temple_complex: courtyard 1, gate 1, pagoda 1, temple_hall 3, wall 1); Vess Freight Terminal (freight_terminal: berth 2, container_stack 265, gantry_crane 4, gate_house 1, office 1, rail_track 3, truck_gate 1, warehouse 2); Launch Key Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 4, launch_tower 4, terminal 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
   Corporate Core                    64     130.0   195.0   480.0       71%  30.3      3.676
-  The Stacks                       134     156.8   185.6   220.8       67%  10.5      9.227
-  Highcrest                        755      23.8    23.8    37.4       34%   2.1      1.440
-  Old Town                        3230      15.0    20.6    26.6       95%   3.2      1.942
-  Neon Strand                     2209      24.5    34.1    51.6       94%   5.0      2.936
-  Vess Docks                        75      13.5    16.0    16.0       35%   0.3      0.267
+  The Stacks                       133     156.8   188.8   220.8       65%  10.3      9.068
+  Highcrest                        750      23.8    23.8    37.4       34%   2.1      1.450
+  Old Town                        3239      15.0    20.6    26.6       96%   3.2      1.949
+  Neon Strand                     2235      24.5    34.1    51.6       95%   5.0      2.984
+  Vess Docks                        77      13.2    16.0    16.0       35%   0.3      0.268
   Launch Key                        14      24.1    32.0    32.0       24%   0.6      0.083
-  Scholar Isle                      50      32.0    40.0    60.0       31%   2.5      0.796
+  Scholar Isle                      50      32.0    40.0    60.0       30%   2.4      0.758
 
-  props 52217, plants 25909 (7115 trees), 78126 instances; lawns 31323 m2, hedges 10.46 km
-  props: sign 13775, awning 11435, ac_unit 8301, street_light 3721, railing 2715, trash 2407, overhead_cable 2270, barrier 1868, traffic_signal 1115, wall_light 905, bench 812, bollard 803, trash_can 778, hydrant 734, dumpster 338, boat 77, scaffolding 48, bus_stop 47, parked_vehicle 23, planter 19, food_stall 13, kiosk 6, vending_machine 6, gate 1
-  plants: shrub 9352, facade_greenery 5689, park_tree 4083, overgrowth 3068, street_tree 1159, conifer 1068, roof_tree 685, median_tree 460, palm 345
+  props 52353, plants 25573 (7111 trees), 77926 instances; lawns 31323 m2, hedges 10.46 km
+  props: sign 13832, awning 11459, ac_unit 8317, street_light 3718, railing 2715, trash 2408, overhead_cable 2294, barrier 1868, traffic_signal 1114, wall_light 910, bench 820, bollard 803, trash_can 782, hydrant 735, dumpster 338, boat 77, scaffolding 49, bus_stop 47, parked_vehicle 23, planter 19, food_stall 13, kiosk 6, vending_machine 5, gate 1
+  plants: shrub 9166, facade_greenery 5722, park_tree 4076, overgrowth 2932, street_tree 1167, conifer 1069, roof_tree 642, median_tree 460, palm 339
 
   elevated highways 1.69 km (2 runs, 0 direct branches), deck up to 9.29 m; ramps 6 (1.7 km); interchanges parclo 2; overpasses 2
   other raised roads 13.57 km, underpass streets 3, road columns 344
 
-  transit 15.6 km, supports 144, portals 15, buildings removed 89; stations elevated 10, sky 3, underground 6
-  by mode: elevated_rail 1 lines 6.57 km 8 stations, maglev 1 lines 0.95 km 2 stations, metro 1 lines 5.31 km 6 stations, sky_tube 1 lines 2.77 km 3 stations
+  transit 14.06 km, supports 124, portals 12, buildings removed 58; stations elevated 9, sky 3, underground 6
+  by mode: elevated_rail 1 lines 5.03 km 7 stations, maglev 1 lines 0.95 km 2 stations, metro 1 lines 5.31 km 6 stations, sky_tube 1 lines 2.77 km 3 stations
 
   district                     archetype              landmass  km2    share  target  error
   Corporate Core               corporate_core         lm03      0.768  0.094  0.094   -0.0%  (island)
@@ -185,3 +185,4 @@ notes:
   - complex tower_cluster in 'Corporate Core': no lots to merge
   - Core Island: path52 overlaps path49: it gives way (16.9 m2)
   - 57 traced buildings placed as drawn
+  - Halo Line: off the roads where they would not make one ring through its stops

@@ -25,14 +25,16 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M6 | Props, vegetation, ground clutter (instanced in the blockout) | Done | [`docs/progress/M6`](docs/progress/M6) |
 | M7a | Elevated highways: viaducts, diamond ramps, overpasses, bridge approach grades, underpass streets, road columns | Done | [`docs/progress/M7`](docs/progress/M7) |
 | M7b | Trumpet and partial cloverleaf interchanges, art-direction loop, Corporate Core pinned import | Done | [`docs/progress/M7b`](docs/progress/M7b) |
-| M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check | Done | [`docs/progress/M8b`](docs/progress/M8b) |
+| M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines that pass on the first layout, faster transit routing | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 
 ## Latest maps (M8b)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M7b added loop interchanges (partial cloverleaf and
 trumpet) and imported the hand-traced Corporate Core as fixed geometry, with the city built
-around it. M8b makes every transit loop one simple ring through its stops in route order.
+around it. M8b makes every transit loop one simple ring through its stops in route order,
+and fast lines (maglev, sky tube) pass on the first layout, so no sample city is redrawn
+for a transit failure.
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):

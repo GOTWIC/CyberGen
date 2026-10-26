@@ -310,6 +310,62 @@ def test_graded_closed():
                for a, b, p, r in zip(loop, loop[1:], pts, pts[1:]) if p != r)
 
 
+def _grid(seed: int, n: int = 40):
+    """A raster context n by n with random costs and walls (no city)."""
+    rng = np.random.default_rng(seed)
+    c = TR.Ctx(None, None)
+    c.nx = c.ny = n
+    cost = rng.uniform(1.0, 4.0, n * n)
+    cost[rng.random(n * n) < 0.18] = TR.INF
+    return c, cost
+
+
+def _path_cost(c, cost, path, turn, din):
+    cl = [min(x, 2.0) if x == TR.INF else x for x in cost.tolist()]
+    prev = None if din is None else max(range(16), key=lambda k: (
+        (TR._MOVES[k][0] * din[0] + TR._MOVES[k][1] * din[1]) / TR._MOVES[k][2], -k))
+    tot = 0.0
+    for u, v in zip(path, path[1:]):
+        dx, dy = v % c.nx - u % c.nx, v // c.nx - u // c.nx
+        k = next(i for i, mv in enumerate(TR._MOVES) if mv[:2] == (dx, dy))
+        L = TR._MOVES[k][2]
+        step = L * TR.CELL_M * (cl[u] + cl[v]) / 2.0
+        if prev is not None:
+            ddx, ddy, dL = TR._MOVES[prev]
+            cs = (ddx * dx + ddy * dy) / (dL * L)
+            if cs < 0.70:
+                step += turn * (1.0 - cs)
+        tot += step
+        prev = k
+    return tot
+
+
+def test_search_cost_to_go(monkeypatch):
+    """M8b: guided by the exact turn-free cost to go, the search finds paths as cheap as with
+    the straight-distance heuristic; `_togo` never overestimates; a cell it cannot reach
+    gives None."""
+    for seed in range(4):
+        c, cost = _grid(seed)
+        a, b = 0, c.nx * c.ny - 1
+        monkeypatch.setattr(TR, "TOGO_M", math.inf)
+        plain = TR.search(c, cost, a, b, 300.0, (1.0, 0.0))
+        monkeypatch.setattr(TR, "TOGO_M", 0.0)
+        guided = TR.search(c, cost, a, b, 300.0, (1.0, 0.0))
+        assert (plain is None) == (guided is None)
+        if plain is not None:
+            assert _path_cost(c, cost, guided, 300.0, (1.0, 0.0)) == \
+                pytest.approx(_path_cost(c, cost, plain, 300.0, (1.0, 0.0)), abs=1e-6)
+            togo = TR._togo(c, [min(x, 2.0) if x == TR.INF else x for x in cost.tolist()], b)
+            assert togo[a] <= _path_cost(c, cost, guided, 0.0, None) + 1e-6
+    c, cost = _grid(9)
+    walled = cost.copy()
+    walled[[c.nx * j + 20 for j in range(c.ny)]] = TR.INF   # a wall two cells thick
+    walled[[c.nx * j + 21 for j in range(c.ny)]] = TR.INF
+    walled[[c.nx * j + 22 for j in range(c.ny)]] = TR.INF
+    assert not TR.reachable(c, walled, 0, c.nx - 1)
+    assert TR.search(c, walled, 0, c.nx - 1, 300.0) is None
+
+
 # --- geometry helpers -------------------------------------------------------------------
 
 def test_arc_path_right_angle_radius():
