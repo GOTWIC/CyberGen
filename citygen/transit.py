@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import shapely
+import shapely.ops
 from shapely.geometry import LineString, Point, Polygon
 
 from . import dmath as M
@@ -227,14 +228,30 @@ def deck_heights(decks, tree, arr, pad: float, which: bool = False) -> list[tupl
     return out
 
 
-def _envelope(pts, need: list[float], g: float) -> list[float]:
-    """The lowest profile over `need` with grades of at most g."""
-    lo = list(need)
-    for i in range(1, len(lo)):
-        lo[i] = max(lo[i], lo[i - 1] - g * _d(pts[i - 1], pts[i]))
-    for i in range(len(lo) - 2, -1, -1):
-        lo[i] = max(lo[i], lo[i + 1] - g * _d(pts[i], pts[i + 1]))
-    return lo
+def _envelope(pts, need: list[float], g: float, closed: bool = False) -> list[float]:
+    """The lowest profile over `need` with grades of at most g (closed: around a loop whose
+    last point is its first)."""
+    return _graded(pts, need, g, max, -1.0, closed)
+
+
+def _graded(pts, vals: list[float], g: float, pick, sign: float, closed: bool) -> list[float]:
+    """vals limited to the grade g from both sides: pick(v, neighbor + sign g d) (max and -1
+    lift the lows, min and +1 cap the highs); around a closed track (first point = last)
+    each pass runs twice, so a bound near the seam reaches the other side."""
+    v = list(vals)
+    n = len(v)
+    for _ in range(2 if closed and n > 2 else 1):
+        if closed and n > 2:
+            v[0] = v[-1] = pick(v[0], v[-1])
+        for i in range(1, n):
+            v[i] = pick(v[i], v[i - 1] + sign * g * _d(pts[i - 1], pts[i]))
+        if closed and n > 2:
+            v[0] = v[-1] = pick(v[0], v[-1])
+        for i in range(n - 2, -1, -1):
+            v[i] = pick(v[i], v[i + 1] + sign * g * _d(pts[i], pts[i + 1]))
+    if closed and n > 2:
+        v[0] = v[-1] = pick(v[0], v[-1])
+    return v
 
 
 def deck_crossings(decks, tree, arr, pad: float) -> list[list[tuple[int, float]]]:
@@ -452,11 +469,26 @@ def _district_point(c: Ctx, d, mode: str, toward=None) -> tuple[float, float]:
     avenues, 250 m for the others, less where the district is narrower: the curves fitted
     later pass inside the junction), so that the line serves the district on its way instead
     of detouring to its middle."""
+    rp = G.from_model_poly(d.polygon).representative_point()
+    best = None
+    for p, rank in _district_cands(c, d, mode, inset=toward is not None):
+        if toward is not None:
+            key = (round(toward.distance(Point(p)) + 150.0 * rank, 2), 0, p)
+        else:
+            key = (rank, round(_d(p, (rp.x, rp.y)), 2), p)
+        if best is None or key < best:
+            best = key
+    return best[2] if best else (q(rp.x), q(rp.y))
+
+
+def _district_cands(c: Ctx, d, mode: str, inset: bool) -> list[tuple[tuple, int]]:
+    """(junction, class rank) of the roads a stop of the mode may use in the district (avenues
+    then streets; highways then avenues for the maglev), with `inset` only those well inside
+    it (see `_district_point`), sorted by position."""
     poly = G.from_model_poly(d.polygon)
-    rp = poly.representative_point()
-    if toward is not None:
-        for inset in ((120.0, 60.0) if mode in ROAD_MODES else (250.0, 150.0, 60.0)):
-            inner = G.qpoly(poly.buffer(-inset))
+    if inset:
+        for x in ((120.0, 60.0) if mode in ROAD_MODES else (250.0, 150.0, 60.0)):
+            inner = G.qpoly(poly.buffer(-x))
             if not inner.is_empty and inner.area > 4.0e4:
                 poly = inner
                 break
@@ -469,18 +501,180 @@ def _district_point(c: Ctx, d, mode: str, toward=None) -> tuple[float, float]:
             for p in (s.centerline[0], s.centerline[-1]):
                 key = (q(p[0]), q(p[1]))
                 ends[key] = min(ends.get(key, 9), want.index(s.road_class))
-    best = None
     shapely.prepare(poly)
-    for p, rank in sorted(ends.items()):
-        if not poly.contains(Point(p)):
-            continue
-        if toward is not None:
-            key = (round(toward.distance(Point(p)) + 150.0 * rank, 2), 0, p)
+    return [(p, rank) for p, rank in sorted(ends.items()) if poly.contains(Point(p))]
+
+
+LOOP_SECTORS = 36        # a district stop of a loop tries a junction per sector (10 degrees)
+LOOP_MIN_GAP = 0.15      # radians (about 9 degrees) between two stops seen from the center
+
+
+def _ring_of(stops: list) -> list:
+    """The stops of a loop once each (the route repeats the first at the end)."""
+    if len(stops) > 2 and stops[-1].name == stops[0].name and stops[-1].kind == stops[0].kind:
+        return stops[:-1]
+    return list(stops)
+
+
+def _gap_cost(d: float, n: int) -> float:
+    """How far the turn between two stops of a loop (seen from its middle) is from an even
+    share of the turn (stops crowded on one side make sharp corners at them)."""
+    even = 2.0 * M.PI / n
+    return ((d - even) / even) ** 2
+
+
+def _loop_points(c: Ctx, ln: Line, pads: dict | None = None) -> list | None:
+    """Points for a loop's stops that make it one simple closed curve in their route order:
+    the district stops (not a nexus platform, a site or a place) move to a junction of their
+    district so that, seen from the middle of the stops, they come in route order around one
+    turn (a star-shaped ring is simple), each edge less than half a turn and the stops as
+    near a circle as the districts allow (the ring the line will follow). A dynamic program
+    over the junctions, both ways round; None when no choice puts them in order (the line
+    keeps its district points). Returns a point per stop of the route."""
+    ring = _ring_of(ln.stops)
+    n = len(ring)
+    if n < 3:
+        return None
+    dist = {d.id: d for d in c.m.districts}
+    home = [s.p for s in ring]
+    ox = q(math.fsum(p[0] for p in home) / n)
+    oy = q(math.fsum(p[1] for p in home) / n)
+    R = math.fsum(_d(p, (ox, oy)) for p in home) / n
+    if R < 1.0:
+        return None
+    cands, every = [], []
+    for s in ring:
+        every.append([])
+        if s.kind == "district" and s.z is None and s.district_id in dist:
+            # in each sector seen from the center, the junction nearest the ring
+            by: dict = {}
+            for p, _ in _district_cands(c, dist[s.district_id], ln.mode, True):
+                every[-1].append((p, float(M.atan2(p[1] - oy, p[0] - ox)),
+                                  ((_d(p, (ox, oy)) - R) / R) ** 2))
+                t = float(M.atan2(p[1] - oy, p[0] - ox))
+                key = (round(abs(_d(p, (ox, oy)) - R), 2), p)
+                k = int((t + M.PI) // (2.0 * M.PI / LOOP_SECTORS))
+                if k not in by or key < by[k][0]:
+                    by[k] = (key, p)
+            pts = [by[k][1] for k in sorted(by)] or [s.p]
         else:
-            key = (rank, round(_d(p, (rp.x, rp.y)), 2), p)
-        if best is None or key < best:
-            best = key
-    return best[2] if best else (q(rp.x), q(rp.y))
+            pts = [s.p]
+        cands.append([(p, float(M.atan2(p[1] - oy, p[0] - ox)),
+                       ((_d(p, (ox, oy)) - R) / R) ** 2) for p in pts])
+    two_pi = 2.0 * M.PI
+    area = math.fsum(home[k][0] * home[(k + 1) % n][1] - home[(k + 1) % n][0] * home[k][1]
+                     for k in range(n))
+    best = None
+    for sgn in (1.0, -1.0):
+        def inc(a, b, sgn=sgn):
+            return (sgn * (b - a)) % two_pi
+        for p0, t0, w0 in cands[0]:
+            # per candidate of the stop: non-dominated (turn so far, cost, points)
+            fronts = {p0: [(0.0, w0, (p0,), t0)]}
+            for k in range(1, n):
+                new: dict = {}
+                for p, t, w in cands[k]:
+                    opts = []
+                    for front in fronts.values():
+                        for A, cost, path, tp in front:
+                            d = inc(tp, t)
+                            if not LOOP_MIN_GAP < d < M.PI - LOOP_MIN_GAP or \
+                                    A + d >= two_pi - LOOP_MIN_GAP:
+                                continue
+                            opts.append((A + d, cost + w + _gap_cost(d, n), path + (p,), t))
+                    if opts:
+                        opts.sort(key=lambda o: (o[0], round(o[1], 9), o[2]))
+                        keep, low = [], INF
+                        for o in opts:
+                            if round(o[1], 9) < low:
+                                keep.append(o)
+                                low = round(o[1], 9)
+                        new[p] = keep
+                fronts = new
+                if not fronts:
+                    break
+            for p in sorted(fronts):
+                for A, cost, path, tp in fronts[p]:
+                    d = inc(tp, t0)
+                    if not LOOP_MIN_GAP < d < M.PI - LOOP_MIN_GAP:
+                        continue
+                    key = (round(cost + _gap_cost(d, n), 9), 0 if sgn * area >= 0 else 1, path)
+                    if best is None or key < best[0]:
+                        best = (key, path, sgn)
+    if best is None:
+        return None
+    pts = list(best[1])
+    r_min = presets.TRANSIT_MODES[ln.mode].min_curve_radius_m or 0.0
+    if r_min > 0:
+        zones = [G.from_model_poly(dist[s.district_id].polygon) if every[k] else None
+                 for k, s in enumerate(ring)]
+        _deepen(pts, every, zones, best[2], (ox, oy), 1.15 * r_min, pads or {})
+    at = dict(zip([id(s) for s in ring], pts))
+    return [at.get(id(s), pts[0]) for s in ln.stops]
+
+
+APEX_PAD_M = 30.0   # a loop's curve at a stop stays this far inside its district
+
+
+def _apex_in(a, p, b, r: float, zone, pad: float = APEX_PAD_M) -> bool:
+    """A curve of radius r at corner p (between a and b) passes inside zone, pad in: it cuts
+    the corner by r (1 / cos(turn / 2) - 1) toward its inside."""
+    if not zone.covers(Point(p)):
+        return False
+    th, _ = _turn_info([a, p, b], 1, False)
+    la, lb = _d(a, p), _d(p, b)
+    if th < M.radians(1.0) or la < 1.0 or lb < 1.0:
+        return True
+    e = r * (1.0 / float(M.cos(min(th, M.radians(150.0)) / 2.0)) - 1.0) + pad
+    ix = (a[0] - p[0]) / la + (b[0] - p[0]) / lb
+    iy = (a[1] - p[1]) / la + (b[1] - p[1]) / lb
+    L = math.sqrt(ix * ix + iy * iy)
+    if L < 1e-9:
+        return True
+    return bool(zone.covers(Point(p[0] + e * ix / L, p[1] + e * iy / L)))
+
+
+def _deepen(pts: list, every: list, zones: list, sgn: float, o, r: float, pads: dict) -> None:
+    """A loop stop whose corner the curves would cut out of its district moves (in place,
+    a few rounds) to the junction of its district, still between its neighbors seen from
+    the middle o, where the curve stays in (`_apex_in`, APEX_PAD_M in plus pads[k] for the
+    k-th stop): the one nearest the ring and the even turn (the costs of `_loop_points`)."""
+    n = len(pts)
+    two_pi = 2.0 * M.PI
+
+    def ang(p):
+        return float(M.atan2(p[1] - o[1], p[0] - o[0]))
+
+    def inc(a, b):
+        return (sgn * (b - a)) % two_pi
+    for _ in range(3):
+        moved = False
+        for k in range(n):
+            if not every[k]:
+                continue
+            prv, nxt = pts[k - 1], pts[(k + 1) % n]
+            pad = APEX_PAD_M + pads.get(k, 0.0)
+            if _apex_in(prv, pts[k], nxt, r, zones[k], pad):
+                continue
+            tp, tn = ang(prv), ang(nxt)
+            span = inc(tp, tn)
+            best = None
+            for p, t, w in every[k]:
+                d1 = inc(tp, t)
+                d2 = span - d1
+                if not (LOOP_MIN_GAP < d1 < M.PI - LOOP_MIN_GAP and
+                        LOOP_MIN_GAP < d2 < M.PI - LOOP_MIN_GAP):
+                    continue
+                if not _apex_in(prv, p, nxt, r, zones[k], pad):
+                    continue
+                key = (round(w + _gap_cost(d1, n) + _gap_cost(d2, n), 9), p)
+                if best is None or key < best:
+                    best = key
+            if best is not None:
+                pts[k] = best[1]
+                moved = True
+        if not moved:
+            break
 
 
 # ---------------------------------------------------------------------------
@@ -868,6 +1062,7 @@ class Line:
     notes: list = field(default_factory=list)
     names: set = field(default_factory=set)      # station names used on the line
     tall_scale: float = 1.0                      # raster: cost of the towers it would clear
+    on_roads: bool = True                        # road modes: legs on the road graph
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -925,6 +1120,42 @@ class RoadGraph:
             self.adj[key].sort(key=lambda e: (e[0], e[1] if isinstance(e[1], tuple)
                                               else (e[1], -1)))
         self.turn = TURN_M[mode]
+        # every edge once, for the legs a line must keep off (its own earlier legs)
+        seen: dict = {}
+        for u in sorted(self.adj):
+            for v, k, wt, pts in self.adj[u]:
+                seen.setdefault(k, pts)
+        self.ekeys = list(seen)
+        self.at = {}
+        for nid in sorted(self.adj):
+            self.at.setdefault((q(self.pos[nid][0]), q(self.pos[nid][1])), nid)
+        self.elines = [LineString(seen[k]) for k in self.ekeys]
+        self.etree = shapely.STRtree(self.elines) if self.elines else None
+
+    def targets(self, st: Stop, c: Ctx) -> set:
+        """Where a leg may reach a stop: its node (`node_near`), and for a district stop any
+        junction within STOP_REACH_M of its point in the district (the leg passes it on its
+        way instead of turning there)."""
+        n0 = self.node_near(st, c)
+        if n0 is None:
+            return set()
+        out = {n0}
+        if st.kind == "district" and st.z is None:
+            dpoly = next((G.from_model_poly(d.polygon) for d in c.m.districts
+                          if d.id == st.district_id), None)
+            if dpoly is not None:
+                for nid in sorted(self.adj):
+                    x = self.pos[nid]
+                    if not nid.startswith("ov") and _d(x, st.p) <= STOP_REACH_M and \
+                            dpoly.covers(Point(x)):
+                        out.add(nid)
+        return out
+
+    def touching(self, geom) -> set:
+        """The edges that meet geom."""
+        if self.etree is None or geom is None or geom.is_empty:
+            return set()
+        return {self.ekeys[i] for i in self.etree.query(geom, predicate="intersects").tolist()}
 
     def node_near(self, st: Stop, c: Ctx, limit: float = 450.0) -> str | None:
         """The graph node nearest the stop, in its district first; for a megasite, on an
@@ -960,9 +1191,13 @@ class RoadGraph:
         u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
         return (-u[0], -u[1]) if rev else u
 
-    def route(self, a: str, b: str, din=None, used=frozenset()) -> list | None:
-        """Cheapest path a to b (node ids) with a turn penalty at every node, starting in
-        direction din (the previous leg's arrival); the polyline."""
+    def route(self, a: str, b, din=None, used=frozenset(), avoid=frozenset(),
+              dend=None) -> tuple | None:
+        """Cheapest path from node a to node b (or the first of a set of nodes) with a turn
+        penalty at every node, starting in direction din (the previous leg's arrival), off the
+        edges in avoid, and (dend) arriving so that it can go on in that direction (a loop's
+        first leg): (the polyline, its edges, the node it ends at)."""
+        goal = {b} if isinstance(b, str) else set(b)
         heap = [(0.0, 0, a, -1)]
         best = {(a, -1): 0.0}
         came: dict = {}
@@ -975,12 +1210,12 @@ class RoadGraph:
             if key in done:
                 continue
             done.add(key)
-            if u == b:
+            if u in goal:
                 runs, ks = self._chain(came, key)
-                return self._join(runs), ks
+                return self._join(runs), ks, u
             din = arrive[key]
             for v, k, wt, pts in self.adj.get(u, ()):
-                if k == ku:
+                if k == ku or k in avoid:
                     continue
                 step = wt * (REUSE_W if k in used else 1.0)
                 if din is not None:
@@ -988,6 +1223,13 @@ class RoadGraph:
                     cosang = max(-1.0, min(1.0, din[0] * dout[0] + din[1] * dout[1]))
                     if cosang < MAX_TURN_COS:
                         continue      # a train does not turn back (its curves would cut it)
+                    if cosang < 0.94:
+                        step += self.turn * (1.0 - cosang)
+                if v in goal and dend is not None:
+                    arr = self._dir(pts, rev=True)
+                    cosang = max(-1.0, min(1.0, arr[0] * dend[0] + arr[1] * dend[1]))
+                    if cosang < MAX_TURN_COS:
+                        continue
                     if cosang < 0.94:
                         step += self.turn * (1.0 - cosang)
                 nk = (v, k)
@@ -1039,63 +1281,123 @@ def snap_cell(c: Ctx, cost, p) -> int:
 
 def route_line(c: Ctx, ln: Line) -> None:
     """The track: the stops in districts between two others moved toward the line's way
-    first; where that leaves a stop unserved, again from the district points, and the
-    route that serves more stops."""
+    first (a loop's to the junctions that keep it one simple ring, `_loop_points`); where
+    that leaves a stop unserved or the track meeting itself, again from the district points,
+    and the route that serves more stops, then meets itself less."""
     mode = ln.mode
     stops = ln.stops
     dist = {d.id: d for d in c.m.districts}
     home = [s.p for s in stops]
     for k in range(1, len(stops) - 1):
         st = stops[k]
-        # (a loop keeps its stops: the chord between its neighbors crosses the loop)
+        # (a loop's stops move below: the chord between its neighbors crosses the loop)
         if not ln.loop and st.kind == "district" and st.z is None and \
                 st.district_id in dist:
             chord = LineString([stops[k - 1].p, stops[k + 1].p])
             if chord.length > 1.0:
                 st.p = _district_point(c, dist[st.district_id], mode, chord)
+    r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
+    if ln.loop:
+        ring = _loop_points(c, ln)
+        if ring is not None:
+            for s, p in zip(stops, ring):
+                s.p = p
     moved = [s.p for s in stops]
     notes, conflicts = list(ln.notes), list(ln.conflicts)
     _route(c, ln)
 
-    def missed():
-        return sum(1 for s in stops if not _served(ln.pts, s))
-    r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
+    def flaws():
+        return (sum(1 for s in stops if not _served(ln.pts, s)), meets(ln.pts, ln.loop, mode))
 
     def tight():
         return ln.min_radius < 0.95 * r_min
-    if moved == home or not missed():
-        if (missed() or tight()) and mode in ROAD_MODES:
-            _restop(c, ln, missed, notes, conflicts)
-        elif tight() and mode not in ROAD_MODES:
-            _straighter(c, ln, missed, notes, conflicts)
-        return
-    first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, missed())
-    for s, p in zip(stops, home):
-        s.p = p
-    ln.notes, ln.conflicts = list(notes), list(conflicts)
-    _route(c, ln)
-    if missed() >= first[5]:
-        ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
-        for s, p in zip(stops, moved):
+    if moved != home and flaws() != (0, 0):
+        first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, flaws())
+        for s, p in zip(stops, home):
             s.p = p
-    if (missed() or tight()) and mode in ROAD_MODES:
-        _restop(c, ln, missed, notes, conflicts)
+        ln.notes, ln.conflicts = list(notes), list(conflicts)
+        _route(c, ln)
+        if flaws() >= first[5]:
+            ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
+            for s, p in zip(stops, moved):
+                s.p = p
+    elif moved == home or flaws() == (0, 0):
+        if tight() and mode not in ROAD_MODES:
+            _straighter(c, ln, flaws, notes, conflicts)
+    if (flaws() != (0, 0) or tight()) and mode in ROAD_MODES:
+        _restop(c, ln, flaws, notes, conflicts)
+    if ln.loop and mode in ROAD_MODES:
+        _off_roads(c, ln, flaws, moved, notes, conflicts)
 
 
-def _straighter(c: Ctx, ln: Line, missed, notes: list, conflicts: list) -> None:
+OFF_ROADS_LONGER = 1.35   # a loop on the roads this much longer than off them goes off them
+DEEPEN_TRIES = 3          # rings a loop off the roads tries, stops the curves cut deeper
+DEEPEN_STEP_M = 60.0      # each time
+
+
+def _off_roads(c: Ctx, ln: Line, flaws, ring: list, notes: list, conflicts: list) -> None:
+    """M8b: a road-following loop routed again with its legs on the raster, from the ring's
+    points (avenues still cost least; its own viaducts elsewhere), kept when that serves
+    more stops or meets itself less, then has no curve too tight, or is the same but the
+    roads made a ring OFF_ROADS_LONGER times longer (the roads cannot make one simple ring
+    through its stops: one bridge between two of them, a stop at a road's end, so the legs
+    go round each other)."""
+    r_min = presets.TRANSIT_MODES[ln.mode].min_curve_radius_m or 0.0
+
+    def score():
+        return (flaws(), 1 if ln.min_radius < 0.95 * r_min else 0)
+    before = (score(), ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts,
+              [s.p for s in ln.stops])
+    ln.on_roads = False
+    best = None
+    pads: dict = {}
+    ring_of = _ring_of(ln.stops)
+    for _ in range(DEEPEN_TRIES):
+        for s, p in zip(ln.stops, ring):
+            s.p = p
+        ln.notes, ln.conflicts = list(notes), list(conflicts)
+        _route(c, ln)
+        if best is None or score() < best[0]:
+            best = (score(), ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts,
+                    [s.p for s in ln.stops])
+        # a stop the curves still cut away: its corner deeper in its district next time
+        cut = [k for k, s in enumerate(ring_of) if not _served(ln.pts, s)]
+        if not cut:
+            break
+        for k in cut:
+            pads[k] = pads.get(k, 0.0) + DEEPEN_STEP_M
+        nxt = _loop_points(c, ln, pads)
+        if nxt is None or nxt == ring:
+            break
+        ring = nxt
+    sc, ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, pts = best
+    for s, p in zip(ln.stops, pts):
+        s.p = p
+    if sc < before[0] or (sc == before[0] and
+                          _plen(before[1]) > OFF_ROADS_LONGER * _plen(ln.pts)):
+        ln.notes.append(f"{ln.name}: off the roads where they would not make one ring through "
+                        f"its stops")
+        return
+    _, ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, pts = before
+    for s, p in zip(ln.stops, pts):
+        s.p = p
+    ln.on_roads = True
+
+
+def _straighter(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
     """A flying line whose curves came out too tight (it wound between towers): routed
     again with the towers it would clear costing a quarter, so it takes a straighter way
     and clears more of them; kept when that serves as many stops with wider curves."""
-    first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, missed())
+    first = (ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, flaws())
     ln.tall_scale = 0.25
     ln.notes, ln.conflicts = list(notes), list(conflicts)
     _route(c, ln)
-    if missed() > first[5] or ln.min_radius <= first[1]:
+    if flaws() > first[5] or ln.min_radius <= first[1]:
         ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = first[:5]
         ln.tall_scale = 1.0
 
 
-def _restop(c: Ctx, ln: Line, missed, notes: list, conflicts: list) -> None:
+def _restop(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
     """A road-following line that still misses a district stop (it turns back there, and its
     curves cut the turn) or keeps a curve tighter than its radius: each stop tries the next
     avenue nodes of its district, nearest first; the route that serves the most stops wins,
@@ -1111,16 +1413,16 @@ def _restop(c: Ctx, ln: Line, missed, notes: list, conflicts: list) -> None:
                 [s.p for s in stops])
 
     def score():
-        return (missed(), 1 if ln.min_radius < 0.95 * r_min else 0,
+        return (flaws(), 1 if ln.min_radius < 0.95 * r_min else 0,
                 -round(min(ln.min_radius, r_min), 1))
     best = (score(), snap())
     budget = [RESTOP_BUDGET]
     for st in list(stops):
-        if best[0][:2] == (0, 0):
+        if best[0][:2] == ((0, 0), 0):
             break
         if st.kind != "district" or st.z is not None or st.district_id not in dist:
             continue
-        if _served(ln.pts, st) and best[0][1] == 0:
+        if _served(ln.pts, st) and best[0][1] == 0 and best[0][0][1] == 0:
             continue
         poly = G.from_model_poly(dist[st.district_id].polygon)
         twins = [s for s in stops if s.name == st.name and s.kind == st.kind]
@@ -1149,11 +1451,113 @@ def _restop(c: Ctx, ln: Line, missed, notes: list, conflicts: list) -> None:
             _route(c, ln)
             if score() < best[0]:
                 best = (score(), snap())
-                if best[0][:2] == (0, 0):
+                if best[0][:2] == ((0, 0), 0):
                     break
         ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts = best[1][:5]
         for s, p in zip(stops, best[1][5]):
             s.p = p
+
+
+STOP_REACH_M = 150.0  # a road-following leg may end at a junction this near its district stop
+
+
+def _legs(c: Ctx, ln: Line, graph, cost) -> tuple[list, set, list, bool]:
+    """The route through the stops before the curves: (points, indices where it reaches a
+    stop, the index for each stop, every leg found). Each leg starts where the last one
+    ended and keeps off the line's earlier legs (M8b), but near its own ends:
+
+    - a road-following line runs on the road graph to a junction within STOP_REACH_M of a
+      district stop in its district (the node nearest a site, platform or exit), a loop's
+      last leg back to where its first left, arriving the way that one went on;
+    - where the roads cannot keep it off the earlier legs (one bridge both ways, say), the
+      leg runs on the raster instead (its own viaduct), and only where that fails too on
+      the roads again, over the earlier legs;
+    - the other modes search the raster, off the earlier legs where they can."""
+    mode = ln.mode
+    stops = ln.stops
+    raw: list = []
+    at_stop = {0}
+    hit = [0]       # the index in raw where the route reaches each stop
+    din = None
+    ok = True
+    used_segs: set = set()
+    used_cells = np.zeros(c.nx * c.ny, bool)
+    dstart = None   # the first leg's departure (a loop's last leg arrives to go on so)
+    first = cur = None   # graph nodes: where the line starts, where the last leg ended
+    nleg = len(stops) - 1
+    for leg, (a, b) in enumerate(zip(stops, stops[1:])):
+        run = None
+        closing = ln.loop and leg == nleg - 1
+        here = raw[-1] if raw else a.p
+        # M8b: a leg keeps off the line's earlier legs (it would cross or run along them),
+        # but near where it starts and, closing a loop, near where the loop started
+        keep_off = _keep_off(raw, here, raw[0] if closing and raw else None)
+        if graph is not None:
+            na = cur if cur is not None else graph.node_near(a, c)
+            goal = ({first} if closing and first is not None else graph.targets(b, c))
+            if na is not None and goal:
+                if na in goal:
+                    res = ([graph.pos[na]], set(), na)
+                else:
+                    dend = dstart if closing else None
+                    res = graph.route(na, goal, din, used_segs, graph.touching(keep_off), dend)
+                if res is not None:
+                    run, ks, cur = res
+                    used_segs |= ks
+                    first = na if first is None else first
+        if run is None:
+            path = None
+            end = raw[0] if closing and raw else b.p
+            pa = snap_cell(c, cost, here)
+            pb = snap_cell(c, cost, end)
+            if keep_off is not None:
+                off = shapely.dwithin(keep_off, c.pts, WIDTH_M[mode] + CELL_M)
+                path = search(c, np.where(off, INF, cost), pa, pb, TURN_COST_M.get(mode, 0.0),
+                              din)
+            if path is not None:
+                run = [here] + [cell_xy(c, k) for k in path] + [end]
+            elif graph is not None:
+                # the roads again, over the earlier legs (the curves may still part them)
+                na = cur if cur is not None else graph.node_near(a, c)
+                goal = ({first} if closing and first is not None else graph.targets(b, c))
+                res = graph.route(na, goal, din, used_segs) if na is not None and goal and \
+                    na not in goal else None
+                if res is not None:
+                    run, ks, cur = res
+                    used_segs |= ks
+                    first = na if first is None else first
+            if run is None:
+                leg_cost = cost
+                if used_cells.any():
+                    near_ends = shapely.dwithin(Point(here), c.pts, 2 * REUSE_PAD_M) | \
+                        shapely.dwithin(Point(end), c.pts, 2 * REUSE_PAD_M)
+                    leg_cost = np.where(used_cells & ~near_ends, cost * REUSE_W, cost)
+                path = search(c, leg_cost, pa, pb, TURN_COST_M.get(mode, 0.0), din)
+                if path is None:
+                    ln.notes.append(f"{ln.name}: no route from {a.name} to {b.name}")
+                    ok = False
+                    path = [cell_of(c, here), cell_of(c, end)]
+                run = [here] + [cell_xy(c, k) for k in path] + [end]
+            if graph is not None and path is not None:
+                # (a raster leg ends at the stop point: its junction, if it is one)
+                cur = graph.at.get((q(end[0]), q(end[1])))
+                if first is None:
+                    first = graph.at.get((q(here[0]), q(here[1])))
+        if len(run) >= 2:
+            used_cells |= shapely.dwithin(LineString(run), c.pts, REUSE_PAD_M)
+        for p in run:
+            if not raw or _d(raw[-1], p) > 0.01:
+                raw.append((G.q(p[0]), G.q(p[1])))
+        at_stop.add(len(raw) - 1)
+        hit.append(len(raw) - 1)
+        if len(raw) >= 2:
+            din = RoadGraph._dir(raw, rev=True)
+            if leg == 0:
+                dstart = RoadGraph._dir(raw)
+    if ln.loop and raw[0] != raw[-1]:
+        raw.append(raw[0])
+        at_stop.add(len(raw) - 1)
+    return raw, at_stop, hit, ok
 
 
 def _route(c: Ctx, ln: Line) -> None:
@@ -1161,7 +1565,7 @@ def _route(c: Ctx, ln: Line) -> None:
     stops = ln.stops
     pre = presets.TRANSIT_MODES[mode]
     r_min = pre.min_curve_radius_m or 0.0
-    graph = RoadGraph(c, mode) if mode in ROAD_MODES else None
+    graph = RoadGraph(c, mode) if mode in ROAD_MODES and ln.on_roads else None
     block = None
     dense, rmin, ok = [], INF, True
     for attempt in range(ATTEMPTS):
@@ -1175,50 +1579,8 @@ def _route(c: Ctx, ln: Line) -> None:
                 if cost[k] == INF:
                     st.p = cell_xy(c, snap_cell(c, cost, st.p))
                     st.p = (G.q(st.p[0]), G.q(st.p[1]))
-        raw: list = []
-        at_stop = {0}
-        hit = [0]       # the index in raw where the route reaches each stop
-        din = None
-        used_segs: set = set()
-        used_cells = np.zeros(c.nx * c.ny, bool)
-        for a, b in zip(stops, stops[1:]):
-            run = None
-            if graph is not None:
-                na, nb = graph.node_near(a, c), graph.node_near(b, c)
-                if na is not None and nb is not None:
-                    # a road-following line stops on the road: at the node nearest the stop
-                    # (beside a megasite or a nexus platform, not inside it)
-                    res = graph.route(na, nb, din, used_segs) if na != nb else \
-                        ([graph.pos[na]], set())
-                    run = None
-                    if res is not None:
-                        run, ks = res
-                        used_segs |= ks
-            if run is None:
-                leg_cost = cost
-                if used_cells.any():
-                    near_ends = shapely.dwithin(Point(a.p), c.pts, 2 * REUSE_PAD_M) | \
-                        shapely.dwithin(Point(b.p), c.pts, 2 * REUSE_PAD_M)
-                    leg_cost = np.where(used_cells & ~near_ends, cost * REUSE_W, cost)
-                path = search(c, leg_cost, snap_cell(c, cost, a.p), snap_cell(c, cost, b.p),
-                              TURN_COST_M.get(mode, 0.0), din)
-                if path is None:
-                    ln.notes.append(f"{ln.name}: no route from {a.name} to {b.name}")
-                    ok = False
-                    path = [cell_of(c, a.p), cell_of(c, b.p)]
-                run = [a.p] + [cell_xy(c, k) for k in path] + [b.p]
-                if len(run) >= 2:
-                    used_cells |= shapely.dwithin(LineString(run), c.pts, REUSE_PAD_M)
-            for p in run:
-                if not raw or _d(raw[-1], p) > 0.01:
-                    raw.append((G.q(p[0]), G.q(p[1])))
-            at_stop.add(len(raw) - 1)
-            hit.append(len(raw) - 1)
-            if len(raw) >= 2:
-                din = RoadGraph._dir(raw, rev=True)
-        if ln.loop and raw[0] != raw[-1]:
-            raw.append(raw[0])
-            at_stop.add(len(raw) - 1)
+        raw, at_stop, hit, legs_ok = _legs(c, ln, graph, cost)
+        ok = ok and legs_ok
         # simplified between stops (a loop would collapse as one run), then arcs at the
         # mode's radius with only the ends fixed: curves may pass beside a stop
         pts, _ = simplify_runs(raw, at_stop, SIMPLIFY_M[mode])
@@ -1265,15 +1627,29 @@ def _route(c: Ctx, ln: Line) -> None:
             block |= shapely.dwithin(b.poly, c.pts, WIDTH_M[mode] / 2.0 + SIDE_PAD_M +
                                      CELL_M * (1 + 2 * attempt))
         ln.notes.append(f"{ln.name}: rerouted around {len(conflicts)} building(s)")
-    if ln.loop and r_min > 0 and rmin < r_min - 0.5 and len(stops) >= 3:
-        alt = _hull_loop(c, ln, cost, r_min)
-        if alt is not None and alt[1] > rmin and all(_served(alt[0], s) for s in stops):
+    if ln.loop and r_min > 0 and graph is None and len(_ring_of(stops)) >= 3:
+        # M8b: a loop off the roads also along its guide ring; the better of the two
+        alt = _guide_loop(c, ln, cost, r_min)
+        if alt is not None and _loop_key(alt[0], alt[1], stops, mode, r_min) <= \
+                _loop_key(dense, rmin, stops, mode, r_min):
             dense, rmin = alt
-            ln.notes.append(f"{ln.name}: loop drawn around its stops (their order makes "
-                            f"turns tighter than {r_min:g} m)")
+    # (M8b: only for a curve the check would fail, as for a loop that meets itself)
+    if ln.loop and r_min > 0 and len(stops) >= 3 and \
+            (rmin < HULL_BELOW * r_min or meets(dense, True, mode)):
+        alt = _hull_loop(c, ln, cost, r_min)
+        if alt is not None and in_order(alt[0], stops, True):
+            m0, m1 = meets(dense, True, mode), meets(alt[0], True, mode)
+            if m1 < m0 or (m1 == m0 and alt[1] > rmin):
+                dense, rmin = alt
+                why = "it met itself" if m0 > m1 else \
+                    f"their order makes turns tighter than {r_min:g} m"
+                ln.notes.append(f"{ln.name}: loop drawn around its stops ({why})")
+    if ln.loop and len(dense) > 2 and dense[0] == dense[-1]:
+        # M8b: a loop's track starts at its first stop, its stations follow in route order
+        dense = _start_at(dense, stop_index(dense, stops[0]))
     ln.pts = dense
     ln.min_radius = rmin
-    ln.stop_at = [stop_index(dense, s) for s in stops]
+    ln.stop_at = ordered_stops(dense, stops, ln.loop)
     for s, i in zip(stops, ln.stop_at):
         zone = _zone(s)
         if zone is not None and not zone.covers(Point(dense[i])):
@@ -1282,6 +1658,30 @@ def _route(c: Ctx, ln: Line) -> None:
                             f"route that runs through its stops keeps them)")
     if not ok:
         ln.conflicts.append("route")
+
+
+KEEP_END_M = 60.0   # a leg may meet the line's earlier legs this near its own ends
+HULL_BELOW = 0.98   # a loop with a curve this much tighter than its radius tries its hull
+
+
+def _keep_off(raw: list, a, b=None):
+    """What a new leg of a line keeps off: the line so far, but within KEEP_END_M of the stop
+    it leaves (and of b, the first stop, for the leg that closes a loop). None when there is
+    nothing."""
+    if len(raw) < 2:
+        return None
+    ends = [p for p in (a, b) if p is not None]
+    parts, run = [], []
+    for p in _densify(raw):
+        if all(_d(p, e) > KEEP_END_M for e in ends):
+            run.append(p)
+            continue
+        if len(run) >= 2:
+            parts.append(run)
+        run = []
+    if len(run) >= 2:
+        parts.append(run)
+    return shapely.MultiLineString(parts) if parts else None
 
 
 def _cut_to_exits(pts: list, cut_ends: list) -> list:
@@ -1300,6 +1700,52 @@ def _cut_to_exits(pts: list, cut_ends: list) -> list:
     return pts
 
 
+GUIDE_STEP_M = 120.0   # waypoints along a loop's guide ring
+
+
+def _loop_key(pts, rmin: float, stops, mode: str, r_min: float) -> tuple:
+    """How good a loop is, lower better: its stops served in route order, where it meets
+    itself, a curve too tight."""
+    return (0 if in_order(pts, stops, True) else 1, meets(pts, True, mode),
+            1 if rmin < HULL_BELOW * r_min else 0)
+
+
+def _guide_loop(c: Ctx, ln: Line, cost, r_min: float):
+    """M8b: a loop along its guide ring, the polygon of its stops in route order with curves
+    of 1.15 r_min (`_loop_points` places the stops so that these pass in their districts),
+    as waypoints every GUIDE_STEP_M routed on the raster around what the line cannot pass,
+    then arcs. Legs from stop to stop would reach a stop off the ring as a spur that the
+    curves cut away."""
+    ring = [s.p for s in _ring_of(ln.stops)]
+    guide, _ = arc_path(ring + [ring[0]], r_min, True, lambda run: True, 2.0 * r_min)
+    if len(guide) < 4:
+        return None
+    way = resample(guide, GUIDE_STEP_M, True)
+    k0 = min(range(len(way)), key=lambda i: (round(_d(way[i], ring[0]), 3), i))
+    way = way[k0:] + way[:k0]
+    raw: list = []
+    din = None
+    turn = TURN_COST_M.get(ln.mode, 0.0)
+    for a, b in zip(way, way[1:] + way[:1]):
+        path = search(c, cost, snap_cell(c, cost, a), snap_cell(c, cost, b), turn, din)
+        run = [cell_xy(c, k) for k in path] if path else [a, b]
+        for p in run:
+            if not raw or _d(raw[-1], p) > 0.01:
+                raw.append((G.q(p[0]), G.q(p[1])))
+        if len(raw) >= 2:
+            din = RoadGraph._dir(raw, rev=True)
+    if len(raw) < 3:
+        return None
+    pts, _ = simplify_runs(raw + [raw[0]], {0}, SIMPLIFY_M[ln.mode])
+
+    def ok_cut(run):
+        return all(_segment_free(c, cost, p, r) for p, r in zip(run, run[1:]))
+    fitted, rmin = arc_path(pts, r_min, True, ok_cut, 2.0 * r_min)
+    if fitted[0] != fitted[-1]:
+        fitted = fitted + [fitted[0]]
+    return _densify(fitted), rmin
+
+
 def _hull_loop(c: Ctx, ln: Line, cost, r_min: float):
     """A loop around its stops: the outline of their convex hull widened by 1.1 r_min
     (every curve of it at least that wide), as waypoints every 120 m routed on the raster
@@ -1308,7 +1754,10 @@ def _hull_loop(c: Ctx, ln: Line, cost, r_min: float):
     ring = G.qpoly(hull.buffer(1.1 * r_min, quad_segs=16))
     if ring.is_empty:
         return None
-    ring = shapely.geometry.polygon.orient(G.parts(ring)[0], 1.0)
+    # M8b: around the way the route goes round
+    ps = [s.p for s in _ring_of(ln.stops)]
+    turn = math.fsum(a[0] * b[1] - b[0] * a[1] for a, b in zip(ps, ps[1:] + ps[:1]))
+    ring = shapely.geometry.polygon.orient(G.parts(ring)[0], 1.0 if turn >= 0 else -1.0)
     way = resample([tuple(p) for p in ring.exterior.coords][:-1], 120.0, True)
     first = ln.stops[0].p
     k0 = min(range(len(way)), key=lambda i: (round(_d(way[i], first), 3), i))
@@ -1371,6 +1820,123 @@ def _served(pts, s: Stop) -> bool:
     if zone is None:
         return True
     return bool(shapely.covers(zone, shapely.points(np.array(pts, dtype=np.float64))).any())
+
+
+SELF_GAP_M = 100.0   # parts of one line this far apart along it must not meet
+
+
+def self_clear_m(mode: str) -> float:
+    """Height between two parts of one line where one passes over the other: 5.5 m under the
+    upper structure, over the lower one."""
+    return ROAD_CLEAR_M + below(mode) + above(mode)
+
+
+def self_meets(pts, loop: bool, reach: float, zs=None, clear: float = 0.0) -> list[tuple]:
+    """Where a line meets itself: (s, x, y) for every place where two parts of its track more
+    than SELF_GAP_M apart along it come within `reach` in plan (with zs, less than `clear`
+    apart in height there), one per place (within 50 m of one already found is the same
+    place)."""
+    pts = [tuple(p[:2]) for p in pts]
+    n = len(pts) - 1
+    if n < 2:
+        return []
+    cum = _cum(pts)
+    L = cum[-1]
+    segs = [LineString([pts[i], pts[i + 1]]) for i in range(n)]
+    tree = shapely.STRtree(segs)
+    ia, ib = tree.query(segs, predicate="dwithin", distance=reach)
+    hits = []
+    for i, j in sorted(zip(ia.tolist(), ib.tolist())):
+        if j <= i:
+            continue
+        gap = cum[j] - cum[i + 1]
+        if loop:
+            gap = min(gap, L - cum[j + 1] + cum[i])
+        if gap <= SELF_GAP_M:
+            continue
+        a, b = shapely.ops.nearest_points(segs[i], segs[j])
+        if zs is not None:
+            za = _z_on(pts, zs, i, (a.x, a.y))
+            zb = _z_on(pts, zs, j, (b.x, b.y))
+            if abs(za - zb) >= clear - 0.01:
+                continue
+        if any(_d((a.x, a.y), (h[1], h[2])) <= 50.0 for h in hits):
+            continue
+        s = cum[i] + _d(pts[i], (a.x, a.y))
+        hits.append((round(s, 1), round(a.x, 1), round(a.y, 1)))
+    return hits
+
+
+def _z_on(pts, zs, i: int, p) -> float:
+    L = _d(pts[i], pts[i + 1])
+    f = 0.0 if L <= 0 else min(max(_d(pts[i], p) / L, 0.0), 1.0)
+    return zs[i] + (zs[i + 1] - zs[i]) * f
+
+
+def meets(pts, loop: bool, mode: str) -> int:
+    """How many places the track (in plan) meets itself: within the structure's width."""
+    return len(self_meets(pts, loop, WIDTH_M[mode]))
+
+
+def in_order(pts, stops, loop: bool) -> bool:
+    """Every stop served by its station in route order (`ordered_stops`); a loop's track is
+    tried from its first stop."""
+    if loop and len(pts) > 2 and pts[0] == pts[-1]:
+        pts = _start_at(pts, stop_index(pts, stops[0]))
+    at = ordered_stops(pts, stops, loop)
+    return all(_zone(s) is None or _zone(s).covers(Point(pts[i])) for s, i in zip(stops, at))
+
+
+def ordered_stops(pts, stops, loop: bool) -> list[int]:
+    """The track vertex of each stop's station, in route order: each the vertex nearest the
+    stop point among those after the previous stop's that serve it (in its district, or
+    within SERVE_M of its site or place), else the nearest after it; a loop's last stop (the
+    first again) is its last vertex. The track of a loop starts at its first stop."""
+    out = []
+    prev = 0
+    arr = shapely.points(np.array(pts, dtype=np.float64))
+    for k, s in enumerate(stops):
+        if k == 0:
+            out.append(0 if loop else _first_stop(pts, s, arr))
+            prev = out[-1]
+            continue
+        if loop and k == len(stops) - 1 and s.name == stops[0].name:
+            out.append(len(pts) - 1)
+            continue
+        zone = _zone(s)
+        idx = list(range(prev, len(pts)))
+        if zone is not None:
+            ins = np.nonzero(shapely.covers(zone, arr[prev:]))[0].tolist()
+            if ins:
+                idx = [prev + i for i in ins]
+        i = min(idx, key=lambda i: (round(_d(pts[i], s.p), 3), i))
+        out.append(i)
+        prev = i
+    return out
+
+
+def _first_stop(pts, s: Stop, arr) -> int:
+    """A line's first station: the vertex nearest the stop point where the track first
+    serves it (it may come back through the district later)."""
+    zone = _zone(s)
+    if zone is None:
+        return _nearest_index(pts, s.p)
+    ins = np.nonzero(shapely.covers(zone, arr))[0].tolist()
+    if not ins:
+        return _nearest_index(pts, s.p)
+    run = [ins[0]]
+    for i in ins[1:]:
+        if i != run[-1] + 1:
+            break
+        run.append(i)
+    return min(run, key=lambda i: (round(_d(pts[i], s.p), 3), i))
+
+
+def _start_at(pts: list, i: int) -> list:
+    """A closed track (first point = last) started again at vertex i."""
+    if i <= 0 or i >= len(pts) - 1:
+        return pts
+    return pts[i:] + pts[1:i + 1]
 
 
 def stop_index(pts, s: Stop) -> int:
@@ -1501,7 +2067,8 @@ def profile(c: Ctx, ln: Line, gone: set) -> None:
         for i in np.nonzero(shapely.contains(poly, arr))[0].tolist():
             need[i] = max(need[i], clr + deck + 1.0)
     g = (presets.TRANSIT_MODES[mode].max_grade or 0.05) * 0.95
-    low = _envelope(ln.pts, need, g)     # what the water already needs, at the grade
+    closed = ln.loop and n > 2 and ln.pts[0] == ln.pts[-1]
+    low = _envelope(ln.pts, need, g, closed)  # what the water already needs, at the grade
     runs = deck_crossings(c.decks, c.dtree, arr, WIDTH_M[mode] / 2.0)
     need0 = list(need)
     over_runs: set = set()
@@ -1585,15 +2152,9 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
     # between two functions of bounded slope keeps that slope); the lower one wins where
     # they cross (the portal there is then dropped)
     g = (presets.TRANSIT_MODES[mode].max_grade or 0.05) * 0.95
-    lo, hi = list(need), list(cap)
-    for i in range(1, n):
-        L = g * _d(ln.pts[i - 1], ln.pts[i])
-        lo[i] = max(lo[i], lo[i - 1] - L)
-        hi[i] = min(hi[i], hi[i - 1] + L)
-    for i in range(n - 2, -1, -1):
-        L = g * _d(ln.pts[i], ln.pts[i + 1])
-        lo[i] = max(lo[i], lo[i + 1] - L)
-        hi[i] = min(hi[i], hi[i + 1] + L)
+    closed = ln.loop and n > 2 and ln.pts[0] == ln.pts[-1]
+    lo = _graded(ln.pts, need, g, max, -1.0, closed)
+    hi = _graded(ln.pts, cap, g, min, 1.0, closed)
     return [q(max(a, min(b, ln.z0))) for a, b in zip(lo, hi)]
 
 
@@ -1634,7 +2195,12 @@ def _spot_name(c: Ctx, p, ln: Line) -> str:
     else:
         pt = Point(p)
         name = next((d.name for d in m.districts if G.from_model_poly(d.polygon).covers(pt)),
-                    ln.name)
+                    None)
+        if name is None:
+            # M8b: off every district (a bank between two river arms): the nearest one
+            near = min(((round(G.from_model_poly(d.polygon).distance(pt), 2), d.name)
+                        for d in m.districts), default=None)
+            name = near[1] if near is not None and near[0] <= 300.0 else ln.name
     used = ln.names
     if not used:
         used.update(s.name for s in ln.stops)
