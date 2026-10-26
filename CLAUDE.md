@@ -249,6 +249,32 @@ M7b is in place, which completes the scope's milestones:
 
 Demo: `docs/progress/M7b/nyxllor_pinned/`. Sample builds: `docs/progress/M7b/`.
 
+M8a (robustness sweep) is in place: `.venv/bin/python -m citygen sweep [SPEC...] [--suite m8a]
+[--seeds ...] [--only LABEL] [--workers 4] [--upto roads|local|full] --out DIR`
+(`citygen/sweep.py`) builds many specs at many seeds, one build per worker process
+(`CITYGEN_WORKERS=1` inside), and writes `sweep.md` and `sweep.json`: pass or fail, failing
+checks with their first failure, retries (hydro and road variant, the full-city tries from
+the report's `city_tries` stat), build time, sha256, crash tracebacks. The `m8a` suite is the
+five samples and the pinned demo at their own seed plus seven more, and the test specs at five
+seeds. Fixes from it, in short:
+- exits on the map border count as land (`covers`, not `contains`), and every exit route
+  enters square to the edge (`Fitter._edge_entry`);
+- crossings keep room for their approach and avoid spanning a district's tip;
+- road groups meet only on land, and a landmass counts where a road runs on it, not where a
+  bridge clips its tip; named bridges land inland and are matched by alignment;
+- four-way water crossings unnode by straightness, and primary forks that run side by side
+  merge (`roads._merge_forks`);
+- an island that would not be built is tried longer, and placement retries each missed
+  island first;
+- loop-road pieces at the seam and footbridge ends keep their levels; tee tails under a
+  viaduct are trimmed;
+- relation repair moves seeds along the asked direction;
+- `build_city` looks at further hydrology variants when no road network passes, and
+  `CITY_RETRIES` is 8.
+
+Transit loop routing is M8b's. Sweep tables before and after, fixes and open items:
+`docs/progress/M8a/README.md`.
+
 ### Rules for cloud sessions building citygen milestones
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build

@@ -1,0 +1,1358 @@
+[
+ {
+  "label": "archipelago_free_port",
+  "seed": 3301,
+  "status": "pass",
+  "failed": [],
+  "seconds": 18.3,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "5deccb25ffa3c60150458b394dd64e4ccfa3e2eea7e7010dc8733d6d248a5fa8"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 42.1,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "94bdca0ec46a6f5325bc44c12ac6a92c91600623b36495d8c67667497466c14d"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 19.1,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "0ab6749978178c5fd9ffef3fb8659879bf15e0a93e6671f9f7d8854c66114b35"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 404,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00120..rs00128 (avenue): radius 12 m near (682, -12), minimum 40 m"
+   },
+   {
+    "id": "level_continuity",
+    "count": 1,
+    "first": "rs01556 meets node rn00769 at 0 m, the node is at 1.1 m"
+   }
+  ],
+  "seconds": 110.0,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "c978c5577d6901825ae45ce973931ef8ca5b74e5992c2834ddd77b11f2c0b7e7"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "district_shares",
+    "count": 5,
+    "first": "'Crown Island': share 0.260 vs 0.340 (spec), -23%"
+   },
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Kettle Island' is not on island 'Kettle Island'"
+   },
+   {
+    "id": "island_sizes",
+    "count": 1,
+    "first": "island 'Kettle Island' was not built"
+   },
+   {
+    "id": "named_bridges",
+    "count": 1,
+    "first": "named bridge 'Kettle Span' (road_rail, Crown Island to Kettle Island) was not built"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00003 (highway): radius 37 m near (-92, 203), minimum 150 m"
+   }
+  ],
+  "seconds": 118.5,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "3448022dc1efae7e2ac07702f297010c03dcf6ebe1eb092bdecb23e8d180ac5a"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 27182,
+  "status": "pass",
+  "failed": [],
+  "seconds": 79.2,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "7263d5a8d75d2acf9f2a4ce7d8441e639b1383cc487a26a199f0de0d2518edfa"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "district_shares",
+    "count": 3,
+    "first": "'Crown Island': share 0.439 vs 0.340 (spec), +29%"
+   },
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Crown Island' is not on island 'Crown Island'"
+   },
+   {
+    "id": "island_sizes",
+    "count": 1,
+    "first": "island 'Crown Island' was not built"
+   },
+   {
+    "id": "named_bridges",
+    "count": 1,
+    "first": "named bridge 'Crown Causeway' (road_rail, Crown Island to north_exit) was not built"
+   },
+   {
+    "id": "curve_radius",
+    "count": 3,
+    "first": "segment rs00001 (highway): radius 58 m near (-1663, 1687), minimum 150 m"
+   }
+  ],
+  "seconds": 183.4,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "f35bc1b349a65c0454c9d68754d162256bee523b94e9ff75debb30046ef239a4"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "district_shares",
+    "count": 3,
+    "first": "'Crown Island': share 0.439 vs 0.340 (spec), +29%"
+   },
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Crown Island' is not on island 'Crown Island'"
+   },
+   {
+    "id": "island_sizes",
+    "count": 1,
+    "first": "island 'Crown Island' was not built"
+   },
+   {
+    "id": "named_bridges",
+    "count": 1,
+    "first": "named bridge 'Crown Causeway' (road_rail, Crown Island to north_exit) was not built"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00001..rs00002 (highway): radius 58 m near (-1663, 1687), minimum 150 m"
+   }
+  ],
+  "seconds": 260.3,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   14
+  ],
+  "layout_salt": 0,
+  "sha256": "288281ec594dd30e7a2b2b304e8c4b935ad4bdc924241b1ea2182a9757ab77d0"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 4412,
+  "status": "pass",
+  "failed": [],
+  "seconds": 177.1,
+  "hydro_variant": 0,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "a8a4c6f893df9366d6c11c6b2a9c1ca1a5b1f0b47ddd6af78f407699c26908c6"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 144.6,
+  "hydro_variant": 9,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   6
+  ],
+  "layout_salt": 0,
+  "sha256": "eadcf47a8718e913eff30f5b3ec5018e38e7fdecb3aa09d65f89bedac67e6f96"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 251.8,
+  "hydro_variant": 0,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "21646bc55f50f75a653866ca6ca0cb0551f7285bed1dd804b392b7c5dccb184a"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "level_continuity",
+    "count": 1,
+    "first": "rs01025 meets node rn01139 at 4.25 m, the node is at 0.01 m"
+   },
+   {
+    "id": "transit_stops",
+    "count": 1,
+    "first": "Delta Loop: no station serves 'Old Town' (nearest 354 m away)"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 104 m (minimum 300)"
+   }
+  ],
+  "seconds": 233.2,
+  "hydro_variant": 0,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   10
+  ],
+  "layout_salt": 0,
+  "sha256": "df0b15484edefc882c01aae6a65de2d4cc922d3898bc40d9e3cf9b6b29a743a4"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d05.ms01 'Freight Terminal' (freight_terminal): no rail_track"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 16 m (minimum 300)"
+   }
+  ],
+  "seconds": 439.1,
+  "hydro_variant": 3,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "f0abe6410c8e0db71779949944ff393b72ad6761a3e720f0b36308016cb759ab",
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/sweep.py\", line 120, in run_job\n    write_outputs(b, d)\n    ~~~~~~~~~~~~~^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 651, in write_outputs\n    render_massing(b, paths[-1])\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 387, in render_massing\n    _draw_massing(ax, m)\n    ~~~~~~~~~~~~~^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 358, in _draw_massing\n    _prism_faces(poly, z0, z1, rgb, faces)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 206, in _prism_faces\n    rings = [p.exterior] + list(p.interiors)\n             ^^^^^^^^^^\nAttributeError: 'MultiPolygon' object has no attribute 'exterior'\n"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d05.ms01 'Freight Terminal' (freight_terminal): no rail_track"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 103 m (minimum 300)"
+   }
+  ],
+  "seconds": 225.0,
+  "hydro_variant": 3,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "5e78612af96e1df66d648f7d05b01b1837fe18d963331c26075d5798b02e0f9e"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 1207,
+  "status": "pass",
+  "failed": [],
+  "seconds": 59.2,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "d8c5f2dfef46346add5e59d0d7074410d3331943f19215a089585e982ea3a39b"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 5077,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 2,
+    "first": "segment rs00022 (highway): radius 119 m near (-130, 1748), minimum 150 m"
+   },
+   {
+    "id": "transit_stops",
+    "count": 2,
+    "first": "Delta Loop: no station serves 'Old Town' (nearest 88 m away)"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 136 m (minimum 300)"
+   }
+  ],
+  "seconds": 332.6,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   6
+  ],
+  "layout_salt": 0,
+  "sha256": "9b409bbf1556f2c48ce9f831db5d31c597e7632a3d472e3121781644bf065224"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d05.ms01 'Freight Terminal' (freight_terminal): no rail_track"
+   },
+   {
+    "id": "transit_altitude",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): z 150.06 m at (669.29, -719.69) outside 40 to 150.0 m"
+   }
+  ],
+  "seconds": 235.0,
+  "hydro_variant": 3,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "614617e62c77ea41c6cc12f7ed72f5d64fe5a6530a27e694ab7394dfa2d2fb30"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 404,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "districts_served",
+    "count": 1,
+    "first": "'Silver Island' is not served by an avenue"
+   },
+   {
+    "id": "bridge_clearance",
+    "count": 1,
+    "first": "junction rn00018 is out on the water (on a bridge)"
+   },
+   {
+    "id": "open_space_share",
+    "count": 1,
+    "first": "'Silver Island' (research_campus): 100% open (target 15% to 55%)"
+   }
+  ],
+  "seconds": 206.2,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "75947a1bee23bb12d808890a4494ff2091d7c94b80ec65621472dbd1aad9c084"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Neon Market' is not west_of 'Transit Nexus' (bearing 20 deg)"
+   },
+   {
+    "id": "named_bridges",
+    "count": 1,
+    "first": "named bridge 'Horizon Bridge' (road_rail, Transit Nexus to Harbor Industrial) was not built"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00010 (highway): radius 133 m near (-337, -266), minimum 150 m"
+   }
+  ],
+  "seconds": 228.2,
+  "hydro_variant": 5,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "c6661c53bb83bded33f8aff6967112e3dc93a17665ec61f37622fd28436a5de8"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "named_bridges",
+    "count": 1,
+    "first": "named bridge 'Silver Span' (road, Old Town to Silver Island) was not built"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Magenta Line (maglev): radius 328 m (minimum 500)"
+   }
+  ],
+  "seconds": 201.8,
+  "hydro_variant": 1,
+  "road_variant": 3,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "abe3db7e036a10dcb330329994baa6ae96ca6038a7f963ef4efc1c6ddf9d9eac"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 8128,
+  "status": "crash",
+  "failed": [],
+  "seconds": 30.2,
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/sweep.py\", line 111, in run_job\n    b = build_city(res, workers=1, local=upto != \"roads\", buildings=upto == \"full\")\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 363, in build_city\n    b = add_roads(ranked, explicit, run)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 477, in add_roads\n    for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):\n                      ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 302, in map\n    return [fn(*job, False) for job in jobs]\n            ~~^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 457, in _road_job\n    return _collect(worker and tracing, road_attempt, b, explicit, k)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 328, in _collect\n    return fn(*args), None\n           ~~^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 432, in road_attempt\n    net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,\n                         variant=k)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/roads.py\", line 2926, in build_roads\n    net = assemble(spec, ctx, peds)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/roads.py\", line 2153, in assemble\n    net.elevated = EL.elevate(spec, ctx, net)\n                   ~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 1688, in elevate\n    E.interchanges()\n    ~~~~~~~~~~~~~~^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 735, in interchanges\n    self.interchange(r, k, kd)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 1181, in interchange\n    T, sT, leg = terminals[sigma]\n                 ~~~~~~~~~^^^^^^^\nKeyError: -1\n"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 9081,
+  "status": "pass",
+  "failed": [],
+  "seconds": 15.4,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "5e399f7408faa3aab7043d25c91f1b282850b300c89b488da2810bb8630df57d"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Spire Line (sky_tube): radius 200 m (minimum 300)"
+   }
+  ],
+  "seconds": 192.7,
+  "hydro_variant": 12,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "2cdfcdcf27a65d5243d371e82aae88c54bd9f7d04f5489feb824692e55e9da4f"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "road_duplicates",
+    "count": 1,
+    "first": "segments rs00053..rs00098 and rs00054..rs00079 run within 25 m of each other for 286 m"
+   }
+  ],
+  "seconds": 108.7,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "b08bceed12ea730314b42d005d74ce4122b035077c0b15f23a772d94547bb6d8"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 58.2,
+  "hydro_variant": 11,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "eba45df286335e1faea6e499531754a22577ce82422f7be52f15e600fe8bc004"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 5077,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "road_graph",
+    "count": 1,
+    "first": "exit 'west' was not built"
+   },
+   {
+    "id": "named_bridges",
+    "count": 2,
+    "first": "named bridge 'Baylink Bridge' (road, Neon Market to west_exit) was not built"
+   },
+   {
+    "id": "lot_block_sizes",
+    "count": 1,
+    "first": "district d09: median block size 580 m (range 100 to 200)"
+   },
+   {
+    "id": "open_space_share",
+    "count": 2,
+    "first": "'Harbor Industrial' (industrial_port): 56% open (target 0% to 10%)"
+   }
+  ],
+  "seconds": 238.5,
+  "hydro_variant": 4,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "4e2273130ec51bde8091e8e1fc71467ece4c20e36c25772870d4bec72251ebb1"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00031 (highway): radius 23 m near (740, -774), minimum 150 m"
+   },
+   {
+    "id": "level_continuity",
+    "count": 1,
+    "first": "rs02519 meets node rn00673 at 0 m, the node is at 3.16 m"
+   }
+  ],
+  "seconds": 193.6,
+  "hydro_variant": 1,
+  "road_variant": 2,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "1d193a5ceabdad19c61baabaeee5de08cb71e895c7479f6444c452678176c447"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 26.2,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "bcac645bef136e8b023b7f9482f83b4d6b1a5d509f91b6088d82b0222154fcf8"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 128.0,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "601d0bd5a8e8c21eebb579678e51b27b78c1f95e9a837248e5bfd212f3b7e38a"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 32.8,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "6f528389934be77c1b7b9efddfb75eebf45c1368eeef8f81e51445fd1cb791bf"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "East Shore Line (elevated_rail): radius 105 m (minimum 150)"
+   }
+  ],
+  "seconds": 109.3,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "0e24a8295df872a412d0f7ec0235a6f63935e896f5aee62b2d46f7375f639186"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "East Shore Line (elevated_rail): radius 110 m (minimum 150)"
+   },
+   {
+    "id": "transit_altitude",
+    "count": 1,
+    "first": "East Shore Line (elevated_rail): z 20.27 m at (375.33, -1038.78) outside 8 to 20.0 m"
+   }
+  ],
+  "seconds": 132.0,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "12199a66c229ce489991859dfa278b26bc47761dcd40e12a1739302c8ac30054"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 49.7,
+  "hydro_variant": 1,
+  "road_variant": 3,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "90a9fd2ec1f2de68c0478ac00722c8111f0172aa11b51e145e5fb674c9e6c816"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d06.ms01 'Vess Freight Terminal' (freight_terminal): no rail_track"
+   }
+  ],
+  "seconds": 222.6,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "b6fe06a5f0003ff3d432a55ad30354ae5d81db3ba54b242f09314cffa18bc2e6"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 2077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 247.7,
+  "hydro_variant": 18,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "f7c38d51fcb611287fcacadaf94b874bab2ff5a8527328de205ee59d5feb69d4"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Halo Line (elevated_rail): radius 88 m (minimum 150)"
+   }
+  ],
+  "seconds": 231.2,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "298a4ce1fc8c0e1957837085602fff237d4b27b0ac72ece83f89dea08db73880"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 148.8,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "f12656e76f5b4832aad51510bcdfd5b413b0f4766d6b7511a2ef42e62147119d"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "open_space_share",
+    "count": 1,
+    "first": "'Launch Key' (spaceport): 71% open (target 0% to 50%)"
+   }
+  ],
+  "seconds": 250.6,
+  "hydro_variant": 7,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "3475278f1167455233606d0c6b3f40c52bcd50d7f4a1d256995ad6e763731dc8"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 27182,
+  "status": "pass",
+  "failed": [],
+  "seconds": 62.9,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "93bae5dc946a9d66d59374ba983b907b28a132123d49465387a5be807bd3bc0c"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 8128,
+  "status": "pass",
+  "failed": [],
+  "seconds": 245.4,
+  "hydro_variant": 19,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "bb3f1ac7ef0c7245ffba1bc6e109111e61adacf358574c935fe1fe1cb8ac9b31"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 2078,
+  "status": "pass",
+  "failed": [],
+  "seconds": 201.4,
+  "hydro_variant": 4,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "2204add3d3c4922b96e827e17f264457e5c1e2ab359ad673ecc382471ff0de8f"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "bridge_clearance",
+    "count": 1,
+    "first": "junction rn00270 is out on the water (on a bridge)"
+   },
+   {
+    "id": "road_avoidance",
+    "count": 1,
+    "first": "segment rs00032 (highway) runs 44 m through flight cone of 'Launch Key Spaceport'"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00030 (highway): radius 111 m near (-351, -1168), minimum 150 m"
+   },
+   {
+    "id": "building_clear_zones",
+    "count": 1,
+    "first": "d01.pin.path38: tower mass on road rs00304 (454.5 m2)"
+   }
+  ],
+  "seconds": 218.7,
+  "hydro_variant": 5,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "bf4f1905acc5aa0c396e24f7c85003c313abecb6cbf7e1a73679c604b64dfd32"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 198.6,
+  "hydro_variant": 4,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "e8d582d6072ff19de5c20a16fdaf4bde41ef75d54f8a1f7082183c175475ddc6"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 123.1,
+  "hydro_variant": 4,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "0cf3a174a85c8d20ffba2d473a8ece2f8ec5d178fc2399a6635a978fe27f36b8"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00022 (highway): radius 51 m near (-1174, 132), minimum 150 m"
+   },
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d06.ms01 'Vess Freight Terminal' (freight_terminal): no rail_track"
+   }
+  ],
+  "seconds": 232.7,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "1ced48d81969d20b3ef5d5e3cfa6624147963b9bea73cc2fa628a3b59a71f713"
+ },
+ {
+  "label": "test_small",
+  "seed": 7,
+  "status": "pass",
+  "failed": [],
+  "seconds": 15.7,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "6b4d78dd0199de9cf658151a07babac190be3049f0f77bdde63d02baaa760cc2"
+ },
+ {
+  "label": "test_small",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 27.0,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "8f71e9a8b187cab09249218eede6d9e0efc7ac2c2605336879f4110c4fec93b0"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 5077,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Neon Strand' should be on the coast"
+   },
+   {
+    "id": "level_continuity",
+    "count": 1,
+    "first": "rs02132 meets node rn00150 at 11.87 m, the node is at 7.69 m"
+   }
+  ],
+  "seconds": 213.2,
+  "hydro_variant": 17,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "df014248e572d22c25e51c3f367915317b0d49491857f8d72cf0cbc165ca4825"
+ },
+ {
+  "label": "test_small",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 15.0,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "0b0ca323a4b9f26dc9d2d3bf8c227acb7b778344fbcce12f877a1178a9531fc7"
+ },
+ {
+  "label": "test_small",
+  "seed": 404,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "bridge_clearance",
+    "count": 2,
+    "first": "segment rs01055 runs 11 m over water without a bridge"
+   }
+  ],
+  "seconds": 70.9,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "2de3fccc5cfeb761739240534a8661755ede97a351aacb90aa93991affd6e5ea"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Highcrest' is not east_of 'The Stacks' (bearing 21 deg)"
+   }
+  ],
+  "seconds": 220.8,
+  "hydro_variant": 3,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "fb6c6a8bddd6658969d016730130f647ff876363d893af4898059f2a6fb2e8be"
+ },
+ {
+  "label": "test_small",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 30.0,
+  "hydro_variant": 16,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "cb2f17bea5c211bff75dff34188807d400d3510e30ad06817b8e0e022c1232ba"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d02.ms01 'Harbor Freight Terminal' (freight_terminal): no rail_track"
+   }
+  ],
+  "seconds": 59.0,
+  "hydro_variant": 18,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "011e90846c6c03ee29604b45a39fea108c8e14ee82bf66a20da98df433eef91e"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 42,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Uptown' is not north_of 'Core' (bearing 87 deg)"
+   }
+  ],
+  "seconds": 68.9,
+  "hydro_variant": 11,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "95cf92ceb9066b8e25da66a13cce1b30a2c70ba320aeaf360b25e2c014613cb9"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 404,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Uptown' is not north_of 'Core' (bearing 79 deg)"
+   },
+   {
+    "id": "road_graph",
+    "count": 1,
+    "first": "exit 'west' was not built"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00009 (highway): radius 54 m near (330, 1475), minimum 150 m"
+   }
+  ],
+  "seconds": 55.9,
+  "hydro_variant": 16,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "8e845363fcb1c8f4f379fc7a3bd6e5bc81f36b0e790dc416754045d002d008ad"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 17,
+  "status": "pass",
+  "failed": [],
+  "seconds": 26.1,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "885e4347b1a15317b26991369e1f123eb7d10762c65f07cd2c2860c38d1c89c5"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Uptown' is not north_of 'Core' (bearing 284 deg)"
+   },
+   {
+    "id": "road_graph",
+    "count": 1,
+    "first": "exit 'west' was not built"
+   },
+   {
+    "id": "megasite_contents",
+    "count": 1,
+    "first": "d02.ms01 'Harbor Freight Terminal' (freight_terminal): no rail_track"
+   }
+  ],
+  "seconds": 51.4,
+  "hydro_variant": 5,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "ce572943ad278b02743c80ffa703387abeb27a18132620a24328f8f0790a1e9e"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "building_clear_zones",
+    "count": 1,
+    "first": "d01.mg02.bld3: podium mass on open d01.os011 (0.5 m2)"
+   },
+   {
+    "id": "transit_stops",
+    "count": 1,
+    "first": "Crown Line: no station serves 'Highcrest' (nearest 20 m away)"
+   }
+  ],
+  "seconds": 269.5,
+  "hydro_variant": 19,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "cd120b487694750974fd838bebf8aa92b9db471a9e74a412d759e7dd57b6ef02"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Core' is not at edge 'center'"
+   }
+  ],
+  "seconds": 72.5,
+  "hydro_variant": 15,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "6919b95c2aadf11fd9ce3771949b8ade23d8175dd9eeed40415bc1a68c9da7c5"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 26.6,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "35eee074df48afb0aef0e9fc5a240f991cbffd73a8babac1f5e419f88469817b"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 26.2,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "fc4707df115d1771606077b7d461736491d6596029ae052eba344fe5eb645ed5"
+ },
+ {
+  "label": "test_delta",
+  "seed": 12,
+  "status": "pass",
+  "failed": [],
+  "seconds": 42.1,
+  "hydro_variant": 0,
+  "road_variant": 3,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "cb7aa4760e4db77533b46f9a04997cde1774ae1e0917ca28a29d9dbe4a4595e9"
+ },
+ {
+  "label": "test_delta",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 66.6,
+  "hydro_variant": 0,
+  "road_variant": 2,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "be45143e31cca12d0f966ca2f0ce79935a761bfc80ce7a4a9ea6b1cfb842f4b2"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00022 (highway): radius 23 m near (15, 1289), minimum 150 m"
+   }
+  ],
+  "seconds": 135.9,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "e78cc2a9e693ee0afe36c32a828aa458fdaf1717d76055edaaa7a9d4d20880ac"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00028 (highway): radius 23 m near (15, 1289), minimum 150 m"
+   }
+  ],
+  "seconds": 133.4,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "8667a2f3782677ef2996138c12abb62858077e6803557534d7e25fb063e023d1"
+ },
+ {
+  "label": "test_delta",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 34.4,
+  "hydro_variant": 3,
+  "road_variant": 3,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "c54d342dac9b71c996408f08ef98c358d7b748ffb1d8d0673dcdf2de0468b72b"
+ },
+ {
+  "label": "test_delta",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 85.1,
+  "hydro_variant": 0,
+  "road_variant": 2,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "6a3c9bcfedf12633dc7630b7b71aa3e6d8ee512d4afa43f7252be1896449c8c7"
+ },
+ {
+  "label": "test_delta",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 69.9,
+  "hydro_variant": 3,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "25f8dccbcc4759658c5f364fa17f775ed1552c92ef64b3df5fcf69e908037358"
+ }
+]

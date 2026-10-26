@@ -1,0 +1,1330 @@
+[
+ {
+  "label": "archipelago_free_port",
+  "seed": 3301,
+  "status": "pass",
+  "failed": [],
+  "seconds": 18.1,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "7440ed69bd8bf428f4fb1401cfc0f115a8c1572fcef2a1b36b41ac9e3fb0e5de"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 45.0,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "5395cd2268fbd3a0d9ea5054a7d03eca8397cc5b360525ec3f2b06712f01fe94"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 65.1,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 2,
+  "retry_fails": [
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "36be824eea3db24bc91e39b9f608140f3f62883bc1af3d9d8921fcef5dcfd97d"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 20.2,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "ab321695f10580c199ac4c8654b0b5294290e1f2badaee1e50618654faa7814e"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 62.2,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "7cd0b33dc560dd2af4ab22dcbb96f57e0be9167f953b27cd888dd678beacfe4f"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 8128,
+  "status": "pass",
+  "failed": [],
+  "seconds": 79.9,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 3,
+  "retry_fails": [
+   1,
+   3,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "7cbfbb9a0650f4f78baa30c09c13aed44369fc805a24b7d4d864f4f2011331da"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "road_graph",
+    "count": 1,
+    "first": "landmass lm05 (Palm Key) is not reached by the road network"
+   },
+   {
+    "id": "districts_served",
+    "count": 1,
+    "first": "'Palm Key' is not served by an avenue"
+   },
+   {
+    "id": "open_space_share",
+    "count": 1,
+    "first": "'Palm Key' (residential_heights): 100% open (target 8% to 40%)"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Island Hopper (monorail): radius 66 m (minimum 100)"
+   }
+  ],
+  "seconds": 348.7,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   4,
+   4,
+   9,
+   6,
+   4,
+   4,
+   4,
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "98f28556f65fc559e8c3f9fe4cf130c0a6a807870edda15ada17a2ccfce23f17"
+ },
+ {
+  "label": "archipelago_free_port",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Island Hopper (monorail): radius 12 m (minimum 100)"
+   }
+  ],
+  "seconds": 245.8,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "7a179f61637aed69b7d861b2e54e98d69eebe1c02d71982d9f0a0a86b3b93f5b"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 48.3,
+  "hydro_variant": 0,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "2bd0d4460a33a49a2c0820f308b2e37002793be9131c140ac26af01bc791b92d"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 37.1,
+  "hydro_variant": 9,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "06e531744144ab0f5e7eb0271de1caf5d7a9cd4382e3dbc31912e519e47538c9"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 187 m (minimum 300)"
+   }
+  ],
+  "seconds": 381.0,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   1,
+   3,
+   1,
+   1,
+   1,
+   6,
+   2,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "a5439e6cc37150c5197e4faf9925bd5e9c6908a4a8fc3faec37d2fd8a4bb67ad"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 4412,
+  "status": "pass",
+  "failed": [],
+  "seconds": 562.4,
+  "hydro_variant": 0,
+  "road_variant": 3,
+  "city_retries": 8,
+  "retry_fails": [
+   8,
+   2,
+   4,
+   3,
+   3,
+   2,
+   4,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "e2ad9fda68bfd29592fd4ed49d5ef7c5f2516300bde2abd5aa51fc9f2af25d28"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_stops",
+    "count": 1,
+    "first": "Delta Loop: no station serves 'Old Town' (nearest 347 m away)"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 108 m (minimum 300)"
+   }
+  ],
+  "seconds": 442.3,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   11,
+   7,
+   2,
+   3,
+   7,
+   5,
+   6,
+   7
+  ],
+  "layout_salt": 0,
+  "sha256": "b490c4d3563a08267a0d6d9b6c8a7b8b5a52ea0794e67dfb8a0685867a8ecad3"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_stops",
+    "count": 1,
+    "first": "Delta Loop: no station serves 'Research Campus' (nearest 210 m away)"
+   },
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 148 m (minimum 300)"
+   }
+  ],
+  "seconds": 409.3,
+  "hydro_variant": 3,
+  "road_variant": 2,
+  "city_retries": 8,
+  "retry_fails": [
+   6,
+   3,
+   4,
+   5,
+   3,
+   2,
+   3,
+   6
+  ],
+  "layout_salt": 0,
+  "sha256": "461c107d3f66f77ce4b3c17f91854a3b114f4920e38e6a853c2f373039382988"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 1207,
+  "status": "pass",
+  "failed": [],
+  "seconds": 123.2,
+  "hydro_variant": 11,
+  "road_variant": 0,
+  "city_retries": 2,
+  "retry_fails": [
+   6,
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "21ff683f386334692b79a34ca271b5cbef4ea2c0c7776cf0052519bc5aca68bc"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 5077,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 15 m (minimum 300)"
+   }
+  ],
+  "seconds": 616.8,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   7,
+   9,
+   1,
+   8,
+   7,
+   7,
+   2,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "1e42bbd1a5c05e9a2da31350fbb8d7eb8248d66198a532108ca97097549acaaa"
+ },
+ {
+  "label": "delta_megacity",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "Delta Loop (sky_tube): radius 50 m (minimum 300)"
+   }
+  ],
+  "seconds": 424.8,
+  "hydro_variant": 12,
+  "road_variant": 1,
+  "city_retries": 8,
+  "retry_fails": [
+   2,
+   2,
+   1,
+   10,
+   3,
+   1,
+   2,
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "d833763a9c3d2a54aa23ef55e611d72875ff1f53f3106839fddf7b6ff6e2f3ea"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 44.9,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "e2b33eb1c85eab328536cea2373d5d451a83d57afa8ed105b6e130e95f4e2e4b"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 83.7,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "07066dc99d1dbda284ced86db2c3ede0b1b728c79b08b4914014c3d8c5817292"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 190.9,
+  "hydro_variant": 12,
+  "road_variant": 1,
+  "city_retries": 4,
+  "retry_fails": [
+   2,
+   3,
+   3,
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "646191aa5804c8124342cfea6015552325ce33b814a59b621298b4a37397e951"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 8128,
+  "status": "pass",
+  "failed": [],
+  "seconds": 89.0,
+  "hydro_variant": 6,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "7ee773ec49518991e43069b6d5a5be6a7785545bf12f0ca9359acb3be3af67ad"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Neon Market' is not west_of 'Transit Nexus' (bearing 20 deg)"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00011 (highway): radius 133 m near (-337, -266), minimum 150 m"
+   }
+  ],
+  "seconds": 405.6,
+  "hydro_variant": 5,
+  "road_variant": 2,
+  "city_retries": 8,
+  "retry_fails": [
+   2,
+   2,
+   3,
+   2,
+   3,
+   2,
+   3,
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "aa370d0f5f1f191dbe2e31fd28c19081c0fb078c1954f524dbc3a12dfb43cafa"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 9081,
+  "status": "pass",
+  "failed": [],
+  "seconds": 15.7,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "be876b719918c35c771f50b8d4b7946e1e7b249cd02c0ebb3877c9b1c91ac3e9"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 69.1,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 2,
+  "retry_fails": [
+   3,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "63097e9046b85c3123dd3682d77cfad1f12da05dc94046388a1b8de7c6a233e6"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 27182,
+  "status": "pass",
+  "failed": [],
+  "seconds": 84.4,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "369c8b22dbc18368a172611a0a42cb6d6ac80678d4e6492db0ee6e3268ee6121"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 5077,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "level_continuity",
+    "count": 2,
+    "first": "rs01448 meets node rn01616 at 8.22 m, the node is at 0 m"
+   }
+  ],
+  "seconds": 329.3,
+  "hydro_variant": 6,
+  "road_variant": 1,
+  "city_retries": 8,
+  "retry_fails": [
+   3,
+   4,
+   3,
+   5,
+   6,
+   4,
+   2,
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "a17d17ad42bfe707aa85dfefb9d4cdcaff0e657c0d057e43e902d9ee7dafb079"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 24.4,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "8798420b89c9ad54ed2fe51c7f4b87ade59928a08e55199cad9bea28e2c298f0"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 59.9,
+  "hydro_variant": 11,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "72f7227cc8d26a05960504faf459830c09250eee3393b95e75ffc85deaeab3b8"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 35.5,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "f0ea4d22197fc9cc3d0c683962efe17cf5a5ccc7282442dac9c0ebd4ea0eddb1"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 123.3,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 3,
+  "retry_fails": [
+   2,
+   2,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "7ee90022b28d31ccf864a064438e96bbd9d997b775d249ca64aea5573ea6fb29"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "East Shore Line (elevated_rail): radius 107 m (minimum 150)"
+   }
+  ],
+  "seconds": 181.3,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   1,
+   2,
+   2,
+   2,
+   1,
+   2,
+   2,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "912c58edfc3f284d593d844b88c1ad1eba0249b4d08dcbdeb0719c8034a5ddd9"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 42.7,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "26b20de178539f275ae2b1221e2a897dac69f8f923c05b51a7ddd9af49579c63"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 27182,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "transit_curves",
+    "count": 1,
+    "first": "East Shore Line (elevated_rail): radius 41 m (minimum 150)"
+   },
+   {
+    "id": "transit_altitude",
+    "count": 1,
+    "first": "East Shore Line (elevated_rail): z 20.15 m at (377.77, -1004.8) outside 8 to 20.0 m"
+   }
+  ],
+  "seconds": 220.0,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   4,
+   3,
+   2,
+   2,
+   4,
+   3,
+   2,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "8e18ac7935bfd6d676ad26a877700c3d9406024f43a3697aabff548e785fc284"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 98.0,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "c74a47e2881fcca690ea35b132ea76a241055d4238e690ac02d7765c711c7e06"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 218.6,
+  "hydro_variant": 1,
+  "road_variant": 3,
+  "city_retries": 4,
+  "retry_fails": [
+   3,
+   1,
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "608563a491175e4e92b88b9657b8efd869ebe25251d1484ff161e74f64e0ecdf"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 2077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 429.3,
+  "hydro_variant": 18,
+  "road_variant": 1,
+  "city_retries": 7,
+  "retry_fails": [
+   2,
+   2,
+   5,
+   2,
+   1,
+   2,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "4b12c6f1becbef8565bb43a994c68e4e8aa85ed5d7bf35e8a0d7d84abb7a58f8"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 114.0,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 2,
+  "retry_fails": [
+   1,
+   6
+  ],
+  "layout_salt": 0,
+  "sha256": "5c5feedab5716ea01f8524387e40834e47f255bc91e33dda5c6524e7962fc72f"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 27182,
+  "status": "pass",
+  "failed": [],
+  "seconds": 68.4,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "7de055ccca8911db0d87b9fbd4694e8099735d0bf652eed69a2edfdd347fcdce"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 8128,
+  "status": "pass",
+  "failed": [],
+  "seconds": 249.3,
+  "hydro_variant": 19,
+  "road_variant": 1,
+  "city_retries": 4,
+  "retry_fails": [
+   1,
+   2,
+   1,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "971ccbf21418c1e42f1c6af471091f33e1786a5837cc7612cf2dc495ae3da306"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 2078,
+  "status": "pass",
+  "failed": [],
+  "seconds": 86.2,
+  "hydro_variant": 4,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "cc7835adef66bb5568949b3f76645e392f5a311f6f258449705e28996a18f2ab"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 42.5,
+  "hydro_variant": 4,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "edf067d91c2520c0e29e768560cbfe2c204d1feddea2b13b2b1c22a8298fbc90"
+ },
+ {
+  "label": "nyxllor",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "open_space_share",
+    "count": 1,
+    "first": "'Launch Key' (spaceport): 74% open (target 0% to 50%)"
+   }
+  ],
+  "seconds": 428.5,
+  "hydro_variant": 7,
+  "road_variant": 1,
+  "city_retries": 8,
+  "retry_fails": [
+   4,
+   1,
+   1,
+   4,
+   5,
+   3,
+   1,
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "358bbd28c5438da7e49b8706626d57c2cc274a61221374e92bb6304647c5ee79"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 122.8,
+  "hydro_variant": 4,
+  "road_variant": 0,
+  "city_retries": 2,
+  "retry_fails": [
+   1,
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "e3dd4a9e5bc316cd2556d79ed9aa41a4e1c35182e68a9217ac7dd95b6129007b"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "bridge_clearance",
+    "count": 1,
+    "first": "junction rn00274 is out on the water (on a bridge)"
+   },
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00030 (highway): radius 111 m near (-351, -1168), minimum 150 m"
+   }
+  ],
+  "seconds": 396.5,
+  "hydro_variant": 5,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   2,
+   3,
+   8,
+   6,
+   4,
+   2,
+   4,
+   3
+  ],
+  "layout_salt": 0,
+  "sha256": "6761b69aed9b1e76b3c16d41504d6a25b38b9fd3768d730c68b2d2afde1374c0"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "curve_radius",
+    "count": 1,
+    "first": "segment rs00021 (highway): radius 51 m near (-1174, 132), minimum 150 m"
+   }
+  ],
+  "seconds": 427.8,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   5,
+   1,
+   3,
+   2,
+   1,
+   2,
+   3,
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "06a8f7692caec8f93433c5429def945d50ea73526221d0829057cd15197b0945"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 5077,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Neon Strand' should be on the coast"
+   },
+   {
+    "id": "level_continuity",
+    "count": 1,
+    "first": "rs02261 meets node rn00157 at 11.87 m, the node is at 7.69 m"
+   }
+  ],
+  "seconds": 417.1,
+  "hydro_variant": 17,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   3,
+   3,
+   4,
+   4,
+   2,
+   7,
+   3,
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "b2c65565f0ee79df1c013a53a97c03892eb724d44413876b707e2d416ef15563"
+ },
+ {
+  "label": "test_small",
+  "seed": 7,
+  "status": "pass",
+  "failed": [],
+  "seconds": 16.3,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "786a71048d6ee1838e389631754c1236dee9bca3ecf151aee863c07b13984a3e"
+ },
+ {
+  "label": "test_small",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 16.2,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "a2987b0d6466a10299f002d57350a6014d0e00ee8c92995438b2be1ac64a6b53"
+ },
+ {
+  "label": "test_small",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 16.5,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "44d7e5707f95129e8ed6a62aea18e2ec19204bd03cc2eb507ff1310845a7ea4f"
+ },
+ {
+  "label": "test_small",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 18.0,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "849a65e0f112b230f851422cb4f977e0d2d672398c7bac471e377690d6a858b3"
+ },
+ {
+  "label": "test_small",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 31.4,
+  "hydro_variant": 16,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "d45a66054b5ec9d1409ab02dc6fff88049cc64828a1d5cce7cfd9b0143b8fea9"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 8128,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Highcrest' is not east_of 'The Stacks' (bearing 21 deg)"
+   }
+  ],
+  "seconds": 354.6,
+  "hydro_variant": 3,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   1,
+   1,
+   2,
+   2,
+   2,
+   3,
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "3f363c193a85e8063309eadec429e5983f29c62e71d3b59067b3d7b222a77ccd"
+ },
+ {
+  "label": "nyxllor_pinned",
+  "seed": 27182,
+  "status": "pass",
+  "failed": [],
+  "seconds": 406.5,
+  "hydro_variant": 19,
+  "road_variant": 2,
+  "city_retries": 5,
+  "retry_fails": [
+   2,
+   1,
+   2,
+   2,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "136a9ac7780810430bb281f1c82c3e20926ad77d9e57e5ccdbe29d1b8bbe6dbf"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 22.7,
+  "hydro_variant": 18,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "717f0ad5b6be03584e942c7f90a9f4e7051bb141a97a597f22265988c2a3f504"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 42,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Core' is not at edge 'center'"
+   }
+  ],
+  "seconds": 125.9,
+  "hydro_variant": 11,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   2,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "0f74d567b259c847169336ad2713156a95b6b39e52f6bdeacd8bc28dc0837dee"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 404,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "road_graph",
+    "count": 1,
+    "first": "exit 'west' was not built"
+   },
+   {
+    "id": "walkway_graph",
+    "count": 1,
+    "first": "landmass lm04: 2 walkway components (walk nodes 118, 1)"
+   }
+  ],
+  "seconds": 99.0,
+  "hydro_variant": 5,
+  "road_variant": 3,
+  "city_retries": 8,
+  "retry_fails": [
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "771faf74792a3060b3987ceadca4303dde5e245873081feb6347baac751e8fe1"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 16.6,
+  "hydro_variant": 6,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "318525d03667df524442048339362b3561d5bfc819314590cb4542e858e713cc"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 17,
+  "status": "pass",
+  "failed": [],
+  "seconds": 26.8,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "65cfcad69cff2f220a70804650b948a2b58eefe4f9e34055023d6a070ccec7b0"
+ },
+ {
+  "label": "test_minimal",
+  "seed": 3141,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "placement",
+    "count": 1,
+    "first": "'Core' is not at edge 'center'"
+   },
+   {
+    "id": "road_graph",
+    "count": 1,
+    "first": "exit 'west' was not built"
+   },
+   {
+    "id": "lot_block_sizes",
+    "count": 1,
+    "first": "district d04: median block size 77 m (range 200 to 400)"
+   },
+   {
+    "id": "open_space_share",
+    "count": 1,
+    "first": "'Launch' (spaceport): 66% open (target 0% to 50%)"
+   },
+   {
+    "id": "megasite_access",
+    "count": 1,
+    "first": "d04.ms01 'Launch Spaceport': no road within 40 m"
+   }
+  ],
+  "seconds": 92.0,
+  "hydro_variant": 5,
+  "road_variant": 0,
+  "city_retries": 8,
+  "retry_fails": [
+   5,
+   5,
+   5,
+   6,
+   5,
+   6,
+   6,
+   6
+  ],
+  "layout_salt": 0,
+  "sha256": "f551d6f080028bbb23f97b3e33af5dc1f7fde92814a05ffb3ee76d3231222a71"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 28.9,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "43d218b4794920b1951362d3bc5cb87797a3f3434430d0388f7cfb46127cec80"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 56.6,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "1c1c90e61d7a0d6f12d5fe18ecbe5885d7e135513e66f2e0c635afce12a931ee"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 56.0,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "ab1810a06f53e448e93d5b828964f2594b9bd9cc0c5df474fdf6bbbcbae9113f"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 52.6,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "7aa4aa0a1eef798a682a2e05fc2d82144f34a5b681ba93e86dccff0ccb4665f9"
+ },
+ {
+  "label": "test_delta",
+  "seed": 12,
+  "status": "pass",
+  "failed": [],
+  "seconds": 50.6,
+  "hydro_variant": 18,
+  "road_variant": 3,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "7da5d78ec1915ac2cd99ca2a2793c0fbbccb159570f37af45689c5c5fe2ded4e"
+ },
+ {
+  "label": "test_delta",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 34.2,
+  "hydro_variant": 0,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "c0e4a924f1498c9328510886e2b67cc44f0cf28a71a30dc0e946592f312a2cb0"
+ },
+ {
+  "label": "test_delta",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 35.4,
+  "hydro_variant": 3,
+  "road_variant": 2,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "37c595b01084ffc04bc4008dc61faee8244014443949708984608381f55e429c"
+ },
+ {
+  "label": "test_delta",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 75.6,
+  "hydro_variant": 14,
+  "road_variant": 2,
+  "city_retries": 1,
+  "retry_fails": [
+   4
+  ],
+  "layout_salt": 0,
+  "sha256": "c39697b4adfbae5aa9cc09fc06f32afd01725238d11aed539aa91b8c6b0b2b8c"
+ },
+ {
+  "label": "test_delta",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 71.6,
+  "hydro_variant": 3,
+  "road_variant": 3,
+  "city_retries": 1,
+  "retry_fails": [
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "5b9c6ab56b0f76ce7f6902a33611f897ded6a60736548bf739e3d2598d4921b9"
+ }
+]

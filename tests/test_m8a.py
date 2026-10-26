@@ -101,6 +101,16 @@ def test_relation_repair_moves_seeds_along_the_direction():
     assert not _failures(b, {"placement"})
 
 
+def test_next_variants_tried_when_no_road_network_passes():
+    # MINIMAL at seed 11: the first good hydrology variant had no land at an exit edge, so no
+    # road network on it passed; a later variant has one
+    data = copy.deepcopy(MINIMAL)
+    data["seed"] = 11
+    b = _roads(data)
+    assert b.passed, [f for c in b.checks for f in c.failures]
+    assert any("no road network passed on the first variants" in n for n in b.notes)
+
+
 def test_sweep_table_and_retries():
     rows = [{"label": "a", "seed": 1, "status": "pass", "failed": [], "seconds": 1.0,
              "hydro_variant": 0, "road_variant": 0, "city_retries": 0, "retry_fails": [],

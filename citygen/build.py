@@ -49,7 +49,7 @@ from .validate import Result, dump_spec
 MAX_VARIANTS = 20
 GOOD_QUALITY = 0.10
 ROAD_CANDIDATES = 3
-CITY_RETRIES = 8       # M7: layouts or road networks a failing full city tries next (M8a: 8,
+CITY_RETRIES = 8       # M7: layouts or road networks a failing full city tries next (M8a: 4 -> 8,
                        # so the next road network gets its own layouts too)
 LAYOUT_SALTS = 3       # of them, local layouts on the same roads first
 
@@ -362,6 +362,30 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
         if not roads:
             return ranked[0]
         b = add_roads(ranked, explicit, run)
+        # M8a: no road network on these variants passes (an exit edge without land, say):
+        # the next variants in turn, the first that passes with its roads wins; in index
+        # order, so the result does not depend on the number of workers
+        nxt = len(built)
+        while sum(len(c.failures) for c in b.checks) and nxt < max_variants:
+            jobs = [(spec, explicit, i, T.on())
+                    for i in range(nxt, min(nxt + run.workers, max_variants))]
+            nxt += len(jobs)
+            found = None
+            for v, entries in run.map(_variant_job, jobs):
+                T.extend(entries)
+                built.append(v)
+                if v.passed:
+                    t = add_roads([v], explicit, run)
+                    if not sum(len(c.failures) for c in t.checks):
+                        found = t
+                        break
+            if found is not None:
+                found.notes = [f"no road network passed on the first variants; hydrology "
+                               f"variant {found.variant} has one"] + found.notes
+                b = found
+                ranked = [x for x in built if x.variant == b.variant] + \
+                    [x for x in sorted(built, key=lambda x: (_score(x), x.variant))
+                     if x.variant != b.variant]
         if not local:
             return b
         # the whole city on these roads; when a later stage fails a check, again with the
