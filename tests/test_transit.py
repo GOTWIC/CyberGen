@@ -386,6 +386,68 @@ def test_arc_path_keeps_pins():
     assert near < 30.0
 
 
+def _end_pose(pts):
+    (x0, y0), (x1, y1) = pts[-2], pts[-1]
+    return x1, y1, math.atan2(y1 - y0, x1 - x0)
+
+
+@pytest.mark.parametrize("a, b", [
+    ((0.0, 0.0, 0.0), (1500.0, 400.0, 0.0)),             # S-bend
+    ((0.0, 0.0, 0.0), (0.0, 900.0, math.pi)),            # U-turn
+    ((0.0, 0.0, math.pi / 2), (300.0, 0.0, -math.pi / 2)),  # close: a three-arc word
+    ((0.0, 0.0, 0.0), (-800.0, 300.0, math.pi / 4)),     # behind it
+])
+def test_dubins_reaches_the_pose(a, b):
+    rho = 200.0
+    L, word, params = TR.dubins(a, b, rho)
+    pts = TR.dubins_points(a, word, params, rho, step=5.0)
+    x, y, h = _end_pose(pts)
+    assert math.dist((x, y), b[:2]) < 0.05
+    assert abs((h - b[2] + math.pi) % (2 * math.pi) - math.pi) < 0.05
+    # the length is the path's, never shorter than the chord; no curve under the radius
+    assert TR._plen(pts) == pytest.approx(L, abs=1.0)
+    assert L >= math.dist(a[:2], b[:2]) - 1e-6
+    assert min(TR.radii(TR.resample(pts, 10.0), False)) >= 0.98 * rho
+
+
+def test_dubins_ring(lines):
+    """A loop as one ring of Dubins paths on the test city: closed, clear of itself and of
+    every cell the line cannot pass, its curves at the radius, each stop passed inside its
+    district in route order."""
+    m = lines.model
+    spec = lines.spec
+    with G.canonical():
+        c = TR.context(spec, m)
+        ln = TR.Line("tl99", "Test Ring", "elevated_rail", "#fff", True, (8.0, 20.0),
+                     TR.base_z("elevated_rail", (8.0, 20.0)), False)
+        ln.stops = [TR.resolve_stop(c, n, ln.mode)
+                    for n in ("Harbor", "Old Quarter", "Uptown", "Core", "Harbor")]
+        ring = TR._loop_points(c, ln)
+        for s, p in zip(ln.stops, ring or [s.p for s in ln.stops]):
+            s.p = p
+        cost = TR.costs(c, ln.mode, ln.z0, False, None, 20.0, 8.0)[0]
+        res = TR._dubins_track(c, ln, cost, 80.0)
+    assert res is not None
+    track, passes, rho = res
+    assert track[0] == track[-1] and len(passes) == 4
+    assert not TR.self_meets(track, True, TR.WIDTH_M[ln.mode])
+    assert all(np.isfinite(cost[TR.cell_of(c, p)]) for p in track)
+    assert min(TR.radii(TR.resample(track[:-1], 10.0, True), True)) >= 0.98 * rho
+    for s, p in zip(ln.stops[:-1], passes):
+        s.p = p
+    at = TR.ordered_stops(track, ln.stops, True)
+    assert at == sorted(at)
+    dist = {d.name: G.from_model_poly(d.polygon) for d in m.districts}
+    for s, i in zip(ln.stops, at):
+        assert dist[s.name].covers(shapely.Point(track[i])), s.name
+
+
+def test_served_exit():
+    s = TR.Stop("north_exit", (0.0, 1000.0), None, "exit")
+    assert TR._served([(0.0, 0.0), (0.0, 900.0)], s)
+    assert not TR._served([(0.0, 0.0), (400.0, 700.0)], s)
+
+
 def test_z_at_interpolates():
     prof = [(0.0, 0.0), (100.0, 10.0), (200.0, 10.0)]
     assert TR._z_at(prof, 50.0) == pytest.approx(5.0)

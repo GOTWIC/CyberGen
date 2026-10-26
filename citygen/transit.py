@@ -82,6 +82,7 @@ PLATFORM_M = {"metro": 4.0, "elevated_rail": 4.0, "monorail": 3.0, "maglev": 5.0
               "sky_tube": 4.0}
 COLUMN_M = {"elevated_rail": 1.6, "monorail": 1.2, "maglev": 2.2, "sky_tube": 3.5}
 METRO_CONCOURSE_Z = -8.0
+METRO_RUN_M = 12.0          # a metro stair runs this far along the concourse from its kiosk
 STATION_TOWER_M = 200.0     # a sky station uses a portal tower within this of its stop
 
 # raster costs per meter, by what a cell is (lower is preferred)
@@ -688,6 +689,361 @@ def _deepen(pts: list, every: list, zones: list, sgn: float, o, r: float, pads: 
                 moved = True
         if not moved:
             break
+
+
+# ---------------------------------------------------------------------------
+# Loops on Dubins rings (M8c)
+# ---------------------------------------------------------------------------
+
+RING_HEADINGS = 16      # headings a loop's ring may pass a stop in (22.5 degrees apart)
+RING_GRID_M = 60.0      # pass points tried in a stop's district, on this grid at least ...
+RING_POINTS = 160       # ... coarser where the district would give more than this many
+RING_ROUNDS = 6         # rounds of the ring search, each moving every pose once
+RING_EVALS = 400        # poses of one stop sampled in a round before its ring is clean
+RING_VIAS = 2           # free poses a blocked ring may add (it goes round what it cannot pass)
+RING_VIA_M = 720.0      # a free pose is tried this far around the blocked stretch
+RING_VIA_GRID_M = 90.0
+RING_RADII = (1.15, 1.06)   # times the mode's radius, the wider first
+RING_R = 1.05           # an open line's curves as fitted at least this times the radius (a
+#                         polyline measures a few percent tighter)
+RING_ARC_W = 1.0        # a meter of curve costs this much more than a straight one (the same
+#                         for every convex ring: it keeps rings from looping round a stop)
+_TWO_PI = 2.0 * M.PI
+
+
+def _mod2pi(x: float) -> float:
+    return x - _TWO_PI * math.floor(x / _TWO_PI)
+
+
+def _heading(k: int) -> float:
+    return _TWO_PI * k / RING_HEADINGS
+
+
+def _acos_s(x: float) -> float:
+    x = min(1.0, max(-1.0, x))
+    return M._atan2_s(math.sqrt((1.0 - x) * (1.0 + x)), x)
+
+
+def dubins(a, b, rho: float):
+    """The shortest path of curvature at most 1 / rho from pose a to pose b ((x, y, heading)):
+    (length, word, (t, p, q)) with t, p, q in units of rho (the straight part of a CSC word
+    too), or None when the poses coincide. Shkel and Lumelsky's six words; every angle from
+    dmath."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    D = math.sqrt(dx * dx + dy * dy)
+    d = D / rho
+    th = _mod2pi(M._atan2_s(dy, dx)) if D > 1e-9 else 0.0
+    al, be = _mod2pi(a[2] - th), _mod2pi(b[2] - th)
+    sa, sb = M._sin_s(al), M._sin_s(be)
+    ca, cb = M._cos_s(al), M._cos_s(be)
+    cab = M._cos_s(al - be)
+    best = None
+
+    def take(word, t, p, q_):
+        nonlocal best
+        L = t + p + q_
+        if best is None or L < best[0] - 1e-12:
+            best = (L, word, (t, p, q_))
+    p2 = 2.0 + d * d - 2.0 * cab + 2.0 * d * (sa - sb)
+    if p2 >= 0.0:
+        tmp = M._atan2_s(cb - ca, d + sa - sb)
+        take("LSL", _mod2pi(-al + tmp), math.sqrt(p2), _mod2pi(be - tmp))
+    p2 = 2.0 + d * d - 2.0 * cab + 2.0 * d * (sb - sa)
+    if p2 >= 0.0:
+        tmp = M._atan2_s(ca - cb, d - sa + sb)
+        take("RSR", _mod2pi(al - tmp), math.sqrt(p2), _mod2pi(-be + tmp))
+    p2 = -2.0 + d * d + 2.0 * cab + 2.0 * d * (sa + sb)
+    if p2 >= 0.0:
+        p = math.sqrt(p2)
+        tmp = M._atan2_s(-ca - cb, d + sa + sb) - M._atan2_s(-2.0, p)
+        take("LSR", _mod2pi(-al + tmp), p, _mod2pi(-_mod2pi(be) + tmp))
+    p2 = -2.0 + d * d + 2.0 * cab - 2.0 * d * (sa + sb)
+    if p2 >= 0.0:
+        p = math.sqrt(p2)
+        tmp = M._atan2_s(ca + cb, d - sa - sb) - M._atan2_s(2.0, p)
+        take("RSL", _mod2pi(al - tmp), p, _mod2pi(be - tmp))
+    tmp = (6.0 - d * d + 2.0 * cab + 2.0 * d * (sa - sb)) / 8.0
+    if abs(tmp) <= 1.0:
+        p = _mod2pi(_TWO_PI - _acos_s(tmp))
+        t = _mod2pi(al - M._atan2_s(ca - cb, d - sa + sb) + p / 2.0)
+        take("RLR", t, p, _mod2pi(al - be - t + p))
+    tmp = (6.0 - d * d + 2.0 * cab + 2.0 * d * (sb - sa)) / 8.0
+    if abs(tmp) <= 1.0:
+        p = _mod2pi(_TWO_PI - _acos_s(tmp))
+        t = _mod2pi(-al - M._atan2_s(ca - cb, d + sa - sb) + p / 2.0)
+        take("LRL", t, p, _mod2pi(be - al - t + p))
+    if best is None:
+        return None
+    return best[0] * rho, best[1], best[2]
+
+
+def dubins_points(a, word: str, params, rho: float, step: float = 10.0) -> list[tuple]:
+    """Points along a Dubins path from pose a, at most step apart (the first is a's)."""
+    x, y, h = float(a[0]), float(a[1]), float(a[2])
+    out = [(G.q(x), G.q(y))]
+    for kind, u in zip(word, params):
+        L = u * rho
+        if L <= 1e-9:
+            continue
+        m = max(1, int(math.ceil(L / step)))
+        f = np.arange(1, m + 1, dtype=np.float64) / m
+        if kind == "S":
+            xs = x + L * f * M._cos_s(h)
+            ys = y + L * f * M._sin_s(h)
+            h1 = h
+        elif kind == "L":
+            cx, cy = x - rho * M._sin_s(h), y + rho * M._cos_s(h)
+            hs = h + u * f
+            xs, ys = cx + rho * M.sin(hs), cy - rho * M.cos(hs)
+            h1 = h + u
+        else:
+            cx, cy = x + rho * M._sin_s(h), y - rho * M._cos_s(h)
+            hs = h - u * f
+            xs, ys = cx - rho * M.sin(hs), cy + rho * M.cos(hs)
+            h1 = h - u
+        for px, py in zip(np.atleast_1d(xs).tolist(), np.atleast_1d(ys).tolist()):
+            p = (G.q(px), G.q(py))
+            if p != out[-1]:
+                out.append(p)
+        x, y, h = float(np.atleast_1d(xs)[-1]), float(np.atleast_1d(ys)[-1]), h1
+    return out
+
+
+def _cells(c: Ctx, pts) -> np.ndarray:
+    """The raster cell of every point (`cell_of`, vectorized)."""
+    a = np.array(pts, dtype=np.float64)
+    i = np.clip(np.floor((a[:, 0] - c.x0) / CELL_M).astype(np.int64), 0, c.nx - 1)
+    j = np.clip(np.floor((a[:, 1] - c.y0) / CELL_M).astype(np.int64), 0, c.ny - 1)
+    return j * c.nx + i
+
+
+def _arc_of(path, rho: float) -> float:
+    """The length of a Dubins path's curves."""
+    _, word, (t, p, q_) = path
+    return (t + q_ + (p if word[1] != "S" else 0.0)) * rho
+
+
+def _grid_in(zone, step: float) -> list[tuple]:
+    x0, y0, x1, y1 = G.qbounds(zone)
+    out = []
+    for j in range(int(math.ceil(y0 / step)), int(math.floor(y1 / step)) + 1):
+        for i in range(int(math.ceil(x0 / step)), int(math.floor(x1 / step)) + 1):
+            p = (q(i * step), q(j * step))
+            if zone.covers(Point(p)):
+                out.append(p)
+    return out
+
+
+def _dubins_track(c: Ctx, ln: Line, cost, r_min: float):
+    """M8c: a line as Dubins paths from stop to stop, straight runs and arcs of RING_RADII
+    times the mode's radius (a loop as one ring): each stop is passed at a point APEX_PAD_M
+    inside its zone (a sky tube's nexus in its tower, an exit at its point heading off the
+    map) in one of RING_HEADINGS headings. The poses are searched in turn (coordinate
+    descent from the stop points, the cheaper paths first), keeping the track over the
+    fewest cells the line cannot pass, then the cheapest over the raster costs and its
+    curves (towers it climbs cost more, portals less); a track still blocked adds free
+    poses beside the blocked stretch. Its curves are the mode's by construction, so where
+    legs and their fitted curves would cut a stop, turn back at one or wind between towers,
+    this track passes. Returns (track, pass point of each stop, radius) for a clean track
+    that keeps clear of itself, else None."""
+    stops = _ring_of(ln.stops) if ln.loop else list(ln.stops)
+    n = len(stops)
+    if n < (3 if ln.loop else 2):
+        return None
+    x0, y0, x1, y1 = c.m.bounds
+    cands, heads = [], []
+    every = list(range(RING_HEADINGS))
+    for k, s in enumerate(stops):
+        z = _zone(s)
+        if z is not None:
+            # (mitre joins: no arcs, so no libm trigonometry in GEOS)
+            zi = G.qpoly(z.buffer(-APEX_PAD_M, join_style="mitre"))
+            z = zi if not zi.is_empty else z
+            shapely.prepare(z)
+        heads.append(every)
+        if s.kind == "exit":
+            # off the map at its nearest edge (into the map, for a line that starts there)
+            q4 = RING_HEADINGS // 4
+            out = min(((round(s.p[0] - x0, 2), 2 * q4), (round(x1 - s.p[0], 2), 0),
+                       (round(s.p[1] - y0, 2), 3 * q4), (round(y1 - s.p[1], 2), q4)))
+            h = out[1] if k else (out[1] + RING_HEADINGS // 2) % RING_HEADINGS
+            heads[-1] = sorted((h + d) % RING_HEADINGS for d in (-2, -1, 0, 1, 2))
+            cands.append([s.p])
+        elif z is not None and s.tower_id is None:
+            step = RING_GRID_M
+            area = G.area(z)
+            if area / (step * step) > RING_POINTS:
+                step = 30.0 * math.ceil(math.sqrt(area / RING_POINTS) / 30.0)
+            pts = set(_grid_in(z, step))
+            if s.kind == "district":
+                pts.update(p for p, _ in _district_cands(c, _district_of(c, s), ln.mode, False)
+                           if z.covers(Point(p)))
+            if z.covers(Point(s.p)):
+                pts.add(s.p)
+            cands.append(sorted(pts) or [s.p])
+        else:
+            cands.append([s.p])
+    fin = np.isfinite(cost)
+    cmin = float(cost[fin].min()) if fin.any() else 1.0
+    for f in RING_RADII:
+        rho = f * r_min
+        res = _pose_descent(c, stops, cands, heads, cost, rho, cmin, ln.mode, ln.loop)
+        if res is not None:
+            return res[0], res[1], rho
+    return None
+
+
+def _pose_descent(c: Ctx, stops, cands, heads, cost, rho: float, cmin: float, mode: str,
+                  closed: bool):
+    """The coordinate descent of `_dubins_track`."""
+    n = len(stops)
+    seg_cache: dict = {}
+    len_cache: dict = {}
+
+    def pose(p, h):
+        return (p[0], p[1], h)
+
+    def low(a, b):
+        """A lower bound of seg(a, b)'s cost (the path at the cheapest cost, its curves),
+        None when there is no path."""
+        key = (a, b)
+        if key not in len_cache:
+            len_cache[key] = dubins((a[0], a[1], _heading(a[2])), (b[0], b[1],
+                                                                   _heading(b[2])), rho)
+        r = len_cache[key]
+        if r is None:
+            return None
+        return cmin * r[0] + RING_ARC_W * _arc_of(r, rho)
+
+    def seg(a, b):
+        """(blocked points, cost integral and curves, points) of the path from pose a to
+        pose b."""
+        key = (a, b)
+        if key not in seg_cache:
+            r = len_cache.get(key) or dubins((a[0], a[1], _heading(a[2])),
+                                             (b[0], b[1], _heading(b[2])), rho)
+            pts = dubins_points((a[0], a[1], _heading(a[2])), r[1], r[2], rho)
+            cv = cost[_cells(c, pts)]
+            ok = np.isfinite(cv)
+            mid = np.where(ok[:-1] & ok[1:], (cv[:-1] + cv[1:]) / 2.0, 0.0)
+            dx, dy = np.diff([p[0] for p in pts]), np.diff([p[1] for p in pts])
+            steps = np.sqrt(dx * dx + dy * dy)
+            seg_cache[key] = (int((~ok).sum()), round(math.fsum((mid * steps).tolist()) +
+                                                      RING_ARC_W * _arc_of(r, rho), 6), pts)
+        return seg_cache[key]
+
+    def pairs(ps):
+        m = len(ps)
+        return [(ps[k], ps[(k + 1) % m]) for k in range(m if closed else m - 1)]
+
+    def total(ps):
+        segs = [seg(a, b) for a, b in pairs(ps)]
+        return (sum(x[0] for x in segs), round(math.fsum(x[1] for x in segs), 6)), segs
+
+    def clear(ps):
+        """Whether the track keeps clear of itself (`meets`), and its points."""
+        pts = []
+        for a, b in pairs(ps):
+            for p in seg(a, b)[2]:
+                if not pts or p != pts[-1]:
+                    pts.append(p)
+        if closed and pts[0] != pts[-1]:
+            pts.append(pts[0])
+        return LineString(pts).is_simple and not meets(pts, closed, mode), pts
+
+    # first poses: the stop points, headed along the chord between their neighbors
+    P = [s.p if s.p in cands[k] else min(cands[k], key=lambda x: (round(_d(x, s.p), 2), x))
+         for k, s in enumerate(stops)]
+    poses = []
+    for k in range(n):
+        a = P[k - 1] if closed or k > 0 else P[k]
+        b = P[(k + 1) % n] if closed or k < n - 1 else P[k]
+        t = _mod2pi(M._atan2_s(b[1] - a[1], b[0] - a[0]))
+        h = int(round(t / _heading(1))) % RING_HEADINGS
+        if h not in heads[k]:
+            h = min(heads[k], key=lambda x: (min((x - h) % RING_HEADINGS,
+                                                 (h - x) % RING_HEADINGS), x))
+        poses.append(pose(P[k], h))
+    where = list(cands)                     # the points each pose may take (free poses too)
+    hdg = list(heads)
+    owner = list(range(n))                  # the stop of each pose, -1 for a free pose
+    if any(low(a, b) is None for a, b in pairs(poses)):
+        return None
+    cur, _ = total(poses)
+    for _round in range(RING_ROUNDS + 2 * RING_VIAS):
+        moved = False
+        for k in range(len(poses)):
+            m = len(poses)
+            prv = poses[k - 1] if closed or k > 0 else None
+            nxt = poses[(k + 1) % m] if closed or k < m - 1 else None
+            opts = []
+            for p in where[k]:
+                for h in hdg[k]:
+                    ps = pose(p, h)
+                    l1 = low(prv, ps) if prv is not None else 0.0
+                    l2 = low(ps, nxt) if nxt is not None else 0.0
+                    if l1 is not None and l2 is not None:
+                        opts.append((round(l1 + l2, 6), p, h))
+            opts.sort()
+            here = [seg(prv, poses[k]) if prv is not None else (0, 0.0),
+                    seg(poses[k], nxt) if nxt is not None else (0, 0.0)]
+            rest = (cur[0] - here[0][0] - here[1][0], cur[1] - here[0][1] - here[1][1])
+            best, pick, tried = cur, None, 0
+            for L, p, h in opts:
+                if best[0] == 0 and L >= best[1] - rest[1]:
+                    break
+                if best[0] > 0 and tried >= RING_EVALS:
+                    break
+                ps = pose(p, h)
+                if ps == poses[k]:
+                    continue
+                tried += 1
+                s1 = seg(prv, ps) if prv is not None else (0, 0.0)
+                s2 = seg(ps, nxt) if nxt is not None else (0, 0.0)
+                val = (rest[0] + s1[0] + s2[0], round(rest[1] + s1[1] + s2[1], 6))
+                if val < best:
+                    trial = list(poses)
+                    trial[k] = ps
+                    if clear(trial)[0]:
+                        best, pick = val, ps
+            if pick is not None:
+                poses[k] = pick
+                cur, moved = best, True
+        if cur[0] > 0 and not moved and owner.count(-1) < RING_VIAS:
+            # a free pose beside the most blocked stretch, tried around it
+            segs = total(poses)[1]
+            k = max(range(len(segs)), key=lambda i: (segs[i][0], -i))
+            bad = [p for p in segs[k][2] if not np.isfinite(cost[cell_of(c, p)])]
+            mx = q(math.fsum(p[0] for p in bad) / len(bad))
+            my = q(math.fsum(p[1] for p in bad) / len(bad))
+            box = G.qpoly(shapely.box(mx - RING_VIA_M, my - RING_VIA_M, mx + RING_VIA_M,
+                                      my + RING_VIA_M))
+            pts_v = [p for p in _grid_in(box, RING_VIA_GRID_M)
+                     if _d(p, (mx, my)) <= RING_VIA_M and np.isfinite(cost[cell_of(c, p)])]
+            if not pts_v:
+                break
+            a, b = poses[k], poses[(k + 1) % len(poses)]
+            t = _mod2pi(M._atan2_s(b[1] - a[1], b[0] - a[0]))
+            p0 = min(pts_v, key=lambda x: (round(_d(x, (mx, my)), 2), x))
+            poses.insert(k + 1, pose(p0, int(round(t / _heading(1))) % RING_HEADINGS))
+            owner.insert(k + 1, -1)
+            where.insert(k + 1, pts_v)
+            hdg.insert(k + 1, list(range(RING_HEADINGS)))
+            cur, _ = total(poses)
+            continue
+        if not moved:
+            break
+    if cur[0] > 0:
+        return None
+    ok, pts = clear(poses)
+    if not ok:
+        return None
+    passes = [(poses[k][0], poses[k][1]) for k in range(len(poses)) if owner[k] >= 0]
+    return _densify(pts), passes
+
+
+def _district_of(c: Ctx, s: Stop):
+    return next(d for d in c.m.districts if d.id == s.district_id)
 
 
 # ---------------------------------------------------------------------------
@@ -1435,6 +1791,19 @@ def route_line(c: Ctx, ln: Line) -> None:
         if ring is not None:
             for s, p in zip(stops, ring):
                 s.p = p
+        if mode not in ROAD_MODES and r_min > 0:
+            # M8c: a flying loop as one ring of Dubins paths, when one is clear
+            cost = costs(c, mode, ln.z0, ln.through, None, ln.alt[1], ln.alt[0],
+                         ln.tall_scale)[0]
+            dub = _dubins_track(c, ln, cost, r_min)
+            if dub is not None:
+                track, passes, rho = dub
+                at = dict(zip([id(s) for s in _ring_of(stops)], passes))
+                for s in stops:
+                    s.p = at.get(id(s), passes[0])
+                ln.pts, ln.min_radius = track, rho
+                ln.stop_at = ordered_stops(track, stops, True)
+                return
     moved = [s.p for s in stops]
     notes, conflicts = list(ln.notes), list(ln.conflicts)
     _route(c, ln)
@@ -1462,8 +1831,45 @@ def route_line(c: Ctx, ln: Line) -> None:
         _restop(c, ln, flaws, notes, conflicts)
     if ln.min_radius < r_min and mode in ROAD_MODES and not ln.loop:
         _spurs(c, ln, flaws, notes, conflicts)
+    if mode in ROAD_MODES and not ln.loop:
+        _off_roads_line(c, ln, flaws, notes, conflicts)
     if ln.loop and mode in ROAD_MODES:
         _off_roads(c, ln, flaws, moved, notes, conflicts)
+    if not ln.loop and r_min > 0:
+        _dubins_line(c, ln, flaws, r_min)
+
+
+def _line_score(c: Ctx, ln: Line, flaws, r_min: float) -> tuple:
+    """How flawed an open line is, lower better: stops missed and places where it meets
+    itself, a curve under its radius (as fitted, RING_R: a polyline measures a few percent
+    tighter), buildings in its corridor it cannot pass."""
+    return (flaws(), 1 if ln.min_radius < RING_R * r_min else 0,
+            len(_corridor(c, ln, ln.pts, check_only=True)))
+
+
+def _dubins_line(c: Ctx, ln: Line, flaws, r_min: float) -> None:
+    """M8c: an open line still flawed after its routes on and off the roads, as Dubins paths
+    from stop to stop (`_dubins_track`: a stop it must turn back at gets a loop of the
+    mode's radius instead of a hairpin the curves cut); kept when that is better."""
+    first = _line_score(c, ln, flaws, r_min)
+    if first == ((0, 0), 0, 0):
+        return
+    cost = costs(c, ln.mode, ln.z0, ln.through, None, ln.alt[1], ln.alt[0], ln.tall_scale)[0]
+    dub = _dubins_track(c, ln, cost, r_min)
+    if dub is None:
+        return
+    before = (ln.pts, ln.min_radius, ln.stop_at, ln.on_roads, [s.p for s in ln.stops])
+    track, passes, rho = dub
+    for s, p in zip(ln.stops, passes):
+        s.p = p
+    ln.pts, ln.min_radius, ln.on_roads = track, rho, False
+    ln.stop_at = ordered_stops(track, ln.stops, False)
+    if _line_score(c, ln, flaws, r_min) < first:
+        ln.notes.append(f"{ln.name}: drawn from stop to stop with {rho:g} m curves")
+        return
+    ln.pts, ln.min_radius, ln.stop_at, ln.on_roads, pts = before
+    for s, p in zip(ln.stops, pts):
+        s.p = p
 
 
 OFF_ROADS_LONGER = 1.35   # a loop on the roads this much longer than off them goes off them
@@ -1518,6 +1924,84 @@ def _off_roads(c: Ctx, ln: Line, flaws, ring: list, notes: list, conflicts: list
     for s, p in zip(ln.stops, pts):
         s.p = p
     ln.on_roads = True
+
+
+def _off_roads_line(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
+    """M8c: an open road line still flawed on the roads (a stop missed, a curve under its
+    radius where a road turns hard beside buildings it cannot take out, or such a building
+    in its corridor, which it would climb over: a hub's site buildings beside the road to
+    its platform) routed again with its legs on the raster (avenues still cheapest, its own
+    viaduct elsewhere), then also with its middle stops at a site, place or island moved to
+    where their zone meets the way between their neighbors (`_way_point`; a hub's platform
+    between two stops close together makes a hairpin); the best route is kept: fewer stops
+    missed or places where it meets itself, then no curve too tight, then nothing in its
+    corridor it cannot pass."""
+    r_min = presets.TRANSIT_MODES[ln.mode].min_curve_radius_m or 0.0
+
+    def score():
+        return _line_score(c, ln, flaws, r_min)
+
+    def snap():
+        return (score(), ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts,
+                [s.p for s in ln.stops], ln.on_roads, ln.keep_free)
+    best = snap()
+    if best[0] == ((0, 0), 0, 0):
+        return
+    home = best[6]
+    cost = None
+    for move in (False, True):
+        if move:
+            mid = [k for k, s in enumerate(ln.stops[1:-1], 1)
+                   if s.kind in ("megasite", "place", "island") and s.tower_id is None]
+            if not mid:
+                break
+            cost = costs(c, ln.mode, ln.z0, ln.through, None, ln.alt[1], ln.alt[0],
+                         ln.tall_scale)[0]
+        for on in ((False,) if not move else (True, False)):
+            for s, p in zip(ln.stops, home):
+                s.p = p
+            if move:
+                for k in mid:
+                    ln.stops[k].p = _way_point(c, ln.stops[k], ln.stops[k - 1].p,
+                                               ln.stops[k + 1].p, cost)
+            ln.on_roads, ln.keep_free = on, False
+            ln.notes, ln.conflicts = list(notes), list(conflicts)
+            _route(c, ln)
+            if score() < best[0]:
+                best = snap()
+                best[4].append(f"{ln.name}: off the roads where they turn too hard or pass "
+                               f"what it cannot" if not on else
+                               f"{ln.name}: passes its middle stops on its way")
+            if best[0] == ((0, 0), 0, 0):
+                break
+        if best[0] == ((0, 0), 0, 0):
+            break
+    (_, ln.pts, ln.min_radius, ln.stop_at, ln.notes, ln.conflicts, pts, ln.on_roads,
+     ln.keep_free) = best
+    for s, p in zip(ln.stops, pts):
+        s.p = p
+
+
+def _way_point(c: Ctx, s: Stop, prev, nxt, cost) -> tuple[float, float]:
+    """M8c: where a line passes a middle stop at a site, place or island on its way: the
+    passable cell SITE_IN_M inside the zone its station serves nearest the chord between
+    its neighbors (ties: nearest the stop's own point)."""
+    zone = G.qpoly(_zone(s).buffer(-SITE_IN_M, join_style="mitre")) \
+        if _zone(s) is not None else None
+    if zone is None or zone.is_empty:
+        return s.p
+    shapely.prepare(zone)
+    ins = np.nonzero(shapely.contains_xy(zone, c.xs, c.ys) & np.isfinite(cost))[0].tolist()
+    if not ins:
+        return s.p
+    chord = LineString([prev, nxt])
+    if chord.length <= 1.0:
+        return s.p
+    d = shapely.distance(chord, c.pts[ins]).tolist()
+    k = min(range(len(ins)), key=lambda i: (round(d[i], 2), round(_d(cell_xy(c, ins[i]), s.p),
+                                                                    2), ins[i]))
+    p = cell_xy(c, ins[k])
+    return (q(p[0]), q(p[1]))
 
 
 def _straighter(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> None:
@@ -1753,7 +2237,8 @@ def _fit(c: Ctx, ln: Line, raw: list, at_stop: set, hit, cost, graph) -> tuple[l
         fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min)
         # a platform (a nexus) the curves cut away stays on the track
         # a stop the curves cut away keeps the point where the route reached it
-        pins = frozenset(raw[i] for s, i in zip(stops, hit or ()) if not _served(fitted, s))
+        pins = frozenset(raw[i] for s, i in zip(stops, hit or ())
+                         if s.kind != "exit" and not _served(fitted, s))
         if pins:
             fitted, rmin = arc_path(pts, r_min, ln.loop, ok_cut, 2.0 * r_min, pins)
         if ln.loop and fitted[0] != fitted[-1]:
@@ -2169,7 +2654,14 @@ def _zone(s: Stop):
     return G.qpoly(s.area.buffer(SERVE_M) if s.kind != "district" else s.area)
 
 
+EXIT_REACH_M = 250.0   # a line to an exit ends this near it (the check allows 300 m)
+
+
 def _served(pts, s: Stop) -> bool:
+    if s.kind == "exit":
+        # M8c: a line to an exit ends there (its last curve run past the map edge and cut
+        # back may end elsewhere)
+        return len(pts) > 0 and min(_d(pts[0], s.p), _d(pts[-1], s.p)) <= EXIT_REACH_M
     zone = _zone(s)
     if zone is None:
         return True
@@ -2759,7 +3251,7 @@ class Builder:
     def _tower_for(self, ln: Line, stop, idx: int, bld: dict):
         """The portal tower that hosts a sky station: the nexus station tower, else the
         portal tower nearest the stop within STATION_TOWER_M; the station moves to the line
-        vertex inside it."""
+        vertex inside it (M8c: one where the station still serves its stop)."""
         c = self.c
         cands = []
         if stop is not None and stop.tower_id and stop.tower_id in ln.portals:
@@ -2771,14 +3263,15 @@ class Builder:
                 d = round(b.poly.distance(Point(p)), 2)
                 if d <= STATION_TOWER_M:
                     cands.append((d, bid))
-            cands = [x[1] for x in sorted(cands)][:1]
-        if not cands:
-            return None, idx
-        b = bld[cands[0]]
-        inside = [i for i, p in enumerate(ln.pts) if b.poly.contains(Point(p))]
-        if not inside:
-            return None, idx
-        return b, inside[len(inside) // 2]
+            cands = [x[1] for x in sorted(cands)]
+        zone = _zone(stop) if stop is not None else None
+        for bid in cands:
+            b = bld[bid]
+            inside = [i for i, p in enumerate(ln.pts) if b.poly.contains(Point(p)) and
+                      (zone is None or zone.covers(Point(p)))]
+            if inside:
+                return b, inside[len(inside) // 2]
+        return None, idx
 
     def _metro(self, sid, seg, foot, acc) -> None:
         z = METRO_CONCOURSE_Z
@@ -2787,10 +3280,15 @@ class Builder:
         acc.append(k)
         self.struct(f"{sid}.cc", "deck", -14.0, -4.0, footprint=foot,
                     attrs={"station": sid, "role": "concourse", "underground": True})
+        line = LineString(seg)
         for e, tag in ((seg[0], "a"), (seg[-1], "b")):
             f, d = self.foot(e)
-            if d < 0.5:  # stairs need a run: step the kiosk 12 m along the concourse
-                continue
+            if d < 0.5:  # stairs need a run: step the kiosk 12 m along the concourse (M8c)
+                r = line.interpolate(min(METRO_RUN_M, line.length / 2.0) if tag == "a" else
+                                     max(line.length - METRO_RUN_M, line.length / 2.0))
+                e = (q(r.x), q(r.y))
+                if _d(e, f) < 0.5:
+                    continue
             acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z)], 3.0,
                                  {"station": sid}))
             sq = G.qpoly(Point(f).buffer(2.5, cap_style="square"))
