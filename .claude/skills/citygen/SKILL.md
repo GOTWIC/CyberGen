@@ -199,9 +199,16 @@ or sky_tube line; every hub on two or more lines.
 
 Route order matters for the fast modes. A maglev (500 m curves) or a sky tube (300 m) cannot
 turn sharply at a stop: order the stops so the line runs roughly straight through them (turns
-under about 60 degrees), and leave a stop that sits off to the side to another line. A loop
-should visit its stops in order around them, not zigzag across. Elevated rail and monorail
-follow the avenues, so a stop off the way between its neighbors makes the line double back.
+under about 60 degrees), and leave a stop that sits off to the side to another line. (Since
+M8b a fast line that must turn at a district may take the curve beside it, over the water
+say, with its station on the stretch inside; the report notes "drawn along its stops".) A loop
+should visit its stops in order around them, not zigzag across: the generator (M8b) places
+each district stop of a loop where the stops come in route order around the loop's middle,
+so any order that can go round once draws one simple ring; an order that cannot (no
+station of a district lies between its neighbors) shows as a `transit_self_crossing`
+failure and a red cross on the transit preview. Elevated rail and monorail follow the
+avenues, so a stop off the way between its neighbors makes the line double back (a loop
+leaves the roads where they would make it cross or wind round itself).
 
 **When the water cannot do what the prompt asks** (for example "every district on its own
 landmass" with one river): `water_required` makes the build add separation channels between
@@ -365,9 +372,10 @@ errors).
    cone is reported in the notes.
 4b. Open `preview_transit.png` (M5): every line in its color over the plan (metro dashed,
    sky tubes with a light casing), stations as rings with names, supports as dots, towers
-   with a portal outlined, lots cleared for a line dotted red. Each line should visit its
-   stops in order without doubling back, run along the avenues (elevated rail, monorail),
-   and keep its stations in the districts it names. The massing preview shows the decks,
+   with a portal outlined, lots cleared for a line dotted red, a red cross where a line
+   meets itself, a loop's stops numbered in route order. Each line should visit its stops
+   in order without doubling back, run along the avenues (elevated rail, monorail), and
+   keep its stations in the districts it names. The massing preview shows the decks,
    tubes and columns.
 4c. Open `preview_props.png` (M6): four 180 m insets at street level with every prop to
    size (street lights with their glow, parked cars, bus shelters, benches, stalls,

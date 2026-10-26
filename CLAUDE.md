@@ -275,6 +275,39 @@ seeds. Fixes from it, in short:
 Transit loop routing is M8b's. Sweep tables before and after, fixes and open items:
 `docs/progress/M8a/README.md`.
 
+M8b (transit loops) is in place, in `citygen/transit.py`: a loop is one simple ring through
+its stops in route order. `_loop_points` moves a loop's district stops to junctions that come
+in route order around the stops' middle (a star-shaped ring is simple; a dynamic program over
+one junction per 10 degree sector, both ways round, near a circle and evenly spaced), and
+`_deepen` pushes a stop deeper where the 1.15 r_min curve at its corner would leave its
+district. Every leg keeps off the line's earlier legs (`_keep_off`, but within 60 m of its
+own start); a road leg may end at any junction within 150 m of a district stop
+(`RoadGraph.targets`), runs on the raster where the roads cannot keep it off (one bridge both
+ways) or where it winds round the blocks, and a loop's last leg arrives to go on as its
+first left. A road-mode loop is also routed off the roads (`_off_roads`) and kept so when
+that serves more stops, meets itself less, or the road ring is 1.35 times longer; a loop off
+the roads is also drawn along its guide ring (`_guide_loop`: the stop polygon with arcs,
+waypoints every 120 m). Stations follow route order (`ordered_stops`; a loop's track starts
+at its first stop), heights are graded round a loop's seam (`_graded`). Check
+`transit_self_crossing` (66 in all): parts of a line more than 100 m apart along it stay a
+structure width apart in plan or 5.5 m plus the structure apart in height, a loop closes,
+stations in route order; the transit preview marks where a line meets itself and numbers a
+loop's stops. Fast open lines (maglev, sky tube: r_min at least 300 m) place a middle stop
+with `_fast_point` (a junction where the curve's apex stays inside, else a corner on a 60 m
+grid beside the district whose guide runs a station length 40 m inside it) and are also
+drawn along their guide line (`_guide_line`: the stops with arcs at those corners, waypoints
+every 120 m), kept when better by `_line_key`. A line ending at a megasite stops where the
+site's zone begins (`_site_point`, `RoadGraph.targets`), not at its middle. The raster
+search uses flat integer states, an exact turn-free cost to go (`_togo`) over 600 m, and a
+reachability flood fill (`reachable`) after 20000 steps. A line's track does not depend on
+the other lines (its heights see the buildings they remove); a whole-city retry
+(`build_city`) after any failed check still moves every line. A sky tube tower it cannot
+climb within its altitude range keeps its portal with 3 m headroom (`_fit_portals`), and an
+open road line still under its radius is tried with legs free to run back along the line
+(`_spurs`). M8b is stacked on M8a: nyxllor builds on its first layout (8 tries on M8a
+alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
+builds and the sweep on the combined code: `docs/progress/M8b/`.
+
 ### Rules for cloud sessions building citygen milestones
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build

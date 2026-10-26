@@ -1,0 +1,18 @@
+citygen blockout: Nyxllor Pinned
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 11023 objects in the .blend, 11023 in the plan
+  [pass] blend_buildings: 6657 building objects, 6657 buildings with masses in the model
+  [pass] blend_instances: 75830 prop and plant instances evaluated in the .blend, 75830 in the plan
+  [pass] gltf_tiles: 196 tile files for 196 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 15 of 15 renders
+  [pass] blender_budget: Blender 80.0 s (budget 600 s)
+
+plan: 11023 objects, 48395 parts, 196 tiles, 6657 buildings (sha256 0e0b0acd87196ac3)
+blender 5.2.0 LTS: 860135 vertices, 348381 faces, 75830 instances, 81 materials, 123 collections
+files (MB): {"blend": 13.8, "usd": 35.8, "gltf_tiles": 49.8, "renders": 4.7}
+timings (s): {"build_s": 1.7, "save_s": 0.6, "usd_s": 9.5, "gltf_s": 41.2, "render_s": 26.9, "total_s": 80.0}
+total (s): {"plan_s": 3.4, "exports_s": 2.9, "total_s": 89.1}

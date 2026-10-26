@@ -1,5 +1,6 @@
 """M5: transit lines, stations, supports and walkways; each transit check with a failing case,
-the track geometry helpers, determinism of the transit stage."""
+the track geometry helpers, determinism of the transit stage. M8b: a loop is one simple ring
+with its stations in route order, a line's route does not depend on the other lines."""
 
 import copy
 import functools
@@ -20,11 +21,13 @@ from citygen.validate import validate_spec
 
 from conftest import SMALL
 
-TRANSIT_CHECKS = {"transit_routes", "transit_stops", "transit_curves", "transit_grades",
-                  "transit_altitude", "transit_clearance", "transit_supports",
+TRANSIT_CHECKS = {"transit_routes", "transit_stops", "transit_curves", "transit_self_crossing",
+                  "transit_grades", "transit_altitude", "transit_clearance", "transit_supports",
                   "station_access", "transit_skybridges", "transit_hubs"}
 
-# The small city with one line of each kind: underground, along the avenues, through towers.
+# The small city with one line of each kind: underground, along the avenues, through towers,
+# and an elevated loop whose stops (west, east, north, middle) cross over if taken from the
+# districts' middles.
 LINES = copy.deepcopy(SMALL)
 LINES["name"] = "Testport Lines"
 LINES["transit"] = {"lines": [
@@ -32,6 +35,8 @@ LINES["transit"] = {"lines": [
     {"mode": "elevated_rail", "name": "Green Line", "route": ["Harbor", "Core", "Old Quarter"]},
     {"mode": "sky_tube", "name": "Sky Line", "through_towers": True,
      "route": ["Core", "Uptown"]},
+    {"mode": "elevated_rail", "name": "Ring Line",
+     "route": ["Harbor", "Old Quarter", "Uptown", "Core", "Harbor"]},
 ]}
 
 
@@ -44,6 +49,14 @@ def _build(data):
 @pytest.fixture(scope="module")
 def lines():
     return _build(copy.deepcopy(LINES))
+
+
+@pytest.fixture(scope="module")
+def no_transit():
+    """The same city without transit: the model the transit stage runs on."""
+    data = copy.deepcopy(LINES)
+    data["transit"] = {"lines": []}
+    return _build(data).model
 
 
 def _rerun(model: CityModel) -> dict:
@@ -79,7 +92,8 @@ def test_build_checks_equal_a_fresh_run(lines):
 
 def test_every_line_built_with_stations(lines):
     m = lines.model
-    assert [t.name for t in m.transit_lines] == ["Red Line", "Green Line", "Sky Line"]
+    assert [t.name for t in m.transit_lines] == ["Red Line", "Green Line", "Sky Line",
+                                                 "Ring Line"]
     kinds = {t.mode: {s.kind for s in m.stations if t.id in s.line_ids}
              for t in m.transit_lines}
     assert kinds == {"metro": {"underground"}, "elevated_rail": {"elevated"},
@@ -200,6 +214,158 @@ def test_check_routes_fails(lines):
     assert not _rerun(_mutate(lines.model, fn))["transit_routes"].passed
 
 
+def test_check_self_crossing_fails(lines):
+    def fn(d):
+        # the line runs back along itself, 3 m aside, at the same height
+        t = _line(d, "elevated_rail")
+        back = [[x + 3.0, y + 3.0, z] for x, y, z in t["path"][::-1]]
+        t["path"] = t["path"] + back
+    c = _rerun(_mutate(lines.model, fn))["transit_self_crossing"]
+    assert not c.passed and "meets itself" in c.failures[0]
+
+
+def test_check_self_crossing_passes_over(lines):
+    def fn(d):
+        # the same, but back 12 m higher: one passes over the other
+        t = _line(d, "elevated_rail")
+        back = [[x + 3.0, y + 3.0, z + 12.0] for x, y, z in t["path"][::-1]]
+        t["path"] = t["path"] + back
+    assert _rerun(_mutate(lines.model, fn))["transit_self_crossing"].passed
+
+
+def test_check_self_crossing_order_fails(lines):
+    def fn(d):
+        t = next(t for t in d["transit_lines"] if t["loop"])
+        t["attrs"]["stop_vertices"] = t["attrs"]["stop_vertices"][::-1]
+    c = _rerun(_mutate(lines.model, fn))["transit_self_crossing"]
+    assert not c.passed and "route order" in c.failures[0]
+
+
+def test_check_self_crossing_open_loop_fails(lines):
+    def fn(d):
+        t = next(t for t in d["transit_lines"] if t["loop"])
+        t["path"] = t["path"][:-5]
+    assert not _rerun(_mutate(lines.model, fn))["transit_self_crossing"].passed
+
+
+# --- loops (M8b) ------------------------------------------------------------------------
+
+def test_loop_is_one_ring(lines):
+    m = lines.model
+    t = next(t for t in m.transit_lines if t.name == "Ring Line")
+    assert t.loop
+    pts = [(p[0], p[1]) for p in t.path]
+    assert pts[0] == pts[-1]
+    assert not TR.self_meets(pts, True, TR.WIDTH_M[t.mode])
+    # simple in plan: the ring is a valid polygon
+    assert shapely.Polygon(pts).is_valid
+    # the stations of its stops in route order, each in its district
+    at = t.attrs["stop_vertices"]
+    assert at[0] == 0 and at[-1] == len(pts) - 1 and at == sorted(at)
+    dist = {d.name: G.from_model_poly(d.polygon) for d in m.districts}
+    for name, i in zip(t.attrs["stops"], at):
+        assert dist[name].covers(shapely.Point(pts[i])), name
+    # no step where the ring closes
+    assert t.path[0][2] == t.path[-1][2]
+
+
+def test_line_route_ignores_other_lines(lines, no_transit):
+    """Each line on the same city alone and with the others: the same track (the other
+    lines only meet it through the buildings they remove, which changes heights)."""
+    spec = lines.spec
+    every = TR.build(spec, no_transit)
+    for name in ("Green Line", "Ring Line"):
+        tl = next(x for x in spec.transit.lines if x.name == name)
+        one = spec.model_copy(update={"transit": spec.transit.model_copy(
+            update={"lines": [tl]})})
+        alone = TR.build(one, no_transit)
+        a = next(r for r in every.rows["transit_lines"] if r["name"] == name)
+        b = alone.rows["transit_lines"][0]
+        assert [p[:2] for p in a["path"]] == [p[:2] for p in b["path"]], name
+
+
+def test_self_meets():
+    # a figure eight crosses itself once; a circle does not; one passing 12 m over is clear
+    eight = [(400.0 * math.sin(2 * math.pi * k / 120), 200.0 * math.sin(4 * math.pi * k / 120))
+             for k in range(121)]
+    assert len(TR.self_meets(eight, True, 9.0)) == 1
+    ring = [(300.0 * math.cos(2 * math.pi * k / 120), 300.0 * math.sin(2 * math.pi * k / 120))
+            for k in range(121)]
+    assert TR.self_meets(ring, True, 9.0) == []
+    zs = [12.0 if 30 <= k < 90 else 24.0 for k in range(121)]
+    assert TR.self_meets(eight, True, 9.0, zs, TR.self_clear_m("elevated_rail")) == []
+
+
+def test_graded_closed():
+    # a loop with a 20 m bound just before its seam: the climb ramps down on both sides
+    side = [(10.0 * k, 0.0) for k in range(25)]
+    pts = side + [(250.0, y) for x, y in [(0, 10.0 * k) for k in range(25)]] + \
+        [(250.0 - x, 250.0) for x, _ in side] + [(0.0, 250.0 - x) for x, _ in side] + [side[0]]
+    vals = [0.0] * len(pts)
+    vals[-3] = 20.0
+    open_ = TR._graded(pts, vals, 0.04, max, -1.0, False)
+    loop = TR._graded(pts, vals, 0.04, max, -1.0, True)
+    assert open_[0] == 0.0 and loop[0] == loop[-1] > 0.0
+    assert all(abs(a - b) <= 0.04 * math.dist(p, r) + 1e-9
+               for a, b, p, r in zip(loop, loop[1:], pts, pts[1:]) if p != r)
+
+
+def _grid(seed: int, n: int = 40):
+    """A raster context n by n with random costs and walls (no city)."""
+    rng = np.random.default_rng(seed)
+    c = TR.Ctx(None, None)
+    c.nx = c.ny = n
+    cost = rng.uniform(1.0, 4.0, n * n)
+    cost[rng.random(n * n) < 0.18] = TR.INF
+    return c, cost
+
+
+def _path_cost(c, cost, path, turn, din):
+    cl = [min(x, 2.0) if x == TR.INF else x for x in cost.tolist()]
+    prev = None if din is None else max(range(16), key=lambda k: (
+        (TR._MOVES[k][0] * din[0] + TR._MOVES[k][1] * din[1]) / TR._MOVES[k][2], -k))
+    tot = 0.0
+    for u, v in zip(path, path[1:]):
+        dx, dy = v % c.nx - u % c.nx, v // c.nx - u // c.nx
+        k = next(i for i, mv in enumerate(TR._MOVES) if mv[:2] == (dx, dy))
+        L = TR._MOVES[k][2]
+        step = L * TR.CELL_M * (cl[u] + cl[v]) / 2.0
+        if prev is not None:
+            ddx, ddy, dL = TR._MOVES[prev]
+            cs = (ddx * dx + ddy * dy) / (dL * L)
+            if cs < 0.70:
+                step += turn * (1.0 - cs)
+        tot += step
+        prev = k
+    return tot
+
+
+def test_search_cost_to_go(monkeypatch):
+    """M8b: guided by the exact turn-free cost to go, the search finds paths as cheap as with
+    the straight-distance heuristic; `_togo` never overestimates; a cell it cannot reach
+    gives None."""
+    for seed in range(4):
+        c, cost = _grid(seed)
+        a, b = 0, c.nx * c.ny - 1
+        monkeypatch.setattr(TR, "TOGO_M", math.inf)
+        plain = TR.search(c, cost, a, b, 300.0, (1.0, 0.0))
+        monkeypatch.setattr(TR, "TOGO_M", 0.0)
+        guided = TR.search(c, cost, a, b, 300.0, (1.0, 0.0))
+        assert (plain is None) == (guided is None)
+        if plain is not None:
+            assert _path_cost(c, cost, guided, 300.0, (1.0, 0.0)) == \
+                pytest.approx(_path_cost(c, cost, plain, 300.0, (1.0, 0.0)), abs=1e-6)
+            togo = TR._togo(c, [min(x, 2.0) if x == TR.INF else x for x in cost.tolist()], b)
+            assert togo[a] <= _path_cost(c, cost, guided, 0.0, None) + 1e-6
+    c, cost = _grid(9)
+    walled = cost.copy()
+    walled[[c.nx * j + 20 for j in range(c.ny)]] = TR.INF   # a wall two cells thick
+    walled[[c.nx * j + 21 for j in range(c.ny)]] = TR.INF
+    walled[[c.nx * j + 22 for j in range(c.ny)]] = TR.INF
+    assert not TR.reachable(c, walled, 0, c.nx - 1)
+    assert TR.search(c, walled, 0, c.nx - 1, 300.0) is None
+
+
 # --- geometry helpers -------------------------------------------------------------------
 
 def test_arc_path_right_angle_radius():
@@ -261,17 +427,14 @@ def _perturb(v):
     return np.where(np.abs(c * 1000.0 - np.rint(c * 1000.0)) < 1e-6, c, moved)
 
 
-def test_transit_stage_ignores_ulp_noise(monkeypatch):
+def test_transit_stage_ignores_ulp_noise(monkeypatch, lines, no_transit):
     """The transit stage twice on the same M3 model, the second time with 2-ULP noise on what
     GEOS computes inside it (grid values and fixed-precision overlays aside): the same
     rows."""
-    lines_b = _build(copy.deepcopy(LINES))
-    spec = lines_b.spec
-    m3 = CityModel.model_validate(json.loads(lines_b.model.to_json()))
-    # the stage runs on the M3 model: rebuild it without transit
-    no_tr = copy.deepcopy(LINES)
-    no_tr["transit"] = {"lines": []}
-    base = _build(no_tr).model
+    spec = lines.spec
+    m3 = CityModel.model_validate(json.loads(lines.model.to_json()))
+    # the stage runs on the M3 model: the city without transit
+    base = no_transit
     clean = TR.build(spec, base)
     geo = ["intersection", "difference", "union", "buffer", "make_valid", "centroid",
            "point_on_surface", "line_interpolate_point", "convex_hull", "simplify"]

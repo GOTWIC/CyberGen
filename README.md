@@ -26,62 +26,72 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M7a | Elevated highways: viaducts, diamond ramps, overpasses, bridge approach grades, underpass streets, road columns | Done | [`docs/progress/M7`](docs/progress/M7) |
 | M7b | Trumpet and partial cloverleaf interchanges, art-direction loop, Corporate Core pinned import | Done | [`docs/progress/M7b`](docs/progress/M7b) |
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
+| M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 
-## Latest maps (M8a)
+## Latest maps (M8b)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
-different coast forms, not one map. M8a swept them and the test specs over many seeds and fixed
-what failed: highways that hooked along the map edge at exits, islands that did not fit,
-islands cut off from the roads, level steps on loop roads and footbridges, side-by-side
-duplicate roads, a crash. The sweep went from 33 to 49 of 68 builds passing every check
-(see [`docs/progress/M8a`](docs/progress/M8a)).
+different coast forms, not one map. M8a swept them and the test specs over many seeds and
+fixed what failed: highways that hooked along the map edge at exits, islands that did not
+fit, islands cut off from the roads, level steps on loop roads and footbridges, side-by-side
+duplicate roads, a crash (see [`docs/progress/M8a`](docs/progress/M8a)). M8b makes every
+transit loop one simple ring through its stops in route order, places fast lines (maglev,
+sky tube) so that their curves fit, and routes transit in about 3 to 13 s per city; on M8a's
+code it takes nyxllor from 8 full-city tries to 1.
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):
 
 | Nexus City (from the concept image) | Nyxllor (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M8a/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8a/nyxllor/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8b/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8b/nyxllor/render_iso_city.jpg" width="420"> |
 
 | Nyxllor with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
-| <img src="docs/progress/M8a/nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8a/delta_megacity/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8b/nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8b/delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
-| <img src="docs/progress/M8a/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8a/peninsula_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8b/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8b/peninsula_city/render_iso_city.jpg" width="420"> |
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 
-<img src="docs/progress/M8a/nyxllor_pinned/render_iso_d01.jpg" width="840">
+<img src="docs/progress/M8b/nyxllor_pinned/render_iso_d01.jpg" width="840">
 
 At street level, beside the viaducts:
 
 | Delta Megacity, beside a viaduct | Nyxllor, corporate core |
 |---|---|
-| <img src="docs/progress/M8a/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8a/nyxllor/render_street_4.jpg" width="420"> |
+| <img src="docs/progress/M8b/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8b/nyxllor/render_street_4.jpg" width="420"> |
 
-Road levels (Nyxllor, M8a): every raised road by deck height, the interchanges (a diamond, a
+Road levels (Nyxllor): every raised road by deck height, the interchanges (a diamond, a
 partial cloverleaf and a trumpet), columns, and the profile of one viaduct:
 
-<img src="docs/progress/M8a/nyxllor/preview_elevated.png" width="840">
+<img src="docs/progress/M8b/nyxllor/preview_elevated.png" width="840">
 
-Props and plants at street level (M6, Nyxllor, 180 m insets):
+Props and plants at street level (Nyxllor, 180 m insets):
 
-<img src="docs/progress/M6/nyxllor/preview_props.png" width="840">
+<img src="docs/progress/M8b/nyxllor/preview_props.png" width="840">
 
-Transit maps (M5):
+Transit maps (M8b): the Halo Line of the pinned demo in its first order, before M8b (it
+doubles back through The Stacks and crosses itself) and now (one ring, stops numbered in
+route order):
+
+| Before M8b | M8b |
+|---|---|
+| <img src="docs/progress/M8b/nyxllor_pinned_round2/before_transit.png" width="420"> | <img src="docs/progress/M8b/nyxllor_pinned_round2/preview_transit.png" width="420"> |
 
 | Nexus City | Nyxllor |
 |---|---|
-| <img src="docs/progress/M5/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M5/nyxllor/preview_transit.png" width="420"> |
+| <img src="docs/progress/M8b/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M8b/nyxllor/preview_transit.png" width="420"> |
 
-Each M8a city folder has the previews, the Blender renders, the build report and the stage
-trace; the M7b ones are in `docs/progress/M7b/`, the M7a ones in `docs/progress/M7/`. The
-props previews are in `docs/progress/M6/`, the transit maps in `docs/progress/M5/`, the 2D
-maps in `docs/progress/M4/`, the other generator previews in `docs/progress/M3p/`. Sample specs live
-in `docs/progress/M1a2/<city>/city_spec.json` and `cities/nyxllor/city_spec.json`; the
-pinned demo's in `docs/progress/M7b/nyxllor_pinned/city_spec.json`.
+Each M8b city folder has every generator preview, the transit map before M8b, the Blender
+renders, the build report and the stage trace; the M8a sweep tables are in
+`docs/progress/M8a/`, the M7b builds in `docs/progress/M7b/`, the M7a ones in
+`docs/progress/M7/`, the 2D maps in `docs/progress/M4/`. Sample specs live in
+`docs/progress/M1a2/<city>/city_spec.json` and `cities/nyxllor/city_spec.json`; the pinned
+demo's in `docs/progress/M7b/nyxllor_pinned/city_spec.json`, its round 1 and round 2 transit
+in `docs/progress/M8b/nyxllor_pinned_round1/` and `nyxllor_pinned_round2/`.
 
 ## Where things are
 

@@ -13,10 +13,10 @@ from . import presets
 from .checks import Check
 from .model import CityModel
 from .spec import CitySpec
-from .transit import (DECK_M, ROAD_CLEAR_M, SERVE_M, SIDE_PAD_M, SKY_CLEAR_M, UNDER_PAD_M,
-                      WIDTH_M, above, road_underside,
-                      below, deck_heights, radii, raised_roads, resample, sidewalk_index,
-                      sidewalks_clear)
+from .transit import (DECK_M, ROAD_CLEAR_M, SELF_GAP_M, SERVE_M, SIDE_PAD_M, SKY_CLEAR_M,
+                      UNDER_PAD_M, WIDTH_M, _graded, above, road_underside,
+                      below, deck_heights, radii, raised_roads, resample, self_clear_m,
+                      self_meets, sidewalk_index, sidewalks_clear)
 
 LIMIT = 12
 RADIUS_TOL = 0.98    # radius measured on 30 m chords of a polyline arc
@@ -174,15 +174,31 @@ def check_altitude(spec: CitySpec, m: CityModel) -> Check:
                 cap[i] = max(cap[i], clr + below(t.mode) + 1.0)
         for i, rz in deck_heights(decks, dtree, arr, WIDTH_M[t.mode] / 2.0):
             cap[i] = max(cap[i], rz + ROAD_CLEAR_M + below(t.mode))
-        for k in range(1, len(pts)):
-            cap[k] = max(cap[k], cap[k - 1] - g * math.dist(pts[k - 1], pts[k]))
-        for k in range(len(pts) - 2, -1, -1):
-            cap[k] = max(cap[k], cap[k + 1] - g * math.dist(pts[k], pts[k + 1]))
+        # (around a loop both ways: a climb near its seam ramps down past it)
+        cap = _graded(pts, cap, g, max, -1.0, t.loop and len(pts) > 2 and pts[0] == pts[-1])
         for k, z in enumerate(zs):
             if z < lo - 0.01 or z > cap[k] + 0.05:
                 _limit(c, f"{t.name} ({t.mode}): z {z:g} m at {pts[k]} outside {lo:g} to "
                           f"{cap[k]:.1f} m")
                 break
+    return c
+
+
+def check_self_crossing(m: CityModel) -> Check:
+    c = _check("transit_self_crossing",
+               f"A line never meets itself at the same level: two parts of its track more than "
+               f"{SELF_GAP_M:g} m apart along it stay its structure width apart in plan, or "
+               f"one passes {ROAD_CLEAR_M:g} m over the other's structure; a loop closes where "
+               f"it starts, and its stations come in route order")
+    for t in m.transit_lines:
+        pts, zs = _track(t)
+        if t.loop and (len(pts) < 3 or pts[0] != pts[-1]):
+            _limit(c, f"{t.name}: the loop does not close")
+        for s, x, y in self_meets(pts, t.loop, WIDTH_M[t.mode], zs, self_clear_m(t.mode)):
+            _limit(c, f"{t.name} ({t.mode}): meets itself at ({x:g}, {y:g}), {s:g} m along")
+        at = t.attrs.get("stop_vertices", [])
+        if any(b < a for a, b in zip(at, at[1:])):
+            _limit(c, f"{t.name}: stations out of route order (stop vertices {at})")
     return c
 
 
@@ -371,7 +387,8 @@ def run(spec: CitySpec, m: CityModel) -> list:
         return []
     with G.canonical():
         return [check_routes(spec, m), check_stops(spec, m), check_curves(m),
-                check_grades(m), check_altitude(spec, m), check_clearance(m),
+                check_self_crossing(m), check_grades(m), check_altitude(spec, m),
+                check_clearance(m),
                 check_supports(m), check_station_access(m), check_skybridges(m),
                 check_hubs(spec, m)]
 
