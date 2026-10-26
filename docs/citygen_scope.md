@@ -423,8 +423,8 @@ Coordinates: meters, x east, y north, z up, origin at city center (matches today
 - Lighting, atmospherics, post-processing (stage 3).
 - (Tunnels and underground metro geometry, terrain relief, stack interchanges and districts on
   several street levels, once listed here, are now milestones M9 to M12 below.)
-- Gameplay, AI, traffic simulation, Unreal-side import tooling beyond the existing greybox
-  script (data for it is produced).
+- Gameplay, AI, traffic simulation (stage 4, lifegen). Unreal-side import tooling is milestone
+  M13 below.
 - Free-form interchange design (templates only).
 - Moving parts (trains, ships, AVs); their routes are exported as data only.
 
@@ -447,6 +447,12 @@ viaducts with simple end ramps from M5.
 
 ### After v1
 
+Stage 1 of the project (layoutgen) ends with M13. The later stages are assetgen (unique 3D
+models and textures for every building and street element), atmosgen (lighting, sky and
+atmospherics in Unreal), lifegen (generated traffic, trains, crowds and animation) and
+storygen (story, characters, cutscenes); stages 1 and 2 are reusable generators, not tied to
+one city.
+
 | M | Deliverable | Done when | Status |
 |---|---|---|---|
 | M8a | Robustness sweep (`citygen sweep`) and fixes of what it finds | sweep pass rate up, no crashes | done |
@@ -457,6 +463,7 @@ viaducts with simple end ramps from M5.
 | M10 | Stack interchanges: four-level highway-highway crossings (both highways, two levels of directional flyovers at about 18 and 27 m, no loops), plus the turbine variant; chosen where two highways cross and the stack's footprint fits; columns placed among all levels | samples with a highway-highway crossing build a stack; grades, clearances and column checks pass; Mac = x86 | planned |
 | M11 | Terrain: a height field per city (spec: hills, ridges, cliffs, flat districts), water bodies at their own levels, roads that follow the ground within their grade (cuts, fills, retaining walls, tunnels from M9 through hills), lots and building bases on slopes (terraces, stepped podiums), terrain-aware props and plants, a ground mesh in the blockout | hilly sample cities pass the full suite with every grade and clearance check measured from the ground; Mac = x86 | planned |
 | M12 | Layered districts: districts stacked on several street levels (an upper deck city over a lower one, Night City style): deck slabs on columns, upper streets, lots and buildings on decks, ramps, stairs and elevators between levels, light wells, a level on every street, lot, walkway and prop, per-level lane and walkway graphs, per-level previews | a layered sample district passes the full suite on every level; walkways connect all levels; Mac = x86 | planned |
+| M13 | Unreal export tool, the last milestone of stage 1 (layoutgen): `citygen unreal <build_dir> <uproject>` imports a built city into an Unreal 5.8 project through editor Python (headless) and the Unreal MCP plugin: a World Partition level from the 256 m tiles, static meshes with collision and per-category materials, props and plants as instanced meshes, citygen ids and types as actor tags, the lane, walkway and transit graphs as data assets for stage 4, a player start; re-importing a build updates it by id. It grows as later stages come online (stage 2 assets replacing the blockout meshes, stage 3 lighting, stage 4 traffic and crowds) | every sample city imports, streams and can be walked (collision) on the Mac; a second import of the same build changes nothing; a regenerated city updates in place | planned |
 
 ## 13. Running it with cloud sessions
 - Push this repo to a private GitHub repository (cloud sessions start from it).
