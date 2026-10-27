@@ -344,6 +344,18 @@ def test_lock_refuses_a_model_edited_by_hand(tmp_path):
         LK.make(tmp_path)
 
 
+def test_lock_refuses_a_build_of_other_code(tmp_path):
+    """A release names the code it ships with: a build state from other code is refused,
+    not copied into the lock."""
+    data, b, st = small()
+    (tmp_path / "city_model.json").write_text(b.model.to_json() + "\n", encoding="utf-8")
+    E.write_state(tmp_path, {**st, "code_sha256": "0" * 64})
+    with pytest.raises(ValueError, match="other citygen code"):
+        LK.make(tmp_path)
+    E.write_state(tmp_path, st)
+    assert LK.make(tmp_path)["code_sha256"] == E.code_version()["code_sha256"]
+
+
 # --- model diff ---------------------------------------------------------------------
 
 def test_model_diff(tmp_path):

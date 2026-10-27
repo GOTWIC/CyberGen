@@ -224,7 +224,8 @@ report like any failure.
 used, the district regenerations in their order (each with the district's spec entry and
 seed), the search's choices, the citygen version, the sha256 of its source code
 (`citygen/*.py`) and of `city_model.json`. It refuses a build whose model does not match its
-state (edited by hand). `citygen lock --verify LOCK` runs the full build (search and all)
+state (edited by hand), and a build made with other code than the citygen doing the release
+(build it again first: a lock names the code it ships with). `citygen lock --verify LOCK` runs the full build (search and all)
 from the spec, applies the overrides, then each regeneration in turn, and compares the
 bytes; with other code it still rebuilds but says so (a lock is a promise of the code it
 names).
@@ -235,7 +236,7 @@ names).
 | Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 100 s |
 
 The tests lock the test city after a regeneration and rebuild it byte for byte, and check
-that a lock refuses a model edited by hand.
+that a lock refuses a model edited by hand or a build of other code.
 
 ## Model diff
 
@@ -272,7 +273,7 @@ city would have started from another layout; fixed and tested).
 
 ## Tests
 
-`tests/test_edit.py` (17 tests, on the small test city unless named):
+`tests/test_edit.py` (18 tests, on the small test city unless named):
 
 - ids: every id from its kind and place (no build counter left), every reference names an
   entity, renaming a renamed model changes nothing, collisions go by content, and a
@@ -285,7 +286,7 @@ city would have started from another layout; fixed and tested).
 - pins (a building and a road survive a regeneration, nothing new on the pinned ground) and
   every override operation;
 - a locked city with a regeneration rebuilds byte for byte; a lock refuses a hand-edited
-  model; the diff; the CLI (`build --district`, `lock`, `lock --verify`, `model diff`).
+  model and a build of other code; the diff; the CLI (`build --district`, `lock`, `lock --verify`, `model diff`).
 
 `tests/test_tunnels.py::test_regeneration_keeps_the_tunnels` regenerates Core and Uptown of
 M9's tunnel test city: every held road, every entity 250 m away and the tunnels come back as

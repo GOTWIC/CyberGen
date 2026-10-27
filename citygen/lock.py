@@ -31,9 +31,16 @@ def make(build_dir, release: str | None = None) -> dict:
     sha = E.model_sha(model)
     if sha != st["model_sha256"]:
         raise ValueError(f"{mp} is not the model its build state names (edited by hand?)")
+    # a release names the code it ships with: only a build with this code shows it gives
+    # these bytes
+    now = E.code_version()
+    if st["code_sha256"] != now["code_sha256"]:
+        raise ValueError(f"{build_dir} was built with other citygen code "
+                         f"({st['code_sha256'][:12]}, this one {now['code_sha256'][:12]}): "
+                         f"build it again with this citygen to release it")
     return {"lock_version": LOCK_VERSION, "name": model.name,
             "release": release or str(len(st.get("edits", [])) + 1),
-            "citygen": st["citygen"], "code_sha256": st["code_sha256"],
+            "citygen": now["citygen"], "code_sha256": now["code_sha256"],
             "spec": st["spec"], "choices": st["choices"],
             "overrides": st.get("base_overrides", st.get("overrides")),
             "edits": st.get("edits", []), "model_sha256": sha}
