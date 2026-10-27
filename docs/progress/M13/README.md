@@ -186,6 +186,22 @@ Both failures are local streets. Only primary roads are bored or put on viaducts
 laid straight across the steepest ground (the Crown escarpment) can still cut or fill past the
 limits; see the open items.
 
+## Tests
+
+The full pytest passes on M13 on M12 (452 passed, 2 skipped).
+`tests/test_terrain.py` covers:
+
+- flat models carrying no terrain;
+- the spec's terrain references;
+- the Lipschitz fit;
+- a small hilly city: all checks passing, grade lines on the 1 cm grid meeting their nodes,
+  buildings seated, the sea at 0, the ground rising where asked and the harbor levelled;
+- each terrain check failing on a broken copy;
+- Cragmouth's build, its tunnels' names, the Crown plateau over the harbor and its tallest
+  tower;
+- Cragmouth's golden model and blockout plan hashes, with grid and drape parts and retaining
+  walls in the plan.
+
 ## Blockout
 
 - **Ground:** a 4 m heightfield per tile (new part kind `grid`, built in Blender from a
