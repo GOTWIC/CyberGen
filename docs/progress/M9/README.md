@@ -12,6 +12,12 @@ M9 adds tunnels to citygen (`citygen/tunnels.py`, checks in `citygen/tunnel_chec
 
 Road tunnels are level -1 of the road network, the negative counterpart of M7's viaducts.
 
+M11 (the gameplay layer, PR #24) was merged into this branch before it landed, so the builds
+here are M11 on M9: 79 checks (66 to M8c, 4 M9, 9 M11), and every city folder has
+`preview_gameplay.png`. The gameplay layer runs on the tunnel cities unchanged: cars reach
+places through the tunnels and over the lids on the lane graph, and people on foot through
+the pedestrian underpasses on the walkway graph.
+
 ## Art direction: which samples have tunnels
 
 | City | Spec change | What it builds |
@@ -33,25 +39,27 @@ Each of the four other cities builds no road tunnel. They still change, though:
 
 ## Builds
 
-All six cities pass all 70 checks. Each `city_model.json` is byte-identical on the M4 Mac
+All six cities pass all 79 checks. Each `city_model.json` is byte-identical on the M4 Mac
 (arm64) and on x86_64 Linux (docker `citygen-x86`, `linux/amd64`, the worktree mounted
 read-only, `CITYGEN_WORKERS=3`):
 
 | City | Full-city tries (M8c, M9) | sha256 of `city_model.json` (both machines) |
 |---|---|---|
-| archipelago_free_port | 1, 1 | `3955cc554a644dafed5fb9842128f18b2c6660b28b2afe00d80751049db72e6b` |
-| delta_megacity | 1, 1 | `af659f62e6ef3fdd7d9bcccefb8c1c4378d6eac81294271943ac06efebc1370e` |
-| nexus_city | 3, 1 | `2d882b269f842813f6dd6c85c68bfa2515a5410e4a7431a52059a25d8e9003d6` |
-| peninsula_city | 1, 1 | `06ce0514189a4a1f7ef96fe6c91a7e223c9e30db0887e5422d02a530fca1187d` |
-| vesper_bay | 1, 1 | `14642066364df211d43bdb83dce6fc03347a4d889bad97488cb536bdaaed257c` |
-| vesper_bay_pinned | 2, 2 | `3bccbc5c127d706dcbb7b667ee8a4d0d6bc5c91edc031cc2fb04c08d543b1c39` |
+| archipelago_free_port | 1, 1 | `7ada11aae912929ad7bd853f431ab46694227844f4169ea023c464eac52b0ebc` |
+| delta_megacity | 1, 1 | `da19195acc4effd30ccdb5e1163a45c0fd1f4b62f60c133610d34a89e9be6923` |
+| nexus_city | 3, 1 | `c413d2db841d77bda8bb92daf2886858758f704a1cb14fdcd86de4cf4b43eb8c` |
+| peninsula_city | 1, 1 | `85d49fc8492029aeddd2f6b842abd968cd84e00919b524706ac7cea6d627894c` |
+| vesper_bay | 1, 1 | `c9be7637f735a2a407be0379d61dfd52cdc016151fa043a5fb8082e300ec36ef` |
+| vesper_bay_pinned | 2, 2 | `31f8e633e604c651b50759625be1547e26a3dab6704018f0a85a2533dfad8686` |
 
 Nexus City now builds on its first try: with the ring sunk under Midtown, its viaducts and
 interchanges are chosen anew (a diamond and a partial cloverleaf), and that layout passes.
 
-Each city folder has every generator preview, `preview_tunnels.png`, the build report, the
-stage trace, the blockout report, `render_top.jpg`, the 8K `render_iso_city.jpg` and, for
-Nexus City and Greyhook, the 8K `render_cutaway.jpg`.
+Each city folder has every generator preview, `preview_tunnels.png`, `preview_gameplay.png`,
+the build report, the stage trace, the blockout report, `render_top.jpg`, the 8K
+`render_iso_city.jpg` and, for Nexus City and Greyhook, the 8K `render_cutaway.jpg`. The
+blockout plans (sha256 in `tests/data/golden_hashes.json`) are the same with and without M11,
+which adds no blockout geometry, so the renders and blockout reports are those of M9 alone.
 
 ## How a road tunnel is laid
 
@@ -123,7 +131,7 @@ longest covered stretch, between the interchanges, of a highway through each dis
 
 Transit columns keep off road tunnel boxes.
 
-## Checks (66 to 70)
+## Checks (67 to 70; 79 with M11)
 
 | Check | What it asks |
 |---|---|
@@ -151,8 +159,9 @@ bridge. `junction_placement` also forbids local junctions on sunk stretches, and
 
 ## Sweep
 
-`citygen sweep --suite m8a --workers 3` (`sweep.md`, `sweep.json`): **58 of 68 builds pass**,
-as on M8c. The ten failures are the same builds with the same failing checks as in
+`citygen sweep --suite m8a --workers 3` on M11 on M9 (`sweep.md`, `sweep.json`): **58 of 68
+builds pass**, as on M8c, on M9 alone and on M11 alone. Against M11's sweep, only retry counts
+differ (nexus_city s1207 2 retries to 0, test_small s404 and test_pinned s1999 0 to 1 each). The ten failures are the same builds with the same failing checks as in
 `docs/progress/M8c/sweep.json` (labels `nyxllor` and `nyxllor_pinned` there are `vesper_bay` and
 `vesper_bay_pinned` here), so none is newly broken:
 
@@ -173,7 +182,8 @@ No tunnel check fails in the sweep. An earlier sweep run found Nexus City s11 pu
 frontage street and a building on a tunnel's box walls (the box is wider than the carriageway);
 that is why a tunnel road's right of way covers the walls (`TUNNEL_SIDE_M`).
 
-The full pytest passes (395 passed, 2 skipped), with the tunnel tests in `tests/test_tunnels.py`.
+The full pytest passes on M11 on M9 (418 passed, 2 skipped; 395 and 2 on M9 alone), with the
+tunnel tests in `tests/test_tunnels.py`.
 
 ## Open items
 
