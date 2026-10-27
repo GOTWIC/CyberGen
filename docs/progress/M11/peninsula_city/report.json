@@ -532,7 +532,7 @@
     },
     {
       "id": "travel_points",
-      "title": "Taxi stands and fast travel: a fast-travel point in every district with streets, taxi stands at least 250 m apart, every stand on its sidewalk",
+      "title": "Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk",
       "passed": true,
       "failures": [],
       "notes": []
