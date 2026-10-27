@@ -190,7 +190,16 @@ before, now over every level of a stack. Elevated stats gain `stacks`, `turbines
   took nine full-city tries; the samples have no traced roads, and the pinned demo is
   unchanged by it.
 
-SWEEP_SECTION
+## Sweep
+
+`citygen sweep --suite m8a --workers 3` ([`sweep.md`](sweep.md), `sweep.json`): **58 of 68
+builds pass, as in M11, and every build has the same result as in M11's
+[`sweep.json`](../M11/sweep.json)**: none newly broken, none newly fixed, the same hydrology
+and road variants, full-city tries and layout salts in all 68 (the stack demo is not in the
+suite). One failing build fails on less: the pinned demo at seed 5077 loses its
+`level_continuity` failure (one failure fewer on each of its full-city tries, most likely the
+gate-link change in M2), and still fails `placement` ('Neon Strand' should be on the coast),
+as in M11.
 
 ## Tests
 
