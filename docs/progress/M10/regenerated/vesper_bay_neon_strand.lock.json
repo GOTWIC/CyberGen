@@ -3,7 +3,7 @@
   "name": "Vesper Bay",
   "release": "1.1",
   "citygen": "0.1.0",
-  "code_sha256": "a174b800bd10700e9a9cd7beed5f517fde6d748b3bdfb47fe1a3ec878e81dbb2",
+  "code_sha256": "d93afe2654112c691bba02770d86c47bd528968a087c1c04be72262c33b05c6b",
   "spec": {
     "$schema": "../../citygen/schemas/city_spec.schema.json",
     "name": "Vesper Bay",
