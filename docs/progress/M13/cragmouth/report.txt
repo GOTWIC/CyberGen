@@ -25,6 +25,10 @@ checks:
   [pass] deck_clearance: Where roads cross without a node, the one under has 5.5 m under the deck over it (3 m over a pedestrian street)
          note: 0 crossings without a node
   [pass] ramps_land: Every ramp is one-way and joins a viaduct at its deck height to a ground road at the ground
+  [pass] stack_ramps: Every stack and turbine has its eight directional ramps, one per movement (four right turns, four left turns, none a loop), each one-way from the right side of one highway to the right side of the other
+         note: 0 stacks and turbines, 0 directional ramps
+  [pass] stack_levels: A stack is four levels: the highway at grade passes under the lifted one (9 m deck), its left ramps onto the lifted highway cross the core at tier 2 (18 m) and those off it at tier 3 (27 m) over them; a turbine's left ramps each cross a highway at a point of their own (at most three levels)
+         note: 0 stacks, 0 turbines
   [pass] tunnel_grades: Tunnel grades within the class maximum: roads 6% (immersed tubes, cut-and-cover tunnels and their open approaches), metro 4%, pedestrian underpasses level
   [pass] tunnel_cover: Cover over every tunnel roof: at least 1 m of ground (40 m into the tunnel from a portal: the roof under the ground), 1.5 m under the water bed (canal 3, river 7, sea 12 m deep), 0.5 m under a road over a pedestrian underpass
   [pass] tunnel_portals: Every road tunnel has a portal at each end on dry land, 5.5 m clear inside, an open approach at most 6% steep, and nothing on or over its open approaches: no road node within 20 m of their top, no other road, building or structure on them
@@ -75,7 +79,7 @@ checks:
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 28345 things on the ground
+         note: 30034 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
@@ -149,9 +153,9 @@ stats:
   Ridgeback                         62     150.4   169.6   192.0       77%  13.0      4.684
   Hollow                           688      42.0    66.5   140.0       70%   7.4      5.131
 
-  props 61478, plants 23621 (9343 trees), 85099 instances; lawns 53906 m2, hedges 3.03 km
-  props: sign 17031, awning 13835, ac_unit 9346, street_light 3618, parked_vehicle 2624, overhead_cable 2417, trash 2226, barrier 2217, traffic_signal 2085, railing 1678, bollard 1168, wall_light 879, trash_can 820, hydrant 759, bench 320, dumpster 270, bus_stop 69, scaffolding 62, boat 42, planter 8, vending_machine 3, kiosk 1
-  plants: shrub 7805, facade_greenery 5942, park_tree 5618, street_tree 1773, median_tree 878, conifer 539, palm 535, roof_tree 530, overgrowth 1
+  props 61610, plants 25178 (9634 trees), 86788 instances; lawns 53906 m2, hedges 3.03 km
+  props: sign 17031, awning 13835, ac_unit 9346, street_light 3618, parked_vehicle 2723, overhead_cable 2417, trash 2226, barrier 2217, traffic_signal 2085, railing 1678, bollard 1168, wall_light 879, trash_can 820, hydrant 759, bench 347, dumpster 270, bus_stop 69, scaffolding 62, boat 42, planter 13, vending_machine 3, kiosk 2
+  plants: shrub 9071, facade_greenery 5942, park_tree 5878, street_tree 1779, median_tree 878, conifer 563, palm 536, roof_tree 530, overgrowth 1
 
   tunnels bored 7 (0.68 km), metro 6 (4.16 km), pedestrian 5 (0.15 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -51.37 m
 

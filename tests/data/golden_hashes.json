@@ -7,7 +7,7 @@
     "numpy": "2.5.4",
     "shapely": "2.2.0",
     "geos": "3.14.1",
-    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M9 with M11: produced on the M4 Mac and, byte for byte, on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3); M12 on M9 and M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five, the pinned demo and the stack demo, stage traces identical"
+    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M9 with M11: produced on the M4 Mac and, byte for byte, on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3); M12 on M9 and M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five, the pinned demo and the stack demo, stage traces identical; M13 on M12: all five, the pinned demo, the stack demo and cragmouth produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3)"
   },
   "cities": {
     "archipelago_free_port": "db0733983fdd333610e67d6dd51055e3dbf286356135144028cc3829bc486bd5",
@@ -22,9 +22,9 @@
     "nexus_city": "b8310fb6487c2aa971ea970b630dd52435a95aa5d3371900fd1f677b43db33ba",
     "peninsula_city": "eacb6d4d4c55a097cb572431849f82473ff0445376cb84054a1d67b6d71d6a66",
     "vesper_bay": "0e33c065c7158b6baf25c01656efa7c46faa27d1b518b1561658758c84a92658",
-    "cragmouth": "9a17c0204232f0d7ce2046ff20339f3e74360f7bc45d429139cc73b553984585"
+    "cragmouth": "e605f08b41e97408e5620305864d2e78aa6004bba2d0b1c5090af4cb2b6ea7b3"
   },
   "terrain_cities": {
-    "cragmouth": "55a904bdfca896d4ac493e47e9526068e05fd8f02f53dcc2371941d025c5a902"
+    "cragmouth": "76b7b16ec713276f6e050a023b11943fb2eb7c44d73fe56d921bf1ae3931f50b"
   }
 }

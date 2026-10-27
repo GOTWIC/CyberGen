@@ -162,6 +162,24 @@
       "notes": []
     },
     {
+      "id": "stack_ramps",
+      "title": "Every stack and turbine has its eight directional ramps, one per movement (four right turns, four left turns, none a loop), each one-way from the right side of one highway to the right side of the other",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "0 stacks and turbines, 0 directional ramps"
+      ]
+    },
+    {
+      "id": "stack_levels",
+      "title": "A stack is four levels: the highway at grade passes under the lifted one (9 m deck), its left ramps onto the lifted highway cross the core at tier 2 (18 m) and those off it at tier 3 (27 m) over them; a turbine's left ramps each cross a highway at a point of their own (at most three levels)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "0 stacks, 0 turbines"
+      ]
+    },
+    {
       "id": "tunnel_grades",
       "title": "Tunnel grades within the class maximum: roads 6% (immersed tubes, cut-and-cover tunnels and their open approaches), metro 4%, pedestrian underpasses level",
       "passed": true,
@@ -495,7 +513,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "28345 things on the ground"
+        "30034 things on the ground"
       ]
     },
     {
@@ -1664,6 +1682,10 @@
       "interchanges": {},
       "flyovers": 0,
       "max_flyover_m": 0.0,
+      "stacks": 0,
+      "turbines": 0,
+      "stack_ramps": 0,
+      "max_stack_m": 0.0,
       "overpasses": 0,
       "max_deck_m": 0.0,
       "raised_other_km": 5.74,
@@ -1757,9 +1779,9 @@
       "highest_wall_m": 19.65,
       "bored_tunnels": 7,
       "highest_plinth_m": 13.09,
-      "parked_off_steep": 665,
-      "seats_off_steep": 197,
-      "trees_off_cliffs": 1558,
+      "parked_off_steep": 566,
+      "seats_off_steep": 164,
+      "trees_off_cliffs": 1,
       "under_viaducts": 63
     },
     "local": {
@@ -2154,16 +2176,16 @@
       }
     },
     "props": {
-      "props": 61478,
-      "plants": 23621,
-      "trees": 9343,
-      "instances": 85099,
+      "props": 61610,
+      "plants": 25178,
+      "trees": 9634,
+      "instances": 86788,
       "props_by_kind": {
         "sign": 17031,
         "awning": 13835,
         "ac_unit": 9346,
         "street_light": 3618,
-        "parked_vehicle": 2624,
+        "parked_vehicle": 2723,
         "overhead_cable": 2417,
         "trash": 2226,
         "barrier": 2217,
@@ -2173,23 +2195,23 @@
         "wall_light": 879,
         "trash_can": 820,
         "hydrant": 759,
-        "bench": 320,
+        "bench": 347,
         "dumpster": 270,
         "bus_stop": 69,
         "scaffolding": 62,
         "boat": 42,
-        "planter": 8,
+        "planter": 13,
         "vending_machine": 3,
-        "kiosk": 1
+        "kiosk": 2
       },
       "plants_by_kind": {
-        "shrub": 7805,
+        "shrub": 9071,
         "facade_greenery": 5942,
-        "park_tree": 5618,
-        "street_tree": 1773,
+        "park_tree": 5878,
+        "street_tree": 1779,
         "median_tree": 878,
-        "conifer": 539,
-        "palm": 535,
+        "conifer": 563,
+        "palm": 536,
         "roof_tree": 530,
         "overgrowth": 1
       },
