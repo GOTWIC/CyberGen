@@ -929,6 +929,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import prop_checks as PC
 
         checks += PC.run(spec, m)
+    if m.pois or m.zones or m.fields or m.densities:
+        from . import gameplay_checks as GC
+
+        checks += GC.run(spec, m)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
@@ -954,6 +958,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import prop_checks as PC
 
         st["props"] = PC.stats(m)
+    if m.pois or m.zones or m.fields or m.densities:
+        from . import gameplay_checks as GC
+
+        st["gameplay"] = GC.stats(m)
     return checks, st
 
 
@@ -961,7 +969,10 @@ def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
                 variant: int) -> dict:
     return {
         "name": spec.name, "seed": spec.seed,
-        "stage": ("M7 (water, districts, waterways, roads, elevated highways, local streets, "
+        "stage": ("M11 (water, districts, waterways, roads, elevated highways, local streets, "
+                  "blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, "
+                  "vegetation, gameplay layer)" if "gameplay" in st else
+                  "M7 (water, districts, waterways, roads, elevated highways, local streets, "
                   "blocks, lots, buildings, skybridges, megasites, transit, props, vegetation)"
                   if "props" in st and "elevated" in st else
                   "M6 (water, districts, waterways, roads, local streets, blocks, lots, "
@@ -1113,6 +1124,16 @@ def report_text(rep: dict) -> str:
                   f"{tn['deepest_road_m']:g} m"
                 + (f", deepest metro {tn['deepest_metro_m']:g} m"
                    if tn.get("deepest_metro_m") is not None else "")]
+    gs = st.get("gameplay")
+    if gs:
+        out += ["", f"  gameplay: {gs['pois']} points of interest, {gs['factions']} factions ("
+                    + ", ".join(f"{k} {v}" for k, v in gs["factions_by_kind"].items())
+                    + f"), {gs['territories']} territories ({gs['contested']} contested), "
+                    f"{gs['taxi_stands']} taxi stands, {gs['fast_travel']} fast-travel points",
+                "  pois: " + ", ".join(f"{k} {v}" for k, v in gs["pois_by_kind"].items()),
+                "  parking: " + ", ".join(f"{k} {v}" for k, v in gs["parking"].items())
+                + f" ({gs['parking_capacity']} spaces); sign slots: "
+                + ", ".join(f"{k} {v}" for k, v in gs["sign_slots"].items())]
     ts = st.get("transit")
     if ts:
         out += ["", f"  transit {ts['km']} km, supports {ts['supports']}, portals "

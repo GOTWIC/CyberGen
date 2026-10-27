@@ -50,6 +50,10 @@ class ArchetypePreset:
     # Whether the archetype wants a coastline (used as a soft default and by the schematic).
     prefers_coast: bool = False
     height_limited: bool = False
+    # M11 gameplay layer: district base values of the wealth, danger and police fields
+    wealth: float = 0.5
+    danger: float = 0.4
+    police: float = 0.5
 
 
 ARCHETYPES: dict[str, ArchetypePreset] = {
@@ -58,18 +62,21 @@ ARCHETYPES: dict[str, ArchetypePreset] = {
         character=("plazas", "podium_towers", "skybridges", "sky_stations", "clean"),
         grid_angle_deg=45, landmark_height_m=450, complexes=("twin_towers", "tower_cluster"),
         skybridge_density=0.6, grime=0.1, neon=0.4, greenery=0.3, area_weight=1.2,
+        wealth=0.9, danger=0.15, police=0.9,
     ),
     "megablock_residential": ArchetypePreset(
         street_pattern="superblocks", block_size_m=(150, 250), height_m=(120, 250),
         character=("megabuildings", "atriums", "elevated_decks"),
         complexes=("megabuilding_campus",), skybridge_density=0.6, grime=0.5, neon=0.4,
         greenery=0.2, area_weight=1.2,
+        wealth=0.35, danger=0.55, police=0.4,
     ),
     "midtown_mixed": ArchetypePreset(
         street_pattern="grid_ring_park", block_size_m=(80, 140), height_m=(30, 150),
         character=("culture", "living", "commerce", "central_plaza"),
         complexes=("bridged_pair",), skybridge_density=0.3, grime=0.3, neon=0.5,
         greenery=0.5, megasites=("central_park",), area_weight=1.3,
+        wealth=0.6, danger=0.3, police=0.6,
     ),
     "entertainment_market": ArchetypePreset(
         street_pattern="organic", block_size_m=(30, 80), height_m=(10, 60),
@@ -77,6 +84,7 @@ ARCHETYPES: dict[str, ArchetypePreset] = {
         complexes=("straddle_building",), skybridge_density=0.3, grime=0.6, neon=0.9,
         greenery=0.1, waterway_style=("organic_canals",), waterway_density=0.3,
         area_weight=0.9,
+        wealth=0.45, danger=0.6, police=0.35,
     ),
     "old_town": ArchetypePreset(
         street_pattern="organic", block_size_m=(20, 60), height_m=(6, 30),
@@ -84,6 +92,7 @@ ARCHETYPES: dict[str, ArchetypePreset] = {
         complexes=(), skybridge_density=0.2, grime=0.7, neon=0.6, greenery=0.3,
         waterway_style=("organic_canals", "creeks"), waterway_density=0.5, area_weight=1.0,
         prefers_coast=True,
+        wealth=0.3, danger=0.65, police=0.25,
     ),
     "industrial_port": ArchetypePreset(
         street_pattern="large_grid", block_size_m=(150, 300), height_m=(8, 25),
@@ -91,30 +100,35 @@ ARCHETYPES: dict[str, ArchetypePreset] = {
         complexes=(), skybridge_density=0.0, grime=0.8, neon=0.2, greenery=0.05,
         waterway_style=("harbor_basins",), waterway_density=0.5,
         megasites=("freight_terminal",), area_weight=1.3, prefers_coast=True,
+        wealth=0.25, danger=0.7, police=0.2,
     ),
     "residential_heights": ArchetypePreset(
         street_pattern="curvilinear", block_size_m=(80, 150), height_m=(10, 60),
         character=("lower_density", "parks", "walls", "guard_gates"),
         complexes=(), skybridge_density=0.05, grime=0.15, neon=0.2, greenery=0.7,
         area_weight=1.0,
+        wealth=0.8, danger=0.15, police=0.7,
     ),
     "research_campus": ArchetypePreset(
         street_pattern="campus_loops", block_size_m=(100, 200), height_m=(15, 90),
         character=("labs", "medical", "r_and_d", "landscaped_grounds"),
         complexes=("campus",), skybridge_density=0.2, grime=0.1, neon=0.3, greenery=0.7,
         area_weight=0.6,
+        wealth=0.75, danger=0.15, police=0.7,
     ),
     "transit_hub": ArchetypePreset(
         street_pattern="radial_ring", block_size_m=(60, 120), height_m=(20, 120),
         character=("multi_level_station", "bus_bays", "maglev_metro_interchange"),
         complexes=("tower_cluster",), skybridge_density=0.5, grime=0.3, neon=0.6,
         greenery=0.2, megasites=("transit_nexus",), area_weight=0.6,
+        wealth=0.5, danger=0.4, police=0.65,
     ),
     "spaceport": ArchetypePreset(
         street_pattern="service_roads", block_size_m=(200, 400), height_m=(10, 60),
         character=("launch_pads", "terminal", "hangars", "cargo"),
         complexes=(), skybridge_density=0.0, grime=0.3, neon=0.3, greenery=0.05,
         megasites=("spaceport",), area_weight=0.9, prefers_coast=True, height_limited=True,
+        wealth=0.6, danger=0.25, police=0.8,
     ),
 }
 

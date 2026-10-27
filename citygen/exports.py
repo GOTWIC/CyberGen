@@ -9,6 +9,9 @@
   `unreal/build_greybox_unreal.py` (unchanged).
 - `graphs`: lane graph, pedestrian graph and transit lines as JSON (ZoneGraph and Mass later).
 - `props_csv`: prop and plant instances (M6), one row each, for instanced meshes in an engine.
+- `gameplay`: the gameplay layer (M11) for lifegen, assetgen and the engine: hour bands,
+  factions, zones, points of interest, the wealth, danger and police fields, street densities,
+  parking, travel points, sign slots, and an index of what stands in each 256 m tile.
 """
 
 from __future__ import annotations
@@ -404,3 +407,36 @@ def props_csv(m: CityModel) -> str:
                     1.0, tile_name(*tile_key(x, y)), p.height_m, p.crown_radius_m,
                     p.species or ""])
     return buf.getvalue()
+
+
+GAMEPLAY = ("factions", "zones", "pois", "fields", "densities", "parking", "travel_points",
+            "sign_slots")
+
+
+def gameplay(m: CityModel) -> dict:
+    """The gameplay layer as one document, with a per-tile index (the blockout's tile names)
+    of the points of interest, parking, travel points and sign slots in each tile."""
+    from .blockout import tile_key, tile_name
+    from .model import HOUR_BANDS
+
+    out: dict = {"city": m.name, "frame": m.frame,
+                 "hour_bands": [{"name": n, "from": a, "to": b} for n, a, b in HOUR_BANDS]}
+    for key in GAMEPLAY:
+        out[key] = [json.loads(e.model_dump_json()) for e in getattr(m, key)]
+    tiles: dict = {}
+
+    def put(kind, eid, x, y):
+        t = tiles.setdefault(tile_name(*tile_key(x, y)), {})
+        t.setdefault(kind, []).append(eid)
+    for p in m.pois:
+        put("pois", p.id, *p.position[:2])
+    for p in m.parking:
+        x, y = (p.entrances[0].position if p.entrances else
+                (p.line[len(p.line) // 2] if p.line else p.polygon.exterior[0]))
+        put("parking", p.id, x, y)
+    for t in m.travel_points:
+        put("travel_points", t.id, *t.position)
+    for s in m.sign_slots:
+        put("sign_slots", s.id, *s.position[:2])
+    out["tiles"] = dict(sorted(tiles.items()))
+    return out

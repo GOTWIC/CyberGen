@@ -82,4 +82,7 @@ def test_all_scope_entities_present():
                 "junctions", "crosswalks", "sidewalks", "lanes", "walkways", "structures", "tunnels", "transit_lines", "stations",
                 "megasites", "blocks", "lots", "open_spaces", "properties", "buildings",
                 "skybridges", "site_elements", "plants", "green_areas", "props", "tiles"}
+    # M11: the gameplay layer
+    expected |= {"factions", "zones", "pois", "fields", "densities", "parking",
+                 "travel_points", "sign_slots"}
     assert set(COLLECTIONS) == expected

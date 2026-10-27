@@ -1206,6 +1206,8 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": TILE_M, "tiles": plan["tiles"]},
                                                indent=1) + "\n", encoding="utf-8")
     (out / "props.csv").write_text(X.props_csv(m), encoding="utf-8")
+    if m.pois or m.zones or m.densities:
+        (out / "gameplay.json").write_text(json.dumps(X.gameplay(m)) + "\n", encoding="utf-8")
     t_exports = time.perf_counter() - t0 - t_plan
     exe = find_blender(blender)
     checks = []
