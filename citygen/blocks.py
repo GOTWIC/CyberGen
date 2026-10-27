@@ -72,8 +72,12 @@ def _w(poly) -> float:
 def row_pieces(net, J) -> list:
     """Right of way of every road (snapped strips) plus the junction corners and cul-de-sac
     bulbs; each district job unions the pieces near it."""
+    from .streets import TUNNEL_SIDE_M
+
     lines = [LineString(s["centerline"]) for s in net.segments]
-    widths = np.array([s["width_m"] / 2 for s in net.segments])
+    # (M9: a tunnel road's right of way covers its box walls and 2 m past them)
+    widths = np.array([s["width_m"] / 2 + (TUNNEL_SIDE_M if s.get("tunnel") else 0.0)
+                       for s in net.segments])
     bufs = G.snap_many(shapely.buffer(np.array(lines, dtype=object), widths, cap_style="flat",
                                       join_style="mitre", mitre_limit=2.0))
     extra = [j["row_polygon"] for j in J["junctions"] if j.get("row_polygon") is not None

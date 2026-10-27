@@ -552,7 +552,10 @@ class Builder:
             forbid += _raised_spans(s["z_profile"], LOCAL_JUNCTION_Z_M)
             # M9: nor where it runs below the ground (a tunnel and its approaches)
             forbid += [(a - 20.0, b + 20.0) for a, b in _sunk_spans(s["z_profile"])]
-            ln = Line(pts, s["road_class"], s["width_m"], s["attrs"].get("role", "primary"),
+            # (M9: a tunnel road's right of way covers its box and 2 m past its walls: no
+            # lot, building or street over the walls)
+            w = s["width_m"] + (2.0 * TUNNEL_SIDE_M if s.get("tunnel") else 0.0)
+            ln = Line(pts, s["road_class"], w, s["attrs"].get("role", "primary"),
                       name=s.get("name"), section=s["cross_section"], primary=s, forbid=forbid)
             for end in (s["start"], s["end"]):
                 p = nodes[end]["position"]
@@ -878,6 +881,7 @@ def under_deck(ln: "Line", p) -> bool:
     return _z_on(ln.primary["z_profile"], _project(ln.pts, p)[0]) >= UNDERPASS_CLEAR_M - 0.5
 
 
+TUNNEL_SIDE_M = 3.0            # M9: a tunnel road's right of way past each carriageway edge
 OVER_TUNNEL_Z_M = -7.3         # M9: a street crosses over a tunnel road this deep (box roof,
 #                                a metre of cover)
 

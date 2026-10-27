@@ -12,15 +12,15 @@
   "cities": {
     "archipelago_free_port": "3955cc554a644dafed5fb9842128f18b2c6660b28b2afe00d80751049db72e6b",
     "delta_megacity": "af659f62e6ef3fdd7d9bcccefb8c1c4378d6eac81294271943ac06efebc1370e",
-    "nexus_city": "35364a8db4fe0051f3bc2e88d02be075398fa52535b06bb4a96883c4ba59ae77",
-    "peninsula_city": "16c280f26d06881fb73d28dc71d727feeb1e221896ee20996f6e81f2cbefe564",
+    "nexus_city": "2d882b269f842813f6dd6c85c68bfa2515a5410e4a7431a52059a25d8e9003d6",
+    "peninsula_city": "06ce0514189a4a1f7ef96fe6c91a7e223c9e30db0887e5422d02a530fca1187d",
     "vesper_bay": "14642066364df211d43bdb83dce6fc03347a4d889bad97488cb536bdaaed257c"
   },
   "blockout_plans": {
     "archipelago_free_port": "12a66c4a75da521fac65b7dded6d66d87fea540de4ddc934568c776dcf37dd97",
     "delta_megacity": "09332d4d24cf183730b387cec40d6efa2365adc722eeadfedeafff0e2e6ce3d6",
-    "nexus_city": "cf46bede2e761596183502f4d6840aec057d77b318161ca7cc46bf8e74f74cfa",
-    "peninsula_city": "87c51ddcdc38b7a9eb38b227a5abd10ad5f7e63dc9aa8af28554845e385b0840",
+    "nexus_city": "b8310fb6487c2aa971ea970b630dd52435a95aa5d3371900fd1f677b43db33ba",
+    "peninsula_city": "eacb6d4d4c55a097cb572431849f82473ff0445376cb84054a1d67b6d71d6a66",
     "vesper_bay": "0e33c065c7158b6baf25c01656efa7c46faa27d1b518b1561658758c84a92658"
   }
 }
