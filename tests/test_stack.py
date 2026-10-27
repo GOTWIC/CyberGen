@@ -257,3 +257,61 @@ def test_stack_columns_fit(stack):
             run = run + 2.5 if core and min(h.distance(p) for h in hw) < reach else 0.0
             best = max(best, run)
         assert 0.0 < best <= EL.STACK_SPAN_M, (s["id"], best)
+
+
+def _with_tee(x: float, side: int):
+    """The test crossing with an avenue meeting the lifted highway (along x) at (x, 0)."""
+    net = _crossing()
+    segs = [s for s in net.segments if s["id"] != "rs0002"]
+    segs.insert(1, _seg(2, "rn0001", "rn0006", (0.0, 0.0), (x, 0.0), n=20))
+    segs.append(_seg(5, "rn0006", "rn0003", (x, 0.0), (HALF, 0.0), n=20))
+    av = _seg(6, "rn0006", "rn0007", (x, 0.0), (x, side * 900.0), n=20)
+    av.update(road_class="avenue", type="road.avenue", width_m=20.0)
+    segs.append(av)
+    net.segments = segs
+    net.nodes += [{"id": "rn0006", "position": (G.q(x), 0.0, 0.0), "attrs": {"kind": "junction"}},
+                  {"id": "rn0007", "position": (G.q(x), G.q(side * 900.0), 0.0),
+                   "attrs": {"kind": "edge"}}]
+    return net
+
+
+@pytest.mark.parametrize("x,side", [(450.0, 1), (600.0, -1)])
+def test_avenue_junction_under_the_lifted_deck(x, side):
+    """An avenue meeting the lifted highway among the stack's ramps, whose own ramps do not
+    fit there, stays at grade under the deck (the viaduct does not come down for it)."""
+    net = _with_tee(x, side)
+    st = EL.elevate(_spec(), _ctx(), net)
+    assert st["interchanges"] == {"stack": 1}, st["notes"]
+    av = [s for s in net.segments if s["road_class"] == "avenue"]
+    assert av and all(z["z"] == 0.0 for s in av for z in s["z_profile"])
+    deck = [s for s in net.segments if s["attrs"].get("elevated")]
+    assert all(z["z"] >= EL.LEVEL_Z[1] - 0.01 for s in deck for z in s["z_profile"]
+               if abs(G.q(s["centerline"][0][1])) < 1.0 and abs(_at_x(s, z["s"]) - x) < 60.0)
+    assert not _clear(net)
+
+
+def _at_x(s, d):
+    return LineString(s["centerline"]).interpolate(d).x
+
+
+def test_a_stack_never_built_is_dropped(monkeypatch):
+    """A planned stack the stage did not build (its node no longer inside a run, say) is
+    dropped like one that did not fit: the crossing is what M7 makes of it."""
+    monkeypatch.setattr(EL.Elev, "stack_ic", lambda self, r, k: None)
+    net, st = _build("stack")
+    monkeypatch.setattr(EL.Elev, "plan_stacks", lambda self: None)
+    ref, st_ref = _build("stack")
+    assert [s["centerline"] for s in net.segments] == [s["centerline"] for s in ref.segments]
+    assert [s["z_profile"] for s in net.segments] == [s["z_profile"] for s in ref.segments]
+
+
+def test_winding():
+    """The builder's own measure of a ramp's turn (left positive), as the check takes it."""
+    quarter = [(100.0 * math.sin(math.radians(a)), 100.0 - 100.0 * math.cos(math.radians(a)))
+               for a in range(0, 91, 3)]
+    from citygen import elevated_checks as EC
+
+    for pts, sign in ((quarter, 1.0), ([(x, -y) for x, y in quarter], -1.0)):
+        w = EL._winding(pts)
+        assert 75.0 < sign * w <= 90.0 and abs(w - EC._turning(pts)) < 1.0
+    assert abs(EL._winding([(0.0, 0.0), (100.0, 0.0), (200.0, 0.0)])) < 1e-9
