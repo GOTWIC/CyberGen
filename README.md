@@ -124,7 +124,8 @@ one (the `citygen` skill takes it from there). Editing, locking and the other co
 ## Stage 2: assetgen
 
 A unique 3D model for every building in a stage 1 city, generated from its footprint, massing
-and use, plus roads, sidewalks, street furniture and textures.
+and use, plus roads, sidewalks, street furniture and textures. Each milestone's assets go
+into Unreal through the same exporter as stage 1's city, replacing the blockout piece by piece.
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
@@ -142,10 +143,9 @@ Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 | AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
 | AG7 | Street elements | Roads with markings, sidewalks, bridges, viaducts, tunnels, quays, transit structures | Planned |
 | AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
-| AG9 | Unreal | The modelled city in Unreal Engine 5.8 | Planned |
-| AG10 | Every city modelled | All sample cities with their assets; frozen releases | Planned |
-| AG11 | Layered districts | Buildings and streets on stacked decks | Planned |
-| AG12 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
+| AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
+| AG10 | Layered districts | Buildings and streets on stacked decks | Planned |
+| AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 
 ---
 
@@ -166,7 +166,7 @@ Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
   `docs/progress/M1a2/<city>/`).
 - `docs/`: each stage's spec (`<generator>_scope.md`) and full milestone log
   (`<generator>_milestones.md`); `docs/progress/<milestone>/` holds each milestone's builds
-  and images.
+  and images; `docs/unreal_export.md` describes the Unreal exporter every stage shares.
 - `maps/`, `pipeline/`, `reference/`, `unreal/`, `out/`: an earlier hand-tracing pipeline; its
   traced Corporate Core map is the pinned demo's input.
 

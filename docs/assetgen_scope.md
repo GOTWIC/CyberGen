@@ -2,7 +2,8 @@
 
 Stage 2 (assetgen) of CyberGen's five stages. A built citygen city in; a 3D model of its own
 for every building, plus the street elements, props, plants and texture library the city
-needs, out, ready for M15's Unreal import. Like citygen it is city-agnostic, offline and
+needs, out, and into Unreal through the shared exporter (`docs/unreal_export.md`), which
+every assetgen milestone updates for what it adds. Like citygen it is city-agnostic, offline and
 deterministic. Its milestones carry the prefix AG (AG0 to AG11, section 14), so their
 folders in `docs/progress/` never clash with stage 1's M folders or a later stage's; their
 full record is `docs/assetgen_milestones.md`. The decisions that need Swagnik before AG1
@@ -24,7 +25,7 @@ starts are in section 13.
         └──> asset manifest (keyed by citygen id, content hashes)
         │
         ├──> Blender previews (district renders, street views, contact sheets)
-        └──> M15 `citygen unreal`: replaces blockout meshes by id, Nanite on
+        └──> Unreal exporter: assetgen's entries replace blockout meshes by id
 
  asset_spec.json (art direction, written by a Claude Code session through the
  `assetgen` skill from the city prompt; no API call)
@@ -77,7 +78,8 @@ starts are in section 13.
    city are validated every run (section 9), like citygen's checks.
 8. **Engine-agnostic files, Unreal-ready conventions.** glTF 2.0 (and USD where useful) with
    meters, citygen's frame and Unreal-friendly naming; Unreal specifics (Nanite flags,
-   master materials, HLOD layers) live in the manifest, applied by M15's importer.
+   master materials, HLOD layers) live in the manifest, applied by the shared Unreal
+   exporter.
 
 ## 3. Pipeline stages
 
@@ -371,26 +373,24 @@ uses; fonts and scripts per asset spec.
   measured in AG0.
 - Coordinates: citygen's frame (meters, x east, y north, z up); each building's nodes sit at
   its own origin (the middle of its footprint, on the 0.01 m grid) so vertex positions stay
-  small; M15 maps to Unreal as it does today.
-- Names follow M10 ids; Unreal asset names replace dots with underscores, as M15's importer
+  small; the Unreal exporter maps them to Unreal's frame as it does the blockout.
+- Names follow M10 ids; Unreal asset names replace dots with underscores, as the exporter
   does.
 
 ## 7. Interfaces
 
-- **M15 (Unreal import)**: M15's `citygen unreal <build_dir> <uproject>` writes
-  `unreal/manifest.json` (every blockout object by key, a building's key being its id, with
-  a 16-hex content hash; instanced kinds with every instance's id), imports the glTF tiles
-  through Interchange with Nanite on and a material instance of `M_CityGen` per material,
-  props and plants as hierarchical instanced meshes (`BP_CityGenInstances`), and updates the
-  level by key and hash (`cg.key`, `cg.hash` actor tags): a second import changes nothing, a
-  regenerated district changes only its actors. assetgen writes the same manifest format for
-  its assets (its own entry for every key it has an asset for, the blockout's for the rest;
-  parts and prop variants as instanced kinds per tile, or merged into the shell where a part
-  repeats fewer than about 8 times), so the import path stays one. What M15's importer lacks
-  for assets comes in AG9: per-building pivots (the blockout's meshes sit in world space),
-  textured master materials with Custom Primitive Data, simple collision from the manifest,
-  LOD chains on non-Nanite pieces, distance field and Lumen card settings (M15 leaves them
-  off), HLOD layers. Any change under `citygen/` is a citygen session's.
+- **Unreal exporter** (`docs/unreal_export.md`): one exporter for every stage, introduced by
+  M15 (`citygen unreal`), which imports the blockout by key and hash (`cg.key`, `cg.hash`
+  actor tags; a second import changes nothing, a regenerated district changes only its
+  actors). assetgen contributes entries in its manifest format, keyed by the same ids and
+  layered over stage 1's: its own entry for every key it has an asset for, the blockout's
+  for the rest, `replaces` where its pieces supersede joined ones (street meshes); parts and
+  prop variants as instanced kinds per tile, or merged into the shell where a part repeats
+  fewer than about 8 times. What the exporter lacks for assets arrives with the milestone
+  that needs it (section 14, the **Unreal** line of each): per-building pivots (the
+  blockout's meshes sit in world space), textured master materials with Custom Primitive
+  Data, simple collision, LOD chains on non-Nanite pieces, distance field and Lumen card
+  settings (M15 leaves them off), HLOD layers.
 - **Stage 3 (atmosgen)**: emissive windows with per-window ids and use (lit patterns by hour
   band from M11 densities), light emitter points on signs, wall lights and street lights,
   neon colors, wet-surface masks, under-deck surfaces.
@@ -530,7 +530,8 @@ as source images (regenerable, not in git). Signage per city about 0.3 GB.
 - the shared library in under an hour, once per library version;
 - Blender previews in under 10 minutes (districts at full detail, the whole city from proxies:
   100 M triangles do not fit Blender in 24 GB);
-- Unreal import of a city's assets in under an hour (measured in AG0 and AG9). For scale,
+- Unreal import of a city's assets in under an hour (measured in AG0's spike, then in the
+  Unreal checks the coordinating session runs after milestones). For scale,
   M15 imports Vesper Bay's 8,544 blockout meshes in 79 s on the Mac and deletes meshes at
   about 50 ms each on a re-import; it leaves distance fields and Lumen cards off because
   building them took about an hour of editor time for thousands of meshes, a cost AG0
@@ -582,7 +583,7 @@ samples build at proxy level or on the Windows PC (decision 13.5).
    Windows PC (SSH, or a local Claude Code there) for the Windows determinism check and full
    imports?
 6. **Interiors.** Interior mapping only (recommended for v1), enterable interiors for M11
-   points of interest as a stage 2 milestone (AG12: bars, clinics, apartments; large
+   points of interest as a stage 2 milestone (AG11: bars, clinics, apartments; large
    scope), or left to the projects that use the cities.
 7. **Art direction input.** Asset spec per city written by a session from the prompt
    (recommended), with review rounds on renders; do you want to give reference images per era
@@ -595,39 +596,43 @@ samples build at proxy level or on the Windows PC (decision 13.5).
 Stage 2's milestones carry the prefix AG. Each is one local session in its own worktree and
 ends with tests passing, the sample cities built with its assets, previews in
 `docs/progress/AG<n>/` (snapshots in `wip/` while it runs), its entry in
-`docs/assetgen_milestones.md`, and its row and images in the README's stage 2 section.
-"Mac = x86" means the manifest (from AG6 also the decoded pixels) is the same on the Mac and
-in the x86 Linux docker image; Windows joins in AG10.
+`docs/assetgen_milestones.md`, its row and images in the README's stage 2 section, and the
+Unreal exporter updated for what it adds (its **Unreal** line below; CLAUDE.md, "Unreal
+exporter"). A milestone session need not run Unreal: when it is done, the coordinating
+session decides whether to run an Unreal check in a separate session. "Mac = x86" means the
+manifest (from AG6 also the decoded pixels) is the same on the Mac and in the x86 Linux
+docker image; Windows joins in AG9.
 
 | AG | Milestone | Needs | Can run beside |
 |---|---|---|---|
-| AG0 | Contract and spike | M10 (merged) | M13, M15 |
+| AG0 | Contract and spike | M10; M15 | M13 |
 | AG1 | Building shells | AG0; decisions 13.2, 13.8 | AG7, AG8 |
 | AG2 | Facades | AG1 | AG6, AG7, AG8 |
 | AG3 | Street fronts | AG2 | AG6, AG7, AG8 |
-| AG4 | Roofs and connections | AG3 | AG6 to AG9 |
-| AG5 | Types, landmarks and slopes | AG4; M13 | AG6 to AG9 |
+| AG4 | Roofs and connections | AG3 | AG6, AG7, AG8 |
+| AG5 | Types, landmarks and slopes | AG4; M13 | AG6, AG7, AG8 |
 | AG6 | Materials and textures | AG1; decisions 13.1, 13.3 | AG2 to AG5, AG7, AG8 |
 | AG7 | Street elements | AG0; M13 for grades | AG1 to AG6 |
 | AG8 | Props, plants and signs | AG0; decision 13.3 | AG1 to AG6 |
-| AG9 | Unreal | AG3, AG6; M15 | AG4, AG5, AG7, AG8 |
-| AG10 | Scale and release | AG4 to AG9; decision 13.5 | |
-| AG11 | Layered districts | AG10; M14 | AG12 |
-| AG12 | Interiors (only if decision 13.6 asks) | AG10 | AG11 |
+| AG9 | Scale and release | AG5 to AG8; decision 13.5 | |
+| AG10 | Layered districts | AG9; M14 | AG11 |
+| AG11 | Interiors (only if decision 13.6 asks) | AG9 | AG10 |
 
 ### 14.1 AG0: Contract and spike
 
 - **Adds:** package `assetgen/` (CLI `python -m assetgen`); the asset spec schema with era
   presets (`assetgen spec validate|schema`) and a first `assetgen` skill; `assetgen brief`
   (`briefs.json` and a brief hash per building: edge classes, floor grid, neighbors, mounted
-  props, sign slots, M13 bases where present) and `assetgen brief diff`; the manifest schema
-  in M15's format (section 7); a deterministic glTF writer; the exact integer triangulator;
-  the determinism harness (Mac and the x86 docker image).
-- **Spike** in a throwaway Unreal 5.8 project of assetgen's own: three generated buildings
-  (a 1 M triangle tower, a shopfront row, a shanty stack) with Nanite, parts as instances,
-  Custom Primitive Data, opaque glass with interior mapping, simple collision. It measures
-  import time, editor disk and cooked size per million triangles, distance field and Lumen
-  card cost, whether Interchange reads `KHR_mesh_quantization` and
+  props, sign slots, M13 bases where present) and `assetgen brief diff`; a deterministic
+  glTF writer; the exact integer triangulator; the determinism harness (Mac and the x86
+  docker image).
+- **Unreal:** assetgen's contribution to the exporter (entries keyed by id, layered over
+  the blockout, `replaces`), on the exporter's own package once M15's move is done. The
+  spike, in a throwaway Unreal 5.8 project of assetgen's own, imports three generated
+  buildings through it (a 1 M triangle tower, a shopfront row, a shanty stack) with Nanite,
+  parts as instances, Custom Primitive Data, opaque glass with interior mapping and simple
+  collision, and measures import time, editor disk and cooked size per million triangles,
+  distance field and Lumen card cost, whether Interchange reads `KHR_mesh_quantization` and
   `EXT_mesh_gpu_instancing`, and the state of Nanite foliage in 5.8.
 - **Done when:** every building of every sample has a brief, Mac = x86; M10's regenerated
   districts change only the briefs of their district and seam; the spike's numbers replace
@@ -645,6 +650,9 @@ in the x86 Linux docker image; Windows joins in AG10.
   which keeps every asset whose key and hash are unchanged; Blender previews (districts and
   the blockout's street cameras at full detail, the whole city from proxies, contact sheets
   per type); checks for coverage, envelope, meshes and uniqueness on genomes.
+- **Unreal:** shells replace their blockout boxes by id, with per-building pivots, a
+  material instance per slot, simple collision from the masses and the proxies as Nanite
+  fallback meshes; the first assets in the level.
 - **Done when:** every sample building has a shell and a proxy; the checks pass; a whole city
   builds in under 20 minutes and a second build writes no file; Mac = x86.
 - **Shows:** the first modelled whole-city render, a district up close, a contact sheet.
@@ -658,6 +666,8 @@ in the x86 Linux docker image; Windows joins in AG10.
   louvered industrial, capsule stacks, clean-tech skins, hangar cladding); massing
   articulation (pipeline stage 3: chamfers, rounded corners, setback ledges, cantilevers,
   crowns, mechanical bands, podium canopies); irregularity by grime and wealth.
+- **Unreal:** parts as instanced kinds (or merged into the shell where a part repeats fewer
+  than about 8 times), with the instances' building ids.
 - **Done when:** the uniqueness check (genes and thumbnail hashes) passes in every sample;
   triangle and instance budgets per building class are met; Mac = x86.
 - **Shows:** towers of each era up close; a contact sheet of 64 buildings drawn at random.
@@ -670,6 +680,8 @@ in the x86 Linux docker image; Windows joins in AG10.
   greenery; party walls (fire walls, ad and graffiti surfaces) and blind walls; the access
   check (a door at every entrance, open to its walkway) and the mounts check (on a panel or
   pier, never on glass).
+- **Unreal:** complex collision in the ground band, so doorways, steps and awning posts
+  collide as drawn; doors tagged with their entrance and walkway ids for stage 4.
 - **Done when:** the access and mounts checks pass; the blockout's street cameras show
   buildings that read as distinct (reviewed with Swagnik); Mac = x86.
 - **Shows:** street-level renders from the blockout's cameras.
@@ -681,6 +693,8 @@ in the x86 Linux docker image; Windows joins in AG10.
   penthouses, helipads and AV pads with markings), green roofs, access huts; facade details
   (downpipes, fire escapes, vents, cables, cameras); skybridges by kind with their landing
   openings; sky tube portals and sky stations; podium decks and atrium interiors.
+- **Unreal:** skybridges replace their blockout pieces by id; roof equipment as instanced
+  kinds.
 - **Done when:** every roof item, skybridge and portal has an asset; the envelope check keeps
   skybridge, transit and sky tube clearances; Mac = x86.
 - **Shows:** an aerial view over a dense district's roofs; a skybridge and a sky tube portal
@@ -697,6 +711,7 @@ in the x86 Linux docker image; Windows joins in AG10.
   (stepped plinths from `plinth_m` up to `base_m`, retaining walls, entrances at grade); the
   art-direction loop (`assetgen review` and asset spec rounds through the skill, as
   citygen's).
+- **Unreal:** hero bakes as per-building textures; plinths meeting M13's terrain.
 - **Done when:** every type, complex and landmark of the samples and of M13's hilly sample
   has its generator; two art-direction rounds on Vesper Bay; Mac = x86.
 - **Shows:** the landmarks at 8K; one district per era; buildings on a slope.
@@ -708,6 +723,9 @@ in the x86 Linux docker image; Windows joins in AG10.
   signage atlases from M11's names and unit uses, brand logos and ad content; per-building
   material parameters and vertex colors; Blender materials that match the Unreal masters;
   the texel density check.
+- **Unreal:** the textured master materials (facade, opaque glass with interior mapping,
+  metal, concrete, neon, signs, decals, road), texture import, material instances with
+  their parameters and Custom Primitive Data per actor.
 - **Done when:** the library is within its budget (section 11); textured renders of every
   sample district; decoded pixels Mac = x86.
 - **Shows:** a material board per era; textured street views by day and by night.
@@ -719,7 +737,9 @@ in the x86 Linux docker image; Windows joins in AG10.
   M12) with parapets, joints and columns; tunnels (M9); quays, canal walls and piers;
   transit guideways, beams, maglev tracks, sky tubes and pylons; megasite elements; all on
   M13's grade lines with embankments and retaining walls where a city has terrain. Written
-  per 256 m tile and keyed by ids, finer than M15's joined pieces.
+  per 256 m tile and keyed by ids.
+- **Unreal:** street meshes per segment and junction that `replaces` M15's joined pieces;
+  sky tubes as non-Nanite meshes with LOD chains.
 - **Done when:** every street element of the samples has an asset; a regenerated district
   rewrites only its tiles' street packs; Mac = x86.
 - **Shows:** an interchange at 8K; street views with the new streets.
@@ -730,49 +750,41 @@ in the x86 Linux docker image; Windows joins in AG10.
   species (space colonization), shrubs, ivy and ground cover; an asset for every M11 sign
   slot (shop signs with their text, neon tubes along glyph outlines, billboards, holo-ads,
   neon bands), in the fonts decision 13.3 allows.
+- **Unreal:** the variants as instanced kinds replacing M15's prototypes; signs as actors
+  per slot; holo-ads and translucent sign faces as non-Nanite meshes with LOD chains;
+  Nanite foliage or LOD chains for trees, as AG0 found.
 - **Done when:** every prop kind, plant species and sign slot has an asset; instance budgets
   are met; Mac = x86.
 - **Shows:** variant sheets per district style; a neon street at night.
 
-### 14.10 AG9: Unreal
-
-- **Adds:** assetgen's Unreal manifest (M15's format, section 7) and what M15's importer
-  lacks for assets: per-building pivots, textured master materials with Custom Primitive
-  Data, simple collision (convex parts per mass, complex only in the ground band), LOD
-  chains on non-Nanite pieces (holo-ads, sky tubes, translucent signs), distance field and
-  Lumen settings from AG0's measurements, HLOD layers; a regenerated district end to end
-  (citygen, assetgen, re-import).
-- **Done when:** Vesper Bay imports with its assets, streams and passes M15's check (walk,
-  traces, roofs, facades); a second import changes nothing; a regenerated district rebuilds
-  and re-imports only its changed assets; import time and disk are within section 11.
-- **Shows:** Vesper Bay in Unreal at 8K; the same street views in Blender and in Unreal.
-
-### 14.11 AG10: Scale and release
+### 14.10 AG9: Scale and release
 
 - **Adds:** every sample at full detail where disk allows (the rest at proxy level, or on
   the Windows PC); `assetgen sweep` over the M8a suite's cities (no crash, budgets); the
   determinism check on Windows; `assetgen lock` and `--verify`.
+- **Unreal:** HLOD layers, distance field and Lumen card settings at city scale, import time
+  and disk per city within section 11.
 - **Done when:** the sweep runs without a crash; the Mac, x86 Linux and Windows agree;
   budgets are met; the README's stage 2 section shows every sample city.
-- **Shows:** whole-city renders of every sample at 8K.
+- **Shows:** whole-city renders of every sample at 8K, in Blender and in Unreal.
 
-### 14.12 AG11 and AG12: after v1
+### 14.11 AG10 and AG11: after v1
 
-- **AG11, layered districts** (after M14): buildings that stand on M14's deck levels
+- **AG10, layered districts** (after M14): buildings that stand on M14's deck levels
   (facades from their deck, deck undersides, supports, stair and elevator cores) and street
-  elements on the decks; done when M14's samples pass every assetgen check.
-- **AG12, interiors** (only if decision 13.6 asks for them): enterable interiors for M11's
+  elements on the decks, with their entries in the exporter; done when M14's samples pass
+  every assetgen check.
+- **AG11, interiors** (only if decision 13.6 asks for them): enterable interiors for M11's
   points of interest (bars, clinics, vendors, apartments), generated from the unit's
   footprint and use.
 
-### 14.13 Order and sessions
+### 14.12 Order and sessions
 
 ```
  AG0 ─┬─> AG1 ─> AG2 ─> AG3 ─> AG4 ─> AG5 ──┐
       │     └──> AG6 ───────────────────────┤
-      ├─> AG7 ──────────────────────────────┼─> AG10 ─> AG11 (after M14), AG12 (if asked)
-      └─> AG8 ──────────────────────────────┤
-          AG3 + AG6 + M15 ──> AG9 ──────────┘
+      ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11 (if asked)
+      └─> AG8 ──────────────────────────────┘
 ```
 
 - **The building line** (AG1 to AG5) runs one session at a time: each builds on the last
@@ -781,21 +793,23 @@ in the x86 Linux docker image; Windows joins in AG10.
   (materials, streets and props live in their own modules), so each can run beside it as a
   separate local session once its prerequisite is merged (AG0; for AG6, AG1, which fixes the
   material slots). At most two assetgen sessions at a time, since citygen sessions share
-  the Mac; shared files (CLI, manifest, report) change in one session at a time.
-- **Unreal early:** AG9 starts once AG3, AG6 and M15 are merged, since buildings with
-  street fronts and textures are the first thing worth importing. The manifest keeps the
-  blockout mesh for every key without an asset, so streets, props and later building work
-  import through the same path as they land.
+  the Mac; shared files (CLI, manifest, report, the exporter's core) change in one session
+  at a time.
+- **Unreal throughout:** the first assets reach the level with AG1, and every milestone
+  after it brings what it adds. After each one the coordinating session decides whether to
+  run an Unreal check in a separate session (likely after AG1, AG3, AG6, AG7, AG8 and AG9,
+  which change what the level holds or how it imports).
 - **The core** is AG0 to AG3: every building has a model of its own that reads as its own
   from the street.
-- **Stage 1 milestones assetgen waits on:** M13 for AG5's slopes and AG7's grades (until
-  then flat ground at z 0), M15 for AG9, M14 for AG11. The asks of section 4.5 go to citygen
-  sessions; each milestone derives what it needs in the brief meanwhile.
+- **Stage 1 milestones assetgen waits on:** M15 and the exporter's move to its own package
+  before AG0's Unreal part, M13 for AG5's slopes and AG7's grades (until then flat ground at
+  z 0), M14 for AG10. The asks of section 4.5 go to citygen sessions; each milestone derives
+  what it needs in the brief meanwhile.
 
 ## 15. Running it
 
 - Local sessions only (no cloud credits); one milestone per session in its own worktree
-  (14.13 for which can run at once).
+  (14.12 for which can run at once).
 - Package `assetgen/` beside `citygen/`, importing citygen's model, `dmath` and `geom`
   (read only; never edited from an assetgen session); tests in `tests/assetgen/`; skill
   `.claude/skills/assetgen/SKILL.md`.
@@ -806,11 +820,11 @@ in the x86 Linux docker image; Windows joins in AG10.
 - Progress in `docs/progress/AG<n>/`, with snapshot images in `wip/<NN>_<step>/` pushed to
   the session branch at least every hour or so; generated assets never in git (previews,
   reports and small goldens only).
-- Unreal tests in a throwaway project of assetgen's own (UE 5.8 at
-  `/Users/Shared/Epic Games/UE_5.8` on the Mac; M15's `citygen unreal --new-project` makes
-  one); heavy scenes on the Windows PC.
-- citygen changes assetgen needs (section 4.5, M15's importer in section 7) go to citygen
-  sessions.
+- Unreal: every milestone updates the exporter for what it adds; Unreal checks run in a
+  separate session the coordinating session dispatches, in a throwaway project of its own
+  (UE 5.8 at `/Users/Shared/Epic Games/UE_5.8` on the Mac), results in
+  `docs/progress/AG<n>/unreal/` (`docs/unreal_export.md`); heavy scenes on the Windows PC.
+- citygen changes assetgen needs (section 4.5) go to citygen sessions.
 
 ## 16. References
 
