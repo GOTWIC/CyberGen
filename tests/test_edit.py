@@ -165,26 +165,29 @@ def test_regeneration_keeps_the_city_outside_the_district():
     assert rec["district"] == REGEN and rec["seed"] != b.spec.district(REGEN).seed
     assert all(c.passed for c in r.checks), [(c.id, c.failures[:2]) for c in r.checks
                                              if not c.passed]
-    info = r.stats["regenerated"]
-    assert info["held_unchanged"] == info["held_segments"]
     did = next(d.id for d in b.model.districts if d.name == REGEN)
-    poly = G.from_model_poly(next(d for d in b.model.districts if d.id == did).polygon)
     old, new = _index(b.model), _index(r.model)
     # the district itself is new
     inside = [i for i, (c, e) in old.items() if c == "buildings" and e["district_id"] == did]
     assert inside and len(set(inside) & set(new)) < len(inside) / 2
-    # every road outside it, and every entity more than 250 m from it, as it was
+    _outside_kept(b, r, REGEN)
+
+
+def _outside_kept(b, r, name: str) -> None:
+    """Every road not inside the district comes back as it was (id, geometry and all), and
+    every entity more than 250 m from it too: outside it, only the seam changes."""
+    info = r.stats["regenerated"]
+    assert info["held_unchanged"] == info["held_segments"]
+    did = next(d.id for d in b.model.districts if d.name == name)
+    poly = G.from_model_poly(next(d for d in b.model.districts if d.id == did).polygon)
+    old, new = _index(b.model), _index(r.model)
     frame = r.frame
     for i, (c, e) in old.items():
         if c == "road_segments" and not frame.inside_row(b.model.index()[i]):
-            assert new.get(i) is not None and new[i][1]["centerline"] == e["centerline"], i
-        p = _anchor_point(e)
-        if p is not None and p.distance(poly) > 250.0 and c not in ("fields",):
-            assert new.get(i) == (c, e), (c, i)
-    # outside it, only the seam changes
-    far = [i for i, (c, e) in old.items() if new.get(i) != (c, e) and c != "fields" and
+            assert new.get(i) == (c, e), i
+    far = [(c, i) for i, (c, e) in old.items() if new.get(i) != (c, e) and c != "fields" and
            _anchor_point(e) is not None and _anchor_point(e).distance(poly) > 250.0]
-    assert not far
+    assert not far, far[:5]
 
 
 def test_regeneration_with_new_spec_fields():
@@ -201,6 +204,7 @@ def test_regeneration_with_new_spec_fields():
                                 if x.district_id == did and not x.landmark)
     assert all(c.passed for c in r.checks), [(c.id, c.failures[:2]) for c in r.checks
                                              if not c.passed]
+    _outside_kept(b, r, "Uptown")
 
 
 def test_regeneration_is_deterministic():

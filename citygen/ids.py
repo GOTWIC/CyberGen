@@ -60,7 +60,7 @@ REFS: dict[str, tuple[str, ...]] = {
     "lanes": ("segment_id", "node_id", "successors[]", "adjacent_ids[]"),
     "walkways": ("neighbors[]",),
     "structures": ("supports[]",),
-    "tunnels": ("segment_ids[]", "district_ids[]", "portals[].segment_id", "crosses"),
+    "tunnels": ("segment_ids[]", "line_id", "walkway_ids[]", "crosses[]", "vent_ids[]"),   # M9
     "transit_lines": ("station_ids[]",),
     "stations": ("line_ids[]", "building_id", "access_ids[]"),
     "megasites": ("district_id", "member_ids[]"),

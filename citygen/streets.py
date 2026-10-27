@@ -648,8 +648,19 @@ class Frame:
                             water_class="canal"))
             B.lines[li].attached = [ends[p] > 1 for p in (pts[0], pts[-1])]
             for k, end in ((0, 0), (1, -1)):
-                if not B.lines[li].attached[k] and not B.attach(li, end, reach=3.0,
-                                                              angle=ORGANIC_ANGLE_DEG):
+                if B.lines[li].attached[k]:
+                    continue
+                # an end on a road already joins it there (a projection could move it 1 cm)
+                p = pts[end]
+                on = sorted({tj for tj, _ in B.index.near(p, pad=1.0) if tj != li and
+                             not B.lines[tj].dead and _locate(B.lines[tj].pts, p) is not None})
+                if on:
+                    t = B.lines[on[0]]
+                    t.inserts.append(p)
+                    if p not in t.junctions:
+                        t.junctions.append(p)
+                    B.lines[li].attached[k] = True
+                elif not B.attach(li, end, reach=3.0, angle=ORGANIC_ANGLE_DEG):
                     B.attach(li, end, reach=22.0, angle=ORGANIC_ANGLE_DEG)
             x = shapely.intersection(LineString(pts), mid)
             if not x.is_empty:
