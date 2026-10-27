@@ -7,20 +7,20 @@
     "numpy": "2.5.4",
     "shapely": "2.2.0",
     "geos": "3.14.1",
-    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M10: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical"
+    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M10: produced on the M4 Mac"
   },
   "cities": {
-    "archipelago_free_port": "1b2751aefc0b09f4c61a11faa45dc2c7b36268526b89c6e8d6684282c29af742",
-    "delta_megacity": "f9b1ba7b9062a9e972e484931ec672aee4345ded9c7762e02eddb209ea7a5eed",
-    "nexus_city": "f0c3060b76c7555b7c4b589fbc0a0daad943d5eba22956910fea36c2075252c1",
-    "peninsula_city": "5e0ae22f698b0a438fcc23caadf60f80c60aee2b03d4422bf3b9e0e86316a946",
-    "vesper_bay": "7e33a807be6557f4f5db3fe3230543d4c806f49b1ce654baf41215e5f311ea40"
+    "archipelago_free_port": "2cb91e663fe3f1aba5184efe0ad2cd5168b1f26721e6e8df9acddda0dbb8f525",
+    "delta_megacity": "49fa43f9631e8512a705dd8a008f5114610468d41b8722d94797ab6cd7c55abe",
+    "nexus_city": "696007837a246fb07489e67d4898889891068166f14651ec9811149965d77d2d",
+    "peninsula_city": "0ca27090773e437f5387065311e29b36eec5464f30785ca90f43bd7dd5e98e0e",
+    "vesper_bay": "3ee6a070f70534d98989183345036fd5c5512422a06c42a9a9ef09c78fb7202b"
   },
   "blockout_plans": {
-    "archipelago_free_port": "e3a7afccc932dbfa0abacd5159d4ca759f2b22dc1de2ab39a00dc5437fe72c79",
-    "delta_megacity": "cbbd3844eedf5111951b63dab29bc4a521a94d9d2806df31884356a10775f412",
-    "nexus_city": "df30224e4c14ccb3093df2977e33cc6cb41597a861aa41e1e2005450fd63feb5",
-    "peninsula_city": "a5d8dd527b286630e47789aa43b63e50a0119673540a1e09f4fdf8e2fb220598",
-    "vesper_bay": "1ffccd79df1c7acea05a64b5953322ae657bc0ffb4c8af24e11d0e309a9e97ca"
+    "archipelago_free_port": "fb8d98b62504b394eeacd9a5eb5ea14634eb619f189574d1b46a0d00ce966845",
+    "delta_megacity": "9ea68808c311a5c0b7223710d3fffb3cce22696ceb66ee4f2a6f4ea719ad3af6",
+    "nexus_city": "0cc0c305be2f10859815a45e1522829c23cd0baed39f44ab82e008d655246c77",
+    "peninsula_city": "b272711f2eeddfc1d8b93126449deabf5fd19b75fcb18cba2e96e0f927bf7479",
+    "vesper_bay": "dbc9cd6c101f4d05b30e402e4416380c17f9f93bd3e4032e325f8b6ecccb572e"
   }
 }

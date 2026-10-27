@@ -148,6 +148,14 @@ def anchor(e: dict) -> str:
 
 SUFFIX = re.compile(r"^(.*)\.(\d+)$")
 
+# id lists that are sets (graph neighbors): sorted by the new ids, so their order does not
+# keep the build order of the ids they name
+SETS: dict[str, tuple[str, ...]] = {
+    "walkways": ("neighbors",),
+    "lanes": ("successors", "adjacent_ids"),
+    "junctions": ("crosswalk_ids",),
+}
+
 
 def signature(coll: str, e: dict) -> str:
     """An entity's kind and geometry, as a key."""
@@ -206,6 +214,9 @@ class Renamer:
     def rewrite(self, coll: str, e: dict) -> None:
         for path in REFS.get(coll, ()):
             _apply(e, path.split("."), self.ref)
+        for key in SETS.get(coll, ()):
+            if e.get(key):
+                e[key] = sorted(e[key])
         if e.get("attrs"):
             e["attrs"] = self._attrs(e["attrs"])
 
@@ -357,7 +368,7 @@ class Renamer:
                 order = []
                 for f in sorted(by_from):
                     cs = sorted(by_from[f], key=lambda e: (
-                        [self.new.get(s, s) for s in e["successors"]], self._key(e)))
+                        sorted(self.new.get(s, s) for s in e["successors"]), self._key(e)))
                     for k, e in enumerate(cs):
                         order.append(e)
                         bases.append(f"{f}.c{k + 1}")

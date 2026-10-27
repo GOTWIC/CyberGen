@@ -3,7 +3,7 @@
   "name": "Nexus City",
   "release": "1.0",
   "citygen": "0.1.0",
-  "code_sha256": "fa698dd69c843790c4b184681966e8ac9ab06700bdc1beb834cb5e33b6bc5546",
+  "code_sha256": "abfdd8fcc37f3ca3f01b70f5274d4eaaca45e6eb46367aeda8cf94d11632c57b",
   "spec": {
     "$schema": "../../../../citygen/schemas/city_spec.schema.json",
     "name": "Nexus City",
@@ -376,9 +376,9 @@
   "choices": {
     "hydro_variant": 11,
     "road_variant": 0,
-    "layout_salt": 0
+    "layout_salt": 2
   },
   "overrides": null,
   "edits": [],
-  "model_sha256": "f0c3060b76c7555b7c4b589fbc0a0daad943d5eba22956910fea36c2075252c1"
+  "model_sha256": "696007837a246fb07489e67d4898889891068166f14651ec9811149965d77d2d"
 }

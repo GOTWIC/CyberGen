@@ -3,7 +3,7 @@
   "name": "Vesper Bay Pinned",
   "release": "1.0",
   "citygen": "0.1.0",
-  "code_sha256": "0e5b2d28a855beda9b2adfb214dc6836cd8ef19e4016e929764da463e0f0ee79",
+  "code_sha256": "abfdd8fcc37f3ca3f01b70f5274d4eaaca45e6eb46367aeda8cf94d11632c57b",
   "spec": {
     "$schema": "../../citygen/schemas/city_spec.schema.json",
     "name": "Vesper Bay Pinned",
@@ -245,9 +245,9 @@
   "choices": {
     "hydro_variant": 4,
     "road_variant": 0,
-    "layout_salt": 0
+    "layout_salt": 1
   },
   "overrides": null,
   "edits": [],
-  "model_sha256": "f86d860c467cf84d4786ef6c2a89d6e7ff7bcd90f6b2ec88b113242fcc062592"
+  "model_sha256": "d39673465d54fe981d59ed983118982a74655a11f3c18098e7edbf67b2e2cb6f"
 }
