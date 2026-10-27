@@ -9,7 +9,7 @@
     "shapely": "2.2.0",
     "geos": "3.14.1"
   },
-  "model_sha256": "c1c392d759acbd5db95d453c708dca023d8753bace6a413ebf776247d560c5b5",
+  "model_sha256": "2e3b9e219243873e03461284e494eb096fbdbdcc13c4b7fbcd6d6793eec76a16",
   "entries": [
     ["v0/coast", "5a3c3ce33863494de184740b35169c357ae349233948c51ac4f7e3ab37540bff"],
     ["v0/rivers", "0af1bb11275c4c9ff4a4e5ce7b176db1f729ef85aa01a72753526fb165cd6dea"],

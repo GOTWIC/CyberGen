@@ -232,21 +232,25 @@ regeneration of such a city would have started from another layout; fixed and te
 
 ## Tests
 
-`tests/test_edit.py` (15 tests on the small test city):
+`tests/test_edit.py` (16 tests on the small test city):
 
 - ids: every id from its kind and place (no build counter left), every reference names an
   entity, renaming a renamed model changes nothing, collisions go by content, and a
   generator change local to one stage (no benches) leaves every other id and entity alone;
 - regeneration: a district with a new seed and a district with new spec fields
   (`height_m`): every road outside it back as it was (id, geometry and all), every entity
-  more than 250 m from it unchanged, every check passing; regeneration is deterministic;
+  more than 250 m from it unchanged, every check passing; regeneration is deterministic; a
+  whole-city retry's layout salt is kept for the replay;
 - pins (a building and a road survive a regeneration, nothing new on the pinned ground) and
   every override operation;
 - a locked city with a regeneration rebuilds byte for byte; a lock refuses a hand-edited
   model; the diff; the CLI (`build --district`, `lock`, `lock --verify`, `model diff`).
 
 The goldens (`tests/data/golden_hashes.json`) are the M10 builds; the check count is
-unchanged (75).
+unchanged (75). `test_gameplay.py::test_check_travel_fails` now removes the fast-travel
+points of the core district: it took the district of the first point, and with stable ids
+the rows come in another order, so that was Test Isle, which has no drive lane and needs no
+point.
 
 ## Open items
 
