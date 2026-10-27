@@ -341,8 +341,9 @@ point; `test_props.py::test_check_trees_fails` gives its tree an 80 m crown inst
 | `citygen/overrides.py` | pins and edits |
 | `citygen/lock.py` | lock and verify |
 | `citygen/diff.py`, `citygen/preview_diff.py` | model diff and its map |
-| `citygen/streets.py` | `Frame` and its hooks in the street builder |
+| `citygen/streets.py` | `Frame` and its hooks in the street builder (`_junction_near`, `_joined`, `Line.fresh`) |
+| `citygen/transit.py` | held lines (`build(spec, m, fixed)`; a held metro back at its base depth) |
 | `citygen/build.py` | `replay`, `choices`, `stable`, `check_all` |
-| `<city>/` | sample builds: previews, report, stage trace, the 8K whole-city render, the release lock `city.lock.json` |
-| `regenerated/` | one regenerated district of every sample (diff map and report), Vesper Bay before and after, the Vesper Bay 1.1 lock |
+| `<city>/` | sample builds (the five, the pinned demo, the stack demo): previews, report, stage trace, the 8K whole-city render, the release lock `city.lock.json` |
+| `regenerated/` | one regenerated district of every sample and of the stack demo (diff map and report), Vesper Bay before and after, the Vesper Bay 1.1 lock |
 | `sweep.md`, `sweep.json` | the m8a sweep |
