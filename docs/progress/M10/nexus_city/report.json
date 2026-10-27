@@ -1,0 +1,1534 @@
+{
+  "name": "Nexus City",
+  "seed": 1207,
+  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation, gameplay layer)",
+  "passed": true,
+  "variant": 11,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "landmass lm.w1154s1112 (0.14 km2) is open land: marsh 'Jade Reach Marsh'",
+        "landmass lm.w911s659 (0.08 km2) is open land: marsh 'Temple Cut Marsh'",
+        "landmass lm.e1592n1427 (0.06 km2) is open land: park 'Northridge Park'"
+      ]
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "land without a district left without roads: lm.w1154s1112, lm.w911s659, lm.e1592n1427"
+      ]
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it; a traced road of any class serves its pinned district)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7, also inside a joined chain; traced roads as drawn)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted; traced roads as drawn)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_grades",
+      "title": "Every road at most 6% steep along its z profile (viaducts, ramps, bridge approaches, streets ramping up to a raised junction; footbridge stairs aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "level_continuity",
+      "title": "Every road meets its nodes at their height (each road level system joined by ramps, no step at a node)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "deck_clearance",
+      "title": "Where roads cross without a node, the one under has 5.5 m under the deck over it (3 m over a pedestrian street)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "5 crossings without a node"
+      ]
+    },
+    {
+      "id": "ramps_land",
+      "title": "Every ramp is one-way and joins a viaduct at its deck height to a ground road at the ground",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_graph",
+      "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lane_graph",
+      "title": "Lane graph strongly connected (every lane reaches every other through junction connectors and lane changes) and every vehicle road has lanes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "walkway_graph",
+      "title": "Walkway graph connected on every landmass with districts (sidewalks, crossings, crosswalks, pedestrian streets, promenades, footbridges, alleys, paths into open space)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "2 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)"
+      ]
+    },
+    {
+      "id": "lot_frontage",
+      "title": "Every lot fronts a street, alley, service lane or pedestrian street (at least 2 m) and records its frontage and district (a traced building's lot as drawn)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lot_block_sizes",
+      "title": "Lot areas within the archetype range (0.75 x min to 1.6 x max) and each district's median block size (square root of area) within the archetype block range (0.5 x lo to 1.8 x hi; traced buildings' lots and the blocks of a traced district aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lot_slivers",
+      "title": "No lot narrower than 3 m and no block narrower than 6 m (strip width from exact area and perimeter; traced buildings' lots aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "sidewalk_clear_path",
+      "title": "Sidewalk clear path at least 1.8 m (width minus furniture zone and curb)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "crosswalks",
+      "title": "A crosswalk on every approach of every signalized junction, and on the side street approaches of unsignalized junctions on avenues",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "junction_placement",
+      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "junction_angles",
+      "title": "Minimum angle between a local road and its neighbors at a junction: 60 degrees in grid districts, 35 in organic ones (old town, entertainment market)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_duplicates",
+      "title": "No near-duplicate local roads: right-of-way edges closer than 4 m over more than 50 m (30 m around shared points aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "open_space_share",
+      "title": "Open space share of each district's net land (open space over open space plus lots) within the archetype target (a traced district aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "places_built",
+      "title": "Every named place of the spec is built in its district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_footprints",
+      "title": "Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_clear_zones",
+      "title": "No ground mass of a building or site element on a road, junction, sidewalk, crosswalk, water, open space or another megasite's reserve or flight cone",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_overlaps",
+      "title": "No two buildings, site elements or skybridge decks overlap (plan and height)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_heights",
+      "title": "Building heights within the district's archetype range (under a flight-cone cap where one applies; parking structures only under the top); landmarks, megasites and traced buildings aside",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_entrances",
+      "title": "Every building has a main entrance on its facade, within 20 m of a ground walkway or a shared alley, service lane or pedestrian street, or joined to the walkway graph by a path (megasite buildings and landmarks always)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "ground_floor_units",
+      "title": "Ground-floor units 4 to 12 m wide, on the ground facade, facing one of the lot's frontage roads",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "roof_items",
+      "title": "Rooftop items stand on a roof of their building (a mass top at their level that holds their footprint)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "complexes",
+      "title": "Every merged lot group is built as its complex: twin towers (two equal towers and a skybridge), tower clusters (three or more stepped towers bridged), megabuilding campuses, campuses, bridged pairs and straddle buildings",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "skybridges",
+      "title": "Skybridges: 8 to 80 m, ends on facades of masses that reach the deck, level on both floor grids, roughly perpendicular, 5.5 m over roads and the navigable clearance over water, through no other building, joined to the walkway graph",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "landmarks",
+      "title": "Every landmark of the spec is built in its district with its kind and height (the megatower with three arms)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "megasite_contents",
+      "title": "Every megasite reserve is filled by its site generator with the parts its kind needs, all inside the reserve",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "megasite_heights",
+      "title": "Nothing inside a spaceport flight cone above its height limit, and nothing near one above the transitional surface (limit + 1 m per 1 m away)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "megasite_access",
+      "title": "Every megasite reaches a road (within 40 m) and its buildings and paths join the walkway graph",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "transit links of megasites: see transit_hubs"
+      ]
+    },
+    {
+      "id": "transit_routes",
+      "title": "Every transit line of the spec is built along its whole route (every leg found)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_stops",
+      "title": "Every stop of a line is served by one of its stations (in the district, within 150 m of the site, place or island), and a line to an exit reaches it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_curves",
+      "title": "Track curve radius at least the mode minimum (elevated rail 150 m, monorail 100, maglev 500, sky tube 300; measured through points 30 m apart)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_self_crossing",
+      "title": "A line never meets itself at the same level: two parts of its track more than 100 m apart along it stay its structure width apart in plan, or one passes 5.5 m over the other's structure; a loop closes where it starts, and its stations come in route order",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_grades",
+      "title": "Track grade at most the mode maximum (elevated rail 4%, monorail 6%, maglev 10%, sky tube 8%)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_altitude",
+      "title": "Track altitude within the mode's range (scope 5.3), higher only where it climbs, at the mode's grade, to clear navigable water or a road deck",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_clearance",
+      "title": "Elevated lines clear the buildings under them (deck underside 2 m over the roof), navigable water (its clearance) and road decks (5.5 m over, or 1 m under a high one); sky lines clear buildings by 10 m or pass through a declared portal",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_supports",
+      "title": "Columns and pylons stand outside lanes, buildings, water and road decks, and leave 1.8 m of every sidewalk clear (in medians, just inside the curbs or off the street)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "94 columns and pylons"
+      ]
+    },
+    {
+      "id": "station_access",
+      "title": "Every station has stairs, escalators or an elevator to the street and joins the walkway graph (elevated and sky stations next to a sidewalk or plaza)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_skybridges",
+      "title": "No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_hubs",
+      "title": "Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "Aurora Spaceport (spaceport): no maglev or sky_tube station within 150 m",
+        "Freight Terminal (freight_terminal): no elevated_rail or metro or monorail station within 150 m"
+      ]
+    },
+    {
+      "id": "props_keepout",
+      "title": "Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "30185 things on the ground"
+      ]
+    },
+    {
+      "id": "props_overlap",
+      "title": "Nothing on the ground overlaps anything else (props, trunks, shrubs)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tree_clearance",
+      "title": "Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_lighting",
+      "title": "Street or wall lights within 25 m of at least 85% of every district's sidewalks",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "Corporate Core: 97% lit",
+        "Transit Nexus: 96% lit",
+        "Aurora Spaceport: 98% lit",
+        "Neon Market: 94% lit",
+        "Northridge: 98% lit",
+        "Midtown: 98% lit",
+        "Old Town: 96% lit",
+        "Harbor Industrial: 97% lit",
+        "Silver Island: 99% lit"
+      ]
+    },
+    {
+      "id": "park_planting",
+      "title": "Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "boats_afloat",
+      "title": "Boats lie in their waterway, clear of bridges",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "poi_reachable_foot",
+      "title": "Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "278 doors"
+      ]
+    },
+    {
+      "id": "poi_reachable_car",
+      "title": "Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "poi_places",
+      "title": "Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "territories",
+      "title": "Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "gameplay_fields",
+      "title": "Wealth, danger and police fields: one raster each over the city bounds, every value between 0 and 1",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_density",
+      "title": "Street density: one row per road segment with every hour band, nothing negative, traffic within the lanes' capacity, no cars on pedestrian ways",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "parking",
+      "title": "Parking: every garage, lot and curb has capacity; garages in their building, lots clear of buildings and carriageways, curb parking on streets with parking lanes and drive lanes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "travel_points",
+      "title": "Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "sign_slots",
+      "title": "Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "shop signs reach 10.2 m"
+      ]
+    },
+    {
+      "id": "road_supports",
+      "title": "Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "380 road columns under 63 raised segments"
+      ]
+    }
+  ],
+  "stats": {
+    "map_km2": 11.56,
+    "land_km2": 8.458,
+    "district_land_km2": 8.177,
+    "water_share": 0.2683,
+    "sea_share": 0.2011,
+    "landmasses": 8,
+    "landmasses_with_districts": 8,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.281,
+    "open_land": [
+      {
+        "name": "Jade Reach Marsh",
+        "kind": "marsh",
+        "area_km2": 0.137
+      },
+      {
+        "name": "Temple Cut Marsh",
+        "kind": "marsh",
+        "area_km2": 0.079
+      },
+      {
+        "name": "Northridge Park",
+        "kind": "park",
+        "area_km2": 0.065
+      }
+    ],
+    "islands": 1,
+    "river_km": 2.77,
+    "channel_km": {
+      "delta_branch": 2.17,
+      "sea_channel": 3.78,
+      "separation": 3.59
+    },
+    "separation_channels": 5,
+    "waterway_km": 3.59,
+    "waterway_km_by_kind": {
+      "basin": 0.9,
+      "canal": 2.37,
+      "creek": 0.32
+    },
+    "waterways": 8,
+    "quay_km": 7.42,
+    "district_boundary_on_water": 0.6624,
+    "boundary_on_water": 0.5833,
+    "boundary_on_water_target": 0.6,
+    "boundary_km": {
+      "water": 6.05,
+      "land": 4.32
+    },
+    "land_boundary_curvature": 1.0228,
+    "boundary_curvature": 1.0845,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "landmass": "lm.e311n439",
+        "area_km2": 1.114,
+        "share": 0.1363,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": -0.0266
+      },
+      {
+        "id": "d02",
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "landmass": "lm.e557s71",
+        "area_km2": 0.514,
+        "share": 0.0628,
+        "target": 0.07,
+        "target_source": "spec",
+        "error": -0.1027
+      },
+      {
+        "id": "d03",
+        "name": "Aurora Spaceport",
+        "archetype": "spaceport",
+        "landmass": "lm.e311n439",
+        "area_km2": 0.799,
+        "share": 0.0977,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0233
+      },
+      {
+        "id": "d04",
+        "name": "Neon Market",
+        "archetype": "entertainment_market",
+        "landmass": "lm.w152s67",
+        "area_km2": 0.776,
+        "share": 0.0948,
+        "target": 0.1,
+        "target_source": "spec",
+        "error": -0.0515
+      },
+      {
+        "id": "d05",
+        "name": "Northridge",
+        "archetype": "residential_heights",
+        "landmass": "lm.e311n439",
+        "area_km2": 0.885,
+        "share": 0.1082,
+        "target": 0.11,
+        "target_source": "spec",
+        "error": -0.0162
+      },
+      {
+        "id": "d06",
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "landmass": "lm.e311n439",
+        "area_km2": 1.21,
+        "share": 0.148,
+        "target": 0.15,
+        "target_source": "spec",
+        "error": -0.0135
+      },
+      {
+        "id": "d07",
+        "name": "Old Town",
+        "archetype": "old_town",
+        "landmass": "lm.e248s1166",
+        "area_km2": 1.214,
+        "share": 0.1485,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0607
+      },
+      {
+        "id": "d08",
+        "name": "Harbor Industrial",
+        "archetype": "industrial_port",
+        "landmass": "lm.e248s1166",
+        "area_km2": 1.216,
+        "share": 0.1487,
+        "target": 0.14,
+        "target_source": "spec",
+        "error": 0.0619
+      },
+      {
+        "id": "d09",
+        "name": "Silver Island",
+        "archetype": "research_campus",
+        "landmass": "lm.w1377n73",
+        "area_km2": 0.45,
+        "share": 0.055,
+        "target": 0.05,
+        "target_source": "spec",
+        "error": 0.1007
+      }
+    ],
+    "road_km": {
+      "alley": 23.42,
+      "avenue": 28.88,
+      "footbridge": 0.64,
+      "highway": 10.34,
+      "pedestrian": 20.23,
+      "service": 5.65,
+      "street": 97.23
+    },
+    "road_nodes": 2243,
+    "road_segments": 3094,
+    "road_components": 1,
+    "bridges": 12,
+    "bridges_by_class": {
+      "sea": 4,
+      "river": 0,
+      "canal": 8
+    },
+    "bridge_span_km": 2.4,
+    "named_bridges": [
+      "Baylink Bridge",
+      "Horizon Bridge",
+      "Silver Span"
+    ],
+    "pedestrian_bridges": 18,
+    "landmasses_connected": [
+      5,
+      5
+    ],
+    "exits": [
+      "east_exit",
+      "north_exit",
+      "west_exit"
+    ],
+    "highway_elevated_share": 0.2765,
+    "megasites": 7,
+    "elevated": {
+      "elevated_km": 2.86,
+      "elevated_runs": 3,
+      "direct_branches": 0,
+      "ramps": 5,
+      "ramp_km": 1.44,
+      "interchanges": {
+        "diamond": 1,
+        "diamond_stub": 1
+      },
+      "flyovers": 0,
+      "max_flyover_m": 0.0,
+      "overpasses": 2,
+      "max_deck_m": 26.5,
+      "raised_other_km": 15.6,
+      "underpass_streets": 1,
+      "road_columns": 380
+    },
+    "local": {
+      "junctions": 1781,
+      "junctions_signalized": 347,
+      "junctions_by_type": {
+        "street_street T": 820,
+        "street_street X": 218,
+        "avenue_avenue T": 204,
+        "street T": 127,
+        "alley_alley T": 125,
+        "pedestrian T": 98,
+        "avenue_avenue X": 51,
+        "street_alley T": 32,
+        "alley_alley X": 20,
+        "highway_highway T": 15,
+        "highway_highway X": 12,
+        "street_alley X": 11,
+        "avenue_avenue multi": 10,
+        "alley T": 8,
+        "street cul_de_sac": 8,
+        "street_service T": 5,
+        "highway_avenue T": 4,
+        "pedestrian X": 4,
+        "service_service T": 3,
+        "street_street multi": 3,
+        "street X": 2,
+        "alley_alley multi": 1
+      },
+      "crosswalks": 1182,
+      "sidewalks": 4183,
+      "sidewalk_km": 171.18,
+      "lanes": 6132,
+      "lane_connectors": 12095,
+      "one_way_segments": 112,
+      "walkways": 16911,
+      "walkway_km": {
+        "alley": 29.07,
+        "crossing": 79.78,
+        "crosswalk": 40.33,
+        "elevated": 1.09,
+        "elevator": 0.0,
+        "footbridge": 0.64,
+        "path": 72.24,
+        "pedestrian_street": 3.17,
+        "promenade": 17.06,
+        "sidewalk": 215.11,
+        "skybridge": 2.93,
+        "stairs": 0.42
+      },
+      "footbridges": 18,
+      "blocks": 1080,
+      "lots": 6497,
+      "merged_lot_groups": 6,
+      "lot_area_m2_by_archetype": {
+        "corporate_core": {
+          "count": 228,
+          "min": 998.6,
+          "p10": 1352.7,
+          "median": 2434.9,
+          "p90": 4835.1,
+          "max": 7236.0,
+          "median_frontage_m": 53.3
+        },
+        "entertainment_market": {
+          "count": 1494,
+          "min": 57.4,
+          "p10": 110.8,
+          "median": 224.7,
+          "p90": 427.7,
+          "max": 727.5,
+          "median_frontage_m": 16.0
+        },
+        "industrial_port": {
+          "count": 74,
+          "min": 2029.9,
+          "p10": 2889.1,
+          "median": 8157.7,
+          "p90": 16019.2,
+          "max": 23833.9,
+          "median_frontage_m": 127.1
+        },
+        "midtown_mixed": {
+          "count": 627,
+          "min": 283.8,
+          "p10": 478.2,
+          "median": 898.0,
+          "p90": 1706.5,
+          "max": 2616.3,
+          "median_frontage_m": 31.3
+        },
+        "old_town": {
+          "count": 3344,
+          "min": 36.4,
+          "p10": 74.0,
+          "median": 159.1,
+          "p90": 323.2,
+          "max": 888.0,
+          "median_frontage_m": 14.0
+        },
+        "research_campus": {
+          "count": 50,
+          "min": 1627.4,
+          "p10": 2623.4,
+          "median": 4811.5,
+          "p90": 8249.2,
+          "max": 12216.8,
+          "median_frontage_m": 98.1
+        },
+        "residential_heights": {
+          "count": 566,
+          "min": 282.2,
+          "p10": 444.8,
+          "median": 821.7,
+          "p90": 1404.3,
+          "max": 2907.2,
+          "median_frontage_m": 29.0
+        },
+        "spaceport": {
+          "count": 14,
+          "min": 4776.0,
+          "p10": 4882.4,
+          "median": 10840.7,
+          "p90": 24610.8,
+          "max": 31565.3,
+          "median_frontage_m": 169.2
+        },
+        "transit_hub": {
+          "count": 100,
+          "min": 432.0,
+          "p10": 799.6,
+          "median": 1684.9,
+          "p90": 3089.1,
+          "max": 4346.1,
+          "median_frontage_m": 58.2
+        }
+      },
+      "block_size_m_by_district": {
+        "Corporate Core": {
+          "count": 55,
+          "min": 43.8,
+          "p10": 60.8,
+          "median": 99.9,
+          "p90": 154.1,
+          "max": 229.1
+        },
+        "Transit Nexus": {
+          "count": 39,
+          "min": 23.8,
+          "p10": 45.4,
+          "median": 62.4,
+          "p90": 95.6,
+          "max": 137.9
+        },
+        "Aurora Spaceport": {
+          "count": 7,
+          "min": 115.6,
+          "p10": 125.0,
+          "median": 149.2,
+          "p90": 249.3,
+          "max": 433.0
+        },
+        "Neon Market": {
+          "count": 219,
+          "min": 14.3,
+          "p10": 22.1,
+          "median": 37.2,
+          "p90": 62.9,
+          "max": 88.9
+        },
+        "Northridge": {
+          "count": 71,
+          "min": 27.3,
+          "p10": 66.5,
+          "median": 91.6,
+          "p90": 111.9,
+          "max": 143.2
+        },
+        "Midtown": {
+          "count": 104,
+          "min": 18.9,
+          "p10": 41.3,
+          "median": 80.1,
+          "p90": 101.2,
+          "max": 183.5
+        },
+        "Old Town": {
+          "count": 557,
+          "min": 8.8,
+          "p10": 17.4,
+          "median": 29.9,
+          "p90": 45.0,
+          "max": 144.9
+        },
+        "Harbor Industrial": {
+          "count": 20,
+          "min": 47.1,
+          "p10": 57.7,
+          "median": 138.7,
+          "p90": 193.3,
+          "max": 589.3
+        },
+        "Silver Island": {
+          "count": 8,
+          "min": 105.0,
+          "p10": 110.5,
+          "median": 151.5,
+          "p90": 219.8,
+          "max": 303.6
+        }
+      },
+      "open_spaces_by_kind": {
+        "courtyard": 5,
+        "green": 43,
+        "park": 178,
+        "plaza": 85,
+        "pocket_park": 187
+      },
+      "open_share_by_district": {
+        "Corporate Core": 0.1143,
+        "Transit Nexus": 0.1026,
+        "Aurora Spaceport": 0.4649,
+        "Neon Market": 0.0626,
+        "Northridge": 0.1761,
+        "Midtown": 0.1621,
+        "Old Town": 0.0623,
+        "Harbor Industrial": 0.0433,
+        "Silver Island": 0.272
+      },
+      "open_share": 0.1453,
+      "places": 7,
+      "generator": {
+        "one_way_loops": 23,
+        "open_paths": 933,
+        "walkway_links": 2,
+        "angles": {
+          "d01": 45.0,
+          "d02": 87.5,
+          "d03": 12.5,
+          "d04": 67.5,
+          "d05": 87.5,
+          "d06": 87.5,
+          "d07": 2.5,
+          "d08": 2.5,
+          "d09": 2.5
+        }
+      }
+    },
+    "buildings": {
+      "count": 6441,
+      "floor_area_km2": 20.291,
+      "by_type": {
+        "shopfront_row": 2789,
+        "shanty_stack": 1855,
+        "villa": 540,
+        "perimeter": 398,
+        "podium_tower": 278,
+        "terraced": 202,
+        "courtyard_block": 111,
+        "tower": 58,
+        "slab": 57,
+        "warehouse": 45,
+        "lab": 27,
+        "yard": 17,
+        "parking_structure": 15,
+        "shed": 15,
+        "hangar": 12,
+        "landmark.spire": 3,
+        "temple_hall": 3,
+        "kiosk": 2,
+        "pavilion": 2,
+        "straddle_building": 2,
+        "control_tower": 1,
+        "ferris_wheel": 1,
+        "gate_house": 1,
+        "landmark.megatower": 1,
+        "office": 1,
+        "pagoda": 1,
+        "skyport": 1,
+        "station": 1,
+        "station_tower": 1,
+        "terminal": 1
+      },
+      "by_use": {
+        "retail": 2791,
+        "residential": 2530,
+        "mixed": 705,
+        "office": 188,
+        "industrial": 78,
+        "entertainment": 58,
+        "civic": 51,
+        "transport": 19,
+        "parking": 15,
+        "religious": 4,
+        "station": 2
+      },
+      "by_district": {
+        "Corporate Core": {
+          "count": 193,
+          "min": 12.0,
+          "median": 124.0,
+          "p90": 200.0,
+          "max": 480.0,
+          "archetype": "corporate_core",
+          "floor_area_km2": 8.254,
+          "coverage": 0.71,
+          "far": 13.1
+        },
+        "Transit Nexus": {
+          "count": 87,
+          "min": 12.0,
+          "median": 42.0,
+          "p90": 73.5,
+          "max": 101.5,
+          "archetype": "transit_hub",
+          "floor_area_km2": 1.013,
+          "coverage": 0.56,
+          "far": 5.64
+        },
+        "Aurora Spaceport": {
+          "count": 14,
+          "min": 11.0,
+          "median": 27.5,
+          "p90": 32.0,
+          "max": 40.0,
+          "archetype": "spaceport",
+          "floor_area_km2": 0.119,
+          "coverage": 0.196,
+          "far": 0.63
+        },
+        "Neon Market": {
+          "count": 1466,
+          "min": 10.5,
+          "median": 21.0,
+          "p90": 28.0,
+          "max": 37.6,
+          "archetype": "entertainment_market",
+          "floor_area_km2": 1.674,
+          "coverage": 0.942,
+          "far": 4.46
+        },
+        "Northridge": {
+          "count": 566,
+          "min": 10.2,
+          "median": 23.8,
+          "p90": 23.8,
+          "max": 47.6,
+          "archetype": "residential_heights",
+          "floor_area_km2": 1.05,
+          "coverage": 0.335,
+          "far": 2.09
+        },
+        "Midtown": {
+          "count": 627,
+          "min": 31.5,
+          "median": 42.0,
+          "p90": 66.5,
+          "max": 140.0,
+          "archetype": "midtown_mixed",
+          "floor_area_km2": 4.939,
+          "coverage": 0.708,
+          "far": 7.8
+        },
+        "Old Town": {
+          "count": 3344,
+          "min": 6.0,
+          "median": 15.0,
+          "p90": 20.6,
+          "max": 29.6,
+          "archetype": "old_town",
+          "floor_area_km2": 2.096,
+          "coverage": 0.955,
+          "far": 3.45
+        },
+        "Harbor Industrial": {
+          "count": 74,
+          "min": 8.9,
+          "median": 11.6,
+          "p90": 16.0,
+          "max": 16.0,
+          "archetype": "industrial_port",
+          "floor_area_km2": 0.206,
+          "coverage": 0.306,
+          "far": 0.31
+        },
+        "Silver Island": {
+          "count": 49,
+          "min": 20.0,
+          "median": 32.0,
+          "p90": 40.0,
+          "max": 68.0,
+          "archetype": "research_campus",
+          "floor_area_km2": 0.693,
+          "coverage": 0.359,
+          "far": 2.65
+        }
+      },
+      "properties": 6418,
+      "complexes": {
+        "bridged_pair": 1,
+        "campus": 1,
+        "landmark": 4,
+        "megasite": 7,
+        "straddle_building": 1,
+        "tower_cluster": 2,
+        "twin_towers": 1
+      },
+      "skybridges": 249,
+      "skybridges_by_kind": {
+        "cable": 45,
+        "catwalk": 103,
+        "enclosed": 96,
+        "open_deck": 4,
+        "stack": 1
+      },
+      "skybridge_km": 2.93,
+      "units": 19262,
+      "units_by_use": {
+        "food": 5298,
+        "bar": 2523,
+        "convenience": 2274,
+        "cyberware": 2055,
+        "club": 1444,
+        "arcade": 1304,
+        "pawn": 1261,
+        "laundromat": 1250,
+        "lobby": 947,
+        "clinic": 906
+      },
+      "roof_items": {
+        "ac_unit": 13226,
+        "billboard": 1335,
+        "water_tank": 1187,
+        "antenna": 976,
+        "mechanical": 570,
+        "av_pad": 57,
+        "helipad": 13
+      },
+      "green_roofs": 640,
+      "green_roof_m2": 296374,
+      "landmarks": [
+        {
+          "name": "Nexus Spire",
+          "kind": "megatower",
+          "height_m": 480.0,
+          "district": "Corporate Core"
+        },
+        {
+          "name": "Kaze Tower",
+          "kind": "spire",
+          "height_m": 300.0,
+          "district": "Corporate Core"
+        },
+        {
+          "name": "Mirai Tower",
+          "kind": "spire",
+          "height_m": 247.74,
+          "district": "Corporate Core"
+        },
+        {
+          "name": "Helios Tower",
+          "kind": "spire",
+          "height_m": 260.0,
+          "district": "Corporate Core"
+        }
+      ],
+      "megasites": {
+        "Transit Nexus": {
+          "kind": "transit_nexus",
+          "contents": {
+            "bus_bay": 10,
+            "drop_off": 1,
+            "metro_entrance": 2,
+            "platform": 3,
+            "plaza": 2,
+            "station": 1,
+            "station_tower": 1
+          }
+        },
+        "Transit Nexus Skyport": {
+          "kind": "skyport",
+          "contents": {
+            "skyport": 1
+          }
+        },
+        "Aurora Spaceport": {
+          "kind": "spaceport",
+          "contents": {
+            "apron": 1,
+            "container_stack": 60,
+            "control_tower": 1,
+            "fuel_tank": 6,
+            "hangar": 3,
+            "launch_pad": 3,
+            "launch_tower": 3,
+            "terminal": 1
+          }
+        },
+        "Neon Wheel": {
+          "kind": "attraction",
+          "contents": {
+            "ferris_wheel": 1,
+            "kiosk": 2,
+            "plaza": 1
+          }
+        },
+        "Central Plaza": {
+          "kind": "central_park",
+          "contents": {
+            "fountain": 1,
+            "lawn": 12,
+            "pavilion": 2,
+            "plaza": 1,
+            "pond": 1
+          }
+        },
+        "Temple District": {
+          "kind": "temple_complex",
+          "contents": {
+            "courtyard": 1,
+            "gate": 1,
+            "pagoda": 1,
+            "temple_hall": 3,
+            "wall": 1
+          }
+        },
+        "Freight Terminal": {
+          "kind": "freight_terminal",
+          "contents": {
+            "berth": 2,
+            "container_stack": 180,
+            "gantry_crane": 4,
+            "gate_house": 1,
+            "office": 1,
+            "rail_track": 3,
+            "truck_gate": 1,
+            "warehouse": 2
+          }
+        }
+      },
+      "site_elements": 576,
+      "structures": 533,
+      "tallest_m": 480.0,
+      "generator": {
+        "walkways_added": 2338
+      }
+    },
+    "transit": {
+      "by_mode": {
+        "elevated_rail": {
+          "lines": 1,
+          "km": 2.36,
+          "stations": 5
+        },
+        "maglev": {
+          "lines": 1,
+          "km": 1.96,
+          "stations": 2
+        },
+        "metro": {
+          "lines": 1,
+          "km": 4.35,
+          "stations": 5
+        },
+        "sky_tube": {
+          "lines": 1,
+          "km": 1.17,
+          "stations": 2
+        }
+      },
+      "stations": {
+        "elevated": 7,
+        "sky": 2,
+        "underground": 5
+      },
+      "supports": 94,
+      "portals": 8,
+      "buildings_removed": 54,
+      "km": 9.84,
+      "generator": {
+        "lines": 4,
+        "stations": 14,
+        "removed_buildings": 54,
+        "removed_skybridges": 9,
+        "portals": 8,
+        "structures": 150,
+        "walkways_added": 52
+      }
+    },
+    "props": {
+      "props": 59783,
+      "plants": 23645,
+      "trees": 8373,
+      "instances": 83428,
+      "props_by_kind": {
+        "sign": 15313,
+        "awning": 12525,
+        "ac_unit": 8263,
+        "street_light": 3947,
+        "bollard": 3317,
+        "parked_vehicle": 3221,
+        "railing": 2470,
+        "barrier": 2209,
+        "overhead_cable": 1894,
+        "traffic_signal": 1814,
+        "trash": 1135,
+        "wall_light": 949,
+        "hydrant": 869,
+        "trash_can": 825,
+        "bench": 597,
+        "dumpster": 162,
+        "bus_stop": 91,
+        "boat": 63,
+        "scaffolding": 59,
+        "planter": 30,
+        "vending_machine": 12,
+        "kiosk": 10,
+        "food_stall": 8
+      },
+      "plants_by_kind": {
+        "shrub": 7610,
+        "facade_greenery": 5506,
+        "park_tree": 3559,
+        "street_tree": 2661,
+        "overgrowth": 1577,
+        "conifer": 881,
+        "palm": 796,
+        "roof_tree": 579,
+        "median_tree": 476
+      },
+      "lawn_m2": 46893,
+      "hedge_km": 6.42,
+      "generator": {
+        "traffic_signals": 1814,
+        "bus_stops": 186,
+        "street_lights": 3613,
+        "narrow_lights": 1283,
+        "hydrants": 869,
+        "crosswalk_cans": 371,
+        "bollards": 3317,
+        "station_props": 8,
+        "street_trees": 2603,
+        "plaza_props": 144,
+        "park_benches": 728,
+        "parked_vehicles": 3221,
+        "alley_clutter": 1297,
+        "median_trees": 1198,
+        "promenade_trees": 132,
+        "park_trees": 8773,
+        "roof_plants": 3856,
+        "facade_greenery": 5506,
+        "overgrowth": 1577,
+        "quay_props": 2669,
+        "highway_barriers": 2209,
+        "overhead_cables": 1894,
+        "unit_dressing": 36101,
+        "scaffolding": 59,
+        "market_gates": 0,
+        "props": 59783,
+        "plants": 23645
+      }
+    },
+    "gameplay": {
+      "pois": 215,
+      "pois_by_kind": {
+        "vendor.food": 43,
+        "bar.bar": 39,
+        "vendor.pawn": 26,
+        "clinic.ripperdoc": 18,
+        "bar.arcade": 17,
+        "vendor.convenience": 16,
+        "clinic.clinic": 14,
+        "bar.club": 9,
+        "apartment.apartment": 8,
+        "apartment.studio": 8,
+        "fixer.fixer": 7,
+        "apartment.penthouse": 5,
+        "hideout.squat": 3,
+        "hideout.warehouse": 2
+      },
+      "factions": 8,
+      "factions_by_kind": {
+        "corporate": 4,
+        "gang": 3,
+        "police": 1
+      },
+      "territories": 13,
+      "contested": 2,
+      "parking": {
+        "street": 607,
+        "garage": 21
+      },
+      "parking_capacity": 15782,
+      "taxi_stands": 29,
+      "fast_travel": 13,
+      "sign_slots": {
+        "shop_sign.blade": 10285,
+        "shop_sign.facade": 5028,
+        "billboard.roof": 1335,
+        "neon.facade": 639,
+        "billboard.facade": 275,
+        "holo_ad.roof": 43
+      },
+      "density_rows": 3094,
+      "peak_traffic_vph": 9690.0,
+      "peak_crowd_per_100m": 168.0,
+      "generator": {
+        "factions": 8,
+        "zones": 22,
+        "pois": 215,
+        "parking": 628,
+        "travel_points": 42,
+        "densities": 3094,
+        "sign_slots": 17605
+      }
+    },
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.2495,
+      "preferred_chains": 2,
+      "planned": 0.5881
+    },
+    "road_variant": 0,
+    "city_tries": [
+      {
+        "variant": 11,
+        "road_variant": 0,
+        "layout_salt": 0,
+        "failures": 4
+      },
+      {
+        "variant": 11,
+        "road_variant": 0,
+        "layout_salt": 1,
+        "failures": 2
+      },
+      {
+        "variant": 11,
+        "road_variant": 0,
+        "layout_salt": 2,
+        "failures": 0
+      }
+    ]
+  },
+  "notes": [
+    "road variant 11/0, layout salt 1 left 2 check failures in the full city; built again on the same roads with the local layout drawn again (salt 2)",
+    "megasite 'Aurora Spaceport' (spaceport) shrunk to 0.31 km2 (asked 0.50) to fit 'Aurora Spaceport'",
+    "megasite 'Freight Terminal' (freight_terminal) shrunk to 0.25 km2 (asked 0.40) to fit 'Harbor Industrial'",
+    "ramps not built: 2 another ramp, 2 off the run, 2 water, 1 reserve or open land",
+    "1 underpass streets under the viaducts (not built: 2 deck too low, 1 near a ramp, 6 no frontage street on both sides)",
+    "'Northridge': a loop street found no connector (3 times)",
+    "'Old Town': streets reach the network only by a highway access",
+    "75 local roads cut back at junctions sharper than the district minimum",
+    "7 local roads running alongside another road removed",
+    "93 lanes reached only over pedestrian streets became pedestrian",
+    "3 local roads crossing another without a junction removed",
+    "54 local segments (6.39 km) not connected to the network were dropped",
+    "landmark 'Mirai Tower' capped at 248 m by a flight cone (asked 290 m)",
+    "Harbor Line: drawn from stop to stop with 172.5 m curves"
+  ]
+}

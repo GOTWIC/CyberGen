@@ -613,6 +613,8 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
     T.stage("checks", [[c.id, c.passed] for c in checks])
     st["separation_budget"] = b.stats.get("separation_budget")
     st["road_variant"] = b.stats.get("road_variant")
+    if "layout_salt" in b.stats:     # (M10: the replay of a city needs it, `choices`)
+        st["layout_salt"] = b.stats["layout_salt"]
     st.setdefault("local", {})["generator"] = loc.info
     b.checks, b.stats = checks, st
     return b
@@ -714,6 +716,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)
+    if "layout_salt" in b.stats:     # (M10: the replay of a city needs it, `choices`)
+        st["layout_salt"] = b.stats["layout_salt"]
     if "local" in st and b.local is not None:
         st["local"]["generator"] = b.local.info
     # wall-clock timings stay on b.m3.info["seconds"]: the report must not depend on the run

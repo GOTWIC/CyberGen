@@ -207,6 +207,15 @@ def test_regeneration_with_new_spec_fields():
     _outside_kept(b, r, "Uptown")
 
 
+def test_choices_keep_the_layout_salt():
+    """A city built again with its local layout salted (a whole-city retry) records the salt,
+    so a replay and a district regeneration start from the same city."""
+    data, b, _ = small()
+    ch = dict(B.choices(b), layout_salt=1)
+    r = B.replay(validate_spec(copy.deepcopy(data)), ch, local=True, buildings=False)
+    assert B.choices(r) == ch
+
+
 def test_regeneration_is_deterministic():
     _, b, st = small()
     r, rec = regenerated()
