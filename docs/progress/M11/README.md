@@ -78,4 +78,73 @@ edits; the filled spec gains the three values per district.
 | `travel_points` | a fast-travel point in every district with streets, taxi stands 250 m apart, each on its sidewalk |
 | `sign_slots` | one slot per sign prop and roof billboard, facade slots on a facade of their building above its shop signs and apart from each other, holo-ads over their roof |
 
-__SECTIONS__
+## Sweep
+
+`citygen sweep --suite m8a --workers 3` ([`sweep.md`](sweep.md), `sweep.json`), next to
+M8c's ([`../M8c/sweep.md`](../M8c/sweep.md); its `nyxllor` labels are `vesper_bay` now):
+
+| | M8c | M11 |
+|---|---|---|
+| builds passing every check | 58 of 68 | 58 of 68 |
+| builds whose pass, failing checks, retries, hydrology and road variant or layout salt differ from M8c | | 0 |
+| full-city tries beyond the first, all 68 builds | 110 | 110 |
+| crashes | 0 | 0 |
+| build time, all 68 builds (one process each, the Mac shared with another session) | 5976 s | 6551 s |
+
+The layer makes no city retry: on every build each full-city try fails or passes exactly as
+on M8c, and the ten builds that fail fail the same M1 to M7 checks (placement, road graph,
+open space share, curve radius and the rest; M8a's open items).
+
+The first sweep of the layer ([`sweep_first_pass.md`](sweep_first_pass.md)) found two
+defects, both fixed before the one above:
+- **Setback lots over other buildings:** a surface lot cut from a lot's front setback could
+  cover a building of a neighboring lot or a complex (up to 1840 m2), so `parking` failed
+  and five builds took one to three more full-city tries. Lots are now tested against every
+  building footprint and carriageway with the check's own measure (`lot_obstacles`,
+  `lot_clash`) and dropped when they touch one.
+- **A district with no fast-travel candidate:** on Vesper Bay s404 the spaceport island had
+  no station, place, landmark or signalized junction, so `travel_points` failed on all nine
+  tries and the build broke. Such a district now falls back to its other junctions, then the
+  middle of each drive lane, and the check asks for a point only where one of those lane
+  middles is reachable on foot and by car.
+Both are pinned by tests (`test_lots_keep_clear_of_buildings`,
+`test_fast_travel_without_stations_or_signals`); the sample cities do not change.
+
+## Tests
+
+`tests/test_gameplay.py` (20 tests): the layer on Testport passes and matches a fresh check
+run; it is complete (every kind, territories and precincts in every district, a density row
+per segment, unique names); a failing case for each of the nine checks; the spec defaults and
+a spec `faction` shared by two districts; the `gameplay.json` tile index; the helpers
+(compass words, the largest strongly connected part, unique names); the two sweep
+regressions; and the stage run twice on the same model, once with 2-ULP noise on everything
+GEOS computes inside it, giving the same rows and the same model bytes. The check counts in
+`test_build.py`, `test_buildings.py` and `test_streets.py` gain the nine checks; the committed
+reports compared with fresh builds are now this folder's.
+
+## Open items
+
+- **No blockout geometry.** Points of interest, slots, parking and travel points are data
+  only (in `city_model.json` and `gameplay.json`); markers in the .blend and glTF tiles were
+  left out to keep the blockout plans, and their goldens, unchanged.
+- **Doors on pedestrian streets.** A shop on a pedestrian street or deep in a market gets its
+  curb on the nearest drive lane, up to 150 m away (the dotted links in the street inset);
+  a drop-off point at the end of the pedestrian street would be closer to how a game routes
+  a taxi.
+- **Rival turfs are geometric.** The rival gang takes the turf nearest its home district;
+  contested borders do not yet follow streets or water, and turfs cross canals.
+- **Densities are estimates.** Traffic and crowds come from road class, lanes, the shops on
+  each segment, stations nearby and an hour profile per archetype, not from a trip model;
+  lifegen can calibrate them (the per-band lists are the interface).
+- **Shop slots inherit M6.** The 13k shop-sign slots of a big city are one per M6 sign prop;
+  stage 2 may want them grouped per shopfront.
+- **Shapely warnings in M2.** The sweep logs "divide by zero encountered in buffer" from
+  `blocks.row_pieces` (a flat-capped buffer of a degenerate street piece) on some seeds; it
+  predates M11 and changes no result here.
+
+## Files
+
+`<city>/` holds `preview_gameplay.png` and the other previews, `report.txt` and
+`report.json`, `trace.json`, `blockout_report.txt`, `render_top.jpg` and the 8K
+`render_iso_city.jpg`. `sweep.md` and `sweep.json` are the sweep, `sweep_first_pass.*` the
+first one; `wip/` the work-in-progress previews.

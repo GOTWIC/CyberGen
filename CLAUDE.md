@@ -377,6 +377,10 @@ city (after props) and nine checks in `gameplay_checks.py` (75 in all):
 - **Outputs:** `preview_gameplay.png` (`preview_gameplay.py`), `gameplay.json` beside the
   blockout exports with a per-tile index; no blockout geometry. Ids come from what a place is
   (building, unit, segment, district), not build order.
+- **Rule:** a gameplay check may only ask for what the stage can always build, and the stage
+  only places what passes it (setback lots use the check's own `lot_clash`; fast travel falls
+  back to junctions and lane middles), so the layer never makes a city retry: the sweep is
+  build for build the same as M8c's (58 of 68). Sample builds: `docs/progress/M11/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
