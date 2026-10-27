@@ -72,6 +72,7 @@ class Built:
     stable_ids: frozenset = frozenset()   # M10: ids already stable (named before the props)
     frame: object = None                  # M10: roads a district regeneration holds
     held_lines: dict = None               # M10: transit lines it keeps (name -> old row)
+    prior: dict = None                    # M10: the old city's ids (`ids.priors`)
 
     @property
     def passed(self) -> bool:
@@ -446,12 +447,12 @@ def choices(b: Built) -> dict:
 
 def replay(result: Result, chosen: dict, workers: int | None = None, local: bool = True,
            buildings: bool = True, spec: CitySpec | None = None, frame=None,
-           held_lines: dict | None = None) -> Built:
+           held_lines: dict | None = None, prior: dict | None = None) -> Built:
     """M10: the city at the choices a search made (`choices`), without the search: water and
     districts of the hydrology variant, its road variant, the local layout salt. With `spec`
     the stages from the local streets on (M2) use it instead (a district edited; M1 stays the
     one of `result`); `frame` (`streets.Frame`) holds roads of an older build and
-    `held_lines` its transit lines (a district regeneration, `edit.py`)."""
+    `held_lines` its transit lines, `prior` its ids (a district regeneration, `edit.py`)."""
     base = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
     run = _Runner(default_workers() if workers is None else workers)
@@ -465,7 +466,7 @@ def replay(result: Result, chosen: dict, workers: int | None = None, local: bool
         st["road_variant"] = t.net.variant
         b.stats = st
         b.notes = b.notes + t.site_notes + t.net.notes
-        b.frame, b.held_lines = frame, held_lines
+        b.frame, b.held_lines, b.prior = frame, held_lines, prior
         if local:
             salt = chosen.get("layout_salt") or 0
             b.spec = spec if spec is not None else base
@@ -486,7 +487,7 @@ def stable(b: Built) -> Built:
     name them too."""
     from . import ids as ID
 
-    b.model, mp = ID.rename(b.model, b.stable_ids)
+    b.model, mp = ID.rename(b.model, b.stable_ids, b.prior)
     b.notes = [ID.text(n, mp) for n in b.notes]
     for c in b.checks:
         c.failures = [ID.text(f, mp) for f in c.failures]
@@ -673,7 +674,9 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     # M10: stable ids for everything built so far, so the props, the plants and the
     # gameplay layer key their draws and names on them (not on build order)
-    m, mp = ID.rename(m)
+    pinned = frozenset(x.id for x in b.frame.pin_buildings) if b.frame is not None \
+        else frozenset()
+    m, mp = ID.rename(m, pinned, b.prior)
     b.stable_ids = frozenset(e.id for e in m.entities())
     for c in early["checks"]:
         c.failures = [ID.text(f, mp) for f in c.failures]

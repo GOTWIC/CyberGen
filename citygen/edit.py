@@ -154,14 +154,16 @@ def regenerate(state: dict, old: CityModel, district: str, spec_data: dict | Non
     poly = G.from_model_poly(dd.polygon)
     ov = state.get("overrides") or {}
     pins = set(ov.get("pins", []))
-    ground = [G.from_model_poly(b.footprint or b.masses[0].footprint) for b in old.buildings
-              if b.id in pins and b.district_id == dd.id] + \
+    pin_b = [b for b in old.buildings if b.id in pins and b.district_id == dd.id]
+    ground = [G.from_model_poly(b.footprint or b.masses[0].footprint) for b in pin_b] + \
         [G.from_model_poly(o.polygon) for o in old.open_spaces
          if o.id in pins and o.district_id == dd.id]
     frame = ST.Frame(old, district, dd.id, poly, {d.name: d.archetype for d in cur.districts},
-                     pins=pins, keep_out=G.union(ground) if ground else None)
+                     pins=pins, keep_out=G.union(ground) if ground else None,
+                     pin_buildings=pin_b)
     held = {ln.name: ln.model_dump(mode="json") for ln in old.transit_lines}
-    new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held)
+    new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,
+                   prior=ID.priors(old.model_dump(mode="json")))
     model, info = splice(old, new.model, dd.id, poly, frame)
     if ov:
         model, notes = OV.apply(model, ov, old=old, district=dd.id)

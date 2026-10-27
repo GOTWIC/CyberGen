@@ -22,7 +22,9 @@ the build order around it moved:
 
 Two entities with the same id are told apart by `.2`, `.3`, in the order of their contents
 (the entity as JSON with every reference rewritten), so the suffix does not depend on the
-build order either. Every reference is rewritten through `REFS` (the typed id fields of
+build order either. A district regeneration passes the old city's ids (`priors`): an
+entity of the same kind and geometry as one of the old city takes its id first, so a held
+road's node keeps its id when a new node of the district lands in the same 1 m cell. Every reference is rewritten through `REFS` (the typed id fields of
 `model.py`) and through every string in `attrs` that is an old id or starts with one
 (`attrs.stop`, `removed_buildings`); a test scans built models for references this misses.
 Notes and check failures that name an old id get the new one (`text`).
@@ -144,9 +146,31 @@ def anchor(e: dict) -> str:
     return tok((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
 
 
+SUFFIX = re.compile(r"^(.*)\.(\d+)$")
+
+
+def signature(coll: str, e: dict) -> str:
+    """An entity's kind and geometry, as a key."""
+    return json.dumps([coll, e.get("type"), _pts(e)], separators=(",", ":"))
+
+
+def priors(data: dict) -> dict[str, list[tuple[str, str]]]:
+    """The ids of a model by the id they would have without a collision suffix:
+    base -> [(id, signature)]."""
+    out: dict[str, list[tuple[str, str]]] = {}
+    for c in ORDER:
+        for e in data.get(c, []):
+            m = SUFFIX.match(e["id"])
+            out.setdefault(m.group(1) if m else e["id"], []).append(
+                (e["id"], signature(c, e)))
+    return out
+
+
 class Renamer:
-    def __init__(self, data: dict, keep: set[str] | frozenset = frozenset()):
+    def __init__(self, data: dict, keep: set[str] | frozenset = frozenset(),
+                 prior: dict | None = None):
         self.d = data
+        self.prior = prior or {}
         self.new: dict[str, str] = {}
         self.old_ids: set[str] = {e["id"] for c in ORDER for e in data.get(c, [])}
         # ids that are stable already (named by an earlier pass): they stay
@@ -251,6 +275,21 @@ class Renamer:
             idx = groups[b]
             if len(idx) > 1:
                 idx = sorted(idx, key=lambda i: self._key(items[i]))
+            if b in self.prior:
+                # an entity the old city had (same kind and geometry) keeps its old id
+                olds: dict[str, list[str]] = {}
+                for nid, sig in self.prior[b]:
+                    olds.setdefault(sig, []).append(nid)
+                rest = []
+                for i in idx:
+                    nid = next((x for x in olds.get(signature(coll, items[i]), ())
+                                if x not in self.taken), None)
+                    if nid is None:
+                        rest.append(i)
+                    else:
+                        self.taken.add(nid)
+                        self.new[items[i]["id"]] = nid
+                idx = rest
             k = 1
             for i in idx:
                 nid = b
@@ -346,18 +385,19 @@ def _apply(obj, path: list[str], fn) -> None:
         _apply(x, path[1:], fn)
 
 
-def rename_data(data: dict, keep: set[str] | frozenset = frozenset()) -> dict[str, str]:
+def rename_data(data: dict, keep: set[str] | frozenset = frozenset(),
+                prior: dict | None = None) -> dict[str, str]:
     """Renames the entities of a model dict in place; returns old id -> new id. Ids in
-    `keep` are stable already and stay."""
-    return Renamer(data, keep).run()
+    `keep` are stable already and stay; `prior` (`priors`) are an older city's."""
+    return Renamer(data, keep, prior).run()
 
 
-def rename(model, keep: set[str] | frozenset = frozenset()):
+def rename(model, keep: set[str] | frozenset = frozenset(), prior: dict | None = None):
     """(the model with stable ids, old id -> new id)."""
     from .model import CityModel
 
     data = model.model_dump(mode="json")
-    mapping = rename_data(data, keep)
+    mapping = rename_data(data, keep, prior)
     return CityModel.model_validate(data), mapping
 
 

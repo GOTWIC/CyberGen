@@ -271,6 +271,7 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     lap("megasites")
     T.stage("megasites_m3", [[x["id"], len(x["member_ids"])] for x in out.megasites])
     pinned_buildings(spec, b, out)
+    frame_pins(b, out)
     walks = [w.model_dump(mode="python") for w in m.walkways]
     out.landmasses = list(b.hydro.landmasses)
     out.walkways = link_entrances(out, walks)
@@ -350,6 +351,41 @@ def pinned_buildings(spec, b, out: Out) -> None:
             out.buildings.append(COLLECTIONS["buildings"].model_validate(row))
     out.notes.append(f"{sum(len(p.buildings) for p, _ in pins.values())} traced buildings "
                      "placed as drawn")
+
+
+def frame_pins(b, out: Out) -> None:
+    """M10: the pinned buildings of a regenerated district as they were, each on its own lot
+    (`blocks._frame_lots`); units and entrances face the road nearest them, the entrances
+    join the new walkways (`link_entrances`)."""
+    from .blocks import PIN_FACING_M, pin_facing
+    from .model import COLLECTIONS
+
+    fr = getattr(b, "frame", None)
+    if fr is None or not fr.pin_buildings:
+        return
+    m = b.model
+    lot_of = {lt.attrs.get("pinned"): lt for lt in m.lots if lt.attrs.get("pinned")}
+    segs_all = [{"id": s.id, "centerline": s.centerline, "road_class": s.road_class}
+                for s in m.road_segments]
+    tree = shapely.STRtree([LineString([p[:2] for p in s["centerline"]]) for s in segs_all])
+    for old in fr.pin_buildings:
+        lt = lot_of.get(old.id)
+        if lt is None:
+            out.notes.append(f"pin {old.id}: no ground left for it")
+            continue
+        foot = G.from_model_poly(old.footprint or old.masses[0].footprint)
+        segs = [segs_all[i] for i in sorted(int(k) for k in tree.query(
+            foot, predicate="dwithin", distance=PIN_FACING_M + 40.0))]
+        row = old.model_dump(mode="python")
+        row.update(lot_id=lt.id, property_id=None, district_id=lt.district_id)
+        for u in row["units"]:
+            s = pin_facing(segs, u["edge"])
+            u["segment_id"] = s["id"] if s is not None else None
+        for e in row["entrances"]:
+            s = pin_facing(segs, [e["position"]])
+            e["segment_id"] = s["id"] if s is not None else None
+        out.buildings.append(COLLECTIONS["buildings"].model_validate(row))
+    out.notes.append(f"{len(fr.pin_buildings)} pinned buildings kept as they were")
 
 
 def JN_dedupe(notes):

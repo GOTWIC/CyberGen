@@ -576,6 +576,7 @@ def build_blocks(spec, B, net, J, mapper=None) -> dict:
         T.detail(f"blocks/{did}", [b for b, _, _ in lots_by_block])
         _district_out(cx, out, d, did, st, lots_by_block, opens, ST._rng(d.seed, 41))
     _pinned_lots(cx, out, net, pieces, ptree)
+    _frame_lots(cx, out, net, pieces, ptree)
     finish_lots(out)
     _merged_groups(cx, out)
     T.detail("blocks/lots", [(l["id"], l["polygon"]) for l in out["lots"]])
@@ -626,6 +627,77 @@ def _pinned_lots(cx: Ctx, out: dict, net, pieces, ptree) -> None:
             out["blocks"].append({"id": bid, "district_id": did, "archetype": d.archetype,
                                   "polygon": blk, "area_m2": G.q(G.area1(blk)),
                                   "frontage_ids": [], "attrs": {"pinned": name}})
+
+
+def _frame_lots(cx: Ctx, out: dict, net, pieces, ptree) -> None:
+    """M10: a pinned building of a regenerated district gets a lot of its own, as a traced
+    building does (attrs `pinned`: the building's id), in a block of its own per district;
+    its frontage also holds the road each of its units faces."""
+    fr = getattr(cx.B, "frame", None)
+    if fr is None or not fr.pin_buildings:
+        return
+    B = cx.B
+    d = next(x for x in cx.spec.districts if x.name == fr.name)
+    did = B.did[d.name]
+    poly = B.polygons[d.name]
+    clip = G.qpoly(poly.buffer(30.0, join_style="mitre"))
+    row = G.union([pieces[i] for i in sorted(int(k) for k in ptree.query(clip))])
+    front = Frontage([s for s in net.segments if not G.apart(LineString(s["centerline"]),
+                                                             poly, s["width_m"])])
+    feet = G.union([G.from_model_poly(b.footprint or b.masses[0].footprint)
+                    for b in fr.pin_buildings])
+    lines = [LineString(s["centerline"]) for s in net.segments]
+    tree = shapely.STRtree(lines)
+    bid = f"{did}.blk999"
+    taken = Polygon()
+    grounds = []
+    for b in fr.pin_buildings:
+        foot = G.from_model_poly(b.footprint or b.masses[0].footprint)
+        g = G.qpoly(foot.buffer(PIN_LOT_GAP_M, join_style="mitre"))
+        for cut in (B.wet, row, taken, feet):
+            g = G.diff(g, cut)
+        g = G.union([G.inter(g, poly), foot])
+        parts = sorted(G.parts(g), key=lambda x: (-G.area1(x), G.qbounds(x)))
+        if not parts:
+            continue
+        g = parts[0]
+        taken = G.union([taken, g])
+        grounds.append(g)
+        recs = front.of(g)
+        have = {r[0] for r in recs}
+        segs = [net.segments[i] for i in sorted(int(k) for k in tree.query(
+            foot, predicate="dwithin", distance=PIN_FACING_M + 40.0))]
+        for u in b.units:
+            s = pin_facing(segs, u.edge)
+            if s is not None and s["id"] not in have:
+                have.add(s["id"])
+                line = [tuple(p) for p in u.edge]
+                recs.append((s["id"], s["road_class"], 0.0, line, [line]))
+        out["lots"].append({"block": bid, "polygon": g, "k": len(grounds) - 1, "fr": recs,
+                            "district_id": did, "archetype": d.archetype,
+                            "merged_group_id": None, "attrs": {"pinned": b.id, "pin": True}})
+    if grounds:
+        blk = G.union(grounds)
+        out["blocks"].append({"id": bid, "district_id": did, "archetype": d.archetype,
+                              "polygon": blk, "area_m2": G.q(G.area1(blk)),
+                              "frontage_ids": [], "attrs": {"pin": True}})
+
+
+PIN_FACING_M = 60.0   # M10: a pinned building's unit faces the nearest road this close
+
+
+def pin_facing(segs: list, pts) -> dict | None:
+    """The road segment (of `segs`, those within PIN_FACING_M + 40 m of the building) a
+    pinned building's unit (its edge) or entrance (its position) faces: the nearest to its
+    middle within PIN_FACING_M, ties to the lowest id."""
+    pts = [tuple(q[:2]) for q in pts]
+    p = Point(sum(q[0] for q in pts) / len(pts), sum(q[1] for q in pts) / len(pts))
+    best = None
+    for s in segs:
+        d = G.dist(LineString([q[:2] for q in s["centerline"]]), p)
+        if best is None or (d, s["id"]) < best[:2]:
+            best = (d, s["id"], s)
+    return best[2] if best is not None and best[0] < PIN_FACING_M else None
 
 
 def _small_kind(arch: str, A: float) -> str:
@@ -879,7 +951,8 @@ def _merged_groups(cx: Ctx, out: dict) -> None:
     spec = cx.spec
     by_d: dict = {}
     for r in out["lots"]:
-        by_d.setdefault(r["district_id"], []).append(r)
+        if not r.get("attrs", {}).get("pin"):    # (M10: a pinned building's lot)
+            by_d.setdefault(r["district_id"], []).append(r)
     shared = None
     for d in spec.districts:
         did = cx.did.get(d.name)

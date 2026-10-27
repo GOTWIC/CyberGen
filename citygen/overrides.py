@@ -14,8 +14,11 @@ kept in the build state and the lock. Entities are named by their stable ids (`i
 
 - **pins** survive a district regeneration (`edit.py`): a pinned road is held like the
   district's border roads; a pinned building or open space keeps its ground (the new streets
-  keep 15 m from it, the new lots leave it out) and comes back as it was, its entrances
-  joined to the new walkways; new buildings, props and plants on it go.
+  keep 15 m from it, the new lots leave it out). A pinned building stands on a lot of its
+  own, like a traced building (`blocks._frame_lots`), and goes back on it as it was before
+  the props and the gameplay layer are made (`buildout.frame_pins`: its units and entrances
+  face the nearest road, its entrances join the new walkways); a pinned open space comes
+  back after the splice, and new buildings, props and plants on it go.
 - **edits** run on the finished city in their order, after every build and regeneration:
   `move` shifts a building (its masses, entrances, units, roof items and what hangs on it:
   green roofs, props, plants, sign slots, points of interest, garages), a prop, a plant, an
@@ -269,6 +272,13 @@ def _restore_pins(d: dict, old: dict, pins: list[str], did: str) -> list[str]:
         if c not in ("buildings", "open_spaces"):
             continue
         if e.get("district_id") != did:
+            continue
+        if c == "buildings" and pid in have:
+            # put back by the build itself (`buildout.frame_pins`): its green roofs too
+            for g in old.get("green_areas", []):
+                if g.get("building_id") == pid and g["id"] not in have:
+                    d["green_areas"].append(g)
+            notes.append(f"pin {pid} kept")
             continue
         foot = G.from_model_poly(e["footprint"] if c == "buildings" and e.get("footprint")
                                  else (e["masses"][0]["footprint"] if c == "buildings"

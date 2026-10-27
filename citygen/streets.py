@@ -476,11 +476,14 @@ class Frame:
     roads that lie in it more than 1 m from its edge; those are built anew."""
 
     def __init__(self, model, name: str, did: str, polygon, base_arch: dict,
-                 pins=(), keep_out=None):
+                 pins=(), keep_out=None, pin_buildings=()):
         self.name, self.did = name, did
         self.base_arch = base_arch
         self.pins = set(pins)          # pinned roads are held too (`overrides.py`)
         self.keep_out = keep_out       # pinned buildings and open spaces: no new streets
+        # pinned buildings of the district: a lot of their own (`blocks._frame_lots`), M3
+        # builds nothing on it, the old building goes back on it (`buildout.frame_pins`)
+        self.pin_buildings = list(pin_buildings)
         self.zone = G.qpoly(polygon.buffer(2.0, join_style="mitre"))
         self.core = G.qpoly(polygon.buffer(-1.0, join_style="mitre"))
         shapely.prepare(self.zone)
