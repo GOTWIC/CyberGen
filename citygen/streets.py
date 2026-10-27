@@ -529,6 +529,8 @@ class Frame:
                 inner.add(pos[s.end])
         self.gates = sorted(inner & nodes)
         self.gate_set = set(self.gates)
+        self.gtree = shapely.STRtree(shapely.points(np.array(self.gates, dtype=np.float64))
+                                     ) if self.gates else None
         self.nodes = nodes
         self.node_list = sorted(nodes)
         self.tree = shapely.STRtree(shapely.points(np.array(self.node_list, dtype=np.float64))
@@ -579,6 +581,13 @@ class Frame:
         """The ends of the held segments through p (where a held street through p met
         other roads in the old city)."""
         return self._met.get(p, set())
+
+    def gates_near(self, q, r: float) -> list[tuple]:
+        """The gates closer than r to q."""
+        if self.gtree is None:
+            return []
+        ks = sorted(int(k) for k in self.gtree.query(Point(q), predicate="dwithin", distance=r))
+        return [self.gates[k] for k in ks if _dist(self.gates[k], q) < r]
 
     def spans(self, t: "Line") -> list[tuple[float, float]]:
         key = t.primary["id"]
@@ -782,6 +791,7 @@ class Builder:
                  roads, open_polys: list, frame: Frame | None = None):
         self.spec = spec
         self.frame = frame
+        self.past_turn = False   # M10: the streets of the district's turn are laid (`_junction_near`)
         self.h = h
         self.polygons = polygons
         self.did = district_ids
@@ -972,16 +982,20 @@ class Builder:
 
     def _junction_near(self, t: Line, q, p, renewed: bool):
         """The junction of road t closer than MIN_JUNCTION_GAP_M to q (the nearest) that a
-        street from p joins instead of q, else None. M10: a held street does not join a
-        junction that only the district's new streets made (`Line.fresh`; in the old city it
-        came later or not at all), unless it met t there before."""
+        street from p joins instead of q, else None. M10: a held street sees the junctions
+        of the old city: not one that only the district's new streets made (`Line.fresh`; in
+        the old city it came later or not at all) unless it met t there before, but the
+        district's old ones on t (its gates) once the old build had laid them (after the
+        district's turn), and before that the one it met t at, if any."""
         near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
         if self.frame is not None and not renewed:
-            old = self.frame.met(p)
+            fr = self.frame
+            old = fr.met(p)
             if t.fresh:
                 near = [j for j in near if j not in t.fresh or j in old]
-            near += [e for e in sorted(old & self.frame.gate_set) if e not in near and
-                     _dist(e, q) < MIN_JUNCTION_GAP_M and _locate(t.pts, e) is not None]
+            gates = fr.gates_near(q, MIN_JUNCTION_GAP_M) if self.past_turn else \
+                [e for e in sorted(old & fr.gate_set) if _dist(e, q) < MIN_JUNCTION_GAP_M]
+            near += [e for e in gates if e not in near and _locate(t.pts, e) is not None]
         return min(near, key=lambda j: (_dist(j, q), j)) if near else None
 
     def _joined(self, t: Line, q, renewed: bool) -> None:
@@ -3435,6 +3449,8 @@ def build_streets(spec: CitySpec, h, polygons: dict, district_ids: dict, waterwa
     for d in spec.districts:
         if d.name in B.free and not B.free[d.name].is_empty:
             fill_district(B, d.name)
+        if frame is not None and d.name == frame.name:
+            B.past_turn = True
     footbridges(B)
     link_dead_ends(B)
     for _ in range(3):
