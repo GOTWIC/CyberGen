@@ -351,6 +351,48 @@ concourse end sits on a walkway. Delta Megacity builds on its first full-city tr
 before); the sweep passes 58 of 68 with no transit failure. Sample builds, same-layout
 before and after maps and the sweep: `docs/progress/M8c/`.
 
+M9 (tunnels) is in place, in `citygen/tunnels.py` (checks in `tunnel_checks.py`, preview
+`preview_tunnels.py`), road tunnels being a negative level (-1) of the road network:
+- **Road tunnels** (end of M1b, before the viaducts): a tunnel is a window on a corridor
+  (segments of one class joined straight on through the nodes) whose profile is a graded
+  envelope of depth needs, z(s) = -max(0, max_i(d_i - g dist(s, I_i))) at 5% (5.8% where
+  that does not fit), with M7's 40 m vertical curves: under water the bed (canal 3, river 7,
+  sea 12 m) plus 1.5 m backfill, the roof and 5.5 m clear; under a road crossing at a node
+  inside the window the clear height, roof and 1 m of cover (the node goes: the crossing road
+  passes over, `attrs.over_tunnel_at`; a tee avenue ends beside the lid, `ends_at_tunnel`).
+  A window fails on a node it cannot pass under (a highway, a fork, an exit), a corridor
+  end, an open approach over water or under another road, a bridge approach reaching its
+  descent (`Ctx.lifts`, solve_grades' envelope), or a network it would cut apart. Immersed
+  tubes replace bridges (`highways.tunnels.water`: auto (sea crossings over 600 m), prefer,
+  never; a named crossing only when its `tunnel` is true); cut-and-cover tunnels go under
+  the districts of `highways.tunnels.under` (the longest covered stretch between the
+  interchanges). Highways only for now. The window's segments become one segment (`tunnel`,
+  `tunnel_ids`, level -1) whose profile `_envelope` keeps (`attrs._tunnel_prof`, dropped
+  after M7); the network is renumbered as M1b numbers it. Model: `tunnels` (kind
+  immersed_tube, cut_and_cover, metro, pedestrian; line, box width, clear height, roof,
+  floor, portals where the roof meets the ground, vent ids). M2 forbids local junctions on
+  sunk stretches and lays streets over covered lids from frontage to frontage (role
+  `over_tunnel`, like M7's underpass streets).
+- **After transit** (`tunnels.build`): open approaches (structure `trench`), portals,
+  ventilation buildings on the lid near each portal of a tunnel over 300 m and every 800 m;
+  the metro lowered at 3% under the water bed, road tunnels, building foundations (4 to 18 m
+  by height, `foundation_m`) and earlier metro lines, its tunnels cut between the station
+  boxes; pedestrian underpasses (`highways.tunnels.underpasses`, default 0.5) under at-grade
+  highways, stairs from a sidewalk on each side, the sidewalk walkways split there. Transit
+  columns keep off road tunnel boxes.
+- **Checks** (70 in all): `tunnel_grades` (roads 6%, metro 4%), `tunnel_cover` (1 m of
+  ground past 40 m from a portal, 1.5 m under the water bed), `tunnel_portals` (on land,
+  nothing on the open approaches, no node within 20 m of their top), `tunnel_clash` (no
+  tunnel within 1 m in height of another tunnel, a metro station box, a foundation or a
+  column footing).
+- **Blockout**: road tunnels as open boxes (floor, walls, roof over the covered stretch,
+  portal lintels) with their roads as own objects, the ground open over the approaches,
+  metro tunnels and underpasses as solid boxes, ventilation buildings; `render_cutaway.jpg`
+  (view `cutaway`, also for `citygen rerender`): the city cut along the longest road tunnel,
+  earth under the ground, from over its first open approach.
+Samples: Vesper Bay cuts and covers the ring highway under Corporate Core and The Stacks,
+Peninsula City crosses its river in an immersed tube. Sample builds: `docs/progress/M9/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build

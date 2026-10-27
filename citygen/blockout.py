@@ -782,8 +782,8 @@ def _tunnels(P: _Plan) -> None:
                                   "t": q(t.roof_m)})
             for p in t.portals:
                 z_open = p.position[2] + t.clear_m
-                h = math.radians(p.heading_deg)
-                ux, uy = math.cos(h), math.sin(h)
+                h = M.radians(p.heading_deg)
+                ux, uy = float(M.cos(h)), float(M.sin(h))
                 c = [q(p.position[0] - ux * 0.75), q(p.position[1] - uy * 0.75), q(z_open)]
                 parts.append({"k": "box", "m": "tunnel_wall", "c": c,
                               "d": [1.5, q(w + 1.0), q(1.0 - z_open)],
