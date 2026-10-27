@@ -7,8 +7,8 @@
 | archipelago_free_port | 4 | 8 |
 | delta_megacity | 3 | 8 |
 | nexus_city | 1 | 8 |
-| nyxllor | 5 | 8 |
-| nyxllor_pinned | 3 | 8 |
+| vesper_bay | 5 | 8 |
+| vesper_bay_pinned | 3 | 8 |
 | peninsula_city | 5 | 8 |
 | test_delta | 5 | 5 |
 | test_minimal | 0 | 5 |
@@ -63,22 +63,22 @@
 | nexus_city | 5077 | fail | road_graph (1): exit 'west' was not built<br>named_bridges (2): named bridge 'Baylink Bridge' (road, Neon Market to west_exit) was not built<br>lot_block_sizes (1): district d09: median block size 580 m (range 100 to 200)<br>open_space_share (2): 'Harbor Industrial' (industrial_port): 56% open (target 0% to 10%) | hv4 rv0 | 238.5 |
 | nexus_city | 8128 | crash | crash: KeyError: -1 |  | 30.2 |
 | nexus_city | 27182 | fail | curve_radius (1): segment rs00031 (highway): radius 23 m near (740, -774), minimum 150 m<br>level_continuity (1): rs02519 meets node rn00673 at 0 m, the node is at 3.16 m | hv1 rv2 | 193.6 |
-| nyxllor | 11 | fail | megasite_contents (1): d06.ms01 'Vess Freight Terminal' (freight_terminal): no rail_track | hv1 rv0 city x1 (2) | 222.6 |
-| nyxllor | 404 | pass |  | hv1 rv3 | 49.7 |
-| nyxllor | 1999 | fail | transit_curves (1): Halo Line (elevated_rail): radius 88 m (minimum 150) | hv1 rv1 city x1 (2) | 231.2 |
-| nyxllor | 2077 | pass |  | hv18 rv0 city x1 (3) | 247.7 |
-| nyxllor | 3141 | fail | open_space_share (1): 'Launch Key' (spaceport): 71% open (target 0% to 50%) | hv7 rv1 city x1 (2) | 250.6 |
-| nyxllor | 5077 | pass |  | hv1 rv1 city x1 (1) | 148.8 |
-| nyxllor | 8128 | pass |  | hv19 rv1 city x1 (3) | 245.4 |
-| nyxllor | 27182 | pass |  | hv1 rv0 | 62.9 |
-| nyxllor_pinned | 11 | fail | bridge_clearance (1): junction rn00270 is out on the water (on a bridge)<br>road_avoidance (1): segment rs00032 (highway) runs 44 m through flight cone of 'Launch Key Spaceport'<br>curve_radius (1): segment rs00030 (highway): radius 111 m near (-351, -1168), minimum 150 m<br>building_clear_zones (1): d01.pin.path38: tower mass on road rs00304 (454.5 m2) | hv5 rv1 city x1 (5) | 218.7 |
-| nyxllor_pinned | 404 | pass |  | hv4 rv3 city x1 (2) | 198.6 |
-| nyxllor_pinned | 1999 | fail | curve_radius (1): segment rs00022 (highway): radius 51 m near (-1174, 132), minimum 150 m<br>megasite_contents (1): d06.ms01 'Vess Freight Terminal' (freight_terminal): no rail_track | hv10 rv0 city x1 (3) | 232.7 |
-| nyxllor_pinned | 2078 | pass |  | hv4 rv3 city x1 (2) | 201.4 |
-| nyxllor_pinned | 3141 | pass |  | hv4 rv1 city x1 (4) | 123.1 |
-| nyxllor_pinned | 5077 | fail | placement (1): 'Neon Strand' should be on the coast<br>level_continuity (1): rs02132 meets node rn00150 at 11.87 m, the node is at 7.69 m | hv17 rv0 | 213.2 |
-| nyxllor_pinned | 8128 | fail | placement (1): 'Highcrest' is not east_of 'The Stacks' (bearing 21 deg) | hv3 rv1 | 220.8 |
-| nyxllor_pinned | 27182 | fail | building_clear_zones (1): d01.mg02.bld3: podium mass on open d01.os011 (0.5 m2)<br>transit_stops (1): Crown Line: no station serves 'Highcrest' (nearest 20 m away) | hv19 rv1 | 269.5 |
+| vesper_bay | 11 | fail | megasite_contents (1): d06.ms01 'Vess Freight Terminal' (freight_terminal): no rail_track | hv1 rv0 city x1 (2) | 222.6 |
+| vesper_bay | 404 | pass |  | hv1 rv3 | 49.7 |
+| vesper_bay | 1999 | fail | transit_curves (1): Halo Line (elevated_rail): radius 88 m (minimum 150) | hv1 rv1 city x1 (2) | 231.2 |
+| vesper_bay | 2077 | pass |  | hv18 rv0 city x1 (3) | 247.7 |
+| vesper_bay | 3141 | fail | open_space_share (1): 'Launch Key' (spaceport): 71% open (target 0% to 50%) | hv7 rv1 city x1 (2) | 250.6 |
+| vesper_bay | 5077 | pass |  | hv1 rv1 city x1 (1) | 148.8 |
+| vesper_bay | 8128 | pass |  | hv19 rv1 city x1 (3) | 245.4 |
+| vesper_bay | 27182 | pass |  | hv1 rv0 | 62.9 |
+| vesper_bay_pinned | 11 | fail | bridge_clearance (1): junction rn00270 is out on the water (on a bridge)<br>road_avoidance (1): segment rs00032 (highway) runs 44 m through flight cone of 'Launch Key Spaceport'<br>curve_radius (1): segment rs00030 (highway): radius 111 m near (-351, -1168), minimum 150 m<br>building_clear_zones (1): d01.pin.path38: tower mass on road rs00304 (454.5 m2) | hv5 rv1 city x1 (5) | 218.7 |
+| vesper_bay_pinned | 404 | pass |  | hv4 rv3 city x1 (2) | 198.6 |
+| vesper_bay_pinned | 1999 | fail | curve_radius (1): segment rs00022 (highway): radius 51 m near (-1174, 132), minimum 150 m<br>megasite_contents (1): d06.ms01 'Vess Freight Terminal' (freight_terminal): no rail_track | hv10 rv0 city x1 (3) | 232.7 |
+| vesper_bay_pinned | 2078 | pass |  | hv4 rv3 city x1 (2) | 201.4 |
+| vesper_bay_pinned | 3141 | pass |  | hv4 rv1 city x1 (4) | 123.1 |
+| vesper_bay_pinned | 5077 | fail | placement (1): 'Neon Strand' should be on the coast<br>level_continuity (1): rs02132 meets node rn00150 at 11.87 m, the node is at 7.69 m | hv17 rv0 | 213.2 |
+| vesper_bay_pinned | 8128 | fail | placement (1): 'Highcrest' is not east_of 'The Stacks' (bearing 21 deg) | hv3 rv1 | 220.8 |
+| vesper_bay_pinned | 27182 | fail | building_clear_zones (1): d01.mg02.bld3: podium mass on open d01.os011 (0.5 m2)<br>transit_stops (1): Crown Line: no station serves 'Highcrest' (nearest 20 m away) | hv19 rv1 | 269.5 |
 | peninsula_city | 11 | fail | road_duplicates (1): segments rs00053..rs00098 and rs00054..rs00079 run within 25 m of each other for 286 m | hv13 rv0 city x1 (5) | 108.7 |
 | peninsula_city | 404 | pass |  | hv2 rv0 city x1 (2) | 128.0 |
 | peninsula_city | 1999 | pass |  | hv11 rv0 city x1 (2) | 58.2 |

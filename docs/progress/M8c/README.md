@@ -6,7 +6,7 @@ Megacity, which needed 9 full-city tries on M8a and M8b (about 6 minutes), now b
 first try in about a minute. The sweep passes 58 of 68 builds (M8b on M8a: 51), and no build
 in it fails a transit check any more.
 
-M8c is stacked on M8d (the trumpet flyover, PR 21), which changes only Nyxllor's roads.
+M8c is stacked on M8d (the trumpet flyover, PR 21), which changes only Vesper Bay's roads.
 Every build below is made with the combined code and passes all 66 checks, and each
 `city_model.json` is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker,
 `linux/amd64`, `CITYGEN_WORKERS=4`):
@@ -16,13 +16,13 @@ Every build below is made with the combined code and passes all 66 checks, and e
 | archipelago_free_port | 1, 1 | `dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a` (unchanged) |
 | delta_megacity | 9, 1 | `91266cfe8240c7b6028e50d8112e3a78393c3c43a302cd0534e49560bd018a9a` |
 | nexus_city | 4, 3 | `4a146cb5d6bdf59a128c06e9955652f4fd358b3dc3b9864fe7210f247bbfb452` |
-| nyxllor | 1, 1 | `ce98f9d060b60430e4825223488f67c8327a2117c7280026fb2d7668a0df86c5` |
+| vesper_bay | 1, 1 | `ce98f9d060b60430e4825223488f67c8327a2117c7280026fb2d7668a0df86c5` |
 | peninsula_city | 1, 1 | `f3bb6ffb5d8160dad20d6983159837e706c40c1411264ecafbbc4cef095679b3` |
-| nyxllor_pinned (M7b demo) | 2, 2 | `0fb851e3c4261ad6c803f6560d186c09a4c37fc0c7f87e9914b3588e158a9d00` |
+| vesper_bay_pinned (M7b demo) | 2, 2 | `0fb851e3c4261ad6c803f6560d186c09a4c37fc0c7f87e9914b3588e158a9d00` |
 
 Nexus City's first two tries and the pinned demo's first fail road checks
 (`level_continuity`, `junction_placement`), not transit. The sample build-time limit in
-`tests/test_build.py` is back to 300 s (M8a had raised it to 600 s for Delta and Nyxllor).
+`tests/test_build.py` is back to 300 s (M8a had raised it to 600 s for Delta and Vesper Bay).
 
 ## How it was found
 
@@ -126,13 +126,13 @@ Nexus City at seed 27182, second layout: the Magenta Line ends 303 m from `north
 | <img src="same_layout/nexus_city_s27182_t2_before.png" width="420"> | <img src="same_layout/nexus_city_s27182_t2_after.png" width="420"> |
 
 The samples as built (each folder also has `before_transit.png`, the map of the same spec
-before M8c, built on its own layout: M8b's, M8d's for Nyxllor):
+before M8c, built on its own layout: M8b's, M8d's for Vesper Bay):
 
-| Delta Megacity | Nyxllor |
+| Delta Megacity | Vesper Bay |
 |---|---|
-| <img src="delta_megacity/preview_transit.png" width="420"> | <img src="nyxllor/preview_transit.png" width="420"> |
+| <img src="delta_megacity/preview_transit.png" width="420"> | <img src="vesper_bay/preview_transit.png" width="420"> |
 
-Nyxllor's Crown Loop (three stops close together) is now a 2.3 km circle at 345 m, the
+Vesper Bay's Crown Loop (three stops close together) is now a 2.3 km circle at 345 m, the
 shortest ring through its stops (4.8 km in M8b). Greyhook's East Shore Line passes Hook
 Spaceport on its way (2.5 km, 3.9 in M8b).
 
@@ -161,13 +161,13 @@ Passing builds per spec (the test specs pass the same 17 of 20):
 | delta_megacity | 4 of 8 | 8 of 8 |
 | nexus_city | 7 of 8 | 7 of 8 |
 | peninsula_city | 7 of 8 | 8 of 8 |
-| nyxllor | 7 of 8 | 7 of 8 |
-| nyxllor_pinned | 4 of 8 | 4 of 8 |
+| vesper_bay | 7 of 8 | 7 of 8 |
+| vesper_bay_pinned | 4 of 8 | 4 of 8 |
 
 Fixed: archipelago s3141 and s27182 (Island Hopper), delta s3141 (Maglev Line), s5077, s8128
 and s27182 (Delta Loop), and peninsula s11 (it now passes on its third try, the second
 layout on the same roads; M8b's best of nine tries kept a building overlap). None broke. The ten builds that fail are all outside
-transit (M8a's road and placement open items: archipelago s1999, nexus s11, nyxllor s3141,
+transit (M8a's road and placement open items: archipelago s1999, nexus s11, vesper_bay s3141,
 pinned s11, s1999, s5077 and s8128, MINIMAL s42, s404 and s3141).
 
 ## Open items
@@ -191,14 +191,12 @@ pinned s11, s1999, s5077 and s8128, MINIMAL s42, s404 and s3141).
 
 `<city>/` holds the previews (`preview_transit.png` first), `before_transit.png` (M8b),
 `report.txt` and `report.json`, `trace.json`, `blockout_report.txt`, `render_top.jpg` and
-the 8K renders (`render_iso_city.jpg` for every city, `nyxllor_pinned/render_iso_d01.jpg`,
-`render_street_4.jpg` for delta_megacity and nyxllor). `same_layout/` holds the before and
+the 8K renders (`render_iso_city.jpg` for every city, `vesper_bay_pinned/render_iso_d01.jpg`,
+`render_street_4.jpg` for delta_megacity and vesper_bay). `same_layout/` holds the before and
 after maps above; `sweep.md` and `sweep.json` the sweep.
 
 ## Added with the CyberGen rename
 
-`vesper_bay/` and `vesper_bay_pinned/` are `nyxllor/` and `nyxllor_pinned/` built again after
-the sample city was renamed Vesper Bay (the repo is now CyberGen; Nyxllor is kept for the
-game). The layouts are identical; only the city, bay and ring road names differ. Both models
-are byte-identical on the M4 Mac and x86_64 Linux. The renders are 8K, including the trumpet
-close-up (`render_trumpet.jpg`, the M8d camera).
+`vesper_bay/` and `vesper_bay_pinned/` were built again when the repo became CyberGen (same
+layouts). Both models are byte-identical on the M4 Mac and x86_64 Linux. The renders are 8K,
+including the trumpet close-up (`render_trumpet.jpg`, the M8d camera).

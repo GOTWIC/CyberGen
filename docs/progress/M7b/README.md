@@ -7,27 +7,27 @@ M7b completes the M7 row of the scope (sections 4.3, 5.2 and 9, M7 row of sectio
 - **Art-direction loop:** a review sheet per round.
 
 ```bash
-.venv/bin/python -m citygen build docs/progress/M7b/nyxllor_pinned/city_spec.json out/pinned --blockout
-.venv/bin/python -m citygen review out/pinned --spec docs/progress/M7b/nyxllor_pinned/city_spec.json
+.venv/bin/python -m citygen build docs/progress/M7b/vesper_bay_pinned/city_spec.json out/pinned --blockout
+.venv/bin/python -m citygen review out/pinned --spec docs/progress/M7b/vesper_bay_pinned/city_spec.json
 ```
 
 All six cities pass all 65 checks: the five samples and the pinned demo, so three or more
 prompts pass the full validation suite. Every model is byte-identical on the M4 Mac and in
 the x86 Linux container.
 
-| Nyxllor with the traced Corporate Core (from above) | Its road levels |
+| Vesper Bay with the traced Corporate Core (from above) | Its road levels |
 |---|---|
-| <img src="nyxllor_pinned/render_top.jpg" width="420"> | <img src="nyxllor_pinned/preview_elevated.png" width="420"> |
+| <img src="vesper_bay_pinned/render_top.jpg" width="420"> | <img src="vesper_bay_pinned/preview_elevated.png" width="420"> |
 
 The traced island in the blockout: the megatower, the traced towers and water pockets, the
 sky tube and the maglev leaving it:
 
-<img src="nyxllor_pinned/render_iso_d01.jpg" width="840">
+<img src="vesper_bay_pinned/render_iso_d01.jpg" width="840">
 
-Nyxllor itself now has all three templates on one viaduct: a diamond (D), a partial
+Vesper Bay itself now has all three templates on one viaduct: a diamond (D), a partial
 cloverleaf (P) and a trumpet (Tr):
 
-<img src="nyxllor/preview_elevated.png" width="840">
+<img src="vesper_bay/preview_elevated.png" width="840">
 
 | Nexus City from above | Delta Megacity from above |
 |---|---|
@@ -50,10 +50,10 @@ The pinned demo also has its spec (`city_spec.json`), `preview_map.png`,
 | Delta Megacity | 2.09 km | 2 | 3 | 1 diamond, 1 parclo | 2 | 12.6 m | 14.34 km | 4 | 256 |
 | Nexus City | 2.85 km | 3 | 3 | 2 diamond | 3 | 26.5 m | 14.70 km | 2 | 375 |
 | Greyhook | 1.17 km | 1 | 0 | none | 0 | 10.3 m | 4.95 km | 4 | 106 |
-| Nyxllor | 2.02 km | 1 | 10 | 1 diamond, 1 parclo, 1 trumpet | 3 | 9.0 m | 10.66 km | 1 | 274 |
-| Nyxllor Pinned | 1.69 km | 2 | 6 | 2 parclo | 2 | 9.3 m | 13.43 km | 3 | 343 |
+| Vesper Bay | 2.02 km | 1 | 10 | 1 diamond, 1 parclo, 1 trumpet | 3 | 9.0 m | 10.66 km | 1 | 274 |
+| Vesper Bay Pinned | 1.69 km | 2 | 6 | 2 parclo | 2 | 9.3 m | 13.43 km | 3 | 343 |
 
-Against M7a, Nyxllor goes from 4 ramps to 10, and Delta Megacity's second node, where no
+Against M7a, Vesper Bay goes from 4 ramps to 10, and Delta Megacity's second node, where no
 diamond fit, is now a partial cloverleaf.
 
 ## Pinned import
@@ -92,7 +92,7 @@ the import is the same bytes on every machine.
   sizes and frontage, block size and open share, heights). They are listed in each check's
   text.
 
-The demo keeps Nyxllor's prompt but moves the Corporate Core to a nearshore island in the
+The demo keeps Vesper Bay's prompt but moves the Corporate Core to a nearshore island in the
 south, joined by the traced spokes:
 - 57 traced buildings and 10 traced roads;
 - one sky tube line from it through The Stacks to Highcrest.
@@ -142,7 +142,7 @@ skill (step 6). For each round:
 
 Three rounds at most. The last round says what is still off.
 
-The pinned demo used all three rounds. In `nyxllor_pinned/`, `review_round<n>.md` is each
+The pinned demo used all three rounds. In `vesper_bay_pinned/`, `review_round<n>.md` is each
 round's sheet and `review_round<n>_transit.png` its transit map (round 3's is
 `preview_transit.png`):
 - **Round 1:** every check passed, but the Launch Express (maglev) turned back. It came in
@@ -159,7 +159,7 @@ The Stacks.
 
 | Round 1 | Round 2 | Round 3 |
 |---|---|---|
-| <img src="nyxllor_pinned/review_round1_transit.png" width="280"> | <img src="nyxllor_pinned/review_round2_transit.png" width="280"> | <img src="nyxllor_pinned/preview_transit.png" width="280"> |
+| <img src="vesper_bay_pinned/review_round1_transit.png" width="280"> | <img src="vesper_bay_pinned/review_round2_transit.png" width="280"> | <img src="vesper_bay_pinned/preview_transit.png" width="280"> |
 
 ## Fixes found in review
 

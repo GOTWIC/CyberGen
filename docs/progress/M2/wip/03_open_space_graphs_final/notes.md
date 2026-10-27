@@ -1,7 +1,7 @@
 # WIP 03: open space, graphs, final samples
 
 The final previews are the milestone outputs themselves (not copied here):
-`docs/progress/M2/<city>/preview_map.png` and `preview_detail.png` for Nyxllor, Saltreach Free
+`docs/progress/M2/<city>/preview_map.png` and `preview_detail.png` for Vesper Bay, Saltreach Free
 Port, Delta Megacity, Nexus City and Greyhook.
 
 - Open space joined to the walkway graph (paths from every park, plaza and promenade); walkway

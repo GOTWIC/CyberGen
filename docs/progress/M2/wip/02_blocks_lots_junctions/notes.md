@@ -11,5 +11,5 @@ sidewalks, medians, lane markings, zebra crosswalks, one-way arrows, lots).
   promenades, footbridges, alleys, paths into open space).
 - Blocks from the right of way; lots by OBB splits with frontage, courtyards in perimeter
   blocks; parks, plazas, markets and courtyards; named places.
-- State: Nyxllor and Greyhook pass every check; Saltreach and Delta have one oversized lot
+- State: Vesper Bay and Greyhook pass every check; Saltreach and Delta have one oversized lot
   each, Nexus a few lanes outside the main lane graph. Build times 19 to 53 s; tuning next.
