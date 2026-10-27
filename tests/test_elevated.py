@@ -292,11 +292,11 @@ def test_trumpet_geometry(monkeypatch):
 
 # --- M8d: the trumpet's flyover ------------------------------------------------------------
 
-NYXLLOR = ROOT / "cities" / "nyxllor" / "city_spec.json"
+VESPER_BAY = ROOT / "cities" / "vesper_bay" / "city_spec.json"
 
 
 def _roads_with_elev(monkeypatch, spec_path):
-    """Nyxllor's roads alone (no local streets or buildings) and the M7 stage that made them."""
+    """Vesper Bay's roads alone (no local streets or buildings) and the M7 stage that made them."""
     seen = {}
     orig = EL.Elev.interchanges
 
@@ -318,13 +318,13 @@ def _grade_ok(prof) -> bool:
 def nyx_roads():
     mp = pytest.MonkeyPatch()
     try:
-        yield _roads_with_elev(mp, NYXLLOR)
+        yield _roads_with_elev(mp, VESPER_BAY)
     finally:
         mp.undo()
 
 
 def test_trumpet_flyover_geometry(nyx_roads):
-    """Nyxllor's trumpet in its textbook form: on the far side one loop (from the stem's near
+    """Vesper Bay's trumpet in its textbook form: on the far side one loop (from the stem's near
     terminal, under the deck, round its quadrant) and one flyover for the other left turn.
     The flyover is a level-2 ramp: it leaves the far lanes at the deck, wraps round the
     loop's outside, crosses the deck square with the clearance and the deck under it, comes
@@ -376,7 +376,7 @@ def test_trumpet_falls_back_to_two_loops(monkeypatch):
     """Where the flyover does not fit, the trumpet keeps the two far loops of M7b, both on the
     stub that runs on under the deck."""
     monkeypatch.setattr(EL.Elev, "_flyover", lambda self, *a, **k: (None, "test: no room"))
-    _, E = _roads_with_elev(monkeypatch, NYXLLOR)
+    _, E = _roads_with_elev(monkeypatch, VESPER_BAY)
     ic = next(i for i in E.icx if i["template"] == "trumpet")
     rps = [rp for rp in E.ramps if rp["ic"] == ic["id"]]
     assert not any(rp.get("flyover") for rp in rps)
@@ -389,7 +389,7 @@ def test_trumpet_falls_back_to_two_loops(monkeypatch):
 
 @pytest.fixture(scope="module")
 def nyx_city():
-    built, _, _ = built_sample(NYXLLOR)
+    built, _, _ = built_sample(VESPER_BAY)
     return built
 
 
@@ -419,7 +419,7 @@ def test_flyover_in_the_city(nyx_city):
 
 
 def _nyx_rerun(model: CityModel) -> dict:
-    spec = load_spec(NYXLLOR).filled
+    spec = load_spec(VESPER_BAY).filled
     checks, _ = C.run_checks(spec, model)
     return {c.id: c for c in checks}
 

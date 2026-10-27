@@ -1,12 +1,25 @@
-# Nyxllor
+# CyberGen
 
-A Cyberpunk 2077-inspired open-city game in Unreal Engine 5. The city layout comes from
-**citygen**: one text prompt (plus an optional concept image) becomes a complete, water-first
-coastal city, built as deterministic offline Python and later as a Blender blockout and Unreal
-map. No API calls anywhere: a Claude Code session turns the prompt into a spec through the
-`citygen` skill, and everything after that is code.
+Offline generators for cyberpunk open cities. Stage 1, **citygen**, turns one text prompt (plus
+an optional concept image) into a complete, water-first coastal city: deterministic offline
+Python, then a Blender blockout and exports for Unreal. No API calls anywhere: a Claude Code
+session turns the prompt into a spec through the `citygen` skill, and everything after that is
+code.
 
-Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
+| Stage | Generator | What it makes | Status |
+|---|---|---|---|
+| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M8 done, M9 to M15 planned |
+| 2 | assetgen | A unique 3D model for every building, plus roads, sidewalks and street furniture; textures | Planned |
+| 3 | atmosgen | Lighting, sky, weather and atmospherics in Unreal | Planned |
+| 4 | lifegen | Traffic, crowds, trains and aircraft, placed and driven procedurally | Planned |
+| 5 | storygen | Story, characters, cutscenes | Planned |
+
+Stages 1 and 2 are city-agnostic and live here. Nyxllor, the Cyberpunk 2077-inspired
+open-city game in Unreal Engine 5 that CyberGen is built for, gets its own repo at stage 3.
+The sample city called Nyxllor up to M8c is **Vesper Bay** (`cities/vesper_bay`) from then on;
+the earlier `docs/progress/<milestone>/nyxllor*` folders keep the old name.
+
+Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 
 ## Progress
 
@@ -28,7 +41,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 | M8c | Transit that passes on a city's first layout: flying loops as Dubins rings, open lines off the roads or as Dubins paths where the roads fail them; Delta Megacity from 9 full-city tries to 1, the sweep 58 of 68 (M8b 51), no transit failures left in it | Done | [`docs/progress/M8c`](docs/progress/M8c) |
-| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](docs/progress/M8d) |
+| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Vesper Bay, then Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](docs/progress/M8d) |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
@@ -46,7 +59,7 @@ fit, islands cut off from the roads, level steps on loop roads and footbridges, 
 duplicate roads, a crash (see [`docs/progress/M8a`](docs/progress/M8a)). M8b makes every
 transit loop one simple ring through its stops in route order, places fast lines (maglev,
 sky tube) so that their curves fit, and routes transit in about 3 to 13 s per city; on M8a's
-code it takes nyxllor from 8 full-city tries to 1. M8d builds the trumpet as one loop and a
+code it takes Vesper Bay (then Nyxllor) from 8 full-city tries to 1. M8d builds the trumpet as one loop and a
 flyover. M8c makes transit pass on the layout a city is first built on: a sky tube or maglev
 loop is one ring of Dubins paths (straight runs and arcs at the mode's radius) through its
 stops, and an open line the roads fail goes off them, or from stop to stop on Dubins paths.
@@ -57,13 +70,13 @@ before), and the sweep passes 58 of 68 builds with no transit failure left (see
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):
 
-| Nexus City (from the concept image) | Nyxllor (bay, river delta) |
+| Nexus City (from the concept image) | Vesper Bay (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M8c/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/nyxllor/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8c/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay/render_iso_city.jpg" width="420"> |
 
-| Nyxllor with the traced Corporate Core on its island | Delta Megacity |
+| Vesper Bay with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
-| <img src="docs/progress/M8c/nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/delta_megacity/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
@@ -71,28 +84,28 @@ for full size):
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 
-<img src="docs/progress/M8c/nyxllor_pinned/render_iso_d01.jpg" width="840">
+<img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="840">
 
 At street level, beside the viaducts:
 
-| Delta Megacity, beside a viaduct | Nyxllor, corporate core |
+| Delta Megacity, beside a viaduct | Vesper Bay, corporate core |
 |---|---|
-| <img src="docs/progress/M8c/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8c/nyxllor/render_street_4.jpg" width="420"> |
+| <img src="docs/progress/M8c/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay/render_street_4.jpg" width="420"> |
 
-Road levels (Nyxllor, M8d): every raised road by deck height, the interchanges (a diamond, a
+Road levels (Vesper Bay, M8d): every raised road by deck height, the interchanges (a diamond, a
 partial cloverleaf and a trumpet), columns, and the profile of one viaduct. The trumpet
 (inset) now has one loop and a flyover that wraps round it, crosses the deck at 16.6 m
 beside the stem and comes down to it:
 
-<img src="docs/progress/M8d/nyxllor/preview_elevated.png" width="840">
+<img src="docs/progress/M8c/vesper_bay/preview_elevated.png" width="840">
 
-Nyxllor's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it:
+Vesper Bay's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it:
 
-<img src="docs/progress/M8d/nyxllor/render_trumpet.jpg" width="840">
+<img src="docs/progress/M8c/vesper_bay/render_trumpet.jpg" width="840">
 
-Props and plants at street level (Nyxllor, 180 m insets):
+Props and plants at street level (Vesper Bay, 180 m insets):
 
-<img src="docs/progress/M8b/nyxllor/preview_props.png" width="840">
+<img src="docs/progress/M8c/vesper_bay/preview_props.png" width="840">
 
 Transit maps (M8c): Delta Megacity on its first layout, before M8c (the Delta Loop's
 curve at Research Campus and the monorail's turn at a bridge foot too tight, so the city was
@@ -102,9 +115,9 @@ built again eight times) and now:
 |---|---|
 | <img src="docs/progress/M8c/same_layout/delta_megacity_s4412_t1_before.png" width="420"> | <img src="docs/progress/M8c/delta_megacity/preview_transit.png" width="420"> |
 
-| Nexus City | Nyxllor |
+| Nexus City | Vesper Bay |
 |---|---|
-| <img src="docs/progress/M8c/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M8c/nyxllor/preview_transit.png" width="420"> |
+| <img src="docs/progress/M8c/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M8c/vesper_bay/preview_transit.png" width="420"> |
 
 Each M8c city folder has every generator preview, the transit map of M8b, the Blender
 renders, the build report and the stage trace, and `docs/progress/M8c/same_layout/` the
@@ -112,29 +125,33 @@ transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) a
 `docs/progress/M8d/`, the M8b ones in `docs/progress/M8b/`, the M8a sweep tables in
 `docs/progress/M8a/`, the M7b builds in `docs/progress/M7b/`, the M7a ones in
 `docs/progress/M7/`, the 2D maps in `docs/progress/M4/`. Sample specs live in
-`docs/progress/M1a2/<city>/city_spec.json` and `cities/nyxllor/city_spec.json`; the pinned
-demo's in `docs/progress/M7b/nyxllor_pinned/city_spec.json`, its round 1 and round 2 transit
-in `docs/progress/M8b/nyxllor_pinned_round1/` and `nyxllor_pinned_round2/`.
+`docs/progress/M1a2/<city>/city_spec.json` and `cities/vesper_bay/city_spec.json`; the pinned
+demo's in `cities/vesper_bay_pinned/city_spec.json` (first in
+`docs/progress/M7b/nyxllor_pinned/`), its round 1 and round 2 transit in
+`docs/progress/M8b/nyxllor_pinned_round1/` and `nyxllor_pinned_round2/`. `docs/progress/M8c/vesper_bay*/`
+are the same layouts as `nyxllor*/` there, built again under the new name.
 
 ## Where things are
 
 - **Milestone outputs:** `docs/progress/<milestone>/<city>/` (preview images, reports, traces).
-- **Work in progress:** while a cloud session runs, it pushes snapshot images to its branch under
+- **Work in progress:** while a milestone session runs, it pushes snapshot images to its branch under
   `docs/progress/<milestone>/wip/`. Open the branch on GitHub (Branches tab) to see them before
   the PR is up.
 - **Generator:** `citygen/`, tests in `tests/`, skill in `.claude/skills/citygen/`.
-- **Earlier hand-traced pipeline** (Corporate Core): `maps/`, `pipeline/`, `out/`, `unreal/`.
+- **Earlier hand-traced pipeline** (Corporate Core, Nyxllor's first district; moves to the
+  nyxllor repo at stage 3 except the traced map, which the pinned demo imports): `maps/`,
+  `pipeline/`, `out/`, `unreal/`.
 
 ## Run it
 
 ```
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m citygen build cities/nyxllor/city_spec.json out/nyxllor --blockout
+.venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
 .venv/bin/python -m pytest -q
 ```
 
 `--blockout` needs Blender 5.2 (found in `/Applications/Blender*.app`, `$BLENDER` or on PATH)
-and adds `city.blend`, `city.usdc`, `tiles/*.glb`, renders and the 2D map to `out/nyxllor`.
+and adds `city.blend`, `city.usdc`, `tiles/*.glb`, renders and the 2D map to `out/vesper_bay`.
 
 To make a new city, open Claude Code in this repo and ask for one (the `citygen` skill takes it
 from there).

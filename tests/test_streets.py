@@ -50,7 +50,7 @@ SMALL2 = {
                                                                   "south_of": "Hub"}},
     ],
 }
-NYXLLOR = ROOT / "cities" / "nyxllor" / "city_spec.json"
+VESPER_BAY = ROOT / "cities" / "vesper_bay" / "city_spec.json"
 
 
 def _build(data):
@@ -152,7 +152,7 @@ def test_grid_angle_followed(small):
 # --- footbridges, junctions ----------------------------------------------------------------
 
 def test_footbridge_spacing():
-    b, _, _ = built_sample(NYXLLOR)
+    b, _, _ = built_sample(VESPER_BAY)
     m = b.model
     feet = [s for s in m.road_segments if s.road_class == "footbridge"]
     assert len(feet) >= 3

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "citygen"
 version = "0.1.0"
-description = "Offline prompt-to-city layout generator for Nyxllor (no network, no LLM SDK)."
+description = "Offline prompt-to-city layout generator, stage 1 of CyberGen (no network, no LLM SDK)."
 requires-python = ">=3.13"
 dependencies = ["pydantic>=2.9", "shapely>=2.0", "numpy>=2.0", "matplotlib>=3.8", "contourpy>=1.2"]
 

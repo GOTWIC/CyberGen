@@ -31,8 +31,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = [ROOT / "docs" / "progress" / "M1a2" / n / "city_spec.json"
            for n in ("archipelago_free_port", "delta_megacity", "nexus_city", "peninsula_city")
-           ] + [ROOT / "cities" / "nyxllor" / "city_spec.json",
-                ROOT / "docs" / "progress" / "M7b" / "nyxllor_pinned" / "city_spec.json"]
+           ] + [ROOT / "cities" / "vesper_bay" / "city_spec.json",
+                ROOT / "cities" / "vesper_bay_pinned" / "city_spec.json"]
 EXTRA_SEEDS = [11, 404, 1999, 3141, 5077, 8128, 27182]
 TEST_SPECS = [("conftest", "SMALL"), ("conftest", "MINIMAL"), ("test_pinned", "PINNED"),
               ("test_quality", "DELTA")]

@@ -128,8 +128,8 @@ def test_sweep_table_and_retries():
     assert "crash: KeyError: -1" in md and "x / y" in md
     jobs = SW.suite_jobs("m8a", SW.EXTRA_SEEDS[:2])
     labels = {j[0] for j in jobs}
-    assert {"nyxllor", "nyxllor_pinned", "test_small", "test_pinned"} <= labels
-    assert ("nyxllor", 2077) in {(j[0], j[2]) for j in jobs}
+    assert {"vesper_bay", "vesper_bay_pinned", "test_small", "test_pinned"} <= labels
+    assert ("vesper_bay", 2077) in {(j[0], j[2]) for j in jobs}
 
 
 def test_roads_leaving_a_node_together_become_one():

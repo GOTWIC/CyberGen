@@ -194,3 +194,11 @@ pinned s11, s1999, s5077 and s8128, MINIMAL s42, s404 and s3141).
 the 8K renders (`render_iso_city.jpg` for every city, `nyxllor_pinned/render_iso_d01.jpg`,
 `render_street_4.jpg` for delta_megacity and nyxllor). `same_layout/` holds the before and
 after maps above; `sweep.md` and `sweep.json` the sweep.
+
+## Added with the CyberGen rename
+
+`vesper_bay/` and `vesper_bay_pinned/` are `nyxllor/` and `nyxllor_pinned/` built again after
+the sample city was renamed Vesper Bay (the repo is now CyberGen; Nyxllor is kept for the
+game). The layouts are identical; only the city, bay and ring road names differ. Both models
+are byte-identical on the M4 Mac and x86_64 Linux. The renders are 8K, including the trumpet
+close-up (`render_trumpet.jpg`, the M8d camera).

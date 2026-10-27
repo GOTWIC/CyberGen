@@ -1,8 +1,8 @@
-# Nyxllor
+# Vesper Bay
 
 ## Prompt
 
-Nyxllor: a coastal cyberpunk megacity on a bay that opens to the west. A wide river enters from
+Vesper Bay: a coastal cyberpunk megacity on a bay that opens to the west. A wide river enters from
 the east and splits into three delta channels before it reaches the bay, so most districts sit on
 their own landmass. Corporate Core in the middle on a 45-degree grid, with a three-armed megatower,
 a central plaza, twin towers and lots of skybridges. North of it, megablock residential stacks;

@@ -1,6 +1,6 @@
 # citygen: prompt-to-city layout generator (scope, v1)
 
-Stage 1 of a three-stage pipeline. One text prompt in; a complete, playable-scale cyberpunk city
+Stage 1 (layoutgen) of CyberGen's five stages. One text prompt in; a complete, playable-scale cyberpunk city
 layout out, built as a blockout scene in Blender plus structured data for later stages and Unreal.
 
 ```
@@ -16,8 +16,8 @@ layout out, built as a blockout scene in Blender plus structured data for later 
         ├──> 2D maps + previews (PNG/SVG, review)
         └──> exports for stage 2/3 and Unreal (USD/glTF, instance data, graphs)
 
- stage 2 (not this project): assets, models, textures
- stage 3 (not this project): lighting, looks
+ stage 2 (assetgen, CyberGen): unique models and textures
+ stages 3 to 5 (atmosgen, lifegen, storygen): looks, life, story
 ```
 
 ## 1. Goal
@@ -102,7 +102,7 @@ after districts so roads and transit can connect to them.)
 
 ```json
 {
-  "name": "Nyxllor", "seed": 1207, "size_km": [3.4, 3.4],
+  "name": "Vesper Bay", "seed": 1207, "size_km": [3.4, 3.4],
   "water": {
     "coast": {"form": "bay", "side": "south_west"},
     "rivers": [{"name": "Sentinel", "from": "north_east", "to": "bay", "width_m": [60, 120],
@@ -447,11 +447,12 @@ viaducts with simple end ramps from M5.
 
 ### After v1
 
-Stage 1 of the project (layoutgen) ends with M15. The later stages are assetgen (unique 3D
+Stage 1 of CyberGen (layoutgen) ends with M15. The later stages are assetgen (unique 3D
 models and textures for every building and street element), atmosgen (lighting, sky and
 atmospherics in Unreal), lifegen (generated traffic, trains, crowds and animation) and
 storygen (story, characters, cutscenes); stages 1 and 2 are reusable generators, not tied to
-one city.
+one city. The game city Nyxllor gets its own repo at stage 3; the sample city called Nyxllor up
+to M8c is Vesper Bay (`cities/vesper_bay`) from then on.
 
 | M | Deliverable | Done when | Status |
 |---|---|---|---|
