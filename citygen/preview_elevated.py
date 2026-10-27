@@ -203,9 +203,13 @@ def render_elevated(b, out, dpi: int = 140) -> None:
         _columns(ax2, m, 6.0, box)
         for s in rs:
             if s.attrs.get("turn") == "left":
-                # a stack's or turbine's left ramp: its crest over the core
+                # a stack's or turbine's left ramp: its crest, written out along the arm it
+                # comes down on (the four labels apart, not on the core)
                 top = max(s.z_profile, key=lambda z: (z.z, -z.s))
-                c = LineString(s.centerline).interpolate(top.s)
+                line = LineString(s.centerline)
+                C = Point(s.attrs.get("crossing") or line.interpolate(top.s).coords[0])
+                arm = [line.interpolate(d) for d in np.arange(top.s, line.length, 10.0)]
+                c = next((q for q in arm if q.distance(C) >= 0.35 * R), arm[-1])
                 tag = f"tier {s.attrs['tier']} " if s.attrs.get("tier") else ""
                 ax2.text(c.x, c.y, f"{tag}{top.z:.1f} m", color=INK, fontsize=6.5,
                          fontweight="bold", path_effects=HALO, zorder=7, ha="center")

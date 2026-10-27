@@ -278,13 +278,20 @@ def _with_tee(x: float, side: int):
 @pytest.mark.parametrize("x,side", [(450.0, 1), (600.0, -1)])
 def test_avenue_junction_under_the_lifted_deck(x, side):
     """An avenue meeting the lifted highway among the stack's ramps, whose own ramps do not
-    fit there, stays at grade under the deck (the viaduct does not come down for it)."""
+    fit there, stays at grade (the viaduct does not come down for it) and ends clear of the
+    deck, so no later stage joins it to the deck."""
     net = _with_tee(x, side)
     st = EL.elevate(_spec(), _ctx(), net)
     assert st["interchanges"] == {"stack": 1}, st["notes"]
     av = [s for s in net.segments if s["road_class"] == "avenue"]
     assert av and all(z["z"] == 0.0 for s in av for z in s["z_profile"])
     deck = [s for s in net.segments if s["attrs"].get("elevated")]
+    assert not {n for s in av for n in (s["start"], s["end"])} & \
+        {n for s in deck for n in (s["start"], s["end"])}
+    lines = [LineString(s["centerline"]) for s in deck]
+    assert min(min(ln.distance(shapely.Point(p)) for ln in lines)
+               for s in av for p in (s["centerline"][0], s["centerline"][-1])) >= \
+        15.0 + EL.UNDER_END_M - 0.5
     assert all(z["z"] >= EL.LEVEL_Z[1] - 0.01 for s in deck for z in s["z_profile"]
                if abs(G.q(s["centerline"][0][1])) < 1.0 and abs(_at_x(s, z["s"]) - x) < 60.0)
     assert not _clear(net)

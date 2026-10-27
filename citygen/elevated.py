@@ -97,6 +97,8 @@ STACK_TRIES = 6                 # profiles tried per ramp (approach and departur
 STACK_CHORD_M = 25.0            # a ramp's line beside its highway follows the chord this far
 #                                 each way
 STACK_WIND_DEG = 140.0          # a directional ramp turns at most this far in all
+UNDER_END_M = 15.0              # an avenue ending under a stack's deck stops this far past
+#                                 its edge
 
 
 def ramp_run(dz: float) -> float:
@@ -2488,6 +2490,23 @@ def rebuild(E: Elev) -> None:
                     if kk in (k1, k2):
                         owner[sid] = e.key
                 edges[e.key] = e
+            elif kd == "under" and len(legs) == 1:
+                # M12: an avenue that met a stack's lifted highway from one side ends clear
+                # of the deck (M2 would join an end right under the viaduct to it)
+                _, u = _at(r.pts, r.cum, r.s_nodes[k])
+                v = E.leg_dir(legs[0], n)
+                sigma = 1 if u[0] * v[1] - u[1] * v[0] > 0 else -1
+                hw_w = max(s["width_m"] for s, _ in r.segs)
+                hit = E._terminal(r, k, legs[0], sigma, hw_w / 2.0 + UNDER_END_M)
+                if hit is not None:
+                    T = hit[0]
+                    kk, e = edge_of(legs[0]["id"])
+                    e = e.oriented_to_end(p)
+                    pts, i = _insert(e.pts, T)
+                    cum = _cum(pts)
+                    edges[kk] = Edge(pts[:i + 1], _slice(e.prof, 0.0, cum[i]), e.row, e.key,
+                                     True, [c for c in e.cuts if tuple(c) != tuple(T)],
+                                     e.extra)
             elif kd == "tee":
                 kk, e = edge_of(legs[0]["id"])
                 e = e.oriented_to_end(p)
