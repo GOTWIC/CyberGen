@@ -1,6 +1,6 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, build the Blender blockout (.blend, USD, glTF tiles, renders, 2D map), and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, build the Blender blockout (.blend, USD, glTF tiles, renders, 2D map), import it into an Unreal 5.8 project when asked, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
@@ -453,6 +453,28 @@ renders: every district should read in its isometric view as it does in
 `preview_massing.png`. A failed blockout check (the .blend does not reopen, an object or tile
 missing, a render missing, over the 10 minute budget) is a citygen problem: report it, do not
 work around it in the spec.
+
+### 6c. Unreal import (M15)
+
+To put a passing city into an Unreal 5.8 project (only when asked; it needs Unreal installed,
+found at `/Users/Shared/Epic Games/UE_5.*`, `$CITYGEN_UE_ROOT` or `--engine`):
+
+```bash
+citygen unreal cities/<slug>/out/blockout/ "<path>/<Project>.uproject" --check --shots <folder>
+```
+
+It writes `<blockout>/unreal/manifest.json`, `prototypes.glb` and `graphs.json`, enables the
+Python and editor-scripting plugins in the .uproject, then runs the editor headless: a World
+Partition level `/Game/CityGen/<City>/Maps/<City>`, a static mesh actor per blockout object
+(complex collision, a material instance per blockout material), props and plants as
+instanced meshes, the lane, walkway and transit graphs as data assets, a player start, every
+actor tagged `cg.key=`, `cg.id=`, `cg.type=` and more. `--check` then plays the level in the
+editor: streaming, traces onto the ground, roofs and facades, a walk along a sidewalk;
+`--shots DIR` renders views. Running it again on the same build changes nothing; on a build
+regenerated with `--district`, only what changed. `--new-project` creates the project from
+the First Person template when the .uproject does not exist. Never import into a project the
+user did not name (their game project is theirs to choose). Report the summary lines it
+prints (actors created, updated, deleted, the check lines) and attach the shots.
 
 ### 7. Report
 

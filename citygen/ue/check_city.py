@@ -189,7 +189,8 @@ def teleport(pawn, x, y, z):
 
 
 def streaming(world, pawn, man, slug):
-    total = man["counts"]["objects"] + man["counts"]["instance_actors"] + 1
+    # the blockout objects, the instance actors, the player start and the three lights
+    total = man["counts"]["objects"] + man["counts"]["instance_actors"] + 4
     yield from settle(world, slug)
     at_start = city_actors(world, slug)
     # the busiest tile at least 600 m from the start
@@ -350,20 +351,16 @@ def shots(man):
     cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
     size = max(b[2] - b[0], b[3] - b[1])
     d = man["cameras"].get("iso_dir") or [0.28, 0.77, -0.57]
-    dist = 1.25 * size
+    dist = 1.9 * size        # the whole city in a 30 degree field of view
     views = [("iso_city", (cx - d[0] * dist, cy - d[1] * dist, -d[2] * dist), (cx, cy, 0.0),
               30.0)]
     for v in man["cameras"].get("street", [])[:3]:
         views.append((v["name"], tuple(v["eye"]), tuple(v["target"]),
                       2.0 * math.degrees(math.atan(18.0 / v.get("lens_mm", 28)))))
-    sun = eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 50000))
-    sun.set_actor_rotation(unreal.Rotator(roll=0.0, pitch=-40.0, yaw=-60.0), False)
-    sky = eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 50000))
-    atm = eas.spawn_actor_from_class(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0))
     files = []
     w = int(JOB.get("width") or 3840)
     for name, eye, target, fov in views:
-        cam = eas.spawn_actor_from_class(unreal.CameraActor, ue(*eye))
+        cam = eas.spawn_actor_from_class(unreal.CameraActor, ue(*eye), transient=True)
         e, tg = ue(*eye), ue(*target)
         rot = unreal.MathLibrary.find_look_at_rotation(e, tg)
         cam.set_actor_rotation(rot, False)
@@ -371,6 +368,8 @@ def shots(man):
         path = os.path.join(out, f"unreal_{name}.png")
         if os.path.exists(path):
             os.remove(path)
+        unreal.AutomationLibrary.finish_loading_before_screenshot()   # shaders, streaming
+        yield from wait(2.0)
         unreal.AutomationLibrary.take_high_res_screenshot(w, w * 9 // 16, path, cam)
         t = time.time()
         while not os.path.exists(path) and time.time() - t < 300:
@@ -380,8 +379,6 @@ def shots(man):
         if os.path.exists(path):
             files.append(path)
             log(f"wrote {path}")
-    for a in (sun, sky, atm):
-        eas.destroy_actor(a)
     RES["shots"] = files
 
 
@@ -400,7 +397,13 @@ def finish():
     unreal.SystemLibrary.quit_editor()
 
 
+BUSY = [False]
+
+
 def tick(dt):
+    if BUSY[0]:     # a screenshot pumps the editor's tick from inside the generator
+        return
+    BUSY[0] = True
     try:
         next(GEN)
     except StopIteration:
@@ -413,6 +416,8 @@ def tick(dt):
         except Exception:
             pass
         finish()
+    finally:
+        BUSY[0] = False
 
 
 HANDLE = unreal.register_slate_post_tick_callback(tick)

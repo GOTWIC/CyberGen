@@ -226,7 +226,7 @@ def test_unreal_import_small_city(small, tmp_path):
     first = U.import_city(build, proj)
     assert first["ok"], first.get("error")
     assert first["actors"]["created"] == first["actor_count"] == \
-        first["counts"]["objects"] + first["counts"]["instance_actors"] + 1
+        first["counts"]["objects"] + first["counts"]["instance_actors"] + 4
     second = U.import_city(build, proj)
     assert second["ok"], second.get("error")
     assert second["actors"]["created"] == second["actors"]["updated"] == \

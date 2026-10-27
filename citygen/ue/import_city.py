@@ -43,7 +43,7 @@ BEL = unreal.BlueprintEditorLibrary
 HASH_TAG = "cg.hash"
 # bumped when the importer makes meshes or actors differently, so the next import of an
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
-MESH_VERSION = "2"
+MESH_VERSION = "3"
 ACTOR_VERSION = "1"
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
               ("Kinds", "[name"), ("Refs", "[name"), ("Widths", "[real"),
@@ -229,11 +229,13 @@ class Importer:
     def finish_mesh(self, sm, h):
         """Per-category materials by slot and complex collision (set without the change
         notification, which would build the mesh again), the content hash."""
-        slots = sm.get_editor_property("static_materials")
-        for s in slots:
+        slots = []
+        for s in sm.get_editor_property("static_materials"):
+            # (the array hands out copies: edit each and set the array again)
             mi = self.mats.get(str(s.material_slot_name))
             if mi is not None:
                 s.set_editor_property("material_interface", mi)
+            slots.append(s)
         sm.set_editor_property("static_materials", slots, NEVER)
         bs = sm.get_editor_property("body_setup")
         if bs is not None:
@@ -397,6 +399,7 @@ class Importer:
                            f"CityGen/{o['category']}")
         self.instances(have)
         self.player_start(have)
+        self.lighting(have)
         for key, a in sorted(have.items()):
             self.eas.destroy_actor(a)
             self.stats["actors"]["deleted"] += 1
@@ -456,6 +459,33 @@ class Importer:
 
         self.place(have, "player_start", h, unreal.PlayerStart.static_class(), make, update,
                    "CityGen")
+
+    def lighting(self, have):
+        """A sun, a sky light and the sky atmosphere, always loaded, so the
+        blockout reads when played (stage 3, atmosgen, replaces them)."""
+        specs = [("lighting.sun", unreal.DirectionalLight), ("lighting.sky", unreal.SkyLight),
+                 ("lighting.atmosphere", unreal.SkyAtmosphere)]
+        for key, cls in specs:
+            h = sha16([key, "v1"])
+
+            def make(cls=cls):
+                return self.eas.spawn_actor_from_class(cls, unreal.Vector(0.0, 0.0, 0.0))
+
+            def update(a, hv, key=key):
+                a.set_editor_property("is_spatially_loaded", False)
+                if key == "lighting.sun":
+                    a.set_actor_rotation(unreal.Rotator(roll=0.0, pitch=-38.0, yaw=-60.0),
+                                         False)
+                    lc = a.get_component_by_class(unreal.DirectionalLightComponent)
+                    lc.set_editor_property("atmosphere_sun_light", True)
+                    lc.set_mobility(unreal.ComponentMobility.MOVABLE)
+                elif key == "lighting.sky":
+                    lc = a.get_component_by_class(unreal.SkyLightComponent)
+                    lc.set_editor_property("real_time_capture", True)
+                    lc.set_mobility(unreal.ComponentMobility.MOVABLE)
+                a.tags = self.tags(key, hv, [], "lighting", "lighting", "", "")
+
+            self.place(have, key, h, cls.static_class(), make, update, "CityGen/Lighting")
 
     # -- graphs --
 
