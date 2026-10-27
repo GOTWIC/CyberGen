@@ -274,7 +274,8 @@ The goldens (`tests/data/golden_hashes.json`) are the M10 builds; the check coun
 unchanged (75). `test_gameplay.py::test_check_travel_fails` now removes the fast-travel
 points of the core district: it took the district of the first point, and with stable ids
 the rows come in another order, so that was Test Isle, which has no drive lane and needs no
-point.
+point; `test_props.py::test_check_trees_fails` gives its tree an 80 m crown instead of 40 m
+(the props draw on stable ids, and the first tree now stands 42 m from any facade).
 
 ## Open items
 
