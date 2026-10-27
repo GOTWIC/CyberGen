@@ -450,6 +450,42 @@ so the stack demo `cities/vesper_bay_stacks` is the pinned demo with only its hi
 (art direction): two crosstowns that cross in a stack in The Stacks (a separate city, so the
 pinned demo and its sweep seeds stay as they were). Sample builds: `docs/progress/M12/`.
 
+M10 (edit, lock, regenerate) is in place:
+- **Stable ids** (`citygen/ids.py`): one renaming pass gives every entity an id from what it
+  is and where it sits: its name (`rv.great_river`, `stn.crown_exchange`), else district,
+  kind and the 1 m cell of its middle as compass offsets from the city center
+  (`rs.e1234n567`, `d03.lot.e512n88`), else its parent's id and a suffix
+  (`d03.lot.e512n88.bld`, `rs.e1234n567.f0`); collisions get `.2` in content order (one
+  reference deep), set-like id lists and id-sorted gameplay rows are sorted by new id. It runs
+  after the road supports (before the props, so props, plants and gameplay draw on stable
+  ids) and at the end of `build_city`; the stages keep build-order ids internally. A new
+  collection or id field must go into `ids.REFS` and `ids.ORDER` (a test fails on any
+  reference the pass misses or any id that still looks like a build counter).
+- **Locality fixes:** `blocks.build_blocks` takes only the road pieces that touch a
+  district's clip and unions them with `geom.union_local` (Z-order merge tree), so a far
+  change does not move a block by 1 cm.
+- **`citygen build SPEC OUT --district NAME`** (`citygen/edit.py`, state in
+  `city_state.json`): M1 replayed at the search's choices (`build.replay`, `choices`), M2 to
+  M11 run for the whole city under a `streets.Frame` (every road not inside the district held
+  and restored as it was, new streets meet held roads only at old nodes, held streets see
+  the old build's junctions at their turn (`Builder._junction_near`: not the new streets'
+  `Line.fresh` ones, the district's old gates once past its turn), clean-ups remove the new
+  street, held footbridges re-injected on canals that reach the district) with transit
+  lines held (a held metro back at its base depth, M9 lowers it again), then `splice`: the
+  district and its seam from the new build, the rest from the old city byte for byte, a
+  reference closure both ways, props and plants near changed ground, taxi spacing, fields,
+  factions, names. 14 to 42 s for a sample district (the stack demo's The Stacks too), with
+  the garbage collector paused (`edit.no_gc`); the state's `choices` must name the winning
+  layout salt (`stats["layout_salt"]`).
+- **Overrides** (`citygen/overrides.py`, `overrides.json` beside the spec): pins (held roads;
+  pinned buildings on a lot of their own put back before the props, `blocks._frame_lots`,
+  `buildout.frame_pins`) and edits (`move`, `replace`, `plaza`, `remove`) on stable ids.
+- **`citygen lock`** (`citygen/lock.py`): `city.lock.json` (spec, overrides, regenerations,
+  choices, code hash, model hash); `--verify` rebuilds from it byte for byte.
+  **`citygen model diff A B [--png]`** (`diff.py`, `preview_diff.py`).
+Sample builds (the five, the pinned and the stack demo, each with a release lock),
+regenerations, sweep: `docs/progress/M10/`.
+
 M13 (terrain) is in place, in `citygen/terrain.py` (checks in `terrain_checks.py`, preview
 `preview_terrain.py`). A spec without `terrain` builds exactly the flat city it built before
 (the new model fields are left out of the JSON: `Field(exclude_if=...)`); every z elsewhere in

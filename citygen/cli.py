@@ -1,5 +1,6 @@
-"""Command line: `citygen spec validate|render|schema|diff`, `citygen build`, `citygen
-blockout`, `citygen rerender`, `citygen review`, `citygen model schema`, `citygen trace diff`.
+"""Command line: `citygen spec validate|render|schema|diff`, `citygen build` (M10: `--district`),
+`citygen blockout`, `citygen rerender`, `citygen review`, `citygen model schema|diff`,
+`citygen lock`, `citygen trace diff`.
 
 Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
 2 usage or file error.
@@ -92,14 +93,32 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"INVALID: {args.spec}: {len(result.errors)} error(s); nothing built",
               file=sys.stderr)
         return EXIT_INVALID
+    from . import edit as E
+    from . import lock as LK
+    from . import overrides as OV
     from . import trace
     from .build import build_city, write_outputs  # shapely, matplotlib only here
 
+    spec_data = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    ov_path = Path(args.overrides) if args.overrides else \
+        Path(args.spec).parent / OV.OVERRIDES_FILE
+    ov = None
+    if args.overrides or ov_path.is_file():
+        try:
+            ov = OV.load(ov_path)
+        except (OSError, ValueError) as e:
+            print(f"error: {ov_path}: {e}", file=sys.stderr)
+            return EXIT_USAGE
+        print(f"overrides: {ov_path} ({len(ov['pins'])} pins, {len(ov['edits'])} edits)")
+    if args.district:
+        return _regenerate(args, spec_data, ov)
     if args.trace:
         trace.start()
     built = build_city(result, max_variants=args.variants)
+    built = LK.finish(built, result, ov)
     entries = trace.stop() if args.trace else None
     paths = write_outputs(built, args.out_dir, dpi=args.dpi)
+    paths.append(E.write_state(args.out_dir, E.new_state(spec_data, built, ov)))
     if args.trace:
         import hashlib
 
@@ -120,6 +139,78 @@ def cmd_build(args: argparse.Namespace) -> int:
     if args.blockout:
         return _blockout(Path(args.out_dir) / "city_model.json", args.out_dir, args)
     return EXIT_OK
+
+
+def _failed(built, out_dir) -> int:
+    failed = [c for c in built.checks if not c.passed]
+    for c in failed:
+        for f in c.failures:
+            print(f"check failed: {c.id}: {f}", file=sys.stderr)
+    if failed:
+        print(f"FAIL: {built.spec.name}: {len(failed)} check(s) failed; see "
+              f"{Path(out_dir) / 'report.txt'}", file=sys.stderr)
+        return EXIT_INVALID
+    print(f"PASS: {built.spec.name}: all {len(built.checks)} checks passed")
+    return EXIT_OK
+
+
+def _regenerate(args: argparse.Namespace, spec_data: dict, ov) -> int:
+    """M10: `citygen build SPEC OUT --district NAME`: one district of the build in OUT (or
+    --base) regenerated; everything else stays."""
+    from . import edit as E
+
+    with E.no_gc():
+        return _regenerate_in(args, spec_data, ov)
+
+
+def _regenerate_in(args: argparse.Namespace, spec_data: dict, ov) -> int:
+    import hashlib
+    import time
+
+    from . import edit as E
+    from .build import write_outputs
+    from .model import CityModel
+
+    src = Path(args.base or args.out_dir)
+    try:
+        state = E.read_state(src)
+        text = (src / "city_model.json").read_text(encoding="utf-8")
+        old = CityModel.from_json(text)
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    # (the file as written: its bytes are the model's JSON)
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    del text
+    if sha != state["model_sha256"]:
+        print(f"error: {src / 'city_model.json'} is not the model of its build state",
+              file=sys.stderr)
+        return EXIT_USAGE
+    now = E.code_version()
+    if now["code_sha256"] != state["code_sha256"]:
+        print(f"note: the city was built with other code ({state['code_sha256'][:12]}, now "
+              f"{now['code_sha256'][:12]})")
+    if ov is not None:
+        state = {**state, "overrides": ov}
+    t0 = time.time()
+    try:
+        built, rec = E.regenerate(state, old, args.district, spec_data=spec_data,
+                                  seed=args.seed)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    dt = time.time() - t0
+    state = {**state, **now, "edits": state.get("edits", []) + [rec],
+             "overrides": rec["overrides"], "model_sha256": rec["model_sha256"]}
+    paths = write_outputs(built, args.out_dir, dpi=args.dpi)
+    paths.append(E.write_state(args.out_dir, state))
+    for p in paths:
+        print(f"wrote {p}")
+    for n in built.notes[-4:]:
+        if "regenerated" in n or "pin" in n or "names" in n:
+            print(n)
+    print(f"regenerated {args.district} (seed {rec['seed']}) in {dt:.1f} s")
+    return _failed(built, args.out_dir)
 
 
 def _blockout(model: Path, out_dir: str, args: argparse.Namespace) -> int:
@@ -268,6 +359,55 @@ def cmd_model_schema(args: argparse.Namespace) -> int:
     return _write_json(json_schema(), args.out)
 
 
+def cmd_model_diff(args: argparse.Namespace) -> int:
+    from . import diff as DF
+
+    try:
+        a, b = (json.loads(Path(x).read_text(encoding="utf-8")) for x in (args.a, args.b))
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    d = DF.diff(a, b)
+    if args.json:
+        Path(args.json).write_text(json.dumps(d, indent=1) + "\n", encoding="utf-8")
+    if args.png:
+        from .preview_diff import render  # matplotlib only here
+
+        render(a, b, d, args.png)
+        print(f"wrote {args.png}")
+    sys.stdout.write(DF.text(d, None if args.all else args.limit))
+    return EXIT_OK if not d else EXIT_INVALID
+
+
+def cmd_lock(args: argparse.Namespace) -> int:
+    from . import edit as E
+    from . import lock as LK
+
+    if args.verify:
+        try:
+            lk = json.loads(Path(args.target).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return EXIT_USAGE
+        ok, lines, built = LK.verify(lk)
+        if args.out:
+            from .build import write_outputs
+
+            write_outputs(built, args.out)
+            print(f"wrote the rebuilt city to {args.out}")
+        print("\n".join(lines))
+        return EXIT_OK if ok else EXIT_INVALID
+    try:
+        lk = LK.make(args.target, args.release)
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    out = LK.write(lk, args.out or Path(args.target) / LK.LOCK_FILE)
+    print(f"wrote {out}: {lk['name']} release {lk['release']}, {len(lk['edits'])} district "
+          f"regenerations, model {lk['model_sha256'][:16]}, code {lk['code_sha256'][:12]}")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="citygen", description="Offline prompt-to-city generator.")
     p.add_argument("--version", action="version", version=f"citygen {__version__}")
@@ -305,6 +445,14 @@ def build_parser() -> argparse.ArgumentParser:
                         "search intermediates (compare machines with `citygen trace diff`)")
     b.add_argument("--blockout", action="store_true",
                    help="after a passing build, also build the Blender blockout (M4)")
+    b.add_argument("--district", metavar="NAME",
+                   help="M10: regenerate this district of the build in OUT_DIR (its entry "
+                        "from SPEC; a new seed when unchanged); the rest stays as it was")
+    b.add_argument("--seed", type=int, help="with --district: the district's new seed")
+    b.add_argument("--base", metavar="BUILD_DIR",
+                   help="with --district: the build to start from (default OUT_DIR)")
+    b.add_argument("--overrides", metavar="FILE.json",
+                   help="pins and overrides (default: overrides.json beside the spec)")
     _blockout_args(b)
     b.set_defaults(func=cmd_build)
 
@@ -372,6 +520,25 @@ def build_parser() -> argparse.ArgumentParser:
     ms = msub.add_parser("schema", help="print or write the city model JSON Schema")
     ms.add_argument("out", nargs="?")
     ms.set_defaults(func=cmd_model_schema)
+    md = msub.add_parser("diff", help="entities two city models add, remove and change, by "
+                                      "id (exit 0 identical, 1 different)")
+    md.add_argument("a")
+    md.add_argument("b")
+    md.add_argument("--limit", type=int, default=20, help="ids listed per kind (default 20)")
+    md.add_argument("--all", action="store_true", help="list every id")
+    md.add_argument("--json", metavar="OUT.json", help="also write the whole diff as JSON")
+    md.add_argument("--png", metavar="OUT.png", help="also draw a map of what changed")
+    md.set_defaults(func=cmd_model_diff)
+
+    lk = sub.add_parser("lock", help="freeze a build as a versioned release (city.lock.json), "
+                                     "or --verify a lock by building it again")
+    lk.add_argument("target", help="a build folder (or, with --verify, a lock file)")
+    lk.add_argument("--release", help="release name (default: one more than the edits)")
+    lk.add_argument("--out", help="lock file to write (default BUILD_DIR/city.lock.json); "
+                                  "with --verify, a folder for the rebuilt city")
+    lk.add_argument("--verify", action="store_true",
+                    help="rebuild the locked city and compare it byte for byte")
+    lk.set_defaults(func=cmd_lock)
     return p
 
 

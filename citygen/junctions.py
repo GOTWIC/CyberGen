@@ -249,7 +249,12 @@ def classify(legs: list[Leg], arch: str | None) -> tuple[str, str, bool]:
 # ---------------------------------------------------------------------------
 
 def one_way_loops(net, district_arch: dict, seed: int) -> int:
-    """Turn some block faces bounded only by narrow organic streets into one-way loops."""
+    """Turn some block faces bounded only by narrow organic streets into one-way loops. (M10:
+    in a district regeneration a face with a held road stays as it is; the held roads keep
+    their old state.)"""
+    frame = getattr(net.builder, "frame", None) if net.builder is not None else None
+    held = {s["id"] for s in net.segments if frame is not None and
+            frame.match(s["centerline"]) is not None}
     segs = {s["id"]: s for s in net.segments}
     pos = {n["id"]: n["position"][:2] for n in net.nodes}
     out_edges: dict[str, list] = {}
@@ -287,7 +292,7 @@ def one_way_loops(net, district_arch: dict, seed: int) -> int:
             if not ok or len(face) < 3:
                 continue
             ids = [f[1] for f in face]
-            if len(set(ids)) != len(ids) or any(i in chosen for i in ids):
+            if len(set(ids)) != len(ids) or any(i in chosen or i in held for i in ids):
                 continue
             area2 = 0.0
             for cu_, _, cv_ in face:
@@ -316,6 +321,8 @@ def one_way_loops(net, district_arch: dict, seed: int) -> int:
                 s["lanes"] = cs_["lanes_forward"] + cs_["lanes_backward"]
                 chosen.add(sid_)
             count += 1
+    if frame is not None:
+        frame.restore(net.segments)
     return count
 
 

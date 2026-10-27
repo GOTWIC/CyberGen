@@ -1,0 +1,389 @@
+{
+  "lock_version": 1,
+  "name": "Nexus City",
+  "release": "1.0",
+  "citygen": "0.1.0",
+  "code_sha256": "d93afe2654112c691bba02770d86c47bd528968a087c1c04be72262c33b05c6b",
+  "spec": {
+    "$schema": "../../../../citygen/schemas/city_spec.schema.json",
+    "name": "Nexus City",
+    "seed": 1207,
+    "size_km": [
+      3.4,
+      3.4
+    ],
+    "source": {
+      "prompt": "Nexus City from the concept image: keep its districts, water and transit layout, and add a sky tube loop linking the corporate core and the spaceport.",
+      "image": "reference/nexus_city_concept.webp",
+      "notes": "Image scale bar implies about 14 km across; clamped to 3.4 km (11.6 km2) per the scope's default city size. 'Arasaka' tower label dropped (third-party IP); Kaze, Mirai and Helios kept as corporate tower names. Kurosawa Hills kept as a place name only (flat ground in v1). M1a: the concept has open water along the whole west side (West Bay) with the spaceport on its northwest shore; the M0 south_west bay at 18% sea left the northwest corner inland, so the coast now opens to the west (sea_share 0.24) and the Sentinel Canal is pinned to reach the bay in the southwest (to.at 0.2), as in the concept. M1a2: the Kurosawa River enters near the northeast corner (from.at 0.42) and runs south along the east side to join the Sentinel Canal downstream, as in the concept; the land east of it is Midtown's bank, so the entry point sets Midtown's share."
+    },
+    "water": {
+      "coast": {
+        "form": "bay",
+        "side": "west",
+        "name": "West Bay",
+        "sea_share": 0.24
+      },
+      "rivers": [
+        {
+          "name": "Sentinel Canal",
+          "kind": "channel",
+          "from": "east",
+          "to": {
+            "edge": "bay",
+            "at": 0.2
+          },
+          "width_m": [
+            120,
+            220
+          ],
+          "meander": 0.25,
+          "delta_branches": 2,
+          "branch_names": [
+            "Jade Reach",
+            "Temple Cut"
+          ]
+        },
+        {
+          "name": "Kurosawa River",
+          "from": {
+            "edge": "north_east",
+            "at": 0.42
+          },
+          "to": "Sentinel Canal",
+          "width_m": [
+            50,
+            90
+          ],
+          "meander": 0.5
+        }
+      ],
+      "islands": [
+        {
+          "name": "Silver Island",
+          "position": "south_west_offshore",
+          "area_km2": 0.45
+        }
+      ],
+      "district_separation": "water_preferred",
+      "bridges": {
+        "density": 0.5,
+        "footbridge_density": 0.7,
+        "named": [
+          {
+            "name": "Baylink Bridge",
+            "kind": "road",
+            "connects": [
+              "Neon Market",
+              "west_exit"
+            ],
+            "crosses": "bay"
+          },
+          {
+            "name": "Horizon Bridge",
+            "kind": "road_rail",
+            "connects": [
+              "Transit Nexus",
+              "Harbor Industrial"
+            ],
+            "crosses": "Sentinel Canal"
+          },
+          {
+            "name": "Silver Span",
+            "kind": "road",
+            "connects": [
+              "Old Town",
+              "Silver Island"
+            ],
+            "crosses": "bay"
+          }
+        ]
+      }
+    },
+    "highways": {
+      "pattern": "ring_plus_spine",
+      "exits": [
+        "north",
+        "east",
+        "west"
+      ],
+      "elevated_share": 0.3,
+      "tunnels": {
+        "under": [
+          "Midtown"
+        ]
+      }
+    },
+    "transit": {
+      "hubs": [
+        "Transit Nexus"
+      ],
+      "lines": [
+        {
+          "mode": "metro",
+          "name": "Blue Line",
+          "route": [
+            "Neon Market",
+            "Corporate Core",
+            "Northridge",
+            "Midtown",
+            "Transit Nexus",
+            "Neon Market"
+          ]
+        },
+        {
+          "mode": "maglev",
+          "name": "Magenta Line",
+          "altitude_m": [
+            25,
+            45
+          ],
+          "route": [
+            "north_exit",
+            "Corporate Core",
+            "Transit Nexus"
+          ]
+        },
+        {
+          "mode": "elevated_rail",
+          "name": "Harbor Line",
+          "route": [
+            "Aurora Spaceport",
+            "Transit Nexus",
+            "Harbor Industrial"
+          ]
+        },
+        {
+          "mode": "sky_tube",
+          "name": "Spire Line",
+          "altitude_m": [
+            70,
+            120
+          ],
+          "through_towers": true,
+          "route": [
+            "Corporate Core",
+            "Transit Nexus"
+          ]
+        }
+      ]
+    },
+    "districts": [
+      {
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "area_share": 0.14,
+        "placement": {
+          "north_of": "Transit Nexus",
+          "edge": "north"
+        },
+        "grid_angle_deg": 45,
+        "height_m": [
+          80,
+          320
+        ],
+        "landmarks": [
+          {
+            "kind": "megatower",
+            "name": "Nexus Spire"
+          },
+          {
+            "kind": "spire",
+            "name": "Kaze Tower",
+            "height_m": 300
+          },
+          {
+            "kind": "spire",
+            "name": "Mirai Tower",
+            "height_m": 290
+          },
+          {
+            "kind": "spire",
+            "name": "Helios Tower",
+            "height_m": 260
+          }
+        ],
+        "places": [
+          {
+            "name": "Sky Garden Plaza",
+            "kind": "plaza",
+            "position": "south"
+          }
+        ],
+        "complexes": [
+          "twin_towers",
+          "tower_cluster"
+        ]
+      },
+      {
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "area_share": 0.07,
+        "placement": {
+          "edge": "center"
+        },
+        "megasites": [
+          {
+            "kind": "transit_nexus",
+            "name": "Transit Nexus"
+          },
+          "skyport"
+        ]
+      },
+      {
+        "name": "Aurora Spaceport",
+        "archetype": "spaceport",
+        "area_share": 0.1,
+        "placement": {
+          "coast": true,
+          "edge": "north_west",
+          "west_of": "Corporate Core"
+        }
+      },
+      {
+        "name": "Neon Market",
+        "archetype": "entertainment_market",
+        "area_share": 0.1,
+        "placement": {
+          "coast": true,
+          "west_of": "Transit Nexus",
+          "south_of": "Aurora Spaceport"
+        },
+        "places": [
+          {
+            "name": "Club Row",
+            "kind": "street"
+          },
+          {
+            "name": "Nightfall Plaza",
+            "kind": "plaza",
+            "position": "south"
+          }
+        ],
+        "megasites": [
+          {
+            "kind": "attraction",
+            "name": "Neon Wheel"
+          }
+        ]
+      },
+      {
+        "name": "Northridge",
+        "archetype": "residential_heights",
+        "area_share": 0.11,
+        "placement": {
+          "edge": "north_east",
+          "east_of": "Corporate Core"
+        },
+        "places": [
+          {
+            "name": "Kurosawa Hills",
+            "kind": "neighborhood",
+            "position": "north_east"
+          }
+        ]
+      },
+      {
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "area_share": 0.15,
+        "placement": {
+          "east_of": "Transit Nexus",
+          "south_of": "Northridge"
+        },
+        "places": [
+          {
+            "name": "Riverside",
+            "kind": "neighborhood",
+            "position": "east"
+          },
+          {
+            "name": "East Gate",
+            "kind": "gate",
+            "position": "east"
+          }
+        ],
+        "megasites": [
+          {
+            "kind": "central_park",
+            "name": "Central Plaza"
+          }
+        ]
+      },
+      {
+        "name": "Old Town",
+        "archetype": "old_town",
+        "area_share": 0.14,
+        "placement": {
+          "coast": true,
+          "south_west_of": "Transit Nexus",
+          "south_of": "Neon Market",
+          "separated_by": "Sentinel Canal"
+        },
+        "waterways": {
+          "style": [
+            "organic_canals",
+            "creeks"
+          ],
+          "density": 0.6,
+          "named": [
+            "Jade Canal"
+          ]
+        },
+        "places": [
+          {
+            "name": "Temple District",
+            "kind": "temple_complex"
+          }
+        ],
+        "grime": 0.7,
+        "neon": 0.6
+      },
+      {
+        "name": "Harbor Industrial",
+        "archetype": "industrial_port",
+        "area_share": 0.14,
+        "placement": {
+          "coast": true,
+          "edge": "south_east",
+          "south_east_of": "Transit Nexus",
+          "south_of": "Midtown",
+          "separated_by": "Sentinel Canal"
+        },
+        "waterways": {
+          "style": "harbor_basins",
+          "density": 0.7
+        },
+        "places": [
+          {
+            "name": "South Docks",
+            "kind": "docks",
+            "position": "south"
+          }
+        ],
+        "megasites": [
+          {
+            "kind": "freight_terminal",
+            "name": "Freight Terminal"
+          }
+        ]
+      },
+      {
+        "name": "Silver Island",
+        "archetype": "research_campus",
+        "area_share": 0.05,
+        "placement": {
+          "on_island": "Silver Island"
+        }
+      }
+    ]
+  },
+  "choices": {
+    "hydro_variant": 11,
+    "road_variant": 0,
+    "layout_salt": 0
+  },
+  "overrides": null,
+  "edits": [],
+  "model_sha256": "9928e4ece1cca83cd7401543ed11dfa2f2fbeedc7a50570c4cad0648b92ca4b8"
+}
