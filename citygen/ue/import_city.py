@@ -137,6 +137,22 @@ def base_material():
 
 # --- the city ---------------------------------------------------------------------------------
 
+def delete_assets(paths):
+    """Delete the assets at `paths` in one go (one by one takes about 0.4 s each: a garbage
+    collection per asset); how many were deleted. The actors that used them were destroyed
+    before, so a garbage collection first lets go of their components' references."""
+    if not paths:
+        return 0
+    unreal.SystemLibrary.collect_garbage()
+    objs = [o for o in (EAL.load_asset(p) for p in paths) if o is not None]
+    if objs:
+        EAL.delete_loaded_assets(objs)
+    left = [p for p in paths if EAL.does_asset_exist(p.split(".")[0])]
+    for p in left:
+        EAL.delete_asset(p)
+    return len(paths) - sum(1 for p in left if EAL.does_asset_exist(p.split(".")[0]))
+
+
 class Importer:
     def __init__(self, man, build_dir):
         self.man = man
@@ -148,6 +164,9 @@ class Importer:
                       "tiles_imported": 0, "materials": {"created": 0, "updated": 0,
                                                          "kept": 0, "deleted": 0},
                       "graphs": {"written": 0, "kept": 0}, "timings": {}}
+        # the keys of the actors created, updated and deleted (a test compares them with the
+        # objects whose hash changed between two manifests)
+        self.keys = {"created": [], "updated": [], "deleted": []}
         self.eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
         self.les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
         self.mats = {}
@@ -188,10 +207,9 @@ class Importer:
             EAL.set_metadata_tag(mi, HASH_TAG, h)
             EAL.save_loaded_asset(mi)
             self.mats[name] = mi
-        for a in EAL.list_assets(folder, recursive=False):
-            if a.split(".")[0] not in want:
-                EAL.delete_asset(a)
-                self.stats["materials"]["deleted"] += 1
+        stale = [a for a in EAL.list_assets(folder, recursive=False)
+                 if a.split(".")[0] not in want]
+        self.stats["materials"]["deleted"] += delete_assets(stale)
 
     # -- meshes --
 
@@ -303,10 +321,9 @@ class Importer:
         for folder in (f"{self.root}/Meshes", f"{self.root}/Props"):
             if not EAL.does_directory_exist(folder):
                 continue
-            for a in EAL.list_assets(folder, recursive=True):
-                if a.split(".")[0] not in want:
-                    EAL.delete_asset(a)
-                    self.stats["meshes"]["deleted"] += 1
+            stale = [a for a in EAL.list_assets(folder, recursive=True)
+                     if a.split(".")[0] not in want]
+            self.stats["meshes"]["deleted"] += delete_assets(stale)
 
     # -- the level --
 
@@ -339,11 +356,20 @@ class Importer:
                 continue
             key = next((t[7:] for t in tags if t.startswith("cg.key=")), None)
             if key is None or key in out:
-                self.eas.destroy_actor(a)
-                self.stats["actors"]["deleted"] += 1
+                self.destroy(a, key or "")
                 continue
             out[key] = a
         return out
+
+    def destroy(self, a, key):
+        """Destroy an actor of the city, its meshes let go first: World Partition holds a
+        destroyed actor until the level is saved, and a mesh it still names cannot be deleted
+        (`prune_meshes` deletes the meshes no object uses, all at once)."""
+        for c in a.get_components_by_class(unreal.StaticMeshComponent):
+            c.set_static_mesh(None)
+        self.eas.destroy_actor(a)
+        self.stats["actors"]["deleted"] += 1
+        self.keys["deleted"].append(key)
 
     def tags(self, key, h, ids, typ, cat, tile, district):
         t = [f"cg.city={self.city}", f"cg.key={key}", f"{HASH_TAG}={h}", f"cg.type={typ}",
@@ -361,16 +387,17 @@ class Importer:
                 self.stats["actors"]["unchanged"] += 1
                 return a
             if a.get_class() != cls:
-                self.eas.destroy_actor(a)
-                self.stats["actors"]["deleted"] += 1
+                self.destroy(a, key)
                 a = None
         if a is None:
             a = make()
             a.set_actor_label(key)
             a.set_folder_path(folder)
             self.stats["actors"]["created"] += 1
+            self.keys["created"].append(key)
         else:
             self.stats["actors"]["updated"] += 1
+            self.keys["updated"].append(key)
         update(a, h)
         return a
 
@@ -401,8 +428,7 @@ class Importer:
         self.player_start(have)
         self.lighting(have)
         for key, a in sorted(have.items()):
-            self.eas.destroy_actor(a)
-            self.stats["actors"]["deleted"] += 1
+            self.destroy(a, key)
 
     def instances(self, have):
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
@@ -571,6 +597,7 @@ class Importer:
         self.timed("graphs", self.graphs)
         self.timed("save", self.save)
         self.stats.update(self.timed("digests", self.digests))
+        self.stats["keys"] = {k: sorted(v) for k, v in self.keys.items()}
         self.stats["level"] = self.level_path
         self.stats["content_root"] = self.root
         return self.stats

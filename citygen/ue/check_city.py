@@ -293,6 +293,7 @@ def collision(world, pawn, man, slug):
         if len(spots) < 3 and all(math.dist(mid(t), s) >= 300.0 for s in spots):
             spots.append(mid(t))
     bx = man["bounds"]
+    roof_at = {o["key"]: o.get("roof") for t in man["tiles"] for o in t["objects"]}
     down = {"traces": 0, "hits": 0, "by_category": {}}
     roofs = {"tried": 0, "hit": 0}
     facades = {"tried": 0, "hit": 0}
@@ -317,13 +318,23 @@ def collision(world, pawn, man, slug):
         for a in blds[:12]:
             o, e = a.get_actor_bounds(False)
             top = o.z + e.z
-            h = trace(world, unreal.Vector(o.x, o.y, top + 500.0),
-                      unreal.Vector(o.x, o.y, o.z - e.z - 100.0), [pawn])
             roofs["tried"] += 1
             # stopped on the building or on what stands on it (a green roof, a skybridge),
-            # well above the ground
-            if h is not None and h["point"].z > o.z - e.z + 300.0:
-                roofs["hit"] += 1
+            # well above the ground: at the manifest's point inside its highest footprint,
+            # else at the middle of its bounds or one of the four quarter points
+            pts = [(o.x + qx * e.x, o.y + qy * e.y) for qx, qy in
+                   ((0.0, 0.0), (-0.5, -0.5), (0.5, -0.5), (-0.5, 0.5), (0.5, 0.5))]
+            r = roof_at.get(tag(a, "cg.key"))
+            if r:
+                pts.insert(0, (r[0] * 100.0, -r[1] * 100.0))
+            for x, y in pts:
+                h = trace(world, unreal.Vector(x, y, top + 500.0),
+                          unreal.Vector(x, y, o.z - e.z - 100.0), [pawn])
+                if h is not None and h["point"].z > o.z - e.z + 300.0:
+                    roofs["hit"] += 1
+                    break
+            else:
+                roofs.setdefault("missed", []).append(tag(a, "cg.key"))
             # across onto a facade at 2 m, from 40 m out on the side nearest the start
             z = o.z - e.z + 200.0
             d = unreal.Vector(o.x - here.x, o.y - here.y, 0.0)
@@ -334,6 +345,8 @@ def collision(world, pawn, man, slug):
             facades["tried"] += 1
             if h is not None:
                 facades["hit"] += 1
+            else:
+                facades.setdefault("missed", []).append(tag(a, "cg.key"))
     land = down["hits"] / max(down["traces"], 1)
     ok = land >= 0.95 and roofs["hit"] >= 0.9 * roofs["tried"] and \
         facades["hit"] >= 0.9 * facades["tried"] and roofs["tried"] > 0

@@ -334,6 +334,39 @@ def _ids(props: dict) -> list[str]:
     return [x for x in ids.split(";") if x]
 
 
+def _inside(rings: list) -> list[float] | None:
+    """A point inside a polygon (outer ring and holes): the middle of the widest chord along a
+    horizontal line through it (half way up, else a quarter or three eighths up or down)."""
+    ys = [p[1] for p in rings[0]]
+    lo, hi = min(ys), max(ys)
+    best = None
+    for f in (0.5, 0.25, 0.75, 0.375, 0.625):
+        y = lo + (hi - lo) * f
+        xs = []
+        for ring in rings:
+            for a, b in zip(ring, ring[1:] + ring[:1]):
+                if (a[1] <= y < b[1]) or (b[1] <= y < a[1]):
+                    xs.append(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]))
+        xs.sort()
+        for a, b in zip(xs[0::2], xs[1::2]):
+            if best is None or b - a > best[0]:
+                best = (b - a, (a + b) / 2.0, y)
+        if best is not None and best[0] > 2.0:
+            break
+    return None if best is None else [round(best[1], 2), round(best[2], 2)]
+
+
+def _roof(parts: list[dict]) -> list[float] | None:
+    """A point on a building's highest prism, inside its footprint: [x, y, top] (the check
+    traces down onto it)."""
+    prisms = [p for p in parts if p["k"] == "prism" and len(p.get("r", [])) >= 3]
+    if not prisms:
+        return None
+    top = max(prisms, key=lambda p: p["z1"])
+    xy = _inside([top["r"]] + list(top.get("h", [])))
+    return None if xy is None else xy + [top["z1"]]
+
+
 def player_start(build: Path, plan: dict) -> dict:
     """On the walkway of the fast-travel point nearest the city's middle (the city center
     if there is none), facing the middle."""
@@ -394,11 +427,13 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
                 "ids": _ids(props), "xforms": p["pts"]})
             continue
         ids = _ids(props)
-        tiles[o["tile"]]["objects"].append({
-            "key": o["name"], "asset": asset_name(o["name"]), "hash": h,
-            "category": o["category"], "type": props.get("citygen_type", ""),
-            "district": _district(o["name"], props), "ids": ids,
-            "materials": sorted({p["m"] for p in o["parts"]})})
+        obj = {"key": o["name"], "asset": asset_name(o["name"]), "hash": h,
+               "category": o["category"], "type": props.get("citygen_type", ""),
+               "district": _district(o["name"], props), "ids": ids,
+               "materials": sorted({p["m"] for p in o["parts"]})}
+        if o["category"] in ("building", "landmark"):
+            obj["roof"] = _roof(o["parts"])
+        tiles[o["tile"]]["objects"].append(obj)
     out_tiles = []
     for t in tiles.values():
         if not t["objects"]:
@@ -439,6 +474,28 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
     }
     man["hash"] = content_hash({k: v for k, v in man.items() if k != "plan_sha256"})
     return man, meshes, graphs
+
+
+# the importer's always-loaded lighting actors (`ue/import_city.py`, `Importer.lighting`)
+LIGHTING = ("lighting.sun", "lighting.sky", "lighting.atmosphere")
+
+
+def actor_hashes(man: dict) -> dict[str, str]:
+    """Every actor an import of `man` makes, by key, with the content hash the importer
+    compares it by (`ue/import_city.py` hashes the player start and the lights the same way)."""
+    out = {o["key"]: o["hash"] for t in man["tiles"] for o in t["objects"]}
+    out.update({i["key"]: i["hash"] for i in man["instances"]})
+    out["player_start"] = content_hash(man["player_start"])
+    out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
+    return out
+
+
+def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
+    """The actors an import of `new` over an import of `old` creates, updates and deletes."""
+    a, b = actor_hashes(old), actor_hashes(new)
+    return {"created": sorted(b.keys() - a.keys()),
+            "updated": sorted(k for k in a.keys() & b.keys() if a[k] != b[k]),
+            "deleted": sorted(a.keys() - b.keys())}
 
 
 def write_manifest(build_dir: str | Path, name: str | None = None) -> Path:
@@ -573,8 +630,9 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
     res = (json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file()
            else {"ok": False, "error": "the editor wrote no result (see the log)"})
     res["exit_code"] = proc.returncode
-    res["wall_s"] = round(time.time() - t, 1)
+    res["wall_s"] = round(time.time() - t, 1)     # the editor's start and quit included
     res["log"] = str(log)
+    result_path.write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
     return res
 
 

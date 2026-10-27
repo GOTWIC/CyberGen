@@ -9,6 +9,7 @@ import struct
 from pathlib import Path
 
 import pytest
+from shapely.geometry import Point, Polygon
 
 from citygen import blockout as BO
 from citygen import exports as X
@@ -79,6 +80,27 @@ def test_manifest_covers_the_plan(build, manifest):
     assert man["content_root"] == "/Game/CityGen/Testport" and man["slug"] == "testport"
     ids = [i for o in objs for i in o["ids"]]
     assert any(i.endswith(".bld") for i in ids)   # buildings carry their citygen ids
+    # a point on every building's roof, inside its highest prism (the check traces onto it)
+    by_name = {o["name"]: o for o in solid}
+    blds = [o for o in objs if o["category"] in ("building", "landmark")]
+    assert blds
+    for o in blds:
+        prisms = [p for p in by_name[o["key"]]["parts"] if p["k"] == "prism"]
+        top = max(prisms, key=lambda p: p["z1"])
+        x, y, z = o["roof"]
+        assert z == top["z1"]
+        assert Polygon(top["r"], top.get("h", [])).buffer(1e-6).contains(Point(x, y)), o["key"]
+
+
+def test_inside_concave():
+    """The interior point of a U and of a square with a square hole."""
+    u = [[0, 0], [30, 0], [30, 30], [20, 30], [20, 10], [10, 10], [10, 30], [0, 30]]
+    x, y = U._inside([u])
+    assert Polygon(u).contains(Point(x, y))
+    ring = [[0, 0], [20, 0], [20, 20], [0, 20]]
+    hole = [[5, 5], [15, 5], [15, 15], [5, 15]]
+    x, y = U._inside([ring, hole])
+    assert Polygon(ring, [hole]).contains(Point(x, y))
 
 
 def test_manifest_is_deterministic(build, manifest):
@@ -104,6 +126,34 @@ def test_hash_follows_the_object(build, manifest, tmp_path):
     t2 = {t["name"]: t["hash"] for t in man2["tiles"]}
     assert [k for k in t1 if t1[k] != t2[k]] == [target["tile"]]
     assert [i["hash"] for i in man["instances"]] == [i["hash"] for i in man2["instances"]]
+    assert U.manifest_changes(man, man2) == {"created": [], "updated": [target["name"]],
+                                             "deleted": []}
+
+
+def test_manifest_changes(build, manifest, tmp_path):
+    """What an import over the last one would do: objects gone, new and changed, by key."""
+    man = manifest[0]
+    assert U.manifest_changes(man, man) == {"created": [], "updated": [], "deleted": []}
+    hashes = U.actor_hashes(man)
+    assert len(hashes) == man["counts"]["objects"] + man["counts"]["instance_actors"] + 4
+    plan = json.loads((build / "blockout_plan.json").read_text())
+    blds = [o for o in plan["objects"] if o["category"] == "building"]
+    gone, moved = blds[0], blds[1]
+    plan["objects"] = [o for o in plan["objects"] if o is not gone]
+    for p in moved["parts"]:
+        for k in ("r", "h"):
+            if k in p:
+                p[k] = [[x + 1.0, y] for x, y in p[k]] if k == "r" else \
+                    [[[x + 1.0, y] for x, y in ring] for ring in p[k]]
+    new = copy.deepcopy(next(o for o in plan["objects"] if o["category"] == "building"))
+    new["name"] += ".copy"
+    plan["objects"].append(new)
+    other = tmp_path / "b2"
+    shutil.copytree(build, other)
+    (other / "blockout_plan.json").write_text(json.dumps(plan))
+    ch = U.manifest_changes(man, U.build_manifest(other)[0])
+    assert ch == {"created": [new["name"]], "updated": [moved["name"]],
+                  "deleted": [gone["name"]]}
 
 
 def _glb(path):
@@ -215,8 +265,8 @@ BLENDER = BO.find_blender()
                     reason="Unreal Engine 5 or Blender not installed")
 def test_unreal_import_small_city(small, tmp_path):
     """The small city into a fresh First Person project: imported, a second import changes
-    nothing, a changed object updates only its actor, and in play-in-editor the cells
-    stream, traces hit the ground and roofs, and the player walks a sidewalk."""
+    nothing, a changed city updates only the actors of what changed, and in play-in-editor
+    the cells stream, traces hit the ground and roofs, and the player walks a sidewalk."""
     build = tmp_path / "build"
     build.mkdir()
     (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
@@ -234,5 +284,24 @@ def test_unreal_import_small_city(small, tmp_path):
     assert second["tiles_imported"] == 0 and second["dirty_packages"] == 0
     assert (second["actor_digest"], second["asset_digest"]) == \
         (first["actor_digest"], first["asset_digest"])
-    chk = U.check_city(build, proj)
+    # the city changed: one building 6 m taller, another gone; the import touches exactly the
+    # actors whose content changed and leaves the rest as they were
+    m2 = small.model_copy(deep=True)
+    blds = [b for b in m2.buildings if not b.landmark]
+    taller, gone = blds[0].id, blds[1].id
+    blds[0].masses[-1].z1_m += 6.0
+    m2.buildings = [b for b in m2.buildings if b.id != gone]
+    build2 = tmp_path / "build2"
+    build2.mkdir()
+    (build2 / "city_model.json").write_text(m2.to_json() + "\n", encoding="utf-8")
+    assert BO.run_blockout(build2 / "city_model.json", build2, render=False)["passed"]
+    third = U.import_city(build2, proj)
+    assert third["ok"], third.get("error")
+    want = U.manifest_changes(json.loads((build / "unreal" / "manifest.json").read_text()),
+                              json.loads((build2 / "unreal" / "manifest.json").read_text()))
+    assert taller in want["updated"] and gone in want["deleted"]
+    assert {k: third["keys"][k] for k in want} == want
+    assert third["actors"]["unchanged"] == \
+        third["actor_count"] - len(want["created"]) - len(want["updated"])
+    chk = U.check_city(build2, proj)
     assert chk["ok"], chk
