@@ -3,21 +3,29 @@
 City-agnostic generators for cyberpunk open cities, in five stages: 1 layoutgen (`citygen`, the
 prompt-to-city layout generator, current), 2 assetgen (a unique 3D model for every building,
 plus street elements and textures), 3 atmosgen (lighting, sky, atmospherics), 4 lifegen
-(traffic, crowds, trains, aircraft, generated), 5 storygen. Stages 1 and 2 live here and stay
-city-agnostic. They are built for Nyxllor, a Cyberpunk 2077-inspired open-city game in Unreal
-Engine 5 at roughly a quarter of Night City's scale (walkable streets, NPC crowds and traffic,
-optional combat and dialogue), which gets its own `nyxllor` repo at stage 3. The owner
-(Swagnik) does art direction and layout; Claude does code, tooling, procedural generation,
-and most asset work.
+(traffic, crowds, trains, aircraft, generated), 5 storygen. CyberGen is a standalone city
+generator that anyone could use for their own cities: it knows of no particular game or
+engine project, and nothing in the repo (docs, code, comments, sample names) refers to one.
+Its cities are sized for open-world games, roughly a quarter of Night City's scale (walkable
+streets, crowds and traffic). The owner (Swagnik) does art direction and layout; Claude does
+code, tooling, procedural generation, and most asset work.
 
-The repo was called Nyxllor until after M8c. The sample city called Nyxllor up to M8c is
-**Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo "Vesper Bay Pinned"
-in `cities/vesper_bay_pinned`); `docs/progress/<milestone>/nyxllor*` folders before the rename
-keep the old name (`tests/conftest.py` `OLD_SLUGS`). Keep "Nyxllor" for the game.
+**Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
+(`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
+detailed per-milestone record for sessions) and section in the root README (images, then a
+high-level milestone table). Stage 1's milestones are M0 to M15, built in
+`docs/progress/M*`; later stages give their milestones a prefix of their own (set in their
+scope doc) so their progress folders never clash with stage 1's.
 
-## Nyxllor's first district (Corporate Core, hand-traced; moves to the nyxllor repo at stage 3)
+The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
+"Vesper Bay Pinned" in `cities/vesper_bay_pinned`). Its build folders in `docs/progress/` up
+to M8d carry an earlier slug (`tests/conftest.py` `OLD_SLUGS`); never use that name in
+anything new.
 
-The traced map stays here as the pinned demo's input (`cities/vesper_bay_pinned`).
+## Corporate Core (hand-traced demo district)
+
+The traced map is the pinned demo's input (`cities/vesper_bay_pinned`); `pipeline/`, `maps/`,
+`reference/` and `unreal/` are the earlier hand-tracing pipeline that made it.
 
 - `reference/corporate_core_reference.png`: AI-generated concept map of the district. It is drawn in a
   planometric style: the ground plan is true shape (seen straight down) and buildings rise straight up
@@ -70,10 +78,10 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 
 ## Unreal
 
-- Project: C++ First Person template, created on the M4 Mac. Heavy work (City Sample, dense city) should
-  move to the Windows PC (RTX 4070 Ti, 12 GB). UE 5.8 ships an official Unreal MCP server and an updated
-  City Sample built with PCG (the PCG Primitives plugin); that is the intended route for Claude to drive
-  the editor directly.
+- Testing Unreal imports: UE 5.8 at `/Users/Shared/Epic Games/UE_5.8` (it ships an official Unreal
+  MCP server and the PCG plugins, the route for Claude to drive the editor), always in a throwaway
+  test project of the generator's own. Heavy scenes run better on the owner's Windows PC
+  (RTX 4070 Ti, 12 GB).
 - `unreal/build_greybox_unreal.py`: editor Python script. Put it plus `corporate_core_plan.json` in
   `<UnrealProject>/Greybox/`, open a level, Tools > Execute Python Script. Clears and rebuilds its own
   actors (tag `CorporateCoreGreybox`), Ctrl+Z undoes a run. Buildings are currently oriented boxes, so
@@ -81,7 +89,6 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 - citygen's blockout exports `city.usdc` (whole city) and one `tiles/<tile>.glb` per 256 m tile
   (custom properties as glTF extras) for World Partition style imports, plus
   `unreal/corporate_core_plan.json`, which `build_greybox_unreal.py` reads unchanged.
-- Keep gameplay logic in C++ where reasonable.
 
 ## Known open items
 
@@ -259,7 +266,7 @@ M7b is in place, which completes the scope's milestones:
 - **Columns:** `elevated._fill_gaps` fills any column gap over 60 m, searching past a short
   segment's end nodes.
 
-Demo: `docs/progress/M7b/nyxllor_pinned/` (spec now in `cities/vesper_bay_pinned/`). Sample builds: `docs/progress/M7b/`.
+Demo: `cities/vesper_bay_pinned/` (first built in M7b). Sample builds: `docs/progress/M7b/`.
 
 M8a (robustness sweep) is in place: `.venv/bin/python -m citygen sweep [SPEC...] [--suite m8a]
 [--seeds ...] [--only LABEL] [--workers 4] [--upto roads|local|full] --out DIR`
@@ -316,7 +323,7 @@ the other lines (its heights see the buildings they remove); a whole-city retry
 (`build_city`) after any failed check still moves every line. A sky tube tower it cannot
 climb within its altitude range keeps its portal with 3 m headroom (`_fit_portals`), and an
 open road line still under its radius is tried with legs free to run back along the line
-(`_spurs`). M8b is stacked on M8a: Vesper Bay (then Nyxllor) builds on its first layout (8 tries on M8a
+(`_spurs`). M8b is stacked on M8a: Vesper Bay builds on its first layout (8 tries on M8a
 alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
 builds and the sweep on the combined code: `docs/progress/M8b/`.
 
@@ -450,17 +457,60 @@ so the stack demo `cities/vesper_bay_stacks` is the pinned demo with only its hi
 (art direction): two crosstowns that cross in a stack in The Stacks (a separate city, so the
 pinned demo and its sweep seeds stay as they were). Sample builds: `docs/progress/M12/`.
 
+M10 (edit, lock, regenerate) is in place:
+- **Stable ids** (`citygen/ids.py`): one renaming pass gives every entity an id from what it
+  is and where it sits: its name (`rv.great_river`, `stn.crown_exchange`), else district,
+  kind and the 1 m cell of its middle as compass offsets from the city center
+  (`rs.e1234n567`, `d03.lot.e512n88`), else its parent's id and a suffix
+  (`d03.lot.e512n88.bld`, `rs.e1234n567.f0`); collisions get `.2` in content order (one
+  reference deep), set-like id lists and id-sorted gameplay rows are sorted by new id. It runs
+  after the road supports (before the props, so props, plants and gameplay draw on stable
+  ids) and at the end of `build_city`; the stages keep build-order ids internally. A new
+  collection or id field must go into `ids.REFS` and `ids.ORDER` (a test fails on any
+  reference the pass misses or any id that still looks like a build counter).
+- **Locality fixes:** `blocks.build_blocks` takes only the road pieces that touch a
+  district's clip and unions them with `geom.union_local` (Z-order merge tree), so a far
+  change does not move a block by 1 cm.
+- **`citygen build SPEC OUT --district NAME`** (`citygen/edit.py`, state in
+  `city_state.json`): M1 replayed at the search's choices (`build.replay`, `choices`), M2 to
+  M11 run for the whole city under a `streets.Frame` (every road not inside the district held
+  and restored as it was, new streets meet held roads only at old nodes, held streets see
+  the old build's junctions at their turn (`Builder._junction_near`: not the new streets'
+  `Line.fresh` ones, the district's old gates once past its turn), clean-ups remove the new
+  street, held footbridges re-injected on canals that reach the district) with transit
+  lines held (a held metro back at its base depth, M9 lowers it again), then `splice`: the
+  district and its seam from the new build, the rest from the old city byte for byte, a
+  reference closure both ways, props and plants near changed ground, taxi spacing, fields,
+  factions, names. 14 to 42 s for a sample district (the stack demo's The Stacks too), with
+  the garbage collector paused (`edit.no_gc`); the state's `choices` must name the winning
+  layout salt (`stats["layout_salt"]`).
+- **Overrides** (`citygen/overrides.py`, `overrides.json` beside the spec): pins (held roads;
+  pinned buildings on a lot of their own put back before the props, `blocks._frame_lots`,
+  `buildout.frame_pins`) and edits (`move`, `replace`, `plaza`, `remove`) on stable ids.
+- **`citygen lock`** (`citygen/lock.py`): `city.lock.json` (spec, overrides, regenerations,
+  choices, code hash, model hash); `--verify` rebuilds from it byte for byte.
+  **`citygen model diff A B [--png]`** (`diff.py`, `preview_diff.py`).
+Sample builds (the five, the pinned and the stack demo, each with a release lock),
+regenerations, sweep: `docs/progress/M10/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
   the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
   and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
   Keep only images and short notes there; overwrite nothing from earlier milestones.
-- **Root `README.md`:** when the milestone PR is ready, update the Progress table and the
-  "Latest maps" images to point at the new milestone's previews. Every 3D render shown in the root
-  README is 8K: `citygen rerender <blockout_dir> iso_city ... --to docs/progress/<M>/<city>`
-  (7680 px wide by default, a few seconds each; fall back to 3840 or 2048 only if 8K fails).
-  Always include the whole-city isometric views (`render_iso_city.jpg`).
+- **Root `README.md`** is organized by stage (see "Layout by stage"). When a milestone PR is
+  ready: set its row in the stage's Milestones table (a few words, status), put its full entry
+  in the stage's milestone log (`docs/citygen_milestones.md`), and point the stage's images at
+  the newest builds. Keep the README short: one-line captions, no before and after pairs, a
+  new image only for something new the milestone adds, details in the log. Every 3D render
+  shown in the root README is 8K: `citygen rerender <blockout_dir> iso_city ... --to
+  docs/progress/<M>/<city>` (7680 px wide by default, a few seconds each; fall back to 3840 or
+  2048 only if 8K fails). Always include the whole-city isometric views
+  (`render_iso_city.jpg`) in the stage's Cities gallery. Write the README for someone who
+  wants to use the generators: what they make and how to run them, not how they are verified
+  (no goldens, hashes, "byte for byte", identical builds across machines, check counts or
+  sweep tallies; those belong in the milestone log).
 
 ## Working preferences
 

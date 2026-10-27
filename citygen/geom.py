@@ -400,6 +400,65 @@ def _union_fixed(geoms):
     return arr[0]
 
 
+_Z_ORIGIN = 1 << 31   # grid units of doubled box centers: every city lies well inside
+
+
+def union_local(geoms):
+    """M10: a snap-rounded union whose merge tree depends only on where the pieces are, so
+    that pieces added or removed in one place leave the result elsewhere as it was (a
+    district's blocks do not move by a centimeter when its neighbor is regenerated).
+
+    `_union_fixed` merges neighbors in the sorted list pairwise, level by level, so one
+    piece more shifts every pair after it, and snap rounding is not associative. Here the
+    tree is the Z-order curve itself: pieces sorted by the Z-order of their box centers from
+    a fixed origin, merged where their codes agree above bit 0, then bit 1, and so on (a
+    quadtree over the plane); equal centers merge first, in input order. In canonical mode
+    only (else as `union`)."""
+    geoms = [g for g in geoms if g is not None and not g.is_empty]
+    if not CANONICAL[0]:
+        return union(geoms)
+    polys = [polygonal(g) for g in geoms]
+    polys = [g for g in polys if not g.is_empty]
+    if not polys:
+        return Polygon()
+    if len(polys) == 1:
+        return _fixed(shapely.union(polys[0], polys[0], grid_size=GRID_M))
+    b = np.rint(shapely.bounds(np.array(polys, dtype=object)) * _SCALE).astype(np.int64)
+    cx = (b[:, 0] + b[:, 2]).tolist()
+    cy = (b[:, 1] + b[:, 3]).tolist()
+    codes = [_zorder(x + _Z_ORIGIN, y + _Z_ORIGIN) for x, y in zip(cx, cy)]
+    order = sorted(range(len(polys)), key=lambda i: (codes[i], i))
+    keys = [codes[i] for i in order]
+    items = [polys[i] for i in order]
+    level = 0
+    while len(items) > 1:
+        sh = [k >> level for k in keys]
+        if all(sh[i] != sh[i + 1] for i in range(len(sh) - 1)):
+            level += 1
+            continue
+        a_idx, b_idx, keep = [], [], []
+        i = 0
+        while i < len(items):
+            if i + 1 < len(items) and sh[i] == sh[i + 1]:
+                a_idx.append(i)
+                b_idx.append(i + 1)
+                keep.append(("u", len(a_idx) - 1, keys[i]))
+                i += 2
+            else:
+                keep.append(("s", i, keys[i]))
+                i += 1
+        A = np.empty(len(a_idx), dtype=object)
+        A[:] = [items[i] for i in a_idx]
+        Bv = np.empty(len(b_idx), dtype=object)
+        Bv[:] = [items[i] for i in b_idx]
+        u = shapely.union(A, Bv, grid_size=GRID_M)
+        for j in np.nonzero(shapely.get_type_id(u) > 6)[0].tolist():
+            u[j] = polygonal(u[j])
+        items = [u[k] if t == "u" else items[k] for t, k, _ in keep]
+        keys = [c for _, _, c in keep]
+    return _fixed(items[0])
+
+
 def line_union(lines):
     lines = [g for g in lines if g is not None and not g.is_empty]
     if not lines:

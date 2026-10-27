@@ -170,7 +170,9 @@ def test_check_parking_fails(city):
 
 def test_check_travel_fails(city):
     m = city.model
-    did = next(t.district_id for t in m.travel_points if t.kind == "fast_travel")
+    # the core district (it has drive lanes, so it must have a fast-travel point)
+    did = m.districts[0].id
+    assert any(t.kind == "fast_travel" and t.district_id == did for t in m.travel_points)
     rows = [t for t in m.travel_points if not (t.kind == "fast_travel" and
                                                t.district_id == did)]
     assert not _checks(m.model_copy(update={"travel_points": rows}))["travel_points"].passed

@@ -61,7 +61,7 @@ def test_sample_city_builds_and_passes(path):
     built, took, _ = built_sample(path)
     failed = [f for c in built.checks for f in c.failures]
     assert not failed, failed
-    # M8a: 300 -> 600 s (Delta Megacity and Vesper Bay, then named Nyxllor, passed on their
+    # M8a: 300 -> 600 s (Delta Megacity and Vesper Bay passed on their
     # 9th and 8th full-city try); M8c: back to 300 s, every sample passes on its first to
     # third try
     assert took < 300, f"{path.parent.name} took {took:.1f} s"
@@ -73,15 +73,15 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M12/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M10/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M12" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M10" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        assert (ROOT / "docs" / "progress" / "M12" / slug / "preview_gameplay.png").is_file()
-        assert (ROOT / "docs" / "progress" / "M12" / slug / "preview_transit.png").is_file()
+        assert (ROOT / "docs" / "progress" / "M10" / slug / "preview_gameplay.png").is_file()
+        assert (ROOT / "docs" / "progress" / "M10" / slug / "preview_transit.png").is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 

@@ -201,7 +201,7 @@ def build_local(spec, b, did: dict, mapper=None) -> Local:
 def _build_local(spec, b, did: dict, mapper=None) -> Local:
     opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
     net = STR.build_streets(spec, b.hydro, b.layout.polygons, did, b.waterways, b.sites,
-                            b.roads, opens)
+                            b.roads, opens, getattr(b, "frame", None))
     darch = {did[d.name]: d.archetype for d in spec.districts}
     jx = JN.build(net, darch, did, spec.seed or 0)
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])

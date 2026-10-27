@@ -454,6 +454,53 @@ renders: every district should read in its isometric view as it does in
 missing, a render missing, over the 10 minute budget) is a citygen problem: report it, do not
 work around it in the spec.
 
+### 6c. Edit, pin and lock (M10)
+
+Every entity has a stable id from what it is and where it sits (`d03.lot.e512n88.bld`,
+`rs.e1234n567`, `d03.prop.bench.w41s1210`: kind, district or parent, and the 1 m grid cell of
+its middle as compass offsets from the city center), so an id names the same thing after any
+later edit. Every build writes `city_state.json` beside `city_model.json`: keep the build
+folder, later edits start from it.
+
+- **One district again.** Change the district's fields in the spec (its `seed`, `height_m`,
+  `block_size_m`, `street_pattern`, `density`, `wealth`, places, ...) and run
+  `citygen build <spec> <out> --district "<name>"` (`--base <build>` to start from another
+  folder, `--seed N` to pick its seed; with nothing changed it takes a new seed). It keeps
+  everything outside the district byte for byte and holds every road that is not inside it
+  (border roads included); the district's new streets meet those at their old nodes. The
+  seam (the junctions where the new streets meet the held roads, the lanes, sidewalks and
+  walkways that end there, what stands along them, and the corners of the blocks those
+  junctions cut) changes with it. It takes under a minute for a sample district and runs
+  every check. M1 is not rebuilt: water, the district outlines, megasite reserves and
+  primary roads stay, so a field M1 reads (`area_share`, `placement`, megasites, the
+  archetype's avenue spacing) needs a full build.
+- **What changed:** `citygen model diff <old>/city_model.json <new>/city_model.json` lists the
+  entities added, removed and changed by id, per collection (`--all`, `--json FILE`;
+  `--png FILE` draws them: the same in grey, removed red, added green, moved yellow). Look at
+  the map with the owner before going on.
+- **Pins and overrides** go in `overrides.json` beside the spec (or `--overrides FILE`),
+  read by every build and regeneration:
+
+  ```json
+  {"version": 1,
+   "pins": ["d03.lot.e512n88.bld", "rs.e1234n567"],
+   "edits": [{"op": "move", "id": "d03.lot.e512n88.bld", "by": [4.0, -2.5]},
+             {"op": "replace", "id": "d03.lot.e512n88.bld", "height_m": 240},
+             {"op": "replace", "id": "d03.os.e600n120", "kind": "garden", "name": "Jade Garden"},
+             {"op": "plaza", "id": "d03.lot.e700n90", "name": "Lantern Square"},
+             {"op": "remove", "id": "d03.prop.kiosk.e705n92"}]}
+  ```
+
+  Pins survive a district regeneration (a pinned road is held, a pinned building or open
+  space keeps its ground). Edits run on the finished city after every build; `replace` also
+  takes `set` with any fields, a road takes a new `name` only (pin it or regenerate its
+  district to change it otherwise). Every check runs after the edits; an edit that breaks
+  one shows in the report like any failure.
+- **Release:** `citygen lock <out> --release 1.0` writes `<out>/city.lock.json` (spec,
+  overrides, the regenerations in order, the search's choices, citygen version and code
+  hash, model hash). `citygen lock --verify <out>/city.lock.json [--out DIR]` builds the city
+  again from the lock alone and must give the same bytes; run it before handing a city on.
+
 ### 7. Report
 
 Reply with:
@@ -491,8 +538,7 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. A pinned import:
-`cities/vesper_bay_pinned/city_spec.json` (Vesper Bay, the sample city called Nyxllor up to
-M8c, with the traced Corporate Core as an island in its bay). Builds of the same cities
+`cities/vesper_bay_pinned/city_spec.json` (Vesper Bay with the traced Corporate Core as an island in its bay). Builds of the same cities
 (previews and reports): `docs/progress/M4/` with the Blender blockout renders and 2D maps,
 `docs/progress/M3p/` with buildings, skybridges, landmarks and
 megasites (the M3 polish; `docs/progress/M3/` before it), `docs/progress/M2/` with local streets, blocks and lots,
