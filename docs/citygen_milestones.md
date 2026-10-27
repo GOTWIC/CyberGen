@@ -44,9 +44,8 @@ transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) a
 `docs/progress/M7/`, the 2D maps in `docs/progress/M4/`. Sample specs live in
 `docs/progress/M1a2/<city>/city_spec.json` and `cities/vesper_bay/city_spec.json`; the pinned
 demo's in `cities/vesper_bay_pinned/city_spec.json` (first built in M7b), its round 1 and
-round 2 transit in `docs/progress/M8b/`. Up to M8d, Vesper Bay's build folders carry an
-earlier slug; in M8c its `vesper_bay*/` folders are the same layouts built again under its
-current name.
+round 2 transit in `docs/progress/M8b/vesper_bay_pinned_round1/` and
+`vesper_bay_pinned_round2/`.
 
 While a milestone session runs, it pushes snapshot images to its branch under
 `docs/progress/<milestone>/wip/`; open the branch on GitHub (Branches tab) to see them before

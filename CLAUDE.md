@@ -18,9 +18,7 @@ high-level milestone table). Stage 1's milestones are M0 to M15, built in
 scope doc) so their progress folders never clash with stage 1's.
 
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
-"Vesper Bay Pinned" in `cities/vesper_bay_pinned`). Its build folders in `docs/progress/` up
-to M8d carry an earlier slug (`tests/conftest.py` `OLD_SLUGS`); never use that name in
-anything new.
+"Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
 
 ## Corporate Core (hand-traced demo district)
 

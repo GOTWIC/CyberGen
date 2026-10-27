@@ -7,18 +7,18 @@ layered 2D map and the exports later stages read (scope sections 7 and 8, M4 row
 12).
 
 ```bash
-.venv/bin/python -m citygen build cities/nyxllor/city_spec.json out/nyxllor --blockout
+.venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
 # or, on a built city:
-.venv/bin/python -m citygen blockout out/nyxllor/city_model.json out/nyxllor
+.venv/bin/python -m citygen blockout out/vesper_bay/city_model.json out/vesper_bay
 ```
 
 All five sample cities pass every blockout check. The largest, Nexus City, takes 72 s from
 model to finished blockout on the M4 Mac, and about 100 s from spec. The budget is 10
 minutes.
 
-| Nexus City, from the top | Nyxllor, Corporate Core |
+| Nexus City, from the top | Vesper Bay, Corporate Core |
 |---|---|
-| <img src="nexus_city/render_top.jpg" width="420"> | <img src="nyxllor/render_iso_d01.jpg" width="420"> |
+| <img src="nexus_city/render_top.jpg" width="420"> | <img src="vesper_bay/render_iso_d01.jpg" width="420"> |
 
 | Greyhook, The Stacks | Saltreach, Westreef street toward Crown Island |
 |---|---|
@@ -141,7 +141,7 @@ neighbors separate. USD and glTF keep the flat base color.
 
 | City | Objects | Buildings | Tiles | Vertices | Faces | .blend MB | USD MB | glTF MB | Renders | Blender | Blockout total |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Nyxllor | 7745 | 5887 | 196 | 0.74 M | 0.29 M | 9.8 | 26.1 | 42.5 | 13 | 55 s | 62 s |
+| Vesper Bay | 7745 | 5887 | 196 | 0.74 M | 0.29 M | 9.8 | 26.1 | 42.5 | 13 | 55 s | 62 s |
 | Saltreach Free Port | 4450 | 3182 | 196 | 0.42 M | 0.16 M | 5.7 | 14.8 | 24.0 | 9 | 27 s | 32 s |
 | Delta Megacity | 7353 | 5457 | 196 | 0.73 M | 0.28 M | 9.5 | 25.5 | 41.2 | 11 | 51 s | 58 s |
 | Nexus City | 8434 | 6424 | 196 | 0.81 M | 0.31 M | 10.7 | 28.2 | 45.9 | 14 | 63 s | 72 s |
@@ -150,7 +150,7 @@ neighbors separate. USD and glTF keep the flat base color.
 The Blender column covers building the meshes, saving, USD export, the glTF tiles and the
 renders. Building the meshes takes about 1 s. About half the time is the 196 glTF exports;
 the renders (EEVEE, 16 samples, 1600 px) take most of the rest. The blockout total adds
-the plan (2.5 s for Nyxllor), the 2D maps and exports, and the reopen check.
+the plan (2.5 s for Vesper Bay), the 2D maps and exports, and the reopen check.
 
 The city models are unchanged against M3p (same golden hashes): M4 only reads them.
 

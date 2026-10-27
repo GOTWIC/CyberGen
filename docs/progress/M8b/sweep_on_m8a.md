@@ -7,8 +7,8 @@
 | archipelago_free_port | 5 | 8 |
 | delta_megacity | 4 | 8 |
 | nexus_city | 7 | 8 |
-| nyxllor | 7 | 8 |
-| nyxllor_pinned | 4 | 8 |
+| vesper_bay | 7 | 8 |
+| vesper_bay_pinned | 4 | 8 |
 | peninsula_city | 7 | 8 |
 | test_delta | 5 | 5 |
 | test_minimal | 2 | 5 |
@@ -56,22 +56,22 @@
 | nexus_city | 5077 | pass |  | hv6 rv0 | 51.9 |
 | nexus_city | 8128 | pass |  | hv6 rv0 city x1 (3) | 89.2 |
 | nexus_city | 27182 | pass |  | hv1 rv0 city x4 (1,1,1,3) | 193.4 |
-| nyxllor | 11 | pass |  | hv10 rv0 | 43.7 |
-| nyxllor | 404 | pass |  | hv1 rv1 city x1 (2) | 82.1 |
-| nyxllor | 1999 | pass |  | hv1 rv1 city x1 (2) | 87.1 |
-| nyxllor | 2077 | pass |  | hv18 rv0 | 45.7 |
-| nyxllor | 3141 | fail | open_space_share (1): 'Launch Key' (spaceport): 67% open (target 0% to 50%) | hv7 rv1 city x8 (1,1,1,1,5,4,2,3) | 366.9 |
-| nyxllor | 5077 | pass |  | hv1 rv1 city x3 (1,5,1) | 164.5 |
-| nyxllor | 8128 | pass |  | hv19 rv0 | 48.6 |
-| nyxllor | 27182 | pass |  | hv1 rv0 | 50.3 |
-| nyxllor_pinned | 11 | fail | bridge_clearance (1): junction rn00283 is out on the water (on a bridge)<br>curve_radius (1): segment rs00031 (highway): radius 111 m near (-351, -1168), minimum 150 m | hv5 rv0 city x8 (3,3,6,6,2,2,3,3) | 394.5 |
-| nyxllor_pinned | 404 | pass |  | hv1 rv0 city x6 (1,2,1,2,1,1) | 286.0 |
-| nyxllor_pinned | 1999 | fail | curve_radius (1): segment rs00021 (highway): radius 51 m near (-1174, 132), minimum 150 m | hv10 rv0 city x8 (1,1,2,1,1,1,4,5) | 422.4 |
-| nyxllor_pinned | 2078 | pass |  | hv4 rv0 city x1 (1) | 79.7 |
-| nyxllor_pinned | 3141 | pass |  | hv4 rv0 city x2 (1,2) | 120.4 |
-| nyxllor_pinned | 5077 | fail | placement (1): 'Neon Strand' should be on the coast<br>level_continuity (1): rs02321 meets node rn00160 at 11.88 m, the node is at 7.69 m | hv17 rv0 city x8 (3,3,3,2,2,3,2,4) | 413.0 |
-| nyxllor_pinned | 8128 | fail | placement (1): 'Highcrest' is not east_of 'The Stacks' (bearing 21 deg) | hv3 rv0 city x8 (1,1,2,3,2,3,1,1) | 375.7 |
-| nyxllor_pinned | 27182 | pass |  | hv19 rv2 city x5 (1,1,1,2,2) | 256.3 |
+| vesper_bay | 11 | pass |  | hv10 rv0 | 43.7 |
+| vesper_bay | 404 | pass |  | hv1 rv1 city x1 (2) | 82.1 |
+| vesper_bay | 1999 | pass |  | hv1 rv1 city x1 (2) | 87.1 |
+| vesper_bay | 2077 | pass |  | hv18 rv0 | 45.7 |
+| vesper_bay | 3141 | fail | open_space_share (1): 'Launch Key' (spaceport): 67% open (target 0% to 50%) | hv7 rv1 city x8 (1,1,1,1,5,4,2,3) | 366.9 |
+| vesper_bay | 5077 | pass |  | hv1 rv1 city x3 (1,5,1) | 164.5 |
+| vesper_bay | 8128 | pass |  | hv19 rv0 | 48.6 |
+| vesper_bay | 27182 | pass |  | hv1 rv0 | 50.3 |
+| vesper_bay_pinned | 11 | fail | bridge_clearance (1): junction rn00283 is out on the water (on a bridge)<br>curve_radius (1): segment rs00031 (highway): radius 111 m near (-351, -1168), minimum 150 m | hv5 rv0 city x8 (3,3,6,6,2,2,3,3) | 394.5 |
+| vesper_bay_pinned | 404 | pass |  | hv1 rv0 city x6 (1,2,1,2,1,1) | 286.0 |
+| vesper_bay_pinned | 1999 | fail | curve_radius (1): segment rs00021 (highway): radius 51 m near (-1174, 132), minimum 150 m | hv10 rv0 city x8 (1,1,2,1,1,1,4,5) | 422.4 |
+| vesper_bay_pinned | 2078 | pass |  | hv4 rv0 city x1 (1) | 79.7 |
+| vesper_bay_pinned | 3141 | pass |  | hv4 rv0 city x2 (1,2) | 120.4 |
+| vesper_bay_pinned | 5077 | fail | placement (1): 'Neon Strand' should be on the coast<br>level_continuity (1): rs02321 meets node rn00160 at 11.88 m, the node is at 7.69 m | hv17 rv0 city x8 (3,3,3,2,2,3,2,4) | 413.0 |
+| vesper_bay_pinned | 8128 | fail | placement (1): 'Highcrest' is not east_of 'The Stacks' (bearing 21 deg) | hv3 rv0 city x8 (1,1,2,3,2,3,1,1) | 375.7 |
+| vesper_bay_pinned | 27182 | pass |  | hv19 rv2 city x5 (1,1,1,2,2) | 256.3 |
 | peninsula_city | 11 | fail | building_overlaps (1): d04.lm01.bld (wheel) and d04.mg01.bld2 (leg) overlap by 45.9 m2 between 4.0 and 24.5 m | hv13 rv0 city x8 (1,3,1,5,1,3,1,5) | 194.2 |
 | peninsula_city | 404 | pass |  | hv2 rv0 | 18.8 |
 | peninsula_city | 1999 | pass |  | hv11 rv0 | 28.5 |

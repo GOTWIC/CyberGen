@@ -162,8 +162,7 @@ bridge. `junction_placement` also forbids local junctions on sunk stretches, and
 `citygen sweep --suite m8a --workers 3` on M11 on M9 (`sweep.md`, `sweep.json`): **58 of 68
 builds pass**, as on M8c, on M9 alone and on M11 alone. Against M11's sweep, only retry counts
 differ (nexus_city s1207 2 retries to 0, test_small s404 and test_pinned s1999 0 to 1 each). The ten failures are the same builds with the same failing checks as in
-`docs/progress/M8c/sweep.json` (labels `nyxllor` and `nyxllor_pinned` there are `vesper_bay` and
-`vesper_bay_pinned` here), so none is newly broken:
+`docs/progress/M8c/sweep.json`, so none is newly broken:
 
 | Build | Failing checks (M8c and M9) |
 |---|---|

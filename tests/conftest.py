@@ -10,8 +10,6 @@ EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
 CITIES = sorted((ROOT / "docs" / "progress" / "M1a2").glob("*/city_spec.json")) + [
     ROOT / "cities" / "vesper_bay" / "city_spec.json"]
 GOLDEN = ROOT / "tests" / "data" / "golden_hashes.json"
-# Build folders in docs/progress up to M8d carry the samples' earlier slugs.
-OLD_SLUGS = {"vesper_bay": "nyxllor", "vesper_bay_pinned": "nyxllor_pinned"}
 
 _BUILT: dict = {}
 

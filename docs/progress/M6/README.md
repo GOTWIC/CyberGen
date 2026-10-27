@@ -5,7 +5,7 @@ street furniture, the clutter and the plants, and the blockout draws all of them
 instances.
 
 ```bash
-.venv/bin/python -m citygen build cities/nyxllor/city_spec.json out/nyxllor --blockout
+.venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
 ```
 
 All five sample cities pass all 60 checks, six of them new. Every model is byte-identical on
@@ -13,11 +13,11 @@ the M4 Mac and in the x86 Linux container. The stage takes 2 to 3 s per city. In
 Nexus City's 82,700 instances take 1.9 s to build. A synthetic run of 100,000 instances on one
 object built in 0.03 s, and its USD export as a point instancer took 0.9 s.
 
-| Nyxllor at street level | Saltreach, Crown Island |
+| Vesper Bay at street level | Saltreach, Crown Island |
 |---|---|
-| <img src="nyxllor/render_street_4.jpg" width="420"> | <img src="archipelago_free_port/render_street_1.jpg" width="420"> |
+| <img src="vesper_bay/render_street_4.jpg" width="420"> | <img src="archipelago_free_port/render_street_1.jpg" width="420"> |
 
-<img src="nyxllor/preview_props.png" width="840">
+<img src="vesper_bay/preview_props.png" width="840">
 
 Each city folder holds:
 - `preview_props.png`: four 180 m insets at street level (the districts of
@@ -37,7 +37,7 @@ Each city folder holds:
 | Delta Megacity | 54,135 | 21,712 | 7,098 | 75,847 | 6.4 ha | 10.9 km |
 | Nexus City | 59,333 | 23,367 | 8,277 | 82,700 | 6.8 ha | 5.4 km |
 | Greyhook | 24,196 | 13,626 | 3,804 | 37,822 | 3.9 ha | 2.1 km |
-| Nyxllor | 51,146 | 24,030 | 6,866 | 75,176 | 6.0 ha | 7.8 km |
+| Vesper Bay | 51,146 | 24,030 | 6,866 | 75,176 | 6.0 ha | 7.8 km |
 
 Most instances are ground-floor dressing: signs, awnings and facade AC units, about 60%
 of the props. After them come street lights, litter, parked cars, barriers, cables, bollards,

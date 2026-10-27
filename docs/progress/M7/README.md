@@ -6,7 +6,7 @@ raised deck, and the blockout draws it all. M7b (next) adds the trumpet and part
 cloverleaf templates, the art-direction loop and the Corporate Core pinned import.
 
 ```bash
-.venv/bin/python -m citygen build cities/nyxllor/city_spec.json out/nyxllor --blockout
+.venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
 ```
 
 All five sample cities pass all 65 checks, five of them new. Every model is byte-identical
@@ -37,7 +37,7 @@ Each city folder holds:
 | Delta Megacity | 2.09 km | 2 | 2 | 1 diamond | 2 | 12.6 m | 14.83 km | 4 | 245 |
 | Nexus City | 2.85 km | 3 | 3 | 2 diamond | 3 | 26.5 m | 14.70 km | 2 | 375 |
 | Greyhook | 1.17 km | 1 | 0 | none | 0 | 10.3 m | 4.95 km | 4 | 106 |
-| Nyxllor | 1.25 km | 1 | 4 | 2 diamond | 2 | 9.0 m | 9.04 km | 0 | 200 |
+| Vesper Bay | 1.25 km | 1 | 4 | 2 diamond | 2 | 9.0 m | 9.04 km | 0 | 200 |
 
 "Other raised roads" are the bridge approaches and the streets ramping up to raised
 junctions. Every report lists, in its notes, the ramps and underpass streets that could not
