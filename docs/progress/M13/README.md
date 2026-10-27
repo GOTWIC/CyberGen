@@ -257,10 +257,25 @@ A lock names its code, so these go stale with any change to `citygen/*.py`.
 
 ## Sweep
 
-`citygen sweep --suite m8a --workers 3` on M13 on M12 (`sweep.md`, `sweep.json`): **58 of 68
-builds pass**, the same 58 as M12's sweep (`docs/progress/M12/sweep.json`). All 68 builds are
-byte for byte the M12 builds, so none is newly broken. Against M8c, the same ten builds fail;
-vesper_bay_pinned s5077 now fails placement only, where M8c also failed level_continuity.
+`citygen sweep --suite m8a --workers 3` on M13 on M10 (`sweep.md`, `sweep.json`), against
+M10's sweep (`docs/progress/M10/sweep.json`):
+
+| | M10 | M13 |
+|---|---|---|
+| builds passing every check | 58 of 68 | 58 of 68 |
+| builds newly failing | | 0 |
+| failing builds with other failing checks | | 0 |
+| builds with other bytes | | 6, all passing or failing as on M10 |
+| full-city tries beyond the first, all 68 builds | 111 | 105 |
+| build time, all 68 (the Mac shared with the x86 run, pytest and regenerations) | 8346 s | 7421 s |
+
+The six builds with other bytes (archipelago_free_port s404, delta_megacity s5077, vesper_bay
+s404 and s3141, test_pinned s404, test_delta s404) now pass on an earlier full-city try: on
+M10 a try failed `level_continuity` because `junctions.one_way_loops` reversed a street but not
+its z profile (checked on main's code: archipelago_free_port s404 fails `level_continuity` on
+its first try there and passes on its second; here it passes on its first). vesper_bay s3141
+fails `open_space_share` on its last try as on M10 (Launch Key 67% open, 71% on M10).
+The other 62 builds are byte for byte M10's.
 
 **Cragmouth at eight seeds** (`citygen sweep cities/cragmouth/city_spec.json --seeds
 6133,11,404,1999,3141,5077,8128,27182 --workers 3`, in `sweep_cragmouth.md` and `.json`):

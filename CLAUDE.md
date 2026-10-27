@@ -532,7 +532,8 @@ no change, and grades are measured on ground + z:
   line outside the district (`grade(..., held)`: held vertices fixed, the envelopes clamped
   to the bounds they set), the splice takes `terrain` and the retaining walls from the new
   build, and `edit._close` lets a building's gameplay rows follow it and drops old lots and
-  open spaces under changed new ground (`_ground_cover`).
+  open spaces under changed new ground (`_ground_cover`). `junctions.one_way_loops` now reverses a street's
+  z profile with it (main bug: six m8a sweep builds now pass on an earlier try).
 Sample: `cities/cragmouth` (a cliffside port; hills, a ridge, the Crown Heights plateau with a
 cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
 `docs/progress/M13/`.
