@@ -1,4 +1,4 @@
-citygen build report: Nexus City (seed 1207, M7 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation))
+citygen build report: Nexus City (seed 1207, M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer))
 result: PASS  (hydrology variant 11)
 
 checks:
@@ -90,6 +90,17 @@ checks:
          note: Silver Island: 99% lit
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
+  [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
+         note: 274 doors
+  [pass] poi_reachable_car: Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door
+  [pass] poi_places: Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones
+  [pass] territories: Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other
+  [pass] gameplay_fields: Wealth, danger and police fields: one raster each over the city bounds, every value between 0 and 1
+  [pass] street_density: Street density: one row per road segment with every hour band, nothing negative, traffic within the lanes' capacity, no cars on pedestrian ways
+  [pass] parking: Parking: every garage, lot and curb has capacity; garages in their building, lots clear of buildings and carriageways, curb parking on streets with parking lanes and drive lanes
+  [pass] travel_points: Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk
+  [pass] sign_slots: Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof
+         note: shop signs reach 10.2 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
          note: 283 road columns under 48 raised segments
 
@@ -158,6 +169,10 @@ stats:
   other raised roads 10.99 km, underpass streets 5, road columns 283
 
   tunnels cut and cover 1 (0.5 km), metro 5 (6.59 km), pedestrian 3 (0.09 km); ventilation buildings 0, roads over them 0, streets over them 1, deepest road -7.8 m, deepest metro -26 m
+
+  gameplay: 215 points of interest, 8 factions (corporate 4, gang 3, police 1), 13 territories (2 contested), 26 taxi stands, 13 fast-travel points
+  pois: vendor.food 35, bar.bar 33, vendor.convenience 25, vendor.pawn 25, bar.arcade 18, clinic.ripperdoc 18, bar.club 14, clinic.clinic 14, apartment.apartment 9, apartment.studio 7, fixer.fixer 7, apartment.penthouse 5, hideout.squat 3, hideout.warehouse 2
+  parking: street 602, garage 18, lot 2 (14619 spaces); sign slots: shop_sign.blade 10126, shop_sign.facade 5007, billboard.roof 1299, neon.facade 635, billboard.facade 334, holo_ad.roof 41
 
   transit 10.43 km, supports 102, portals 9, buildings removed 18; stations elevated 6, sky 2, underground 5
   by mode: elevated_rail 1 lines 3.07 km 4 stations, maglev 1 lines 1.97 km 2 stations, metro 1 lines 4.26 km 5 stations, sky_tube 1 lines 1.13 km 2 stations

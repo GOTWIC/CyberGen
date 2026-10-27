@@ -9,7 +9,7 @@
     "shapely": "2.2.0",
     "geos": "3.14.1"
   },
-  "model_sha256": "2d882b269f842813f6dd6c85c68bfa2515a5410e4a7431a52059a25d8e9003d6",
+  "model_sha256": "c413d2db841d77bda8bb92daf2886858758f704a1cb14fdcd86de4cf4b43eb8c",
   "entries": [
     ["v0/coast", "9c9110bb3a751b015d4157926c9e4bd1ff20bf6f47bad5c507d5305ff03a2a11"],
     ["v0/rivers", "43a62f0cacec9caf1b3965c88c45695e666f8d0fb90f7e7ac5e0c5bd674f5f38"],
@@ -9576,7 +9576,15 @@
     ["transit/tl04/route", "8df9e028ab416f04c33acfe42d44202b96d9c21a95d98b6817de9f44c7f2badb"],
     ["transit/profiles", "a0460fa8ccc7a7296c4ba60e16a48e8ffde31f632847d30466938365233351f6"],
     ["transit", "a723ae3482f52d6e8ca884bdd0b565680eef126fa1fe47c932337e56fb1d880e"],
-    ["checks_m3", "6a0654b194974f206a832a67a8e997edb4c36bd2e40fa840a8a18b4d44b5be7a"],
+    ["gameplay/densities", "986df9073aed1edc77e0e3fe07c3a2bff65673d8c64867d529007158e39c1378"],
+    ["gameplay/factions", "5ba5574e89a509874db8eadff9fb80a0783b1a3d958caefaf0979af80a3bba91"],
+    ["gameplay/fields", "d7915d4d8d9b1a473d3c51f1739f1bfa28ffa9f51daf6ac69cc653833dd30207"],
+    ["gameplay/parking", "941bcd1b51b708e9e6288d91b4084ee721bef7c4abf1459091e1bdbc30eec58e"],
+    ["gameplay/pois", "e5d997e2eeb037bd2b67e94f3b0be9c8b813bad6535b1e13323075120760be3f"],
+    ["gameplay/sign_slots", "6aaeec3f5efc38610623cfb9ba7a6b86e357a36ea1a18068301e8a644eb03d28"],
+    ["gameplay/travel_points", "940ac01cb5c4aca8fcab864859ad5e503c1a0a8ec4e704f2d0cd3734302130a7"],
+    ["gameplay/zones", "bfa380628c7a2d662b84f2cb449abca99ff1444db3f545d1aa4304a7a3c18683"],
+    ["checks_m3", "1c4d910346299a2ca7846641670bf2d8e14b1df468b9b3e7ba4d4d7af3b7d6e0"],
     ["city_try0", "dae84a6dff5f8e89e72fe2b73a5264734f64af117cfe2eddd7ca81ae3597d114"]
   ]
 }

@@ -1,4 +1,4 @@
-citygen build report: Greyhook (seed 9081, M7 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation))
+citygen build report: Greyhook (seed 9081, M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer))
 result: PASS  (hydrology variant 0)
 
 checks:
@@ -83,6 +83,17 @@ checks:
          note: Hook Spaceport: 97% lit
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
+  [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
+         note: 192 doors
+  [pass] poi_reachable_car: Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door
+  [pass] poi_places: Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones
+  [pass] territories: Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other
+  [pass] gameplay_fields: Wealth, danger and police fields: one raster each over the city bounds, every value between 0 and 1
+  [pass] street_density: Street density: one row per road segment with every hour band, nothing negative, traffic within the lanes' capacity, no cars on pedestrian ways
+  [pass] parking: Parking: every garage, lot and curb has capacity; garages in their building, lots clear of buildings and carriageways, curb parking on streets with parking lanes and drive lanes
+  [pass] travel_points: Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk
+  [pass] sign_slots: Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof
+         note: shop signs reach 10.2 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
          note: 48 road columns under 14 raised segments
 
@@ -139,6 +150,10 @@ stats:
   plants: shrub 5809, overgrowth 2155, park_tree 1570, street_tree 990, palm 777, facade_greenery 743, conifer 381, roof_tree 338, median_tree 155
 
   tunnels immersed tube 1 (0.76 km), metro 5 (2.55 km); ventilation buildings 2, roads over them 2, streets over them 1, deepest road -15.8 m, deepest metro -26 m
+
+  gameplay: 121 points of interest, 6 factions (gang 3, corporate 2, police 1), 9 territories (1 contested), 16 taxi stands, 8 fast-travel points
+  pois: vendor.food 23, bar.arcade 15, apartment.studio 13, bar.bar 12, vendor.convenience 11, clinic.ripperdoc 10, bar.club 8, clinic.clinic 7, apartment.penthouse 6, vendor.pawn 6, fixer.fixer 5, hideout.back_room 2, apartment.apartment 1, hideout.squat 1, hideout.warehouse 1
+  parking: street 411, garage 47 (22023 spaces); sign slots: shop_sign.blade 4369, shop_sign.facade 1255, billboard.roof 515, neon.facade 247, billboard.facade 95, holo_ad.roof 34
 
   transit 7.57 km, supports 69, portals 9, buildings removed 19; stations elevated 5, sky 3, underground 5
   by mode: elevated_rail 1 lines 2.22 km 5 stations, metro 1 lines 3.17 km 5 stations, sky_tube 1 lines 2.18 km 3 stations

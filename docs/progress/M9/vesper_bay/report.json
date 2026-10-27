@@ -1,7 +1,7 @@
 {
   "name": "Vesper Bay",
   "seed": 2077,
-  "stage": "M7 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation)",
+  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer)",
   "passed": true,
   "variant": 18,
   "checks": [
@@ -511,6 +511,73 @@
       "passed": true,
       "failures": [],
       "notes": []
+    },
+    {
+      "id": "poi_reachable_foot",
+      "title": "Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "269 doors"
+      ]
+    },
+    {
+      "id": "poi_reachable_car",
+      "title": "Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "poi_places",
+      "title": "Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "territories",
+      "title": "Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "gameplay_fields",
+      "title": "Wealth, danger and police fields: one raster each over the city bounds, every value between 0 and 1",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_density",
+      "title": "Street density: one row per road segment with every hour band, nothing negative, traffic within the lanes' capacity, no cars on pedestrian ways",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "parking",
+      "title": "Parking: every garage, lot and curb has capacity; garages in their building, lots clear of buildings and carriageways, curb parking on streets with parking lanes and drive lanes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "travel_points",
+      "title": "Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "sign_slots",
+      "title": "Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "shop signs reach 10.5 m"
+      ]
     },
     {
       "id": "road_supports",
@@ -1296,6 +1363,63 @@
         "market_gates": 1,
         "props": 50568,
         "plants": 25847
+      }
+    },
+    "gameplay": {
+      "pois": 195,
+      "pois_by_kind": {
+        "vendor.food": 28,
+        "vendor.pawn": 27,
+        "bar.bar": 25,
+        "apartment.studio": 18,
+        "bar.arcade": 18,
+        "clinic.ripperdoc": 18,
+        "vendor.convenience": 17,
+        "bar.club": 12,
+        "clinic.clinic": 9,
+        "fixer.fixer": 7,
+        "apartment.penthouse": 4,
+        "hideout.squat": 4,
+        "apartment.apartment": 3,
+        "hideout.back_room": 2,
+        "hideout.warehouse": 2,
+        "apartment.capsule": 1
+      },
+      "factions": 8,
+      "factions_by_kind": {
+        "gang": 4,
+        "corporate": 3,
+        "police": 1
+      },
+      "territories": 13,
+      "contested": 3,
+      "parking": {
+        "street": 521,
+        "garage": 29,
+        "lot": 3
+      },
+      "parking_capacity": 19506,
+      "taxi_stands": 31,
+      "fast_travel": 11,
+      "sign_slots": {
+        "shop_sign.blade": 9719,
+        "shop_sign.facade": 3484,
+        "billboard.roof": 1279,
+        "neon.facade": 655,
+        "billboard.facade": 258,
+        "holo_ad.roof": 65
+      },
+      "density_rows": 2868,
+      "peak_traffic_vph": 9690.0,
+      "peak_crowd_per_100m": 168.0,
+      "generator": {
+        "factions": 8,
+        "zones": 21,
+        "pois": 195,
+        "parking": 553,
+        "travel_points": 42,
+        "densities": 2868,
+        "sign_slots": 15460
       }
     },
     "separation_budget": {
