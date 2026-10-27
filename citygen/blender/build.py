@@ -354,6 +354,12 @@ def build_object(o, mats, cols, tag=True):
             md.box(p["c"], p["d"], p["yaw"], mi)
         elif k == "beam":
             md.beam(p["a"], p["b"], p["w"], p["h"], mi)
+        elif k == "mesh":
+            base = len(md.verts)
+            for x, y, z in p["v"]:
+                md.v(x, y, z)
+            for f in p["f"]:
+                md.face([base + i for i in f], mi)
     mesh = bpy.data.meshes.new(o["name"])
     mesh.from_pydata(md.verts, [], md.faces)
     for name in slots:
@@ -516,7 +522,8 @@ def cutaway(scene, plan):
     # collection operand: the boolean takes their union)
     coll = bpy.data.collections.new("citygen_cutters")
     scene.collection.children.link(coll)
-    cutter = _box_obj("citygen_cutter", ring, z0 - 50.0, z1)
+    # (down to 20 m above the earth's bottom: the pit keeps a floor)
+    cutter = _box_obj("citygen_cutter", ring, z0 + 20.0, z1)
     scene.collection.objects.unlink(cutter)
     coll.objects.link(cutter)
     md = MeshData()

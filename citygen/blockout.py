@@ -768,12 +768,24 @@ def _tunnels(P: _Plan) -> None:
             outer = ribbon(pts, w, tops)
             inner = ribbon(pts, w - 2.0, tops)
             if outer is not None and inner is not None:
-                for i in range(len(pts) - 1):
-                    th = q(max(tops[i] - zs[i], tops[i + 1] - zs[i + 1]) + t.floor_m)
-                    for side in (0, 1):
-                        parts.append({"k": "ribbon", "m": "tunnel_wall",
-                                      "l": [outer[side][i], outer[side][i + 1]],
-                                      "rr": [inner[side][i], inner[side][i + 1]], "t": th})
+                # each wall one closed mesh: its top (roof top or parapet) and its foot (under
+                # the floor) follow the road
+                bots = [q(z - 0.3 - t.floor_m) for z in zs]
+                for side in (0, 1):
+                    vs, fs = [], []
+                    for i in range(len(pts)):
+                        o, n_ = outer[side][i], inner[side][i]
+                        vs += [o, n_, [n_[0], n_[1], bots[i]], [o[0], o[1], bots[i]]]
+                    for i in range(len(pts) - 1):
+                        a0, b0 = 4 * i, 4 * (i + 1)
+                        for k in range(4):
+                            k1 = (k + 1) % 4
+                            f = [a0 + k, b0 + k, b0 + k1, a0 + k1]
+                            fs.append(f[::-1] if side == 0 else f)
+                    e = 4 * (len(pts) - 1)
+                    fs.append([0, 3, 2, 1] if side == 0 else [0, 1, 2, 3])
+                    fs.append([e, e + 1, e + 2, e + 3] if side == 0 else [e, e + 3, e + 2, e + 1])
+                    parts.append({"k": "mesh", "m": "tunnel_wall", "v": vs, "f": fs})
             cov = [(p, rz) for p, s, rz in zip(pts, cum, roof_z) if a - 0.01 <= s <= b + 0.01]
             if len(cov) >= 2:
                 rr = ribbon([p for p, _ in cov], w, [z for _, z in cov])

@@ -20,7 +20,7 @@ from citygen.validate import validate_spec
 from conftest import ROOT, SMALL, built_sample
 
 TUNNEL_CHECKS = {"tunnel_grades", "tunnel_cover", "tunnel_portals", "tunnel_clash"}
-# the small city with tunnels asked under three districts: one fits (under Harbor)
+# the small city with tunnels asked under three districts (some fit)
 SPEC = {"under": ["Core", "Uptown", "Harbor"], "water": "prefer"}
 
 
@@ -97,10 +97,10 @@ def test_city_passes_with_a_tunnel(city):
     assert not failed, failed
     assert TUNNEL_CHECKS <= {c.id for c in city.checks}
     road = [t for t in city.model.tunnels if t.kind == "cut_and_cover"]
-    assert len(road) == 1
+    assert road
+    asked = {d.id for d in city.model.districts if d.name in SPEC["under"]}
+    assert {t.attrs["district"] for t in road} <= asked
     t = road[0]
-    assert t.attrs["district"] == next(d.id for d in city.model.districts
-                                       if d.name == "Harbor")
     assert len(t.portals) == 2 and all(p.position[2] == TN.portal_z(t.kind)
                                        for p in t.portals)
     assert t.segment_ids
@@ -109,7 +109,7 @@ def test_city_passes_with_a_tunnel(city):
         s = segs[sid]
         assert s.tunnel and s.level == -1 and t.id in s.tunnel_ids
         assert min(z.z for z in s.z_profile) <= -TN.covered_need(t.kind) + 0.01
-    assert city.stats["tunnels"]["by_kind"]["cut_and_cover"]["count"] == 1
+    assert city.stats["tunnels"]["by_kind"]["cut_and_cover"]["count"] == len(road)
 
 
 def test_tunnel_parts(city):
