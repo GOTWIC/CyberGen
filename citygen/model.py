@@ -523,6 +523,152 @@ class Prop(Entity):
     scale: Point3 = (1.0, 1.0, 1.0)
 
 
+# --- gameplay layer (M11) ---------------------------------------------------------
+
+# hour bands of the density rows (name, first hour, end hour)
+HOUR_BANDS = (("night", 0, 6), ("morning", 6, 10), ("day", 10, 16), ("evening", 16, 20),
+              ("late", 20, 24))
+PerBand = Annotated[list[float], Field(min_length=5, max_length=5,
+                                       description="Per hour band: night 0-6, morning 6-10, "
+                                                   "day 10-16, evening 16-20, late 20-24.")]
+
+
+class Access(_Model):
+    """How a place is reached: a door, the ground walkway it opens on (on foot), and the
+    drive lane where a car stops for it (by car)."""
+    position: Point2 = Field(description="The door, on the facade at ground level.")
+    kind: Literal["main", "service", "loading", "garage", "gate", "unit", "curb"] = "main"
+    walkway_id: str = Field(description="Ground walkway the door opens on.")
+    walk_link_m: float = Field(description="Door to that walkway.")
+    lane_id: str = Field(description="Drive lane where a car stops (lane graph).")
+    curb: Point2 = Field(description="Point on that lane's centerline nearest the door.")
+    curb_m: float = Field(description="Door to curb point, straight.")
+
+
+class Faction(Entity):
+    """A gang, a corporation's security or the city police; `type` is `faction.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "faction"
+    name: str
+    kind: Literal["gang", "corporate", "police"]
+    color: str
+    home_district_id: str | None = None
+    zone_ids: list[str] = Field(default_factory=list)
+
+
+class Zone(Entity):
+    """A territory (a turf of a district's blocks held by one faction) or a police precinct
+    (a district with its presence level); `type` is `zone.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "zone"
+    kind: Literal["territory", "police"]
+    name: str
+    district_id: str
+    faction_id: str | None = None
+    polygons: list[Polygon]
+    level: Fraction = Field(description="Territory: how firmly it is held; police: presence.")
+    block_ids: list[str] = Field(default_factory=list)
+
+
+class Poi(Entity):
+    """A named point of interest; `type` is `poi.<kind>`. Bars, clinics and vendors are
+    ground-floor units (`unit_index`), apartments a floor of a residential building, hideouts
+    a building of a gang turf, fixers keep a table in a bar (`host_id`)."""
+    TYPE_PREFIX: ClassVar[str] = "poi"
+    kind: Literal["bar", "clinic", "vendor", "fixer", "hideout", "apartment"]
+    sub: str = Field(description="bar, club, arcade; clinic, ripperdoc; food, convenience, "
+                                 "pawn; fixer; warehouse, squat, back_room; capsule, studio, "
+                                 "apartment, penthouse.")
+    name: str
+    district_id: str
+    building_id: str | None = None
+    unit_index: int | None = None
+    host_id: str | None = None
+    position: Point3 = Field(description="The main door (z: the floor, for apartments).")
+    floor: int = 0
+    entrances: Annotated[list[Access], Field(min_length=1)]
+    hours: tuple[int, int] = Field((0, 24), description="Open from, to (hours; to < from "
+                                                        "runs past midnight; 0, 24 always).")
+    zone_id: str | None = Field(None, description="Territory it stands in.")
+    faction_id: str | None = Field(None, description="Hideouts: the faction it belongs to.")
+    wealth: Fraction = 0.0
+    danger: Fraction = 0.0
+
+
+class GameField(Entity):
+    """A scalar field on a raster over the city bounds (wealth, danger, police presence),
+    values 0 to 1 by cell, rows from the south, west to east; `type` is `field.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "field"
+    kind: Literal["wealth", "danger", "police"]
+    origin: Point2 = Field(description="South-west corner of cell (0, 0).")
+    cell_m: float
+    nx: int
+    ny: int
+    values: list[float]
+
+
+class StreetDensity(Entity):
+    """Traffic, crowd and spawn density of one road segment per hour band (for lifegen)."""
+    TYPE_PREFIX: ClassVar[str] = "density"
+    segment_id: str
+    district_id: str | None = None
+    speed_kmh: float = Field(description="Speed limit (0: no cars).")
+    traffic_vph: PerBand = Field(description="Vehicles per hour, both directions.")
+    vehicles_per_100m: PerBand
+    crowd_per_100m: PerBand = Field(description="Pedestrians on its sidewalks (or on it).")
+    gang_per_100m: PerBand
+    police_per_100m: PerBand
+
+
+class Parking(Entity):
+    """A garage (parking structure or underground garage of a building), a surface lot, or the
+    curb parking of a street; `type` is `parking.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "parking"
+    kind: Literal["garage", "lot", "street"]
+    district_id: str | None = None
+    building_id: str | None = None
+    lot_id: str | None = None
+    segment_id: str | None = None
+    polygon: Polygon | None = None
+    line: list[Point2] = Field(default_factory=list)
+    levels: int = 1
+    underground: bool = False
+    capacity: int
+    entrances: list[Access] = Field(default_factory=list)
+
+
+class TravelPoint(Entity):
+    """A taxi stand at the curb or a fast-travel point; `type` is `travel.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "travel"
+    kind: Literal["taxi_stand", "fast_travel"]
+    name: str
+    district_id: str
+    position: Point2 = Field(description="On the sidewalk (walkway) beside the curb.")
+    access: Access
+    near_id: str | None = Field(None, description="Station, place, building or node it "
+                                                  "serves.")
+
+
+class SignSlot(Entity):
+    """A surface for signage that stages 2 and 3 fill: shop signs (the M6 sign props),
+    billboards (M3 roof billboards and facade panels), holo-ads over roofs and neon bands on
+    facades; `type` is `sign_slot.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "sign_slot"
+    kind: Literal["shop_sign", "billboard", "holo_ad", "neon"]
+    mount: Literal["facade", "blade", "roof"]
+    building_id: str | None = None
+    prop_id: str | None = Field(None, description="Shop signs: the M6 sign prop.")
+    roof_item: int | None = Field(None, description="Roof billboards: index in roof_items.")
+    position: Point3 = Field(description="Center of the face.")
+    yaw_deg: float = Field(description="Facing direction, degrees counterclockwise from east.")
+    width_m: float
+    height_m: float
+    emitter: bool = True
+    two_sided: bool = False
+    content: str = Field(description="Shop use, or ad, corporate, district.")
+    segment_id: str | None = Field(None, description="Road it faces.")
+    audience: float = Field(0.0, description="People and vehicles passing per hour in the "
+                                             "evening band.")
+
+
 class Tile(Entity):
     TYPE_PREFIX: ClassVar[str] = "tile"
     ix: int
@@ -541,6 +687,9 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "transit_lines": TransitLine, "stations": Station, "megasites": Megasite, "blocks": Block,
     "lots": Lot, "open_spaces": OpenSpace, "properties": Property, "buildings": Building,
     "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
+    "factions": Faction, "zones": Zone, "pois": Poi, "fields": GameField,
+    "densities": StreetDensity, "parking": Parking, "travel_points": TravelPoint,
+    "sign_slots": SignSlot,
     "tiles": Tile,
 }
 
@@ -586,6 +735,14 @@ class CityModel(_Model):
     plants: list[Plant] = Field(default_factory=list)
     green_areas: list[GreenArea] = Field(default_factory=list)
     props: list[Prop] = Field(default_factory=list)
+    factions: list[Faction] = Field(default_factory=list)
+    zones: list[Zone] = Field(default_factory=list)
+    pois: list[Poi] = Field(default_factory=list)
+    fields: list[GameField] = Field(default_factory=list)
+    densities: list[StreetDensity] = Field(default_factory=list)
+    parking: list[Parking] = Field(default_factory=list)
+    travel_points: list[TravelPoint] = Field(default_factory=list)
+    sign_slots: list[SignSlot] = Field(default_factory=list)
     tiles: list[Tile] = Field(default_factory=list)
 
     @model_validator(mode="after")

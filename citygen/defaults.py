@@ -87,7 +87,7 @@ def fill_district(d: District, city_seed: int, separation: str) -> None:
         d.waterways = Waterways(style=list(p.waterway_style), density=p.waterway_density)
     if d.complexes is None:
         d.complexes = [Complex(kind=k) for k in p.complexes]
-    for attr in ("skybridge_density", "grime", "neon", "greenery"):
+    for attr in ("skybridge_density", "grime", "neon", "greenery", "wealth", "danger", "police"):
         if getattr(d, attr) is None:
             setattr(d, attr, getattr(p, attr))
 
