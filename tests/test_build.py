@@ -138,6 +138,8 @@ def test_small_city_passes(small_built):
                    # M7
                    "road_grades", "level_continuity", "deck_clearance", "ramps_land",
                    "road_supports",
+                   # M12
+                   "stack_ramps", "stack_levels",
                    # M11
                    "poi_reachable_foot", "poi_reachable_car", "poi_places", "territories",
                    "gameplay_fields", "street_density", "parking", "travel_points",

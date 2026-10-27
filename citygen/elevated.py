@@ -88,7 +88,7 @@ STACK_CORE_M = 200.0            # a stack's core: its left flyovers hold their t
 STACK_SPACE_M = 75.0            # a right ramp's ends this far nearer the crossing than the
 #                                 left ramp's on the same side (their lanes never cross)
 STACK_TOP_M = LEVEL_Z[3] + 2.0  # highest stack ramp deck
-STACK_SPAN_M = 56.0             # a directional ramp's longest stretch with no spot for a column
+STACK_SPAN_M = 60.0             # a directional ramp's longest stretch with no column (SUPPORT_MAX_GAP_M)
 #                                 (columns at both its ends keep it within the supports' 66 m)
 TURBINE_SWING = ((60.0, 40.0, 200.0), (60.0, 130.0, 200.0))   # a turbine's left ramps onto
 TURBINE_TOP_M = STACK_TOP_M        # and off the lifted highway: wider turns, their crossings
@@ -1979,24 +1979,38 @@ class Elev:
                   oY: float, R: float, k: float = 0.0):
         """The turn of a directional ramp from the line oX right of X's traffic to the line oY
         right of Y's, where Q is the corner of the two lines: one fillet of radius R at Q (a
-        right turn), or two (a left turn: it leaves X's line k before Q and crosses the core
-        on the diagonal to Y's line, which it joins k after Q). The lines are tangent to the
-        roads where the turn meets them (found in a few rounds from the crossing). Returns
-        (station on X where it starts, its points, station on Y where it ends) or None."""
+        right turn), or two (a left turn: it leaves X's line and crosses the core on the
+        diagonal to Y's line; the diagonal crosses X k - oX - oY before the crossing and Y as
+        far after it, so a bend of either road further out does not move it onto the
+        crossing). The lines are tangent to the roads where the turn meets them (found in a
+        few rounds from the crossing). Returns (station on X where it starts, its points,
+        station on Y where it ends) or None."""
         pts = None
+        if k > 0.0:
+            c = k - oX - oY
+            PX, _ = _at(lx.pts, lx.cum, s1 - cx * c)
+            PY, _ = _at(ly.pts, ly.cum, s2 + cy * c)
+            L = _d(PX, PY)
+            if L <= 1.0:
+                return None
+            dg = ((PY[0] - PX[0]) / L, (PY[1] - PX[1]) / L)
         for _ in range(4):
             A1, e1 = self._sys_line(lx, s1, cx, oX)
             A2, e2 = self._sys_line(ly, s2, cy, oY)
-            den = e1[0] * e2[1] - e1[1] * e2[0]
-            if abs(den) < 0.3:
-                return None
-            t = ((A2[0] - A1[0]) * e2[1] - (A2[1] - A1[1]) * e2[0]) / den
-            Q = (A1[0] + t * e1[0], A1[1] + t * e1[1])
             if k > 0.0:
-                corners = [(Q[0] - k * e1[0], Q[1] - k * e1[1]),
-                           (Q[0] + k * e2[0], Q[1] + k * e2[1])]
+                corners = []
+                for A, e in ((A1, e1), (A2, e2)):
+                    den = e[0] * dg[1] - e[1] * dg[0]
+                    if abs(den) < 0.3:
+                        return None
+                    t = ((PX[0] - A[0]) * dg[1] - (PX[1] - A[1]) * dg[0]) / den
+                    corners.append((A[0] + t * e[0], A[1] + t * e[1]))
             else:
-                corners = [Q]
+                den = e1[0] * e2[1] - e1[1] * e2[0]
+                if abs(den) < 0.3:
+                    return None
+                t = ((A2[0] - A1[0]) * e2[1] - (A2[1] - A1[1]) * e2[0]) / den
+                corners = [(A1[0] + t * e1[0], A1[1] + t * e1[1])]
             last = corners[-1]
             end = (last[0] + e2[0] * (2.0 * R + 10.0), last[1] + e2[1] * (2.0 * R + 10.0))
             pts = _fillet_path(e1, corners, end, [R] * len(corners))

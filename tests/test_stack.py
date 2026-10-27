@@ -228,7 +228,7 @@ def test_water_in_the_way():
     assert not _ramps(net) or "stack" not in st.get("interchanges", {})
 
 
-@pytest.mark.parametrize("angle", [80.0])
+@pytest.mark.parametrize("angle", [80.0, 70.0])
 def test_skewed_stack(angle):
     net, st = _build("stack", angle=angle)
     assert st["interchanges"] == {"stack": 1}, st["notes"]
