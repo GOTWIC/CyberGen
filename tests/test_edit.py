@@ -55,7 +55,7 @@ def _anchor_point(e: dict):
 # --- stable ids ----------------------------------------------------------------------
 
 BUILD_ORDER = re.compile(r"(^|\.)(rn|rs|jn|cw|sw|ln|lc|wk|br|st|tl|pl|os|lm|isl|r|sep|blk|lot|"
-                         r"sb|ww|ms|mg|el|gr|col|hedge|lawn)\d+[a-z]?(\.|$)")
+                         r"sb|ww|ms|mg|el|gr|col|hedge|lawn|tn|tm|tp)\d+[a-z]?(\.|$)")
 
 
 def test_ids_come_from_what_and_where():

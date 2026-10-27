@@ -48,7 +48,7 @@ STATE_VERSION = 1
 ATTR_REFS = ("sidewalk", "junction", "segment", "street", "building", "open_space",
              "skybridge", "station", "walkway", "lot", "roof", "median", "path", "quay",
              "waterway", "place", "from", "split_of", "line_id", "road_id", "zone_id",
-             "station_building_id", "block_id", "landmass_id", "megasite")
+             "station_building_id", "block_id", "landmass_id", "megasite", "tunnel")
 
 
 # --- build state ----------------------------------------------------------------------
