@@ -61,6 +61,31 @@
           "minimum": 10,
           "title": "Width M",
           "type": "number"
+        },
+        "facing": {
+          "description": "Sides where the edge is a cliff; on the other sides the plateau rises over a broad slope (`slope_m`). Left out: a cliff all round.",
+          "items": {
+            "enum": [
+              "north",
+              "north_east",
+              "east",
+              "south_east",
+              "south",
+              "south_west",
+              "west",
+              "north_west"
+            ],
+            "type": "string"
+          },
+          "title": "Facing",
+          "type": "array"
+        },
+        "slope_m": {
+          "default": 400.0,
+          "maximum": 2000,
+          "minimum": 50,
+          "title": "Slope M",
+          "type": "number"
         }
       },
       "required": [
