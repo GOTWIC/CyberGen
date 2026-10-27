@@ -10,6 +10,13 @@ optional combat and dialogue), which gets its own `nyxllor` repo at stage 3. The
 (Swagnik) does art direction and layout; Claude does code, tooling, procedural generation,
 and most asset work.
 
+**Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
+(`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
+detailed per-milestone record for sessions) and section in the root README (images, then a
+high-level milestone table). Stage 1's milestones are M0 to M15, built in
+`docs/progress/M*`; later stages give their milestones a prefix of their own (set in their
+scope doc) so their progress folders never clash with stage 1's.
+
 The repo was called Nyxllor until after M8c. The sample city called Nyxllor up to M8c is
 **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo "Vesper Bay Pinned"
 in `cities/vesper_bay_pinned`); `docs/progress/<milestone>/nyxllor*` folders before the rename
@@ -492,11 +499,15 @@ regenerations, sweep: `docs/progress/M10/`.
   the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
   and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
   Keep only images and short notes there; overwrite nothing from earlier milestones.
-- **Root `README.md`:** when the milestone PR is ready, update the Progress table and the
-  "Latest maps" images to point at the new milestone's previews. Every 3D render shown in the root
-  README is 8K: `citygen rerender <blockout_dir> iso_city ... --to docs/progress/<M>/<city>`
-  (7680 px wide by default, a few seconds each; fall back to 3840 or 2048 only if 8K fails).
-  Always include the whole-city isometric views (`render_iso_city.jpg`).
+- **Root `README.md`** is organized by stage (see "Layout by stage"). When a milestone PR is
+  ready: set its row in the stage's Milestones table (a few words, status), put its full entry
+  in the stage's milestone log (`docs/citygen_milestones.md`), and point the stage's images at
+  the newest builds. Keep the README short: one-line captions, no before and after pairs, a
+  new image only for something new the milestone adds, details in the log. Every 3D render
+  shown in the root README is 8K: `citygen rerender <blockout_dir> iso_city ... --to
+  docs/progress/<M>/<city>` (7680 px wide by default, a few seconds each; fall back to 3840 or
+  2048 only if 8K fails). Always include the whole-city isometric views
+  (`render_iso_city.jpg`) in the stage's Cities gallery.
 
 ## Working preferences
 
