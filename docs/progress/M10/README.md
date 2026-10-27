@@ -251,28 +251,24 @@ of every regeneration in the table.
 ## Sweep
 
 `citygen sweep --suite m8a --workers 3` ([`sweep.md`](sweep.md), `sweep.json`), next to
-M11's ([`../M11/sweep.md`](../M11/sweep.md)):
+M12's ([`../M12/sweep.md`](../M12/sweep.md)), on the final code:
 
-| | M11 | M10 |
+| | M12 | M10 |
 |---|---|---|
 | builds passing every check | 58 of 68 | 58 of 68 |
 | builds newly failing | | 0 |
-| builds whose pass, failing checks, retries, hydrology or road variant differ from M11 (ids in the messages aside) | | 1 |
+| builds whose pass, failing checks, retries, hydrology or road variant differ from M12 (ids in the messages aside) | | 1 |
 | full-city tries beyond the first, all 68 builds | 110 | 111 |
 | crashes | 0 | 0 |
-| build time, all 68 builds (one process each, the Mac shared with the x86 run and another session) | 6551 s | 7215 s |
+| build time, all 68 builds (one process each; the Mac shared with the x86 run and the test suite) | 6693 s | 8346 s |
 
 The one difference: Delta Megacity s3141 passes on its third full-city try instead of its
-second (first tries with 11 and 1 failures instead of 9); the block fix moves a few blocks,
-so its first layouts come out a little differently. The ten builds that fail fail the same
-checks as on M11 (placement, road graph, open space share, curve radius and the rest; M8a's
-open items). The salt column now shows the layout salt of a whole-city retry (`salt 2`): the
-build stats did not keep it before, so M11's table showed none (and a district
-regeneration of such a city would have started from another layout; fixed and tested).
-The sweep ran before three changes that only touch ids and row order (sorted id lists, the
-collision tie-break one reference deep, gameplay rows sorted by the new ids); they change no
-decision (every sample's report is the same before and after), so only the sha256 column
-of `sweep.json` is of the earlier code.
+second (as it did before M9 and M12 came in); the block fix moves a few blocks, so its first
+layouts come out a little differently. The ten builds that fail fail the same checks as on
+M12 (placement, road graph, open space share, curve radius and the rest; M8a's open items).
+The salt column shows the layout salt of a whole-city retry (`salt 2`): the build stats did
+not keep it before M10, so earlier tables showed none (and a district regeneration of such a
+city would have started from another layout; fixed and tested).
 
 ## Tests
 
