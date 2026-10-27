@@ -109,7 +109,12 @@ away changes, and they move every city slightly (new goldens):
    - transit lines are held (track and heights; a building of the new district in a line's
      way goes, as it would in a full build).
    Everything else runs as in a full build: the other districts' streets grow from the same
-   seeds and come out the same.
+   seeds and come out the same. Where a street of another district snaps to a junction
+   nearby on a shared road, the junctions it sees are those of the old city: not one that
+   only the district's new streets made (`Line.fresh`; in the old city it came later or not
+   at all), but the old node where it met the district's old streets, if it met them there
+   (`Builder._junction_near`, `Frame.met`). Found on M9's tunnel test city: one street of
+   Core and one of Uptown came back 1 cm and 3 m along their border road before.
 3. **The splice** (`edit.splice`): every entity of the district, and of its seam, comes from
    the new build; everything else from the old city, byte for byte. The seam is where the
    new district meets the held city: the nodes where its streets (old or new) meet held

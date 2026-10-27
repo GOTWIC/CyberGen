@@ -217,6 +217,7 @@ class Line:
     junctions: list[tuple[float, float]] = field(default_factory=list)
     nodes: list[tuple[float, float]] = field(default_factory=list)  # primary nodes on it
     inserts: list[tuple[float, float]] = field(default_factory=list)
+    fresh: set = field(default_factory=set)  # M10: junctions only the district's new streets made
     attached: list[bool] = field(default_factory=lambda: [False, False])
     crosses: str | None = None          # footbridges: the water id
     water_class: str | None = None
@@ -535,6 +536,10 @@ class Frame:
         self._spans: dict[str, list] = {}
         self.local = sorted(k for k, r in self.rows.items() if "m1b_segment" not in r.attrs)
         self.ltree = shapely.STRtree([LineString(k) for k in self.local]) if self.local else None
+        self._met: dict[tuple, set] = {}          # vertex of a held street -> its ends
+        for k in self.local:
+            for v in k:
+                self._met.setdefault(v, set()).update((k[0], k[-1]))
 
     def inside_row(self, s) -> bool:
         a = s.attrs
@@ -569,6 +574,11 @@ class Frame:
             if abs(o.length - line.length) < 0.05 and o.hausdorff_distance(line) < 0.03:
                 return r
         return None
+
+    def met(self, p) -> set:
+        """The ends of the held segments through p (where a held street through p met
+        other roads in the old city)."""
+        return self._met.get(p, set())
 
     def spans(self, t: "Line") -> list[tuple[float, float]]:
         key = t.primary["id"]
@@ -906,8 +916,7 @@ class Builder:
             if end == 0:
                 new = new[::-1]
             self.replace_pts(li, new)
-            if q not in t.junctions:
-                t.junctions.append(q)
+            self._joined(t, q, self._renewed(ln))
             t.inserts.append(q)
             ln.attached[0 if end == 0 else 1] = True
             return True
@@ -940,9 +949,9 @@ class Builder:
             return False
         if not self._legal(t, q, _project(t.pts, q)[0]):
             return False
-        near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
-        if near:
-            q = min(near, key=lambda j: (_dist(j, q), j))
+        j = self._junction_near(t, q, p, self._renewed(ln))
+        if j is not None:
+            q = j
         if self._renewed(ln):
             q = self.frame.meet(t, q)
             if q is None:
@@ -956,11 +965,34 @@ class Builder:
             return False
         new = list(pts) + [q]
         self.replace_pts(li, new if end == -1 else new[::-1])
-        if q not in t.junctions:
-            t.junctions.append(q)
+        self._joined(t, q, self._renewed(ln))
         t.inserts.append(q)
         ln.attached[1 if end == -1 else 0] = True
         return True
+
+    def _junction_near(self, t: Line, q, p, renewed: bool):
+        """The junction of road t closer than MIN_JUNCTION_GAP_M to q (the nearest) that a
+        street from p joins instead of q, else None. M10: a held street does not join a
+        junction that only the district's new streets made (`Line.fresh`; in the old city it
+        came later or not at all), unless it met t there before."""
+        near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
+        if self.frame is not None and not renewed:
+            old = self.frame.met(p)
+            if t.fresh:
+                near = [j for j in near if j not in t.fresh or j in old]
+            near += [e for e in sorted(old & self.frame.gate_set) if e not in near and
+                     _dist(e, q) < MIN_JUNCTION_GAP_M and _locate(t.pts, e) is not None]
+        return min(near, key=lambda j: (_dist(j, q), j)) if near else None
+
+    def _joined(self, t: Line, q, renewed: bool) -> None:
+        """Junction q on road t (M10: one that only the district's new streets made is
+        fresh)."""
+        if q not in t.junctions:
+            t.junctions.append(q)
+            if renewed:
+                t.fresh.add(q)
+        elif not renewed:
+            t.fresh.discard(q)
 
     def _legal(self, t: Line, q, s: float) -> bool:
         if any(s0 - 5.0 <= s <= s1 + 5.0 for s0, s1 in t.forbid):
@@ -990,9 +1022,9 @@ class Builder:
         s = _project(t.pts, q)[0]
         if not self._legal(t, q, s):
             return None
-        near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
-        if near:
-            q = min(near, key=lambda j: (_dist(j, q), j))
+        j = self._junction_near(t, q, p, renewed)
+        if j is not None:
+            q = j
             if not self._legal(t, q, _project(t.pts, q)[0]):
                 return None
         else:
@@ -2320,10 +2352,11 @@ def link_dead_ends(B: Builder) -> None:
             continue
         _, tj, q = best
         t = B.lines[tj]
-        near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
-        if near:
-            q = min(near, key=lambda j: (_dist(j, q), j))
-        if B.frame is not None and t.district == B.frame.name and B.frame.holds(t, q):
+        renewed = B.frame is not None and t.district == B.frame.name
+        j = B._junction_near(t, q, p, renewed)
+        if j is not None:
+            q = j
+        if renewed and B.frame.holds(t, q):
             q = B.frame.node_on(t, q)  # M10: a gate link onto a held road of the district
             if q is None:
                 continue
@@ -2338,8 +2371,7 @@ def link_dead_ends(B: Builder) -> None:
                         section=sec))
         B.lines[li].attached = [True, True]
         t.inserts.append(q)
-        if q not in t.junctions:
-            t.junctions.append(q)
+        B._joined(t, q, renewed)
 
 
 def _pairs(idx):
@@ -2461,9 +2493,9 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
             t = B.lines[tj]
             if not B._legal(t, q, _project(t.pts, q)[0]):
                 continue
-            near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
-            if near:
-                q = min(near, key=lambda j: (_dist(j, q), j))
+            j = B._junction_near(t, q, a, B._renewed(ln))
+            if j is not None:
+                q = j
             if B._renewed(ln) and B.frame.holds(t, q):
                 continue  # M10: no new link from the district onto a held road
             link = LineString([a, q])
@@ -2483,8 +2515,7 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
             ln.inserts.append(a)
             ln.junctions.append(a)
             t.inserts.append(q)
-            if q not in t.junctions:
-                t.junctions.append(q)
+            B._joined(t, q, B._renewed(ln))
             return True
     return False
 
