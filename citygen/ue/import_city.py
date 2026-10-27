@@ -140,7 +140,7 @@ def base_material():
 def delete_assets(paths):
     """Delete the assets at `paths` in one go (one by one takes about 0.4 s each: a garbage
     collection per asset); how many were deleted. The actors that used them were destroyed
-    before, so a garbage collection first lets go of their components' references."""
+    and the level saved before, so a garbage collection first lets go of them."""
     if not paths:
         return 0
     unreal.SystemLibrary.collect_garbage()
@@ -396,6 +396,10 @@ class Importer:
             self.stats["actors"]["created"] += 1
             self.keys["created"].append(key)
         else:
+            # an actor whose mesh asset is the same object (its tile imported again in place)
+            # and whose only change is its tags is not marked dirty by setting them: mark it,
+            # or the level keeps the old hash and every import updates it again
+            a.modify()
             self.stats["actors"]["updated"] += 1
             self.keys["updated"].append(key)
         update(a, h)
@@ -582,7 +586,7 @@ class Importer:
     def save(self):
         dirty = (len(unreal.EditorLoadingAndSavingUtils.get_dirty_content_packages())
                  + len(unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()))
-        self.stats["dirty_packages"] = dirty
+        self.stats["dirty_packages"] = self.stats.get("dirty_packages", 0) + dirty
         if dirty:
             self.les.save_current_level()
             unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
@@ -593,9 +597,12 @@ class Importer:
         self.timed("meshes", self.meshes)
         self.timed("level", self.level)
         self.timed("actors", self.actors)
-        self.timed("prune", self.prune_meshes)
         self.timed("graphs", self.graphs)
+        # saved before the meshes no object uses are deleted: deleting an asset that the open
+        # level still names reloads the level, which drops what was not saved
         self.timed("save", self.save)
+        self.timed("prune", self.prune_meshes)
+        self.timed("save_pruned", self.save)
         self.stats.update(self.timed("digests", self.digests))
         self.stats["keys"] = {k: sorted(v) for k, v in self.keys.items()}
         self.stats["level"] = self.level_path

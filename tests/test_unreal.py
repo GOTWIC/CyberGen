@@ -303,5 +303,10 @@ def test_unreal_import_small_city(small, tmp_path):
     assert {k: third["keys"][k] for k in want} == want
     assert third["actors"]["unchanged"] == \
         third["actor_count"] - len(want["created"]) - len(want["updated"])
+    # and what it changed was saved: the same build again changes nothing
+    fourth = U.import_city(build2, proj)
+    assert fourth["ok"], fourth.get("error")
+    assert fourth["actors"]["created"] == fourth["actors"]["updated"] == \
+        fourth["actors"]["deleted"] == fourth["dirty_packages"] == 0
     chk = U.check_city(build2, proj)
     assert chk["ok"], chk
