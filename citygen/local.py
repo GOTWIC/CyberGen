@@ -36,6 +36,7 @@ class Local:
     places: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     info: dict = field(default_factory=dict)
+    terrain: dict | None = None    # M13: finished ground, walls, bores, stats
 
 
 def open_paths(W: JN.WalkGraph, opens: list[dict]) -> int:

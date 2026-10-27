@@ -3287,6 +3287,7 @@ class Builder:
         line = LineString(seg)
         for e, tag in ((seg[0], "a"), (seg[-1], "b")):
             f, d = self.foot(e)
+            stepped = d < 0.5
             if d < 0.5:  # stairs need a run: step the kiosk 12 m along the concourse (M8c)
                 r = line.interpolate(min(METRO_RUN_M, line.length / 2.0) if tag == "a" else
                                      max(line.length - METRO_RUN_M, line.length / 2.0))
@@ -3295,6 +3296,17 @@ class Builder:
                     continue
             acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z)], 3.0,
                                  {"station": sid}))
+            kind, l3, w, at = self.new[k]
+            if stepped and self.c.m.terrain is not None and (q(e[0]), q(e[1]), q(z)) not in l3:
+                # (M13, terrain cities only so far: the flat cities keep their M8c bytes) a
+                # stepped stair foot between two concourse vertices joins the concourse there
+                s_e = line.project(Point(e))
+                cum = [0.0]
+                for p0, p1 in zip(l3, l3[1:]):
+                    cum.append(cum[-1] + math.hypot(p1[0] - p0[0], p1[1] - p0[1]))
+                at_k = next((i for i in range(1, len(cum)) if cum[i] > s_e), len(l3) - 1)
+                self.new[k] = (kind, l3[:at_k] + [(q(e[0]), q(e[1]), q(z))] + l3[at_k:], w,
+                               at)
             sq = G.qpoly(Point(f).buffer(2.5, cap_style="square"))
             self.struct(f"{sid}.ent{tag}", "canopy", 0.0, 3.2, footprint=sq,
                         attrs={"station": sid, "role": "metro_entrance"})

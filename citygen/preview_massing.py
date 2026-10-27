@@ -309,7 +309,7 @@ def _solids(m, window=None):
         add(poly, s.z_m - 1.0, s.z_m + s.levels * s.level_height_m, to_rgb(SKYBRIDGE))
     for s in m.structures:
         a = s.attrs or {}
-        if s.z1_m <= 0.0:
+        if s.z1_m <= 0.0 or s.kind == "retaining_wall":
             continue
         rgb = to_rgb(a.get("color", "#a4abb8"))
         if s.footprint is not None:

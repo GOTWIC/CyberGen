@@ -153,6 +153,44 @@ class MeshData:
                 t = t[::-1]
             self.face(t, mat)
 
+    def drape(self, rings, mat):
+        """M13: a face from 3D rings (outer counterclockwise, holes clockwise), triangulated
+        in plan, each vertex at its own height."""
+        base = len(self.verts)
+        flat = []
+        for ring in rings:
+            for x, y, z in ring:
+                self.v(x, y, z)
+                flat.append(Vector((x, y, 0.0)))
+        lists, k = [], 0
+        for ring in rings:
+            lists.append(flat[k:k + len(ring)])
+            k += len(ring)
+        for tri in tessellate_polygon(lists):
+            t = [base + i for i in tri]
+            a, b, c = (self.verts[i] for i in t)
+            cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+            if cross < 0:
+                t = t[::-1]
+            self.face(t, mat)
+
+    def grid(self, p, mat):
+        """M13: a heightfield, nx by ny points `c` apart from (x0, y0), z row by row from the
+        south; the cells in `skip` left open."""
+        nx, ny, c = p["nx"], p["ny"], p["c"]
+        x0, y0, zs = p["x0"], p["y0"], p["z"]
+        base = len(self.verts)
+        for j in range(ny):
+            for i in range(nx):
+                self.v(x0 + i * c, y0 + j * c, zs[j * nx + i])
+        skip = set(p.get("skip", []))
+        for j in range(ny - 1):
+            for i in range(nx - 1):
+                if j * (nx - 1) + i in skip:
+                    continue
+                a = base + j * nx + i
+                self.face([a, a + 1, a + nx + 1, a + nx], mat)
+
     def walls(self, ring, z0, z1, mat):
         n = len(ring)
         lo = [self.v(x, y, z0) for x, y in ring]
@@ -348,6 +386,10 @@ def build_object(o, mats, cols, tag=True):
             md.prism(p, mi)
         elif k == "flat":
             md.cap([p["r"]] + p["h"], p["z"], mi, up=True)
+        elif k == "drape":
+            md.drape([p["r"]] + p["h"], mi)
+        elif k == "grid":
+            md.grid(p, mi)
         elif k == "ribbon":
             md.ribbon(p, mi)
         elif k == "box":

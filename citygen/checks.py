@@ -913,6 +913,9 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import tunnel_checks as TNC
 
         checks += TNC.run(spec, m)
+        from . import terrain_checks as TGC
+
+        checks += TGC.run(spec, m)
     if m.lots or m.blocks or m.junctions:
         from . import street_checks as SC
 
@@ -942,6 +945,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import tunnel_checks as TNC
 
         st["tunnels"] = TNC.stats(m)
+        if m.terrain is not None:
+            from . import terrain_checks as TGC
+
+            st["terrain"] = TGC.stats(m)
     if m.lots or m.blocks or m.junctions:
         from . import street_checks as SC
 
