@@ -1,7 +1,7 @@
 """M9: tunnels. The profile envelope, the spec fields, a small city with a cut-and-cover
 tunnel (its network, parts, metro and underpasses), each tunnel check with a failing case,
-the sample tunnels (Nexus City cut-and-cover, Peninsula City immersed tube) and the
-blockout plan."""
+a district regeneration over the tunnel (M10), the sample tunnels (Nexus City cut-and-cover,
+Peninsula City immersed tube) and the blockout plan."""
 
 import copy
 import json
@@ -11,6 +11,7 @@ from shapely.geometry import LineString, Point
 
 from citygen import blockout as BO
 from citygen import checks as C
+from citygen import edit as E
 from citygen import tunnel_checks as TNC
 from citygen import tunnels as TN
 from citygen.build import build_city
@@ -18,6 +19,7 @@ from citygen.model import CityModel
 from citygen.validate import validate_spec
 
 from conftest import ROOT, SMALL, built_sample
+from test_edit import _outside_kept
 
 TUNNEL_CHECKS = {"tunnel_grades", "tunnel_cover", "tunnel_portals", "tunnel_clash"}
 # the small city with tunnels asked under three districts (some fit)
@@ -200,6 +202,19 @@ def test_underpasses_join_the_walkway_graph(city):
         assert kinds == ["stairs", "stairs", "underpass"]
         for w in t.walkway_ids:
             assert walks[w].neighbors
+
+
+# --- district regeneration (M10) ---------------------------------------------------------------
+
+def test_regeneration_keeps_the_tunnels(city):
+    """Regenerating a district a tunnel runs under keeps the tunnels and every road outside
+    it (also the held streets that met the district's old streets at its border)."""
+    st = E.new_state(_spec(**SPEC), city)
+    for name in ("Core", "Uptown"):
+        r, _ = E.regenerate(st, city.model, name)
+        assert all(c.passed for c in r.checks), (name, [c.id for c in r.checks if not c.passed])
+        _outside_kept(city, r, name)
+        assert r.model.tunnels == city.model.tunnels, name
 
 
 # --- samples ------------------------------------------------------------------------------------

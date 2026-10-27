@@ -259,8 +259,8 @@ batch, and marks an updated actor modified; the Unreal test imports a changed ci
   drives the editor through its own Python instead; a Claude session in a running editor with
   the MCP plugin can run the same two scripts.
 - **Blueprint data assets, not a C++ plugin.** The graph and instance classes are made by the
-  importer as Blueprints, so any project (Blueprint or C++, Nyxllor included) takes the
-  import without compiling; stage 4 can read the arrays by reflection or wrap them in C++.
+  importer as Blueprints, so any project (Blueprint or C++) takes the import without
+  compiling; stage 4 can read the arrays by reflection or wrap them in C++.
 - **No distance fields or Lumen cards on the blockout meshes.** With them the editor spends an
   hour building data for thousands of meshes before its first frame; screen-space global
   illumination is enough for a blockout, and stage 2's meshes will bring their own settings.
@@ -275,8 +275,8 @@ batch, and marks an updated actor modified; the Unreal test imports a changed ci
   stage 3's).
 - **A test project outside the repo.** `/Users/swag/Projects/Unreal Projects/CyberGenImportTest`,
   made from the First Person template and its shared packs exactly as the New Project
-  dialog makes it (`citygen unreal --new-project` does the same); the Nyxllor game project
-  was not touched.
+  dialog makes it (`citygen unreal --new-project` does the same); no other project was
+  touched.
 
 ## Tests
 
