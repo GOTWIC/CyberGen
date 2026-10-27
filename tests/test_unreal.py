@@ -9,10 +9,13 @@ import struct
 from pathlib import Path
 
 import pytest
+import shapely
 from shapely.geometry import Point, Polygon
 
 from citygen import blockout as BO
+from citygen import edit as E
 from citygen import exports as X
+from citygen import geom as G
 from citygen import unreal as U
 from citygen.build import build_city
 from citygen.cli import main
@@ -21,11 +24,29 @@ from citygen.validate import validate_spec
 from conftest import SMALL
 
 
+REGEN = "Old Quarter"     # the small city's district regenerated (M10, `build --district`)
+
+
 @pytest.fixture(scope="module")
-def small():
-    result = validate_spec(copy.deepcopy(SMALL))
+def small_built():
+    data = copy.deepcopy(SMALL)
+    result = validate_spec(data)
     assert result.ok
-    return build_city(result).model
+    return data, build_city(result)
+
+
+@pytest.fixture(scope="module")
+def small(small_built):
+    return small_built[1].model
+
+
+@pytest.fixture(scope="module")
+def regenerated(small_built):
+    """The small city with REGEN regenerated at a new seed, as `citygen build --district`."""
+    data, b = small_built
+    r, _ = E.regenerate(E.new_state(data, b), b.model, REGEN)
+    assert all(c.passed for c in r.checks), [c.id for c in r.checks if not c.passed]
+    return r.model
 
 
 def _blockout_files(m, out: Path) -> Path:
@@ -156,6 +177,37 @@ def test_manifest_changes(build, manifest, tmp_path):
                   "deleted": [gone["name"]]}
 
 
+def test_district_regeneration_changes_only_its_neighborhood(small, regenerated, manifest,
+                                                             tmp_path):
+    """A regenerated district changes only objects of the tiles within 250 m of it (M10 keeps
+    every entity farther away byte for byte) and no building of another district."""
+    man = manifest[0]
+    new = U.build_manifest(_blockout_files(regenerated, tmp_path / "regen"))[0]
+    ch = U.manifest_changes(man, new)
+    did = next(d.id for d in small.districts if d.name == REGEN)
+    poly = G.from_model_poly(next(d for d in small.districts if d.id == did).polygon)
+    ts = man["tile_size_m"]
+
+    def tile_box(name):
+        ix, iy = int(name[1:4]), int(name[4:7])
+        return shapely.box(ix * ts, iy * ts, (ix + 1) * ts, (iy + 1) * ts)
+
+    tile = {o["key"]: t["name"] for m in (man, new) for t in m["tiles"] for o in t["objects"]}
+    tile.update({i["key"]: i["tile"] for m in (man, new) for i in m["instances"]})
+    changed = [k for v in ch.values() for k in v]
+    assert any(k.startswith(did + ".") and k.endswith(".bld") for k in ch["deleted"])
+    assert any(k.startswith(did + ".") and k.endswith(".bld") for k in ch["created"])
+    far = [k for k in changed if k in tile and tile_box(tile[k]).distance(poly) > 250.0]
+    assert not far, far[:5]
+    kept = [t["name"] for t in man["tiles"] if tile_box(t["name"]).distance(poly) > 250.0]
+    assert kept      # the test city has tiles far enough to stay as they were
+    # no building of another district changed (the district is close to half this city)
+    others = [k for k in changed if k.endswith(".bld") and not k.startswith(did + ".")]
+    assert not others, others[:5]
+    blds = [k for k in U.actor_hashes(new) if k.endswith(".bld") and not k.startswith(did)]
+    assert blds
+
+
 def _glb(path):
     data = path.read_bytes()
     magic, version, total = struct.unpack("<4sII", data[:12])
@@ -263,10 +315,11 @@ BLENDER = BO.find_blender()
 
 @pytest.mark.skipif(UE_ROOT is None or BLENDER is None,
                     reason="Unreal Engine 5 or Blender not installed")
-def test_unreal_import_small_city(small, tmp_path):
+def test_unreal_import_small_city(small, regenerated, tmp_path):
     """The small city into a fresh First Person project: imported, a second import changes
-    nothing, a changed city updates only the actors of what changed, and in play-in-editor
-    the cells stream, traces hit the ground and roofs, and the player walks a sidewalk."""
+    nothing, the city with a district regenerated updates only the actors of what changed (and
+    an import after it changes nothing), and in play-in-editor the cells stream, traces hit
+    the ground and roofs, and the player walks a sidewalk."""
     build = tmp_path / "build"
     build.mkdir()
     (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
@@ -284,22 +337,19 @@ def test_unreal_import_small_city(small, tmp_path):
     assert second["tiles_imported"] == 0 and second["dirty_packages"] == 0
     assert (second["actor_digest"], second["asset_digest"]) == \
         (first["actor_digest"], first["asset_digest"])
-    # the city changed: one building 6 m taller, another gone; the import touches exactly the
-    # actors whose content changed and leaves the rest as they were
-    m2 = small.model_copy(deep=True)
-    blds = [b for b in m2.buildings if not b.landmark]
-    taller, gone = blds[0].id, blds[1].id
-    blds[0].masses[-1].z1_m += 6.0
-    m2.buildings = [b for b in m2.buildings if b.id != gone]
+    # the city with a district regenerated (`citygen build --district`): the import touches
+    # exactly the actors whose content changed and leaves the rest as they were
     build2 = tmp_path / "build2"
     build2.mkdir()
-    (build2 / "city_model.json").write_text(m2.to_json() + "\n", encoding="utf-8")
+    (build2 / "city_model.json").write_text(regenerated.to_json() + "\n", encoding="utf-8")
     assert BO.run_blockout(build2 / "city_model.json", build2, render=False)["passed"]
     third = U.import_city(build2, proj)
     assert third["ok"], third.get("error")
     want = U.manifest_changes(json.loads((build / "unreal" / "manifest.json").read_text()),
                               json.loads((build2 / "unreal" / "manifest.json").read_text()))
-    assert taller in want["updated"] and gone in want["deleted"]
+    did = next(d.id for d in small.districts if d.name == REGEN)
+    assert any(k.startswith(did + ".") for k in want["created"])
+    assert any(k.startswith(did + ".") for k in want["deleted"])
     assert {k: third["keys"][k] for k in want} == want
     assert third["actors"]["unchanged"] == \
         third["actor_count"] - len(want["created"]) - len(want["updated"])
