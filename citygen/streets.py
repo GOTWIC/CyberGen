@@ -660,6 +660,10 @@ class Frame:
                     if p not in t.junctions:
                         t.junctions.append(p)
                     B.lines[li].attached[k] = True
+                elif not self.inside_row(r):
+                    # a held piece stays where it is (its end an old node the district's new
+                    # streets may meet; `_reconnect` links it if nothing does)
+                    B.lines[li].attached[k] = True
                 elif not B.attach(li, end, reach=3.0, angle=ORGANIC_ANGLE_DEG):
                     B.attach(li, end, reach=22.0, angle=ORGANIC_ANGLE_DEG)
             x = shapely.intersection(LineString(pts), mid)

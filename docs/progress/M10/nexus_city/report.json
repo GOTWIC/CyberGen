@@ -1494,6 +1494,7 @@
       "planned": 0.5881
     },
     "road_variant": 0,
+    "layout_salt": 2,
     "city_tries": [
       {
         "variant": 11,

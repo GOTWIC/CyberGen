@@ -32,6 +32,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import shapely
+from shapely.geometry import LineString
 
 from . import __version__
 from . import geom as G
@@ -162,9 +163,10 @@ def regenerate(state: dict, old: CityModel, district: str, spec_data: dict | Non
                      pins=pins, keep_out=G.union(ground) if ground else None,
                      pin_buildings=pin_b)
     held = {ln.name: ln.model_dump(mode="json") for ln in old.transit_lines}
+    O = old.model_dump(mode="json")
     new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,
-                   prior=ID.priors(old.model_dump(mode="json")))
-    model, info = splice(old, new.model, dd.id, poly, frame)
+                   prior=ID.priors(O))
+    model, info = splice(old, new.model, dd.id, poly, frame, O)
     if ov:
         model, notes = OV.apply(model, ov, old=old, district=dd.id)
         info["notes"] += notes
@@ -345,8 +347,9 @@ def _get(obj, path):
         yield from _get(x, path[1:])
 
 
-def splice(old: CityModel, new: CityModel, did: str, poly, frame) -> tuple[CityModel, dict]:
-    O = old.model_dump(mode="json")
+def splice(old: CityModel, new: CityModel, did: str, poly, frame,
+           O: dict | None = None) -> tuple[CityModel, dict]:
+    O = O if O is not None else old.model_dump(mode="json")
     N = new.model_dump(mode="json")
     zone = G.qpoly(poly.buffer(1.0, join_style="mitre"))
     shapely.prepare(zone)
@@ -418,13 +421,14 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame) -> tuple[CityM
         out[k] = N.get(k)
     _fields(out, O, N, did, zone)
     _factions(out, io["factions"], inn["factions"])
+    n_taxi = _spacing(out, src)
     renamed = _names(out, src)
     model = CityModel.model_validate(out)
     seam = sorted(i for i, s in src.items() if s == "n" and own_n.cls.get(i) != "x"
                   and own_o.cls.get(i) != "x")
     grown = sorted(i for i in seam if first.get(i) != "n")
     held = sum(1 for s in O["road_segments"] if not own_o.cls.get(s["id"]) == "x"
-               and inn["road_segments"].get(s["id"]) == s)
+               and _same_road(inn["road_segments"].get(s["id"]), s))
     n_held = sum(1 for s in O["road_segments"] if own_o.cls.get(s["id"]) != "x")
     notes = [f"district {did} regenerated: {held} of {n_held} held road segments came back "
              f"unchanged; {len(seam)} entities outside it changed on its seam "
@@ -434,10 +438,41 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame) -> tuple[CityM
                      f"not in the city (first: {dangling[0][0]} -> {dangling[0][1]})")
     if renamed:
         notes.append(f"{renamed} new names that an old place had already got a number")
+    if n_taxi:
+        notes.append(f"{n_taxi} new taxi stands too close to an old one dropped")
     info = {"district_id": did, "held_segments": n_held, "held_unchanged": held,
             "seam": len(seam), "seam_by_reference": len(grown), "dangling": len(dangling),
             "notes": notes}
     return model, info
+
+
+def _same_road(n: dict | None, o: dict) -> bool:
+    """A held road came back as it was (the roads of the district it passes over or under,
+    `attrs.grade_separated_with`, may have new ids)."""
+    if n is None:
+        return False
+    strip = lambda e: {**e, "attrs": {k: v for k, v in e["attrs"].items()  # noqa: E731
+                                      if k != "grade_separated_with"}}
+    return n == o or strip(n) == strip(o)
+
+
+def _spacing(out: dict, src: dict) -> int:
+    """Taxi stands keep TAXI_GAP_M apart (`travel_points` check): a new one closer than that
+    to one the old city keeps goes. Returns how many went."""
+    from .gameplay import TAXI_GAP_M
+
+    rows = out.get("travel_points", [])
+    old = [t["position"] for t in rows if t["kind"] == "taxi_stand" and src.get(t["id"]) == "o"]
+    keep = []
+    for t in rows:
+        p = t["position"]
+        if t["kind"] == "taxi_stand" and src.get(t["id"]) == "n" and any(
+                (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 < TAXI_GAP_M ** 2 for q in old):
+            continue
+        keep.append(t)
+    gone = len(rows) - len(keep)
+    out["travel_points"] = keep
+    return gone
 
 
 def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
@@ -524,8 +559,26 @@ GROUND_M = 4.0     # props and plants this close to a new one follow the new bui
 CROWN_M = 14.0     # plants this close to a new building do too (crowns fit its facades)
 
 
+def _ground_shape(c: str, e: dict):
+    """The ground an entity takes, for `_ground_neighbors`."""
+    if c == "buildings":
+        return G.from_model_poly(e.get("footprint") or e["masses"][0]["footprint"])
+    for k in ("polygon", "footprint"):
+        if isinstance(e.get(k), dict):
+            return G.from_model_poly(e[k])
+    for k in ("centerline", "line", "path"):
+        if e.get(k):
+            pts = [p[:2] for p in e[k]]
+            return LineString(pts) if len(pts) > 1 else shapely.points(pts[0])
+    if e.get("position"):
+        return shapely.points(e["position"][:2])
+    return None
+
+
 def _ground_neighbors(src, io, inn, take, gone, changed) -> None:
-    """Old props and plants next to what the new build changed on the ground."""
+    """Old props and plants next to what the new build changed on the ground (props, plants,
+    buildings, and the junctions, crosswalks, sidewalks, lanes and structures of the seam,
+    whose keep-outs an old prop could stand in)."""
     olds = [(c, i) for c in ("props", "plants") for i in io[c] if src.get(i) == "o"]
     if not olds:
         return
@@ -533,17 +586,15 @@ def _ground_neighbors(src, io, inn, take, gone, changed) -> None:
                                   dtype=np.float64))
     tree = shapely.STRtree(pts)
     probes, reach = [], []
-    for c in ("props", "plants", "buildings"):
+    for c in ("props", "plants", "buildings", "junctions", "crosswalks", "sidewalks", "lanes",
+              "structures"):
         for i, e in inn[c].items():
             if src.get(i) != "n" or not changed(i):
                 continue
-            if c == "buildings":
-                fp = e.get("footprint") or e["masses"][0]["footprint"]
-                probes.append(G.from_model_poly(fp))
-                reach.append(CROWN_M)
-            else:
-                probes.append(shapely.points(e["position"][:2]))
-                reach.append(GROUND_M)
+            g = _ground_shape(c, e)
+            if g is not None:
+                probes.append(g)
+                reach.append(CROWN_M if c == "buildings" else GROUND_M)
     if not probes:
         return
     hit = set()
