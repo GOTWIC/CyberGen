@@ -126,9 +126,26 @@ one (the `citygen` skill takes it from there). Editing, locking and the other co
 A unique 3D model for every building in a stage 1 city, generated from its footprint, massing
 and use, plus roads, sidewalks, street furniture and textures.
 
+Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
+[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
+
 ### Milestones
 
-Being planned.
+| | Milestone | What it adds | Status |
+|---|---|---|---|
+| AG0 | Groundwork | What each building is made from, file formats, three test buildings in Unreal | Planned |
+| AG1 | Building shells | Walls, floors and window openings for every building | Planned |
+| AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
+| AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
+| AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
+| AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
+| AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
+| AG7 | Street elements | Roads with markings, sidewalks, bridges, viaducts, tunnels, quays, transit structures | Planned |
+| AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
+| AG9 | Unreal | The modelled city in Unreal Engine 5.8 | Planned |
+| AG10 | Every city modelled | All sample cities with their assets; frozen releases | Planned |
+| AG11 | Layered districts | Buildings and streets on stacked decks | Planned |
+| AG12 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 
 ---
 
