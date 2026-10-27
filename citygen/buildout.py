@@ -478,7 +478,7 @@ def link_entrances(out: Out, walks: list) -> list:
             new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True}))
     walks = _split(walks, gi, lines, splits)
     n0 = len(walks)
-    k = max((int(w["id"][2:]) for w in walks), default=0)
+    k = wk_max(walks)
     first = k + 1
     for i, (kind, pts, width, z, attrs) in enumerate(new):
         k += 1
@@ -541,13 +541,20 @@ def _foot(lines, walks, gi, k: int, p) -> tuple:
     return G.qpoint(line.interpolate(d))
 
 
+def wk_max(walks) -> int:
+    """The highest walkway number (`wk000123`); 0 when there is none (a finished city has
+    stable ids, M10, and a stage run again on it numbers its new walkways from 1)."""
+    return max((int(w["id"][2:]) for w in walks
+                if w["id"].startswith("wk") and w["id"][2:].isdigit()), default=0)
+
+
 def _split(walks, gi, lines, splits) -> list:
     """Ground walkways split at the door feet (the first piece keeps the id; the others get
     new ids at the end)."""
     if not splits:
         return walks
     walks = list(walks)
-    k = max(int(w["id"][2:]) for w in walks)
+    k = wk_max(walks)
     extra = []
     for li in sorted(splits):
         w = walks[gi[li]]

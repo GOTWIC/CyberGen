@@ -63,7 +63,7 @@ from . import dmath as M
 from . import geom as G
 from . import presets
 from . import trace as T
-from .buildout import _foot, _ground, _landmass_index, _nearest_on, _neighbors, _split
+from .buildout import _foot, _ground, _landmass_index, _nearest_on, _neighbors, _split, wk_max
 from .roads import _arc_line, _fillet_radii
 
 CELL_M = 15.0
@@ -3653,7 +3653,7 @@ def _build(spec, m, fixed: dict) -> Out:
                       "through_towers": ln.through, "supports": supports[ln.id]}})
     # ground walkways split at the station feet, then the new walkways
     walks = _split(walks, B.gi, B.glines, B.splits)
-    k = max(int(w["id"][2:]) for w in walks)
+    k = wk_max(walks)
     ids = []
     for kind, line3, width, attrs in B.new:
         k += 1
