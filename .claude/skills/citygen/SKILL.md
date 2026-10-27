@@ -454,7 +454,7 @@ renders: every district should read in its isometric view as it does in
 missing, a render missing, over the 10 minute budget) is a citygen problem: report it, do not
 work around it in the spec.
 
-### 6c. Unreal import (M15)
+### 6d. Unreal import (M15)
 
 To put a passing city into an Unreal 5.8 project (only when asked; it needs Unreal installed,
 found at `/Users/Shared/Epic Games/UE_5.*`, `$CITYGEN_UE_ROOT` or `--engine`):

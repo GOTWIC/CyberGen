@@ -86,26 +86,34 @@ def trace(world, a, b, ignore=()):
 
 # --- the walkway graph (the importer's flat graphs) ------------------------------------------
 
-def sidewalk_path(build, start, length_m):
+def sidewalk_path(build, start, length_m, clear=None):
     """A walk of `length_m` from the sidewalk point nearest `start` (citygen meters): along
-    that sidewalk, then on into its neighbors, preferring sidewalks."""
+    that sidewalk, then on into its neighbors, preferring sidewalks. `clear(line)` rejects a
+    walkway (one with no head room); the walkways it rejected are counted in `skipped`."""
     g = json.load(open(os.path.join(build, "unreal", "graphs.json"),
                        encoding="utf-8"))["walkways"]
     ps, pts = g["point_start"], g["points"]
+    skipped = set()
 
     def line(i):
         return [(pts[3 * k], pts[3 * k + 1], pts[3 * k + 2]) for k in range(ps[i], ps[i + 1])]
 
-    best = None
+    def usable(i):
+        if clear is None or clear(line(i)):
+            return True
+        skipped.add(i)
+        return False
+
+    near = []
     for i, kind in enumerate(g["kinds"]):
         if kind != "sidewalk":
             continue
-        for k, p in enumerate(line(i)):
-            d = (p[0] - start[0]) ** 2 + (p[1] - start[1]) ** 2
-            if best is None or d < best[0]:
-                best = (d, i, k)
+        d, k = min(((p[0] - start[0]) ** 2 + (p[1] - start[1]) ** 2, k)
+                   for k, p in enumerate(line(i)))
+        near.append((d, i, k))
+    best = next((b for b in sorted(near)[:40] if usable(b[1])), None)
     if best is None:
-        return []
+        return [], len(skipped)
     _, i, k = best
     path = line(i)[k:]
     if len(path) < 2:
@@ -120,7 +128,7 @@ def sidewalk_path(build, start, length_m):
             if j in seen:
                 continue
             ln = line(j)
-            if not ln:
+            if not ln or not usable(j):
                 continue
             if math.dist(ln[0][:2], path[-1][:2]) <= math.dist(ln[-1][:2], path[-1][:2]):
                 nxt = (j, ln)
@@ -134,7 +142,24 @@ def sidewalk_path(build, start, length_m):
         for p in ln:
             total += math.dist(path[-1][:2], p[:2])
             path.append(p)
-    return path
+    return path, len(skipped)
+
+
+def head_room(world, ignore, step_m=5.0):
+    """A test for a walkway: nothing between 0.45 m and 2.3 m above it, every `step_m` along
+    it (a trace up and one down, so a deck is found from below and from above)."""
+    def clear(ln):
+        for a, b in zip(ln, ln[1:]):
+            n = max(1, int(math.dist(a[:2], b[:2]) // step_m))
+            for s in range(n + 1):
+                f = s / n
+                x, y = (a[0] + (b[0] - a[0]) * f) * 100.0, -(a[1] + (b[1] - a[1]) * f) * 100.0
+                z = (a[2] + (b[2] - a[2]) * f) * 100.0
+                lo, hi = unreal.Vector(x, y, z + 45.0), unreal.Vector(x, y, z + 230.0)
+                if trace(world, lo, hi, ignore) or trace(world, hi, lo, ignore):
+                    return False
+        return True
+    return clear
 
 
 # --- the check ----------------------------------------------------------------------------
@@ -171,14 +196,42 @@ def run():
     RES["ok"] = all(c.get("ok") for c in RES["checks"].values())
 
 
-def settle(world, slug, timeout=LOAD_WAIT_S):
-    """Wait until the number of city actors in the game world stops changing."""
+def streamed(world, at=None, radius_m=150.0):
+    """World Partition has finished streaming, within `radius_m` of `at` (an Unreal
+    location) when given; None where the query is not available."""
+    try:
+        wps = next((s for s in unreal.ObjectIterator(unreal.WorldPartitionSubsystem)
+                    if s.get_world() == world), None)
+        if wps is None:
+            if "streamed" not in RES:
+                RES["streamed"] = "no WorldPartitionSubsystem in the play world"
+                log(RES["streamed"])
+            return None
+        if at is None:
+            return bool(wps.is_all_streaming_completed())
+        q = unreal.WorldPartitionStreamingQuerySource()
+        q.set_editor_property("location", at)
+        q.set_editor_property("radius", radius_m * 100.0)
+        q.set_editor_property("spatial_query", True)
+        q.set_editor_property("include_any_data_layer", True)
+        return bool(wps.is_streaming_completed(
+            unreal.WorldPartitionRuntimeCellState.ACTIVATED, [q], False))
+    except Exception as e:      # noqa: BLE001 (an engine without the query)
+        if "streamed" not in RES:
+            RES["streamed"] = str(e)
+            log(f"no streaming query: {e}")
+        return None
+
+
+def settle(world, slug, timeout=LOAD_WAIT_S, at=None):
+    """Wait until World Partition has finished streaming (around `at` when given) and the
+    number of city actors in the game world stops changing."""
     t, last, stable = time.time(), -1, 0
     while time.time() - t < timeout:
         n = len(city_actors(world, slug))
         stable = stable + 1 if n == last else 0
         last = n
-        if n > 0 and stable >= 30:
+        if n > 0 and stable >= 30 and streamed(world, at) is not False:
             break
         yield
     return last
@@ -205,7 +258,7 @@ def streaming(world, pawn, man, slug):
     near_start = {tag(a, "cg.key") for a in at_start}
     teleport(pawn, fx, fy, 400.0)       # high up: nothing to stand on until it loads
     yield from wait(1.0)
-    yield from settle(world, slug)
+    yield from settle(world, slug, at=ue(fx, fy, 0.0))
     at_far = city_actors(world, slug)
     near_far = {tag(a, "cg.key") for a in at_far}
     tiles = {tag(a, "cg.tile") for a in at_far} - {""}
@@ -246,13 +299,13 @@ def collision(world, pawn, man, slug):
     for x0, y0 in spots:
         teleport(pawn, x0, y0, 300.0)
         yield from wait(0.5)
-        yield from settle(world, slug)
+        yield from settle(world, slug, at=ue(x0, y0, 0.0))
         for i in range(-6, 7):
             for j in range(-6, 7):
                 x, y = x0 + 16.0 * i, y0 + 16.0 * j
                 if not (bx[0] < x < bx[2] and bx[1] < y < bx[3]):
                     continue
-                h = trace(world, ue(x, y, 600.0), ue(x, y, -60.0), [pawn])
+                h = trace(world, ue(x, y, 600.0), ue(x, y, -3.0), [pawn])
                 down["traces"] += 1
                 if h is not None:
                     down["hits"] += 1
@@ -297,12 +350,30 @@ def collision(world, pawn, man, slug):
     yield from settle(world, slug)
 
 
+def blocker(world, pawn, loc, fx, fy):
+    """What stands in front of the player: a 25 cm sphere swept 1.2 m forward at four
+    heights from above the step height (the capsule's middle is 96 cm up) to the head; its
+    category or class."""
+    for dz in (-45.0, -15.0, 25.0, 65.0):
+        a = unreal.Vector(loc.x, loc.y, loc.z + dz)
+        b = unreal.Vector(loc.x + fx * 120.0, loc.y + fy * 120.0, loc.z + dz)
+        hit = unreal.SystemLibrary.sphere_trace_single(
+            world, a, b, 25.0, VISIBILITY, True, [pawn], unreal.DrawDebugTrace.NONE, True)
+        if hit is not None and hit.to_tuple()[0]:
+            act = hit.to_tuple()[9]
+            return (tag(act, "cg.category") or act.get_class().get_name()) + f"@{dz:+.0f}"
+    return "nothing found"
+
+
 def walk(world, pawn, man):
     """The player along a sidewalk from the start: movement input toward each next point of
-    the path every frame, on the ground all the way. Where something stops the player (a
-    bench, a planter), it steps aside, as a player would, and the blocker is noted."""
+    the path every frame, on the ground all the way. The path keeps to walkways with head
+    room (not an at-grade sidewalk under a ramp's deck, see the M15 README). Where something
+    stops the player (a bench, a planter), it steps aside, as a player would, and the blocker
+    is noted."""
     sx, sy, sz = man["player_start"]["position"]
-    path = sidewalk_path(JOB["build_dir"], (sx, sy), WALK_M)
+    path, skipped = sidewalk_path(JOB["build_dir"], (sx, sy), WALK_M,
+                                  head_room(world, [pawn]))
     if len(path) < 2:
         RES["checks"]["walk"] = {"ok": False, "error": "no sidewalk near the start"}
         return
@@ -312,7 +383,7 @@ def walk(world, pawn, man):
     start = pawn.get_actor_location()
     k, t, on_ground, frames, low = 1, time.time(), 0, 0, 1e9
     travelled, last = 0.0, start
-    mark, mark_t, side_until, side, blockers = start, time.time(), 0.0, 1.0, {}
+    mark, mark_t, side_until, side, blockers, stops = start, time.time(), 0.0, 1.0, {}, []
     while k < len(path) and time.time() - t < WALK_S:
         loc = pawn.get_actor_location()
         tx, ty = path[k][0] * 100.0, -path[k][1] * 100.0
@@ -325,12 +396,11 @@ def walk(world, pawn, man):
         now = time.time()
         if now - mark_t > 0.6:
             if math.hypot(loc.x - mark.x, loc.y - mark.y) < 30.0 and now > side_until:
-                h = trace(world, unreal.Vector(loc.x, loc.y, loc.z - 60.0),
-                          unreal.Vector(loc.x + fx * 120.0, loc.y + fy * 120.0, loc.z - 60.0),
-                          [pawn])
-                c = (tag(h["actor"], "cg.category") or h["actor"].get_class().get_name()
-                     ) if h else "unknown"
+                c = blocker(world, pawn, loc, fx, fy)
                 blockers[c] = blockers.get(c, 0) + 1
+                if len(stops) < 8:
+                    stops.append([round(loc.x / 100.0, 2), round(-loc.y / 100.0, 2),
+                                  round(loc.z / 100.0, 2), c])
                 side_until, side = now + 0.7, -side
             mark, mark_t = loc, now
         if now < side_until:      # step aside (to the left, then the right), still forward
@@ -351,7 +421,8 @@ def walk(world, pawn, man):
     RES["checks"]["walk"] = {"ok": ok, "path_m": round(length, 1), "points": len(path),
                              "reached": reached, "travelled_m": round(travelled / 100.0, 1),
                              "on_ground": round(share, 3), "max_drop_m": round(z_drop, 2),
-                             "seconds": round(time.time() - t, 1), "stopped_by": blockers}
+                             "seconds": round(time.time() - t, 1), "stopped_by": blockers,
+                             "stops": stops, "skipped_low_walkways": skipped}
     stops = (", stepped round " + ", ".join(f"{v} x {k_}" for k_, v in sorted(
         blockers.items()))) if blockers else ""
     RES["lines"].append(f"walk: {travelled / 100.0:.0f} m along a {length:.0f} m sidewalk "
