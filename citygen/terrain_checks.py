@@ -71,7 +71,8 @@ def check_grades(m) -> Check:
 def check_cut_fill(m) -> Check:
     c = Check("cut_fill", f"Open cuts at most {TE.CUT_MAX_M:g} m and fills at most "
                           f"{TE.FILL_MAX_M:g} m against the natural ground; deeper cuts bored "
-                          "with at least 1 m of rock over the tunnel roof")
+                          "with at least 1 m of rock over the tunnel roof, higher roads on "
+                          "viaducts")
     nat, _ = _fields(m)
     bored: dict[str, list[tuple[float, float]]] = {}
     for t in m.tunnels:
@@ -80,6 +81,10 @@ def check_cut_fill(m) -> Check:
                 bored.setdefault(sid, []).append((t.attrs["s0"], t.attrs["s1"]))
             if t.attrs.get("min_cover_m", 0.0) < 1.0 - 0.01:
                 _limit(c, f"{t.id} (bored): {t.attrs.get('min_cover_m', 0.0):.1f} m of rock")
+    raised: dict[str, list[tuple[float, float]]] = {}
+    for st in m.structures:
+        if st.attrs.get("terrain_viaduct") and st.kind == "deck":
+            raised.setdefault(st.attrs["segment"], []).append((st.attrs["s0"], st.attrs["s1"]))
     water = TE.water_union(m)
     for s in m.road_segments:
         if not s.ground or s.bridge or s.road_class == "footbridge":
@@ -93,7 +98,8 @@ def check_cut_fill(m) -> Check:
             if w:
                 continue
             d = p.z - nat.at(x, y)
-            if d > TE.FILL_MAX_M + 0.05:
+            if d > TE.FILL_MAX_M + 0.05 and not any(a - 1 <= p.s <= b + 1
+                                                     for a, b in raised.get(s.id, [])):
                 _limit(c, f"{s.id} ({s.road_class}): {d:.1f} m of fill at ({x:.0f}, {y:.0f})")
                 break
             if -d > TE.CUT_MAX_M + 0.05 and not any(a - 1 <= p.s <= b + 1

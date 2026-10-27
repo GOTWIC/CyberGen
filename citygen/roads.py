@@ -55,7 +55,7 @@ BRIDGE_JOIN = 8000.0       # joining or crossing an existing bridge on the water
 QUAY_COST = 1.5
 OUTSIDE_COST = 1.25        # land without a district (still allowed)
 SLOPE_FREE = 0.04          # M13: ground up to this steep costs nothing extra
-SLOPE_COST = 25.0          # M13: extra cost per unit of slope over SLOPE_FREE
+SLOPE_COST = 40.0          # M13: extra cost per unit of slope over SLOPE_FREE
 
 # Cross-sections and alignment (scope 5.1). Radii in meters.
 CLASSES = {

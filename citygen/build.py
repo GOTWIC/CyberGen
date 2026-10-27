@@ -570,7 +570,7 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
         TE.apply_grade(loc, gr)
         gr.stats["slope_greens"] = TE.steep_lots(loc, gr.finished)
         loc.terrain = {"ground": gr.finished, "stats": {**tst, **gr.stats},
-                       "walls": gr.walls, "bores": gr.bores}
+                       "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
         T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
@@ -639,7 +639,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         from . import terrain as TE
 
         m = with_rows(m, TE.seat(m, tg["ground"]))
-        m = with_rows(m, {"structures": list(m.structures) + TE.wall_rows(tg["walls"])})
+        m = with_rows(m, {"structures": list(m.structures) + TE.wall_rows(tg["walls"]) +
+                          TE.viaduct_rows(tg["viaducts"], [s.model_dump(mode="json")
+                                                           for s in m.road_segments],
+                                          b.roads.terrain[0])})
     tr = None
     if spec.transit.lines:
         tr = TR.build(spec, m)
@@ -652,7 +655,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     if tg is not None:
         m = with_rows(m, {"tunnels": list(m.tunnels) + TE.bore_rows(
             tg["bores"], [s.model_dump(mode="json") for s in m.road_segments],
-            b.roads.terrain[0])})
+            b.roads.terrain[0], {d.id: d.name for d in m.districts})})
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     pr = PR.build(spec, m)
@@ -684,7 +687,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st["elevated"] = EC.stats(m)
     st["tunnels"] = TNC.stats(m)
     if m.terrain is not None:
-        st["terrain"] = TGC.stats(m)
+        st["terrain"] = {**TGC.stats(m), **{k: v for k, v in tg["stats"].items()
+                                            if k not in m.terrain.stats}}
     if "local" in st:
         st["local"] = SC.stats(spec, m)
     st["buildings"] = BC.stats(spec, m, bx)

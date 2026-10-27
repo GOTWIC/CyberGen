@@ -566,6 +566,10 @@ class Cliff(_Model):
     district: Name
     height_m: Annotated[float, Field(gt=0, le=200)]
     width_m: Annotated[float, Field(ge=10, le=600)] = 60.0
+    facing: list[Direction] = Field(default_factory=list, description="Sides where the edge "
+                                    "is a cliff; on the other sides the plateau rises over a "
+                                    "broad slope (`slope_m`). Left out: a cliff all round.")
+    slope_m: Annotated[float, Field(ge=50, le=2000)] = 400.0
 
 
 class Terrain(_Model):

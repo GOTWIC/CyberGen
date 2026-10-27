@@ -8,7 +8,7 @@
   ],
   "source": {
     "prompt": "A cliffside port city climbing out of a small bay. A flat harbor of cranes and container stacks at the waterline, an entertainment strip of neon stairs and terraces on the slope above it, a corporate crown of towers on a cliff-edged plateau looking down on the bay, an old quarter of crooked streets on a hill to the west, megablocks stacked along a ridge to the east, and a river valley running down from the north. Highways tunnel through the hills; a metro runs deep under them.",
-    "notes": "M13's hilly sample. Art direction: the bay on the south side so the iso camera (from the south) looks up the slopes at the crown; the crown is a plateau 30 m over the harbor with a hill on it, so its towers stand highest; the old quarter and the ridge frame it; the harbor is levelled flat."
+    "notes": "M13's hilly sample. Art direction: the bay on the south side so the iso camera (from the south) looks up the slopes at the crown; the crown is a plateau 30 m over the harbor with a hill on it, so its towers stand highest; the old quarter and the ridge frame it; the harbor is levelled flat. Highways stay on the ground (no viaducts): they climb in cuts and bore through the hills."
   },
   "water": {
     "coast": {
@@ -41,7 +41,7 @@
       "east",
       "west"
     ],
-    "elevated_share": 0.1
+    "elevated_share": 0.0
   },
   "transit": {
     "lines": [
@@ -122,20 +122,20 @@
   "terrain": {
     "shore_m": 2.0,
     "inland_grade": 0.012,
-    "relief_m": 6.0,
+    "relief_m": 8.0,
     "relief_scale_m": 500,
     "hills": [
       {
         "name": "Old Hill",
         "at": "Old Quarter",
-        "height_m": 55,
-        "radius_m": 750
+        "height_m": 75,
+        "radius_m": 950
       },
       {
         "name": "Crown Hill",
         "at": "Crown Heights",
-        "height_m": 30,
-        "radius_m": 700
+        "height_m": 40,
+        "radius_m": 650
       }
     ],
     "ridges": [
@@ -143,15 +143,21 @@
         "name": "Ridgeback",
         "from": "Ridgeback",
         "to": "north_east",
-        "height_m": 50,
-        "width_m": 900
+        "height_m": 70,
+        "width_m": 1000
       }
     ],
     "cliffs": [
       {
         "district": "Crown Heights",
-        "height_m": 28,
-        "width_m": 100
+        "height_m": 34,
+        "width_m": 110,
+        "facing": [
+          "south",
+          "south_east",
+          "south_west"
+        ],
+        "slope_m": 450
       }
     ],
     "flat": [

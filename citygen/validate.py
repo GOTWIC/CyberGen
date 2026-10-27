@@ -438,6 +438,27 @@ def check_transit(spec: S.CitySpec, n: Names) -> list[Issue]:
         if b.tunnel and b.kind == "pedestrian":
             issues.append(Issue("error", f"water.bridges.named[{j}].tunnel",
                                 "a pedestrian crossing has no tunnel (tubes carry roads)"))
+    tr = spec.terrain
+    if tr is not None:
+        from .terrain import DIRS
+
+        places = set(n.districts) | set(DIRS)
+        for j, h in enumerate(tr.hills):
+            if h.at not in places:
+                issues.append(_ref_issue(f"terrain.hills[{j}].at", h.at,
+                                         "a district, a direction or 'center'", places))
+        for j, r in enumerate(tr.ridges):
+            for key, ref in (("from", r.from_), ("to", r.to)):
+                if ref not in places:
+                    issues.append(_ref_issue(f"terrain.ridges[{j}].{key}", ref,
+                                             "a district, a direction or 'center'", places))
+        for j, c in enumerate(tr.cliffs):
+            if c.district not in n.districts:
+                issues.append(_ref_issue(f"terrain.cliffs[{j}].district", c.district,
+                                         "a district", n.districts))
+        for j, ref in enumerate(tr.flat):
+            if ref not in n.districts:
+                issues.append(_ref_issue(f"terrain.flat[{j}]", ref, "a district", n.districts))
     return issues
 
 

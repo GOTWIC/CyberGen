@@ -30,6 +30,7 @@ import math
 from dataclasses import dataclass, field as dfield
 
 import numpy as np
+from shapely.geometry import Point
 
 from . import geom as G
 
@@ -48,10 +49,14 @@ MAX_GRADE = {"highway": 0.06, "avenue": 0.08, "street": 0.12, "alley": 0.15,
 EMBANK_SLOPE = 1.5      # embankments 1:1.5 (run per rise)
 EMBANK_RUN_M = 9.0      # longest embankment run; beyond it a retaining wall
 WALL_MIN_M = 1.5        # a retaining wall only where the step is at least this high
-CUT_MAX_M = 18.0        # deepest open cut
-FILL_MAX_M = 15.0       # highest fill
+CUT_MAX_M = 20.0        # deepest open cut (between retaining walls)
+FILL_MAX_M = 18.0       # highest fill (between retaining walls)
 BORE_MIN_M = 14.0       # a primary road this far under the natural ground is bored through
-BORE_LEN_M = 80.0       # over at least this length
+BORE_LEN_M = 40.0       # over at least this length
+VIADUCT_MIN_M = 15.0    # a primary road this far over the natural ground stands on columns
+VIADUCT_LEN_M = 20.0    # over at least this length
+COLUMN_STEP_M = 32.0    # columns under a terrain viaduct
+COLUMN_MIN_M = 6.0      # only where the deck is at least this high
 STEEP_LOT_M = 15.0      # a lot whose ground falls more than this becomes a hillside green
 BORE_CLEAR_M = 5.5
 BORE_ROOF_M = 1.5
@@ -187,6 +192,38 @@ def _rings(poly) -> list[list[tuple[float, float]]]:
         out.append(list(p.exterior.coords))
         out += [list(r.coords) for r in p.interiors]
     return out
+
+
+def ring_dist_many(X, Y, segs) -> np.ndarray:
+    best = None
+    for (ax, ay), (bx, by) in segs:
+        d, _ = seg_dist(X, Y, ax, ay, bx, by)
+        best = d if best is None else np.minimum(best, d)
+    return best
+
+
+def _facing_edges(poly, facing) -> tuple[list, list]:
+    """A polygon's boundary edges split into those whose outward normal faces one of the
+    directions (within 67.5 degrees) and the rest."""
+    steep, soft = [], []
+    for part in G.parts(poly):
+        ring = list(part.exterior.coords)
+        area2 = sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(ring, ring[1:]))
+        sgn = 1.0 if area2 > 0 else -1.0       # counterclockwise: outward is to the right
+        for a, b in zip(ring, ring[1:]):
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            L = math.hypot(dx, dy)
+            if L == 0:
+                continue
+            nx_, ny_ = sgn * dy / L, -sgn * dx / L
+            hit = False
+            for f in facing:
+                vx, vy = DIRS[f]
+                vl = math.hypot(vx, vy)
+                if (nx_ * vx + ny_ * vy) / vl > 0.38:
+                    hit = True
+            (steep if hit else soft).append((a, b))
+    return steep, soft
 
 
 def poly_dist(X, Y, poly) -> np.ndarray:
@@ -466,8 +503,14 @@ def field(spec, model) -> tuple[Field, Levels, dict]:
         js, iss = _window(f, bx0, by0, bx1, by1)
         Xs, Ys = X[js, iss], Y[js, iss]
         inn = inside(Xs, Ys, dpoly)
-        depth = poly_dist(Xs, Ys, dpoly)
-        lift = np.where(inn, cl.height_m * smoothstep(depth / cl.width_m), 0.0)
+        if cl.facing:
+            steep, soft = _facing_edges(dpoly, cl.facing)
+            ds = ring_dist_many(Xs, Ys, steep) if steep else np.full(Xs.shape, np.inf)
+            dw = ring_dist_many(Xs, Ys, soft) if soft else np.full(Xs.shape, np.inf)
+            ramp = np.minimum(smoothstep(ds / cl.width_m), smoothstep(dw / cl.slope_m))
+        else:
+            ramp = smoothstep(poly_dist(Xs, Ys, dpoly) / cl.width_m)
+        lift = np.where(inn, cl.height_m * ramp, 0.0)
         H[js, iss] = H[js, iss] + lift
         stats["cliffs"].append({"district": cl.district, "height_m": cl.height_m})
     # flat districts and megasites
@@ -591,6 +634,7 @@ class Graded:
     finished: Field
     walls: list[dict]
     bores: list[dict]
+    viaducts: list[dict]
     stats: dict
 
 
@@ -672,10 +716,10 @@ def grade(spec, segments, nodes, nat: Field, water=None) -> Graded:
     elev = [v / 100.0 for v in e]
     ground = {sid: [(sv, elev[v]) for sv, v in ch] for sid, ch in chains.items()}
     node_ground = {k[1]: elev[v] for k, v in vid.items() if k[0] == "n"}
-    fin, walls, bores, st = finish(spec, segments, ground, nat, water)
+    fin, walls, bores, viaducts, st = finish(spec, segments, ground, nat, water)
     st["graph_vertices"] = len(pos)
     st["crossings"] = sum(len(v) for v in cross.values()) // 2
-    return Graded(ground, node_ground, fin, walls, bores, st)
+    return Graded(ground, node_ground, fin, walls, bores, viaducts, st)
 
 
 BLEND_M = 6.0           # the ground beside a road meets the natural ground over this run
@@ -683,10 +727,12 @@ CORRIDOR_PAD_M = 1.5    # the ground is levelled this far past a road's full wid
 PRIMARY = ("highway", "avenue")
 
 
-def _bore_runs(s, prof, nat: Field) -> list[tuple[float, float]]:
-    """Stretches of a primary road at least BORE_MIN_M under the natural ground for at least
-    BORE_LEN_M (at grade, not on a bridge or in an M9 tunnel)."""
-    if s["road_class"] not in PRIMARY or s.get("tunnel") or s.get("bridge"):
+def _bore_runs(s, prof, nat: Field, sign: int = 1, depth: float = BORE_MIN_M,
+               length: float = BORE_LEN_M, water=None) -> list[tuple[float, float]]:
+    """Stretches of a primary road at least `depth` under the natural ground (sign 1: bored
+    tunnels) or over it (sign -1: terrain viaducts) for at least `length` (at grade, not on a
+    bridge or in an M9 tunnel; a viaduct not over the water)."""
+    if s["road_class"] not in PRIMARY or s.get("tunnel") or (sign > 0 and s.get("bridge")):
         return []
     zp = _zp(s.get("z_profile") or [])
     line = [tuple(p) for p in s["centerline"]]
@@ -694,7 +740,8 @@ def _bore_runs(s, prof, nat: Field) -> list[tuple[float, float]]:
     runs, cur = [], None
     for sv, g in prof:
         x, y = point_at(line, cum, sv)
-        deep = nat.at(x, y) - g >= BORE_MIN_M and abs(z_on(zp, sv)) < 0.5
+        deep = sign * (nat.at(x, y) - g) >= depth and abs(z_on(zp, sv)) < 0.5 and \
+            (water is None or not water.contains(Point(x, y)))
         if deep and cur is None:
             cur = [sv, sv]
         elif deep:
@@ -704,7 +751,7 @@ def _bore_runs(s, prof, nat: Field) -> list[tuple[float, float]]:
             cur = None
     if cur is not None:
         runs.append(tuple(cur))
-    return [(a, b) for a, b in runs if b - a >= BORE_LEN_M]
+    return [(a, b) for a, b in runs if b - a >= length]
 
 
 def finish(spec, segments, ground, nat: Field, water=None):
@@ -718,12 +765,17 @@ def finish(spec, segments, ground, nat: Field, water=None):
     bestK = np.full(F.shape, np.inf)
     bestG = np.zeros(F.shape)
     bores = []
+    viaducts = []
     pieces = []
     for s in segments:
         prof = ground[s["id"]]
         runs = _bore_runs(s, prof, nat)
         for a, b in runs:
             bores.append({"segment": s["id"], "s0": a, "s1": b})
+        vruns = _bore_runs(s, prof, nat, -1, VIADUCT_MIN_M, VIADUCT_LEN_M, water)
+        for a, b in vruns:
+            viaducts.append({"segment": s["id"], "s0": a, "s1": b})
+        runs = runs + vruns
         line = [tuple(p) for p in s["centerline"]]
         cum = _cum(line)
         hw = s["width_m"] / 2.0
@@ -766,7 +818,8 @@ def finish(spec, segments, ground, nat: Field, water=None):
             fill, cut = max(fill, dd), max(cut, -dd)
     st = {"max_cut_m": q(cut), "max_fill_m": q(fill), "walls": len(walls),
           "wall_km": q(sum(w["length_m"] for w in walls) / 1000.0), "bores": len(bores)}
-    return fin, walls, bores, st
+    st["viaducts"] = len(viaducts)
+    return fin, walls, bores, viaducts, st
 
 
 def _walls(segments, ground, nat: Field, bestK, fin: Field, bores, water=None) -> list[dict]:
@@ -939,7 +992,7 @@ def wall_rows(walls) -> list[dict]:
             for k, w in enumerate(walls)]
 
 
-def bore_rows(bores, segments, nat: Field) -> list[dict]:
+def bore_rows(bores, segments, nat: Field, dnames: dict | None = None) -> list[dict]:
     """Bored tunnels as M9 tunnel rows (kind `bored`): line z over the grade line, portals
     where the cut reaches BORE_MIN_M."""
     from . import dmath as M
@@ -965,7 +1018,9 @@ def bore_rows(bores, segments, nat: Field) -> list[dict]:
         for a, c in ((pts[0], pts[1]), (pts[-1], pts[-2])):
             hd = M.degrees(M.atan2(c[1] - a[1], c[0] - a[0]))
             portals.append({"position": list(a), "heading_deg": q(hd), "open_m": 0.0})
-        name = f"{s['name']} Tunnel" if s.get("name") else None
+        where = s.get("name") or next((dnames[d] for d in s.get("district_ids") or []
+                                       if dnames and d in dnames), None)
+        name = f"{where} Tunnel" if where else None
         if name is not None:
             used[name] = used.get(name, 0) + 1
             if used[name] > 1:
@@ -1050,7 +1105,7 @@ def seat(model, fin: Field) -> dict:
 
 PARK_MAX = 0.10          # no parked car on a street steeper than this
 SEAT_MAX = 0.12          # no bench, stall, kiosk or vending machine on ground this steep
-TREE_MAX = 0.60          # no tree or shrub rooted on ground this steep (a cliff face)
+TREE_MAX = 1.00          # no tree or shrub rooted on ground this steep (a cliff face)
 STEEP_PROPS = ("bench", "food_stall", "kiosk", "vending_machine", "planter")
 GROUND_PLANTS = ("street_tree", "park_tree", "conifer", "palm", "median_tree", "shrub",
                  "overgrowth")
@@ -1059,12 +1114,25 @@ GROUND_PLANTS = ("street_tree", "park_tree", "conifer", "palm", "median_tree", "
 def dressing(m) -> tuple[dict, dict]:
     """Props and plants that suit the ground: parked cars off steep streets, seats and stalls
     off steep ground, no tree on a cliff face (M13)."""
+    import shapely
+
     fin = ground_of(m)
-    st = {"parked_off_steep": 0, "seats_off_steep": 0, "trees_off_cliffs": 0}
+    st = {"parked_off_steep": 0, "seats_off_steep": 0, "trees_off_cliffs": 0,
+          "under_viaducts": 0}
+    decks = [shapely.LineString([p[:2] for p in s.line]).buffer(s.attrs["width_m"] / 2 + 2.0)
+             for s in m.structures if s.attrs.get("terrain_viaduct") and len(s.line) >= 2]
+    under = G.union(decks) if decks else None
+
+    def below(x, y, z):
+        return under is not None and abs(z) < 0.5 and under.contains(Point(x, y))
+
     props = []
     for p in m.props:
         kind = p.type.split(".", 1)[1] if "." in p.type else p.type
         x, y, z = p.position
+        if below(x, y, z):
+            st["under_viaducts"] += 1
+            continue
         if abs(z) < 0.5 and kind == "parked_vehicle" and fin.slope(x, y) > PARK_MAX:
             st["parked_off_steep"] += 1
             continue
@@ -1076,8 +1144,49 @@ def dressing(m) -> tuple[dict, dict]:
     for p in m.plants:
         kind = p.type.split(".", 1)[1] if "." in p.type else p.type
         x, y, z = p.position
+        if below(x, y, z):
+            st["under_viaducts"] += 1
+            continue
         if abs(z) < 0.5 and kind in GROUND_PLANTS and fin.slope(x, y) > TREE_MAX:
             st["trees_off_cliffs"] += 1
             continue
         plants.append(p)
     return {"props": props, "plants": plants}, st
+
+
+def viaduct_rows(viaducts, segments, nat: Field) -> list[dict]:
+    """Terrain viaducts: a deck under the road (line z: deck top over the natural ground) and
+    columns every COLUMN_STEP_M where the deck stands at least COLUMN_MIN_M high."""
+    by = {s["id"]: s for s in segments}
+    out = []
+    for k, v in enumerate(viaducts):
+        s = by[v["segment"]]
+        line = [tuple(p) for p in s["centerline"]]
+        cum = _cum(line)
+        st = [(p["s"], p["z"]) for p in s["ground"]]
+        n = max(2, int(math.ceil((v["s1"] - v["s0"]) / STEP_M)) + 1)
+        pts = []
+        for i in range(n):
+            sv = v["s0"] + (v["s1"] - v["s0"]) * i / (n - 1)
+            x, y = point_at(line, cum, sv)
+            pts.append([q(x), q(y), q(z_on(st, sv) - nat.at(x, y))])
+        did = f"tv{k + 1:02d}"
+        out.append({"id": did, "type": "structure.terrain_viaduct", "kind": "deck",
+                    "line": pts, "z0_m": q(min(p[2] for p in pts) - 1.2),
+                    "z1_m": q(max(p[2] for p in pts)), "supports": [s["id"]],
+                    "attrs": {"terrain_viaduct": True, "segment": s["id"],
+                              "s0": q(v["s0"]), "s1": q(v["s1"]),
+                              "width_m": q(s["width_m"]), "deck_m": 1.2}})
+        nc = int((v["s1"] - v["s0"]) // COLUMN_STEP_M)
+        for i in range(nc + 1):
+            sv = v["s0"] + (v["s1"] - v["s0"]) * (i + 0.5) / (nc + 1)
+            x, y = point_at(line, cum, sv)
+            h = z_on(st, sv) - nat.at(x, y) - 1.2
+            if h < COLUMN_MIN_M:
+                continue
+            foot = G.qpoly(Point(x, y).buffer(1.25, cap_style="square"))
+            out.append({"id": f"{did}.c{i + 1:02d}", "type": "structure.terrain_column",
+                        "kind": "column", "footprint": G.to_model_poly(foot), "z0_m": 0.0,
+                        "z1_m": q(h), "supports": [did],
+                        "attrs": {"terrain_viaduct": True, "segment": s["id"]}})
+    return out

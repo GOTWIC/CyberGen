@@ -1131,6 +1131,15 @@ def report_text(rep: dict) -> str:
                   f"{tn['deepest_road_m']:g} m"
                 + (f", deepest metro {tn['deepest_metro_m']:g} m"
                    if tn.get("deepest_metro_m") is not None else "")]
+    tg = st.get("terrain")
+    if tg:
+        out += ["", f"  terrain: ground up to {tg.get('max_m', 0):g} m; cuts to "
+                    f"{tg.get('max_cut_m', 0):g} m, fills to {tg.get('max_fill_m', 0):g} m; "
+                    f"{tg.get('retaining_walls', 0)} retaining walls (highest "
+                    f"{tg.get('highest_wall_m', 0):g} m), {tg.get('bored_tunnels', 0)} bored "
+                    f"tunnels, {tg.get('viaducts', 0)} terrain viaducts; "
+                    f"{tg.get('slope_greens', 0)} hillside greens, highest plinth "
+                    f"{tg.get('highest_plinth_m', 0):g} m"]
     gs = st.get("gameplay")
     if gs:
         out += ["", f"  gameplay: {gs['pois']} points of interest, {gs['factions']} factions ("
