@@ -81,7 +81,7 @@ edits; the filled spec gains the three values per district.
 ## Sweep
 
 `citygen sweep --suite m8a --workers 3` ([`sweep.md`](sweep.md), `sweep.json`), next to
-M8c's ([`../M8c/sweep.md`](../M8c/sweep.md); its `nyxllor` labels are `vesper_bay` now):
+M8c's ([`../M8c/sweep.md`](../M8c/sweep.md)):
 
 | | M8c | M11 |
 |---|---|---|

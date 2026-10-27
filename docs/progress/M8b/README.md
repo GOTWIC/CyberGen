@@ -16,11 +16,11 @@ PR 15. Every build below is made with the combined code and passes all 66 checks
 | archipelago_free_port | `dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a` |
 | delta_megacity | `3800f2104d3183d5d606912e617365f80e51e63f5115f2af18a3a05251f508fb` |
 | nexus_city | `f97e5177e235278914648449f39fa922b37f16d67fc833a3291eb6b7e1be1d76` |
-| nyxllor | `29a57fe579da2683dd0a993f9b12e2fbb4af3716cab129b5a13bf9f58c6ea31c` |
+| vesper_bay | `29a57fe579da2683dd0a993f9b12e2fbb4af3716cab129b5a13bf9f58c6ea31c` |
 | peninsula_city | `0e6533f5821182e12fc690f788032c197230aaa2e2448d58e016b916255db5b2` |
-| nyxllor_pinned (M7b demo, round 3 order) | `fb773f4e722378be5eb972ecb67eb9adbc7f921fca51598c8e413325f1493afb` |
-| nyxllor_pinned_round1 (round 1 maglev) | `d1d2eb0da7860e87124ea78cde270dd42d62f0105169d4c7e55ca93f83d13c79` |
-| nyxllor_pinned_round2 (round 2 order) | `7ef74e76d156d0e0bfb172bc291de672a10f5999737a27de70c68d9a57354f9d` |
+| vesper_bay_pinned (M7b demo, round 3 order) | `fb773f4e722378be5eb972ecb67eb9adbc7f921fca51598c8e413325f1493afb` |
+| vesper_bay_pinned_round1 (round 1 maglev) | `d1d2eb0da7860e87124ea78cde270dd42d62f0105169d4c7e55ca93f83d13c79` |
+| vesper_bay_pinned_round2 (round 2 order) | `7ef74e76d156d0e0bfb172bc291de672a10f5999737a27de70c68d9a57354f9d` |
 
 The PR has three parts: the loop rings (first review), a polish round after it (fast lines
 on their first layout, transit time, Greyhook's East Shore Line), both measured on PR 14's
@@ -37,11 +37,11 @@ which reproduces the M7b golden hashes). The "before" maps are in each folder as
 ### The pinned demo, Halo Line in its round 2 order
 
 Neon Strand, The Stacks, Highcrest, Old Town, Neon Strand
-(`nyxllor_pinned_round2/city_spec.json`):
+(`vesper_bay_pinned_round2/city_spec.json`):
 
 | Before: doubles back through The Stacks, meets itself in 31 places | After: one ring, stations in route order |
 |---|---|
-| <img src="nyxllor_pinned_round2/before_transit.png" width="420"> | <img src="nyxllor_pinned_round2/preview_transit.png" width="420"> |
+| <img src="vesper_bay_pinned_round2/before_transit.png" width="420"> | <img src="vesper_bay_pinned_round2/preview_transit.png" width="420"> |
 
 ### The pinned demo, round 3 order
 
@@ -49,15 +49,15 @@ Neon Strand, Highcrest, Old Town, The Stacks, Neon Strand (the M7b demo spec):
 
 | Before: closes, but winds round Highcrest and crosses itself (13 places) | After |
 |---|---|
-| <img src="nyxllor_pinned/before_transit.png" width="420"> | <img src="nyxllor_pinned/preview_transit.png" width="420"> |
+| <img src="vesper_bay_pinned/before_transit.png" width="420"> | <img src="vesper_bay_pinned/preview_transit.png" width="420"> |
 
-### Nyxllor sample
+### Vesper Bay sample
 
 Its Halo Line is in the round 2 order:
 
 | Before: 17 places | After |
 |---|---|
-| <img src="nyxllor/before_transit.png" width="420"> | <img src="nyxllor/preview_transit.png" width="420"> |
+| <img src="vesper_bay/before_transit.png" width="420"> | <img src="vesper_bay/preview_transit.png" width="420"> |
 
 ### Delta Megacity, Nexus City and Saltreach (archipelago)
 
@@ -84,8 +84,8 @@ Each figure is the number of places where the line meets itself at the same leve
 |---|---|---|---|---|
 | pinned, round 2 | Halo Line (loop) | 31, 8.3 km | 0, 5.0 km | 0, 5.6 km |
 | pinned, round 3 | Halo Line (loop) | 13, 10.3 km | 0, 6.3 km | 0, 5.9 km |
-| nyxllor | Halo Line (loop) | 17, 6.7 km | 0, 7.6 km | 0, 7.8 km |
-| nyxllor | Crown Loop (sky tube loop) | 0, 3.7 km | 0, 4.7 km | 0, 4.8 km |
+| vesper_bay | Halo Line (loop) | 17, 6.7 km | 0, 7.6 km | 0, 7.8 km |
+| vesper_bay | Crown Loop (sky tube loop) | 0, 3.7 km | 0, 4.7 km | 0, 4.8 km |
 | delta_megacity | Skyline Loop, Delta Loop (sky tube loops) | 0, 4.7 and 4.8 km | 0, 4.9 and 4.3 km | 0, 4.7 and 4.3 km |
 | nexus_city | Blue Line (metro loop) | 0, 4.3 km | 0, 4.1 km | 0, 4.3 km |
 | archipelago_free_port | Island Hopper (monorail) | 3, 9.8 km | 0, 5.9 km | 0, 5.9 km |
@@ -218,11 +218,11 @@ Fixes:
 | City | Line | Base code (`510dc70`) | First review | Polish round |
 |---|---|---|---|---|
 | delta_megacity | Maglev Line | city passes on layout salt 2 | 130 m curve on layout 1; passes on salt 1 | 539 m on layout 1 |
-| nyxllor | Launch Express | city passes on layout salt 3 | 508 m on layout 1 | 611 m on layout 1 |
+| vesper_bay | Launch Express | city passes on layout salt 3 | 508 m on layout 1 | 611 m on layout 1 |
 | pinned, round 1 | Launch Express | 548 m, but the city passes on layout salt 4 (Halo Line meets itself in 6 places) | fails `transit_curves` and `transit_altitude`; city moves to another layout | 550 m, same layout as rounds 2 and 3 |
 
 On PR 14's base, no sample city retried for transit after the polish round: delta_megacity,
-nyxllor and the three other samples built on their first layout, and the pinned demo
+vesper_bay and the three other samples built on their first layout, and the pinned demo
 retried once in all three rounds for `level_continuity` (`rs01479` at 0.16 m), so all three
 ended on the same layout. M8a changes the layouts, and on the combined code Delta and Nexus
 retry for transit again ([Stacked on M8a](#stacked-on-m8a)).
@@ -238,9 +238,9 @@ has three stations, round 2's one.
 
 | Round 1: maglev `east_exit`, Corporate Core, Launch Key | Round 2 |
 |---|---|
-| <img src="nyxllor_pinned_round1/preview_transit.png" width="420"> | <img src="nyxllor_pinned_round2/preview_transit.png" width="420"> |
+| <img src="vesper_bay_pinned_round1/preview_transit.png" width="420"> | <img src="vesper_bay_pinned_round2/preview_transit.png" width="420"> |
 
-Before, round 1 for comparison: `nyxllor_pinned_round1/before_transit.png`.
+Before, round 1 for comparison: `vesper_bay_pinned_round1/before_transit.png`.
 
 ### Transit stage time
 
@@ -252,7 +252,7 @@ for `transit.build`:
 | pinned, round 2 | 6.3 | 34.6 | 8.6 |
 | pinned, round 1 (layout 1) | 48.7 | 79.6 | 9.5 |
 | delta_megacity | 22.4 | 22.6 | 7.1 |
-| nyxllor | 53.3 | 66.7 | 9.1 |
+| vesper_bay | 53.3 | 66.7 | 9.1 |
 | peninsula_city | 2.8 | 6.3 | 2.9 |
 | archipelago_free_port | 2.0 | 6.5 | 3.5 |
 
@@ -302,8 +302,8 @@ From each report's `city_tries` stat (one try per layout salt and road network):
 | archipelago_free_port | 1 | 1 |
 | delta_megacity | 9 | 9 |
 | nexus_city | 3 | 4 |
-| nyxllor | 8 | 1 |
-| nyxllor_pinned | 2 | 2 |
+| vesper_bay | 8 | 1 |
+| vesper_bay_pinned | 2 | 2 |
 | peninsula_city | 1 | 1 |
 
 What each failing try failed on, with the combined code:
@@ -315,19 +315,19 @@ What each failing try failed on, with the combined code:
   (103 and 176 m). Layout 9 passes.
 - **nexus_city:** `level_continuity` on layouts 1 and 2 (M8a's area), with the Magenta Line
   at 489 m and the Harbor Line at 121 m on layout 2; the Harbor Line at 117 m on layout 3.
-- **nyxllor:** none. Its first layout failed only the Crown Loop's altitude before the fix
+- **vesper_bay:** none. Its first layout failed only the Crown Loop's altitude before the fix
   below.
-- **nyxllor_pinned** (all three rounds): `junction_placement` on layout 1 (a segment 12 m
+- **vesper_bay_pinned** (all three rounds): `junction_placement` on layout 1 (a segment 12 m
   over its node, M8a's area); round 1's maglev also climbs to 60.8 m there.
 
-So the transit fixes bring nyxllor from 8 tries to 1 (about 50 s instead of 7 min). Delta
+So the transit fixes bring vesper_bay from 8 tries to 1 (about 50 s instead of 7 min). Delta
 still needs 9, mostly for its two sky tube loops and the monorail on M8a's new layouts.
 
 ### Fixes for the combined code
 
 - **Tight portals (`_fit_portals`).** A sky tube through towers dropped the portal of a
   tower its profile left less than 8 m of headroom in, and climbed over it. Each climb
-  lifted the neighbors out of their portals, one after another: nyxllor's Crown Loop rose
+  lifted the neighbors out of their portals, one after another: vesper_bay's Crown Loop rose
   to 183 m on M8a's first layout (check limit 150 m). A tower the line could not climb
   within its altitude range now keeps its portal with 3 m of headroom (the clearance check
   asks only that the tube be inside the portal).
@@ -366,8 +366,8 @@ Passing builds per spec (the test specs pass the same 17 of 20 in both):
 | delta_megacity | 3 of 8 | 4 of 8 |
 | nexus_city | 6 of 8 | 7 of 8 |
 | peninsula_city | 6 of 8 | 7 of 8 |
-| nyxllor | 7 of 8 | 7 of 8 |
-| nyxllor_pinned | 4 of 8 | 4 of 8 |
+| vesper_bay | 7 of 8 | 7 of 8 |
+| vesper_bay_pinned | 4 of 8 | 4 of 8 |
 
 Changed builds:
 - **Fixed:** delta s11 (Delta Loop radius; now on its first try), nexus s5077 (passes on
@@ -417,5 +417,5 @@ retry once for a road check, so they still share their layout.
 `report.txt` and `report.json`, `trace.json` (and `city_spec.json` for the two extra demo
 rounds) and, for the five samples and the demo,
 `blockout_report.txt` and the blockout renders. The 8K renders are `render_iso_city.jpg` for
-every blockout city, plus `nyxllor_pinned/render_iso_d01.jpg` and `render_street_4.jpg` for
-delta_megacity and nyxllor. Work in progress: `wip/`.
+every blockout city, plus `vesper_bay_pinned/render_iso_d01.jpg` and `render_street_4.jpg` for
+delta_megacity and vesper_bay. Work in progress: `wip/`.

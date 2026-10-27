@@ -301,7 +301,7 @@
   ],
   "layout_salt": 0,
   "sha256": "f0abe6410c8e0db71779949944ff393b72ad6761a3e720f0b36308016cb759ab",
-  "traceback": "Traceback (most recent call last):\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/sweep.py\", line 120, in run_job\n    write_outputs(b, d)\n    ~~~~~~~~~~~~~^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 651, in write_outputs\n    render_massing(b, paths[-1])\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 387, in render_massing\n    _draw_massing(ax, m)\n    ~~~~~~~~~~~~~^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 358, in _draw_massing\n    _prism_faces(poly, z0, z1, rgb, faces)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 206, in _prism_faces\n    rings = [p.exterior] + list(p.interiors)\n             ^^^^^^^^^^\nAttributeError: 'MultiPolygon' object has no attribute 'exterior'\n"
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/sweep.py\", line 120, in run_job\n    write_outputs(b, d)\n    ~~~~~~~~~~~~~^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 651, in write_outputs\n    render_massing(b, paths[-1])\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 387, in render_massing\n    _draw_massing(ax, m)\n    ~~~~~~~~~~~~~^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 358, in _draw_massing\n    _prism_faces(poly, z0, z1, rgb, faces)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/preview_massing.py\", line 206, in _prism_faces\n    rings = [p.exterior] + list(p.interiors)\n             ^^^^^^^^^^\nAttributeError: 'MultiPolygon' object has no attribute 'exterior'\n"
  },
  {
   "label": "delta_megacity",
@@ -489,7 +489,7 @@
   "status": "crash",
   "failed": [],
   "seconds": 30.2,
-  "traceback": "Traceback (most recent call last):\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/sweep.py\", line 111, in run_job\n    b = build_city(res, workers=1, local=upto != \"roads\", buildings=upto == \"full\")\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 363, in build_city\n    b = add_roads(ranked, explicit, run)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 477, in add_roads\n    for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):\n                      ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 302, in map\n    return [fn(*job, False) for job in jobs]\n            ~~^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 457, in _road_job\n    return _collect(worker and tracing, road_attempt, b, explicit, k)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 328, in _collect\n    return fn(*args), None\n           ~~^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 432, in road_attempt\n    net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,\n                         variant=k)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/roads.py\", line 2926, in build_roads\n    net = assemble(spec, ctx, peds)\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/roads.py\", line 2153, in assemble\n    net.elevated = EL.elevate(spec, ctx, net)\n                   ~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 1688, in elevate\n    E.interchanges()\n    ~~~~~~~~~~~~~~^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 735, in interchanges\n    self.interchange(r, k, kd)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^\n  File \"/Users/swag/Projects/Nyxllor/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 1181, in interchange\n    T, sT, leg = terminals[sigma]\n                 ~~~~~~~~~^^^^^^^\nKeyError: -1\n"
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/sweep.py\", line 111, in run_job\n    b = build_city(res, workers=1, local=upto != \"roads\", buildings=upto == \"full\")\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 363, in build_city\n    b = add_roads(ranked, explicit, run)\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 477, in add_roads\n    for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):\n                      ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 302, in map\n    return [fn(*job, False) for job in jobs]\n            ~~^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 457, in _road_job\n    return _collect(worker and tracing, road_attempt, b, explicit, k)\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 328, in _collect\n    return fn(*args), None\n           ~~^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/build.py\", line 432, in road_attempt\n    net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,\n                         variant=k)\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/roads.py\", line 2926, in build_roads\n    net = assemble(spec, ctx, peds)\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/roads.py\", line 2153, in assemble\n    net.elevated = EL.elevate(spec, ctx, net)\n                   ~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 1688, in elevate\n    E.interchanges()\n    ~~~~~~~~~~~~~~^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 735, in interchanges\n    self.interchange(r, k, kd)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^\n  File \"/Users/swag/Projects/Vesper Bay/.claude/worktrees/m8a-robustness-24d520/citygen/elevated.py\", line 1181, in interchange\n    T, sT, leg = terminals[sigma]\n                 ~~~~~~~~~^^^^^^^\nKeyError: -1\n"
  },
  {
   "label": "peninsula_city",
@@ -704,7 +704,7 @@
   "sha256": "12199a66c229ce489991859dfa278b26bc47761dcd40e12a1739302c8ac30054"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 404,
   "status": "pass",
   "failed": [],
@@ -717,7 +717,7 @@
   "sha256": "90a9fd2ec1f2de68c0478ac00722c8111f0172aa11b51e145e5fb674c9e6c816"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 11,
   "status": "fail",
   "failed": [
@@ -738,7 +738,7 @@
   "sha256": "b6fe06a5f0003ff3d432a55ad30354ae5d81db3ba54b242f09314cffa18bc2e6"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 2077,
   "status": "pass",
   "failed": [],
@@ -753,7 +753,7 @@
   "sha256": "f7c38d51fcb611287fcacadaf94b874bab2ff5a8527328de205ee59d5feb69d4"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 1999,
   "status": "fail",
   "failed": [
@@ -774,7 +774,7 @@
   "sha256": "298a4ce1fc8c0e1957837085602fff237d4b27b0ac72ece83f89dea08db73880"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 5077,
   "status": "pass",
   "failed": [],
@@ -789,7 +789,7 @@
   "sha256": "f12656e76f5b4832aad51510bcdfd5b413b0f4766d6b7511a2ef42e62147119d"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 3141,
   "status": "fail",
   "failed": [
@@ -810,7 +810,7 @@
   "sha256": "3475278f1167455233606d0c6b3f40c52bcd50d7f4a1d256995ad6e763731dc8"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 27182,
   "status": "pass",
   "failed": [],
@@ -823,7 +823,7 @@
   "sha256": "93bae5dc946a9d66d59374ba983b907b28a132123d49465387a5be807bd3bc0c"
  },
  {
-  "label": "nyxllor",
+  "label": "vesper_bay",
   "seed": 8128,
   "status": "pass",
   "failed": [],
@@ -838,7 +838,7 @@
   "sha256": "bb3f1ac7ef0c7245ffba1bc6e109111e61adacf358574c935fe1fe1cb8ac9b31"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 2078,
   "status": "pass",
   "failed": [],
@@ -853,7 +853,7 @@
   "sha256": "2204add3d3c4922b96e827e17f264457e5c1e2ab359ad673ecc382471ff0de8f"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 11,
   "status": "fail",
   "failed": [
@@ -889,7 +889,7 @@
   "sha256": "bf4f1905acc5aa0c396e24f7c85003c313abecb6cbf7e1a73679c604b64dfd32"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 404,
   "status": "pass",
   "failed": [],
@@ -904,7 +904,7 @@
   "sha256": "e8d582d6072ff19de5c20a16fdaf4bde41ef75d54f8a1f7082183c175475ddc6"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 3141,
   "status": "pass",
   "failed": [],
@@ -919,7 +919,7 @@
   "sha256": "0cf3a174a85c8d20ffba2d473a8ece2f8ec5d178fc2399a6635a978fe27f36b8"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 1999,
   "status": "fail",
   "failed": [
@@ -973,7 +973,7 @@
   "sha256": "8f71e9a8b187cab09249218eede6d9e0efc7ac2c2605336879f4110c4fec93b0"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 5077,
   "status": "fail",
   "failed": [
@@ -1029,7 +1029,7 @@
   "sha256": "2de3fccc5cfeb761739240534a8661755ede97a351aacb90aa93991affd6e5ea"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 8128,
   "status": "fail",
   "failed": [
@@ -1174,7 +1174,7 @@
   "sha256": "ce572943ad278b02743c80ffa703387abeb27a18132620a24328f8f0790a1e9e"
  },
  {
-  "label": "nyxllor_pinned",
+  "label": "vesper_bay_pinned",
   "seed": 27182,
   "status": "fail",
   "failed": [
