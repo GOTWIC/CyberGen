@@ -14,11 +14,11 @@ the following; `city_model.json` is not committed, because a build regenerates i
 - `report.json` and `report.txt`: the checks plus a stats table;
 - `trace.json`: stage hashes.
 
-The specs are unchanged (`docs/progress/M1a2/`, Nyxllor in `cities/nyxllor/`).
+The specs are unchanged (`docs/progress/M1a2/`, Vesper Bay in `cities/vesper_bay/`).
 
 | City | Street / alley / service / pedestrian km | Footbridges | Junctions (signalized) | Crosswalks | Lanes / connectors | Walkway km | Blocks | Lots | Open space | Places |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Nyxllor | 94.6 / 24.4 / 12.3 / 9.9 | 7 | 1688 (345) | 1155 | 6174 / 12185 | 450 | 1030 | 5877 | 11.4% | 3 |
+| Vesper Bay | 94.6 / 24.4 / 12.3 / 9.9 | 7 | 1688 (345) | 1155 | 6174 / 12185 | 450 | 1030 | 5877 | 11.4% | 3 |
 | Saltreach Free Port | 50.4 / 9.8 / 6.2 / 16.9 | 5 | 1006 (213) | 726 | 3171 / 6263 | 256 | 598 | 3282 | 13.6% | 2 |
 | Delta Megacity | 86.8 / 21.1 / 7.4 / 16.4 | 11 | 1581 (365) | 1271 | 5538 / 11232 | 396 | 984 | 5454 | 11.0% | 4 |
 | Nexus City | 98.1 / 20.9 / 5.8 / 20.3 | 12 | 1774 (423) | 1425 | 6380 / 12396 | 451 | 1058 | 6412 | 14.1% | 7 |
@@ -26,14 +26,14 @@ The specs are unchanged (`docs/progress/M1a2/`, Nyxllor in `cities/nyxllor/`).
 
 | City | Lots by archetype: median m2 (median frontage m) |
 |---|---|
-| Nyxllor | corporate core 2636 (61); entertainment market 228 (16); industrial port 6215 (112); megablock residential 4996 (91); old town 163 (14); research campus 3874 (88); residential heights 803 (29); spaceport 14352 (106) |
+| Vesper Bay | corporate core 2636 (61); entertainment market 228 (16); industrial port 6215 (112); megablock residential 4996 (91); old town 163 (14); research campus 3874 (88); residential heights 803 (29); spaceport 14352 (106) |
 | Saltreach Free Port | corporate core 2485 (58); industrial port 6274 (170); old town 164 (14); research campus 5131 (125); residential heights 761 (26) |
 | Delta Megacity | corporate core 2679 (62); industrial port 7054 (131); midtown mixed 890 (30); old town 161 (14); research campus 4275 (78); transit hub 1420 (49) |
 | Nexus City | corporate core 2730 (57); entertainment market 222 (16); industrial port 7757 (138); midtown mixed 869 (30); old town 162 (14); research campus 5732 (132); residential heights 791 (29); spaceport 8120 (99); transit hub 1440 (51) |
 | Greyhook (peninsula) | entertainment market 228 (16); industrial port 8481 (152); megablock residential 5032 (97); residential heights 820 (28); spaceport 9626 (92); transit hub 1637 (45) |
 
 Build times on the cloud container (4 CPUs, one city at a time, CLI with previews and
-`--trace`): Nexus City 48 s, Delta Megacity 42 s, Nyxllor 36 s, Saltreach Free Port 19 s,
+`--trace`): Nexus City 48 s, Delta Megacity 42 s, Vesper Bay 36 s, Saltreach Free Port 19 s,
 Greyhook 17 s.
 
 Lots are built in worker processes, by district and in chunks of 250 blocks.
@@ -161,9 +161,9 @@ Each candidate was emulated on x86 and Delta Megacity rebuilt with `--trace`:
 | C++ standard library (libc++ on macOS, libstdc++ on Linux) | GEOS 3.14.1 rebuilt with clang and libc++ (Ubuntu's source of the same release), swapped into the shapely 2.2.0 wheel | **different** |
 
 With the libc++ GEOS the Mac's pattern came back: Saltreach and Greyhook identical, Delta
-Megacity, Nyxllor and Nexus City different. In each, every M1 stage, the streets, junctions,
+Megacity, Vesper Bay and Nexus City different. In each, every M1 stage, the streets, junctions,
 lanes and the first district's blocks were identical, and the first different entry was the
-blocks of the next district (`blocks/d02` in Delta and Nyxllor, `blocks/d05` in Nexus).
+blocks of the next district (`blocks/d02` in Delta and Vesper Bay, `blocks/d05` in Nexus).
 
 Replaying that district's block job under both GEOS builds, with a hash of every shapely call,
 gave the first call whose output differed for identical input:
@@ -211,7 +211,7 @@ difference in any entry). Emulated build times were 7 to 18 minutes per city.
 
 | City | Trace entries | x86_64 (libstdc++ GEOS) | x86_64, libc++ GEOS | emulated aarch64 | M4 Mac (macOS arm64) |
 |---|---|---|---|---|---|
-| Nyxllor | 5897 | `f6a35536c06a9d17dfa754aedcca4477428169e881202f30e5c3dadde0a9006d` | same | same | same |
+| Vesper Bay | 5897 | `f6a35536c06a9d17dfa754aedcca4477428169e881202f30e5c3dadde0a9006d` | same | same | same |
 | Saltreach Free Port | 53 | `6b2701d4107a1b05f08676e6b9bcb00c369b1b60e4f0bfa25676dee7eaa90b23` | same | same | same |
 | Delta Megacity | 2766 | `4bfce90b33071689b89ed332b360b15889ebcc5de73c757af3a0ae6ca3edafe8` | same | same | same |
 | Nexus City | 8544 | `d2fe5ce9c22aa448e23e5a0e2bd0f9eb04553612a3df0fd8e1ef0107f16698b2` | same | same | same |
@@ -223,7 +223,7 @@ wheels, 4 workers) against a local x86_64 reference (Docker `linux/amd64` under 
 stage traces identical, all 31 checks pass on both, and pytest passes on both.
 
 Before the fix (`48eaba0`), the libc++ GEOS gave `d86b5839...` for Delta Megacity, `48597f0a...`
-for Nyxllor and `d9774745...` for Nexus City instead of the x86 models.
+for Vesper Bay and `d9774745...` for Nexus City instead of the x86 models.
 
 Not covered here: Apple's libm. No M2 decision calls libm directly (angles come from `dmath`,
 squares are products), and GEOS uses it only for round buffer joins, whose vertices are
@@ -264,7 +264,7 @@ under two seeds, and all five samples were also rebuilt under two seeds with the
   primary-on-primary angles and primary junctions inside ramp lengths are left to M7
   interchanges.
 - **Footbridges and walkways.** Footbridges have stairs, not ramps. Landmasses with no
-  pedestrian bridge keep their own walkway graph (3 components in Nyxllor).
+  pedestrian bridge keep their own walkway graph (3 components in Vesper Bay).
 - **Build time.** Nexus City, the slowest, takes 48 s of the 60 s budget with previews and
   `--trace` on the 4-CPU container; the trace hashes about 18,000 lanes recursively.
 

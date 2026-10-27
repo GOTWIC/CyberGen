@@ -5,9 +5,9 @@ loops, because one ramp could not fly over another. M8d builds the textbook form
 one loop and one flyover for the two left turns. The two-loop form stays as the fallback
 where the flyover does not fit.
 
-Only Nyxllor among the samples has a trumpet, so it is the only city that changes. The other
+Only Vesper Bay among the samples has a trumpet, so it is the only city that changes. The other
 four samples and the pinned demo are byte-identical to M8b. With the flyover switched off,
-Nyxllor also reproduces M8b's model byte for byte (`29a57fe5...`), so the fallback is exactly
+Vesper Bay also reproduces M8b's model byte for byte (`29a57fe5...`), so the fallback is exactly
 the M7b form.
 
 | City | sha256 of `city_model.json` (x86_64 Linux) | vs M8b |
@@ -15,24 +15,24 @@ the M7b form.
 | archipelago_free_port | `dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a` | same |
 | delta_megacity | `3800f2104d3183d5d606912e617365f80e51e63f5115f2af18a3a05251f508fb` | same |
 | nexus_city | `f97e5177e235278914648449f39fa922b37f16d67fc833a3291eb6b7e1be1d76` | same |
-| nyxllor | `23bfe34f8529cbae3de4a19fec793a2cc3c515d9934527d0eb4be5354b2fe60a` | new |
+| vesper_bay | `23bfe34f8529cbae3de4a19fec793a2cc3c515d9934527d0eb4be5354b2fe60a` | new |
 | peninsula_city | `0e6533f5821182e12fc690f788032c197230aaa2e2448d58e016b916255db5b2` | same |
-| nyxllor_pinned | `fb773f4e722378be5eb972ecb67eb9adbc7f921fca51598c8e413325f1493afb` | same |
+| vesper_bay_pinned | `fb773f4e722378be5eb972ecb67eb9adbc7f921fca51598c8e413325f1493afb` | same |
 
 Every build passes all 66 checks. The M4 Mac builds the same six models byte for byte (and the
 same blockout plans), checked by the lead session; every city folder has its `trace.json`.
 
 ## Before and after
 
-Nyxllor's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it.
+Vesper Bay's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it.
 
-<img src="nyxllor/render_trumpet.jpg" width="840">
+<img src="vesper_bay/render_trumpet.jpg" width="840">
 
-Nyxllor's trumpet (ic02), road levels with the trumpet at street scale:
+Vesper Bay's trumpet (ic02), road levels with the trumpet at street scale:
 
 | Before: two far loops on a stub under the deck | After: one loop and one flyover |
 |---|---|
-| <img src="nyxllor/before_elevated.png" width="420"> | <img src="nyxllor/preview_elevated.png" width="420"> |
+| <img src="vesper_bay/before_elevated.png" width="420"> | <img src="vesper_bay/preview_elevated.png" width="420"> |
 
 The ramps of the trumpet, before and after:
 
@@ -119,14 +119,14 @@ order reaches a decision.
   The cloud container had no Blender (download.blender.org is blocked there), so the
   blockouts were built on the M4 Mac: `blockout_report.txt` and the renders in each city
   folder, 8K whole-city views (`render_iso_city.jpg`) and a close-up of the trumpet
-  (`nyxllor/render_trumpet.jpg`, from `citygen rerender ... --eye --target`, a camera of
+  (`vesper_bay/render_trumpet.jpg`, from `citygen rerender ... --eye --target`, a camera of
   one's own). The blockout plan hashes in `tests/data/golden_hashes.json` are updated (only
-  Nyxllor's changes).
+  Vesper Bay's changes).
 
 ## Tests
 
 In `tests/test_elevated.py`:
-- `test_trumpet_flyover_geometry`: Nyxllor's roads alone.
+- `test_trumpet_flyover_geometry`: Vesper Bay's roads alone.
   - The trumpet has one loop and one flyover on the far side, in opposite directions.
   - The loop and the near ramps share the stem's near terminal, and the stem ends there.
   - The flyover starts on the deck at its height and lands on the stem at grade, at most 6%
@@ -162,11 +162,11 @@ none needed the two-loop fallback. No build changed its result:
 
 | build | before | after | flyover crest |
 |---|---|---|---|
-| nyxllor, seed 2077 (the sample) | pass | pass | 16.6 m |
-| nyxllor, seed 27182 | pass | pass | 16.6 m |
+| vesper_bay, seed 2077 (the sample) | pass | pass | 16.6 m |
+| vesper_bay, seed 27182 | pass | pass | 16.6 m |
 | test_pinned, seed 1999 | pass | pass | 16.6 m |
 | delta_megacity, seed 27182 | fail: `transit_curves` (Delta Loop, sky tube, 46 m radius) | the same | 16.6 m |
-| nyxllor, seed 3141 | fail: `open_space_share` (Launch Key 67% open) | the same check (71%) | 16.6 m |
+| vesper_bay, seed 3141 | fail: `open_space_share` (Launch Key 67% open) | the same check (71%) | 16.6 m |
 
 The two failing builds fail as on `main`, after the same 8 whole-city tries, for reasons
 outside the interchanges (a sky tube loop's curve, a spaceport's open share). Their road
@@ -181,7 +181,7 @@ deck there, as any ramp's does.
 
 ## Open items
 
-- **Flyover length.** The flyover is long (957 m in Nyxllor): it climbs to 16.6 m and falls
+- **Flyover length.** The flyover is long (957 m in Vesper Bay): it climbs to 16.6 m and falls
   at the 5% design grade beside the stem. A run with interchanges close together, or a short
   stem, falls back to the two loops.
 - **Crossing the stem.** In the bell the flyover passes over the deck, the near ramps and

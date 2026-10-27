@@ -8,16 +8,16 @@ graph. Skybridges in the way of a line are removed, and the skybridges of comple
 passed over or under.
 
 ```bash
-.venv/bin/python -m citygen build cities/nyxllor/city_spec.json out/nyxllor --blockout
+.venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
 ```
 
 All five sample cities pass all 54 checks, 10 of them new. Every model is byte-identical on
 the M4 Mac and in the x86 Linux container. A build from spec takes about 15 to 50 s on the
 Mac.
 
-| Nexus City | Nyxllor |
+| Nexus City | Vesper Bay |
 |---|---|
-| <img src="nexus_city/preview_transit.png" width="420"> | <img src="nyxllor/preview_transit.png" width="420"> |
+| <img src="nexus_city/preview_transit.png" width="420"> | <img src="vesper_bay/preview_transit.png" width="420"> |
 
 | Delta Megacity | Saltreach Free Port | Greyhook |
 |---|---|---|
@@ -25,9 +25,9 @@ Mac.
 
 Blender blockout (M4 renderer) with the decks, tubes, columns and station canopies:
 
-| Nyxllor, Corporate Core | Delta Megacity, Midtown |
+| Vesper Bay, Corporate Core | Delta Megacity, Midtown |
 |---|---|
-| <img src="nyxllor/render_iso_d01.jpg" width="420"> | <img src="delta_megacity/render_iso_d02.jpg" width="420"> |
+| <img src="vesper_bay/render_iso_d01.jpg" width="420"> | <img src="delta_megacity/render_iso_d02.jpg" width="420"> |
 
 Each city folder holds:
 - `preview_transit.png`: every line in its color over the plan. Metro lines are dashed, sky
@@ -46,7 +46,7 @@ Each city folder holds:
 | Delta Megacity | metro, maglev, 2 sky tubes, monorail | 18.6 | 11 elevated, 7 sky, 3 underground | 263 | 19 | 37 |
 | Nexus City | metro, maglev, elevated rail, sky tube | 12.8 | 10 elevated, 2 sky, 5 underground | 155 | 1 | 30 |
 | Greyhook | sky tube, elevated rail, metro | 10.9 | 8 elevated, 3 sky, 5 underground | 172 | 18 | 23 |
-| Nyxllor | elevated rail, metro, maglev, sky tube | 16.2 | 8 elevated, 4 sky, 5 underground | 243 | 22 | 72 |
+| Vesper Bay | elevated rail, metro, maglev, sky tube | 16.2 | 8 elevated, 4 sky, 5 underground | 243 | 22 | 72 |
 
 Every line meets its mode's limits:
 - curve radius: elevated rail 150 m, monorail 100 m, maglev 500 m, sky tube 300 m;
@@ -169,7 +169,7 @@ were changed where the old order made the line turn back or cut a stop:
     through Midtown.
   - Delta Loop: visits its stops in order around them: Old Town, Industrial Port, Research
     Campus.
-- **Nyxllor**
+- **Vesper Bay**
   - Launch Express (maglev): east exit, Corporate Core, Launch Key. Neon Strand was a 79
     degree turn off the way; the Halo Line serves it.
 - **Saltreach Free Port**

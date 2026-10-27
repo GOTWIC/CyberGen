@@ -31,7 +31,7 @@ Traces produced on the cloud machine (x86_64 Linux) for the five samples:
 | Saltreach Free Port | `archipelago_free_port/trace.json` | 30 | `9dc08512dd7408ebee953f6b111043ee4481c756597ee097688c2cc623d95832` |
 | Delta Megacity | `delta_megacity/trace.json` | 2741 | `9e57bb01c326f7943b8725417e7a96d5af41cc576b3c494f1137453dd9e7b008` |
 | Nexus City | `nexus_city/trace.json` | 8513 | `1a725ee5acf7f627ced6088fbab2587fab8be6cc125721b0b6e410c17fddb1c1` |
-| Nyxllor | `nyxllor/trace.json` | 5868 | `60221a5a24138eb175681b2e52bdc64404cbe70680dab32261ec832a4af5b535` |
+| Vesper Bay | `vesper_bay/trace.json` | 5868 | `60221a5a24138eb175681b2e52bdc64404cbe70680dab32261ec832a4af5b535` |
 | Greyhook | `peninsula_city/trace.json` | 219 | `309dcb0bd14f97bf0186b266b1e2181a8654afa23714db71a5c7ede2cb05bffa` |
 
 On another machine:
@@ -43,7 +43,7 @@ On another machine:
     /tmp/nexus_trace.json
 ```
 
-(Nyxllor's spec is `cities/nyxllor/city_spec.json`.)
+(Vesper Bay's spec is `cities/vesper_bay/city_spec.json`.)
 
 ## Divergence sources found
 
@@ -128,7 +128,7 @@ On another machine:
   the 0.001 m grid are not moved (grid vertices GEOS copies, and exact points such as
   midpoints, which double-double intersection computes the same everywhere).
 - **Workers**: one process and several give the same bytes (test, and traces of Greyhook and
-  Nyxllor compared).
+  Vesper Bay compared).
 - `tests/test_roads.py::test_golden_hashes` asserts the hashes in
   `tests/data/golden_hashes.json`; every check passes for all five cities.
 
@@ -136,7 +136,7 @@ On another machine:
 
 `docs/progress/M1b/<city>/` holds the regenerated `preview_map.png`, `report.json` and
 `report.txt` (table in `docs/progress/M1b/README.md`). The previews look as before or close
-to it: Nyxllor barely moved; Saltreach keeps its islands and roads with redrawn inner
+to it: Vesper Bay barely moved; Saltreach keeps its islands and roads with redrawn inner
 waterways (Kettle Island's slips face west); Greyhook keeps its districts, and its separation
 channel now runs between Lantern Strip and The Stacks (57% of the district boundary on water,
 target 60%, was 63%); Nexus City now uses hydrology variant 1 (the Kurosawa River runs between

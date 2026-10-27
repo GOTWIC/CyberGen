@@ -5,7 +5,7 @@ generator. Specs are never edited.
 
 ```bash
 .venv/bin/python -m citygen sweep --out out/sweep --workers 4          # the m8a suite
-.venv/bin/python -m citygen sweep cities/nyxllor/city_spec.json --seeds 11,404 --out out/s
+.venv/bin/python -m citygen sweep cities/vesper_bay/city_spec.json --seeds 11,404 --out out/s
 ```
 
 `citygen sweep` (`citygen/sweep.py`) runs one build per worker process (`CITYGEN_WORKERS=1`
@@ -42,8 +42,8 @@ Builds passing every check, per spec:
 | delta_megacity | 3 of 8 | 3 of 8 |
 | nexus_city | 1 of 8 | 6 of 8 |
 | peninsula_city | 5 of 8 | 6 of 8 |
-| nyxllor | 5 of 8 | 7 of 8 |
-| nyxllor_pinned | 3 of 8 | 4 of 8 |
+| vesper_bay | 5 of 8 | 7 of 8 |
+| vesper_bay_pinned | 3 of 8 | 4 of 8 |
 | test_small | 4 of 5 | 5 of 5 |
 | test_minimal | 0 of 5 | 2 of 5 |
 | test_pinned | 3 of 5 | 5 of 5 |
@@ -85,12 +85,12 @@ the x86_64 Linux container (`citygen-x86`):
 | archipelago_free_port | `7440ed69bd8b…` | 1 |
 | delta_megacity | `e2ad9fda68bf…` | 9 (hv0 rv3, after hv12 rv3 and hv0 rv0 with four layouts each) |
 | nexus_city | `21ff683f3863…` | 3 |
-| nyxllor | `4b12c6f1becb…` | 8 |
-| nyxllor_pinned | `cc7835adef66…` | 2 |
+| vesper_bay | `4b12c6f1becb…` | 8 |
+| vesper_bay_pinned | `cc7835adef66…` | 2 |
 | peninsula_city | `be876b719918…` | 1 |
 
 `tests/data/golden_hashes.json` holds the new hashes of the five samples and their blockout
-plans. Delta Megacity and Nyxllor pass only because a failing city now tries more layouts and
+plans. Delta Megacity and Vesper Bay pass only because a failing city now tries more layouts and
 road networks (`CITY_RETRIES` 4 to 8); with 4 they would fail. The report does not record which
 checks the earlier tries failed. M8b reports that with its transit polish both cities pass on
 their first layout on its own base; Delta Megacity has to be checked again after stacking,
@@ -111,7 +111,7 @@ since M8a moves it to another hydrology variant.
 | **Footbridge level steps** (archipelago s404, delta s4412) | Footbridges were left out of M7's local grades, so a lifted node met a footbridge end at 0 m. Water reaching a footbridge's end also kept the deck height at the end node. | Footbridge ends follow their nodes. Both ends of the stair profile stand on the ground. |
 | **Service ring over water** (test_small s404) | The 0.5 m clip margin let a reserve ring graze a river bank. | The clip region leaves the water out. |
 | **Duplicate primary roads** (peninsula s11) | A connector and a waterfront avenue left one node side by side for 286 m. | `roads._merge_forks`: the lesser road branches off the other 50 m before they part. |
-| **Freight terminal without rail** (delta s11, s8128, nyxllor s11, MINIMAL) | The rail yard was tried at one span only. | Shorter yards where the reserve's land side is cut back. |
+| **Freight terminal without rail** (delta s11, s8128, vesper_bay s11, MINIMAL) | The rail yard was tried at one span only. | Shorter yards where the reserve's land side is cut back. |
 | **Placement failing in every variant** (MINIMAL s404) | Relation repair only swapped seeds. Also, `partition` moves the seeds it is given, so the kept partition was not the trial that passed. | Seeds also move apart along the asked direction, or the district is placed along it from the other one. Trials run on a copy. A repair is kept only when the final partition has fewer failures. |
 | **No road network on the chosen variant** (MINIMAL s11, s1999: an exit edge without land) | The variant search stops at the first good variant, even when no road network on it passes. | The next variants are tried in index order; the first that passes with its roads wins. |
 | **curve_radius at an elevated tee** (nexus s8128) | The check joined M7's split pieces through a junction and measured the junction's kink. | Junctions inside a joined chain count as junction areas, as the check describes. |
@@ -133,13 +133,13 @@ Side-by-side roads merged into one branch (peninsula s11):
 
 ## The six cities
 
-| Nexus City | Nyxllor |
+| Nexus City | Vesper Bay |
 |---|---|
-| <img src="nexus_city/render_iso_city.jpg" width="420"> | <img src="nyxllor/render_iso_city.jpg" width="420"> |
+| <img src="nexus_city/render_iso_city.jpg" width="420"> | <img src="vesper_bay/render_iso_city.jpg" width="420"> |
 
-| Nyxllor with the traced Corporate Core | Delta Megacity |
+| Vesper Bay with the traced Corporate Core | Delta Megacity |
 |---|---|
-| <img src="nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="delta_megacity/render_iso_city.jpg" width="420"> |
+| <img src="vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
@@ -170,11 +170,11 @@ blockout renders (`render_iso_city.jpg` at 8K).
 - **Level steps:** nexus s5077 (8.22 m where a street meets a raised node; before M8a this seed
   had no west exit, now a later hydrology variant has one) and pinned s5077 (11.87 against
   7.69 m).
-- **Spaceport open share:** nyxllor s3141 (Launch Key 74% open against 50%), also MINIMAL
+- **Spaceport open share:** vesper_bay s3141 (Launch Key 74% open against 50%), also MINIMAL
   s3141.
 - **MINIMAL s404 and s3141:** the west exit is not built on any variant; s404 also has a
   one-node walkway component.
-- **Build time:** Delta Megacity and Nyxllor take 5 to 7 minutes with `CITYGEN_WORKERS` 2 to 4
+- **Build time:** Delta Megacity and Vesper Bay take 5 to 7 minutes with `CITYGEN_WORKERS` 2 to 4
   (9 and 8 full-city tries), so the sample build-time test allows 600 s instead of 300 s.
 - **Visual review:** previews were looked at for the failing builds and the known defects (the
   hook at the map edge, now pinned by a test); passing builds were not reviewed one by one, so

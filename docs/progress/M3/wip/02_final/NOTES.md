@@ -11,4 +11,4 @@ All five samples pass all 44 checks (13 new for M3). Since WIP 01:
 - the flight cone caps heights on a 45 degree surface;
 - each massing close-up is centered on its district's buildings.
 
-Images: massing of Nyxllor and Nexus City, heights of Nexus City and Delta Megacity.
+Images: massing of Vesper Bay and Nexus City, heights of Nexus City and Delta Megacity.

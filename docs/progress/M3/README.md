@@ -20,11 +20,11 @@ for byte:
 - `report.json` and `report.txt`: the checks plus a stats table (now with buildings);
 - `trace.json`: stage hashes.
 
-The specs are unchanged (`docs/progress/M1a2/`, Nyxllor in `cities/nyxllor/`).
+The specs are unchanged (`docs/progress/M1a2/`, Vesper Bay in `cities/vesper_bay/`).
 
 | City | Buildings | Floor area km2 | Tallest m | Skybridges (km) | Ground-floor units | Roof items | Green roofs | Complexes | Landmarks | Megasites |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Nyxllor | 5887 | 29.7 | 480 | 230 (2.57) | 17260 | 15997 | 503 | 5 | 1 | 3 |
+| Vesper Bay | 5887 | 29.7 | 480 | 230 (2.57) | 17260 | 15997 | 503 | 5 | 1 | 3 |
 | Saltreach Free Port | 3182 | 14.0 | 292 | 180 (1.95) | 10450 | 8919 | 390 | 2 | 0 | 3 |
 | Delta Megacity | 5454 | 22.8 | 480 | 328 (3.78) | 18123 | 15896 | 449 | 4 | 1 | 3 |
 | Nexus City | 6409 | 19.5 | 480 | 255 (3.04) | 19947 | 17390 | 622 | 6 | 4 | 7 |
@@ -35,13 +35,13 @@ area):
 
 | City | Median / p90 / max building height, coverage, FAR by district |
 |---|---|
-| Nyxllor | Corporate Core 132 / 192 / 480 m, 80%, 13.1; The Stacks 157 / 182 / 234 m, 53%, 20.9; Highcrest 20 / 24 / 44 m, 33%, 1.9; Old Town 15 / 21 / 27 m, 96%, 3.4; Neon Strand 21 / 31 / 42 m, 97%, 4.7; Vess Docks 12 / 15 / 16 m, 28%, 0.3; Launch Key 21 / 32 / 40 m, 14%, 0.5; Scholar Isle 28 / 40 / 72 m, 32%, 2.5 |
+| Vesper Bay | Corporate Core 132 / 192 / 480 m, 80%, 13.1; The Stacks 157 / 182 / 234 m, 53%, 20.9; Highcrest 20 / 24 / 44 m, 33%, 1.9; Old Town 15 / 21 / 27 m, 96%, 3.4; Neon Strand 21 / 31 / 42 m, 97%, 4.7; Vess Docks 12 / 15 / 16 m, 28%, 0.3; Launch Key 21 / 32 / 40 m, 14%, 0.5; Scholar Isle 28 / 40 / 72 m, 32%, 2.5 |
 | Saltreach Free Port | Crown Island 128 / 172 / 292 m, 81%, 14.0; Kettle Island 11 / 16 / 16 m, 30%, 0.3; Westreef 15 / 21 / 27 m, 96%, 3.4; Lumen Key 28 / 40 / 60 m, 27%, 2.1; Palm Key 24 / 24 / 44 m, 25%, 1.6 |
 | Delta Megacity | Transit Nexus 46 / 70 / 105 m, 72%, 6.1; Midtown 42 / 66 / 119 m, 68%, 7.3; Corporate Core 132 / 188 / 480 m, 83%, 15.1; Old Town 15 / 21 / 27 m, 96%, 3.5; Industrial Port 11 / 16 / 16 m, 32%, 0.3; Research Campus 28 / 40 / 64 m, 35%, 2.7 |
 | Nexus City | Corporate Core 120 / 184 / 480 m, 80%, 12.3; Transit Nexus 49 / 66 / 102 m, 70%, 6.5; Aurora Spaceport 20 / 32 / 32 m, 26%, 0.5; Neon Market 21 / 32 / 46 m, 96%, 4.7; Northridge 24 / 24 / 51 m, 34%, 2.2; Midtown 38 / 63 / 119 m, 70%, 7.6; Old Town 15 / 21 / 27 m, 95%, 3.3; Harbor Industrial 12 / 16 / 16 m, 31%, 0.3; Silver Island 32 / 52 / 60 m, 32%, 2.7 |
 | Greyhook (peninsula) | Wallgate Heights 20 / 24 / 48 m, 34%, 2.0; Neckgate 32 / 60 / 112 m, 72%, 5.1; The Stacks 160 / 186 / 237 m, 53%, 19.6; Lantern Strip 21 / 32 / 120 m, 97%, 4.7; Eastside Docks 11 / 16 / 16 m, 31%, 0.3; Hook Spaceport 24 / 36 / 40 m, 24%, 0.7 |
 
-Landmarks: the megatower of Nyxllor, Delta Megacity and Nexus City (Nexus Spire, 480 m), the
+Landmarks: the megatower of Vesper Bay, Delta Megacity and Nexus City (Nexus Spire, 480 m), the
 three Nexus spires (Kaze Tower 300 m, Helios Tower 260 m, Mirai Tower 234 m: asked 290 m,
 capped by the Aurora Spaceport flight cone, as the report notes) and the Lantern Wheel of
 Greyhook (120 m). Megasites filled: three spaceports (Launch Key, Aurora, Hook), four transit
@@ -203,7 +203,7 @@ stages, and expects the same bytes.
 
 | City | Trace entries | Model sha256 (x86_64, libstdc++ GEOS) | libc++ GEOS |
 |---|---|---|---|
-| Nyxllor | 5908 | `11586629e5b833b74fd9928a280030753c4975342d757d951391c4df1e86e333` | same |
+| Vesper Bay | 5908 | `11586629e5b833b74fd9928a280030753c4975342d757d951391c4df1e86e333` | same |
 | Saltreach Free Port | 61 | `92b71ab7985c37f6f811f92711d80ab2064b75236ce1d588ab4f630c64cc356f` | same |
 | Delta Megacity | 2775 | `d7df4db62d678b96d4e86443c01a7d1509fccb2a0eafbb74cc66554bb0c39103` | same |
 | Nexus City | 8556 | `cf095fc347ed855cc845a07b216dd1b6c9332eb9381db091b5fa2bd5489b7e25` | same |
@@ -217,7 +217,7 @@ process meanwhile and take most of that wall time), skybridges, and megasites pl
 
 | City | CLI build | M3 lot jobs (CPU) | Skybridges | Megasites + walkways |
 |---|---|---|---|---|
-| Nyxllor | 64 s | 6.2 s (19.5 s) | 1.0 s | 1.0 s |
+| Vesper Bay | 64 s | 6.2 s (19.5 s) | 1.0 s | 1.0 s |
 | Saltreach Free Port | 31 s | 3.6 s (11.0 s) | 0.7 s | 0.5 s |
 | Delta Megacity | 66 s | 5.9 s (17.3 s) | 1.4 s | 0.8 s |
 | Nexus City | 77 s | 6.6 s (21.9 s) | 1.4 s | 1.7 s |
