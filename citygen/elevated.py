@@ -580,6 +580,9 @@ class Elev:
         plan = self.stack_plan.get(n)
         if plan is not None and on == set(plan["lift"]):
             return "stack"
+        for p in self.stack_plan.values():
+            if n in p["under"][1] and on <= p["under"][2]:
+                return "under"      # avenues meeting at grade under a stack's lifted deck
         if n in self.forced:
             return "split"
         cls = {s["road_class"] for s in others}
@@ -766,7 +769,7 @@ class Elev:
                     meets.append((oid, t_o, _z_at(pr, t_o), _project(r.pts, r.cum, p)[0]))
             on = {sg["id"] for sg, _ in r.segs}
             for k in range(1, len(r.nodes) - 1):
-                if self.kind.get((r.id, r.nodes[k])) not in ("cross", "tee", "stack"):
+                if self.kind.get((r.id, r.nodes[k])) not in ("cross", "tee", "stack", "under"):
                     continue
                 for o in self.inc[r.nodes[k]]:
                     # the avenue legs of an overpass (they cross the run there once
@@ -1732,8 +1735,9 @@ class Elev:
 
     def _corridor(self, n: str, pair) -> tuple[list, list] | None:
         """The highway through n along a pair of its legs and on through the nodes beyond
-        (the highway leg there that runs straightest on, 35 degrees at most) to its ends, in a
-        Run's form (segments with reversed flags, nodes); None where it closes on itself."""
+        (the highway leg there that runs straightest on, 35 degrees at most, or round a bend
+        of up to 90 degrees where it is the only one) to its ends, in a Run's form (segments
+        with reversed flags, nodes); None where it closes on itself."""
         sides = []
         seen = {pair[0]["id"], pair[1]["id"]}
         for s in pair:
@@ -1748,12 +1752,13 @@ class Elev:
                     break
                 v = self.leg_dir(cur, far)
                 nxt = None
-                for o in self.inc[far]:
-                    if o["id"] in seen or o["road_class"] != "highway" or o["start"] == o["end"]:
-                        continue
+                hw = [o for o in self.inc[far] if o["id"] not in seen and
+                      o["road_class"] == "highway" and o["start"] != o["end"]]
+                for o in hw:
                     w = self.leg_dir(o, far)
                     d = round(v[0] * w[0] + v[1] * w[1], 9)
-                    if d <= -STRAIGHT_COS and (nxt is None or (d, o["id"]) < nxt[0]):
+                    lim = 0.0 if len(hw) == 1 else -STRAIGHT_COS
+                    if d <= lim and (nxt is None or (d, o["id"]) < nxt[0]):
                         nxt = ((d, o["id"]), o)
                 if nxt is None:
                     break
@@ -1839,15 +1844,21 @@ class Elev:
                     old[s["id"]] = bool(s["attrs"].get("elevated"))
                     by[s["id"]] = s
                     s["attrs"]["elevated"] = flag
-            # the lifted window must not hold a node that brings a run down
+            # a node of avenues the lifted window would come down at (three of them, or two
+            # that do not run straight on under it) stays at grade under the deck instead;
+            # nothing else may bring it down
             run, k, idx = lw
-            bad = False
+            bad, under = False, []
             for i in range(idx[0] + 1, idx[-1] + 1):
                 if run.nodes[i] == n:
                     continue
                 on = {run.segs[i - 1][0]["id"], run.segs[i][0]["id"]}
                 _, u = _at(run.pts, run.cum, run.s_nodes[i])
-                if self.node_kind(run.nodes[i], on, u) in ("split", "branch"):
+                kd = self.node_kind(run.nodes[i], on, u)
+                if kd == "split" and all(o["road_class"] == "avenue" for o in
+                                         self.inc[run.nodes[i]] if o["id"] not in on):
+                    under.append(run.nodes[i])
+                elif kd in ("split", "branch"):
                     bad = True
             if bad:
                 for sid, f in sorted(old.items()):
@@ -1857,7 +1868,9 @@ class Elev:
                 continue
             taken |= ids_l | ids_g
             self.stack_plan[n] = {"lift": tuple(s["id"] for s in lift), "ground": gw[0],
-                                  "gk": gw[1], "old": old, "by": by}
+                                  "gk": gw[1], "old": old, "by": by,
+                                  "under": (run.id, frozenset(under),
+                                            frozenset(s["id"] for s, _ in run.segs))}
 
     def unplan(self, n: str) -> None:
         """A stack that did not fit: its highways keep the viaducts M7 chose for them."""
@@ -2430,7 +2443,8 @@ def rebuild(E: Elev) -> None:
     for r in sorted(E.runs, key=lambda r: r.id):
         cuts = {0.0, r.L}
         for k in range(1, len(r.nodes) - 1):
-            if E.kind.get((r.id, r.nodes[k])) not in ("cross", "tee", "plain", "stack"):
+            if E.kind.get((r.id, r.nodes[k])) not in ("cross", "tee", "plain", "stack",
+                                                      "under"):
                 cuts.add(r.s_nodes[k])
         cuts |= set(E.cut_pts.get(r.id, []))
         cuts = sorted(cuts)
@@ -2446,8 +2460,8 @@ def rebuild(E: Elev) -> None:
             attrs.update({"elevated": True, "split_of": r.id, "level": r.level})
             over = [G.qpoint(_at(r.pts, r.cum, r.s_nodes[k])[0])
                     for k in range(1, len(r.nodes) - 1)
-                    if E.kind.get((r.id, r.nodes[k])) in ("cross", "tee", "stack") and
-                    a < r.s_nodes[k] < b]
+                    if E.kind.get((r.id, r.nodes[k])) in ("cross", "tee", "stack", "under")
+                    and a < r.s_nodes[k] < b]
             if over:
                 attrs["overpass_at"] = over
             if r.branch_of is not None:
@@ -2734,7 +2748,7 @@ def elevate(spec, ctx, net) -> dict:
             apart = {}
             for r in E.runs:
                 for k in range(1, len(r.nodes) - 1):
-                    if E.kind.get((r.id, r.nodes[k])) in ("cross", "tee", "stack"):
+                    if E.kind.get((r.id, r.nodes[k])) in ("cross", "tee", "stack", "under"):
                         apart[r.nodes[k]] = {r.segs[k - 1][0]["id"], r.segs[k][0]["id"]}
             extra: dict = {}
             for _k in range(3):

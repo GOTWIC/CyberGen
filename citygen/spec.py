@@ -332,6 +332,10 @@ class Water(_Model):
 class NamedHighway(_Model):
     name: Name
     route: Annotated[list[str], Field(min_length=2)]
+    reuse: bool = Field(True, description="False: the route keeps to its own line and crosses "
+                                          "the highways it meets instead of running along "
+                                          "them (a crosstown; M12 builds a stack where it "
+                                          "crosses one with room).")
 
 
 class Highways(_Model):
