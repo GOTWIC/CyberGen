@@ -8,7 +8,7 @@ code.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M8 done, M9 to M15 planned |
+| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M9 done, M10 to M15 planned |
 | 2 | assetgen | A unique 3D model for every building, plus roads, sidewalks and street furniture; textures | Planned |
 | 3 | atmosgen | Lighting, sky, weather and atmospherics in Unreal | Planned |
 | 4 | lifegen | Traffic, crowds, trains and aircraft, placed and driven procedurally | Planned |
@@ -42,7 +42,7 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 | M8c | Transit that passes on a city's first layout: flying loops as Dubins rings, open lines off the roads or as Dubins paths where the roads fail them; Delta Megacity from 9 full-city tries to 1, the sweep 58 of 68 (M8b 51), no transit failures left in it | Done | [`docs/progress/M8c`](docs/progress/M8c) |
 | M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Vesper Bay, then Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](docs/progress/M8d) |
-| M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
+| M9 | Tunnels as level -1 of the road network: cut-and-cover tunnels under districts and immersed tubes under water (portals, walled approaches, ventilation buildings), metro tunnels lowered under foundations and road tunnels, pedestrian underpasses; four tunnel checks (70 in all), tunnel boxes and a cutaway render in the blockout; Nexus City gets the Midtown Tunnel, Greyhook the Neckwater Tube; the sweep passes 58 of 68 as on M8c | Done | [`docs/progress/M9`](docs/progress/M9) |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
 | M12 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
@@ -50,7 +50,7 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
-## Latest maps (M8c)
+## Latest maps (M9)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M8a swept them and the test specs over many seeds and
@@ -65,22 +65,41 @@ loop is one ring of Dubins paths (straight runs and arcs at the mode's radius) t
 stops, and an open line the roads fail goes off them, or from stop to stop on Dubins paths.
 Delta Megacity now builds on its first try in about a minute (9 tries, about 6 minutes,
 before), and the sweep passes 58 of 68 builds with no transit failure left (see
-[`docs/progress/M8c`](docs/progress/M8c)).
+[`docs/progress/M8c`](docs/progress/M8c)). M9 adds tunnels: Nexus City's ring highway runs
+under Midtown in a cut-and-cover tunnel, and Greyhook's spine highway crosses its river in an
+immersed tube instead of on a bridge; every city's metro is lowered under the tower
+foundations, and pedestrian underpasses take sidewalks under the at-grade highways (see
+[`docs/progress/M9`](docs/progress/M9)).
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):
 
 | Nexus City (from the concept image) | Vesper Bay (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M8c/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M9/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M9/vesper_bay/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
-| <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/delta_megacity/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M9/vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M9/delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
-| <img src="docs/progress/M8c/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/peninsula_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M9/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M9/peninsula_city/render_iso_city.jpg" width="420"> |
+
+Tunnels (M9): Greyhook's Neckwater Tube, 756 m long, 15.8 m down under the river bed, with a
+ventilation building at each shore portal, and Nexus City's Midtown Tunnel under a street that
+crosses its lid (each with a street-scale inset and the road and metro profiles):
+
+| Greyhook, Neckwater Tube | Nexus City, Midtown Tunnel |
+|---|---|
+| <img src="docs/progress/M9/peninsula_city/preview_tunnels.png" width="420"> | <img src="docs/progress/M9/nexus_city/preview_tunnels.png" width="420"> |
+
+The cutaway render (8K): the city cut along the tunnel, the earth taken away on the camera's
+side, looking down the open approach and through the portal:
+
+| Greyhook | Nexus City |
+|---|---|
+| <img src="docs/progress/M9/peninsula_city/render_cutaway.jpg" width="420"> | <img src="docs/progress/M9/nexus_city/render_cutaway.jpg" width="420"> |
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 
@@ -119,7 +138,8 @@ built again eight times) and now:
 |---|---|
 | <img src="docs/progress/M8c/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M8c/vesper_bay/preview_transit.png" width="420"> |
 
-Each M8c city folder has every generator preview, the transit map of M8b, the Blender
+Each M9 city folder has every generator preview, `preview_tunnels.png` where a city has
+tunnels, the build report, the stage trace and the 8K renders. Each M8c city folder has every generator preview, the transit map of M8b, the Blender
 renders, the build report and the stage trace, and `docs/progress/M8c/same_layout/` the
 transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) are in
 `docs/progress/M8d/`, the M8b ones in `docs/progress/M8b/`, the M8a sweep tables in
