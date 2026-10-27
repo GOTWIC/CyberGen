@@ -162,21 +162,34 @@ def signature(coll: str, e: dict) -> str:
     return json.dumps([coll, e.get("type"), _pts(e)], separators=(",", ":"))
 
 
-def priors(data: dict) -> dict[str, list[tuple[str, str]]]:
+class Priors:
     """The ids of a model by the id they would have without a collision suffix:
-    base -> [(id, signature)]."""
-    out: dict[str, list[tuple[str, str]]] = {}
-    for c in ORDER:
-        for e in data.get(c, []):
-            m = SUFFIX.match(e["id"])
-            out.setdefault(m.group(1) if m else e["id"], []).append(
-                (e["id"], signature(c, e)))
-    return out
+    base -> [(id, signature)], the signatures made when asked for."""
+
+    def __init__(self, data: dict):
+        self.ids: dict[str, list[tuple[str, dict]]] = {}
+        for c in ORDER:
+            for e in data.get(c, []):
+                m = SUFFIX.match(e["id"])
+                self.ids.setdefault(m.group(1) if m else e["id"], []).append((c, e))
+
+    def __contains__(self, base: str) -> bool:
+        return base in self.ids
+
+    def count(self, base: str) -> int:
+        return len(self.ids.get(base, ()))
+
+    def __getitem__(self, base: str) -> list[tuple[str, str]]:
+        return [(e["id"], signature(c, e)) for c, e in self.ids[base]]
+
+
+def priors(data: dict) -> Priors:
+    return Priors(data)
 
 
 class Renamer:
     def __init__(self, data: dict, keep: set[str] | frozenset = frozenset(),
-                 prior: dict | None = None):
+                 prior: "Priors | None" = None):
         self.d = data
         self.prior = prior or {}
         self.by_id: dict | None = None
@@ -296,8 +309,9 @@ class Renamer:
             idx = groups[b]
             if len(idx) > 1:
                 idx = sorted(idx, key=lambda i: self._key(items[i]))
-            if b in self.prior:
+            if b in self.prior and (len(idx) > 1 or self.prior.count(b) > 1):
                 # an entity the old city had (same kind and geometry) keeps its old id
+                # (where either city has more than one: else it gets the base anyway)
                 olds: dict[str, list[str]] = {}
                 for nid, sig in self.prior[b]:
                     olds.setdefault(sig, []).append(nid)
@@ -408,13 +422,13 @@ def _apply(obj, path: list[str], fn) -> None:
 
 
 def rename_data(data: dict, keep: set[str] | frozenset = frozenset(),
-                prior: dict | None = None) -> dict[str, str]:
+                prior: "Priors | None" = None) -> dict[str, str]:
     """Renames the entities of a model dict in place; returns old id -> new id. Ids in
     `keep` are stable already and stay; `prior` (`priors`) are an older city's."""
     return Renamer(data, keep, prior).run()
 
 
-def rename(model, keep: set[str] | frozenset = frozenset(), prior: dict | None = None):
+def rename(model, keep: set[str] | frozenset = frozenset(), prior: "Priors | None" = None):
     """(the model with stable ids, old id -> new id)."""
     from .model import CityModel
 

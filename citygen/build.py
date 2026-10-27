@@ -72,7 +72,8 @@ class Built:
     stable_ids: frozenset = frozenset()   # M10: ids already stable (named before the props)
     frame: object = None                  # M10: roads a district regeneration holds
     held_lines: dict = None               # M10: transit lines it keeps (name -> old row)
-    prior: dict = None                    # M10: the old city's ids (`ids.priors`)
+    prior: object = None                  # M10: the old city's ids (`ids.priors`)
+    model_text: str = None                # M10: the model's JSON, when made already
 
     @property
     def passed(self) -> bool:
@@ -447,7 +448,7 @@ def choices(b: Built) -> dict:
 
 def replay(result: Result, chosen: dict, workers: int | None = None, local: bool = True,
            buildings: bool = True, spec: CitySpec | None = None, frame=None,
-           held_lines: dict | None = None, prior: dict | None = None) -> Built:
+           held_lines: dict | None = None, prior=None) -> Built:
     """M10: the city at the choices a search made (`choices`), without the search: water and
     districts of the hydrology variant, its road variant, the local layout salt. With `spec`
     the stages from the local streets on (M2) use it instead (a district edited; M1 stays the
@@ -762,7 +763,7 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     paths = [out / "city_model.json", out / "report.json", out / "report.txt",
              out / "preview_map.png"]
-    paths[0].write_text(b.model.to_json() + "\n", encoding="utf-8")
+    paths[0].write_text(b.model_text or (b.model.to_json() + "\n"), encoding="utf-8")
     rep = b.report()
     paths[1].write_text(json.dumps(rep, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     paths[2].write_text(C.report_text(rep), encoding="utf-8")

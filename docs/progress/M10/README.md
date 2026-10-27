@@ -129,7 +129,15 @@ city comes back the same, and the splice guarantees it byte for byte where a sta
 perfectly local. Skipping the M1 search (the slow part of a full build) keeps a sample
 district under a minute.
 
-REGEN_TABLE
+One district of every sample regenerated on a new seed (`citygen build SPEC OUT --base
+BUILD --district NAME`, `CITYGEN_WORKERS=4`, the Mac shared with a sweep and the test suite
+of other sessions); every check passes on every result:
+
+TIMING_TABLE
+
+"Outside" counts the entities that are not the district's own and differ from the old
+city; the farthest is measured from the district's outline to the entity's shape. Maps and
+reports: [`regenerated/`](regenerated/).
 
 ## Pins and overrides
 
@@ -181,7 +189,13 @@ from the spec, applies the overrides, then each regeneration in turn, and compar
 bytes; with other code it still rebuilds but says so (a lock is a promise of the code it
 names).
 
-LOCK_TABLE
+| Release | Regenerations | `citygen lock --verify` |
+|---|---|---|
+| Saltreach Free Port 1.0 ([`city.lock.json`](archipelago_free_port/city.lock.json)) | none | PASS, the same `city_model.json` byte for byte, 28 s |
+| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 106 s |
+
+The tests lock the test city after a regeneration and rebuild it byte for byte, and check
+that a lock refuses a model edited by hand.
 
 ## Model diff
 

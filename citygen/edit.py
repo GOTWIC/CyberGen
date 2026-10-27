@@ -176,8 +176,10 @@ def regenerate(state: dict, old: CityModel, district: str, spec_data: dict | Non
     stats["regenerated"] = {k: v for k, v in info.items() if k != "notes"}
     out.stats = {**new.stats, **stats}
     out.notes = new.notes + info["notes"]
+    out.model_text = model.to_json() + "\n"
     edit = {"district": district, "entry": entry_of(nd), "seed": int(nd.seed),
-            "overrides": state.get("overrides"), "model_sha256": model_sha(model)}
+            "overrides": state.get("overrides"),
+            "model_sha256": hashlib.sha256(out.model_text.encode("utf-8")).hexdigest()}
     return out, edit
 
 
@@ -311,10 +313,20 @@ GROUND = ("blocks", "lots", "open_spaces", "buildings", "skybridges", "site_elem
 
 
 def _refs(coll: str, e: dict):
-    """Every live reference of an entity (ids it names)."""
+    """Every live reference of an entity (ids it names), in `ID.REFS` order."""
     for path in ID.REFS.get(coll, ()):
-        if path != "merged_group_id":   # a lot group: a key, not an entity
+        if path == "merged_group_id":
+            continue
+        if "." in path:
             yield from _get(e, path.split("."))
+        elif path.endswith("[]"):
+            v = e.get(path[:-2])
+            if v:
+                yield from (x for x in v if isinstance(x, str))
+        else:
+            v = e.get(path)
+            if isinstance(v, str):
+                yield v
     a = e.get("attrs") or {}
     for k in ATTR_REFS:
         if k == "split_of" and coll != "walkways":
@@ -500,6 +512,7 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
                 for t in _refs(c, e):
                     r.setdefault(t, []).append(i)
     dangling = []
+    probed: set = set()
     work = deque(sorted(i for i, v in src.items() if v == "n"))
     gone = deque(sorted(i for c in io for i in io[c] if i not in src))
 
@@ -547,7 +560,7 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
                     take(j)
             old_referrers(i)
         if not work and not gone:
-            _ground_neighbors(src, io, inn, take, gone, changed)
+            _ground_neighbors(src, io, inn, take, gone, changed, probed)
     return dangling
 
 
@@ -575,31 +588,41 @@ def _ground_shape(c: str, e: dict):
     return None
 
 
-def _ground_neighbors(src, io, inn, take, gone, changed) -> None:
+def _ground_neighbors(src, io, inn, take, gone, changed, probed: set) -> None:
     """Old props and plants next to what the new build changed on the ground (props, plants,
     buildings, and the junctions, crosswalks, sidewalks, lanes and structures of the seam,
-    whose keep-outs an old prop could stand in)."""
+    whose keep-outs an old prop could stand in). Each new entity probes once (`probed`):
+    the old props only get fewer."""
     olds = [(c, i) for c in ("props", "plants") for i in io[c] if src.get(i) == "o"]
     if not olds:
         return
     pts = shapely.points(np.array([io[c][i]["position"][:2] for c, i in olds],
                                   dtype=np.float64))
     tree = shapely.STRtree(pts)
-    probes, reach = [], []
+    cand = []
     for c in ("props", "plants", "buildings", "junctions", "crosswalks", "sidewalks", "lanes",
               "structures"):
         for i, e in inn[c].items():
-            if src.get(i) != "n" or not changed(i):
+            if i in probed or src.get(i) != "n" or not changed(i):
                 continue
-            g = _ground_shape(c, e)
-            if g is not None:
-                probes.append(g)
-                reach.append(CROWN_M if c == "buildings" else GROUND_M)
-    if not probes:
+            probed.add(i)
+            p = ID._pts(e)
+            if p:
+                cand.append((c, e, min(q[0] for q in p), min(q[1] for q in p),
+                             max(q[0] for q in p), max(q[1] for q in p)))
+    if not cand:
         return
+    # their bounding boxes first (most of the district is far from any old prop), then
+    # the shapes of those near one
+    box = shapely.box(*np.array([t[2:] for t in cand], dtype=np.float64).T)
+    reach = np.array([CROWN_M if t[0] == "buildings" else GROUND_M for t in cand])
+    near = sorted({int(k) for k in tree.query(box, predicate="dwithin", distance=reach)[0]})
     hit = set()
-    for g, r in zip(probes, reach):
-        hit.update(int(k) for k in tree.query(g, predicate="dwithin", distance=r))
+    for k in near:
+        c, e = cand[k][:2]
+        g = _ground_shape(c, e)
+        if g is not None:
+            hit.update(int(j) for j in tree.query(g, predicate="dwithin", distance=reach[k]))
     for k in sorted(hit):
         c, i = olds[k]
         if src.get(i) != "o":
