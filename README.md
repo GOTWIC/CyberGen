@@ -1,9 +1,9 @@
 # CyberGen
 
 Offline generators for cyberpunk open cities, in five stages: from one text prompt to a city
-that is laid out, modelled, lit, populated and given a story. Built for Nyxllor, a Cyberpunk
-2077-inspired open-city game in Unreal Engine 5. No API or network calls: a Claude Code
-session turns the prompt into a spec, and code does the rest.
+that is laid out, modelled, lit, populated and given a story. Describe a city to Claude Code,
+the `citygen` skill turns the description into a spec, and the generators build the rest on
+your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
@@ -13,14 +13,12 @@ session turns the prompt into a spec, and code does the rest.
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
 
-Stages 1 and 2 are city-agnostic and live here. Nyxllor gets its own repo at stage 3.
-
 ---
 
 ## Stage 1: layoutgen
 
-`citygen` turns a prompt (and an optional concept image) into a complete city layout, byte for
-byte the same on any machine, then builds a Blender blockout and exports it for Unreal.
+`citygen` turns a prompt (and an optional concept image) into a complete city layout, then
+builds a 3D blockout of it in Blender and exports it for game engines such as Unreal.
 
 Spec: [`docs/citygen_scope.md`](docs/citygen_scope.md) · Full milestone log:
 [`docs/citygen_milestones.md`](docs/citygen_milestones.md) · Builds:
@@ -93,16 +91,16 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | | Milestone | What it adds | Status |
 |---|---|---|---|
 | M0 | City spec | Spec format, district presets, the prompt-to-spec skill | ✅ Done |
-| M1 | Water, districts, main roads | Coasts, rivers, deltas, islands, districts, highways, avenues, bridges; identical builds on any machine | ✅ Done |
+| M1 | Water, districts, main roads | Coasts, rivers, deltas, islands, districts, highways, avenues, bridges | ✅ Done |
 | M2 | Streets and lots | Local streets, junctions, sidewalks, crosswalks, blocks, lots, open space | ✅ Done |
 | M3 | Buildings | Towers, megablocks, landmarks, complexes, skybridges, megasites | ✅ Done |
 | M4 | Blockout | Blender model, renders, 2D map, USD and glTF exports | ✅ Done |
 | M5 | Transit | Metro, elevated rail, monorail, maglev, sky tubes, stations | ✅ Done |
 | M6 | Props and plants | Street furniture, parked cars, signs, trees, greenery | ✅ Done |
 | M7 | Elevated highways | Viaducts, ramps, interchanges; importing a hand-traced district | ✅ Done |
-| M8 | Robustness | Cities that build cleanly across many seeds; better transit and interchanges | ✅ Done |
+| M8 | Reliability | A working city from any seed; better transit and interchanges | ✅ Done |
 | M9 | Tunnels | Road tunnels under districts and water, metro tunnels, pedestrian underpasses | ✅ Done |
-| M10 | Editing | Stable ids, regenerating one district, pins and overrides, locked releases | ✅ Done |
+| M10 | Editing | Regenerate one district, keep or change single buildings, freeze a version | ✅ Done |
 | M11 | Gameplay layer | Places, factions, wealth and danger, traffic and crowd data, parking, fast travel | ✅ Done |
 | M12 | Stack interchanges | Four-level highway crossings | ✅ Done |
 | M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | 🚧 In progress |
@@ -152,8 +150,7 @@ Being planned.
 - `docs/`: each stage's spec (`<generator>_scope.md`) and full milestone log
   (`<generator>_milestones.md`); `docs/progress/<milestone>/` holds each milestone's builds
   and images.
-- `maps/`, `pipeline/`, `reference/`, `unreal/`, `out/`: the earlier hand-traced Corporate Core
-  pipeline (moves to the nyxllor repo at stage 3, except the traced map the pinned demo
-  imports).
+- `maps/`, `pipeline/`, `reference/`, `unreal/`, `out/`: an earlier hand-tracing pipeline; its
+  traced Corporate Core map is the pinned demo's input.
 
 Each later stage adds its own package, spec, milestone log and README section the same way.

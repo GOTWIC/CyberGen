@@ -538,8 +538,7 @@ Reply with:
 ```
 
 Worked examples (prompts, specs and schematics): `docs/progress/M0/`. A pinned import:
-`cities/vesper_bay_pinned/city_spec.json` (Vesper Bay, the sample city called Nyxllor up to
-M8c, with the traced Corporate Core as an island in its bay). Builds of the same cities
+`cities/vesper_bay_pinned/city_spec.json` (Vesper Bay with the traced Corporate Core as an island in its bay). Builds of the same cities
 (previews and reports): `docs/progress/M4/` with the Blender blockout renders and 2D maps,
 `docs/progress/M3p/` with buildings, skybridges, landmarks and
 megasites (the M3 polish; `docs/progress/M3/` before it), `docs/progress/M2/` with local streets, blocks and lots,
