@@ -30,7 +30,9 @@ without the new fields (and salted as the build salted it), the bytes equal the 
 (the pinned demo: the M11 README's sha256). The blockout plans of the five samples are
 unchanged (their goldens stand).
 
-X86_NOTE
+Every model is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker image
+`citygen-x86`, `linux/amd64`, worktree mounted read-only, `CITYGEN_WORKERS=3`), and `citygen
+trace diff` finds every stage identical in all seven (`<city>/trace.json`).
 
 ## The stack in Vesper Bay Stacks
 
