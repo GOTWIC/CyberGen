@@ -27,7 +27,9 @@ passes all 77 checks on its first full-city try (Nexus City on its third, as in 
 without the new fields, the bytes equal the M11 golden. The blockout plans of the five
 samples are unchanged (their goldens stand).
 
-X86_NOTE
+Every model is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker image
+`citygen-x86`, `linux/amd64`, worktree mounted read-only, `CITYGEN_WORKERS=3`), and `citygen
+trace diff` finds every stage identical in all six (`<city>/trace.json`).
 
 ## The stack in Vesper Bay Pinned
 
