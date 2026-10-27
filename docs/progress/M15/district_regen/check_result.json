@@ -1,0 +1,105 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 240 of 5146 actors loaded at the start, 966 after a teleport to (-1152, 1152) (962 new)",
+  "collision: 507 of 507 traces down hit (building 255, ground 51, water 37, junction 32, road_street 24, open_plaza 20), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 233 m along a 234 m sidewalk path in 40 s, 100% of frames on the ground, reached its end, stepped round 1 x nothing found"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 5146,
+   "loaded_at_start": 240,
+   "loaded_far": 966,
+   "only_far": 962,
+   "far_spot_m": [
+    -1152.0,
+    1152.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "ground": 51,
+     "building": 255,
+     "road_service": 8,
+     "road_street": 24,
+     "prop_boat": 1,
+     "quay": 13,
+     "structure_deck": 12,
+     "water": 37,
+     "site_container_stack": 4,
+     "junction": 32,
+     "plant_overgrowth": 1,
+     "prop_awning": 11,
+     "plant_facade_greenery": 1,
+     "road_alley": 19,
+     "open_plaza": 20,
+     "sidewalk": 7,
+     "sea": 7,
+     "road_pedestrian": 2,
+     "green_roof": 2
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     378.24,
+     74.55
+    ],
+    [
+     -1152.0,
+     1152.0
+    ],
+    [
+     -640.0,
+     896.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 233.8,
+   "points": 6,
+   "reached": true,
+   "travelled_m": 233.1,
+   "on_ground": 1.0,
+   "max_drop_m": 0.1,
+   "seconds": 39.6,
+   "stopped_by": {
+    "nothing found": 1
+   },
+   "stops": [
+    [
+     344.34,
+     15.57,
+     1.13,
+     "nothing found"
+    ]
+   ],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Greyhook M10",
+ "shots": [
+  "dist/redo/shots/unreal_iso_city.png",
+  "dist/redo/shots/unreal_view_1_d03.mg.w78n700.bld.w53n740.png",
+  "dist/redo/shots/unreal_view_2_d02.mg.e923n1346.bld.e831n1381.png",
+  "dist/redo/shots/unreal_view_3_d04_street.png"
+ ],
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 108.0,
+ "exit_code": 0,
+ "wall_s": 137.7
+}

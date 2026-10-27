@@ -1,0 +1,54 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 11211,
+  "updated": 0,
+  "deleted": 0,
+  "unchanged": 0
+ },
+ "meshes": {
+  "imported": 9129,
+  "kept": 0,
+  "deleted": 0
+ },
+ "tiles_imported": 197,
+ "materials": {
+  "created": 90,
+  "updated": 0,
+  "kept": 0,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 3,
+  "kept": 0
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.6,
+  "meshes": 26.83,
+  "level": 0.51,
+  "actors": 21.2,
+  "prune": 0.19,
+  "graphs": 0.35,
+  "save": 5.91,
+  "digests": 0.37
+ },
+ "dirty_packages": 11301,
+ "actor_count": 11211,
+ "actor_digest": "bc20494d8185fce2",
+ "asset_count": 9222,
+ "asset_digest": "28510949ef7813d2",
+ "level": "/Game/CityGen/NexusCity/Maps/NexusCity",
+ "content_root": "/Game/CityGen/NexusCity",
+ "city": "Nexus City",
+ "counts": {
+  "tiles": 196,
+  "objects": 9097,
+  "instance_actors": 2110,
+  "instances": 82587,
+  "prototypes": 32
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 56.0,
+ "wall_s": 69.7
+}

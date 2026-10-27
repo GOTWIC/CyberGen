@@ -8,7 +8,7 @@ code.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M9, M11 and M12 done, M10 and M13 to M15 planned |
+| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M9, M11, M12 and M15 done, M10, M13 and M14 planned |
 | 2 | assetgen | A unique 3D model for every building, plus roads, sidewalks and street furniture; textures | Planned |
 | 3 | atmosgen | Lighting, sky, weather and atmospherics in Unreal | Planned |
 | 4 | lifegen | Traffic, crowds, trains and aircraft, placed and driven procedurally | Planned |
@@ -48,9 +48,38 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M12 | Stack interchanges: four-level highway-highway crossings (one highway lifted through the crossing, eight one-way directional ramps, the left turns as flyovers at 18 and 27 m), the turbine as their fallback, M7's crossing where neither fits; 2 checks (81 in all); a stack demo (the pinned demo with two crosstowns), the samples and the pinned demo unchanged | Done | [`docs/progress/M12`](docs/progress/M12) |
 | M13 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
-| M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
+| M15 | Unreal export tool (end of stage 1): `citygen unreal` puts a built city into an Unreal 5.8 project headless, as a World Partition level with collision, a material per blockout material, props and plants as instanced meshes, citygen ids as actor tags, the lane, walkway and transit graphs as data assets and a player start; importing again updates by id (the same build writes nothing, a district regenerated with M10 changes exactly the actors of what changed); a play-in-editor check (streaming, traces, a walk) and 8K shots; every sample imported and checked | Done | [`docs/progress/M15`](docs/progress/M15) |
 
-## Latest maps (M9, M11 and M12)
+## Latest maps (M15, M12, M11 and M9)
+
+M15 puts a built city into Unreal 5.8: every sample imports headless into a test project
+made from the First Person template as a World Partition level, streams, and can be walked
+(checked in play-in-editor). Vesper Bay in Unreal (8K, rendered in the editor with every
+actor loaded, the blockout's isometric view; see
+[`docs/progress/M15`](docs/progress/M15)):
+
+<img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="840">
+
+The other samples in Unreal (8K):
+
+| Nexus City | Vesper Bay with the traced Corporate Core |
+|---|---|
+| <img src="docs/progress/M15/nexus_city/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/vesper_bay_pinned/unreal_iso_city.jpg" width="420"> |
+
+| Delta Megacity | Saltreach Free Port |
+|---|---|
+| <img src="docs/progress/M15/delta_megacity/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/archipelago_free_port/unreal_iso_city.jpg" width="420"> |
+
+| Greyhook | Delta Megacity at street level in Unreal |
+|---|---|
+| <img src="docs/progress/M15/peninsula_city/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/delta_megacity/unreal_street_3.jpg" width="420"> |
+
+The same street camera in the Blender blockout and in Unreal (Vesper Bay):
+
+| Blender blockout (EEVEE) | Unreal 5.8 |
+|---|---|
+| <img src="docs/progress/M15/vesper_bay/blender_street_2.jpg" width="420"> | <img src="docs/progress/M15/vesper_bay/unreal_street_2.jpg" width="420"> |
+
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M12 adds stack interchanges where two highways cross with

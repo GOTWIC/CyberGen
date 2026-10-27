@@ -471,11 +471,18 @@ assets (Blueprint classes the importer makes, so no C++ compile), a player start
 sky light and the sky atmosphere. Actors carry `cg.city=`, `cg.key=`, `cg.hash=`, `cg.id=`,
 `cg.type=`, `cg.category=`, `cg.tile=` and `cg.district=` tags. Importing again updates by
 key and hash (a tile's glTF only when one of its objects changed; `MESH_VERSION` and
-`ACTOR_VERSION` re-apply importer changes); the same build twice writes no file. `--check`
-runs `citygen/ue/check_city.py` in the full editor (`-ExecCmds="py ..."`; `-ExecutePythonScript`
-quits when the script returns; `Slate.bAllowThrottling 0` or play-in-editor does not tick
-unfocused): streaming, traces onto ground, roofs and facades, a walk along a sidewalk, and
-with `--shots` renders from the blockout cameras. citygen makes no network call; the
+`ACTOR_VERSION` re-apply importer changes); the same build twice writes no file, and
+`unreal.manifest_changes(old, new)` is exactly what an import over another does (the result's
+`keys`: created, updated, deleted). An updated actor is marked modified (setting tags alone
+does not dirty it), a destroyed one lets go of its meshes, and the meshes no object uses are
+deleted after the save in one batch (deleting an asset the open level still names reloads
+the level and drops unsaved changes). `--check` runs `citygen/ue/check_city.py` in the full
+editor (`-ExecCmds="py ..."`; `-ExecutePythonScript` quits when the script returns;
+`Slate.bAllowThrottling 0` or play-in-editor does not tick unfocused; it waits on
+`WorldPartitionSubsystem.is_streaming_completed`, found through `unreal.ObjectIterator`):
+streaming, traces onto ground, roofs and facades, a walk along sidewalks with head room (the
+sidewalks of a raised road stay at z 0 in the model, an open item), and with `--shots`
+renders from the blockout cameras. citygen makes no network call; the
 official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
 editor) is the interactive route for a Claude session. The test project is
 `/Users/swag/Projects/Unreal Projects/CyberGenImportTest` (outside the repo; never import
