@@ -337,6 +337,10 @@ class Water(_Model):
 class NamedHighway(_Model):
     name: Name
     route: Annotated[list[str], Field(min_length=2)]
+    reuse: bool = Field(True, description="False: the route keeps to its own line and crosses "
+                                          "the highways it meets instead of running along "
+                                          "them (a crosstown; M12 builds a stack where it "
+                                          "crosses one with room).")
 
 
 class Tunnels(_Model):
@@ -363,6 +367,9 @@ class Highways(_Model):
     elevated_share: Fraction = Field(0.2, description="Share of highway length on viaducts.")
     named: list[NamedHighway] = Field(default_factory=list)
     tunnels: Tunnels = Field(default_factory=Tunnels)
+    crossings: Literal["stack", "turbine"] = Field(
+        "stack", description="Interchange where two highways cross with room for it: a "
+                             "four-level stack or a turbine (each the other's fallback).")
 
 
 class TransitLine(_Model):

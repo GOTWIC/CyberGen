@@ -19,10 +19,10 @@ M13 gives citygen ground that is not flat (`citygen/terrain.py`, checks in
 - **Terrain-aware props and plants:** no parked cars on steep streets, no benches or stalls
   on steep ground, no trees on cliff faces, nothing on the ground under a terrain viaduct.
 - **The ground in the blockout:** a 4 m heightfield, with everything draped on it.
-- **Five new checks**, 84 in all.
+- **Five new checks**, 86 in all (with M12's two).
 
 The hilly sample is **Cragmouth** (`cities/cragmouth`). A spec without `terrain` builds exactly
-the city it built before: the five samples and the pinned demo are byte-identical to M11 on M9.
+the city it built before: the five samples, the pinned demo and the M12 stack demo are byte-identical to M12 on M9 and M11.
 
 ## Art direction: Cragmouth
 
@@ -111,7 +111,7 @@ where it stands:
 
 So M7, M9 and M5 clearances need no change, and grades are measured on ground + z.
 
-## Checks (80 to 84)
+## Checks (82 to 86)
 
 | Check | What it asks |
 |---|---|

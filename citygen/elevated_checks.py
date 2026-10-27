@@ -172,9 +172,172 @@ def check_supports(m: CityModel) -> Check:
     return c
 
 
+# --- M12: stacks and turbines -------------------------------------------------------------
+
+SYSTEM = ("stack", "turbine")
+
+
+def _systems(m: CityModel) -> dict:
+    """Interchange id -> its directional ramps, for every stack and turbine."""
+    by: dict = {}
+    for s in m.road_segments:
+        if s.attrs.get("role") == "ramp" and s.attrs.get("template") in SYSTEM:
+            by.setdefault(s.attrs.get("interchange"), []).append(s)
+    return dict(sorted(by.items()))
+
+
+def _unit(a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = (dx * dx + dy * dy) ** 0.5
+    return (dx / L, dy / L) if L > 0 else (1.0, 0.0)
+
+
+def _along(pts, d: float, from_end: bool = False):
+    """The point d m along a polyline (from its end when asked)."""
+    line = LineString(pts)
+    p = line.interpolate(line.length - d if from_end else d)
+    return (p.x, p.y)
+
+
+def _angle(a, b) -> float:
+    return float(np.degrees(np.arctan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1])))
+
+
+def _turning(pts) -> float:
+    """Signed total turn of a polyline in degrees (left positive), over 10 m steps."""
+    line = LineString(pts)
+    qs = [line.interpolate(d) for d in np.arange(0.0, line.length, 10.0).tolist()]
+    qs.append(line.interpolate(line.length))
+    hs = [_unit((a.x, a.y), (b.x, b.y)) for a, b in zip(qs, qs[1:]) if a.distance(b) > 0.5]
+    return sum(_angle(a, b) for a, b in zip(hs, hs[1:]))
+
+
+def check_stack_ramps(m: CityModel) -> Check:
+    c = Check("stack_ramps", "Every stack and turbine has its eight directional ramps, one per "
+                             "movement (four right turns, four left turns, none a loop), each "
+                             "one-way from the right side of one highway to the right side of "
+                             "the other")
+    at: dict = {}
+    for s in m.road_segments:
+        for nid in (s.start, s.end):
+            at.setdefault(nid, []).append(s)
+    pos = {n.id: (n.position[0], n.position[1]) for n in m.road_nodes}
+    systems = _systems(m)
+    for ic, rs in systems.items():
+        turns = sorted(s.attrs.get("turn") or "" for s in rs)
+        if turns != ["left"] * 4 + ["right"] * 4:
+            _limit(c, f"{ic}: ramps {', '.join(turns)} (four right and four left turns wanted)")
+            continue
+        heads = []
+        for s in rs:
+            pts = [tuple(p) for p in s.centerline]
+            h0 = _unit(pts[0], _along(pts, 30.0))
+            h1 = _unit(_along(pts, 30.0, True), pts[-1])
+            heads.append((h0, h1, s.id))
+            turn = _turning(pts)
+            if not s.one_way:
+                _limit(c, f"{s.id} ({ic}): not one-way")
+            if abs(turn) > 150.0:
+                _limit(c, f"{s.id} ({ic}): turns {turn:.0f} degrees (a loop)")
+            elif (turn > 0) != (s.attrs.get("turn") == "left"):
+                _limit(c, f"{s.id} ({ic}): a {s.attrs.get('turn')} turn that turns {turn:.0f} "
+                          "degrees")
+            for nid, h, far, end in ((s.start, h0, _along(pts, 60.0), "leaves"),
+                                     (s.end, h1, _along(pts, 60.0, True), "joins")):
+                roads = [o for o in at.get(nid, []) if o.id != s.id and
+                         o.road_class == "highway" and o.attrs.get("role") != "ramp"]
+                if len(roads) != 2:
+                    _limit(c, f"{s.id} ({ic}) {end} no highway at {nid}")
+                    continue
+                # the road's direction of travel there: its piece that runs on with the ramp
+                P = pos[nid]
+                ds = []
+                for o in roads:
+                    op = [tuple(p) for p in o.centerline]
+                    op = op if o.start == nid else op[::-1]
+                    ds.append(_unit(P, _along(op, 25.0)))
+                d = max(ds, key=lambda v: v[0] * h[0] + v[1] * h[1])
+                if d[0] * h[0] + d[1] * h[1] < 0.0:
+                    d = (-d[0], -d[1])
+                side = d[0] * (far[1] - P[1]) - d[1] * (far[0] - P[0])
+                if side > -1.0:
+                    _limit(c, f"{s.id} ({ic}) {end} its highway at {nid} from the left side")
+        for i, (a0, a1, ia) in enumerate(heads):
+            for b0, b1, ib in heads[i + 1:]:
+                if abs(_angle(a0, b0)) < 45.0 and abs(_angle(a1, b1)) < 45.0:
+                    _limit(c, f"{ic}: {ia} and {ib} make the same movement")
+    c.notes.append(f"{len(systems)} stacks and turbines, "
+                   f"{sum(len(r) for r in systems.values())} directional ramps")
+    return c
+
+
+def _z_near(s, p) -> float:
+    line = LineString(s.centerline)
+    return EL._z_at(_prof(s), line.project(Point(p)))
+
+
+def check_stack_levels(m: CityModel) -> Check:
+    c = Check("stack_levels", f"A stack is four levels: the highway at grade passes under the "
+                              f"lifted one ({EL.LEVEL_Z[1]:g} m deck), its left ramps onto the "
+                              f"lifted highway cross the core at tier 2 ({EL.LEVEL_Z[2]:g} m) and "
+                              f"those off it at tier 3 ({EL.LEVEL_Z[3]:g} m) over them; a "
+                              f"turbine's left ramps each cross a highway at a point of their "
+                              f"own (at most three levels)")
+    systems = _systems(m)
+    hw = [s for s in m.road_segments if s.road_class == "highway" and
+          s.attrs.get("role") != "ramp"]
+    lines = [LineString(s.centerline) for s in hw]
+    tree = shapely.STRtree(lines) if lines else None
+    for ic, rs in systems.items():
+        C = rs[0].attrs.get("crossing")
+        if C is None or tree is None:
+            _limit(c, f"{ic}: no crossing point")
+            continue
+        pt = Point(C)
+        near = [hw[i] for i in sorted(int(x) for x in tree.query(pt, predicate="dwithin",
+                                                                 distance=2.0))]
+        up = [s for s in near if s.attrs.get("elevated")]
+        gnd = [s for s in near if not s.attrs.get("elevated")]
+        if not up or max(_z_near(s, C) for s in up) < EL.LEVEL_Z[1] - 0.5:
+            _limit(c, f"{ic}: no deck at {EL.LEVEL_Z[1]:g} m over its crossing")
+        if not gnd or min(_z_near(s, C) for s in gnd) > 0.5:
+            _limit(c, f"{ic}: no highway at grade under its crossing")
+        left = [s for s in rs if s.attrs.get("turn") == "left"]
+        if rs[0].attrs.get("template") == "stack":
+            for s in left:
+                tier = s.attrs.get("tier")
+                top = max(z.z for z in s.z_profile)
+                if tier not in (2, 3) or not (EL.LEVEL_Z[tier] - 0.05 <= top <=
+                                              EL.STACK_TOP_M + 0.05):
+                    _limit(c, f"{s.id} ({ic}): tier {tier}, crest {top:.1f} m")
+            for a in [s for s in left if s.attrs.get("tier") == 3]:
+                la = LineString(a.centerline)
+                for b in [s for s in left if s.attrs.get("tier") == 2]:
+                    for p in EL.G_points(la.intersection(LineString(b.centerline))):
+                        za, zb = _z_near(a, p), _z_near(b, p)
+                        if za < EL.LEVEL_Z[3] - 0.05 or zb < EL.LEVEL_Z[2] - 0.05 or \
+                                za - zb < EL.CLEAR_M + EL.DECK_M - 0.05:
+                            _limit(c, f"{a.id} over {b.id} ({ic}) at ({p[0]:.0f}, "
+                                      f"{p[1]:.0f}): {za:.1f} m over {zb:.1f} m")
+        else:
+            # the left ramps' crossings of each highway at points of their own
+            for road in near:
+                rl = LineString(road.centerline)
+                hits = sorted(rl.project(Point(p)) for s in left
+                              for p in EL.G_points(rl.intersection(LineString(s.centerline))))
+                for x0, x1 in zip(hits, hits[1:]):
+                    if x1 - x0 < 15.0:
+                        _limit(c, f"{ic}: two left ramps cross {road.id} {x1 - x0:.0f} m "
+                                  "apart")
+    c.notes.append(f"{sum(1 for r in systems.values() if r[0].attrs.get('template') == 'stack')}"
+                   f" stacks, {sum(1 for r in systems.values() if r[0].attrs.get('template') == 'turbine')} turbines")
+    return c
+
+
 def run(m: CityModel, supports: bool) -> list[Check]:
     with G.canonical():
-        out = [check_grades(m), check_continuity(m), check_clearance(m), check_ramps(m)]
+        out = [check_grades(m), check_continuity(m), check_clearance(m), check_ramps(m),
+               check_stack_ramps(m), check_stack_levels(m)]
         if supports:
             out.append(check_supports(m))
     return out
@@ -195,6 +358,7 @@ def stats(m: CityModel) -> dict:
     cols = [s for s in m.structures if (s.attrs or {}).get("road_id")]
     under = [s for s in m.road_segments if s.attrs.get("role") == "underpass"]
     fly = [s for s in ramps if s.attrs.get("flyover")]
+    sysr = [s for s in ramps if s.attrs.get("template") in SYSTEM]
     return {
         "elevated_km": round(sum(s.attrs.get("length_m", 0.0) for s in el) / 1000.0, 2),
         "elevated_runs": len({s.attrs.get("split_of") for s in el if not s.attrs.get("direct")}),
@@ -204,6 +368,10 @@ def stats(m: CityModel) -> dict:
         "interchanges": dict(sorted(tmpl.items())),
         "flyovers": len(fly),
         "max_flyover_m": round(max((z.z for s in fly for z in s.z_profile), default=0.0), 2),
+        "stacks": tmpl.get("stack", 0),
+        "turbines": tmpl.get("turbine", 0),
+        "stack_ramps": len(sysr),
+        "max_stack_m": round(max((z.z for s in sysr for z in s.z_profile), default=0.0), 2),
         "overpasses": over,
         "max_deck_m": round(max((z.z for s in el for z in s.z_profile), default=0.0), 2),
         "raised_other_km": round(sum(s.attrs.get("length_m", 0.0) for s in raised) / 1000.0,

@@ -141,6 +141,8 @@ def test_small_city_passes(small_built):
                    "road_supports",
                    # M9
                    "tunnel_grades", "tunnel_cover", "tunnel_portals", "tunnel_clash",
+                   # M12
+                   "stack_ramps", "stack_levels",
                    # M11
                    "poi_reachable_foot", "poi_reachable_car", "poi_places", "territories",
                    "gameplay_fields", "street_density", "parking", "travel_points",
