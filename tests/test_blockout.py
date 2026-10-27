@@ -4,6 +4,7 @@ import copy
 import json
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pytest
 from shapely.geometry import Polygon
@@ -180,6 +181,11 @@ def test_blender_build_small_city(small, tmp_path):
                         samples=1)
     from PIL import Image
     assert [Image.open(f).size for f in files] == [(480, 300), (480, 270)]
+    # a camera of one's own
+    files = BO.rerender(out, tmp_path / "hires", [], width=480, samples=1,
+                        eye=(0.0, -300.0, 200.0), target=(0.0, 0.0, 0.0), name="look")
+    assert [Path(f).name for f in files] == ["render_look.jpg"]
+    assert Image.open(files[0]).size == (480, 270)
     with pytest.raises(RuntimeError):
         BO.rerender(out, tmp_path / "hires", ["no_such_view"], width=480, samples=1)
 

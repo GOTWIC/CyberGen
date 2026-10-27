@@ -1,9 +1,9 @@
 """M7 preview: `preview_elevated.png`, the road levels. Left, the city: ground roads in muted
 tones, every raised road colored by its deck height (viaducts drawn wide, ramps, bridge
 approaches), interchanges labeled by template, road columns as dots, underpass streets.
-Right, the interchange with the most ramps at street scale (ramps with the heights at their
-ends, columns, the roads under the deck), and the height profile of the longest viaduct with
-the roads passing under it. Previews are for review only (not part of the model hash).
+Right, the interchange with the most ramps at street scale (a trumpet with a flyover first:
+ramps with the heights at their ends, a flyover's crest, columns, the roads under the deck),
+and the height profile of the longest viaduct with the roads passing under it. Previews are for review only (not part of the model hash).
 """
 
 from __future__ import annotations
@@ -86,10 +86,15 @@ def _draw_roads(ax, m, lw_scale: float = 1.0, box=None) -> None:
         segs, zs = _pieces(s)
         elev = bool(s.attrs.get("elevated"))
         ramp = s.attrs.get("role") == "ramp"
-        w = (3.4 if elev else 1.6 if ramp else 1.2) * lw_scale
+        fly = bool(s.attrs.get("flyover"))
+        w = (3.4 if elev else 2.4 if fly else 1.6 if ramp else 1.2) * lw_scale
+        if fly:
+            # a flyover passes over the deck: a dark casing keeps it readable on top
+            ax.add_collection(LineCollection(segs, colors=BG, linewidths=w + 1.6 * lw_scale,
+                                             zorder=3.6, capstyle="round"))
         ax.add_collection(LineCollection(segs, colors=CMAP(norm(np.asarray(zs))),
-                                         linewidths=w, zorder=3.5 if elev else 3.2,
-                                         capstyle="round"))
+                                         linewidths=w, zorder=3.7 if fly else 3.5 if elev
+                                         else 3.2, capstyle="round"))
 
 
 def _columns(ax, m, size: float = 2.0, box=None) -> None:
@@ -106,12 +111,14 @@ def _columns(ax, m, size: float = 2.0, box=None) -> None:
 
 
 def _interchanges(m) -> list[tuple[str, str, list]]:
-    """(interchange id, template, its ramps) by number of ramps."""
+    """(interchange id, template, its ramps): those with a flyover first, then by number of
+    ramps."""
     by: dict = {}
     for s in m.road_segments:
         if s.attrs.get("role") == "ramp":
             by.setdefault(s.attrs.get("interchange"), (s.attrs.get("template"), []))[1].append(s)
-    return sorted(((k, t, rs) for k, (t, rs) in by.items()), key=lambda x: (-len(x[2]), x[0]))
+    return sorted(((k, t, rs) for k, (t, rs) in by.items()), key=lambda x: (
+        not any(s.attrs.get("flyover") for s in x[2]), -len(x[2]), x[0]))
 
 
 def render_elevated(b, out, dpi: int = 140) -> None:
@@ -131,6 +138,8 @@ def render_elevated(b, out, dpi: int = 140) -> None:
              f"{st.get('ramps', 0)} ramps ({tm or 'no interchange'}), "
              f"{st.get('overpasses', 0)} roads under the decks, "
              f"{st.get('underpass_streets', 0)} underpass streets, "
+             + (f"{st['flyovers']} flyover{'s' if st['flyovers'] > 1 else ''} up to "
+                f"{st['max_flyover_m']} m, " if st.get("flyovers") else "") +
              f"{st.get('road_columns', 0)} columns; deck up to {st.get('max_deck_m', 0)} m; "
              f"{'checks PASS' if b.passed else 'checks FAIL'}", color=MUTED, fontsize=9,
              va="top")
@@ -154,6 +163,8 @@ def render_elevated(b, out, dpi: int = 140) -> None:
             ax.plot([p[0]], [p[1]], marker="o", ms=4, mfc="none", mec="#e8e8f0", zorder=6)
     handles = [Line2D([], [], color=CMAP(0.15), lw=3.4, label="viaduct (color: deck height)"),
                Line2D([], [], color=CMAP(0.5), lw=1.6, label="ramp"),
+               Line2D([], [], color=CMAP(0.55), lw=2.4, label="flyover (trumpet)",
+                      path_effects=[pe.withStroke(linewidth=4.0, foreground="#5a5f6b")]),
                Line2D([], [], color=CMAP(0.8), lw=1.2, label="raised approach"),
                Line2D([], [], color="#7ee0c3", lw=1.6, label="underpass street"),
                Line2D([], [], color="#e8e8f0", marker="o", lw=0, ms=4, mfc="none",
@@ -174,7 +185,8 @@ def render_elevated(b, out, dpi: int = 140) -> None:
     if ics:
         k, t, rs = ics[0]
         pts = np.asarray([p for s in rs for p in s.centerline])
-        cx, cy = pts[:, 0].mean(), pts[:, 1].mean()
+        cx = (pts[:, 0].min() + pts[:, 0].max()) / 2.0
+        cy = (pts[:, 1].min() + pts[:, 1].max()) / 2.0
         R = max(float(np.ptp(pts[:, 0])), float(np.ptp(pts[:, 1])), 200.0) / 2.0 + 60.0
         box = (cx - R, cy - R, cx + R, cy + R)
         foot = [np.asarray(G.from_model_poly(b_.footprint).exterior.coords)
@@ -190,6 +202,13 @@ def render_elevated(b, out, dpi: int = 140) -> None:
                 if box[0] <= end[0] <= box[2] and box[1] <= end[1] <= box[3]:
                     ax2.text(end[0], end[1], f"{at:.1f} m", color=INK, fontsize=6.5,
                              path_effects=HALO, zorder=6)
+            if s.attrs.get("flyover"):
+                # its crest, where it passes over the deck
+                top = max(s.z_profile, key=lambda z: (z.z, -z.s))
+                c = LineString(s.centerline).interpolate(top.s)
+                ax2.text(c.x, c.y, f"flyover {top.z:.1f} m", color=INK, fontsize=7,
+                         fontweight="bold", path_effects=HALO, zorder=7, ha="left",
+                         va="bottom")
         ax2.set_xlim(box[0], box[2])
         ax2.set_ylim(box[1], box[3])
         ax2.set_title(f"{k}: {t.replace('_', ' ')}, {len(rs)} ramps", color=INK, fontsize=9)
@@ -235,9 +254,22 @@ def render_elevated(b, out, dpi: int = 140) -> None:
             ax3.axvline(x, color="#e8e8f0", lw=0.8, ls=":")
         ax3.set_xlabel("along the viaduct (m)", color=INK, fontsize=8)
         ax3.set_ylabel("deck height (m)", color=INK, fontsize=8)
-        ax3.set_title(f"viaduct {key} ({acc / 1000:.2f} km); dotted: roads under it",
-                      color=INK, fontsize=9)
-        ax3.set_ylim(0, max(max(zs) * 1.15, 12.0))
+        title = f"viaduct {key} ({acc / 1000:.2f} km); dotted: roads under it"
+        top = max(zs)
+        for s in m.road_segments:
+            if s.attrs.get("flyover"):
+                # a trumpet's flyover along its own length (deck end first), over the deck
+                fx = [z.s for z in s.z_profile]
+                fz = [z.z for z in s.z_profile]
+                if fz[0] < fz[-1]:
+                    L = s.attrs["length_m"]
+                    fx, fz = [L - x for x in reversed(fx)], fz[::-1]
+                ax3.plot(fx, fz, color=CMAP(0.75), lw=1.4, ls="--",
+                         label=f"flyover of {s.attrs.get('interchange')} (along itself)")
+                top = max(top, max(fz))
+                ax3.legend(loc="upper right", fontsize=7, frameon=False, labelcolor=INK)
+        ax3.set_title(title, color=INK, fontsize=9)
+        ax3.set_ylim(0, max(top * 1.15, 12.0))
     else:
         ax3.text(0.5, 0.5, "no viaduct", color=MUTED, ha="center", va="center",
                  transform=ax3.transAxes)

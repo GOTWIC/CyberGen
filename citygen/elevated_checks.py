@@ -194,6 +194,7 @@ def stats(m: CityModel) -> dict:
               s.attrs.get("role") != "ramp" and any(z.z > 0.5 for z in s.z_profile)]
     cols = [s for s in m.structures if (s.attrs or {}).get("road_id")]
     under = [s for s in m.road_segments if s.attrs.get("role") == "underpass"]
+    fly = [s for s in ramps if s.attrs.get("flyover")]
     return {
         "elevated_km": round(sum(s.attrs.get("length_m", 0.0) for s in el) / 1000.0, 2),
         "elevated_runs": len({s.attrs.get("split_of") for s in el if not s.attrs.get("direct")}),
@@ -201,6 +202,8 @@ def stats(m: CityModel) -> dict:
         "ramps": len(ramps),
         "ramp_km": round(sum(s.attrs.get("length_m", 0.0) for s in ramps) / 1000.0, 2),
         "interchanges": dict(sorted(tmpl.items())),
+        "flyovers": len(fly),
+        "max_flyover_m": round(max((z.z for s in fly for z in s.z_profile), default=0.0), 2),
         "overpasses": over,
         "max_deck_m": round(max((z.z for s in el for z in s.z_profile), default=0.0), 2),
         "raised_other_km": round(sum(s.attrs.get("length_m", 0.0) for s in raised) / 1000.0,
