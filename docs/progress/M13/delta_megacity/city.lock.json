@@ -1,0 +1,245 @@
+{
+  "lock_version": 1,
+  "name": "Delta Megacity",
+  "release": "1.0",
+  "citygen": "0.1.0",
+  "code_sha256": "a0a252eb2ed62603097edb66faf970a24f81f165130551df525fbf7ca47f7212",
+  "spec": {
+    "$schema": "../../../../citygen/schemas/city_spec.schema.json",
+    "name": "Delta Megacity",
+    "seed": 4412,
+    "size_km": [
+      3.5,
+      3.5
+    ],
+    "source": {
+      "prompt": "Delta megacity: a huge river splits into four channels before it reaches the sea in the south. Every district sits on its own landmass between the channels. A transit nexus on the central island where every line meets. Corporate core on the east bank with a megatower and twin towers. A canal-laced old town on the west bank with floating markets. An industrial port at the river mouth with a freight terminal. Midtown with a central park in the north, upstream. A lush research campus on an island in the delta. Metro and maglev through the center, two sky tube loops, monorail along the waterfront.",
+      "notes": "Megacity read as the top of the default size range: 3.5 x 3.5 km (12.25 km2). The prompt names no river, channels or islands, so descriptive names were chosen (Great River with West, East and Far West Channels, Central Island, Delta Island, Southern Sea). 'Four channels' read as the main channel plus three delta_branches. 'Every district on its own landmass' set as district_separation water_required; with one river, Midtown (north east, upstream) shares the east bank with the Corporate Core and the Industrial Port (river mouth) shares the west bank with Old Town. Floating markets expressed as a market place on the Old Town canals; 'monorail along the waterfront' routed through waterfront places (West Quay, East Quay, Harbor Front) and the Central Island. Every line passes through the Transit Nexus. M1a: dropped edge south from the Industrial Port; the delta coast puts the river mouth on a lobe 1.2 km south of the center, which a 1.8 km2 port cannot sit on, and coast + south_of + along_river already say 'at the river mouth'."
+    },
+    "water": {
+      "coast": {
+        "form": "delta",
+        "side": "south",
+        "name": "Southern Sea"
+      },
+      "rivers": [
+        {
+          "name": "Great River",
+          "from": "north",
+          "to": "sea",
+          "width_m": [
+            120,
+            150
+          ],
+          "meander": 0.35,
+          "delta_branches": 3,
+          "branch_names": [
+            "West Channel",
+            "East Channel",
+            "Far West Channel"
+          ]
+        }
+      ],
+      "islands": [
+        {
+          "name": "Central Island",
+          "position": "center",
+          "setting": "mid_river",
+          "river": "Great River",
+          "area_km2": 0.55
+        },
+        {
+          "name": "Delta Island",
+          "position": "south",
+          "setting": "delta",
+          "river": "Great River",
+          "area_km2": 0.5
+        }
+      ],
+      "district_separation": "water_required"
+    },
+    "transit": {
+      "hubs": [
+        "Transit Nexus"
+      ],
+      "lines": [
+        {
+          "mode": "metro",
+          "name": "Metro Line",
+          "route": [
+            "Old Town",
+            "Transit Nexus",
+            "Corporate Core"
+          ]
+        },
+        {
+          "mode": "maglev",
+          "name": "Maglev Line",
+          "route": [
+            "east_exit",
+            "Midtown",
+            "Transit Nexus",
+            "Industrial Port"
+          ]
+        },
+        {
+          "mode": "sky_tube",
+          "name": "Skyline Loop",
+          "through_towers": true,
+          "route": [
+            "Transit Nexus",
+            "Corporate Core",
+            "Midtown",
+            "Transit Nexus"
+          ]
+        },
+        {
+          "mode": "sky_tube",
+          "name": "Delta Loop",
+          "route": [
+            "Transit Nexus",
+            "Old Town",
+            "Industrial Port",
+            "Research Campus",
+            "Transit Nexus"
+          ]
+        },
+        {
+          "mode": "monorail",
+          "name": "Waterfront Monorail",
+          "route": [
+            "West Quay",
+            "Transit Nexus",
+            "East Quay",
+            "Harbor Front"
+          ]
+        }
+      ]
+    },
+    "districts": [
+      {
+        "name": "Transit Nexus",
+        "archetype": "transit_hub",
+        "placement": {
+          "on_island": "Central Island"
+        },
+        "megasites": [
+          {
+            "kind": "transit_nexus",
+            "name": "Transit Nexus"
+          }
+        ]
+      },
+      {
+        "name": "Midtown",
+        "archetype": "midtown_mixed",
+        "placement": {
+          "edge": "north_east",
+          "north_of": "Corporate Core",
+          "along_river": "Great River"
+        },
+        "megasites": [
+          {
+            "kind": "central_park",
+            "name": "Central Park"
+          }
+        ]
+      },
+      {
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "placement": {
+          "edge": "east",
+          "east_of": "Transit Nexus",
+          "south_of": "Midtown",
+          "separated_by": "Great River"
+        },
+        "landmarks": [
+          "megatower"
+        ],
+        "complexes": [
+          "twin_towers"
+        ],
+        "places": [
+          {
+            "name": "East Quay",
+            "kind": "waterfront",
+            "position": "west"
+          }
+        ]
+      },
+      {
+        "name": "Old Town",
+        "archetype": "old_town",
+        "placement": {
+          "edge": "west",
+          "west_of": "Transit Nexus",
+          "separated_by": "Great River"
+        },
+        "waterways": {
+          "style": [
+            "canal_grid",
+            "organic_canals"
+          ],
+          "density": 0.75
+        },
+        "places": [
+          {
+            "name": "Floating Markets",
+            "kind": "market",
+            "position": "center"
+          },
+          {
+            "name": "West Quay",
+            "kind": "waterfront",
+            "position": "east"
+          }
+        ]
+      },
+      {
+        "name": "Industrial Port",
+        "archetype": "industrial_port",
+        "placement": {
+          "coast": true,
+          "south_of": [
+            "Transit Nexus",
+            "Old Town"
+          ],
+          "along_river": "Great River"
+        },
+        "waterways": {
+          "style": "harbor_basins"
+        },
+        "megasites": [
+          {
+            "kind": "freight_terminal",
+            "name": "Freight Terminal"
+          }
+        ],
+        "places": [
+          {
+            "name": "Harbor Front",
+            "kind": "waterfront",
+            "position": "south"
+          }
+        ]
+      },
+      {
+        "name": "Research Campus",
+        "archetype": "research_campus",
+        "placement": {
+          "on_island": "Delta Island"
+        },
+        "greenery": 0.9
+      }
+    ]
+  },
+  "choices": {
+    "hydro_variant": 12,
+    "road_variant": 3,
+    "layout_salt": 0
+  },
+  "overrides": null,
+  "edits": [],
+  "model_sha256": "228fdb26390bacedf84da87dd39daa6fd40d3fdb3fd9159837ab61a7419c4538"
+}

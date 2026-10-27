@@ -80,7 +80,7 @@ checks:
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 18857 things on the ground
+         note: 18861 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
@@ -93,7 +93,7 @@ checks:
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
-         note: 192 doors
+         note: 180 doors
   [pass] poi_reachable_car: Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door
   [pass] poi_places: Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones
   [pass] territories: Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other
@@ -119,12 +119,12 @@ stats:
   bridges 4 (sea 0, river 2, canal 2; 0.18 km of span), pedestrian 6; named: Wallgate Bridge
   landmasses with districts connected by road 3 of 3; highway planned elevated 0%; megasite reserves 3; road variant 0
   local roads street 50.64 km, alley 7.43 km, service 12.32 km, pedestrian 9.77 km, footbridge 0.21 km; 49 one-way segments, 6 footbridges
-  junctions 722 (136 signalized), crosswalks 425, sidewalks 96.03 km, lanes 2435 + 4574 connectors, walkways 6945 (alley 19.75 km, crossing 37.5 km, crosswalk 15.91 km, elevated 0.79 km, elevator 0.0 km, footbridge 0.21 km, path 49.32 km, pedestrian_street 0.4 km, promenade 9.37 km, sidewalk 117.67 km, skybridge 2.11 km, stairs 0.34 km)
+  junctions 722 (136 signalized), crosswalks 425, sidewalks 96.03 km, lanes 2435 + 4574 connectors, walkways 6994 (alley 19.75 km, crossing 37.5 km, crosswalk 15.91 km, elevated 0.79 km, elevator 0.0 km, footbridge 0.21 km, path 50.06 km, pedestrian_street 0.4 km, promenade 9.37 km, sidewalk 117.67 km, skybridge 2.15 km, stairs 0.33 km)
   junctions by type: street_street T 349, avenue_avenue T 119, street T 80, street_street X 64, alley_alley T 36, pedestrian T 21, alley T 10, alley_alley X 8, street_alley T 8, street_service T 7, avenue_avenue X 6, highway_highway T 3
-  blocks 411, lots 2475 (5 merged groups), open space 12.5% of net land (courtyard 1, green 17, park 207, plaza 130, pocket_park 2), named places 1
+  blocks 410, lots 2483 (5 merged groups), open space 12.5% of net land (courtyard 1, green 17, park 207, plaza 127, pocket_park 2), named places 1
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
-  entertainment_market          1403       56    113      224     458      756    15.8
+  entertainment_market          1411       57    113      224     449      753    15.7
   industrial_port                 45     2109   3273     8708   16781    24218   162.0
   megablock_residential          118     2193   2856     5257   10666    16658   102.0
   residential_heights            731      281    438      781    1381     3303    27.3
@@ -135,45 +135,45 @@ stats:
   Wallgate Heights                      82             88      17.6%
   Neckgate                              39             75      10.0%
   The Stacks                            53            105      10.0%
-  Lantern Strip                        207             37       6.2%
+  Lantern Strip                        206             37       6.2%
   Eastside Docks                        19            136       6.3%
   Hook Spaceport                        11            194      20.2%
 
-  buildings 2452 (14.273 km2 floor area), properties 2438, tallest 230.4 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
-  by type: shopfront_row 893, villa 701, shanty_stack 437, podium_tower 154, megabuilding 82, slab 50, warehouse 23, perimeter 19, hangar 17, terraced 16, parking_structure 15, tower 15, yard 12, shed 7, courtyard_block 3, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
-  skybridges 124 (2.11 km: enclosed 29, open_deck 95), ground-floor units 6629 (food 1481, bar 1069, club 932, cyberware 689, convenience 669, arcade 623, pawn 440, lobby 288, laundromat 245, clinic 193)
-  roof items: ac_unit 5540, water_tank 644, billboard 515, mechanical 192, antenna 48, av_pad 8; green roofs 346 (167102 m2)
+  buildings 2460 (14.237 km2 floor area), properties 2446, tallest 230.4 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
+  by type: shopfront_row 899, villa 701, shanty_stack 423, podium_tower 174, megabuilding 82, slab 50, warehouse 23, perimeter 19, hangar 17, terraced 16, parking_structure 15, yard 12, tower 11, shed 7, courtyard_block 3, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
+  skybridges 130 (2.15 km: enclosed 29, open_deck 101), ground-floor units 6643 (food 1481, bar 1026, club 963, cyberware 684, convenience 672, arcade 649, pawn 425, lobby 305, laundromat 245, clinic 193)
+  roof items: ac_unit 5564, water_tank 633, billboard 552, mechanical 191, antenna 48, av_pad 8; green roofs 353 (168874 m2)
   landmarks: Lantern Wheel (ferris_wheel, 120 m)
   megasites: Neckgate Transit Nexus (transit_nexus: bus_bay 10, drop_off 1, metro_entrance 2, platform 2, plaza 2, station 1, station_tower 1); Neck Arena (stadium: parking_structure 2, pitch 1, plaza 1, stadium 1); Hook Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 3, launch_tower 3, terminal 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
-  Wallgate Heights                 729      20.4    23.8    40.8       33%   1.9      1.199
+  Wallgate Heights                 729      20.4    23.8    40.8       33%   1.9      1.198
   Neckgate                         145      35.0    63.0   112.0       72%   5.5      1.348
-  The Stacks                       106     156.8   185.6   230.4       71%  12.8      9.245
-  Lantern Strip                   1389      21.0    31.5   120.0       97%   4.7      1.722
+  The Stacks                       106     156.8   185.6   230.4       71%  12.8      9.234
+  Lantern Strip                   1397      21.0    34.1   120.0       97%   4.7      1.697
   Eastside Docks                    40      11.5    16.0    16.0       26%   0.3      0.112
   Hook Spaceport                    33      24.5    36.0    40.0       23%   0.7      0.284
 
-  props 24167, plants 12918 (3873 trees), 37085 instances; lawns 32428 m2, hedges 0.76 km
-  props: sign 5624, awning 3872, ac_unit 2945, street_light 2907, trash 1775, railing 1489, bollard 1311, traffic_signal 645, barrier 570, parked_vehicle 560, hydrant 547, overhead_cable 503, bench 466, trash_can 458, dumpster 336, bus_stop 47, boat 41, wall_light 33, scaffolding 14, food_stall 10, planter 6, vending_machine 5, kiosk 3
-  plants: shrub 5809, overgrowth 2155, park_tree 1570, street_tree 990, palm 777, facade_greenery 743, conifer 381, roof_tree 338, median_tree 155
+  props 24169, plants 12833 (3792 trees), 37002 instances; lawns 32428 m2, hedges 0.76 km
+  props: sign 5613, awning 3877, ac_unit 2908, street_light 2903, trash 1783, railing 1489, bollard 1305, traffic_signal 645, barrier 570, parked_vehicle 563, hydrant 550, overhead_cable 530, trash_can 463, bench 462, dumpster 322, bus_stop 64, boat 37, wall_light 33, scaffolding 22, planter 13, vending_machine 9, food_stall 6, kiosk 2
+  plants: shrub 5788, overgrowth 2211, park_tree 1564, street_tree 932, palm 776, facade_greenery 730, conifer 365, roof_tree 312, median_tree 155
 
   tunnels immersed tube 1 (0.76 km), metro 5 (2.55 km); ventilation buildings 2, roads over them 2, streets over them 1, deepest road -15.8 m, deepest metro -26 m
 
-  gameplay: 121 points of interest, 6 factions (gang 3, corporate 2, police 1), 9 territories (1 contested), 16 taxi stands, 8 fast-travel points
-  pois: vendor.food 23, bar.arcade 15, apartment.studio 13, bar.bar 12, vendor.convenience 11, clinic.ripperdoc 10, bar.club 8, clinic.clinic 7, apartment.penthouse 6, vendor.pawn 6, fixer.fixer 5, hideout.back_room 2, apartment.apartment 1, hideout.squat 1, hideout.warehouse 1
-  parking: street 411, garage 47 (22023 spaces); sign slots: shop_sign.blade 4369, shop_sign.facade 1255, billboard.roof 515, neon.facade 247, billboard.facade 95, holo_ad.roof 34
+  gameplay: 121 points of interest, 6 factions (gang 3, corporate 2, police 1), 9 territories (1 contested), 13 taxi stands, 8 fast-travel points
+  pois: vendor.food 24, clinic.ripperdoc 13, apartment.studio 12, bar.arcade 12, bar.bar 12, bar.club 11, vendor.convenience 10, apartment.penthouse 6, vendor.pawn 6, fixer.fixer 5, clinic.clinic 4, apartment.apartment 2, hideout.back_room 2, hideout.squat 1, hideout.warehouse 1
+  parking: street 411, garage 38 (17512 spaces); sign slots: shop_sign.blade 4371, shop_sign.facade 1242, billboard.roof 552, neon.facade 265, billboard.facade 97, holo_ad.roof 24
 
-  transit 7.57 km, supports 69, portals 9, buildings removed 19; stations elevated 5, sky 3, underground 5
-  by mode: elevated_rail 1 lines 2.22 km 5 stations, metro 1 lines 3.17 km 5 stations, sky_tube 1 lines 2.18 km 3 stations
+  transit 7.56 km, supports 69, portals 9, buildings removed 19; stations elevated 5, sky 3, underground 5
+  by mode: elevated_rail 1 lines 2.22 km 5 stations, metro 1 lines 3.16 km 5 stations, sky_tube 1 lines 2.18 km 3 stations
 
   district                     archetype              landmass  km2    share  target  error
-  Wallgate Heights             residential_heights    lm02      1.070  0.207  0.200   +3.6%  (spec)
-  Neckgate                     transit_hub            lm01      0.619  0.120  0.120   -0.2%  (spec)
-  The Stacks                   megablock_residential  lm01      1.124  0.217  0.220   -1.2%  (spec)
-  Lantern Strip                entertainment_market   lm03      0.652  0.126  0.130   -3.0%  (spec)
-  Eastside Docks               industrial_port        lm01      0.672  0.130  0.130   +0.0%  (spec)
-  Hook Spaceport               spaceport              lm01      1.031  0.200  0.200   -0.2%  (spec)
+  Wallgate Heights             residential_heights    lm.e0n1588  1.070  0.207  0.200   +3.6%  (spec)
+  Neckgate                     transit_hub            lm.e451s31  0.619  0.120  0.120   -0.2%  (spec)
+  The Stacks                   megablock_residential  lm.e451s31  1.124  0.217  0.220   -1.2%  (spec)
+  Lantern Strip                entertainment_market   lm.w832n1074  0.652  0.126  0.130   -3.0%  (spec)
+  Eastside Docks               industrial_port        lm.e451s31  0.672  0.130  0.130   +0.0%  (spec)
+  Hook Spaceport               spaceport              lm.e451s31  1.031  0.200  0.200   -0.2%  (spec)
 
 notes:
   - megasite 'Hook Spaceport' (spaceport) shrunk to 0.31 km2 (asked 0.50) to fit 'Hook Spaceport'

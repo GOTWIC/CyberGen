@@ -67,8 +67,8 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "landmass lm06 (0.49 km2) is open land: marsh 'Lotus Cut Marsh'",
-        "landmass lm07 (0.17 km2) is open land: marsh 'North Reach Marsh'"
+        "landmass lm.w258n220 (0.49 km2) is open land: marsh 'Lotus Cut Marsh'",
+        "landmass lm.w312s675 (0.17 km2) is open land: marsh 'North Reach Marsh'"
       ]
     },
     {
@@ -84,7 +84,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "land without a district left without roads: lm06, lm07"
+        "land without a district left without roads: lm.w258n220, lm.w312s675"
       ]
     },
     {
@@ -518,7 +518,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "27954 things on the ground"
+        "27691 things on the ground"
       ]
     },
     {
@@ -571,7 +571,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "269 doors"
+        "274 doors"
       ]
     },
     {
@@ -692,7 +692,7 @@
         "id": "d01",
         "name": "Corporate Core",
         "archetype": "corporate_core",
-        "landmass": "lm01",
+        "landmass": "lm.e388n616",
         "area_km2": 1.154,
         "share": 0.1493,
         "target": 0.1538,
@@ -703,7 +703,7 @@
         "id": "d02",
         "name": "The Stacks",
         "archetype": "megablock_residential",
-        "landmass": "lm01",
+        "landmass": "lm.e388n616",
         "area_km2": 1.163,
         "share": 0.1504,
         "target": 0.1538,
@@ -714,7 +714,7 @@
         "id": "d03",
         "name": "Highcrest",
         "archetype": "residential_heights",
-        "landmass": "lm01",
+        "landmass": "lm.e388n616",
         "area_km2": 0.962,
         "share": 0.1244,
         "target": 0.1281,
@@ -725,7 +725,7 @@
         "id": "d04",
         "name": "Old Town",
         "archetype": "old_town",
-        "landmass": "lm03",
+        "landmass": "lm.e1107s1134",
         "area_km2": 1.028,
         "share": 0.1329,
         "target": 0.1281,
@@ -736,7 +736,7 @@
         "id": "d05",
         "name": "Neon Strand",
         "archetype": "entertainment_market",
-        "landmass": "lm01",
+        "landmass": "lm.e388n616",
         "area_km2": 0.876,
         "share": 0.1133,
         "target": 0.1153,
@@ -747,7 +747,7 @@
         "id": "d06",
         "name": "Vess Docks",
         "archetype": "industrial_port",
-        "landmass": "lm02",
+        "landmass": "lm.w122s1071",
         "area_km2": 1.35,
         "share": 0.1746,
         "target": 0.1666,
@@ -758,7 +758,7 @@
         "id": "d07",
         "name": "Launch Key",
         "archetype": "spaceport",
-        "landmass": "lm04",
+        "landmass": "lm.w1310n524",
         "area_km2": 0.6,
         "share": 0.0776,
         "target": 0.0772,
@@ -769,7 +769,7 @@
         "id": "d08",
         "name": "Scholar Isle",
         "archetype": "research_campus",
-        "landmass": "lm05",
+        "landmass": "lm.e1119s508",
         "area_km2": 0.6,
         "share": 0.0776,
         "target": 0.0772,
@@ -884,7 +884,7 @@
       "lanes": 6102,
       "lane_connectors": 11973,
       "one_way_segments": 100,
-      "walkways": 16112,
+      "walkways": 16025,
       "walkway_km": {
         "alley": 34.99,
         "crossing": 80.44,
@@ -892,17 +892,17 @@
         "elevated": 1.8,
         "elevator": 0.0,
         "footbridge": 0.22,
-        "path": 78.04,
+        "path": 77.91,
         "pedestrian_street": 2.42,
         "promenade": 6.87,
         "sidewalk": 204.14,
-        "skybridge": 3.4,
+        "skybridge": 3.3,
         "stairs": 0.81,
         "underpass": 0.06
       },
       "footbridges": 6,
       "blocks": 997,
-      "lots": 5917,
+      "lots": 5916,
       "merged_lot_groups": 5,
       "lot_area_m2_by_archetype": {
         "corporate_core": {
@@ -934,18 +934,18 @@
         },
         "megablock_residential": {
           "count": 114,
-          "min": 2060.6,
+          "min": 2060.2,
           "p10": 2783.3,
-          "median": 5799.2,
+          "median": 5798.8,
           "p90": 11282.9,
-          "max": 16426.7,
+          "max": 16426.4,
           "median_frontage_m": 99.1
         },
         "old_town": {
-          "count": 2951,
+          "count": 2950,
           "min": 37.3,
-          "p10": 76.1,
-          "median": 161.4,
+          "p10": 76.3,
+          "median": 161.6,
           "p90": 315.1,
           "max": 952.6,
           "median_frontage_m": 13.7
@@ -1082,15 +1082,15 @@
       }
     },
     "buildings": {
-      "count": 5794,
-      "floor_area_km2": 22.847,
+      "count": 5793,
+      "floor_area_km2": 22.848,
       "by_type": {
-        "shopfront_row": 2827,
-        "shanty_stack": 1760,
+        "shopfront_row": 2821,
+        "shanty_stack": 1767,
         "villa": 561,
         "podium_tower": 227,
-        "courtyard_block": 82,
         "megabuilding": 81,
+        "courtyard_block": 80,
         "warehouse": 55,
         "lab": 39,
         "slab": 36,
@@ -1110,8 +1110,8 @@
         "terminal": 1
       },
       "by_use": {
-        "retail": 2827,
-        "residential": 2524,
+        "retail": 2821,
+        "residential": 2529,
         "office": 197,
         "industrial": 94,
         "entertainment": 69,
@@ -1128,7 +1128,7 @@
           "p90": 200.0,
           "max": 480.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 8.349,
+          "floor_area_km2": 8.351,
           "coverage": 0.758,
           "far": 13.59
         },
@@ -1139,9 +1139,9 @@
           "p90": 182.4,
           "max": 227.2,
           "archetype": "megablock_residential",
-          "floor_area_km2": 8.406,
+          "floor_area_km2": 8.413,
           "coverage": 0.688,
-          "far": 11.27
+          "far": 11.28
         },
         "Highcrest": {
           "count": 586,
@@ -1150,20 +1150,20 @@
           "p90": 23.8,
           "max": 44.2,
           "archetype": "residential_heights",
-          "floor_area_km2": 1.007,
+          "floor_area_km2": 1.006,
           "coverage": 0.314,
           "far": 1.83
         },
         "Old Town": {
-          "count": 2918,
+          "count": 2917,
           "min": 6.0,
           "median": 15.0,
           "p90": 20.6,
           "max": 26.6,
           "archetype": "old_town",
-          "floor_area_km2": 1.756,
-          "coverage": 0.946,
-          "far": 3.3
+          "floor_area_km2": 1.748,
+          "coverage": 0.945,
+          "far": 3.28
         },
         "Neon Strand": {
           "count": 1814,
@@ -1210,7 +1210,7 @@
           "far": 2.08
         }
       },
-      "properties": 5775,
+      "properties": 5774,
       "complexes": {
         "campus": 1,
         "landmark": 1,
@@ -1220,39 +1220,39 @@
         "tower_cluster": 1,
         "twin_towers": 1
       },
-      "skybridges": 268,
+      "skybridges": 258,
       "skybridges_by_kind": {
-        "cable": 33,
-        "catwalk": 97,
+        "cable": 34,
+        "catwalk": 86,
         "enclosed": 60,
         "open_deck": 77,
         "stack": 1
       },
-      "skybridge_km": 3.4,
-      "units": 16780,
+      "skybridge_km": 3.3,
+      "units": 16762,
       "units_by_use": {
-        "food": 4567,
-        "bar": 2119,
-        "convenience": 1949,
-        "cyberware": 1792,
-        "club": 1629,
-        "arcade": 1350,
-        "pawn": 1175,
-        "laundromat": 987,
-        "clinic": 786,
-        "lobby": 426
+        "food": 4577,
+        "bar": 2122,
+        "convenience": 1945,
+        "cyberware": 1785,
+        "club": 1633,
+        "arcade": 1342,
+        "pawn": 1163,
+        "laundromat": 978,
+        "clinic": 793,
+        "lobby": 424
       },
       "roof_items": {
-        "ac_unit": 12097,
-        "billboard": 1279,
-        "water_tank": 1099,
-        "antenna": 836,
-        "mechanical": 224,
-        "av_pad": 41,
+        "ac_unit": 12110,
+        "billboard": 1286,
+        "water_tank": 1100,
+        "antenna": 818,
+        "mechanical": 222,
+        "av_pad": 42,
         "helipad": 19
       },
-      "green_roofs": 498,
-      "green_roof_m2": 381041,
+      "green_roofs": 494,
+      "green_roof_m2": 376566,
       "landmarks": [
         {
           "name": "Corporate Core Megatower",
@@ -1303,7 +1303,7 @@
       "structures": 662,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2427
+        "walkways_added": 2335
       }
     },
     "transit": {
@@ -1342,100 +1342,100 @@
         "lines": 4,
         "stations": 21,
         "removed_buildings": 135,
-        "removed_skybridges": 21,
+        "removed_skybridges": 20,
         "portals": 20,
         "structures": 351,
         "walkways_added": 85
       }
     },
     "props": {
-      "props": 50568,
-      "plants": 25847,
-      "trees": 6393,
-      "instances": 76415,
+      "props": 50279,
+      "plants": 25470,
+      "trees": 6317,
+      "instances": 75749,
       "props_by_kind": {
         "sign": 13203,
-        "awning": 10730,
-        "ac_unit": 7564,
-        "street_light": 3909,
-        "trash": 2250,
-        "overhead_cable": 1842,
+        "awning": 10694,
+        "ac_unit": 7468,
+        "street_light": 3902,
+        "trash": 2247,
+        "overhead_cable": 1865,
         "barrier": 1828,
         "railing": 1507,
         "bollard": 1489,
-        "traffic_signal": 1415,
-        "parked_vehicle": 1273,
-        "hydrant": 825,
-        "wall_light": 801,
-        "trash_can": 784,
-        "bench": 599,
-        "dumpster": 315,
-        "bus_stop": 78,
-        "scaffolding": 48,
-        "boat": 42,
-        "planter": 27,
-        "vending_machine": 17,
-        "food_stall": 13,
-        "kiosk": 8,
+        "traffic_signal": 1417,
+        "parked_vehicle": 1159,
+        "hydrant": 832,
+        "wall_light": 800,
+        "trash_can": 765,
+        "bench": 543,
+        "dumpster": 325,
+        "bus_stop": 94,
+        "boat": 49,
+        "scaffolding": 36,
+        "vending_machine": 21,
+        "planter": 16,
+        "food_stall": 12,
+        "kiosk": 6,
         "gate": 1
       },
       "plants_by_kind": {
-        "shrub": 9192,
-        "facade_greenery": 5266,
-        "overgrowth": 4029,
-        "park_tree": 2215,
-        "street_tree": 2101,
-        "roof_tree": 967,
-        "conifer": 889,
+        "shrub": 9044,
+        "facade_greenery": 5291,
+        "overgrowth": 3957,
+        "park_tree": 2152,
+        "street_tree": 2130,
+        "roof_tree": 861,
+        "conifer": 847,
         "palm": 769,
         "median_tree": 419
       },
       "lawn_m2": 47006,
       "hedge_km": 9.51,
       "generator": {
-        "traffic_signals": 1415,
-        "bus_stops": 159,
-        "street_lights": 3686,
-        "narrow_lights": 1024,
-        "hydrants": 825,
-        "crosswalk_cans": 306,
+        "traffic_signals": 1417,
+        "bus_stops": 191,
+        "street_lights": 3679,
+        "narrow_lights": 1023,
+        "hydrants": 832,
+        "crosswalk_cans": 321,
         "bollards": 1489,
-        "station_props": 14,
-        "street_trees": 2101,
-        "plaza_props": 111,
-        "park_benches": 843,
-        "parked_vehicles": 1273,
-        "alley_clutter": 2565,
+        "station_props": 16,
+        "street_trees": 2130,
+        "plaza_props": 101,
+        "park_benches": 735,
+        "parked_vehicles": 1159,
+        "alley_clutter": 2572,
         "median_trees": 1171,
         "promenade_trees": 17,
-        "park_trees": 7727,
-        "roof_plants": 5536,
-        "facade_greenery": 5266,
-        "overgrowth": 4029,
-        "quay_props": 1642,
+        "park_trees": 7681,
+        "roof_plants": 5223,
+        "facade_greenery": 5291,
+        "overgrowth": 3957,
+        "quay_props": 1649,
         "highway_barriers": 1828,
-        "overhead_cables": 1842,
-        "unit_dressing": 31497,
-        "scaffolding": 48,
+        "overhead_cables": 1865,
+        "unit_dressing": 31365,
+        "scaffolding": 36,
         "market_gates": 1,
-        "props": 50568,
-        "plants": 25847
+        "props": 50279,
+        "plants": 25470
       }
     },
     "gameplay": {
       "pois": 195,
       "pois_by_kind": {
-        "vendor.food": 28,
-        "vendor.pawn": 27,
-        "bar.bar": 25,
-        "apartment.studio": 18,
-        "bar.arcade": 18,
-        "clinic.ripperdoc": 18,
-        "vendor.convenience": 17,
-        "bar.club": 12,
-        "clinic.clinic": 9,
+        "vendor.pawn": 33,
+        "vendor.food": 26,
+        "bar.bar": 23,
+        "clinic.ripperdoc": 17,
+        "apartment.studio": 16,
+        "bar.arcade": 16,
+        "bar.club": 16,
+        "vendor.convenience": 13,
+        "clinic.clinic": 10,
         "fixer.fixer": 7,
-        "apartment.penthouse": 4,
+        "apartment.penthouse": 6,
         "hideout.squat": 4,
         "apartment.apartment": 3,
         "hideout.back_room": 2,
@@ -1452,19 +1452,19 @@
       "contested": 3,
       "parking": {
         "street": 521,
-        "garage": 29,
+        "garage": 35,
         "lot": 3
       },
-      "parking_capacity": 19506,
-      "taxi_stands": 31,
+      "parking_capacity": 22097,
+      "taxi_stands": 30,
       "fast_travel": 11,
       "sign_slots": {
-        "shop_sign.blade": 9719,
-        "shop_sign.facade": 3484,
-        "billboard.roof": 1279,
-        "neon.facade": 655,
-        "billboard.facade": 258,
-        "holo_ad.roof": 65
+        "shop_sign.blade": 9838,
+        "shop_sign.facade": 3365,
+        "billboard.roof": 1286,
+        "neon.facade": 659,
+        "billboard.facade": 250,
+        "holo_ad.roof": 50
       },
       "density_rows": 2868,
       "peak_traffic_vph": 9690.0,
@@ -1473,10 +1473,10 @@
         "factions": 8,
         "zones": 21,
         "pois": 195,
-        "parking": 553,
-        "travel_points": 42,
+        "parking": 559,
+        "travel_points": 41,
         "densities": 2868,
-        "sign_slots": 15460
+        "sign_slots": 15448
       }
     },
     "separation_budget": {
