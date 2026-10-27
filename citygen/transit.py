@@ -3582,6 +3582,9 @@ def _build(spec, m, fixed: dict) -> Out:
         if fx is not None and len(fx["attrs"].get("stop_vertices", [])) == len(ln.stops):
             ln.pts = [(p[0], p[1]) for p in fx["path"]]
             ln.zs = [p[2] for p in fx["path"]]
+            if tl.mode == "metro":
+                # (its heights are as M9 lowered them; the tunnel stage lowers it again)
+                ln.zs = [ln.z0] * len(ln.pts)
             ln.stop_at = list(fx["attrs"]["stop_vertices"])
             r = fx["attrs"].get("min_radius_m")
             ln.min_radius = INF if r is None else r

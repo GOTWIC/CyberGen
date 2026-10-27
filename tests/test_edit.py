@@ -8,7 +8,7 @@ import pytest
 import shapely
 from shapely.geometry import Point
 
-from conftest import SMALL
+from conftest import MINIMAL, SMALL
 
 from citygen import build as B
 from citygen import diff as DF
@@ -214,6 +214,22 @@ def test_choices_keep_the_layout_salt():
     ch = dict(B.choices(b), layout_salt=1)
     r = B.replay(validate_spec(copy.deepcopy(data)), ch, local=True, buildings=False)
     assert B.choices(r) == ch
+
+
+def test_regeneration_keeps_a_lowered_metro():
+    """A held metro line comes back at its depth: the tunnel stage lowers it again from the
+    mode's base depth, not from the depth it lowered it to before (the minimal city's Line 1
+    dips under the Core megatower's foundations only)."""
+    data = copy.deepcopy(MINIMAL)
+    b = B.build_city(validate_spec(data))
+    line = next(ln for ln in b.model.transit_lines if ln.mode == "metro")
+    zs = [p[2] for p in line.path]
+    assert min(zs) < max(zs)
+    r, _ = E.regenerate(E.new_state(data, b), b.model, "Uptown")
+
+    def depths(m):
+        return {s.id: s.attrs["track_z_m"] for s in m.stations if "track_z_m" in s.attrs}
+    assert depths(b.model) and depths(r.model) == depths(b.model)
 
 
 def test_regeneration_is_deterministic():
