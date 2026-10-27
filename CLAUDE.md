@@ -467,20 +467,24 @@ M10 (edit, lock, regenerate) is in place:
 - **`citygen build SPEC OUT --district NAME`** (`citygen/edit.py`, state in
   `city_state.json`): M1 replayed at the search's choices (`build.replay`, `choices`), M2 to
   M11 run for the whole city under a `streets.Frame` (every road not inside the district held
-  and restored as it was, new streets meet held roads only at old nodes, clean-ups remove
-  the new street, held footbridges re-injected on canals that reach the district) with
-  transit lines held, then `splice`: the district and its seam from the new build, the rest
-  from the old city byte for byte, a reference closure both ways, props and plants near
-  changed ground, taxi spacing, fields, factions, names. 14 to 35 s for a sample district,
-  with the garbage collector paused (`edit.no_gc`); the state's `choices` must name the
-  winning layout salt (`stats["layout_salt"]`).
+  and restored as it was, new streets meet held roads only at old nodes, held streets see
+  the old build's junctions at their turn (`Builder._junction_near`: not the new streets'
+  `Line.fresh` ones, the district's old gates once past its turn), clean-ups remove the new
+  street, held footbridges re-injected on canals that reach the district) with transit
+  lines held (a held metro back at its base depth, M9 lowers it again), then `splice`: the
+  district and its seam from the new build, the rest from the old city byte for byte, a
+  reference closure both ways, props and plants near changed ground, taxi spacing, fields,
+  factions, names. 14 to 42 s for a sample district (the stack demo's The Stacks too), with
+  the garbage collector paused (`edit.no_gc`); the state's `choices` must name the winning
+  layout salt (`stats["layout_salt"]`).
 - **Overrides** (`citygen/overrides.py`, `overrides.json` beside the spec): pins (held roads;
   pinned buildings on a lot of their own put back before the props, `blocks._frame_lots`,
   `buildout.frame_pins`) and edits (`move`, `replace`, `plaza`, `remove`) on stable ids.
 - **`citygen lock`** (`citygen/lock.py`): `city.lock.json` (spec, overrides, regenerations,
   choices, code hash, model hash); `--verify` rebuilds from it byte for byte.
   **`citygen model diff A B [--png]`** (`diff.py`, `preview_diff.py`).
-Sample builds, regenerations, sweep: `docs/progress/M10/`.
+Sample builds (the five, the pinned and the stack demo, each with a release lock),
+regenerations, sweep: `docs/progress/M10/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

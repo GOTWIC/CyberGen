@@ -3,7 +3,7 @@
   "name": "Saltreach Free Port",
   "release": "1.0",
   "citygen": "0.1.0",
-  "code_sha256": "8fb834209d74888b3545d0f8088e6dfa8acff906b0549bc09f27359d63f15b71",
+  "code_sha256": "f427009f3b00d818662c3f154e07536034bcc3d6cd48b77ce8062748a48328e7",
   "spec": {
     "$schema": "../../../../citygen/schemas/city_spec.schema.json",
     "name": "Saltreach Free Port",
@@ -216,5 +216,5 @@
   },
   "overrides": null,
   "edits": [],
-  "model_sha256": "c1ef045fbddae1ef6366150c4af0ad8c13b2675f3b0834289b167b6166523913"
+  "model_sha256": "edf4e11cc92ee86892ec615fb7c1028ddbc1208e69a9f4489c7b5910ec549b18"
 }

@@ -1,7 +1,7 @@
 {
   "name": "Delta Megacity",
   "seed": 4412,
-  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation, gameplay layer)",
+  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer)",
   "passed": true,
   "variant": 12,
   "checks": [
@@ -95,7 +95,7 @@
     },
     {
       "id": "named_bridges",
-      "title": "Every named bridge is built",
+      "title": "Every named bridge is built (as a tube where it asks for one)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -166,6 +166,52 @@
       "notes": []
     },
     {
+      "id": "stack_ramps",
+      "title": "Every stack and turbine has its eight directional ramps, one per movement (four right turns, four left turns, none a loop), each one-way from the right side of one highway to the right side of the other",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "0 stacks and turbines, 0 directional ramps"
+      ]
+    },
+    {
+      "id": "stack_levels",
+      "title": "A stack is four levels: the highway at grade passes under the lifted one (9 m deck), its left ramps onto the lifted highway cross the core at tier 2 (18 m) and those off it at tier 3 (27 m) over them; a turbine's left ramps each cross a highway at a point of their own (at most three levels)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "0 stacks, 0 turbines"
+      ]
+    },
+    {
+      "id": "tunnel_grades",
+      "title": "Tunnel grades within the class maximum: roads 6% (immersed tubes, cut-and-cover tunnels and their open approaches), metro 4%, pedestrian underpasses level",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_cover",
+      "title": "Cover over every tunnel roof: at least 1 m of ground (40 m into the tunnel from a portal: the roof under the ground), 1.5 m under the water bed (canal 3, river 7, sea 12 m deep), 0.5 m under a road over a pedestrian underpass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_portals",
+      "title": "Every road tunnel has a portal at each end on dry land, 5.5 m clear inside, an open approach at most 6% steep, and nothing on or over its open approaches: no road node within 20 m of their top, no other road, building or structure on them",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_clash",
+      "title": "No tunnel within 1 m (in height, where they overlap in plan) of another tunnel, a metro station box, a building's foundations and basements (4 to 18 m deep by height) or a column footing",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "street_graph",
       "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
       "passed": true,
@@ -225,7 +271,7 @@
     },
     {
       "id": "junction_placement",
-      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one)",
+      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one) or below it (M9 tunnels and their approaches)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -436,7 +482,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "24711 things on the ground"
+        "24709 things on the ground"
       ]
     },
     {
@@ -707,11 +753,32 @@
       "interchanges": {},
       "flyovers": 0,
       "max_flyover_m": 0.0,
+      "stacks": 0,
+      "turbines": 0,
+      "stack_ramps": 0,
+      "max_stack_m": 0.0,
       "overpasses": 0,
       "max_deck_m": 9.0,
       "raised_other_km": 16.06,
       "underpass_streets": 1,
       "road_columns": 231
+    },
+    "tunnels": {
+      "by_kind": {
+        "metro": {
+          "count": 2,
+          "km": 1.94
+        },
+        "pedestrian": {
+          "count": 1,
+          "km": 0.03
+        }
+      },
+      "vents": 0,
+      "deepest_road_m": 0.0,
+      "deepest_metro_m": -20.0,
+      "over_tunnel_roads": 0,
+      "over_tunnel_streets": 0
     },
     "local": {
       "junctions": 1580,
@@ -745,7 +812,7 @@
       "lanes": 5402,
       "lane_connectors": 10960,
       "one_way_segments": 82,
-      "walkways": 16177,
+      "walkways": 16182,
       "walkway_km": {
         "alley": 24.8,
         "crossing": 65.62,
@@ -758,7 +825,8 @@
         "promenade": 16.08,
         "sidewalk": 190.17,
         "skybridge": 3.93,
-        "stairs": 0.41
+        "stairs": 0.43,
+        "underpass": 0.03
       },
       "footbridges": 17,
       "blocks": 991,
@@ -1092,7 +1160,7 @@
         }
       },
       "site_elements": 709,
-      "structures": 518,
+      "structures": 520,
       "tallest_m": 480.0,
       "generator": {
         "walkways_added": 2899
@@ -1142,9 +1210,9 @@
     },
     "props": {
       "props": 55087,
-      "plants": 20386,
-      "trees": 6628,
-      "instances": 75473,
+      "plants": 20384,
+      "trees": 6626,
+      "instances": 75471,
       "props_by_kind": {
         "sign": 13208,
         "awning": 11391,
@@ -1175,7 +1243,7 @@
         "shrub": 6363,
         "facade_greenery": 5697,
         "street_tree": 2634,
-        "park_tree": 2062,
+        "park_tree": 2060,
         "palm": 940,
         "overgrowth": 875,
         "roof_tree": 823,
@@ -1200,7 +1268,7 @@
         "alley_clutter": 833,
         "median_trees": 1141,
         "promenade_trees": 182,
-        "park_trees": 4990,
+        "park_trees": 4988,
         "roof_plants": 4867,
         "facade_greenery": 5697,
         "overgrowth": 875,
@@ -1211,7 +1279,7 @@
         "scaffolding": 31,
         "market_gates": 1,
         "props": 55087,
-        "plants": 20386
+        "plants": 20384
       }
     },
     "gameplay": {
@@ -1284,7 +1352,7 @@
     ]
   },
   "notes": [
-    "1 underpass streets under the viaducts",
+    "1 underpass streets under the viaducts or over the tunnels",
     "1 local roads stopped short of a primary road they crossed where no junction is allowed",
     "45 local roads cut back at junctions sharper than the district minimum",
     "6 local roads running alongside another road removed",
@@ -1293,6 +1361,8 @@
     "42 local segments (6.27 km) not connected to the network were dropped",
     "lot too small or narrow for a building",
     "Maglev Line: drawn along its stops with 500 m curves",
-    "Waterfront Monorail: off the roads where they turn too hard or pass what it cannot"
+    "Waterfront Monorail: off the roads where they turn too hard or pass what it cannot",
+    "metro Metro Line: lowered to -20 m under foundation",
+    "1 pedestrian underpasses under the highways"
   ]
 }

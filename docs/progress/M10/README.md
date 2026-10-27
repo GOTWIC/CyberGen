@@ -14,22 +14,24 @@ between two builds.
 | `citygen lock OUT [--release 1.0]` | writes `OUT/city.lock.json` |
 | `citygen lock --verify LOCK [--out DIR]` | builds the city again from the lock alone and compares the bytes |
 
-Every sample passes all 75 checks on the same number of full-city tries as on M11, and each
-`city_model.json` is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker image
-`citygen-x86`, `linux/amd64`, `CITYGEN_WORKERS=3`), stage traces included. Ids are longer, so
-the models grow by about 4% (Vesper Bay 55.5 to 57.8 MB); apart from ids, the block fix
-moves a few blocks by a centimeter or so, so a few lots split differently: building and lot
-counts move by 0.16% at most (Delta Megacity 5410 to 5417 buildings, Greyhook 2458 to 2462,
-Saltreach and Nexus City unchanged).
+M10 is built on M12 (stack interchanges), M9 (tunnels) and M11 (the gameplay layer). Every
+sample, the pinned demo and the stack demo pass all 81 checks on the same number of
+full-city tries as on M12, and each `city_model.json` is byte-identical on the M4 Mac (arm64)
+and on x86_64 Linux (docker image `citygen-x86`, `linux/amd64`, `CITYGEN_WORKERS=3`), stage
+traces included. Ids are longer, so the models grow by about 4% (Vesper Bay 55.5 to 57.9 MB);
+apart from ids, the block fix moves a few blocks by a centimeter or so, so a few lots split
+differently: building counts move by 0.33% at most from M12's (Greyhook 2452 to 2460, Delta
+Megacity 5410 to 5417, Nexus City 6520 to 6519, Saltreach unchanged).
 
-| City | Tries (M11, M10) | Entities | Release lock | sha256 of `city_model.json` (both machines) |
+| City | Tries (M12, M10) | Entities | Release lock | sha256 of `city_model.json` (both machines) |
 |---|---|---|---|---|
-| archipelago_free_port | 1, 1 | 90849 | [`city.lock.json`](archipelago_free_port/city.lock.json) | `c1ef045fbddae1ef6366150c4af0ad8c13b2675f3b0834289b167b6166523913` |
-| delta_megacity | 1, 1 | 157688 | [`city.lock.json`](delta_megacity/city.lock.json) | `b7566b55ef1842162c11bd11e4ab9a98c6db43f8988425a963277f2b94a9c6f3` |
-| nexus_city | 3, 3 | 175968 | [`city.lock.json`](nexus_city/city.lock.json) | `053121af07981bac0d34f1aa42adf540552941fcee47aa764c0c88ccb2ca5540` |
-| peninsula_city | 1, 1 | 75884 | [`city.lock.json`](peninsula_city/city.lock.json) | `da4a0c2480d824f2f7c8cb2c6cb172e7b817f6ec2039016d17dfde4bab5fc22e` |
-| vesper_bay | 1, 1 | 162098 | [`city.lock.json`](vesper_bay/city.lock.json) | `b525089828cbc1fcc35a7a9e1fa313400d6c99f1192429302f207153cebd15ac` |
-| vesper_bay_pinned | 2, 2 | 169484 | [`city.lock.json`](vesper_bay_pinned/city.lock.json) | `2e3b9e219243873e03461284e494eb096fbdbdcc13c4b7fbcd6d6793eec76a16` |
+| archipelago_free_port | 1, 1 | 90849 | [`city.lock.json`](archipelago_free_port/city.lock.json) | `edf4e11cc92ee86892ec615fb7c1028ddbc1208e69a9f4489c7b5910ec549b18` |
+| delta_megacity | 1, 1 | 157696 | [`city.lock.json`](delta_megacity/city.lock.json) | `228fdb26390bacedf84da87dd39daa6fd40d3fdb3fd9159837ab61a7419c4538` |
+| nexus_city | 1, 1 | 174279 | [`city.lock.json`](nexus_city/city.lock.json) | `9928e4ece1cca83cd7401543ed11dfa2f2fbeedc7a50570c4cad0648b92ca4b8` |
+| peninsula_city | 1, 1 | 73690 | [`city.lock.json`](peninsula_city/city.lock.json) | `b3cc9920e125f4e4cb996fd442bad66051e21dd5b72024b9e87e9c36230b2e91` |
+| vesper_bay | 1, 1 | 162114 | [`city.lock.json`](vesper_bay/city.lock.json) | `3bd79ca0fb90f712c665051464feaaed718e31e2b52b514b524149673eda0da2` |
+| vesper_bay_pinned | 2, 2 | 169499 | [`city.lock.json`](vesper_bay_pinned/city.lock.json) | `2d362ab49246119ff9b576ecf74a1ac0ed5dbf9d582a02d2798446d95b773508` |
+| vesper_bay_stacks | 1, 1 | 169881 | [`city.lock.json`](vesper_bay_stacks/city.lock.json) | `2e16890979a5bbbc90cb57c243205c967cd72a4f0011c00004449ef204d0cee5` |
 
 <img src="regenerated/vesper_bay__neon_strand_diff.png" width="840">
 
@@ -52,6 +54,7 @@ the entity is and where it sits:
 | belongs to a parent | the parent's id and a suffix | building `d03.lot.e512n88.bld`, sidewalks `rs.e1234n567.swl`, lanes `rs.e1234n567.f0`, a lane's connectors `rs.e1234n567.f0.c1`, junction `jn.e1240n570` (after its node) |
 | M11 gameplay rows | as M11 named them, under the renamed parent | `d03.lot.e512n88.bld.u03.bar`, `rs.e1234n567.density` |
 | districts, `land`, `sea`, fields, factions, tiles | unchanged | `d01`, `field.wealth` |
+| M9 tunnels and their parts | kind and the cell of the tunnel's middle; parts under it | `tn.w213n727`, `tn.w213n727.portala`, `tn.w213n727.vent.w274n890` |
 
 Two entities with the same id get `.2`, `.3` in the order of their contents (the entity as
 JSON with every reference rewritten, and where a name is not known yet, the contents of what
@@ -109,12 +112,19 @@ away changes, and they move every city slightly (new goldens):
    - transit lines are held (track and heights; a building of the new district in a line's
      way goes, as it would in a full build).
    Everything else runs as in a full build: the other districts' streets grow from the same
-   seeds and come out the same. Where a street of another district snaps to a junction
-   nearby on a shared road, the junctions it sees are those of the old city: not one that
-   only the district's new streets made (`Line.fresh`; in the old city it came later or not
-   at all), but the old node where it met the district's old streets, if it met them there
-   (`Builder._junction_near`, `Frame.met`). Found on M9's tunnel test city: one street of
-   Core and one of Uptown came back 1 cm and 3 m along their border road before.
+   seeds and come out the same. A street of another district that snaps to a junction near
+   where it meets a shared road sees the junctions the old build had at that moment
+   (`Builder._junction_near`): not one that only the district's new streets made
+   (`Line.fresh`), unless it met the road there before (`Frame.met`); and the district's old
+   ones on the road (its gates) once the builder is past the district's turn, before it only
+   the one it met the road at. Without this a street of a district laid after it came back a
+   little moved (M9's tunnel test city: a Core street 1 cm, an Uptown street 3 m along their
+   border road; the stack demo: Highcrest's streets on The Stacks' border avenue, 12 held
+   roads and then 11 failing checks).
+   A held metro line starts from its base depth again: its stored heights are the ones the
+   tunnel stage lowered it to, and that stage takes a line's shallowest point as its base, so
+   a regeneration sank a whole held line to its old deepest point (Delta Megacity's Midtown:
+   five stations up to 1.1 km away from -16 to -20 m).
 3. **The splice** (`edit.splice`): every entity of the district, and of its seam, comes from
    the new build; everything else from the old city, byte for byte. The seam is where the
    new district meets the held city: the nodes where its streets (old or new) meet held
@@ -138,27 +148,32 @@ perfectly local. Skipping the M1 search (the slow part of a full build) keeps a 
 district under a minute.
 
 One district of every sample regenerated on a new seed (`citygen build SPEC OUT --base
-BUILD --district NAME`, `CITYGEN_WORKERS=4`, the Mac shared with the full test suite);
-every check passes on every result:
+BUILD --district NAME`, `CITYGEN_WORKERS=4`, the Mac shared with another session's sweep, at
+a load of 20 to 47); every check passes on every result:
 
 | City, district | Regeneration | Whole command | Held roads back as they were | Changed outside the district (through references) | Of those, more than 0.5 m out; the farthest | Diff: added, removed, changed |
 |---|---|---|---|---|---|---|
-| Saltreach Free Port, Westreef (old town) | 17.6 s | 23.4 s | 441 of 441 | 77 (4) | 1; 1 m | 56527, 56691, 877 |
-| Delta Megacity, Midtown (midtown mixed) | 31.0 s | 39.6 s | 2480 of 2480 | 270 (3) | 16; 13 m | 24078, 23869, 505 |
-| Nexus City, Neon Market (entertainment market) | 34.5 s | 44.0 s | 2445 of 2445 | 552 (7) | 22; 90 m | 33752, 33071, 1135 |
-| Greyhook, Lantern Strip (entertainment market) | 14.3 s | 19.3 s | 668 of 668 | 109 (6) | 31; 86 m | 29520, 29606, 587 |
-| Vesper Bay, Neon Strand (entertainment market) | 31.2 s | 40.0 s | 2136 of 2136 | 1155 (443) | 751; 171 m | 42134, 41240, 1153 |
-| Vesper Bay, Old Town (old town) | 30.6 s | 39.5 s | 1553 of 1553 | 225 (4) | 15; 6 m | 60466, 61757, 714 |
-| Vesper Bay Pinned, Old Town (old town) | 33.9 s | 43.4 s | 1638 of 1638 | 850 (51) | 343; 229 m | 68171, 66603, 948 |
+| Saltreach Free Port, Westreef (old town) | 20.6 s | 27.1 s | 441 of 441 | 77 (4) | 1; 1 m | 56527, 56691, 877 |
+| Delta Megacity, Midtown (midtown mixed) | 35.7 s | 45.1 s | 2480 of 2480 | 270 (3) | 16; 13 m | 24078, 23869, 505 |
+| Nexus City, Neon Market (entertainment market) | 41.8 s | 52.4 s | 2346 of 2346 | 590 (1) | 0 | 34799, 33853, 901 |
+| Greyhook, Lantern Strip (entertainment market) | 16.6 s | 22.1 s | 618 of 618 | 109 (6) | 31; 86 m | 29521, 29606, 587 |
+| Vesper Bay, Neon Strand (entertainment market) | 36.5 s | 46.7 s | 2136 of 2136 | 1155 (443) | 751; 171 m | 42134, 41240, 1153 |
+| Vesper Bay, Old Town (old town) | 36.3 s | 46.1 s | 1553 of 1553 | 225 (4) | 15; 6 m | 60466, 61757, 714 |
+| Vesper Bay Pinned, Old Town (old town) | 39.6 s | 50.6 s | 1638 of 1638 | 850 (51) | 343; 229 m | 68171, 66603, 948 |
+| Vesper Bay Stacks, The Stacks (megablock residential; the stack) | 40.0 s | 50.9 s | 2857 of 2857 | 1058 (145) | 285; 48 m | 13357, 14513, 707 |
 
 "Regeneration" is the edit itself (replay, frame, splice, checks), "whole command" adds
 loading the old model and writing the new one, its report and eight previews. Both run
 with Python's cyclic garbage collector paused (`edit.no_gc`): two cities in memory are
 millions of objects, and its passes over them took a third of the time (Nexus City 52 s
-before, 34 s after; 3.3 GB at most before, 3.8 GB after). Every changed entity is within
-90 m of the district, except where the seam runs through big neighbor blocks (Neon Strand:
-megablocks of The Stacks; the pinned demo's Old Town: port blocks of Vess Docks), which are
-built again whole with what stands on them (open items).
+before, 34 s after; 3.3 GB at most before, 3.8 GB after). On a quiet Mac the same
+regenerations took 14 to 35 s (19 to 44 s for the whole command) before M9 and M12 came in;
+the times above are on a Mac running another session's sweep. Every changed entity is
+within 90 m of the district, except where the seam runs through big neighbor blocks (Neon
+Strand: megablocks of The Stacks; the pinned demo's Old Town: port blocks of Vess Docks),
+which are built again whole with what stands on them (open items). Regenerating The Stacks
+on the stack demo keeps its stack (its ramps are M1's, replayed) and every tunnel; M9's
+tunnels are held like any road.
 
 "Outside" counts the entities that are not the district's own and differ from the old
 city; the farthest is measured from the district's outline to the entity's shape. Maps and
@@ -216,8 +231,8 @@ names).
 
 | Release | Regenerations | `citygen lock --verify` |
 |---|---|---|
-| Saltreach Free Port 1.0 ([`city.lock.json`](archipelago_free_port/city.lock.json)) | none | PASS, the same `city_model.json` byte for byte, 28 s |
-| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 86 s |
+| Saltreach Free Port 1.0 ([`city.lock.json`](archipelago_free_port/city.lock.json)) | none | PASS, the same `city_model.json` byte for byte, 31 s |
+| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 100 s |
 
 The tests lock the test city after a regeneration and rebuild it byte for byte, and check
 that a lock refuses a model edited by hand.
@@ -261,7 +276,7 @@ of `sweep.json` is of the earlier code.
 
 ## Tests
 
-`tests/test_edit.py` (16 tests on the small test city):
+`tests/test_edit.py` (17 tests, on the small test city unless named):
 
 - ids: every id from its kind and place (no build counter left), every reference names an
   entity, renaming a renamed model changes nothing, collisions go by content, and a
@@ -269,14 +284,19 @@ of `sweep.json` is of the earlier code.
 - regeneration: a district with a new seed and a district with new spec fields
   (`height_m`): every road outside it back as it was (id, geometry and all), every entity
   more than 250 m from it unchanged, every check passing; regeneration is deterministic; a
-  whole-city retry's layout salt is kept for the replay;
+  whole-city retry's layout salt is kept for the replay; a held metro line keeps its depth
+  (the minimal city, whose Line 1 dips under the Core megatower);
 - pins (a building and a road survive a regeneration, nothing new on the pinned ground) and
   every override operation;
 - a locked city with a regeneration rebuilds byte for byte; a lock refuses a hand-edited
   model; the diff; the CLI (`build --district`, `lock`, `lock --verify`, `model diff`).
 
-The goldens (`tests/data/golden_hashes.json`) are the M10 builds; the check count is
-unchanged (75). `test_gameplay.py::test_check_travel_fails` now removes the fast-travel
+`tests/test_tunnels.py::test_regeneration_keeps_the_tunnels` regenerates Core and Uptown of
+M9's tunnel test city: every held road, every entity 250 m away and the tunnels come back as
+they were, every check passes.
+
+The goldens (`tests/data/golden_hashes.json`) are the M10 builds on M12; M10 adds no check
+(81 with M9 and M12). `test_gameplay.py::test_check_travel_fails` now removes the fast-travel
 points of the core district: it took the district of the first point, and with stable ids
 the rows come in another order, so that was Test Isle, which has no drive lane and needs no
 point; `test_props.py::test_check_trees_fails` gives its tree an 80 m crown instead of 40 m
@@ -305,8 +325,16 @@ point; `test_props.py::test_check_trees_fails` gives its tree an 80 m crown inst
 - **Locks name their code.** `code_sha256` covers `citygen/*.py`; after any code change a
   lock still rebuilds but says the code differs, so the sample locks committed here go stale
   with the next commit (rebuild and lock again for a new release).
-- **M9 tunnels.** `ids.REFS` has `tunnels` from M9's model on its branch; check it, and its
-  place in `ids.ORDER`, after merging.
+- **Snap rounding outside the blocks.** On the minimal test city (which fails `placement`
+  in its own build), regenerating Harbor brings back 730 of 784 held roads: Uptown's
+  streets, laid after Harbor's, come back 1 cm off (a union of the street layer rounds
+  differently), and the seam through them then breaks checks. Every sample keeps all its
+  held roads; a merge tree like the blocks' (`geom.union_local`) would be the fix where it
+  is found.
+- **Found on the way (main, not M10):** on the stack demo the Crown Line's sky tube keeps a
+  portal tower (`attrs.portals`) that the Halo Line's elevated rail removes as in its way
+  (`attrs.removed_buildings`), so that reference names no building; it is so on main's own
+  M12 build too.
 
 ## Files
 
