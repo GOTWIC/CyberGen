@@ -81,6 +81,9 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 - citygen's blockout exports `city.usdc` (whole city) and one `tiles/<tile>.glb` per 256 m tile
   (custom properties as glTF extras) for World Partition style imports, plus
   `unreal/corporate_core_plan.json`, which `build_greybox_unreal.py` reads unchanged.
+- `citygen unreal <build_dir> <uproject>` (M15) imports a whole built city headless: a World
+  Partition level with collision, per-category materials, instanced props, actor tags by
+  citygen id, the graphs as data assets and a player start; importing again updates by id.
 - Keep gameplay logic in C++ where reasonable.
 
 ## Known open items
@@ -449,6 +452,34 @@ meets. Two checks (`stack_ramps`, `stack_levels`, 77 in all on M11, 81 with M9);
 so the stack demo `cities/vesper_bay_stacks` is the pinned demo with only its highways changed
 (art direction): two crosstowns that cross in a stack in The Stacks (a separate city, so the
 pinned demo and its sweep seeds stay as they were). Sample builds: `docs/progress/M12/`.
+
+M15 (Unreal export, the end of stage 1) is in place: `citygen unreal <build_dir> <uproject>
+[--check] [--shots DIR] [--new-project]` imports a blockout output into an Unreal 5.8 project.
+`citygen/unreal.py` (venv side, no Unreal) writes `<build_dir>/unreal/manifest.json` (an actor
+per blockout object of the glTF tiles, keyed by its name, with the sha256 of its plan entry;
+props and plants as one instanced actor per kind and tile with their citygen ids; a
+material per blockout material; the player start on the sidewalk of the fast-travel point
+nearest the middle; the blockout cameras), `prototypes.glb` (the prop and plant kinds, written
+there from the plan's parts) and `graphs.json` (lane, walkway and transit graphs as flat
+arrays), enables PythonScriptPlugin and EditorScriptingUtilities in the .uproject and runs
+`UnrealEditor-Cmd -run=pythonscript` on `citygen/ue/import_city.py` (stdlib and `unreal`
+only). Under `/Game/CityGen/<City>` that makes a World Partition level, static meshes through
+Interchange (no imported materials, no distance fields or Lumen cards, complex collision,
+the hash as `cg.hash` metadata), material instances of `/Game/CityGen/Core/M_CityGen`,
+`BP_CityGenInstances` actors (an HISM and the instances' ids) and `BP_CityGenGraph` data
+assets (Blueprint classes the importer makes, so no C++ compile), a player start, a sun, a
+sky light and the sky atmosphere. Actors carry `cg.city=`, `cg.key=`, `cg.hash=`, `cg.id=`,
+`cg.type=`, `cg.category=`, `cg.tile=` and `cg.district=` tags. Importing again updates by
+key and hash (a tile's glTF only when one of its objects changed; `MESH_VERSION` and
+`ACTOR_VERSION` re-apply importer changes); the same build twice writes no file. `--check`
+runs `citygen/ue/check_city.py` in the full editor (`-ExecCmds="py ..."`; `-ExecutePythonScript`
+quits when the script returns; `Slate.bAllowThrottling 0` or play-in-editor does not tick
+unfocused): streaming, traces onto ground, roofs and facades, a walk along a sidewalk, and
+with `--shots` renders from the blockout cameras. citygen makes no network call; the
+official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
+editor) is the interactive route for a Claude session. The test project is
+`/Users/swag/Projects/Unreal Projects/CyberGenImportTest` (outside the repo; never import
+into the Nyxllor game project unasked). Sample imports: `docs/progress/M15/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

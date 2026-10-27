@@ -226,15 +226,20 @@ def streaming(world, pawn, man, slug):
 
 
 def collision(world, pawn, man, slug):
-    """Traces down on a 16 m grid within 100 m of three spots (the start, the middle of the
-    city's tiles and one more), down onto roofs and across onto facades."""
+    """Traces down on a 16 m grid within 100 m of three spots (the start and the middles of
+    the two busiest tiles 300 m or more from it and from each other; traces outside the
+    city's bounds do not count), down onto roofs and across onto facades."""
     sx, sy, sz = man["player_start"]["position"]
     spots = [(sx, sy)]
-    tiles = man["tiles"]
-    mid = tiles[len(tiles) // 2]["bounds"]
-    spots.append(((mid[0] + mid[2]) / 2, (mid[1] + mid[3]) / 2))
-    q = tiles[len(tiles) // 4]["bounds"]
-    spots.append(((q[0] + q[2]) / 2, (q[1] + q[3]) / 2))
+
+    def mid(t):
+        b = t["bounds"]
+        return (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
+
+    for t in sorted(man["tiles"], key=lambda t: (-len(t["objects"]), t["name"])):
+        if len(spots) < 3 and all(math.dist(mid(t), s) >= 300.0 for s in spots):
+            spots.append(mid(t))
+    bx = man["bounds"]
     down = {"traces": 0, "hits": 0, "by_category": {}}
     roofs = {"tried": 0, "hit": 0}
     facades = {"tried": 0, "hit": 0}
@@ -245,6 +250,8 @@ def collision(world, pawn, man, slug):
         for i in range(-6, 7):
             for j in range(-6, 7):
                 x, y = x0 + 16.0 * i, y0 + 16.0 * j
+                if not (bx[0] < x < bx[2] and bx[1] < y < bx[3]):
+                    continue
                 h = trace(world, ue(x, y, 600.0), ue(x, y, -60.0), [pawn])
                 down["traces"] += 1
                 if h is not None:
@@ -292,7 +299,8 @@ def collision(world, pawn, man, slug):
 
 def walk(world, pawn, man):
     """The player along a sidewalk from the start: movement input toward each next point of
-    the path every frame, on the ground all the way."""
+    the path every frame, on the ground all the way. Where something stops the player (a
+    bench, a planter), it steps aside, as a player would, and the blocker is noted."""
     sx, sy, sz = man["player_start"]["position"]
     path = sidewalk_path(JOB["build_dir"], (sx, sy), WALK_M)
     if len(path) < 2:
@@ -304,6 +312,7 @@ def walk(world, pawn, man):
     start = pawn.get_actor_location()
     k, t, on_ground, frames, low = 1, time.time(), 0, 0, 1e9
     travelled, last = 0.0, start
+    mark, mark_t, side_until, side, blockers = start, time.time(), 0.0, 1.0, {}
     while k < len(path) and time.time() - t < WALK_S:
         loc = pawn.get_actor_location()
         tx, ty = path[k][0] * 100.0, -path[k][1] * 100.0
@@ -312,7 +321,21 @@ def walk(world, pawn, man):
             k += 1
             continue
         n = math.hypot(dx, dy)
-        pawn.add_movement_input(unreal.Vector(dx / n, dy / n, 0.0), 1.0, False)
+        fx, fy = dx / n, dy / n
+        now = time.time()
+        if now - mark_t > 0.6:
+            if math.hypot(loc.x - mark.x, loc.y - mark.y) < 30.0 and now > side_until:
+                h = trace(world, unreal.Vector(loc.x, loc.y, loc.z - 60.0),
+                          unreal.Vector(loc.x + fx * 120.0, loc.y + fy * 120.0, loc.z - 60.0),
+                          [pawn])
+                c = (tag(h["actor"], "cg.category") or h["actor"].get_class().get_name()
+                     ) if h else "unknown"
+                blockers[c] = blockers.get(c, 0) + 1
+                side_until, side = now + 0.7, -side
+            mark, mark_t = loc, now
+        if now < side_until:      # step aside (to the left, then the right), still forward
+            fx, fy = 0.4 * fx - side * fy, 0.4 * fy + side * fx
+        pawn.add_movement_input(unreal.Vector(fx, fy, 0.0), 1.0, False)
         frames += 1
         if mc is not None and mc.is_moving_on_ground():
             on_ground += 1
@@ -328,10 +351,13 @@ def walk(world, pawn, man):
     RES["checks"]["walk"] = {"ok": ok, "path_m": round(length, 1), "points": len(path),
                              "reached": reached, "travelled_m": round(travelled / 100.0, 1),
                              "on_ground": round(share, 3), "max_drop_m": round(z_drop, 2),
-                             "seconds": round(time.time() - t, 1)}
+                             "seconds": round(time.time() - t, 1), "stopped_by": blockers}
+    stops = (", stepped round " + ", ".join(f"{v} x {k_}" for k_, v in sorted(
+        blockers.items()))) if blockers else ""
     RES["lines"].append(f"walk: {travelled / 100.0:.0f} m along a {length:.0f} m sidewalk "
                         f"path in {time.time() - t:.0f} s, {100 * share:.0f}% of frames on "
-                        f"the ground, {'reached its end' if reached else 'did not reach its end'}")
+                        f"the ground, {'reached its end' if reached else 'did not reach its end'}"
+                        + stops)
 
 
 # --- shots ------------------------------------------------------------------------------------
@@ -351,7 +377,7 @@ def shots(man):
     cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
     size = max(b[2] - b[0], b[3] - b[1])
     d = man["cameras"].get("iso_dir") or [0.28, 0.77, -0.57]
-    dist = 1.9 * size        # the whole city in a 30 degree field of view
+    dist = 2.3 * size        # the whole city in a 30 degree field of view
     views = [("iso_city", (cx - d[0] * dist, cy - d[1] * dist, -d[2] * dist), (cx, cy, 0.0),
               30.0)]
     for v in man["cameras"].get("street", [])[:3]:

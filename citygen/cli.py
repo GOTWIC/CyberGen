@@ -216,7 +216,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                 return EXIT_INVALID
         if args.check or args.check_only:
             chk = U.check_city(build, args.uproject, engine=args.engine, shots=args.shots,
-                               timeout=args.timeout)
+                               timeout=args.timeout, width=args.shot_width)
             print(U.check_summary(chk))
             if not chk.get("ok"):
                 print(chk.get("error", ""), file=sys.stderr)
@@ -437,6 +437,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "ground traces, a walk along a sidewalk")
     ue.add_argument("--check-only", action="store_true", help="the check without importing")
     ue.add_argument("--shots", metavar="DIR", help="with --check: rendered views into DIR")
+    ue.add_argument("--shot-width", type=int, default=3840,
+                    help="width of the rendered views in pixels (default 3840; 7680 for 8K)")
     ue.add_argument("--timeout", type=float, default=7200.0,
                     help="seconds per editor run (default 7200)")
     ue.set_defaults(func=cmd_unreal)
