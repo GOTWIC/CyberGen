@@ -1,0 +1,204 @@
+{
+  "lock_version": 1,
+  "name": "Greyhook",
+  "release": "1.0",
+  "citygen": "0.1.0",
+  "code_sha256": "d93afe2654112c691bba02770d86c47bd528968a087c1c04be72262c33b05c6b",
+  "spec": {
+    "$schema": "../../../../citygen/schemas/city_spec.schema.json",
+    "name": "Greyhook",
+    "seed": 9081,
+    "size_km": [
+      3.0,
+      3.6
+    ],
+    "source": {
+      "prompt": "A narrow peninsula city pointing south into a cold grey sea. A spaceport at the tip. Megablock towers stacked along the spine. A dense entertainment strip on the western shore with a Ferris wheel. Walled residential heights in the north where the peninsula meets the mainland. A single river cuts across the neck. Sky tubes run down the spine through the megablocks, an elevated rail line follows the east shore, and a stadium sits near the neck.",
+      "notes": "Map is taller than wide (3.0 x 3.6 km) to fit a long north-south peninsula. Districts the prompt implies but does not name: a transit hub at the neck (holding the stadium, where the sky tube and rail meet) and an east-shore dock district for the elevated rail to follow. Cold grey mood read as more grime and less greenery."
+    },
+    "water": {
+      "coast": {
+        "form": "peninsula",
+        "side": "south",
+        "name": "Grey Sea",
+        "sea_share": 0.5
+      },
+      "rivers": [
+        {
+          "name": "Neckwater",
+          "from": "west",
+          "to": "east",
+          "width_m": [
+            50,
+            80
+          ],
+          "meander": 0.3
+        }
+      ],
+      "district_separation": "water_preferred",
+      "bridges": {
+        "density": 0.4,
+        "named": [
+          {
+            "name": "Wallgate Bridge",
+            "kind": "road_rail",
+            "connects": [
+              "Wallgate Heights",
+              "Neckgate"
+            ],
+            "crosses": "Neckwater"
+          }
+        ]
+      }
+    },
+    "highways": {
+      "pattern": "spine",
+      "exits": [
+        "north"
+      ],
+      "elevated_share": 0.4,
+      "tunnels": {
+        "water": "prefer"
+      }
+    },
+    "transit": {
+      "hubs": [
+        "Neckgate"
+      ],
+      "lines": [
+        {
+          "mode": "sky_tube",
+          "name": "Spine Tube",
+          "through_towers": true,
+          "altitude_m": [
+            60,
+            140
+          ],
+          "route": [
+            "Neckgate",
+            "The Stacks",
+            "Hook Spaceport"
+          ]
+        },
+        {
+          "mode": "elevated_rail",
+          "name": "East Shore Line",
+          "route": [
+            "Wallgate Heights",
+            "Neckgate",
+            "Eastside Docks",
+            "Hook Spaceport"
+          ]
+        },
+        {
+          "mode": "metro",
+          "name": "Strip Line",
+          "route": [
+            "north_exit",
+            "Wallgate Heights",
+            "Neckgate",
+            "Lantern Strip",
+            "The Stacks"
+          ]
+        }
+      ]
+    },
+    "districts": [
+      {
+        "name": "Wallgate Heights",
+        "archetype": "residential_heights",
+        "area_share": 0.2,
+        "placement": {
+          "edge": "north",
+          "coast": false,
+          "separated_by": "wall"
+        },
+        "grime": 0.3,
+        "greenery": 0.5
+      },
+      {
+        "name": "Neckgate",
+        "archetype": "transit_hub",
+        "area_share": 0.12,
+        "placement": {
+          "south_of": "Wallgate Heights",
+          "separated_by": "Neckwater"
+        },
+        "megasites": [
+          "transit_nexus",
+          {
+            "kind": "stadium",
+            "name": "Neck Arena"
+          }
+        ]
+      },
+      {
+        "name": "The Stacks",
+        "archetype": "megablock_residential",
+        "area_share": 0.22,
+        "placement": {
+          "south_of": "Neckgate"
+        },
+        "complexes": [
+          {
+            "kind": "megabuilding_campus",
+            "count": 3
+          }
+        ],
+        "skybridge_density": 0.8,
+        "grime": 0.7,
+        "greenery": 0.1
+      },
+      {
+        "name": "Lantern Strip",
+        "archetype": "entertainment_market",
+        "area_share": 0.13,
+        "placement": {
+          "west_of": "The Stacks",
+          "coast": true
+        },
+        "landmarks": [
+          {
+            "kind": "ferris_wheel",
+            "name": "Lantern Wheel"
+          }
+        ],
+        "places": [
+          {
+            "name": "Neon Pier",
+            "kind": "pier",
+            "position": "west"
+          }
+        ]
+      },
+      {
+        "name": "Eastside Docks",
+        "archetype": "industrial_port",
+        "area_share": 0.13,
+        "placement": {
+          "east_of": "The Stacks",
+          "coast": true
+        },
+        "megasites": []
+      },
+      {
+        "name": "Hook Spaceport",
+        "archetype": "spaceport",
+        "area_share": 0.2,
+        "placement": {
+          "edge": "south",
+          "south_of": "The Stacks",
+          "coast": true
+        }
+      }
+    ]
+  },
+  "choices": {
+    "hydro_variant": 0,
+    "road_variant": 0,
+    "layout_salt": 0
+  },
+  "overrides": null,
+  "edits": [],
+  "model_sha256": "b3cc9920e125f4e4cb996fd442bad66051e21dd5b72024b9e87e9c36230b2e91"
+}

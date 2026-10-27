@@ -111,7 +111,7 @@ def test_check_overlap_fails(city):
 def test_check_trees_fails(city):
     def fn(d):
         t = next(p for p in d["plants"] if _kind(p) in ("street_tree", "park_tree"))
-        t["crown_radius_m"] = 40.0
+        t["crown_radius_m"] = 80.0   # (the first tree may stand 42 m from any facade)
     assert not _rerun(_mutate(city.model, fn))["tree_clearance"].passed
 
 
