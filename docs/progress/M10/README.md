@@ -24,12 +24,12 @@ Saltreach and Nexus City unchanged).
 
 | City | Tries (M11, M10) | Entities | Release lock | sha256 of `city_model.json` (both machines) |
 |---|---|---|---|---|
-| archipelago_free_port | 1, 1 | 90849 | [`city.lock.json`](archipelago_free_port/city.lock.json) | `2cb91e663fe3f1aba5184efe0ad2cd5168b1f26721e6e8df9acddda0dbb8f525` |
-| delta_megacity | 1, 1 | 157688 | [`city.lock.json`](delta_megacity/city.lock.json) | `49fa43f9631e8512a705dd8a008f5114610468d41b8722d94797ab6cd7c55abe` |
-| nexus_city | 3, 3 | 175968 | [`city.lock.json`](nexus_city/city.lock.json) | `696007837a246fb07489e67d4898889891068166f14651ec9811149965d77d2d` |
-| peninsula_city | 1, 1 | 75884 | [`city.lock.json`](peninsula_city/city.lock.json) | `0ca27090773e437f5387065311e29b36eec5464f30785ca90f43bd7dd5e98e0e` |
-| vesper_bay | 1, 1 | 162098 | [`city.lock.json`](vesper_bay/city.lock.json) | `3ee6a070f70534d98989183345036fd5c5512422a06c42a9a9ef09c78fb7202b` |
-| vesper_bay_pinned | 2, 2 | 169484 | [`city.lock.json`](vesper_bay_pinned/city.lock.json) | `d39673465d54fe981d59ed983118982a74655a11f3c18098e7edbf67b2e2cb6f` |
+| archipelago_free_port | 1, 1 | 90849 | [`city.lock.json`](archipelago_free_port/city.lock.json) | `c1ef045fbddae1ef6366150c4af0ad8c13b2675f3b0834289b167b6166523913` |
+| delta_megacity | 1, 1 | 157688 | [`city.lock.json`](delta_megacity/city.lock.json) | `b7566b55ef1842162c11bd11e4ab9a98c6db43f8988425a963277f2b94a9c6f3` |
+| nexus_city | 3, 3 | 175968 | [`city.lock.json`](nexus_city/city.lock.json) | `053121af07981bac0d34f1aa42adf540552941fcee47aa764c0c88ccb2ca5540` |
+| peninsula_city | 1, 1 | 75884 | [`city.lock.json`](peninsula_city/city.lock.json) | `da4a0c2480d824f2f7c8cb2c6cb172e7b817f6ec2039016d17dfde4bab5fc22e` |
+| vesper_bay | 1, 1 | 162098 | [`city.lock.json`](vesper_bay/city.lock.json) | `b525089828cbc1fcc35a7a9e1fa313400d6c99f1192429302f207153cebd15ac` |
+| vesper_bay_pinned | 2, 2 | 169484 | [`city.lock.json`](vesper_bay_pinned/city.lock.json) | `2e3b9e219243873e03461284e494eb096fbdbdcc13c4b7fbcd6d6793eec76a16` |
 
 <img src="regenerated/vesper_bay__neon_strand_diff.png" width="840">
 
@@ -54,9 +54,12 @@ the entity is and where it sits:
 | districts, `land`, `sea`, fields, factions, tiles | unchanged | `d01`, `field.wealth` |
 
 Two entities with the same id get `.2`, `.3` in the order of their contents (the entity as
-JSON with every reference rewritten), never the build order. In a district regeneration an
-entity with the kind and geometry of an old one takes the old id first (a held road's node
-keeps its id when a new node lands in the same 1 m cell).
+JSON with every reference rewritten, and where a name is not known yet, the contents of what
+it names), never the build order. In a district regeneration an entity takes the id of the
+one old entity with its kind and geometry first (a held road's node keeps its id when a new
+node lands in the same 1 m cell). Id lists that are sets (walkway neighbors, lane successors,
+a junction's crosswalks) are sorted, and the gameplay rows their stage sorts by id are
+sorted by the new ids, so the stage run again on a finished city gives the same rows.
 
 **Design: one renaming pass over the finished model** (`citygen/ids.py`), not new id code in
 every stage. The stages keep their build-order ids internally: their orders, hash keys and
@@ -130,10 +133,27 @@ perfectly local. Skipping the M1 search (the slow part of a full build) keeps a 
 district under a minute.
 
 One district of every sample regenerated on a new seed (`citygen build SPEC OUT --base
-BUILD --district NAME`, `CITYGEN_WORKERS=4`, the Mac shared with a sweep and the test suite
-of other sessions); every check passes on every result:
+BUILD --district NAME`, `CITYGEN_WORKERS=4`, the Mac shared with the full test suite);
+every check passes on every result:
 
-TIMING_TABLE
+| City, district | Regeneration | Whole command | Held roads back as they were | Changed outside the district (through references) | Of those, more than 0.5 m out; the farthest | Diff: added, removed, changed |
+|---|---|---|---|---|---|---|
+| Saltreach Free Port, Westreef (old town) | 17.6 s | 23.4 s | 441 of 441 | 77 (4) | 1; 1 m | 56527, 56691, 877 |
+| Delta Megacity, Midtown (midtown mixed) | 31.0 s | 39.6 s | 2480 of 2480 | 270 (3) | 16; 13 m | 24078, 23869, 505 |
+| Nexus City, Neon Market (entertainment market) | 34.5 s | 44.0 s | 2445 of 2445 | 552 (7) | 22; 90 m | 33752, 33071, 1135 |
+| Greyhook, Lantern Strip (entertainment market) | 14.3 s | 19.3 s | 668 of 668 | 109 (6) | 31; 86 m | 29520, 29606, 587 |
+| Vesper Bay, Neon Strand (entertainment market) | 31.2 s | 40.0 s | 2136 of 2136 | 1155 (443) | 751; 171 m | 42134, 41240, 1153 |
+| Vesper Bay, Old Town (old town) | 30.6 s | 39.5 s | 1553 of 1553 | 225 (4) | 15; 6 m | 60466, 61757, 714 |
+| Vesper Bay Pinned, Old Town (old town) | 33.9 s | 43.4 s | 1638 of 1638 | 850 (51) | 343; 229 m | 68171, 66603, 948 |
+
+"Regeneration" is the edit itself (replay, frame, splice, checks), "whole command" adds
+loading the old model and writing the new one, its report and eight previews. Both run
+with Python's cyclic garbage collector paused (`edit.no_gc`): two cities in memory are
+millions of objects, and its passes over them took a third of the time (Nexus City 52 s
+before, 34 s after; 3.3 GB at most before, 3.8 GB after). Every changed entity is within
+90 m of the district, except where the seam runs through big neighbor blocks (Neon Strand:
+megablocks of The Stacks; the pinned demo's Old Town: port blocks of Vess Docks), which are
+built again whole with what stands on them (open items).
 
 "Outside" counts the entities that are not the district's own and differ from the old
 city; the farthest is measured from the district's outline to the entity's shape. Maps and
@@ -192,7 +212,7 @@ names).
 | Release | Regenerations | `citygen lock --verify` |
 |---|---|---|
 | Saltreach Free Port 1.0 ([`city.lock.json`](archipelago_free_port/city.lock.json)) | none | PASS, the same `city_model.json` byte for byte, 28 s |
-| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 106 s |
+| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 85 s |
 
 The tests lock the test city after a regeneration and rebuild it byte for byte, and check
 that a lock refuses a model edited by hand.
@@ -229,6 +249,10 @@ checks as on M11 (placement, road graph, open space share, curve radius and the 
 open items). The salt column now shows the layout salt of a whole-city retry (`salt 2`): the
 build stats did not keep it before, so M11's table showed none (and a district
 regeneration of such a city would have started from another layout; fixed and tested).
+The sweep ran before three changes that only touch ids and row order (sorted id lists, the
+collision tie-break one reference deep, gameplay rows sorted by the new ids); they change no
+decision (every sample's report is the same before and after), so only the sha256 column
+of `sweep.json` is of the earlier code.
 
 ## Tests
 
@@ -264,9 +288,9 @@ point.
   and megasites; fields that M1 reads (`area_share`, `placement`, relations, megasites, the
   highway pattern) need a full build. M1 is not cached either: every regeneration replays
   it (5 to 7 s).
-- **Time.** The regeneration itself takes 22 to 56 s with 3 or 4 workers on the shared Mac;
-  loading the old model and writing the new one, the report and the eight previews add 7
-  to 15 s. With the default 8 workers on a quiet machine it is faster.
+- **Time.** 14 to 35 s for the regeneration and 19 to 44 s for the whole command with 4
+  workers on the shared Mac. Full builds would gain from the paused collector too (not
+  done here: M10 leaves the full build's speed alone).
 - **Roads in overrides.** An edit cannot move or remove a road (the lane, walkway and
   transit graphs hang on it): pin it, or change and regenerate the district.
 - **Ids move with geometry.** An id names where an entity sits, so an entity that moves (a
@@ -289,6 +313,6 @@ point.
 | `citygen/diff.py`, `citygen/preview_diff.py` | model diff and its map |
 | `citygen/streets.py` | `Frame` and its hooks in the street builder |
 | `citygen/build.py` | `replay`, `choices`, `stable`, `check_all` |
-| `<city>/` | sample builds (previews, reports, traces, renders, `city_state.json`, `city.lock.json`) |
-| `regenerated/` | a regenerated Vesper Bay district: before, after, diff |
+| `<city>/` | sample builds: previews, report, stage trace, the 8K whole-city render, the release lock `city.lock.json` |
+| `regenerated/` | one regenerated district of every sample (diff map and report), Vesper Bay before and after, the Vesper Bay 1.1 lock |
 | `sweep.md`, `sweep.json` | the m8a sweep |

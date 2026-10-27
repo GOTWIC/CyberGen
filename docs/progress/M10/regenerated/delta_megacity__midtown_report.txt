@@ -173,5 +173,5 @@ notes:
   - 5 local roads crossing another without a junction removed
   - 36 local segments (6.22 km) not connected to the network were dropped
   - lot too small or narrow for a building
-  - district d02 regenerated: 2480 of 2480 held road segments came back unchanged; 274 entities outside it changed on its seam (7 through references)
+  - district d02 regenerated: 2480 of 2480 held road segments came back unchanged; 270 entities outside it changed on its seam (3 through references)
   - 2 new names that an old place had already got a number

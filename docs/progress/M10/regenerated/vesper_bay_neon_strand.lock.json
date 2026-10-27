@@ -3,7 +3,7 @@
   "name": "Vesper Bay",
   "release": "1.1",
   "citygen": "0.1.0",
-  "code_sha256": "abfdd8fcc37f3ca3f01b70f5274d4eaaca45e6eb46367aeda8cf94d11632c57b",
+  "code_sha256": "339eca189645f966f67da65e294b7d17dff1cbd3e00d916fc5aa2541eefa3c79",
   "spec": {
     "$schema": "../../citygen/schemas/city_spec.schema.json",
     "name": "Vesper Bay",
@@ -310,8 +310,8 @@
       },
       "seed": 224633511,
       "overrides": null,
-      "model_sha256": "5cd1cdecd24f86ecbbc481f6a529ede8a6244a719992c7c16df5e2e8bd86bd2c"
+      "model_sha256": "053d09d4fd31ceac7adc87fe2f4024dd9081ad0c3e23755d9cff0009668a19c3"
     }
   ],
-  "model_sha256": "5cd1cdecd24f86ecbbc481f6a529ede8a6244a719992c7c16df5e2e8bd86bd2c"
+  "model_sha256": "053d09d4fd31ceac7adc87fe2f4024dd9081ad0c3e23755d9cff0009668a19c3"
 }
