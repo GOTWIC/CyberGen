@@ -430,6 +430,14 @@ def check_transit(spec: S.CitySpec, n: Names) -> list[Issue]:
                 issues.append(_ref_issue(f"highways.named[{j}].route", ref,
                                          "a district, place, megasite, island or exit",
                                          n.locatable()))
+    for j, ref in enumerate(spec.highways.tunnels.under):
+        if ref not in n.districts:
+            issues.append(_ref_issue(f"highways.tunnels.under[{j}]", ref, "a district",
+                                     n.districts))
+    for j, b in enumerate(spec.water.bridges.named):
+        if b.tunnel and b.kind == "pedestrian":
+            issues.append(Issue("error", f"water.bridges.named[{j}].tunnel",
+                                "a pedestrian crossing has no tunnel (tubes carry roads)"))
     return issues
 
 

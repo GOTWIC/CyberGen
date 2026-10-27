@@ -190,6 +190,7 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
             b["span_m"] = a.pop("span_m")
             b["ramp_length_m"] = a.pop("ramp_length_m")
             b.pop("road_class", None)
+        data["tunnels"] = [dict(t) for t in roads.tunnels]
     if local is not None:
         data["road_nodes"] = local.nodes
         data["road_segments"] = local.segments
@@ -203,6 +204,9 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
             b["attrs"] = a
             bridges.append(b)
         data["bridges"] = bridges
+        from . import tunnels as TN
+
+        data["tunnels"] = TN.relink(roads.tunnels, local.segments)
         for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
                     "lots", "places"):
             data[key] = getattr(local, key)
@@ -673,6 +677,11 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     if spec.transit.lines:
         tr = TR.build(spec, m, b.held_lines)
         m = with_rows(m, tr.rows)
+    # M9: tunnel parts, metro tunnels, pedestrian underpasses (before the columns and props)
+    from . import tunnels as TN
+
+    tn = TN.build(spec, m)
+    m = with_rows(m, tn.rows)
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     # M10: stable ids for everything built so far, so the props, the plants and the
@@ -686,7 +695,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         c.notes = [ID.text(n, mp) for n in c.notes]
     early["stats"] = ID.remap(early["stats"], mp)
     b.notes = [ID.text(n, mp) for n in b.notes]
-    late_notes = [ID.text(n, mp) for n in out.notes + (tr.notes if tr is not None else [])]
+    late_notes = [ID.text(n, mp) for n in out.notes + (tr.notes if tr is not None else []) +
+                  tn.notes]
     pr = PR.build(spec, m)
     m = with_rows(m, pr.rows)
     # M11: the gameplay layer on the finished city
@@ -700,13 +710,17 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     bx = BC._B(m)
     from . import elevated_checks as EC
 
-    checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
-              for c in early["checks"]] + BC.run(spec, m, None, bx) + TC.run(spec, m) + \
-        PC.run(spec, m) + GC.run(spec, m)
+    from . import tunnel_checks as TNC
+
+    late = {c.id: c for c in TNC.run(spec, m)}
+    checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
+              late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
+        TC.run(spec, m) + PC.run(spec, m) + GC.run(spec, m)
     with G.canonical():
         checks.append(EC.check_supports(m))
     st = early["stats"]
     st["elevated"] = EC.stats(m)
+    st["tunnels"] = TNC.stats(m)
     if "local" in st:
         st["local"] = SC.stats(spec, m)
     st["buildings"] = BC.stats(spec, m, bx)
@@ -795,6 +809,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_elevated.png")
         render_elevated(b, paths[-1])
+    if b.model.tunnels:
+        from .preview_tunnels import render_tunnels
+
+        paths.append(out / "preview_tunnels.png")
+        render_tunnels(b, paths[-1])
     if b.model.pois or b.model.zones:
         from .preview_gameplay import render_gameplay
 

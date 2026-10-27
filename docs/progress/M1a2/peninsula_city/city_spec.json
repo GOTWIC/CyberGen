@@ -21,7 +21,8 @@
       ]
     }
   },
-  "highways": {"pattern": "spine", "exits": ["north"], "elevated_share": 0.4},
+  "highways": {"pattern": "spine", "exits": ["north"], "elevated_share": 0.4,
+               "tunnels": {"water": "prefer"}},
   "transit": {
     "hubs": ["Neckgate"],
     "lines": [

@@ -115,7 +115,7 @@ def median_trees(c: Ctx) -> list[Cand]:
         cs = s.cross_section
         if s.bridge or s.road_class not in ("avenue", "highway") or cs.median_m < 2.0:
             continue
-        if any(z.z > 0.5 for z in s.z_profile):
+        if any(abs(z.z) > 0.5 for z in s.z_profile):
             continue
         L = length(s.centerline)
         if L < 40.0:
@@ -495,7 +495,7 @@ def green_rows(c: Ctx) -> list[dict]:
         cs = s.cross_section
         if s.bridge or s.road_class not in ("avenue", "highway") or cs.median_m < 2.0:
             continue
-        if any(z.z > 0.5 for z in s.z_profile):
+        if any(abs(z.z) > 0.5 for z in s.z_profile):
             continue
         strip = LineString(s.centerline).buffer(cs.median_m / 2.0 - 0.3, cap_style="flat")
         if jtree is not None:
