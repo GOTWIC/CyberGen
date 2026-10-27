@@ -266,18 +266,7 @@ def check_parking(m: CityModel, n: _Net) -> Check:
                          "building, lots clear of buildings and carriageways, curb parking on "
                          "streets with parking lanes and drive lanes")
     bld = {b.id: b for b in m.buildings}
-    foot, carr = [], []
-    for b in m.buildings:
-        if b.footprint is not None:
-            foot.append(G.from_model_poly(b.footprint))
-    for s in m.road_segments:
-        if s.bridge or s.road_class in ("pedestrian", "footbridge") or s.level > 0:
-            continue
-        cs = s.cross_section
-        half = (cs.total_width_m - cs.sidewalk_m[0] - cs.sidewalk_m[1]) / 2.0
-        carr.append(LineString(s.centerline).buffer(max(half, 0.5), cap_style="flat"))
-    ft = shapely.STRtree(foot) if foot else None
-    ct = shapely.STRtree(carr) if carr else None
+    obstacles = GP.lot_obstacles(m) if any(p.kind == "lot" for p in m.parking) else None
     lanes_of = {ln.segment_id for ln in m.lanes if ln.kind == "lane" and ln.id in n.scc}
     for p in m.parking:
         if p.capacity <= 0:
@@ -291,15 +280,9 @@ def check_parking(m: CityModel, n: _Net) -> Check:
             if p.polygon is None or not p.entrances:
                 _limit(c, f"{p.id}: no polygon or entrance")
                 continue
-            poly = G.from_model_poly(p.polygon)
-            for tree, geoms, what in ((ft, foot, "a building"), (ct, carr, "a carriageway")):
-                if tree is None:
-                    continue
-                for i in sorted(tree.query(poly, predicate="intersects").tolist()):
-                    a = G.area(G.inter(poly, G.snap(geoms[i])))
-                    if a > 1.0:
-                        _limit(c, f"{p.id}: overlaps {what} by {a:.1f} m2")
-                        break
+            a = GP.lot_clash(G.from_model_poly(p.polygon), obstacles)
+            if a > 1.0:
+                _limit(c, f"{p.id}: overlaps a building or carriageway by {a:.1f} m2")
         else:
             s = n.seg.get(p.segment_id)
             if s is None or not any(s.cross_section.parking) or s.id not in lanes_of:
@@ -309,13 +292,18 @@ def check_parking(m: CityModel, n: _Net) -> Check:
 
 def check_travel(m: CityModel, n: _Net) -> Check:
     c = Check("travel_points", "Taxi stands and fast travel: a fast-travel point in every "
-                               "district with streets, taxi stands at least 250 m apart, "
+                               "district with a drive lane reachable on foot, taxi stands at "
+                               "least 250 m apart, "
                                "every stand on its sidewalk")
     have = {t.district_id for t in m.travel_points if t.kind == "fast_travel"}
-    streets = {s.district_ids[0] for s in m.road_segments if s.district_ids and
-               s.road_class in GP.DRIVE_CLASSES}
+    ctx = None
     for d in m.districts:
-        if d.id in streets and d.id not in have:
+        if d.id in have:
+            continue
+        # required where one could stand: a drive lane of the district reachable on foot
+        ctx = ctx or GP.Ctx(None, m)
+        if any(ctx.access(p, "curb", None, drive_reach=120.0) is not None
+               for _, p in GP.lane_points(ctx, d.id)):
             _limit(c, f"{d.id} ({d.name}): no fast-travel point")
     taxis = [t for t in m.travel_points if t.kind == "taxi_stand"]
     for i, a in enumerate(taxis):

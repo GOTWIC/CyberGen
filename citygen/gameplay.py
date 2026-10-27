@@ -993,6 +993,30 @@ def _ground_foot(b):
     return G.union(polys) if len(polys) > 1 else (polys[0] if polys else None)
 
 
+def lot_obstacles(m):
+    """What a surface lot must keep clear of: building footprints and the carriageways of
+    ground roads, with an STRtree over them."""
+    geoms = [G.from_model_poly(b.footprint) for b in m.buildings if b.footprint is not None]
+    for s in m.road_segments:
+        if s.bridge or s.road_class in ("pedestrian", "footbridge") or s.level > 0:
+            continue
+        cs = s.cross_section
+        half = (cs.total_width_m - cs.sidewalk_m[0] - cs.sidewalk_m[1]) / 2.0
+        geoms.append(G.snap(LineString(s.centerline).buffer(max(half, 0.5), cap_style="flat")))
+    return geoms, (shapely.STRtree(geoms) if geoms else None)
+
+
+def lot_clash(poly, obstacles) -> float:
+    """Largest overlap (m2) of a lot polygon with one obstacle."""
+    geoms, tree = obstacles
+    if tree is None:
+        return 0.0
+    worst = 0.0
+    for i in sorted(tree.query(poly, predicate="intersects").tolist()):
+        worst = max(worst, G.area(G.inter(poly, geoms[i])))
+    return worst
+
+
 def build_parking(c: Ctx) -> list[dict]:
     m = c.m
     out: list[dict] = []
@@ -1041,6 +1065,7 @@ def build_parking(c: Ctx) -> list[dict]:
     trunks = [Point(p.position[0], p.position[1]) for p in m.plants if p.position[2] <= 0.5] + \
         [Point(p.position[0], p.position[1]) for p in m.props if p.position[2] <= 0.5]
     ttree = shapely.STRtree(trunks) if trunks else None
+    obstacles = None
     for lt in m.lots:
         bs = by_lot.get(lt.id, [])
         if lt.archetype not in LOT_ARCH or len(bs) != 1 or not lt.frontage:
@@ -1064,6 +1089,10 @@ def build_parking(c: Ctx) -> list[dict]:
             continue
         lot_poly = parts[0]
         if ttree is not None and len(ttree.query(lot_poly, predicate="intersects")):
+            continue
+        if obstacles is None:
+            obstacles = lot_obstacles(m)
+        if lot_clash(lot_poly, obstacles) > 0.5:
             continue
         mid = fl.interpolate(0.5, normalized=True)
         door = G.nearest(lot_poly.exterior, mid)
@@ -1164,6 +1193,8 @@ def build_travel(c: Ctx, pois: list[dict]) -> list[dict]:
                 if shapely.contains_xy(c.dpoly[d.id], x, y):
                     cand.append((0.7, j.node_id, (x, y), None))
         chosen: list = []
+        if not cand:
+            cand = fast_fallback(c, d.id)
         while len(chosen) < n and cand:
             def score(t):
                 if not chosen:
@@ -1175,6 +1206,8 @@ def build_travel(c: Ctx, pois: list[dict]) -> list[dict]:
                 continue
             acc = c.access(best[2], "curb", None, drive_reach=120.0)
             if acc is None:
+                if not cand and not chosen and best[0] > 0.5:
+                    cand = fast_fallback(c, d.id)
                 continue
             p = c.on_walk(acc, best[2])
             chosen.append(best)
@@ -1185,6 +1218,32 @@ def build_travel(c: Ctx, pois: list[dict]) -> list[dict]:
                         "district_id": d.id, "position": p, "access": acc, "near_id": best[1],
                         "attrs": {}})
     out.sort(key=lambda r: r["id"])
+    return out
+
+
+def fast_fallback(c: Ctx, did: str) -> list:
+    """Fast-travel candidates for a district without a station, place, landmark or signalized
+    junction that serves: its other junctions, then the middle of each of its drive lanes."""
+    pos = {nd.id: nd.position for nd in c.m.road_nodes}
+    out = []
+    for j in c.m.junctions:
+        if not j.signalized and j.node_id in pos:
+            x, y = pos[j.node_id][:2]
+            if shapely.contains_xy(c.dpoly[did], x, y):
+                out.append((0.5, j.node_id, (x, y), None))
+    for ln, mid in lane_points(c, did):
+        out.append((0.3, ln.id, mid, None))
+    return out
+
+
+def lane_points(c: Ctx, did: str) -> list:
+    """(lane, its middle) for the drive lanes of the district's roads."""
+    out = []
+    for i, ln in enumerate(c.lanes):
+        s = c.seg[ln.segment_id]
+        if (s.district_ids[0] if s.district_ids else None) == did:
+            x, y = _half(ln.centerline)
+            out.append((ln, (q(x), q(y))))
     return out
 
 

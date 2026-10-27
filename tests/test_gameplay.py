@@ -10,6 +10,7 @@ import shapely
 
 from citygen import checks as C
 from citygen import exports as X
+from citygen import geom as G
 from citygen import gameplay as GP
 from citygen import gameplay_checks as GC
 from citygen.build import build_city, with_rows
@@ -184,6 +185,39 @@ def test_check_slots_fails(city):
     low = [s.model_copy(update={"position": (s.position[0], s.position[1], 3.0)})
            if s.id == face.id else s for s in m.sign_slots]
     assert not _checks(m.model_copy(update={"sign_slots": low}))["sign_slots"].passed
+
+
+def test_lots_keep_clear_of_buildings(city):
+    """Sweep regression: a setback lot over another lot's building is not placed, and the
+    check sees the overlap."""
+    m = city.model
+    b = next(x for x in m.buildings if x.footprint is not None and x.lot_id)
+    obstacles = GP.lot_obstacles(m)
+    assert GP.lot_clash(G.from_model_poly(b.footprint), obstacles) > 1.0
+    for p in m.parking:
+        if p.kind == "lot":
+            assert GP.lot_clash(G.from_model_poly(p.polygon), obstacles) <= 0.5
+    if m.parking:
+        bad = m.parking[0].model_copy(update={"kind": "lot", "type": "parking.lot",
+                                              "polygon": b.footprint,
+                                              "entrances": m.pois[0].entrances})
+        rows = [bad] + list(m.parking[1:])
+        assert not _checks(m.model_copy(update={"parking": rows}))["parking"].passed
+
+
+def test_fast_travel_without_stations_or_signals(city):
+    """Sweep regression: a district with no station, place, landmark or signalized junction
+    still gets a fast-travel point (a junction or the middle of a drive lane)."""
+    m = _bare(city.model)
+    m = m.model_copy(update={
+        "stations": [], "places": [],
+        "junctions": [j.model_copy(update={"signalized": False}) for j in m.junctions],
+        "buildings": [b.model_copy(update={"landmark": False}) for b in m.buildings]})
+    out = GP.build(city.spec, m)
+    m2 = with_rows(m, out.rows)
+    assert _checks(m2)["travel_points"].passed
+    have = {t.district_id for t in m2.travel_points if t.kind == "fast_travel"}
+    assert have == {d.id for d in m.districts}
 
 
 # --- spec controls, export, helpers ----------------------------------------------------------

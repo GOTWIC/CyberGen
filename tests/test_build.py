@@ -73,14 +73,14 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M8c/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M11/<city>/report.json is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M8c" / slug / "report.json"
+        committed = ROOT / "docs" / "progress" / "M11" / slug / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        assert (ROOT / "docs" / "progress" / "M8c" / slug / "preview_transit.png").is_file()
+        assert (ROOT / "docs" / "progress" / "M11" / slug / "preview_gameplay.png").is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
@@ -137,7 +137,11 @@ def test_small_city_passes(small_built):
                    "park_planting", "boats_afloat",
                    # M7
                    "road_grades", "level_continuity", "deck_clearance", "ramps_land",
-                   "road_supports"}
+                   "road_supports",
+                   # M11
+                   "poi_reachable_foot", "poi_reachable_car", "poi_places", "territories",
+                   "gameplay_fields", "street_density", "parking", "travel_points",
+                   "sign_slots"}
 
 
 def test_check_geometry_invalid(small_built):

@@ -8,7 +8,29 @@ and sign and ad slots for stages 2 and 3. It runs last, on the finished city
 75 in all). The data is in `city_model.json` (eight new collections) and in a new export,
 `gameplay.json`, beside the blockout exports.
 
-__RESULTS__
+Every sample passes all 75 checks on the same number of full-city tries as on M8c, and
+each `city_model.json` is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker
+image `citygen-x86`, `linux/amd64`, `CITYGEN_WORKERS=3`), stage traces included:
+
+| City | Tries (M8c, M11) | Points of interest | Factions | Territories | Taxi stands / fast travel | Parking spaces | Sign slots | sha256 of `city_model.json` (both machines) |
+|---|---|---|---|---|---|---|---|---|
+| archipelago_free_port | 1, 1 | 87 (vendor 38, bar 20, clinic 13, apartment 9, hideout 4, fixer 3) | 2 gangs, 2 corporations, police | 8 (2 contested) | 15 / 6 | 11126 | 7764 | `8c7533f9cef483e2cfb7029af4ae3cb26ee0ed720301170dba56ef94a4208b17` |
+| delta_megacity | 1, 1 | 190 (vendor 79, bar 53, clinic 30, apartment 17, hideout 6, fixer 5) | 2 gangs, 3 corporations, police | 12 (2 contested) | 26 / 11 | 15016 | 14962 | `5b9811f4f8d21315e68c898cdd7c2efcb4532d170af98a6a5edeb05005422dd6` |
+| nexus_city | 3, 3 | 215 (vendor 85, bar 65, clinic 32, apartment 21, fixer 7, hideout 5) | 3 gangs, 4 corporations, police | 13 (2 contested) | 33 / 13 | 15049 | 17615 | `2304d2b15a5d16b47789ccd236a2bd7bdae0f6c29d156a9bfc04c78315832c46` |
+| peninsula_city | 1, 1 | 117 (vendor 38, bar 35, apartment 20, clinic 15, fixer 5, hideout 4) | 3 gangs, 2 corporations, police | 9 (1 contested) | 17 / 8 | 19766 | 6658 | `4a340f1228c1476d6bf45ce4b3ef748a1858758b256e06625b9d987df933f69d` |
+| vesper_bay | 1, 1 | 195 (vendor 72, bar 55, clinic 27, apartment 26, hideout 8, fixer 7) | 4 gangs, 3 corporations, police | 13 (3 contested) | 31 / 11 | 19506 | 15460 | `98ea72f81e6f01f18443a32b3fcc8a2a359895bee37278ec7cf467ce09c22210` |
+| vesper_bay_pinned | 2, 2 | 212 (vendor 74, bar 60, apartment 30, clinic 30, hideout 10, fixer 8) | 4 gangs, 3 corporations, police | 13 (4 contested) | 29 / 12 | 18614 | 16143 | `42894b0951c1659948c9f2244a16b594537bd4f8fa7af477b4ffb5d0a3f90e62` |
+
+The stage takes 0.8 to 2.5 s per city on the Mac and its checks 0.1 to 0.6 s; run again on
+a saved model with its own rows dropped, it gives the same bytes. Apart from the new
+collections, the only change to the model is three values in each district's `params`
+(`wealth`, `danger`, `police`, from the filled spec); every other collection is the M8c one,
+so the blockout plans (and their goldens) are unchanged. `city_model.json` grows by about
+15% (Vesper Bay 48.2 to 55.5 MB, most of it the sign slots and densities);
+`gameplay.json` is 8.5 MB for Vesper Bay.
+
+<img src="vesper_bay/preview_gameplay.png" width="840">
+
 
 ## What the stage builds
 
