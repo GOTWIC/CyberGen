@@ -1,12 +1,14 @@
 """M13 terrain: the height field, water levels, grade lines, finished ground, retaining walls,
 bored tunnels and terrain viaducts, seated buildings, the terrain checks (and that they fail on
-broken copies), the hilly sample Cragmouth (golden hashes, model and blockout plan), and that a
-flat city carries no terrain at all."""
+broken copies), the hilly sample Cragmouth (golden hashes, model and blockout plan), that a
+flat city carries no terrain at all, and (with M10) stable ids and district regeneration on a
+hilly city."""
 
 import copy
 import hashlib
 import json
 import math
+import re
 
 import pytest
 
@@ -27,12 +29,16 @@ HILLY = {"hills": [{"name": "Core Hill", "at": "Core", "height_m": 35, "radius_m
          "flat": ["Harbor"], "relief_m": 3.0}
 
 
-@pytest.fixture(scope="module")
-def hilly():
+def hilly_data() -> dict:
     d = copy.deepcopy(SMALL)
     d["terrain"] = HILLY
     d["highways"] = {"elevated_share": 0.0}
-    res = validate_spec(d)
+    return d
+
+
+@pytest.fixture(scope="module")
+def hilly():
+    res = validate_spec(hilly_data())
     assert res.ok, res.issues
     return build_city(res)
 
@@ -145,6 +151,82 @@ def test_terrain_checks_fail_on_broken_copies(hilly):
           for w in t.water_levels]
     bad = m.model_copy(update={"terrain": t.model_copy(update={"water_levels": wl})})
     assert not TGC.check_water(bad).passed
+
+
+def test_held_vertices_bound_the_fit():
+    """M10: vertices held at a grade line bound the rest both ways, so the fit keeps the
+    grade on the edges beside them even where the free target would pull it away."""
+    n = 30
+    adj = [[] for _ in range(n)]
+    for i in range(n - 1):
+        adj[i].append((i + 1, 60))
+        adj[i + 1].append((i, 60))
+    tgt = [0] * n
+    frozen = frozenset(range(10))
+    for v in frozen:
+        tgt[v] = 1500          # held 15 m over a flat target
+    hi = TE._lipschitz(n, adj, tgt, frozen)
+    lo = TE._lipschitz(n, adj, [-v for v in tgt], frozen)
+    big = 1 << 60
+    up = TE._lipschitz(n, adj, [t if v in frozen else big for v, t in enumerate(tgt)])
+    dn = TE._lipschitz(n, adj, [-t if v in frozen else big for v, t in enumerate(tgt)])
+    hi = [max(h, -d) for h, d in zip(hi, dn)]
+    lo = [max(lw, -u) for lw, u in zip(lo, up)]
+    e = [(h - lw) // 2 for h, lw in zip(hi, lo)]
+    assert e[:10] == [1500] * 10
+    assert all(abs(a - b) <= 60 for a, b in zip(e, e[1:]))
+    # down from the held stretch at the full grade, as far as it can come in 20 edges
+    assert e[-1] == 1500 - 20 * 60
+
+
+EXTRA_COUNTER = re.compile(r"(^|\.)(rw|tb|tv|wall|bore|viaduct|tvcol|slope)\d+(\.|$)")
+
+
+def test_hilly_ids_come_from_what_and_where(hilly):
+    """M10 on M13: retaining walls, terrain viaducts and their columns, bored tunnels and
+    hillside greens are named from what and where they are; every reference (the terrain's
+    water levels too) names an entity."""
+    from test_edit import BUILD_ORDER
+
+    from citygen import edit as E
+    from citygen.model import COLLECTIONS
+
+    d = hilly.model.model_dump(mode="json")
+    ids = [e["id"] for c in COLLECTIONS for e in d.get(c, [])]
+    assert len(ids) == len(set(ids))
+    assert not [i for i in ids if BUILD_ORDER.search(i) or EXTRA_COUNTER.search(i)]
+    walls = [e["id"] for e in d["structures"] if e["kind"] == "retaining_wall"]
+    assert walls and all(re.fullmatch(r"(rs\.[ew]\d+[ns]\d+(\.\d+)?\.)?wall\.[ew]\d+[ns]\d+"
+                                      r"(\.\d+)?", i) for i in walls)
+    have = set(ids)
+    missing = [(e["id"], r) for c in COLLECTIONS for e in d.get(c, []) for r in E._refs(c, e)
+               if r not in have and not (c == "rivers" and r == "sea")]
+    assert not missing, missing[:10]
+    assert all(w.water_id in have or w.water_id == "sea"
+               for w in hilly.model.terrain.water_levels)
+
+
+def test_hilly_regeneration_holds_every_road(hilly):
+    """M10 on M13: a district regenerated on a hilly city holds every road outside it (its
+    grade line too: the new streets are fitted to the held ones), and every check passes."""
+    from citygen import edit as E
+
+    st = E.new_state(hilly_data(), hilly)
+    out, _ = E.regenerate(st, hilly.model, "Old Quarter")
+    info = out.stats["regenerated"]
+    assert info["held_unchanged"] == info["held_segments"] > 0
+    assert all(c.passed for c in out.checks), [(c.id, c.failures[:2]) for c in out.checks
+                                              if not c.passed]
+    from citygen import geom as G
+    from citygen import streets as ST
+
+    old = {s.id: s for s in hilly.model.road_segments}
+    dd = next(x for x in hilly.model.districts if x.name == "Old Quarter")
+    frame = ST.Frame(hilly.model, dd.name, dd.id, G.from_model_poly(dd.polygon), {})
+    held = [s for s in old.values() if not frame.inside_row(s)]
+    new = {s.id: s for s in out.model.road_segments}
+    assert held and all(new.get(s.id) == s for s in held)
+    assert out.model.terrain is not None and out.model.terrain.ground
 
 
 def test_flat_city_terrain_checks_have_nothing_to_check():

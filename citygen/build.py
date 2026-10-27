@@ -628,7 +628,14 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
         from . import terrain as TE
 
         nat, lv, tst = b.roads.terrain
-        gr = TE.grade(spec, loc.segments, loc.nodes, nat, TE.water_union(b.model))
+        held = {}
+        if b.frame is not None:
+            # M10: a held road keeps its grade line; the district's streets fit to it
+            for sg in loc.segments:
+                old = b.frame.match(sg["centerline"], sg)
+                if old is not None and old.ground:
+                    held[sg["id"]] = [(p.s, p.z) for p in old.ground]
+        gr = TE.grade(spec, loc.segments, loc.nodes, nat, TE.water_union(b.model), held)
         TE.apply_grade(loc, gr)
         gr.stats["slope_greens"] = TE.steep_lots(loc, gr.finished)
         loc.terrain = {"ground": gr.finished, "stats": {**tst, **gr.stats},

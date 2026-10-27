@@ -519,6 +519,13 @@ no change, and grades are measured on ground + z:
 - **Blockout**: the ground a 4 m heightfield per tile (part `grid`), flats draped cell by cell
   (part `drape`), roads on their grade lines, buildings on their bases with stepped plinths,
   water at its level, retaining walls; the cameras frame the ground.
+- **With M10**: ids from what and where (`<segment>.wall.<cell>`, `<segment>.viaduct.<cell>`,
+  `<segment>.tvcol.<cell>`, `bore.<cell>`, `<district>.os.slope.<cell>`; `ids.Renamer`
+  also renames `terrain.water_levels[].water_id`). `--district` holds every road's grade
+  line outside the district (`grade(..., held)`: held vertices fixed, the envelopes clamped
+  to the bounds they set), the splice takes `terrain` and the retaining walls from the new
+  build, and `edit._close` lets a building's gameplay rows follow it and drops old lots and
+  open spaces under changed new ground (`_ground_cover`).
 Sample: `cities/cragmouth` (a cliffside port; hills, a ridge, the Crown Heights plateau with a
 cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
 `docs/progress/M13/`.

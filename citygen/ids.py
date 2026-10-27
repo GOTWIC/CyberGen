@@ -409,6 +409,9 @@ class Renamer:
             for e in self.d.get(coll, []):
                 self.rewrite(coll, e)
                 e["id"] = self.new[e["id"]]
+        # M13: the water bodies the terrain's levels name
+        for wl in (self.d.get("terrain") or {}).get("water_levels", []):
+            wl["water_id"] = self.ref(wl["water_id"])
         for coll in SORTED:
             if self.d.get(coll):
                 self.d[coll].sort(key=lambda e: e["id"])

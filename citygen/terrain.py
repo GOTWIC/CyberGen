@@ -638,8 +638,10 @@ class Graded:
     stats: dict
 
 
-def _lipschitz(n: int, adj: list[list[tuple[int, int]]], target: list[int]) -> list[int]:
-    """min over v of target[v] + d(v, u): Dijkstra from every vertex at once (integers)."""
+def _lipschitz(n: int, adj: list[list[tuple[int, int]]], target: list[int],
+               frozen: frozenset = frozenset()) -> list[int]:
+    """min over v of target[v] + d(v, u): Dijkstra from every vertex at once (integers);
+    `frozen` vertices keep their target (bounds pass through them only from it)."""
     dist = list(target)
     heap = [(d, i) for i, d in enumerate(dist)]
     heapq.heapify(heap)
@@ -649,7 +651,7 @@ def _lipschitz(n: int, adj: list[list[tuple[int, int]]], target: list[int]) -> l
             continue
         for v, w in adj[u]:
             nd = d + w
-            if nd < dist[v]:
+            if nd < dist[v] and v not in frozen:
                 dist[v] = nd
                 heapq.heappush(heap, (nd, v))
     return dist
@@ -659,10 +661,13 @@ def water_union(model):
     return G.union([poly for _, _, poly, _ in water_bodies(model)])
 
 
-def grade(spec, segments, nodes, nat: Field, water=None) -> Graded:
+def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = None) -> Graded:
     """Grade lines of every road: the profile closest to the natural ground in the largest
     deviation (the mean of the lowest and highest profiles within the grade limits) on the
-    graph of all roads, every node and every crossing without a node shared."""
+    graph of all roads, every node and every crossing without a node shared. `held` (M10, a
+    district regeneration): segment id -> the grade line it keeps, [(s, z)]; their vertices
+    are fixed at it and the rest is fitted to them."""
+    held = held or {}
     node_pos = {n["id"]: tuple(n["position"][:2]) for n in nodes}
     cross = crossings(segments)
     vid: dict = {}
@@ -710,11 +715,24 @@ def grade(spec, segments, nodes, nat: Field, water=None) -> Graded:
             adj[a].append((b, cap))
             adj[b].append((a, cap))
     tgt = [int(round(nat.at(x, y) * 100.0)) for x, y in pos]
-    hi = _lipschitz(len(pos), adj, tgt)
-    lo = _lipschitz(len(pos), adj, [-v for v in tgt])
+    for sid, prof in sorted(held.items()):
+        for sv, v in chains[sid]:
+            tgt[v] = int(round(z_on(prof, sv) * 100.0))
+    frozen = frozenset(v for sid in held for _, v in chains[sid])
+    hi = _lipschitz(len(pos), adj, tgt, frozen)
+    lo = _lipschitz(len(pos), adj, [-v for v in tgt], frozen)
+    if frozen:
+        # the held vertices bound the rest both ways (a held vertex takes no bound from its
+        # neighbors, so without this the envelopes would break the grade beside it)
+        big = 1 << 60
+        up = _lipschitz(len(pos), adj, [t if v in frozen else big for v, t in enumerate(tgt)])
+        dn = _lipschitz(len(pos), adj, [-t if v in frozen else big for v, t in enumerate(tgt)])
+        hi = [max(h, -d) for h, d in zip(hi, dn)]
+        lo = [max(lw, -u) for lw, u in zip(lo, up)]
     e = [(h - lw) // 2 for h, lw in zip(hi, lo)]
     elev = [v / 100.0 for v in e]
-    ground = {sid: [(sv, elev[v]) for sv, v in ch] for sid, ch in chains.items()}
+    ground = {sid: (list(held[sid]) if sid in held else [(sv, elev[v]) for sv, v in ch])
+              for sid, ch in chains.items()}
     node_ground = {k[1]: elev[v] for k, v in vid.items() if k[0] == "n"}
     fin, walls, bores, viaducts, st = finish(spec, segments, ground, nat, water)
     st["graph_vertices"] = len(pos)
@@ -935,11 +953,12 @@ def steep_lots(loc, fin: Field) -> int:
         vals = footprint_ground(fin, G.from_model_poly(lot["polygon"]))
         if vals and max(vals) - min(vals) > STEEP_LOT_M:
             gone.add(lot["id"])
-            greens.append({"id": f"{lot['id']}.slope", "type": "open_space.green.slope",
+            # (named `<district>.os.slope.<cell>` by the M10 pass)
+            greens.append({"id": f"{lot['district_id']}.os.slope{len(greens) + 1:04d}",
+                           "type": "open_space.green.slope",
                            "kind": "green", "polygon": lot["polygon"],
                            "district_id": lot["district_id"],
-                           "attrs": {"slope": True, "lot": lot["id"],
-                                     "fall_m": q(max(vals) - min(vals))}})
+                           "attrs": {"slope": True, "fall_m": q(max(vals) - min(vals))}})
         else:
             keep.append(lot)
     groups = {lot.get("merged_group_id") for lot in loc.lots if lot["id"] in gone}
@@ -983,7 +1002,10 @@ def apply_grade(loc, gr: Graded) -> None:
 
 
 def wall_rows(walls) -> list[dict]:
-    return [{"id": f"rw{k + 1:04d}", "type": "structure.retaining_wall",
+    """Retaining walls as structures (named `<segment>.wall.<cell>`, or `wall.<cell>`, by
+    the M10 pass)."""
+    return [{"id": (f"{w['segment']}.wall{k + 1:04d}" if w["segment"] else f"wall{k + 1:04d}"),
+             "type": "structure.retaining_wall",
              "kind": "retaining_wall", "line": w["line"], "z0_m": 0.0, "z1_m": w["height_m"],
              "supports": [w["segment"]] if w["segment"] else [],
              "attrs": {"segment": w["segment"], "cut": w["kind"] == "cut",
@@ -1025,7 +1047,7 @@ def bore_rows(bores, segments, nat: Field, dnames: dict | None = None) -> list[d
             used[name] = used.get(name, 0) + 1
             if used[name] > 1:
                 name = f"{name} {used[name]}"
-        out.append({"id": f"tb{k + 1:02d}", "type": "tunnel.bored", "kind": "bored",
+        out.append({"id": f"bore{k + 1:02d}", "type": "tunnel.bored", "kind": "bored",
                     "name": name, "segment_ids": [s["id"]], "crosses": [],
                     "line": pts, "width_m": q(s["width_m"] + 2.0), "clear_m": BORE_CLEAR_M,
                     "roof_m": BORE_ROOF_M, "floor_m": 1.0, "portals": portals,
@@ -1189,7 +1211,7 @@ def viaduct_rows(viaducts, segments, nat: Field) -> list[dict]:
             sv = v["s0"] + (v["s1"] - v["s0"]) * i / (n - 1)
             x, y = point_at(line, cum, sv)
             pts.append([q(x), q(y), q(z_on(st, sv) - nat.at(x, y))])
-        did = f"tv{k + 1:02d}"
+        did = f"{s['id']}.viaduct{k + 1:02d}"     # (M10: `<segment>.viaduct.<cell>`)
         out.append({"id": did, "type": "structure.terrain_viaduct", "kind": "deck",
                     "line": pts, "z0_m": q(min(p[2] for p in pts) - 1.2),
                     "z1_m": q(max(p[2] for p in pts)), "supports": [s["id"]],
@@ -1204,7 +1226,8 @@ def viaduct_rows(viaducts, segments, nat: Field) -> list[dict]:
             if h < COLUMN_MIN_M:
                 continue
             foot = G.qpoly(Point(x, y).buffer(1.25, cap_style="square"))
-            out.append({"id": f"{did}.c{i + 1:02d}", "type": "structure.terrain_column",
+            out.append({"id": f"{s['id']}.tvcol{k + 1:02d}{i + 1:03d}",
+                        "type": "structure.terrain_column",
                         "kind": "column", "footprint": G.to_model_poly(foot), "z0_m": 0.0,
                         "z1_m": q(h), "supports": [did],
                         "attrs": {"terrain_viaduct": True, "segment": s["id"]}})

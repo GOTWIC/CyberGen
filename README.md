@@ -50,17 +50,31 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
-## Latest maps (M10 and M13)
+## Latest maps (M13 and M10)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
-different coast forms, not one map. M10 makes a built city editable: every entity has a
-stable id from what it is and where it sits, one district can be built again on its own
+different coast forms, not one map, and since M13 a hilly sample with them.
+
+M13 adds terrain (on M10, M12, M11 and M9). Cragmouth, the new hilly sample, is a cliffside
+port climbing out of a bay. Its harbor is levelled at the water. The towers of Crown Heights
+stand on a plateau 34 m over the bay, and the old quarter climbs a 75 m hill. Megablocks step
+up a ridge among hillside greens, and the highways bore through the hills. A district of a
+hilly city can be regenerated like any other: every road outside it keeps its grade line (see
+[`docs/progress/M13`](docs/progress/M13)):
+
+<img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="840">
+
+| The old quarter's hill (8K) | The ground: grades, walls, bored tunnels |
+|---|---|
+| <img src="docs/progress/M13/cragmouth/render_hillside.jpg" width="420"> | <img src="docs/progress/M13/cragmouth/preview_terrain.png" width="420"> |
+
+Before it, M10 made a built city editable: every entity has a stable id from what it is and where it sits, one district can be built again on its own
 (`citygen build SPEC OUT --district NAME`, under a minute) while every road outside it comes
 back as it was and everything away from its seam stays byte for byte, pins and overrides
 keep or change single buildings, open spaces and roads, and `citygen lock` freezes a city
 as a release that rebuilds byte for byte (see [`docs/progress/M10`](docs/progress/M10)).
 
-Before it, M12 added stack interchanges where two highways cross with room for one: one
+M12 added stack interchanges where two highways cross with room for one: one
 highway lifted to 9 m through the crossing, the other at grade, and eight one-way
 directional ramps, the left turns as flyovers at 18 m and 27 m (a turbine, then M7's
 crossing, where the stack does not fit). None of the five samples or the pinned demo has
@@ -108,17 +122,6 @@ sign slots:
 | Nexus City | Delta Megacity |
 |---|---|
 | <img src="docs/progress/M10/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M10/delta_megacity/preview_gameplay.png" width="420"> |
-
-M13 adds terrain. Cragmouth, the new hilly sample, is a cliffside port climbing out of a bay.
-Its harbor is levelled at the water. The towers of Crown Heights stand on a plateau 34 m over the
-bay, and the old quarter climbs a 75 m hill. Megablocks step up a ridge among hillside greens,
-and the highways bore through the hills (see [`docs/progress/M13`](docs/progress/M13)):
-
-<img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="840">
-
-| The old quarter's hill (8K) | The ground: grades, walls, bored tunnels |
-|---|---|
-| <img src="docs/progress/M13/cragmouth/render_hillside.jpg" width="420"> | <img src="docs/progress/M13/cragmouth/preview_terrain.png" width="420"> |
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):
