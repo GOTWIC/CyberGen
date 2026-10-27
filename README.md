@@ -8,7 +8,7 @@ code.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M9 and M11 done, M10 and M12 to M15 planned |
+| 1 | layoutgen (`citygen`) | Water, districts, roads, streets, lots, buildings, transit, props; Blender blockout, Unreal export | M0 to M9, M11 and M13 done, M10, M12, M14 and M15 planned |
 | 2 | assetgen | A unique 3D model for every building, plus roads, sidewalks and street furniture; textures | Planned |
 | 3 | atmosgen | Lighting, sky, weather and atmospherics in Unreal | Planned |
 | 4 | lifegen | Traffic, crowds, trains and aircraft, placed and driven procedurally | Planned |
@@ -46,11 +46,11 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: named points of interest (bars, clinics, vendors, fixers, hideouts, apartments) with their doors, faction territories and police precincts, wealth, danger and police fields, traffic, crowd and spawn density per street and hour band, parking, taxi stands, fast travel, sign and ad slots; every place reachable on foot and by car (9 checks, 75 in all), `gameplay.json` | Done | [`docs/progress/M11`](docs/progress/M11) |
 | M12 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
-| M13 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
+| M13 | Terrain: a height field from the spec (hills, ridges, cliff plateaus, flat districts), water at its own levels, every road on a grade line fitted to the ground within its class's grade (cuts and fills between retaining walls, bored tunnels through hills, terrain viaducts), highways routed round steep ground, hillside greens, buildings on stepped plinths, the ground as a heightfield in the blockout; five terrain checks (84 in all); the hilly sample Cragmouth; flat cities byte-identical | Done | [`docs/progress/M13`](docs/progress/M13) |
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
-## Latest maps (M9 and M11)
+## Latest maps (M9, M11 and M13)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M11 adds the gameplay layer on top of the finished city:
@@ -78,6 +78,17 @@ slots:
 | Nexus City | Delta Megacity |
 |---|---|
 | <img src="docs/progress/M9/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M9/delta_megacity/preview_gameplay.png" width="420"> |
+
+M13 adds terrain. Cragmouth, the new hilly sample, is a cliffside port climbing out of a bay.
+Its harbor is levelled at the water. The towers of Crown Heights stand on a plateau 34 m over the
+bay, and the old quarter climbs a 75 m hill. Megablocks step up a ridge among hillside greens,
+and the highways bore through the hills (see [`docs/progress/M13`](docs/progress/M13)):
+
+<img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="840">
+
+| The old quarter's hill (8K) | The ground: grades, walls, bored tunnels |
+|---|---|
+| <img src="docs/progress/M13/cragmouth/render_hillside.jpg" width="420"> | <img src="docs/progress/M13/cragmouth/preview_terrain.png" width="420"> |
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):

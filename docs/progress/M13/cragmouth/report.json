@@ -1,0 +1,2310 @@
+{
+  "name": "Cragmouth",
+  "seed": 6133,
+  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer)",
+  "passed": true,
+  "variant": 1,
+  "checks": [
+    {
+      "id": "geometry_valid",
+      "title": "All geometry valid (shapely is_valid), non-empty",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "waterways_connected",
+      "title": "Every waterway connects to a river, channel or the sea (declared basins aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_shares",
+      "title": "District area shares within 15% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "placement",
+      "title": "Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_required",
+      "title": "water_required districts share no land with another district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "district_pieces",
+      "title": "Every district is one piece on one landmass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "island_sizes",
+      "title": "Every island built, area within 10% of the spec",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "no_slivers",
+      "title": "No land narrower than 40 m (districts, landmasses)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "land_use",
+      "title": "Every landmass holds a district or is named open land (marsh, park); no orphan wedges",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "canal_quality",
+      "title": "Canals and creeks: no crossings below 30 deg, no near-duplicate canals",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_graph",
+      "title": "Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "districts_served",
+      "title": "Every district is touched by an avenue (at least 50 m within 25 m of it; a traced road of any class serves its pinned district)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "named_bridges",
+      "title": "Every named bridge is built (as a tube where it asks for one)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "bridge_clearance",
+      "title": "Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_avoidance",
+      "title": "No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "curve_radius",
+      "title": "Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7, also inside a joined chain; traced roads as drawn)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "segment_length",
+      "title": "No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted; traced roads as drawn)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_duplicates",
+      "title": "No near-parallel duplicate roads (within 25 m for over 150 m)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_grades",
+      "title": "Every road at most 6% steep along its z profile (viaducts, ramps, bridge approaches, streets ramping up to a raised junction; footbridge stairs aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "level_continuity",
+      "title": "Every road meets its nodes at their height (each road level system joined by ramps, no step at a node)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "deck_clearance",
+      "title": "Where roads cross without a node, the one under has 5.5 m under the deck over it (3 m over a pedestrian street)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "0 crossings without a node"
+      ]
+    },
+    {
+      "id": "ramps_land",
+      "title": "Every ramp is one-way and joins a viaduct at its deck height to a ground road at the ground",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_grades",
+      "title": "Tunnel grades within the class maximum: roads 6% (immersed tubes, cut-and-cover tunnels and their open approaches), metro 4%, pedestrian underpasses level",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_cover",
+      "title": "Cover over every tunnel roof: at least 1 m of ground (40 m into the tunnel from a portal: the roof under the ground), 1.5 m under the water bed (canal 3, river 7, sea 12 m deep), 0.5 m under a road over a pedestrian underpass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_portals",
+      "title": "Every road tunnel has a portal at each end on dry land, 5.5 m clear inside, an open approach at most 6% steep, and nothing on or over its open approaches: no road node within 20 m of their top, no other road, building or structure on them",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_clash",
+      "title": "No tunnel within 1 m (in height, where they overlap in plan) of another tunnel, a metro station box, a building's foundations and basements (4 to 18 m deep by height) or a column footing",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "ground_grades",
+      "title": "Every road at most its class's grade on the ground (grade line plus z): highways and ramps 6%, avenues 8%, streets 12%, alleys and pedestrian ways 15%",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "cut_fill",
+      "title": "Open cuts at most 20 m and fills at most 18 m against the natural ground; deeper cuts bored with at least 1 m of rock over the tunnel roof, higher roads on viaducts",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "retaining_walls",
+      "title": "Where grading made the ground steeper than an embankment (1:1.5), a retaining wall, a bored tunnel portal or a building stands",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_seats",
+      "title": "Every building seated on the ground: base at its entrance ground (within half a floor), at most 16 m of plinth under the base and 16 m of ground over it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_levels",
+      "title": "Every water body at its level: the sea at 0, rivers never rising downstream, waterways at the level of what they join; the ground in the water at that level, the land beside it over it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_graph",
+      "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lane_graph",
+      "title": "Lane graph strongly connected (every lane reaches every other through junction connectors and lane changes) and every vehicle road has lanes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "walkway_graph",
+      "title": "Walkway graph connected on every landmass with districts (sidewalks, crossings, crosswalks, pedestrian streets, promenades, footbridges, alleys, paths into open space)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "2 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)"
+      ]
+    },
+    {
+      "id": "lot_frontage",
+      "title": "Every lot fronts a street, alley, service lane or pedestrian street (at least 2 m) and records its frontage and district (a traced building's lot as drawn)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lot_block_sizes",
+      "title": "Lot areas within the archetype range (0.75 x min to 1.6 x max) and each district's median block size (square root of area) within the archetype block range (0.5 x lo to 1.8 x hi; traced buildings' lots and the blocks of a traced district aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "lot_slivers",
+      "title": "No lot narrower than 3 m and no block narrower than 6 m (strip width from exact area and perimeter; traced buildings' lots aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "sidewalk_clear_path",
+      "title": "Sidewalk clear path at least 1.8 m (width minus furniture zone and curb)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "crosswalks",
+      "title": "A crosswalk on every approach of every signalized junction, and on the side street approaches of unsignalized junctions on avenues",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "junction_placement",
+      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one) or below it (M9 tunnels and their approaches)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "junction_angles",
+      "title": "Minimum angle between a local road and its neighbors at a junction: 60 degrees in grid districts, 35 in organic ones (old town, entertainment market)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_duplicates",
+      "title": "No near-duplicate local roads: right-of-way edges closer than 4 m over more than 50 m (30 m around shared points aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "open_space_share",
+      "title": "Open space share of each district's net land (open space over open space plus lots) within the archetype target (a traced district aside)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "places_built",
+      "title": "Every named place of the spec is built in its district",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_footprints",
+      "title": "Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_clear_zones",
+      "title": "No ground mass of a building or site element on a road, junction, sidewalk, crosswalk, water, open space or another megasite's reserve or flight cone",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_overlaps",
+      "title": "No two buildings, site elements or skybridge decks overlap (plan and height)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_heights",
+      "title": "Building heights within the district's archetype range (under a flight-cone cap where one applies; parking structures only under the top); landmarks, megasites and traced buildings aside",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_entrances",
+      "title": "Every building has a main entrance on its facade, within 20 m of a ground walkway or a shared alley, service lane or pedestrian street, or joined to the walkway graph by a path (megasite buildings and landmarks always)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "ground_floor_units",
+      "title": "Ground-floor units 4 to 12 m wide, on the ground facade, facing one of the lot's frontage roads",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "roof_items",
+      "title": "Rooftop items stand on a roof of their building (a mass top at their level that holds their footprint)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "complexes",
+      "title": "Every merged lot group is built as its complex: twin towers (two equal towers and a skybridge), tower clusters (three or more stepped towers bridged), megabuilding campuses, campuses, bridged pairs and straddle buildings",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "skybridges",
+      "title": "Skybridges: 8 to 80 m, ends on facades of masses that reach the deck, level on both floor grids, roughly perpendicular, 5.5 m over roads and the navigable clearance over water, through no other building, joined to the walkway graph",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "landmarks",
+      "title": "Every landmark of the spec is built in its district with its kind and height (the megatower with three arms)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "megasite_contents",
+      "title": "Every megasite reserve is filled by its site generator with the parts its kind needs, all inside the reserve",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "megasite_heights",
+      "title": "Nothing inside a spaceport flight cone above its height limit, and nothing near one above the transitional surface (limit + 1 m per 1 m away)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "megasite_access",
+      "title": "Every megasite reaches a road (within 40 m) and its buildings and paths join the walkway graph",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "transit links of megasites: see transit_hubs"
+      ]
+    },
+    {
+      "id": "transit_routes",
+      "title": "Every transit line of the spec is built along its whole route (every leg found)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_stops",
+      "title": "Every stop of a line is served by one of its stations (in the district, within 150 m of the site, place or island), and a line to an exit reaches it",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_curves",
+      "title": "Track curve radius at least the mode minimum (elevated rail 150 m, monorail 100, maglev 500, sky tube 300; measured through points 30 m apart)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_self_crossing",
+      "title": "A line never meets itself at the same level: two parts of its track more than 100 m apart along it stay its structure width apart in plan, or one passes 5.5 m over the other's structure; a loop closes where it starts, and its stations come in route order",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_grades",
+      "title": "Track grade at most the mode maximum (elevated rail 4%, monorail 6%, maglev 10%, sky tube 8%)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_altitude",
+      "title": "Track altitude within the mode's range (scope 5.3), higher only where it climbs, at the mode's grade, to clear navigable water or a road deck",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_clearance",
+      "title": "Elevated lines clear the buildings under them (deck underside 2 m over the roof), navigable water (its clearance) and road decks (5.5 m over, or 1 m under a high one); sky lines clear buildings by 10 m or pass through a declared portal",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_supports",
+      "title": "Columns and pylons stand outside lanes, buildings, water and road decks, and leave 1.8 m of every sidewalk clear (in medians, just inside the curbs or off the street)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "0 columns and pylons"
+      ]
+    },
+    {
+      "id": "station_access",
+      "title": "Every station has stairs, escalators or an elevator to the street and joins the walkway graph (elevated and sky stations next to a sidewalk or plaza)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_skybridges",
+      "title": "No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "transit_hubs",
+      "title": "Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "props_keepout",
+      "title": "Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "28345 things on the ground"
+      ]
+    },
+    {
+      "id": "props_overlap",
+      "title": "Nothing on the ground overlaps anything else (props, trunks, shrubs)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tree_clearance",
+      "title": "Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_lighting",
+      "title": "Street or wall lights within 25 m of at least 85% of every district's sidewalks",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "Low Harbor: 99% lit",
+        "Lantern Steps: 95% lit",
+        "Crown Heights: 98% lit",
+        "Old Quarter: 94% lit",
+        "Ridgeback: 97% lit",
+        "Hollow: 98% lit"
+      ]
+    },
+    {
+      "id": "park_planting",
+      "title": "Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "boats_afloat",
+      "title": "Boats lie in their waterway, clear of bridges",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "poi_reachable_foot",
+      "title": "Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "327 doors"
+      ]
+    },
+    {
+      "id": "poi_reachable_car",
+      "title": "Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "poi_places",
+      "title": "Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "territories",
+      "title": "Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "gameplay_fields",
+      "title": "Wealth, danger and police fields: one raster each over the city bounds, every value between 0 and 1",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "street_density",
+      "title": "Street density: one row per road segment with every hour band, nothing negative, traffic within the lanes' capacity, no cars on pedestrian ways",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "parking",
+      "title": "Parking: every garage, lot and curb has capacity; garages in their building, lots clear of buildings and carriageways, curb parking on streets with parking lanes and drive lanes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "travel_points",
+      "title": "Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "sign_slots",
+      "title": "Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "shop signs reach 10.2 m"
+      ]
+    },
+    {
+      "id": "road_supports",
+      "title": "Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "67 road columns under 20 raised segments"
+      ]
+    }
+  ],
+  "stats": {
+    "map_km2": 10.2,
+    "land_km2": 7.261,
+    "district_land_km2": 7.261,
+    "water_share": 0.2882,
+    "sea_share": 0.28,
+    "landmasses": 2,
+    "landmasses_with_districts": 2,
+    "unassigned_land_km2": 0.0,
+    "open_land_km2": 0.889,
+    "open_land": [
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.013
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.012
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.015
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.013
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.012
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.018
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.013
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.012
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.015
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.017
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.014
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.0
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.0
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.0
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      }
+    ],
+    "islands": 0,
+    "river_km": 2.29,
+    "channel_km": {},
+    "separation_channels": 0,
+    "waterway_km": 2.43,
+    "waterway_km_by_kind": {
+      "basin": 0.98,
+      "canal": 1.14,
+      "creek": 0.31
+    },
+    "waterways": 6,
+    "quay_km": 5.04,
+    "district_boundary_on_water": 0.4035,
+    "boundary_on_water": 0.301,
+    "boundary_on_water_target": null,
+    "boundary_km": {
+      "water": 2.56,
+      "land": 5.94
+    },
+    "land_boundary_curvature": 1.0416,
+    "boundary_curvature": 1.0796,
+    "districts": [
+      {
+        "id": "d01",
+        "name": "Low Harbor",
+        "archetype": "industrial_port",
+        "landmass": "lm01",
+        "area_km2": 0.908,
+        "share": 0.125,
+        "target": 0.125,
+        "target_source": "spec",
+        "error": 0.0
+      },
+      {
+        "id": "d02",
+        "name": "Lantern Steps",
+        "archetype": "entertainment_market",
+        "landmass": "lm02",
+        "area_km2": 1.059,
+        "share": 0.1459,
+        "target": 0.1458,
+        "target_source": "spec",
+        "error": 0.0006
+      },
+      {
+        "id": "d03",
+        "name": "Crown Heights",
+        "archetype": "corporate_core",
+        "landmass": "lm01",
+        "area_km2": 1.21,
+        "share": 0.1667,
+        "target": 0.1667,
+        "target_source": "spec",
+        "error": -0.0001
+      },
+      {
+        "id": "d04",
+        "name": "Old Quarter",
+        "archetype": "old_town",
+        "landmass": "lm02",
+        "area_km2": 1.209,
+        "share": 0.1666,
+        "target": 0.1667,
+        "target_source": "spec",
+        "error": -0.0008
+      },
+      {
+        "id": "d05",
+        "name": "Ridgeback",
+        "archetype": "megablock_residential",
+        "landmass": "lm01",
+        "area_km2": 1.512,
+        "share": 0.2082,
+        "target": 0.2083,
+        "target_source": "spec",
+        "error": -0.0005
+      },
+      {
+        "id": "d06",
+        "name": "Hollow",
+        "archetype": "midtown_mixed",
+        "landmass": "lm01",
+        "area_km2": 1.363,
+        "share": 0.1877,
+        "target": 0.1875,
+        "target_source": "spec",
+        "error": 0.0009
+      }
+    ],
+    "road_km": {
+      "alley": 28.7,
+      "avenue": 23.54,
+      "footbridge": 0.07,
+      "highway": 8.93,
+      "pedestrian": 8.21,
+      "service": 9.9,
+      "street": 101.92
+    },
+    "road_nodes": 2288,
+    "road_segments": 3226,
+    "road_components": 1,
+    "bridges": 6,
+    "bridges_by_class": {
+      "sea": 0,
+      "river": 2,
+      "canal": 4
+    },
+    "bridge_span_km": 0.13,
+    "named_bridges": [],
+    "pedestrian_bridges": 3,
+    "landmasses_connected": [
+      2,
+      2
+    ],
+    "exits": [
+      "east_exit",
+      "north_exit",
+      "west_exit"
+    ],
+    "highway_elevated_share": 0.0,
+    "megasites": 2,
+    "elevated": {
+      "elevated_km": 0.0,
+      "elevated_runs": 0,
+      "direct_branches": 0,
+      "ramps": 0,
+      "ramp_km": 0.0,
+      "interchanges": {},
+      "flyovers": 0,
+      "max_flyover_m": 0.0,
+      "overpasses": 0,
+      "max_deck_m": 0.0,
+      "raised_other_km": 5.74,
+      "underpass_streets": 0,
+      "road_columns": 67
+    },
+    "tunnels": {
+      "by_kind": {
+        "bored": {
+          "count": 7,
+          "km": 0.68
+        },
+        "metro": {
+          "count": 6,
+          "km": 4.16
+        },
+        "pedestrian": {
+          "count": 5,
+          "km": 0.15
+        }
+      },
+      "vents": 0,
+      "deepest_road_m": 0.0,
+      "deepest_metro_m": -51.37,
+      "over_tunnel_roads": 0,
+      "over_tunnel_streets": 0
+    },
+    "terrain": {
+      "hills": [
+        {
+          "name": "Old Hill",
+          "at": [
+            -1211.6,
+            902.62
+          ],
+          "height_m": 75.0
+        },
+        {
+          "name": "Crown Hill",
+          "at": [
+            -247.66,
+            204.58
+          ],
+          "height_m": 40.0
+        }
+      ],
+      "ridges": [
+        {
+          "name": "Ridgeback",
+          "from": [
+            1269.44,
+            569.83
+          ],
+          "to": [
+            1275.0,
+            1125.0
+          ]
+        }
+      ],
+      "cliffs": [
+        {
+          "district": "Crown Heights",
+          "height_m": 34.0
+        }
+      ],
+      "flat": [
+        {
+          "name": "Low Harbor",
+          "level_m": 5.9
+        },
+        {
+          "name": "Low Harbor Freight Terminal",
+          "level_m": 5.9
+        },
+        {
+          "name": "Hollow Central Park",
+          "level_m": 23.6
+        }
+      ],
+      "max_m": 95.11,
+      "max_cut_m": 18.68,
+      "max_fill_m": 18.67,
+      "walls": 1280,
+      "wall_km": 83.57,
+      "bores": 7,
+      "viaducts": 1,
+      "graph_vertices": 18859,
+      "crossings": 0,
+      "slope_greens": 181,
+      "retaining_walls": 1280,
+      "highest_wall_m": 19.65,
+      "bored_tunnels": 7,
+      "highest_plinth_m": 13.09,
+      "parked_off_steep": 665,
+      "seats_off_steep": 197,
+      "trees_off_cliffs": 1558,
+      "under_viaducts": 63
+    },
+    "local": {
+      "junctions": 1839,
+      "junctions_signalized": 405,
+      "junctions_by_type": {
+        "street_street T": 878,
+        "street_street X": 278,
+        "avenue_avenue T": 209,
+        "alley_alley T": 166,
+        "avenue_avenue X": 94,
+        "street T": 58,
+        "street_alley T": 25,
+        "pedestrian T": 23,
+        "alley_alley X": 19,
+        "street_service T": 17,
+        "highway_highway T": 15,
+        "street_street multi": 12,
+        "highway_highway X": 11,
+        "alley T": 10,
+        "street_alley X": 10,
+        "avenue_avenue multi": 7,
+        "service_service T": 4,
+        "alley_alley multi": 2,
+        "pedestrian X": 1
+      },
+      "crosswalks": 1406,
+      "sidewalks": 4555,
+      "sidewalk_km": 163.79,
+      "lanes": 6888,
+      "lane_connectors": 14036,
+      "one_way_segments": 142,
+      "walkways": 17759,
+      "walkway_km": {
+        "alley": 38.6,
+        "crossing": 88.42,
+        "crosswalk": 45.1,
+        "elevator": 0.0,
+        "footbridge": 0.07,
+        "path": 71.13,
+        "pedestrian_street": 0.91,
+        "promenade": 7.31,
+        "sidewalk": 209.43,
+        "skybridge": 3.5,
+        "stairs": 0.2,
+        "underpass": 0.15
+      },
+      "footbridges": 3,
+      "blocks": 1129,
+      "lots": 6800,
+      "merged_lot_groups": 2,
+      "lot_area_m2_by_archetype": {
+        "corporate_core": {
+          "count": 167,
+          "min": 1006.9,
+          "p10": 1489.4,
+          "median": 2598.3,
+          "p90": 4144.6,
+          "max": 6775.1,
+          "median_frontage_m": 54.1
+        },
+        "entertainment_market": {
+          "count": 2222,
+          "min": 57.9,
+          "p10": 117.7,
+          "median": 239.7,
+          "p90": 458.6,
+          "max": 755.8,
+          "median_frontage_m": 16.1
+        },
+        "industrial_port": {
+          "count": 58,
+          "min": 2104.5,
+          "p10": 2780.2,
+          "median": 7026.2,
+          "p90": 15450.0,
+          "max": 35376.3,
+          "median_frontage_m": 125.3
+        },
+        "megablock_residential": {
+          "count": 62,
+          "min": 2140.6,
+          "p10": 3037.9,
+          "median": 5269.4,
+          "p90": 9795.0,
+          "max": 13218.0,
+          "median_frontage_m": 91.5
+        },
+        "midtown_mixed": {
+          "count": 688,
+          "min": 282.0,
+          "p10": 487.7,
+          "median": 908.5,
+          "p90": 1671.7,
+          "max": 4209.4,
+          "median_frontage_m": 31.5
+        },
+        "old_town": {
+          "count": 3603,
+          "min": 37.3,
+          "p10": 78.9,
+          "median": 159.5,
+          "p90": 315.2,
+          "max": 721.4,
+          "median_frontage_m": 13.4
+        }
+      },
+      "block_size_m_by_district": {
+        "Low Harbor": {
+          "count": 15,
+          "min": 52.0,
+          "p10": 96.0,
+          "median": 150.6,
+          "p90": 291.7,
+          "max": 311.2
+        },
+        "Lantern Steps": {
+          "count": 331,
+          "min": 10.6,
+          "p10": 20.8,
+          "median": 39.0,
+          "p90": 61.9,
+          "max": 106.0
+        },
+        "Crown Heights": {
+          "count": 58,
+          "min": 43.2,
+          "p10": 62.8,
+          "median": 107.2,
+          "p90": 152.8,
+          "max": 197.2
+        },
+        "Old Quarter": {
+          "count": 554,
+          "min": 9.2,
+          "p10": 17.1,
+          "median": 30.7,
+          "p90": 47.7,
+          "max": 133.4
+        },
+        "Ridgeback": {
+          "count": 61,
+          "min": 46.7,
+          "p10": 72.6,
+          "median": 113.4,
+          "p90": 191.8,
+          "max": 242.8
+        },
+        "Hollow": {
+          "count": 110,
+          "min": 22.1,
+          "p10": 51.6,
+          "median": 76.9,
+          "p90": 101.0,
+          "max": 203.1
+        }
+      },
+      "open_spaces_by_kind": {
+        "courtyard": 15,
+        "green": 234,
+        "park": 37,
+        "plaza": 224,
+        "pocket_park": 28
+      },
+      "open_share_by_district": {
+        "Low Harbor": 0.0411,
+        "Lantern Steps": 0.0621,
+        "Crown Heights": 0.1141,
+        "Old Quarter": 0.0624,
+        "Ridgeback": 0.0955,
+        "Hollow": 0.1624
+      },
+      "open_share": 0.0952,
+      "places": 0,
+      "generator": {
+        "one_way_loops": 29,
+        "open_paths": 795,
+        "walkway_links": 0,
+        "angles": {
+          "d01": 42.5,
+          "d02": 2.5,
+          "d03": 45.0,
+          "d04": 2.5,
+          "d05": 2.5,
+          "d06": 2.5
+        }
+      }
+    },
+    "buildings": {
+      "count": 6805,
+      "floor_area_km2": 21.831,
+      "by_type": {
+        "shopfront_row": 3387,
+        "shanty_stack": 2227,
+        "perimeter": 423,
+        "podium_tower": 326,
+        "terraced": 187,
+        "courtyard_block": 99,
+        "megabuilding": 43,
+        "warehouse": 35,
+        "tower": 24,
+        "slab": 13,
+        "yard": 13,
+        "shed": 12,
+        "parking_structure": 9,
+        "pavilion": 2,
+        "straddle_building": 2,
+        "gate_house": 1,
+        "landmark.megatower": 1,
+        "office": 1
+      },
+      "by_use": {
+        "retail": 3387,
+        "residential": 2388,
+        "mixed": 688,
+        "office": 159,
+        "entertainment": 111,
+        "industrial": 61,
+        "parking": 9,
+        "civic": 2
+      },
+      "by_district": {
+        "Low Harbor": {
+          "count": 58,
+          "min": 9.1,
+          "median": 12.6,
+          "p90": 16.0,
+          "max": 16.0,
+          "archetype": "industrial_port",
+          "floor_area_km2": 0.154,
+          "coverage": 0.308,
+          "far": 0.31
+        },
+        "Lantern Steps": {
+          "count": 2222,
+          "min": 10.5,
+          "median": 21.0,
+          "p90": 31.5,
+          "max": 45.5,
+          "archetype": "entertainment_market",
+          "floor_area_km2": 2.812,
+          "coverage": 0.968,
+          "far": 4.74
+        },
+        "Crown Heights": {
+          "count": 167,
+          "min": 12.0,
+          "median": 140.0,
+          "p90": 192.0,
+          "max": 480.0,
+          "archetype": "corporate_core",
+          "floor_area_km2": 6.948,
+          "coverage": 0.828,
+          "far": 15.12
+        },
+        "Old Quarter": {
+          "count": 3602,
+          "min": 6.0,
+          "median": 15.0,
+          "p90": 20.6,
+          "max": 26.6,
+          "archetype": "old_town",
+          "floor_area_km2": 2.092,
+          "coverage": 0.955,
+          "far": 3.22
+        },
+        "Ridgeback": {
+          "count": 62,
+          "min": 124.8,
+          "median": 150.4,
+          "p90": 169.6,
+          "max": 192.0,
+          "archetype": "megablock_residential",
+          "floor_area_km2": 4.684,
+          "coverage": 0.767,
+          "far": 12.99
+        },
+        "Hollow": {
+          "count": 688,
+          "min": 31.5,
+          "median": 42.0,
+          "p90": 66.5,
+          "max": 140.0,
+          "archetype": "midtown_mixed",
+          "floor_area_km2": 5.131,
+          "coverage": 0.705,
+          "far": 7.37
+        }
+      },
+      "properties": 6799,
+      "complexes": {
+        "bridged_pair": 1,
+        "landmark": 1,
+        "megasite": 2,
+        "straddle_building": 1
+      },
+      "skybridges": 285,
+      "skybridges_by_kind": {
+        "cable": 50,
+        "catwalk": 102,
+        "enclosed": 76,
+        "open_deck": 57
+      },
+      "skybridge_km": 3.5,
+      "units": 21299,
+      "units_by_use": {
+        "food": 5604,
+        "bar": 3061,
+        "convenience": 2247,
+        "cyberware": 2115,
+        "club": 1886,
+        "arcade": 1663,
+        "pawn": 1400,
+        "laundromat": 1373,
+        "lobby": 981,
+        "clinic": 969
+      },
+      "roof_items": {
+        "ac_unit": 14107,
+        "billboard": 1641,
+        "water_tank": 1217,
+        "antenna": 1165,
+        "mechanical": 539,
+        "av_pad": 45,
+        "helipad": 16
+      },
+      "green_roofs": 351,
+      "green_roof_m2": 245130,
+      "landmarks": [
+        {
+          "name": "Crown Spire",
+          "kind": "megatower",
+          "height_m": 480.0,
+          "district": "Crown Heights"
+        }
+      ],
+      "megasites": {
+        "Low Harbor Freight Terminal": {
+          "kind": "freight_terminal",
+          "contents": {
+            "berth": 1,
+            "container_stack": 147,
+            "gantry_crane": 1,
+            "gate_house": 1,
+            "office": 1,
+            "rail_track": 2,
+            "truck_gate": 1,
+            "warehouse": 2
+          }
+        },
+        "Hollow Central Park": {
+          "kind": "central_park",
+          "contents": {
+            "fountain": 1,
+            "lawn": 12,
+            "pavilion": 2,
+            "plaza": 1,
+            "pond": 1
+          }
+        }
+      },
+      "site_elements": 280,
+      "structures": 1384,
+      "tallest_m": 480.0,
+      "generator": {
+        "walkways_added": 2471
+      }
+    },
+    "transit": {
+      "by_mode": {
+        "metro": {
+          "lines": 1,
+          "km": 5.0,
+          "stations": 7
+        }
+      },
+      "stations": {
+        "underground": 7
+      },
+      "supports": 0,
+      "portals": 0,
+      "buildings_removed": 0,
+      "km": 5.0,
+      "generator": {
+        "lines": 1,
+        "stations": 7,
+        "removed_buildings": 0,
+        "removed_skybridges": 0,
+        "portals": 0,
+        "structures": 21,
+        "walkways_added": 21
+      }
+    },
+    "props": {
+      "props": 61478,
+      "plants": 23621,
+      "trees": 9343,
+      "instances": 85099,
+      "props_by_kind": {
+        "sign": 17031,
+        "awning": 13835,
+        "ac_unit": 9346,
+        "street_light": 3618,
+        "parked_vehicle": 2624,
+        "overhead_cable": 2417,
+        "trash": 2226,
+        "barrier": 2217,
+        "traffic_signal": 2085,
+        "railing": 1678,
+        "bollard": 1168,
+        "wall_light": 879,
+        "trash_can": 820,
+        "hydrant": 759,
+        "bench": 320,
+        "dumpster": 270,
+        "bus_stop": 69,
+        "scaffolding": 62,
+        "boat": 42,
+        "planter": 8,
+        "vending_machine": 3,
+        "kiosk": 1
+      },
+      "plants_by_kind": {
+        "shrub": 7805,
+        "facade_greenery": 5942,
+        "park_tree": 5618,
+        "street_tree": 1773,
+        "median_tree": 878,
+        "conifer": 539,
+        "palm": 535,
+        "roof_tree": 530,
+        "overgrowth": 1
+      },
+      "lawn_m2": 53906,
+      "hedge_km": 3.03,
+      "generator": {
+        "traffic_signals": 2089,
+        "bus_stops": 143,
+        "street_lights": 3330,
+        "narrow_lights": 1173,
+        "hydrants": 761,
+        "crosswalk_cans": 473,
+        "bollards": 1168,
+        "station_props": 0,
+        "street_trees": 1785,
+        "plaza_props": 139,
+        "park_benches": 581,
+        "parked_vehicles": 3289,
+        "alley_clutter": 2503,
+        "median_trees": 1350,
+        "promenade_trees": 70,
+        "park_trees": 12852,
+        "roof_plants": 3217,
+        "facade_greenery": 5942,
+        "overgrowth": 1,
+        "quay_props": 1808,
+        "highway_barriers": 2217,
+        "overhead_cables": 2417,
+        "unit_dressing": 40212,
+        "scaffolding": 62,
+        "market_gates": 0,
+        "props": 62365,
+        "plants": 25217
+      }
+    },
+    "gameplay": {
+      "pois": 269,
+      "pois_by_kind": {
+        "vendor.food": 49,
+        "bar.bar": 38,
+        "vendor.pawn": 36,
+        "bar.arcade": 29,
+        "apartment.studio": 24,
+        "clinic.ripperdoc": 24,
+        "bar.club": 16,
+        "clinic.clinic": 14,
+        "vendor.convenience": 14,
+        "apartment.apartment": 8,
+        "fixer.fixer": 8,
+        "hideout.squat": 4,
+        "hideout.back_room": 3,
+        "hideout.warehouse": 2
+      },
+      "factions": 6,
+      "factions_by_kind": {
+        "gang": 4,
+        "corporate": 1,
+        "police": 1
+      },
+      "territories": 13,
+      "contested": 4,
+      "parking": {
+        "street": 559,
+        "garage": 16
+      },
+      "parking_capacity": 16940,
+      "taxi_stands": 31,
+      "fast_travel": 11,
+      "sign_slots": {
+        "shop_sign.blade": 11781,
+        "shop_sign.facade": 5250,
+        "billboard.roof": 1641,
+        "neon.facade": 746,
+        "billboard.facade": 344,
+        "holo_ad.roof": 63
+      },
+      "density_rows": 3226,
+      "peak_traffic_vph": 9690.0,
+      "peak_crowd_per_100m": 168.0,
+      "generator": {
+        "factions": 6,
+        "zones": 19,
+        "pois": 269,
+        "parking": 575,
+        "travel_points": 42,
+        "densities": 3226,
+        "sign_slots": 19825
+      }
+    },
+    "separation_budget": {
+      "target": 0.6,
+      "before": 0.3049,
+      "preferred_chains": 0,
+      "planned": 0.3049
+    },
+    "road_variant": 1,
+    "city_tries": [
+      {
+        "variant": 1,
+        "road_variant": 1,
+        "layout_salt": 0,
+        "failures": 0
+      }
+    ]
+  },
+  "notes": [
+    "megasite 'Low Harbor Freight Terminal' (freight_terminal) shrunk to 0.18 km2 (asked 0.40) to fit 'Low Harbor'",
+    "76 local roads cut back at junctions sharper than the district minimum",
+    "4 local roads running alongside another road removed",
+    "48 lanes reached only over pedestrian streets became pedestrian",
+    "3 local roads crossing another without a junction removed",
+    "62 local segments (4.03 km) not connected to the network were dropped",
+    "complex straddle_building d02.mg01: built on lots d02.blk069.lot003, d02.blk157.lot006 (the merged group did not fit)",
+    "lot too small or narrow for a building",
+    "metro Hill Line: lowered to -51.37 m under foundation",
+    "5 pedestrian underpasses under the highways"
+  ]
+}

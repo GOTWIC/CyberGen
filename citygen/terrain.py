@@ -1112,13 +1112,31 @@ GROUND_PLANTS = ("street_tree", "park_tree", "conifer", "palm", "median_tree", "
 
 
 def dressing(m) -> tuple[dict, dict]:
-    """Props and plants that suit the ground: parked cars off steep streets, seats and stalls
-    off steep ground, no tree on a cliff face (M13)."""
+    """Props and plants that suit the ground: parked cars off streets steeper than PARK_MAX
+    (the street's own grade line), seats and stalls off steep natural ground, no tree on a
+    cliff face (natural ground over TREE_MAX), nothing at the ground under a terrain
+    viaduct (M13)."""
     import shapely
 
     fin = ground_of(m)
+    nat = Field.from_rows(m.terrain, m.terrain.natural)
     st = {"parked_off_steep": 0, "seats_off_steep": 0, "trees_off_cliffs": 0,
           "under_viaducts": 0}
+    segs = {s.id: s for s in m.road_segments}
+
+    def road_grade(sid, x, y) -> float:
+        """The grade of a road's grade line where a point stands beside it."""
+        s = segs.get(sid)
+        if s is None or not s.ground:
+            return fin.slope(x, y)
+        from .elevated import _project
+
+        line = [tuple(p) for p in s.centerline]
+        cum = _cum(line)
+        at = _project(line, cum, (x, y))[0]
+        st_ = [(p.s, p.z) for p in s.ground]
+        a_, b_ = max(at - 5.0, 0.0), min(at + 5.0, cum[-1])
+        return abs(z_on(st_, b_) - z_on(st_, a_)) / max(b_ - a_, 1.0)
     decks = [shapely.LineString([p[:2] for p in s.line]).buffer(s.attrs["width_m"] / 2 + 2.0)
              for s in m.structures if s.attrs.get("terrain_viaduct") and len(s.line) >= 2]
     under = G.union(decks) if decks else None
@@ -1133,10 +1151,11 @@ def dressing(m) -> tuple[dict, dict]:
         if below(x, y, z):
             st["under_viaducts"] += 1
             continue
-        if abs(z) < 0.5 and kind == "parked_vehicle" and fin.slope(x, y) > PARK_MAX:
+        if abs(z) < 0.5 and kind == "parked_vehicle" and \
+                road_grade(p.attrs.get("segment"), x, y) > PARK_MAX:
             st["parked_off_steep"] += 1
             continue
-        if abs(z) < 0.5 and kind in STEEP_PROPS and fin.slope(x, y) > SEAT_MAX:
+        if abs(z) < 0.5 and kind in STEEP_PROPS and nat.slope(x, y) > SEAT_MAX:
             st["seats_off_steep"] += 1
             continue
         props.append(p)
@@ -1147,7 +1166,7 @@ def dressing(m) -> tuple[dict, dict]:
         if below(x, y, z):
             st["under_viaducts"] += 1
             continue
-        if abs(z) < 0.5 and kind in GROUND_PLANTS and fin.slope(x, y) > TREE_MAX:
+        if abs(z) < 0.5 and kind in GROUND_PLANTS and nat.slope(x, y) > TREE_MAX:
             st["trees_off_cliffs"] += 1
             continue
         plants.append(p)
