@@ -1268,7 +1268,8 @@ def _checks(m, plan, rep, verify, out: Path, render: bool, export: bool) -> list
                            (out / usd).stat().st_size > 0, f"{usd}"))
     if render:
         want = 1 + (1 if plan["cameras"]["districts"] else 0) + \
-            len(plan["cameras"]["districts"]) + len(plan["cameras"]["street"])
+            len(plan["cameras"]["districts"]) + len(plan["cameras"]["street"]) + \
+            (1 if plan["cameras"].get("cutaway") else 0)
         got = [r for r in rep["files"].get("renders", []) if (out / r).is_file()]
         out_checks.append(("renders", len(got) == want, f"{len(got)} of {want} renders"))
     return out_checks
