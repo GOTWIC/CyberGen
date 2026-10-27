@@ -444,6 +444,64 @@
           ],
           "default": null,
           "title": "Greenery"
+        },
+        "wealth": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M11: base of the wealth field.",
+          "title": "Wealth"
+        },
+        "danger": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M11: base of the danger field.",
+          "title": "Danger"
+        },
+        "police": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M11: base of the police presence field.",
+          "title": "Police"
+        },
+        "faction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M11: the faction that holds the district (districts with the same faction share it); default: a generated gang where the district is dangerous, a corporation in corporate districts, else the police.",
+          "title": "Faction"
         }
       },
       "required": [

@@ -179,6 +179,12 @@ Then, only where the prompt or image says so:
   `name`, `area_km2`, `edge`, `coast`, `height_limit_m`); left out = preset (spaceport, transit hub,
   industrial port and midtown archetypes bring one), `[]` = none.
 - `skybridge_density`, `grime`, `neon`, `greenery` (0 to 1): only for explicit mood words.
+- `wealth`, `danger`, `police` (0 to 1, M11 gameplay layer): the base of the district's
+  wealth, danger and police fields; archetype defaults, set only for explicit words ("rich",
+  "lawless", "heavily policed"). `faction`: the gang, corporation or police that holds the
+  district (districts with the same name share it); left out, a dangerous district gets a
+  generated gang, corporate, campus, port and spaceport districts a corporation, the rest the
+  city police. Only when the prompt names one.
 
 **Transit** (`transit`): `hubs` (districts, places or megasites where lines meet; default: transit
 hub districts and transit_nexus sites) and `lines`, each `mode`, `name`, `route` (two or more
@@ -390,6 +396,12 @@ errors).
    run through the dense districts with ramps down to the avenues; the notes list ramps and
    underpass streets that could not be built. More viaduct: raise `highways.elevated_share`;
    none: set it to 0.
+4e. Open `preview_gameplay.png` (M11): territories in faction colors (contested turfs
+   hatched) with the points of interest, taxi stands and fast-travel points; the wealth and
+   danger fields; evening traffic and late crowds per street; and a 300 m street inset with
+   names, doors, curb points, parking and sign slots. More gangs or a calmer district:
+   raise or lower its `danger` (gangs hold districts at 0.45 and up); name factions with
+   `faction`.
 5. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass

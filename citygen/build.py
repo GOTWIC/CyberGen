@@ -573,6 +573,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     from . import building_checks as BC
     from . import buildout as BO
     from . import elevated as EL
+    from . import gameplay as GP
+    from . import gameplay_checks as GC
     from . import street_checks as SC
     from . import prop_checks as PC
     from . import props as PR
@@ -610,6 +612,11 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     pr = PR.build(spec, m)
     m = with_rows(m, pr.rows)
+    # M11: the gameplay layer on the finished city
+    gp = GP.build(spec, m)
+    m = with_rows(m, gp.rows)
+    for key in sorted(gp.rows):
+        T.stage(f"gameplay/{key}", gp.rows[key])
     b.model = m
     lms = SimpleNamespace(landmasses={lm.id: G.from_model_poly(lm.polygon)
                                       for lm in m.landmasses})
@@ -618,7 +625,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
 
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
               for c in early["checks"]] + BC.run(spec, m, None, bx) + TC.run(spec, m) + \
-        PC.run(spec, m)
+        PC.run(spec, m) + GC.run(spec, m)
     with G.canonical():
         checks.append(EC.check_supports(m))
     st = early["stats"]
@@ -629,6 +636,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     if tr is not None:
         st["transit"] = {**TC.stats(m), "generator": tr.info}
     st["props"] = {**PC.stats(m), "generator": pr.info}
+    st["gameplay"] = {**GC.stats(m), "generator": gp.info}
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)
@@ -638,7 +646,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st.setdefault("buildings", {})["generator"] = {k: v for k, v in out.info.items()
                                                    if k != "seconds"}
     b.checks, b.stats = checks, st
-    b.notes = b.notes + out.notes + (tr.notes if tr is not None else []) + pr.notes
+    b.notes = b.notes + out.notes + (tr.notes if tr is not None else []) + pr.notes + \
+        gp.notes
     return b
 
 
@@ -693,4 +702,9 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_elevated.png")
         render_elevated(b, paths[-1])
+    if b.model.pois or b.model.zones:
+        from .preview_gameplay import render_gameplay
+
+        paths.append(out / "preview_gameplay.png")
+        render_gameplay(b, paths[-1])
     return paths

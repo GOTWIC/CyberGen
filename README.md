@@ -44,43 +44,50 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Vesper Bay, then Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](docs/progress/M8d) |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
-| M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
+| M11 | Gameplay layer: named points of interest (bars, clinics, vendors, fixers, hideouts, apartments) with their doors, faction territories and police precincts, wealth, danger and police fields, traffic, crowd and spawn density per street and hour band, parking, taxi stands, fast travel, sign and ad slots; every place reachable on foot and by car (9 checks, 75 in all), `gameplay.json` | Done | [`docs/progress/M11`](docs/progress/M11) |
 | M12 | Stack interchanges: four-level highway-highway crossings with directional flyovers | Planned | |
 | M13 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
-## Latest maps (M8c)
+## Latest maps (M11)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
-different coast forms, not one map. M8a swept them and the test specs over many seeds and
-fixed what failed: highways that hooked along the map edge at exits, islands that did not
-fit, islands cut off from the roads, level steps on loop roads and footbridges, side-by-side
-duplicate roads, a crash (see [`docs/progress/M8a`](docs/progress/M8a)). M8b makes every
-transit loop one simple ring through its stops in route order, places fast lines (maglev,
-sky tube) so that their curves fit, and routes transit in about 3 to 13 s per city; on M8a's
-code it takes Vesper Bay (then Nyxllor) from 8 full-city tries to 1. M8d builds the trumpet as one loop and a
-flyover. M8c makes transit pass on the layout a city is first built on: a sky tube or maglev
-loop is one ring of Dubins paths (straight runs and arcs at the mode's radius) through its
-stops, and an open line the roads fail goes off them, or from stop to stop on Dubins paths.
-Delta Megacity now builds on its first try in about a minute (9 tries, about 6 minutes,
-before), and the sweep passes 58 of 68 builds with no transit failure left (see
-[`docs/progress/M8c`](docs/progress/M8c)).
+different coast forms, not one map. M11 adds the gameplay layer on top of the finished city:
+named points of interest with their doors, gang, corporate and police territories, wealth,
+danger and police fields, traffic, crowd and spawn density per street and hour band for
+lifegen, parking, taxi stands, fast-travel points, and sign and ad slots for stages 2 and 3.
+Every place is reachable on foot and by car, by construction, so no city retries more than
+on M8c (see [`docs/progress/M11`](docs/progress/M11)). Before it, M8a swept the samples over
+many seeds ([`docs/progress/M8a`](docs/progress/M8a)), M8b made transit loops simple rings,
+M8d built the trumpet as one loop and a flyover, and M8c made transit pass on a city's first
+layout ([`docs/progress/M8c`](docs/progress/M8c)).
+
+The gameplay layer (Vesper Bay): territories in faction colors (contested turfs hatched) with
+points of interest, taxi stands and fast travel; the wealth and danger fields; evening traffic
+and late crowds per street; a 300 m street inset with names, doors, curb points and sign
+slots:
+
+<img src="docs/progress/M11/vesper_bay/preview_gameplay.png" width="840">
+
+| Nexus City | Delta Megacity |
+|---|---|
+| <img src="docs/progress/M11/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M11/delta_megacity/preview_gameplay.png" width="420"> |
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):
 
 | Nexus City (from the concept image) | Vesper Bay (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M8c/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M11/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M11/vesper_bay/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
-| <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/delta_megacity/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M11/vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M11/delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
-| <img src="docs/progress/M8c/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/peninsula_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M11/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M11/peninsula_city/render_iso_city.jpg" width="420"> |
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 
@@ -97,7 +104,7 @@ partial cloverleaf and a trumpet), columns, and the profile of one viaduct. The 
 (inset) now has one loop and a flyover that wraps round it, crosses the deck at 16.6 m
 beside the stem and comes down to it:
 
-<img src="docs/progress/M8c/vesper_bay/preview_elevated.png" width="840">
+<img src="docs/progress/M11/vesper_bay/preview_elevated.png" width="840">
 
 Vesper Bay's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it:
 
@@ -105,7 +112,7 @@ Vesper Bay's trumpet in the blockout (8K): the loop inside, the flyover's bell w
 
 Props and plants at street level (Vesper Bay, 180 m insets):
 
-<img src="docs/progress/M8c/vesper_bay/preview_props.png" width="840">
+<img src="docs/progress/M11/vesper_bay/preview_props.png" width="840">
 
 Transit maps (M8c): Delta Megacity on its first layout, before M8c (the Delta Loop's
 curve at Research Campus and the monorail's turn at a bridge foot too tight, so the city was
@@ -119,7 +126,7 @@ built again eight times) and now:
 |---|---|
 | <img src="docs/progress/M8c/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M8c/vesper_bay/preview_transit.png" width="420"> |
 
-Each M8c city folder has every generator preview, the transit map of M8b, the Blender
+Each M11 city folder has every generator preview (`preview_gameplay.png` first), the build report, the stage trace and the 8K whole-city render; each M8c city folder has every generator preview, the transit map of M8b, the Blender
 renders, the build report and the stage trace, and `docs/progress/M8c/same_layout/` the
 transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) are in
 `docs/progress/M8d/`, the M8b ones in `docs/progress/M8b/`, the M8a sweep tables in

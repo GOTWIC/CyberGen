@@ -133,8 +133,9 @@ def _blockout(model: Path, out_dir: str, args: argparse.Namespace) -> int:
     out = Path(out_dir)
     b = rep.get("blender") or {}
     for f in ["blockout_plan.json", "map_2d.svg", "map_2d.png", "graphs.json", "tiles.json",
-              "props.csv", "unreal/corporate_core_plan.json"]:
-        print(f"wrote {out / f}")
+              "props.csv", "gameplay.json", "unreal/corporate_core_plan.json"]:
+        if (out / f).exists():
+            print(f"wrote {out / f}")
     for k, v in (b.get("files") or {}).items():
         print(f"wrote {out / v}" if isinstance(v, str) else f"wrote {len(v)} {k} in {out}")
     if not rep["passed"]:

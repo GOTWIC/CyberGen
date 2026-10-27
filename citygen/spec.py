@@ -497,6 +497,14 @@ class District(_Model):
     grime: Fraction | None = None
     neon: Fraction | None = None
     greenery: Fraction | None = None
+    wealth: Fraction | None = Field(None, description="M11: base of the wealth field.")
+    danger: Fraction | None = Field(None, description="M11: base of the danger field.")
+    police: Fraction | None = Field(None, description="M11: base of the police presence "
+                                                      "field.")
+    faction: Name | None = Field(
+        None, description="M11: the faction that holds the district (districts with the same "
+                          "faction share it); default: a generated gang where the district is "
+                          "dangerous, a corporation in corporate districts, else the police.")
 
 
 # ---------------------------------------------------------------------------

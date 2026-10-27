@@ -83,7 +83,7 @@ def test_report_has_prop_stats(city):
     assert st["props"] == len(city.model.props) and st["plants"] == len(city.model.plants)
     assert st["instances"] == st["props"] + st["plants"]
     rep = city.report()
-    assert rep["stage"].startswith("M7")
+    assert rep["stage"].startswith("M11")
     assert "props" in C.report_text(rep)
 
 
