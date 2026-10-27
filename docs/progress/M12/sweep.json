@@ -4,33 +4,33 @@
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 21.2,
+  "seconds": 35.3,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "9c9669b626cecd3f696957b81cc2d4131de051ec7ee808b171dc9f168ec46d4d"
+  "sha256": "ab269ba80a5d3c24dbb902a3144f762a4e5e5a57f70d6f9be6beb918f3ebed83"
  },
  {
   "label": "archipelago_free_port",
   "seed": 3301,
   "status": "pass",
   "failed": [],
-  "seconds": 21.1,
+  "seconds": 35.6,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "e5780b722a035ca3edde143788a00e5f510828d8e632a2f1ede09f48b449c617"
+  "sha256": "db0733983fdd333610e67d6dd51055e3dbf286356135144028cc3829bc486bd5"
  },
  {
   "label": "archipelago_free_port",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 53.8,
+  "seconds": 67.9,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 1,
@@ -38,111 +38,111 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "45bac52185b0ea99bd597cb5af2f2afb9b0a1c0ef353f7ab560a17791be62852"
+  "sha256": "877c6f07fce3b11ae801a990a1bb4994e8890ae065aca2f5325f87502bfc0a58"
  },
  {
   "label": "archipelago_free_port",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 28.1,
+  "seconds": 28.3,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "e3a959777dea723d195cfc78fab8abf0ffb18c37fb4265d3dd98f72d0aa9aff9"
+  "sha256": "fbea4da547289c565c90601bcfa6519760d550cee982a9ff7e98674633bbe6a4"
  },
  {
   "label": "archipelago_free_port",
   "seed": 5077,
   "status": "pass",
   "failed": [],
-  "seconds": 30.7,
+  "seconds": 32.0,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "dffbf64547d649685e6989731d784cc1a18706602720b4d7a94e63375bb00e80"
+  "sha256": "49bdfecd011216d23c90494738a357537fd62a1959ec5e86e0774c7cca4c9d78"
  },
  {
   "label": "archipelago_free_port",
   "seed": 8128,
   "status": "pass",
   "failed": [],
-  "seconds": 49.1,
+  "seconds": 50.0,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "d552dde731a217ce6058a913951b91bdb72cada10d66227cc104a1a79560b779"
+  "sha256": "b8a4438b27ef5db12da6af00e289a97b21556440ce93c6cad295f7569f740799"
  },
  {
   "label": "archipelago_free_port",
   "seed": 27182,
   "status": "pass",
   "failed": [],
-  "seconds": 34.9,
+  "seconds": 37.3,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "ca0d2733d4c943302955c70a0dc6677bb4772109e0ac0a904aac1a9999197ea0"
+  "sha256": "ba42766695b699ce19167baa9a314229b061396e9660741c84bd6cad11d9ef91"
  },
  {
   "label": "delta_megacity",
   "seed": 4412,
   "status": "pass",
   "failed": [],
-  "seconds": 58.6,
+  "seconds": 58.5,
   "hydro_variant": 12,
   "road_variant": 3,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "6feb38bd8c67a2cfde3989df90468bc6ad78437f2a349d6e8f494c4a2b91c6ae"
+  "sha256": "8ce02071a18f7f3e7456b5ff3d5a61d27b45204681f1b9de5b11f560b451b535"
  },
  {
   "label": "delta_megacity",
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 53.3,
+  "seconds": 52.9,
   "hydro_variant": 13,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "f2bd765b45cfebb2ea7914d64102352274f15701042d1ab40529020622b61d58"
+  "sha256": "31a5d97234e52ae0dfea52fe589be8fee19094e2b14e0212f70bb0575eabc4c9"
  },
  {
   "label": "delta_megacity",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 44.6,
+  "seconds": 47.9,
   "hydro_variant": 0,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "6acf0f877b3647f14a1c29b8784c9f5c7b3460228b88c266deb07063ad7af845"
+  "sha256": "a3752709da13b1605f419b74b64cfe152b61120cf4a1a0c5076d97cdbcea79c2"
  },
  {
   "label": "delta_megacity",
   "seed": 1999,
   "status": "pass",
   "failed": [],
-  "seconds": 40.6,
+  "seconds": 43.5,
   "hydro_variant": 9,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "b18ff4e386348bf555c04fd1ba04b5493c422b691219d49e798f4587ed4680d0"
+  "sha256": "b64d4c5b7144916521ecfb7818fa14e77d8d29f5e15cfc60f38616a9a459a705"
  },
  {
   "label": "archipelago_free_port",
@@ -165,7 +165,7 @@
     "first": "'Palm Key' (residential_heights): 100% open (target 8% to 40%)"
    }
   ],
-  "seconds": 277.7,
+  "seconds": 285.3,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 8,
@@ -180,14 +180,14 @@
    3
   ],
   "layout_salt": 0,
-  "sha256": "e5bc92c7b93ba24358f1480c138a477240b6870466a77e697e8a4e5d991b35fc"
+  "sha256": "b722736493aa7e02bfca149c45c4c69c7dfb1549c6e8c05fe69c5cd7913b4294"
  },
  {
   "label": "delta_megacity",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 73.1,
+  "seconds": 76.4,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 1,
@@ -195,27 +195,27 @@
    9
   ],
   "layout_salt": 0,
-  "sha256": "848c5444c780e8a59dbe6f732d736fc8177385cb93299a824b82cdf7bd511ada"
+  "sha256": "6d942e06a9684d67543679133d85b1fec738dceab89f31e11d787bd6c8e9007f"
  },
  {
   "label": "delta_megacity",
   "seed": 8128,
   "status": "pass",
   "failed": [],
-  "seconds": 49.5,
+  "seconds": 51.4,
   "hydro_variant": 3,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "d3dbf6a5967fd353f62f73cd11f680795ca10d23cbac60239d79e450b14defba"
+  "sha256": "d4ac22f6087dcf4e7eda11c9d73e7e61b20724540cc3e968d68ea763e735d7de"
  },
  {
   "label": "delta_megacity",
   "seed": 5077,
   "status": "pass",
   "failed": [],
-  "seconds": 112.1,
+  "seconds": 117.5,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 2,
@@ -224,95 +224,92 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "938ea524133c96c2601cbdb5d1c9ace02ac74a5e56f7a9afa52b7e0e4c2c60cc"
+  "sha256": "6992af12e7018c613e482a3389bff7aa14d4a84924548bce5a1cffbaf2d67ea3"
  },
  {
   "label": "delta_megacity",
   "seed": 27182,
   "status": "pass",
   "failed": [],
-  "seconds": 44.7,
+  "seconds": 46.4,
   "hydro_variant": 12,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "0c6a06f87df05e8eed76fb370c5dde153285873c40545c509927298a708c8515"
- },
- {
-  "label": "nexus_city",
-  "seed": 404,
-  "status": "pass",
-  "failed": [],
-  "seconds": 51.4,
-  "hydro_variant": 13,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "5f4f8c4631f1695737d9de52a56b667b67cf918297d0d721711ce714917f0747"
- },
- {
-  "label": "nexus_city",
-  "seed": 1999,
-  "status": "pass",
-  "failed": [],
-  "seconds": 45.6,
-  "hydro_variant": 1,
-  "road_variant": 1,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "1d86406b874793b3366b3718d260c3c818861b4c07a3013d46d5f3425757f954"
+  "sha256": "bf1e85d3fee6da83d8b958839f4bdfa73577d0c9c4e305830e7f40b1f5784471"
  },
  {
   "label": "nexus_city",
   "seed": 1207,
   "status": "pass",
   "failed": [],
-  "seconds": 152.2,
+  "seconds": 58.0,
   "hydro_variant": 11,
   "road_variant": 0,
-  "city_retries": 2,
-  "retry_fails": [
-   4,
-   2
-  ],
+  "city_retries": 0,
+  "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "6757ba4121f32887a7a5082a314ed2b2c9fc01ecb3b64e899be21bf9811bd1ba"
+  "sha256": "af71faeb71ff41dd1129c26a0b45d6286d03804e4011eeea607a8c8f3d0d8e07"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 51.5,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "f502f9afdbe000fd17a857b7844b2973b79eb6afeb73f7cdf87365741b7f0457"
+ },
+ {
+  "label": "nexus_city",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 48.8,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "c9955c51221f1ac4267497b4df5e54ddef1724e116d97ceb0da41a2908bc4e14"
  },
  {
   "label": "nexus_city",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 58.4,
+  "seconds": 60.9,
   "hydro_variant": 12,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "6e57b6efb804370a7e371454bddb883cdda7223936b470a82ec980b6a8d1b6e2"
+  "sha256": "fce7cf5ab9ddc163a0699156e0b320d4f6cb0febc2ce9dfccf497c209e97a34d"
  },
  {
   "label": "nexus_city",
   "seed": 5077,
   "status": "pass",
   "failed": [],
-  "seconds": 57.2,
+  "seconds": 57.8,
   "hydro_variant": 6,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "4e94c1c63ce196f86a4db8470bb121622f573337685c733becbfc4a32934fe69"
+  "sha256": "3694d33fff37d492e61407f8618251aedf26d9115f886d2bbb073b6f4a185f18"
  },
  {
   "label": "nexus_city",
   "seed": 8128,
   "status": "pass",
   "failed": [],
-  "seconds": 98.5,
+  "seconds": 101.7,
   "hydro_variant": 6,
   "road_variant": 0,
   "city_retries": 1,
@@ -320,27 +317,27 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "55752f5661f3f93c37bd4900e94d35a35b0d457f0f08d10e15a00974f5429195"
+  "sha256": "cf56927a369a6498bc11cf5dc3a3d5c3bcbb25e76b2c173036584600e4ec7e59"
  },
  {
   "label": "peninsula_city",
   "seed": 9081,
   "status": "pass",
   "failed": [],
-  "seconds": 17.9,
+  "seconds": 18.3,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "8456650dfca5bec4e9bcd65301822dd38849fd4dd8375599cfa437cfd5aeabb4"
+  "sha256": "7b2a69ca5d77f57a9e2c2e957da1ffd7189a9cade8e17b102d51a5b9d86b11ca"
  },
  {
   "label": "nexus_city",
   "seed": 27182,
   "status": "pass",
   "failed": [],
-  "seconds": 98.0,
+  "seconds": 94.4,
   "hydro_variant": 1,
   "road_variant": 0,
   "city_retries": 1,
@@ -348,40 +345,27 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "91c95ced7c82c9d268888e3d0a44743ad88c70247a6ea2703c06a19c57d65532"
+  "sha256": "ff3da40cc752b8fae68e08abc5e8b08d3a67fc6ce93b66f721fa04b0b93bca0c"
  },
  {
   "label": "peninsula_city",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 20.5,
+  "seconds": 25.4,
   "hydro_variant": 2,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "b77bda66360376c1fd11307248c3ce7d8445f8061e6d2bc7db684ec688619218"
- },
- {
-  "label": "peninsula_city",
-  "seed": 1999,
-  "status": "pass",
-  "failed": [],
-  "seconds": 29.8,
-  "hydro_variant": 11,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "8f81c6ed99cf6e12649d2619bd22af5fa3699cebb8880828acf640f1bb4d7057"
+  "sha256": "5ec1cc9db51f029795231daaf373fc952e7ebaf7eec37231155799d01a12e8a6"
  },
  {
   "label": "peninsula_city",
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 77.3,
+  "seconds": 92.4,
   "hydro_variant": 13,
   "road_variant": 0,
   "city_retries": 2,
@@ -390,7 +374,59 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "2b33594895247fc409d38a2a0247a05dccf1362f83db141b9df2bc2a57d5e17b"
+  "sha256": "6d955b763013e487ddc8ab40d851a5e41f3a42276c7dacc73f172405e5d509f6"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 38.5,
+  "hydro_variant": 11,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "a4fab64eeeefcc0fc5b30f69357ebd2ac1ba5fc2d93ca1fbe7aa64cd795769e9"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 28.3,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "709968318aa28dc88951718bc7914f0b756920a5a0f5a8519b9e15efda7c47e7"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 38.8,
+  "hydro_variant": 13,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "25d98ebc96e09faa61ac58009a6aa5f14f515feb7ae13de6b019b89c43ce6771"
+ },
+ {
+  "label": "peninsula_city",
+  "seed": 8128,
+  "status": "pass",
+  "failed": [],
+  "seconds": 24.8,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "51f7053d36abae5c2702ffbceeea4fc077d008456aad3508b8f09701ea69444d"
  },
  {
   "label": "nexus_city",
@@ -405,12 +441,12 @@
    {
     "id": "curve_radius",
     "count": 1,
-    "first": "segment rs00011 (highway): radius 133 m near (-337, -266), minimum 150 m"
+    "first": "segment rs00010 (highway): radius 133 m near (-337, -266), minimum 150 m"
    }
   ],
-  "seconds": 415.4,
+  "seconds": 456.3,
   "hydro_variant": 5,
-  "road_variant": 2,
+  "road_variant": 0,
   "city_retries": 8,
   "retry_fails": [
    2,
@@ -423,53 +459,14 @@
    4
   ],
   "layout_salt": 0,
-  "sha256": "4239a710bc73344fdf1be45d8e66a618957ee00491689b7d4f2023ef28d2bed2"
- },
- {
-  "label": "peninsula_city",
-  "seed": 3141,
-  "status": "pass",
-  "failed": [],
-  "seconds": 28.1,
-  "hydro_variant": 10,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "256d2525a47db9f608a0dafcd009bae6f82eccfb13c2e830fa6c10b88c5afeb7"
- },
- {
-  "label": "peninsula_city",
-  "seed": 8128,
-  "status": "pass",
-  "failed": [],
-  "seconds": 23.8,
-  "hydro_variant": 2,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "063ed230daae04de0ab79e68bc86668de403a5444dc9b498a18bdc2ff6c5a7b7"
- },
- {
-  "label": "peninsula_city",
-  "seed": 5077,
-  "status": "pass",
-  "failed": [],
-  "seconds": 38.3,
-  "hydro_variant": 13,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "079b51947cd23404817e0bccb273beb5d7d03e4eecf6963c3cf2c1eb787e4463"
+  "sha256": "27a007df0c0b6599477607b32ed072e72fee7321451d6af4bb33d7092a858c78"
  },
  {
   "label": "peninsula_city",
   "seed": 27182,
   "status": "pass",
   "failed": [],
-  "seconds": 67.9,
+  "seconds": 72.7,
   "hydro_variant": 2,
   "road_variant": 0,
   "city_retries": 3,
@@ -479,53 +476,53 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "a08b8fa80996f85fc8538900dec45babfb6a8b1daa3d7b49cf5caf917639d40b"
- },
- {
-  "label": "vesper_bay",
-  "seed": 11,
-  "status": "pass",
-  "failed": [],
-  "seconds": 47.8,
-  "hydro_variant": 10,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "976a36e147028fc38f5bcf36c817749d08752eb55843a55d8145aa483d07ae00"
+  "sha256": "234e8e22f5dd28a5fde243a0f16b9b18843540167803264996b65e689b116da2"
  },
  {
   "label": "vesper_bay",
   "seed": 2077,
   "status": "pass",
   "failed": [],
-  "seconds": 48.9,
+  "seconds": 50.9,
   "hydro_variant": 18,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "2e5582be86c77054c3705fcd653851ad129bdf074b673f74651a17bfc144058d"
+  "sha256": "4982f2e1415f6f1ecf48924c5600c36291a19f582c0e351ca08dd3b3b71fa9ba"
+ },
+ {
+  "label": "vesper_bay",
+  "seed": 11,
+  "status": "pass",
+  "failed": [],
+  "seconds": 50.9,
+  "hydro_variant": 10,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "19cdd59fdfe69448e3e1de26574c3b0ade0a8c32c410710254e7576bece7eaae"
  },
  {
   "label": "vesper_bay",
   "seed": 1999,
   "status": "pass",
   "failed": [],
-  "seconds": 48.4,
+  "seconds": 52.5,
   "hydro_variant": 1,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "249383f7b3896474cdedb2cf53868dec48690b7eaf76d6b4f68a273b6ab30ad5"
+  "sha256": "2549001f367fa77f35e6b2a443037ec80d80719e72333117ea4776a086c5e508"
  },
  {
   "label": "vesper_bay",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 88.5,
+  "seconds": 95.5,
   "hydro_variant": 1,
   "road_variant": 1,
   "city_retries": 1,
@@ -533,53 +530,53 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "22dcd898fd2057334db756b4c078c1f7d9c315e31860f7bb4c8b1305c9ed3aa3"
+  "sha256": "0535b658c483bd3963c4476ccdc47821016b4b66fe7782ac3252615c8e7342ed"
  },
  {
   "label": "vesper_bay",
   "seed": 5077,
   "status": "pass",
   "failed": [],
-  "seconds": 49.1,
+  "seconds": 52.5,
   "hydro_variant": 1,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "b4a2725fead73200115568a225b2d475bb19b3ea9a56b7a154f26d8b45f50cca"
+  "sha256": "7d4faff405d4237bbf96b7e17d5874ca83142842d5b6f704b3fee626f65dec1a"
  },
  {
   "label": "vesper_bay",
   "seed": 8128,
   "status": "pass",
   "failed": [],
-  "seconds": 51.9,
+  "seconds": 55.5,
   "hydro_variant": 19,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "78bcb7e93ba13da08616a3d1e9c00391e92d3ae64b84d069b9c89dfc0a0d4004"
+  "sha256": "85c05fd2a984300f0403d9eca37ef2a0ec7bddbc89e5bafc8d6987e55b090a57"
  },
  {
   "label": "vesper_bay",
   "seed": 27182,
   "status": "pass",
   "failed": [],
-  "seconds": 52.3,
+  "seconds": 57.2,
   "hydro_variant": 1,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "341f8db3568d2b15c70d04abadcc3b384e25373b3c2331c0212fc97a9202c0d2"
+  "sha256": "85eb96b6672558036ddaff2e35d95222eba5044d0c37bae1d564f3e4c06a42bd"
  },
  {
   "label": "vesper_bay_pinned",
   "seed": 2078,
   "status": "pass",
   "failed": [],
-  "seconds": 87.0,
+  "seconds": 91.0,
   "hydro_variant": 4,
   "road_variant": 0,
   "city_retries": 1,
@@ -587,7 +584,7 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "b896bf87d4ebfc0139a458ff2bf214f5c1c298a55ab686bd3a5fdfb4ef8e975f"
+  "sha256": "4d0d1c437df33a7ede7a7a6dab6f735912547d878f03a6b007e108de205e458b"
  },
  {
   "label": "vesper_bay",
@@ -600,7 +597,7 @@
     "first": "'Launch Key' (spaceport): 71% open (target 0% to 50%)"
    }
   ],
-  "seconds": 387.6,
+  "seconds": 410.9,
   "hydro_variant": 7,
   "road_variant": 2,
   "city_retries": 8,
@@ -615,14 +612,14 @@
    3
   ],
   "layout_salt": 0,
-  "sha256": "64185c3e1238ddb6765a4821488e76ddd68322d86053bb2486bad6def739cb46"
+  "sha256": "993a36189f6e029106e0ee7327896b8347caf912f72de652ec8740ae7cfbe29d"
  },
  {
   "label": "vesper_bay_pinned",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 314.2,
+  "seconds": 325.4,
   "hydro_variant": 1,
   "road_variant": 0,
   "city_retries": 6,
@@ -635,7 +632,7 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "ca1d4eb693e96d1afc1354dcac426507e5714de5978ed70cf230078e3a35545a"
+  "sha256": "28c551bab748b817793abecb32ef4409cbd78e5a043357e698c22189e90828bc"
  },
  {
   "label": "vesper_bay_pinned",
@@ -653,7 +650,7 @@
     "first": "segment rs00030 (highway): radius 111 m near (-351, -1168), minimum 150 m"
    }
   ],
-  "seconds": 432.0,
+  "seconds": 443.4,
   "hydro_variant": 5,
   "road_variant": 0,
   "city_retries": 8,
@@ -668,14 +665,14 @@
    3
   ],
   "layout_salt": 0,
-  "sha256": "996cacf617dcfb9ec370f14217e08f8920091399e369ba0bd938856c7c504f75"
+  "sha256": "6117b252d81939dd937a7733347da9b743159f6e8cd321834c0570ce0b2cff75"
  },
  {
   "label": "vesper_bay_pinned",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 136.2,
+  "seconds": 133.4,
   "hydro_variant": 4,
   "road_variant": 0,
   "city_retries": 2,
@@ -684,7 +681,7 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "df8385c835900b9f91c34e80a4febd0a691e1bddb22b771e1f7c82e9b8ebf341"
+  "sha256": "f17c2e558dac832936e4713385204869c9059468d3858d5ce62e3bc80d6a4a2b"
  },
  {
   "label": "vesper_bay_pinned",
@@ -697,7 +694,7 @@
     "first": "segment rs00021 (highway): radius 51 m near (-1174, 132), minimum 150 m"
    }
   ],
-  "seconds": 467.5,
+  "seconds": 467.8,
   "hydro_variant": 10,
   "road_variant": 0,
   "city_retries": 8,
@@ -712,14 +709,14 @@
    4
   ],
   "layout_salt": 0,
-  "sha256": "9f59db60384ed3bc07c1bd590e64a5301b25bfb08f53cbf0d4dbd4deeeee5abb"
+  "sha256": "a5da6208f92e47d346de022a5c775ff2480c29b6f280cf0b92adc04396428be7"
  },
  {
   "label": "vesper_bay_pinned",
   "seed": 27182,
   "status": "pass",
   "failed": [],
-  "seconds": 104.3,
+  "seconds": 105.3,
   "hydro_variant": 19,
   "road_variant": 1,
   "city_retries": 1,
@@ -727,59 +724,33 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "8bfe4c1e59bb5fe5232a688317946fd2c89c9847a24d085c5dd4c023957a3355"
+  "sha256": "a6d59a84393498c5d5b071366dab7996d49c982561fe4a4137ad19bf4e97dbff"
  },
  {
   "label": "test_small",
   "seed": 7,
   "status": "pass",
   "failed": [],
-  "seconds": 17.2,
+  "seconds": 16.8,
   "hydro_variant": 1,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "4900c41ab0967f78f856127e79f5e8b0ccceaa27951697eca56233abc1f15e29"
+  "sha256": "52c303422482770e83b0748dc039cb6c73076ad00160fffe00228ef3d81ad667"
  },
  {
   "label": "test_small",
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 16.4,
+  "seconds": 16.1,
   "hydro_variant": 1,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "80e4378ef8a20613e38302dfd3eb7a58dd51bad0c86d20536fa2a4ccb79e4ff3"
- },
- {
-  "label": "test_small",
-  "seed": 404,
-  "status": "pass",
-  "failed": [],
-  "seconds": 17.1,
-  "hydro_variant": 1,
-  "road_variant": 1,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "9fce04020fa2d17f65c469ae6224341b8e042b5846cf879ef9319228d6925374"
- },
- {
-  "label": "test_small",
-  "seed": 1999,
-  "status": "pass",
-  "failed": [],
-  "seconds": 16.2,
-  "hydro_variant": 1,
-  "road_variant": 1,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "adb1e091a697fdfb4f6ab03a736c728d45e047c0ceddb094c68e7f72e6d8de54"
+  "sha256": "285f6f8b1ba16836349990c4b43202548e20f0fec78972ac3f134f2f2de2f22e"
  },
  {
   "label": "vesper_bay_pinned",
@@ -792,14 +763,14 @@
     "first": "'Neon Strand' should be on the coast"
    }
   ],
-  "seconds": 460.8,
+  "seconds": 461.6,
   "hydro_variant": 17,
   "road_variant": 0,
   "city_retries": 8,
   "retry_fails": [
    2,
-   2,
-   2,
+   4,
+   4,
    1,
    1,
    2,
@@ -807,14 +778,42 @@
    3
   ],
   "layout_salt": 0,
-  "sha256": "30209a8081be2b3a6a33dd5a71a4399ef9ea959717278ea79ee280ef835eb60e"
+  "sha256": "9aa22ae9cacd4338741abefc853892f38368c8c5c0b591747133740bc126e416"
+ },
+ {
+  "label": "test_small",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 33.1,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 1,
+  "retry_fails": [
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "f7684b3f54c136231d6f66c28b00818061e7609ee17d99d8c644b58a7cb05327"
+ },
+ {
+  "label": "test_small",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 17.9,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "43eb5c4c13b04185676f34509307171da58b36787d627190b5afbb519a200714"
  },
  {
   "label": "test_small",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 33.0,
+  "seconds": 32.7,
   "hydro_variant": 16,
   "road_variant": 0,
   "city_retries": 1,
@@ -822,7 +821,7 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "17d2805028dfeae50a65293eec4fcdc1fb549f0b6c4edf4f6236f77ba036ed71"
+  "sha256": "cecc1ceb849505ece2166ee439e7cfc36b2c2bc7f2bc3f8579d836846419aa6e"
  },
  {
   "label": "vesper_bay_pinned",
@@ -835,7 +834,7 @@
     "first": "'Highcrest' is not east_of 'The Stacks' (bearing 21 deg)"
    }
   ],
-  "seconds": 420.2,
+  "seconds": 419.9,
   "hydro_variant": 3,
   "road_variant": 0,
   "city_retries": 8,
@@ -850,33 +849,33 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "b02bcc0081e7d311987bbcd0f92f167e27b60ed5bc773396cd5c957ea3dd4c38"
+  "sha256": "aea7d60e0296696e28a203cbe8c4dbed4b57b27365c07b52522efea24e1a3fcb"
  },
  {
   "label": "test_minimal",
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 27.1,
+  "seconds": 25.5,
   "hydro_variant": 18,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "1dff18e065e71104cb1688590543083de4db55aef265c7dd31795cad765db05b"
+  "sha256": "b88c7066ff265dc43458e1476b61d577fd86786322751a60174bd653d9fd4d57"
  },
  {
   "label": "test_minimal",
   "seed": 1999,
   "status": "pass",
   "failed": [],
-  "seconds": 19.2,
+  "seconds": 20.4,
   "hydro_variant": 6,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "ac098f495ccc4574d2195d6f20af8bcf24c979a284f839324606337c4959beb4"
+  "sha256": "51a8bbe74921b3ce839c528e4a2b0f83db599c35d396c7c62ae7b3a3f54473e0"
  },
  {
   "label": "test_minimal",
@@ -889,7 +888,7 @@
     "first": "'Core' is not at edge 'center'"
    }
   ],
-  "seconds": 144.6,
+  "seconds": 146.8,
   "hydro_variant": 11,
   "road_variant": 0,
   "city_retries": 8,
@@ -904,7 +903,7 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "915206bf93197d5d37c38f8689afffa3ca52f39346e3290678b5c95a929a5c26"
+  "sha256": "7f592d4310da20781bc3258bc02a223c1a7b8bb1228ede48671bbf0a9fb66959"
  },
  {
   "label": "test_minimal",
@@ -922,7 +921,7 @@
     "first": "landmass lm04: 2 walkway components (walk nodes 116, 1)"
    }
   ],
-  "seconds": 113.5,
+  "seconds": 119.4,
   "hydro_variant": 5,
   "road_variant": 3,
   "city_retries": 8,
@@ -937,20 +936,20 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "d43f4217acf9517fe1c757ee6b5a87d9faff4b1ebde5ae79a3652735711c637a"
+  "sha256": "aec33d41da9eac81e79298227f96f51ca263bddde4c93d55dad10e2e6ea645ec"
  },
  {
   "label": "test_pinned",
   "seed": 17,
   "status": "pass",
   "failed": [],
-  "seconds": 28.2,
+  "seconds": 28.1,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "f3e98b5db3c85782ae574fe8de6feb365018b51eccb603e404de204b801f5cf6"
+  "sha256": "535d716974b92603fe18152d6470ccbffcb1d09b8d92bd9c395109646abaf952"
  },
  {
   "label": "test_minimal",
@@ -983,7 +982,7 @@
     "first": "d04.ms01 'Launch Spaceport': no road within 40 m"
    }
   ],
-  "seconds": 106.4,
+  "seconds": 109.6,
   "hydro_variant": 5,
   "road_variant": 0,
   "city_retries": 8,
@@ -998,27 +997,14 @@
    5
   ],
   "layout_salt": 0,
-  "sha256": "83226bbecda568f8fcf832af39700064de1d2344bd7311054da74c5dd09b3909"
- },
- {
-  "label": "test_pinned",
-  "seed": 1999,
-  "status": "pass",
-  "failed": [],
-  "seconds": 27.8,
-  "hydro_variant": 0,
-  "road_variant": 0,
-  "city_retries": 0,
-  "retry_fails": [],
-  "layout_salt": 0,
-  "sha256": "f84963aa27f9fb92a2114b34a2a4985a7ba8e5531b39a9502a0fe88a90aced7d"
+  "sha256": "79df302855f713217d1a36655a10a4c6a9be05d2f94d673fe6a35eafc984d1ef"
  },
  {
   "label": "test_pinned",
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 56.5,
+  "seconds": 57.5,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 1,
@@ -1026,14 +1012,14 @@
    1
   ],
   "layout_salt": 0,
-  "sha256": "4e601bef7e37149551ea2ae29e9586f7b624c108ba99aba8013be834fc631c48"
+  "sha256": "0aea1641692af0ba5e1b3125d13c1a9add78f00d00c4206d7d1c3550f8fd476b"
  },
  {
   "label": "test_pinned",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 57.2,
+  "seconds": 59.5,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 1,
@@ -1041,14 +1027,29 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "7b4f1c08f82edf567183492ddb87c0c7a8d66c4fd41663ca28e8f1677f81bdb2"
+  "sha256": "5cca3cd909f5685b6714bab995554ea5c2b9ad9d445704659a7a7ca65bebbe8c"
+ },
+ {
+  "label": "test_pinned",
+  "seed": 1999,
+  "status": "pass",
+  "failed": [],
+  "seconds": 58.4,
+  "hydro_variant": 0,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "3cd9a11030d363d44e30dab0ab8d025e871410e2d994e3bee3ee3a75d8091201"
  },
  {
   "label": "test_pinned",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 56.2,
+  "seconds": 57.1,
   "hydro_variant": 0,
   "road_variant": 0,
   "city_retries": 1,
@@ -1056,53 +1057,53 @@
    2
   ],
   "layout_salt": 0,
-  "sha256": "c06dd72952215210b85ed8c0e2b507f4699a47b33ff12b735587508224ba0125"
+  "sha256": "3642118a9a1c12cb3d021e327d50bbf7b3d5a9bcd61a6f268af8216776f38e69"
  },
  {
   "label": "test_delta",
   "seed": 11,
   "status": "pass",
   "failed": [],
-  "seconds": 36.1,
+  "seconds": 37.0,
   "hydro_variant": 0,
   "road_variant": 1,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "366f6d47a09189f1a9e7fbfd11617c333f4979ca206b6c902eceec64ccbc546d"
+  "sha256": "608a3a53b376b94ea5296b5e37ced7acc92576a9ebcf512105fb0c4a4c6e74e3"
  },
  {
   "label": "test_delta",
   "seed": 12,
   "status": "pass",
   "failed": [],
-  "seconds": 52.8,
+  "seconds": 54.0,
   "hydro_variant": 18,
   "road_variant": 3,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "12f1a9a673930970f5b837db87a0e89e732c48bc5746068ceb72fa0f5495865b"
+  "sha256": "78253faf8608918fc09ab7fcb58fbb8f6d01866d5b290b4c92f41ec42bbc6cb4"
  },
  {
   "label": "test_delta",
   "seed": 1999,
   "status": "pass",
   "failed": [],
-  "seconds": 36.3,
+  "seconds": 36.5,
   "hydro_variant": 3,
   "road_variant": 2,
   "city_retries": 0,
   "retry_fails": [],
   "layout_salt": 0,
-  "sha256": "a4ee33f5c2d9c75ba782c9a47fa37ea12785313c0b1ce22c6b4407fc9f25117f"
+  "sha256": "bc8f0740ba87688f0585e01a3ef8a6ccfbfe04c6e88b9e3f5e861a917d072c48"
  },
  {
   "label": "test_delta",
   "seed": 404,
   "status": "pass",
   "failed": [],
-  "seconds": 80.5,
+  "seconds": 80.9,
   "hydro_variant": 14,
   "road_variant": 2,
   "city_retries": 1,
@@ -1110,14 +1111,14 @@
    4
   ],
   "layout_salt": 0,
-  "sha256": "25913859100be29375a95ddf2ddc34b2097c693e584eccb75820e9742c559a59"
+  "sha256": "89ed83478f9b6f387a6585aa9151111ef218a81c91e71d9716b54f423b49c682"
  },
  {
   "label": "test_delta",
   "seed": 3141,
   "status": "pass",
   "failed": [],
-  "seconds": 76.6,
+  "seconds": 77.4,
   "hydro_variant": 3,
   "road_variant": 3,
   "city_retries": 1,
@@ -1125,6 +1126,6 @@
    5
   ],
   "layout_salt": 0,
-  "sha256": "5d635ecc8be488e210919a9e8ac519b0ea3b1688794e5490199c3bf3ca791886"
+  "sha256": "f6dd61724e2c95b412c281e65fa17188c1795b8fdfdf5f2669020f0ed1808993"
  }
 ]

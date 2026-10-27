@@ -107,7 +107,7 @@ Crosstown's end wraps the Vess Freight Terminal reserve with curves under 150 m 
 seeds, traced roads leaving Core Island meet no ring to join, a named route does not always
 end exactly on its exit (the exit counts as not built), and in some road variants the two
 crosstowns cross near the east exit with too short an arm. With the change in the pinned
-demo, it failed at seeds 404 and 3141, two of the sweep seeds where it passes in M11. Other routes tried (the ring and spine
+demo, it failed at seeds 404 and 3141, two of the sweep seeds where it passes in M11 and M9. Other routes tried (the ring and spine
 with crosstowns added, a crosstown from the north exit or to a south exit, routes through
 Highcrest or The Stacks) crossed with an arm too short, with water within the ramps' reach,
 or with an avenue where a ramp's column could not stand.
@@ -211,14 +211,16 @@ before, now over every level of a stack. Elevated stats gain `stacks`, `turbines
 
 ## Sweep
 
-`citygen sweep --suite m8a --workers 3` ([`sweep.md`](sweep.md), `sweep.json`): **58 of 68
-builds pass, as in M11, and every build has the same result as in M11's
-[`sweep.json`](../M11/sweep.json)**: none newly broken, none newly fixed, the same hydrology
-and road variants, full-city tries and layout salts in all 68 (the stack demo is not in the
-suite). One failing build fails on less: the pinned demo at seed 5077 loses its
-`level_continuity` failure (one failure fewer on each of its full-city tries, most likely the
-gate-link change in M2), and still fails `placement` ('Neon Strand' should be on the coast),
-as in M11.
+`citygen sweep --suite m8a --workers 3` on the code merged with M9 ([`sweep.md`](sweep.md),
+`sweep.json`): **58 of 68 builds pass, as in M9, and 67 of the 68 have the same result as in
+M9's [`sweep.json`](../M9/sweep.json)**: the same pass or fail, failing checks, hydrology and
+road variants, full-city tries and layout salts (the stack demo is not in the suite). None is
+newly broken or newly fixed. The 68th fails on less: the pinned demo at seed 5077 loses its
+`level_continuity` failure (as it did on M11's code, most likely the gate-link change in M2)
+and still fails `placement` ('Neon Strand' should be on the coast), as in M9.
+
+On M11's code alone, before the merge, the sweep was the same against M11's `sweep.json`:
+58 of 68, every build as in M11 but for that one failure fewer.
 
 ## Tests
 
@@ -232,6 +234,10 @@ stack that is never built, no stack on an M9 tunnel (a tunnel leg, an avenue tun
 window), and the winding measure; one more builds the stack demo's roads and checks its
 stack. The check counts (70 with no transit lines, M9's four included) and check ids are
 updated, and `test_committed_reports_match` reads the M12 reports.
+
+The full pytest passes on the code merged with M9 (437 passed, 2 skipped, the two
+data-dependent skips M9 has too; 35 minutes at `CITYGEN_WORKERS=3`); the two tunnel tests,
+written while it ran, pass with the rest of `tests/test_stack.py`.
 
 ## Open items
 
