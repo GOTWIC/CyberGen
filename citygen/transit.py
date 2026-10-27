@@ -26,6 +26,10 @@ Runs after M3, on the city with its buildings, so every line sees what it passes
    (`_fast_point`), and is also drawn along its guide line (`_guide_line`); a line ends at a
    site where the zone its station serves begins (`_site_point`). The raster search skips
    what it cannot reach and, over 600 m, is guided by the exact turn-free cost to go.
+   M8c: a flying loop is one ring of Dubins paths through its stops (`_dubins_track`, the
+   mode's radius by construction); an open road line the roads fail goes off them
+   (`_off_roads_line`), and any open line still flawed is tried as Dubins paths from stop
+   to stop (`_dubins_line`).
 3. **Profile.** z from the mode's altitude between two envelopes limited to the grade: from
    below navigable water, road decks, the roofs under the line and kept skybridges passed
    over; from above the towers a sky tube passes through and skybridges passed under.

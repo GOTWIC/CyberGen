@@ -308,6 +308,22 @@ open road line still under its radius is tried with legs free to run back along 
 alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
 builds and the sweep on the combined code: `docs/progress/M8b/`.
 
+M8c (transit on a city's first layout) is in place, in `citygen/transit.py`: a flying loop
+(sky tube, maglev) is one ring of Dubins paths (`dubins`, `dubins_points`, `_dubins_track`:
+straight runs and arcs of 1.15, then 1.06, times the mode's radius; each stop passed at a
+point 30 m inside its zone, a sky tube's nexus inside its tower, in one of 16 headings; the
+poses found by coordinate descent from the `_loop_points` ring, fewest blocked cells, then
+the raster cost plus curve length; up to two free poses where blocked; kept only when clear
+of itself), else M8b's routes. An open road line still flawed after M8b's retries goes off
+the roads, then with its middle site, place or island stops on its way
+(`_off_roads_line`, `_way_point`); any open line still flawed is tried as Dubins paths from
+stop to stop (`_dubins_line`), kept when better (`_line_score`). A line to an exit counts as
+missing it unless a track end is within 250 m (`_served`); sky stations only use portal
+towers that still serve their stop; metro stairs step 12 m along the concourse where a
+concourse end sits on a walkway. Delta Megacity builds on its first full-city try (9
+before); the sweep passes 58 of 68 with no transit failure. Sample builds, same-layout
+before and after maps and the sweep: `docs/progress/M8c/`.
+
 ### Rules for cloud sessions building citygen milestones
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
