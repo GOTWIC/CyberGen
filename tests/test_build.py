@@ -61,8 +61,9 @@ def test_sample_city_builds_and_passes(path):
     built, took, _ = built_sample(path)
     failed = [f for c in built.checks for f in c.failures]
     assert not failed, failed
-    # M8a: 300 -> 600 s (Delta Megacity and Nyxllor passed on their 9th and 8th full-city
-    # try); M8c: back to 300 s, every sample passes on its first to third try
+    # M8a: 300 -> 600 s (Delta Megacity and Vesper Bay, then named Nyxllor, passed on their
+    # 9th and 8th full-city try); M8c: back to 300 s, every sample passes on its first to
+    # third try
     assert took < 300, f"{path.parent.name} took {took:.1f} s"
     # Every polygon in the model is valid (also a check; asserted directly here).
     for e in built.model.entities():

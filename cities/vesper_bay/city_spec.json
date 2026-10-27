@@ -1,6 +1,6 @@
 {
   "$schema": "../../citygen/schemas/city_spec.schema.json",
-  "name": "Nyxllor",
+  "name": "Vesper Bay",
   "seed": 2077,
   "size_km": [3.5, 3.4],
   "source": {
@@ -8,7 +8,7 @@
     "notes": "Three delta channels expressed as delta_branches 2. Palms on the strip expressed as greenery only."
   },
   "water": {
-    "coast": {"form": "bay", "side": "west", "name": "Nyx Bay"},
+    "coast": {"form": "bay", "side": "west", "name": "Vesper Bay"},
     "rivers": [
       {"name": "Vess River", "from": "east", "to": "bay", "width_m": [70, 140], "meander": 0.4,
        "delta_branches": 2, "branch_names": ["North Reach", "Lotus Cut"]}

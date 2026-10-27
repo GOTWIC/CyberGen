@@ -1,5 +1,5 @@
 {
-  "name": "Nyxllor", "seed": 1207, "size_km": [3.4, 3.4],
+  "name": "Vesper Bay", "seed": 1207, "size_km": [3.4, 3.4],
   "water": {
     "coast": {"form": "bay", "side": "south_west"},
     "rivers": [{"name": "Sentinel", "from": "north_east", "to": "bay", "width_m": [60, 120],

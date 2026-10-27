@@ -6,10 +6,13 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
-# The build samples: the four M0 cities (specs as adjusted for M1a and M1a2) and Nyxllor.
+# The build samples: the four M0 cities (specs as adjusted for M1a and M1a2) and Vesper Bay.
 CITIES = sorted((ROOT / "docs" / "progress" / "M1a2").glob("*/city_spec.json")) + [
-    ROOT / "cities" / "nyxllor" / "city_spec.json"]
+    ROOT / "cities" / "vesper_bay" / "city_spec.json"]
 GOLDEN = ROOT / "tests" / "data" / "golden_hashes.json"
+# Vesper Bay was the sample city Nyxllor up to M8c; docs/progress folders before the rename
+# keep the old slug.
+OLD_SLUGS = {"vesper_bay": "nyxllor", "vesper_bay_pinned": "nyxllor_pinned"}
 
 _BUILT: dict = {}
 

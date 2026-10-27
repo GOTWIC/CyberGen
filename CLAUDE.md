@@ -1,12 +1,23 @@
-# Nyxllor
+# CyberGen
 
-A Cyberpunk 2077-inspired open-city game in Unreal Engine 5, at roughly a quarter of Night City's scale:
-walkable streets, NPC crowds and traffic, optional combat and dialogue, no story. The owner (Swagnik)
-does art direction and layout; Claude does code, tooling, procedural generation, and most asset work.
-Assets can be built with Claude (Blender, PCG) or sourced (Fab, MetaHuman) where that makes more sense
-(characters, clothing, weapons, cars).
+City-agnostic generators for cyberpunk open cities, in five stages: 1 layoutgen (`citygen`, the
+prompt-to-city layout generator, current), 2 assetgen (a unique 3D model for every building,
+plus street elements and textures), 3 atmosgen (lighting, sky, atmospherics), 4 lifegen
+(traffic, crowds, trains, aircraft, generated), 5 storygen. Stages 1 and 2 live here and stay
+city-agnostic. They are built for Nyxllor, a Cyberpunk 2077-inspired open-city game in Unreal
+Engine 5 at roughly a quarter of Night City's scale (walkable streets, NPC crowds and traffic,
+optional combat and dialogue), which gets its own `nyxllor` repo at stage 3. The owner
+(Swagnik) does art direction and layout; Claude does code, tooling, procedural generation,
+and most asset work.
 
-## Current stage: layout of the first district (Corporate Core)
+The repo was called Nyxllor until after M8c. The sample city called Nyxllor up to M8c is
+**Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo "Vesper Bay Pinned"
+in `cities/vesper_bay_pinned`); `docs/progress/<milestone>/nyxllor*` folders before the rename
+keep the old name (`tests/conftest.py` `OLD_SLUGS`). Keep "Nyxllor" for the game.
+
+## Nyxllor's first district (Corporate Core, hand-traced; moves to the nyxllor repo at stage 3)
+
+The traced map stays here as the pinned demo's input (`cities/vesper_bay_pinned`).
 
 - `reference/corporate_core_reference.png`: AI-generated concept map of the district. It is drawn in a
   planometric style: the ground plan is true shape (seen straight down) and buildings rise straight up
@@ -248,7 +259,7 @@ M7b is in place, which completes the scope's milestones:
 - **Columns:** `elevated._fill_gaps` fills any column gap over 60 m, searching past a short
   segment's end nodes.
 
-Demo: `docs/progress/M7b/nyxllor_pinned/`. Sample builds: `docs/progress/M7b/`.
+Demo: `docs/progress/M7b/nyxllor_pinned/` (spec now in `cities/vesper_bay_pinned/`). Sample builds: `docs/progress/M7b/`.
 
 M8a (robustness sweep) is in place: `.venv/bin/python -m citygen sweep [SPEC...] [--suite m8a]
 [--seeds ...] [--only LABEL] [--workers 4] [--upto roads|local|full] --out DIR`
@@ -305,7 +316,7 @@ the other lines (its heights see the buildings they remove); a whole-city retry
 (`build_city`) after any failed check still moves every line. A sky tube tower it cannot
 climb within its altitude range keeps its portal with 3 m headroom (`_fit_portals`), and an
 open road line still under its radius is tried with legs free to run back along the line
-(`_spurs`). M8b is stacked on M8a: nyxllor builds on its first layout (8 tries on M8a
+(`_spurs`). M8b is stacked on M8a: Vesper Bay (then Nyxllor) builds on its first layout (8 tries on M8a
 alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
 builds and the sweep on the combined code: `docs/progress/M8b/`.
 
@@ -321,7 +332,7 @@ vertical curves, at most 6%. Its stretches with no room for a column stay within
 (`_fly_span`). Ramps built later test a flyover in height (`_apart_in_z`). The ramp has
 `attrs.flyover` and `level` 2; the stats gain `flyovers` and `max_flyover_m`;
 `preview_elevated.png` casts it on top, puts a flyover trumpet in its inset and its profile in
-the profile panel. Only Nyxllor has a trumpet among the samples (crest 16.6 m). Sample builds:
+the profile panel. Only Vesper Bay has a trumpet among the samples (crest 16.6 m). Sample builds:
 `docs/progress/M8d/`.
 
 M8c (transit on a city's first layout) is in place, in `citygen/transit.py`: a flying loop
@@ -340,7 +351,7 @@ concourse end sits on a walkway. Delta Megacity builds on its first full-city tr
 before); the sweep passes 58 of 68 with no transit failure. Sample builds, same-layout
 before and after maps and the sweep: `docs/progress/M8c/`.
 
-### Rules for cloud sessions building citygen milestones
+### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
   the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
