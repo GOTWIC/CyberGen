@@ -451,8 +451,7 @@ Stage 1 of CyberGen (layoutgen) ends with M15. The later stages are assetgen (un
 models and textures for every building and street element), atmosgen (lighting, sky and
 atmospherics in Unreal), lifegen (generated traffic, trains, crowds and animation) and
 storygen (story, characters, cutscenes); stages 1 and 2 are reusable generators, not tied to
-one city. The game city Nyxllor gets its own repo at stage 3; the sample city called Nyxllor up
-to M8c is Vesper Bay (`cities/vesper_bay`) from then on.
+one city.
 
 | M | Deliverable | Done when | Status |
 |---|---|---|---|
