@@ -94,6 +94,9 @@ TURBINE_SWING = ((60.0, 40.0, 200.0), (60.0, 130.0, 200.0))   # a turbine's left
 TURBINE_TOP_M = STACK_TOP_M        # and off the lifted highway: wider turns, their crossings
 #                                     apart (no point has more than three levels)
 STACK_TRIES = 6                 # profiles tried per ramp (approach and departure 20 m longer)
+STACK_CHORD_M = 25.0            # a ramp's line beside its highway follows the chord this far
+#                                 each way
+STACK_WIND_DEG = 140.0          # a directional ramp turns at most this far in all
 
 
 def ramp_run(dz: float) -> float:
@@ -1845,13 +1848,16 @@ class Elev:
                     by[s["id"]] = s
                     s["attrs"]["elevated"] = flag
             # a node of avenues the lifted window would come down at (three of them, or two
-            # that do not run straight on under it) stays at grade under the deck instead;
-            # nothing else may bring it down
+            # that do not run straight on under it) stays at grade under the deck instead,
+            # as does one whose ramps do not fit (`elevate`); nothing else may bring it down
             run, k, idx = lw
-            bad, under = False, []
+            bad, under, window = False, [], set()
             for i in range(idx[0] + 1, idx[-1] + 1):
                 if run.nodes[i] == n:
                     continue
+                if all(o["road_class"] == "avenue" for o in self.inc[run.nodes[i]]
+                       if o["id"] not in ids_l):
+                    window.add(run.nodes[i])
                 on = {run.segs[i - 1][0]["id"], run.segs[i][0]["id"]}
                 _, u = _at(run.pts, run.cum, run.s_nodes[i])
                 kd = self.node_kind(run.nodes[i], on, u)
@@ -1870,7 +1876,8 @@ class Elev:
             self.stack_plan[n] = {"lift": tuple(s["id"] for s in lift), "ground": gw[0],
                                   "gk": gw[1], "old": old, "by": by,
                                   "under": (run.id, frozenset(under),
-                                            frozenset(s["id"] for s, _ in run.segs))}
+                                            frozenset(s["id"] for s, _ in run.segs)),
+                                  "window": frozenset(window)}
 
     def unplan(self, n: str) -> None:
         """A stack that did not fit: its highways keep the viaducts M7 chose for them."""
@@ -1970,8 +1977,15 @@ class Elev:
 
     def _sys_line(self, R_: Run, s: float, c: int, o: float):
         """The line o m to the right of traffic along c (+1: with the stations) on R_ at
-        station s: (point, unit direction of travel)."""
+        station s: (point, unit direction of travel). The direction is the chord over
+        `STACK_CHORD_M` each way, so a short jog in the road (a crossing moved onto an avenue
+        node) does not fold the line back on itself."""
         P, u = _at(R_.pts, R_.cum, s)
+        A, _ = _at(R_.pts, R_.cum, s - STACK_CHORD_M)
+        B, _ = _at(R_.pts, R_.cum, s + STACK_CHORD_M)
+        L = _d(A, B)
+        if L > 1.0:
+            u = ((B[0] - A[0]) / L, (B[1] - A[1]) / L)
         e = (c * u[0], c * u[1])
         return (P[0] + o * e[1], P[1] - o * e[0]), e
 
@@ -2050,10 +2064,13 @@ class Elev:
     def _sys_end(self, R_: Run, s: float, cuts, lifted: bool) -> str | None:
         """Why a ramp cannot leave or join R_ at station s (None when it can): off its ends,
         near a node or another ramp end, over the water, off the deck or on a bridge
-        approach of the road at grade."""
+        approach of the road at grade. Avenues meeting at grade under the lifted deck (node
+        kind `under`) are no node on it."""
         if not 5.0 < s < R_.L - 5.0:
             return "off the road"
-        if any(abs(x - s) < NODE_GAP_M for x in R_.s_nodes + list(cuts)):
+        nodes = [x for x, nid in zip(R_.s_nodes, R_.nodes)
+                 if not lifted or self.kind.get((R_.id, nid)) != "under"]
+        if any(abs(x - s) < NODE_GAP_M for x in nodes + list(cuts)):
             return "too near a node"
         P, _ = _at(R_.pts, R_.cum, s)
         if G.dist(Point(P), self.ctx.wet) < 30.0:
@@ -2177,16 +2194,26 @@ class Elev:
         if div_l is not None:
             lim_a = cx * (s1 - div_l) - STACK_SPACE_M
             lim_d = cy * (mrg_l - s2) - STACK_SPACE_M
-        return self._sys_fit(ic, C, X, cx, oX, s1, Y, cy, oY, s2, cpts, shape,
-                             pair if shape == "stack" else None, lim_a, lim_d, cuts_x, cuts_y)
+        first = None
+        for bias in ("even", "approach", "departure"):
+            rp, why = self._sys_fit(ic, C, X, cx, oX, s1, Y, cy, oY, s2, cpts, shape,
+                                    pair if shape == "stack" else None, lim_a, lim_d, cuts_x,
+                                    cuts_y, bias)
+            if rp is not None:
+                return rp, None
+            first = first or why
+        return None, first
 
     def _sys_fit(self, ic, C, X, cx: int, oX: float, s1: float, Y, cy: int, oY: float,
-                 s2: float, cpts, shape: str, tier, lim_a, lim_d, cuts_x, cuts_y) -> tuple:
+                 s2: float, cpts, shape: str, tier, lim_a, lim_d, cuts_x, cuts_y,
+                 bias: str = "even") -> tuple:
         """A directional ramp round a given turn: its approach and departure grow until its
         profile clears every road and ramp it passes over (a stack's left ramps hold their
         tier over the core), then it must clear the ground, the other ramps of its system in
         height (a right ramp passes under a left one where that is high enough, else over it)
-        and find room for its columns. Returns (ramp, None) or (None, reason)."""
+        and find room for its columns. The length it lacks to climb goes half to each end
+        (`bias` "even"), or all to the approach or the departure. Returns (ramp, None) or
+        (None, reason)."""
         lx, _, kx, wx, upx, _ = X
         ly, _, ky, wy, upy, _ = Y
         a = _swing(oX) + 20.0
@@ -2222,14 +2249,26 @@ class Elev:
             L = qs[-1]
             hump = [(q, z) for q, z in zip(qs, need) if z > 0.0]
             zs, zd = lx.z(s_div + cx * TAPER_M), ly.z(s_mrg - cy * TAPER_M)
-            more_a = max([0.0] + [TAPER_M + CURVE_M / 2.0 + 5.0 + max(0.0, z - zs) / GRADE - q
+            # a hump lower than the end it is near may come closer to it
+            more_a = max([0.0] + [TAPER_M + CURVE_M / 2.0 + 5.0 + (z - zs) / GRADE - q
                                   for q, z in hump])
-            more_d = max([0.0] + [TAPER_M + CURVE_M / 2.0 + 5.0 + max(0.0, z - zd) / GRADE -
-                                  (L - q) for q, z in hump])
+            more_d = max([0.0] + [TAPER_M + CURVE_M / 2.0 + 5.0 + (z - zd) / GRADE - (L - q)
+                                  for q, z in hump])
             more = 2.0 * TAPER_M + CURVE_M + 10.0 + abs(zd - zs) / GRADE - L - more_a - more_d
             if more_a > 0.0 or more_d > 0.0 or more > 0.0:
-                a += 10.0 * math.ceil((more_a + max(0.0, more) / 2.0) / 10.0)
-                d += 10.0 * math.ceil((more_d + max(0.0, more) / 2.0) / 10.0)
+                share = {"even": 0.5, "approach": 1.0, "departure": 0.0}[bias]
+                fa = more_a + max(0.0, more) * share
+                fd = more_d + max(0.0, more) * (1.0 - share)
+                # the length to climb may come from either end: from the other where one is
+                # held by the left ramp beside it
+                if lim_d is not None and d + fd > lim_d:
+                    x = min(fd - more_d, d + fd - lim_d)
+                    fa, fd = fa + x, fd - x
+                elif lim_a is not None and a + fa > lim_a:
+                    x = min(fa - more_a, a + fa - lim_a)
+                    fa, fd = fa - x, fd + x
+                a += 10.0 * math.ceil(fa / 10.0)
+                d += 10.0 * math.ceil(fd / 10.0)
                 why = "no room to climb"
                 continue
             prof = self._sys_profile(L, hump, lambda x: lx.z(s_div + cx * x),
@@ -2246,16 +2285,39 @@ class Elev:
                 soft -= set(meet)
                 why = "meets a left ramp"
                 continue
+            turn = _winding(path)
+            if abs(turn) > STACK_WIND_DEG or (turn > 0.0) != (shape != "right"):
+                return None, "winds"
             why = self._fly_clear(path)
             if why:
                 return None, why
             gk, gs, gw = (lx, s_div, wx) if not upx else (ly, s_mrg, wy)
             Tg = G.qpoint(_at(gk.pts, gk.cum, gs)[0])
             if self._fly_span(qs, prof, under, path, Tg, gw) > STACK_SPAN_M:
-                return None, "no room for its columns"
+                # its swings out and in elsewhere, where they cross the roads more square
+                tries += 1
+                if tries > STACK_TRIES:
+                    return None, "no room for its columns"
+                a += 20.0
+                d += 20.0
+                why = "no room for its columns"
+                continue
             return {"pts": path, "prof": prof, "ic": ic["id"], "stub": False, "loop": False,
                     "dir": True, "shape": shape, "_ends": (s_div, s_mrg)}, None
         return None, why
+
+
+def _winding(pts) -> float:
+    """Signed total turn of a polyline in degrees (left positive), over 10 m steps."""
+    cum = _cum(pts)
+    qs = [_at(pts, cum, 10.0 * i)[0] for i in range(int(cum[-1] / 10.0) + 1)] + [pts[-1]]
+    hs = []
+    for a, b in zip(qs, qs[1:]):
+        L = _d(a, b)
+        if L > 0.5:
+            hs.append(((b[0] - a[0]) / L, (b[1] - a[1]) / L))
+    return sum(M.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1])
+               for a, b in zip(hs, hs[1:])) * 180.0 / math.pi
 
 
 def _swing(o: float) -> float:
@@ -2776,8 +2838,14 @@ def elevate(spec, ctx, net) -> dict:
             bad = sorted(ic["node"] for ic in E.icx if ic["template"] == "none")
             if not bad:
                 break
-            E.forced |= set(bad)
-        lost = sorted(ic["node"] for ic in E.icx if ic["template"] == "lost")
+            # M12: an avenue junction on a stack's lifted highway whose ramps do not fit
+            # passes under the deck instead of bringing it down
+            for p in E.stack_plan.values():
+                rid, under, segs = p["under"]
+                p["under"] = (rid, under | (set(bad) & p["window"]), segs)
+            E.forced |= set(bad) - {m for p in E.stack_plan.values() for m in p["window"]}
+        built = {ic["node"] for ic in E.icx if ic["template"] in ("stack", "turbine")}
+        lost = sorted(n for n in E.stack_plan if n not in built)
         if not lost:
             break
         for n in lost:
