@@ -1,0 +1,200 @@
+citygen build report: Nexus City (seed 1207, M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation, gameplay layer))
+result: PASS  (hydrology variant 11)
+
+checks:
+  [pass] geometry_valid: All geometry valid (shapely is_valid), non-empty
+  [pass] waterways_connected: Every waterway connects to a river, channel or the sea (declared basins aside)
+  [pass] district_shares: District area shares within 15% of the spec
+  [pass] placement: Placement relations (direction by centroid, edge, coast, on_island, along_river, adjacent_to, separated_by)
+  [pass] water_required: water_required districts share no land with another district
+  [pass] district_pieces: Every district is one piece on one landmass
+  [pass] island_sizes: Every island built, area within 10% of the spec
+  [pass] no_slivers: No land narrower than 40 m (districts, landmasses)
+  [pass] land_use: Every landmass holds a district or is named open land (marsh, park); no orphan wedges
+         note: landmass lm06 (0.14 km2) is open land: marsh 'Jade Reach Marsh'
+         note: landmass lm07 (0.08 km2) is open land: marsh 'Temple Cut Marsh'
+         note: landmass lm08 (0.06 km2) is open land: park 'Northridge Park'
+  [pass] canal_quality: Canals and creeks: no crossings below 30 deg, no near-duplicate canals
+  [pass] road_graph: Road graph connected: one component reaching every landmass with a district (islands by bridge or causeway), every exit built
+         note: land without a district left without roads: lm06, lm07, lm08
+  [pass] districts_served: Every district is touched by an avenue (at least 50 m within 25 m of it; a traced road of any class serves its pinned district)
+  [pass] named_bridges: Every named bridge is built
+  [pass] bridge_clearance: Every bridge has the clearance of the water it crosses (sea channel and port approach 25 m+, river 10 to 15 m, canal 3 to 4 m), every road over water is a bridge, no junction on a bridge
+  [pass] road_avoidance: No road through megasite reserves or spaceport flight cones, nor through marsh or park open land (declared causeways aside)
+  [pass] curve_radius: Minimum curve radius per class (highway 150 m, avenue 40 m), outside junction areas (25 m from an avenue junction, M2; 60 m from a highway junction, an interchange in M7, also inside a joined chain; traced roads as drawn)
+  [pass] segment_length: No highway segment under 60 m, no avenue segment under 40 m (a stretch that leaves the map is cut by the map border and not counted; traced roads as drawn)
+  [pass] road_duplicates: No near-parallel duplicate roads (within 25 m for over 150 m)
+  [pass] road_grades: Every road at most 6% steep along its z profile (viaducts, ramps, bridge approaches, streets ramping up to a raised junction; footbridge stairs aside)
+  [pass] level_continuity: Every road meets its nodes at their height (each road level system joined by ramps, no step at a node)
+  [pass] deck_clearance: Where roads cross without a node, the one under has 5.5 m under the deck over it (3 m over a pedestrian street)
+         note: 5 crossings without a node
+  [pass] ramps_land: Every ramp is one-way and joins a viaduct at its deck height to a ground road at the ground
+  [pass] street_graph: Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it
+  [pass] lane_graph: Lane graph strongly connected (every lane reaches every other through junction connectors and lane changes) and every vehicle road has lanes
+  [pass] walkway_graph: Walkway graph connected on every landmass with districts (sidewalks, crossings, crosswalks, pedestrian streets, promenades, footbridges, alleys, paths into open space)
+         note: 2 walkway component(s) in the city (landmasses without a pedestrian bridge stay apart)
+  [pass] lot_frontage: Every lot fronts a street, alley, service lane or pedestrian street (at least 2 m) and records its frontage and district (a traced building's lot as drawn)
+  [pass] lot_block_sizes: Lot areas within the archetype range (0.75 x min to 1.6 x max) and each district's median block size (square root of area) within the archetype block range (0.5 x lo to 1.8 x hi; traced buildings' lots and the blocks of a traced district aside)
+  [pass] lot_slivers: No lot narrower than 3 m and no block narrower than 6 m (strip width from exact area and perimeter; traced buildings' lots aside)
+  [pass] sidewalk_clear_path: Sidewalk clear path at least 1.8 m (width minus furniture zone and curb)
+  [pass] crosswalks: A crosswalk on every approach of every signalized junction, and on the side street approaches of unsignalized junctions on avenues
+  [pass] junction_placement: No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one)
+  [pass] junction_angles: Minimum angle between a local road and its neighbors at a junction: 60 degrees in grid districts, 35 in organic ones (old town, entertainment market)
+  [pass] street_duplicates: No near-duplicate local roads: right-of-way edges closer than 4 m over more than 50 m (30 m around shared points aside)
+  [pass] open_space_share: Open space share of each district's net land (open space over open space plus lots) within the archetype target (a traced district aside)
+  [pass] places_built: Every named place of the spec is built in its district
+  [pass] building_footprints: Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it
+  [pass] building_clear_zones: No ground mass of a building or site element on a road, junction, sidewalk, crosswalk, water, open space or another megasite's reserve or flight cone
+  [pass] building_overlaps: No two buildings, site elements or skybridge decks overlap (plan and height)
+  [pass] building_heights: Building heights within the district's archetype range (under a flight-cone cap where one applies; parking structures only under the top); landmarks, megasites and traced buildings aside
+  [pass] building_entrances: Every building has a main entrance on its facade, within 20 m of a ground walkway or a shared alley, service lane or pedestrian street, or joined to the walkway graph by a path (megasite buildings and landmarks always)
+  [pass] ground_floor_units: Ground-floor units 4 to 12 m wide, on the ground facade, facing one of the lot's frontage roads
+  [pass] roof_items: Rooftop items stand on a roof of their building (a mass top at their level that holds their footprint)
+  [pass] complexes: Every merged lot group is built as its complex: twin towers (two equal towers and a skybridge), tower clusters (three or more stepped towers bridged), megabuilding campuses, campuses, bridged pairs and straddle buildings
+  [pass] skybridges: Skybridges: 8 to 80 m, ends on facades of masses that reach the deck, level on both floor grids, roughly perpendicular, 5.5 m over roads and the navigable clearance over water, through no other building, joined to the walkway graph
+  [pass] landmarks: Every landmark of the spec is built in its district with its kind and height (the megatower with three arms)
+  [pass] megasite_contents: Every megasite reserve is filled by its site generator with the parts its kind needs, all inside the reserve
+  [pass] megasite_heights: Nothing inside a spaceport flight cone above its height limit, and nothing near one above the transitional surface (limit + 1 m per 1 m away)
+  [pass] megasite_access: Every megasite reaches a road (within 40 m) and its buildings and paths join the walkway graph
+         note: transit links of megasites: see transit_hubs
+  [pass] transit_routes: Every transit line of the spec is built along its whole route (every leg found)
+  [pass] transit_stops: Every stop of a line is served by one of its stations (in the district, within 150 m of the site, place or island), and a line to an exit reaches it
+  [pass] transit_curves: Track curve radius at least the mode minimum (elevated rail 150 m, monorail 100, maglev 500, sky tube 300; measured through points 30 m apart)
+  [pass] transit_self_crossing: A line never meets itself at the same level: two parts of its track more than 100 m apart along it stay its structure width apart in plan, or one passes 5.5 m over the other's structure; a loop closes where it starts, and its stations come in route order
+  [pass] transit_grades: Track grade at most the mode maximum (elevated rail 4%, monorail 6%, maglev 10%, sky tube 8%)
+  [pass] transit_altitude: Track altitude within the mode's range (scope 5.3), higher only where it climbs, at the mode's grade, to clear navigable water or a road deck
+  [pass] transit_clearance: Elevated lines clear the buildings under them (deck underside 2 m over the roof), navigable water (its clearance) and road decks (5.5 m over, or 1 m under a high one); sky lines clear buildings by 10 m or pass through a declared portal
+  [pass] transit_supports: Columns and pylons stand outside lanes, buildings, water and road decks, and leave 1.8 m of every sidewalk clear (in medians, just inside the curbs or off the street)
+         note: 94 columns and pylons
+  [pass] station_access: Every station has stairs, escalators or an elevator to the street and joins the walkway graph (elevated and sky stations next to a sidewalk or plaza)
+  [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
+  [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
+         note: Aurora Spaceport (spaceport): no maglev or sky_tube station within 150 m
+         note: Freight Terminal (freight_terminal): no elevated_rail or metro or monorail station within 150 m
+  [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
+         note: 30238 things on the ground
+  [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
+  [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
+  [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
+         note: Corporate Core: 97% lit
+         note: Transit Nexus: 96% lit
+         note: Aurora Spaceport: 98% lit
+         note: Neon Market: 94% lit
+         note: Northridge: 98% lit
+         note: Midtown: 98% lit
+         note: Old Town: 96% lit
+         note: Harbor Industrial: 97% lit
+         note: Silver Island: 99% lit
+  [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
+  [pass] boats_afloat: Boats lie in their waterway, clear of bridges
+  [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
+         note: 280 doors
+  [pass] poi_reachable_car: Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door
+  [pass] poi_places: Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones
+  [pass] territories: Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other
+  [pass] gameplay_fields: Wealth, danger and police fields: one raster each over the city bounds, every value between 0 and 1
+  [pass] street_density: Street density: one row per road segment with every hour band, nothing negative, traffic within the lanes' capacity, no cars on pedestrian ways
+  [pass] parking: Parking: every garage, lot and curb has capacity; garages in their building, lots clear of buildings and carriageways, curb parking on streets with parking lanes and drive lanes
+  [pass] travel_points: Taxi stands and fast travel: a fast-travel point in every district with streets, taxi stands at least 250 m apart, every stand on its sidewalk
+  [pass] sign_slots: Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof
+         note: shop signs reach 10.2 m
+  [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
+         note: 380 road columns under 63 raised segments
+
+stats:
+  map 11.56 km2, land 8.458 km2 (districts 8.177 km2, unassigned 0.0 km2)
+  water share 26.8% (sea 20.1%)
+  landmasses 8 (8 with districts), islands 1
+  rivers 2.77 km; channels delta_branch 2.17 km, sea_channel 3.78 km, separation 3.59 km
+  separation channels 5; boundary between districts on water 58% (target 60%), 6.05 km on water, 4.32 km on land
+  district perimeter facing water 66%; boundary curvature (arc / chord over 400 m) 1.0845, land boundaries 1.0228
+  open land 0.281 km2; marsh 'Jade Reach Marsh' 0.137 km2; marsh 'Temple Cut Marsh' 0.079 km2; park 'Northridge Park' 0.065 km2
+  inner waterways 8 (3.59 km: basin 0.9, canal 2.37, creek 0.32), quays 7.42 km
+  roads alley 23.42 km, avenue 28.88 km, footbridge 0.64 km, highway 10.34 km, pedestrian 20.23 km, service 5.65 km, street 97.23 km; 3094 segments, 2243 nodes, 1 component(s); exits east_exit, north_exit, west_exit
+  bridges 12 (sea 4, river 0, canal 8; 2.4 km of span), pedestrian 18; named: Baylink Bridge, Horizon Bridge, Silver Span
+  landmasses with districts connected by road 5 of 5; highway planned elevated 28%; megasite reserves 7; road variant 0
+  local roads street 97.23 km, alley 23.42 km, service 5.65 km, pedestrian 20.23 km, footbridge 0.64 km; 112 one-way segments, 18 footbridges
+  junctions 1781 (347 signalized), crosswalks 1182, sidewalks 171.18 km, lanes 6132 + 12095 connectors, walkways 16796 (alley 29.07 km, crossing 79.78 km, crosswalk 40.33 km, elevated 1.07 km, elevator 0.0 km, footbridge 0.64 km, path 72.35 km, pedestrian_street 3.17 km, promenade 17.06 km, sidewalk 215.11 km, skybridge 2.84 km, stairs 0.42 km)
+  junctions by type: street_street T 820, street_street X 218, avenue_avenue T 204, street T 127, alley_alley T 125, pedestrian T 98, avenue_avenue X 51, street_alley T 32, alley_alley X 20, highway_highway T 15, highway_highway X 12, street_alley X 11
+  blocks 1080, lots 6497 (6 merged groups), open space 14.5% of net land (courtyard 5, green 43, park 178, plaza 85, pocket_park 187), named places 7
+
+  lots by archetype            count   min m2   p10    median    p90      max  median frontage m
+  corporate_core                 228      998   1353     2435    4835     7236    53.3
+  entertainment_market          1498       58    111      224     427      728    16.0
+  industrial_port                 74     2030   2889     8158   16019    23834   127.1
+  midtown_mixed                  627      284    478      898    1706     2616    31.3
+  old_town                      3340       36     74      160     323      888    14.0
+  research_campus                 50     1627   2623     4812    8249    12217    98.1
+  residential_heights            566      282    445      822    1401     2907    29.0
+  spaceport                       14     4776   4882    10841   24611    31565   169.2
+  transit_hub                    100      432    800     1685    3089     4346    58.2
+
+  blocks and open space by district  blocks  median block m  open share
+  Corporate Core                        55            100      11.4%
+  Transit Nexus                         39             62      10.3%
+  Aurora Spaceport                       7            149      46.5%
+  Neon Market                          219             37       6.3%
+  Northridge                            71             92      17.6%
+  Midtown                              104             80      16.2%
+  Old Town                             557             30       6.2%
+  Harbor Industrial                     20            139       4.3%
+  Silver Island                          8            152      27.2%
+
+  buildings 6441 (20.286 km2 floor area), properties 6418, tallest 480 m; complexes bridged_pair 1, campus 1, landmark 4, megasite 7, straddle_building 1, tower_cluster 2, twin_towers 1
+  by type: shopfront_row 2780, shanty_stack 1866, villa 540, perimeter 398, podium_tower 277, terraced 202, courtyard_block 111, slab 57, tower 57, warehouse 45, lab 27, yard 17, parking_structure 15, shed 15, hangar 12, landmark.spire 3, temple_hall 3, kiosk 2, pavilion 2, straddle_building 2, control_tower 1, ferris_wheel 1, gate_house 1, landmark.megatower 1, office 1, pagoda 1, skyport 1, station 1, station_tower 1, terminal 1
+  skybridges 237 (2.84 km: cable 29, catwalk 102, enclosed 97, open_deck 8, stack 1), ground-floor units 19301 (food 5270, bar 2560, convenience 2323, cyberware 2052, club 1401, arcade 1370, laundromat 1249, pawn 1245, lobby 943, clinic 888)
+  roof items: ac_unit 13119, billboard 1356, water_tank 1155, antenna 1033, mechanical 570, av_pad 57, helipad 13; green roofs 636 (295654 m2)
+  landmarks: Nexus Spire (megatower, 480 m), Kaze Tower (spire, 300 m), Mirai Tower (spire, 247.74 m), Helios Tower (spire, 260 m)
+  megasites: Transit Nexus (transit_nexus: bus_bay 10, drop_off 1, metro_entrance 2, platform 3, plaza 2, station 1, station_tower 1); Transit Nexus Skyport (skyport: skyport 1); Aurora Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 3, launch_tower 3, terminal 1); Neon Wheel (attraction: ferris_wheel 1, kiosk 2, plaza 1); Central Plaza (central_park: fountain 1, lawn 12, pavilion 2, plaza 1, pond 1); Temple District (temple_complex: courtyard 1, gate 1, pagoda 1, temple_hall 3, wall 1); Freight Terminal (freight_terminal: berth 2, container_stack 180, gantry_crane 4, gate_house 1, office 1, rail_track 3, truck_gate 1, warehouse 2)
+
+  buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
+  Corporate Core                   193     124.0   200.0   480.0       71%  13.1      8.240
+  Transit Nexus                     87      42.0    73.5   101.5       56%   5.6      1.013
+  Aurora Spaceport                  14      27.5    32.0    40.0       20%   0.6      0.119
+  Neon Market                     1470      21.0    28.0    37.6       94%   4.5      1.683
+  Northridge                       566      23.8    23.8    47.6       33%   2.1      1.049
+  Midtown                          627      42.0    66.5   140.0       71%   7.8      4.936
+  Old Town                        3340      15.0    21.0    27.0       96%   3.5      2.100
+  Harbor Industrial                 74      11.6    16.0    16.0       31%   0.3      0.206
+  Silver Island                     49      32.0    40.0    68.0       36%   2.6      0.693
+
+  props 59862, plants 23687 (8392 trees), 83549 instances; lawns 46893 m2, hedges 6.42 km
+  props: sign 15308, awning 12483, ac_unit 8364, street_light 3939, bollard 3318, parked_vehicle 3192, railing 2470, barrier 2209, overhead_cable 1902, traffic_signal 1811, trash 1116, wall_light 959, hydrant 867, trash_can 856, bench 601, dumpster 166, bus_stop 105, scaffolding 69, boat 59, planter 30, vending_machine 16, kiosk 15, food_stall 7
+  plants: shrub 7597, facade_greenery 5551, park_tree 3525, street_tree 2724, overgrowth 1600, conifer 871, palm 796, roof_tree 547, median_tree 476
+
+  elevated highways 2.86 km (3 runs, 0 direct branches), deck up to 26.5 m; ramps 5 (1.44 km); interchanges diamond 1, diamond_stub 1; overpasses 2
+  other raised roads 15.6 km, underpass streets 1, road columns 380
+
+  gameplay: 215 points of interest, 8 factions (corporate 4, gang 3, police 1), 13 territories (2 contested), 33 taxi stands, 13 fast-travel points
+  pois: vendor.food 41, bar.bar 37, vendor.pawn 31, clinic.ripperdoc 18, bar.arcade 15, clinic.clinic 14, bar.club 13, vendor.convenience 13, apartment.apartment 10, fixer.fixer 7, apartment.penthouse 5, apartment.studio 5, hideout.squat 3, hideout.warehouse 2, apartment.capsule 1
+  parking: street 607, garage 19 (15049 spaces); sign slots: shop_sign.blade 10195, shop_sign.facade 5113, billboard.roof 1356, neon.facade 655, billboard.facade 256, holo_ad.roof 40
+
+  transit 9.84 km, supports 94, portals 8, buildings removed 54; stations elevated 7, sky 2, underground 5
+  by mode: elevated_rail 1 lines 2.36 km 5 stations, maglev 1 lines 1.96 km 2 stations, metro 1 lines 4.35 km 5 stations, sky_tube 1 lines 1.17 km 2 stations
+
+  district                     archetype              landmass  km2    share  target  error
+  Corporate Core               corporate_core         lm01      1.114  0.136  0.140   -2.7%  (spec)
+  Transit Nexus                transit_hub            lm04      0.514  0.063  0.070  -10.3%  (spec)
+  Aurora Spaceport             spaceport              lm01      0.799  0.098  0.100   -2.3%  (spec)
+  Neon Market                  entertainment_market   lm03      0.776  0.095  0.100   -5.1%  (spec)
+  Northridge                   residential_heights    lm01      0.885  0.108  0.110   -1.6%  (spec)
+  Midtown                      midtown_mixed          lm01      1.210  0.148  0.150   -1.4%  (spec)
+  Old Town                     old_town               lm02      1.214  0.148  0.140   +6.1%  (spec)
+  Harbor Industrial            industrial_port        lm02      1.216  0.149  0.140   +6.2%  (spec)
+  Silver Island                research_campus        lm05      0.450  0.055  0.050  +10.1%  (spec)
+
+notes:
+  - road variant 11/0, layout salt 1 left 2 check failures in the full city; built again on the same roads with the local layout drawn again (salt 2)
+  - megasite 'Aurora Spaceport' (spaceport) shrunk to 0.31 km2 (asked 0.50) to fit 'Aurora Spaceport'
+  - megasite 'Freight Terminal' (freight_terminal) shrunk to 0.25 km2 (asked 0.40) to fit 'Harbor Industrial'
+  - ramps not built: 2 another ramp, 2 off the run, 2 water, 1 reserve or open land
+  - 1 underpass streets under the viaducts (not built: 2 deck too low, 1 near a ramp, 6 no frontage street on both sides)
+  - 'Northridge': a loop street found no connector (3 times)
+  - 'Old Town': streets reach the network only by a highway access
+  - 75 local roads cut back at junctions sharper than the district minimum
+  - 7 local roads running alongside another road removed
+  - 93 lanes reached only over pedestrian streets became pedestrian
+  - 3 local roads crossing another without a junction removed
+  - 54 local segments (6.39 km) not connected to the network were dropped
+  - landmark 'Mirai Tower' capped at 248 m by a flight cone (asked 290 m)
+  - Harbor Line: drawn from stop to stop with 172.5 m curves

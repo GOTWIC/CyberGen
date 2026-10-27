@@ -351,6 +351,33 @@ concourse end sits on a walkway. Delta Megacity builds on its first full-city tr
 before); the sweep passes 58 of 68 with no transit failure. Sample builds, same-layout
 before and after maps and the sweep: `docs/progress/M8c/`.
 
+M11 (gameplay layer) is in place: the build ends with `citygen/gameplay.py` on the finished
+city (after props) and nine checks in `gameplay_checks.py` (75 in all):
+- **Factions and zones:** a gang per district with `danger` at 0.45 or more, a corporation
+  for corporate, campus, port and spaceport districts, else the city police (spec
+  `faction` names or shares one); each district split into 1 to 4 turfs by straight bisectors
+  between seed blocks, a rival gang on the turf nearest its home; a police precinct per
+  district with its station building.
+- **Fields:** wealth, danger and police on a 32 m raster (`fields`): spec `wealth`, `danger`,
+  `police` per district (archetype defaults in `presets.py`), blended with an integer box
+  blur, raised or lowered near parks and water, landmarks, alleys, raised decks, stations and
+  precinct stations.
+- **Points of interest** (`pois`): bars, clinics and vendors from ground-floor units (budget
+  per km2 by archetype, spacing), apartments, gang hideouts, fixers in a bar; named from word
+  lists by hash, unique. Every place has an `Access`: door, ground walkway (main walkway
+  component of its landmass), drive lane (largest strongly connected part of the lane graph)
+  and curb point; candidates without one are skipped, so `poi_reachable_foot` and
+  `poi_reachable_car` hold by construction.
+- **Lifegen data:** `densities` per road segment and hour band (`model.HOUR_BANDS`): traffic,
+  vehicles, crowds, gang members and police per 100 m. `parking` (structures, underground
+  garages, setback lots, curb), `travel_points` (taxi stands, fast travel).
+- **Sign slots** (`sign_slots`): one per M6 shop sign and M3 roof billboard, plus facade
+  billboards facing highways and avenues, holo-ads over tower roofs and neon bands above the
+  shop signs.
+- **Outputs:** `preview_gameplay.png` (`preview_gameplay.py`), `gameplay.json` beside the
+  blockout exports with a per-tile index; no blockout geometry. Ids come from what a place is
+  (building, unit, segment, district), not build order.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build

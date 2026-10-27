@@ -101,7 +101,7 @@ def test_junctions_stay_at_their_node(city):
 
 def test_report_has_elevated_stats(city):
     rep = city.report()
-    assert rep["stage"].startswith("M7") and "elevated highways" in rep["stage"]
+    assert rep["stage"].startswith("M11") and "elevated highways" in rep["stage"]
     assert "elevated highways" in C.report_text(rep)
 
 

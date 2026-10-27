@@ -369,7 +369,8 @@ class Ctx:
         self.lane_geoms = np.array(self.lane_lines, dtype=object)
         self.lane_ix = {ln.id: i for i, ln in enumerate(self.lanes)}
         self.lane_tree = shapely.STRtree(self.lane_lines) if self.lane_lines else None
-        self.names = Names()
+        self.names = Names()        # factions and places
+        self.zone_names = Names()   # territories and precincts (named after their district)
         self.fields: dict = {}
 
     # -- places ---------------------------------------------------------------------------
@@ -553,7 +554,7 @@ def factions_and_zones(c: Ctx) -> tuple[list, list, dict]:
             level = 0.4 if i == rival_turf else (0.5 + 0.5 * v["danger"]) if \
                 f["kind"] == "gang" else 0.9 if f["kind"] == "corporate" else v["police"]
             zones.append({"id": zid, "type": "zone.territory", "kind": "territory",
-                          "name": c.names.take(lambda k: base if k == 0 else
+                          "name": c.zone_names.take(lambda k: base if k == 0 else
                                                f"{base} {k + 1}"),
                           "district_id": d.id, "faction_id": f["id"],
                           "polygons": G.to_model_polys(cell) if not cell.is_empty else
@@ -580,7 +581,7 @@ def factions_and_zones(c: Ctx) -> tuple[list, list, dict]:
         precinct[d.id] = best[2] if best else None
         pz = f"{d.id}.police"
         zones.append({"id": pz, "type": "zone.police", "kind": "police",
-                      "name": c.names.take(lambda k: f"{d.name} Precinct" if k == 0 else
+                      "name": c.zone_names.take(lambda k: f"{d.name} Precinct" if k == 0 else
                                            f"{d.name} Precinct {k + 1}"),
                       "district_id": d.id, "faction_id": police["id"],
                       "polygons": G.to_model_polys(poly), "level": q(v["police"]),
@@ -1109,6 +1110,7 @@ def build_travel(c: Ctx, pois: list[dict]) -> list[dict]:
     sp = _Spacer(cell=100.0)
 
     dname = {d.id: d.name for d in c.dist}
+    taken: set[str] = set()     # one stand per road segment (its id)
 
     cands = []
     for s in m.stations:
@@ -1129,10 +1131,11 @@ def build_travel(c: Ctx, pois: list[dict]) -> list[dict]:
         if acc is None:
             continue
         p = c.on_walk(acc, acc["curb"])
-        if not sp.free("taxi", p, TAXI_GAP_M):
+        seg = c.lanes[c.lane_ix[acc["lane_id"]]].segment_id
+        if not sp.free("taxi", p, TAXI_GAP_M) or seg in taken:
             continue
         sp.add("taxi", p)
-        seg = c.lanes[c.lane_ix[acc["lane_id"]]].segment_id
+        taken.add(seg)
         cen = c.center[did]
         base = label or f"{dname[did]} {compass(p[0] - cen[0], p[1] - cen[1])}"
         out.append({"id": f"{seg}.taxi", "type": "travel.taxi_stand", "kind": "taxi_stand",
