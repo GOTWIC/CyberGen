@@ -57,9 +57,9 @@ different coast forms, not one map. M12 adds stack interchanges where two highwa
 room for one: one highway lifted to 9 m through the crossing, the other at grade, and eight
 one-way directional ramps, the left turns as flyovers at 18 m and 27 m (a turbine, then M7's
 crossing, where the stack does not fit). None of the five samples or the pinned demo has such
-a crossing, so they are as in M9, and a stack demo, Vesper Bay Stacks, is the pinned demo
-with two crosstown highways that cross in a stack in The Stacks (see
-[`docs/progress/M12`](docs/progress/M12)).
+a crossing, so they are as in M9 (its tunnels further down), and a stack demo, Vesper Bay
+Stacks, is the pinned demo with two crosstown highways that cross in a stack in The Stacks
+(see [`docs/progress/M12`](docs/progress/M12)).
 
 The stack in Vesper Bay Stacks (8K): the Stacks Crosstown on its viaduct over the Bayline,
 the tier-2 flyovers at 18 m, the tier-3 flyovers at 27 m over them, the right turns in their

@@ -1,7 +1,7 @@
 {
   "name": "Vesper Bay Stacks",
   "seed": 2078,
-  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation, gameplay layer)",
+  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer)",
   "passed": true,
   "variant": 4,
   "checks": [
@@ -96,7 +96,7 @@
     },
     {
       "id": "named_bridges",
-      "title": "Every named bridge is built",
+      "title": "Every named bridge is built (as a tube where it asks for one)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -185,6 +185,34 @@
       ]
     },
     {
+      "id": "tunnel_grades",
+      "title": "Tunnel grades within the class maximum: roads 6% (immersed tubes, cut-and-cover tunnels and their open approaches), metro 4%, pedestrian underpasses level",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_cover",
+      "title": "Cover over every tunnel roof: at least 1 m of ground (40 m into the tunnel from a portal: the roof under the ground), 1.5 m under the water bed (canal 3, river 7, sea 12 m deep), 0.5 m under a road over a pedestrian underpass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_portals",
+      "title": "Every road tunnel has a portal at each end on dry land, 5.5 m clear inside, an open approach at most 6% steep, and nothing on or over its open approaches: no road node within 20 m of their top, no other road, building or structure on them",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_clash",
+      "title": "No tunnel within 1 m (in height, where they overlap in plan) of another tunnel, a metro station box, a building's foundations and basements (4 to 18 m deep by height) or a column footing",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "street_graph",
       "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
       "passed": true,
@@ -244,7 +272,7 @@
     },
     {
       "id": "junction_placement",
-      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one)",
+      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one) or below it (M9 tunnels and their approaches)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -455,7 +483,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "26032 things on the ground"
+        "26029 things on the ground"
       ]
     },
     {
@@ -768,6 +796,23 @@
       "underpass_streets": 3,
       "road_columns": 452
     },
+    "tunnels": {
+      "by_kind": {
+        "metro": {
+          "count": 7,
+          "km": 4.6
+        },
+        "pedestrian": {
+          "count": 1,
+          "km": 0.03
+        }
+      },
+      "vents": 0,
+      "deepest_road_m": 0.0,
+      "deepest_metro_m": -26.0,
+      "over_tunnel_roads": 0,
+      "over_tunnel_streets": 0
+    },
     "local": {
       "junctions": 1780,
       "junctions_signalized": 287,
@@ -802,7 +847,7 @@
       "lanes": 6576,
       "lane_connectors": 13084,
       "one_way_segments": 128,
-      "walkways": 17384,
+      "walkways": 17389,
       "walkway_km": {
         "alley": 41.74,
         "crossing": 92.76,
@@ -815,7 +860,8 @@
         "promenade": 9.74,
         "sidewalk": 199.49,
         "skybridge": 2.94,
-        "stairs": 0.74
+        "stairs": 0.75,
+        "underpass": 0.03
       },
       "footbridges": 2,
       "blocks": 1066,
@@ -1217,7 +1263,7 @@
         }
       },
       "site_elements": 732,
-      "structures": 728,
+      "structures": 730,
       "tallest_m": 480.0,
       "generator": {
         "walkways_added": 2311
@@ -1267,9 +1313,9 @@
     },
     "props": {
       "props": 51149,
-      "plants": 25166,
+      "plants": 25163,
       "trees": 7925,
-      "instances": 76315,
+      "instances": 76312,
       "props_by_kind": {
         "sign": 13625,
         "awning": 11223,
@@ -1297,7 +1343,7 @@
         "gate": 1
       },
       "plants_by_kind": {
-        "shrub": 7840,
+        "shrub": 7837,
         "facade_greenery": 5672,
         "park_tree": 4234,
         "overgrowth": 3194,
@@ -1325,7 +1371,7 @@
         "alley_clutter": 2431,
         "median_trees": 949,
         "promenade_trees": 247,
-        "park_trees": 10252,
+        "park_trees": 10249,
         "roof_plants": 3543,
         "facade_greenery": 5672,
         "overgrowth": 3194,
@@ -1336,7 +1382,7 @@
         "scaffolding": 53,
         "market_gates": 1,
         "props": 51149,
-        "plants": 25166
+        "plants": 25163
       }
     },
     "gameplay": {
@@ -1421,7 +1467,7 @@
     "traced road path75 on Core Island finds no land to reach; it ends at the coast",
     "'Corporate Core': no free land for an avenue",
     "ramps not built: 3 too near another node, 2 another ramp, 1 meets",
-    "3 underpass streets under the viaducts (not built: 1 deck too low, 1 near a ramp, 2 near a road under the deck)",
+    "3 underpass streets under the viaducts or over the tunnels (not built: 1 deck too low, 1 near a ramp, 2 near a road under the deck)",
     "'Highcrest': a loop street found no connector (2 times)",
     "2 local roads stopped short of a primary road they crossed where no junction is allowed",
     "100 local roads cut back at junctions sharper than the district minimum",
@@ -1431,6 +1477,8 @@
     "83 local segments (11.05 km) not connected to the network were dropped",
     "Core Island: path52 overlaps path49: it gives way (16.9 m2)",
     "57 traced buildings placed as drawn",
-    "Halo Line: loop drawn around its stops (it met itself)"
+    "Halo Line: loop drawn around its stops (it met itself)",
+    "metro Spine Line: lowered to -26 m under foundation, water",
+    "1 pedestrian underpasses under the highways"
   ]
 }

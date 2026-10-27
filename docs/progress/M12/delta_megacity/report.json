@@ -1,7 +1,7 @@
 {
   "name": "Delta Megacity",
   "seed": 4412,
-  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, props, vegetation, gameplay layer)",
+  "stage": "M11 (water, districts, waterways, roads, elevated highways, local streets, blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, vegetation, gameplay layer)",
   "passed": true,
   "variant": 12,
   "checks": [
@@ -95,7 +95,7 @@
     },
     {
       "id": "named_bridges",
-      "title": "Every named bridge is built",
+      "title": "Every named bridge is built (as a tube where it asks for one)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -184,6 +184,34 @@
       ]
     },
     {
+      "id": "tunnel_grades",
+      "title": "Tunnel grades within the class maximum: roads 6% (immersed tubes, cut-and-cover tunnels and their open approaches), metro 4%, pedestrian underpasses level",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_cover",
+      "title": "Cover over every tunnel roof: at least 1 m of ground (40 m into the tunnel from a portal: the roof under the ground), 1.5 m under the water bed (canal 3, river 7, sea 12 m deep), 0.5 m under a road over a pedestrian underpass",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_portals",
+      "title": "Every road tunnel has a portal at each end on dry land, 5.5 m clear inside, an open approach at most 6% steep, and nothing on or over its open approaches: no road node within 20 m of their top, no other road, building or structure on them",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tunnel_clash",
+      "title": "No tunnel within 1 m (in height, where they overlap in plan) of another tunnel, a metro station box, a building's foundations and basements (4 to 18 m deep by height) or a column footing",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "street_graph",
       "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
       "passed": true,
@@ -243,7 +271,7 @@
     },
     {
       "id": "junction_placement",
-      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one)",
+      "title": "No junction of a local road on a bridge, nor where the primary road is more than 3 m above ground (the local street ramps up to a lower one) or below it (M9 tunnels and their approaches)",
       "passed": true,
       "failures": [],
       "notes": []
@@ -454,7 +482,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "24546 things on the ground"
+        "24545 things on the ground"
       ]
     },
     {
@@ -735,6 +763,23 @@
       "underpass_streets": 1,
       "road_columns": 231
     },
+    "tunnels": {
+      "by_kind": {
+        "metro": {
+          "count": 2,
+          "km": 1.94
+        },
+        "pedestrian": {
+          "count": 1,
+          "km": 0.03
+        }
+      },
+      "vents": 0,
+      "deepest_road_m": 0.0,
+      "deepest_metro_m": -20.0,
+      "over_tunnel_roads": 0,
+      "over_tunnel_streets": 0
+    },
     "local": {
       "junctions": 1580,
       "junctions_signalized": 358,
@@ -767,7 +812,7 @@
       "lanes": 5402,
       "lane_connectors": 10960,
       "one_way_segments": 82,
-      "walkways": 16241,
+      "walkways": 16246,
       "walkway_km": {
         "alley": 24.8,
         "crossing": 65.62,
@@ -780,7 +825,8 @@
         "promenade": 16.08,
         "sidewalk": 190.17,
         "skybridge": 4.01,
-        "stairs": 0.41
+        "stairs": 0.43,
+        "underpass": 0.03
       },
       "footbridges": 17,
       "blocks": 991,
@@ -1114,7 +1160,7 @@
         }
       },
       "site_elements": 709,
-      "structures": 518,
+      "structures": 520,
       "tallest_m": 480.0,
       "generator": {
         "walkways_added": 2956
@@ -1164,9 +1210,9 @@
     },
     "props": {
       "props": 55352,
-      "plants": 20153,
-      "trees": 6378,
-      "instances": 75505,
+      "plants": 20152,
+      "trees": 6376,
+      "instances": 75504,
       "props_by_kind": {
         "sign": 13215,
         "awning": 11364,
@@ -1194,10 +1240,10 @@
         "gate": 1
       },
       "plants_by_kind": {
-        "shrub": 6499,
+        "shrub": 6500,
         "facade_greenery": 5655,
         "street_tree": 2488,
-        "park_tree": 1979,
+        "park_tree": 1977,
         "palm": 940,
         "overgrowth": 823,
         "roof_tree": 798,
@@ -1222,7 +1268,7 @@
         "alley_clutter": 865,
         "median_trees": 1141,
         "promenade_trees": 182,
-        "park_trees": 4914,
+        "park_trees": 4913,
         "roof_plants": 4950,
         "facade_greenery": 5655,
         "overgrowth": 823,
@@ -1233,7 +1279,7 @@
         "scaffolding": 47,
         "market_gates": 1,
         "props": 55352,
-        "plants": 20153
+        "plants": 20152
       }
     },
     "gameplay": {
@@ -1306,7 +1352,7 @@
     ]
   },
   "notes": [
-    "1 underpass streets under the viaducts",
+    "1 underpass streets under the viaducts or over the tunnels",
     "1 local roads stopped short of a primary road they crossed where no junction is allowed",
     "45 local roads cut back at junctions sharper than the district minimum",
     "6 local roads running alongside another road removed",
@@ -1315,6 +1361,8 @@
     "42 local segments (6.27 km) not connected to the network were dropped",
     "lot too small or narrow for a building",
     "Maglev Line: drawn along its stops with 500 m curves",
-    "Waterfront Monorail: off the roads where they turn too hard or pass what it cannot"
+    "Waterfront Monorail: off the roads where they turn too hard or pass what it cannot",
+    "metro Metro Line: lowered to -20 m under foundation",
+    "1 pedestrian underpasses under the highways"
   ]
 }

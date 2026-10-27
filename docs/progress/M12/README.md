@@ -7,32 +7,44 @@ core and the four right turns in their quadrants, with no loops. The turbine is 
 eight movements with the left turns swept wider round the core so their crossings fall
 apart (no point has more than three levels); each is the other's fallback, and where neither
 fits the crossing is built exactly as M7 builds it. Columns stand under every level as for
-any raised road. Two new checks (`stack_ramps`, `stack_levels`, 77 in all).
+any raised road. Two new checks (`stack_ramps`, `stack_levels`), 81 in all on the code merged
+with M9 (tunnels) and M11 (gameplay layer).
 
 None of the five samples or the pinned demo has two highways that cross with room for a
 stack, so the stack is shown in a seventh city, **Vesper Bay Stacks**: the pinned demo with
-only its highways changed (art direction, below). The five samples and the pinned demo are
-byte-identical to M11 apart from `spec_sha256` (the filled spec gains the defaults of the two
-new spec fields), and every city passes all 77 checks:
+only its highways changed (art direction, below). On main with M9 and M11, the five samples
+and the pinned demo are byte-identical to M9's builds apart from `spec_sha256` (the filled
+spec gains the defaults of the two new spec fields), and every city passes all 81 checks:
 
-| City | Tries (M11, M12) | Interchanges | sha256 of `city_model.json` (M4 Mac and x86_64 Linux) | vs M11 |
+| City | Tries (M9, M12) | Interchanges | sha256 of `city_model.json` (M4 Mac and x86_64 Linux) | vs M9 |
 |---|---|---|---|---|
-| archipelago_free_port | 1, 1 | diamond | `e5780b722a035ca3edde143788a00e5f510828d8e632a2f1ede09f48b449c617` | same apart from the spec hash |
-| delta_megacity | 1, 1 | none | `6feb38bd8c67a2cfde3989df90468bc6ad78437f2a349d6e8f494c4a2b91c6ae` | same apart from the spec hash |
-| nexus_city | 3, 3 | diamond, diamond stub | `6757ba4121f32887a7a5082a314ed2b2c9fc01ecb3b64e899be21bf9811bd1ba` | same apart from the spec hash |
-| peninsula_city | 1, 1 | none | `8456650dfca5bec4e9bcd65301822dd38849fd4dd8375599cfa437cfd5aeabb4` | same apart from the spec hash |
-| vesper_bay | 1, 1 | diamond, parclo, trumpet | `2e5582be86c77054c3705fcd653851ad129bdf074b673f74651a17bfc144058d` | same apart from the spec hash |
-| vesper_bay_pinned | 2, 2 | diamond (2), parclo | `b896bf87d4ebfc0139a458ff2bf214f5c1c298a55ab686bd3a5fdfb4ef8e975f` | same apart from the spec hash |
-| vesper_bay_stacks | new, 1 | diamond, **stack** | `385dbd9a2df5811d71c51d6ddcd9c14094c242e8ee251a36a373e9908f218d67` | new (the stack demo) |
+| archipelago_free_port | 1, 1 | diamond | `db0733983fdd333610e67d6dd51055e3dbf286356135144028cc3829bc486bd5` | same apart from the spec hash |
+| delta_megacity | 1, 1 | none | `8ce02071a18f7f3e7456b5ff3d5a61d27b45204681f1b9de5b11f560b451b535` | same apart from the spec hash |
+| nexus_city | 1, 1 | diamond, parclo | `af71faeb71ff41dd1129c26a0b45d6286d03804e4011eeea607a8c8f3d0d8e07` | same apart from the spec hash |
+| peninsula_city | 1, 1 | none | `7b2a69ca5d77f57a9e2c2e957da1ffd7189a9cade8e17b102d51a5b9d86b11ca` | same apart from the spec hash |
+| vesper_bay | 1, 1 | diamond, parclo, trumpet | `4982f2e1415f6f1ecf48924c5600c36291a19f582c0e351ca08dd3b3b71fa9ba` | same apart from the spec hash |
+| vesper_bay_pinned | 2, 2 | diamond (2), parclo | `4d0d1c437df33a7ede7a7a6dab6f735912547d878f03a6b007e108de205e458b` | same apart from the spec hash |
+| vesper_bay_stacks | new, 1 | diamond, **stack** | `837a49773993e0ee433a6c7eb5cd51eabf6cfd5fcfb315f2c4869515e8c4d17c` | new (the stack demo) |
 
 "Same apart from the spec hash": with `spec_sha256` set back to the hash of the spec dumped
-without the new fields (and salted as the build salted it), the bytes equal the M11 golden
-(the pinned demo: the M11 README's sha256). The blockout plans of the five samples are
-unchanged (their goldens stand).
+without the new fields (and salted as the build salted it), the bytes equal the M9 golden
+(the pinned demo: the M9 README's sha256), and `citygen trace diff` against
+`docs/progress/M9/<city>/trace.json` finds every stage equal up to the checks. The blockout
+plans of the five samples are M9's (their goldens stand), so the renders are M9's scenes.
+
+On the M11 code alone (before the merge) the stack demo was `385dbd9a...`; M9 changes it as
+it changes every city (its metro in seven M9 tunnels, 4.6 km, one pedestrian underpass),
+and its roads, the stack and its 153 columns are the same.
 
 Every model is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker image
 `citygen-x86`, `linux/amd64`, worktree mounted read-only, `CITYGEN_WORKERS=3`), and `citygen
 trace diff` finds every stage identical in all seven (`<city>/trace.json`).
+
+Each city folder has every generator preview (`preview_tunnels.png` where a city has M9
+tunnels), the build report and stage trace, the blockout report, `render_top.jpg` and the 8K
+`render_iso_city.jpg`; Nexus City and Greyhook also the 8K `render_cutaway.jpg` of M9, and
+the stack demo the 8K stack close-up `render_stack.jpg` and the pinned demo's road levels and
+map beside its own (`before_elevated.png`, `before_map.png`).
 
 ## The stack in Vesper Bay Stacks
 
@@ -114,13 +126,15 @@ flowchart LR
 
 1. **Sites** (`Elev.stack_sites`). A node where two generated highways cross: four highway
    legs and no other road, in two pairs that each run straight on (35 degrees at most) and
-   cross at 45 degrees or more; not traced, not an exit.
+   cross at 45 degrees or more; not traced, not an exit, no leg in an M9 tunnel.
 2. **Plan** (`plan_stacks`, `_corridor`, `_window`). Each highway is followed through the
    crossing (on through nodes where it runs straightest, round a bend of up to 90 degrees
    where it is the only highway there) to its ends. The lifted one needs 640 m of ramp room
    both ways plus its run down beyond (or it stays up to the map edge), the one at grade
-   700 m. No other highway may meet either within its window. The highway already up goes
-   up, else the one that leaves the ground highway with fewer junctions near the crossing.
+   700 m. No other highway may meet either within its window, and no M9 tunnel may lie in
+   either window or meet a node in it (a tunnel stays down and takes no ramp). The highway
+   already up goes up, else the one that leaves the ground highway with fewer junctions near
+   the crossing.
 3. **Avenues under the lifted deck.** A node of avenues in the lifted window that would
    bring the viaduct down stays at grade under the deck (node kind `under`), and so does one
    whose own ramps do not fit among the stack's (it is tried first, as M7 would). An avenue
@@ -168,7 +182,7 @@ Skew: the left turns of an acute angle cross each highway at half the angle, so 
 over the roads lengthen as the crossing gets sharper; a stack fits down to about 70 degrees
 (tested at 90, 80 and 70); at 65 degrees the test crossing gets the turbine.
 
-## Checks (77 in all)
+## Checks (81 in all)
 
 | check | what |
 |---|---|
@@ -189,6 +203,11 @@ before, now over every level of a stack. Elevated stats gain `stacks`, `turbines
   the end of an avenue climbing to the Core Island bridge without clearance, and the city
   took nine full-city tries; the samples have no traced roads, and the pinned demo is
   unchanged by it.
+- Merge with M9 (`citygen/elevated.py`): M9 already keeps tunnel segments off the viaducts
+  and splits a run at a node where a tunnel meets it; stacks follow suit (no tunnel leg at a
+  stack site, no tunnel segment in either window or at a node in it, and a tunnel at a node
+  under the lifted deck still splits it rather than passing under). No sample has a tunnel
+  near a highway crossing, so this changes no build.
 
 ## Sweep
 
@@ -203,15 +222,16 @@ as in M11.
 
 ## Tests
 
-`tests/test_stack.py` (19 tests) builds the M7 stage on a crossing of two straight highways
+`tests/test_stack.py` (21 tests) builds the M7 stage on a crossing of two straight highways
 on open land: the site and the plan, the eight ramps and their attributes, the four levels,
 grades and ends, clearances, the shared crossings of the fourth level, the turbine, each as
 the other's fallback, the fallback to M7's crossing (byte for byte), water in the way,
 skewed crossings at 80 and 70 degrees, determinism, column spans over the core, an avenue
 junction on the lifted highway passing under the deck (and ending clear of it), a planned
-stack that is never built, and the winding measure; one more builds the stack demo's roads
-and checks its stack. The check counts (66 with no transit lines) and check ids are updated,
-and `test_committed_reports_match` reads the M12 reports.
+stack that is never built, no stack on an M9 tunnel (a tunnel leg, an avenue tunnel in the
+window), and the winding measure; one more builds the stack demo's roads and checks its
+stack. The check counts (70 with no transit lines, M9's four included) and check ids are
+updated, and `test_committed_reports_match` reads the M12 reports.
 
 ## Open items
 

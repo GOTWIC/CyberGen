@@ -313,6 +313,23 @@ def test_a_stack_never_built_is_dropped(monkeypatch):
     assert [s["z_profile"] for s in net.segments] == [s["z_profile"] for s in ref.segments]
 
 
+@pytest.mark.parametrize("where", ["leg", "tee"])
+def test_no_stack_on_a_tunnel(where):
+    """M9 tunnels stay down and take no ramp: a crossing with a leg in a tunnel is no stack
+    site, and an avenue tunnel meeting a highway within its window keeps the plan off."""
+    if where == "leg":
+        net = _crossing()
+        net.segments[1]["attrs"]["tunnel"] = "tn01"
+    else:
+        net = _with_tee(450.0, 1)
+        next(s for s in net.segments if s["road_class"] == "avenue")["attrs"]["tunnel"] = "tn01"
+    E = EL.Elev(_ctx(), net)
+    assert [s[0] for s in E.stack_sites()] == ([] if where == "leg" else ["rn0001"])
+    E.plan_stacks()
+    assert not E.stack_plan
+    assert not any(s["attrs"].get("elevated") for s in net.segments)
+
+
 def test_winding():
     """The builder's own measure of a ramp's turn (left positive), as the check takes it."""
     quarter = [(100.0 * math.sin(math.radians(a)), 100.0 - 100.0 * math.cos(math.radians(a)))

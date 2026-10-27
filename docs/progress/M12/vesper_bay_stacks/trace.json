@@ -9,7 +9,7 @@
     "shapely": "2.2.0",
     "geos": "3.14.1"
   },
-  "model_sha256": "385dbd9a2df5811d71c51d6ddcd9c14094c242e8ee251a36a373e9908f218d67",
+  "model_sha256": "837a49773993e0ee433a6c7eb5cd51eabf6cfd5fcfb315f2c4869515e8c4d17c",
   "entries": [
     ["v0/coast", "5a3c3ce33863494de184740b35169c357ae349233948c51ac4f7e3ab37540bff"],
     ["v0/rivers", "0af1bb11275c4c9ff4a4e5ce7b176db1f729ef85aa01a72753526fb165cd6dea"],
@@ -1402,7 +1402,7 @@
     ["gameplay/sign_slots", "0bad859a8f55eb09b6a8fbb0e629375827d69e1f3a55b66780b3419d52a0faf4"],
     ["gameplay/travel_points", "43c8f0974afc28324fbe11d3961b895a66aace96de91c78c24cc0062ae38f6a6"],
     ["gameplay/zones", "b5d77bda10762a7a53447c67a0cbb10d341b2494b69a3f8fdd9a786ed865ebd4"],
-    ["checks_m3", "c6833ec5823b3f698208fb4a68093bb76c5a7617ffa0a7cc692ce781cc7f17a9"],
+    ["checks_m3", "51224dd7ac1b70276d41493bae91ca0cabeb02f30e4400014e9c456c423cc3c6"],
     ["city_try0", "1d58df62280b67fd9b86d065906aefe79d6a3fb5650599e09b11bba3b0515408"]
   ]
 }
