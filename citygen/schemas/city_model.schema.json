@@ -1,5 +1,85 @@
 {
   "$defs": {
+    "Access": {
+      "additionalProperties": false,
+      "description": "How a place is reached: a door, the ground walkway it opens on (on foot), and the\ndrive lane where a car stops for it (by car).",
+      "properties": {
+        "position": {
+          "description": "The door, on the facade at ground level.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "kind": {
+          "default": "main",
+          "enum": [
+            "main",
+            "service",
+            "loading",
+            "garage",
+            "gate",
+            "unit",
+            "curb"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "walkway_id": {
+          "description": "Ground walkway the door opens on.",
+          "title": "Walkway Id",
+          "type": "string"
+        },
+        "walk_link_m": {
+          "description": "Door to that walkway.",
+          "title": "Walk Link M",
+          "type": "number"
+        },
+        "lane_id": {
+          "description": "Drive lane where a car stops (lane graph).",
+          "title": "Lane Id",
+          "type": "string"
+        },
+        "curb": {
+          "description": "Point on that lane's centerline nearest the door.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Curb",
+          "type": "array"
+        },
+        "curb_m": {
+          "description": "Door to curb point, straight.",
+          "title": "Curb M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position",
+        "walkway_id",
+        "walk_link_m",
+        "lane_id",
+        "curb",
+        "curb_m"
+      ],
+      "title": "Access",
+      "type": "object"
+    },
     "Block": {
       "additionalProperties": false,
       "properties": {
@@ -834,6 +914,80 @@
       "title": "Entrance",
       "type": "object"
     },
+    "Faction": {
+      "additionalProperties": false,
+      "description": "A gang, a corporation's security or the city police; `type` is `faction.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "gang",
+            "corporate",
+            "police"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "color": {
+          "title": "Color",
+          "type": "string"
+        },
+        "home_district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home District Id"
+        },
+        "zone_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Zone Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "color"
+      ],
+      "title": "Faction",
+      "type": "object"
+    },
     "Frontage": {
       "additionalProperties": false,
       "properties": {
@@ -876,6 +1030,90 @@
         "line"
       ],
       "title": "Frontage",
+      "type": "object"
+    },
+    "GameField": {
+      "additionalProperties": false,
+      "description": "A scalar field on a raster over the city bounds (wealth, danger, police presence),\nvalues 0 to 1 by cell, rows from the south, west to east; `type` is `field.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "wealth",
+            "danger",
+            "police"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "description": "South-west corner of cell (0, 0).",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Origin",
+          "type": "array"
+        },
+        "cell_m": {
+          "title": "Cell M",
+          "type": "number"
+        },
+        "nx": {
+          "title": "Nx",
+          "type": "integer"
+        },
+        "ny": {
+          "title": "Ny",
+          "type": "integer"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "origin",
+        "cell_m",
+        "nx",
+        "ny",
+        "values"
+      ],
+      "title": "GameField",
       "type": "object"
     },
     "GreenArea": {
@@ -1620,6 +1858,149 @@
       "title": "OpenSpace",
       "type": "object"
     },
+    "Parking": {
+      "additionalProperties": false,
+      "description": "A garage (parking structure or underground garage of a building), a surface lot, or the\ncurb parking of a street; `type` is `parking.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "garage",
+            "lot",
+            "street"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
+        },
+        "building_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Building Id"
+        },
+        "lot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lot Id"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segment Id"
+        },
+        "polygon": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "line": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Line",
+          "type": "array"
+        },
+        "levels": {
+          "default": 1,
+          "title": "Levels",
+          "type": "integer"
+        },
+        "underground": {
+          "default": false,
+          "title": "Underground",
+          "type": "boolean"
+        },
+        "capacity": {
+          "title": "Capacity",
+          "type": "integer"
+        },
+        "entrances": {
+          "items": {
+            "$ref": "#/$defs/Access"
+          },
+          "title": "Entrances",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "capacity"
+      ],
+      "title": "Parking",
+      "type": "object"
+    },
     "Place": {
       "additionalProperties": false,
       "description": "A named place of the spec, built as a labeled sub-area (M2): a plaza, park, garden or\nmarket carved out of lots; a named promenade, waterfront or street; a waterway; a shore\nstrip (pier, docks, beach); a gate where an avenue enters; a neighborhood of blocks; or\na megasite.",
@@ -1776,6 +2157,198 @@
         "crown_radius_m"
       ],
       "title": "Plant",
+      "type": "object"
+    },
+    "Poi": {
+      "additionalProperties": false,
+      "description": "A named point of interest; `type` is `poi.<kind>`. Bars, clinics and vendors are\nground-floor units (`unit_index`), apartments a floor of a residential building, hideouts\na building of a gang turf, fixers keep a table in a bar (`host_id`).",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "bar",
+            "clinic",
+            "vendor",
+            "fixer",
+            "hideout",
+            "apartment"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "sub": {
+          "description": "bar, club, arcade; clinic, ripperdoc; food, convenience, pawn; fixer; warehouse, squat, back_room; capsule, studio, apartment, penthouse.",
+          "title": "Sub",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "district_id": {
+          "title": "District Id",
+          "type": "string"
+        },
+        "building_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Building Id"
+        },
+        "unit_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit Index"
+        },
+        "host_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Id"
+        },
+        "position": {
+          "description": "The main door (z: the floor, for apartments).",
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "floor": {
+          "default": 0,
+          "title": "Floor",
+          "type": "integer"
+        },
+        "entrances": {
+          "items": {
+            "$ref": "#/$defs/Access"
+          },
+          "minItems": 1,
+          "title": "Entrances",
+          "type": "array"
+        },
+        "hours": {
+          "default": [
+            0,
+            24
+          ],
+          "description": "Open from, to (hours; to < from runs past midnight; 0, 24 always).",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Hours",
+          "type": "array"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Territory it stands in.",
+          "title": "Zone Id"
+        },
+        "faction_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hideouts: the faction it belongs to.",
+          "title": "Faction Id"
+        },
+        "wealth": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Wealth",
+          "type": "number"
+        },
+        "danger": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Danger",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "sub",
+        "name",
+        "district_id",
+        "position",
+        "entrances"
+      ],
+      "title": "Poi",
       "type": "object"
     },
     "Polygon": {
@@ -2607,6 +3180,170 @@
       "title": "Sidewalk",
       "type": "object"
     },
+    "SignSlot": {
+      "additionalProperties": false,
+      "description": "A surface for signage that stages 2 and 3 fill: shop signs (the M6 sign props),\nbillboards (M3 roof billboards and facade panels), holo-ads over roofs and neon bands on\nfacades; `type` is `sign_slot.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "shop_sign",
+            "billboard",
+            "holo_ad",
+            "neon"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "mount": {
+          "enum": [
+            "facade",
+            "blade",
+            "roof"
+          ],
+          "title": "Mount",
+          "type": "string"
+        },
+        "building_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Building Id"
+        },
+        "prop_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Shop signs: the M6 sign prop.",
+          "title": "Prop Id"
+        },
+        "roof_item": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Roof billboards: index in roof_items.",
+          "title": "Roof Item"
+        },
+        "position": {
+          "description": "Center of the face.",
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "yaw_deg": {
+          "description": "Facing direction, degrees counterclockwise from east.",
+          "title": "Yaw Deg",
+          "type": "number"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "height_m": {
+          "title": "Height M",
+          "type": "number"
+        },
+        "emitter": {
+          "default": true,
+          "title": "Emitter",
+          "type": "boolean"
+        },
+        "two_sided": {
+          "default": false,
+          "title": "Two Sided",
+          "type": "boolean"
+        },
+        "content": {
+          "description": "Shop use, or ad, corporate, district.",
+          "title": "Content",
+          "type": "string"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Road it faces.",
+          "title": "Segment Id"
+        },
+        "audience": {
+          "default": 0.0,
+          "description": "People and vehicles passing per hour in the evening band.",
+          "title": "Audience",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "mount",
+        "position",
+        "yaw_deg",
+        "width_m",
+        "height_m",
+        "content"
+      ],
+      "title": "SignSlot",
+      "type": "object"
+    },
     "SiteElement": {
       "additionalProperties": false,
       "description": "A part of a megasite or a lot that is not a building: launch pads, fuel tanks, cranes,\ncontainer stacks, berths, rail tracks, platforms, bus bays, lawns, ponds, paths, walls,\ngates. Flat ones carry a footprint (or line) at z_m; raised ones carry masses.",
@@ -2966,6 +3703,119 @@
       "title": "Station",
       "type": "object"
     },
+    "StreetDensity": {
+      "additionalProperties": false,
+      "description": "Traffic, crowd and spawn density of one road segment per hour band (for lifegen).",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "segment_id": {
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
+        },
+        "speed_kmh": {
+          "description": "Speed limit (0: no cars).",
+          "title": "Speed Kmh",
+          "type": "number"
+        },
+        "traffic_vph": {
+          "description": "Vehicles per hour, both directions.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "title": "Traffic Vph",
+          "type": "array"
+        },
+        "vehicles_per_100m": {
+          "description": "Per hour band: night 0-6, morning 6-10, day 10-16, evening 16-20, late 20-24.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "title": "Vehicles Per 100M",
+          "type": "array"
+        },
+        "crowd_per_100m": {
+          "description": "Pedestrians on its sidewalks (or on it).",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "title": "Crowd Per 100M",
+          "type": "array"
+        },
+        "gang_per_100m": {
+          "description": "Per hour band: night 0-6, morning 6-10, day 10-16, evening 16-20, late 20-24.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "title": "Gang Per 100M",
+          "type": "array"
+        },
+        "police_per_100m": {
+          "description": "Per hour band: night 0-6, morning 6-10, day 10-16, evening 16-20, late 20-24.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "title": "Police Per 100M",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "segment_id",
+        "speed_kmh",
+        "traffic_vph",
+        "vehicles_per_100m",
+        "crowd_per_100m",
+        "gang_per_100m",
+        "police_per_100m"
+      ],
+      "title": "StreetDensity",
+      "type": "object"
+    },
     "Structure": {
       "additionalProperties": false,
       "properties": {
@@ -3216,6 +4066,93 @@
         "path"
       ],
       "title": "TransitLine",
+      "type": "object"
+    },
+    "TravelPoint": {
+      "additionalProperties": false,
+      "description": "A taxi stand at the curb or a fast-travel point; `type` is `travel.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "taxi_stand",
+            "fast_travel"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "district_id": {
+          "title": "District Id",
+          "type": "string"
+        },
+        "position": {
+          "description": "On the sidewalk (walkway) beside the curb.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "access": {
+          "$ref": "#/$defs/Access"
+        },
+        "near_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Station, place, building or node it serves.",
+          "title": "Near Id"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "district_id",
+        "position",
+        "access"
+      ],
+      "title": "TravelPoint",
       "type": "object"
     },
     "Unit": {
@@ -3529,6 +4466,95 @@
       ],
       "title": "ZSample",
       "type": "object"
+    },
+    "Zone": {
+      "additionalProperties": false,
+      "description": "A territory (a turf of a district's blocks held by one faction) or a police precinct\n(a district with its presence level); `type` is `zone.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "territory",
+            "police"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "district_id": {
+          "title": "District Id",
+          "type": "string"
+        },
+        "faction_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Faction Id"
+        },
+        "polygons": {
+          "items": {
+            "$ref": "#/$defs/Polygon"
+          },
+          "title": "Polygons",
+          "type": "array"
+        },
+        "level": {
+          "description": "Territory: how firmly it is held; police: presence.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Level",
+          "type": "number"
+        },
+        "block_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Block Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "district_id",
+        "polygons",
+        "level"
+      ],
+      "title": "Zone",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -3812,6 +4838,62 @@
         "$ref": "#/$defs/Prop"
       },
       "title": "Props",
+      "type": "array"
+    },
+    "factions": {
+      "items": {
+        "$ref": "#/$defs/Faction"
+      },
+      "title": "Factions",
+      "type": "array"
+    },
+    "zones": {
+      "items": {
+        "$ref": "#/$defs/Zone"
+      },
+      "title": "Zones",
+      "type": "array"
+    },
+    "pois": {
+      "items": {
+        "$ref": "#/$defs/Poi"
+      },
+      "title": "Pois",
+      "type": "array"
+    },
+    "fields": {
+      "items": {
+        "$ref": "#/$defs/GameField"
+      },
+      "title": "Fields",
+      "type": "array"
+    },
+    "densities": {
+      "items": {
+        "$ref": "#/$defs/StreetDensity"
+      },
+      "title": "Densities",
+      "type": "array"
+    },
+    "parking": {
+      "items": {
+        "$ref": "#/$defs/Parking"
+      },
+      "title": "Parking",
+      "type": "array"
+    },
+    "travel_points": {
+      "items": {
+        "$ref": "#/$defs/TravelPoint"
+      },
+      "title": "Travel Points",
+      "type": "array"
+    },
+    "sign_slots": {
+      "items": {
+        "$ref": "#/$defs/SignSlot"
+      },
+      "title": "Sign Slots",
       "type": "array"
     },
     "tiles": {
