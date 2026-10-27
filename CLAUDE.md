@@ -387,7 +387,8 @@ M10 (edit, lock, regenerate) is in place:
   is and where it sits: its name (`rv.great_river`, `stn.crown_exchange`), else district,
   kind and the 1 m cell of its middle as compass offsets from the city center
   (`rs.e1234n567`, `d03.lot.e512n88`), else its parent's id and a suffix
-  (`d03.lot.e512n88.bld`, `rs.e1234n567.f0`); collisions get `.2` in content order. It runs
+  (`d03.lot.e512n88.bld`, `rs.e1234n567.f0`); collisions get `.2` in content order (one
+  reference deep), set-like id lists and id-sorted gameplay rows are sorted by new id. It runs
   after the road supports (before the props, so props, plants and gameplay draw on stable
   ids) and at the end of `build_city`; the stages keep build-order ids internally. A new
   collection or id field must go into `ids.REFS` and `ids.ORDER` (a test fails on any
@@ -402,7 +403,9 @@ M10 (edit, lock, regenerate) is in place:
   the new street, held footbridges re-injected on canals that reach the district) with
   transit lines held, then `splice`: the district and its seam from the new build, the rest
   from the old city byte for byte, a reference closure both ways, props and plants near
-  changed ground, taxi spacing, fields, factions, names. Under a minute for a sample district.
+  changed ground, taxi spacing, fields, factions, names. 14 to 35 s for a sample district,
+  with the garbage collector paused (`edit.no_gc`); the state's `choices` must name the
+  winning layout salt (`stats["layout_salt"]`).
 - **Overrides** (`citygen/overrides.py`, `overrides.json` beside the spec): pins (held roads;
   pinned buildings on a lot of their own put back before the props, `blocks._frame_lots`,
   `buildout.frame_pins`) and edits (`move`, `replace`, `plaza`, `remove`) on stable ids.
