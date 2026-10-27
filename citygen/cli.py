@@ -358,6 +358,11 @@ def cmd_model_diff(args: argparse.Namespace) -> int:
     d = DF.diff(a, b)
     if args.json:
         Path(args.json).write_text(json.dumps(d, indent=1) + "\n", encoding="utf-8")
+    if args.png:
+        from .preview_diff import render  # matplotlib only here
+
+        render(a, b, d, args.png)
+        print(f"wrote {args.png}")
     sys.stdout.write(DF.text(d, None if args.all else args.limit))
     return EXIT_OK if not d else EXIT_INVALID
 
@@ -510,6 +515,7 @@ def build_parser() -> argparse.ArgumentParser:
     md.add_argument("--limit", type=int, default=20, help="ids listed per kind (default 20)")
     md.add_argument("--all", action="store_true", help="list every id")
     md.add_argument("--json", metavar="OUT.json", help="also write the whole diff as JSON")
+    md.add_argument("--png", metavar="OUT.png", help="also draw a map of what changed")
     md.set_defaults(func=cmd_model_diff)
 
     lk = sub.add_parser("lock", help="freeze a build as a versioned release (city.lock.json), "

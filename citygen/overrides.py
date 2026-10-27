@@ -225,7 +225,7 @@ def _edit(d: dict, e: dict) -> list[str]:
             "id": f"{i}.plaza", "type": "open_space.plaza", "kind": "plaza",
             "polygon": ent["polygon"], "z_m": 0.0, "name": e.get("name"),
             "district_id": ent["district_id"],
-            "attrs": {"area_m2": ent["area_m2"], "override": "plaza", "lot": i}}]
+            "attrs": {"area_m2": ent["area_m2"], "override": "plaza", "was_lot": i}}]
         return [f"lot {i} became a plaza ({len(blds)} buildings removed)"]
     # replace
     new = dict(ent)

@@ -28,6 +28,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import shapely
@@ -187,12 +188,29 @@ def _anchor(e: dict):
     return (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
 
 
+class _Ground:
+    """Polygons a point may lie in (no union: their own grid coordinates decide)."""
+
+    def __init__(self, polys: list):
+        self.polys = [p for p in polys if not p.is_empty]
+        for p in self.polys:
+            shapely.prepare(p)
+        self.tree = shapely.STRtree(self.polys) if self.polys else None
+
+    def contains(self, pt) -> bool:
+        if self.tree is None:
+            return False
+        return any(self.polys[int(k)].contains(pt)
+                   for k in self.tree.query(pt, predicate="intersects"))
+
+
 class _Owner:
     """Which entities of one model belong to the regenerated district ("x"), to its seam
     ("seam") or to the rest of the city ("out")."""
 
-    def __init__(self, m: dict, did: str, zone, frame, seam_nodes: set):
+    def __init__(self, m: dict, did: str, zone, frame, seam_nodes: set, ground):
         self.m, self.did, self.zone, self.frame = m, did, zone, frame
+        self.ground = ground     # the district and the blocks its seam junctions cut
         self.cls: dict[str, str] = {}
         segs = m.get("road_segments", [])
         x_seg = {s["id"] for s in segs if self._inside_row(s)}
@@ -258,6 +276,13 @@ class _Owner:
             return "out"   # M1: the same in both builds
         if e["id"].startswith(did + "."):
             return "x"
+        if coll in GROUND:
+            a_ = _anchor(e)
+            if a_ is not None and self.ground.contains(shapely.points(a_)):
+                return "x"
+        if coll == "properties":
+            cs = {self.cls.get(b) for b in e["building_ids"]}
+            return "x" if "x" in cs else "seam" if "seam" in cs else "out"
         for k in ("building_id", "prop_id", "lot_id", "megasite_id"):
             c = self.by(e.get(k))
             if c is not None:
@@ -273,12 +298,23 @@ class _Owner:
         return "out"
 
 
+KEEP_BLOCK_M2 = 1.0   # a neighbor block a seam junction moves less than this stays
+
+# collections that follow the ground: those on the district's ground, or on a block one of
+# its seam junctions cuts, come from the new build
+GROUND = ("blocks", "lots", "open_spaces", "buildings", "skybridges", "site_elements",
+          "green_areas", "plants", "props", "sign_slots", "pois", "parking")
+
+
 def _refs(coll: str, e: dict):
-    """(path, id) of every live reference of an entity."""
+    """Every live reference of an entity (ids it names)."""
     for path in ID.REFS.get(coll, ()):
-        yield from _get(e, path.split("."))
+        if path != "merged_group_id":   # a lot group: a key, not an entity
+            yield from _get(e, path.split("."))
     a = e.get("attrs") or {}
     for k in ATTR_REFS:
+        if k == "split_of" and coll != "walkways":
+            continue   # road pieces of one M1b or M7 run (a key, not an entity)
         v = a.get(k)
         if isinstance(v, str):
             yield v
@@ -317,14 +353,33 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame) -> tuple[CityM
     for side in (O, N):
         ends: dict[str, set] = {}
         for s in side["road_segments"]:
-            from types import SimpleNamespace
             x = frame.inside_row(SimpleNamespace(id=s["id"], attrs=s["attrs"],
                                               centerline=s["centerline"]))
             for n in (s["start"], s["end"]):
                 ends.setdefault(n, set()).add(x)
         seam_nodes |= {n for n, v in ends.items() if v == {True, False}}
-    own_o = _Owner(O, did, zone, frame, seam_nodes)
-    own_n = _Owner(N, did, zone, frame, seam_nodes)
+    # the blocks of other districts that a seam junction cuts (their corners follow it)
+    jp = [G.from_model_poly(j["polygon"]) for side in (O, N) for j in side["junctions"]
+          if j["node_id"] in seam_nodes]
+    jtree = shapely.STRtree(jp) if jp else None
+    near = []
+    blocks = ({b["id"]: b for b in O["blocks"]}, {b["id"]: b for b in N["blocks"]})
+    for side, other in ((0, 1), (1, 0)):
+        for i, b in blocks[side].items():
+            poly_b = G.from_model_poly(b["polygon"])
+            if b["district_id"] == did or jtree is None or \
+                    not len(jtree.query(poly_b, predicate="dwithin", distance=1.0)):
+                continue
+            # a block a seam junction moved by less than KEEP_BLOCK_M2 stays as it was,
+            # with what stands on it
+            twin = blocks[other].get(i)
+            if twin is not None and G.area(G.from_model_poly(twin["polygon"]).
+                                           symmetric_difference(poly_b)) < KEEP_BLOCK_M2:
+                continue
+            near.append(G.qpoly(poly_b.buffer(0.5, join_style="mitre")))
+    ground = _Ground([zone] + near)
+    own_o = _Owner(O, did, zone, frame, seam_nodes, ground)
+    own_n = _Owner(N, did, zone, frame, seam_nodes, ground)
     io = {c: {e["id"]: e for e in O.get(c, [])} for c in COLLECTIONS}
     inn = {c: {e["id"]: e for e in N.get(c, [])} for c in COLLECTIONS}
     coll_of = {}
@@ -417,9 +472,12 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
             work.append(i)
 
     def old_referrers(i):
+        present = src.get(i) is not None
         for j in rev["o"].get(i, ()):
             if src.get(j) != "o":
                 continue
+            if present and coll_of[j] in STAY:
+                continue   # it still names something that is there: it stays as it was
             if ent(j, "n") is None:
                 del src[j]
                 gone.append(j)
@@ -456,6 +514,10 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
     return dangling
 
 
+# kept as they were while what they name is still there (a building whose entrance names
+# a seam walkway that moved by a meter)
+STAY = ("blocks", "lots", "buildings", "properties", "open_spaces", "skybridges",
+        "site_elements", "green_areas", "pois", "parking", "zones")
 GROUND_M = 4.0     # props and plants this close to a new one follow the new build
 CROWN_M = 14.0     # plants this close to a new building do too (crowns fit its facades)
 
