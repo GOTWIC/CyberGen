@@ -212,7 +212,7 @@ names).
 | Release | Regenerations | `citygen lock --verify` |
 |---|---|---|
 | Saltreach Free Port 1.0 ([`city.lock.json`](archipelago_free_port/city.lock.json)) | none | PASS, the same `city_model.json` byte for byte, 28 s |
-| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 85 s |
+| Vesper Bay 1.1 ([`regenerated/vesper_bay_neon_strand.lock.json`](regenerated/vesper_bay_neon_strand.lock.json)) | Neon Strand on a new seed | PASS, byte for byte (the full build with its search, then the regeneration), 86 s |
 
 The tests lock the test city after a regeneration and rebuild it byte for byte, and check
 that a lock refuses a model edited by hand.
