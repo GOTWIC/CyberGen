@@ -964,16 +964,21 @@ def _run(cmd: list[str], marker: str, timeout: float) -> tuple[dict | None, str]
 
 def rerender(blockout_dir: str | Path, to_dir: str | Path, views: list[str],
              width: int = README_WIDTH, blender: str | None = None,
-             samples: int = 16) -> list[str]:
+             samples: int = 16, eye=None, target=None, lens: float = 35.0,
+             name: str = "custom") -> list[str]:
     """Render chosen views of a blockout (`top`, `iso_city`, `iso_<district>`, `street_<n>`)
     again from its city.blend, `width` pixels wide, as to_dir/render_<view>.jpg (same cameras
-    as the build). Returns the files written."""
+    as the build), plus, with `eye` and `target` (plan coordinates, meters), a perspective
+    view of one's own as render_<name>.jpg. Returns the files written."""
     exe = find_blender(blender)
     if exe is None:
         raise RuntimeError("no Blender (set BLENDER or --blender)")
     cmd = [exe, "-b", "--factory-startup", "-P", str(RERENDER_SCRIPT), "--",
            str(Path(blockout_dir)), str(Path(to_dir)), "--width", str(width), "--samples",
            str(samples), *views]
+    if eye is not None and target is not None:
+        cmd += ["--eye", *map(str, eye), "--target", *map(str, target), "--lens", str(lens),
+                "--name", name]
     done, log = _run(cmd, "CITYGEN_RERENDER_DONE", timeout=BUDGET_S)
     if done is None:
         raise RuntimeError("Blender rerender failed:\n" + log[-2000:])

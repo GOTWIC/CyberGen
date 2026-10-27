@@ -162,8 +162,12 @@ def cmd_rerender(args: argparse.Namespace) -> int:
               file=sys.stderr)
         return EXIT_USAGE
     try:
+        if not args.views and args.eye is None:
+            print("error: name a view or give --eye and --target", file=sys.stderr)
+            return EXIT_USAGE
         files = rerender(src, args.to or src, args.views, width=args.width,
-                         blender=args.blender, samples=args.samples)
+                         blender=args.blender, samples=args.samples, eye=args.eye,
+                         target=args.target, lens=args.lens, name=args.name)
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_USAGE
@@ -314,7 +318,13 @@ def build_parser() -> argparse.ArgumentParser:
                                          "at another width (README images: 8K)")
     rr.add_argument("blockout_dir", help="a citygen blockout output (city.blend, "
                                          "blockout_plan.json)")
-    rr.add_argument("views", nargs="+", help="top, iso_city, iso_<district> or street_<n>")
+    rr.add_argument("views", nargs="*", help="top, iso_city, iso_<district> or street_<n>")
+    rr.add_argument("--eye", type=float, nargs=3, metavar=("X", "Y", "Z"),
+                    help="a perspective view of one's own: camera position (plan meters)")
+    rr.add_argument("--target", type=float, nargs=3, metavar=("X", "Y", "Z"),
+                    help="the point that view looks at")
+    rr.add_argument("--lens", type=float, default=35.0, help="its lens in mm (default 35)")
+    rr.add_argument("--name", default="custom", help="its file: render_<name>.jpg")
     rr.add_argument("--to", help="output folder (default: blockout_dir)")
     rr.add_argument("--width", type=int, default=7680, help="width in pixels (default 7680)")
     rr.add_argument("--samples", type=int, default=16, help="EEVEE render samples")

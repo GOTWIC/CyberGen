@@ -21,14 +21,31 @@ import build  # noqa: E402  (citygen/blender/build.py; its main() only runs as a
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    if len(argv) < 3:
+    if len(argv) < 2:
         raise SystemExit("usage: blender -b -P rerender.py -- BLOCKOUT_DIR TO_DIR "
                          "[--width W] [--samples N] VIEW [VIEW ...]")
     src, to = os.path.abspath(argv[0]), os.path.abspath(argv[1])
     width, samples, names = 7680, 16, []
+    eye = target = None
+    lens, cname = 35.0, "custom"
     rest = argv[2:]
     i = 0
     while i < len(rest):
+        if rest[i] in ("--eye", "--target"):
+            v = tuple(float(x) for x in rest[i + 1:i + 4])
+            if rest[i] == "--eye":
+                eye = v
+            else:
+                target = v
+            i += 4
+            continue
+        if rest[i] in ("--lens", "--name"):
+            if rest[i] == "--lens":
+                lens = float(rest[i + 1])
+            else:
+                cname = rest[i + 1]
+            i += 2
+            continue
         if rest[i] in ("--width", "--samples"):
             if rest[i] == "--width":
                 width = int(rest[i + 1])
@@ -41,6 +58,9 @@ def main():
     with open(os.path.join(src, "blockout_plan.json"), encoding="utf-8") as f:
         plan = json.load(f)
     by_name = {v[0]: v for v in build.views(plan, 1600)}
+    if eye is not None and target is not None:
+        by_name[cname] = (cname, False, lens, eye, target, 1600, 900)
+        names.append(cname)
     missing = [n for n in names if n not in by_name]
     if missing:
         raise SystemExit(f"unknown views {missing}; known: {sorted(by_name)}")
