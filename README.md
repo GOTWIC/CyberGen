@@ -124,11 +124,28 @@ one (the `citygen` skill takes it from there). Editing, locking and the other co
 ## Stage 2: assetgen
 
 A unique 3D model for every building in a stage 1 city, generated from its footprint, massing
-and use, plus roads, sidewalks, street furniture and textures.
+and use, plus roads, sidewalks, street furniture and textures. Each milestone's assets go
+into Unreal through the same exporter as stage 1's city, replacing the blockout piece by piece.
+
+Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
+[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
 
 ### Milestones
 
-Being planned.
+| | Milestone | What it adds | Status |
+|---|---|---|---|
+| AG0 | Groundwork | What each building is made from, file formats, three test buildings in Unreal | Planned |
+| AG1 | Building shells | Walls, floors and window openings for every building | Planned |
+| AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
+| AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
+| AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
+| AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
+| AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
+| AG7 | Street elements | Roads with markings, sidewalks, bridges, viaducts, tunnels, quays, transit structures | Planned |
+| AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
+| AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
+| AG10 | Layered districts | Buildings and streets on stacked decks | Planned |
+| AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 
 ---
 
@@ -149,7 +166,7 @@ Being planned.
   `docs/progress/M1a2/<city>/`).
 - `docs/`: each stage's spec (`<generator>_scope.md`) and full milestone log
   (`<generator>_milestones.md`); `docs/progress/<milestone>/` holds each milestone's builds
-  and images.
+  and images; `docs/unreal_export.md` describes the Unreal exporter every stage shares.
 - `maps/`, `pipeline/`, `reference/`, `unreal/`, `out/`: an earlier hand-tracing pipeline; its
   traced Corporate Core map is the pinned demo's input.
 
