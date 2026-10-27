@@ -434,8 +434,7 @@ class Ctx:
             for s in self.net.segments:
                 if s["id"] in mine:
                     continue
-                if piece.distance(LineString(s["centerline"])) < s["width_m"] / 2.0 + 2.0 and \
-                        not ({s["start"], s["end"]} & set(cor.nodes[ia:ib + 1])):
+                if piece.distance(LineString(s["centerline"])) < s["width_m"] / 2.0 + 2.0:
                     return None, f"another road over an open approach ({s['id']})"
         why = self.cuts_off(cor, ia, ib)
         if why:
@@ -879,7 +878,14 @@ def _tunnel_row(spec, ctx, tid: str, w: Window) -> dict:
     crosses = list(w.waters)
     if w.district:
         crosses.append(ctx.did[w.district])
-    return {"id": tid, "type": f"tunnel.{kind}", "kind": kind, "name": w.name,
+    name = w.name
+    if name is None and w.district:
+        name = f"{w.district} Tunnel"
+    elif name is None:
+        wn = {x.id: x.name for x in ctx.waters}
+        named = [wn[i] for i in w.waters if wn.get(i)]
+        name = f"{named[0]} Tube" if named else None
+    return {"id": tid, "type": f"tunnel.{kind}", "kind": kind, "name": name,
             "segment_ids": [], "crosses": crosses, "line": line,
             "width_m": box_width(road_w), "clear_m": CLEAR_M,
             "roof_m": TUBE_ROOF_M if kind == "immersed_tube" else ROOF_M,

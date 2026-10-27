@@ -390,8 +390,9 @@ M9 (tunnels) is in place, in `citygen/tunnels.py` (checks in `tunnel_checks.py`,
   metro tunnels and underpasses as solid boxes, ventilation buildings; `render_cutaway.jpg`
   (view `cutaway`, also for `citygen rerender`): the city cut along the longest road tunnel,
   earth under the ground, from over its first open approach.
-Samples: Vesper Bay cuts and covers the ring highway under Corporate Core and The Stacks,
-Peninsula City crosses its river in an immersed tube. Sample builds: `docs/progress/M9/`.
+Samples: Nexus City's ring highway dips under Midtown in a cut-and-cover tunnel, Peninsula
+City's spine crosses its river in an immersed tube (Vesper Bay keeps its trumpet: a tunnel on
+its ring takes the flyover's stem). Sample builds: `docs/progress/M9/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

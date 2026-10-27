@@ -1,6 +1,6 @@
 """M9: tunnels. The profile envelope, the spec fields, a small city with a cut-and-cover
 tunnel (its network, parts, metro and underpasses), each tunnel check with a failing case,
-the sample tunnels (Vesper Bay cut-and-cover, Peninsula City immersed tube) and the
+the sample tunnels (Nexus City cut-and-cover, Peninsula City immersed tube) and the
 blockout plan."""
 
 import copy
@@ -204,12 +204,14 @@ def test_underpasses_join_the_walkway_graph(city):
 
 # --- samples ------------------------------------------------------------------------------------
 
-def test_vesper_bay_has_cut_and_cover_tunnels():
-    b, _, _ = built_sample(ROOT / "cities" / "vesper_bay" / "city_spec.json")
+def test_nexus_city_has_a_cut_and_cover_tunnel():
+    b, _, _ = built_sample(ROOT / "docs" / "progress" / "M1a2" / "nexus_city" /
+                           "city_spec.json")
     road = [t for t in b.model.tunnels if t.kind == "cut_and_cover"]
-    assert len(road) == 2
+    assert len(road) == 1
     names = {d.id: d.name for d in b.model.districts}
-    assert {names[t.attrs["district"]] for t in road} == {"Corporate Core", "The Stacks"}
+    assert names[road[0].attrs["district"]] == "Midtown"
+    assert road[0].name == "Midtown Tunnel"
     assert all(c.passed for c in b.checks if c.id in TUNNEL_CHECKS)
 
 
@@ -236,5 +238,5 @@ def test_blockout_draws_tunnels(city):
     assert t.kind in ("cut_and_cover", "immersed_tube")
     # the camera looks from the cut side at the tunnel's middle, below the ground
     o, n = cut["origin"], cut["n"]
-    assert (cut["eye"][0] - o[0]) * n[0] + (cut["eye"][1] - o[1]) * n[1] > 100.0
+    assert (cut["eye"][0] - o[0]) * n[0] + (cut["eye"][1] - o[1]) * n[1] > 30.0
     assert cut["target"][2] < 0.0

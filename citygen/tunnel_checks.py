@@ -150,6 +150,7 @@ def check_portals(m: CityModel) -> Check:
     ntree = shapely.STRtree(shapely.points(nodes)) if nodes else None
     others = [(LineString(s.centerline).buffer(s.width_m / 2.0, cap_style="flat"), s.id)
               for s in m.road_segments]
+    segs = {s.id: s for s in m.road_segments}
     otree = shapely.STRtree([o[0] for o in others]) if others else None
     things = [(G.from_model_poly(b.footprint), b.id) for b in m.buildings
               if b.footprint is not None]
@@ -192,8 +193,22 @@ def check_portals(m: CityModel) -> Check:
             if otree is not None:
                 for i in sorted(int(x) for x in otree.query(strip.buffer(-1.0),
                                                             predicate="intersects")):
-                    if others[i][1] not in mine:
-                        _limit(c, f"{t.id}: road {others[i][1]} over its open approach")
+                    if others[i][1] in mine:
+                        continue
+                    # a deck high over the open trench is no obstacle
+                    o = segs[others[i][1]]
+                    ol = LineString(o.centerline)
+                    hit = ol.intersection(strip.buffer(-1.0))
+                    from .elevated import _z_at
+
+                    prof = [(z.s, z.z) for z in o.z_profile]
+                    pts_ = [ol.project(Point(q)) for q in
+                            (hit.coords if hasattr(hit, "coords") else
+                             [c_ for g in getattr(hit, "geoms", []) for c_ in g.coords])]
+                    low = min((_z_at(prof, x) for x in pts_), default=0.0)
+                    if low < 1.0 + TN.CLEAR_M + 1.8:
+                        _limit(c, f"{t.id}: road {o.id} ({o.attrs.get('role')}, {low:.1f} m) "
+                                  "over its open approach")
                         break
             if ttree is not None:
                 for i in sorted(int(x) for x in ttree.query(strip.buffer(-1.0),

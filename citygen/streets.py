@@ -551,7 +551,7 @@ class Builder:
                 forbid.append((b["s0"], b["s1"]))
             forbid += _raised_spans(s["z_profile"], LOCAL_JUNCTION_Z_M)
             # M9: nor where it runs below the ground (a tunnel and its approaches)
-            forbid += _sunk_spans(s["z_profile"])
+            forbid += [(a - 20.0, b + 20.0) for a, b in _sunk_spans(s["z_profile"])]
             ln = Line(pts, s["road_class"], s["width_m"], s["attrs"].get("role", "primary"),
                       name=s.get("name"), section=s["cross_section"], primary=s, forbid=forbid)
             for end in (s["start"], s["end"]):

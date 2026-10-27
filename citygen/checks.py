@@ -686,7 +686,10 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
         if s.road_class in ROAD_MIN_RADIUS_M:
             deg[s.start] = deg.get(s.start, 0) + 1
             deg[s.end] = deg.get(s.end, 0) + 1
-    over = [tuple(p) for s in m.road_segments for p in s.attrs.get("overpass_at", [])]
+    # (M9: where a road passes over a tunnel or a tunnel under a road, as at an overpass)
+    over = [tuple(p) for s in m.road_segments
+            for key in ("overpass_at", "underpass_at", "over_tunnel_at")
+            for p in s.attrs.get(key, [])]
     # junctions inside a chain (M7 joins the pieces of an elevated run through its tees)
     pos = {n.id: (n.position[0], n.position[1]) for n in m.road_nodes}
     hubs = [pos[k] for k in sorted(deg) if deg[k] >= 3 and k in pos]

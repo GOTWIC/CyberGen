@@ -1,5 +1,5 @@
 {
-  "about": "sha256 of each sample city's city_model.json (vesper_bay was nyxllor up to M8c, renamed with the same layout; citygen build output, M9 tunnels (vesper_bay: cut-and-cover tunnels under two districts, peninsula_city: an immersed tube; the metro lowered under foundations, pedestrian underpasses, every model with the new fields) on M8c on M8d: M8b on M8a, the trumpet with one loop and one flyover (M8d, only vesper_bay has a trumpet), and transit that passes on a city's first layout: flying loops as Dubins rings, open lines off the roads or as Dubins paths where the roads fail them (M8c); archipelago_free_port is unchanged from M8b). The same bytes on every machine with the pinned requirements: produced for M8c on the M4 Mac and, byte for byte, on x86_64 Linux (docker, linux/amd64); earlier milestones confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) docs/progress/M7b/<city>/trace.json (M7b), docs/progress/M8a/<city>/trace.json (M8a) and docs/progress/M8b/<city>/trace.json (M8b on M8a), docs/progress/M8d/<city>/trace.json (M8d) and docs/progress/M8c/<city>/trace.json (M8c on M8d) and docs/progress/M9/<city>/trace.json (M9). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
+  "about": "sha256 of each sample city's city_model.json (vesper_bay was nyxllor up to M8c, renamed with the same layout; citygen build output, M9 tunnels (nexus_city: a cut-and-cover tunnel under Midtown, peninsula_city: an immersed tube; the metro lowered under foundations, pedestrian underpasses, every model with the new fields) on M8c on M8d: M8b on M8a, the trumpet with one loop and one flyover (M8d, only vesper_bay has a trumpet), and transit that passes on a city's first layout: flying loops as Dubins rings, open lines off the roads or as Dubins paths where the roads fail them (M8c); archipelago_free_port is unchanged from M8b). The same bytes on every machine with the pinned requirements: produced for M8c on the M4 Mac and, byte for byte, on x86_64 Linux (docker, linux/amd64); earlier milestones confirmed with GEOS 3.14.1 rebuilt with clang against libc++ (the C++ library of macOS builds) and with one worker and another PYTHONHASHSEED; traces of every stage are in docs/progress/M1b_det/ (M1b), docs/progress/M2/<city>/trace.json (M2), docs/progress/M3/<city>/trace.json (M3) and docs/progress/M3p/<city>/trace.json (M3p) docs/progress/M5/<city>/trace.json (M5) docs/progress/M6/<city>/trace.json (M6), docs/progress/M7/<city>/trace.json (M7a) docs/progress/M7b/<city>/trace.json (M7b), docs/progress/M8a/<city>/trace.json (M8a) and docs/progress/M8b/<city>/trace.json (M8b on M8a), docs/progress/M8d/<city>/trace.json (M8d) and docs/progress/M8c/<city>/trace.json (M8c on M8d) and docs/progress/M9/<city>/trace.json (M9). tests/test_roads.py asserts them on every run. blockout_plans: sha256 of each sample's blockout_plan.json (citygen blockout, M4), asserted by tests/test_blockout.py; the plan is the same bytes on every machine, Blender only draws it.",
   "produced_on": {
     "machine": "arm64 (M4 Mac), confirmed on x86_64 Linux (docker, linux/amd64)",
     "system": "Darwin and Linux",
@@ -12,15 +12,15 @@
   "cities": {
     "archipelago_free_port": "3955cc554a644dafed5fb9842128f18b2c6660b28b2afe00d80751049db72e6b",
     "delta_megacity": "af659f62e6ef3fdd7d9bcccefb8c1c4378d6eac81294271943ac06efebc1370e",
-    "nexus_city": "0d21c7651bfe5d7df0524424a60a9390e7a14168881265f2eb4f48ac9cc7b709",
-    "peninsula_city": "8fc323640439b1adbeb68c68edf82d8b4eabfd80d07114f22da8cbcf54444bd4",
-    "vesper_bay": "10627eb31a9924ddba4ab29eed4b292bc48c8eb65b5a0aae652af95df745aa55"
+    "nexus_city": "35364a8db4fe0051f3bc2e88d02be075398fa52535b06bb4a96883c4ba59ae77",
+    "peninsula_city": "16c280f26d06881fb73d28dc71d727feeb1e221896ee20996f6e81f2cbefe564",
+    "vesper_bay": "14642066364df211d43bdb83dce6fc03347a4d889bad97488cb536bdaaed257c"
   },
   "blockout_plans": {
     "archipelago_free_port": "12a66c4a75da521fac65b7dded6d66d87fea540de4ddc934568c776dcf37dd97",
     "delta_megacity": "09332d4d24cf183730b387cec40d6efa2365adc722eeadfedeafff0e2e6ce3d6",
-    "nexus_city": "9fdfed03549507fbada66c95110de1163d95d9eb48b460bc062ad68a02d3e22c",
-    "peninsula_city": "9ac84b7567f997fb5811fde1d28ae1bd2f6d04d2f0240739b88bbde2f2a32f9c",
-    "vesper_bay": "bdcbba1f3a38c0ec725ade8b3895fd0a0536041f1aafec50f23e7729524cee65"
+    "nexus_city": "4db4f4df5d562e33398f609b9ed9ccc47e021b3406c8f8ffcb45e10349383ea4",
+    "peninsula_city": "9df79fd9c42826a5eb806194066288291b1d9f728daf7225e258105659d7c3b4",
+    "vesper_bay": "0e33c065c7158b6baf25c01656efa7c46faa27d1b518b1561658758c84a92658"
   }
 }
