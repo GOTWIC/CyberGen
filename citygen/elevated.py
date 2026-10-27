@@ -417,8 +417,9 @@ class Elev:
                     key=lambda s: s["id"])
         for s in hw:
             s["attrs"]["elevated"] = False
-        # traced roads stay as drawn (their own `elevated road` layer marks decks)
-        hw = [s for s in hw if "pinned" not in s["attrs"]]
+        # traced roads stay as drawn (their own `elevated road` layer marks decks); M9
+        # tunnels stay down
+        hw = [s for s in hw if "pinned" not in s["attrs"] and "tunnel" not in s["attrs"]]
         share = spec.highways.elevated_share
         total = sum(s["attrs"]["length_m"] for s in hw)
         if not hw or share <= 0:
@@ -585,10 +586,11 @@ class Elev:
         plan = self.stack_plan.get(n)
         if plan is not None and on == set(plan["lift"]):
             return "stack"
+        tun = any("tunnel" in s["attrs"] for s in others)
         for p in self.stack_plan.values():
-            if n in p["under"][1] and on <= p["under"][2]:
+            if n in p["under"][1] and on <= p["under"][2] and not tun:
                 return "under"      # avenues meeting at grade under a stack's lifted deck
-        if n in self.forced:
+        if n in self.forced or tun:
             return "split"
         cls = {s["road_class"] for s in others}
         if cls == {"avenue"}:
@@ -1721,7 +1723,7 @@ class Elev:
             if self.node[n]["attrs"].get("kind") in ("exit", "edge"):
                 continue
             if any(s["road_class"] != "highway" or "pinned" in s["attrs"] or
-                   s["start"] == s["end"] for s in legs):
+                   "tunnel" in s["attrs"] or s["start"] == s["end"] for s in legs):
                 continue
             vs = [self.leg_dir(s, n) for s in legs]
             best = None
@@ -1819,6 +1821,8 @@ class Elev:
                 ids_g = {gw[0].segs[i][0]["id"] for i in gw[2]}
                 if (ids_l | ids_g) & taken or ids_l & ids_g:
                     continue
+                if any("tunnel" in w[0].segs[i][0]["attrs"] for w in (lw, gw) for i in w[2]):
+                    continue        # M9 tunnels stay down and take no ramps
                 inner = []
                 ok = True
                 for w, ids in ((lw, ids_l), (gw, ids_g)):
@@ -1828,8 +1832,8 @@ class Elev:
                         if m == n:
                             continue
                         if m in self.stack_plan or any(
-                                o["road_class"] == "highway" and o["id"] not in ids
-                                for o in self.inc[m]):
+                                (o["road_class"] == "highway" and o["id"] not in ids) or
+                                "tunnel" in o["attrs"] for o in self.inc[m]):
                             ok = False
                         if w is gw:
                             inner.append(m)
@@ -2771,7 +2775,10 @@ def _envelope(net, apart: dict | None = None, extra: dict | None = None) -> None
         L = Ls[s["id"]]
         z0, z1 = val.get(end(s, s["start"]), 0.0), val.get(end(s, s["end"]), 0.0)
         sp = spans.get(s["id"], [])
+        tun = s["attrs"].get("_tunnel_prof")
         if not sp and z0 <= 0.0 and z1 <= 0.0:
+            if tun:
+                s["z_profile"] = _rows(compress(tun))   # M9: a tunnel keeps its own
             continue
         ss = set(_stations(L))
         for s0, s1, _ in sp:
@@ -2782,7 +2789,10 @@ def _envelope(net, apart: dict | None = None, extra: dict | None = None) -> None
             for s0, s1, zb in sp:
                 d = s0 - x if x < s0 else (x - s1 if x > s1 else 0.0)
                 z = max(z, zb - APPROACH_GRADE * d)
-            prof.append((x, z))
+            prof.append((x, z + (_z_at(tun, x) if tun else 0.0)))
+        if tun:
+            prof = sorted(set(prof) | {(x, _z_at(tun, x) + max(
+                0.0, z0 - APPROACH_GRADE * x, z1 - APPROACH_GRADE * (L - x))) for x, _ in tun})
         s["z_profile"] = _rows(compress(prof))
 
 

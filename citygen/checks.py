@@ -521,8 +521,8 @@ def check_districts_served(m: CityModel, g: _Geo) -> Check:
 
 
 def check_named_bridges(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
-    c = Check("named_bridges", "Every named bridge is built")
-    built = {b.name for b in m.bridges if b.name}
+    c = Check("named_bridges", "Every named bridge is built (as a tube where it asks for one)")
+    built = {b.name for b in m.bridges if b.name} | {t.name for t in m.tunnels if t.name}
     for nb in spec.water.bridges.named:
         if nb.name not in built:
             c.failures.append(f"named bridge '{nb.name}' ({nb.kind}, "
@@ -571,6 +571,8 @@ def check_bridges(m: CityModel, g: _Geo) -> Check:
         if deg.get(n.id, 0) >= 3 and inner.contains(shapely.Point(n.position[:2])):
             c.failures.append(f"junction {n.id} is out on the water (on a bridge)")
     for s in m.road_segments:
+        if s.tunnel:
+            continue      # M9: under the water bed (tunnel_cover)
         wet = g.roads[s.id].intersection(g.all_water).length
         if wet - spans.get(s.id, 0.0) > 3.0:
             c.failures.append(f"segment {s.id} runs {wet - spans.get(s.id, 0.0):.0f} m over "
@@ -684,7 +686,10 @@ def check_curve_radius(m: CityModel, g: _Geo) -> Check:
         if s.road_class in ROAD_MIN_RADIUS_M:
             deg[s.start] = deg.get(s.start, 0) + 1
             deg[s.end] = deg.get(s.end, 0) + 1
-    over = [tuple(p) for s in m.road_segments for p in s.attrs.get("overpass_at", [])]
+    # (M9: where a road passes over a tunnel or a tunnel under a road, as at an overpass)
+    over = [tuple(p) for s in m.road_segments
+            for key in ("overpass_at", "underpass_at", "over_tunnel_at")
+            for p in s.attrs.get(key, [])]
     # junctions inside a chain (M7 joins the pieces of an elevated run through its tees)
     pos = {n.id: (n.position[0], n.position[1]) for n in m.road_nodes}
     hubs = [pos[k] for k in sorted(deg) if deg[k] >= 3 and k in pos]
@@ -905,6 +910,9 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import elevated_checks as EC
 
         checks += EC.run(m, supports=bool(m.buildings))
+        from . import tunnel_checks as TNC
+
+        checks += TNC.run(spec, m)
     if m.lots or m.blocks or m.junctions:
         from . import street_checks as SC
 
@@ -931,6 +939,9 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import elevated_checks as EC
 
         st["elevated"] = EC.stats(m)
+        from . import tunnel_checks as TNC
+
+        st["tunnels"] = TNC.stats(m)
     if m.lots or m.blocks or m.junctions:
         from . import street_checks as SC
 
@@ -959,8 +970,8 @@ def report_dict(spec: CitySpec, checks: list[Check], st: dict, notes: list[str],
     return {
         "name": spec.name, "seed": spec.seed,
         "stage": ("M11 (water, districts, waterways, roads, elevated highways, local streets, "
-                  "blocks, lots, buildings, skybridges, megasites, transit, props, vegetation, "
-                  "gameplay layer)" if "gameplay" in st else
+                  "blocks, lots, buildings, skybridges, megasites, transit, tunnels, props, "
+                  "vegetation, gameplay layer)" if "gameplay" in st else
                   "M7 (water, districts, waterways, roads, elevated highways, local streets, "
                   "blocks, lots, buildings, skybridges, megasites, transit, props, vegetation)"
                   if "props" in st and "elevated" in st else
@@ -1105,6 +1116,16 @@ def report_text(rep: dict) -> str:
                 + f"; overpasses {es['overpasses']}",
                 f"  other raised roads {es['raised_other_km']} km, underpass streets "
                 f"{es['underpass_streets']}, road columns {es['road_columns']}"]
+    tn = st.get("tunnels")
+    if tn and tn["by_kind"]:
+        out += ["", "  tunnels " + ", ".join(f"{k.replace('_', ' ')} {r['count']} ({r['km']} km)"
+                                             for k, r in tn["by_kind"].items())
+                + f"; ventilation buildings {tn['vents']}, roads over them "
+                  f"{tn['over_tunnel_roads']}, streets over them "
+                  f"{tn.get('over_tunnel_streets', 0)}, deepest road "
+                  f"{tn['deepest_road_m']:g} m"
+                + (f", deepest metro {tn['deepest_metro_m']:g} m"
+                   if tn.get("deepest_metro_m") is not None else "")]
     gs = st.get("gameplay")
     if gs:
         out += ["", f"  gameplay: {gs['pois']} points of interest, {gs['factions']} factions ("

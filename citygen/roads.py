@@ -139,6 +139,7 @@ class RoadNet:
     exits: dict[str, tuple[float, float]] = field(default_factory=dict)
     variant: int = 0
     elevated: dict = field(default_factory=dict)
+    tunnels: list[dict] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -2252,6 +2253,10 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
     _grade_separations(ctx, net)
     _mark_elevated(spec, ctx, net)
     _name_bridges(spec, ctx, net)
+    # M9: immersed tubes and cut-and-cover tunnels (a negative level, before the viaducts)
+    from . import tunnels as TN
+
+    TN.apply(spec, ctx, net, TN.choose(spec, ctx, net))
     for k, p in enumerate(peds):
         bridge_n += 1
         span = _spans(ctx, p["line"], whole=True)
@@ -2275,6 +2280,7 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
     ctx.notes += net.elevated.pop("notes", [])
     if net.elevated.get("runs"):
         _grade_separations(ctx, net)
+    TN.attach(net)
     return net
 
 

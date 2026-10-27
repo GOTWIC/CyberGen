@@ -338,7 +338,8 @@ def _local_junctions(m: CityModel, n: _Net):
 def check_junction_placement(m: CityModel, n: _Net):
     c = _check("junction_placement", "No junction of a local road on a bridge, nor where the "
                                      f"primary road is more than {LOCAL_JUNCTION_Z_M:g} m above "
-                                     "ground (the local street ramps up to a lower one)")
+                                     "ground (the local street ramps up to a lower one) or "
+                                     "below it (M9 tunnels and their approaches)")
     br = {b.id: b for b in m.bridges}
     for nid, legs in _local_junctions(m, n):
         p = n.pos[nid]
@@ -359,6 +360,9 @@ def check_junction_placement(m: CityModel, n: _Net):
                 s.z_profile[-1].z if s.z_profile else 0.0)
             if z0 > LOCAL_JUNCTION_Z_M + 0.05 and s.road_class in ("highway", "avenue"):
                 c.failures.append(f"node {nid}: segment {s.id} is {z0:g} m above ground there")
+            if z0 < -0.05 and s.road_class in ("highway", "avenue"):
+                c.failures.append(f"node {nid}: segment {s.id} is {-z0:g} m below ground "
+                                  "there")
     return c
 
 

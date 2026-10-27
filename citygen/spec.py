@@ -76,6 +76,7 @@ PlaceKind = Literal[
 HighwayPattern = Literal["ring", "ring_plus_spine", "spine", "grid", "radial", "coastal", "none"]
 BridgeKind = Literal["road", "rail", "road_rail", "pedestrian"]
 TransitCrossing = Literal["own_bridge", "shared_deck", "auto"]
+TunnelWater = Literal["never", "auto", "prefer"]
 
 MEGASITE_KINDS: tuple[str, ...] = MegasiteKind.__args__  # type: ignore[attr-defined]
 DIRECTIONS: tuple[str, ...] = Direction.__args__  # type: ignore[attr-defined]
@@ -302,6 +303,10 @@ class NamedBridge(_Model):
         description="Two districts, islands, places or exits ('west_exit') it joins.")
     crosses: str | None = Field(None, description="River, channel or 'sea'/'bay' it spans.")
     landmark: bool = True
+    tunnel: bool | None = Field(
+        None, description="True: an immersed tube instead of a bridge where one fits (M9); "
+                          "false: always a bridge; left out: as highways.tunnels.water "
+                          "decides.")
 
 
 class Bridges(_Model):
@@ -338,11 +343,30 @@ class NamedHighway(_Model):
                                           "crosses one with room).")
 
 
+class Tunnels(_Model):
+    water: TunnelWater = Field(
+        "auto", description="Immersed tubes under rivers, channels and the bay for highway "
+                            "crossings (M9): 'auto' where a bridge does not fit (a sea crossing "
+                            "over 600 m of water); 'prefer' every river and sea crossing where a "
+                            "tube fits; 'never' bridges only. A named crossing stays a bridge "
+                            "unless its 'tunnel' asks for a tube. A tube needs a straight "
+                            "approach on both banks with no junction but avenues that cross "
+                            "over it or end beside it.")
+    under: StrOrList = Field(
+        default_factory=list,
+        description="Districts a highway passes under in a cut-and-cover tunnel, with a green "
+                    "lid over it, where the tunnel fits between its interchanges.")
+    underpasses: Fraction = Field(
+        0.5, description="Pedestrian underpasses under at-grade highways, between the "
+                         "frontage streets on both sides (share of the spots that fit).")
+
+
 class Highways(_Model):
     pattern: HighwayPattern = "ring_plus_spine"
     exits: list[Direction] | None = Field(None, description="Off-map exits. Default: land edges.")
     elevated_share: Fraction = Field(0.2, description="Share of highway length on viaducts.")
     named: list[NamedHighway] = Field(default_factory=list)
+    tunnels: Tunnels = Field(default_factory=Tunnels)
     crossings: Literal["stack", "turbine"] = Field(
         "stack", description="Interchange where two highways cross with room for it: a "
                              "four-level stack or a turbine (each the other's fallback).")

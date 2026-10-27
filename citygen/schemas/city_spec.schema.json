@@ -569,6 +569,9 @@
           "title": "Named",
           "type": "array"
         },
+        "tunnels": {
+          "$ref": "#/$defs/Tunnels"
+        },
         "crossings": {
           "default": "stack",
           "description": "Interchange where two highways cross with room for it: a four-level stack or a turbine (each the other's fallback).",
@@ -838,6 +841,19 @@
           "default": true,
           "title": "Landmark",
           "type": "boolean"
+        },
+        "tunnel": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "True: an immersed tube instead of a bridge where one fits (M9); false: always a bridge; left out: as highways.tunnels.water decides.",
+          "title": "Tunnel"
         }
       },
       "required": [
@@ -1495,6 +1511,47 @@
         "route"
       ],
       "title": "TransitLine",
+      "type": "object"
+    },
+    "Tunnels": {
+      "additionalProperties": false,
+      "properties": {
+        "water": {
+          "default": "auto",
+          "description": "Immersed tubes under rivers, channels and the bay for highway crossings (M9): 'auto' where a bridge does not fit (a sea crossing over 600 m of water); 'prefer' every river and sea crossing where a tube fits; 'never' bridges only. A named crossing stays a bridge unless its 'tunnel' asks for a tube. A tube needs a straight approach on both banks with no junction but avenues that cross over it or end beside it.",
+          "enum": [
+            "never",
+            "auto",
+            "prefer"
+          ],
+          "title": "Water",
+          "type": "string"
+        },
+        "under": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "Districts a highway passes under in a cut-and-cover tunnel, with a green lid over it, where the tunnel fits between its interchanges.",
+          "title": "Under"
+        },
+        "underpasses": {
+          "default": 0.5,
+          "description": "Pedestrian underpasses under at-grade highways, between the frontage streets on both sides (share of the spots that fit).",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Underpasses",
+          "type": "number"
+        }
+      },
+      "title": "Tunnels",
       "type": "object"
     },
     "Water": {

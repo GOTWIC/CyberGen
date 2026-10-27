@@ -79,6 +79,8 @@ MATERIALS = {
     "plant_crown": "#3f8a47", "plant_conifer": "#2f6e45", "plant_palm": "#7fae45",
     "plant_shrub": "#5aa060", "plant_scrub": "#7a8a4a", "plant_ivy": "#5fae55",
     "hedge": "#2f6e45", "lawn": "#4f8a57",
+    "tunnel_wall": "#9a9ea8", "tunnel_lid": "#b7a98f", "tunnel_metro": "#4a78d6",
+    "tunnel_ped": "#7ee0c3", "tunnel_vent": "#c4c8d2", "soil": "#6b5a45",
 }
 MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
 MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
@@ -287,6 +289,11 @@ def _land_and_water(P: _Plan) -> None:
     wet = G.union([G.from_model_poly(w.polygon) for w in [*m.rivers, *m.channels,
                                                          *m.waterways]])
     ground = G.diff(land, wet) if not wet.is_empty else land
+    # M9: the open approaches of the road tunnels and the underpass stair wells are holes
+    holes = [G.from_model_poly(st.footprint) for st in m.structures
+             if st.kind == "trench" and st.footprint is not None]
+    if holes:
+        ground = G.diff(ground, G.union(holes))
     x0, y0, x1, y1 = m.bounds
     ix0, iy0 = tile_key(x0, y0)
     ix1, iy1 = tile_key(x1 - 1e-6, y1 - 1e-6)
@@ -336,6 +343,15 @@ def _streets(P: _Plan) -> None:
         if r is None:
             continue
         mid = pts[len(pts) // 2]
+        if s.tunnel:
+            # M9: a road in a tunnel, its own object (the tunnel shell is in `_tunnels`)
+            t = tile_key(*mid)
+            P.add(f"{s.id}.tunnel_road", P.collection(did, "Tunnels"), t, "tunnel_road",
+                  [{"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
+                    "t": 0.3}],
+                  {"citygen_id": s.id, "citygen_type": s.type, "road_class": s.road_class,
+                   "name": s.name or "", "level": s.level})
+            continue
         if raised or s.bridge:
             # a deck with its own object: thickness, and piers down to the water (M7: the
             # columns over land are model structures); a low raised street (a ramp up to a
@@ -522,6 +538,16 @@ def _sites(P: _Plan) -> None:
         transit = bool(a.get("line_id") or a.get("station"))
         if s.z1_m <= 0.0:
             continue    # underground (metro concourses): not in the blockout
+        if s.kind in ("trench", "portal"):
+            continue    # M9: drawn with their tunnel (`_tunnels`)
+        if s.kind == "vent":
+            ext, holes = _poly_rings(s.footprint)
+            cx, cy = _center(ext)
+            P.add(s.id, P.collection(P.district_at(cx, cy), "Tunnels"), tile_key(cx, cy),
+                  "tunnel_vent", [{"k": "prism", "m": "tunnel_vent", "z0": q(s.z0_m),
+                                   "z1": q(s.z1_m), "r": ext, "h": holes, "s": "prism"}],
+                  {"citygen_id": s.id, "citygen_type": s.type, "tunnel_id": a.get("tunnel", "")})
+            continue
         parts = []
         if s.footprint is not None:
             mat = ("canopy" if s.kind == "canopy" else "transit_support"
@@ -684,6 +710,168 @@ def _dressing(P: _Plan) -> None:
 
 # --- cameras ----------------------------------------------------------------------------------
 
+# --- tunnels (M9) -------------------------------------------------------------------------------
+
+def _portal_s(pts, cum, t) -> tuple[float, float]:
+    out = []
+    for p in t.portals:
+        best = None
+        for i in range(len(pts) - 1):
+            a, b = pts[i], pts[i + 1]
+            L2 = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2
+            f = 0.0 if L2 <= 0 else max(0.0, min(1.0, ((p.position[0] - a[0]) * (b[0] - a[0])
+                                                       + (p.position[1] - a[1]) *
+                                                       (b[1] - a[1])) / L2))
+            x, y = a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])
+            d = _dist((x, y), p.position[:2])
+            if best is None or d < best[0]:
+                best = (d, cum[i] + f * (cum[i + 1] - cum[i]))
+        out.append(best[1])
+    out.sort()
+    return (out[0], out[-1]) if out else (0.0, cum[-1])
+
+
+def _tunnels(P: _Plan) -> None:
+    """Road tunnels as open boxes (floor, walls, the roof over the covered stretch, a lintel
+    over each portal; the walls of the open approaches up to a parapet), metro tunnels and
+    pedestrian underpasses as solid boxes; one object each."""
+    m = P.m
+    for t in m.tunnels:
+        pl: list = []
+        for x, y, z in t.line:
+            if not pl or _dist((x, y), pl[-1][:2]) > 0.01:
+                pl.append((x, y, z))
+        if len(pl) < 2:
+            continue
+        pts = [(x, y) for x, y, _ in pl]
+        zs = [z for _, _, z in pl]
+        cum = _cum2(pts)
+        mid = pts[len(pts) // 2]
+        did = P.district_at(*mid)
+        parts = []
+        if t.kind in ("metro", "pedestrian"):
+            top = [z + t.clear_m + t.roof_m for z in zs]
+            r = ribbon(pts, t.width_m, top)
+            if r is not None:
+                parts.append({"k": "ribbon", "m": "tunnel_metro" if t.kind == "metro" else
+                              "tunnel_ped", "l": r[0], "rr": r[1],
+                              "t": q(t.clear_m + t.roof_m + t.floor_m)})
+        else:
+            a, b = _portal_s(pts, cum, t)
+            w = t.width_m
+            fl = ribbon(pts, w, [z - 0.3 for z in zs])
+            if fl is not None:
+                parts.append({"k": "ribbon", "m": "tunnel_wall", "l": fl[0], "rr": fl[1],
+                              "t": q(t.floor_m)})
+            roof_z = [z + t.clear_m + t.roof_m for z in zs]
+            tops = [rz if a - 0.01 <= s <= b + 0.01 else 1.0 for s, rz in zip(cum, roof_z)]
+            outer = ribbon(pts, w, tops)
+            inner = ribbon(pts, w - 2.0, tops)
+            if outer is not None and inner is not None:
+                # each wall one closed mesh: its top (roof top or parapet) and its foot (under
+                # the floor) follow the road
+                bots = [q(z - 0.3 - t.floor_m) for z in zs]
+                for side in (0, 1):
+                    vs, fs = [], []
+                    for i in range(len(pts)):
+                        o, n_ = outer[side][i], inner[side][i]
+                        vs += [o, n_, [n_[0], n_[1], bots[i]], [o[0], o[1], bots[i]]]
+                    for i in range(len(pts) - 1):
+                        a0, b0 = 4 * i, 4 * (i + 1)
+                        for k in range(4):
+                            k1 = (k + 1) % 4
+                            f = [a0 + k, b0 + k, b0 + k1, a0 + k1]
+                            fs.append(f[::-1] if side == 0 else f)
+                    e = 4 * (len(pts) - 1)
+                    fs.append([0, 3, 2, 1] if side == 0 else [0, 1, 2, 3])
+                    fs.append([e, e + 1, e + 2, e + 3] if side == 0 else [e, e + 3, e + 2, e + 1])
+                    parts.append({"k": "mesh", "m": "tunnel_wall", "v": vs, "f": fs})
+            cov = [(p, rz) for p, s, rz in zip(pts, cum, roof_z) if a - 0.01 <= s <= b + 0.01]
+            if len(cov) >= 2:
+                rr = ribbon([p for p, _ in cov], w, [z for _, z in cov])
+                if rr is not None:
+                    parts.append({"k": "ribbon", "m": "tunnel_wall", "l": rr[0], "rr": rr[1],
+                                  "t": q(t.roof_m)})
+            for p in t.portals:
+                z_open = p.position[2] + t.clear_m
+                h = M.radians(p.heading_deg)
+                ux, uy = float(M.cos(h)), float(M.sin(h))
+                c = [q(p.position[0] - ux * 0.75), q(p.position[1] - uy * 0.75), q(z_open)]
+                parts.append({"k": "box", "m": "tunnel_wall", "c": c,
+                              "d": [1.5, q(w + 1.0), q(1.0 - z_open)],
+                              "yaw": q(p.heading_deg)})
+        if not parts:
+            continue
+        P.add(f"{t.id}.tunnel", P.collection(did, "Tunnels"), tile_key(*mid), "tunnel",
+              parts, {"citygen_id": t.id, "citygen_type": t.type, "kind": t.kind,
+                      "name": t.name or ""})
+
+
+def _cum2(pts) -> list[float]:
+    out = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        out.append(out[-1] + _dist(a, b))
+    return out
+
+
+def _cutaway(P: _Plan) -> dict | None:
+    """M9: a section along the longest road tunnel (the city on the camera's side of its
+    chord taken away, earth under the ground), seen from that side."""
+    m = P.m
+    road = [t for t in m.tunnels if t.kind in ("immersed_tube", "cut_and_cover")]
+    if not road:
+        return None
+    t = max(road, key=lambda t: (t.attrs.get("length_m", 0.0), t.id))
+    a, b = t.line[0], t.line[-1]
+    L = _dist(a, b) or 1.0
+    u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+    n = (-u[1], u[0])
+    # the camera on the side the isometric views look from (south): n points toward it
+    if n[0] * ISO_DIR[0] + n[1] * ISO_DIR[1] > 0:
+        n = (-n[0], -n[1])
+    pts = [(p[0], p[1]) for p in t.line]
+    cum = _cum2(pts)
+    half = cum[-1] / 2.0
+    mid = pts[0]
+    for i in range(len(pts) - 1):
+        if cum[i] <= half <= cum[i + 1]:
+            f = (half - cum[i]) / max(cum[i + 1] - cum[i], 1e-9)
+            mid = (pts[i][0] + f * (pts[i + 1][0] - pts[i][0]),
+                   pts[i][1] + f * (pts[i + 1][1] - pts[i][1]))
+    zmin = min(p[2] for p in t.line)
+    half_len = L / 2.0 + 160.0
+    # the tunnels' inner volumes (road to roof, wall to wall), opened in the ground and earth
+    voids = []
+    for o in m.tunnels:
+        opts = [(p[0], p[1]) for p in o.line]
+        near = [((x - mid[0]) * u[0] + (y - mid[1]) * u[1],
+                 (x - mid[0]) * n[0] + (y - mid[1]) * n[1]) for x, y in opts]
+        if not any(abs(a_) <= half_len and -60.0 <= b_ <= 900.0 for a_, b_ in near):
+            continue
+        r = ribbon(opts, max(o.width_m - 2.2, 1.0), [p[2] + o.clear_m - 0.05 for p in o.line])
+        if r is not None:
+            voids.append({"k": "ribbon", "m": "soil", "l": r[0], "rr": r[1],
+                          "t": q(o.clear_m - 0.15)})
+    # framed on the first portal: from over its open approach, down the ramp, through the
+    # portal into the covered stretch
+    a_s = min(_portal_s(pts, cum, t))
+
+    def at(s_):
+        s_ = min(max(s_, 0.0), cum[-1])
+        for i in range(len(pts) - 1):
+            if cum[i] <= s_ <= cum[i + 1]:
+                f = (s_ - cum[i]) / max(cum[i + 1] - cum[i], 1e-9)
+                return (pts[i][0] + f * (pts[i + 1][0] - pts[i][0]),
+                        pts[i][1] + f * (pts[i + 1][1] - pts[i][1]))
+        return pts[-1]
+    ep, tp = at(a_s - 70.0), at(a_s + 25.0)
+    return {"tunnel": t.id, "origin": [q(mid[0]), q(mid[1])], "u": [q(u[0]), q(u[1])],
+            "n": [q(n[0]), q(n[1])], "half_len": q(half_len), "depth": 900.0,
+            "z": [q(zmin - 40.0), 600.0], "voids": voids,
+            "eye": [q(ep[0] + n[0] * 48.0), q(ep[1] + n[1] * 48.0), 7.0],
+            "target": [q(tp[0]), q(tp[1]), -5.0], "lens_mm": 20}
+
+
 def _cameras(P: _Plan) -> dict:
     m = P.m
     x0, y0, x1, y1 = m.bounds
@@ -699,8 +887,12 @@ def _cameras(P: _Plan) -> dict:
         districts.append({"id": d.id, "name": d.name, "archetype": d.archetype,
                           "box": [q(bx0), q(by0), 0.0, q(bx1), q(by1),
                                   q(tall.get(d.id, 30.0))]})
-    return {"top": top, "iso_dir": list(ISO_DIR), "districts": districts,
-            "street": _street_views(P)}
+    out = {"top": top, "iso_dir": list(ISO_DIR), "districts": districts,
+           "street": _street_views(P)}
+    cut = _cutaway(P)
+    if cut is not None:
+        out["cutaway"] = cut
+    return out
 
 
 def _street_views(P: _Plan, n: int = 4) -> list[dict]:
@@ -876,6 +1068,7 @@ def make_plan(m: CityModel) -> dict:
         _open_space(P)
         _buildings(P)
         _sites(P)
+        _tunnels(P)
         _dressing(P)
         cams = _cameras(P)
     for o in P.objects:
@@ -1089,7 +1282,8 @@ def _checks(m, plan, rep, verify, out: Path, render: bool, export: bool) -> list
                            (out / usd).stat().st_size > 0, f"{usd}"))
     if render:
         want = 1 + (1 if plan["cameras"]["districts"] else 0) + \
-            len(plan["cameras"]["districts"]) + len(plan["cameras"]["street"])
+            len(plan["cameras"]["districts"]) + len(plan["cameras"]["street"]) + \
+            (1 if plan["cameras"].get("cutaway") else 0)
         got = [r for r in rep["files"].get("renders", []) if (out / r).is_file()]
         out_checks.append(("renders", len(got) == want, f"{len(got)} of {want} renders"))
     return out_checks
