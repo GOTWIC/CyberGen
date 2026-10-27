@@ -7,7 +7,7 @@
     "numpy": "2.5.4",
     "shapely": "2.2.0",
     "geos": "3.14.1",
-    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M10: produced on the M4 Mac"
+    "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M10: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical"
   },
   "cities": {
     "archipelago_free_port": "40e05569d5b544f29d68a202305a106dd79f848c844b036d9ddc2a76764be400",
