@@ -45,7 +45,7 @@ Full plan for stage 1: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: named points of interest (bars, clinics, vendors, fixers, hideouts, apartments) with their doors, faction territories and police precincts, wealth, danger and police fields, traffic, crowd and spawn density per street and hour band, parking, taxi stands, fast travel, sign and ad slots; every place reachable on foot and by car (9 checks, 75 in all), `gameplay.json` | Done | [`docs/progress/M11`](docs/progress/M11) |
-| M12 | Stack interchanges: four-level highway-highway crossings (one highway lifted through the crossing, eight one-way directional ramps, the left turns as flyovers at 18 and 27 m), the turbine as their fallback, M7's crossing where neither fits; 2 checks (77 in all); the pinned demo's two crosstowns cross in a stack, the five samples are unchanged | Done | [`docs/progress/M12`](docs/progress/M12) |
+| M12 | Stack interchanges: four-level highway-highway crossings (one highway lifted through the crossing, eight one-way directional ramps, the left turns as flyovers at 18 and 27 m), the turbine as their fallback, M7's crossing where neither fits; 2 checks (77 in all); a stack demo (the pinned demo with two crosstowns), the samples and the pinned demo unchanged | Done | [`docs/progress/M12`](docs/progress/M12) |
 | M13 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | Planned | |
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
@@ -56,20 +56,21 @@ Five sample cities are rebuilt and checked at every milestone, so quality is jud
 different coast forms, not one map. M12 adds stack interchanges where two highways cross with
 room for one: one highway lifted to 9 m through the crossing, the other at grade, and eight
 one-way directional ramps, the left turns as flyovers at 18 m and 27 m (a turbine, then M7's
-crossing, where the stack does not fit). None of the five samples has such a crossing, so
-they are as in M11; the pinned demo's highways are now two crosstowns that cross in a stack
-in The Stacks (see [`docs/progress/M12`](docs/progress/M12)).
+crossing, where the stack does not fit). None of the five samples or the pinned demo has such
+a crossing, so they are as in M11, and a stack demo, Vesper Bay Stacks, is the pinned demo
+with two crosstown highways that cross in a stack in The Stacks (see
+[`docs/progress/M12`](docs/progress/M12)).
 
-The stack in Vesper Bay Pinned (8K): the Stacks Crosstown on its viaduct over the Bayline,
+The stack in Vesper Bay Stacks (8K): the Stacks Crosstown on its viaduct over the Bayline,
 the tier-2 flyovers at 18 m, the tier-3 flyovers at 27 m over them, the right turns in their
 quadrants:
 
-<img src="docs/progress/M12/vesper_bay_pinned/render_stack.jpg" width="840">
+<img src="docs/progress/M12/vesper_bay_stacks/render_stack.jpg" width="840">
 
 Its road levels: the stack in the inset, each left turn with its tier, and the profiles of
 its eight ramps over the 9, 18 and 27 m levels:
 
-<img src="docs/progress/M12/vesper_bay_pinned/preview_elevated.png" width="840">
+<img src="docs/progress/M12/vesper_bay_stacks/preview_elevated.png" width="840">
 
 M11 added the gameplay layer on top of the finished city:
 named points of interest with their doors, gang, corporate and police territories, wealth,
@@ -99,13 +100,18 @@ for full size):
 |---|---|
 | <img src="docs/progress/M12/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M12/vesper_bay/render_iso_city.jpg" width="420"> |
 
-| Vesper Bay with the traced Corporate Core on its island and the stack | Delta Megacity |
+| Vesper Bay with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
 | <img src="docs/progress/M12/vesper_bay_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M12/delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
 | <img src="docs/progress/M12/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M12/peninsula_city/render_iso_city.jpg" width="420"> |
+
+Vesper Bay Stacks, the stack demo (the pinned demo with two crosstowns; the stack in The
+Stacks, right of center):
+
+<img src="docs/progress/M12/vesper_bay_stacks/render_iso_city.jpg" width="840">
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 
@@ -144,7 +150,7 @@ built again eight times) and now:
 |---|---|
 | <img src="docs/progress/M8c/nexus_city/preview_transit.png" width="420"> | <img src="docs/progress/M8c/vesper_bay/preview_transit.png" width="420"> |
 
-Each M12 city folder has every generator preview, the build report, the stage trace and the 8K whole-city render (the pinned demo also the stack close-up and its M11 maps); each M11 city folder has every generator preview (`preview_gameplay.png` first), the build report, the stage trace and the 8K whole-city render; each M8c city folder has every generator preview, the transit map of M8b, the Blender
+Each M12 city folder has every generator preview, the build report, the stage trace and the 8K whole-city render (the stack demo also its stack close-up and the pinned demo's maps beside its own); each M11 city folder has every generator preview (`preview_gameplay.png` first), the build report, the stage trace and the 8K whole-city render; each M8c city folder has every generator preview, the transit map of M8b, the Blender
 renders, the build report and the stage trace, and `docs/progress/M8c/same_layout/` the
 transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) are in
 `docs/progress/M8d/`, the M8b ones in `docs/progress/M8b/`, the M8a sweep tables in

@@ -8,7 +8,7 @@
   ],
   "source": {
     "prompt": "Vesper Bay with its Corporate Core imported from the hand-traced map (maps/corporate_core_v1.0.1.svg) as an island in the bay; the rest as in cities/vesper_bay.",
-    "notes": "M7b pinned-import demo. The Corporate Core megatower and towers come from the tracing (no spec landmark); the sky tube runs from the island to the northeast as a line, not a loop (a loop cuts the corner past a corner island). The maglev runs from the island to Launch Key only (art-direction round 2: from the east exit through the southwest island to the northwest spaceport it turned back). The Halo Line runs clockwise, Neon Strand, Highcrest, Old Town, The Stacks (round 3: the order through The Stacks first zigzagged and looped back on itself). M12 art direction: the ring and spine are replaced by two crosstown highways that cross in The Stacks, the Stacks Crosstown from the northeast exit to Vess Docks and the Bayline from the east exit to Neon Strand, so the demo has a four-level stack (no sample had two highways crossing with room for one)."
+    "notes": "M7b pinned-import demo. The Corporate Core megatower and towers come from the tracing (no spec landmark); the sky tube runs from the island to the northeast as a line, not a loop (a loop cuts the corner past a corner island). The maglev runs from the island to Launch Key only (art-direction round 2: from the east exit through the southwest island to the northwest spaceport it turned back). The Halo Line runs clockwise, Neon Strand, Highcrest, Old Town, The Stacks (round 3: the order through The Stacks first zigzagged and looped back on itself)."
   },
   "water": {
     "coast": {
@@ -73,28 +73,10 @@
     }
   },
   "highways": {
-    "pattern": "none",
+    "pattern": "ring_plus_spine",
     "exits": [
       "east",
-      "north_east"
-    ],
-    "named": [
-      {
-        "name": "Stacks Crosstown",
-        "route": [
-          "north_east_exit",
-          "Vess Docks"
-        ],
-        "reuse": false
-      },
-      {
-        "name": "Bayline",
-        "route": [
-          "east_exit",
-          "Neon Strand"
-        ],
-        "reuse": false
-      }
+      "north"
     ]
   },
   "transit": {

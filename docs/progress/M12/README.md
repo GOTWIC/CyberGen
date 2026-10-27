@@ -9,10 +9,11 @@ apart (no point has more than three levels); each is the other's fallback, and w
 fits the crossing is built exactly as M7 builds it. Columns stand under every level as for
 any raised road. Two new checks (`stack_ramps`, `stack_levels`, 77 in all).
 
-None of the five samples has two highways that cross with room for a stack, so the pinned
-demo got one by art direction (below). The five samples are byte-identical to M11 apart from
-`spec_sha256` (the filled spec gains the defaults of the two new spec fields), and every city
-passes all 77 checks on its first full-city try (Nexus City on its third, as in M11):
+None of the five samples or the pinned demo has two highways that cross with room for a
+stack, so the stack is shown in a seventh city, **Vesper Bay Stacks**: the pinned demo with
+only its highways changed (art direction, below). The five samples and the pinned demo are
+byte-identical to M11 apart from `spec_sha256` (the filled spec gains the defaults of the two
+new spec fields), and every city passes all 77 checks:
 
 | City | Tries (M11, M12) | Interchanges | sha256 of `city_model.json` (M4 Mac and x86_64 Linux) | vs M11 |
 |---|---|---|---|---|
@@ -21,29 +22,29 @@ passes all 77 checks on its first full-city try (Nexus City on its third, as in 
 | nexus_city | 3, 3 | diamond, diamond stub | `6757ba4121f32887a7a5082a314ed2b2c9fc01ecb3b64e899be21bf9811bd1ba` | same apart from the spec hash |
 | peninsula_city | 1, 1 | none | `8456650dfca5bec4e9bcd65301822dd38849fd4dd8375599cfa437cfd5aeabb4` | same apart from the spec hash |
 | vesper_bay | 1, 1 | diamond, parclo, trumpet | `2e5582be86c77054c3705fcd653851ad129bdf074b673f74651a17bfc144058d` | same apart from the spec hash |
-| vesper_bay_pinned | 2, 1 | diamond, **stack** | `9c1139debc44ec1e9f04c3e97673148b559ba6f6551ce89307e7340bf5c46729` | new road network |
+| vesper_bay_pinned | 2, 2 | diamond (2), parclo | `b896bf87d4ebfc0139a458ff2bf214f5c1c298a55ab686bd3a5fdfb4ef8e975f` | same apart from the spec hash |
+| vesper_bay_stacks | new, 1 | diamond, **stack** | `385dbd9a2df5811d71c51d6ddcd9c14094c242e8ee251a36a373e9908f218d67` | new (the stack demo) |
 
 "Same apart from the spec hash": with `spec_sha256` set back to the hash of the spec dumped
-without the new fields, the bytes equal the M11 golden. The blockout plans of the five
-samples are unchanged (their goldens stand).
+without the new fields (and salted as the build salted it), the bytes equal the M11 golden
+(the pinned demo: the M11 README's sha256). The blockout plans of the five samples are
+unchanged (their goldens stand).
 
-Every model is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker image
-`citygen-x86`, `linux/amd64`, worktree mounted read-only, `CITYGEN_WORKERS=3`), and `citygen
-trace diff` finds every stage identical in all six (`<city>/trace.json`).
+X86_NOTE
 
-## The stack in Vesper Bay Pinned
+## The stack in Vesper Bay Stacks
 
-<img src="vesper_bay_pinned/render_stack.jpg" width="840">
+<img src="vesper_bay_stacks/render_stack.jpg" width="840">
 
 The Stacks Crosstown (lifted, northeast to southwest) crosses the Bayline (at grade,
 northwest to southeast) at 72 degrees in The Stacks, at (937.5, 562.5). The 8K close-up
 above looks north-east over the crossing from 700 m up; the whole city is in
-`vesper_bay_pinned/render_iso_city.jpg`.
+`vesper_bay_stacks/render_iso_city.jpg`.
 
-| Before (M11): ring and spine | After (M12): two crosstowns and a stack |
+| The pinned demo: ring and spine | Vesper Bay Stacks: two crosstowns and a stack |
 |---|---|
-| <img src="vesper_bay_pinned/before_elevated.png" width="420"> | <img src="vesper_bay_pinned/preview_elevated.png" width="420"> |
-| <img src="vesper_bay_pinned/before_map.png" width="420"> | <img src="vesper_bay_pinned/preview_map.png" width="420"> |
+| <img src="vesper_bay_stacks/before_elevated.png" width="420"> | <img src="vesper_bay_stacks/preview_elevated.png" width="420"> |
+| <img src="vesper_bay_stacks/before_map.png" width="420"> | <img src="vesper_bay_stacks/preview_map.png" width="420"> |
 
 The road-levels preview puts the stack in its inset (each left turn labeled with its tier
 and crest) and the profiles of its eight ramps in the profile panel, over the 9, 18 and
@@ -59,13 +60,14 @@ and crest) and the profiles of its eight ramps in the profile panel, over the 9,
 0.86 km. The tier-3 ramps come down to the ground highway, so they are the longest: 27 m at
 5% is 540 m of grade before the tapers and vertical curves.
 
-### Art direction: the pinned demo's highways
+### Art direction: a stack demo beside the pinned demo
 
-The pinned demo's ring and spine never crossed with room (the ring bends at its crossings
-and its inside is shallow above Scholar Isle's river), and no other sample has a crossing
-of two highways with 700 m of dry, junction-free road on each arm either (Vesper Bay's one
-place with room holds its trumpet, the M8d showcase that M9 also keeps). So the pinned
-demo's `highways` changed, and only that (`cities/vesper_bay_pinned/city_spec.json`):
+The pinned demo's ring and spine never cross with room (the ring bends at its crossings and
+its inside is shallow above Scholar Isle's river), and no other sample has a crossing of two
+highways with 700 m of dry, junction-free road on each arm either (Vesper Bay's one place
+with room holds its trumpet, the M8d showcase that M9 also keeps). The smallest change that
+gives a stack is to the pinned demo's `highways`, and only those
+(`cities/vesper_bay_stacks/city_spec.json`, otherwise the pinned spec, seed 2078):
 
 ```json
 "highways": {
@@ -82,11 +84,19 @@ Two crosstowns that cross in The Stacks (the district the interchange is named f
 the northeast corner down to the docks and from the east edge across to the strand. The new
 `reuse: false` (`NamedHighway.reuse`) keeps a named route on its own line across the
 highways it meets; with M1b's reuse discount the second route ran along the first instead of
-crossing it. The network has one diamond (on the Crosstown's viaduct northeast of the stack) and
-the stack; the rest of the city follows. The north exit moved to the northeast corner. Other
-routes tried (the ring and spine with crosstowns added, a crosstown from the north exit,
-routes through Highcrest or The Stacks) crossed with an arm too short, with water within
-the ramps' reach, or with junctions where the ramps had to land.
+crossing it. The network has one diamond (on the Crosstown's viaduct northeast of the stack)
+and the stack; the north exit moved to the northeast corner.
+
+It is a separate city rather than a change to the pinned demo because the pinned demo also
+stands in the sweep at eight seeds, and the crosstowns are fragile away from seed 2078: the
+Crosstown's end wraps the Vess Freight Terminal reserve with curves under 150 m at some
+seeds, traced roads leaving Core Island meet no ring to join, a named route does not always
+end exactly on its exit (the exit counts as not built), and in some road variants the two
+crosstowns cross near the east exit with too short an arm. With the change in the pinned
+demo, it failed at seeds 404 and 3141, two of the sweep seeds where it passes in M11. Other routes tried (the ring and spine
+with crosstowns added, a crosstown from the north exit or to a south exit, routes through
+Highcrest or The Stacks) crossed with an arm too short, with water within the ramps' reach,
+or with an avenue where a ramp's column could not stand.
 
 ## How a stack is laid out
 
@@ -173,9 +183,10 @@ before, now over every level of a stack. Elevated stats gain `stacks`, `turbines
 - `citygen/roads.py`: a named highway with `reuse: false` routes without M1b's discount on
   earlier highways (`_waypoint_route(reuse=...)`); unchanged otherwise.
 - `citygen/streets.py`: M2 gives no gate link to the end of a traced road stopping on its
-  bridge more than 3 m up (`link_dead_ends`). In the pinned demo such a link crossed under
+  bridge more than 3 m up (`link_dead_ends`). In the stack demo such a link crossed under
   the end of an avenue climbing to the Core Island bridge without clearance, and the city
-  took nine full-city tries; the samples have no traced roads and keep their links.
+  took nine full-city tries; the samples have no traced roads, and the pinned demo is
+  unchanged by it.
 
 SWEEP_SECTION
 

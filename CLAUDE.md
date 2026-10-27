@@ -401,9 +401,10 @@ fits, or a planned stack is not built, the stage runs again without the plan (M7
 same bytes). Ramps carry `attrs.template`, `turn`, `tier`, `crossing`; stack left ramps
 `level` 2 or 3. `NamedHighway.reuse: false` makes a crosstown that crosses the highways it
 meets. Two checks (`stack_ramps`, `stack_levels`, 77 in all); `preview_elevated.png` puts a
-stack in its inset and its ramp profiles in the profile panel. No sample has room for a stack;
-the pinned demo's highways are two crosstowns that cross in a stack in The Stacks (art
-direction). Sample builds: `docs/progress/M12/`.
+stack in its inset and its ramp profiles in the profile panel. No sample has room for a stack,
+so the stack demo `cities/vesper_bay_stacks` is the pinned demo with only its highways changed
+(art direction): two crosstowns that cross in a stack in The Stacks (a separate city, so the
+pinned demo and its sweep seeds stay as they were). Sample builds: `docs/progress/M12/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

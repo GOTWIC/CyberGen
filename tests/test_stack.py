@@ -11,6 +11,7 @@ from shapely.geometry import LineString, Polygon, box
 
 from citygen import elevated as EL
 from citygen import geom as G
+from conftest import ROOT
 
 HALF = 1900.0
 
@@ -322,3 +323,18 @@ def test_winding():
         w = EL._winding(pts)
         assert 75.0 < sign * w <= 90.0 and abs(w - EC._turning(pts)) < 1.0
     assert abs(EL._winding([(0.0, 0.0), (100.0, 0.0), (200.0, 0.0)])) < 1e-9
+
+
+def test_the_stack_demo():
+    """Vesper Bay Stacks (the pinned demo with two crosstowns) builds its stack where they
+    cross in The Stacks, and every road check passes, the stack checks among them."""
+    from citygen.build import build_city
+    from citygen.validate import load_spec
+
+    b = build_city(load_spec(ROOT / "cities" / "vesper_bay_stacks" / "city_spec.json"),
+                   local=False)
+    st = b.stats["elevated"]
+    assert st["interchanges"].get("stack") == 1, st["notes"]
+    assert st["stack_ramps"] == 8 and st["max_stack_m"] == EL.LEVEL_Z[3]
+    assert {"stack_ramps", "stack_levels"} <= {c.id for c in b.checks}
+    assert not [f for c in b.checks for f in c.failures]
