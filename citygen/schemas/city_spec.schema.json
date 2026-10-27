@@ -568,6 +568,16 @@
           },
           "title": "Named",
           "type": "array"
+        },
+        "crossings": {
+          "default": "stack",
+          "description": "Interchange where two highways cross with room for it: a four-level stack or a turbine (each the other's fallback).",
+          "enum": [
+            "stack",
+            "turbine"
+          ],
+          "title": "Crossings",
+          "type": "string"
         }
       },
       "title": "Highways",

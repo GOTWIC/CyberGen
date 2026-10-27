@@ -1,9 +1,10 @@
 """M7 preview: `preview_elevated.png`, the road levels. Left, the city: ground roads in muted
 tones, every raised road colored by its deck height (viaducts drawn wide, ramps, bridge
 approaches), interchanges labeled by template, road columns as dots, underpass streets.
-Right, the interchange with the most ramps at street scale (a trumpet with a flyover first:
-ramps with the heights at their ends, a flyover's crest, columns, the roads under the deck),
-and the height profile of the longest viaduct with the roads passing under it. Previews are for review only (not part of the model hash).
+Right, the interchange with the most ramps at street scale (a stack first, then a turbine, then
+a trumpet with a flyover: ramps with the heights at their ends, flyover and tier crests,
+columns, the roads under the deck), and the height profile of the longest viaduct with the
+roads passing under it, or (M12) the profiles of a stack's ramps against its deck levels. Previews are for review only (not part of the model hash).
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ FOOT = "#2b303a"
 CMAP = plt.get_cmap("plasma")
 ZMAX = 30.0
 TEMPLATE = {"diamond": "D", "diamond_stub": "T", "direct": "B", "overpass": "O", "parclo": "P",
-            "trumpet": "Tr"}
+            "trumpet": "Tr", "stack": "S", "turbine": "Tb"}
+SYSTEM = ("stack", "turbine")
 
 
 def _z_at(prof, s: float) -> float:
@@ -86,7 +88,7 @@ def _draw_roads(ax, m, lw_scale: float = 1.0, box=None) -> None:
         segs, zs = _pieces(s)
         elev = bool(s.attrs.get("elevated"))
         ramp = s.attrs.get("role") == "ramp"
-        fly = bool(s.attrs.get("flyover"))
+        fly = bool(s.attrs.get("flyover")) or (s.attrs.get("turn") == "left")
         w = (3.4 if elev else 2.4 if fly else 1.6 if ramp else 1.2) * lw_scale
         if fly:
             # a flyover passes over the deck: a dark casing keeps it readable on top
@@ -111,14 +113,15 @@ def _columns(ax, m, size: float = 2.0, box=None) -> None:
 
 
 def _interchanges(m) -> list[tuple[str, str, list]]:
-    """(interchange id, template, its ramps): those with a flyover first, then by number of
-    ramps."""
+    """(interchange id, template, its ramps): stacks, turbines, those with a flyover first,
+    then by number of ramps."""
     by: dict = {}
     for s in m.road_segments:
         if s.attrs.get("role") == "ramp":
             by.setdefault(s.attrs.get("interchange"), (s.attrs.get("template"), []))[1].append(s)
     return sorted(((k, t, rs) for k, (t, rs) in by.items()), key=lambda x: (
-        not any(s.attrs.get("flyover") for s in x[2]), -len(x[2]), x[0]))
+        x[1] != "stack", x[1] != "turbine", not any(s.attrs.get("flyover") for s in x[2]),
+        -len(x[2]), x[0]))
 
 
 def render_elevated(b, out, dpi: int = 140) -> None:
@@ -139,7 +142,9 @@ def render_elevated(b, out, dpi: int = 140) -> None:
              f"{st.get('overpasses', 0)} roads under the decks, "
              f"{st.get('underpass_streets', 0)} underpass streets, "
              + (f"{st['flyovers']} flyover{'s' if st['flyovers'] > 1 else ''} up to "
-                f"{st['max_flyover_m']} m, " if st.get("flyovers") else "") +
+                f"{st['max_flyover_m']} m, " if st.get("flyovers") else "")
+             + (f"{st['stack_ramps']} stack and turbine ramps up to {st['max_stack_m']} m, "
+                if st.get("stack_ramps") else "") +
              f"{st.get('road_columns', 0)} columns; deck up to {st.get('max_deck_m', 0)} m; "
              f"{'checks PASS' if b.passed else 'checks FAIL'}", color=MUTED, fontsize=9,
              va="top")
@@ -163,7 +168,7 @@ def render_elevated(b, out, dpi: int = 140) -> None:
             ax.plot([p[0]], [p[1]], marker="o", ms=4, mfc="none", mec="#e8e8f0", zorder=6)
     handles = [Line2D([], [], color=CMAP(0.15), lw=3.4, label="viaduct (color: deck height)"),
                Line2D([], [], color=CMAP(0.5), lw=1.6, label="ramp"),
-               Line2D([], [], color=CMAP(0.55), lw=2.4, label="flyover (trumpet)",
+               Line2D([], [], color=CMAP(0.55), lw=2.4, label="flyover (trumpet, stack)",
                       path_effects=[pe.withStroke(linewidth=4.0, foreground="#5a5f6b")]),
                Line2D([], [], color=CMAP(0.8), lw=1.2, label="raised approach"),
                Line2D([], [], color="#7ee0c3", lw=1.6, label="underpass street"),
@@ -197,6 +202,16 @@ def render_elevated(b, out, dpi: int = 140) -> None:
         _draw_roads(ax2, m, 3.0, box)
         _columns(ax2, m, 6.0, box)
         for s in rs:
+            if s.attrs.get("turn") == "left":
+                # a stack's or turbine's left ramp: its crest over the core
+                top = max(s.z_profile, key=lambda z: (z.z, -z.s))
+                c = LineString(s.centerline).interpolate(top.s)
+                tag = f"tier {s.attrs['tier']} " if s.attrs.get("tier") else ""
+                ax2.text(c.x, c.y, f"{tag}{top.z:.1f} m", color=INK, fontsize=6.5,
+                         fontweight="bold", path_effects=HALO, zorder=7, ha="center")
+                continue
+            if s.attrs.get("turn"):
+                continue
             for end, at in ((s.centerline[0], s.z_profile[0].z),
                             (s.centerline[-1], s.z_profile[-1].z)):
                 if box[0] <= end[0] <= box[2] and box[1] <= end[1] <= box[3]:
@@ -215,10 +230,15 @@ def render_elevated(b, out, dpi: int = 140) -> None:
     else:
         ax2.text(0.5, 0.5, "no interchange", color=MUTED, ha="center", va="center",
                  transform=ax2.transAxes)
-    # the longest viaduct's profile
+    # the longest viaduct's profile (a stack's ramps where there is one)
     ax3 = fig.add_axes([side + 0.05, 0.08, (side_w - 0.9) / (map_w + side_w), 0.32])
     ax3.set_facecolor("#20242c")
     ax3.tick_params(colors=MUTED, labelsize=7)
+    if ics and ics[0][1] in SYSTEM:
+        _system_profiles(ax3, m, ics[0])
+        fig.savefig(out, dpi=dpi, facecolor=BG)
+        plt.close(fig)
+        return
     runs: dict = {}
     for s in m.road_segments:
         if s.attrs.get("elevated") and not s.attrs.get("direct"):
@@ -275,3 +295,34 @@ def render_elevated(b, out, dpi: int = 140) -> None:
                  transform=ax3.transAxes)
     fig.savefig(out, dpi=dpi, facecolor=BG)
     plt.close(fig)
+
+
+def _system_profiles(ax, m, ic) -> None:
+    """M12: a stack's (or turbine's) ramps along themselves, from where each leaves its highway:
+    the right turns thin, the left turns by tier, over the deck levels."""
+    from . import elevated as EL
+
+    k, t, rs = ic
+    norm = Normalize(0.0, ZMAX)
+    top = 0.0
+    for s in sorted(rs, key=lambda s: (s.attrs.get("turn") != "right",
+                                       s.attrs.get("tier") or 0, s.id)):
+        xs = [z.s for z in s.z_profile]
+        zs = [z.z for z in s.z_profile]
+        left = s.attrs.get("turn") == "left"
+        ax.plot(xs, zs, color=CMAP(norm(max(zs))), lw=1.8 if left else 0.9,
+                alpha=1.0 if left else 0.7)
+        top = max(top, max(zs))
+    for lv, z in sorted(EL.LEVEL_Z.items()):
+        ax.axhline(z, color="#e8e8f0", lw=0.7, ls=":")
+        ax.text(0.995, z, f"level {lv}: {z:g} m", color=MUTED, fontsize=6.5, ha="right",
+                va="bottom", transform=ax.get_yaxis_transform())
+    handles = [Line2D([], [], color=CMAP(norm(EL.LEVEL_Z[3])), lw=1.8,
+                      label="left turns (flyovers)"),
+               Line2D([], [], color=CMAP(norm(EL.LEVEL_Z[1])), lw=0.9, label="right turns")]
+    ax.legend(handles=handles, loc="upper left", fontsize=7, frameon=False, labelcolor=INK)
+    ax.set_xlabel("along each ramp (m)", color=INK, fontsize=8)
+    ax.set_ylabel("deck height (m)", color=INK, fontsize=8)
+    ax.set_title(f"{k}: {t} ramp profiles over the highway at grade and the {EL.LEVEL_Z[1]:g} m "
+                 "deck", color=INK, fontsize=9)
+    ax.set_ylim(0, max(top * 1.15, 12.0))

@@ -339,6 +339,9 @@ class Highways(_Model):
     exits: list[Direction] | None = Field(None, description="Off-map exits. Default: land edges.")
     elevated_share: Fraction = Field(0.2, description="Share of highway length on viaducts.")
     named: list[NamedHighway] = Field(default_factory=list)
+    crossings: Literal["stack", "turbine"] = Field(
+        "stack", description="Interchange where two highways cross with room for it: a "
+                             "four-level stack or a turbine (each the other's fallback).")
 
 
 class TransitLine(_Model):
