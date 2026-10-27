@@ -399,7 +399,7 @@ def _district_lots(job: dict) -> dict:
     seed = job["seed"]
     front = Frontage(job["segments"])
     land = G.diff(job["polygon"], job["wet"])
-    row = G.union(job["row"])
+    row = G.union_local(job["row"])   # M10: blocks far from a change stay as they were
     for g in (row, job["reserves"], job["cones"], job["open_land"], job["pinned"]):
         land = G.diff(land, g)
     blocks, opens = [], []
@@ -509,7 +509,7 @@ def build_blocks(spec, B, net, J, mapper=None) -> dict:
     ptree = shapely.STRtree(pieces)
     T.detail("blocks/row", pieces)
     out = {"blocks": [], "lots": [], "open": [], "places": [], "notes": cx.notes}
-    cores = G.union([c for _, c in net.cores]) if net.cores else Polygon()
+    cores = G.union_local([c for _, c in net.cores]) if net.cores else Polygon()
     names = [d for d in spec.districts if d.name in B.polygons]
     jobs = []
     for d in names:
@@ -519,7 +519,10 @@ def build_blocks(spec, B, net, J, mapper=None) -> dict:
                 if not G.apart(LineString(s["centerline"]), poly, s["width_m"])]
         jobs.append({"archetype": d.archetype, "seed": d.seed, "polygon": poly,
                      "wet": G.inter(B.wet, clip),
-                     "row": [pieces[i] for i in sorted(int(k) for k in ptree.query(clip))],
+                     # M10: the pieces that touch the clip, not all in its bounding box (the
+                     # union's merge order would let far roads move these blocks by 1 cm)
+                     "row": [pieces[i] for i in sorted(int(k) for k in ptree.query(
+                         clip, predicate="intersects"))],
                      "reserves": B.reserves, "cones": B.cones, "open_land": B.open_land,
                      # traced buildings stand on their own ground, PIN_LOT_GAP_M around them
                      "pinned": G.qpoly(G.inter(B.pin_feet, clip).buffer(

@@ -1533,6 +1533,7 @@ class Line:
     on_roads: bool = True                        # road modes: legs on the road graph
     corners: dict = field(default_factory=dict)  # stop index -> guide corner (fast lines)
     keep_free: bool = False                      # legs may run back along the line
+    held: bool = False                           # M10: the old track kept (regeneration)
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -3541,12 +3542,14 @@ def _skybridge_hits(c: Ctx, lines: list) -> list[str]:
     return sorted(out)
 
 
-def build(spec, m) -> Out:
+def build(spec, m, fixed: dict | None = None) -> Out:
+    """`fixed` (M10, a district regeneration): line name -> the old line's row; such a line
+    keeps its track and heights, and the buildings now in its way go."""
     with G.canonical():
-        return _build(spec, m)
+        return _build(spec, m, fixed or {})
 
 
-def _build(spec, m) -> Out:
+def _build(spec, m, fixed: dict) -> Out:
     import shapely.ops  # noqa: F401  (nearest_points)
 
     c = context(spec, m)
@@ -3567,7 +3570,16 @@ def _build(spec, m) -> Out:
         if len(ln.stops) < 2:
             notes.append(f"{tl.name}: fewer than two stops; not built")
             continue
-        route_line(c, ln)
+        fx = fixed.get(tl.name)
+        if fx is not None and len(fx["attrs"].get("stop_vertices", [])) == len(ln.stops):
+            ln.pts = [(p[0], p[1]) for p in fx["path"]]
+            ln.zs = [p[2] for p in fx["path"]]
+            ln.stop_at = list(fx["attrs"]["stop_vertices"])
+            r = fx["attrs"].get("min_radius_m")
+            ln.min_radius = INF if r is None else r
+            ln.held = True
+        else:
+            route_line(c, ln)
         T.stage(f"transit/{ln.id}/route", [ln.pts, round(ln.min_radius, 2)
                                            if ln.min_radius != INF else None])
         lines.append(ln)
@@ -3577,6 +3589,18 @@ def _build(spec, m) -> Out:
     for ln in lines:
         gone |= set(ln.removed)
     for ln in lines:
+        if ln.held:
+            # M10: the old track and heights; a portal that no longer fits goes, and what is
+            # now in the way (a building of the regenerated district) is taken out
+            for _ in range(len(ln.portals)):
+                if not _fit_portals(c, ln):
+                    break
+            out = [x for x in ln.conflicts if x != "route"] + clearance_conflicts(c, ln, gone)
+            ln.removed += out
+            gone |= set(out)
+            ln.conflicts = [x for x in ln.conflicts if x == "route"]
+            notes += ln.notes
+            continue
         profile(c, ln, gone)
         for _ in range(40):
             if not _fit_portals(c, ln):

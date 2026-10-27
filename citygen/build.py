@@ -69,6 +69,9 @@ class Built:
     roads: object = None
     local: object = None
     m3: object = None
+    stable_ids: frozenset = frozenset()   # M10: ids already stable (named before the props)
+    frame: object = None                  # M10: roads a district regeneration holds
+    held_lines: dict = None               # M10: transit lines it keeps (name -> old row)
 
     @property
     def passed(self) -> bool:
@@ -360,7 +363,7 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
                 break
         ranked = sorted(built, key=lambda b: (_score(b), b.variant))
         if not roads:
-            return ranked[0]
+            return stable(ranked[0])
         b = add_roads(ranked, explicit, run)
         # M8a: no road network on these variants passes (an exit edge without land, say):
         # the next variants in turn, the first that passes with its roads wins; in index
@@ -387,7 +390,7 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
                     [x for x in sorted(built, key=lambda x: (_score(x), x.variant))
                      if x.variant != b.variant]
         if not local:
-            return b
+            return stable(b)
         # the whole city on these roads; when a later stage fails a check, again with the
         # local layout drawn again (district seeds salted, LAYOUT_SALTS times), then on the
         # next road network that passes, at most CITY_RETRIES more tries in all; the try
@@ -430,9 +433,66 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
             b.notes = [f"{what} left {fails} check failures in the full city; built again on "
                        f"{again}"] + b.notes
         best[1].stats["city_tries"] = tries
-        return best[1]
+        return stable(best[1])
     finally:
         run.close()
+
+
+def choices(b: Built) -> dict:
+    """What the search chose: a build at these choices (`replay`) is the same city."""
+    return {"hydro_variant": b.variant, "road_variant": b.stats.get("road_variant"),
+            "layout_salt": b.stats.get("layout_salt", 0)}
+
+
+def replay(result: Result, chosen: dict, workers: int | None = None, local: bool = True,
+           buildings: bool = True, spec: CitySpec | None = None, frame=None,
+           held_lines: dict | None = None) -> Built:
+    """M10: the city at the choices a search made (`choices`), without the search: water and
+    districts of the hydrology variant, its road variant, the local layout salt. With `spec`
+    the stages from the local streets on (M2) use it instead (a district edited; M1 stays the
+    one of `result`); `frame` (`streets.Frame`) holds roads of an older build and
+    `held_lines` its transit lines (a district regeneration, `edit.py`)."""
+    base = result.filled
+    explicit = {d.name for d in result.spec.districts if d.area_share is not None}
+    run = _Runner(default_workers() if workers is None else workers)
+    try:
+        v = build_variant(base, explicit, chosen["hydro_variant"])
+        t = road_attempt(v, explicit, chosen["road_variant"])
+        b = copy.copy(v)
+        b.sites, b.roads, b.model, b.checks = t.sites, t.net, t.model, t.checks
+        st = t.stats
+        st["separation_budget"] = v.stats.get("separation_budget")
+        st["road_variant"] = t.net.variant
+        b.stats = st
+        b.notes = b.notes + t.site_notes + t.net.notes
+        b.frame, b.held_lines = frame, held_lines
+        if local:
+            salt = chosen.get("layout_salt") or 0
+            b.spec = spec if spec is not None else base
+            if salt:
+                b.spec = _salted(b.spec, salt)
+            if salt:
+                b.stats["layout_salt"] = salt
+            add_local(b, explicit, run, check=not buildings)
+            if buildings:
+                add_buildings(b, explicit, run)
+        return stable(b)
+    finally:
+        run.close()
+
+
+def stable(b: Built) -> Built:
+    """M10: the finished city with stable ids (`ids.py`); the notes, check failures and stats
+    name them too."""
+    from . import ids as ID
+
+    b.model, mp = ID.rename(b.model, b.stable_ids)
+    b.notes = [ID.text(n, mp) for n in b.notes]
+    for c in b.checks:
+        c.failures = [ID.text(f, mp) for f in c.failures]
+        c.notes = [ID.text(n, mp) for n in c.notes]
+    b.stats = ID.remap(b.stats, mp)
+    return b
 
 
 @dataclass
@@ -575,6 +635,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     from . import elevated as EL
     from . import gameplay as GP
     from . import gameplay_checks as GC
+    from . import ids as ID
     from . import street_checks as SC
     from . import prop_checks as PC
     from . import props as PR
@@ -606,10 +667,20 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     m = with_rows(b.model, BO.rows(out))
     tr = None
     if spec.transit.lines:
-        tr = TR.build(spec, m)
+        tr = TR.build(spec, m, b.held_lines)
         m = with_rows(m, tr.rows)
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
+    # M10: stable ids for everything built so far, so the props, the plants and the
+    # gameplay layer key their draws and names on them (not on build order)
+    m, mp = ID.rename(m)
+    b.stable_ids = frozenset(e.id for e in m.entities())
+    for c in early["checks"]:
+        c.failures = [ID.text(f, mp) for f in c.failures]
+        c.notes = [ID.text(n, mp) for n in c.notes]
+    early["stats"] = ID.remap(early["stats"], mp)
+    b.notes = [ID.text(n, mp) for n in b.notes]
+    late_notes = [ID.text(n, mp) for n in out.notes + (tr.notes if tr is not None else [])]
     pr = PR.build(spec, m)
     m = with_rows(m, pr.rows)
     # M11: the gameplay layer on the finished city
@@ -646,9 +717,23 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st.setdefault("buildings", {})["generator"] = {k: v for k, v in out.info.items()
                                                    if k != "seconds"}
     b.checks, b.stats = checks, st
-    b.notes = b.notes + out.notes + (tr.notes if tr is not None else []) + pr.notes + \
-        gp.notes
+    b.notes = b.notes + late_notes + pr.notes + gp.notes
     return b
+
+
+def check_all(spec: CitySpec, m: CityModel) -> tuple[list, dict]:
+    """M10: every check of a full build on a finished city model (a regenerated district,
+    overrides), in the order a build reports them, with the stats of each stage."""
+    prev = G.CANONICAL[0]
+    G.CANONICAL[0] = False
+    try:
+        checks, st = C.run_checks(spec, m, roads=True)
+    finally:
+        G.CANONICAL[0] = prev
+    # a build checks the supports last (after the transit structures they avoid)
+    checks = [c for c in checks if c.id != "road_supports"] + \
+        [c for c in checks if c.id == "road_supports"]
+    return checks, st
 
 
 def with_rows(model: CityModel, rows: dict) -> CityModel:

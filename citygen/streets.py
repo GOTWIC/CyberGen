@@ -247,6 +247,7 @@ class StreetNet:
     notes: list[str] = field(default_factory=list)
     angles: dict[str, float] = field(default_factory=dict)     # district grid angle (deg)
     builder: object = None
+    held: int = 0      # M10: held segments found again (district regeneration)
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +452,180 @@ class SegIndex:
         return sorted(out)
 
 
+FRAME_SNAP_M = 25.0   # M10: a street of a regenerated district meets a held road at an old
+                      # node at most this far from where it would have met it
+
+
+def _ckey(pts) -> tuple:
+    """A centerline as a key, the same either way along."""
+    a = tuple((float(x), float(y)) for x, y in pts)
+    return min(a, a[::-1])
+
+
+def _ekey(pts) -> tuple:
+    a, b = (float(pts[0][0]), float(pts[0][1])), (float(pts[-1][0]), float(pts[-1][1]))
+    return (a, b) if a <= b else (b, a)
+
+
+class Frame:
+    """M10, `citygen build --district`: the roads a district regeneration holds. Every road
+    segment of the old city that is not inside the district (its border roads, the roads
+    outside it, the primary roads that leave it) is held: built again as it was, with all its
+    nodes, and the district's new streets meet it only at one of those nodes. Inside the
+    district are its own local streets (not its boundary streets) and the pieces of primary
+    roads that lie in it more than 1 m from its edge; those are built anew."""
+
+    def __init__(self, model, name: str, did: str, polygon, base_arch: dict,
+                 pins=(), keep_out=None):
+        self.name, self.did = name, did
+        self.base_arch = base_arch
+        self.pins = set(pins)          # pinned roads are held too (`overrides.py`)
+        self.keep_out = keep_out       # pinned buildings and open spaces: no new streets
+        self.zone = G.qpoly(polygon.buffer(2.0, join_style="mitre"))
+        self.core = G.qpoly(polygon.buffer(-1.0, join_style="mitre"))
+        shapely.prepare(self.zone)
+        shapely.prepare(self.core)
+        pos = {n.id: (G.q(n.position[0]), G.q(n.position[1])) for n in model.road_nodes}
+        self.rows: dict[tuple, object] = {}       # held segments by centerline
+        self.m1b: dict[str, list[tuple]] = {}     # M1b id -> centerlines of its held pieces
+        nodes = set()
+        for s in model.road_segments:
+            if self.inside_row(s):
+                continue
+            self.rows[_ckey(s.centerline)] = s
+            if "m1b_segment" in s.attrs:
+                self.m1b.setdefault(s.attrs["m1b_segment"], []).append(
+                    tuple((G.q(x), G.q(y)) for x, y in s.centerline))
+            nodes.add(pos[s.start])
+            nodes.add(pos[s.end])
+        self.ends: dict[tuple, list] = {}       # held segments by their end points
+        for k, r in self.rows.items():
+            self.ends.setdefault(_ekey(k), []).append(r)
+        self.nodes = nodes
+        self.node_list = sorted(nodes)
+        self.tree = shapely.STRtree(shapely.points(np.array(self.node_list, dtype=np.float64))
+                                    ) if nodes else None
+        self._spans: dict[str, list] = {}
+        self.local = sorted(k for k, r in self.rows.items() if "m1b_segment" not in r.attrs)
+        self.ltree = shapely.STRtree([LineString(k) for k in self.local]) if self.local else None
+
+    def inside_row(self, s) -> bool:
+        a = s.attrs
+        if a.get("role") == "district_boundary" or s.id in self.pins:
+            return False
+        line = LineString(s.centerline)
+        if "m1b_segment" in a:
+            return self.core.contains(line)
+        if a.get("role") == "footbridge":
+            return a.get("district") == self.did and self.zone.contains(line)
+        return a.get("district") == self.did
+
+    def free_local(self, t: "Line") -> bool:
+        if t.district != self.name or t.role == "district_boundary":
+            return False
+        return t.role != "footbridge" or self.zone.contains(LineString(t.pts))
+
+    def match(self, pts):
+        """The held segment that a new edge is (the same ends and course; the old one may
+        keep a vertex where a street of the district met it once), else None."""
+        cands = self.ends.get(_ekey(pts))
+        if not cands:
+            return None
+        line = LineString(pts)
+        for r in cands:
+            o = LineString(r.centerline)
+            if abs(o.length - line.length) < 0.05 and o.hausdorff_distance(line) < 0.03:
+                return r
+        return None
+
+    def spans(self, t: "Line") -> list[tuple[float, float]]:
+        key = t.primary["id"]
+        if key not in self._spans:
+            out = []
+            for c in self.m1b.get(key, []):
+                s0, s1 = _project(t.pts, c[0])[0], _project(t.pts, c[-1])[0]
+                out.append((min(s0, s1), max(s0, s1)))
+            self._spans[key] = sorted(out)
+        return self._spans[key]
+
+    def holds(self, t: "Line", q) -> bool:
+        """Whether road t is held where a street would meet it at q."""
+        if t.primary is not None:
+            s = _project(t.pts, q)[0]
+            return any(s0 - 0.5 <= s <= s1 + 0.5 for s0, s1 in self.spans(t))
+        return not self.free_local(t)
+
+    def node_on(self, t: "Line", q) -> tuple | None:
+        """The old node on road t nearest q (within FRAME_SNAP_M), else None."""
+        if self.tree is None:
+            return None
+        ks = sorted(int(k) for k in self.tree.query(Point(q), predicate="dwithin",
+                                                     distance=FRAME_SNAP_M))
+        best = None
+        for k in ks:
+            p = self.node_list[k]
+            if _locate(t.pts, p) is None:
+                continue
+            d = _dist(p, q)
+            if best is None or (d, p) < best:
+                best = (d, p)
+        return best[1] if best else None
+
+    def meet(self, t: "Line", q):
+        """Where a new street of the district meets road t near q: an old node where t is
+        held (None if there is none within FRAME_SNAP_M); where t is free, q, or the old node
+        of a held stretch of t closer than MIN_JUNCTION_GAP_M."""
+        if self.holds(t, q):
+            return self.node_on(t, q)
+        if t.primary is not None:
+            olds = [p for p in self.on_line(t) if _dist(p, q) < MIN_JUNCTION_GAP_M]
+            if olds:
+                return min(olds, key=lambda p: (_dist(p, q), p))
+        return q
+
+    def on_line(self, t: "Line") -> list[tuple]:
+        """The ends of the held segments that run along road t (they stay nodes)."""
+        if len(t.pts) < 2:
+            return []
+        if t.primary is not None:
+            pieces = self.m1b.get(t.primary["id"], [])
+        elif self.free_local(t) or self.ltree is None:
+            return []
+        else:
+            ks = sorted(int(k) for k in self.ltree.query(LineString(t.pts), predicate="dwithin",
+                                                          distance=0.05))
+            pieces = [self.local[k] for k in ks]
+        out = []
+        for c in pieces:
+            if all(_locate(t.pts, p) is not None for p in c):
+                out += [c[0], c[-1]]
+        return out
+
+    def restore(self, segments: list[dict]) -> int:
+        """Held segments as they were (direction, one-way state, cross-section, profile,
+        attributes): the regeneration must not change them. Returns how many it found."""
+        found = 0
+        for s in segments:
+            old = self.match(s["centerline"])
+            if old is None:
+                continue
+            found += 1
+            o = old.model_dump(mode="json")
+            fwd = tuple(s["centerline"][0]) == tuple(o["centerline"][0])
+            a, b = (s["start"], s["end"]) if fwd else (s["end"], s["start"])
+            for k in RESTORED:
+                s[k] = o[k]
+            if "role" in o["attrs"]:
+                s["attrs"] = {**s["attrs"], "role": o["attrs"]["role"]}
+            s["start"], s["end"] = a, b
+        return found
+
+
+# the fields `Frame.restore` copies (not the ids and references, which the new build names)
+RESTORED = ("type", "road_class", "lanes", "width_m", "centerline", "level", "z_profile",
+            "cross_section", "one_way", "clearance_m", "name")
+
+
 def _cross_exact(a, b, c, d):
     """Intersection of segments ab and cd on the cm grid (exact); None when they do not meet
     in a single point. Returns (point, t on ab as a Fraction)."""
@@ -489,8 +664,9 @@ def _rdiv(n: int, d: int) -> int:
 
 class Builder:
     def __init__(self, spec: CitySpec, h, polygons: dict, district_ids: dict, waterways, sites,
-                 roads, open_polys: list):
+                 roads, open_polys: list, frame: Frame | None = None):
         self.spec = spec
+        self.frame = frame
         self.h = h
         self.polygons = polygons
         self.did = district_ids
@@ -515,6 +691,11 @@ class Builder:
         self.pin_feet = G.union(feet) if feet else Polygon()
         self.pinned = G.qpoly(G.union(feet).buffer(PIN_CLEAR_M, join_style="mitre")) \
             if feet else Polygon()
+        if frame is not None and frame.keep_out is not None and not frame.keep_out.is_empty:
+            # M10: pinned buildings and open spaces of a regenerated district keep their ground
+            self.pin_feet = G.union([self.pin_feet, frame.keep_out])
+            self.pinned = G.union([self.pinned, G.qpoly(frame.keep_out.buffer(
+                PIN_CLEAR_M, join_style="mitre"))])
         self.closed = G.union([G.qpoly(self.reserves.buffer(CLOSED_PAD_M, join_style="mitre")),
                                self.cones, self.open_land, self.pinned])
         shapely.prepare(self.closed)
@@ -608,7 +789,7 @@ class Builder:
             t = self.lines[tj]
             if t.no_junction and not (allow_highway and t.cls == "highway"):
                 continue
-            new = self._attach_to(pts, t, angle, reach, ln.inserts)
+            new = self._attach_to(pts, t, angle, reach, ln.inserts, self._renewed(ln))
             if new is None:
                 continue
             q = new[-1]
@@ -652,6 +833,10 @@ class Builder:
         near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
         if near:
             q = min(near, key=lambda j: (_dist(j, q), j))
+        if self._renewed(ln):
+            q = self.frame.meet(t, q)
+            if q is None:
+                return False
         angle = min_angle(self.arch[ln.district]) if ln.district else GRID_ANGLE_DEG
         if _angle_between(_unit(q[0] - p[0], q[1] - p[1]), self._tangent(t.pts, q)) < angle:
             return False
@@ -672,7 +857,13 @@ class Builder:
             return False
         return not any(_dist(j, q) < PRIMARY_NODE_GAP_M for j in t.nodes)
 
-    def _attach_to(self, pts, t: Line, angle: float, reach: float, keep=()):
+    def _renewed(self, ln: Line) -> bool:
+        """M10: a street of the district being regenerated (it meets held roads only at
+        their nodes; every other street is built as it was)."""
+        return self.frame is not None and self.frame.free_local(ln)
+
+    def _attach_to(self, pts, t: Line, angle: float, reach: float, keep=(),
+                   renewed: bool = False):
         """The polyline extended onto road t, or None where no junction is allowed."""
         p = pts[-1]
         back, _ = _along(pts[::-1], min(8.0, _plen(pts) / 2))
@@ -698,6 +889,10 @@ class Builder:
             for e in (t.pts[0], t.pts[-1]):
                 if q != e and _dist(e, q) < 8.0:
                     q = e  # join at the end of the target instead of leaving a stub
+        if renewed:
+            q = self.frame.meet(t, q)  # M10: a held road is met at one of its nodes
+            if q is None:
+                return None
         tang = self._tangent(t.pts, q)
         a = _unit(q[0] - back[0], q[1] - back[1])
         if _dist(q, back) >= 1.0 and _angle_between(a, tang) >= angle:
@@ -714,6 +909,10 @@ class Builder:
             q2 = _pt(*q2)
             if not self._legal(t, q2, s2):
                 return None
+            if renewed:
+                q2 = self.frame.meet(t, q2)
+                if q2 is None:
+                    return None
             a2 = _unit(q2[0] - pb[0], q2[1] - pb[1])
             prev, _ = _along(pts[::-1], min(30.0, _plen(pts)))
             a_prev = _unit(pb[0] - prev[0], pb[1] - prev[1])
@@ -1022,9 +1221,11 @@ def build_frame(B: Builder) -> None:
                 continue
             shared = shapely.intersection(pa.boundary, G.qpoly(pb.buffer(0.5, join_style="mitre")))
             shared = shapely.difference(G.snap(shared), wet15_)
-            arch = a if cross_section("street", B.arch[a])["total_width_m"] >= \
-                cross_section("street", B.arch[b])["total_width_m"] else b
-            sec = cross_section("street", B.arch[arch])
+            # (M10: a regenerated district's boundary streets keep their old archetype)
+            ar = B.frame.base_arch if B.frame is not None else B.arch
+            arch = a if cross_section("street", ar[a])["total_width_m"] >= \
+                cross_section("street", ar[b])["total_width_m"] else b
+            sec = cross_section("street", ar[arch])
             for pts in _merged_lines(G.snap(shapely.simplify(shared, 2.0))
                                      if not shared.is_empty else shared):
                 for piece in _clip(pts, free_all1):
@@ -1985,6 +2186,10 @@ def link_dead_ends(B: Builder) -> None:
         near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
         if near:
             q = min(near, key=lambda j: (_dist(j, q), j))
+        if B.frame is not None and t.district == B.frame.name and B.frame.holds(t, q):
+            q = B.frame.node_on(t, q)  # M10: a gate link onto a held road of the district
+            if q is None:
+                continue
         link = LineString([p, q])
         if B.closed.intersects(link) and link.intersection(B.closed).length > 0.5:
             continue
@@ -2122,6 +2327,8 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
             near = [j for j in t.junctions if _dist(j, q) < MIN_JUNCTION_GAP_M]
             if near:
                 q = min(near, key=lambda j: (_dist(j, q), j))
+            if B._renewed(ln) and B.frame.holds(t, q):
+                continue  # M10: no new link from the district onto a held road
             link = LineString([a, q])
             if _dist(a, q) < 1.0 or link.intersection(B.wet).length > 0.5 or (
                     B.closed.intersects(link) and link.intersection(B.closed).length > 0.5):
@@ -2177,6 +2384,10 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
     line index)."""
     notes: list[str] = []
     live = [i for i, ln in enumerate(B.lines) if not ln.dead and len(ln.pts) >= 2]
+    if B.frame is not None:
+        # M10: a held road keeps every node it had, used or not
+        for i in live:
+            B.lines[i].inserts += B.frame.on_line(B.lines[i])
     seg_line, seg_k, coords = [], [], []
     for i in live:
         pts = B.lines[i].pts
@@ -2222,6 +2433,14 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
             cuts.setdefault(loc, []).append((p, B.lines[prim].width / 2 + 3.0))
             crossings += 1
             continue
+        if B.frame is not None and not snapped and li != lj and p not in B.frame.nodes:
+            hi_, hj = B.frame.holds(B.lines[li], p), B.frame.holds(B.lines[lj], p)
+            if hi_ != hj:
+                # M10: a new street crossing a held road stops on both sides of it
+                held, new = (li, lj) if hi_ else (lj, li)
+                cuts.setdefault(new, []).append((p, B.lines[held].width / 2 + 3.0))
+                crossings += 1
+                continue
         if li == lj and not snapped:
             # a line crossing itself is cut at both places (an insert is found only once)
             self_cuts.setdefault(li, []).append((seg_k[x], p))
@@ -2327,6 +2546,8 @@ def _merge_and_trim(B: Builder, edges):
             es = [e for e in ends[p] if alive[e]]
             if len(es) != 2 or es[0] == es[1]:
                 continue
+            if B.frame is not None and p in B.frame.nodes:
+                continue  # M10: a held node stays
             e1, e2 = es
             (p1, l1), (p2, l2) = edges[e1], edges[e2]
             if not _mergeable(B, l1, l2):
@@ -2354,7 +2575,7 @@ def _merge_and_trim(B: Builder, edges):
             ln = B.lines[li]
             short = _plen(pts) < 6.0
             dangling = deg[pts[0]] == 1 or deg[pts[-1]] == 1
-            if ln.primary is None and short and dangling:
+            if ln.primary is None and short and dangling and not _held(B, pts):
                 changed = True
                 continue
             keep.append((pts, li))
@@ -2424,6 +2645,9 @@ def fix_angles(B: Builder, edges) -> tuple[list, int]:
             local = [(e, a) for _, e, a in pair if B.lines[edges[e][1]].primary is None]
             if not local:
                 continue
+            new = [(e, a) for e, a in local if B._renewed(B.lines[edges[e][1]])]
+            if new and len(new) < len(local):
+                local = new  # M10: the new street gives way, not the held one
             e, a = min(local, key=lambda t: (RANK[B.lines[edges[t[0]][1]].cls],
                                             _plen(edges[t[0]][0]), t[0]))
             pts = edges[e][0]
@@ -2526,6 +2750,9 @@ def fix_duplicates(B: Builder, edges) -> tuple[list, int]:
             lj = edges[j][1]
             pb = B.lines[lj].primary is not None
             cand = [k for k, prim in ((i, pa), (j, pb)) if not prim]
+            new = [k for k in cand if B._renewed(B.lines[edges[k][1]])]
+            if new and len(new) < len(cand):
+                cand = new  # M10: the new street goes, not the held one
             k = min(cand, key=lambda k: (RANK[B.lines[edges[k][1]].cls],
                                          _plen(edges[k][0]), k))
             drop.add(k)
@@ -2579,6 +2806,7 @@ def drop_unnoded_crossings(B: Builder, edges) -> tuple[list, int]:
     n = 0
     for _ in range(20):
         idx = [k for k, (pts, li) in enumerate(edges) if li >= B.n_primary]
+        new = {k for k in idx if B._renewed(B.lines[edges[k][1]])}
         if len(idx) < 2:
             break
         lines = [LineString(edges[k][0]) for k in idx]
@@ -2590,6 +2818,9 @@ def drop_unnoded_crossings(B: Builder, edges) -> tuple[list, int]:
                     continue
                 pa, pb = edges[idx[a]][0], edges[idx[b]][0]
                 k = idx[a] if (_plen(pa), idx[a]) < (_plen(pb), idx[b]) else idx[b]
+                other = idx[b] if k == idx[a] else idx[a]
+                if k not in new and other in new:
+                    k = other  # M10: the new street goes, not the held one
                 if worst is None or k < worst:
                     worst = k
         if worst is None:
@@ -2659,8 +2890,13 @@ def clean_graph(B: Builder, edges):
             n_lost = sum(1 for p, li in edges if find(p[0]) != main)
             notes.append(f"{n_lost} local segments ({lost / 1000:.2f} km) not connected to the "
                          "network were dropped")
-        edges = [(p, li) for p, li in edges if find(p[0]) == main]
+        edges = [(p, li) for p, li in edges if find(p[0]) == main or _held(B, p)]
     return edges, notes
+
+
+def _held(B: Builder, pts) -> bool:
+    """M10: an edge that is a held segment of the old city (never dropped)."""
+    return B.frame is not None and B.frame.match(pts) is not None
 
 
 PIN_CLEAR_M = 15.0              # street centerline to a traced building (a 20 m street keeps 5 m)
@@ -2820,6 +3056,8 @@ def build_output(B: Builder, edges) -> None:
     net.bridges = [bridges[k] for k in sorted(bridges)]
     _local_grades(net)
     _grade_separations(net)
+    if B.frame is not None:
+        net.held = B.frame.restore(net.segments)
 
 
 def _local_grades(net: StreetNet) -> None:
@@ -2935,8 +3173,8 @@ def _grade_separations(net: StreetNet) -> None:
 # ---------------------------------------------------------------------------
 
 def build_streets(spec: CitySpec, h, polygons: dict, district_ids: dict, waterways, sites,
-                  roads, open_polys: list) -> StreetNet:
-    B = Builder(spec, h, polygons, district_ids, waterways, sites, roads, open_polys)
+                  roads, open_polys: list, frame: Frame | None = None) -> StreetNet:
+    B = Builder(spec, h, polygons, district_ids, waterways, sites, roads, open_polys, frame)
     build_frame(B)
     for d in spec.districts:
         if d.name in B.free and not B.free[d.name].is_empty:
