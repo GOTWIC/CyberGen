@@ -25,7 +25,8 @@
       ]
     }
   },
-  "highways": {"pattern": "ring_plus_spine", "exits": ["east", "north"]},
+  "highways": {"pattern": "ring_plus_spine", "exits": ["east", "north"],
+               "tunnels": {"under": ["Corporate Core", "The Stacks"]}},
   "transit": {
     "hubs": ["Corporate Core"],
     "lines": [

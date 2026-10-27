@@ -878,10 +878,22 @@ def under_deck(ln: "Line", p) -> bool:
     return _z_on(ln.primary["z_profile"], _project(ln.pts, p)[0]) >= UNDERPASS_CLEAR_M - 0.5
 
 
+OVER_TUNNEL_Z_M = -7.3         # M9: a street crosses over a tunnel road this deep (box roof,
+#                                a metre of cover)
+
+
+def over_tunnel(ln: "Line", p) -> bool:
+    """A primary road in a covered tunnel at p (on it): a street passes over it."""
+    if ln.primary is None or not ln.primary.get("tunnel"):
+        return False
+    return _z_on(ln.primary["z_profile"], _project(ln.pts, p)[0]) <= OVER_TUNNEL_Z_M + 0.5
+
+
 def underpasses(B: Builder, frontage: dict, free_all) -> list[int]:
     """Streets straight across under the elevated highways, every 200 m or so, where the
     deck is high enough, joined to the frontage streets on both sides (scope 5.2: covered
-    sections); none within 60 m of a road passing under it or 40 m of a ramp."""
+    sections); none within 60 m of a road passing under it or 40 m of a ramp. M9: the same
+    over the lid of a highway in a covered tunnel (role over_tunnel)."""
     added: list[int] = []
     why: dict = {}
 
@@ -891,16 +903,23 @@ def underpasses(B: Builder, frontage: dict, free_all) -> list[int]:
     ramps = [ln.line for ln in prim if ln.role == "ramp"]
     for hi_ in sorted(frontage):
         hw = B.lines[hi_]
-        if not (hw.primary or {}).get("attrs", {}).get("elevated"):
+        tun = bool((hw.primary or {}).get("tunnel"))
+        if not (hw.primary or {}).get("attrs", {}).get("elevated") and not tun:
             continue
         fr = set(frontage[hi_])
-        over = [tuple(p) for p in hw.primary["attrs"].get("overpass_at", [])]
+        over = [tuple(p) for p in hw.primary["attrs"].get(
+            "underpass_at" if tun else "overpass_at", [])]
         L = _plen(hw.pts)
         s = UNDERPASS_STEP_M / 2.0
         while s < L - 40.0:
             here = s
             s += UNDERPASS_STEP_M
-            if here < 40.0 or _z_on(hw.primary["z_profile"], here) < UNDERPASS_CLEAR_M:
+            if tun:
+                if here < 40.0 or any(_z_on(hw.primary["z_profile"], here + d) >
+                                      OVER_TUNNEL_Z_M for d in (-10.0, 0.0, 10.0)):
+                    no("tunnel too shallow")
+                    continue
+            elif here < 40.0 or _z_on(hw.primary["z_profile"], here) < UNDERPASS_CLEAR_M:
                 no("deck too low")
                 continue
             c, u = _along(hw.pts, here)
@@ -953,8 +972,8 @@ def underpasses(B: Builder, frontage: dict, free_all) -> list[int]:
                 no("no district")
                 continue
             sec = cross_section("street", B.arch[n])
-            li = B.add(Line([a, b], "street", sec["total_width_m"], "underpass", n,
-                            section=sec))
+            li = B.add(Line([a, b], "street", sec["total_width_m"],
+                            "over_tunnel" if tun else "underpass", n, section=sec))
             if B.attach(li, 0, 3.0, targets=fr) and B.attach(li, -1, 3.0, targets=fr):
                 added.append(li)
             else:
@@ -962,7 +981,8 @@ def underpasses(B: Builder, frontage: dict, free_all) -> list[int]:
                 B.lines[li].dead = True
                 B.index.remove_line(li)
     if added or why:
-        B.notes.append(f"{len(added)} underpass streets under the viaducts" + (
+        B.notes.append(f"{len(added)} underpass streets under the viaducts or over the "
+                       "tunnels" + (
             " (not built: " + ", ".join(f"{v} {k}" for k, v in sorted(why.items())) + ")"
             if why else ""))
     return added
@@ -2219,7 +2239,7 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
             # a local road crossing a primary road where no junction was allowed: it stops
             # on both sides instead (cut below), no node; under a viaduct it passes under
             loc, prim = (lj, li) if li < B.n_primary else (li, lj)
-            if under_deck(B.lines[prim], p):
+            if under_deck(B.lines[prim], p) or over_tunnel(B.lines[prim], p):
                 continue
             cuts.setdefault(loc, []).append((p, B.lines[prim].width / 2 + 3.0))
             crossings += 1

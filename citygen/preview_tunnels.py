@@ -148,7 +148,8 @@ def _roads(ax, m, lw_scale: float = 1.0, box=None) -> None:
     ws = [(1.0 if s.road_class == "highway" else 0.7 if s.road_class == "avenue" else 0.45)
           * lw_scale for s in rows if not s.tunnel]
     ax.add_collection(LineCollection(lines, colors=GROUND, linewidths=ws, zorder=2))
-    over = [np.asarray(s.centerline) for s in rows if s.attrs.get("over_tunnel_at")]
+    over = [np.asarray(s.centerline) for s in rows if s.attrs.get("over_tunnel_at") or
+            s.attrs.get("role") == "over_tunnel"]
     ax.add_collection(LineCollection(over, colors="#e8e8f0", linewidths=1.2 * lw_scale,
                                      zorder=5))
 
@@ -217,7 +218,8 @@ def render_tunnels(b, out, dpi: int = 140) -> None:
                         for k, r in by.items()) or "no tunnels"
     fig.text(0.012, 1 - 0.62 / fig_h,
              f"{summary}; {st.get('vents', 0)} ventilation buildings, "
-             f"{st.get('over_tunnel_roads', 0)} roads over road tunnels; deepest road "
+             f"{st.get('over_tunnel_roads', 0) + st.get('over_tunnel_streets', 0)} roads and "
+             f"streets over road tunnels; deepest road "
              f"{st.get('deepest_road_m', 0)} m, metro "
              f"{st.get('deepest_metro_m') if st.get('deepest_metro_m') is not None else '-'} m;"
              f" {'checks PASS' if b.passed else 'checks FAIL'}", color=MUTED, fontsize=9,

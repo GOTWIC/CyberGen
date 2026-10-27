@@ -926,6 +926,15 @@ def relink(tunnels: list[dict], segments: list[dict]) -> list[dict]:
         out.append(t)
     rows = {t["id"]: t for t in out}
     for s in segments:
+        # M2 pieces keep only the crossing points that lie on them
+        for key in ("over_tunnel_at", "underpass_at", "ends_at_tunnel"):
+            if key in s["attrs"]:
+                ln = LineString(s["centerline"])
+                keep = [p for p in s["attrs"][key] if ln.distance(Point(p)) < 1.0]
+                if keep:
+                    s["attrs"][key] = keep
+                else:
+                    del s["attrs"][key]
         if not s.get("tunnel"):
             continue
         if not any(z["z"] < -0.005 for z in s["z_profile"]):

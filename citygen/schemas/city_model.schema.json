@@ -2371,6 +2371,19 @@
           "description": "Highest bridge clearance on it.",
           "title": "Clearance M"
         },
+        "tunnel": {
+          "default": false,
+          "description": "Runs through a tunnel (M9; level -1, the z profile below the ground).",
+          "title": "Tunnel",
+          "type": "boolean"
+        },
+        "tunnel_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tunnel Ids",
+          "type": "array"
+        },
         "district_ids": {
           "description": "Districts it serves.",
           "items": {
@@ -3000,7 +3013,10 @@
             "column",
             "pylon",
             "tube",
-            "canopy"
+            "canopy",
+            "portal",
+            "trench",
+            "vent"
           ],
           "title": "Kind",
           "type": "string"
@@ -3218,6 +3234,202 @@
       "title": "TransitLine",
       "type": "object"
     },
+    "Tunnel": {
+      "additionalProperties": false,
+      "description": "A road tunnel (immersed tube under water, cut-and-cover box under the ground), a metro\ntunnel between station boxes, or a pedestrian underpass. `line` is the road surface or\ntrack along the whole sunk stretch (open approaches included); the structure is a box\n`width_m` wide from `floor_m` under the line to `roof_m` over its clear height.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "immersed_tube",
+            "cut_and_cover",
+            "metro",
+            "pedestrian"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "segment_ids": {
+          "description": "Roads through it.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Segment Ids",
+          "type": "array"
+        },
+        "line_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Metro: its transit line.",
+          "title": "Line Id"
+        },
+        "walkway_ids": {
+          "description": "Underpasses.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Walkway Ids",
+          "type": "array"
+        },
+        "crosses": {
+          "description": "Water, districts and roads it passes under.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Crosses",
+          "type": "array"
+        },
+        "line": {
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Line",
+          "type": "array"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "clear_m": {
+          "description": "Clear height over the road, track or walkway.",
+          "title": "Clear M",
+          "type": "number"
+        },
+        "roof_m": {
+          "description": "Roof slab thickness.",
+          "title": "Roof M",
+          "type": "number"
+        },
+        "floor_m": {
+          "default": 1.0,
+          "description": "Floor slab under the road or track.",
+          "title": "Floor M",
+          "type": "number"
+        },
+        "portals": {
+          "items": {
+            "$ref": "#/$defs/TunnelPortal"
+          },
+          "title": "Portals",
+          "type": "array"
+        },
+        "vent_ids": {
+          "description": "Ventilation buildings.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Vent Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "line",
+        "width_m",
+        "clear_m",
+        "roof_m"
+      ],
+      "title": "Tunnel",
+      "type": "object"
+    },
+    "TunnelPortal": {
+      "additionalProperties": false,
+      "description": "Where a tunnel's roof meets the ground: the open approach ramp (a walled trench) runs\non from here to the ground.",
+      "properties": {
+        "position": {
+          "description": "Road (or track) center at the portal.",
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "heading_deg": {
+          "description": "Into the tunnel, degrees counterclockwise from east.",
+          "title": "Heading Deg",
+          "type": "number"
+        },
+        "open_m": {
+          "description": "Length of the open approach outside the portal.",
+          "title": "Open M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position",
+        "heading_deg",
+        "open_m"
+      ],
+      "title": "TunnelPortal",
+      "type": "object"
+    },
     "Unit": {
       "additionalProperties": false,
       "description": "A ground-floor unit along a street facade (4 to 12 m wide).",
@@ -3361,7 +3573,8 @@
             "stairs",
             "escalator",
             "elevator",
-            "path"
+            "path",
+            "underpass"
           ],
           "title": "Kind",
           "type": "string"
@@ -3721,6 +3934,13 @@
         "$ref": "#/$defs/Structure"
       },
       "title": "Structures",
+      "type": "array"
+    },
+    "tunnels": {
+      "items": {
+        "$ref": "#/$defs/Tunnel"
+      },
+      "title": "Tunnels",
       "type": "array"
     },
     "transit_lines": {

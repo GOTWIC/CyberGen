@@ -301,4 +301,6 @@ def stats(m: CityModel) -> dict:
     return {"by_kind": dict(sorted(by.items())), "vents": vents, "deepest_road_m": deep,
             "deepest_metro_m": metro,
             "over_tunnel_roads": sum(1 for s in m.road_segments
-                                     if s.attrs.get("over_tunnel_at"))}
+                                     if s.attrs.get("over_tunnel_at")),
+            "over_tunnel_streets": sum(1 for s in m.road_segments
+                                       if s.attrs.get("role") == "over_tunnel")}

@@ -1105,7 +1105,9 @@ def report_text(rep: dict) -> str:
         out += ["", "  tunnels " + ", ".join(f"{k.replace('_', ' ')} {r['count']} ({r['km']} km)"
                                              for k, r in tn["by_kind"].items())
                 + f"; ventilation buildings {tn['vents']}, roads over them "
-                  f"{tn['over_tunnel_roads']}, deepest road {tn['deepest_road_m']:g} m"
+                  f"{tn['over_tunnel_roads']}, streets over them "
+                  f"{tn.get('over_tunnel_streets', 0)}, deepest road "
+                  f"{tn['deepest_road_m']:g} m"
                 + (f", deepest metro {tn['deepest_metro_m']:g} m"
                    if tn.get("deepest_metro_m") is not None else "")]
     ts = st.get("transit")

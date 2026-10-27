@@ -465,11 +465,151 @@ def views(plan, res):
     for k, v in enumerate(cams["street"], 1):
         out.append((f"street_{k}", False, v["lens_mm"], v["eye"], v["target"], res,
                     int(res * 9 / 16)))
+    cut = cams.get("cutaway")
+    if cut:
+        # M9: the section along the longest road tunnel (rendered last: it cuts the scene)
+        out.append(("cutaway", False, cut["lens_mm"], cut["eye"], cut["target"], res,
+                    int(res * 9 / 16)))
     return out
 
 
-def render_view(scene, view, path, width=None):
-    """Render one view (from `views`) to path, at its own size or at `width` pixels wide."""
+CUT_KEEP = ("ground", "water", "sea", "tunnel", "tunnel_road", "junction", "crosswalk",
+            "sidewalk", "quay")
+
+
+def _box_obj(name, corners_xy, z0, z1, mat=None):
+    """A closed box mesh from four plan corners (counterclockwise)."""
+    md = MeshData()
+    md.cap([corners_xy], z1, 0, up=True)
+    md.cap([corners_xy], z0, 0, up=False)
+    md.walls(corners_xy, z0, z1, 0)
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(md.verts, [], md.faces)
+    if mat is not None:
+        mesh.materials.append(mat)
+    mesh.validate(clean_customdata=False)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+
+def cutaway(scene, plan):
+    """Cut the scene along the cutaway plane (M9): an earth block under the ground; the
+    ground, water, streets, tunnels and the buildings across the plane cut by a box on the
+    camera's side, everything else on that side hidden. Returns what to undo."""
+    c = plan["cameras"]["cutaway"]
+    ox, oy = c["origin"]
+    ux, uy = c["u"]
+    nx, ny = c["n"]
+    H, D = c["half_len"], c["depth"]
+    z0, z1 = c["z"]
+
+    def pt(du, dn):
+        return (ox + ux * du + nx * dn, oy + uy * du + ny * dn)
+
+    ring = [pt(-H, 0.0), pt(H, 0.0), pt(H, D), pt(-H, D)]
+    if (ring[1][0] - ring[0][0]) * (ring[2][1] - ring[0][1]) - \
+            (ring[1][1] - ring[0][1]) * (ring[2][0] - ring[0][0]) < 0:
+        ring = ring[::-1]
+    # the cutters: the box on the camera's side, and the tunnels' inner volumes (a
+    # collection operand: the boolean takes their union)
+    coll = bpy.data.collections.new("citygen_cutters")
+    scene.collection.children.link(coll)
+    cutter = _box_obj("citygen_cutter", ring, z0 - 50.0, z1)
+    scene.collection.objects.unlink(cutter)
+    coll.objects.link(cutter)
+    md = MeshData()
+    for p in c.get("voids", []):
+        md.ribbon(p, 0)
+    voids = None
+    if md.faces:
+        mesh = bpy.data.meshes.new("citygen_voids")
+        mesh.from_pydata(md.verts, [], md.faces)
+        mesh.validate(clean_customdata=False)
+        mesh.update()
+        voids = bpy.data.objects.new("citygen_voids", mesh)
+        coll.objects.link(voids)
+    coll.hide_render = True
+    for ob in coll.objects:
+        ob.display_type = "WIRE"
+    soil_mat = bpy.data.materials.new("citygen_soil")
+    soil_mat.use_nodes = True
+    bsdf = soil_mat.node_tree.nodes.get("Principled BSDF")
+    if bsdf is not None:
+        bsdf.inputs["Base Color"].default_value = (*srgb("#6b5a45"), 1.0)
+        bsdf.inputs["Roughness"].default_value = 0.95
+    back = 500.0
+    sring = [pt(-H, -back), pt(H, -back), pt(H, D * 0.5), pt(-H, D * 0.5)]
+    if (sring[1][0] - sring[0][0]) * (sring[2][1] - sring[0][1]) - \
+            (sring[1][1] - sring[0][1]) * (sring[2][0] - sring[0][0]) < 0:
+        sring = sring[::-1]
+    soil = _box_obj("citygen_soil", sring, z0, -4.0, soil_mat)
+    # a low light from the camera's side into the section (the tunnels lie under their roofs)
+    fill = bpy.data.lights.new("citygen_cut_light", "SUN")
+    fill.energy = 2.2
+    fill.angle = math.radians(3.0)
+    lamp = bpy.data.objects.new("citygen_cut_light", fill)
+    d = Vector((-nx, -ny, -0.12)).normalized()
+    lamp.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
+    scene.collection.objects.link(lamp)
+    undo = {"mods": [], "hidden": [], "objects": [cutter, soil, lamp] +
+            ([voids] if voids else []), "collection": coll}
+
+    def side(obj):
+        """(min, max) of the object's corners along n from the plane, and along u."""
+        dn, du = [], []
+        for v in obj.bound_box:
+            w = obj.matrix_world @ Vector(v)
+            dn.append((w.x - ox) * nx + (w.y - oy) * ny)
+            du.append((w.x - ox) * ux + (w.y - oy) * uy)
+        return min(dn), max(dn), min(du), max(du)
+
+    tunnel_cats = ("tunnel", "tunnel_road")
+    for obj in list(scene.objects):
+        if obj.type != "MESH" or obj in (cutter, voids, lamp):
+            continue
+        a0, a1, b0, b1 = side(obj)
+        if a1 <= 0.0 or a0 >= D or b1 <= -H or b0 >= H:
+            continue        # away from the cut
+        cat = obj.get("citygen_category", "")
+        straddles = a0 < 0.0 < a1
+        if obj is soil or cat in CUT_KEEP or cat.startswith("road_") or \
+                cat.startswith("open_") or (straddles and cat not in tunnel_cats and
+                                            obj.get("citygen_tile") is not None and
+                                            not obj.modifiers):
+            mod = obj.modifiers.new("citygen_cut", "BOOLEAN")
+            mod.operation = "DIFFERENCE"
+            mod.operand_type = "COLLECTION"
+            mod.collection = coll
+            try:
+                mod.solver = "EXACT"
+                mod.use_hole_tolerant = True
+            except (AttributeError, TypeError):
+                pass
+            undo["mods"].append((obj, mod.name))
+        elif not obj.hide_render:
+            obj.hide_render = True
+            undo["hidden"].append(obj)
+    return undo
+
+
+def uncut(undo):
+    for obj, name in undo["mods"]:
+        mod = obj.modifiers.get(name)
+        if mod is not None:
+            obj.modifiers.remove(mod)
+    for obj in undo["hidden"]:
+        obj.hide_render = False
+    for obj in undo["objects"]:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    if undo.get("collection") is not None:
+        bpy.data.collections.remove(undo["collection"])
+
+
+def render_view(scene, view, path, width=None, plan=None):
+    """Render one view (from `views`) to path, at its own size or at `width` pixels wide
+    (the cutaway needs the plan: it cuts the scene for its render, then puts it back)."""
     name, ortho, scale, eye, target, w, h = view
     cam = camera(scene, f"cam_{name}", ortho)
     if ortho:
@@ -479,11 +619,16 @@ def render_view(scene, view, path, width=None):
     look(cam, eye, target)
     if width:
         w, h = width, int(round(width * h / w))
-    return render(scene, path, w, h)
+    undo = cutaway(scene, plan) if name == "cutaway" and plan is not None else None
+    try:
+        return render(scene, path, w, h)
+    finally:
+        if undo is not None:
+            uncut(undo)
 
 
 def renders(scene, plan, out, res):
-    return [render_view(scene, v, os.path.join(out, f"render_{v[0]}.jpg"))
+    return [render_view(scene, v, os.path.join(out, f"render_{v[0]}.jpg"), plan=plan)
             for v in views(plan, res)]
 
 
