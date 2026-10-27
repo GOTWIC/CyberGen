@@ -19,11 +19,14 @@ the M7b form.
 | peninsula_city | `0e6533f5821182e12fc690f788032c197230aaa2e2448d58e016b916255db5b2` | same |
 | nyxllor_pinned | `fb773f4e722378be5eb972ecb67eb9adbc7f921fca51598c8e413325f1493afb` | same |
 
-Every build passes all 66 checks. The Mac's byte-identity is still to be confirmed by the lead
-session: every city folder has its `trace.json` (`citygen trace diff` finds the first stage
-where two machines part).
+Every build passes all 66 checks. The M4 Mac builds the same six models byte for byte (and the
+same blockout plans), checked by the lead session; every city folder has its `trace.json`.
 
 ## Before and after
+
+Nyxllor's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it.
+
+<img src="nyxllor/render_trumpet.jpg" width="840">
 
 Nyxllor's trumpet (ic02), road levels with the trumpet at street scale:
 
@@ -113,10 +116,12 @@ order reaches a decision.
   - The profile panel adds the flyover's own profile (dashed) to the viaduct's.
 - **Blockout.** The plan draws the flyover as an elevated deck at its heights, like every
   ramp; its columns are model structures (`tests/test_elevated.py` checks the plan).
-  **Blender is not available in this cloud container** (download.blender.org is blocked by
-  the network policy), so the `.blend`, the glTF tiles and the 8K renders of M8d are left to
-  the lead session. The blockout plan hashes in `tests/data/golden_hashes.json` are updated
-  (only Nyxllor's changes).
+  The cloud container had no Blender (download.blender.org is blocked there), so the
+  blockouts were built on the M4 Mac: `blockout_report.txt` and the renders in each city
+  folder, 8K whole-city views (`render_iso_city.jpg`) and a close-up of the trumpet
+  (`nyxllor/render_trumpet.jpg`, from `citygen rerender ... --eye --target`, a camera of
+  one's own). The blockout plan hashes in `tests/data/golden_hashes.json` are updated (only
+  Nyxllor's changes).
 
 ## Tests
 
@@ -182,5 +187,4 @@ deck there, as any ramp's does.
 - **Crossing the stem.** In the bell the flyover passes over the deck, the near ramps and
   the stem's near terminal beside the stem. It only crosses the loop itself in the
   diagonal shape.
-- **Renders.** The Blender blockout and the 8K renders are for the lead session (no Blender
-  here). The root README keeps M8b's whole-city renders until then.
+

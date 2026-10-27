@@ -37,7 +37,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
 | M15 | Unreal export tool (end of stage 1): a built city into an Unreal 5.8 World Partition level with collision, materials, instanced props, ids and graphs; updated as later stages come online | Planned | |
 
-## Latest maps (M8b, road levels M8d)
+## Latest maps (M8d)
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M8a swept them and the test specs over many seeds and
@@ -49,30 +49,29 @@ sky tube) so that their curves fit, and routes transit in about 3 to 13 s per ci
 code it takes nyxllor from 8 full-city tries to 1.
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
-for full size). These are M8b's renders: M8d changes only Nyxllor's trumpet and was built
-where no Blender was available, so its renders are still to come:
+for full size):
 
 | Nexus City (from the concept image) | Nyxllor (bay, river delta) |
 |---|---|
-| <img src="docs/progress/M8b/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8b/nyxllor/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8d/nexus_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8d/nyxllor/render_iso_city.jpg" width="420"> |
 
 | Nyxllor with the traced Corporate Core on its island | Delta Megacity |
 |---|---|
-| <img src="docs/progress/M8b/nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8b/delta_megacity/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8d/nyxllor_pinned/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8d/delta_megacity/render_iso_city.jpg" width="420"> |
 
 | Saltreach Free Port (archipelago) | Greyhook (peninsula) |
 |---|---|
-| <img src="docs/progress/M8b/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8b/peninsula_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M8d/archipelago_free_port/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8d/peninsula_city/render_iso_city.jpg" width="420"> |
 
 The traced Corporate Core on its island (megatower, traced towers and water pockets):
 
-<img src="docs/progress/M8b/nyxllor_pinned/render_iso_d01.jpg" width="840">
+<img src="docs/progress/M8d/nyxllor_pinned/render_iso_d01.jpg" width="840">
 
 At street level, beside the viaducts:
 
 | Delta Megacity, beside a viaduct | Nyxllor, corporate core |
 |---|---|
-| <img src="docs/progress/M8b/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8b/nyxllor/render_street_4.jpg" width="420"> |
+| <img src="docs/progress/M8d/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8d/nyxllor/render_street_4.jpg" width="420"> |
 
 Road levels (Nyxllor, M8d): every raised road by deck height, the interchanges (a diamond, a
 partial cloverleaf and a trumpet), columns, and the profile of one viaduct. The trumpet
@@ -80,6 +79,10 @@ partial cloverleaf and a trumpet), columns, and the profile of one viaduct. The 
 beside the stem and comes down to it:
 
 <img src="docs/progress/M8d/nyxllor/preview_elevated.png" width="840">
+
+Nyxllor's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it:
+
+<img src="docs/progress/M8d/nyxllor/render_trumpet.jpg" width="840">
 
 Props and plants at street level (Nyxllor, 180 m insets):
 

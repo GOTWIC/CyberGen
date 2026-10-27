@@ -181,7 +181,8 @@ it only triangulates and draws): `city.blend`, `city.usdc`, `tiles/<tile>.glb`, 
 and `map_2d.png`, `unreal/corporate_core_plan.json` for the greybox script, `graphs.json`,
 `tiles.json` and `props.csv`. `citygen rerender <blockout_dir> VIEW... [--width 7680] [--to DIR]`
 (`citygen/blender/rerender.py`) renders chosen views (`top`, `iso_city`, `iso_<district>`,
-`street_<n>`) again from the saved `city.blend` with the build's cameras. The Blender test skips when Blender is missing. Sample builds:
+`street_<n>`) again from the saved `city.blend` with the build's cameras; `--eye X Y Z --target X Y
+Z [--lens MM] [--name N]` adds a perspective camera of one's own. The Blender test skips when Blender is missing. Sample builds:
 `docs/progress/M4/`.
 
 M5 (transit) is in place: the same build runs `citygen/transit.py` after the buildings (stops
