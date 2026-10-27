@@ -25,7 +25,7 @@ Implementation notes: `CLAUDE.md` (one section per milestone) and each
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](progress/M8a) |
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](progress/M8b) |
 | M8c | Transit that passes on a city's first layout: flying loops as Dubins rings, open lines off the roads or as Dubins paths where the roads fail them; Delta Megacity from 9 full-city tries to 1, the sweep 58 of 68 (M8b 51), no transit failures left in it | Done | [`docs/progress/M8c`](progress/M8c) |
-| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Vesper Bay, then Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](progress/M8d) |
+| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Vesper Bay), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](progress/M8d) |
 | M9 | Tunnels as level -1 of the road network: cut-and-cover tunnels under districts and immersed tubes under water (portals, walled approaches, ventilation buildings), metro tunnels lowered under foundations and road tunnels, pedestrian underpasses; four tunnel checks (70 in all), tunnel boxes and a cutaway render in the blockout; Nexus City gets the Midtown Tunnel, Greyhook the Neckwater Tube; the sweep passes 58 of 68 as on M8c | Done | [`docs/progress/M9`](progress/M9) |
 | M10 | Edit, lock and regenerate: stable ids from what an entity is and where it sits, `citygen build --district` regenerates one district in under a minute with every road outside it held and everything away from its seam byte for byte, pins and overrides (`overrides.json`), `citygen lock` releases that rebuild byte for byte, `citygen model diff` with a map | Done | [`docs/progress/M10`](progress/M10) |
 | M11 | Gameplay layer: named points of interest (bars, clinics, vendors, fixers, hideouts, apartments) with their doors, faction territories and police precincts, wealth, danger and police fields, traffic, crowd and spawn density per street and hour band, parking, taxi stands, fast travel, sign and ad slots; every place reachable on foot and by car (9 checks, 75 in all), `gameplay.json` | Done | [`docs/progress/M11`](progress/M11) |
@@ -43,10 +43,10 @@ transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) a
 `docs/progress/M8a/`, the M7b builds in `docs/progress/M7b/`, the M7a ones in
 `docs/progress/M7/`, the 2D maps in `docs/progress/M4/`. Sample specs live in
 `docs/progress/M1a2/<city>/city_spec.json` and `cities/vesper_bay/city_spec.json`; the pinned
-demo's in `cities/vesper_bay_pinned/city_spec.json` (first in
-`docs/progress/M7b/nyxllor_pinned/`), its round 1 and round 2 transit in
-`docs/progress/M8b/nyxllor_pinned_round1/` and `nyxllor_pinned_round2/`. `docs/progress/M8c/vesper_bay*/`
-are the same layouts as `nyxllor*/` there, built again under the new name.
+demo's in `cities/vesper_bay_pinned/city_spec.json` (first built in M7b), its round 1 and
+round 2 transit in `docs/progress/M8b/`. Up to M8d, Vesper Bay's build folders carry an
+earlier slug; in M8c its `vesper_bay*/` folders are the same layouts built again under its
+current name.
 
 While a milestone session runs, it pushes snapshot images to its branch under
 `docs/progress/<milestone>/wip/`; open the branch on GitHub (Branches tab) to see them before

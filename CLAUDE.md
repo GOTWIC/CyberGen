@@ -3,12 +3,12 @@
 City-agnostic generators for cyberpunk open cities, in five stages: 1 layoutgen (`citygen`, the
 prompt-to-city layout generator, current), 2 assetgen (a unique 3D model for every building,
 plus street elements and textures), 3 atmosgen (lighting, sky, atmospherics), 4 lifegen
-(traffic, crowds, trains, aircraft, generated), 5 storygen. Stages 1 and 2 live here and stay
-city-agnostic. They are built for Nyxllor, a Cyberpunk 2077-inspired open-city game in Unreal
-Engine 5 at roughly a quarter of Night City's scale (walkable streets, NPC crowds and traffic,
-optional combat and dialogue), which gets its own `nyxllor` repo at stage 3. The owner
-(Swagnik) does art direction and layout; Claude does code, tooling, procedural generation,
-and most asset work.
+(traffic, crowds, trains, aircraft, generated), 5 storygen. CyberGen is a standalone city
+generator that anyone could use for their own cities: it knows of no particular game or
+engine project, and nothing in the repo (docs, code, comments, sample names) refers to one.
+Its cities are sized for open-world games, roughly a quarter of Night City's scale (walkable
+streets, crowds and traffic). The owner (Swagnik) does art direction and layout; Claude does
+code, tooling, procedural generation, and most asset work.
 
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
@@ -17,14 +17,15 @@ high-level milestone table). Stage 1's milestones are M0 to M15, built in
 `docs/progress/M*`; later stages give their milestones a prefix of their own (set in their
 scope doc) so their progress folders never clash with stage 1's.
 
-The repo was called Nyxllor until after M8c. The sample city called Nyxllor up to M8c is
-**Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo "Vesper Bay Pinned"
-in `cities/vesper_bay_pinned`); `docs/progress/<milestone>/nyxllor*` folders before the rename
-keep the old name (`tests/conftest.py` `OLD_SLUGS`). Keep "Nyxllor" for the game.
+The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
+"Vesper Bay Pinned" in `cities/vesper_bay_pinned`). Its build folders in `docs/progress/` up
+to M8d carry an earlier slug (`tests/conftest.py` `OLD_SLUGS`); never use that name in
+anything new.
 
-## Nyxllor's first district (Corporate Core, hand-traced; moves to the nyxllor repo at stage 3)
+## Corporate Core (hand-traced demo district)
 
-The traced map stays here as the pinned demo's input (`cities/vesper_bay_pinned`).
+The traced map is the pinned demo's input (`cities/vesper_bay_pinned`); `pipeline/`, `maps/`,
+`reference/` and `unreal/` are the earlier hand-tracing pipeline that made it.
 
 - `reference/corporate_core_reference.png`: AI-generated concept map of the district. It is drawn in a
   planometric style: the ground plan is true shape (seen straight down) and buildings rise straight up
@@ -77,10 +78,10 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 
 ## Unreal
 
-- Project: C++ First Person template, created on the M4 Mac. Heavy work (City Sample, dense city) should
-  move to the Windows PC (RTX 4070 Ti, 12 GB). UE 5.8 ships an official Unreal MCP server and an updated
-  City Sample built with PCG (the PCG Primitives plugin); that is the intended route for Claude to drive
-  the editor directly.
+- Testing Unreal imports: UE 5.8 at `/Users/Shared/Epic Games/UE_5.8` (it ships an official Unreal
+  MCP server and the PCG plugins, the route for Claude to drive the editor), always in a throwaway
+  test project of the generator's own. Heavy scenes run better on the owner's Windows PC
+  (RTX 4070 Ti, 12 GB).
 - `unreal/build_greybox_unreal.py`: editor Python script. Put it plus `corporate_core_plan.json` in
   `<UnrealProject>/Greybox/`, open a level, Tools > Execute Python Script. Clears and rebuilds its own
   actors (tag `CorporateCoreGreybox`), Ctrl+Z undoes a run. Buildings are currently oriented boxes, so
@@ -88,7 +89,6 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 - citygen's blockout exports `city.usdc` (whole city) and one `tiles/<tile>.glb` per 256 m tile
   (custom properties as glTF extras) for World Partition style imports, plus
   `unreal/corporate_core_plan.json`, which `build_greybox_unreal.py` reads unchanged.
-- Keep gameplay logic in C++ where reasonable.
 
 ## Known open items
 
@@ -266,7 +266,7 @@ M7b is in place, which completes the scope's milestones:
 - **Columns:** `elevated._fill_gaps` fills any column gap over 60 m, searching past a short
   segment's end nodes.
 
-Demo: `docs/progress/M7b/nyxllor_pinned/` (spec now in `cities/vesper_bay_pinned/`). Sample builds: `docs/progress/M7b/`.
+Demo: `cities/vesper_bay_pinned/` (first built in M7b). Sample builds: `docs/progress/M7b/`.
 
 M8a (robustness sweep) is in place: `.venv/bin/python -m citygen sweep [SPEC...] [--suite m8a]
 [--seeds ...] [--only LABEL] [--workers 4] [--upto roads|local|full] --out DIR`
@@ -323,7 +323,7 @@ the other lines (its heights see the buildings they remove); a whole-city retry
 (`build_city`) after any failed check still moves every line. A sky tube tower it cannot
 climb within its altitude range keeps its portal with 3 m headroom (`_fit_portals`), and an
 open road line still under its radius is tried with legs free to run back along the line
-(`_spurs`). M8b is stacked on M8a: Vesper Bay (then Nyxllor) builds on its first layout (8 tries on M8a
+(`_spurs`). M8b is stacked on M8a: Vesper Bay builds on its first layout (8 tries on M8a
 alone), Delta still takes 9 (its sky tube loops and monorail on M8a's layouts). Sample
 builds and the sweep on the combined code: `docs/progress/M8b/`.
 
@@ -551,7 +551,10 @@ cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
   shown in the root README is 8K: `citygen rerender <blockout_dir> iso_city ... --to
   docs/progress/<M>/<city>` (7680 px wide by default, a few seconds each; fall back to 3840 or
   2048 only if 8K fails). Always include the whole-city isometric views
-  (`render_iso_city.jpg`) in the stage's Cities gallery.
+  (`render_iso_city.jpg`) in the stage's Cities gallery. Write the README for someone who
+  wants to use the generators: what they make and how to run them, not how they are verified
+  (no goldens, hashes, "byte for byte", identical builds across machines, check counts or
+  sweep tallies; those belong in the milestone log).
 
 ## Working preferences
 
