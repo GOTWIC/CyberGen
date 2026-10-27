@@ -1,0 +1,147 @@
+[
+ {
+  "label": "cragmouth",
+  "seed": 6133,
+  "status": "pass",
+  "failed": [],
+  "seconds": 79.2,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "76b7b16ec713276f6e050a023b11943fb2eb7c44d73fe56d921bf1ae3931f50b"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 404,
+  "status": "pass",
+  "failed": [],
+  "seconds": 196.8,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 2,
+  "retry_fails": [
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "eb35e51b46251a39f868a691ecb85b0ec2ff2205b3a660ae8f1a563b6b41e345"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 3141,
+  "status": "pass",
+  "failed": [],
+  "seconds": 259.3,
+  "hydro_variant": 4,
+  "road_variant": 1,
+  "city_retries": 2,
+  "retry_fails": [
+   2,
+   6
+  ],
+  "layout_salt": 0,
+  "sha256": "7f6c746bb2fe46ddc946c13e1c39843278948d713425a607de9aa3bf2f643dac"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 5077,
+  "status": "pass",
+  "failed": [],
+  "seconds": 70.1,
+  "hydro_variant": 1,
+  "road_variant": 0,
+  "city_retries": 0,
+  "retry_fails": [],
+  "layout_salt": 0,
+  "sha256": "d08415f49fee7ce5cbe70ff613a8b6616dfc5ad50a4e9c5474b5cdfaecd638d3"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 11,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "cut_fill",
+    "count": 1,
+    "first": "rs02034 (street): 18.5 m of fill at (274, -74)"
+   }
+  ],
+  "seconds": 603.8,
+  "hydro_variant": 1,
+  "road_variant": 1,
+  "city_retries": 8,
+  "retry_fails": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   2
+  ],
+  "layout_salt": 0,
+  "sha256": "12439403c7dcdd29640de3364ad2f32c7c087564a172b9d5fd578fb09108e44a"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 8128,
+  "status": "pass",
+  "failed": [],
+  "seconds": 128.3,
+  "hydro_variant": 2,
+  "road_variant": 0,
+  "city_retries": 1,
+  "retry_fails": [
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "c5e902deac65a2957329e6ea58c2c9e1a08b98f30a8d18e25e0a3d34b27c521a"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 27182,
+  "status": "pass",
+  "failed": [],
+  "seconds": 191.9,
+  "hydro_variant": 9,
+  "road_variant": 1,
+  "city_retries": 2,
+  "retry_fails": [
+   1,
+   1
+  ],
+  "layout_salt": 0,
+  "sha256": "8b17f751c596681a5df53502f754d8711da1e7bb3d97eb317420e7784ca904ed"
+ },
+ {
+  "label": "cragmouth",
+  "seed": 1999,
+  "status": "fail",
+  "failed": [
+   {
+    "id": "cut_fill",
+    "count": 3,
+    "first": "rs02367 (street): 20.1 m open cut at (427, -149)"
+   }
+  ],
+  "seconds": 733.0,
+  "hydro_variant": 7,
+  "road_variant": 3,
+  "city_retries": 8,
+  "retry_fails": [
+   5,
+   5,
+   4,
+   6,
+   7,
+   5,
+   8,
+   5
+  ],
+  "layout_salt": 0,
+  "sha256": "6eae9d23a5476254b68d8dc8ba6b26d1d83667b2995cf724af4a58785b4fd164"
+ }
+]

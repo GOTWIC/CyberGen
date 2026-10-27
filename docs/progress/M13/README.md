@@ -126,7 +126,65 @@ passes the five new checks with nothing to check.
 
 ## Builds
 
-SWEEP_AND_BUILDS
+All eight cities pass all 86 checks. Each `city_model.json` is byte-identical on the M4 Mac
+(arm64) and on x86_64 Linux (docker `citygen-x86`, `linux/amd64`, the worktree mounted
+read-only, `CITYGEN_WORKERS=3`):
+
+| City | Full-city tries | sha256 of `city_model.json` (both machines) | vs M12 |
+|---|---|---|---|
+| cragmouth | 1 | `76b7b16ec713276f6e050a023b11943fb2eb7c44d73fe56d921bf1ae3931f50b` | new (the hilly sample) |
+| archipelago_free_port | 1 | `db0733983fdd333610e67d6dd51055e3dbf286356135144028cc3829bc486bd5` | identical |
+| delta_megacity | 1 | `8ce02071a18f7f3e7456b5ff3d5a61d27b45204681f1b9de5b11f560b451b535` | identical |
+| nexus_city | 1 | `af71faeb71ff41dd1129c26a0b45d6286d03804e4011eeea607a8c8f3d0d8e07` | identical |
+| peninsula_city | 1 | `7b2a69ca5d77f57a9e2c2e957da1ffd7189a9cade8e17b102d51a5b9d86b11ca` | identical |
+| vesper_bay | 1 | `4982f2e1415f6f1ecf48924c5600c36291a19f582c0e351ca08dd3b3b71fa9ba` | identical |
+| vesper_bay_pinned | 2 | `4d0d1c437df33a7ede7a7a6dab6f735912547d878f03a6b007e108de205e458b` | identical |
+| vesper_bay_stacks | 1 | `837a49773993e0ee433a6c7eb5cd51eabf6cfd5fcfb315f2c4869515e8c4d17c` | identical |
+
+The flat cities' blockout plans are unchanged too (`blockout_plans` in
+`tests/data/golden_hashes.json`), so their renders and blockout reports are M12's. Their
+reports gain the five terrain checks (passing with nothing to check).
+
+**Cragmouth** in numbers (`report.txt`):
+
+- **Ground:** from 0 to 95 m.
+- **Grade lines:** cuts to 18.7 m and fills to 18.7 m.
+- **Retaining walls:** 1280, the highest 19.7 m.
+- **Bored tunnels:** seven, 56 to 137 m long, with 7 to 9 m of rock over their roofs. The
+  three Crown Heights Boulevard tunnels run under Crown Hill; the four Ridgeback tunnels run
+  through the ridge.
+- **Terrain viaduct:** one.
+- **Hillside greens:** 181.
+- **Plinths:** the highest is 13.1 m.
+- **Dressing:** 566 parked cars left off streets steeper than 10%, and 164 benches and stalls
+  off steep ground.
+- **Water:** the Cragwater falls along its 457 stations to the bay.
+- **Tries:** it builds on its first full-city try.
+
+Each city folder has every generator preview, the build report, the stage trace, the blockout
+report, `render_top.jpg` and the 8K `render_iso_city.jpg`. Cragmouth also has
+`preview_terrain.png` and the 8K `render_hillside.jpg`.
+
+## Sweep
+
+`citygen sweep --suite m8a --workers 3` on M13 on M12 (`sweep.md`, `sweep.json`): **58 of 68
+builds pass**, the same 58 as M12's sweep (`docs/progress/M12/sweep.json`). All 68 builds are
+byte for byte the M12 builds, so none is newly broken. Against M8c, the same ten builds fail;
+vesper_bay_pinned s5077 now fails placement only, where M8c also failed level_continuity.
+
+**Cragmouth at eight seeds** (`citygen sweep cities/cragmouth/city_spec.json --seeds
+6133,11,404,1999,3141,5077,8128,27182 --workers 3`, in `sweep_cragmouth.md` and `.json`):
+**6 of 8 pass**.
+
+| Seed | Result |
+|---|---|
+| 6133 (its own), 404, 3141, 5077, 8128, 27182 | pass |
+| 11 | fails `cut_fill`: a street on 18.5 m of fill |
+| 1999 | fails `cut_fill`: a street in a 20.1 m cut |
+
+Both failures are local streets. Only primary roads are bored or put on viaducts, so a street
+laid straight across the steepest ground (the Crown escarpment) can still cut or fill past the
+limits; see the open items.
 
 ## Blockout
 
@@ -151,6 +209,9 @@ SWEEP_AND_BUILDS
     up the slope (streets up to 12%, many walls) where a hill town would wind along the
     contours.
   - Lots too steep to build become greens instead of being shaped into terraces.
+- **Streets on the steepest ground:** a street that M2 lays straight across an escarpment
+  can cut or fill past the limits (Cragmouth seeds 11 and 1999). Stairs (a pedestrian street)
+  or a winding route would carry it.
 - **Junction cuts and fills:** the grade fit spreads a misfit evenly, so where an unclimbable
   step meets a junction both the junction and its roads take part of it. The fill and cut
   limits (18 and 20 m) are large for a city; a fit that weights junctions, or a layout that
