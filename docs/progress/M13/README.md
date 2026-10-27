@@ -22,7 +22,8 @@ M13 gives citygen ground that is not flat (`citygen/terrain.py`, checks in
 - **Five new checks**, 86 in all (with M12's two).
 
 The hilly sample is **Cragmouth** (`cities/cragmouth`). A spec without `terrain` builds exactly
-the city it built before: the five samples, the pinned demo and the M12 stack demo are byte-identical to M12 on M9 and M11.
+the city it built before: the five samples, the pinned demo and the M12 stack demo are
+byte-identical to M10 (on M12, M9 and M11), the code M13 is merged with.
 
 ## Art direction: Cragmouth
 
@@ -126,24 +127,26 @@ passes the five new checks with nothing to check.
 
 ## Builds
 
-All eight cities pass all 86 checks. Each `city_model.json` is byte-identical on the M4 Mac
-(arm64) and on x86_64 Linux (docker `citygen-x86`, `linux/amd64`, the worktree mounted
-read-only, `CITYGEN_WORKERS=3`):
+M13 is built on M10 (stable ids, edit, lock), M12, M9 and M11. All eight cities pass all 86
+checks. Each `city_model.json` and `report.json` is byte-identical on the M4 Mac (arm64) and
+on x86_64 Linux (docker `citygen-x86`, `linux/amd64`, the worktree mounted read-only,
+`CITYGEN_WORKERS=3`), and the stage traces match entry for entry (`citygen trace diff`):
 
-| City | Full-city tries | sha256 of `city_model.json` (both machines) | vs M12 |
-|---|---|---|---|
-| cragmouth | 1 | `76b7b16ec713276f6e050a023b11943fb2eb7c44d73fe56d921bf1ae3931f50b` | new (the hilly sample) |
-| archipelago_free_port | 1 | `db0733983fdd333610e67d6dd51055e3dbf286356135144028cc3829bc486bd5` | identical |
-| delta_megacity | 1 | `8ce02071a18f7f3e7456b5ff3d5a61d27b45204681f1b9de5b11f560b451b535` | identical |
-| nexus_city | 1 | `af71faeb71ff41dd1129c26a0b45d6286d03804e4011eeea607a8c8f3d0d8e07` | identical |
-| peninsula_city | 1 | `7b2a69ca5d77f57a9e2c2e957da1ffd7189a9cade8e17b102d51a5b9d86b11ca` | identical |
-| vesper_bay | 1 | `4982f2e1415f6f1ecf48924c5600c36291a19f582c0e351ca08dd3b3b71fa9ba` | identical |
-| vesper_bay_pinned | 2 | `4d0d1c437df33a7ede7a7a6dab6f735912547d878f03a6b007e108de205e458b` | identical |
-| vesper_bay_stacks | 1 | `837a49773993e0ee433a6c7eb5cd51eabf6cfd5fcfb315f2c4869515e8c4d17c` | identical |
+| City | Full-city tries | sha256 of `city_model.json` (both machines) | vs M10 | Release lock |
+|---|---|---|---|---|
+| cragmouth | 1 | `1175f1f22e0800fabae9bd1a436dec96c6313072dc71f25b4c304d1106c9e6f4` | new (the hilly sample) | [`city.lock.json`](cragmouth/city.lock.json) |
+| archipelago_free_port | 1 | `edf4e11cc92ee86892ec615fb7c1028ddbc1208e69a9f4489c7b5910ec549b18` | identical | [`city.lock.json`](archipelago_free_port/city.lock.json) |
+| delta_megacity | 1 | `228fdb26390bacedf84da87dd39daa6fd40d3fdb3fd9159837ab61a7419c4538` | identical | [`city.lock.json`](delta_megacity/city.lock.json) |
+| nexus_city | 1 | `9928e4ece1cca83cd7401543ed11dfa2f2fbeedc7a50570c4cad0648b92ca4b8` | identical | [`city.lock.json`](nexus_city/city.lock.json) |
+| peninsula_city | 1 | `b3cc9920e125f4e4cb996fd442bad66051e21dd5b72024b9e87e9c36230b2e91` | identical | [`city.lock.json`](peninsula_city/city.lock.json) |
+| vesper_bay | 1 | `3bd79ca0fb90f712c665051464feaaed718e31e2b52b514b524149673eda0da2` | identical | [`city.lock.json`](vesper_bay/city.lock.json) |
+| vesper_bay_pinned | 2 | `2d362ab49246119ff9b576ecf74a1ac0ed5dbf9d582a02d2798446d95b773508` | identical | [`city.lock.json`](vesper_bay_pinned/city.lock.json) |
+| vesper_bay_stacks | 1 | `2e16890979a5bbbc90cb57c243205c967cd72a4f0011c00004449ef204d0cee5` | identical | [`city.lock.json`](vesper_bay_stacks/city.lock.json) |
 
-The flat cities' blockout plans are unchanged too (`blockout_plans` in
-`tests/data/golden_hashes.json`), so their renders and blockout reports are M12's. Their
-reports gain the five terrain checks (passing with nothing to check).
+The flat cities' blockout plans are M10's too (`blockout_plans` in
+`tests/data/golden_hashes.json`), so their 8K renders are M10's
+(`docs/progress/M10/<city>/render_iso_city.jpg`). Their reports gain the five terrain checks
+(passing with nothing to check); every stage hash of their traces is M10's.
 
 **Cragmouth** in numbers (`report.txt`):
 
@@ -156,14 +159,101 @@ reports gain the five terrain checks (passing with nothing to check).
 - **Terrain viaduct:** one.
 - **Hillside greens:** 181.
 - **Plinths:** the highest is 13.1 m.
-- **Dressing:** 566 parked cars left off streets steeper than 10%, and 164 benches and stalls
-  off steep ground.
+- **Dressing:** 592 parked cars left off streets steeper than 10%, and 165 benches and stalls
+  off steep ground (on M12: 566 and 164; the props now draw on M10's stable ids, the ground
+  and the roads are the same).
 - **Water:** the Cragwater falls along its 457 stations to the bay.
 - **Tries:** it builds on its first full-city try.
 
-Each city folder has every generator preview, the build report, the stage trace, the blockout
-report, `render_top.jpg` and the 8K `render_iso_city.jpg`. Cragmouth also has
-`preview_terrain.png` and the 8K `render_hillside.jpg`.
+Each city folder has every generator preview, the build report, the stage trace and the
+release lock. Cragmouth also has its blockout report, `render_top.jpg`, the 8K
+`render_iso_city.jpg`, `preview_terrain.png` and the 8K `render_hillside.jpg`.
+
+## With M10: ids, regeneration, locks
+
+**Stable ids.** M13's entities are named from what and where they are, like everything else
+(`ids.py` derives them from the build-order ids M13 gives them):
+
+| Entity | Id | Example (Cragmouth) |
+|---|---|---|
+| retaining wall | its road segment, `wall` and its cell (`wall.<cell>` where no segment) | `rs.w997n776.wall.w1032n756` |
+| terrain viaduct deck, column | its road segment, `viaduct` or `tvcol` and the cell | `rs.e814n566.viaduct.e814n566`, `rs.e814n566.tvcol.e766n565` |
+| bored tunnel | `bore` and its cell | `bore.w487n577` |
+| hillside green | district, `os.slope` and its cell | `d03.os.slope.w598n231` |
+
+The renaming pass also renames the water body each `terrain.water_levels` row names. No new
+collection or id field: walls and viaducts name their segment in `supports` and
+`attrs.segment` (already in `REFS` and `edit.ATTR_REFS`), bored tunnels in `segment_ids`.
+`tests/test_terrain.py` scans the hilly test city for build counters (M10's pattern plus
+`rw`, `tb`, `tv`, `wall`, `bore`, `viaduct`, `tvcol`, `slope`) and dangling references.
+
+**District regeneration on a hilly city.** The grade fit is one graph of the whole network, so
+new streets in a district could pull the grade lines of held roads around it. In a
+regeneration `add_local` passes every held road's old grade line to `terrain.grade` (`held`):
+its stations are fixed at it, and the free vertices are fitted between the bounds those set:
+
+$$\tilde U = \max\Big(U,\ \max_f \big(z_f - d(f, v)\big)\Big), \qquad \tilde L = \min\Big(L,\ \min_f \big(z_f + d(f, v)\big)\Big)$$
+
+(a fixed vertex takes no bound from its neighbors, so without the clamp the envelopes would
+break the grade beside it). The splice takes the finished ground (`terrain`) and the retaining
+walls from the new build (it differs from the old only around the district's new streets).
+
+Three fixes came out of regenerating the hilly test city:
+
+- `junctions.one_way_loops` reversed a street but not its z profile, so a one-way street that
+  ramps up to a raised avenue had its ramp at the wrong end (`level_continuity`). It is a bug
+  on main that no sample hits (their models are unchanged).
+- `edit._close`: a building's gameplay rows (its points of interest) follow it when the new
+  build changed the building (they stayed old and named units it no longer had).
+- `edit._ground_cover`: old lots and open spaces under a changed new lot, open space or
+  building go (an old park stayed under a new lot of a seam block).
+
+Every district of the small hilly test city regenerates with every check passing and every
+held road back as it was, grade line included (`test_hilly_regeneration_holds_every_road`).
+
+On the samples (`citygen build SPEC OUT --base BUILD --district NAME`, Mac shared with the
+sweep and pytest; reports and diff maps in [`regenerated/`](regenerated/)):
+
+| City, district | Time | Held roads back as they were | Outside the district changed (through references) | Checks |
+|---|---|---|---|---|
+| Cragmouth, Old Quarter (on its 75 m hill) | 70 s | 1674 of 1674 | 15027 (14083) | all 86 pass |
+| Vesper Bay, Old Town (flat) | 41 s | 1553 of 1553 | 225 (4) | all 86 pass |
+| Cragmouth, Crown Heights | 62 s | 3065 of 3076 | 6068 (5251) | 12 fail |
+| Cragmouth, Low Harbor | 74 s | 3131 of 3158 | 4341 (3942) | 14 fail |
+| Cragmouth, Lantern Steps | 74 s | 2308 of 2309 | 22613 (21827) | 3 fail |
+| Cragmouth, Ridgeback | 77 s | 3007 of 3038 | 5298 (4287) | 17 fail |
+| Cragmouth, Hollow | 74 s | 2937 of 2939 | 1850 (497) | 4 fail |
+
+Vesper Bay's Old Town is as on M10 (1553 of 1553, 225 (4)). Of Cragmouth's six districts only
+the Old Quarter regenerates cleanly. The others are not terrain: the same spec without its
+`terrain` block (`regenerated/cragmouth_flat_city_spec.json`, a flat city of the same layout
+whose M1 routes without the slope cost) fails the same way (Low Harbor 12 checks and 3212 of
+3240 held roads, Lantern Steps 6 and 2373 of 2388, Crown Heights 1 and 3122 of 3125;
+`regenerated/cragmouth_flat__*_report.txt`), and every failure is M10's frame:
+
+- a new street meets a held road at a new point instead of an old node (Crown Heights: the
+  waterfront avenue split at a new node), or a held node comes back doubled 1 cm apart;
+- a neighbor district laid after the regenerated one comes back with its grid at other
+  offsets (Hollow beside Crown Heights), so the splice holds both its old streets and new
+  ones beside them (duplicates, 0 degree junctions, buildings on the new streets);
+- M3 draws each lot by its index in its district's build-order lot list, so a seam block of
+  a neighbor split 1 m differently reseeds the whole neighbor district's buildings; the
+  splice then takes them all through references (Old Quarter: 1180 buildings of Lantern
+  Steps, every check passing). Keying M3's draws on stable lot ids would fix this but moves
+  every city's buildings.
+
+These are open items for M10 (below); M2 never reads the terrain.
+
+**Locks.** Every sample has a release lock (`citygen lock <build> --release 1.0`, from the
+builds above, code `a0a252eb2ed6`). `citygen lock --verify` rebuilds two of them byte for
+byte:
+
+| Release | `citygen lock --verify` |
+|---|---|
+| Cragmouth 1.0 | PASS, the same `city_model.json` byte for byte, 80 s |
+| Saltreach Free Port 1.0 | PASS, byte for byte, 33 s |
+
+A lock names its code, so these go stale with any change to `citygen/*.py`.
 
 ## Sweep
 
@@ -247,5 +337,12 @@ The full pytest passes on M13 on M12 (452 passed, 2 skipped).
 - **Metro stair foot:** an M8c metro stair stepped 12 m along its concourse can end between
   two concourse vertices and miss the walkway graph. Terrain cities insert the vertex. Flat
   cities keep their M8c bytes, and so the bug, until a milestone may change their goldens.
+- **District regeneration on Cragmouth (M10's frame, found here, not terrain):** five of
+  its six districts fail checks after `--district`, as they do on the same spec without
+  terrain: a new street can split a held road at a new point, a held node can come back
+  doubled 1 cm apart, a neighbor laid later can come back with its grid at other offsets
+  (the splice then keeps both grids), and M3's lot draws by build-order index reseed a
+  neighbor whose seam block splits differently. Fixing the last moves every city's
+  buildings (new goldens), so it belongs to its own change.
 - **Rivers** fall in one profile along their centerline. There are no weirs or rapids, and no
   lakes at their own level in the spec yet.

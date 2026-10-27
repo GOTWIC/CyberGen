@@ -500,7 +500,11 @@ folder, later edits start from it.
   junctions cut) changes with it. It takes under a minute for a sample district and runs
   every check. M1 is not rebuilt: water, the district outlines, megasite reserves and
   primary roads stay, so a field M1 reads (`area_share`, `placement`, megasites, the
-  archetype's avenue spacing) needs a full build.
+  archetype's avenue spacing) needs a full build. On a hilly city (M13) the held roads keep
+  their grade lines and the district's new streets are fitted to them; the `terrain` block
+  is M1's, so changing it needs a full build. Read the report: a regeneration whose checks
+  fail (on some layouts a neighbor's streets come back moved, M13 README) is not a release;
+  try another seed or a full build.
 - **What changed:** `citygen model diff <old>/city_model.json <new>/city_model.json` lists the
   entities added, removed and changed by id, per collection (`--all`, `--json FILE`;
   `--png FILE` draws them: the same in grey, removed red, added green, moved yellow). Look at
