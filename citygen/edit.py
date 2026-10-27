@@ -452,6 +452,8 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
     for c in COLLECTIONS:
         rows = [e for i, e in io[c].items() if src.get(i) == "o"]
         rows += [e for i, e in inn[c].items() if src.get(i) == "n"]
+        if c in ID.SORTED:
+            rows.sort(key=lambda e: e["id"])
         out[c] = rows
     for k in ("spec_sha256",):
         out[k] = N.get(k)

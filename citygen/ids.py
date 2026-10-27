@@ -148,6 +148,11 @@ def anchor(e: dict) -> str:
 
 SUFFIX = re.compile(r"^(.*)\.(\d+)$")
 
+# collections their stage sorts by id (M11): sorted by the new ids, so that the stage run
+# again on the finished city gives the same rows (sign slots are named after props, which
+# the last pass renames)
+SORTED = ("pois", "parking", "travel_points", "sign_slots")
+
 # id lists that are sets (graph neighbors): sorted by the new ids, so their order does not
 # keep the build order of the ids they name
 SETS: dict[str, tuple[str, ...]] = {
@@ -404,6 +409,9 @@ class Renamer:
             for e in self.d.get(coll, []):
                 self.rewrite(coll, e)
                 e["id"] = self.new[e["id"]]
+        for coll in SORTED:
+            if self.d.get(coll):
+                self.d[coll].sort(key=lambda e: e["id"])
         return self.new
 
 
