@@ -80,7 +80,6 @@ The same street camera in the Blender blockout and in Unreal (Vesper Bay):
 |---|---|
 | <img src="docs/progress/M15/vesper_bay/blender_street_2.jpg" width="420"> | <img src="docs/progress/M15/vesper_bay/unreal_street_2.jpg" width="420"> |
 
-
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M12 adds stack interchanges where two highways cross with
 room for one: one highway lifted to 9 m through the crossing, the other at grade, and eight
