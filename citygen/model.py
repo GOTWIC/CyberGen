@@ -220,6 +220,9 @@ class RoadSegment(Entity):
     bridge: bool = False
     bridge_ids: list[str] = Field(default_factory=list)
     clearance_m: float | None = Field(None, description="Highest bridge clearance on it.")
+    tunnel: bool = Field(False, description="Runs through a tunnel (M9; level -1, the z "
+                                            "profile below the ground).")
+    tunnel_ids: list[str] = Field(default_factory=list)
     district_ids: list[str] = Field(default_factory=list, description="Districts it serves.")
     name: str | None = None
 
@@ -289,7 +292,7 @@ class Walkway(Entity):
     TYPE_PREFIX: ClassVar[str] = "walkway"
     kind: Literal["sidewalk", "crosswalk", "crossing", "pedestrian_street", "promenade",
                   "footbridge", "alley", "skybridge", "elevated", "stairs", "escalator",
-                  "elevator", "path"]
+                  "elevator", "path", "underpass"]
     line: Line3
     width_m: float
     neighbors: list[str] = Field(default_factory=list)
@@ -297,12 +300,46 @@ class Walkway(Entity):
 
 class Structure(Entity):
     TYPE_PREFIX: ClassVar[str] = "structure"
-    kind: Literal["deck", "ramp", "column", "pylon", "tube", "canopy"]
+    kind: Literal["deck", "ramp", "column", "pylon", "tube", "canopy", "portal", "trench",
+                  "vent"]
     footprint: Polygon | None = None
     line: list[Point3] = Field(default_factory=list)
     z0_m: float
     z1_m: float
     supports: list[str] = Field(default_factory=list, description="Ids carried by this structure.")
+
+
+# --- tunnels (M9) -------------------------------------------------------------
+
+class TunnelPortal(_Model):
+    """Where a tunnel's roof meets the ground: the open approach ramp (a walled trench) runs
+    on from here to the ground."""
+    position: Point3 = Field(description="Road (or track) center at the portal.")
+    heading_deg: float = Field(description="Into the tunnel, degrees counterclockwise from "
+                                           "east.")
+    open_m: float = Field(description="Length of the open approach outside the portal.")
+
+
+class Tunnel(Entity):
+    """A road tunnel (immersed tube under water, cut-and-cover box under the ground), a metro
+    tunnel between station boxes, or a pedestrian underpass. `line` is the road surface or
+    track along the whole sunk stretch (open approaches included); the structure is a box
+    `width_m` wide from `floor_m` under the line to `roof_m` over its clear height."""
+    TYPE_PREFIX: ClassVar[str] = "tunnel"
+    kind: Literal["immersed_tube", "cut_and_cover", "metro", "pedestrian"]
+    name: str | None = None
+    segment_ids: list[str] = Field(default_factory=list, description="Roads through it.")
+    line_id: str | None = Field(None, description="Metro: its transit line.")
+    walkway_ids: list[str] = Field(default_factory=list, description="Underpasses.")
+    crosses: list[str] = Field(default_factory=list,
+                               description="Water, districts and roads it passes under.")
+    line: Line3
+    width_m: float
+    clear_m: float = Field(description="Clear height over the road, track or walkway.")
+    roof_m: float = Field(description="Roof slab thickness.")
+    floor_m: float = Field(1.0, description="Floor slab under the road or track.")
+    portals: list[TunnelPortal] = Field(default_factory=list)
+    vent_ids: list[str] = Field(default_factory=list, description="Ventilation buildings.")
 
 
 # --- transit -----------------------------------------------------------------
@@ -683,7 +720,7 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "channels": Channel, "waterways": Waterway, "quays": Quay, "bridges": Bridge,
     "districts": District, "places": Place, "road_nodes": RoadNode, "road_segments": RoadSegment,
     "junctions": Junction, "crosswalks": Crosswalk, "sidewalks": Sidewalk, "lanes": Lane,
-    "walkways": Walkway, "structures": Structure,
+    "walkways": Walkway, "structures": Structure, "tunnels": Tunnel,
     "transit_lines": TransitLine, "stations": Station, "megasites": Megasite, "blocks": Block,
     "lots": Lot, "open_spaces": OpenSpace, "properties": Property, "buildings": Building,
     "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
@@ -722,6 +759,7 @@ class CityModel(_Model):
     lanes: list[Lane] = Field(default_factory=list)
     walkways: list[Walkway] = Field(default_factory=list)
     structures: list[Structure] = Field(default_factory=list)
+    tunnels: list[Tunnel] = Field(default_factory=list)
     transit_lines: list[TransitLine] = Field(default_factory=list)
     stations: list[Station] = Field(default_factory=list)
     megasites: list[Megasite] = Field(default_factory=list)

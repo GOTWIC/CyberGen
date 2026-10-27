@@ -34,7 +34,8 @@
       ]
     }
   },
-  "highways": {"pattern": "ring_plus_spine", "exits": ["north", "east", "west"], "elevated_share": 0.3},
+  "highways": {"pattern": "ring_plus_spine", "exits": ["north", "east", "west"], "elevated_share": 0.3,
+               "tunnels": {"under": ["Midtown"]}},
   "transit": {
     "hubs": ["Transit Nexus"],
     "lines": [

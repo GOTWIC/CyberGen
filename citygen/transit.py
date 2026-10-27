@@ -3497,6 +3497,14 @@ class Builder:
         for i in ltree.query(pt, predicate="dwithin", distance=4.0 + size).tolist():
             if llines[i].distance(pt) < lw[i] / 2.0 + size / 2.0:
                 return False
+        # M9: no footing on a road tunnel's box or open approach
+        if not hasattr(c, "_tunnels"):
+            boxes = [LineString([p_[:2] for p_ in t.line]).buffer(t.width_m / 2.0 + 1.0,
+                                                                 cap_style="flat")
+                     for t in c.m.tunnels if t.kind in ("immersed_tube", "cut_and_cover")]
+            c._tunnels = (shapely.STRtree(boxes), boxes) if boxes else None
+        if c._tunnels is not None and len(c._tunnels[0].query(sq, predicate="intersects")):
+            return False
         return True
 
 

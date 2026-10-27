@@ -4,7 +4,8 @@
         --width 7680 [--samples 16] VIEW [VIEW ...]
 
 BLOCKOUT_DIR holds `city.blend` and `blockout_plan.json` (a `citygen blockout` output). VIEW
-names a render of `build.views`: `top`, `iso_city`, `iso_<district>` or `street_<n>`; each is
+names a render of `build.views`: `top`, `iso_city`, `iso_<district>`, `street_<n>` or
+`cutaway` (M9, the section along the longest road tunnel); each is
 written as TO_DIR/render_<VIEW>.jpg with the same camera as the build, `--width` pixels wide
 (README images use 7680). `citygen rerender` runs it.
 """
@@ -68,8 +69,8 @@ def main():
     scene = bpy.context.scene
     build.setup_render(scene, samples)
     os.makedirs(to, exist_ok=True)
-    done = [build.render_view(scene, by_name[n], os.path.join(to, f"render_{n}.jpg"), width)
-            for n in names]
+    done = [build.render_view(scene, by_name[n], os.path.join(to, f"render_{n}.jpg"), width,
+                              plan=plan) for n in names]
     print("CITYGEN_RERENDER_DONE " + json.dumps({"files": done, "width": width}))
 
 

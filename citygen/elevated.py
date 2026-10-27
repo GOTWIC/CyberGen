@@ -392,8 +392,9 @@ class Elev:
                     key=lambda s: s["id"])
         for s in hw:
             s["attrs"]["elevated"] = False
-        # traced roads stay as drawn (their own `elevated road` layer marks decks)
-        hw = [s for s in hw if "pinned" not in s["attrs"]]
+        # traced roads stay as drawn (their own `elevated road` layer marks decks); M9
+        # tunnels stay down
+        hw = [s for s in hw if "pinned" not in s["attrs"] and "tunnel" not in s["attrs"]]
         share = spec.highways.elevated_share
         total = sum(s["attrs"]["length_m"] for s in hw)
         if not hw or share <= 0:
@@ -557,7 +558,7 @@ class Elev:
         others = [s for s in self.inc[n] if s["id"] not in on]
         if not others:
             return "plain"
-        if n in self.forced:
+        if n in self.forced or any("tunnel" in s["attrs"] for s in others):
             return "split"
         cls = {s["road_class"] for s in others}
         if cls == {"avenue"}:
@@ -2086,7 +2087,10 @@ def _envelope(net, apart: dict | None = None, extra: dict | None = None) -> None
         L = Ls[s["id"]]
         z0, z1 = val.get(end(s, s["start"]), 0.0), val.get(end(s, s["end"]), 0.0)
         sp = spans.get(s["id"], [])
+        tun = s["attrs"].get("_tunnel_prof")
         if not sp and z0 <= 0.0 and z1 <= 0.0:
+            if tun:
+                s["z_profile"] = _rows(compress(tun))   # M9: a tunnel keeps its own
             continue
         ss = set(_stations(L))
         for s0, s1, _ in sp:
@@ -2097,7 +2101,10 @@ def _envelope(net, apart: dict | None = None, extra: dict | None = None) -> None
             for s0, s1, zb in sp:
                 d = s0 - x if x < s0 else (x - s1 if x > s1 else 0.0)
                 z = max(z, zb - APPROACH_GRADE * d)
-            prof.append((x, z))
+            prof.append((x, z + (_z_at(tun, x) if tun else 0.0)))
+        if tun:
+            prof = sorted(set(prof) | {(x, _z_at(tun, x) + max(
+                0.0, z0 - APPROACH_GRADE * x, z1 - APPROACH_GRADE * (L - x))) for x, _ in tun})
         s["z_profile"] = _rows(compress(prof))
 
 
