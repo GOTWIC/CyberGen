@@ -22,7 +22,9 @@ Importing a build again updates the level by key and content hash: the same buil
 writes no file, and a city regenerated with `citygen build --district` changes only the
 actors of what changed (below).
 
-The six samples (their M12 builds on main, blockouts without renders), each imported into
+The six samples (their M12 builds, from before M10 gave every entity a stable id; the
+importer does not depend on the ids' form, and the district test below runs on M10's ids;
+blockouts without renders), each imported into
 the test project on the M4 Mac, imported again, and checked in play-in-editor, one
 city at a time (Unreal 5.8.0; times are wall-clock with the editor's start and quit, on a
 machine shared with other sessions' sweeps). Actors: one static mesh actor per blockout
@@ -194,8 +196,8 @@ it created, updated and deleted (`keys`).
 imported, no file saved, and the digests of every actor (tags, mesh, transform) and asset
 (path, hash) equal.
 
-**A district regenerated** (M10, on M10's branch before it lands here): Greyhook built with
-M10's code, then `citygen build ... --district "Lantern Strip" --base` (a new seed for
+**A district regenerated** (M10; run on M10's branch before it was merged here, the same
+code as main's): Greyhook built with M10's code, then `citygen build ... --district "Lantern Strip" --base` (a new seed for
 the district: 1,390 of its buildings replaced by 1,377 new ones, 7 changed in place;
 `citygen model diff`: 29,521 entities added, 29,606 removed, 587 changed, of them 109
 outside the district on its seam), both through the blockout, imported as "Greyhook M10":
@@ -286,14 +288,16 @@ the city), is deterministic, and a changed object changes only its own hash and 
 `prototypes.glb` is valid glTF 2.0 (header, chunks, unit normals, a street light 8 m tall)
 with citygen's axes (a box east and north of the origin lands at +x and -z); the flat graphs
 are consistent (offsets, links in range, a lane's successors); `manifest_changes` lists
-exactly the objects added, moved and removed between two manifests; `--manifest-only`,
-project preparation, engine discovery and names. `test_unreal_import_small_city` (skipped
-without Unreal or Blender) builds the test suite's small city, makes a fresh project from
-the First Person template, imports, imports again (nothing changes, same digests), changes
-the city (one building 6 m taller, another removed, the blockout run again), imports that
-over it (the actors created, updated and deleted are exactly `manifest_changes`, the rest
-unchanged), imports it again (nothing changes, nothing saved: the changes were saved) and
-runs the check on it. Also: every building's roof point lies inside its highest footprint,
+exactly the objects added, moved and removed between two manifests; a district of the
+small city regenerated with M10 (`edit.regenerate`, what `citygen build --district` runs)
+changes only objects of tiles within 250 m of it and no building of another district;
+`--manifest-only`, project preparation, engine discovery and names.
+`test_unreal_import_small_city` (skipped without Unreal or Blender) builds the test suite's
+small city, makes a fresh project from the First Person template, imports, imports again
+(nothing changes, same digests), regenerates its Old Quarter (blockout run again), imports
+that over it (the actors created, updated and deleted are exactly `manifest_changes`, the
+rest unchanged), imports it again (nothing changes, nothing saved: the changes were saved)
+and runs the check on it (6 min on the M4 Mac). Also: every building's roof point lies inside its highest footprint,
 and the interior point of a U and of a square with a hole lies inside them.
 
 ## Open items
