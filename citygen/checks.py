@@ -1087,6 +1087,8 @@ def report_text(rep: dict) -> str:
                     f"{es['direct_branches']} direct branches), deck up to {es['max_deck_m']:g} m;"
                     f" ramps {es['ramps']} ({es['ramp_km']} km); interchanges "
                 + (", ".join(f"{k} {v}" for k, v in es["interchanges"].items()) or "none")
+                + (f" ({es['flyovers']} trumpet flyover, up to {es['max_flyover_m']:g} m)"
+                   if es.get("flyovers") else "")
                 + f"; overpasses {es['overpasses']}",
                 f"  other raised roads {es['raised_other_km']} km, underpass streets "
                 f"{es['underpass_streets']}, road columns {es['road_columns']}"]

@@ -9,10 +9,10 @@ result: PASS
   [pass] gltf_tiles: 196 tile files for 196 tiles with objects
   [pass] usd_export: city.usdc
   [pass] renders: 15 of 15 renders
-  [pass] blender_budget: Blender 132.8 s (budget 600 s)
+  [pass] blender_budget: Blender 97.1 s (budget 600 s)
 
 plan: 11024 objects, 48396 parts, 196 tiles, 6657 buildings (sha256 48c4f0ac6c6549fb)
 blender 5.2.0 LTS: 860147 vertices, 348386 faces, 75830 instances, 81 materials, 123 collections
 files (MB): {"blend": 13.8, "usd": 35.8, "gltf_tiles": 49.8, "renders": 4.7}
-timings (s): {"build_s": 3.0, "save_s": 0.8, "usd_s": 19.5, "gltf_s": 71.8, "render_s": 37.4, "total_s": 132.8}
-total (s): {"plan_s": 4.5, "exports_s": 3.8, "total_s": 144.5}
+timings (s): {"build_s": 2.2, "save_s": 0.6, "usd_s": 12.5, "gltf_s": 52.2, "render_s": 29.4, "total_s": 97.1}
+total (s): {"plan_s": 3.8, "exports_s": 3.2, "total_s": 106.8}

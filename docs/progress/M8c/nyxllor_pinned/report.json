@@ -671,6 +671,8 @@
         "diamond": 2,
         "parclo": 1
       },
+      "flyovers": 0,
+      "max_flyover_m": 0.0,
       "overpasses": 3,
       "max_deck_m": 12.16,
       "raised_other_km": 10.85,

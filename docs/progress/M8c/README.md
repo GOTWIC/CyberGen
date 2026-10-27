@@ -6,15 +6,17 @@ Megacity, which needed 9 full-city tries on M8a and M8b (about 6 minutes), now b
 first try in about a minute. The sweep passes 58 of 68 builds (M8b on M8a: 51), and no build
 in it fails a transit check any more.
 
-Every build below passes all 66 checks, and each `city_model.json` is byte-identical on the
-M4 Mac (arm64) and on x86_64 Linux (docker, `linux/amd64`, `CITYGEN_WORKERS=4`):
+M8c is stacked on M8d (the trumpet flyover, PR 21), which changes only Nyxllor's roads.
+Every build below is made with the combined code and passes all 66 checks, and each
+`city_model.json` is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker,
+`linux/amd64`, `CITYGEN_WORKERS=4`):
 
 | City | Full-city tries (M8b, M8c) | sha256 of `city_model.json` (both machines) |
 |---|---|---|
 | archipelago_free_port | 1, 1 | `dd2b22763893110783337b21b9f58b6e1b46900461144684fe42cb532dbe641a` (unchanged) |
 | delta_megacity | 9, 1 | `91266cfe8240c7b6028e50d8112e3a78393c3c43a302cd0534e49560bd018a9a` |
 | nexus_city | 4, 3 | `4a146cb5d6bdf59a128c06e9955652f4fd358b3dc3b9864fe7210f247bbfb452` |
-| nyxllor | 1, 1 | `3291c3d08bb0a0ed4385f8bf7fdec724415c76db767f073d48c072d1dd2346aa` |
+| nyxllor | 1, 1 | `ce98f9d060b60430e4825223488f67c8327a2117c7280026fb2d7668a0df86c5` |
 | peninsula_city | 1, 1 | `f3bb6ffb5d8160dad20d6983159837e706c40c1411264ecafbbc4cef095679b3` |
 | nyxllor_pinned (M7b demo) | 2, 2 | `0fb851e3c4261ad6c803f6560d186c09a4c37fc0c7f87e9914b3588e158a9d00` |
 
@@ -123,8 +125,8 @@ Nexus City at seed 27182, second layout: the Magenta Line ends 303 m from `north
 |---|---|
 | <img src="same_layout/nexus_city_s27182_t2_before.png" width="420"> | <img src="same_layout/nexus_city_s27182_t2_after.png" width="420"> |
 
-The samples as built (each folder also has `before_transit.png`, M8b's map of the same
-spec, built on its own layout):
+The samples as built (each folder also has `before_transit.png`, the map of the same spec
+before M8c, built on its own layout: M8b's, M8d's for Nyxllor):
 
 | Delta Megacity | Nyxllor |
 |---|---|
@@ -136,23 +138,24 @@ Spaceport on its way (2.5 km, 3.9 in M8b).
 
 ## Sweep
 
-`citygen sweep --suite m8a --workers 4`, next to M8b's on M8a
-([`../M8b/sweep_on_m8a.md`](../M8b/sweep_on_m8a.md)). The full table is
-[`sweep.md`](sweep.md) (`sweep.json`). The run was interrupted after 42 builds by another
-session's `pkill`; the other 26 were built with the same code and the tables merged.
+`citygen sweep --suite m8a --workers 4` on the combined code (M8c on M8d), next to M8b's on
+M8a ([`../M8b/sweep_on_m8a.md`](../M8b/sweep_on_m8a.md)) and M8d's
+([`../M8d/sweep_after.md`](../M8d/sweep_after.md), the same 51 of 68 as M8b). The full table
+is [`sweep.md`](sweep.md) (`sweep.json`). M8c on its own (before M8d was merged) gave the
+same pass and fail for every build.
 
-| | M8b on M8a | M8c |
+| | M8b on M8a | M8c on M8d |
 |---|---|---|
 | builds passing every check | 51 of 68 (75%) | 58 of 68 (85%) |
 | passing apart from transit checks | 57 | 58 |
 | builds with a transit failure | 6 | 0 |
 | crashes | 0 | 0 |
 | full-city tries, all 68 builds | 261 | 178 |
-| build time, all 68 builds (one process each) | 8634 s | 7399 s |
+| build time, all 68 builds (one process each) | 8634 s | 5976 s |
 
 Passing builds per spec (the test specs pass the same 17 of 20):
 
-| spec | M8b on M8a | M8c |
+| spec | M8b on M8a | M8c on M8d |
 |---|---|---|
 | archipelago_free_port | 5 of 8 | 7 of 8 |
 | delta_megacity | 4 of 8 | 8 of 8 |
@@ -165,8 +168,7 @@ Fixed: archipelago s3141 and s27182 (Island Hopper), delta s3141 (Maglev Line), 
 and s27182 (Delta Loop), and peninsula s11 (it now passes on its third try, the second
 layout on the same roads; M8b's best of nine tries kept a building overlap). None broke. The ten builds that fail are all outside
 transit (M8a's road and placement open items: archipelago s1999, nexus s11, nyxllor s3141,
-pinned s11, s1999, s5077 and s8128, MINIMAL s42, s404 and s3141). The pinned builds ran while
-other builds and renders shared the machine, so their times are longer than M8b's.
+pinned s11, s1999, s5077 and s8128, MINIMAL s42, s404 and s3141).
 
 ## Open items
 

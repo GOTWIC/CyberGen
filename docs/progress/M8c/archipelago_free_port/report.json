@@ -623,6 +623,8 @@
       "interchanges": {
         "diamond": 1
       },
+      "flyovers": 0,
+      "max_flyover_m": 0.0,
       "overpasses": 1,
       "max_deck_m": 26.5,
       "raised_other_km": 13.08,

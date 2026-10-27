@@ -28,7 +28,7 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 | M8a | Robustness sweep (`citygen sweep`, 68 builds at many seeds) and the fixes it led to: 33 to 49 of 68 builds passing (57 apart from transit), no crashes | Done | [`docs/progress/M8a`](docs/progress/M8a) |
 | M8b | Transit loops as one simple ring, stations in route order, lines independent of each other, `transit_self_crossing` check; fast lines placed so their curves fit, faster transit routing; on M8a's code the sweep passes 51 of 68 builds (M8a alone 49) | Done | [`docs/progress/M8b`](docs/progress/M8b) |
 | M8c | Transit that passes on a city's first layout: flying loops as Dubins rings, open lines off the roads or as Dubins paths where the roads fail them; Delta Megacity from 9 full-city tries to 1, the sweep 58 of 68 (M8b 51), no transit failures left in it | Done | [`docs/progress/M8c`](docs/progress/M8c) |
-| M8d | Trumpet interchange with one loop and one flyover | In progress (paused) | |
+| M8d | Trumpet in its textbook form: one loop and one level-2 flyover round it (crest 16.6 m in Nyxllor), the two-loop form as the fallback; the sweep passes 51 of 68 builds as before, all five trumpets in it take the flyover, the 63 builds without one are byte-identical | Done | [`docs/progress/M8d`](docs/progress/M8d) |
 | M9 | Tunnels: road tunnels and underwater crossings with portals, metro tunnel geometry, pedestrian underpasses | Planned | |
 | M10 | Edit, lock and regenerate: stable ids, one district regenerated alone, pins and overrides, locked versioned cities, model diff | Planned | |
 | M11 | Gameplay layer: points of interest, faction and danger zones, traffic and crowd density, parking and fast travel, sign and ad slots, reachability checks | Planned | |
@@ -41,13 +41,18 @@ Full plan: [`docs/citygen_scope.md`](docs/citygen_scope.md).
 
 Five sample cities are rebuilt and checked at every milestone, so quality is judged across
 different coast forms, not one map. M8a swept them and the test specs over many seeds and
-fixed what failed (see [`docs/progress/M8a`](docs/progress/M8a)); M8b made every transit
-loop one simple ring through its stops in route order. M8c makes transit pass on the layout
-a city is first built on: a sky tube or maglev loop is one ring of Dubins paths (straight
-runs and arcs at the mode's radius) through its stops, and an open line the roads fail goes
-off them, or from stop to stop on Dubins paths. Delta Megacity now builds on its first try
-in about a minute (9 tries, about 6 minutes, before), and the sweep passes 58 of 68 builds
-with no transit failure left (see [`docs/progress/M8c`](docs/progress/M8c)).
+fixed what failed: highways that hooked along the map edge at exits, islands that did not
+fit, islands cut off from the roads, level steps on loop roads and footbridges, side-by-side
+duplicate roads, a crash (see [`docs/progress/M8a`](docs/progress/M8a)). M8b makes every
+transit loop one simple ring through its stops in route order, places fast lines (maglev,
+sky tube) so that their curves fit, and routes transit in about 3 to 13 s per city; on M8a's
+code it takes nyxllor from 8 full-city tries to 1. M8d builds the trumpet as one loop and a
+flyover. M8c makes transit pass on the layout a city is first built on: a sky tube or maglev
+loop is one ring of Dubins paths (straight runs and arcs at the mode's radius) through its
+stops, and an open line the roads fail goes off them, or from stop to stop on Dubins paths.
+Delta Megacity now builds on its first try in about a minute (9 tries, about 6 minutes,
+before), and the sweep passes 58 of 68 builds with no transit failure left (see
+[`docs/progress/M8c`](docs/progress/M8c)).
 
 Whole cities in the Blender blockout, seen isometrically from the south (8K images; open one
 for full size):
@@ -74,14 +79,20 @@ At street level, beside the viaducts:
 |---|---|
 | <img src="docs/progress/M8c/delta_megacity/render_street_4.jpg" width="420"> | <img src="docs/progress/M8c/nyxllor/render_street_4.jpg" width="420"> |
 
-Road levels (Nyxllor): every raised road by deck height, the interchanges (a diamond, a
-partial cloverleaf and a trumpet), columns, and the profile of one viaduct:
+Road levels (Nyxllor, M8d): every raised road by deck height, the interchanges (a diamond, a
+partial cloverleaf and a trumpet), columns, and the profile of one viaduct. The trumpet
+(inset) now has one loop and a flyover that wraps round it, crosses the deck at 16.6 m
+beside the stem and comes down to it:
 
-<img src="docs/progress/M8c/nyxllor/preview_elevated.png" width="840">
+<img src="docs/progress/M8d/nyxllor/preview_elevated.png" width="840">
+
+Nyxllor's trumpet in the blockout (8K): the loop inside, the flyover's bell wrapping round it:
+
+<img src="docs/progress/M8d/nyxllor/render_trumpet.jpg" width="840">
 
 Props and plants at street level (Nyxllor, 180 m insets):
 
-<img src="docs/progress/M8c/nyxllor/preview_props.png" width="840">
+<img src="docs/progress/M8b/nyxllor/preview_props.png" width="840">
 
 Transit maps (M8c): Delta Megacity on its first layout, before M8c (the Delta Loop's
 curve at Research Campus and the monorail's turn at a bridge foot too tight, so the city was
@@ -97,8 +108,9 @@ built again eight times) and now:
 
 Each M8c city folder has every generator preview, the transit map of M8b, the Blender
 renders, the build report and the stage trace, and `docs/progress/M8c/same_layout/` the
-transit of M8b and M8c on the same saved layouts; the M8b builds are in
-`docs/progress/M8b/`, the M8a sweep tables in `docs/progress/M8a/`, the M7b builds in `docs/progress/M7b/`, the M7a ones in
+transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) are in
+`docs/progress/M8d/`, the M8b ones in `docs/progress/M8b/`, the M8a sweep tables in
+`docs/progress/M8a/`, the M7b builds in `docs/progress/M7b/`, the M7a ones in
 `docs/progress/M7/`, the 2D maps in `docs/progress/M4/`. Sample specs live in
 `docs/progress/M1a2/<city>/city_spec.json` and `cities/nyxllor/city_spec.json`; the pinned
 demo's in `docs/progress/M7b/nyxllor_pinned/city_spec.json`, its round 1 and round 2 transit

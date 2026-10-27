@@ -629,6 +629,8 @@
       "ramps": 0,
       "ramp_km": 0.0,
       "interchanges": {},
+      "flyovers": 0,
+      "max_flyover_m": 0.0,
       "overpasses": 0,
       "max_deck_m": 10.34,
       "raised_other_km": 4.9,
