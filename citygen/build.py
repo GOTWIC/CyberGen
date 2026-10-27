@@ -185,6 +185,7 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
             b["span_m"] = a.pop("span_m")
             b["ramp_length_m"] = a.pop("ramp_length_m")
             b.pop("road_class", None)
+        data["tunnels"] = [dict(t) for t in roads.tunnels]
     if local is not None:
         data["road_nodes"] = local.nodes
         data["road_segments"] = local.segments
@@ -198,6 +199,9 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
             b["attrs"] = a
             bridges.append(b)
         data["bridges"] = bridges
+        from . import tunnels as TN
+
+        data["tunnels"] = TN.relink(roads.tunnels, local.segments)
         for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
                     "lots", "places"):
             data[key] = getattr(local, key)
@@ -606,6 +610,11 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     if spec.transit.lines:
         tr = TR.build(spec, m)
         m = with_rows(m, tr.rows)
+    # M9: tunnel parts, metro tunnels, pedestrian underpasses (before the columns and props)
+    from . import tunnels as TN
+
+    tn = TN.build(spec, m)
+    m = with_rows(m, tn.rows)
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     pr = PR.build(spec, m)
@@ -616,13 +625,17 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     bx = BC._B(m)
     from . import elevated_checks as EC
 
-    checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else c
-              for c in early["checks"]] + BC.run(spec, m, None, bx) + TC.run(spec, m) + \
-        PC.run(spec, m)
+    from . import tunnel_checks as TNC
+
+    late = {c.id: c for c in TNC.run(spec, m)}
+    checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
+              late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
+        TC.run(spec, m) + PC.run(spec, m)
     with G.canonical():
         checks.append(EC.check_supports(m))
     st = early["stats"]
     st["elevated"] = EC.stats(m)
+    st["tunnels"] = TNC.stats(m)
     if "local" in st:
         st["local"] = SC.stats(spec, m)
     st["buildings"] = BC.stats(spec, m, bx)
@@ -638,7 +651,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st.setdefault("buildings", {})["generator"] = {k: v for k, v in out.info.items()
                                                    if k != "seconds"}
     b.checks, b.stats = checks, st
-    b.notes = b.notes + out.notes + (tr.notes if tr is not None else []) + pr.notes
+    b.notes = b.notes + out.notes + (tr.notes if tr is not None else []) + tn.notes + pr.notes
     return b
 
 
@@ -693,4 +706,9 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_elevated.png")
         render_elevated(b, paths[-1])
+    if b.model.tunnels:
+        from .preview_tunnels import render_tunnels
+
+        paths.append(out / "preview_tunnels.png")
+        render_tunnels(b, paths[-1])
     return paths

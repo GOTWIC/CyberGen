@@ -550,6 +550,8 @@ class Builder:
                 b = bridges[bid]
                 forbid.append((b["s0"], b["s1"]))
             forbid += _raised_spans(s["z_profile"], LOCAL_JUNCTION_Z_M)
+            # M9: nor where it runs below the ground (a tunnel and its approaches)
+            forbid += _sunk_spans(s["z_profile"])
             ln = Line(pts, s["road_class"], s["width_m"], s["attrs"].get("role", "primary"),
                       name=s.get("name"), section=s["cross_section"], primary=s, forbid=forbid)
             for end in (s["start"], s["end"]):
@@ -2685,6 +2687,11 @@ def _raised_spans(prof, z_min: float = 0.05) -> list[tuple[float, float]]:
     return out
 
 
+def _sunk_spans(prof, z_max: float = -0.05) -> list[tuple[float, float]]:
+    """Stretches of a z profile below z_max (M9: tunnels and their open approaches)."""
+    return _raised_spans([{"s": p["s"], "z": -p["z"]} for p in prof] if prof else [], -z_max)
+
+
 def _slice_profile(prof: list[dict], a: float, b: float) -> list[dict]:
     def z_at(s):
         for p0, p1 in zip(prof[:-1], prof[1:]):
@@ -2791,8 +2798,8 @@ def build_output(B: Builder, edges) -> None:
                 row["bridge"] = True
                 foot.append((row, li))
         seg_out.append(row)
-    # footbridge bridge records
-    n_br = len(bridges)
+    # footbridge bridge records (numbered on from the highest: M9 tubes leave gaps)
+    n_br = max((int(k[2:]) for k in bridges), default=0)
     for row, li in foot:
         ln_pts = row["centerline"]
         ln = B.lines[li]
