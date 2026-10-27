@@ -571,6 +571,16 @@
         },
         "tunnels": {
           "$ref": "#/$defs/Tunnels"
+        },
+        "crossings": {
+          "default": "stack",
+          "description": "Interchange where two highways cross with room for it: a four-level stack or a turbine (each the other's fallback).",
+          "enum": [
+            "stack",
+            "turbine"
+          ],
+          "title": "Crossings",
+          "type": "string"
         }
       },
       "title": "Highways",
@@ -867,6 +877,12 @@
           "minItems": 2,
           "title": "Route",
           "type": "array"
+        },
+        "reuse": {
+          "default": true,
+          "description": "False: the route keeps to its own line and crosses the highways it meets instead of running along them (a crosstown; M12 builds a stack where it crosses one with room).",
+          "title": "Reuse",
+          "type": "boolean"
         }
       },
       "required": [

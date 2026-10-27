@@ -425,6 +425,31 @@ city (after props) and nine checks in `gameplay_checks.py` (75 in all on M8c, 79
   back to junctions and lane middles), so the layer never makes a city retry: the sweep is
   build for build the same as M8c's (58 of 68). Sample builds: `docs/progress/M11/`.
 
+M12 (stack interchanges) is in place, in `citygen/elevated.py`: where two generated highways
+cross (four highway legs, two straight pairs, 45 degrees or more; `Elev.stack_sites`) and the
+footprint fits, `plan_stacks` lifts one through the crossing (640 m of ramp room both ways
+plus its run down, or up to the map edge) and keeps the other at grade (700 m), no other
+highway meeting either window, no M9 tunnel in either or at their nodes; avenue nodes under
+the lifted window stay at grade (node kind
+`under`, also an avenue junction whose own ramps do not fit; a one-sided avenue then ends
+`UNDER_END_M` clear of the deck). `stack_ic` builds eight one-way directional ramps
+(`_system`): the left turns first, out to lines 45 m beyond the highway edges and across the
+core on a diagonal pinned 50 m before and after the crossing on the two roads (`_sys_core`,
+150 m turns), tier 2 (18 m, from the highway at grade) and tier 3 (27 m) over the 200 m core;
+then the right turns in their quadrants, under the left ramps where those are high enough.
+Profiles as M8d's flyover (5.5 m plus the deck, 40 m crests, 5%, 6% at most; the climb's
+length goes to either end, `bias`), no 60 m stretch without a column spot (`_fly_span`), at
+most 140 degrees of turning (`_winding`). The turbine (`highways.crossings: "turbine"`, else
+the stack's fallback) sweeps the left turns wider so their crossings fall apart. Where neither
+fits, or a planned stack is not built, the stage runs again without the plan (M7's crossing,
+same bytes). Ramps carry `attrs.template`, `turn`, `tier`, `crossing`; stack left ramps
+`level` 2 or 3. `NamedHighway.reuse: false` makes a crosstown that crosses the highways it
+meets. Two checks (`stack_ramps`, `stack_levels`, 77 in all on M11, 81 with M9);
+`preview_elevated.png` puts a stack in its inset and its ramp profiles in the profile panel. No sample has room for a stack,
+so the stack demo `cities/vesper_bay_stacks` is the pinned demo with only its highways changed
+(art direction): two crosstowns that cross in a stack in The Stacks (a separate city, so the
+pinned demo and its sweep seeds stay as they were). Sample builds: `docs/progress/M12/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
