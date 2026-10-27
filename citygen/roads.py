@@ -1190,8 +1190,10 @@ def _ring_waypoints(ctx: Ctx) -> list[tuple]:
 
 
 def _waypoint_route(ctx: Ctx, pts: list[tuple], cls: str, role: str, name: str,
-                    closed: bool = False, start_exit: str | None = None) -> None:
-    """Route through snapped waypoints (consecutive legs)."""
+                    closed: bool = False, start_exit: str | None = None,
+                    reuse: bool = True) -> None:
+    """Route through snapped waypoints (consecutive legs). `reuse` False (M12): the route
+    gets no discount on earlier highways, so it keeps to its own line and crosses them."""
     g = ctx.grid
     cells = []
     deep = g.deep()
@@ -1230,7 +1232,7 @@ def _waypoint_route(ctx: Ctx, pts: list[tuple], cls: str, role: str, name: str,
             near = (fx - bx) ** 2 + (fy - by) ** 2 < 180.0 ** 2
             targets = set(free[near].tolist()) - {cur} or {b}
         start = ctx.exits[start_exit] if start_exit and i == 0 else None
-        path = g.search([cur], targets, reuse=None if closed else "highway",
+        path = g.search([cur], targets, reuse=None if closed or not reuse else "highway",
                         heuristic=len(targets) == 1,
                         shore=ctx.shore if cls == "highway" else 1.0)
         if path is None or len(path) < 2:
@@ -1408,7 +1410,7 @@ def build_highways(spec: CitySpec, ctx: Ctx) -> None:
                 p = reg.representative_point()
                 stops.append((p.x, p.y))
         if len(stops) >= 2:
-            _waypoint_route(ctx, stops, "highway", "named", nh.name)
+            _waypoint_route(ctx, stops, "highway", "named", nh.name, reuse=nh.reuse)
             for r in ctx.roads:
                 if r.role == "named" and r.name is None:
                     r.name = nh.name

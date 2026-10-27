@@ -2322,7 +2322,8 @@ def footbridges(B: Builder) -> list[int]:
 
 def link_dead_ends(B: Builder) -> None:
     """Free ends of local streets close to another road join it (within 25 m, at a legal
-    junction); the M1b avenues that stop at a megasite gate join the service ring."""
+    junction); the M1b avenues that stop at a megasite gate join the service ring (not a
+    traced road that stops on its bridge, more than `LOCAL_JUNCTION_Z_M` up)."""
     for li in range(B.n_primary, len(B.lines)):
         ln = B.lines[li]
         if ln.dead or ln.cls == "footbridge":
@@ -2336,8 +2337,11 @@ def link_dead_ends(B: Builder) -> None:
                 if not B.attach(li, end, reach=22.0) and grid:
                     B.extend_ray(li, end, 150.0)
     deg: dict = {}
+    traced = {e for s in B.roads.segments if s["attrs"].get("role") == "pinned"
+              for e in (s["start"], s["end"])}
     for n in B.roads.nodes:
-        if n["attrs"].get("kind") == "end":
+        if n["attrs"].get("kind") == "end" and not (
+                n["id"] in traced and n["position"][2] > LOCAL_JUNCTION_Z_M):
             deg[(G.q(n["position"][0]), G.q(n["position"][1]))] = n
     for p in sorted(deg):
         best = None
