@@ -25,8 +25,10 @@ A district regeneration:
 from __future__ import annotations
 
 import copy
+import gc
 import hashlib
 import json
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -117,9 +119,31 @@ def entry_of(d) -> dict:
 
 # --- regeneration ---------------------------------------------------------------------
 
+@contextmanager
+def no_gc():
+    """Python's cyclic garbage collector paused: two cities in memory are millions of
+    container objects, and its full passes over them took a third of a regeneration (Nexus
+    City: 52 s, 34 s without; 3.3 GB at most, 3.8 GB without). Cycles go when it ends."""
+    was = gc.isenabled()
+    gc.disable()
+    try:
+        yield
+    finally:
+        if was:
+            gc.enable()
+
+
 def regenerate(state: dict, old: CityModel, district: str, spec_data: dict | None = None,
                seed: int | None = None, workers: int | None = None,
                entry: dict | None = None):
+    """`_regenerate` with the garbage collector paused."""
+    with no_gc():
+        return _regenerate(state, old, district, spec_data, seed, workers, entry)
+
+
+def _regenerate(state: dict, old: CityModel, district: str, spec_data: dict | None = None,
+                seed: int | None = None, workers: int | None = None,
+                entry: dict | None = None):
     """(the built city with the district regenerated, the edit record for the state). The
     district's new spec entry: `entry` as it is (a rebuild), else its entry in `spec_data`,
     else its current one; a new seed when that is unchanged and none is given."""

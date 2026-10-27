@@ -157,6 +157,14 @@ def _failed(built, out_dir) -> int:
 def _regenerate(args: argparse.Namespace, spec_data: dict, ov) -> int:
     """M10: `citygen build SPEC OUT --district NAME`: one district of the build in OUT (or
     --base) regenerated; everything else stays."""
+    from . import edit as E
+
+    with E.no_gc():
+        return _regenerate_in(args, spec_data, ov)
+
+
+def _regenerate_in(args: argparse.Namespace, spec_data: dict, ov) -> int:
+    import hashlib
     import time
 
     from . import edit as E
@@ -166,11 +174,15 @@ def _regenerate(args: argparse.Namespace, spec_data: dict, ov) -> int:
     src = Path(args.base or args.out_dir)
     try:
         state = E.read_state(src)
-        old = CityModel.from_json((src / "city_model.json").read_text(encoding="utf-8"))
+        text = (src / "city_model.json").read_text(encoding="utf-8")
+        old = CityModel.from_json(text)
     except (OSError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_USAGE
-    if E.model_sha(old) != state["model_sha256"]:
+    # (the file as written: its bytes are the model's JSON)
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    del text
+    if sha != state["model_sha256"]:
         print(f"error: {src / 'city_model.json'} is not the model of its build state",
               file=sys.stderr)
         return EXIT_USAGE
