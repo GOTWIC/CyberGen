@@ -3,7 +3,7 @@
   "name": "Delta Megacity",
   "release": "1.0",
   "citygen": "0.1.0",
-  "code_sha256": "abfdd8fcc37f3ca3f01b70f5274d4eaaca45e6eb46367aeda8cf94d11632c57b",
+  "code_sha256": "0a467b29a338fb987e35741ef111696e99d0152f2e2489f093106ef4f428146d",
   "spec": {
     "$schema": "../../../../citygen/schemas/city_spec.schema.json",
     "name": "Delta Megacity",
@@ -241,5 +241,5 @@
   },
   "overrides": null,
   "edits": [],
-  "model_sha256": "49fa43f9631e8512a705dd8a008f5114610468d41b8722d94797ab6cd7c55abe"
+  "model_sha256": "09175912a08c70facc7a834feacb46d825fb51f7aa7e24183d1e730c76ee364c"
 }

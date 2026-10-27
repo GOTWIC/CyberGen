@@ -179,6 +179,7 @@ class Renamer:
                  prior: dict | None = None):
         self.d = data
         self.prior = prior or {}
+        self.by_id: dict | None = None
         self.new: dict[str, str] = {}
         self.old_ids: set[str] = {e["id"] for c in ORDER for e in data.get(c, [])}
         # ids that are stable already (named by an earlier pass): they stay
@@ -263,16 +264,25 @@ class Renamer:
             return f"{e['district_id']}.lot.{anchor(e)}"
         return self.derived(old, coll not in DERIVED, e)
 
-    def _key(self, e: dict) -> str:
-        """An entity's contents with every old id as it is called now (or '?' where its
-        new name is not known yet): ties between equal ids sort by it."""
+    def _key(self, e: dict, depth: int = 1) -> str:
+        """An entity's contents with every old id as it is called now; where its new name is
+        not known yet, '?' and (`depth` deep) the contents of what it names (two access
+        walkways of two stations of one stop differ only in their station): ties between
+        equal ids sort by it."""
         def fix(v):
             if isinstance(v, dict):
                 return {k: fix(x) for k, x in v.items() if k != "id"}
             if isinstance(v, list):
                 return [fix(x) for x in v]
             if isinstance(v, str) and v in self.old_ids:
-                return self.new.get(v, "?")
+                n = self.new.get(v)
+                if n is not None:
+                    return n
+                if depth > 0:
+                    if self.by_id is None:
+                        self.by_id = {x["id"]: x for c in ORDER for x in self.d.get(c, [])}
+                    return "?" + self._key(self.by_id[v], depth - 1)
+                return "?"
             return v
         return json.dumps(fix(e), sort_keys=True, ensure_ascii=False, allow_nan=False)
 
@@ -293,8 +303,9 @@ class Renamer:
                     olds.setdefault(sig, []).append(nid)
                 rest = []
                 for i in idx:
-                    nid = next((x for x in olds.get(signature(coll, items[i]), ())
-                                if x not in self.taken), None)
+                    # (only where one old entity had this kind and geometry)
+                    cand = olds.get(signature(coll, items[i]), ())
+                    nid = cand[0] if len(cand) == 1 and cand[0] not in self.taken else None
                     if nid is None:
                         rest.append(i)
                     else:

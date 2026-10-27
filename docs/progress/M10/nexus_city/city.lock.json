@@ -3,7 +3,7 @@
   "name": "Nexus City",
   "release": "1.0",
   "citygen": "0.1.0",
-  "code_sha256": "abfdd8fcc37f3ca3f01b70f5274d4eaaca45e6eb46367aeda8cf94d11632c57b",
+  "code_sha256": "0a467b29a338fb987e35741ef111696e99d0152f2e2489f093106ef4f428146d",
   "spec": {
     "$schema": "../../../../citygen/schemas/city_spec.schema.json",
     "name": "Nexus City",
@@ -380,5 +380,5 @@
   },
   "overrides": null,
   "edits": [],
-  "model_sha256": "696007837a246fb07489e67d4898889891068166f14651ec9811149965d77d2d"
+  "model_sha256": "568a88a430133618a916759130a873132a6bf47f7adfb388408092e807d8fda5"
 }

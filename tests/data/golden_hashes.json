@@ -10,11 +10,11 @@
     "confirmed_on": "M8b: x86_64 Linux container citygen-x86 (same sha256 for all five and the pinned demo); M8d: produced on x86_64 Linux (cloud container, Python 3.13.17), Mac identity to be confirmed; M11: produced on the M4 Mac and confirmed byte for byte on x86_64 Linux (container citygen-x86, CITYGEN_WORKERS=3), all five and the pinned demo, stage traces identical; M10: produced on the M4 Mac"
   },
   "cities": {
-    "archipelago_free_port": "2cb91e663fe3f1aba5184efe0ad2cd5168b1f26721e6e8df9acddda0dbb8f525",
-    "delta_megacity": "49fa43f9631e8512a705dd8a008f5114610468d41b8722d94797ab6cd7c55abe",
-    "nexus_city": "696007837a246fb07489e67d4898889891068166f14651ec9811149965d77d2d",
-    "peninsula_city": "0ca27090773e437f5387065311e29b36eec5464f30785ca90f43bd7dd5e98e0e",
-    "vesper_bay": "3ee6a070f70534d98989183345036fd5c5512422a06c42a9a9ef09c78fb7202b"
+    "archipelago_free_port": "40e05569d5b544f29d68a202305a106dd79f848c844b036d9ddc2a76764be400",
+    "delta_megacity": "09175912a08c70facc7a834feacb46d825fb51f7aa7e24183d1e730c76ee364c",
+    "nexus_city": "568a88a430133618a916759130a873132a6bf47f7adfb388408092e807d8fda5",
+    "peninsula_city": "b147efbf92e7b57dce44c1bddc109be1fcf84c48d59eaf11cef206ed7ed0cee5",
+    "vesper_bay": "1c34536941730b42a14a7c16f6b9fe8d7cf83e523db34a7dd8f6958768368fe3"
   },
   "blockout_plans": {
     "archipelago_free_port": "fb8d98b62504b394eeacd9a5eb5ea14634eb619f189574d1b46a0d00ce966845",

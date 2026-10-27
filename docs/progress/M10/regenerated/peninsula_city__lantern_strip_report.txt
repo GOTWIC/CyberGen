@@ -173,4 +173,4 @@ notes:
   - 2 local roads crossing another without a junction removed
   - 6 local segments (3.34 km) not connected to the network were dropped
   - lot under a wheel rim left open (2 times)
-  - district d04 regenerated: 668 of 668 held road segments came back unchanged; 126 entities outside it changed on its seam (23 through references)
+  - district d04 regenerated: 668 of 668 held road segments came back unchanged; 109 entities outside it changed on its seam (6 through references)

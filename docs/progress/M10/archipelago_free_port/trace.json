@@ -9,7 +9,7 @@
     "shapely": "2.2.0",
     "geos": "3.14.1"
   },
-  "model_sha256": "2cb91e663fe3f1aba5184efe0ad2cd5168b1f26721e6e8df9acddda0dbb8f525",
+  "model_sha256": "40e05569d5b544f29d68a202305a106dd79f848c844b036d9ddc2a76764be400",
   "entries": [
     ["v0/coast", "ee868a940ed7b529db5bf2234a03c2dd552278052827eabcb6ade50017a5488e"],
     ["v0/rivers", "929172fae51e7c4fedc288349b430c1ca2ee1b35f6a9493f3ca7c83b44786791"],
@@ -79,7 +79,7 @@
     ["gameplay/factions", "777eaa5fb57e0d5d616b9ddeeb4a415dba4443b2664e0026da7ddb20903b9bf8"],
     ["gameplay/fields", "301b6c941b4d6688264b8977569c2abc681d17ab6aa4b5d08d0f8182213f5404"],
     ["gameplay/parking", "d7ab6ca0bda19f993b9b717ec082b2ffee22c3800a9b390bc3674416f0faa7f1"],
-    ["gameplay/pois", "c419352fa5efbed635bfddef147bb847a9e4dfbeea6ee45da85be7e3c30e6252"],
+    ["gameplay/pois", "f548e5c66b58885c72dcc5de4fcdaa80771a2f15baf03082419292e96f7f7c6b"],
     ["gameplay/sign_slots", "13ee8c250b1de3f17279957dbfdb5496ed5b644f4459165055e6aae327109714"],
     ["gameplay/travel_points", "4b2e3cf0a99a1ab85cb932c7f73329b8e47aaf27b9934d5d119f409ad59027f5"],
     ["gameplay/zones", "e826ea1c7ec6cb146f5f0e27ed95ed80e5d23e7f3f8170c66effc497786ceaf8"],

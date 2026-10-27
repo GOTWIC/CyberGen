@@ -475,7 +475,9 @@ folder, later edits start from it.
   primary roads stay, so a field M1 reads (`area_share`, `placement`, megasites, the
   archetype's avenue spacing) needs a full build.
 - **What changed:** `citygen model diff <old>/city_model.json <new>/city_model.json` lists the
-  entities added, removed and changed by id, per collection (`--all`, `--json FILE`).
+  entities added, removed and changed by id, per collection (`--all`, `--json FILE`;
+  `--png FILE` draws them: the same in grey, removed red, added green, moved yellow). Look at
+  the map with the owner before going on.
 - **Pins and overrides** go in `overrides.json` beside the spec (or `--overrides FILE`),
   read by every build and regeneration:
 

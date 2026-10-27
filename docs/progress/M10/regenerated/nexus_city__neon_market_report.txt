@@ -197,6 +197,6 @@ notes:
   - 3 local roads crossing another without a junction removed
   - 53 local segments (6.36 km) not connected to the network were dropped
   - landmark 'Mirai Tower' capped at 248 m by a flight cone (asked 290 m)
-  - district d04 regenerated: 2445 of 2445 held road segments came back unchanged; 715 entities outside it changed on its seam (170 through references)
-  - 6 new names that an old place had already got a number
+  - district d04 regenerated: 2445 of 2445 held road segments came back unchanged; 552 entities outside it changed on its seam (7 through references)
+  - 7 new names that an old place had already got a number
   - 1 new taxi stands too close to an old one dropped

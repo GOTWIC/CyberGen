@@ -186,5 +186,5 @@ notes:
   - 45 lanes reached only over pedestrian streets became pedestrian
   - 3 local roads crossing another without a junction removed
   - 35 local segments (7.18 km) not connected to the network were dropped
-  - district d04 regenerated: 1553 of 1553 held road segments came back unchanged; 247 entities outside it changed on its seam (26 through references)
+  - district d04 regenerated: 1553 of 1553 held road segments came back unchanged; 225 entities outside it changed on its seam (4 through references)
   - 2 new names that an old place had already got a number

@@ -14,7 +14,29 @@ between two builds.
 | `citygen lock OUT [--release 1.0]` | writes `OUT/city.lock.json` |
 | `citygen lock --verify LOCK [--out DIR]` | builds the city again from the lock alone and compares the bytes |
 
-RESULTS_TABLE
+Every sample passes all 75 checks on the same number of full-city tries as on M11, and each
+`city_model.json` is byte-identical on the M4 Mac (arm64) and on x86_64 Linux (docker image
+`citygen-x86`, `linux/amd64`, `CITYGEN_WORKERS=3`), stage traces included. Ids are longer, so
+the models grow by about 4% (Vesper Bay 55.5 to 57.8 MB); apart from ids, the block fix
+moves a few blocks by a centimeter or so, so a few lots split differently: building and lot
+counts move by 0.16% at most (Delta Megacity 5410 to 5417 buildings, Greyhook 2458 to 2462,
+Saltreach and Nexus City unchanged).
+
+| City | Tries (M11, M10) | Entities | Release lock | sha256 of `city_model.json` (both machines) |
+|---|---|---|---|---|
+| archipelago_free_port | 1, 1 | 90849 | [`city.lock.json`](archipelago_free_port/city.lock.json) | `2cb91e663fe3f1aba5184efe0ad2cd5168b1f26721e6e8df9acddda0dbb8f525` |
+| delta_megacity | 1, 1 | 157688 | [`city.lock.json`](delta_megacity/city.lock.json) | `49fa43f9631e8512a705dd8a008f5114610468d41b8722d94797ab6cd7c55abe` |
+| nexus_city | 3, 3 | 175968 | [`city.lock.json`](nexus_city/city.lock.json) | `696007837a246fb07489e67d4898889891068166f14651ec9811149965d77d2d` |
+| peninsula_city | 1, 1 | 75884 | [`city.lock.json`](peninsula_city/city.lock.json) | `0ca27090773e437f5387065311e29b36eec5464f30785ca90f43bd7dd5e98e0e` |
+| vesper_bay | 1, 1 | 162098 | [`city.lock.json`](vesper_bay/city.lock.json) | `3ee6a070f70534d98989183345036fd5c5512422a06c42a9a9ef09c78fb7202b` |
+| vesper_bay_pinned | 2, 2 | 169484 | [`city.lock.json`](vesper_bay_pinned/city.lock.json) | `d39673465d54fe981d59ed983118982a74655a11f3c18098e7edbf67b2e2cb6f` |
+
+<img src="regenerated/vesper_bay__neon_strand_diff.png" width="840">
+
+Vesper Bay with Neon Strand regenerated on a new seed: the whole city and a close-up, what
+is the same in grey, removed in red, added in green, moved or reshaped in yellow. The yellow
+along the district's east edge is the seam: blocks of The Stacks that a seam junction's
+corner cut, with what stands on them, and two parks on them planted again.
 
 ## Stable ids
 
@@ -168,9 +190,31 @@ LOCK_TABLE
 `--png` draws it (`citygen/preview_diff.py`: what is the same in grey, removed in red, added
 in green, moved or reshaped in yellow, with a close-up of the area that changed).
 
-DIFF_SECTION
+`citygen model diff` on the Vesper Bay regeneration above: 42134 entities added, 41240
+removed, 1153 changed, nearly all in Neon Strand; `regenerated/` has the map and the report
+of every regeneration in the table.
 
-SWEEP_SECTION
+## Sweep
+
+`citygen sweep --suite m8a --workers 3` ([`sweep.md`](sweep.md), `sweep.json`), next to
+M11's ([`../M11/sweep.md`](../M11/sweep.md)):
+
+| | M11 | M10 |
+|---|---|---|
+| builds passing every check | 58 of 68 | 58 of 68 |
+| builds newly failing | | 0 |
+| builds whose pass, failing checks, retries, hydrology or road variant differ from M11 (ids in the messages aside) | | 1 |
+| full-city tries beyond the first, all 68 builds | 110 | 111 |
+| crashes | 0 | 0 |
+| build time, all 68 builds (one process each, the Mac shared with the x86 run and another session) | 6551 s | 7215 s |
+
+The one difference: Delta Megacity s3141 passes on its third full-city try instead of its
+second (first tries with 11 and 1 failures instead of 9); the block fix moves a few blocks,
+so its first layouts come out a little differently. The ten builds that fail fail the same
+checks as on M11 (placement, road graph, open space share, curve radius and the rest; M8a's
+open items). The salt column now shows the layout salt of a whole-city retry (`salt 2`): the
+build stats did not keep it before, so M11's table showed none (and a district
+regeneration of such a city would have started from another layout; fixed and tested).
 
 ## Tests
 
@@ -192,7 +236,29 @@ unchanged (75).
 
 ## Open items
 
-OPEN_ITEMS
+- **The seam can be wide on megablocks.** A block of a neighbor district that a seam
+  junction's corner cuts by 1 m2 or more is built again with what stands on it; in The
+  Stacks (megablock residential) that is a whole megablock and its towers, and a park on
+  such a block is planted again (Vesper Bay, Neon Strand: changes up to 170 m from the
+  district, all on blocks and walkways along its border). Keeping the old buildings on a cut
+  block when they still fit it would narrow this.
+- **What M1 decides stays.** `--district` keeps the district's outline, its primary roads
+  and megasites; fields that M1 reads (`area_share`, `placement`, relations, megasites, the
+  highway pattern) need a full build. M1 is not cached either: every regeneration replays
+  it (5 to 7 s).
+- **Time.** The regeneration itself takes 22 to 56 s with 3 or 4 workers on the shared Mac;
+  loading the old model and writing the new one, the report and the eight previews add 7
+  to 15 s. With the default 8 workers on a quiet machine it is faster.
+- **Roads in overrides.** An edit cannot move or remove a road (the lane, walkway and
+  transit graphs hang on it): pin it, or change and regenerate the district.
+- **Ids move with geometry.** An id names where an entity sits, so an entity that moves (a
+  seam junction, a prop the seam re-placed) gets a new id. Overrides that name such an
+  entity are skipped with a note.
+- **Locks name their code.** `code_sha256` covers `citygen/*.py`; after any code change a
+  lock still rebuilds but says the code differs, so the sample locks committed here go stale
+  with the next commit (rebuild and lock again for a new release).
+- **M9 tunnels.** `ids.REFS` has `tunnels` from M9's model on its branch; check it, and its
+  place in `ids.ORDER`, after merging.
 
 ## Files
 

@@ -199,5 +199,5 @@ notes:
   - complex tower_cluster in 'Corporate Core': no lots to merge
   - Core Island: path52 overlaps path49: it gives way (16.9 m2)
   - 57 traced buildings placed as drawn
-  - district d04 regenerated: 1638 of 1638 held road segments came back unchanged; 858 entities outside it changed on its seam (59 through references)
+  - district d04 regenerated: 1638 of 1638 held road segments came back unchanged; 850 entities outside it changed on its seam (51 through references)
   - 2 new names that an old place had already got a number
