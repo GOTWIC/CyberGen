@@ -60,7 +60,7 @@ def slab(name, x, z, w, h):
 def label(text, x, z):
     cu = bpy.data.curves.new(f"lbl_{text}", "FONT")
     cu.body = text
-    cu.size = 0.42
+    cu.size = 0.38
     ob = bpy.data.objects.new(f"lbl_{text}", cu)
     ob.location = (x, -0.05, z)
     ob.rotation_euler = (math.radians(90), 0, 0)
@@ -134,6 +134,8 @@ def board(b):
         label(it["label"], x, z - 0.55)
     w = COLS * (SIZE + GAP) - GAP
     h = rows * (SIZE + GAP + 0.6)
+    t = label(b.get("title", b["name"]), 0.0, h + 0.2)
+    t.data.size = 0.6
     cam_d = bpy.data.cameras.new("cam")
     cam_d.type = "ORTHO"
     cam_d.ortho_scale = max(w, h * 16 / 9) * 1.06

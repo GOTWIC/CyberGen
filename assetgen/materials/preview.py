@@ -163,16 +163,18 @@ def board_job(args) -> dict:
     for era in LB.ERAS:
         mats = []
         for slot in ("concrete", "plaster", "brick", "panel", "cladding", "roof"):
-            mats.append((f"{slot} ({era})", CT.material(slot, era, lib), slot))
+            mats.append((slot, CT.material(slot, era, lib), slot))
         for slot in ("spandrel", "trim", "structure", "equipment", "louver", "glass"):
             mats.append((slot, CT.material(slot, era, lib), slot))
-        boards.append({"name": era, "materials": mats})
+        boards.append({"name": era, "title": f"{era.replace('_', ' ')} era: its walls and "
+                       "roof (top), shared surfaces (bottom)", "materials": mats})
     shared = [(s, CT.material(s, None, lib), s) for s in
               ("patch_sheet", "patch_rust", "patch_tarp", "patch_panel", "patch_ply",
                "board_concrete", "stucco", "timber", "shutter", "perforated", "seam",
                "hangar", "tile", "mullion",
                "pod", "sill")]
-    boards.append({"name": "building_parts", "materials": shared})
+    boards.append({"name": "building_parts", "title": "building parts and patches",
+                   "materials": shared})
     street = [(s, CT.material(s, None, lib, "streets"), s) for s in
               ("asphalt.highway", "asphalt.avenue", "asphalt.street", "asphalt.alley",
                "marking.white", "marking.yellow", "paving.cobble", "paving.tile",
@@ -180,7 +182,7 @@ def board_job(args) -> dict:
                "paving.concrete_tile", "paving.resin", "paving.brick", "paving.timber",
                "curb.granite", "concrete.deck", "stone.quay", "tile.tunnel", "steel.painted",
                "ballast", "container.c1", "manhole", "lawn")]
-    boards.append({"name": "streets", "materials": street})
+    boards.append({"name": "streets", "title": "street surfaces", "materials": street})
     if args.only:
         boards = [b for b in boards if b["name"] in args.only]
     names = set()

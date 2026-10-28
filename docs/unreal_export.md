@@ -33,6 +33,7 @@ script, not this exporter.)
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
 | with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
 | stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
+| with AG6: textures (the shared library, imported once per project; a city's sign pages), textured masters, `Night` in a parameter collection, an instance per material key (era variants of the wall and roof slots) | `/Game/CityGen/Core/Textures/`, `Core/MPC_CityGen`, `/Game/CityGen/<City>/Assets/Textures/` |
 
 Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, `cg.tile` and
 `cg.district` tags. Frames: citygen's (x east, y north, z up, meters) to Unreal's at
@@ -275,6 +276,82 @@ them (`SetLodFromStaticMesh`, `SetLodScreenSizes`), its actor without collision;
 instead of graphs.json's (on a terrain city the ground under them, graphs.json's z there,
 is added); the new keys in the re-import digests.
 
+## assetgen's materials (AG6)
+
+`assetgen build` now textures what the contributions name (`assetgen/materials/contrib.py`;
+spec of the library and masters: `assetgen/materials/catalog.py`):
+
+```json
+{"textures": {"set.brick_heritage.base": {"file": "library/sets/brick_heritage_base.png",
+                                          "pixels_sha256": "...", "size": [1024, 1024],
+                                          "srgb": true, "kind": "color"},
+              "set.brick_heritage.normal": {"...": "...", "srgb": false, "kind": "normal"},
+              "atlas.interiors.night": {"file": "library/atlases/interiors_night.png", "...": ""}},
+ "materials": {"brick@heritage": {"master": "facade", "slot": "brick", "tint_cpd": 0, "...": "",
+                                  "textures": {"BaseTex": "set.brick_heritage.base",
+                                               "NormalTex": "...", "OrmTex": "...",
+                                               "Macro": "atlas.macro.macro",
+                                               "Decals": "atlas.decals.base"},
+                                  "scalars": {"TileM": 2.0, "Textured": 1.0, "Streaks": 1.0},
+                                  "vectors": {"RefColor": [0.17, 0.06, 0.03]}}},
+ "entries": [{"key": "d04.lot.e512n88.bld", "materials": {"brick": "brick@heritage"},
+              "cpd": ["... 30 floats"], "...": ""}],
+ "library": {"version": "ag6.1", "hash": "...", "density_px_m": 512}}
+```
+
+- **Textures**: each contribution lists the textures its materials read: the shared library's
+  sets (`set.<set>.base|normal|orm`) and atlases (`atlas.<atlas>.<map>`), whose files are
+  under `BUILD/assets/library` (a link `assetgen build` makes to the library folder,
+  `~/.cache/cybergen/assetgen_library/d<density>` or `$ASSETGEN_LIBRARY`), and the city's
+  pages (`city.<page>`, `BUILD/assets/textures/`). `kind`: `color` (sRGB), `normal` (OpenGL:
+  green up; flipped on import), `mask` (linear: occlusion, roughness, metallic and the tint
+  mask in alpha). The pixel hash is the texture's identity: the same name with other pixels
+  in two contributions is refused.
+- **Materials**: AG1's and AG7's fields stay; `textures` (parameter to texture), `scalars`
+  and `vectors` (`RefColor`, linear: the set's mean color where it takes the tint, which the
+  tint replaces) are new. Masters: `facade`, `metal`, `concrete`, `road`, `foliage` (textured
+  surface: base color, normal, ORM, tint over the tinted pixels, macro map, grime from the
+  ground, rain streaks under the top, the road's atlas stains), `glass` (interior mapping),
+  `neon`, `sign`, `decal`, and AG1's and AG7's `opaque`, `emissive`, `translucent`.
+- **Era materials**: a wall or roof slot (`concrete`, `plaster`, `brick`, `panel`,
+  `cladding`, `roof`) has one material per era, `<slot>@<era>`, with `slot` naming the mesh
+  slot; a building's entry maps its slots to its era's (`materials`); the mesh's own slot
+  keeps the slot's base material (the `mixed_modern` sets).
+- **Custom Primitive Data**: 30 floats: AG1's 23, then the room width and floor height (the
+  interior grid), the interior atlas row, rain streaks, the building's top over its pivot,
+  the share of blinds down and the era's index (`cpd_layout`).
+- **Window interiors**: the glass master finds each window's room from UV0 (meters along the
+  facade and up from the base) and the building's room width and floor height: rooms are
+  cells of that grid, the view goes into the cell's box in the facade's tangent frame, its
+  hit is projected onto the interior atlas's one-point image of a room (row by use, column
+  by a hash of the cell, lit by the lit-window ratio, blinds by their share). Nothing per
+  pane or per vertex: the panes AG1's packs give UV1 and a window id in the vertex alpha
+  are not read any more (AG2 or AG9 may drop them from the glass slots, for lean meshes).
+  This is what AG1's Unreal check needed: curtain wall panes that share corners came out per
+  triangle there, which data that is a function of position cannot.
+- **`unreal_contribution.materials.json`** (part `materials`): no entries; a `sign`
+  material per sign, ad and logo page and the `decal` material with their textures, for
+  AG3's and AG8's sign meshes and decals (`signs.json` maps every sign slot to its page and
+  cell).
+
+**What the exporter does with them** (`citygen/unreal.py` `stage2`,
+`citygen/ue/import_city.py`):
+- the manifest's `stage2.textures`: per texture its file (from BUILD), pixel hash, kind,
+  color space and folder: the library's under `/Game/CityGen/Core/Textures` (once per
+  project, shared by every city), the city's under `<city>/Assets/Textures`; a material's
+  record carries each texture's hash, so new pixels update the instances that read them and
+  no actor; an actor's record carries its era materials (`materials`, slot to instance), so
+  another era updates only that actor;
+- `textures2`: each texture imported (`AssetImportTask`) when missing or of another hash,
+  with its color space, compression (`TC_NormalMap` with the green channel flipped,
+  `TC_Masks`, default) and texture group; the city's pages it no longer has deleted;
+- `/Game/CityGen/Core/MPC_CityGen` with `Night` (0 by day; stage 3 drives it): the rooms
+  light, neon and signs glow with it;
+- the masters rebuilt (`STAGE2_VERSION` 4) with Custom HLSL nodes for the surface, the
+  room, the glass and the stains, their sample parameters defaulting to a texture of the
+  build of each kind; the instances get their textures, scalars and vectors; each actor its
+  era instances as override materials on its component (by slot name).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -303,3 +380,4 @@ is added); the new keys in the re-import digests.
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`d03.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on; `city.deck_road.<tile>` and `city.deck_sidewalk.<tile>` with no district until the stage 1 fixes), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |
 | Stage 1 fixes | No code change. Keys: a deck's streets and sidewalks are joined per district like the ground's (`d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`, with `cg.district=d03`; they were `city.deck_road.<tile>`, `city.deck_sidewalk.<tile>` with an empty `cg.district`), so importing Vesper Bay Decks over an M14 import replaces those actors under their new keys; its ramps keep theirs (`<segment>.ramp`). Cragmouth's local junctions are level out to their corners (more retaining wall actors on its hills, keys by wall id as before) | Not run (the coordinating session's call; `docs/progress/stage1_fixes/`) |
 | AG1 and AG7 (after M15) | Stage 2 taken as layer 2: every `assets/unreal_contribution.*.json` read in sorted order (`unreal.stage2`, the manifest's `stage2`; a key in two files refused), the blockout actors of each entry's key and `replaces` dropped, an actor per shell and street piece at its pivot (`cg.stage=2`), the packs through Interchange in their nodes' frames with their own normals, stage 2 masters (`M_CgFacade`, `M_CgGlass`, `M_CgMetal`, `M_CgRoad`, `M_CgOpaque`, `M_CgEmissive`, `M_CgTranslucent`, `M_CgFoliage`) and an instance per part and slot reading the actor's Custom Primitive Data tint, the 23 floats as the components' saved defaults, building collision as convex hulls through GeometryScript (`GeometryScripting` plugin), complex collision for streets, the sky tube glass as a non-Nanite LOD chain, container stacks as instanced actors per entry and kind, proxies imported only, `graphs.walkways` lines in the walkway data assets; `--blockout-only`; the check's walk keeps to walkable walkways (no leg over 30%, no step over 0.6 m, not under the terrain) and tries up to eight starts; the buildings contribution's `asset` is the shell node's Interchange name and its patch slots spell out their tint rule | the small test city, Greyhook and Cragmouth: blockout alone, then stage 2 over it (exactly the actors `manifest_changes` names), imported again (nothing changed), checked (507 of 507 traces down, 36 of 36 roofs and facades, 248, 130 and 81 m walked) with shots; first imports with stage 2 5 to 14 minutes, most of it Nanite builds (`docs/progress/AG1/unreal/`) |
+| AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |

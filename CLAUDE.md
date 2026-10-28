@@ -854,6 +854,33 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
   (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
   generator change: the code hash is in every tile's hash.
 
+AG6 (materials and textures) is in place, in `assetgen/materials/` (tests
+`tests/assetgen/test_ag_materials.py`):
+- **Library** (`library.py`, `surfaces.py`, `noise.py`, `pbr.py`, `atlases.py`,
+  `interiors.py`; `assetgen library [OUT] [--density 512]`): tileable sets per era (walls
+  and roofs in each era's look) and shared ones (building parts, street surfaces), each base
+  color with height, OpenGL normal, occlusion-roughness-metallic with the tint mask, at 512
+  px/m within reach of the street (256 above); trim sheets per era, decal, road, interior
+  (day and night, one-point room images per use) and macro atlases. Integer-hash noise and
+  elementwise float32 arithmetic, numpy and PIL only; made once into
+  `~/.cache/cybergen/assetgen_library/d<density>` (or `$ASSETGEN_LIBRARY`), kept while its
+  code hash is unchanged, linked from `BUILD/assets/library`; not in git.
+- **City** (`signage.py`, `glyphs.py`): sign pages from M11's names and unit uses in each
+  district's scripts (an in-repo stroke font for Latin and Cyrillic, stroke-built kana and
+  Hangul, Hanzi-like and Devanagari-like signs), brand logos, ads and holo-ads,
+  `BUILD/assets/textures/` and `signs.json` (every sign slot's page and cell).
+- **Materials** (`catalog.py`, `params.py`, `contrib.py`): slot to master and set; wall and
+  roof slots per era (`<slot>@<era>`, a building entry's `materials`); 7 more Custom
+  Primitive Data floats (room grid, interior row, streaks, top, blinds, era); the
+  contributions' `textures` and material parameters, `unreal_contribution.materials.json`.
+  Window interiors are mapped from UV0 and the building's room grid, nothing per pane.
+- **Checks** (`checks.py`): texel density from the packs' UVs (99.5 % of each part's area
+  at three quarters of the spec's density or more), texture budgets; `materials_report.*`.
+- **Previews**: `assetgen materials preview BUILD [--night]` and `assetgen materials board
+  OUT` (`assetgen/blender/ag6_materials.py`, node for node the Unreal masters;
+  `ag6_preview.py`, `ag6_board.py`). `assetgen build --no-textures` gives AG1's flat
+  materials. Exporter: `docs/unreal_export.md`, AG6 section. Results: `docs/progress/AG6/`.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.
