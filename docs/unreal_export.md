@@ -102,14 +102,79 @@ The spike measured how Unreal takes this (`docs/progress/AG0/README.md`): Interc
 so instances must come from the manifest, as above); simple collision boxes can be written
 into a mesh's body setup from Python.
 
-**What the exporter still needs for it** (in the PR that first ships real assets, AG1, on
-the exporter's own package once M15 is merged and moved): read `unreal_contribution.json` as
-a layer over the blockout manifest and replace the blockout actor of every key it has (and
-of its `replaces`), keeping the blockout's for the rest; import its glTF packs with assets
-keyed by `asset` and hashed by `hash`; spawn actors at `pivot`; make the masters (M_AgOpaque,
-M_AgGlass with interior mapping, as `assetgen/ue/spike_import.py` does) and their instances
-per slot; write the collision boxes; set Custom Primitive Data on every component; build the
-part instances (HISM per building and kind); include the new keys in its re-import digests.
+### From AG1: real buildings
+
+`assetgen build BUILD` writes the contribution as one file per part of stage 2, beside the
+packs it points at: `BUILD/assets/unreal_contribution.buildings.json` (AG1; AG7 adds
+`unreal_contribution.streets.json`). Each key is in one file only. What changed from AG0's
+format:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "buildings", "layer": 2,
+ "city": "Vesper Bay", "model_sha256": "...", "cpd_layout": {"0-2": "wall tint", "...": ""},
+ "materials": {"brick": {"master": "facade", "color": [0.196, 0.067, 0.036],
+                         "roughness": 0.9, "metallic": 0.0, "tint_cpd": 0}, "...": {}},
+ "entries": [{
+   "key": "d03.lot.e512n88.bld", "kind": "building", "hash": "<asset hash, 16 hex>",
+   "replaces": [], "glb": "tiles/t+02+00.glb", "node": "<key>.shell", "asset": "<key, _>",
+   "pivot": [512.34, 88.1, 0.0], "yaw_deg": 0.0,
+   "nanite": true, "distance_field": false, "lumen_cards": false,
+   "triangles": 12840, "slots": ["brick", "glass", "roof", "structure", "trim"],
+   "collision": {"simple": [{"center": [0, 0, 7.5], "extent": [6, 9, 7.5], "yaw_deg": 45}],
+                 "convex": [{"z": [0, 15], "ring": [[-6, -9], [6, -9], [6, 4], [0, 9]]}]},
+   "cpd": [0.33, 0.12, 0.07, 0.8, 4.5, 0.3, 0.35, 0.4127, "... 23 floats"],
+   "proxy": {"glb": "proxies/t+02+00.glb", "node": "<key>.proxy", "asset": "<key, _>_proxy",
+             "triangles": 34},
+   "parts": [], "tags": {"cg.type": "building.villa", "cg.district": "d03",
+                         "cg.tile": "t+02+00"}}]}
+```
+
+- **Packs**: `tiles/<tile>.glb` holds every building of a 256 m tile (citygen's tile names,
+  by the building's origin): a root node per building named by its key at its pivot, a
+  child `<key>.shell` with the shell mesh (one primitive per material slot). The vertices
+  are in the building's frame, so the static mesh asset is made from the child alone and the
+  actor placed at `pivot`. `proxies/<tile>.glb` holds the far proxies the same way
+  (`<key>.proxy`, its node at the pivot).
+- **Materials**: one material instance per slot for the whole city, its parent the slot's
+  `master`, `color`, `roughness` and `metallic` as its parameters. A slot with `tint_cpd`
+  takes its base color from the actor's Custom Primitive Data at that index (three floats,
+  linear RGB): the building's wall, trim, glass, roof, spandrel or patch tint; one master
+  serves every building. UV1 and vertex colors exist only on the glass slots (`glass`,
+  `storefront`): UV1 0 to 1 over each pane, vertex alpha a per-window id for the interior
+  mapping master.
+- **Custom Primitive Data**: 23 floats per actor (`cpd_layout`): AG0's 0 to 7 (tint 0 to 2
+  is now the wall tint, wear, dirt height, neon, lit-window ratio, seed), then the trim,
+  glass, roof, spandrel and patch tints.
+- **Collision**: `simple` boxes (a mass piece that is a rectangle) and `convex` prisms (any
+  other convex piece of a mass footprint, its ring and z range), building frame, meters:
+  `KBoxElem` and `KConvexElem` (the ring at both heights). Simple collision is used as
+  complex until AG3 adds the ground band.
+- **Proxy**: the building's far proxy, its masses as prisms (7 to 500 triangles), a Nanite
+  fallback and HLOD input (AG9 sets up the HLOD layers); as a static mesh of its own.
+- **Parts**: empty until AG2 (hierarchical instanced meshes per building and kind).
+- **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
+  unchanged packs, so a re-import may skip the key.
+
+**What the exporter still needs for it** (M15 was not on main when AG1 finished, so the
+exporter's code is unchanged; this is the work for the first PR that has both):
+- read every `BUILD/assets/unreal_contribution.*.json`, in sorted file order, as stage 2's
+  layer over the blockout manifest, refusing a key that appears in two files;
+- replace the blockout actor of every key it has, and of every key in its `replaces`,
+  keeping the blockout's for the rest; include the new keys and hashes in the re-import
+  digests (an unchanged hash touches nothing);
+- import the packs through Interchange with one static mesh per `<key>.shell` node (and per
+  `<key>.proxy`), assets named by `asset`, and spawn each actor at `pivot` (Unreal
+  100 x, -100 y, 100 z; yaw -yaw);
+- make the masters (`facade`, `glass` with interior mapping, `metal`, as
+  `assetgen/ue/spike_import.py` does) and one material instance per slot, a static switch
+  or scalar picking the CPD index `tint_cpd`;
+- set the 23 Custom Primitive Data floats on every component;
+- write the collision boxes and convex elements into each mesh's body setup;
+- Nanite on, distance fields and Lumen cards off for every building mesh;
+- build parts as hierarchical instanced meshes per building and kind (ready for AG2: the
+  list is empty in AG1);
+- the proxies: as their own meshes for HLOD (AG9) and, where Nanite is off, as the
+  fallback.
 
 ## Milestones and checks
 
@@ -131,3 +196,4 @@ part instances (HISM per building and kind); include the new keys in its re-impo
 |---|---|---|
 | M15 | Introduced: manifest by key and hash, glTF tiles through Interchange with Nanite, `M_CityGen` material instances, instanced props and plants, graphs as data assets, player start, default sun and sky, re-import by key and hash, `--check` and `--shots` | the six samples, imported, imported again and checked |
 | AG0 | No code change (M15 was not on main yet): assetgen's contribution format defined (above, written by `assetgen spike`), with the list of what the exporter needs to take it; the spike ran on M15's project setup from its branch | the spike: three generated buildings and a test tree in a throwaway project (`docs/progress/AG0/unreal/`) |
+| AG1 | No code change (M15 was still not on main): `assetgen build` writes the first real contribution, `unreal_contribution.buildings.json` (a shell, pivot, slots, box and convex collision, 23 CPD floats and a proxy per building; one file per stage 2 part); the exporter work it needs listed above | none yet (the coordinating session's call) |

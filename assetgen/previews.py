@@ -1,0 +1,264 @@
+"""`assetgen preview BUILD [--blockout DIR] [--views ...] [--width W] [--out DIR]`: Blender
+previews of a build's assets (scope 14.2), written to `BUILD/assets/previews/`:
+
+- `city.jpg`: the whole city from its far proxies, isometric (the blockout's iso_city
+  camera);
+- `iso_<district>.jpg`: every district at full detail (its neighbors from proxies);
+- `street_<n>.jpg`: the blockout's street cameras with the shells around them;
+- `contact_<type>.jpg`: a contact sheet per building type (up to 12 buildings drawn by id
+  hash, each framed alone), and `contact_sheet.jpg`, 64 buildings drawn across the city.
+
+The cameras are the blockout's (`blockout_plan.json` when `--blockout` names a blockout
+directory, else planned here from the model); with a blockout the scene is its city.blend
+without the building boxes, so the shells stand on its ground, streets and props.
+Blender only draws: everything it renders is the build's glTF.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from . import build as BD
+from . import gltf as G
+from .buildings import genome as GN
+from .buildings import systems as SY
+
+ISO_DIR = (0.280167, 0.769751, -0.573576)     # the blockout's isometric direction
+STREET_R = 700.0
+SHEET_N = 12
+RANDOM_N = 64
+CELL = 480
+
+
+def _norm(v):
+    L = math.sqrt(sum(c * c for c in v))
+    return tuple(c / L for c in v)
+
+
+def _cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def iso_frame(box, d, aspect):
+    """Center and ortho width framing a box (x0, y0, z0, x1, y1, z1) seen along d (the
+    blockout's `iso_frame`)."""
+    x0, y0, z0, x1, y1, z1 = box
+    side = _norm(_cross(d, (0.0, 0.0, 1.0)))
+    up = _norm(_cross(side, d))
+    corners = [(x, y, z) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+    c = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 4)
+    us = [_dot([p[k] - c[k] for k in range(3)], side) for p in corners]
+    vs = [_dot([p[k] - c[k] for k in range(3)], up) for p in corners]
+    du, dv = (max(us) + min(us)) / 2, (max(vs) + min(vs)) / 2
+    c = tuple(c[k] + side[k] * du + up[k] * dv for k in range(3))
+    return c, max(max(us) - min(us), (max(vs) - min(vs)) * aspect) * 1.06
+
+
+def front_dir(brief: dict) -> tuple[float, float, float]:
+    """A view direction onto a building's main front (its longest `front` edge, else its
+    longest window-bearing one), turned 30 degrees to show a corner, 35 degrees down."""
+    best = None
+    for e in brief["edges"]:
+        rank = 0 if e["class"] == "front" else (1 if e["class"] in ("street", "plaza", "park",
+                                                                    "canal", "open") else 2)
+        key = (rank, -e["length_m"])
+        if e["ring"] == 0 and (best is None or key < best[0]):
+            best = (key, e["normal_deg"])
+    if best is None:
+        return _norm(ISO_DIR)
+    a = math.radians(best[1] + 30.0)
+    c = math.cos(math.radians(35.0))
+    return _norm((-math.cos(a) * c, -math.sin(a) * c, -math.sin(math.radians(35.0))))
+
+
+def _ortho(box, w, aspect, back, d=ISO_DIR):
+    d = _norm(d)
+    c, scale = iso_frame(box, d, aspect)
+    return {"ortho": True, "scale": scale, "eye": [c[k] - d[k] * back for k in range(3)],
+            "target": list(c), "w": w, "h": int(w / aspect)}
+
+
+def cameras(bdir: Path, blockout: Path | None) -> dict:
+    if blockout is not None and (blockout / "blockout_plan.json").is_file():
+        return json.loads((blockout / "blockout_plan.json").read_text())["cameras"]
+    from citygen.blockout import make_plan
+    from citygen.model import CityModel
+    m = CityModel.model_validate_json((bdir / "city_model.json").read_bytes())
+    return make_plan(m)["cameras"]
+
+
+def _tile_box(name: str) -> tuple[float, float, float, float]:
+    ix, iy = int(name[1:4]), int(name[4:7])
+    return ix * BD.TILE_M, iy * BD.TILE_M, (ix + 1) * BD.TILE_M, (iy + 1) * BD.TILE_M
+
+
+def plan_views(man: dict, cams: dict, width: int, which: set[str]) -> list[dict]:
+    views = []
+    boxes = [d["box"] for d in cams["districts"]]
+    tall = max((r["bounds"][1][2] for r in man["buildings"].values()), default=30.0)
+    if "city" in which and boxes:
+        box = [min(b[i] for b in boxes) for i in range(3)] + \
+            [max(b[i] for b in boxes) for i in range(3, 5)] + [tall]
+        views.append({"name": "city", **_ortho(box, width, 1.6, 8000.0), "shell_tiles": []})
+    by_d: dict[str, set] = {}
+    for r in man["buildings"].values():
+        if r["district"]:
+            by_d.setdefault(r["district"], set()).add(r["tile"])
+    if "districts" in which:
+        for d in cams["districts"]:
+            if d["id"] not in by_d:
+                continue
+            views.append({"name": f"iso_{d['id']}", **_ortho(d["box"], width, 1.6, 4000.0),
+                          "shell_tiles": sorted(by_d[d["id"]])})
+    if "street" in which:
+        for k, v in enumerate(cams["street"], 1):
+            ex, ey = v["eye"][0], v["eye"][1]
+            near = []
+            for t in man["tiles"]:
+                x0, y0, x1, y1 = _tile_box(t)
+                dx = max(x0 - ex, 0.0, ex - x1)
+                dy = max(y0 - ey, 0.0, ey - y1)
+                if dx * dx + dy * dy <= STREET_R * STREET_R:
+                    near.append(t)
+            views.append({"name": f"street_{k}", "ortho": False, "lens": v["lens_mm"],
+                          "eye": v["eye"], "target": v["target"], "w": width,
+                          "h": int(width * 9 / 16), "shell_tiles": sorted(near)})
+    return views
+
+
+def _pick(ids: list[str], n: int, purpose: str) -> list[str]:
+    return sorted(ids, key=lambda i: (GN.u(i, purpose, "ag1.preview"), i))[:n]
+
+
+def sheet_jobs(bdir: Path, man: dict, out: Path) -> list[dict]:
+    """A glTF per sheet with its buildings each at the origin, and a framed view per cell."""
+    briefs = json.loads((bdir / "assets" / "briefs.json").read_text())["briefs"]
+    by_type: dict[str, list[str]] = {}
+    for bid, r in sorted(man["buildings"].items()):
+        by_type.setdefault(r["type"], []).append(bid)
+    sheets = [(t.split(".", 1)[1], _pick(ids, SHEET_N, t)) for t, ids in sorted(by_type.items())]
+    sheets.append(("random", _pick(sorted(man["buildings"]), RANDOM_N, "random")))
+    jobs = []
+    sd = out / "sheets"
+    sd.mkdir(parents=True, exist_ok=True)
+    for name, ids in sheets:
+        g = G.Gltf(generator="assetgen preview")
+        made = []
+        for bid in ids:
+            br = briefs[bid]
+            sh, _, rec = BD.building_asset(br, GN.make(br))
+            made.append((bid, sh, rec))
+        mats = BD._materials(g, sorted({s for _, sh, _ in made for s in sh["arrays"]}))
+        cells = []
+        for k, (bid, sh, rec) in enumerate(made):
+            mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats))
+            child = g.node(f"{bid}.shell", mesh=mesh, extras=BD._node_extras(bid, rec))
+            g.node(bid, children=[child], root=True)
+            (x0, y0, z0), (x1, y1, z1) = rec["bounds"]
+            v = _ortho([x0, y0, 0.0, x1, y1, z1], CELL, 1.0, 2000.0, front_dir(briefs[bid]))
+            v["scale"] *= 1.04
+            cells.append({"key": bid, "file": f"sheets/{name}_{k:02d}.jpg", "view": v,
+                          "type": rec["type"], "height": round(z1, 1),
+                          "district": rec["district"]})
+        path = sd / f"{name}.glb"
+        path.write_bytes(g.to_glb())
+        jobs.append({"name": name, "glb": str(path), "cells": cells})
+    return jobs
+
+
+def compose(out: Path, sheets: list[dict], man: dict) -> list[Path]:
+    from PIL import Image, ImageDraw
+    made = []
+    for sh in sheets:
+        n = len(sh["cells"])
+        if not n:
+            continue
+        cols = 8 if n > 16 else 4
+        rows = (n + cols - 1) // cols
+        pad = 26
+        im = Image.new("RGB", (cols * CELL, rows * (CELL + pad) + 40), (24, 25, 28))
+        dr = ImageDraw.Draw(im)
+        total = sum(1 for r in man["buildings"].values()
+                    if r["type"] == "building." + sh["name"])
+        title = "64 buildings drawn across the city" if sh["name"] == "random" else \
+            f"{sh['name']}: {n} of {total}"
+        dr.text((10, 12), f"{man['city']}, {title}", fill=(230, 230, 230))
+        for k, c in enumerate(sh["cells"]):
+            p = out / c["file"]
+            if not p.is_file():
+                continue
+            x, y = (k % cols) * CELL, 40 + (k // cols) * (CELL + pad)
+            im.paste(Image.open(p).convert("RGB").resize((CELL, CELL)), (x, y))
+            label = c["key"] if sh["name"] != "random" else \
+                f"{c['type'].split('.', 1)[1]}, {c['height']} m"
+            dr.text((x + 6, y + CELL + 6), label, fill=(200, 200, 200))
+        f = out / ("contact_sheet.jpg" if sh["name"] == "random" else
+                   f"contact_{sh['name']}.jpg")
+        im.save(f, quality=90)
+        made.append(f)
+    return made
+
+
+def run(build_dir: str | Path, blockout: str | None = None, out: str | None = None,
+        which: list[str] | None = None, width: int = 2400, blender: str | None = None,
+        log=print) -> dict:
+    bdir = Path(build_dir)
+    adir = bdir / "assets"
+    man = json.loads((adir / "manifest.json").read_text())
+    od = Path(out) if out else adir / "previews"
+    od.mkdir(parents=True, exist_ok=True)
+    bo = Path(blockout) if blockout else (bdir / "blockout" if (bdir / "blockout").is_dir()
+                                          else None)
+    which = set(which or ("city", "districts", "street", "sheets"))
+    cams = cameras(bdir, bo)
+    views = plan_views(man, cams, width, which)
+    sheets = sheet_jobs(bdir, man, od) if "sheets" in which else []
+    lit = 0.12
+    job = {"assets": str(adir), "out": str(od), "views": views, "sheets": sheets,
+           "proxy_tiles": sorted(man["tiles"]) if views else [],
+           "blend": str(bo / "city.blend") if bo and (bo / "city.blend").is_file() else None,
+           "slots": {k: [v[0], SY.srgb_linear(v[1]), v[2], v[3], v[4]]
+                     for k, v in SY.SLOTS.items()}, "lit": lit, "samples": 32}
+    from citygen.blockout import find_blender
+    exe = find_blender(blender)
+    if exe is None:
+        raise RuntimeError("no Blender (set BLENDER or --blender)")
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(job, f)
+        jp = f.name
+    script = Path(__file__).resolve().parent / "blender" / "preview_assets.py"
+    log(f"blender: {len(views)} views, {sum(len(s['cells']) for s in sheets)} sheet cells")
+    proc = subprocess.run([exe, "-b", "--factory-startup", "-P", str(script), "--", jp],
+                          capture_output=True, text=True)
+    for line in proc.stdout.splitlines():
+        if line.startswith("[ag preview"):
+            log(line)
+    if proc.returncode != 0 or not (od / "preview_report.json").is_file():
+        sys.stderr.write(proc.stdout[-4000:] + proc.stderr[-4000:])
+        raise RuntimeError(f"Blender failed ({proc.returncode})")
+    made = compose(od, sheets, man) if sheets else []
+    rep = json.loads((od / "preview_report.json").read_text())
+    rep["contact_sheets"] = [p.name for p in made]
+    (od / "preview_report.json").write_text(json.dumps(rep, indent=1) + "\n")
+    return rep
+
+
+def main(args) -> int:
+    try:
+        rep = run(args.build, args.blockout, args.out, args.views, args.width, args.blender)
+    except (OSError, RuntimeError, KeyError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(f"previews: {len(rep['views'])} views, {len(rep['contact_sheets'])} contact sheets")
+    return 0
+
+

@@ -26,6 +26,7 @@ check):
 
 from __future__ import annotations
 
+import bisect
 import math
 
 from citygen import dmath as M
@@ -53,8 +54,8 @@ def _u(bid: str, purpose: str) -> float:
 
 class Facade:
     """One mass edge: a -> b (mm), outward to the right; s along it in mm, 0..L."""
-    __slots__ = ("a", "b", "L", "ux", "uy", "nx", "ny", "j", "k", "ring", "i", "u0", "rec",
-                 "c0", "c1", "regions")
+    __slots__ = ("a", "b", "L", "ux", "uy", "nx", "ny", "j", "u0", "rec", "c0", "c1",
+                 "regions")
 
     def __init__(self, a, b, u0: float):
         self.a, self.b = a, b
@@ -87,6 +88,13 @@ def _corner_clear(d_in, d_out, r: int) -> int:
     if sin_t <= 1e-3:
         return EDGE_CLEAR
     return max(EDGE_CLEAR, int(math.ceil((EDGE_CLEAR + r * cos_t) / sin_t)))
+
+
+TURN_COS = 0.9397            # cos 20 degrees: less turn than this is no corner
+
+
+def _turned(d_in, d_out) -> bool:
+    return d_in[0] * d_out[0] + d_in[1] * d_out[1] < TURN_COS
 
 
 def _thickness(ring) -> int:
@@ -173,7 +181,7 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
 
 def bay_cuts(L: int, c0: int, c1: int, bay: int, rhythm: str, key: str) -> list[tuple]:
     usable = L - c0 - c1
-    if usable < max(int(0.6 * bay), 700):
+    if usable < max(int(0.45 * bay), 900):
         return []
     n = max(1, int(round(usable / bay)))
     if rhythm == "aba" and n >= 3:
@@ -202,11 +210,14 @@ def bay_openings(b0: int, b1: int, j: int, n: int, win: str, rhythm: str, wwr: f
     if win == "sparse" and j % 3 != 1:
         return []
     if sysname == "shanty_patchwork":
-        if _u(key, f"p{j}") > open_p:
+        # the opening's place in its bay is the facade's (`key` without the row), whether it
+        # is there in a row is the row's: every row then has the same columns
+        if open_p < 1.0 and _u(key, f"p{j}") > open_p:
             return []
+        fkey = key.rsplit("|", 1)[0]
         k = {"patch": 1.0, "slit": 1.5, "square": 0.8}.get(win, 1.0)
-        ow = min(int(wb * wwr * k * (0.75 + 0.4 * _u(key, f"w{j}"))), wb - 2 * PIER_MIN)
-        off = int((wb - ow) * (_u(key, f"o{j}") - 0.5) * 0.6)
+        ow = min(int(wb * wwr * k * (0.75 + 0.4 * _u(fkey, f"w{j}"))), wb - 2 * PIER_MIN)
+        off = int((wb - ow) * (_u(fkey, f"o{j}") - 0.5) * 0.6)
         return [(mid - ow // 2 + off, mid - ow // 2 + off + ow)]
     if sysname == "unitized_curtain_wall":
         mull = max(60, int(wb * (1.0 - wwr)))
@@ -269,7 +280,8 @@ class ShellBuilder:
         self.buf = Buf()
         self.stats = {"bays": 0, "openings": 0, "mount_panels": 0, "storefronts": 0,
                       "strips": 0, "strips_refused": 0, "roof_items": 0, "masses": 0}
-        self.used = {"groups": [], "features": {}, "ground": False, "finish": False}
+        self.used = {"groups": [], "features": {}, "ground": False, "finish": False,
+                     "base": False}
         self.mass_info: list[dict] = []
         b = brief["building"]
         self.parking = b["type"] == "building.parking_structure"
@@ -324,6 +336,7 @@ class ShellBuilder:
                    for p in m["footprint"]["exterior"]]
             holes = [[(int(round(p[0] * 1000)), int(round(p[1] * 1000))) for p in h]
                      for h in m["footprint"]["holes"]]
+            holes = self._unpinched(ext, holes)
             masses.append({"k": k, "role": m["role"], "shape": m["shape"],
                            "z0": int(round(m["z"][0] * 1000)), "z1": int(round(m["z"][1] * 1000)),
                            "rings": [ext] + holes, "floors": int(m["floors"]["count"])})
@@ -352,6 +365,23 @@ class ShellBuilder:
         arrs = self.buf.arrays()
         return {"buf": self.buf, "arrays": arrs, "stats": self.stats, "used": self.used,
                 "masses": self.mass_info}
+
+    def _unpinched(self, ext, holes):
+        """The courts that touch neither the exterior nor another court (a court pinched onto
+        the exterior at a point would make that corner's walls meet four ways): those that
+        do are filled."""
+        keep = []
+        for j, h in enumerate(holes):
+            others = [ext] + [o for i, o in enumerate(holes) if i != j]
+            hc = RG.clean(h)
+            touch = len(hc) < 3 or len(set(hc)) != len(hc) or any(
+                RG.inside(p, o) == 0 for o in others for p in hc) or any(
+                RG.inside(p, hc) == 0 for o in others for p in o)
+            if touch:
+                self.stats["courts_filled"] = self.stats.get("courts_filled", 0) + 1
+            else:
+                keep.append(h)
+        return keep
 
     def _covered_above(self, ms: dict, a, b) -> bool:
         """Whether another mass of the building stands on this mass's edge a-b (just above
@@ -445,8 +475,12 @@ class ShellBuilder:
                 d_in = _unit(prev, a)
                 d_out = (fa.ux, fa.uy)
                 d_nx = _unit(b, nxt)
-                fa.c0 = max(corner, _corner_clear(d_in, d_out, reveal))
-                fa.c1 = max(corner, _corner_clear(d_out, d_nx, reveal))
+                # the corner pier only at a real corner; where the ring runs on nearly
+                # straight (a front split in two), just the reveal's clearance
+                fa.c0 = max(corner if _turned(d_in, d_out) else 0,
+                            _corner_clear(d_in, d_out, reveal))
+                fa.c1 = max(corner if _turned(d_out, d_nx) else 0,
+                            _corner_clear(d_out, d_nx, reveal))
                 ok = allow and not _blocked(fa, reveal + EDGE_CLEAR, all_edges)
                 info["openings"] += self._facade(ms, g, fa, rows, wall, sysname, reveal, bay,
                                                  ok)
@@ -610,6 +644,12 @@ class ShellBuilder:
         wwr = cont.get(f"{g}.wwr", 0.4) if sysname else 0.0
         open_p = cont.get(f"{g}.open_p", 0.55)
         cuts = bay_cuts(L, fa.c0, fa.c1, bay, rhythm, key) if allow and bay else []
+        patch_cols = None
+        if sysname == "shanty_patchwork":
+            pot = [(a_, b_, "glass") for jb, (b0, b1) in enumerate(cuts)
+                   for a_, b_ in bay_openings(b0, b1, jb, len(cuts), win, rhythm, wwr,
+                                              sysname, f"{key}|x", 1.0)]
+            patch_cols = [x for a_, b_, _ in _merge_ok(pot, fa.c0, fa.c1, L) for x in (a_, b_)]
         units = self.units_by_edge.get(fa.j, []) if fa.j is not None else []
         mounts = self.mounts.get(fa.j, []) if fa.j is not None else []
         for lo, hi, kind, f in rows:
@@ -657,6 +697,8 @@ class ShellBuilder:
             for a_, b_, _ in ops:
                 c += [a_, b_]
             c.append(L)
+            if patch_cols is not None:
+                c = sorted(set(c) | set(patch_cols))
             cols.append(c)
             ops_by_row.append({a_: (b_, back) for a_, b_, back in ops})
             n_open += len(ops)
@@ -700,34 +742,51 @@ class ShellBuilder:
             ix += [vid(slot, p[0], p[1], pts), vid(slot, q[0], q[1], pts),
                    vid(slot, r[0], r[1], pts)]
 
-        def slot_at(s, z):
+        def slot_at(s, z, chain=None):
+            """The wall's slot; on patchwork, a patch per column of the chain (so strips
+            and piers of one column match) and band of patch height."""
             if not patch:
                 return wall
-            return GN.pick(key, f"patch{s // pw}.{z // ph}", SY.PATCH_SLOTS, mix, "ag1.shell")
+            c0 = 0
+            if chain is not None:
+                c0 = chain[max(bisect.bisect_right(chain, s) - 1, 0)]
+            else:
+                c0 = s // pw
+            return GN.pick(key, f"patch{c0 // pw}.{z // ph}", SY.PATCH_SLOTS, mix, "ag1.shell")
 
-        def zipper(B, zb, T, zt):
+        def zipper(B, zb, T, zt, fixed=None):
+            """The strip between chain B at zb and chain T at zt (sorted s, both from 0 to
+            L), every triangle spanning both chains. On patchwork the strips between rows
+            have the rows' columns on both chains (a patch per column); the strips at the
+            bottom and top, whose triangles fan to the corners, are one patch each."""
+            if patch and fixed is None and B != T:
+                fixed = slot_at(0, (zb + zt) // 2)
             i = j = 0
             while i < len(B) - 1 or j < len(T) - 1:
                 if j == len(T) - 1 or (i < len(B) - 1 and B[i + 1] <= T[j + 1]):
-                    s = slot_at((B[i] + B[i + 1] + T[j]) // 3, (zb + zt) // 2)
+                    s = fixed or slot_at((B[i] + B[i + 1] + T[j]) // 3, (zb + zt) // 2, B)
                     tri(s, (B[i], zb), (B[i + 1], zb), (T[j], zt))
                     i += 1
                 else:
-                    s = slot_at((B[i] + T[j + 1] + T[j]) // 3, (zb + zt) // 2)
+                    s = fixed or slot_at((B[i] + T[j + 1] + T[j]) // 3, (zb + zt) // 2, B)
                     tri(s, (B[i], zb), (T[j + 1], zt), (T[j], zt))
                     j += 1
 
         z0, z1 = ms["z0"], ms["z1"]
         prev, pz = [0, L], z0
         o = (int(round(-fa.nx * reveal)), int(round(-fa.ny * reveal)))
+        base = self.gm["genes"]["base"]
+        plinth = base if rows and z0 <= 50 and base != "wall" and wall != "structure" else None
+        if plinth:
+            self.used["base"] = True        # the strip under the ground row in its finish
         for (lo, hi, kind, f), c, ops in zip(rows, cols, ops_by_row):
-            zipper(prev, pz, c, lo)
+            zipper(prev, pz, c, lo, plinth if pz == z0 else None)
             for i in range(len(c) - 1):
                 a_, b_ = c[i], c[i + 1]
                 if a_ in ops and ops[a_][0] == b_:
                     self._pocket(fa, a_, b_, lo, hi, o, ops[a_][1], wall, key, f, i)
                     continue
-                s = slot_at((a_ + b_) // 2, (lo + hi) // 2)
+                s = slot_at((a_ + b_) // 2, (lo + hi) // 2, c)
                 tri(s, (a_, lo), (b_, lo), (b_, hi))
                 tri(s, (a_, lo), (b_, hi), (a_, hi))
             prev, pz = c, hi
@@ -749,10 +808,14 @@ class ShellBuilder:
         Bl0, Br0, Bl1, Br1 = bk(Fl0), bk(Fr0), bk(Fl1), bk(Fr1)
         ix, iy = -fa.nx, -fa.ny                      # into the wall
         rv = wall if not wall.startswith("patch") else "patch_sheet"
-        sill = buf.plane((0.0, 0.0, 1.0), Fl0, (fa.ux, fa.uy, 0.0), (ix, iy, 0.0), fa.u0 + sa / 1000.0)
-        head = buf.plane((0.0, 0.0, -1.0), Fl1, (fa.ux, fa.uy, 0.0), (ix, iy, 0.0), fa.u0 + sa / 1000.0)
-        left = buf.plane((fa.ux, fa.uy, 0.0), Fl0, (ix, iy, 0.0), (0.0, 0.0, 1.0), 0.0, lo / 1000.0)
-        right = buf.plane((-fa.ux, -fa.uy, 0.0), Fr0, (ix, iy, 0.0), (0.0, 0.0, 1.0), 0.0, lo / 1000.0)
+        u = (fa.ux, fa.uy, 0.0)
+        into = (ix, iy, 0.0)
+        up = (0.0, 0.0, 1.0)
+        us = fa.u0 + sa / 1000.0
+        sill = buf.plane((0.0, 0.0, 1.0), Fl0, u, into, us)
+        head = buf.plane((0.0, 0.0, -1.0), Fl1, u, into, us)
+        left = buf.plane(u, Fl0, into, up, 0.0, lo / 1000.0)
+        right = buf.plane((-fa.ux, -fa.uy, 0.0), Fr0, into, up, 0.0, lo / 1000.0)
         buf.quad(rv, sill, Fl0, Fr0, Br0, Bl0)
         buf.quad(rv, head, Fr1, Fl1, Bl1, Br1)
         buf.quad(rv, left, Fl0, Bl0, Bl1, Fl1)
@@ -813,8 +876,8 @@ class ShellBuilder:
         ux, uy = far[0] - cx, far[1] - cy
         L = math.sqrt(ux * ux + uy * uy) or 1.0
         ux, uy = ux / L, uy / L
-        r = (ms["z1"] - ms["z0"]) / 2.0
-        zc = ms["z0"] + r
+        zc = ms["z0"] + (ms["z1"] - ms["z0"]) / 2.0
+        r = (ms["z1"] - ms["z0"]) / 2.0 - 1000.0      # the rim beams' outer faces on the mass
         n = 32
         pts = []
         for kk in range(n):

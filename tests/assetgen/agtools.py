@@ -47,3 +47,29 @@ def small_regen() -> Path:
         assert ag(["brief", str(out), "--no-preview"]) == 0
         _CACHE["regen"] = out
     return _CACHE["regen"]
+
+
+def small_assets() -> Path:
+    """The small test city with its assets built (`assetgen build`, two workers):
+    DIR/base/assets."""
+    if "assets" not in _CACHE:
+        from assetgen.build import build
+        d = small_build()
+        rep = build(d / "base", workers=2, log=lambda *a: None)
+        _CACHE["assets"] = (d / "base", rep)
+    return _CACHE["assets"][0]
+
+
+def small_assets_report() -> dict:
+    small_assets()
+    return _CACHE["assets"][1]
+
+
+def copy_model(src: Path, dst: Path) -> Path:
+    """A build directory holding only src's city_model.json (and city_state.json)."""
+    import shutil
+    dst.mkdir(parents=True, exist_ok=True)
+    for name in ("city_model.json", "city_state.json"):
+        if (src / name).is_file():
+            shutil.copy2(src / name, dst / name)
+    return dst

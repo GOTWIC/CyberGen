@@ -31,16 +31,17 @@ GROUPS = ("base", "body", "top")
 GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay_m", "wwr",
                "sill_m", "head_m", "reveal_m", "corner_m", "cornice_m", "parapet_m",
                "band_m")
-BUILDING_GENES = ("ground", "crown", "corner", "finish", "wall", "trim", "glass", "roof",
-                  "mech_every")
+BUILDING_GENES = ("ground", "crown", "corner", "finish", "base", "wall", "trim", "glass",
+                  "roof", "mech_every")
 CONTINUOUS = ("bay_m", "wwr", "sill_m", "head_m", "reveal_m", "corner_m", "cornice_m",
               "parapet_m", "band_m", "open_p", "patch_w", "patch_h", "wear", "dirt_m",
-              "wall_v", "wall_w", "trim_v")
+              "wall_v", "wall_w", "trim_v", "roof_v")
 # what one unit of genome distance is for a continuous gene (a clearly visible change)
 SCALE = {"bay_m": 0.3, "wwr": 0.08, "sill_m": 0.15, "head_m": 0.15, "reveal_m": 0.05,
          "corner_m": 0.25, "cornice_m": 0.15, "parapet_m": 0.2, "band_m": 0.05,
          "open_p": 0.12, "patch_w": 0.35, "patch_h": 0.3,
-         "wear": 0.25, "dirt_m": 2.0, "wall_v": 0.06, "wall_w": 0.04, "trim_v": 0.06}
+         "wear": 0.25, "dirt_m": 2.0, "wall_v": 0.06, "wall_w": 0.04, "trim_v": 0.06,
+         "roof_v": 0.06}
 LIT_BY_USE = {"residential": 0.35, "hotel": 0.45, "office": 0.6, "retail": 0.5,
               "civic": 0.4, "industrial": 0.15, "parking": 0.05}
 
@@ -148,8 +149,12 @@ def make(brief: dict) -> dict:
             lo, hi = max(lo, 4.0), max(hi, 6.0)
         if s == "shanty_patchwork":
             lo, hi = 1.4, 2.6
+        wwr = T["wwr"]
+        ew = era_style.get("window_to_wall")
+        if ew and s != "unitized_curtain_wall" and max(wwr[0], ew[0]) <= min(wwr[1], ew[1]):
+            wwr = (max(wwr[0], ew[0]), min(wwr[1], ew[1]))      # the era's share, if it fits
         for gene, rng, step in (("bay_m", (lo, hi), SY.STEP["bay_m"]),
-                                ("wwr", T["wwr"], SY.STEP["wwr"]),
+                                ("wwr", wwr, SY.STEP["wwr"]),
                                 ("sill_m", T["sill"], SY.STEP["sill_m"]),
                                 ("head_m", T["head_gap"], SY.STEP["head_m"]),
                                 ("reveal_m", T["reveal"], SY.STEP["reveal_m"]),
@@ -175,6 +180,7 @@ def make(brief: dict) -> dict:
     genes["corner"] = pick(fkey, "corner", SY.CORNERS, None, salt)
     genes["finish"] = pick(fkey, "finish", T.get("finishes") or (T["wall"],), None, salt)
     genes["mech_every"] = pick(fkey, "mech_every", (15, 18, 20, 22, 25), None, salt)
+    genes["base"] = pick(fkey, "base", ("wall", "structure", "trim"), None, salt)
     # colors: the era's palette (a landmark's own), an owner's brand colors over it
     pal = list((spec.get("landmark") or {}).get("palette") or era_style.get("palette") or
                ["#8c8a86"])
@@ -202,6 +208,7 @@ def make(brief: dict) -> dict:
     cont["wall_v"] = draw(bid, "wall_v", -0.12, 0.12, SY.STEP["wall_v"], salt)
     cont["wall_w"] = draw(bid, "wall_w", -0.06, 0.06, SY.STEP["wall_w"], salt)
     cont["trim_v"] = draw(bid, "trim_v", -0.1, 0.1, SY.STEP["trim_v"], salt)
+    cont["roof_v"] = draw(bid, "roof_v", -0.12, 0.12, SY.STEP["wall_v"], salt)
     neon = float((b.get("style") or {}).get("neon", 0.3))
     extra = {"neon": quant(neon, SY.STEP["neon"]),
              "lit": draw(bid, "lit", 0.7, 1.3, 0.01, salt) * LIT_BY_USE.get(b["use"], 0.4),
@@ -215,7 +222,7 @@ def make(brief: dict) -> dict:
     colors = {
         "wall": _jitter(genes["wall"], cont["wall_v"], cont["wall_w"]),
         "trim": _jitter(genes["trim"], cont["trim_v"], 0.0),
-        "glass": genes["glass"], "roof": genes["roof"],
+        "glass": genes["glass"], "roof": _jitter(genes["roof"], cont["roof_v"], 0.0),
         "spandrel": _jitter(dark, cont["wall_v"] * 0.5, 0.0),
         "patch": _jitter("#9a958c", cont["wall_v"], cont["wall_w"]),
     }
@@ -262,6 +269,8 @@ def effective(genome: dict, used: dict) -> dict:
         out["ground"] = genes["ground"]
     if used.get("finish"):
         out["finish"] = genes["finish"]
-    for gene in ("wear", "dirt_m", "wall_v", "wall_w"):
+    if used.get("base"):
+        out["base"] = genes["base"]
+    for gene in ("wear", "dirt_m", "wall_v", "wall_w", "roof_v"):
         out[gene] = cont[gene]
     return out

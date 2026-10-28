@@ -38,11 +38,13 @@ from .buildings import proxy as PX
 from .buildings import shell as SH
 from .buildings import systems as SY
 
-GEN_VERSION = "ag1.3"          # bump whenever the shells' bytes change
+GEN_VERSION = "ag1.7"          # bump whenever the shells' bytes change
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
          "spec_sha256", "briefs_sha256", "buildings", "tiles")
 MAX_WORKERS = 4
+# the files a build delivers besides its packs (the report holds timings, so it is not one)
+DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json")
 
 
 def tile_name(x: float, y: float) -> str:
@@ -158,6 +160,17 @@ def _node_extras(bid: str, rec: dict) -> dict:
     for k, v in rec["tints"].items():
         ex[f"cg_{k}"] = v
     return ex
+
+
+def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
+    """One building's shell alone as a GLB at its own origin (goldens, contact sheets)."""
+    sh, _, rec = building_asset(brief, gm or GN.make(brief))
+    g = G.Gltf(generator=f"assetgen {__version__} ({GEN_VERSION})")
+    mats = _materials(g, sorted(sh["arrays"]))
+    mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats))
+    child = g.node(f"{bid}.shell", mesh=mesh, extras=_node_extras(bid, rec))
+    g.node(bid, children=[child], root=True)
+    return g.to_glb()
 
 
 def tile_job(job: dict) -> dict:

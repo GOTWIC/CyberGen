@@ -1,5 +1,5 @@
 """Write tests/assetgen/data/golden_hashes.json (run by hand after a change that moves the
-briefs, the spike or the triangulator, and say why in the PR):
+briefs, the shells, the spike or the triangulator, and say why in the PR):
 
     .venv/bin/python tests/assetgen/goldens.py [--builds DIR]
 
@@ -23,7 +23,15 @@ from assetgen import spike as SP  # noqa: E402
 from assetgen.triangulate import triangulate  # noqa: E402
 from citygen import dmath as M  # noqa: E402
 
-from agtools import CITIES, GOLDEN, ROOT, built_sample, small_build  # noqa: E402
+from assetgen import build as BD  # noqa: E402
+
+from agtools import CITIES, GOLDEN, ROOT, built_sample, small_assets, small_build  # noqa: E402
+
+# AG1: the shells of these Vesper Bay buildings as GLB bytes (one per kind, chosen as AG0's
+# brief goldens are, plus a curtain-wall tower, a shanty stack and a parking structure)
+AG1_KINDS = ("building.landmark.", "building.podium_tower", "building.shopfront_row",
+             "building.shanty_stack", "building.megabuilding", "building.villa",
+             "building.warehouse", "building.parking_structure", "building.tower")
 
 KINDS = ("building.landmark.", "building.podium_tower", "building.shopfront_row",
          "building.shanty_stack", "building.megabuilding", "building.villa")
@@ -64,11 +72,20 @@ def main():
     out = {"about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json "
                     "(tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few "
                     "Vesper Bay buildings, the five samples' briefs.json, the two small spike "
-                    "buildings' glTF files and a triangulation. Made on the M4 Mac and "
-                    "confirmed on x86_64 Linux (docker image citygen-x86).",
+                    "buildings' glTF files and a triangulation; (AG1, under ag1) the small "
+                    "city's asset manifest and the digest of its asset files, and the shells "
+                    "of a few Vesper Bay buildings as GLB. Made on the M4 Mac and confirmed "
+                    "on x86_64 Linux (docker image citygen-x86).",
            "testport_briefs": C.sha256_bytes(
                (small_build() / "base" / "assets" / "briefs.json").read_bytes()),
            "triangulate": tri_golden(), "buildings": {}, "samples": {}, "spike": {}}
+    base = small_assets()
+    tree = {str(p.relative_to(base / "assets")): C.sha256_bytes(p.read_bytes())
+            for p in sorted((base / "assets").rglob("*")) if p.is_file() and
+            (p.suffix == ".glb" or p.name in BD.DELIVERED)}
+    out["ag1"] = {"testport_manifest": C.sha256_bytes(
+        (base / "assets" / "manifest.json").read_bytes()),
+        "testport_files": C.digest(tree), "buildings": {}}
     for path in CITIES:
         model, data = model_of(path, args.builds)
         res = B.build_briefs(model)
@@ -85,6 +102,13 @@ def main():
             if sky:
                 pick[sky[0]] = B.brief_hash(res["briefs"][sky[0]])
             out["buildings"]["vesper_bay"] = dict(sorted(pick.items()))
+            shells = {}
+            for kind in AG1_KINDS:
+                ids = sorted(b.id for b in model.buildings if b.type.startswith(kind))
+                if ids:
+                    shells[ids[0]] = C.sha256_bytes(BD.building_glb(ids[0],
+                                                                   res["briefs"][ids[0]]))
+            out["ag1"]["buildings"]["vesper_bay"] = dict(sorted(shells.items()))
         print(path.parent.name, out["samples"][path.parent.name], flush=True)
     with tempfile.TemporaryDirectory() as d:
         rep = SP.write_spike(d, quantized=True, which=("shopfront_row", "shanty_stack"))

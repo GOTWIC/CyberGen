@@ -1,6 +1,6 @@
 ---
 name: assetgen
-description: Turn a city prompt (and optional concept images) into a validated assetgen asset_spec.json (art direction per era, district, owner and landmark), check it against the built city, write the brief of every building (briefs.json, edge classes, preview_edges.png), and report. Use when asked to art-direct, style or revise the buildings, materials or signage of a citygen city with assetgen, or to write or fix an asset spec.
+description: Turn a city prompt (and optional concept images) into a validated assetgen asset_spec.json (art direction per era, district, owner and landmark), check it against the built city, write the brief of every building (briefs.json, edge classes, preview_edges.png), build every building's shell and proxy with Blender previews, and report. Use when asked to art-direct, style or revise the buildings, materials or signage of a citygen city with assetgen, or to write or fix an asset spec.
 ---
 
 # assetgen: prompt to asset spec
@@ -116,8 +116,28 @@ writes `OUT/assets/briefs.json` (one brief and hash per building), `brief_report
 (black) inside dense blocks, canal edges (blue) on the water. A change to one district's
 entry changes only that district's briefs (`assetgen brief diff A B` shows which).
 
-### 5. Report
+### 5. Assets (AG1 on)
+
+```bash
+.venv/bin/python -m assetgen build OUT --spec cities/<slug>/asset_spec.json
+.venv/bin/python -m citygen blockout OUT/city_model.json OUT/blockout --no-export
+.venv/bin/python -m assetgen preview OUT --blockout OUT/blockout
+```
+
+`assetgen build` makes every building's shell and far proxy (`OUT/assets/tiles/`,
+`proxies/`, `manifest.json`, `asset_report.txt`, `unreal_contribution.buildings.json`) and
+exits 1 if a check fails; a second run with nothing changed writes no file. `assetgen
+preview` renders the whole city from proxies, each district and the blockout's street
+cameras at full detail, and contact sheets per building type (`OUT/assets/previews/`). The
+spec steers what the previews show: an era's `systems` pick the facade systems (AG1 builds
+unitized curtain wall, punched concrete, precast panel, punched brick, corrugated and shanty
+patchwork; the others fall back to the nearest of these until AG2), its `palette` the wall
+and trim colors, `bay_m` and `window_to_wall` the facade rhythm, a district's `wear` the
+grime, an owner's `brand_colors` and `facade_bias` its buildings.
+
+### 6. Report
 
 Report the spec's path, what it sets and why (one line per entry), the validation result, the
-brief counts and edge classes from the brief report, and anything in the prompt the spec could
-not express (it goes to the scope's open items).
+brief counts and edge classes from the brief report, the asset report's checks and triangle
+counts when assets were built, and anything in the prompt the spec could not express (it goes
+to the scope's open items).

@@ -1,7 +1,7 @@
 """The envelope check (scope section 9) on one shell: every vertex inside a mass that spans
 its height, or an allowed overhang (a cornice or slab band at most 0.6 m out from a face, its
-miter at a corner at most `OVERHANG_MM` from the footprint, and at least 3 m up, over the sidewalk and never down to it; a parapet at most
-`PARAPET_MM` over its mass's top); roof equipment over a mass's roof. Masses that M3 put
+miter at a corner at most `OVERHANG_MM` from the footprint, and at least 3 m up, over the
+sidewalk and never down to it; a parapet at most `PARAPET_MM` over its mass's top); roof equipment over a mass's roof. Masses that M3 put
 past their lot (straddle buildings) are the envelope as they are. Distances in IEEE doubles,
 element-wise in a fixed order (scope section 10).
 """
