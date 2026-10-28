@@ -263,13 +263,15 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--out", help="output directory (default BUILD/assets/previews)")
     pv.add_argument("--blockout", help="the build's blockout directory (city.blend), for "
                                        "ground, streets and the street cameras")
-    pv.add_argument("--views", nargs="*", help="city, districts, street, sheets (default all of "
-                                                  "these), city_full")
+    pv.add_argument("--views", nargs="*", help="city, districts, street, sheets, towers "
+                                                  "(default all of these), city_full")
     pv.add_argument("--only", nargs="*", help="just these views and sheets (city, "
                                               "iso_<district>, street_<n>, random, <type>)")
     pv.add_argument("--width", type=int, default=2400, help="render width in pixels")
     pv.add_argument("--cell", type=int, default=480, help="contact sheet cell in pixels")
     pv.add_argument("--blender", help="the Blender executable")
+    pv.add_argument("--no-parts", action="store_true",
+                    help="leave the instanced parts out (shells and merged parts only)")
     pv.set_defaults(func=cmd_preview)
 
     sg = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")

@@ -83,17 +83,24 @@ def test_genome_is_a_function_of_the_brief():
     br = court_block()
     a, b = GN.make(br), GN.make(copy.deepcopy(br))
     assert a == b
-    assert set(SY.AG1_SYSTEMS) >= {a["genes"][f"{g}.system"] for g in GN.GROUPS}
+    assert set(SY.ALL_SYSTEMS) >= {a["genes"][f"{g}.system"] for g in GN.GROUPS}
     other = copy.deepcopy(br)
     other["id"] = "d01.lot.e9n9.bld"
     assert GN.make(other) != a
 
 
-def test_every_era_maps_onto_ag1_systems():
-    from assetgen.presets import ERA_PRESETS
+def test_every_era_draws_built_systems():
+    """AG2 builds every system an era names: none falls back (at a height each allows)."""
+    from assetgen.presets import ERA_PRESETS, FACADE_SYSTEMS
+    assert set(FACADE_SYSTEMS) == set(SY.SYSTEMS) and not SY.FALLBACK
     for era, style in ERA_PRESETS.items():
-        w = GN.system_weights({"era_style": style}, "building.tower", 30)
-        assert w and set(w) <= set(SY.AG1_SYSTEMS), era
+        for floors in (4, 12):
+            w = GN.system_weights({"era_style": style}, "building.tower", floors)
+            assert w and set(w) <= set(SY.ALL_SYSTEMS), era
+            for name in style["systems"]:
+                lo, hi, _ = SY.FLOORS.get(name, (0, 999, None))
+                if lo <= floors <= hi:
+                    assert name in w, (era, name, floors)
 
 
 def test_family_shares_discrete_genes_and_overrides_apply():
@@ -143,7 +150,7 @@ def test_shell_is_closed_with_courts_reveals_and_strips():
     assert ck["triangles"] > 0
     assert ck["degenerate"] == ck["duplicate"] == ck["open_edges"] == ck["bad_edges"] == 0
     assert res["stats"]["openings"] > 0
-    env = EN.check(br, res["arrays"])
+    env = EN.check(br, res["arrays"], EN.part_points(res["parts"]))
     assert env["ok"], env
     for slot in SY.GLASS_SLOTS:
         a = res["arrays"].get(slot)

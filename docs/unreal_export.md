@@ -153,7 +153,7 @@ format:
   complex until AG3 adds the ground band.
 - **Proxy**: the building's far proxy, its masses as prisms (7 to 500 triangles), a Nanite
   fallback and HLOD input (AG9 sets up the HLOD layers); as a static mesh of its own.
-- **Parts**: empty until AG2 (hierarchical instanced meshes per building and kind).
+- **Parts**: AG2's instanced parts (next section); empty in AG1.
 - **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
   unchanged packs, so a re-import may skip the key.
 
@@ -173,10 +173,50 @@ exporter's code is unchanged; this is the work for the first PR that has both):
 - set the 23 Custom Primitive Data floats on every component;
 - write the collision boxes and convex elements into each mesh's body setup;
 - Nanite on, distance fields and Lumen cards off for every building mesh;
-- build parts as hierarchical instanced meshes per building and kind (ready for AG2: the
-  list is empty in AG1);
+- build parts as hierarchical instanced meshes per building and kind (AG2 fills the list:
+  next section);
 - the proxies: as their own meshes for HLOD (AG9) and, where Nanite is off, as the
   fallback.
+
+### From AG2: facade parts
+
+`assetgen build` (AG2) fills each building entry's `parts` with its instanced facade parts
+and writes their meshes beside the shells, one pack per tile: `parts/<tile>.glb`, a root
+node per part mesh at the origin, named by the hash of the part's type and parameters
+(`part.window.casement.h29779f5c63`), so every building of the tile whose part has the same
+parameters uses the same mesh. A part a building places fewer than 8 times is merged into
+its shell instead and not listed (as is one that would fold a thin triangle when turned to
+its facade and rounded to the millimeter).
+
+```json
+{"key": "d03.lot.e512n88.bld", "...": "...", "instances": 412,
+ "parts": [{"kind": "part.window.casement.h29779f5c63", "type": "part.window.casement",
+            "glb": "parts/t+02+00.glb", "node": "part.window.casement.h29779f5c63",
+            "asset": "part_window_casement_h29779f5c63", "count": 96, "triangles": 80,
+            "xforms": [[-6.12, 4.5, 3.35, 135.0], "..."], "building": "d03.lot.e512n88.bld"}]}
+```
+
+- **Kinds**: `kind` is the part's node name, unique within the entry (a building can have
+  several window sizes of one type); `type` the semantic type for tags and stage 3 and 4
+  (`part.window.<style>`, `part.cap.mullion`, `part.spandrel.panel`, `part.balcony.<style>`,
+  `part.louver.panel`, `part.fin.vertical`, `part.fin.crown`, `part.shade.blade`,
+  `part.shutter.open`, `part.grille.bars`, `part.panel.<board|infill|screen|eggcrate|addon>`,
+  `part.member.<column|beam|diagonal>`, `part.pod.capsule`, `part.ac.window`,
+  `part.dish.satellite`, `part.column.arcade`, `part.balconette.rail`,
+  `part.canopy.podium`, `part.mast.<mast|spire>`).
+- **Transforms**: `xforms` are `[x, y, z, yaw]` in the building frame (meters relative to
+  the entry's `pivot`, yaw in degrees counterclockwise about z), as AG7's container parts:
+  an HISM instance at `pivot + (x, y, z)` turned by yaw (Unreal: `(100 x, -100 y, 100 z)`,
+  yaw `-yaw`). A part's own frame: x along its facade, y into the wall, z up.
+- **Material and CPD**: the parts' slots are in the contribution's `materials` like the
+  shells' (tints only from the six channels of `cpd_layout`); the HISM carries the
+  building's 23 CPD floats, so a part takes its building's colors.
+- **Building ids**: `building` names the entry each instance belongs to (one HISM per
+  building and kind, keyed `<key>.<kind>`, its `Ids` the building's key).
+- **Collision**: none needed from the parts (the building's simple collision covers its
+  masses; AG3 adds the ground band); Nanite on, distance fields and Lumen cards off.
+- **Re-import**: a part's mesh is named by its parameters' hash and its pack changes only
+  when the tile's buildings change, so an unchanged building's HISMs change nothing.
 
 ## assetgen's street contribution (AG7)
 

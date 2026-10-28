@@ -16,6 +16,12 @@ Materials: one per slot (`ag_<slot>`), its color times the building's tint from 
 object's custom properties (`cg_wall`, `cg_trim`, ...: the glTF node extras), brick and
 panel joints, corrugation and window grids drawn from UV0 in meters; glass lit by its
 window id (vertex alpha) for a few rooms.
+
+AG2's instanced parts: each tile's part pack is loaded with its shells, every part mesh a
+hidden prototype, and a point cloud per part mesh (per building on contact sheets) carries
+its placements with the building's tints as point attributes; geometry nodes instance the
+prototype on it, and the parts' materials (`ag_<slot>.inst`) read the tints from the
+instances.
 """
 
 import json
@@ -98,9 +104,9 @@ def start_scene():
 
 # --- materials -----------------------------------------------------------------------------
 
-def _attr(nt, name, kind="OBJECT"):
+def _attr(nt, name, kind=None):
     a = nt.nodes.new("ShaderNodeAttribute")
-    a.attribute_type = kind
+    a.attribute_type = kind or ATTR_KIND
     a.attribute_name = name
     return a
 
@@ -151,9 +157,14 @@ def _scale_rgb(nt, col, k):
     return m.outputs[0]
 
 
-def make_material(slot, spec):
+ATTR_KIND = "OBJECT"
+
+
+def make_material(slot, spec, inst=False):
+    global ATTR_KIND
+    ATTR_KIND = "INSTANCER" if inst else "OBJECT"
     master, rgb, rough, metal, tint = spec
-    mat = bpy.data.materials.new(f"ag_{slot}")
+    mat = bpy.data.materials.new(f"ag_{slot}.inst" if inst else f"ag_{slot}")
     mat.use_nodes = True
     nt = mat.node_tree
     bsdf = nt.nodes["Principled BSDF"]
@@ -264,7 +275,85 @@ def materials():
     return {slot: make_material(slot, spec) for slot, spec in sorted(JOB["slots"].items())}
 
 
+def inst_materials():
+    return {slot: make_material(slot, spec, True) for slot, spec in sorted(JOB["slots"].items())}
+
+
 MATS = {}
+MATS_INST = {}
+TINTS = ("cg_wall", "cg_trim", "cg_glass", "cg_roof", "cg_spandrel", "cg_patch")
+
+
+def instance_group(proto):
+    ng = bpy.data.node_groups.new(f"ag_parts.{proto.name}", "GeometryNodeTree")
+    ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    N, L = ng.nodes, ng.links
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    iop = N.new("GeometryNodeInstanceOnPoints")
+    oi = N.new("GeometryNodeObjectInfo")
+    oi.transform_space = "ORIGINAL"
+    oi.inputs["As Instance"].default_value = True
+    oi.inputs["Object"].default_value = proto
+    rot = N.new("GeometryNodeInputNamedAttribute")
+    rot.data_type = "FLOAT_VECTOR"
+    rot.inputs["Name"].default_value = "rot"
+    L.new(gi.outputs["Geometry"], iop.inputs["Points"])
+    L.new(oi.outputs["Geometry"], iop.inputs["Instance"])
+    L.new(rot.outputs["Attribute"], iop.inputs["Rotation"])
+    L.new(iop.outputs["Instances"], go.inputs["Geometry"])
+    return ng
+
+
+def load_parts(glb, inst, tag, by_building=False):
+    """A part pack's meshes as hidden prototypes and their placements as instancers: one
+    per part mesh, or per building and part mesh (`by_building`)."""
+    objs = import_glb(glb, tag)
+    protos = {}
+    for o in objs:
+        if o.type != "MESH":
+            continue
+        protos[o.name.split(".")[0] + "." + o.name.split(".")[1] + "." +
+               o.name.split(".")[2] + "." + o.name.split(".")[3]
+               if o.name.count(".") >= 4 else o.name] = o
+        for i, ms in enumerate(o.material_slots):
+            if ms.material is not None:
+                base = ms.material.name.split(".")[0]
+                if base in MATS_INST:
+                    o.material_slots[i].material = MATS_INST[base]
+        o.hide_render = True
+        o.location = (0.0, 0.0, -5000.0)
+    made = list(objs)
+    groups_of = {}
+    tints = inst.get("tints", [])
+    for node in sorted(inst.get("parts", {})):
+        proto = protos.get(node)
+        if proto is None:
+            continue
+        if proto.name not in groups_of:
+            groups_of[proto.name] = instance_group(proto)
+        pts = inst["parts"][node]
+        groups = {}
+        for p in pts:
+            groups.setdefault(p[4] if by_building else -1, []).append(p)
+        for bi, pl in sorted(groups.items()):
+            me = bpy.data.meshes.new(f"inst.{node}")
+            me.vertices.add(len(pl))
+            me.vertices.foreach_set("co", [v for p in pl for v in (p[0], p[1], p[2])])
+            a = me.attributes.new("rot", "FLOAT_VECTOR", "POINT")
+            a.data.foreach_set("vector", [v for p in pl for v in (0.0, 0.0, p[3])])
+            for k, name in enumerate(TINTS):
+                at = me.attributes.new(name, "FLOAT_VECTOR", "POINT")
+                at.data.foreach_set("vector", [v for p in pl for v in tints[p[4]][k]])
+            me.update()
+            ob = bpy.data.objects.new(f"inst.{node}", me)
+            mod = ob.modifiers.new("parts", "NODES")
+            mod.node_group = groups_of[proto.name]
+            ob["ag_tag"] = tag
+            ob["ag_building"] = int(bi)
+            bpy.context.scene.collection.objects.link(ob)
+            made.append(ob)
+    return made
 
 
 def import_glb(path, tag):
@@ -333,9 +422,14 @@ def render(scene, v, path):
 # --- main ----------------------------------------------------------------------------------
 
 def main():
-    global MATS
+    global MATS, MATS_INST
     scene = start_scene()
     MATS = materials()
+    MATS_INST = inst_materials()
+    insts = {}
+    if JOB.get("instances") and JOB.get("parts_on", True):
+        with open(JOB["instances"]) as f:
+            insts = json.load(f)
     out = JOB["out"]
     report = {"views": [], "sheets": []}
     proxies = {}
@@ -351,11 +445,14 @@ def main():
         hidden = []
         for tile in v.get("shell_tiles", []):
             shells += import_glb(f"{JOB['assets']}/tiles/{tile}.glb", "shell")
+            if tile in insts:
+                shells += load_parts(f"{JOB['assets']}/parts/{tile}.glb", insts[tile], "parts")
         for o in shells:
             if o.type == "EMPTY" and o.name in proxies:
                 proxies[o.name].hide_render = True
                 hidden.append(proxies[o.name])
-        tris = sum(len(o.data.polygons) for o in shells if o.type == "MESH")
+        tris = sum(len(o.data.polygons) for o in shells
+                   if o.type == "MESH" and not o.name.startswith("inst."))
         render(scene, v, f"{out}/{v['name']}.jpg")
         report["views"].append({"name": v["name"], "shell_tiles": len(v.get("shell_tiles", [])),
                                 "faces": tris, "seconds": round(time.time() - t, 1)})
@@ -383,16 +480,23 @@ def main():
     for sh in JOB["sheets"]:
         objs = import_glb(sh["glb"], "sheet")
         roots = {o.name: o for o in objs if o.type == "EMPTY"}
-        for cell in sh["cells"]:
-            for o in objs:
+        parts = []
+        if sh.get("parts_glb") and sh.get("instances") and JOB.get("parts_on", True):
+            parts = load_parts(sh["parts_glb"], sh["instances"], "sheet_parts", True)
+        inst_of = {}
+        for o in parts:
+            if o.name.startswith("inst."):
+                inst_of.setdefault(int(o["ag_building"]), []).append(o)
+        for k, cell in enumerate(sh["cells"]):
+            for o in objs + parts:
                 o.hide_render = True
             root = roots.get(cell["key"])
             if root is None:
                 continue
-            for o in [root] + list(root.children_recursive):
+            for o in [root] + list(root.children_recursive) + inst_of.get(k, []):
                 o.hide_render = False
             render(scene, cell["view"], f"{out}/{cell['file']}")
-        remove(objs)
+        remove(objs + parts)
         report["sheets"].append({"name": sh["name"], "cells": len(sh["cells"])})
         log(f"sheet {sh['name']}: {len(sh['cells'])}")
     with open(f"{out}/preview_report.json", "w") as f:
