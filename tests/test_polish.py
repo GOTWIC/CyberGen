@@ -14,7 +14,7 @@ from citygen import roads as RD
 from citygen.build import build_city
 from citygen.validate import load_spec
 
-from conftest import CITIES, ROOT, built_sample
+from conftest import CITIES, ROOT, ROUND_TIP, built_sample
 from test_buildings import _mutate, _rerun
 
 GREYHOOK = ROOT / "docs" / "progress" / "M1a2" / "peninsula_city" / "city_spec.json"
@@ -199,15 +199,15 @@ def test_merge_degree2_smooths_a_normal_joint():
 
 
 def test_merge_degree2_keeps_nodes_on_greyhook_seed_5(monkeypatch):
-    """Greyhook with seed 5 (found by building the samples' roads over seeds and road
-    variants): a smoothed joint used to end 3 cm off its node, so merging made a new dead
-    end there (later dropped as a dangle, taking a road piece with it). Merging must keep
+    """Greyhook's earlier layout with seed 5 (found by building the samples' roads over seeds
+    and road variants): a smoothed joint used to end 3 cm off its node, so merging made a new
+    dead end there (later dropped as a dangle, taking a road piece with it). Merging must keep
     every other node with its degree."""
     from citygen import build as B
     from citygen import megasites as MSI
     from citygen.validate import validate_spec
 
-    data = _spec_data(GREYHOOK)
+    data = _spec_data(ROUND_TIP)
     data["seed"] = 5
     real = RD._merge_degree2
     moved = []

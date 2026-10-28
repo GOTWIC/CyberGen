@@ -1,0 +1,94 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 354 of 10436 actors loaded at the start, 1283 after a teleport to (896, -1408) (1279 new)",
+  "collision: 507 of 507 traces down hit (building 228, road_street 51, junction 46, water 37, elevated 23, sidewalk 22), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 252 m along a 258 m sidewalk path in 44 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 10436,
+   "loaded_at_start": 354,
+   "loaded_far": 1283,
+   "only_far": 1279,
+   "far_spot_m": [
+    896.0,
+    -1408.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "water": 37,
+     "ground": 16,
+     "building": 228,
+     "green_roof": 9,
+     "structure_canopy": 1,
+     "sidewalk": 22,
+     "road_avenue": 9,
+     "road_pedestrian": 3,
+     "junction": 46,
+     "lawn": 3,
+     "open_plaza": 6,
+     "plant_street_tree": 1,
+     "road_street": 51,
+     "crosswalk": 1,
+     "open_park": 1,
+     "elevated": 23,
+     "plant_facade_greenery": 2,
+     "road_alley": 19,
+     "prop_awning": 14,
+     "open_pocket_park": 1,
+     "open_green": 2,
+     "site_courtyard": 10,
+     "prop_sign": 1,
+     "skybridge": 1
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     36.65,
+     311.58
+    ],
+    [
+     896.0,
+     -1408.0
+    ],
+    [
+     1408.0,
+     -1408.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 257.6,
+   "points": 7,
+   "reached": true,
+   "travelled_m": 252.2,
+   "on_ground": 1.0,
+   "max_drop_m": 0.05,
+   "seconds": 44.1,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Vesper Bay",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 82.4,
+ "wall_s": 112.0
+}

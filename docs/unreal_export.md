@@ -55,7 +55,7 @@ Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, 
 
 | Stage | Contribution |
 |---|---|
-| 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain (M13) and deck levels (M14) as they land |
+| 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); deck levels (M14) as it lands |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
 | 3 atmosgen | lights (windows, signs, street lights), sky, weather, fog and post volumes, replacing M15's default sun and sky |
 | 4 lifegen | traffic, crowd and transit systems on the graphs, spawners |
@@ -146,11 +146,12 @@ citygen id; `streets/parts.glb`, the instanced parts), in AG0's format with `"pa
   waterways, site elements). `replaces` names the blockout objects the piece supersedes,
   taken from citygen's own blockout code: the joined objects per district, category and
   tile (`<district>.road_<class>.<tile>`, `.junction.`, `.crosswalk.`, `.sidewalk.`,
-  `.quay.`, a megasite's `<owner>.<kind>.<tile>`, M13's `city.retaining_wall.<tile>`), a
-  raised road's `<id>.deck`, a tunnel's `<id>.tunnel` and its roads' `<id>.tunnel_road`.
-  A structure's blockout object has the structure's id as its name, so its entry replaces
-  it by key. Each joined object a piece replaces has every member covered (the report's
-  `street_replaces` check), so dropping it loses nothing. The blockout's ground, water,
+  `.quay.`, a megasite's `<owner>.<kind>.<tile>`), a raised road's `<id>.deck`, a tunnel's
+  `<id>.tunnel` and its roads' `<id>.tunnel_road`. A structure's blockout object has the
+  structure's id as its name, so its entry replaces it by key; M13's retaining walls too,
+  since M15 draws one blockout object per wall (AG7 was made on one joined
+  `city.retaining_wall.<tile>` per tile). Each joined object a piece replaces has every
+  member covered (the report's `street_replaces` check), so dropping it loses nothing. The blockout's ground, water,
   open space, green areas, buildings, props and plants stay.
 - **Pivot**: each piece's node sits at the middle of what it covers (0.01 m grid, z 0);
   vertices are relative to it. Z is absolute (M13's ground already added).
@@ -196,6 +197,7 @@ in its re-import digests (a regenerated district changes only its tiles' entries
 
 | Milestone | Change to the exporter | Unreal check |
 |---|---|---|
-| M15 | Introduced: manifest by key and hash, glTF tiles through Interchange with Nanite, `M_CityGen` material instances, instanced props and plants, graphs as data assets, player start, default sun and sky, re-import by key and hash, `--check` and `--shots` | the six samples, imported, imported again and checked |
+| M15 | Introduced: manifest by key and hash, glTF tiles through Interchange with Nanite, `M_CityGen` material instances, instanced props and plants, graphs as data assets, player start, default sun and sky, re-import by key and hash (`unreal.manifest_changes` says what an import will do), `--check` and `--shots` | the six samples, imported, imported again and checked; a district regenerated with M10 imported over its base and back, exactly the changed actors each way |
+| M13 (merged into M15) | Terrain: the ground a heightfield mesh per 256 m tile (`city.ground.<tile>`, draped, complex collision), water at its own levels, roads on their grade lines, buildings on their bases with stepped plinths (in the building's actor, material `plinth`), retaining walls one actor each by id (`rs.w997n776.wall.w1032n756`; the blockout now draws one object per wall), bored tunnels (`bore.w487n577.tunnel`), terrain viaducts and their columns (`rs.e814n566.viaduct.e814n566`, `rs.e814n566.tvcol.e766n565`), hillside greens in the joined open-space pieces (tagged `d03.os.slope.<cell>`, as every open space); the graphs with absolute heights on a terrain city (`graphs.json` `"heights": "absolute"`: sidewalks and lanes over their road's grade line, the rest over the finished ground), so the data assets, the player start and the check's walk stand on the ground; the walk's fall measured from the path, not the start; a facade trace that misses from the building's bottom is tried again from over the ground at its spot; `--view` adds shots | Cragmouth imported (11933 actors, 126 s), imported again (nothing changed, 20 s) and checked (507 of 507 traces down, 36 of 36 roofs and facades, 150 m walked) with 8K shots, two of hillsides (`docs/progress/M15/cragmouth/`) |
 | AG0 | No code change (M15 was not on main yet): assetgen's contribution format defined (above, written by `assetgen spike`), with the list of what the exporter needs to take it; the spike ran on M15's project setup from its branch | the spike: three generated buildings and a test tree in a throwaway project (`docs/progress/AG0/unreal/`) |
 | AG7 | No code change (the AG1 session owns the exporter): the street contribution defined (above, written by `assetgen streets`): per-piece entries replacing the blockout's joined street objects, sky tube glass as non-Nanite LOD chains, container parts, walkways on raised decks; what the exporter needs to take it listed there | the coordinating session's call |

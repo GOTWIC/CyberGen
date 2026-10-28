@@ -438,8 +438,9 @@ def check_heights(spec: CitySpec, m: CityModel, bx: _B):
                 lo, hi = dsp.upper_height_m
         top = min(hi, cap)
         h = b.height_m - base
-        # under a cap, the floor grid may leave the building up to one floor below it
-        low = 0.0 if kind in ANCILLARY else lo if top >= lo else top - b.floor_height_m
+        # under a cap, the floor grid may leave the building up to one floor below it (also
+        # when the cap is less than a floor above the range's low end: `floors_in`)
+        low = 0.0 if kind in ANCILLARY else min(lo, top - b.floor_height_m)
         if not (low - 0.01 <= h <= top + 0.01):
             _limit(c, c.failures, f"{b.id} ({kind}): {h:g} m outside {low:g} to "
                                   f"{top:g} m ('{d.name}', {d.archetype}"

@@ -1,7 +1,7 @@
 """M9: tunnels. The profile envelope, the spec fields, a small city with a cut-and-cover
 tunnel (its network, parts, metro and underpasses), each tunnel check with a failing case,
 a district regeneration over the tunnel (M10), the sample tunnels (Nexus City cut-and-cover,
-Peninsula City immersed tube) and the blockout plan."""
+an immersed tube in Greyhook's earlier layout) and the blockout plan."""
 
 import copy
 import json
@@ -18,7 +18,7 @@ from citygen.build import build_city
 from citygen.model import CityModel
 from citygen.validate import validate_spec
 
-from conftest import ROOT, SMALL, built_sample
+from conftest import ROOT, ROUND_TIP, SMALL, built_sample
 from test_edit import _outside_kept
 
 TUNNEL_CHECKS = {"tunnel_grades", "tunnel_cover", "tunnel_portals", "tunnel_clash"}
@@ -230,9 +230,10 @@ def test_nexus_city_has_a_cut_and_cover_tunnel():
     assert all(c.passed for c in b.checks if c.id in TUNNEL_CHECKS)
 
 
-def test_peninsula_city_has_an_immersed_tube():
-    b, _, _ = built_sample(ROOT / "docs" / "progress" / "M1a2" / "peninsula_city" /
-                           "city_spec.json")
+def test_peninsula_round_tip_has_an_immersed_tube():
+    """Greyhook's earlier layout: the spine crosses its river in an immersed tube (the
+    reshaped Greyhook crosses near the map edge, with no room for the approaches)."""
+    b, _, _ = built_sample(ROUND_TIP)
     tubes = [t for t in b.model.tunnels if t.kind == "immersed_tube"]
     assert len(tubes) == 1
     t = tubes[0]

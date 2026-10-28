@@ -152,6 +152,16 @@ class Coast(_Model):
     sea_share: Annotated[float, Field(ge=0.05, le=0.8)] | None = Field(
         None, description="Fraction of the map that is sea, offshore islands included (they "
                           "are carved out of it). Default by form.")
+    headlands: Annotated[int, Field(ge=2, le=5)] | None = Field(
+        None, description="Peninsula only: the land widens from a neck toward the sea and fans "
+                          "out into this many headlands with coves between them, instead of "
+                          "ending in one rounded tip.")
+
+    @model_validator(mode="after")
+    def _headlands_on_peninsula(self) -> Coast:
+        if self.headlands is not None and self.form != "peninsula":
+            raise ValueError("'headlands' needs coast form 'peninsula'")
+        return self
 
 
 _DIRECTION_LIST = ["north", "north_east", "east", "south_east", "south", "south_west", "west",
