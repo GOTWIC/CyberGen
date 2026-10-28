@@ -146,14 +146,18 @@ def _pick(ids: list[str], n: int, purpose: str) -> list[str]:
     return sorted(ids, key=lambda i: (GN.u(i, purpose, "ag1.preview"), i))[:n]
 
 
-def sheet_jobs(bdir: Path, man: dict, out: Path, cell: int = CELL) -> list[dict]:
-    """A glTF per sheet with its buildings each at the origin, and a framed view per cell."""
+def sheet_jobs(bdir: Path, man: dict, out: Path, cell: int = CELL,
+               only: list[str] | None = None) -> list[dict]:
+    """A glTF per sheet with its buildings each at the origin, and a framed view per cell
+    (`only`: just the sheets of these names, `random` or a type without `building.`)."""
     briefs = json.loads((bdir / "assets" / "briefs.json").read_text())["briefs"]
     by_type: dict[str, list[str]] = {}
     for bid, r in sorted(man["buildings"].items()):
         by_type.setdefault(r["type"], []).append(bid)
     sheets = [(t.split(".", 1)[1], _pick(ids, SHEET_N, t)) for t, ids in sorted(by_type.items())]
     sheets.append(("random", _pick(sorted(man["buildings"]), RANDOM_N, "random")))
+    if only:
+        sheets = [sh for sh in sheets if sh[0] in only]
     jobs = []
     sd = out / "sheets"
     sd.mkdir(parents=True, exist_ok=True)
@@ -231,8 +235,8 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
     views = plan_views(man, cams, width, which)
     if only:
         views = [v for v in views if v["name"] in only]
-    sheets = sheet_jobs(bdir, man, od, cell) if "sheets" in which else []
-    lit = 0.12
+    sheets = sheet_jobs(bdir, man, od, cell, only) if "sheets" in which else []
+    lit = 0.03
     job = {"assets": str(adir), "out": str(od), "views": views, "sheets": sheets,
            "proxy_tiles": sorted(man["tiles"]) if views else [],
            "blend": str(bo / "city.blend") if bo and (bo / "city.blend").is_file() else None,

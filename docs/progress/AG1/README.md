@@ -12,11 +12,20 @@ district rebuilds only the tiles whose buildings changed.
 | `assetgen build BUILD [--spec S] [--overrides O] [--workers N]` | `BUILD/assets/`: `tiles/<tile>.glb` (shells), `proxies/<tile>.glb`, `manifest.json`, `asset_report.json` and `.txt`, `unreal_contribution.buildings.json`; exit 1 if a check fails |
 | `assetgen preview BUILD [--blockout DIR] [--views ...] [--only ...] [--width W]` | Blender previews in `BUILD/assets/previews/`: the city from proxies (`city`), every shell at once (`city_full`), districts and the blockout's street cameras at full detail, contact sheets per type |
 
-SAMPLES_TABLE
+| City | Buildings | Shell triangles | Section 11 estimate | Openings | Proxy triangles (median, max) | Packs on disk | Build, 4 workers |
+|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 21.8 M (3,758 per building) | 36.7 M (0.59) | 1.06 M | 34, 390 | 1.26 GB + 27 MB | 119 s |
+| Saltreach Free Port | 3,135 | 15.4 M (4,906 per building) | 20.3 M (0.76) | 0.82 M | 34, 367 | 0.90 GB + 15 MB | 46 s |
+| Delta Megacity | 5,417 | 24.0 M (4,424 per building) | 36.9 M (0.65) | 1.22 M | 40, 268 | 1.39 GB + 27 MB | 75 s |
+| Nexus City | 6,519 | 21.5 M (3,303 per building) | 36.8 M (0.59) | 1.03 M | 35, 335 | 1.24 GB + 31 MB | 71 s |
+| Greyhook | 2,460 | 9.8 M (3,992 per building) | 20.4 M (0.48) | 0.49 M | 23, 498 | 0.57 GB + 11 MB | 23 s |
+| Vesper Bay Pinned | 6,658 | 20.6 M (3,090 per building) | 38.4 M (0.54) | 0.92 M | 34, 336 | 1.19 GB + 31 MB | 62 s |
+| Vesper Bay Stacks | 6,686 | 20.1 M (3,003 per building) | 36.6 M (0.55) | 0.89 M | 34, 334 | 1.16 GB + 31 MB | 63 s |
 
 Times are `assetgen build` from the city model to the last file with 4 worker processes on
-the M4 Pro shared with three other sessions (load 10 to 15), briefs included (13 to 19 s of
-it). A second build of the same city writes no file and takes 5 to 7 s (the briefs and
+the M4 Pro, shared with other sessions' Blender and Python jobs (load 15 to 100 during these
+runs; Vesper Bay takes 50 to 60 s at a load near 10), briefs included (5 to 28 s of it). So
+a whole city builds in 1 to 2 minutes with 4 workers, far inside the 20 minute target. A second build of the same city writes no file and takes 5 to 7 s (the briefs and
 records are read back, the checks run again). Section 11's estimate for the shells is its
 $N_b\, t_b + A_r\, \rho_r$ with the city's own bays and roof area; AG1's shells use about
 half of it, so AG2's parts have the other half.
@@ -75,8 +84,9 @@ $$\text{mass} \to \text{edges} \to \text{floor rows} \to \text{bays} \to \lbrace
 
 UV0 is meters along each face (world-scale tiling, continuous around a mass); UV1 (0 to 1
 over a pane) and vertex colors (a window id in alpha, for interior mapping) exist only on
-the glass slots, as AG0 measured. Footprints citygen leaves with a spike of no width or a
-court pinched onto the exterior are cleaned before building (8 to 12 spikes per city).
+the glass slots, as AG0 measured. Footprints citygen leaves with a spike of no width, a ring
+that crosses itself or a court pinched onto the exterior are tidied before building
+(`rings.tidy`: 22 to 73 rings per city, one court filled in Nexus City).
 
 **Proxies** (`buildings/proxy.py`): the masses as prisms with their roofs (no openings, no
 bottoms), at most 500 triangles (rings thinned while they stay simple), UV0 in meters so the
@@ -100,7 +110,11 @@ All five pass on every sample:
 | `asset_unique` | every two buildings outside one complex family differ in at least $k = 4$ discrete genes or by a genome distance of at least 4 (a discrete gene counts 1, a continuous one $\min(\lvert\Delta\rvert / s, 1)$ with $s$ a clearly visible step), on the genes each shell used |
 | `asset_budget` | the city's shell triangles within section 11's estimate for its bays and roofs |
 
-UNIQUE_LINE
+Uniqueness compares 27 to 28 discrete and 32 to 39 continuous genes over 3 to 22 million
+pairs per city; the nearest pair outside a family is 4.7 to 6.1 apart (median nearest 10.0
+to 10.6). Mount panels: 11 to 34 thousand openings per city became a panel because a sign,
+prop, plant or skybridge end would have hung on glass. Ring strips: 5 to 15 thousand per
+city, 11 to 28% refused where a run would fold (they are left out, never drawn wrong).
 
 ## Rebuilds
 
@@ -133,4 +147,24 @@ exporter needs to take it.
 
 ## For later milestones
 
-FOLLOWUPS
+- **AG2**: the shells leave about 40% of section 11's triangle estimate for parts; the
+  reveals that should become instanced parts with sills, mullions and fins are in the
+  shells today (about 20 triangles per opening, its share of the wall included). Massing
+  articulation, the other facade systems (each era's fallbacks are in `systems.FALLBACK`)
+  and wear by grime and wealth go there.
+  The uniqueness check measures genomes only; AG2 adds the thumbnail hash.
+- **AG3**: storefronts are glazed openings per unit (no doors, shutters or signs yet);
+  mount panels already keep every sign slot, prop and skybridge end off the glass, so the
+  mounts check should pass from the start. Blind walls get few, small windows; party walls
+  none.
+- **AG4**: roof equipment is a block per roof item; skybridge ends are blank panels on the
+  facade; portals are not cut yet.
+- **AG5**: shanty stacks, megabuildings, warehouses, parking structures and landmarks use the
+  general grammar (with their type's system); the wheel is the blockout's rim and spokes.
+- **AG6**: the slots (`systems.SLOTS`) and their tint channels, UV0 in meters, UV1 and window
+  ids on glass, and the 23 CPD floats are the material contract; AG6's masters read them.
+- **Exporter** (whichever PR has M15 on main first): the list in `docs/unreal_export.md`.
+  Collision is mostly convex prisms (45 degree footprints rounded to the millimeter are
+  rarely exact rectangles); boxes could take a small angle tolerance.
+- **citygen** (scope 4.5): footprints with zero-width spikes, self-crossing rings and courts
+  touching the exterior (`rings.tidy` cleans them; a citygen fix would make it a no-op).

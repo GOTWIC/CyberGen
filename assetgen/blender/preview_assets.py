@@ -217,9 +217,9 @@ def make_material(slot, spec):
         nt.links.new(m.outputs[0], bsdf.inputs["Base Color"])
     elif slot in ("glass", "storefront"):
         # day glass: the building's tint lifted toward the sky it reflects
-        g = _scale_rgb(nt, col, 2.2) if col is not None else None
-        sky = (0.33, 0.4, 0.5, 1.0)
-        mixed = _mix(nt, _value(nt, 0.35), g if g is not None else base, sky)
+        g = _scale_rgb(nt, col, 2.0) if col is not None else None
+        sky = (0.24, 0.34, 0.48, 1.0)
+        mixed = _mix(nt, _value(nt, 0.5), g if g is not None else base, sky)
         nt.links.new(mixed, bsdf.inputs["Base Color"])
         bsdf.inputs["Roughness"].default_value = 0.12
         bsdf.inputs["Metallic"].default_value = 0.25
@@ -227,12 +227,12 @@ def make_material(slot, spec):
         ca = nt.nodes.new("ShaderNodeVertexColor")
         ca.layer_name = "Color"
         lit = _math(nt, "MULTIPLY", _math(nt, "LESS_THAN", ca.outputs["Alpha"],
-                                          vb=JOB.get("lit", 0.06)),
+                                          vb=JOB.get("lit", 0.03)),
                     _math(nt, "GREATER_THAN", ca.outputs["Alpha"], vb=0.002))
         warm = (1.0, 0.82, 0.6, 1.0) if slot == "glass" else (1.0, 0.92, 0.8, 1.0)
         bsdf.inputs["Emission Color"].default_value = warm
         nt.links.new(_math(nt, "ADD", _math(nt, "MULTIPLY", lit,
-                                            vb=0.35 if slot == "glass" else 0.6), vb=0.02),
+                                            vb=0.25 if slot == "glass" else 0.5), vb=0.02),
                      bsdf.inputs["Emission Strength"])
     elif slot == "proxy":
         # a window grid from UV0 (meters: u around the mass, v up) and the building's bay
