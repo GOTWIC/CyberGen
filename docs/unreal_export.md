@@ -315,6 +315,82 @@ them (`SetLodFromStaticMesh`, `SetLodScreenSizes`), its actor without collision;
 instead of graphs.json's (on a terrain city the ground under them, graphs.json's z there,
 is added); the new keys in the re-import digests.
 
+## assetgen's props and signs contributions (AG8)
+
+`assetgen props BUILD` (and `assetgen build`, last) writes two layer-2 contributions beside
+its packs: `unreal_contribution.props.json` (`"part": "props"`) and
+`unreal_contribution.signs.json` (`"part": "signs"`), in AG0's format:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "props", "layer": 2,
+ "masters": ["opaque", "metal", "foliage", "emissive", "neon", "translucent", "holo"],
+ "materials": {"metal.dark": {"master": "metal", "color": [0.023, 0.026, 0.03],
+                              "roughness": 0.5, "metallic": 0.8},
+               "leaf.oak": {"master": "foliage", "two_sided": true, "...": "..."}},
+ "entries": [
+  {"key": "prop.street_light.t+01+00", "kind": "prop.street_light", "hash": "<16 hex>",
+   "replaces": [], "pivot": [384.0, 128.0, 0.0], "yaw_deg": 0.0, "tile": "t+01+00",
+   "parts": [{"kind": "prop.street_light.civic.v3", "glb": "props/variants/street_light.glb",
+              "node": "prop.street_light.civic.v3", "asset": "prop_street_light_civic_v3",
+              "count": 2, "triangles": 214,
+              "xforms": [[-12.4, 40.1, 0.0, 87.5, 1.0, 1.0, 1.0], "..."],
+              "ids": ["d03.prop.street_light.e372n168", "..."]}]},
+  {"key": "plant.street_tree.t+01+00", "parts": [{"kind": "plant.ginkgo.v5",
+   "glb": "props/plants/ginkgo.glb", "nanite": true, "shape_preservation": "voxelize",
+   "collision": {"none": true}, "xforms": [[x, y, z, yaw, 1.07, 1.07, 0.91]], "...": "..."}]},
+  {"key": "prop.overhead_cable.t-03+05", "glb": "props/tiles/t-03+05.glb",
+   "node": "prop.overhead_cable.t-03+05", "collision": {"none": true}, "...": "..."},
+  {"key": "prop.barrier.t+00+02", "drop": true, "replaces": [], "...": "..."}]}
+```
+
+```json
+{"version": 1, "stage": "assetgen", "part": "signs", "layer": 2,
+ "entries": [
+  {"key": "d05.prop.sign.w744n1012.slot", "kind": "sign.shop_sign", "hash": "<16 hex>",
+   "replaces": ["prop.sign.t-03+03"], "glb": "props/signs/t-03+03.glb",
+   "node": "sign.h1c0f9e2b7a4d3e51", "asset": "sign_h1c0f9e2b7a4d3e51",
+   "pivot": [-744.2, 1012.4, 6.04], "yaw_deg": 49.2, "nanite": true, "triangles": 612,
+   "slots": ["neon.ff2a6d", "sign.frame"], "collision": {"none": true}, "tile": "t-03+03"},
+  {"key": "d01.lot.e1052n46.bld.slot.holo_ad.holo", "kind": "sign.holo_ad.holo",
+   "nanite": false, "node": "d01.lot.e1052n46.bld.slot.holo_ad.holo.lod0",
+   "lods": [{"node": "....holo.lod0", "screen_size": 1.0, "triangles": 134},
+            {"node": "....holo.lod1", "screen_size": 0.3, "triangles": 116},
+            {"node": "....holo.lod2", "screen_size": 0.08, "triangles": 2}], "...": "..."}]}
+```
+
+- **Props and plants replace M15's prototypes**: M15 draws each prop and plant kind of a
+  tile as one instanced actor of a prototype (`prop.<kind>.<tile>`, `plant.<type>.<tile>`);
+  AG8's entry has that actor's key and holds the variants as parts: per part kind the
+  family pack's node (`props/variants/<kind>.glb`, `props/plants/<species>.glb`, every
+  variant at the origin), its instances' transforms from the entry's pivot (the tile's
+  middle: x, y, z in meters, yaw in degrees, then the scale) and the citygen id of each.
+  Plants: Nanite with `ShapePreservation` `Voxelize` (AG0's finding; 5.8, experimental),
+  no collision. The exact props (cables, scaffolding, market gates) are one mesh per kind
+  and tile in `props/tiles/<tile>.glb`, an actor in place of the same key. M6's highway
+  median barriers, which AG7's road pieces draw as one continuous barrier, are left out; a
+  prototype actor with nothing left gets a `drop` entry.
+- **Signs**: an actor per M11 sign slot at the slot's position and yaw (x the way the face
+  looks); a tile's distinct sign meshes in `props/signs/<tile>.glb`, shared by the slots
+  that draw the same sign; shop signs name their tile's sign prototype actor
+  (`prop.sign.<tile>`) in `replaces`. A holo-ad is two entries: the projector on the roof
+  (Nanite) under the slot's key, the image `<slot>.holo`, non-Nanite, a LOD chain of three
+  (the planes, text, frame and scan bands; the text; one plane) on the `holo` master.
+- **Materials**: linear colors (no conversion, unlike AG7's); `neon` (emissive 8), `emissive`
+  (lamps, screens, lit faces; 4), `holo` (translucent, two-sided, emissive 3), `foliage`
+  (two-sided). Flat colors until AG6's library: bark, leaves, painted metal, sign faces and
+  billboard content are what AG6 or a later pass textures.
+- **Collision**: none on plants, signs and exact props (they stand off the walkways or over
+  head); complex on prop variants.
+
+**What the exporter does with props and signs** (AG8): `stage2` looks a key up among M15's
+prototype actors too, so an entry keyed by one, or naming one in `replaces`, drops it; a
+`drop` entry only drops; a part may carry `ids` (the instance actor's `Ids` then hold one
+id per transform), `collision`, `nanite` and `shape_preservation` (on its mesh record, in
+its hash); transforms may carry a scale (`[x, y, z, yaw, sx, sy, sz]`); `EMISSIVE2` gains
+`holo`. The importer skips the replaced prototype actors, applies the scale and ids, sets
+`NaniteShapePreservation.VOXELIZE` on a mesh whose record asks for it, and makes `M_CgHolo`
+(the translucent master with an emissive strength).
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -343,4 +419,5 @@ is added); the new keys in the re-import digests.
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`d03.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on; `city.deck_road.<tile>` and `city.deck_sidewalk.<tile>` with no district until the stage 1 fixes), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |
 | Stage 1 fixes | No code change. Keys: a deck's streets and sidewalks are joined per district like the ground's (`d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`, with `cg.district=d03`; they were `city.deck_road.<tile>`, `city.deck_sidewalk.<tile>` with an empty `cg.district`), so importing Vesper Bay Decks over an M14 import replaces those actors under their new keys; its ramps keep theirs (`<segment>.ramp`). Cragmouth's local junctions are level out to their corners (more retaining wall actors on its hills, keys by wall id as before) | Not run (the coordinating session's call; `docs/progress/stage1_fixes/`) |
 | AG1 and AG7 (after M15) | Stage 2 taken as layer 2: every `assets/unreal_contribution.*.json` read in sorted order (`unreal.stage2`, the manifest's `stage2`; a key in two files refused), the blockout actors of each entry's key and `replaces` dropped, an actor per shell and street piece at its pivot (`cg.stage=2`), the packs through Interchange in their nodes' frames with their own normals, stage 2 masters (`M_CgFacade`, `M_CgGlass`, `M_CgMetal`, `M_CgRoad`, `M_CgOpaque`, `M_CgEmissive`, `M_CgTranslucent`, `M_CgFoliage`) and an instance per part and slot reading the actor's Custom Primitive Data tint, the 23 floats as the components' saved defaults, building collision as convex hulls through GeometryScript (`GeometryScripting` plugin), complex collision for streets, the sky tube glass as a non-Nanite LOD chain, container stacks as instanced actors per entry and kind, proxies imported only, `graphs.walkways` lines in the walkway data assets; `--blockout-only`; the check's walk keeps to walkable walkways (no leg over 30%, no step over 0.6 m, not under the terrain) and tries up to eight starts; the buildings contribution's `asset` is the shell node's Interchange name and its patch slots spell out their tint rule | the small test city, Greyhook and Cragmouth: blockout alone, then stage 2 over it (exactly the actors `manifest_changes` names), imported again (nothing changed), checked (507 of 507 traces down, 36 of 36 roofs and facades, 248, 130 and 81 m walked) with shots; first imports with stage 2 5 to 14 minutes, most of it Nanite builds (`docs/progress/AG1/unreal/`) |
+| AG8 | Props, plants and signs taken: `unreal_contribution.props.json` and `.signs.json` (above); `stage2` replaces M15's prop and plant prototype actors by key (entries keyed by them, or `replaces`, or `drop`), parts with per-instance ids, scales, collision, Nanite and `shape_preservation`; the importer skips the replaced prototypes, scales instances, sets voxel Nanite foliage, makes `M_CgHolo`; tests without Unreal (`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` now with every prototype replaced) | the coordinating session's call |
 | AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |

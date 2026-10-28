@@ -553,6 +553,87 @@ def test_stage2_refuses(build, manifest, tmp_path):
         U.build_manifest(_with_contributions(build, tmp_path / "layer", old))
 
 
+def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
+    """AG8 over M15's prototype actors: an entry keyed by a prototype actor's key replaces
+    it with its variants (transforms with a scale, an id per instance; plants as Nanite
+    foliage without collision), a `drop` entry only removes one, a sign replaces its tile's
+    sign prototypes through `replaces`, a holo-ad's image is a LOD chain on the `holo`
+    master; the importer skips the replaced prototype actors."""
+    man = manifest[0]
+    insts = sorted(i["key"] for i in man["instances"])
+    props_k = next(k for k in insts if k.startswith("prop."))
+    plant_k = next(k for k in insts if k.startswith("plant."))
+    drop_k = next(k for k in insts if k.startswith("prop.") and k != props_k)
+    sign_k = next((k for k in insts if k.startswith("prop.sign.")), insts[-1])
+    xf = [[1.0, 2.0, 0.0, 30.0, 1.0, 1.0, 1.0], [3.0, -4.0, 0.5, -90.0, 2.5, 1.2, 1.0]]
+    props = {"version": 1, "stage": "assetgen", "part": "props", "layer": 2,
+             "materials": {"metal.dark": {"master": "metal", "color": [0.02, 0.02, 0.03],
+                                          "roughness": 0.5, "metallic": 0.8},
+                           "leaf.oak": {"master": "foliage", "color": [0.04, 0.1, 0.02],
+                                        "roughness": 0.8, "metallic": 0.0}},
+             "entries": [
+                 {"key": props_k, "kind": "prop.test", "hash": "p1", "replaces": [],
+                  "pivot": [128.0, 128.0, 0.0], "yaw_deg": 0.0,
+                  "parts": [{"kind": "prop.test.civic.v0", "glb": "props/variants/test.glb",
+                             "node": "prop.test.civic.v0", "asset": "prop_test_civic_v0",
+                             "count": 2, "triangles": 50, "xforms": xf,
+                             "ids": ["a.prop.1", "a.prop.2"]}]},
+                 {"key": plant_k, "kind": "plant.test", "hash": "p2", "replaces": [],
+                  "pivot": [128.0, 128.0, 0.0], "yaw_deg": 0.0,
+                  "parts": [{"kind": "plant.oak.v3", "glb": "props/plants/oak.glb",
+                             "node": "plant.oak.v3", "asset": "plant_oak_v3", "count": 1,
+                             "triangles": 9000, "xforms": xf[:1], "ids": ["a.plant.1"],
+                             "nanite": True, "shape_preservation": "voxelize",
+                             "collision": {"none": True}}]},
+                 {"key": drop_k, "kind": "prop.barrier", "hash": "p3", "replaces": [],
+                  "pivot": [0.0, 0.0, 0.0], "yaw_deg": 0.0, "drop": True}]}
+    signs = {"version": 1, "stage": "assetgen", "part": "signs", "layer": 2,
+             "materials": {"holo.05d9e8": {"master": "holo", "color": [0.0, 0.7, 0.8],
+                                           "roughness": 0.1, "metallic": 0.0}},
+             "entries": [
+                 {"key": "a.sign.slot", "kind": "sign.shop_sign", "hash": "s1",
+                  "replaces": [sign_k], "glb": "props/signs/t+00+00.glb",
+                  "node": "sign.h0123", "asset": "sign_h0123", "pivot": [5.0, 6.0, 4.5],
+                  "yaw_deg": 90.0, "nanite": True, "triangles": 200, "slots": [],
+                  "collision": {"none": True}, "tile": "t+00+00"},
+                 {"key": "a.holo.slot.holo", "kind": "sign.holo_ad.holo", "hash": "s2",
+                  "replaces": [], "glb": "props/signs/t+00+00.glb",
+                  "node": "a.holo.slot.holo.lod0", "asset": "a_holo_slot_holo",
+                  "pivot": [7.0, 8.0, 90.0], "yaw_deg": 0.0, "nanite": False,
+                  "triangles": 40, "slots": ["holo.05d9e8"], "collision": {"none": True},
+                  "tile": "t+00+00",
+                  "lods": [{"node": f"a.holo.slot.holo.lod{k}", "screen_size": s,
+                            "triangles": 40 >> k} for k, s in enumerate((1.0, 0.3, 0.08))]}]}
+    staged = _with_contributions(build, tmp_path / "props", {"props": props, "signs": signs})
+    m2 = U.build_manifest(staged)[0]
+    s2 = m2["stage2"]
+    assert s2["replaced"] == sorted({props_k, plant_k, drop_k, sign_k})
+    assert s2["counts"]["replaces_missing"] == 0
+    inst = {a["key"]: a for a in s2["instances"]}
+    a = inst[f"{props_k}.prop.test.civic.v0"]
+    assert a["xforms"] == xf and a["ids"] == ["a.prop.1", "a.prop.2"]
+    assert a["category"] == next(i["category"] for i in man["instances"] if i["key"] == props_k)
+    plants = next(p for p in s2["packs"] if p["folder"].endswith("PropsParts/oak"))
+    (oak,) = plants["meshes"]
+    assert oak["shape_preservation"] == "voxelize" and oak["collision"] == {"none": True}
+    variants = next(p for p in s2["packs"] if p["folder"].endswith("PropsParts/test"))
+    assert "shape_preservation" not in variants["meshes"][0]
+    assert s2["materials"]["signs.holo.05d9e8"]["emissive"] == U.EMISSIVE2["holo"]
+    assert "holo" in s2["masters"]
+    (ch,) = s2["lod_chains"]
+    assert [lo["screen_size"] for lo in ch["lods"]] == [1.0, 0.3, 0.08]
+    hashes = U.actor_hashes(m2)
+    assert not {props_k, plant_k, drop_k, sign_k} & set(hashes)
+    assert {f"{props_k}.prop.test.civic.v0", f"{plant_k}.plant.oak.v3", "a.sign.slot",
+            "a.holo.slot.holo"} <= set(hashes)
+    ch = U.manifest_changes(man, m2)
+    assert sorted(ch["deleted"]) == sorted({props_k, plant_k, drop_k, sign_k})
+    # the importer leaves the replaced prototype actors out (its skip set)
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert 'if inst["key"] in self.skip:' in src and "xf[4:7]" in src
+    assert 'r.get("ids")' in src and "NaniteShapePreservation" in src
+
+
 @pytest.fixture(scope="module")
 def staged(small, build, manifest, tmp_path_factory):
     """The small city with its assets built by assetgen (shells, proxies, streets) beside
@@ -574,6 +655,7 @@ def test_stage2_from_assetgen(staged, manifest):
     m2, _, g2 = U.build_manifest(staged)
     s2 = m2["stage2"]
     blockout = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    protos = {i["key"] for i in man["instances"]}
     con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
     blds = [e["key"] for e in con["entries"]]
     assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
@@ -590,8 +672,10 @@ def test_stage2_from_assetgen(staged, manifest):
     ch = U.manifest_changes(man, m2)
     s2keys = actor_keys | {a["key"] for a in s2["instances"]}
     assert ch["deleted"] == sorted(set(s2["replaced"]) - s2keys)
-    assert ch["updated"] == sorted(s2keys & set(blockout))
-    assert ch["created"] == sorted(s2keys - set(blockout))
+    assert ch["updated"] == sorted(s2keys & (set(blockout) | protos))
+    assert ch["created"] == sorted(s2keys - set(blockout) - protos)
+    # AG8: every prop and plant prototype actor of M15 replaced by props, plants and signs
+    assert protos <= set(s2["replaced"])
     assert all(len(a["cpd"]) == 23 for a in s2["actors"] if a["key"] in set(blds))
     assert _dump(U.build_manifest(staged)[0]) == _dump(m2)
 

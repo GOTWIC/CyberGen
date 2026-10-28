@@ -1,0 +1,51 @@
+assetgen props: Delta Megacity: PASS
+
+  [ok] props_coverage: 55087 props (2116 on AG7's barriers), 20384 plants, 14983 sign slots; 0 without an asset
+  [ok] props_families: 20 prop kinds in 5 styles, 14 plant species
+  [ok] props_replaces: 1897 prototype actors, 1897 replaced
+  [ok] props_meshes: no bad triangles
+  [ok] props_budgets: 92928 instances (at most 3244 in a tile, budgets 15000 and 300000), 81389850 triangles drawn through them, 5984373 unique triangles (budget 10000000)
+
+variants 715 in 35 families, instances 92928 (1577 brackets), exact props 1620, signs 14983 (14964 meshes)
+unique triangles 5984373 (signs 4736734, exact 598056), drawn through instances 81389850, disk 342.4 MB
+
+instances by kind:
+  awning: 32167
+  ac_unit: 7659
+  parked_vehicle: 3644
+  street_light: 3314
+  bollard: 2943
+  railing: 2903
+  traffic_signal: 1961
+  bracket: 1577
+  wall_light: 1066
+  trash_can: 840
+  hydrant: 746
+  trash: 634
+  bench: 580
+  dumpster: 199
+  bus_stop: 97
+  boat: 76
+  planter: 43
+  kiosk: 18
+  vending_machine: 18
+  food_stall: 11
+instances by species:
+  ivy: 17745
+  sedum: 4044
+  boxwood: 2319
+  plane: 1537
+  maple: 1444
+  ginkgo: 1181
+  scrub: 875
+  fan_palm: 758
+  birch: 721
+  pine: 609
+  linden: 387
+  oak: 326
+  elm: 304
+  date_palm: 182
+signs: billboard.facade 252, billboard.roof 1016, holo_ad.roof 63, neon.facade 444, shop_sign.channel 638, shop_sign.lightbox 4506, shop_sign.neon 5517, shop_sign.panel 2547
+scripts: hangul 2026, hanzi 6409, kana 856, latin 5692
+files: 35 families made, 98 tiles made, 0 kept, 169 written, 0 removed
+seconds: gather 14.66, families 2.29, tiles 12.44, write 0.46, total 30.22, workers 3
