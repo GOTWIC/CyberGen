@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1 and AG7 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1, AG7 and AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -226,6 +226,28 @@ and megasite element, each named by its citygen id and replacing the blockout's 
 pieces in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
 [`docs/progress/AG7`](docs/progress/AG7).
 
+<img src="docs/progress/AG8/vesper_bay/neon_strand_night_8k.jpg" width="840">
+
+An alley in Neon Strand at night (8K): shop signs with their names in neon, lightboxes and
+blade signs, awnings, AC units and bollards, among the building shells and streets.
+
+<img src="docs/progress/AG8/sheets/sheet_neon_8k.jpg" width="840">
+
+The neon district style's props (8K): street lights, signals, shelters, benches, stalls,
+kiosks, barriers, railings, dumpsters, parked cars, boats and sample signs.
+
+```bash
+.venv/bin/python -m assetgen props out/vesper_bay --sheets out/vesper_bay/sheets
+```
+
+`assetgen build` also runs it, last (`--no-props` skips it). The props stage writes
+`out/<city>/assets/props/`: 4 to 12 variants of every street prop kind in each of five
+district styles, 15 plant species grown as branching trees, palms, pines, shrubs and ivy,
+and a sign for every sign slot with the shop's name in Latin, Cyrillic or generated East
+Asian and Indic scripts. Each prop and plant picks its variant from its id, and in Unreal the
+variants replace the blockout's stand-ins as instances. Sheets of every style and the
+plants, and street views: [`docs/progress/AG8`](docs/progress/AG8).
+
 <img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
 
 Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).
@@ -246,7 +268,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
 | AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
 | AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |
-| AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
+| AG8 | Props, plants and signs | Street furniture and parked cars in variants per district style, trees by species, shrubs and ivy, shop signs with their text, neon, billboards, holo-ads | Done |
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Buildings and streets on stacked decks | Planned |
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |

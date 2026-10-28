@@ -461,7 +461,7 @@ STAGE2_FOLDER = "Assets"                    # under the city's content root
 # read a color at each: AG1's wall, trim, glass, roof, spandrel and patch tints)
 TINT_CPD = (0, 8, 11, 14, 17, 20)
 SRGB_PARTS = ("streets",)                   # AG7 writes its slot colors as sRGB (0 to 1)
-EMISSIVE2 = {"neon": 8.0, "emissive": 4.0}  # the emissive strength of a master's instances
+EMISSIVE2 = {"neon": 8.0, "emissive": 4.0, "holo": 3.0}  # a master's instances' emissive
 
 
 def contributions(build_dir: str | Path) -> list[tuple[str, dict, str]]:
@@ -496,9 +496,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
     (at its pivot, Custom Primitive Data, its tags), an instanced actor per entry and part
     kind, the glTF packs to import (one static mesh per shell, proxy, street or part node;
     collision, Nanite and LODs by entry), the materials (one instance per part and slot)
-    and the blockout actors dropped: every entry's own key and every key in its `replaces`.
-    A key may be in one contribution only."""
+    and the blockout actors dropped: every entry's own key and every key in its `replaces`
+    (M15's prop and plant prototype actors too, by their keys: AG8's variants take their
+    place; a `drop` entry only drops them). A key may be in one contribution only."""
     blockout = {o["key"]: (t["name"], o) for t in man["tiles"] for o in t["objects"]}
+    blockout.update({i["key"]: (i["tile"], i) for i in man["instances"]})
     owner: dict[str, str] = {}
     mats, packs, actors, insts, chains = {}, {}, [], [], []
     replaced, missing, files = set(), 0, []
@@ -522,10 +524,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             sha_of[glb] = hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
         return sha_of[glb]
 
-    def mesh(pk, node, h, collision, nanite):
+    def mesh(pk, node, h, collision, nanite, shape=None):
         a = asset_name(node)
         pk["meshes"][a] = {"asset": a, "hash": content_hash([h, node, collision, nanite]),
                            "collision": collision, "nanite": nanite}
+        if shape:
+            # (AG8's plants: Nanite foliage, `voxelize`, AG0)
+            pk["meshes"][a]["shape_preservation"] = shape
+            pk["meshes"][a]["hash"] = content_hash([h, node, collision, nanite, shape])
         return f"{pk['folder']}/{a}", pk["meshes"][a]["hash"]
 
     for rel, c, sha in contribs:
@@ -553,6 +559,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                                  "contribution only)")
             owner[k] = rel
             bo = blockout.get(k)
+            if e.get("drop"):
+                # (AG8: every instance of a prototype actor left out: it goes, nothing comes)
+                for r in [k] + list(e.get("replaces", [])):
+                    if r in blockout:
+                        replaced.add(r)
+                    elif r != k:
+                        missing += 1
+                continue
             tags = e.get("tags") or {}
             col = e.get("collision") or {}
             if col.get("simple") or col.get("convex"):
@@ -606,10 +620,13 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             for p in e.get("parts") or []:
                 glb = p.get("glb") or e["glb"]
                 mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb),
-                              {"complex": True}, True)
+                              p.get("collision") or {"complex": True}, p.get("nanite", True),
+                              p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
                      "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [],
                      "xforms": p["xforms"], **base}
+                if p.get("ids"):
+                    a["ids"] = p["ids"]          # (one citygen id per transform)
                 a["type"] = p["kind"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)

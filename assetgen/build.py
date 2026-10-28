@@ -1,6 +1,6 @@
-"""`assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]` (scope
-sections 3, 4.4, 6): the building assets of a citygen build into `BUILD/assets/`, then its
-street packs.
+"""`assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]
+[--no-props]` (scope sections 3, 4.4, 6): the building assets of a citygen build into
+`BUILD/assets/`, then its street packs, then its props, plants and signs.
 
 1. Briefs (AG0's stage), reused from `briefs.json` when the model, spec and overrides are
    the ones it was made from; written only when they change.
@@ -17,6 +17,9 @@ street packs.
 5. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
    bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
    `streets_report.json` and `.txt` (the report only when another of its files changed).
+6. The props stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the
+   variant families, exact props and signs, `unreal_contribution.props.json` and
+   `.signs.json`, `props_report.json` and `.txt` (likewise).
 
 An unchanged city's rebuild writes no file.
 """
@@ -256,7 +259,7 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
-          log=print, streets: bool = True) -> dict:
+          log=print, streets: bool = True, props: bool = True) -> dict:
     t0 = time.perf_counter()
     model, sha, bdir = B.load_model(build_dir)
     out = bdir / "assets"
@@ -368,6 +371,25 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         rep["ok"] = rep["ok"] and srep["ok"]
         log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
             f"made, {n} files written")
+    if props:
+        from .props.build import build as props_build, default_workers as props_workers
+        prep = props_build(model, sha, out, filled, briefs=briefs,
+                           workers=workers or props_workers(), report_always=False)
+        f = prep["files"]
+        n = len(f["written"]) + len(f["removed"]) + int(bool(f["manifest_written"])) + \
+            sum(int(bool(x)) for x in f["contribution_written"]) + int(f["report_written"])
+        wrote += n
+        st = prep["stats"]
+        rep["props"] = {"ok": prep["ok"], "variants": st["variants"],
+                        "instances": st["instances"], "signs": st["signs"],
+                        "unique_triangles": st["unique_triangles"],
+                        "disk_bytes": st["disk_bytes"],
+                        "failed": [c["id"] for c in prep["checks"] if not c["ok"]],
+                        "tiles_made": f["tiles_made"], "files_written": n,
+                        "seconds": prep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and prep["ok"]
+        log(f"props: {st['variants']} variants, {st['instances']} instances, {st['signs']} "
+            f"signs, {f['tiles_made']} tiles made, {n} files written")
     rep["files_written"] = wrote
     return rep
 
@@ -478,4 +500,11 @@ def report_text(rep: dict) -> str:
                      f"{st['triangles']:,} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if st['ok'] else 'FAIL ' + ', '.join(st['failed'])}"
                      f" ({st['tiles_made']} tiles made, {st['seconds']} s; streets_report.txt)")
+    pr = rep.get("props")
+    if pr is not None:
+        lines.append(f"props: {pr['variants']} variants, {pr['instances']:,} instances, "
+                     f"{pr['signs']:,} signs, {pr['unique_triangles']:,} triangles, "
+                     f"{pr['disk_bytes'] / 1e6:.1f} MB; "
+                     f"{'all checks pass' if pr['ok'] else 'FAIL ' + ', '.join(pr['failed'])}"
+                     f" ({pr['tiles_made']} tiles made, {pr['seconds']} s; props_report.txt)")
     return "\n".join(lines) + "\n"

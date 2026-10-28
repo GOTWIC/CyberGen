@@ -865,6 +865,33 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
   (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
   generator change: the code hash is in every tile's hash.
 
+AG8 (props, plants and signs) is in place, in `assetgen/props/` (tests
+`tests/assetgen/test_ag_props.py`):
+- **`assetgen props BUILD [--spec S] [--workers N] [--sheets DIR]`** (`build.py`; also the
+  last stage of `assetgen build`, `--no-props` skips it): every M6 prop kind a family of 4
+  to 12 variants per district style (`styles.py`: sleek, civic, heavy, neon, old from the
+  era; `variants.py`), every plant species 6 or 8 (`trees.py`: space colonization, palms,
+  pines, shrubs, sedum, scrub, ivy), each placement's variant a hash of its id
+  (`gather.py`); awnings and ivy in segments, facade props off their wall (the briefs'
+  `gap_m`) on brackets; cables, scaffolding and market gates exact meshes per tile; M6's
+  highway median barriers dropped where AG7's road piece has its barrier. On M13 a
+  placement stands on its building's `base_m` (facade, roof) else the ground at its point.
+- **Signs** (`signs.py`, `glyphs.py`): an asset per M11 sign slot (box, panel, neon and
+  channel shop signs, blade signs, billboards, holo-ads as non-Nanite LOD chains, neon
+  bands), text from POI names or generated shop names, an in-repo stroke font for Latin and
+  Cyrillic, generated glyphs for hanzi, kana, hangul and devanagari (decision 13.3 defers
+  fonts). Node names never end in a dot and digits (Blender's glTF import overflows).
+- **Outputs**: `assets/props/variants/<kind>.glb`, `plants/<species>.glb`,
+  `tiles/<tile>.glb`, `signs/<tile>.glb`, `props/manifest.json`,
+  `unreal_contribution.props.json` and `.signs.json` (entries keyed by M15's prototype
+  actors, parts with `[x, y, z, yaw, sx, sy, sz]` and ids), `props_report.json/.txt`
+  (checks `props_coverage`, `props_families`, `props_replaces`, `props_meshes`,
+  `props_budgets`). A tile is made again only when its inputs or the code change.
+- **Previews**: `assetgen/blender/props_preview.py` (the blockout with AG1's shells, AG7's
+  streets and AG8's instances through geometry nodes; `--night` adds lamp and sign lights)
+  and `props_sheet.py` (variant sheets). Golden: `tests/assetgen/data/golden_props.json`
+  (`tests/assetgen/props_goldens.py`).
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.
