@@ -613,6 +613,7 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     a = inst[f"{props_k}.prop.test.civic.v0"]
     assert a["xforms"] == xf and a["ids"] == ["a.prop.1", "a.prop.2"]
     assert a["category"] == next(i["category"] for i in man["instances"] if i["key"] == props_k)
+    assert "no_collision" not in a and inst[f"{plant_k}.plant.oak.v3"]["no_collision"]
     plants = next(p for p in s2["packs"] if p["folder"].endswith("PropsParts/oak"))
     (oak,) = plants["meshes"]
     assert oak["shape_preservation"] == "voxelize" and oak["collision"] == {"none": True}
@@ -632,6 +633,7 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'if inst["key"] in self.skip:' in src and "xf[4:7]" in src
     assert 'r.get("ids")' in src and "NaniteShapePreservation" in src
+    assert src.count('if r.get("no_collision"):') == 2
 
 
 @pytest.fixture(scope="module")

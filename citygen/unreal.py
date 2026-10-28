@@ -622,6 +622,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                      "xforms": p["xforms"], **base}
                 if p.get("ids"):
                     a["ids"] = p["ids"]          # (one citygen id per transform)
+                if (p.get("collision") or {}).get("none"):
+                    a["no_collision"] = True     # (AG8's plants)
                 a["type"] = p["kind"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
