@@ -335,23 +335,27 @@ def collision(world, pawn, man, slug):
                     break
             else:
                 roofs.setdefault("missed", []).append(tag(a, "cg.key"))
-            # across onto a facade at 2 m, from 40 m out on the side nearest the start, 2 m over
-            # the ground there but under the roof (M13: on a slope the actor's bottom, a
-            # plinth's foot, can lie deep under the ground the trace starts from, and a house
-            # downhill can stand lower than that ground)
+            # across onto a facade, from 40 m out on the side nearest the start, 2 m over the
+            # actor's bottom, else 2 m over what a trace down finds there, under the roof (M13:
+            # on a slope the actor's bottom, a plinth's foot, can lie deep under the ground the
+            # trace starts from, and a house downhill can stand lower than that ground; on flat
+            # ground the trace down can end on a roof or a deck over the street)
             d = unreal.Vector(o.x - here.x, o.y - here.y, 0.0)
             ln = math.hypot(d.x, d.y) or 1.0
             sx_ = o.x - d.x / ln * (max(e.x, e.y) + 4000.0)
             sy_ = o.y - d.y / ln * (max(e.x, e.y) + 4000.0)
+            zs = [o.z - e.z + 200.0]
             g = trace(world, unreal.Vector(sx_, sy_, top + 500.0),
                       unreal.Vector(sx_, sy_, o.z - e.z - 100.0), [pawn])
-            z = min(max(o.z - e.z, g["point"].z if g is not None else -1e9) + 200.0,
-                    top - 100.0)
-            start = unreal.Vector(sx_, sy_, z)
-            h = trace(world, start, unreal.Vector(o.x, o.y, z), [pawn])
+            if g is not None and g["point"].z > o.z - e.z:
+                zs.append(g["point"].z + 200.0)
             facades["tried"] += 1
-            if h is not None:
-                facades["hit"] += 1
+            for z in zs:
+                z = min(z, top - 100.0)
+                if trace(world, unreal.Vector(sx_, sy_, z), unreal.Vector(o.x, o.y, z),
+                         [pawn]) is not None:
+                    facades["hit"] += 1
+                    break
             else:
                 facades.setdefault("missed", []).append(tag(a, "cg.key"))
     land = down["hits"] / max(down["traces"], 1)

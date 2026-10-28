@@ -279,15 +279,18 @@ absolute heights, and the check (below). Every new piece is keyed on M13's stabl
 
 | City | Actors loaded at the start, after a teleport | Traces down | Roofs | Facades | Walk, on the ground | Check |
 |---|---|---|---|---|---|---|
-| Cragmouth | 467, 1607 | 507/507 | 36/36 | 36/36 | 143 m, 100% | pass (120 s) |
+| Cragmouth | 467, 1607 | 507/507 | 36/36 | 36/36 | 150 m, 100% | pass (112 s) |
 
 The traces down hit buildings 221 times, streets 74, the terrain ground 38, hillside and
 other greens 33, junctions 35, avenues 27 and embankments 3; the ground runs from 0 to 95 m,
 inside the traces' window (600 m down to 3 m below 0). Two check fixes for slopes: a facade
-trace starts over the ground found by a trace down at its spot, clamped under the roof (from
-a fixed height it began underground below a plateau, or above a house downhill: 30, then 31
-of 36), and the walk measures a fall from its path's own height, not from where it started.
-The walk stopped 4 m short of its end, held by a step at a corner (open items).
+trace that misses from 2 m over the building's bottom is tried again from 2 m over what a
+trace down finds at its spot, both clamped under the roof (from the bottom alone it began
+underground below a plateau; from the ground alone it passed over a house downhill, or,
+in the test suite's flat city, started on a roof across the street: 30, 31 and 32 of 36),
+and the walk measures a fall from its path's own height, not from where it started.
+The walk (150 m with its steps round) did not reach its end, held 4 m before it by a step at a
+corner (open items).
 
 ```bash
 citygen build cities/cragmouth/city_spec.json out/cragmouth --blockout
@@ -435,7 +438,7 @@ its own id, and the plinth and wall materials are in the manifest.
 - **The MCP route is documented, not automated.** A Claude session with the Unreal MCP
   plugin running in the editor can run the same two scripts; there is no MCP driver in the
   repo (citygen makes no network calls).
-- **A step where two grade lines meet.** Cragmouth's walk stopped 4 m short at (-55, -7):
+- **A step where two grade lines meet.** Cragmouth's walk was held 4 m short at (-55, -7):
   a corner where the grade lines of `rs.w15n19` (54.6 m) and `rs.w109n31` (56.2 m) meet
   1.6 m apart, and the terrain ground between their sidewalks (55.9 m) stands above the
   lower one. The importer draws what the blockout gives; a smooth corner is M13's (the
