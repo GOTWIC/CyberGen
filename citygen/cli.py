@@ -280,7 +280,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
               "citygen blockout)", file=sys.stderr)
         return EXIT_USAGE
     if args.manifest_only:
-        path = U.write_manifest(build, args.name)
+        path = U.write_manifest(build, args.name, not args.blockout_only)
         print(f"wrote {path}")
         return EXIT_OK
     if args.uproject and args.new_project and not Path(args.uproject).is_file():
@@ -298,7 +298,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     try:
         res = U.import_city(build, args.uproject, engine=args.engine, name=args.name,
-                            timeout=args.timeout) if not args.check_only else None
+                            timeout=args.timeout, assets=not args.blockout_only) \
+            if not args.check_only else None
         if res is not None:
             print(U.import_summary(res))
             if not res.get("ok"):
@@ -585,6 +586,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "First Person template when it does not exist")
     ue.add_argument("--manifest-only", action="store_true",
                     help="write BUILD_DIR/unreal/manifest.json and stop (no Unreal needed)")
+    ue.add_argument("--blockout-only", action="store_true",
+                    help="leave out stage 2 (assetgen's BUILD_DIR/assets/"
+                         "unreal_contribution.*.json): the blockout alone")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk")

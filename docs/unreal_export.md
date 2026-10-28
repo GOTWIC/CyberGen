@@ -157,26 +157,43 @@ format:
 - **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
   unchanged packs, so a re-import may skip the key.
 
-**What the exporter still needs for it** (M15 was not on main when AG1 finished, so the
-exporter's code is unchanged; this is the work for the first PR that has both):
-- read every `BUILD/assets/unreal_contribution.*.json`, in sorted file order, as stage 2's
-  layer over the blockout manifest, refusing a key that appears in two files;
-- replace the blockout actor of every key it has, and of every key in its `replaces`,
-  keeping the blockout's for the rest; include the new keys and hashes in the re-import
-  digests (an unchanged hash touches nothing);
-- import the packs through Interchange with one static mesh per `<key>.shell` node (and per
-  `<key>.proxy`), assets named by `asset`, and spawn each actor at `pivot` (Unreal
-  100 x, -100 y, 100 z; yaw -yaw);
-- make the masters (`facade`, `glass` with interior mapping, `metal`, as
-  `assetgen/ue/spike_import.py` does) and one material instance per slot, a static switch
-  or scalar picking the CPD index `tint_cpd`;
-- set the 23 Custom Primitive Data floats on every component;
-- write the collision boxes and convex elements into each mesh's body setup;
-- Nanite on, distance fields and Lumen cards off for every building mesh;
-- build parts as hierarchical instanced meshes per building and kind (ready for AG2: the
-  list is empty in AG1);
-- the proxies: as their own meshes for HLOD (AG9) and, where Nanite is off, as the
-  fallback.
+**What the exporter does with it** (done after M15 merged, in the exporter PR for AG1 and
+AG7; `citygen/unreal.py` `stage2`, `citygen/ue/import_city.py`):
+- **Layering**: every `BUILD/assets/unreal_contribution.*.json` is read in sorted file
+  order as layer 2 over the blockout manifest (the manifest's `stage2`); a key in two files
+  is refused, as is a file of another version or layer. `--blockout-only` (or no assets
+  folder) gives exactly the blockout's manifest.
+- **Replacing**: the blockout actor of every entry's key and of every key in its
+  `replaces` is dropped (`stage2.replaced`); the rest stay. The new actors and their hashes
+  are in `actor_hashes`, so `manifest_changes` is exactly what an import does (a building
+  key is "updated" from its blockout box to its shell; a joined street object "deleted";
+  a street piece "created").
+- **Meshes**: the packs go through Interchange with the meshes kept in their nodes' frame
+  (`bake_meshes` off) and their own flat normals (`recompute_normals` off), one static
+  mesh per `<key>.shell` and `<key>.proxy` node under `Assets/Buildings/<tile>` and
+  `Assets/BuildingsProxies/<tile>`, named as Interchange names the node (the
+  contribution's `asset`, `<key>_shell`); each actor stands at `pivot` (Unreal
+  100 x, -100 y, 100 z; yaw -yaw) with the blockout actor's category, district and level,
+  the entry's type and tile, and `cg.stage=2`.
+- **Masters**: `/Game/CityGen/Core/M_CgFacade`, `M_CgGlass` (interior mapping on UV1, a
+  room per pane from the window id in the vertex alpha, lit rooms by Custom Primitive Data
+  6 times `LitScale`), `M_CgMetal` and the street masters; one instance per part and slot
+  (`Assets/Materials/MI_buildings_<slot>`). A material's `tint_cpd` (one of 0, 8, 11, 14,
+  17, 20) is its `TintChannel`: the master reads a Custom Primitive Data color at each of
+  those indices and the instance picks one; `tint_scale` and `tint_times_color` (the patch
+  slots: 3.1 times the slot's own color) scale it.
+- **Custom Primitive Data**: the 23 floats on every building actor's component.
+- **Collision**: the boxes and convex prisms as exact convex hulls in each shell's body
+  setup, used as complex: Python cannot write `KConvexElem`'s vertices, so the importer
+  extrudes each piece into a GeometryScript dynamic mesh and lets
+  `SetStaticMeshCollisionFromMesh` make one hull per piece (boxes come out as boxes); the
+  project gets the `GeometryScripting` plugin with the other two.
+- **Nanite** on, distance fields and Lumen cards off for every shell.
+- **Parts**: a `BP_CityGenInstances` actor (HISM) per entry and part kind, keyed
+  `<key>.<kind>`, the transforms relative to the pivot, the entry's Custom Primitive Data
+  on the component (AG1's lists are empty; AG7's container stacks use it).
+- **Proxies**: imported as static meshes (Nanite off, no collision), not spawned: ready
+  for HLOD (AG9).
 
 ## assetgen's street contribution (AG7)
 
@@ -235,16 +252,19 @@ citygen id; `streets/parts.glb`, the instanced parts), in AG0's format with `"pa
   put on its deck (the model has them at z 0 under it, an M15 open item); z over the ground,
   as the model's.
 
-**What the exporter still needs for streets** (AG7 changes no exporter code; the AG1
-session owns the exporter): read `unreal_contribution.streets.json` as a second layer-2
-contribution beside the buildings', and drop every blockout actor named in a `replaces`;
-the masters `road`, `opaque`, `metal`, `emissive`, `translucent` (two-sided, blended) and
-`foliage` with their instances per slot; complex collision on street meshes (`"collision":
-{"complex": true}`, Nanite on, simple collision none); non-Nanite meshes with LOD chains
-from the `lods` nodes and screen sizes (sky tube glass), no collision; HISM per entry and
-part kind from `parts` (`streets/parts.glb`); the walkway graph data assets built from
-`graphs.walkways` where it has a line (the corrected z) instead of the model's; the new keys
-in its re-import digests (a regenerated district changes only its tiles' entries).
+**What the exporter does with streets** (done after M15 merged, with the buildings'):
+`unreal_contribution.streets.json` is the second layer-2 contribution (sorted after the
+buildings'), every blockout actor named in a `replaces` dropped; the masters `M_CgRoad`,
+`M_CgOpaque`, `M_CgMetal`, `M_CgEmissive` (emissive strength 4), `M_CgTranslucent`
+(blended, two-sided, opacity 0.35) and `M_CgFoliage` (two-sided), one instance per slot
+(`MI_streets_<slot>`; AG7 writes its colors as sRGB, the exporter makes them linear); a
+static mesh per piece under `Assets/Streets/<tile>`, complex collision, Nanite on; the sky
+tube glass's LOD nodes imported (Nanite off), the chain made as the entry's `asset` from
+them (`SetLodFromStaticMesh`, `SetLodScreenSizes`), its actor without collision; a
+`BP_CityGenInstances` actor per entry and part kind from `parts` (`streets/parts.glb` under
+`Assets/StreetsParts/parts`); the walkway graph data assets take `graphs.walkways` lines
+instead of graphs.json's (on a terrain city the ground under them, graphs.json's z there,
+is added); the new keys in the re-import digests.
 
 ## Milestones and checks
 

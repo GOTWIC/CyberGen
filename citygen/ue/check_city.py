@@ -242,8 +242,10 @@ def teleport(pawn, x, y, z):
 
 
 def streaming(world, pawn, man, slug):
-    # the blockout objects, the instance actors, the player start and the three lights
-    total = man["counts"]["objects"] + man["counts"]["instance_actors"] + 4
+    # the blockout objects, the instance actors, the player start and the three lights (with
+    # stage 2: the manifest counts its actors over the blockout's)
+    total = man["counts"].get("actors") or \
+        man["counts"]["objects"] + man["counts"]["instance_actors"] + 4
     yield from settle(world, slug)
     at_start = city_actors(world, slug)
     # the busiest tile at least 600 m from the start
@@ -268,6 +270,7 @@ def streaming(world, pawn, man, slug):
               t["name"] == far_tile for t in man["tiles"])))
     RES["checks"]["streaming"] = {
         "ok": ok, "actors": total, "loaded_at_start": len(at_start),
+        "stage2_at_start": sum(1 for a in at_start if "cg.stage=2" in tags_of(a)),
         "loaded_far": len(at_far), "only_far": len(near_far - near_start),
         "far_spot_m": [round(fx, 1), round(fy, 1)], "far_tile_loaded": far_tile in tiles}
     RES["lines"].append(f"streaming: {len(at_start)} of {total} actors loaded at the start, "

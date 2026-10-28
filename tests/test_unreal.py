@@ -346,7 +346,8 @@ def test_prepare_project_and_engine(tmp_path):
     up = tmp_path / "P.uproject"
     up.write_text(json.dumps({"FileVersion": 3, "Plugins": [
         {"Name": "PythonScriptPlugin", "Enabled": False}]}))
-    assert sorted(U.prepare_project(up)) == ["EditorScriptingUtilities", "PythonScriptPlugin"]
+    assert sorted(U.prepare_project(up)) == ["EditorScriptingUtilities", "GeometryScripting",
+                                             "PythonScriptPlugin"]
     assert U.prepare_project(up) == []
     plugins = json.loads(up.read_text())["Plugins"]
     assert {p["Name"] for p in plugins if p["Enabled"]} == set(U.PLUGINS)
@@ -363,6 +364,236 @@ def test_names():
     assert U.asset_name("d01.blk001.lot007.bld") == "d01_blk001_lot007_bld"
     assert U.asset_name("city.ground.t+00-03") == "city_ground_t+00-03"
     assert U.srgb_to_linear("#ffffff") == [1.0, 1.0, 1.0]
+
+
+# --- stage 2 (assetgen's layer) -----------------------------------------------------------
+
+def _dump(man) -> str:
+    return json.dumps(man, sort_keys=True)
+
+
+def _with_contributions(build: Path, out: Path, contribs: dict) -> Path:
+    """A copy of `build` with BUILD/assets/unreal_contribution.<part>.json for each part."""
+    shutil.copytree(build, out)
+    (out / "assets").mkdir(exist_ok=True)
+    for part, c in contribs.items():
+        (out / "assets" / f"unreal_contribution.{part}.json").write_text(json.dumps(c))
+    return out
+
+
+def _fake(man, graphs_json):
+    """Two small contributions in AG1's and AG7's format over the blockout `man`: two
+    buildings by their blockout keys, a road piece replacing a joined road object, a
+    container stack of parts only, a sky tube's glass as a LOD chain, a walkway on a deck."""
+    objs = [o for t in man["tiles"] for o in t["objects"]]
+    blds = sorted(o["key"] for o in objs if o["category"] == "building")[:2]
+    road = sorted(o["key"] for o in objs if ".road_" in o["key"])[0]
+    tile = next(t["name"] for t in man["tiles"] for o in t["objects"] if o["key"] == blds[0])
+    box = {"center": [0.0, 0.0, 5.0], "extent": [4.0, 3.0, 5.0], "yaw_deg": 0.0}
+    prism = {"z": [0.0, 12.0], "ring": [[-5.0, -4.0], [5.0, -4.0], [0.0, 6.0]]}
+    buildings = {"version": 1, "stage": "assetgen", "part": "buildings", "layer": 2,
+                 "materials": {"brick": {"master": "facade", "color": [0.2, 0.07, 0.04],
+                                         "roughness": 0.9, "metallic": 0.0, "tint_cpd": 0},
+                               "patch_tarp": {"master": "facade", "color": [0.03, 0.1, 0.25],
+                                              "roughness": 0.8, "metallic": 0.0,
+                                              "tint_cpd": 20, "tint_scale": 3.1,
+                                              "tint_times_color": True}},
+                 "entries": [{"key": k, "kind": "building", "hash": f"h{i}", "replaces": [],
+                              "glb": f"tiles/{tile}.glb", "node": f"{k}.shell",
+                              "asset": U.asset_name(f"{k}.shell"), "pivot": [10.0 * i, 5.0, 0.0],
+                              "yaw_deg": 0.0, "nanite": True, "triangles": 100,
+                              "slots": ["brick"], "cpd": [0.5] * 23,
+                              "collision": {"simple": [box], "convex": [prism]},
+                              "proxy": {"glb": f"proxies/{tile}.glb", "node": f"{k}.proxy",
+                                        "asset": U.asset_name(k) + "_proxy", "triangles": 12},
+                              "parts": [], "tags": {"cg.type": "building.test",
+                                                    "cg.tile": tile}}
+                             for i, k in enumerate(blds)]}
+    walk = next(w for w in graphs_json["walkways"] if w["kind"] == "sidewalk")
+    lifted = [[p[0], p[1], 9.2] for p in walk["line"]]
+    streets = {"version": 1, "stage": "assetgen", "part": "streets", "layer": 2,
+               "materials": {"asphalt.street": {"master": "road", "color": [0.2, 0.2, 0.22],
+                                                "roughness": 0.88, "metallic": 0.0}},
+               "entries": [
+                   {"key": "rs.test1", "kind": "street.road", "hash": "s1", "replaces": [road],
+                    "glb": "streets/t+00+00.glb", "node": "rs.test1", "asset": "rs_test1",
+                    "pivot": [1.0, 2.0, 0.0], "yaw_deg": 0.0, "nanite": True,
+                    "triangles": 40, "slots": ["asphalt.street"],
+                    "collision": {"complex": True}, "tile": "t+00+00"},
+                   {"key": "site.test.el", "kind": "street.site.container_stack",
+                    "hash": "s2", "replaces": [], "glb": "streets/t+00+00.glb",
+                    "node": "site.test.el", "asset": "site_test_el", "pivot": [3.0, 4.0, 0.0],
+                    "yaw_deg": 0.0, "nanite": True, "triangles": 0, "slots": [],
+                    "collision": {"complex": True}, "tile": "t+00+00",
+                    "parts": [{"kind": "part.container.c3", "glb": "streets/parts.glb",
+                               "node": "part.container.c3", "asset": "part_container_c3",
+                               "count": 2, "triangles": 132,
+                               "xforms": [[0.0, 0.0, 0.0, 0.0], [0.0, 2.6, 0.0, 90.0]]}]},
+                   {"key": "tl.test.tb.glass", "kind": "street.transit.tube.glass",
+                    "hash": "s3", "replaces": [], "glb": "streets/t+00+00.glb",
+                    "node": "tl.test.tb.glass.lod0", "asset": "tl_test_tb_glass",
+                    "pivot": [5.0, 6.0, 0.0], "yaw_deg": 0.0, "nanite": False,
+                    "triangles": 24, "slots": [], "collision": {"none": True},
+                    "tile": "t+00+00",
+                    "lods": [{"node": f"tl.test.tb.glass.lod{k}", "screen_size": s,
+                              "triangles": 24 >> k} for k, s in enumerate((1.0, 0.25, 0.06))]}],
+               "graphs": {"walkways": {walk["id"]: lifted}}}
+    return {"buildings": buildings, "streets": streets}, blds, road, walk, lifted
+
+
+def test_without_assets_the_manifest_is_the_blockouts(build, manifest, tmp_path):
+    """A build without stage 2 (no assets folder, an empty one, or --blockout-only) gives
+    exactly the blockout's manifest and graphs."""
+    man, _, graphs = manifest
+    assert "stage2" not in man and "actors" not in man["counts"]
+    empty = tmp_path / "empty"
+    shutil.copytree(build, empty)
+    (empty / "assets").mkdir()
+    again = U.build_manifest(empty)
+    assert _dump(again[0]) == _dump(man) and _dump(again[2]) == _dump(graphs)
+    fake = _fake(man, json.loads((build / "graphs.json").read_text()))[0]
+    staged = _with_contributions(build, tmp_path / "staged", fake)
+    only = U.build_manifest(staged, assets=False)
+    assert _dump(only[0]) == _dump(man) and _dump(only[2]) == _dump(graphs)
+    assert "stage2" in U.build_manifest(staged)[0]
+    assert main(["unreal", str(staged), "--manifest-only", "--blockout-only"]) == 0
+    written = json.loads((staged / "unreal" / "manifest.json").read_text())
+    assert _dump(written) == _dump(man)
+
+
+def test_stage2_layer(build, manifest, tmp_path):
+    """Stage 2 over the blockout: its entries' actors at their pivots, the blockout actors of
+    their keys and `replaces` dropped, parts as instanced actors per entry and kind, a LOD
+    chain, materials per part and slot, the walkway lines; `manifest_changes` from the
+    blockout alone is exactly that."""
+    man, _, graphs = manifest
+    raw = json.loads((build / "graphs.json").read_text())
+    fake, blds, road, walk, lifted = _fake(man, raw)
+    staged = _with_contributions(build, tmp_path / "staged", fake)
+    m2, _, g2 = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    assert [f["file"] for f in s2["files"]] == ["assets/unreal_contribution.buildings.json",
+                                                "assets/unreal_contribution.streets.json"]
+    assert s2["replaced"] == sorted(blds + [road])
+    keys = [a["key"] for a in s2["actors"]]
+    assert keys == sorted(blds + ["rs.test1", "tl.test.tb.glass"])
+    assert [a["key"] for a in s2["instances"]] == ["site.test.el.part.container.c3"]
+    assert s2["instances"][0]["xforms"][1] == [0.0, 2.6, 0.0, 90.0]
+    a = {x["key"]: x for x in s2["actors"]}
+    assert a[blds[1]]["pivot"] == [10.0, 5.0, 0.0] and len(a[blds[1]]["cpd"]) == 23
+    assert a[blds[0]]["category"] == "building" and a[blds[0]]["type"] == "building.test"
+    assert a["rs.test1"]["category"] == next(
+        o["category"] for t in man["tiles"] for o in t["objects"] if o["key"] == road)
+    assert a["tl.test.tb.glass"]["no_collision"] and "no_collision" not in a["rs.test1"]
+    # one mesh per shell, proxy, street and part node, named as Interchange names the node
+    packs = {p["folder"]: p for p in s2["packs"]}
+    shells = next(p for f, p in packs.items() if f.startswith("Assets/Buildings/"))
+    assert [m["asset"] for m in shells["meshes"]] == sorted(U.asset_name(f"{k}.shell")
+                                                           for k in blds)
+    assert shells["meshes"][0]["collision"]["convex"] == [fake["buildings"]["entries"][0][
+        "collision"]["convex"][0]]
+    proxies = next(p for f, p in packs.items() if f.startswith("Assets/BuildingsProxies/"))
+    assert all(not m["nanite"] and m["collision"] == {"none": True} for m in proxies["meshes"])
+    street = packs["Assets/Streets/t+00+00"]
+    assert [m["asset"] for m in street["meshes"]] == ["rs_test1"] + [
+        f"tl_test_tb_glass_lod{k}" for k in range(3)]
+    assert all(p["glb"] is None for p in s2["packs"])       # (no packs in this test)
+    (ch,) = s2["lod_chains"]
+    assert ch["mesh"] == "Assets/Streets/t+00+00/tl_test_tb_glass"
+    assert [lo["screen_size"] for lo in ch["lods"]] == [1.0, 0.25, 0.06]
+    # materials: per part and slot; AG7's sRGB colors made linear, AG1's kept
+    mats = s2["materials"]
+    assert mats["buildings.brick"]["color"] == [0.2, 0.07, 0.04]
+    assert mats["buildings.brick"]["tint_cpd"] == 0 and mats["streets.asphalt.street"][
+        "tint_cpd"] == -1
+    assert mats["buildings.patch_tarp"]["tint_times_color"] and \
+        mats["buildings.patch_tarp"]["tint_scale"] == 3.1
+    assert mats["streets.asphalt.street"]["color"] == pytest.approx(
+        [0.0331, 0.0331, 0.0397], abs=1e-4)
+    assert s2["masters"] == ["facade", "road"]
+    # the walkway on the deck, where graphs.json has it at z 0
+    i = g2["walkways"]["ids"].index(walk["id"])
+    ps = g2["walkways"]["point_start"]
+    pts = g2["walkways"]["points"][3 * ps[i]:3 * ps[i + 1]]
+    assert pts[2::3] == [9.2] * len(lifted)
+    assert g2["walkways"]["hash"] != graphs["walkways"]["hash"]
+    assert g2["lanes"] == graphs["lanes"]
+    # what an import over the blockout's does
+    ch = U.manifest_changes(man, m2)
+    assert ch == {"created": sorted(["rs.test1", "tl.test.tb.glass",
+                                     "site.test.el.part.container.c3"]),
+                  "updated": sorted(blds), "deleted": [road]}
+    assert m2["counts"]["actors"] == len(U.actor_hashes(m2)) == \
+        len(U.actor_hashes(man)) + 2
+    assert U.manifest_changes(m2, man) == {"created": [road], "updated": sorted(blds),
+                                           "deleted": ch["created"]}
+    # an entry's hash moves only its actor
+    fake["buildings"]["entries"][1]["hash"] = "h9"
+    m3 = U.build_manifest(_with_contributions(build, tmp_path / "s3", fake))[0]
+    assert U.manifest_changes(m2, m3) == {"created": [], "updated": [blds[1]],
+                                          "deleted": []}
+
+
+def test_stage2_refuses(build, manifest, tmp_path):
+    """A key in two contributions, a tint index no master reads, a contribution of another
+    version or layer."""
+    man = manifest[0]
+    fake = _fake(man, json.loads((build / "graphs.json").read_text()))[0]
+    dup = copy.deepcopy(fake)
+    dup["streets"]["entries"].append(copy.deepcopy(dup["buildings"]["entries"][0]))
+    with pytest.raises(ValueError, match="in assets/unreal_contribution.buildings.json and"):
+        U.build_manifest(_with_contributions(build, tmp_path / "dup", dup))
+    bad = copy.deepcopy(fake)
+    bad["buildings"]["materials"]["brick"]["tint_cpd"] = 5
+    with pytest.raises(ValueError, match="tint_cpd 5"):
+        U.build_manifest(_with_contributions(build, tmp_path / "tint", bad))
+    old = copy.deepcopy(fake)
+    old["streets"]["layer"] = 3
+    with pytest.raises(ValueError, match="layer 2"):
+        U.build_manifest(_with_contributions(build, tmp_path / "layer", old))
+
+
+@pytest.fixture(scope="module")
+def staged(small, build, manifest, tmp_path_factory):
+    """The small city with its assets built by assetgen (shells, proxies, streets) beside
+    the blockout files."""
+    from assetgen.build import build as asset_build
+    out = tmp_path_factory.mktemp("ue2") / "build"
+    shutil.copytree(build, out)
+    (out / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
+    rep = asset_build(out, workers=2, log=lambda *a: None)
+    assert rep["ok"], rep.get("checks")
+    return out
+
+
+def test_stage2_from_assetgen(staged, manifest):
+    """assetgen's real contributions for the small city: every building replaces its blockout
+    actor by key, every `replaces` names a blockout object, one mesh per node of the packs,
+    and an import over the blockout's changes exactly the replaced keys and the new ones."""
+    man = manifest[0]
+    m2, _, g2 = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    blockout = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
+    blds = [e["key"] for e in con["entries"]]
+    assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
+    assert set(blds) <= set(s2["replaced"])
+    assert s2["counts"]["replaces_missing"] == 0
+    assert all(e["asset"] == U.asset_name(e["node"]) for e in con["entries"])
+    for p in s2["packs"]:
+        assert p["glb"], p["folder"]
+        nodes = {U.asset_name(n["name"]) for n in U.read_glb_json(staged / p["glb"])["nodes"]
+                 if "mesh" in n}
+        assert {m["asset"] for m in p["meshes"]} <= nodes, p["folder"]
+    actor_keys = {a["key"] for a in s2["actors"]}
+    assert set(blds) <= actor_keys
+    ch = U.manifest_changes(man, m2)
+    s2keys = actor_keys | {a["key"] for a in s2["instances"]}
+    assert ch["deleted"] == sorted(set(s2["replaced"]) - s2keys)
+    assert ch["updated"] == sorted(s2keys & set(blockout))
+    assert ch["created"] == sorted(s2keys - set(blockout))
+    assert all(len(a["cpd"]) == 23 for a in s2["actors"] if a["key"] in set(blds))
+    assert _dump(U.build_manifest(staged)[0]) == _dump(m2)
 
 
 # --- in Unreal (where it is installed) ------------------------------------------------------
@@ -420,4 +651,50 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     assert chk["ok"], chk
     # the project and the builds take most of a gigabyte: kept only when the test fails
     for d in (proj.parent, build, build2):
+        shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.mark.skipif(UE_ROOT is None or BLENDER is None,
+                    reason="Unreal Engine 5 or Blender not installed")
+def test_unreal_import_stage2_small_city(small, tmp_path):
+    """Stage 2 over the blockout in Unreal: the small city imported alone, then with
+    assetgen's buildings and streets (exactly the actors `manifest_changes` names change),
+    imported again (nothing changes), checked in play-in-editor, and back to the blockout."""
+    from assetgen.build import build as asset_build
+    build = tmp_path / "build"
+    build.mkdir()
+    (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
+    assert BO.run_blockout(build / "city_model.json", build, render=False)["passed"]
+    assert asset_build(build, workers=2, log=lambda *a: None)["ok"]
+    proj = U.new_project(tmp_path / "Proj", UE_ROOT)
+    first = U.import_city(build, proj, assets=False)
+    assert first["ok"], first.get("error")
+    old = json.loads((build / "unreal" / "manifest.json").read_text())
+    assert "stage2" not in old and "stage2" not in first
+    second = U.import_city(build, proj)
+    assert second["ok"], second.get("error")
+    new = json.loads((build / "unreal" / "manifest.json").read_text())
+    want = U.manifest_changes(old, new)
+    assert want["deleted"] and want["updated"] and want["created"]
+    assert {k: second["keys"][k] for k in want} == want
+    s2 = second["stage2"]
+    assert s2["meshes"]["imported"] == new["stage2"]["counts"]["meshes"]
+    assert s2["hulls"] > 0 and s2["complex_fallback"] == 0
+    assert second["actor_count"] == new["counts"]["actors"]
+    third = U.import_city(build, proj)
+    assert third["ok"], third.get("error")
+    assert third["actors"]["created"] == third["actors"]["updated"] == \
+        third["actors"]["deleted"] == third["dirty_packages"] == 0
+    assert third["stage2"]["packs_imported"] == third["tiles_imported"] == 0
+    assert (third["actor_digest"], third["asset_digest"]) == \
+        (second["actor_digest"], second["asset_digest"])
+    chk = U.check_city(build, proj)
+    assert chk["ok"], chk
+    assert chk["checks"]["streaming"]["stage2_at_start"] > 0
+    back = U.import_city(build, proj, assets=False)
+    assert back["ok"], back.get("error")
+    assert {k: back["keys"][k] for k in want} == U.manifest_changes(new, old)
+    assert (back["actor_digest"], back["actor_count"]) == \
+        (first["actor_digest"], first["actor_count"])
+    for d in (proj.parent, build):
         shutil.rmtree(d, ignore_errors=True)
