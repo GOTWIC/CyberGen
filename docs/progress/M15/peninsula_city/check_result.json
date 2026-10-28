@@ -1,0 +1,87 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 237 of 5136 actors loaded at the start, 982 after a teleport to (-1152, 1152) (978 new)",
+  "collision: 507 of 507 traces down hit (building 253, ground 52, water 37, road_street 33, road_alley 27, junction 23), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 229 m along a 234 m sidewalk path in 39 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 5136,
+   "loaded_at_start": 237,
+   "loaded_far": 982,
+   "only_far": 978,
+   "far_spot_m": [
+    -1152.0,
+    1152.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "ground": 52,
+     "building": 253,
+     "road_service": 8,
+     "road_street": 33,
+     "prop_boat": 1,
+     "quay": 13,
+     "structure_deck": 12,
+     "water": 37,
+     "site_container_stack": 4,
+     "junction": 23,
+     "sidewalk": 8,
+     "road_alley": 27,
+     "prop_awning": 13,
+     "open_plaza": 16,
+     "prop_sign": 2,
+     "road_pedestrian": 5
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     378.24,
+     74.55
+    ],
+    [
+     -1152.0,
+     1152.0
+    ],
+    [
+     -640.0,
+     1152.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 233.8,
+   "points": 6,
+   "reached": true,
+   "travelled_m": 229.3,
+   "on_ground": 1.0,
+   "max_drop_m": 0.1,
+   "seconds": 38.6,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Greyhook",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 54.8,
+ "exit_code": 0,
+ "wall_s": 87.8
+}

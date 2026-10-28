@@ -316,6 +316,12 @@ def one_way_loops(net, district_arch: dict, seed: int) -> int:
                 if s["start"] != cu_:
                     s["start"], s["end"] = s["end"], s["start"]
                     s["centerline"] = s["centerline"][::-1]
+                    prof = s.get("z_profile") or []
+                    if any(p["z"] != 0.0 for p in prof):
+                        # (a street ramping up to a raised road keeps its ramp at that end)
+                        L = prof[-1]["s"]
+                        s["z_profile"] = [{"s": G.q(L - p["s"]), "z": p["z"]}
+                                          for p in reversed(prof)]
                 s["one_way"] = True
                 s["cross_section"] = cs_
                 s["lanes"] = cs_["lanes_forward"] + cs_["lanes_backward"]

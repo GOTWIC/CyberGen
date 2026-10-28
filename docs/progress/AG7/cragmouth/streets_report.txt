@@ -1,0 +1,59 @@
+assetgen streets: Cragmouth: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 1114 blockout objects replaced
+  [ok] street_budgets: 1226030 triangles in the city (budget 20000000), at most 26348 in a tile (t-05+02, budget 2500000)
+
+coverage:
+  road_segments: 3224 of 3226 (+2 declared)
+  junctions: 1839 of 1839
+  crosswalks: 1406 of 1406
+  sidewalks: 4555 of 4555
+  bridges: 9 of 9
+  structures: 1384 of 1384
+  tunnels: 18 of 18
+  quays: 6 of 6
+  waterways: 5 of 6 (+1 declared)
+  site_elements: 280 of 280
+  transit_lines: 1 of 1
+  megasites: 2 of 2
+  stations: 7 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 12729, tiles 130, triangles 1226030, disk 83.6 MB
+triangles by kind:
+  street.sidewalk: 467166 (4555 pieces)
+  street.road: 263694 (3226 pieces)
+  street.junction: 216742 (1839 pieces)
+  street.structure.retaining_wall: 144708 (1280 pieces)
+  street.crosswalk: 43832 (1406 pieces)
+  street.quay: 37126 (6 pieces)
+  street.tunnel.metro: 34000 (6 pieces)
+  street.site.rail_track: 4740 (2 pieces)
+  street.bridge: 3054 (9 pieces)
+  street.tunnel.bored: 2208 (7 pieces)
+  street.canal_wall.canal: 2188 (2 pieces)
+  street.underpass_stair: 1160 (10 pieces)
+  street.site.berth: 1074 (1 pieces)
+  street.column: 902 (67 pieces)
+  street.transit.canopy: 728 (14 pieces)
+  street.transit.deck: 534 (7 pieces)
+  street.site.container_stack: 520 (260 pieces)
+  street.canal_wall.basin: 384 (3 pieces)
+  street.tunnel.pedestrian: 320 (5 pieces)
+  street.structure.deck: 208 (1 pieces)
+  street.site.gantry_crane: 206 (1 pieces)
+  street.site.lawn: 178 (12 pieces)
+  street.site.pond: 94 (1 pieces)
+  street.site.truck_gate: 84 (1 pieces)
+  street.site.fountain: 58 (1 pieces)
+  street.structure.canopy: 52 (1 pieces)
+  street.structure.column: 40 (4 pieces)
+  street.site.plaza: 30 (1 pieces)
+  street.canal_wall.creek: 0 (1 pieces)
+no mesh: inside its junctions 2, natural banks 1
+corner pads: 5059 made, 9 skipped (chain 1, no sidewalk 6, same edge 2)
+bridges: footbridge.steel 2, footbridge.stone 1, girder 6
+instances: part.container.c0 1085, part.container.c1 1031, part.container.c2 1119, part.container.c3 1064, part.container.c4 1031, part.container.c5 1072
+files: 130 tiles made, 0 kept, 130 written, 0 same bytes, 0 removed
+seconds: context 2.45, gather 0.66, make 3.17, write 0.24, total 6.89, workers 4

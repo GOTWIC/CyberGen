@@ -32,6 +32,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import numpy as np
 import shapely
 import shapely.ops
 from shapely.geometry import LineString, Point, Polygon, box
@@ -79,6 +80,7 @@ MATERIALS = {
     "plant_crown": "#3f8a47", "plant_conifer": "#2f6e45", "plant_palm": "#7fae45",
     "plant_shrub": "#5aa060", "plant_scrub": "#7a8a4a", "plant_ivy": "#5fae55",
     "hedge": "#2f6e45", "lawn": "#4f8a57",
+    "plinth": "#5d5a55", "retaining_wall": "#8a8478",
     "tunnel_wall": "#9a9ea8", "tunnel_lid": "#b7a98f", "tunnel_metro": "#4a78d6",
     "tunnel_ped": "#7ee0c3", "tunnel_vent": "#c4c8d2", "soil": "#6b5a45",
 }
@@ -540,6 +542,8 @@ def _sites(P: _Plan) -> None:
             continue    # underground (metro concourses): not in the blockout
         if s.kind in ("trench", "portal"):
             continue    # M9: drawn with their tunnel (`_tunnels`)
+        if s.kind == "retaining_wall":
+            continue    # M13: drawn with the ground (`_terrain`)
         if s.kind == "vent":
             ext, holes = _poly_rings(s.footprint)
             cx, cy = _center(ext)
@@ -889,6 +893,22 @@ def _cameras(P: _Plan) -> dict:
                                   q(tall.get(d.id, 30.0))]})
     out = {"top": top, "iso_dir": list(ISO_DIR), "districts": districts,
            "street": _street_views(P)}
+    if m.terrain is not None:
+        # M13: the boxes from the lowest to the highest ground, the views over the ground
+        from . import terrain as TE
+
+        fin = TE.ground_of(m)
+        for d in districts:
+            bx0, by0, _, bx1, by1, h = d["box"]
+            js, iss = TE._window(fin, bx0, by0, bx1, by1)
+            sub = fin.arr[js, iss]
+            if sub.size:
+                d["box"][2] = q(float(sub.min()))
+                d["box"][5] = q(float(sub.max()) + h)
+        for v in out["street"]:
+            for key in ("eye", "target"):
+                x, y, z = v[key]
+                v[key] = [x, y, q(z + fin.at(x, y))]
     cut = _cutaway(P)
     if cut is not None:
         out["cutaway"] = cut
@@ -1070,6 +1090,7 @@ def make_plan(m: CityModel) -> dict:
         _sites(P)
         _tunnels(P)
         _dressing(P)
+        _terrain(P)
         cams = _cameras(P)
     for o in P.objects:
         ids = o["props"].get("citygen_ids")
@@ -1202,7 +1223,9 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
     start = views[0]["eye"] if views else None
     (out / "unreal" / "corporate_core_plan.json").write_text(
         json.dumps(X.legacy_plan(m, start), indent=1) + "\n", encoding="utf-8")
-    (out / "graphs.json").write_text(json.dumps(X.graphs(m)) + "\n", encoding="utf-8")
+    # (M13: a terrain city's graphs with absolute heights, as the blockout draws them)
+    ground = _Ground(m) if m.terrain is not None else None
+    (out / "graphs.json").write_text(json.dumps(X.graphs(m, ground)) + "\n", encoding="utf-8")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": TILE_M, "tiles": plan["tiles"]},
                                                indent=1) + "\n", encoding="utf-8")
     (out / "props.csv").write_text(X.props_csv(m), encoding="utf-8")
@@ -1307,3 +1330,329 @@ def report_text(rep: dict) -> str:
                   f"timings (s): {json.dumps(b['timings'])}"]
     lines.append(f"total (s): {json.dumps(rep['timings'])}")
     return "\n".join(lines) + "\n"
+
+
+# --- terrain (M13) ------------------------------------------------------------------------------
+
+DRAPE_STEP_M = 6.0       # draped edges are sampled at least this often
+DRAPE_CELL_M = 16.0      # a large flat (a park, a plaza) is draped cell by cell
+BED_M = 2.0              # the ground mesh under the water, below its level
+WATER_DROP_M = 0.3       # the water surface under its level (under the levee)
+
+
+def _densify_ring(ring, step=DRAPE_STEP_M):
+    out = []
+    n = len(ring)
+    for i in range(n):
+        a, b = ring[i], ring[(i + 1) % n]
+        out.append(a)
+        L = _dist(a, b)
+        k = int(math.ceil(L / step))
+        for j in range(1, k):
+            f = j / k
+            out.append([q(a[0] + (b[0] - a[0]) * f), q(a[1] + (b[1] - a[1]) * f)])
+    return out
+
+
+def _densify_ribbon(part, step=DRAPE_STEP_M):
+    l_, r_ = part["l"], part["rr"]
+    L2, R2 = [l_[0]], [r_[0]]
+    for i in range(len(l_) - 1):
+        a, b, c, d = l_[i], l_[i + 1], r_[i], r_[i + 1]
+        mid0 = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)
+        mid1 = ((b[0] + d[0]) / 2, (b[1] + d[1]) / 2)
+        k = int(math.ceil(_dist(mid0, mid1) / step))
+        for j in range(1, k):
+            f = j / k
+            L2.append([q(a[0] + (b[0] - a[0]) * f), q(a[1] + (b[1] - a[1]) * f),
+                       q(a[2] + (b[2] - a[2]) * f)])
+            R2.append([q(c[0] + (d[0] - c[0]) * f), q(c[1] + (d[1] - c[1]) * f),
+                       q(c[2] + (d[2] - c[2]) * f)])
+        L2.append(b)
+        R2.append(d)
+    part["l"], part["rr"] = L2, R2
+
+
+class _Ground:
+    """Heights for the blockout: the finished ground, roads' grade lines, building bases."""
+
+    def __init__(self, m):
+        from . import terrain as TE
+
+        self.TE = TE
+        self.fin = TE.ground_of(m)
+        self.segs = {}
+        for s in m.road_segments:
+            if s.ground:
+                line = [tuple(p) for p in s.centerline]
+                self.segs[s.id] = (line, TE._cum(line), [(p.s, p.z) for p in s.ground])
+        self.base = {b.id: b.base_m for b in m.buildings if b.base_m is not None}
+        self.sky = {s.id: s.base_m for s in m.skybridges if s.base_m is not None}
+        foots = [(G.from_model_poly(b.footprint), b.base_m) for b in m.buildings
+                 if b.footprint is not None and b.base_m is not None]
+        self.foots = foots
+        self.ftree = shapely.STRtree([f for f, _ in foots]) if foots else None
+
+    def at(self, x, y) -> float:
+        return self.fin.at(x, y)
+
+    def road(self, sid, x, y) -> float:
+        rec = self.segs.get(sid)
+        if rec is None:
+            return self.fin.at(x, y)
+        line, cum, prof = rec
+        from .elevated import _project
+
+        return self.TE.z_on(prof, _project(line, cum, (x, y))[0])
+
+    def building_base(self, x, y) -> float | None:
+        if self.ftree is None:
+            return None
+        hit = self.ftree.query(Point(x, y), predicate="intersects").tolist()
+        return min((self.foots[i][1] for i in hit), default=None)
+
+
+def _lift_part(p, fz, drape_big=False):
+    """A part over the ground: fz(x, y) is the ground under each point."""
+    k = p["k"]
+    if p.get("abs"):
+        return [p]
+    if k == "prism":
+        cx, cy = _center(p["r"])
+        g = fz(cx, cy)
+        return [{**p, "z0": q(p["z0"] + g), "z1": q(p["z1"] + g)}]
+    if k == "flat":
+        out = []
+        poly = Polygon(p["r"], p["h"])
+        bx0, by0, bx1, by1 = poly.bounds
+        if drape_big and max(bx1 - bx0, by1 - by0) > DRAPE_CELL_M * 2:
+            pieces = []
+            i0, i1 = int(math.floor(bx0 / DRAPE_CELL_M)), int(math.ceil(bx1 / DRAPE_CELL_M))
+            j0, j1 = int(math.floor(by0 / DRAPE_CELL_M)), int(math.ceil(by1 / DRAPE_CELL_M))
+            cells = [box(i * DRAPE_CELL_M, j * DRAPE_CELL_M, (i + 1) * DRAPE_CELL_M,
+                         (j + 1) * DRAPE_CELL_M) for j in range(j0, j1) for i in range(i0, i1)]
+            for piece in shapely.intersection(np.array(cells, dtype=object), poly).tolist():
+                pieces += G.parts(piece)
+        else:
+            pieces = [poly]
+        for pc in pieces:
+            ext, holes = _shapely_rings(pc)
+            if len(ext) < 3:
+                continue
+            rings = [_densify_ring(ext)] + [_densify_ring(h) for h in holes]
+            r3 = [[[x, y, q(p["z"] + fz(x, y))] for x, y in r] for r in rings]
+            out.append({"k": "drape", "m": p["m"], "r": r3[0], "h": r3[1:]})
+        return out
+    if k == "ribbon":
+        p = dict(p)
+        _densify_ribbon(p)
+        L, R = [], []
+        for a, b in zip(p["l"], p["rr"]):
+            g = fz((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+            L.append([a[0], a[1], q(a[2] + g)])
+            R.append([b[0], b[1], q(b[2] + g)])
+        p["l"], p["rr"] = L, R
+        return [p]
+    if k == "box":
+        c = p["c"]
+        return [{**p, "c": [c[0], c[1], q(c[2] + fz(c[0], c[1]))]}]
+    if k == "beam":
+        a, b = p["a"], p["b"]
+        return [{**p, "a": [a[0], a[1], q(a[2] + fz(a[0], a[1]))],
+                 "b": [b[0], b[1], q(b[2] + fz(b[0], b[1]))]}]
+    if k == "mesh":
+        return [{**p, "v": [[x, y, q(z + fz(x, y))] for x, y, z in p["v"]]}]
+    if k == "inst":
+        return [{**p, "pts": [[pt[0], pt[1], q(pt[2] + fz(pt[0], pt[1]))] + pt[3:]
+                              for pt in p["pts"]]}]
+    return [p]
+
+
+def _ground_grid(P: _Plan, gd: _Ground) -> None:
+    """The ground as a heightfield per tile (the finished ground; under the water its bed)."""
+    m = P.m
+    fin = gd.fin
+    X, Y = fin.grid()
+    Z = fin.arr.copy()
+    wet = shapely.contains_xy(P.wet, X, Y) if not P.wet.is_empty else np.zeros(Z.shape, bool)
+    Z = np.where(wet, Z - BED_M, Z)
+    land = G.union([G.from_model_poly(p) for lnd in m.land for p in lnd.polygons])
+    holes = [G.from_model_poly(st.footprint) for st in m.structures
+             if st.kind == "trench" and st.footprint is not None]
+    trench = G.union(holes) if holes else None
+    for o in [o for o in P.objects if o["category"] == "ground"]:
+        P.objects.remove(o)
+    x0, y0, x1, y1 = m.bounds
+    ix0, iy0 = tile_key(x0, y0)
+    ix1, iy1 = tile_key(x1 - 1e-6, y1 - 1e-6)
+    for ix in range(ix0, ix1 + 1):
+        for iy in range(iy0, iy1 + 1):
+            tb = box(max(ix * TILE_M, x0), max(iy * TILE_M, y0),
+                     min((ix + 1) * TILE_M, x1), min((iy + 1) * TILE_M, y1))
+            if not tb.intersects(land):
+                continue
+            i0 = int(math.floor((tb.bounds[0] - fin.x0) / fin.cell))
+            i1 = min(fin.nx - 1, int(math.ceil((tb.bounds[2] - fin.x0) / fin.cell)))
+            j0 = int(math.floor((tb.bounds[1] - fin.y0) / fin.cell))
+            j1 = min(fin.ny - 1, int(math.ceil((tb.bounds[3] - fin.y0) / fin.cell)))
+            nx, ny = i1 - i0 + 1, j1 - j0 + 1
+            if nx < 2 or ny < 2:
+                continue
+            zs = [q(float(v)) for v in Z[j0:j1 + 1, i0:i1 + 1].ravel()]
+            skip = []
+            if trench is not None and tb.intersects(trench):
+                cx = fin.x0 + (np.arange(i0, i1) + 0.5) * fin.cell
+                cy = fin.y0 + (np.arange(j0, j1) + 0.5) * fin.cell
+                CX, CY = np.meshgrid(cx, cy)
+                skip = np.nonzero(shapely.contains_xy(trench, CX, CY).ravel())[0].tolist()
+            t = (ix, iy)
+            P.add(f"city.ground.{tile_name(*t)}", [P.city, "Ground"], t, "ground",
+                  [{"k": "grid", "m": "ground", "abs": True, "x0": q(fin.x0 + i0 * fin.cell),
+                    "y0": q(fin.y0 + j0 * fin.cell), "c": fin.cell, "nx": nx, "ny": ny,
+                    "z": zs, "skip": skip}],
+                  {"citygen_type": "ground"})
+
+
+def _water_levels(P: _Plan, gd: _Ground):
+    """(x, y) -> the water's level there (the river's at its nearest centerline point)."""
+    m = P.m
+    lv = {w.water_id: w for w in m.terrain.water_levels}
+    polys = []
+    for wid, kind, poly, ent in gd.TE.water_bodies(m):
+        w = lv.get(wid)
+        if w is None:
+            continue
+        if w.profile:
+            line = [tuple(p) for p in ent.centerline]
+            polys.append((poly, line, gd.TE._cum(line), [(p.s, p.z) for p in w.profile]))
+        else:
+            polys.append((poly, None, None, w.level_m))
+    from .elevated import _project
+
+    def level(x, y):
+        pt = Point(x, y)
+        best = None
+        for poly, line, cum, v in polys:
+            d = poly.distance(pt)
+            if best is None or d < best[0]:
+                best = (d, poly, line, cum, v)
+        if best is None:
+            return 0.0
+        _, poly, line, cum, v = best
+        if line is None:
+            return v
+        return gd.TE.z_on(v, _project(line, cum, (x, y))[0])
+    return level
+
+
+def _terrain(P: _Plan) -> None:
+    """M13: everything onto the ground. The ground becomes a heightfield; the water sits at
+    its level; roads on their grade lines; buildings, their roof items and skybridges on
+    their bases, with stepped plinths down to the ground; everything else over the finished
+    ground where it stands; retaining walls."""
+    m = P.m
+    if m.terrain is None:
+        return
+    gd = _Ground(m)
+    level = _water_levels(P, gd)
+    seg_ids = set(gd.segs)
+    walk_seg = {w.id: w.segment_id for w in m.sidewalks}
+    bored = {t.id: t.segment_ids[0] for t in m.tunnels if t.kind == "bored" and t.segment_ids}
+    road_tun = {t.id: t.segment_ids[0] for t in m.tunnels
+                if t.kind in ("immersed_tube", "cut_and_cover") and t.segment_ids}
+    for o in list(P.objects):
+        cat = o["category"]
+        if cat in ("ground", "sea"):
+            continue
+        props = o["props"]
+        cid = props.get("citygen_id")
+        ids = props.get("citygen_ids")
+        ids = ids if isinstance(ids, list) else None
+        if cat == "water":
+            o["parts"] = [{"k": "drape", "m": p["m"], "abs": True,
+                           "r": [[x, y, q(level(x, y) - WATER_DROP_M)]
+                                 for x, y in _densify_ring(p["r"], 24.0)],
+                           "h": [[[x, y, q(level(x, y) - WATER_DROP_M)]
+                                  for x, y in _densify_ring(h, 24.0)] for h in p["h"]]}
+                          for p in o["parts"]]
+            continue
+        if cat in ("building", "landmark"):
+            base = gd.base.get(cid)
+            if base is None:
+                o["parts"] = [x for p in o["parts"] for x in _lift_part(p, gd.at)]
+                continue
+            b = next(bb for bb in m.buildings if bb.id == cid)
+            parts = [x for p in o["parts"] for x in _lift_part(p, lambda x_, y_: base)]
+            parts += _plinth(b, gd)
+            o["parts"] = parts
+            continue
+        if cat == "skybridge":
+            base = gd.sky.get(cid, 0.0)
+            o["parts"] = [x for p in o["parts"] for x in _lift_part(p, lambda x_, y_: base)]
+            continue
+        new = []
+        for i, p in enumerate(o["parts"]):
+            eid = ids[i] if ids is not None and i < len(ids) else cid
+            if eid in seg_ids:
+                fz = (lambda sid: lambda x, y: gd.road(sid, x, y))(eid)
+            elif eid in walk_seg and walk_seg[eid] in seg_ids:
+                fz = (lambda sid: lambda x, y: gd.road(sid, x, y))(walk_seg[eid])
+            elif cid in bored or cid in road_tun:
+                sid = bored.get(cid) or road_tun.get(cid)
+                fz = (lambda sid: lambda x, y: gd.road(sid, x, y))(sid)
+            elif cat in ("green_roof",) or (cat.startswith("open_") and p.get("z", 0.0) > 0.6):
+                cx, cy = _center(p["r"])
+                bb = gd.building_base(cx, cy)
+                fz = (lambda v: lambda x, y: v)(bb) if bb is not None else gd.at
+            else:
+                fz = gd.at
+            new += _lift_part(p, fz, drape_big=cat.startswith("open_") or cat in
+                              ("junction", "lawn"))
+        o["parts"] = new
+    _ground_grid(P, gd)
+    _walls(P, gd)
+
+
+def _plinth(b, gd: _Ground) -> list[dict]:
+    """A stepped plinth from the ground up to the base: the footprint cut into 8 m cells,
+    each from the lowest ground at its corners."""
+    if b.footprint is None or b.base_m is None or b.plinth_m is None or \
+            b.base_m - b.plinth_m < 0.3:
+        return []
+    poly = G.from_model_poly(b.footprint)
+    bx0, by0, bx1, by1 = poly.bounds
+    step = 8.0
+    cells = [box(bx0 + i * step, by0 + j * step, bx0 + (i + 1) * step, by0 + (j + 1) * step)
+             for j in range(int(math.ceil((by1 - by0) / step)))
+             for i in range(int(math.ceil((bx1 - bx0) / step)))]
+    out = []
+    for piece in shapely.intersection(np.array(cells, dtype=object), poly).tolist():
+        for pc in G.parts(piece):
+            ext, holes = _shapely_rings(pc)
+            if len(ext) < 3:
+                continue
+            low = min(gd.at(x, y) for x, y in ext)
+            if b.base_m - low < 0.3:
+                continue
+            out.append({"k": "prism", "m": "plinth", "abs": True, "z0": q(low - 0.5),
+                        "z1": q(b.base_m), "r": ext, "h": holes, "s": "prism"})
+    return out
+
+
+def _walls(P: _Plan, gd: _Ground) -> None:
+    """Retaining walls: a 0.5 m slab along each wall, from under the lower ground to a
+    parapet over the upper; one object per wall, named by its id (M15: the Unreal exporter
+    keys its actors by stable id)."""
+    for w in P.m.structures:
+        if w.kind != "retaining_wall" or len(w.line) < 2:
+            continue
+        pts = [(p[0], p[1]) for p in w.line]
+        tops = [q(gd.at(x, y) + h / 2.0 + 0.3) for (x, y), (_, _, h) in zip(pts, w.line)]
+        r = ribbon(pts, 0.5, tops)
+        if r is None:
+            continue
+        cx, cy = _center(pts)
+        P.add(w.id, [P.city, "Ground", "Retaining walls"], tile_key(cx, cy), "retaining_wall",
+              [{"k": "ribbon", "m": "retaining_wall", "abs": True, "l": r[0], "rr": r[1],
+                "t": q(max(h for _, _, h in w.line) + 1.0)}],
+              {"citygen_id": w.id, "citygen_type": "structure.retaining_wall"})

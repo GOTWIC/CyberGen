@@ -1195,7 +1195,13 @@ def _metro(m, road_tunnels: list, notes: list) -> tuple[list, list, list]:
                     if need < caps[i]:
                         caps[i], why[i] = need, "metro"
         loop = bool(ln["loop"]) and pts[0] == pts[-1]
-        zs = _graded_min(cum, caps, METRO_GRADE, loop)
+        # M13: graded on the ground (ground + z), then measured from the ground again
+        from . import terrain as TE
+
+        gr = TE.on_ground(m, pts)
+        zs = _graded_min(cum, [c + g for c, g in zip(caps, gr)], METRO_GRADE, loop)
+        za = list(zs)                  # on the ground (M13; the same on a flat city)
+        zs = [G.q(z - g) for z, g in zip(zs, gr)]
         ln["path"] = [[x, y, z] for (x, y), z in zip(pts, zs)]
         deep = min(zs)
         ln["attrs"] = {**ln["attrs"], "tunnel_deepest_m": deep,
@@ -1211,7 +1217,7 @@ def _metro(m, road_tunnels: list, notes: list) -> tuple[list, list, list]:
             from .elevated import _project
 
             s_at = _project(pts, cum, p[:2])[0]
-            zt = z_at(list(zip(cum, zs)), s_at)
+            zt = z_at(list(zip(cum, za)), s_at) - TE.on_ground(m, [p[:2]])[0]
             st["attrs"] = {**st["attrs"], "track_z_m": G.q(zt)}
             if st.get("footprint"):
                 foots.append((s_at, G.from_model_poly(st["footprint"]), sid))
@@ -1233,8 +1239,10 @@ def _metro(m, road_tunnels: list, notes: list) -> tuple[list, list, list]:
             sb = _project(pts, cum, cs[-1])[0]
             if sb < sa:
                 cs, sa, sb = cs[::-1], sb, sa
-            prof = list(zip(cum, zs))
-            l3 = [(x, y, G.q(z_at(prof, _project(pts, cum, (x, y))[0]))) for x, y in cs]
+            prof = list(zip(cum, za))
+            gc = TE.on_ground(m, cs)
+            l3 = [(x, y, G.q(z_at(prof, _project(pts, cum, (x, y))[0]) - g))
+                  for (x, y), g in zip(cs, gc)]
             k += 1
             before = [f[2] for f in order if f[0] <= sa + 1.0]
             after = [f[2] for f in order if f[0] >= sb - 1.0]
