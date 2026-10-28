@@ -66,13 +66,33 @@ def render(streets_dir: Path, out_png: Path, insets=None, title: str = "") -> No
     from matplotlib.collections import PolyCollection
 
     tris, cols, zs = [], [], []
+
+    def add(T, col):
+        tris.append(T[:, :, :2])
+        zs.append(T[:, :, 2].max(axis=1))
+        cols.append(np.repeat(np.array([col], dtype=np.float64), len(T), axis=0))
     for f in sorted(Path(streets_dir).glob("t*.glb")):
         for _, name, col, T in read_glb(f):
             if name.startswith("glass"):
                 col = [col[0], col[1], col[2], 0.35]
-            tris.append(T[:, :, :2])
-            zs.append(T[:, :, 2].max(axis=1))
-            cols.append(np.repeat(np.array([col], dtype=np.float64), len(T), axis=0))
+            add(T, col)
+    # instanced parts (containers) where the contribution places them
+    con = Path(streets_dir).parent / "unreal_contribution.streets.json"
+    parts = Path(streets_dir) / "parts.glb"
+    if con.is_file() and parts.is_file():
+        protos: dict = {}
+        for node, _, col, T in read_glb(parts):
+            protos.setdefault(node, []).append((col, T))
+        for e in json.loads(con.read_text(encoding="utf-8"))["entries"]:
+            for p in e.get("parts", []):
+                px, py, pz = e["pivot"]
+                for col, T in protos.get(p["node"], []):
+                    for x, y, z, yaw in p["xforms"]:
+                        a = np.radians(yaw)
+                        c, s_ = np.cos(a), np.sin(a)
+                        X = T[:, :, 0] * c - T[:, :, 1] * s_ + px + x
+                        Y = T[:, :, 0] * s_ + T[:, :, 1] * c + py + y
+                        add(np.stack([X, Y, T[:, :, 2] + pz + z], axis=2), col)
     if not tris:
         return
     T = np.concatenate(tris)

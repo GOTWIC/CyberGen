@@ -1,5 +1,6 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
-diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen streets BUILD`.
+diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen streets BUILD`,
+`assetgen streets seam BASE REGEN`.
 
 Exit codes: 0 valid (diff: no change), 1 invalid spec (diff: briefs differ), 2 usage or
 file error.
@@ -160,6 +161,24 @@ def cmd_streets(args: argparse.Namespace) -> int:
     return EXIT_OK if rep["ok"] else EXIT_INVALID
 
 
+def cmd_streets_seam(args: argparse.Namespace) -> int:
+    from .streets.seam import seam
+    try:
+        r = seam(Path(args.base), Path(args.regen), args.district)
+    except (OSError, ValueError, KeyError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    if args.json:
+        Path(args.json).write_text(json.dumps(r, indent=1) + "\n", encoding="utf-8",
+                                   newline="\n")
+    print(f"{r['changed']} of {r['pieces']} pieces changed ({r['own']} themselves, "
+          f"{r['seam']} through a neighbor, {len(r['unexplained'])} unexplained); "
+          f"{len(r['changed_tiles'])} of {r['tiles']} tiles changed, "
+          f"{len(r['tiles_without_a_changed_piece'])} without a changed piece")
+    return EXIT_OK if not r["unexplained"] and not r["tiles_without_a_changed_piece"] \
+        else EXIT_INVALID
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="assetgen",
                                 description="Offline building, street and texture assets.")
@@ -204,7 +223,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="also write KHR_mesh_quantization copies")
     sp.set_defaults(func=cmd_spike)
 
-    st = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")
+    sg = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")
+    ssub2 = sg.add_subparsers(dest="command", required=True)
+    st = ssub2.add_parser("make", help="write BUILD/assets/streets/ (also: assetgen streets "
+                                       "BUILD)")
     st.add_argument("build", help="a citygen build directory (or its city_model.json)")
     st.add_argument("--spec", help="asset_spec.json (default: the era presets)")
     st.add_argument("--out", help="output directory (default BUILD/assets)")
@@ -214,6 +236,13 @@ def build_parser() -> argparse.ArgumentParser:
                     help="make every tile again (the files are still written only if "
                          "their bytes change)")
     st.set_defaults(func=cmd_streets)
+    se = ssub2.add_parser("seam", help="what a district regeneration changed in the street "
+                                       "packs, and why")
+    se.add_argument("base", help="the base build (its street stage run)")
+    se.add_argument("regen", help="the regenerated build (its street stage run)")
+    se.add_argument("--district", help="the regenerated district's name")
+    se.add_argument("--json", metavar="FILE", help="also write the result as JSON")
+    se.set_defaults(func=cmd_streets_seam)
     return p
 
 
@@ -222,6 +251,10 @@ def main(argv: list[str] | None = None) -> int:
     # `assetgen brief BUILD` is short for `assetgen brief make BUILD`
     if len(argv) >= 2 and argv[0] == "brief" and argv[1] not in ("make", "diff", "schema",
                                                                  "-h", "--help"):
+        argv.insert(1, "make")
+    # `assetgen streets BUILD` is short for `assetgen streets make BUILD`
+    if len(argv) >= 2 and argv[0] == "streets" and argv[1] not in ("make", "seam", "-h",
+                                                                   "--help"):
         argv.insert(1, "make")
     parser = build_parser()
     try:

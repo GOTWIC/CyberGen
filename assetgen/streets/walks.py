@@ -69,21 +69,21 @@ def gather_sidewalk(cx: Ctx, w) -> Piece:
                 # the crosswalk's end on this sidewalk's curb line
                 if abs(t + sgn * w.width_m / 2.0) < 1.5 and -1.0 <= ss <= P.L + 1.0:
                     drops.append([C.m(ss - c.width_m / 2.0), C.m(ss + c.width_m / 2.0),
-                                  "crosswalk"])
+                                  "crosswalk", c.id])
         for owner, e in sorted(cx.doors_on.get(s.id, ()), key=lambda d: (d[0], d[1].kind)):
             pos = e.position
             ss, t = P.project(pos[0], pos[1])
             if 0.0 <= ss <= P.L and sgn * t >= w.width_m / 2.0 - 0.5 and \
                     sgn * t <= w.width_m / 2.0 + 8.0:
                 half = 3.0 if e.kind == "garage" else 2.5
-                drops.append([C.m(ss - half), C.m(ss + half), e.kind])
+                drops.append([C.m(ss - half), C.m(ss + half), e.kind, owner])
         xs = [p[0] for p in w.line]
         ys = [p[1] for p in w.line]
         pad = w.width_m
         for pl in cx.trees.near(min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad):
             ss, t = P.project(pl.position[0], pl.position[1])
             if 0.5 <= ss <= P.L - 0.5 and abs(t) <= w.width_m / 2.0:
-                trees.append([C.m(ss), C.m(t)])
+                trees.append([C.m(ss), C.m(t), pl.id])
     road = _road_inputs(cx, s)
     inputs = {"walk": dump(w), "road": road, "style": cx.style(_district(cx, s)),
               "drops": sorted(drops), "trees": sorted(trees),
@@ -97,7 +97,7 @@ def gather_sidewalk(cx: Ctx, w) -> Piece:
 
 def _drop_f(s: float, drops) -> float:
     f = 0.0
-    for a, b, _ in drops:
+    for a, b, *_ in drops:
         if a <= s <= b:
             return 1.0
         if a - 1.0 < s < a:
@@ -123,7 +123,7 @@ def make_sidewalk(inp: dict) -> Out:
     t_curb = -sgn * width / 2.0
     drops = inp["drops"]
     extra = []
-    for a, b, _ in drops:
+    for a, b, *_ in drops:
         extra += [a - 1.0, a, b, b + 1.0]
     offs = [0.0, CURB_STONE_M] + ([RAMP_M] if width > RAMP_M + 0.3 else []) + [width]
     curb_slot = MT.curb(style["archetype"])
@@ -170,7 +170,7 @@ def make_sidewalk(inp: dict) -> Out:
     mesh.grid(curb_slot, face, fuv, expect=[(-sgn * a, -sgn * b, 0.0) for a, b in nrm])
     mesh.grid(pave, back, buv, expect=[(sgn * a, sgn * b, 0.0) for a, b in nrm])
     # tree pits
-    for ts, tt in inp["trees"]:
+    for ts, tt, _ in inp["trees"]:
         tt = max(min(tt, width / 2.0 - PIT_M / 2.0 - 0.2), -width / 2.0 + PIT_M / 2.0 + 0.2) \
             if width > PIT_M + 0.4 else 0.0
         hp = PIT_M / 2.0
@@ -606,6 +606,7 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
             for k in range(len(r)):
                 key = tuple(sorted((r[k], r[(k + 1) % len(r)])))
                 uses[key] = uses.get(key, 0) + 1
+    ends: set = set()
     for parts, row in drawn:
         drew = False
         for r in parts:
@@ -617,6 +618,12 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
                 p, q = r[k], r[(k + 1) % len(r)]
                 if uses[tuple(sorted((p, q)))] > 1:
                     continue
+                # where two corners touch at a point, their faces there would share an
+                # edge running the same way: the second face is left out
+                if (q, 1) in ends or (p, -1) in ends:
+                    continue
+                ends.add((q, 1))
+                ends.add((p, -1))
                 mid = ((p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0)
                 if _near(mid, ring, True) or any(_near(mid, h, True) for h in holes):
                     mesh.wall(curb_slot, p, q, zfun(*p), zfun(*p) + 0.15, zfun(*q),

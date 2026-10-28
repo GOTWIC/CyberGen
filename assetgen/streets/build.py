@@ -412,3 +412,18 @@ def default_workers() -> int:
         return max(1, min(MAX_WORKERS, int(os.environ.get("ASSETGEN_WORKERS", MAX_WORKERS))))
     except ValueError:
         return MAX_WORKERS
+
+
+def outputs_digest(out_dir: Path) -> dict:
+    """sha256 of what the stage wrote (tile packs, parts, contribution; not the manifest,
+    which also records the code's hash): the goldens' measure."""
+    out_dir = Path(out_dir)
+    sdir = out_dir / "streets"
+    tiles = {f.stem: C.sha256_bytes(f.read_bytes()) for f in sorted(sdir.glob("t*.glb"))}
+    return {"tiles": tiles, "parts": C.sha256_bytes((sdir / "parts.glb").read_bytes()),
+            "contribution": C.sha256_bytes(
+                (out_dir / "unreal_contribution.streets.json").read_bytes()),
+            "all": C.digest({"tiles": tiles,
+                             "parts": C.sha256_bytes((sdir / "parts.glb").read_bytes()),
+                             "contribution": C.sha256_bytes(
+                                 (out_dir / "unreal_contribution.streets.json").read_bytes())})}

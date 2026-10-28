@@ -393,7 +393,7 @@ def gather_column(cx: Ctx, st) -> Piece:
     c = bbox_center(ring)
     road = None
     if s is not None:
-        road = {"line": [list(p) for p in s.centerline], "width": s.width_m,
+        road = {"id": s.id, "line": [list(p) for p in s.centerline], "width": s.width_m,
                 "s_m": a.get("s_m")}
     inputs = {"st": dump(st), "road": road, "ground": cx.ground.samples([c]),
               "origin": list(c)}
@@ -447,9 +447,12 @@ def _portal_s(ln: Line3, portals) -> list[float]:
 
 
 def _lined_walls(mesh: Mesh, ln: Line3, s0: float, s1: float, w: float, z_bot: float,
-                 top_of, inner_slot: str, outer_slot: str = "concrete", step: float = 6.0):
+                 top_of, inner_slot: str, outer_slot: str = "concrete", step: float = 6.0,
+                 roof: float | None = None):
     """Both walls of a road tunnel or trench: 1 m thick, inner face toward the road; top_of(s)
-    gives each station's top height."""
+    gives each station's top height. Under a roof (a tunnel's covered stretch, `roof` its
+    slab) the inner face stops at the soffit and the outer one at the roof's top, with no
+    cap: the walls and the slab are one closed section."""
     if s1 - s0 < 0.05:
         return
     st = ln.path.stations(s0, s1, step, ln.zp.knots(s0, s1))
@@ -461,26 +464,28 @@ def _lined_walls(mesh: Mesh, ln: Line3, s0: float, s1: float, w: float, z_bot: f
             x, y, nx, ny, k = ln.path.frame(s, vi)
             zb = ln.z(s) + z_bot
             zt = top_of(s)
+            zo = zt + roof if roof is not None else zt
             pi = (x + nx * k * ti, y + ny * k * ti)
             po = (x + nx * k * to, y + ny * k * to)
             if side > 0:
                 inner.append([(*pi, zb), (*pi, zt)])
                 ui.append([(s, zb), (s, zt)])
                 top.append([(*pi, zt), (*po, zt)])
-                outer.append([(*po, zt), (*po, zb)])
-                uo.append([(s, zt), (s, zb)])
+                outer.append([(*po, zo), (*po, zb)])
+                uo.append([(s, zo), (s, zb)])
             else:
                 inner.append([(*pi, zt), (*pi, zb)])
                 ui.append([(s, zt), (s, zb)])
                 top.append([(*po, zt), (*pi, zt)])
-                outer.append([(*po, zb), (*po, zt)])
-                uo.append([(s, zb), (s, zt)])
+                outer.append([(*po, zb), (*po, zo)])
+                uo.append([(s, zb), (s, zo)])
             ut.append([(s, 0.0), (s, 1.0)])
             ei.append((-side * nx, -side * ny, 0.0))
             eo.append((side * nx, side * ny, 0.0))
         # inner faces look at the road: the left wall's (side > 0) toward -t
         mesh.grid(inner_slot, inner, ui, expect=ei)
-        mesh.grid(outer_slot, top, ut, expect=(0.0, 0.0, 1.0))
+        if roof is None:
+            mesh.grid(outer_slot, top, ut, expect=(0.0, 0.0, 1.0))
         mesh.grid(outer_slot, outer, uo, expect=eo)
 
 
@@ -500,10 +505,10 @@ def make_tunnel(inp: dict) -> Out:
     a, b = (ps[0], ps[-1]) if len(ps) >= 2 else (0.0, ln.L)
     if b - a < 1.0:
         return Out(empty="no covered stretch")
-    _lined_walls(mesh, ln, a, b, w, -0.3, lambda s: ln.z(s) + clear, "tile.tunnel")
+    _lined_walls(mesh, ln, a, b, w, -0.3, lambda s: ln.z(s) + clear, "tile.tunnel",
+                 roof=roof)
     hi = w / 2.0 - 1.0
-    ln_ = ln
-    fr = ln_.frames(a, b, 6.0)
+    fr = ln.frames(a, b, 6.0)
     mesh.sweep("concrete", fr, [(hi, clear), (-hi, clear)])          # soffit, facing down
     mesh.sweep("concrete", fr, [(-w / 2.0, clear + roof), (w / 2.0, clear + roof)])
     for side in (-1.0, 1.0):
