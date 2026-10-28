@@ -1,8 +1,9 @@
 """AG2's facades on small made-up briefs: every part closed and named by its parameters,
 every facade system a closed shell inside its envelope, parts merged below eight placements
 and instanced from eight, massing articulation (corner cuts, setback ledges, crowns,
-arcades, canopies), balconies only where the facade has room, irregularity by grime and
-wealth, the thumbnail hash and the budgets per building class."""
+arcades, canopies), balconies only where the facade has room, the industrial dado and
+roofs, irregularity by grime and wealth, the thumbnail hash and the budgets per building
+class."""
 
 import copy
 
@@ -100,6 +101,20 @@ def test_every_system_builds_a_closed_shell_inside_its_envelope():
             assert len(x["at"]) >= PT.INSTANCE_MIN
 
 
+def test_no_part_is_placed_twice():
+    for s, floors, style in (("precast_panel", 8, {"body.window": "paired",
+                                                   "body.balcony": "rail",
+                                                   "body.balcony_pat": "every"}),
+                             ("stucco_shutters", 4, None), ("exoskeleton", 12, None),
+                             ("timber_infill", 4, None)):
+        br = _tower(s, floors, style=style)
+        sb = SH.ShellBuilder(br, GN.make(br))
+        sb.build()
+        for k, at in sb.parts.at.items():
+            spots = [a[:3] + (round(a[3], 4), round(a[4], 4)) for a in at]
+            assert len(spots) == len(set(spots)), (s, k)
+
+
 def test_merged_parts_keep_the_shell_closed():
     br = _tower("punched_brick", 2, w=9.0, d=7.0)
     _, res = _built(br)
@@ -174,6 +189,22 @@ def test_irregularity_follows_grime_and_wealth():
     assert clean[0] == 0.0 and not clean[1]
     assert dirty[0] > 0.5 and dirty[1]
     assert dirty[2] & {"ac", "grille", "patch_ply", "panel", "dish"}
+
+
+def test_industrial_dado_and_roofs():
+    for dado in ("dado", "structure"):
+        br = _tower("corrugated", 1, btype="building.warehouse", w=40.0, d=24.0, fh=9.0,
+                    style={"dado": dado, "dado_m": 2.4, "ground": "blank"})
+        gm, res = _built(br)
+        assert gm["genes"]["roof"] in SY.ROOFS_INDUSTRIAL
+        assert res["used"]["dado"] and dado in res["arrays"]
+        assert GN.effective(gm, res["used"])["dado"] == dado
+        z = res["arrays"][dado]["pos"][:, 2]
+        assert int(z.min()) == 0 and int(z.max()) == 2400
+        assert _closed(res["arrays"])
+    br = _tower("precast_panel", 4, style={"dado": "dado"})
+    gm, res = _built(br)
+    assert gm["genes"]["roof"] in SY.ROOFS and not res["used"]["dado"]
 
 
 def test_thumbnails_tell_buildings_apart():

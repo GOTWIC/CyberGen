@@ -27,8 +27,9 @@ from assetgen import build as BD  # noqa: E402
 
 from agtools import CITIES, GOLDEN, ROOT, built_sample, small_assets, small_build  # noqa: E402
 
-# AG1: the shells of these Vesper Bay buildings as GLB bytes (one per kind, chosen as AG0's
-# brief goldens are, plus a curtain-wall tower, a shanty stack and a parking structure)
+# AG1 (and AG2's parts): these Vesper Bay buildings as GLB bytes, their shells and instanced
+# parts (one per kind, chosen as AG0's brief goldens are, plus a curtain-wall tower, a shanty
+# stack and a parking structure)
 AG1_KINDS = ("building.landmark.", "building.podium_tower", "building.shopfront_row",
              "building.shanty_stack", "building.megabuilding", "building.villa",
              "building.warehouse", "building.parking_structure", "building.tower")
@@ -72,10 +73,12 @@ def main():
     out = {"about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json "
                     "(tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few "
                     "Vesper Bay buildings, the five samples' briefs.json, the two small spike "
-                    "buildings' glTF files and a triangulation; (AG1, under ag1) the small "
-                    "city's asset manifest and the digest of its asset files, and the shells "
-                    "of a few Vesper Bay buildings as GLB. Made on the M4 Mac and confirmed "
-                    "on x86_64 Linux (docker image citygen-x86).",
+                    "buildings' glTF files and a triangulation; (AG1, under ag1, with AG2's "
+                    "parts) the small city's asset manifest and the digest of its asset "
+                    "files (shells, proxies, part packs), and a few Vesper Bay buildings as "
+                    "GLB (shell and instanced parts). AG0 and AG1's made on the M4 Mac and "
+                    "confirmed on x86_64 Linux (docker image citygen-x86); AG2's on the Mac "
+                    "(the x86 check is deferred, docs/determinism_check.md).",
            "testport_briefs": C.sha256_bytes(
                (small_build() / "base" / "assets" / "briefs.json").read_bytes()),
            "triangulate": tri_golden(), "buildings": {}, "samples": {}, "spike": {}}
@@ -83,7 +86,7 @@ def main():
     a = base / "assets"                    # the building packs (the streets: AG7's goldens)
     tree = {str(p.relative_to(a)): C.sha256_bytes(p.read_bytes())
             for p in sorted(a.rglob("*")) if p.is_file() and
-            ((p.suffix == ".glb" and p.parent.name in ("tiles", "proxies")) or
+            ((p.suffix == ".glb" and p.parent.name in ("tiles", "proxies", "parts")) or
              (p.parent == a and p.name in BD.DELIVERED))}
     out["ag1"] = {"testport_manifest": C.sha256_bytes(
         (base / "assets" / "manifest.json").read_bytes()),

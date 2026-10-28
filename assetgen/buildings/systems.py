@@ -280,6 +280,8 @@ AG2_CROWNS = ("flat", "parapet", "lantern", "stepped", "halo", "mast", "spire")
 CORNERS = ("plain", "heavy", "tight")
 GLASS = ("#1b2430", "#22303a", "#1e2b26", "#2b251e", "#2a3440", "#15191d", "#283238")
 ROOFS = ("#3d3d3d", "#4d4b47", "#5a5650", "#2f3133", "#6b6a66", "#544a40")
+# AG2: roofs of the industrial systems (galvanized and coated metal, white membrane, tar)
+ROOFS_INDUSTRIAL = ("#9ea3a7", "#c9ccc9", "#7a3e2c", "#4d5a66", "#3d3d3d", "#6b6a66", "#8a8f86")
 STEP = {"bay_m": 0.05, "wwr": 0.01, "sill_m": 0.05, "head_m": 0.05, "reveal_m": 0.01,
         "corner_m": 0.05, "cornice_m": 0.05, "parapet_m": 0.05, "band_m": 0.01,
         "open_p": 0.05, "patch_w": 0.1, "patch_h": 0.1,
@@ -346,6 +348,7 @@ SLOTS: dict[str, tuple] = {
     "infill": ("facade", "#e0d6c2", 0.9, 0.0, "wall"),
     "seam": ("metal", "#6e767d", 0.45, 0.65, "wall"),
     "hangar": ("metal", "#c4c9ce", 0.4, 0.6, "wall"),
+    "dado": ("facade", "#a39f97", 0.9, 0.0, None),
     # AG2: parts
     "frame": ("metal", "#5d6166", 0.45, 0.6, "trim"),
     "sill": ("facade", "#c7c0b2", 0.8, 0.0, None),

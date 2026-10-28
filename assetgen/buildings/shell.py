@@ -19,7 +19,8 @@ door rows, spandrel panels, shutters, egg crates, screen blades, sunshades, and 
 and low wealth add: boards, infills, replaced frames, AC units, grilles, dishes, add-on
 boxes); every bay line gets the system's own parts (mullion caps, fins, exoskeleton and
 diagrid members, timber frames); eaves and ribs run as strips, podium canopies over the
-ground floor, masts and spires on the roof. A part placed fewer than `parts.INSTANCE_MIN`
+ground floor, masts and spires on the roof; industrial walls on the ground take a block or
+concrete dado. A part placed fewer than `parts.INSTANCE_MIN`
 times is merged into the shell; the others are the building's instances.
 
 Geometry, on integer millimeters in the building frame, every part closed (the mesh
@@ -209,7 +210,11 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
             kind, sill, head = "void", 1000, H - 300
         elif f + f0 == 0 and z0 <= 50 and ground is not None:
             if ground == "blank":
-                continue
+                if n_all > 1 or H < 5000:
+                    continue
+                # a shed of one tall floor: a clerestory under its eaves
+                head = H - gap0
+                sill = head - (900 if win != "strip" else 1400)
             if ground == "storefront":
                 kind, sill, head = "shop", 300, H - max(500, H // 6)
             elif ground == "lobby":
@@ -364,7 +369,7 @@ class ShellBuilder:
                       "strips": 0, "strips_refused": 0, "roof_items": 0, "masses": 0}
         self.used = {"groups": [], "features": {}, "ground": False, "finish": False,
                      "base": False, "parts": {}, "articulation": [], "crown": False,
-                     "irregular": False}
+                     "irregular": False, "dado": False}
         self.mass_info: list[dict] = []
         b = brief["building"]
         self.parking = b["type"] == "building.parking_structure"
@@ -670,7 +675,7 @@ class ShellBuilder:
             if done:
                 feats.append("bands")
                 if feature == "ribs":
-                    self.used["parts"].setdefault(g, []).append("ribs")
+                    self.used["parts"].setdefault(g, set()).add("ribs")
         if feature == "eaves":
             self._eaves(ms, g, rows)
 
@@ -950,9 +955,21 @@ class ShellBuilder:
         prev, pz = [0, L], z0
         o = (int(round(-fa.nx * reveal)), int(round(-fa.ny * reveal)))
         base = self.gm["genes"]["base"]
-        plinth = base if rows and z0 <= 50 and base != "wall" and wall != "structure" else None
+        # an industrial wall on the ground: its dado line (the same on every facade of the
+        # mass, so the corners stay welded) where the first row starts 0.3 m above it
+        dado = 0
+        if sysname in SY.INDUSTRIAL and z0 <= 50 and self.gm["genes"]["dado"] != "none":
+            dz = int(round(self.gm["cont"]["dado_m"] * 1000))
+            if (rows[0][0] if rows else z1) >= z0 + dz + 300:
+                dado = dz
+                self.used["dado"] = True
+        plinth = base if rows and z0 <= 50 and base != "wall" and wall != "structure" and \
+            not dado else None
         if plinth:
             self.used["base"] = True        # the strip under the ground row in its finish
+        if dado:
+            zipper(prev, pz, [0, L], z0 + dado, self.gm["genes"]["dado"])
+            prev, pz = [0, L], z0 + dado
         for row, c, ops, bset in zip(rows, cols, ops_by_row, balc or [{}] * len(rows)):
             lo, hi, kind, f = row[:4]
             zipper(prev, pz, c, lo, plinth if pz == z0 else None)
@@ -1059,7 +1076,7 @@ class ShellBuilder:
             return
         genes, cont = self.gm["genes"], self.gm["cont"]
         feat = SY.SYSTEMS[sysname].get("feature")
-        used = self.used["parts"].setdefault(g, [])
+        used = self.used["parts"].setdefault(g, set())
         P = self.parts
         mid = (a_ + b_) // 2
         r = reveal
@@ -1068,7 +1085,7 @@ class ShellBuilder:
             P.on(fa, "louver", {"w": qw, "h": qh, "r": r, "n": max(3, min(16, h // 220)),
                                 "bd": 140, "tilt": 30}, mid, lo)
             if feat == "louvers":
-                used.append("louvers")
+                used.add("louvers")
             return
         if kind == "pod":
             if lo >= STRIP_MIN_Z:
@@ -1079,7 +1096,7 @@ class ShellBuilder:
                 P.on(fa, "pod", {"w": pw, "h": ph, "r": r,
                                  "d": PT.q(cont[f"{g}.pod_m"] * 1000),
                                  "pr": PT.q(min(pw, ph) * 3 // 10)}, mid, lo)
-                used.append("capsules")
+                used.add("capsules")
             else:
                 self._frame(fa, "fixed", w, h, r, mid, lo)
             return
@@ -1103,7 +1120,7 @@ class ShellBuilder:
             if feat == "addons" and lo - 150 >= STRIP_MIN_Z and u1 < 0.14 * irr + 0.10:
                 P.on(fa, "panel", {"style": "addon", "w": PT.q(w + 400),
                                    "h": PT.q(min(h + 300, 2400)), "d": 500}, mid, lo - 150)
-                used.append("addons")
+                used.add("addons")
                 self.used["irregular"] = True
                 return
         style = genes[f"{g}.frame"]
@@ -1119,11 +1136,12 @@ class ShellBuilder:
             self._frame(fa, style, w, h, r, mid, lo,
                         (50, 70, 60) if sills and not door else None,
                         (25, 220, 90) if sysname == "punched_brick" else None)
-            used.append("frame")
+            used.add("frame")
             if sills:
-                used.append("sills")
+                used.add("sills")
         if door:
-            if jb in bset:
+            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2:
+                # the bay's balcony, once (by its first opening, where a bay has two)
                 b0, b1, d = bset[jb]
                 st = genes[f"{g}.balcony"]
                 p = {"style": st, "w": PT.q(b1 - b0 - 160), "d": d, "t": 200, "rh": 1050}
@@ -1132,20 +1150,20 @@ class ShellBuilder:
                     p.update(style="enclosed", eh=PT.q(hf - 250))
                     self.used["irregular"] = True
                 P.on(fa, "balcony", p, (b0 + b1) // 2, zf)
-                used.append("balcony")
-            else:
+                used.add("balcony")
+            elif jb not in bset:
                 P.on(fa, "spandrel", {"w": qw, "h": PT.q(full - lo), "r": r}, mid, lo)
         if feat == "shutters" and h >= 900:
             sw = PT.q(w // 2)
             if pl >= sw + 80 and pr >= sw + 80:
                 P.on(fa, "shutter", {"w": sw, "h": qh}, a_ - 40 - sw // 2, lo)
                 P.on(fa, "shutter", {"w": sw, "h": qh}, b_ + 40 + sw // 2, lo)
-                used.append("shutters")
+                used.add("shutters")
         if feat == "eggcrate" and genes.get(f"{g}.crate") == "eggcrate" and \
                 lo - 150 >= STRIP_MIN_Z and pl >= 170 and pr >= 170:
             P.on(fa, "panel", {"style": "eggcrate", "w": qw, "h": qh, "d": 400, "t": 150,
                                "slot": wall}, mid, lo)
-            used.append("eggcrate")
+            used.add("eggcrate")
         if feat == "screen" and lo - 150 >= STRIP_MIN_Z:
             nb = 3 if w >= 1800 else 2
             pat = genes.get(f"{g}.blades", "flat")
@@ -1156,11 +1174,11 @@ class ShellBuilder:
                 P.on(fa, "panel", {"style": "screen", "w": PT.q(min(w // nb, 600)),
                                    "h": PT.q(h + 300), "t": 30, "off": 330}, s, lo - 150,
                      extra_deg=ang)
-            used.append("screen")
+            used.add("screen")
         if genes.get(f"{g}.balcony") == "balconette" and genes[f"{g}.window"] == "tall" and \
                 lo >= STRIP_MIN_Z:
             P.on(fa, "balconette", {"w": qw, "rh": 900}, mid, lo)
-            used.append("balcony")
+            used.add("balcony")
         if curtain or irr <= 0:
             return
         use = self.br["building"]["use"]
@@ -1189,7 +1207,7 @@ class ShellBuilder:
             if shade and fa.room((x0 + x1) // 2, hi + 140, 450, 450) >= 450:
                 self.parts.on(fa, "shade", {"L": PT.q(x1 - x0 - 60), "d": 450, "t": 60},
                               (x0 + x1) // 2, hi + 200)
-        self.used["parts"].setdefault(g, []).append("ribbon")
+        self.used["parts"].setdefault(g, set()).add("ribbon")
 
     # -- AG2: the bay lines --------------------------------------------------------------
 
@@ -1202,7 +1220,7 @@ class ShellBuilder:
             return
         genes, cont = self.gm["genes"], self.gm["cont"]
         P = self.parts
-        used = self.used["parts"].setdefault(g, [])
+        used = self.used["parts"].setdefault(g, set())
         lines = [cuts[0][0]] + [b1 for _, b1 in cuts]
         zb = max(ms["z0"], rows[0][0] - 150)
         zt = min(ms["z1"], rows[-1][1] + 150)
@@ -1216,7 +1234,7 @@ class ShellBuilder:
                 for s in lines:
                     if free(s, 60, zb, zb + h):
                         P.on(fa, "cap", {"dir": "v", "w": 70, "p": 90, "h": h}, s, zb)
-                used.append("caps")
+                used.add("caps")
         elif feat == "fins":
             z0f = max(zb, STRIP_MIN_Z)
             h = PT.q(zt - z0f)
@@ -1226,13 +1244,13 @@ class ShellBuilder:
                 for s in lines:
                     if free(s, d, z0f, z0f + h):
                         P.on(fa, "fin", {"t": 100, "d": d, "h": h}, s, z0f, extra_deg=ang)
-                used.append("fins")
+                used.add("fins")
         elif feat in ("exo", "diagrid"):
             if self._members(fa, ms, g, feat, lines, reveal, mounts):
-                used.append(feat)
+                used.add(feat)
         elif feat == "timber":
             if self._timber(fa, ms, g, cuts, rows):
-                used.append("timber")
+                used.add("timber")
 
     def _members(self, fa: Facade, ms: dict, g: str, feat: str, lines, reveal: int,
                  mounts) -> bool:
@@ -1375,7 +1393,7 @@ class ShellBuilder:
                 if self._sloped(ring, res[0], res[1], zt, zl, zbot, "tile"):
                     made = True
         if made:
-            self.used["parts"].setdefault(g, []).append("eaves")
+            self.used["parts"].setdefault(g, set()).add("eaves")
             self.stats["eaves"] = self.stats.get("eaves", 0) + 1
 
     def _sloped(self, ring, outer, hole, zt: int, zl: int, zb: int, slot: str) -> bool:

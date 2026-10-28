@@ -380,11 +380,13 @@ def import_glb(path, tag):
 
 
 def remove(objs):
-    for o in objs:
-        me = o.data if o.type == "MESH" else None
-        bpy.data.objects.remove(o, do_unlink=True)
-        if me is not None and me.users == 0:
-            bpy.data.meshes.remove(me)
+    """Objects and their meshes, at once (one by one is quadratic in Blender)."""
+    meshes = {o.data for o in objs if o.type == "MESH" and o.data is not None}
+    groups = {m.node_group for o in objs for m in o.modifiers
+              if m.type == "NODES" and m.node_group is not None}
+    bpy.data.batch_remove(list(objs))
+    bpy.data.batch_remove([m for m in meshes if m.users == 0])
+    bpy.data.batch_remove([g for g in groups if g.users == 0])
 
 
 # --- cameras -------------------------------------------------------------------------------

@@ -220,6 +220,9 @@ def make(brief: dict) -> dict:
     genes["finish"] = pick(fkey, "finish", T.get("finishes") or (T["wall"],), None, salt)
     genes["mech_every"] = pick(fkey, "mech_every", (15, 18, 20, 22, 25), None, salt)
     genes["base"] = pick(fkey, "base", ("wall", "structure", "trim"), None, salt)
+    # AG2: an industrial wall's base band (a block or concrete dado under the cladding)
+    genes["dado"] = pick(fkey, "dado", ("none", "dado", "structure"), (0.15, 0.5, 0.35), salt)
+    cont["dado_m"] = draw(fkey, "dado_m", 1.2, 3.6, 0.3, salt)
     # AG2: massing articulation (scope pipeline stage 3) by the era's weights
     art = SY.ARTICULATION.get(spec.get("era") or "", SY.ARTICULATION_DEFAULT)
     genes["cut"] = pick(fkey, "cut", ("none", "chamfer", "round"), art["cut"], salt)
@@ -246,7 +249,8 @@ def make(brief: dict) -> dict:
     genes["wall"] = wall
     genes["trim"] = trim
     genes["glass"] = pick(fkey, "glass", SY.GLASS, None, salt)
-    genes["roof"] = pick(fkey, "roof", SY.ROOFS, None, salt)
+    genes["roof"] = pick(fkey, "roof", SY.ROOFS_INDUSTRIAL if body in SY.INDUSTRIAL else SY.ROOFS,
+                         None, salt)
     dist = spec.get("district") or {}
     wear0 = float(era_style.get("wear", 0.4)) * float(dist.get("wear", 1.0))
     grime = float((b.get("style") or {}).get("grime", 0.4))
@@ -348,6 +352,9 @@ def effective(genome: dict, used: dict) -> dict:
         out["finish"] = genes["finish"]
     if used.get("base"):
         out["base"] = genes["base"]
+    if used.get("dado"):
+        out["dado"] = genes["dado"]
+        out["dado_m"] = cont["dado_m"]
     for gene in ("wear", "dirt_m", "wall_v", "wall_w", "roof_v"):
         out[gene] = cont[gene]
     return out
