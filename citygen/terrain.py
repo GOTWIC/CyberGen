@@ -664,13 +664,22 @@ def water_union(model):
     return G.union([poly for _, _, poly, _ in water_bodies(model)])
 
 
-def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = None) -> Graded:
+def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = None,
+          level: dict | None = None) -> Graded:
     """Grade lines of every road: the profile closest to the natural ground in the largest
     deviation (the mean of the lowest and highest profiles within the grade limits) on the
     graph of all roads, every node and every crossing without a node shared. `held` (M10, a
     district regeneration): segment id -> the grade line it keeps, [(s, z)]; their vertices
-    are fixed at it and the rest is fitted to them."""
+    are fixed at it and the rest is fitted to them. `level`: (segment id, node id) -> the
+    junction's run along that leg's centerline (out to the edge of its polygon, past its curb
+    and sidewalk corners: `junctions.cutbacks`, `run_along`), at most 0.45 of the leg; at a
+    junction of local roads the grade line holds the node's height over it, so its roads
+    meet at one height at the corners (a primary road keeps its grade through its
+    junctions: levelled, its fills and cuts would pass CUT_MAX_M and FILL_MAX_M)."""
     held = held or {}
+    primary = {n for s in segments if s["road_class"] in PRIMARY or _ramp(s)
+               for n in (s["start"], s["end"])}
+    level = {k: v for k, v in (level or {}).items() if k[1] not in primary}
     node_pos = {n["id"]: tuple(n["position"][:2]) for n in nodes}
     cross = crossings(segments)
     vid: dict = {}
@@ -691,6 +700,8 @@ def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = Non
         stations = {round(L * k / n, 2): None for k in range(n + 1)}
         for sx, key in cross.get(s["id"], []):
             stations[sx] = key
+        for sx in _level_runs(s, round(L, 2), level):
+            stations.setdefault(sx, None)
         ss = sorted(stations)
         ch = []
         for k, sv in enumerate(ss):
@@ -708,13 +719,16 @@ def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = Non
     adj: list[list[tuple[int, int]]] = [[] for _ in pos]
     for s in segments:
         g = MAX_GRADE.get(s["road_class"], 0.12)
-        if s["attrs"].get("ramp") or s.get("type", "").endswith(".ramp"):
+        if _ramp(s):
             g = MAX_GRADE["highway"]
         zp = _zp(s.get("z_profile") or [])
         ch = chains[s["id"]]
+        r0, r1 = _level_runs(s, ch[-1][0], level)
         for (s0, a), (s1, b) in zip(ch, ch[1:]):
             dz = abs(z_on(zp, s1) - z_on(zp, s0)) if zp else 0.0
             cap = int(math.floor(max(0.0, g * (s1 - s0) - dz) * 100.0))
+            if s1 <= r0 or s0 >= r1:
+                cap = 0     # inside a junction: level
             adj[a].append((b, cap))
             adj[b].append((a, cap))
     tgt = [int(round(nat.at(x, y) * 100.0)) for x, y in pos]
@@ -741,6 +755,18 @@ def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = Non
     st["graph_vertices"] = len(pos)
     st["crossings"] = sum(len(v) for v in cross.values()) // 2
     return Graded(ground, node_ground, fin, walls, bores, viaducts, st)
+
+
+def _ramp(s: dict) -> bool:
+    return bool(s["attrs"].get("ramp")) or s.get("type", "").endswith(".ramp")
+
+
+def _level_runs(s: dict, L: float, level: dict) -> tuple[float, float]:
+    """(end of the level run at the start node, start of the one at the end node) along a
+    segment of length L: stations on the 0.01 m grid, 0 and L where its node is no junction."""
+    a = level.get((s["id"], s["start"]), 0.0)
+    b = level.get((s["id"], s["end"]), 0.0)
+    return round(min(a, 0.45 * L), 2), round(L - min(b, 0.45 * L), 2)
 
 
 BLEND_M = 6.0           # the ground beside a road meets the natural ground over this run

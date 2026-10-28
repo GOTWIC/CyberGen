@@ -364,6 +364,8 @@ the sweep; the tests that read `docs/progress` run again after main's folder ren
   doubled 1 cm apart, a neighbor laid later can come back with its grid at other offsets
   (the splice then keeps both grids), and M3's lot draws by build-order index reseed a
   neighbor whose seam block splits differently. Fixing the last moves every city's
-  buildings (new goldens), so it belongs to its own change.
+  buildings (new goldens), so it belongs to its own change. Fixed after M15, all but the
+  lot draws: every district regenerates with every check passing
+  ([`stage1_fixes`](../stage1_fixes/)).
 - **Rivers** fall in one profile along their centerline. There are no weirs or rapids, and no
   lakes at their own level in the spec yet.

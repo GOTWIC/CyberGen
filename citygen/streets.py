@@ -38,6 +38,7 @@ output is snapped before anything measures or compares it.
 
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -218,6 +219,7 @@ class Line:
     nodes: list[tuple[float, float]] = field(default_factory=list)  # primary nodes on it
     inserts: list[tuple[float, float]] = field(default_factory=list)
     fresh: set = field(default_factory=set)  # M10: junctions only the district's new streets made
+    bored: list = field(default_factory=list)  # M10 on M13: (s0, s1) the old city bored
     attached: list[bool] = field(default_factory=lambda: [False, False])
     crosses: str | None = None          # footbridges: the water id
     water_class: str | None = None
@@ -321,6 +323,11 @@ def _project(pts, p) -> tuple[float, float, tuple[float, float], int]:
             best = (acc + t * L, d, q, i)
         acc += L
     return best
+
+
+def _turn_deg(u, v) -> float:
+    """Angle in degrees between two directions (0 to 180)."""
+    return M.degrees(M.atan2(abs(u[0] * v[1] - u[1] * v[0]), u[0] * v[0] + u[1] * v[1]))
 
 
 def _angle_between(u, v) -> float:
@@ -452,7 +459,14 @@ class SegIndex:
             out.update(self.buckets.get(key, ()))
         return sorted(out)
 
+    def copy(self) -> "SegIndex":
+        out = SegIndex(self.cell)
+        out.buckets = {k: list(v) for k, v in self.buckets.items()}
+        out.keys_of = {k: set(v) for k, v in self.keys_of.items()}
+        return out
 
+
+BORE_PAD_M = 20.0     # M10 on M13: no new junction this close to an old bored stretch
 FRAME_SNAP_M = 25.0   # M10: a street of a regenerated district meets a held road at an old
                       # node at most this far from where it would have met it
 
@@ -477,9 +491,12 @@ class Frame:
     roads that lie in it more than 1 m from its edge; those are built anew."""
 
     def __init__(self, model, name: str, did: str, polygon, base_arch: dict,
-                 pins=(), keep_out=None, pin_buildings=()):
+                 pins=(), keep_out=None, pin_buildings=(), old_entry=None):
         self.name, self.did = name, did
         self.base_arch = base_arch
+        # the district's spec entry in the old city (its seed salted as the build's layout):
+        # its old streets are laid again for the districts after it (`_Ghosts`)
+        self.old_entry = old_entry
         self.pins = set(pins)          # pinned roads are held too (`overrides.py`)
         self.keep_out = keep_out       # pinned buildings and open spaces: no new streets
         # pinned buildings of the district: a lot of their own (`blocks._frame_lots`), M3
@@ -487,6 +504,9 @@ class Frame:
         self.pin_buildings = list(pin_buildings)
         self.zone = G.qpoly(polygon.buffer(2.0, join_style="mitre"))
         self.core = G.qpoly(polygon.buffer(-1.0, join_style="mitre"))
+        # M13: the old city's bored stretches of primary road (no new street meets them)
+        self.bores = [LineString([(p[0], p[1]) for p in t.line]) for t in model.tunnels
+                      if t.kind == "bored" and len(t.line) >= 2]
         shapely.prepare(self.zone)
         shapely.prepare(self.core)
         pos = {n.id: (G.q(n.position[0]), G.q(n.position[1])) for n in model.road_nodes}
@@ -581,6 +601,25 @@ class Frame:
         """The ends of the held segments through p (where a held street through p met
         other roads in the old city)."""
         return self._met.get(p, set())
+
+    def old_point(self, p) -> bool:
+        """Whether p is a node or a vertex of a held road in the old city (a held road may be
+        split there: its old cleanup can have merged a junction into a road's course)."""
+        return p in self.nodes or p in self._met
+
+    def bored_spans(self, pts) -> list[tuple[float, float]]:
+        """(s0, s1) along a primary road of the old city's bored stretches on it, BORE_PAD_M
+        longer at each end."""
+        if not self.bores:
+            return []
+        line = LineString(pts)
+        out = []
+        for b in self.bores:
+            if line.distance(b) > 1.0 or line.buffer(1.0).intersection(b).length < 1.0:
+                continue
+            s0, s1 = sorted((line.project(Point(b.coords[0])), line.project(Point(b.coords[-1]))))
+            out.append((round(s0 - BORE_PAD_M, 2), round(s1 + BORE_PAD_M, 2)))
+        return sorted(out)
 
     def gates_near(self, q, r: float) -> list[tuple]:
         """The gates closer than r to q."""
@@ -750,6 +789,97 @@ RESTORED = ("type", "road_class", "lanes", "width_m", "centerline", "level", "z_
             "cross_section", "one_way", "clearance_m", "name")
 
 
+def _clone(ln: "Line") -> "Line":
+    """A copy of a line whose lists change apart from the original's."""
+    c = copy.copy(ln)
+    c.pts, c.forbid, c.junctions = list(ln.pts), list(ln.forbid), list(ln.junctions)
+    c.nodes, c.inserts, c.attached = list(ln.nodes), list(ln.inserts), list(ln.attached)
+    c.fresh = set(ln.fresh)
+    return c
+
+
+class _Ghosts:
+    """M10: the old streets of a regenerated district, for the districts laid after it. In the
+    old city their streets were laid against the district's old ones (they run alongside them,
+    end on them, take their junctions), so while they are laid again the district's old fill
+    stands in for its new one: replayed (its old spec entry, no frame) on a snapshot of the
+    lines taken before the district's turn. The lines laid before the district then look as
+    the old fill left them, the new streets are hidden and the old ones added; `restore` puts
+    the new streets back, keeps what the later districts added to the earlier lines, and
+    drops the old streets (a later street that ended on one keeps its end there, an old node
+    the new streets may meet)."""
+
+    def __init__(self, B: "Builder"):
+        self.n0 = len(B.lines)
+        self.pre = [_clone(ln) for ln in B.lines]
+        self.index = B.index.copy()
+
+    def lay(self, B: "Builder", entry) -> None:
+        """After the district's new streets: its old fill replayed, then swapped in."""
+        name = B.frame.name
+        O = copy.copy(B)
+        O.frame, O.lines, O.index, O.notes = None, self.pre, self.index, []
+        O.net = StreetNet()
+        O.dspec = {**B.dspec, name: entry}
+        O.arch = {**B.arch, name: entry.archetype}
+        if B.frame.keep_out is not None and not B.frame.keep_out.is_empty:
+            # (the old city had no pinned ground in the district: the free land as it was)
+            O.closed = G.union([G.qpoly(B.reserves.buffer(CLOSED_PAD_M, join_style="mitre")),
+                                B.cones, B.open_land, B.pinned0])
+            shapely.prepare(O.closed)
+            O.pinned = B.pinned0
+            O.free = {**B.free, name: O.free_area(name)}
+        if name in O.free and not O.free[name].is_empty:
+            fill_district(O, name)
+        self.old = O.lines
+        self.kept = [_clone(B.lines[i]) for i in range(self.n0)]
+        self.new = [li for li in range(self.n0, len(B.lines)) if not B.lines[li].dead]
+        for i in range(self.n0):
+            self._set(B, i, O.lines[i])
+        for li in self.new:
+            B.lines[li].dead = True
+            B.index.remove_line(li)
+        self.g0 = len(B.lines)
+        for g in O.lines[self.n0:]:
+            li = B.add(_clone(g))
+            if g.dead:
+                B.lines[li].dead = True
+                B.index.remove_line(li)
+        self.g1 = len(B.lines)
+
+    @staticmethod
+    def _set(B: "Builder", i: int, src: "Line") -> None:
+        ln = B.lines[i]
+        moved = ln.pts != src.pts or ln.dead != src.dead
+        ln.pts, ln.forbid, ln.junctions = list(src.pts), list(src.forbid), list(src.junctions)
+        ln.nodes, ln.inserts, ln.attached = list(src.nodes), list(src.inserts), list(src.attached)
+        ln.fresh, ln.dead = set(src.fresh), src.dead
+        if moved:
+            B.index.remove_line(i)
+            if not ln.dead:
+                B.index.add(i, ln.pts)
+
+    def restore(self, B: "Builder") -> None:
+        for i in range(self.n0):
+            ln, old, new = B.lines[i], self.old[i], self.kept[i]
+            ins = ln.inserts[len(old.inserts):]      # what the later districts added
+            js = [j for j in ln.junctions if j not in old.junctions]
+            att = [a if a != o else n for a, o, n in zip(ln.attached, old.attached,
+                                                          new.attached)]
+            self._set(B, i, new)
+            ln.inserts += ins
+            ln.junctions += [j for j in js if j not in ln.junctions]
+            ln.fresh -= set(js)
+            ln.attached = att
+        for li in range(self.g0, self.g1):
+            if not B.lines[li].dead:
+                B.lines[li].dead = True
+                B.index.remove_line(li)
+        for li in self.new:
+            B.lines[li].dead = False
+            B.index.add(li, B.lines[li].pts)
+
+
 def _cross_exact(a, b, c, d):
     """Intersection of segments ab and cd on the cm grid (exact); None when they do not meet
     in a single point. Returns (point, t on ab as a Fraction)."""
@@ -816,6 +946,7 @@ class Builder:
         self.pin_feet = G.union(feet) if feet else Polygon()
         self.pinned = G.qpoly(G.union(feet).buffer(PIN_CLEAR_M, join_style="mitre")) \
             if feet else Polygon()
+        self.pinned0 = self.pinned       # (M10: without the regenerated district's pins)
         if frame is not None and frame.keep_out is not None and not frame.keep_out.is_empty:
             # M10: pinned buildings and open spaces of a regenerated district keep their ground
             self.pin_feet = G.union([self.pin_feet, frame.keep_out])
@@ -828,6 +959,7 @@ class Builder:
         self.index = SegIndex()
         self.net = StreetNet()
         self._primary_lines()
+        self.n_frame = len(self.lines)    # (the lines of the shared frame, `build_frame`)
 
     # --- lines -----------------------------------------------------------------------
 
@@ -863,6 +995,11 @@ class Builder:
             w = s["width_m"] + (2.0 * TUNNEL_SIDE_M if s.get("tunnel") else 0.0)
             ln = Line(pts, s["road_class"], w, s["attrs"].get("role", "primary"),
                       name=s.get("name"), section=s["cross_section"], primary=s, forbid=forbid)
+            # (M10 on M13: in a regeneration, no new street of the district meets it where
+            # the old city bored through a hill: a junction there would leave the cuts on
+            # both sides too short to bore)
+            if self.frame is not None:
+                ln.bored = self.frame.bored_spans(pts)
             for end in (s["start"], s["end"]):
                 p = nodes[end]["position"]
                 ln.junctions.append((p[0], p[1]))
@@ -915,14 +1052,19 @@ class Builder:
             gap = d - t.width / 2
             if gap <= reach and gap < best.get(tj, math.inf):
                 best[tj] = gap
+        held = self.frame is not None and not self._renewed(ln)
         for tj in sorted(best, key=lambda j: (best[j], j)):
             t = self.lines[tj]
             if t.no_junction and not (allow_highway and t.cls == "highway"):
                 continue
+            if held and self._laid_anew(tj):
+                continue    # M10: a held street meets the district only where it did
             new = self._attach_to(pts, t, angle, reach, ln.inserts, self._renewed(ln))
             if new is None:
                 continue
             q = new[-1]
+            if held and t.no_junction and q not in self.frame.nodes:
+                continue    # (nor a highway access the old city did not have)
             if end == 0:
                 new = new[::-1]
             self.replace_pts(li, new)
@@ -957,11 +1099,13 @@ class Builder:
         t = self.lines[tj]
         if t.no_junction:
             return False
-        if not self._legal(t, q, _project(t.pts, q)[0]):
+        if not self._legal(t, q, _project(t.pts, q)[0], self._renewed(ln)):
             return False
         j = self._junction_near(t, q, p, self._renewed(ln))
         if j is not None:
             q = j
+        if self.frame is not None and not self._renewed(ln) and self._laid_anew(tj):
+            return False    # M10: a held street meets the district only where it did
         if self._renewed(ln):
             q = self.frame.meet(t, q)
             if q is None:
@@ -1008,8 +1152,10 @@ class Builder:
         elif not renewed:
             t.fresh.discard(q)
 
-    def _legal(self, t: Line, q, s: float) -> bool:
+    def _legal(self, t: Line, q, s: float, renewed: bool = False) -> bool:
         if any(s0 - 5.0 <= s <= s1 + 5.0 for s0, s1 in t.forbid):
+            return False
+        if renewed and any(s0 <= s <= s1 for s0, s1 in t.bored):
             return False
         return not any(_dist(j, q) < PRIMARY_NODE_GAP_M for j in t.nodes)
 
@@ -1017,6 +1163,11 @@ class Builder:
         """M10: a street of the district being regenerated (it meets held roads only at
         their nodes; every other street is built as it was)."""
         return self.frame is not None and self.frame.free_local(ln)
+
+    def _laid_anew(self, tj: int) -> bool:
+        """M10: a street the regenerated district laid anew (not one of its frame streets,
+        which the shared frame lays as it was)."""
+        return tj >= self.n_frame and self._renewed(self.lines[tj])
 
     def _attach_to(self, pts, t: Line, angle: float, reach: float, keep=(),
                    renewed: bool = False):
@@ -1034,12 +1185,12 @@ class Builder:
                 q = r
         q = q[0] if q is not None else _pt(*_project(t.pts, p)[2])
         s = _project(t.pts, q)[0]
-        if not self._legal(t, q, s):
+        if not self._legal(t, q, s, renewed):
             return None
         j = self._junction_near(t, q, p, renewed)
         if j is not None:
             q = j
-            if not self._legal(t, q, _project(t.pts, q)[0]):
+            if not self._legal(t, q, _project(t.pts, q)[0], renewed):
                 return None
         else:
             for e in (t.pts[0], t.pts[-1]):
@@ -1049,9 +1200,8 @@ class Builder:
             q = self.frame.meet(t, q)  # M10: a held road is met at one of its nodes
             if q is None:
                 return None
-        tang = self._tangent(t.pts, q)
         a = _unit(q[0] - back[0], q[1] - back[1])
-        if _dist(q, back) >= 1.0 and _angle_between(a, tang) >= angle:
+        if _dist(q, back) >= 1.0 and self._meets(t, q, a, angle, renewed):
             if _dist(p, q) > 3.0:
                 d1 = _unit(q[0] - p[0], q[1] - p[1])
                 if d0[0] * d1[0] + d0[1] * d1[1] < 0.64:  # a hook of over 50 degrees
@@ -1063,7 +1213,7 @@ class Builder:
             pb = _pt(*pb)
             s2, _, q2, _ = _project(t.pts, pb)
             q2 = _pt(*q2)
-            if not self._legal(t, q2, s2):
+            if not self._legal(t, q2, s2, renewed):
                 return None
             if renewed:
                 q2 = self.frame.meet(t, q2)
@@ -1073,7 +1223,7 @@ class Builder:
             prev, _ = _along(pts[::-1], min(30.0, _plen(pts)))
             a_prev = _unit(pb[0] - prev[0], pb[1] - prev[1])
             turn = M.degrees(M.acos(max(-1.0, min(1.0, a_prev[0] * a2[0] + a_prev[1] * a2[1]))))
-            if _angle_between(a2, self._tangent(t.pts, q2)) < angle or turn > 65.0 or \
+            if not self._meets(t, q2, a2, angle, renewed) or turn > 65.0 or \
                     _dist(q2, pb) > 40.0:
                 return None
             sb = _project(pts, pb)[0]
@@ -1088,6 +1238,17 @@ class Builder:
             if self.closed.intersects(link) and link.intersection(self.closed).length > 0.5:
                 return None
         return _dedupe(new)
+
+    def _meets(self, t: Line, q, a, angle: float, renewed: bool) -> bool:
+        """Whether a street arriving along direction a meets road t at q at `angle` or more.
+        M10: an old node a regenerated district's street meets is often where a held road
+        bends; there it makes that angle with both of the road's legs."""
+        if renewed and q in t.pts[1:-1]:
+            i = t.pts.index(q, 1)
+            w = (-a[0], -a[1])
+            return all(_turn_deg(w, _unit(r[0] - q[0], r[1] - q[1])) >= angle
+                       for r in (t.pts[i - 1], t.pts[i + 1]))
+        return _angle_between(a, self._tangent(t.pts, q)) >= angle
 
     @staticmethod
     def _tangent(pts, q):
@@ -2358,14 +2519,15 @@ def link_dead_ends(B: Builder) -> None:
                 n["id"] in traced and n["position"][2] > LOCAL_JUNCTION_Z_M):
             deg[(G.q(n["position"][0]), G.q(n["position"][1]))] = n
     for p in sorted(deg):
-        best = None
-        for tj, k in B.index.near(p, pad=40.0):
-            t = B.lines[tj]
-            if tj < B.n_primary or t.dead or t.cls in ("footbridge", "pedestrian"):
-                continue
-            d, q, _ = _seg_dist(p, t.pts[k], t.pts[k + 1])
-            if d <= 35.0 and (best is None or d < best[0] - 1e-9):
-                best = (d, tj, _pt(*q))
+        best = _end_target(B, p)
+        if B.frame is not None and best is not None and B._laid_anew(best[1]):
+            # M10: a new street of the district is nearest; the link onto a held road that
+            # the old city had here stays as it was
+            hb = _end_target(B, p, held=True)
+            if hb is not None and hb[0] >= 0.5:
+                q = B._junction_near(B.lines[hb[1]], hb[2], p, False) or hb[2]
+                if B.frame.match([p, q]) is not None:
+                    best = (hb[0], hb[1], q)
         if best is None or best[0] < 0.5:
             continue
         _, tj, q = best
@@ -2390,6 +2552,21 @@ def link_dead_ends(B: Builder) -> None:
         B.lines[li].attached = [True, True]
         t.inserts.append(q)
         B._joined(t, q, renewed)
+
+
+def _end_target(B: Builder, p, held: bool = False):
+    """(distance, line, nearest point) of the local road nearest a primary dead end p
+    (within 35 m), else None; `held` (M10): not of the district's new streets."""
+    best = None
+    for tj, k in B.index.near(p, pad=40.0):
+        t = B.lines[tj]
+        if tj < B.n_primary or t.dead or t.cls in ("footbridge", "pedestrian") or (
+                held and B._laid_anew(tj)):
+            continue
+        d, q, _ = _seg_dist(p, t.pts[k], t.pts[k + 1])
+        if d <= 35.0 and (best is None or d < best[0] - 1e-9):
+            best = (d, tj, _pt(*q))
+    return best
 
 
 def _pairs(idx):
@@ -2490,11 +2667,15 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
         ln = B.lines[li]
         if ln.cls in PEDESTRIAN:
             continue
+        # M10: a held road is split only at an old node (a link the old city had there)
+        held = B.frame is not None and not B._renewed(ln)
         L = _plen(ln.pts)
         n = max(int(L / 15.0), 1)
         for k in range(n + 1):
             a, _ = _along(ln.pts, L * k / n)
             a = _pt(*a)
+            if held and not B.frame.old_point(a):
+                continue
             best = None
             for tj, kk in B.index.near(a, pad=55.0):
                 if tj not in main_set:
@@ -2509,13 +2690,15 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
                 continue
             d, tj, q = best
             t = B.lines[tj]
-            if not B._legal(t, q, _project(t.pts, q)[0]):
+            if not B._legal(t, q, _project(t.pts, q)[0], B._renewed(ln)):
                 continue
             j = B._junction_near(t, q, a, B._renewed(ln))
             if j is not None:
                 q = j
             if B._renewed(ln) and B.frame.holds(t, q):
                 continue  # M10: no new link from the district onto a held road
+            if held and not B._laid_anew(tj) and not B.frame.old_point(q):
+                continue
             link = LineString([a, q])
             if _dist(a, q) < 1.0 or link.intersection(B.wet).length > 0.5 or (
                     B.closed.intersects(link) and link.intersection(B.closed).length > 0.5):
@@ -2527,8 +2710,10 @@ def _link_group(B: Builder, group: list[int], main_set: set) -> bool:
                 continue
             sec = ln.section if ln.cls in ("street", "service") else \
                 cross_section("street", B.arch.get(ln.district))
+            # (M10: a held road's link onto the district's new streets is the district's)
+            dist = B.frame.name if held and B._laid_anew(tj) else ln.district
             cj = B.add(Line([a, q], "street" if ln.cls != "service" else "service",
-                            sec["total_width_m"], "connector", ln.district, section=sec))
+                            sec["total_width_m"], "connector", dist, section=sec))
             B.lines[cj].attached = [True, True]
             ln.inserts.append(a)
             ln.junctions.append(a)
@@ -3019,6 +3204,14 @@ def drop_unnoded_crossings(B: Builder, edges) -> tuple[list, int]:
 
 def clean_graph(B: Builder, edges):
     notes = []
+    if B.frame is not None:
+        # M10: held roads that reached the network only through the district's old streets
+        # join its new ones first (else they would be taken for an island and made
+        # pedestrian)
+        edges, n_link = _frame_join(B, edges)
+        if n_link:
+            notes.append(f"{n_link} held roads cut off from the network joined to the "
+                         "regenerated district")
     edges = _merge_and_trim(B, edges)
     edges, n_ang = fix_angles(B, edges)
     edges, n_dup = fix_duplicates(B, edges)
@@ -3096,51 +3289,114 @@ def clean_graph(B: Builder, edges):
 RECONNECT_M = 60.0
 
 
-def _reconnect(B: Builder, edges, find, weight):
+def _frame_join(B: Builder, edges):
+    """`_reconnect` on the vehicle network of the noded edges (M10): held roads that cars
+    reached only through the district's old streets."""
+    parent: dict = {}
+
+    def find(x):
+        while parent.setdefault(x, x) != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    veh = [(pts, li) for pts, li in edges if B.lines[li].cls in VEHICLE]
+    for pts, li in veh:
+        parent[find(pts[0])] = find(pts[-1])
+    weight: dict = {}
+    for pts, li in veh:
+        r = find(pts[0])
+        weight[r] = weight.get(r, 0.0) + (1e6 if li < B.n_primary else _plen(pts))
+    if not weight:
+        return edges, 0
+    n, edges = _reconnect(B, edges, find, weight, vehicle=True)
+    return edges, n
+
+
+def _legs_ok(legs: list, p, u, amin: float) -> bool:
+    """A link leaving p along u meets the roads at p (their directions from p) at `amin` or
+    more; at a dead end it runs on without turning back."""
+    if len(legs) == 1:
+        return _turn_deg(u, _unit(legs[0][0] - p[0], legs[0][1] - p[1])) >= 90.0
+    return all(_turn_deg(u, _unit(v[0] - p[0], v[1] - p[1])) >= amin for v in legs)
+
+
+def _reconnect(B: Builder, edges, find, weight, vehicle: bool = False):
     """M10: a group of held roads that reached the network only through the district's
-    old streets (a promenade, a lane) is joined to its new streets: a link from the group's
-    node nearest a new street of the district (within RECONNECT_M) to that street, which is
-    split there. Returns (links, edges)."""
+    old streets (a promenade, a lane) is joined to its new streets: a link from a node of
+    the group to a new street of the district (within RECONNECT_M), which is split there.
+    `vehicle`: the components are the vehicle network's, the groups its held roads and the
+    link a street onto a new vehicle street. Returns (links, edges)."""
     main = max(sorted(weight), key=lambda r: weight[r])
     fr = B.frame
     free = [k for k, (pts, li) in enumerate(edges)
             if find(pts[0]) == main and fr.free_local(B.lines[li]) and
-            B.lines[li].cls not in ("footbridge",)]
+            B.lines[li].cls not in ("footbridge",) and
+            (not vehicle or B.lines[li].cls in VEHICLE)]
     if not free:
         return 0, edges
     lines = [LineString(edges[k][0]) for k in free]
     tree = shapely.STRtree(lines)
     groups: dict = {}
     for k, (pts, li) in enumerate(edges):
+        if vehicle and B.lines[li].cls not in VEHICLE:
+            continue
         r = find(pts[0])
         if r != main and _held(B, pts):
             groups.setdefault(r, []).append(k)
+    amin = min_angle(B.arch[fr.name])
     n = 0
     for r in sorted(groups):
+        legs: dict = {}
+        for pts, li in edges:
+            legs.setdefault(pts[0], []).append(pts[1])
+            legs.setdefault(pts[-1], []).append(pts[-2])
         nodes = sorted({q for k in groups[r] for q in (edges[k][0][0], edges[k][0][-1])})
         ped = all(B.lines[edges[k][1]].cls in PEDESTRIAN for k in groups[r])
-        best = None
+        # the link that meets the roads at both ends at the district's junction angle,
+        # shortest first (else the shortest): from a node of the group to the nearest point
+        # of a new street, or to one of its ends
+        cands = []
         for p in nodes:
             for j in sorted(int(x) for x in tree.query(Point(p), predicate="dwithin",
                                                          distance=RECONNECT_M)):
-                d = lines[j].distance(Point(p))
-                if best is None or (round(d, 6), p, j) < best[:3]:
-                    best = (round(d, 6), p, j)
-        if best is None or best[0] < 1.0:
+                pts = edges[free[j]][0]
+                s, _, q, i = _project(pts, p)
+                q = _pt(*q)
+                if _dist(q, pts[0]) < 8.0:
+                    q = pts[0]
+                elif _dist(q, pts[-1]) < 8.0:
+                    q = pts[-1]
+                # (and points along the street, where the nearest would meet it too sharply)
+                Lj = _plen(pts)
+                along = [_pt(*_along(pts, Lj * m / max(1, int(Lj / 4.0)))[0])
+                         for m in range(1, max(1, int(Lj / 4.0)))]
+                for qq in sorted({q, pts[0], pts[-1], *along}):
+                    L = _dist(p, qq)
+                    if L < 1.0 or L > RECONNECT_M:
+                        continue
+                    u = _unit(qq[0] - p[0], qq[1] - p[1])
+                    if qq in (pts[0], pts[-1]):
+                        at_q = legs.get(qq)
+                    else:
+                        iq = _project(pts, qq)[3]
+                        at_q = [pts[iq], pts[iq + 1]]
+                    ok = _legs_ok(legs.get(p, []), p, u, amin) and \
+                        _legs_ok(at_q, qq, (-u[0], -u[1]), amin)
+                    cands.append((not ok, qq != q and not ok, round(L, 6), p, j, qq))
+        best = None
+        for _, _, _, p, j, q in sorted(cands):
+            link = LineString([p, q])
+            if not (link.intersection(B.wet).length > 0.5 or (
+                    B.closed.intersects(link) and link.intersection(B.closed).length > 0.5)):
+                best = (p, j, q)
+                break
+        if best is None:
             continue
-        _, p, j = best
+        p, j, q = best
         k = free[j]
         pts, li = edges[k]
-        s, _, q, i = _project(pts, p)
-        q = _pt(*q)
-        if _dist(q, pts[0]) < 8.0:
-            q = pts[0]
-        elif _dist(q, pts[-1]) < 8.0:
-            q = pts[-1]
-        link = LineString([p, q])
-        if link.length < 1.0 or link.intersection(B.wet).length > 0.5 or (
-                B.closed.intersects(link) and link.intersection(B.closed).length > 0.5):
-            continue
+        i = _project(pts, q)[3]
         if q not in (pts[0], pts[-1]):
             a_, b_ = _dedupe(list(pts[:i + 1]) + [q]), _dedupe([q] + list(pts[i + 1:]))
             if len(a_) < 2 or len(b_) < 2:
@@ -3443,14 +3699,33 @@ def _grade_separations(net: StreetNet) -> None:
 def build_streets(spec: CitySpec, h, polygons: dict, district_ids: dict, waterways, sites,
                   roads, open_polys: list, frame: Frame | None = None) -> StreetNet:
     B = Builder(spec, h, polygons, district_ids, waterways, sites, roads, open_polys, frame)
+    # (M10: the shared frame as in the old city, unless the district's archetype changed: then
+    # its own frame streets meet the held roads at old nodes)
+    if frame is not None and frame.old_entry is not None and \
+            frame.old_entry.archetype == B.arch[frame.name]:
+        B.frame = None
     build_frame(B)
-    if frame is not None:
-        frame.inject(B)
+    B.n_frame = len(B.lines)
+    ghosts = None
     for d in spec.districts:
+        # M10: the regenerated district's streets with the frame; every other district's as
+        # in the old city (no frame, the same lines before them: the district's old ones
+        # standing in for its new ones after its turn, `_Ghosts`)
+        here = frame is not None and d.name == frame.name
+        B.frame = frame if here or (B.past_turn and ghosts is None) else None
+        if here:
+            if frame.old_entry is not None:
+                ghosts = _Ghosts(B)
+            frame.inject(B)
         if d.name in B.free and not B.free[d.name].is_empty:
             fill_district(B, d.name)
-        if frame is not None and d.name == frame.name:
+        if here:
             B.past_turn = True
+            if ghosts is not None:
+                ghosts.lay(B, frame.old_entry)
+    B.frame = frame
+    if ghosts is not None:
+        ghosts.restore(B)
     footbridges(B)
     link_dead_ends(B)
     for _ in range(3):

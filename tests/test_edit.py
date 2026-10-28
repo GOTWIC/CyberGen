@@ -190,6 +190,17 @@ def _outside_kept(b, r, name: str) -> None:
     assert not far, far[:5]
 
 
+def test_regeneration_of_the_first_district_keeps_the_ones_after_it():
+    """The districts laid after the regenerated one are laid again against its old streets
+    (`streets._Ghosts`), so they come back as they were, with every road outside it."""
+    _, b, st = small()
+    first = b.spec.districts[0].name
+    r, rec = regenerated(first)
+    assert all(c.passed for c in r.checks), [(c.id, c.failures[:2]) for c in r.checks
+                                             if not c.passed]
+    _outside_kept(b, r, first)
+
+
 def test_regeneration_with_new_spec_fields():
     data, b, st = small()
     spec2 = copy.deepcopy(data)

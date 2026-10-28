@@ -1,0 +1,1276 @@
+model fields: spec_sha256, terrain
+bridges: 0 added, 0 removed, 1 changed
+  ~ br.w1112n699 (segment_ids)
+districts: 0 added, 0 removed, 1 changed
+  ~ d04 (seed)
+road_nodes: 1029 added, 1049 removed, 43 changed
+  + rn.w1001n1118
+  + rn.w1002n1261
+  + rn.w1003n1434
+  + rn.w1003n930
+  + rn.w1004n801
+  + rn.w1005n1037
+  + rn.w1005n897
+  + rn.w1006n573
+  + rn.w1010n1205
+  + rn.w1010n543
+  + rn.w1010n575
+  + rn.w1012n1021
+  + rn.w1013n433
+  + rn.w1014n1160
+  + rn.w1015n497
+  + rn.w1016n938
+  + rn.w1017n1077
+  + rn.w1018n1389
+  + rn.w1018n466
+  + rn.w1019n1126
+  + ... 1009 more
+  - rn.w1001n606
+  - rn.w1003n1191
+  - rn.w1003n1254
+  - rn.w1003n1362
+  - rn.w1003n886
+  - rn.w1004n1223
+  - rn.w1004n434
+  - rn.w1006n907
+  - rn.w1007n423
+  - rn.w1008n1049
+  - rn.w1009n464
+  - rn.w1009n917
+  - rn.w1011n801
+  - rn.w1012n482
+  - rn.w1013n982
+  - rn.w1014n1189
+  - rn.w1014n645
+  - rn.w1014n959
+  - rn.w1015n1284
+  - rn.w1016n972
+  - ... 1029 more
+  ~ rn.w1092n801 (ground_m)
+  ~ rn.w1097n682 (ground_m)
+  ~ rn.w1112n1455 (attrs, ground_m)
+  ~ rn.w1112n375 (attrs)
+  ~ rn.w1112n776 (ground_m)
+  ~ rn.w1127n691 (ground_m)
+  ~ rn.w1132n801 (ground_m)
+  ~ rn.w1143n321 (attrs)
+  ~ rn.w1165n316 (attrs)
+  ~ rn.w1228n301 (attrs)
+  ~ rn.w1238n691 (ground_m)
+  ~ rn.w1244n715 (ground_m)
+  ~ rn.w1274n290 (attrs)
+  ~ rn.w1308n676 (ground_m, position)
+  ~ rn.w1312n751 (ground_m, position)
+  ~ rn.w1420n255 (attrs)
+  ~ rn.w1493n751 (ground_m)
+  ~ rn.w1513n1423 (ground_m, position)
+  ~ rn.w1533n751 (ground_m)
+  ~ rn.w1533n801 (ground_m)
+  ~ ... 23 more
+road_segments: 1541 added, 1535 removed, 17 changed
+  + rs.w1000n1173
+  + rs.w1000n1453
+  + rs.w1001n431
+  + rs.w1002n1322
+  + rs.w1002n832
+  + rs.w1003n1071
+  + rs.w1003n403
+  + rs.w1003n462
+  + rs.w1003n951
+  + rs.w1004n1215
+  + rs.w1004n357
+  + rs.w1005n610
+  + rs.w1006n1018
+  + rs.w1008n1295
+  + rs.w1008n558
+  + rs.w1009n1029
+  + rs.w1009n1098
+  + rs.w1010n1122
+  + rs.w1010n934
+  + rs.w1014n1192
+  + ... 1521 more
+  - rs.w1000n1030
+  - rs.w1000n1245
+  - rs.w1000n413
+  - rs.w1000n599
+  - rs.w1001n801
+  - rs.w1001n877
+  - rs.w1002n1490
+  - rs.w1003n1207
+  - rs.w1003n521
+  - rs.w1004n896
+  - rs.w1005n1183
+  - rs.w1005n1460
+  - rs.w1005n835
+  - rs.w1007n1235
+  - rs.w1007n1433
+  - rs.w1007n449
+  - rs.w1007n548
+  - rs.w1007n625
+  - rs.w1008n1008
+  - rs.w1008n912
+  - ... 1515 more
+  ~ rs.w1112n999 (attrs, centerline, end, ground, start, z_profile)
+  ~ rs.w1163n1076 (attrs, centerline, cross_section, end, ground, lanes, road_class, start, type, width_m, z_profile)
+  ~ rs.w1241n703 (ground)
+  ~ rs.w1313n776 (ground)
+  ~ rs.w1339n275 (ground)
+  ~ rs.w1513n1442 (attrs, centerline, ground, z_profile)
+  ~ rs.w1584n436 (attrs, centerline, cross_section, end, ground, lanes, road_class, start, type, width_m, z_profile)
+  ~ rs.w689n922 (attrs, centerline, ground, start, z_profile)
+  ~ rs.w747n751 (attrs, centerline, end, ground, z_profile)
+  ~ rs.w800n877 (ground)
+  ~ rs.w827n925 (attrs, centerline, cross_section, end, ground, lanes, one_way, start, z_profile)
+  ~ rs.w850n631 (ground)
+  ~ rs.w867n619 (ground)
+  ~ rs.w890n620 (ground)
+  ~ rs.w893n801 (ground)
+  ~ rs.w908n801 (attrs, centerline, cross_section, ground, lanes, one_way, start, z_profile)
+  ~ rs.w997n776 (ground)
+junctions: 879 added, 867 removed, 28 changed
+  + jn.w1001n1118
+  + jn.w1003n1434
+  + jn.w1003n930
+  + jn.w1004n801
+  + jn.w1005n1037
+  + jn.w1005n897
+  + jn.w1006n573
+  + jn.w1010n1205
+  + jn.w1010n543
+  + jn.w1012n1021
+  + jn.w1013n433
+  + jn.w1014n1160
+  + jn.w1015n497
+  + jn.w1016n938
+  + jn.w1017n1077
+  + jn.w1018n1389
+  + jn.w1018n466
+  + jn.w1019n1126
+  + jn.w1019n1179
+  + jn.w1019n403
+  + ... 859 more
+  - jn.w1001n606
+  - jn.w1003n1191
+  - jn.w1003n1254
+  - jn.w1003n886
+  - jn.w1004n434
+  - jn.w1006n907
+  - jn.w1008n1049
+  - jn.w1009n464
+  - jn.w1009n917
+  - jn.w1011n801
+  - jn.w1012n482
+  - jn.w1014n1189
+  - jn.w1014n959
+  - jn.w1015n1284
+  - jn.w1016n972
+  - jn.w1017n1233
+  - jn.w1018n1079
+  - jn.w1018n1252
+  - jn.w1018n1320
+  - jn.w1019n513
+  - ... 847 more
+  ~ jn.w1041n319 (crosswalk_ids, polygon)
+  ~ jn.w1112n1455 (crosswalk_ids, legs, polygon, shape)
+  ~ jn.w1112n375 (crosswalk_ids, legs, polygon, shape)
+  ~ jn.w1112n776 (crosswalk_ids, polygon)
+  ~ jn.w1143n321 (crosswalk_ids, legs, polygon, shape)
+  ~ jn.w1207n306 (crosswalk_ids, polygon)
+  ~ jn.w1228n301 (attrs, crosswalk_ids, legs, polygon, shape)
+  ~ jn.w1244n715 (polygon)
+  ~ jn.w1274n290 (corner_radius_m, crosswalk_ids, legs, polygon, shape)
+  ~ jn.w1308n676 (polygon)
+  ~ jn.w1312n751 (attrs, corner_radius_m, polygon)
+  ~ jn.w1314n281 (attrs, corner_radius_m, crosswalk_ids, polygon)
+  ~ jn.w1420n255 (attrs, corner_radius_m, crosswalk_ids, legs, polygon, shape)
+  ~ jn.w1512n1461 (attrs, crosswalk_ids, polygon)
+  ~ jn.w1513n1423 (crosswalk_ids, polygon)
+  ~ jn.w1513n776 (crosswalk_ids, polygon)
+  ~ jn.w1553n223 (crosswalk_ids, polygon)
+  ~ jn.w1600n212 (attrs, corner_radius_m, crosswalk_ids, polygon)
+  ~ jn.w1636n204 (attrs, corner_radius_m, crosswalk_ids, legs, polygon, shape)
+  ~ jn.w720n977 (polygon)
+  ~ ... 8 more
+crosswalks: 291 added, 296 removed, 18 changed
+  + cw.w1051n334
+  + cw.w1056n320
+  + cw.w1091n1329
+  + cw.w1091n859
+  + cw.w1092n1355
+  + cw.w1092n1446
+  + cw.w1093n1194
+  + cw.w1093n1244
+  + cw.w1093n477
+  + cw.w1093n876
+  + cw.w1094n1046
+  + cw.w1094n1142
+  + cw.w1094n1257
+  + cw.w1094n1407
+  + cw.w1094n445
+  + cw.w1095n374
+  + cw.w1097n542
+  + cw.w1098n1160
+  + cw.w1098n978
+  + cw.w1099n1002
+  + ... 271 more
+  - cw.w1004n317
+  - cw.w1043n338
+  - cw.w1054n320
+  - cw.w1092n1096
+  - cw.w1092n435
+  - cw.w1093n1066
+  - cw.w1094n1132
+  - cw.w1094n1217
+  - cw.w1094n1313
+  - cw.w1094n1349
+  - cw.w1094n985
+  - cw.w1095n1014
+  - cw.w1095n894
+  - cw.w1096n1402
+  - cw.w1097n1166
+  - cw.w1097n1241
+  - cw.w1097n1456
+  - cw.w1097n849
+  - cw.w1099n520
+  - cw.w1099n631
+  - ... 276 more
+  ~ cw.w1112n1000 (junction_id, line)
+  ~ cw.w1112n1154 (junction_id, line, segment_id)
+  ~ cw.w1112n555 (junction_id, line, segment_id)
+  ~ cw.w1112n745 (segment_id)
+  ~ cw.w1288n287 (line)
+  ~ cw.w1379n265 (segment_id)
+  ~ cw.w1495n1458 (line, segment_id)
+  ~ cw.w1497n237 (segment_id)
+  ~ cw.w1513n1041 (junction_id, line, segment_id)
+  ~ cw.w1513n1236 (junction_id, line, segment_id)
+  ~ cw.w1513n254 (segment_id)
+  ~ cw.w1513n398 (junction_id, line, segment_id)
+  ~ cw.w1538n776 (line)
+  ~ cw.w712n1014 (segment_id)
+  ~ cw.w719n1131 (line, segment_id)
+  ~ cw.w732n921 (segment_id)
+  ~ cw.w793n566 (junction_id, line, segment_id)
+  ~ cw.w933n314 (line)
+sidewalks: 1910 added, 2021 removed, 46 changed
+  + rs.w1000n1173.swl
+  + rs.w1000n1173.swr
+  + rs.w1002n832.swl
+  + rs.w1002n832.swr
+  + rs.w1003n1071.swl
+  + rs.w1003n1071.swr
+  + rs.w1003n462.swl
+  + rs.w1003n462.swr
+  + rs.w1003n951.swl
+  + rs.w1003n951.swr
+  + rs.w1004n1215.swl
+  + rs.w1004n1215.swr
+  + rs.w1004n357.swl
+  + rs.w1004n357.swr
+  + rs.w1006n1018.swl
+  + rs.w1006n1018.swr
+  + rs.w1009n1029.swl
+  + rs.w1009n1029.swr
+  + rs.w1010n1122.swl
+  + rs.w1010n1122.swr
+  + ... 1890 more
+  - rs.w1000n1030.swl
+  - rs.w1000n1030.swr
+  - rs.w1000n413.swl
+  - rs.w1000n413.swr
+  - rs.w1000n599.swl
+  - rs.w1000n599.swr
+  - rs.w1001n801.swl
+  - rs.w1001n801.swr
+  - rs.w1001n877.swl
+  - rs.w1001n877.swr
+  - rs.w1004n896.swl
+  - rs.w1004n896.swr
+  - rs.w1005n1183.swl
+  - rs.w1005n1183.swr
+  - rs.w1005n1460.swl
+  - rs.w1005n1460.swr
+  - rs.w1007n1235.swl
+  - rs.w1007n1235.swr
+  - rs.w1007n1433.swl
+  - rs.w1007n1433.swr
+  - ... 2001 more
+  ~ rs.w1014n318.swl (line)
+  ~ rs.w1014n318.swr (line)
+  ~ rs.w1077n321.swl (line)
+  ~ rs.w1077n321.swr (line)
+  ~ rs.w1112n1477.swl (line)
+  ~ rs.w1112n1477.swr (line)
+  ~ rs.w1112n349.swl (line)
+  ~ rs.w1112n349.swr (line)
+  ~ rs.w1112n999.swl (line)
+  ~ rs.w1112n999.swr (line)
+  ~ rs.w1154n318.swl (line)
+  ~ rs.w1154n318.swr (line)
+  ~ rs.w1175n314.swl (line)
+  ~ rs.w1175n314.swr (line)
+  ~ rs.w1196n309.swl (line)
+  ~ rs.w1196n309.swr (line)
+  ~ rs.w1217n304.swl (line)
+  ~ rs.w1217n304.swr (line)
+  ~ rs.w1251n296.swl (line)
+  ~ rs.w1251n296.swr (line)
+  ~ ... 26 more
+lanes: 9549 added, 9454 removed, 299 changed
+  + rs.w1000n1173.b0
+  + rs.w1000n1173.b0.c1
+  + rs.w1000n1173.f0
+  + rs.w1000n1173.f0.c1
+  + rs.w1000n1173.f0.c2
+  + rs.w1000n1453.b0
+  + rs.w1000n1453.b0.c1
+  + rs.w1000n1453.b0.c2
+  + rs.w1000n1453.f0
+  + rs.w1000n1453.f0.c1
+  + rs.w1000n1453.f0.c2
+  + rs.w1001n431.b0
+  + rs.w1001n431.b0.c1
+  + rs.w1001n431.b0.c2
+  + rs.w1001n431.f0
+  + rs.w1001n431.f0.c1
+  + rs.w1001n431.f0.c2
+  + rs.w1002n1322.b0
+  + rs.w1002n1322.b0.c1
+  + rs.w1002n1322.b0.c2
+  + ... 9529 more
+  - rs.w1000n1030.b0
+  - rs.w1000n1030.b0.c1
+  - rs.w1000n1030.b0.c2
+  - rs.w1000n1030.f0
+  - rs.w1000n1030.f0.c1
+  - rs.w1000n1030.f0.c2
+  - rs.w1000n1030.f0.c3
+  - rs.w1000n1245.b0
+  - rs.w1000n1245.b0.c1
+  - rs.w1000n1245.b0.c2
+  - rs.w1000n1245.f0
+  - rs.w1000n1245.f0.c1
+  - rs.w1000n1245.f0.c2
+  - rs.w1000n1245.f0.c3
+  - rs.w1000n413.b0
+  - rs.w1000n413.b0.c1
+  - rs.w1000n413.b0.c2
+  - rs.w1000n413.f0
+  - rs.w1000n413.f0.c1
+  - rs.w1000n413.f0.c2
+  - ... 9434 more
+  ~ rs.w1014n318.b0 (centerline)
+  ~ rs.w1014n318.b0.c2 (centerline)
+  ~ rs.w1014n318.b1 (centerline)
+  ~ rs.w1014n318.b1.c1 (centerline, successors)
+  ~ rs.w1014n318.b1.c2 (centerline)
+  ~ rs.w1014n318.f0 (centerline, successors)
+  ~ rs.w1014n318.f0.c1 (centerline)
+  ~ rs.w1014n318.f0.c2 (centerline, successors)
+  ~ rs.w1014n318.f1 (centerline)
+  ~ rs.w1014n318.f1.c1 (centerline)
+  ~ rs.w1014n318.f1.c2 (centerline)
+  ~ rs.w1026n288.f0.c2 (centerline, successors)
+  ~ rs.w1026n288.f0.c3 (centerline)
+  ~ rs.w1077n321.b0 (centerline)
+  ~ rs.w1077n321.b1 (centerline)
+  ~ rs.w1077n321.f0 (centerline)
+  ~ rs.w1077n321.f0.c1 (centerline)
+  ~ rs.w1077n321.f0.c2 (centerline, successors)
+  ~ rs.w1077n321.f1 (centerline)
+  ~ rs.w1077n321.f1.c1 (centerline)
+  ~ ... 279 more
+walkways: 8903 added, 8694 removed, 459 changed
+  + wk.w1000n1018
+  + wk.w1000n1115
+  + wk.w1000n1170
+  + wk.w1000n1236
+  + wk.w1000n1436
+  + wk.w1000n1453
+  + wk.w1000n1470
+  + wk.w1000n630
+  + wk.w1000n895
+  + wk.w1000n936
+  + wk.w1000n945
+  + wk.w1001n1202
+  + wk.w1001n1472
+  + wk.w1001n431
+  + wk.w1001n639
+  + wk.w1001n639.2
+  + wk.w1002n1111
+  + wk.w1002n1322
+  + wk.w1002n1442
+  + wk.w1002n573
+  + ... 8883 more
+  - wk.w1000n1011
+  - wk.w1000n1051
+  - wk.w1000n1131
+  - wk.w1000n1245
+  - wk.w1000n1251
+  - wk.w1000n317
+  - wk.w1000n462
+  - wk.w1000n573
+  - wk.w1000n899
+  - wk.w1000n919
+  - wk.w1001n1125
+  - wk.w1001n1185
+  - wk.w1001n1194
+  - wk.w1001n1247
+  - wk.w1001n250
+  - wk.w1001n471
+  - wk.w1001n589
+  - wk.w1001n602
+  - wk.w1001n797
+  - wk.w1001n843
+  - ... 8674 more
+  ~ wk.w1000n205 (neighbors)
+  ~ wk.w1005n252 (neighbors)
+  ~ wk.w1006n262 (neighbors)
+  ~ wk.w1007n251 (neighbors)
+  ~ wk.w1010n218 (neighbors)
+  ~ wk.w1010n72 (neighbors)
+  ~ wk.w1011n258 (neighbors)
+  ~ wk.w1011n258.2 (neighbors)
+  ~ wk.w1013n434 (attrs, kind, line, neighbors)
+  ~ wk.w1015n259 (neighbors)
+  ~ wk.w1015n259.2 (neighbors)
+  ~ wk.w1015n265 (neighbors)
+  ~ wk.w1016n79 (neighbors)
+  ~ wk.w1018n73 (neighbors)
+  ~ wk.w1018s476 (neighbors)
+  ~ wk.w1019n70 (neighbors)
+  ~ wk.w1023n524 (line, neighbors)
+  ~ wk.w1026n288 (neighbors)
+  ~ wk.w1029n89 (neighbors)
+  ~ wk.w1034n312 (neighbors)
+  ~ ... 439 more
+structures: 840 added, 847 removed, 10 changed
+  + rs.w1000n1453.wall.w1018n1456
+  + rs.w1002n832.wall.w1014n835
+  + rs.w1003n403.wall.w1008n389
+  + rs.w1003n951.wall.w1004n950
+  + rs.w1003n951.wall.w1017n959
+  + rs.w1009n1098.wall.w1032n1106
+  + rs.w1015n651.wall.w1000n666
+  + rs.w1015n651.wall.w1009n669
+  + rs.w1015n651.wall.w1020n658
+  + rs.w1015n651.wall.w1020n674
+  + rs.w1016n1143.wall.w1040n1146
+  + rs.w1016n418.wall.w1010n423
+  + rs.w1016n418.wall.w1039n420
+  + rs.w1017n542.wall.w1021n537
+  + rs.w1017n849.wall.w1011n863
+  + rs.w1020n1476.wall.w1010n1480
+  + rs.w1022n1361.wall.w1030n1361
+  + rs.w1023n381.wall.w1048n384
+  + rs.w1025n451.wall.w1024n450
+  + rs.w1025n451.wall.w1031n455
+  + ... 820 more
+  - rs.w1000n1245.wall.w1008n1244
+  - rs.w1002n1490.wall.w991n1485
+  - rs.w1002n1490.wall.w991n1497
+  - rs.w1003n1207.wall.w1009n1212
+  - rs.w1004n896.wall.w1020n884
+  - rs.w1005n835.wall.w1004n835
+  - rs.w1005n835.wall.w1049n834
+  - rs.w1007n449.wall.w995n433
+  - rs.w1007n625.wall.w1022n618
+  - rs.w1009n1269.wall.w1009n1281
+  - rs.w1009n1380.wall.w1016n1388
+  - rs.w1009n1380.wall.w1017n1370
+  - rs.w1010n1388.wall.w1020n1403
+  - rs.w1012n938.wall.w1040n930
+  - rs.w1014n318.wall.w1018n354
+  - rs.w1017n1302.wall.w1026n1284
+  - rs.w1020n1091.wall.w1034n1088
+  - rs.w1020n1210.wall.w1034n1206
+  - rs.w1022n1050.wall.w1026n1060
+  - rs.w1022n529.wall.w1002n538
+  - ... 827 more
+  ~ rs.w1287n246.wall.w1309n252 (attrs, line)
+  ~ rs.w1363n235.wall.w1349n249 (line, z1_m)
+  ~ rs.w689n922.wall.w678n940 (line, z1_m)
+  ~ rs.w689n922.wall.w694n888 (line, z1_m)
+  ~ rs.w747n751.wall.w722n728 (line, z1_m)
+  ~ rs.w867n619.wall.w858n686 (line, z1_m)
+  ~ rs.w867n619.wall.w891n677 (line, z1_m)
+  ~ rs.w867n619.wall.w919n741 (line, z1_m)
+  ~ rs.w997n776.wall.w948n756 (line, z1_m)
+  ~ stn.old_quarter.enta (footprint)
+tunnels: 0 added, 0 removed, 1 changed
+  ~ tm.w1068n427 (line)
+transit_lines: 0 added, 0 removed, 1 changed
+  ~ tl.hill_line (path)
+stations: 0 added, 0 removed, 1 changed
+  ~ stn.old_quarter (access_ids, attrs)
+blocks: 567 added, 552 removed, 14 changed
+  + d02.blk.w1465n222
+  + d02.blk.w781n317
+  + d04.blk.w1002n480
+  + d04.blk.w1002n914
+  + d04.blk.w1003n947
+  + d04.blk.w1004n1306
+  + d04.blk.w1004n1421
+  + d04.blk.w1004n417
+  + d04.blk.w1006n381
+  + d04.blk.w1006n521
+  + d04.blk.w1007n979
+  + d04.blk.w1011n446
+  + d04.blk.w1011n849
+  + d04.blk.w1017n1059
+  + d04.blk.w1018n343
+  + d04.blk.w1019n1457
+  + d04.blk.w1023n613
+  + d04.blk.w1026n852
+  + d04.blk.w1028n1041
+  + d04.blk.w1028n560
+  + ... 547 more
+  - d02.blk.w1464n222
+  - d02.blk.w785n318
+  - d04.blk.w1002n1105
+  - d04.blk.w1002n539
+  - d04.blk.w1003n833
+  - d04.blk.w1005n1445
+  - d04.blk.w1007n1244
+  - d04.blk.w1013n568
+  - d04.blk.w1014n1387
+  - d04.blk.w1015n1029
+  - d04.blk.w1017n1410
+  - d04.blk.w1018n353
+  - d04.blk.w1022n398
+  - d04.blk.w1022n885
+  - d04.blk.w1023n617
+  - d04.blk.w1024n495
+  - d04.blk.w1026n1061
+  - d04.blk.w1026n1156
+  - d04.blk.w1026n1284
+  - d04.blk.w1030n420
+  - ... 532 more
+  ~ d02.blk.w1010n284 (area_m2, polygon)
+  ~ d02.blk.w1164n290 (area_m2, polygon)
+  ~ d02.blk.w1200n256 (area_m2, polygon)
+  ~ d02.blk.w1239n230 (area_m2, polygon)
+  ~ d02.blk.w1257n269 (area_m2, polygon)
+  ~ d02.blk.w1318n233 (area_m2, polygon)
+  ~ d02.blk.w1401n221 (area_m2, frontage_ids, polygon)
+  ~ d02.blk.w1464n156 (area_m2, polygon)
+  ~ d02.blk.w1604n161 (area_m2, polygon)
+  ~ d02.blk.w780n287 (frontage_ids)
+  ~ d04.blk.w1270n606 (area_m2, frontage_ids, polygon)
+  ~ d04.blk.w1613n738 (area_m2, frontage_ids, polygon)
+  ~ d04.blk.w805n842 (area_m2, frontage_ids, polygon)
+  ~ d04.blk.w992n699 (frontage_ids)
+lots: 3592 added, 3592 removed, 39 changed
+  + d02.lot.w1222n127
+  + d02.lot.w1242s792
+  + d02.lot.w1253n51
+  + d02.lot.w1482n220
+  + d02.lot.w773n317
+  + d02.lot.w787n317
+  + d02.lot.w839s571
+  + d02.lot.w906s600
+  + d04.lot.w1000n1188
+  + d04.lot.w1000n1310
+  + d04.lot.w1000n1374
+  + d04.lot.w1000n392
+  + d04.lot.w1001n1131
+  + d04.lot.w1001n489
+  + d04.lot.w1001n579
+  + d04.lot.w1002n450
+  + d04.lot.w1003n1419
+  + d04.lot.w1003n424
+  + d04.lot.w1003n881
+  + d04.lot.w1003n947
+  + ... 3572 more
+  - d02.lot.w1070s518
+  - d02.lot.w1223n129
+  - d02.lot.w1247s790
+  - d02.lot.w1481n220
+  - d02.lot.w774n317
+  - d02.lot.w792n318
+  - d02.lot.w839s565
+  - d02.lot.w840s578
+  - d02.lot.w906s606
+  - d02.lot.w907s594
+  - d04.lot.w1000n1093
+  - d04.lot.w1001n1293
+  - d04.lot.w1001n365
+  - d04.lot.w1001n488
+  - d04.lot.w1001n531
+  - d04.lot.w1001n932
+  - d04.lot.w1002n1147
+  - d04.lot.w1002n1270
+  - d04.lot.w1002n338
+  - d04.lot.w1002n477
+  - ... 3572 more
+  ~ d02.lot.w1003n297 (area_m2, frontage, polygon)
+  ~ d02.lot.w1019n295 (area_m2, frontage, polygon)
+  ~ d02.lot.w1158n291 (area_m2, frontage, polygon)
+  ~ d02.lot.w1196n287 (area_m2, frontage, polygon)
+  ~ d02.lot.w1224n278 (area_m2, frontage, polygon)
+  ~ d02.lot.w1268n268 (area_m2, frontage, polygon)
+  ~ d02.lot.w1299n265 (area_m2, frontage, polygon)
+  ~ d02.lot.w1322n254 (area_m2, frontage, polygon)
+  ~ d02.lot.w1339n254 (frontage, polygon)
+  ~ d02.lot.w1386n239 (area_m2, frontage, frontage_ids, polygon)
+  ~ d02.lot.w1390n105 (area_m2, frontage, polygon)
+  ~ d02.lot.w1401n237 (area_m2, frontage, frontage_ids, polygon)
+  ~ d02.lot.w1409n110 (area_m2, frontage, polygon)
+  ~ d02.lot.w1413n235 (frontage, frontage_ids, polygon)
+  ~ d02.lot.w1429n115 (area_m2, frontage, polygon)
+  ~ d02.lot.w1439n222 (area_m2, block_id, frontage, frontage_ids, polygon)
+  ~ d02.lot.w1452n121 (area_m2, frontage, frontage_ids, polygon)
+  ~ d02.lot.w1455n220 (area_m2, block_id, frontage, frontage_ids, polygon)
+  ~ d02.lot.w1540n208 (area_m2, frontage, polygon)
+  ~ d02.lot.w1570n202 (area_m2, frontage, polygon)
+  ~ ... 19 more
+open_spaces: 91 added, 56 removed, 1 changed
+  + d02.os.w1070s518
+  + d04.os.slope.w1240n1384
+  + d04.os.slope.w1252n1353
+  + d04.os.slope.w1252n1407
+  + d04.os.slope.w1257n1360
+  + d04.os.slope.w1258n1363
+  + d04.os.slope.w1259n1367
+  + d04.os.slope.w1263n1381
+  + d04.os.slope.w1266n1405
+  + d04.os.slope.w1273n1405
+  + d04.os.slope.w1283n1384
+  + d04.os.slope.w1299n1376
+  + d04.os.slope.w1311n1375
+  + d04.os.slope.w1323n1373
+  + d04.os.slope.w1333n1370
+  + d04.os.w1002n674
+  + d04.os.w1017n794
+  + d04.os.w1020n698
+  + d04.os.w1022n746
+  + d04.os.w1028n751
+  + ... 71 more
+  - d02.os.w1247n61
+  - d04.os.w1002n692
+  - d04.os.w1006n672
+  - d04.os.w1007n1000
+  - d04.os.w1022n694
+  - d04.os.w1028n684
+  - d04.os.w1031n520
+  - d04.os.w1036n693
+  - d04.os.w1037n1338
+  - d04.os.w1040n742
+  - d04.os.w1086n799
+  - d04.os.w1197n1382
+  - d04.os.w1214n589
+  - d04.os.w1245n759
+  - d04.os.w1291n794
+  - d04.os.w1303n1445
+  - d04.os.w1312n616
+  - d04.os.w1314n1165
+  - d04.os.w1314n328
+  - d04.os.w1317n481
+  - ... 36 more
+  ~ d04.os.w778n748 (attrs, polygon)
+properties: 3592 added, 3591 removed, 1193 changed
+  + d02.lot.w1222n127.prop
+  + d02.lot.w1242s792.prop
+  + d02.lot.w1253n51.prop
+  + d02.lot.w1482n220.prop
+  + d02.lot.w773n317.prop
+  + d02.lot.w787n317.prop
+  + d02.lot.w839s571.prop
+  + d02.lot.w906s600.prop
+  + d04.lot.w1000n1188.prop
+  + d04.lot.w1000n1310.prop
+  + d04.lot.w1000n1374.prop
+  + d04.lot.w1000n392.prop
+  + d04.lot.w1001n1131.prop
+  + d04.lot.w1001n489.prop
+  + d04.lot.w1001n579.prop
+  + d04.lot.w1002n450.prop
+  + d04.lot.w1003n1419.prop
+  + d04.lot.w1003n424.prop
+  + d04.lot.w1003n881.prop
+  + d04.lot.w1003n947.prop
+  + ... 3572 more
+  - d02.lot.w1070s518.prop
+  - d02.lot.w1223n129.prop
+  - d02.lot.w1247s790.prop
+  - d02.lot.w1481n220.prop
+  - d02.lot.w774n317.prop
+  - d02.lot.w792n318.prop
+  - d02.lot.w839s565.prop
+  - d02.lot.w840s578.prop
+  - d02.lot.w906s606.prop
+  - d02.lot.w907s594.prop
+  - d04.lot.w1000n1093.prop
+  - d04.lot.w1001n1293.prop
+  - d04.lot.w1001n365.prop
+  - d04.lot.w1001n488.prop
+  - d04.lot.w1001n531.prop
+  - d04.lot.w1001n932.prop
+  - d04.lot.w1002n1147.prop
+  - d04.lot.w1002n1270.prop
+  - d04.lot.w1002n338.prop
+  - d04.lot.w1002n477.prop
+  - ... 3571 more
+  ~ d02.lot.w1001n54.prop (owner)
+  ~ d02.lot.w1001s66.prop (owner)
+  ~ d02.lot.w1002s298.prop (owner)
+  ~ d02.lot.w1002s580.prop (owner)
+  ~ d02.lot.w1003n297.prop (owner)
+  ~ d02.lot.w1003s26.prop (owner)
+  ~ d02.lot.w1004s193.prop (owner)
+  ~ d02.lot.w1007n273.prop (owner)
+  ~ d02.lot.w1007n91.prop (owner)
+  ~ d02.lot.w1009n282.prop (owner)
+  ~ d02.lot.w1009s264.prop (owner)
+  ~ d02.lot.w1009s47.prop (owner)
+  ~ d02.lot.w1009s754.prop (owner)
+  ~ d02.lot.w1011n286.prop (owner)
+  ~ d02.lot.w1013n241.prop (owner)
+  ~ d02.lot.w1013s158.prop (owner)
+  ~ d02.lot.w1013s217.prop (owner)
+  ~ d02.lot.w1013s441.prop (owner)
+  ~ d02.lot.w1014s10.prop (owner)
+  ~ d02.lot.w1014s570.prop (owner)
+  ~ ... 1173 more
+buildings: 3592 added, 3591 removed, 1195 changed
+  + d02.lot.w1222n127.bld
+  + d02.lot.w1242s792.bld
+  + d02.lot.w1253n51.bld
+  + d02.lot.w1482n220.bld
+  + d02.lot.w773n317.bld
+  + d02.lot.w787n317.bld
+  + d02.lot.w839s571.bld
+  + d02.lot.w906s600.bld
+  + d04.lot.w1000n1188.bld
+  + d04.lot.w1000n1310.bld
+  + d04.lot.w1000n1374.bld
+  + d04.lot.w1000n392.bld
+  + d04.lot.w1001n1131.bld
+  + d04.lot.w1001n489.bld
+  + d04.lot.w1001n579.bld
+  + d04.lot.w1002n450.bld
+  + d04.lot.w1003n1419.bld
+  + d04.lot.w1003n424.bld
+  + d04.lot.w1003n881.bld
+  + d04.lot.w1003n947.bld
+  + ... 3572 more
+  - d02.lot.w1070s518.bld
+  - d02.lot.w1223n129.bld
+  - d02.lot.w1247s790.bld
+  - d02.lot.w1481n220.bld
+  - d02.lot.w774n317.bld
+  - d02.lot.w792n318.bld
+  - d02.lot.w839s565.bld
+  - d02.lot.w840s578.bld
+  - d02.lot.w906s606.bld
+  - d02.lot.w907s594.bld
+  - d04.lot.w1000n1093.bld
+  - d04.lot.w1001n1293.bld
+  - d04.lot.w1001n365.bld
+  - d04.lot.w1001n488.bld
+  - d04.lot.w1001n531.bld
+  - d04.lot.w1001n932.bld
+  - d04.lot.w1002n1147.bld
+  - d04.lot.w1002n1270.bld
+  - d04.lot.w1002n338.bld
+  - d04.lot.w1002n477.bld
+  - ... 3571 more
+  ~ d02.lot.w1001n54.bld (floors, height_m, masses, roof_items, style, units)
+  ~ d02.lot.w1001s66.bld (masses, roof_items, style, units)
+  ~ d02.lot.w1002s298.bld (height_m, masses, roof_items, style, units)
+  ~ d02.lot.w1002s580.bld (base_m, entrances, floors, footprint, height_m, masses, plinth_m, roof_items, style, type, units, use)
+  ~ d02.lot.w1003n297.bld (base_m, entrances, footprint, height_m, masses, roof_items, style, type, units, use)
+  ~ d02.lot.w1003s26.bld (base_m, entrances, footprint, height_m, masses, roof_items, style, type, units, use)
+  ~ d02.lot.w1004s193.bld (floors, height_m, masses, roof_items, style, units)
+  ~ d02.lot.w1007n273.bld (masses, roof_items, style)
+  ~ d02.lot.w1007n91.bld (height_m, masses, roof_items, style, units)
+  ~ d02.lot.w1009n282.bld (base_m, entrances, footprint, masses, roof_items, style, type, use)
+  ~ d02.lot.w1009s264.bld (roof_items, style, units)
+  ~ d02.lot.w1009s47.bld (floors, height_m, masses, roof_items, style, units)
+  ~ d02.lot.w1009s754.bld (base_m, entrances, floors, footprint, height_m, masses, roof_items, style, type, units, use)
+  ~ d02.lot.w1011n286.bld (masses, style)
+  ~ d02.lot.w1013n241.bld (base_m, entrances, footprint, height_m, masses, roof_items, style, type, use)
+  ~ d02.lot.w1013s158.bld (height_m, masses, roof_items, style, units)
+  ~ d02.lot.w1013s217.bld (style, units)
+  ~ d02.lot.w1013s441.bld (floors, footprint, height_m, masses, roof_items, style, type, units, use)
+  ~ d02.lot.w1014s10.bld (roof_items, style, units)
+  ~ d02.lot.w1014s570.bld (base_m, entrances, floors, footprint, height_m, masses, roof_items, style, type, units, use)
+  ~ ... 1175 more
+skybridges: 144 added, 160 removed, 0 changed
+  + d02.sb.w1023n69
+  + d02.sb.w1086s103
+  + d02.sb.w1139s823
+  + d02.sb.w1218s261
+  + d02.sb.w1218s437
+  + d02.sb.w1253s24
+  + d02.sb.w1293n219
+  + d02.sb.w1302n234
+  + d02.sb.w1384s861
+  + d02.sb.w1465s613
+  + d02.sb.w1662s14
+  + d02.sb.w735s242
+  + d02.sb.w845s8
+  + d02.sb.w955s536
+  + d04.sb.w1023n910
+  + d04.sb.w1035n1165
+  + d04.sb.w1061n1038
+  + d04.sb.w1061n1059
+  + d04.sb.w1064n534
+  + d04.sb.w1074n1407
+  + ... 124 more
+  - d02.sb.w1004n247
+  - d02.sb.w1493n50
+  - d02.sb.w1542n198
+  - d02.sb.w1596n148
+  - d02.sb.w1622n146
+  - d02.sb.w843n8
+  - d02.sb.w856n278
+  - d02.sb.w873s108
+  - d02.sb.w881n91
+  - d02.sb.w947n26
+  - d04.sb.w1007n1128
+  - d04.sb.w1007n445
+  - d04.sb.w1014n1336
+  - d04.sb.w1018n1243
+  - d04.sb.w1019n986
+  - d04.sb.w1025n1187
+  - d04.sb.w1029n1029
+  - d04.sb.w1031n563
+  - d04.sb.w1039n1378
+  - d04.sb.w1045n636
+  - ... 140 more
+plants: 4925 added, 5106 removed, 93 changed
+  + city.plant.facade_greenery.w1092n1500
+  + city.plant.facade_greenery.w1700n327
+  + city.plant.facade_greenery.w1700n742
+  + d02.plant.facade_greenery.w1004s568
+  + d02.plant.facade_greenery.w1007s563
+  + d02.plant.facade_greenery.w1012s447
+  + d02.plant.facade_greenery.w1018n303
+  + d02.plant.facade_greenery.w1018s143
+  + d02.plant.facade_greenery.w1018s538
+  + d02.plant.facade_greenery.w1019s434
+  + d02.plant.facade_greenery.w1020s531
+  + d02.plant.facade_greenery.w1024s517
+  + d02.plant.facade_greenery.w1028s764
+  + d02.plant.facade_greenery.w1028s771
+  + d02.plant.facade_greenery.w1029s777
+  + d02.plant.facade_greenery.w1033s542
+  + d02.plant.facade_greenery.w1035s309
+  + d02.plant.facade_greenery.w1035s715
+  + d02.plant.facade_greenery.w1050s690
+  + d02.plant.facade_greenery.w1050s707
+  + ... 4905 more
+  - city.plant.facade_greenery.w1700n585
+  - city.plant.facade_greenery.w1700n591
+  - city.plant.facade_greenery.w1700n596
+  - city.plant.facade_greenery.w931n1500
+  - d02.plant.facade_greenery.w1000s86
+  - d02.plant.facade_greenery.w1007s86
+  - d02.plant.facade_greenery.w1010s558
+  - d02.plant.facade_greenery.w1017s757
+  - d02.plant.facade_greenery.w1017s762
+  - d02.plant.facade_greenery.w1018s746
+  - d02.plant.facade_greenery.w1018s751
+  - d02.plant.facade_greenery.w1025n6
+  - d02.plant.facade_greenery.w1026n12
+  - d02.plant.facade_greenery.w1039s146
+  - d02.plant.facade_greenery.w1039s622
+  - d02.plant.facade_greenery.w1041s630
+  - d02.plant.facade_greenery.w1041s635
+  - d02.plant.facade_greenery.w1042s45
+  - d02.plant.facade_greenery.w1043s553
+  - d02.plant.facade_greenery.w1043s561
+  - ... 5086 more
+  ~ d02.plant.facade_greenery.w1227n286 (attrs, position)
+  ~ d02.plant.facade_greenery.w1254s721 (position)
+  ~ d02.plant.facade_greenery.w1261n278 (attrs, position)
+  ~ d02.plant.facade_greenery.w1286n226 (position)
+  ~ d02.plant.facade_greenery.w1293n270 (attrs, position)
+  ~ d02.plant.facade_greenery.w1404n244 (attrs, position)
+  ~ d02.plant.facade_greenery.w1406s738 (position)
+  ~ d02.plant.facade_greenery.w1419n229 (attrs, position)
+  ~ d02.plant.facade_greenery.w1432n219 (attrs, position)
+  ~ d02.plant.facade_greenery.w1447n234 (attrs, position)
+  ~ d02.plant.facade_greenery.w1491s800 (position)
+  ~ d02.plant.facade_greenery.w1535n212 (attrs, position)
+  ~ d02.plant.facade_greenery.w1600s786 (position)
+  ~ d02.plant.facade_greenery.w1621n66 (position)
+  ~ d02.plant.facade_greenery.w1629n53 (position)
+  ~ d02.plant.facade_greenery.w1634n54 (position)
+  ~ d02.plant.facade_greenery.w753s252 (attrs, position)
+  ~ d02.plant.facade_greenery.w799n323 (attrs, position)
+  ~ d02.plant.facade_greenery.w856n224 (position)
+  ~ d02.plant.facade_greenery.w910n241 (position)
+  ~ ... 73 more
+green_areas: 90 added, 63 removed, 2 changed
+  + d02.lot.w1088s139.bld.gr.w1088s139
+  + d02.lot.w1188n168.bld.gr.w1188n167
+  + d02.lot.w1272s615.bld.gr.w1272s615
+  + d02.lot.w1314s183.bld.gr.w1314s183
+  + d02.lot.w1409n81.bld.gr.w1409n81
+  + d02.lot.w1451s779.bld.gr.w1451s779
+  + d02.lot.w922n212.bld.gr.w922n212
+  + d02.lot.w928n290.bld.gr.w927n290
+  + d02.lot.w943s701.bld.gr.w943s702
+  + d02.lot.w946n18.bld.gr.w946n18
+  + d02.lot.w960n68.bld.gr.w960n68
+  + d04.lot.w1001n489.bld.gr.w1001n489
+  + d04.lot.w1145n338.bld.gr.w1145n343
+  + d04.lot.w1245n884.bld.gr.w1245n884
+  + d04.lot.w1694n245.bld.gr.w1694n245
+  + d04.lot.w686n1040.bld.gr.w686n1040
+  + d04.lot.w810n1227.bld.gr.w810n1227
+  + d04.lot.w884n1257.bld.gr.w884n1257
+  + d04.lot.w916n1283.bld.gr.w916n1283
+  + d04.lot.w966n1491.bld.gr.w966n1491
+  + ... 70 more
+  - d04.lot.w1248n617.bld.gr.w1248n617
+  - d04.lot.w1252n1445.bld.gr.w1252n1445
+  - d04.lot.w1423n1155.bld.gr.w1423n1155
+  - d04.lot.w1478n865.bld.gr.w1478n865
+  - d04.lot.w1536n250.bld.gr.w1536n251
+  - d04.lot.w1643n1000.bld.gr.w1643n1000
+  - d04.os.w793n693.hedge.w793n688
+  - d04.os.w793n693.hedge.w798n744
+  - d04.os.w793n693.hedge.w823n745
+  - d04.os.w793n693.hedge.w844n733
+  - rs.w1014n318.lawn.w1013n318
+  - rs.w1077n321.lawn.w1071n320
+  - rs.w1112n1046.lawn.w1112n1047
+  - rs.w1112n1109.lawn.w1112n1113
+  - rs.w1112n1146.lawn.w1112n1148
+  - rs.w1112n1199.lawn.w1112n1197
+  - rs.w1112n1332.lawn.w1112n1332
+  - rs.w1112n1378.lawn.w1112n1377
+  - rs.w1112n1427.lawn.w1112n1427
+  - rs.w1112n1477.lawn.w1112n1484
+  - ... 43 more
+  ~ rs.w1576n218.lawn.w1572n219 (polygon)
+  ~ rs.w1606n776.lawn.w1619n776 (polygon)
+props: 24021 added, 28508 removed, 5228 changed
+  + city.prop.ac_unit.w1093n1500
+  + city.prop.ac_unit.w1700n325
+  + city.prop.ac_unit.w1700n740
+  + city.prop.ac_unit.w1700n793
+  + city.prop.awning.w1329n1501
+  + city.prop.awning.w1701n327
+  + city.prop.awning.w1701n742
+  + city.prop.awning.w1701n794
+  + city.prop.dumpster.w1197n1501
+  + city.prop.sign.w1090n1500
+  + city.prop.sign.w1700n329
+  + city.prop.sign.w1701n744
+  + city.prop.sign.w1701n795
+  + city.prop.street_light.w1704n319
+  + city.prop.street_light.w1704n891
+  + city.prop.street_light.w1705n283
+  + d02.prop.ac_unit.w768n316
+  + d02.prop.ac_unit.w779n316
+  + d02.prop.ac_unit.w781n312
+  + d02.prop.ac_unit.w789n312
+  + ... 24001 more
+  - city.prop.ac_unit.w1700n209
+  - city.prop.ac_unit.w1700n589
+  - city.prop.ac_unit.w1700n595
+  - city.prop.ac_unit.w933n1500
+  - city.prop.awning.w1701n211
+  - city.prop.awning.w1701n585
+  - city.prop.awning.w1701n591
+  - city.prop.awning.w931n1501
+  - city.prop.dumpster.w1701n226
+  - city.prop.dumpster.w1702n267
+  - city.prop.sign.w1700n587
+  - city.prop.sign.w1700n598
+  - city.prop.sign.w1701n213
+  - city.prop.sign.w1701n593
+  - city.prop.street_light.w1037n1506
+  - city.prop.street_light.w1061n1504
+  - city.prop.street_light.w1702n1082
+  - city.prop.street_light.w1702n1140
+  - city.prop.street_light.w1703n1106
+  - city.prop.street_light.w1703n546
+  - ... 28488 more
+  ~ d02.prop.ac_unit.w1016s543 (position)
+  ~ d02.prop.ac_unit.w1018s536 (position)
+  ~ d02.prop.ac_unit.w1021s529 (position)
+  ~ d02.prop.ac_unit.w1026s510 (position)
+  ~ d02.prop.ac_unit.w1028s506 (position)
+  ~ d02.prop.ac_unit.w1031s495 (position)
+  ~ d02.prop.ac_unit.w1031s781 (position, yaw_deg)
+  ~ d02.prop.ac_unit.w1034s714 (position)
+  ~ d02.prop.ac_unit.w1046s338 (position)
+  ~ d02.prop.ac_unit.w1046s597 (position)
+  ~ d02.prop.ac_unit.w1053s445 (position, yaw_deg)
+  ~ d02.prop.ac_unit.w1057n305 (position)
+  ~ d02.prop.ac_unit.w1061s692 (position)
+  ~ d02.prop.ac_unit.w1061s702 (position)
+  ~ d02.prop.ac_unit.w1066s492 (position)
+  ~ d02.prop.ac_unit.w1068s459 (position)
+  ~ d02.prop.ac_unit.w1069n306 (position)
+  ~ d02.prop.ac_unit.w1070s773 (position, yaw_deg)
+  ~ d02.prop.ac_unit.w1071s790 (position, yaw_deg)
+  ~ d02.prop.ac_unit.w1072s493 (position)
+  ~ ... 5208 more
+zones: 0 added, 0 removed, 4 changed
+  ~ d02.turf1 (polygons)
+  ~ d02.turf2 (attrs, block_ids, polygons)
+  ~ d04.turf1 (attrs, block_ids, polygons)
+  ~ d04.turf2 (attrs, block_ids, polygons)
+pois: 111 added, 100 removed, 15 changed
+  + d02.lot.w1032s523.bld.u02.bar
+  + d02.lot.w1049s778.bld.u06.vendor
+  + d02.lot.w1078s803.bld.u00.bar
+  + d02.lot.w1086n296.bld.u00.vendor
+  + d02.lot.w1091s416.bld.u02.vendor
+  + d02.lot.w1096s810.bld.u00.vendor
+  + d02.lot.w1123s262.bld.u02.vendor
+  + d02.lot.w1124s116.bld.apt005
+  + d02.lot.w1132s392.bld.u01.bar
+  + d02.lot.w1137s304.bld.u00.bar
+  + d02.lot.w1191s262.bld.u00.clinic
+  + d02.lot.w1226s847.bld.u00.bar
+  + d02.lot.w1236s258.bld.u02.vendor
+  + d02.lot.w1276s686.bld.hideout
+  + d02.lot.w1299n265.bld.u03.clinic
+  + d02.lot.w1316n123.bld.u01.vendor
+  + d02.lot.w1320s863.bld.u02.vendor
+  + d02.lot.w1324s364.bld.apt003
+  + d02.lot.w1338s344.bld.u05.bar
+  + d02.lot.w1341s258.bld.u03.bar
+  + ... 91 more
+  - d02.lot.w1002s580.bld.u03.bar
+  - d02.lot.w1032s523.bld.u02.vendor
+  - d02.lot.w1049s778.bld.u06.bar
+  - d02.lot.w1078s803.bld.u00.clinic
+  - d02.lot.w1137s304.bld.u00.vendor
+  - d02.lot.w1225s693.bld.u03.vendor
+  - d02.lot.w1266s846.bld.u10.vendor
+  - d02.lot.w1353s853.bld.u00.clinic
+  - d02.lot.w1371s863.bld.u07.vendor
+  - d02.lot.w1400s818.bld.u00.vendor
+  - d02.lot.w1518s886.bld.u06.vendor
+  - d02.lot.w1578s577.bld.hideout
+  - d02.lot.w1591n195.bld.u00.vendor
+  - d02.lot.w728n200.bld.u01.vendor
+  - d02.lot.w737s141.bld.u00.bar
+  - d02.lot.w738s251.bld.apt004
+  - d02.lot.w749n98.bld.u06.bar
+  - d02.lot.w762s102.bld.u08.vendor
+  - d02.lot.w765s298.bld.u06.vendor
+  - d02.lot.w778n21.bld.u01.vendor
+  - ... 80 more
+  ~ d02.lot.w1013s217.bld.u02.bar (attrs, hours, name, sub)
+  ~ d02.lot.w1057s450.bld.u08.bar (attrs, entrances, position)
+  ~ d02.lot.w1395s867.bld.u09.bar (attrs, entrances, hours, name, sub)
+  ~ d02.lot.w1413n235.bld.u01.bar (attrs, danger, entrances, hours, name, sub, wealth)
+  ~ d02.lot.w1419n25.bld.u03.vendor (attrs, entrances, name, position)
+  ~ d02.lot.w1442s881.bld.u00.bar (attrs, hours, name, sub)
+  ~ d02.lot.w1630s564.bld.u05.vendor (attrs, entrances, position)
+  ~ d02.lot.w738n221.bld.u01.bar (attrs, entrances, hours, name, position, sub)
+  ~ d02.lot.w738s251.bld.u02.bar (attrs, hours, name, sub)
+  ~ d02.lot.w767n286.bld.u01.bar (attrs, hours, name, sub)
+  ~ d02.lot.w786s480.bld.u02.vendor (attrs, entrances, position)
+  ~ d02.lot.w787s583.bld.u01.bar (attrs, hours, name, sub)
+  ~ d02.lot.w925s263.bld.u04.bar (attrs, entrances, hours, name, position, sub)
+  ~ d02.lot.w978s536.bld.u02.vendor (attrs, hours, name, sub)
+  ~ d02.lot.w983s442.bld.u03.bar (attrs, entrances, hours, name, position, sub)
+fields: 0 added, 0 removed, 2 changed
+  ~ field.danger (values)
+  ~ field.wealth (values)
+densities: 1541 added, 1535 removed, 42 changed
+  + rs.w1000n1173.density
+  + rs.w1000n1453.density
+  + rs.w1001n431.density
+  + rs.w1002n1322.density
+  + rs.w1002n832.density
+  + rs.w1003n1071.density
+  + rs.w1003n403.density
+  + rs.w1003n462.density
+  + rs.w1003n951.density
+  + rs.w1004n1215.density
+  + rs.w1004n357.density
+  + rs.w1005n610.density
+  + rs.w1006n1018.density
+  + rs.w1008n1295.density
+  + rs.w1008n558.density
+  + rs.w1009n1029.density
+  + rs.w1009n1098.density
+  + rs.w1010n1122.density
+  + rs.w1010n934.density
+  + rs.w1014n1192.density
+  + ... 1521 more
+  - rs.w1000n1030.density
+  - rs.w1000n1245.density
+  - rs.w1000n413.density
+  - rs.w1000n599.density
+  - rs.w1001n801.density
+  - rs.w1001n877.density
+  - rs.w1002n1490.density
+  - rs.w1003n1207.density
+  - rs.w1003n521.density
+  - rs.w1004n896.density
+  - rs.w1005n1183.density
+  - rs.w1005n1460.density
+  - rs.w1005n835.density
+  - rs.w1007n1235.density
+  - rs.w1007n1433.density
+  - rs.w1007n449.density
+  - rs.w1007n548.density
+  - rs.w1007n625.density
+  - rs.w1008n1008.density
+  - rs.w1008n912.density
+  - ... 1515 more
+  ~ rs.w1048s445.density (attrs, crowd_per_100m)
+  ~ rs.w1112n999.density (gang_per_100m)
+  ~ rs.w1123n223.density (attrs, crowd_per_100m, traffic_vph, vehicles_per_100m)
+  ~ rs.w1155n103.density (attrs, crowd_per_100m, traffic_vph, vehicles_per_100m)
+  ~ rs.w1163n1076.density (attrs, crowd_per_100m, gang_per_100m, speed_kmh, traffic_vph, vehicles_per_100m)
+  ~ rs.w1180s695.density (attrs, crowd_per_100m, traffic_vph, vehicles_per_100m)
+  ~ rs.w1185n115.density (gang_per_100m)
+  ~ rs.w1221n101.density (gang_per_100m)
+  ~ rs.w1227n124.density (gang_per_100m)
+  ~ rs.w1240n55.density (gang_per_100m)
+  ~ rs.w1241n703.density (gang_per_100m)
+  ~ rs.w1241n85.density (attrs, crowd_per_100m, gang_per_100m, traffic_vph, vehicles_per_100m)
+  ~ rs.w1256n26.density (gang_per_100m)
+  ~ rs.w1257n29.density (gang_per_100m)
+  ~ rs.w1257n72.density (gang_per_100m)
+  ~ rs.w1258n26.density (gang_per_100m)
+  ~ rs.w1259n42.density (gang_per_100m)
+  ~ rs.w1261n11.density (gang_per_100m)
+  ~ rs.w1267n92.density (gang_per_100m)
+  ~ rs.w1280n23.density (gang_per_100m)
+  ~ ... 22 more
+parking: 59 added, 59 removed, 0 changed
+  + rs.w1014n1192.parking
+  + rs.w1029n1211.parking
+  + rs.w1035n1182.parking
+  + rs.w1045n882.parking
+  + rs.w1050n859.parking
+  + rs.w1055n1202.parking
+  + rs.w1180n624.parking
+  + rs.w1200n629.parking
+  + rs.w1206n1436.parking
+  + rs.w1220n1456.parking
+  + rs.w1236n1414.parking
+  + rs.w1268n566.parking
+  + rs.w1272n549.parking
+  + rs.w1311n637.parking
+  + rs.w1321n1188.parking
+  + rs.w1332n653.parking
+  + rs.w1336n1164.parking
+  + rs.w1336n603.parking
+  + rs.w1350n1204.parking
+  + rs.w1354n1039.parking
+  + ... 39 more
+  - rs.w1039n884.parking
+  - rs.w1045n1264.parking
+  - rs.w1055n859.parking
+  - rs.w1059n902.parking
+  - rs.w1061n1246.parking
+  - rs.w1077n877.parking
+  - rs.w1083n1258.parking
+  - rs.w1171n961.parking
+  - rs.w1192n435.parking
+  - rs.w1196n944.parking
+  - rs.w1200n970.parking
+  - rs.w1213n424.parking
+  - rs.w1254n416.parking
+  - rs.w1257n567.parking
+  - rs.w1272n411.parking
+  - rs.w1284n547.parking
+  - rs.w1288n589.parking
+  - rs.w1356n1193.parking
+  - rs.w1371n1210.parking
+  - rs.w1400n1185.parking
+  - ... 39 more
+travel_points: 8 added, 8 removed, 7 changed
+  + rs.w1096n540.taxi
+  + rs.w1112n851.taxi
+  + rs.w1375n654.taxi
+  + rs.w1513n1176.taxi
+  + rs.w1513n392.taxi
+  + rs.w693n1353.taxi
+  + rs.w730n1046.taxi
+  + rs.w803n530.taxi
+  - rs.w1112n1378.taxi
+  - rs.w1112n811.taxi
+  - rs.w1373n670.taxi
+  - rs.w1463n1091.taxi
+  - rs.w688n1105.taxi
+  - rs.w729n1392.taxi
+  - rs.w765n772.taxi
+  - rs.w800s439.taxi
+  ~ rn.w1553n223.fast_travel (access, position)
+  ~ rs.w1011s237.taxi (name)
+  ~ rs.w1038s552.taxi (access, name, near_id, position)
+  ~ rs.w1086s790.taxi (access, name, near_id, position)
+  ~ rs.w738s181.taxi (access, name, near_id, position)
+  ~ rs.w767n248.taxi (access, name)
+  ~ stn.old_quarter.fast_travel (access, position)
+sign_slots: 9607 added, 10496 removed, 3507 changed
+  + city.prop.sign.w1090n1500.slot
+  + city.prop.sign.w1700n329.slot
+  + city.prop.sign.w1701n744.slot
+  + city.prop.sign.w1701n795.slot
+  + d02.lot.w1001n54.bld.roof00.billboard
+  + d02.lot.w1007n273.bld.roof00.billboard
+  + d02.lot.w1007n91.bld.roof00.billboard
+  + d02.lot.w1013s441.bld.slot.neon
+  + d02.lot.w1014s570.bld.roof00.billboard
+  + d02.lot.w1014s570.bld.slot.neon
+  + d02.lot.w1023s542.bld.roof00.billboard
+  + d02.lot.w1023s542.bld.slot.neon
+  + d02.lot.w1024s129.bld.roof00.billboard
+  + d02.lot.w1024s129.bld.slot.neon
+  + d02.lot.w1026s305.bld.roof00.billboard
+  + d02.lot.w1026s305.bld.slot.neon
+  + d02.lot.w1026s570.bld.roof00.billboard
+  + d02.lot.w1032s523.bld.roof00.billboard
+  + d02.lot.w1035n277.bld.roof01.billboard
+  + d02.lot.w1035s28.bld.roof00.billboard
+  + ... 9587 more
+  - city.prop.sign.w1700n587.slot
+  - city.prop.sign.w1700n598.slot
+  - city.prop.sign.w1701n213.slot
+  - city.prop.sign.w1701n593.slot
+  - d02.lot.w1001s66.bld.roof00.billboard
+  - d02.lot.w1002s298.bld.roof01.billboard
+  - d02.lot.w1003s26.bld.slot.neon
+  - d02.lot.w1009s754.bld.roof00.billboard
+  - d02.lot.w1009s754.bld.slot.neon
+  - d02.lot.w1013s158.bld.roof00.billboard
+  - d02.lot.w1014s10.bld.roof00.billboard
+  - d02.lot.w1019n295.bld.roof00.billboard
+  - d02.lot.w1019s558.bld.roof00.billboard
+  - d02.lot.w1019s558.bld.slot.neon
+  - d02.lot.w1026s305.bld.roof01.billboard
+  - d02.lot.w1027s218.bld.roof00.billboard
+  - d02.lot.w1028n80.bld.slot.neon
+  - d02.lot.w1028s107.bld.roof00.billboard
+  - d02.lot.w1032n269.bld.roof00.billboard
+  - d02.lot.w1034n49.bld.roof00.billboard
+  - ... 10476 more
+  ~ d02.lot.w1004s193.bld.roof00.billboard (height_m, position)
+  ~ d02.lot.w1009s264.bld.roof01.billboard (height_m, position)
+  ~ d02.lot.w1009s47.bld.roof00.billboard (height_m, position)
+  ~ d02.lot.w1009s754.bld.slot.billboard (attrs, height_m, position, segment_id, width_m, yaw_deg)
+  ~ d02.lot.w1023s168.bld.slot.neon (height_m, position)
+  ~ d02.lot.w1024s604.bld.roof00.billboard (position, width_m)
+  ~ d02.lot.w1028s107.bld.slot.neon (height_m, position)
+  ~ d02.lot.w1029n257.bld.roof00.billboard (height_m, position)
+  ~ d02.lot.w1030s169.bld.roof01.billboard (height_m, position, width_m)
+  ~ d02.lot.w1041s492.bld.roof00.billboard (height_m, position)
+  ~ d02.lot.w1041s492.bld.slot.neon (height_m, position)
+  ~ d02.lot.w1041s706.bld.roof00.billboard (height_m, position, width_m)
+  ~ d02.lot.w1041s706.bld.slot.billboard (attrs, height_m, position, segment_id, width_m, yaw_deg)
+  ~ d02.lot.w1045n23.bld.slot.neon (height_m, position)
+  ~ d02.lot.w1049s778.bld.slot.billboard (position)
+  ~ d02.lot.w1049s778.bld.slot.neon (height_m, position)
+  ~ d02.lot.w1052s526.bld.slot.neon (height_m, position)
+  ~ d02.lot.w1055s581.bld.roof00.billboard (height_m, position)
+  ~ d02.lot.w1061s618.bld.roof00.billboard (height_m, position)
+  ~ d02.lot.w1062s258.bld.slot.billboard (attrs, height_m, position, width_m, yaw_deg)
+  ~ ... 3487 more
+total: 76882 added, 82180 removed, 12267 changed

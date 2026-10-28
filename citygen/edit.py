@@ -146,10 +146,8 @@ def _regenerate(state: dict, old: CityModel, district: str, spec_data: dict | No
                 entry: dict | None = None):
     """(the built city with the district regenerated, the edit record for the state). The
     district's new spec entry: `entry` as it is (a rebuild), else its entry in `spec_data`,
-    else its current one; a new seed when that is unchanged and none is given."""
-    from . import build as B
-    from . import overrides as OV
-    from . import streets as ST
+    else its current one; a new seed when that is unchanged and none is given (up to
+    REGEN_TRIES of them, until every check passes)."""
     from .defaults import derive_seed
     from .validate import validate_spec
 
@@ -168,9 +166,40 @@ def _regenerate(state: dict, old: CityModel, district: str, spec_data: dict | No
         if nd is None:
             raise ValueError(f"no district {district!r} in the spec given")
     same = entry_of(nd) == entry_of(d_old)
+    seeds = [seed]
     if seed is None and same and entry is None:
+        # a new seed; a layout that fails a check is drawn again (as `build_city` draws a
+        # failing city's local layout again), the try with the fewest failures wins
         k = sum(1 for e in state.get("edits", []) if e["district"] == district) + 1
-        seed = derive_seed(int(d_old.seed), "regenerate", k)
+        seeds = [derive_seed(int(d_old.seed), "regenerate", k)] + \
+            [derive_seed(int(d_old.seed), "regenerate", k, t) for t in range(1, REGEN_TRIES)]
+    best, tried = None, []
+    for s in seeds:
+        built = _regenerate_once(state, old, district, base, cur, d_old, nd, s, workers)
+        fails = sum(len(c.failures) for c in built[0].checks)
+        tried.append((int(built[1]["seed"]), fails))
+        if best is None or fails < best[0]:
+            best = (fails, built)
+        if not fails:
+            break
+    out, edit = best[1]
+    if len(tried) > 1:
+        out.notes = out.notes + [
+            f"regenerated with seed {edit['seed']} after "
+            + ", ".join(f"seed {s} left {f} check failures" for s, f in tried
+                        if s != edit["seed"])]
+    return out, edit
+
+
+REGEN_TRIES = 4     # seeds a regeneration tries when it picks them itself
+
+
+def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_old, nd,
+                     seed: int | None, workers: int | None):
+    from . import build as B
+    from . import overrides as OV
+    from . import streets as ST
+
     if seed is not None:
         nd = nd.model_copy(update={"seed": int(seed)})
     spec = cur.model_copy(update={"districts": [nd if d.name == district else d
@@ -185,7 +214,7 @@ def _regenerate(state: dict, old: CityModel, district: str, spec_data: dict | No
          if o.id in pins and o.district_id == dd.id]
     frame = ST.Frame(old, district, dd.id, poly, {d.name: d.archetype for d in cur.districts},
                      pins=pins, keep_out=G.union(ground) if ground else None,
-                     pin_buildings=pin_b)
+                     pin_buildings=pin_b, old_entry=d_old)
     held = {ln.name: ln.model_dump(mode="json") for ln in old.transit_lines}
     O = old.model_dump(mode="json")
     new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,
@@ -323,6 +352,8 @@ class _Owner:
             c = self.by(a.get(k))
             if c in ("x", "seam"):
                 return c
+        if coll == "walkways" and a.get("joins") == "walkway island":
+            return "seam"   # (a cut-off group's link: the new build's, which joins its own)
         if coll in ("walkways", "structures") or e["id"].startswith("city."):
             return self.geo(e)
         return "out"
@@ -473,6 +504,7 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
             out[k] = N.get(k)
     _fields(out, O, N, did, zone)
     _factions(out, io["factions"], inn["factions"])
+    _turfs(out)
     n_taxi = _spacing(out, src)
     renamed = _names(out, src)
     model = CityModel.model_validate(out)
@@ -577,11 +609,27 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
             elif changed(j):
                 take(j)
 
+    def slot_prop(j):
+        # a sign slot that went (its building did) takes its sign with it: the sign hangs on
+        # a facade that is not there any more
+        if coll_of.get(j) != "sign_slots":
+            return
+        pid = io["sign_slots"][j].get("prop_id")
+        if src.get(pid) != "o":
+            return
+        if ent(pid, "n") is None:
+            del src[pid]
+            gone.append(pid)
+        elif changed(pid):
+            take(pid)
+
     rounds = 0
     while (work or gone) and rounds < 2_000_000:
         rounds += 1
         if gone:
-            old_referrers(gone.popleft())
+            g = gone.popleft()
+            slot_prop(g)
+            old_referrers(g)
             continue
         i = work.popleft()
         if src.get(i) != "n":
@@ -746,6 +794,37 @@ def _factions(out: dict, of: dict, nf: dict) -> None:
             continue
         rows.append({**base, "zone_ids": ids})
     out["factions"] = rows
+
+
+def _turfs(out: dict) -> None:
+    """Every district's territories hold its blocks as the splice left them: a block that went
+    leaves its turf, and a block of the seam's new build goes to the turf of the seed nearest
+    it (as `gameplay` assigns them)."""
+    from .gameplay import _center
+
+    have = {b["id"]: b for b in out.get("blocks", [])}
+    by_d: dict[str, list] = {}
+    for b in out.get("blocks", []):
+        by_d.setdefault(b["district_id"], []).append(b["id"])
+    zones = [dict(z) for z in out.get("zones", [])]
+    turfs: dict[str, list] = {}
+    for z in zones:
+        if z["kind"] == "territory":
+            turfs.setdefault(z["district_id"], []).append(z)
+    for d, zs in turfs.items():
+        held = set()
+        for z in zs:
+            z["block_ids"] = [i for i in z["block_ids"] if i in have and
+                              have[i]["district_id"] == d and i not in held]
+            held |= set(z["block_ids"])
+        for bid in by_d.get(d, []):
+            if bid in held or not zs:
+                continue
+            c = _center(G.from_model_poly(have[bid]["polygon"]).exterior.coords)
+            z = min(zs, key=lambda z: (round((c[0] - z["attrs"]["seed"][0]) ** 2 +
+                                             (c[1] - z["attrs"]["seed"][1]) ** 2, 4), z["id"]))
+            z["block_ids"] = sorted(z["block_ids"] + [bid])
+    out["zones"] = zones
 
 
 def _names(out: dict, src: dict) -> int:

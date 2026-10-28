@@ -287,3 +287,46 @@ def test_road_grades_on_the_ground_within_class(hilly):
                 dz = abs(g1 + TE.z_on(zp, s1) - g0 - TE.z_on(zp, s0))
                 assert (dz - 0.02) / (s1 - s0) <= g + TGC.GRADE_TOL, (s.id, s0)
     assert math.isfinite(hilly.model.terrain.stats["max_m"])
+
+
+def test_junction_legs_meet_at_one_height(hilly):
+    """Every road of a junction of local roads holds its node's height through the junction
+    (to its curb and sidewalk corners), so its legs meet at one height at the corners, not a
+    step (a primary road keeps its grade through its junctions)."""
+    from shapely.geometry import LineString, Point
+
+    from citygen import geom as G
+
+    segs = {s.id: s for s in hilly.model.road_segments}
+    nodes = {n.id: n for n in hilly.model.road_nodes}
+    at: dict = {}
+    for s in segs.values():
+        for n in (s.start, s.end):
+            at.setdefault(n, []).append(s)
+    n_legs = 0
+    for j in hilly.model.junctions:
+        nd = nodes.get(j.node_id)
+        if nd is None or nd.ground_m is None or len(at.get(j.node_id, [])) < 3 or any(
+                s.road_class in TE.PRIMARY or s.type.endswith(".ramp") for s in at[j.node_id]):
+            continue
+        poly = G.from_model_poly(j.polygon)
+        for s in at[j.node_id]:
+            if not s.ground:
+                continue
+            line = LineString(s.centerline)
+            at_start = line.project(Point(nd.position[:2])) < line.length / 2
+            # the run from the node to where the centerline leaves the junction
+            inside = line.intersection(poly.buffer(-0.05))
+            pieces = [g for g in getattr(inside, "geoms", [inside]) if g.length > 0 and
+                      g.distance(Point(nd.position[:2])) < 0.05]
+            if not pieces:
+                continue
+            # (at most 0.45 of the leg: a short leg between two junctions keeps the rest to
+            # climb from one to the other)
+            run = min(pieces[0].length, 0.45 * line.length)
+            prof = [(p.s, p.z) for p in s.ground]
+            for k in range(11):
+                sv = run * k / 10 if at_start else line.length - run * k / 10
+                assert abs(TE.z_on(prof, sv) - nd.ground_m) <= 0.011, (j.id, s.id, sv)
+            n_legs += 1
+    assert n_legs > 100
