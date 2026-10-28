@@ -102,14 +102,81 @@ The spike measured how Unreal takes this (`docs/progress/AG0/README.md`): Interc
 so instances must come from the manifest, as above); simple collision boxes can be written
 into a mesh's body setup from Python.
 
-**What the exporter still needs for it** (in the PR that first ships real assets, AG1, on
-the exporter's own package once M15 is merged and moved): read `unreal_contribution.json` as
-a layer over the blockout manifest and replace the blockout actor of every key it has (and
-of its `replaces`), keeping the blockout's for the rest; import its glTF packs with assets
-keyed by `asset` and hashed by `hash`; spawn actors at `pivot`; make the masters (M_AgOpaque,
-M_AgGlass with interior mapping, as `assetgen/ue/spike_import.py` does) and their instances
-per slot; write the collision boxes; set Custom Primitive Data on every component; build the
-part instances (HISM per building and kind); include the new keys in its re-import digests.
+### From AG1: real buildings
+
+`assetgen build BUILD` writes the contribution as one file per part of stage 2, beside the
+packs it points at: `BUILD/assets/unreal_contribution.buildings.json` (AG1; AG7 adds
+`unreal_contribution.streets.json`). Each key is in one file only. What changed from AG0's
+format:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "buildings", "layer": 2,
+ "city": "Vesper Bay", "model_sha256": "...", "cpd_layout": {"0-2": "wall tint", "...": ""},
+ "materials": {"brick": {"master": "facade", "color": [0.196, 0.067, 0.036],
+                         "roughness": 0.9, "metallic": 0.0, "tint_cpd": 0}, "...": {}},
+ "entries": [{
+   "key": "d03.lot.e512n88.bld", "kind": "building", "hash": "<asset hash, 16 hex>",
+   "replaces": [], "glb": "tiles/t+02+00.glb", "node": "<key>.shell", "asset": "<key, _>",
+   "pivot": [512.34, 88.1, 0.0], "yaw_deg": 0.0,
+   "nanite": true, "distance_field": false, "lumen_cards": false,
+   "triangles": 12840, "slots": ["brick", "glass", "roof", "structure", "trim"],
+   "collision": {"simple": [{"center": [0, 0, 7.5], "extent": [6, 9, 7.5], "yaw_deg": 45}],
+                 "convex": [{"z": [0, 15], "ring": [[-6, -9], [6, -9], [6, 4], [0, 9]]}]},
+   "cpd": [0.33, 0.12, 0.07, 0.8, 4.5, 0.3, 0.35, 0.4127, "... 23 floats"],
+   "proxy": {"glb": "proxies/t+02+00.glb", "node": "<key>.proxy", "asset": "<key, _>_proxy",
+             "triangles": 34},
+   "parts": [], "tags": {"cg.type": "building.villa", "cg.district": "d03",
+                         "cg.tile": "t+02+00"}}]}
+```
+
+- **Packs**: `tiles/<tile>.glb` holds every building of a 256 m tile (citygen's tile names,
+  by the building's origin): a root node per building named by its key at its pivot, a
+  child `<key>.shell` with the shell mesh (one primitive per material slot). The vertices
+  are in the building's frame, so the static mesh asset is made from the child alone and the
+  actor placed at `pivot`. `proxies/<tile>.glb` holds the far proxies the same way
+  (`<key>.proxy`, its node at the pivot). On M13's terrain the pivot's z is the building's
+  `base_m` (its ground floor over sea level), and the shell, proxy and collision reach down
+  below it to the lowest ground under the footprint (a plinth); on flat ground z is 0.
+- **Materials**: one material instance per slot for the whole city, its parent the slot's
+  `master`, `color`, `roughness` and `metallic` as its parameters. A slot with `tint_cpd`
+  takes its base color from the actor's Custom Primitive Data at that index (three floats,
+  linear RGB): the building's wall, trim, glass, roof, spandrel or patch tint; one master
+  serves every building. UV1 and vertex colors exist only on the glass slots (`glass`,
+  `storefront`): UV1 0 to 1 over each pane, vertex alpha a per-window id for the interior
+  mapping master.
+- **Custom Primitive Data**: 23 floats per actor (`cpd_layout`): AG0's 0 to 7 (tint 0 to 2
+  is now the wall tint, wear, dirt height, neon, lit-window ratio, seed), then the trim,
+  glass, roof, spandrel and patch tints.
+- **Collision**: `simple` boxes (a mass piece that is a rectangle) and `convex` prisms (any
+  other convex piece of a mass footprint, its ring and z range), building frame, meters:
+  `KBoxElem` and `KConvexElem` (the ring at both heights). Simple collision is used as
+  complex until AG3 adds the ground band.
+- **Proxy**: the building's far proxy, its masses as prisms (7 to 500 triangles), a Nanite
+  fallback and HLOD input (AG9 sets up the HLOD layers); as a static mesh of its own.
+- **Parts**: empty until AG2 (hierarchical instanced meshes per building and kind).
+- **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
+  unchanged packs, so a re-import may skip the key.
+
+**What the exporter still needs for it** (M15 was not on main when AG1 finished, so the
+exporter's code is unchanged; this is the work for the first PR that has both):
+- read every `BUILD/assets/unreal_contribution.*.json`, in sorted file order, as stage 2's
+  layer over the blockout manifest, refusing a key that appears in two files;
+- replace the blockout actor of every key it has, and of every key in its `replaces`,
+  keeping the blockout's for the rest; include the new keys and hashes in the re-import
+  digests (an unchanged hash touches nothing);
+- import the packs through Interchange with one static mesh per `<key>.shell` node (and per
+  `<key>.proxy`), assets named by `asset`, and spawn each actor at `pivot` (Unreal
+  100 x, -100 y, 100 z; yaw -yaw);
+- make the masters (`facade`, `glass` with interior mapping, `metal`, as
+  `assetgen/ue/spike_import.py` does) and one material instance per slot, a static switch
+  or scalar picking the CPD index `tint_cpd`;
+- set the 23 Custom Primitive Data floats on every component;
+- write the collision boxes and convex elements into each mesh's body setup;
+- Nanite on, distance fields and Lumen cards off for every building mesh;
+- build parts as hierarchical instanced meshes per building and kind (ready for AG2: the
+  list is empty in AG1);
+- the proxies: as their own meshes for HLOD (AG9) and, where Nanite is off, as the
+  fallback.
 
 ## assetgen's street contribution (AG7)
 
@@ -200,5 +267,6 @@ in its re-import digests (a regenerated district changes only its tiles' entries
 | M15 | Introduced: manifest by key and hash, glTF tiles through Interchange with Nanite, `M_CityGen` material instances, instanced props and plants, graphs as data assets, player start, default sun and sky, re-import by key and hash (`unreal.manifest_changes` says what an import will do), `--check` and `--shots` | the six samples, imported, imported again and checked; a district regenerated with M10 imported over its base and back, exactly the changed actors each way |
 | M13 (merged into M15) | Terrain: the ground a heightfield mesh per 256 m tile (`city.ground.<tile>`, draped, complex collision), water at its own levels, roads on their grade lines, buildings on their bases with stepped plinths (in the building's actor, material `plinth`), retaining walls one actor each by id (`rs.w997n776.wall.w1032n756`; the blockout now draws one object per wall), bored tunnels (`bore.w487n577.tunnel`), terrain viaducts and their columns (`rs.e814n566.viaduct.e814n566`, `rs.e814n566.tvcol.e766n565`), hillside greens in the joined open-space pieces (tagged `d03.os.slope.<cell>`, as every open space); the graphs with absolute heights on a terrain city (`graphs.json` `"heights": "absolute"`: sidewalks and lanes over their road's grade line, the rest over the finished ground), so the data assets, the player start and the check's walk stand on the ground; the walk's fall measured from the path, not the start; a facade trace that misses from the building's bottom is tried again from over the ground at its spot; `--view` adds shots | Cragmouth imported (11933 actors, 126 s), imported again (nothing changed, 20 s) and checked (507 of 507 traces down, 36 of 36 roofs and facades, 150 m walked) with 8K shots, two of hillsides (`docs/progress/M15/cragmouth/`) |
 | AG0 | No code change (M15 was not on main yet): assetgen's contribution format defined (above, written by `assetgen spike`), with the list of what the exporter needs to take it; the spike ran on M15's project setup from its branch | the spike: three generated buildings and a test tree in a throwaway project (`docs/progress/AG0/unreal/`) |
+| AG1 | No code change (M15 was still not on main): `assetgen build` writes the first real contribution, `unreal_contribution.buildings.json` (a shell, pivot, slots, box and convex collision, 23 CPD floats and a proxy per building; one file per stage 2 part); the exporter work it needs listed above | none yet (the coordinating session's call) |
 | AG7 | No code change (the AG1 session owns the exporter): the street contribution defined (above, written by `assetgen streets`): per-piece entries replacing the blockout's joined street objects, sky tube glass as non-Nanite LOD chains, container parts, walkways on raised decks; what the exporter needs to take it listed there | the coordinating session's call |
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`city.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |

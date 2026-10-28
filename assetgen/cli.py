@@ -1,9 +1,10 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
-diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen streets BUILD`,
+diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen build BUILD` (the
+building shells, then the street stage), `assetgen preview BUILD`, `assetgen streets BUILD`,
 `assetgen streets seam BASE REGEN`.
 
-Exit codes: 0 valid (diff: no change), 1 invalid spec (diff: briefs differ), 2 usage or
-file error.
+Exit codes: 0 valid (diff: no change; build: every check passes), 1 invalid spec (diff:
+briefs differ; build: a check fails), 2 usage or file error.
 """
 
 from __future__ import annotations
@@ -129,6 +130,28 @@ def cmd_spike(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_build(args: argparse.Namespace) -> int:
+    from . import build as BD
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        rep = BD.build(src, args.spec, args.overrides, args.workers,
+                       streets=not args.no_streets)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_INVALID
+    sys.stdout.write(BD.report_text(rep))
+    print(f"files written: {rep['files_written']}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
+def cmd_preview(args: argparse.Namespace) -> int:
+    from . import previews as PV
+    return PV.main(args)
+
+
 def cmd_streets(args: argparse.Namespace) -> int:
     from . import brief as B
     from . import spec as S
@@ -222,6 +245,32 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--quantized", action="store_true",
                     help="also write KHR_mesh_quantization copies")
     sp.set_defaults(func=cmd_spike)
+
+    bu = sub.add_parser("build", help="building shells and proxies, then the street packs "
+                                      "(BUILD/assets)")
+    bu.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    bu.add_argument("--spec", help="asset_spec.json (default: the era presets)")
+    bu.add_argument("--overrides", help="asset_overrides.json")
+    bu.add_argument("--workers", type=int, help="worker processes (default "
+                                                "ASSETGEN_WORKERS, else up to 4)")
+    bu.add_argument("--no-streets", action="store_true",
+                    help="the buildings only (default: then the street stage, as "
+                         "`assetgen streets`)")
+    bu.set_defaults(func=cmd_build)
+
+    pv = sub.add_parser("preview", help="Blender previews of a build's assets")
+    pv.add_argument("build", help="a citygen build directory with BUILD/assets")
+    pv.add_argument("--out", help="output directory (default BUILD/assets/previews)")
+    pv.add_argument("--blockout", help="the build's blockout directory (city.blend), for "
+                                       "ground, streets and the street cameras")
+    pv.add_argument("--views", nargs="*", help="city, districts, street, sheets (default all of "
+                                                  "these), city_full")
+    pv.add_argument("--only", nargs="*", help="just these views and sheets (city, "
+                                              "iso_<district>, street_<n>, random, <type>)")
+    pv.add_argument("--width", type=int, default=2400, help="render width in pixels")
+    pv.add_argument("--cell", type=int, default=480, help="contact sheet cell in pixels")
+    pv.add_argument("--blender", help="the Blender executable")
+    pv.set_defaults(func=cmd_preview)
 
     sg = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")
     ssub2 = sg.add_subparsers(dest="command", required=True)

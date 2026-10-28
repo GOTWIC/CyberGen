@@ -10,7 +10,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | Milestone | What it adds | Status | Outputs |
 |---|---|---|---|
 | AG0 | Contract and spike: package `assetgen/`, asset spec and skill, a brief and hash per building, glTF writer, triangulator, assetgen's part of the Unreal exporter; three generated buildings in Unreal 5.8 to measure Nanite size, import time and Lumen cost | Done | [`docs/progress/AG0`](progress/AG0) |
-| AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the first assets in Unreal | Planned | |
+| AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the contribution for the first assets in Unreal | Done | [`docs/progress/AG1`](progress/AG1) |
 | AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth | Planned | |
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Planned | |
 | AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
@@ -70,6 +70,79 @@ buildings (hardware ray-traced Lumen on the PC); AG8 tries voxel Nanite foliage 
 the exporter work AG0 could not do (M15 not on main) is listed in `unreal_export.md`; asks of
 citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their height
 (Vesper Bay: 1,419 AC units, 573 signs, 484 awnings off a wall).
+
+## AG1: building shells
+
+**Built.** The building line's first generators (`assetgen/buildings/`) and the build:
+- **genome** (`genome.py`): district palette (era preset with the spec over it, district
+  additions, a landmark's palette), property family (a complex's buildings share discrete
+  genes and colors, step continuous ones), building genes per mass group (`base`, `body`,
+  `top`: system, window type, rhythm, bay, window share, sill, head, reveal, corner pier,
+  cornice, parapet, bands) and per building (ground band, crown, corner, finish, base strip,
+  colors, wear, dirt height), all blake2b of ids, quantized; `effective` gives the genes a
+  shell used;
+- **facade systems** (`systems.py`): unitized curtain wall, punched concrete, precast panel,
+  punched brick, corrugated, shanty patchwork; every other system falls back to the nearest
+  (`FALLBACK`), types with a fixed system (`TYPE_SYSTEM`), roles to mass groups, material
+  slots with their tint channel, the 23 CPD floats;
+- **grammar and shell** (`shell.py`, `meshbuf.py`, `rings.py`): floor rows per mass (ground,
+  louver, lantern, parking rows), bays between corner piers at real corners, openings by
+  window type and region class, storefronts per unit, mount panels; walls welded per plane
+  with zipper strips, reveal pockets and panes, caps (`triangulate(..., keep_straight=True)`),
+  ring strips for parapets, cornices and bands (mitered, beveled past 1.5 offsets), roof
+  equipment blocks; spiked rings and pinched courts cleaned; every part closed; on M13's
+  slopes the pivot at the building's `base_m` and a plinth under every mass on the base,
+  down into the lowest ground under the footprint (`shell.plinth_mm`; AG5 steps it);
+- **proxies** (`proxy.py`, at most 500 triangles) and **collision** (`collision.py`: convex
+  pieces per mass, boxes where rectangles);
+- **`assetgen build`** (`assetgen/build.py`, `manifest.py`, `asset_checks.py`,
+  `contribution.py`, `buildings/envelope.py`): briefs kept when their inputs are, asset hash
+  per building, 256 m tile packs made in up to 4 worker processes where hashes changed,
+  manifest, report, `unreal_contribution.buildings.json`, files written only when their
+  bytes change; checks `asset_coverage`, `asset_envelope`, `asset_meshes`, `asset_unique`,
+  `asset_budget`; then AG7's street stage (`--no-streets` skips it; its report written only
+  when another of its files changed, so an unchanged rebuild writes no file), one verdict
+  for both;
+- **`assetgen preview`** (`previews.py`, `blender/preview_assets.py`): the city from proxies
+  (and with every shell), districts and the blockout's street cameras at full detail,
+  contact sheets per type and one of 64 buildings across the city, on the blockout's
+  city.blend without its building boxes;
+- tests `tests/assetgen/test_ag_shell.py`, `test_ag_build.py`; goldens under `ag1` (the small
+  city's manifest and asset files, nine Vesper Bay shells as GLB).
+
+**Samples** (all five checks pass in each; 4 workers on the shared Mac):
+
+| City | Buildings | Shell triangles | Of section 11's estimate | Packs | Build |
+|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 21.8 M | 0.59 | 1.29 GB | 50 to 119 s |
+| Saltreach Free Port | 3,135 | 15.4 M | 0.76 | 0.91 GB | 46 s |
+| Delta Megacity | 5,417 | 24.0 M | 0.65 | 1.41 GB | 75 s |
+| Nexus City | 6,519 | 21.5 M | 0.59 | 1.27 GB | 71 s |
+| Greyhook | 2,460 | 9.8 M | 0.48 | 0.58 GB | 23 s |
+| Vesper Bay Pinned | 6,658 | 20.6 M | 0.54 | 1.22 GB | 62 s |
+| Vesper Bay Stacks | 6,686 | 20.1 M | 0.55 | 1.19 GB | 63 s |
+| Cragmouth | 6,800 | 22.7 M | 0.57 | 1.33 GB | 74 s (3 workers), streets 7 s more |
+
+About 58 bytes of glTF per shell triangle (positions, normals and UV0 everywhere; UV1 and
+colors on glass only); proxies 7 to 498 triangles (median 23 to 40). A second build writes
+no file (3 to 14 s). Uniqueness: nearest pair outside a family 4.4 to 6.1 apart (k = 4).
+Cragmouth (M13, merged after AG1's first builds): 4,359 plinths.
+
+**Mac = x86** (run before the validation rule deferred it to `docs/determinism_check.md`):
+whole-city builds of Vesper Bay and Greyhook byte-identical in `citygen-x86` (279 and 171
+files); AG1's tests passed there, the small city's goldens included.
+
+**Exporter**: M15 was not on main, so only the contribution file
+(`unreal_contribution.buildings.json`); `unreal_export.md` ("From AG1") lists the exporter
+work. No Unreal check yet (the coordinating session's call).
+
+**For later milestones**: AG2 gets about 40% of section 11's triangle estimate for parts
+(reveals are in the shells for now), the other facade systems (`systems.FALLBACK`), massing
+articulation, wear and the thumbnail hash; AG3 storefront detail and doors (mount panels
+already keep mounts off the glass); AG4 roof equipment (blocks now), skybridge landings and
+portals; AG5 per-type and landmark generators; AG6 reads the slots, tints, UVs and CPD
+layout as the material contract; citygen: footprints with zero-width spikes, self-crossing
+rings and pinched courts (`rings.tidy` cleans them).
 
 ## AG7: street elements
 

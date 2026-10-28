@@ -1,0 +1,212 @@
+{
+ "views": [
+  {
+   "name": "city",
+   "shell_tiles": 0,
+   "faces": 0,
+   "seconds": 4.2
+  },
+  {
+   "name": "iso_d01",
+   "shell_tiles": 25,
+   "faces": 8583860,
+   "seconds": 36.2
+  },
+  {
+   "name": "iso_d02",
+   "shell_tiles": 23,
+   "faces": 5810468,
+   "seconds": 32.1
+  },
+  {
+   "name": "iso_d03",
+   "shell_tiles": 21,
+   "faces": 2776028,
+   "seconds": 31.6
+  },
+  {
+   "name": "iso_d04",
+   "shell_tiles": 26,
+   "faces": 4099444,
+   "seconds": 87.2
+  },
+  {
+   "name": "iso_d05",
+   "shell_tiles": 20,
+   "faces": 3593700,
+   "seconds": 61.1
+  },
+  {
+   "name": "iso_d06",
+   "shell_tiles": 25,
+   "faces": 151800,
+   "seconds": 31.2
+  },
+  {
+   "name": "iso_d07",
+   "shell_tiles": 10,
+   "faces": 91656,
+   "seconds": 12.7
+  },
+  {
+   "name": "iso_d08",
+   "shell_tiles": 15,
+   "faces": 1545504,
+   "seconds": 24.9
+  },
+  {
+   "name": "street_1",
+   "shell_tiles": 37,
+   "faces": 9336776,
+   "seconds": 51.3
+  },
+  {
+   "name": "street_2",
+   "shell_tiles": 32,
+   "faces": 7228452,
+   "seconds": 63.0
+  },
+  {
+   "name": "street_3",
+   "shell_tiles": 32,
+   "faces": 7490952,
+   "seconds": 41.2
+  },
+  {
+   "name": "street_4",
+   "shell_tiles": 21,
+   "faces": 5452476,
+   "seconds": 27.7
+  },
+  {
+   "name": "street_5",
+   "shell_tiles": 25,
+   "faces": 4325540,
+   "seconds": 66.4
+  }
+ ],
+ "sheets": [
+  {
+   "name": "control_tower",
+   "cells": 1
+  },
+  {
+   "name": "courtyard_block",
+   "cells": 12
+  },
+  {
+   "name": "gate_house",
+   "cells": 1
+  },
+  {
+   "name": "hangar",
+   "cells": 9
+  },
+  {
+   "name": "lab",
+   "cells": 12
+  },
+  {
+   "name": "landmark.megatower",
+   "cells": 1
+  },
+  {
+   "name": "megabuilding",
+   "cells": 12
+  },
+  {
+   "name": "office",
+   "cells": 1
+  },
+  {
+   "name": "pagoda",
+   "cells": 1
+  },
+  {
+   "name": "parking_structure",
+   "cells": 7
+  },
+  {
+   "name": "podium_tower",
+   "cells": 12
+  },
+  {
+   "name": "shanty_stack",
+   "cells": 12
+  },
+  {
+   "name": "shed",
+   "cells": 12
+  },
+  {
+   "name": "shopfront_row",
+   "cells": 12
+  },
+  {
+   "name": "slab",
+   "cells": 12
+  },
+  {
+   "name": "straddle_building",
+   "cells": 2
+  },
+  {
+   "name": "temple_hall",
+   "cells": 3
+  },
+  {
+   "name": "terminal",
+   "cells": 1
+  },
+  {
+   "name": "terraced",
+   "cells": 12
+  },
+  {
+   "name": "tower",
+   "cells": 12
+  },
+  {
+   "name": "villa",
+   "cells": 12
+  },
+  {
+   "name": "warehouse",
+   "cells": 12
+  },
+  {
+   "name": "yard",
+   "cells": 12
+  },
+  {
+   "name": "random",
+   "cells": 64
+  }
+ ],
+ "contact_sheets": [
+  "contact_control_tower.jpg",
+  "contact_courtyard_block.jpg",
+  "contact_gate_house.jpg",
+  "contact_hangar.jpg",
+  "contact_lab.jpg",
+  "contact_landmark.megatower.jpg",
+  "contact_megabuilding.jpg",
+  "contact_office.jpg",
+  "contact_pagoda.jpg",
+  "contact_parking_structure.jpg",
+  "contact_podium_tower.jpg",
+  "contact_shanty_stack.jpg",
+  "contact_shed.jpg",
+  "contact_shopfront_row.jpg",
+  "contact_slab.jpg",
+  "contact_straddle_building.jpg",
+  "contact_temple_hall.jpg",
+  "contact_terminal.jpg",
+  "contact_terraced.jpg",
+  "contact_tower.jpg",
+  "contact_villa.jpg",
+  "contact_warehouse.jpg",
+  "contact_yard.jpg",
+  "contact_sheet.jpg"
+ ]
+}

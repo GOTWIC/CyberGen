@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 and AG7 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1 and AG7 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -142,24 +142,61 @@ and use, plus roads, sidewalks, street furniture and textures. Each milestone's 
 into Unreal through the same exporter as stage 1's city, replacing the blockout piece by piece.
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
-[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
+[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
+[`docs/progress/AG1`](docs/progress/AG1)
 
-<img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
+### Cities
 
-Every facade edge of Vesper Bay by what it faces: the main street (red), other streets,
-alleys, water, plazas and parks, party walls (black), blind walls, yards, and walls above
-their neighbors.
+Every building modelled: walls with window openings, storefronts, slab bands, parapets and
+cornices, in one of six facade styles chosen per district, owner and building (8K; open one
+for full size).
+
+| Vesper Bay | Nexus City |
+|---|---|
+| <img src="docs/progress/AG1/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG1/nexus_city/city_full.jpg" width="420"> |
+
+| Delta Megacity | Saltreach Free Port |
+|---|---|
+| <img src="docs/progress/AG1/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG1/archipelago_free_port/city_full.jpg" width="420"> |
+
+| Greyhook | Vesper Bay with the hand-traced Corporate Core |
+|---|---|
+| <img src="docs/progress/AG1/peninsula_city/city_full.jpg" width="420"> | <img src="docs/progress/AG1/vesper_bay_pinned/city_full.jpg" width="420"> |
+
+| Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
+|---|---|
+| <img src="docs/progress/AG1/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG1/cragmouth/city_full.jpg" width="420"> |
+
+### Up close
+
+| Corporate Core, every building at full detail (8K) | A street in Old Town (8K) |
+|---|---|
+| <img src="docs/progress/AG1/vesper_bay/detail/iso_d01.jpg" width="420"> | <img src="docs/progress/AG1/vesper_bay/detail/street_5.jpg" width="420"> |
+
+<img src="docs/progress/AG1/vesper_bay/contact_sheet.jpg" width="840">
+
+64 Vesper Bay buildings drawn at random, each framed alone (8K).
 
 ```bash
 .venv/bin/python -m assetgen spec validate cities/vesper_bay/asset_spec.json --build out/vesper_bay
-.venv/bin/python -m assetgen brief out/vesper_bay --spec cities/vesper_bay/asset_spec.json
-.venv/bin/python -m assetgen brief diff out/vesper_bay out/vesper_bay_regenerated
+.venv/bin/python -m assetgen build out/vesper_bay --spec cities/vesper_bay/asset_spec.json
+.venv/bin/python -m citygen blockout out/vesper_bay/city_model.json out/vesper_bay/blockout
+.venv/bin/python -m assetgen preview out/vesper_bay --blockout out/vesper_bay/blockout
 ```
 
 The asset spec (art direction per era, district, owner and landmark) is written from the
-city prompt by a Claude Code session through the repo's `assetgen` skill; the brief stage
-writes `out/<city>/assets/briefs.json`, everything each building's model will be made from,
-with a hash per building, so a regenerated district rebuilds only its own assets.
+city prompt by a Claude Code session through the repo's `assetgen` skill. `assetgen build`
+writes `out/<city>/assets/`: a glTF pack per 256 m tile with every building's model, far
+proxies, a manifest keyed by building id and the entries the Unreal exporter reads, then the
+street packs (below); it rebuilds only what changed, so a regenerated district rebuilds only
+its own. On hilly cities buildings stand on plinths down to the ground. `assetgen preview`
+renders the city, its districts and street views in Blender.
+
+<img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
+
+What every facade faces, which decides its windows: the main street (red), other streets,
+alleys, water, plazas and parks, party walls (black, no windows), blind walls, yards, and
+walls above their neighbors.
 
 <img src="docs/progress/AG7/vesper_bay_stacks/streets_interchange.jpg" width="840">
 
@@ -171,10 +208,11 @@ with parapets, columns and pier caps, lane markings, sidewalks, crosswalks and t
 .venv/bin/python -m assetgen streets out/vesper_bay
 ```
 
-The street stage writes `out/<city>/assets/streets/`, one glTF pack per 256 m tile with a mesh
-for every road, sidewalk, crosswalk, junction, bridge, viaduct, tunnel, quay, transit structure
-and megasite element, each named by its citygen id and replacing the blockout's street pieces
-in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
+`assetgen build` also runs it, after the buildings (`--no-streets` skips it). The street
+stage writes `out/<city>/assets/streets/`, one glTF pack per 256 m tile with a mesh for
+every road, sidewalk, crosswalk, junction, bridge, viaduct, tunnel, quay, transit structure
+and megasite element, each named by its citygen id and replacing the blockout's street
+pieces in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
 [`docs/progress/AG7`](docs/progress/AG7).
 
 ### Milestones
@@ -182,7 +220,7 @@ in Unreal; a regenerated district rewrites only the tiles it touches. Street vie
 | | Milestone | What it adds | Status |
 |---|---|---|---|
 | AG0 | Groundwork | Art direction spec and skill, a brief of what every building is made from (facade edges by what they face), glTF writer, three test buildings in Unreal | Done |
-| AG1 | Building shells | Walls, floors and window openings for every building | Planned |
+| AG1 | Building shells | A model for every building: walls with window openings, storefronts, slabs, parapets and cornices in six facade styles; far models for distant views | Done |
 | AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
 | AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
 | AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |

@@ -8,7 +8,10 @@ by Ear Clipping", 2002); the bridged ring is then clipped ear by ear in a fixed 
 
 `triangulate(outer, holes)` returns triangles as indices into the input vertices (the outer
 ring's, then each hole's in turn), counterclockwise in the plane. A ring may be given in
-either direction; a repeated closing point and consecutive duplicates are ignored.
+either direction; a repeated closing point and consecutive duplicates are ignored. Straight
+vertices (between their neighbors on one line) are dropped, unless `keep_straight`: then
+every vertex is a corner of some triangle, so a face meets its neighbors without T-junctions
+(AG1's roofs and caps, whose rings carry the facades' corner points).
 """
 
 from __future__ import annotations
@@ -100,7 +103,7 @@ def _bridge(pts, ring: list[int], hole: list[int], others: list[list[int]]) -> l
     raise TriangulationError("no vertex of the outer ring sees the hole")
 
 
-def triangulate(outer, holes=()) -> list[tuple[int, int, int]]:
+def triangulate(outer, holes=(), keep_straight: bool = False) -> list[tuple[int, int, int]]:
     pts = [tuple(int(c) for c in p) for p in outer]
     rings = [_clean(outer, 0)]
     base = len(pts)
@@ -124,10 +127,10 @@ def triangulate(outer, holes=()) -> list[tuple[int, int, int]]:
     hs.sort(key=lambda h: (-max(pts[i][0] for i in h), min(h)))
     for k, h in enumerate(hs):
         ring = _bridge(pts, ring, h, hs[k + 1:])
-    return _clip(pts, ring)
+    return _clip(pts, ring, keep_straight)
 
 
-def _clip(pts, ring: list[int]) -> list[tuple[int, int, int]]:
+def _clip(pts, ring: list[int], keep: bool = False) -> list[tuple[int, int, int]]:
     n = len(ring)
     prev = [(k - 1) % n for k in range(n)]
     nxt = [(k + 1) % n for k in range(n)]
@@ -141,7 +144,7 @@ def _clip(pts, ring: list[int]) -> list[tuple[int, int, int]]:
         o = orient(a, b, c)
         cut = False
         if o == 0:
-            cut = a == c or not _between(a, c, b) or alive > 3
+            cut = a == c or not _between(a, c, b) or (alive > 3 and not keep)
             if cut:
                 # a straight or folded-back vertex: drop it, no triangle
                 nxt[p], prev[q] = q, p

@@ -219,8 +219,10 @@ def _write_text(path: Path, text: str) -> bool:
 
 
 def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None = None,
-          force: bool = False) -> dict:
-    """Make the street packs of a city into out_dir (BUILD/assets); returns the report."""
+          force: bool = False, report_always: bool = True) -> dict:
+    """Make the street packs of a city into out_dir (BUILD/assets); returns the report.
+    `report_always=False` (`assetgen build`) writes the report only when another file
+    changed or it is missing, so an unchanged rebuild writes no file."""
     t0 = time.perf_counter()
     out_dir = Path(out_dir)
     sdir = out_dir / "streets"
@@ -342,9 +344,12 @@ def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None =
     rep_text = json.dumps(rep, sort_keys=True, indent=1, ensure_ascii=False) + "\n"
     from .checks import report_text
     # the report carries timings: it is rewritten on every run (the packs, the manifest and
-    # the contribution are not, when nothing changed)
-    _write_text(out_dir / "streets_report.json", rep_text)
-    _write_text(out_dir / "streets_report.txt", report_text(rep))
+    # the contribution are not, when nothing changed), unless report_always is off
+    changed = bool(written or stale or parts_written or man_written or con_written)
+    rep["files"]["report_written"] = False
+    if report_always or changed or not (out_dir / "streets_report.json").is_file():
+        rep["files"]["report_written"] = _write_text(out_dir / "streets_report.json", rep_text)
+        _write_text(out_dir / "streets_report.txt", report_text(rep))
     return rep
 
 

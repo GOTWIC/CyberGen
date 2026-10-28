@@ -742,6 +742,51 @@ AG0 (contract and spike) is in place:
   (`citygen-x86`). Write them again with `.venv/bin/python tests/assetgen/goldens.py
   [--builds DIR]` after a citygen change moves a model, and say why in the PR.
 
+AG1 (building shells) is in place:
+- **Genome** (`assetgen/buildings/genome.py`): blake2b draws from the brief alone: the era's
+  palette with the spec's district and owner additions, a property family's shared genes
+  (complexes), per mass group (`base`, `body`, `top`) a facade system and its window type,
+  rhythm, bay, window share, sill, head, reveal, corner pier, cornice, parapet and bands,
+  per building colors, wear and finishes. `effective` keeps the genes a shell used (the
+  uniqueness vector). Every era maps onto AG1's six systems (`systems.FALLBACK`); building
+  types fix some (`TYPE_SYSTEM`).
+- **Grammar and shell** (`buildings/shell.py`): per mass the floor rows (sill and head per
+  floor, shared by all its facades so corners match; ground, louver, lantern and parking
+  rows), per facade bays between corner piers (only at real corners), openings by window
+  type and the brief's region class (none on party or hidden walls), storefronts per unit,
+  a panel wherever a mount would fall on glass; the wall a grid welded on its plane (pier
+  cells, zipper strips between rows), a reveal pocket and pane per opening, caps on the
+  ring's corners (`triangulate(..., keep_straight=True)`), ring strips (`buildings/rings.py`:
+  parapets, cornices, slab bands, beveled past 1.5 offsets), roof equipment blocks until
+  AG4. Every part is closed on integer millimeters (`meshbuf.check`); spiked rings and
+  courts pinched onto the exterior are cleaned first. UV1 and vertex colors only on glass.
+  On M13's slopes the pivot is the building's `base_m` and every mass on the base gets a
+  plinth down into the lowest ground under the footprint (`shell.plinth_mm`, also in the
+  proxy, collision and envelope; AG5 steps it).
+- **Proxies, collision** (`buildings/proxy.py`, `collision.py`): masses as prisms (at most
+  500 triangles), convex pieces per mass (boxes where rectangles).
+- **`assetgen build BUILD [--spec S] [--workers N] [--no-streets]`** (`assetgen/build.py`,
+  at most 4 workers by default): briefs (kept when model, spec and overrides are unchanged),
+  genomes, asset hash per building (brief, `GEN_VERSION`, material library), 256 m tile
+  packs `tiles/<tile>.glb` and `proxies/<tile>.glb` made in workers only where a tile's
+  hashes changed, `manifest.json` (`assetgen/manifest.py`: other stages' sections kept),
+  `asset_report.json`/`.txt`, `unreal_contribution.buildings.json`
+  (`assetgen/contribution.py`); every file written only when its bytes change, so an
+  unchanged rebuild writes none. Bump `GEN_VERSION` whenever pack bytes change. Checks
+  (`assetgen/asset_checks.py`): `asset_coverage`, `asset_envelope`
+  (`buildings/envelope.py`), `asset_meshes`, `asset_unique` ($k$ genes or distance), and
+  `asset_budget` (section 11's estimate); then AG7's street stage, the same bytes as
+  `assetgen streets` (its report written only when another of its files changed, so an
+  unchanged rebuild still writes no file); exit 1 on a failure of either.
+- **`assetgen preview BUILD [--blockout DIR]`** (`assetgen/previews.py`,
+  `assetgen/blender/preview_assets.py`): on the blockout's city.blend without its building
+  boxes, the whole city from proxies (`city_full` with every shell), each district and the
+  blockout's street cameras at full detail, contact sheets per type; materials per slot
+  tinted from the glTF node extras.
+- **Exporter**: M15 was not on main, so AG1 only writes the contribution;
+  `docs/unreal_export.md` lists what the exporter needs for it. Results:
+  `docs/progress/AG1/`.
+
 AG7 (street elements) is in place, in `assetgen/streets/` (tests
 `tests/assetgen/test_ag_streets.py`):
 - **`assetgen streets BUILD [--spec S] [--workers N]`** (`build.py`): every street element as
