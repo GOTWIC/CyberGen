@@ -53,9 +53,9 @@ class Mass(_M):
 
 class Region(_M):
     """A rectangle of an edge's facade: s along the edge, z up."""
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
     s: tuple[float, float]
     z: tuple[float, float]
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
     class_: EdgeClass = Field(alias="class")
     ref: str | None = Field(None, description="party, blind: the neighbor; hidden: the own "
                                               "mass (m<k>); facing: the road, water, open "

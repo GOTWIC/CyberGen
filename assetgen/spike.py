@@ -10,9 +10,10 @@
 
 The generators are simple (AG1 builds the real ones) but use the real contract: integer
 millimeters in the building frame, exact triangulation, material slots, two UV sets, vertex
-colors (grime toward the ground; a random id per window in green for interior mapping),
-parts in their own frame instanced by transform, simple collision boxes per mass and
-Custom Primitive Data per building. Randomness is blake2b of (salt, id, purpose).
+vertex colors (a gray darkening toward the ground, which glTF multiplies into the base color;
+a random id per window in alpha for the glass master's interior mapping), parts in their own
+frame instanced by transform, simple collision boxes per mass and Custom Primitive Data per
+building. Randomness is blake2b of (salt, id, purpose).
 
 `write_spike(out)` writes per building `<name>.glb` (shell and part prototypes, the import
 the exporter uses), `<name>_gpuinst.glb` (parts with EXT_mesh_gpu_instancing),
@@ -28,6 +29,8 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from citygen import dmath as M
 
 from . import __version__
 from . import canon as C
@@ -61,6 +64,8 @@ SLOTS = {
     "roof": ("facade", "#4d4b47", 0.95, 0.0),
     "sign": ("neon", "#ff2a6d", 0.5, 0.0),
     "awning": ("facade", "#8c2f2b", 0.85, 0.0),
+    "bark": ("facade", "#4a3b2c", 0.95, 0.0),
+    "leaf": ("foliage", "#3f6b2a", 0.7, 0.0),
 }
 
 
@@ -93,7 +98,6 @@ class Wall:
 
     @property
     def yaw(self) -> float:
-        from citygen import dmath as M
         return M.degrees(M.atan2(self.u[1], self.u[0]))
 
 
@@ -128,13 +132,16 @@ def pane(mb: MeshBuilder, mat: str, w: Wall, s0, s1, t0, t1, d, color):
 
 
 def grime(t: int, top: int, wear: float = 1.0) -> tuple[int, int, int, int]:
-    """Vertex color: darker toward the ground (red channel the grime the material reads)."""
-    g = min(int(round(200 * wear * max(0.0, 1.0 - t / max(top, 1)) ** 2)), 255)
-    return (g, 128, 0, 255)
+    """Vertex color: a gray that darkens toward the ground (glTF multiplies COLOR_0 into the
+    base color); alpha 255."""
+    v = 255 - min(int(round(90 * wear * max(0.0, 1.0 - t / max(top, 1)) ** 2)), 135)
+    return (v, v, v, 255)
 
 
 def window_id(key: str, k: int) -> tuple[int, int, int, int]:
-    return (0, int(rnd(key, f"win{k}") * 255), 0, 255)
+    """A window's vertex color: white, and a random id in alpha (opaque materials ignore
+    it; the glass master reads it to vary the room behind)."""
+    return (255, 255, 255, 1 + int(rnd(key, f"win{k}") * 254))
 
 
 def rect(x0, y0, x1, y1):
@@ -193,8 +200,8 @@ def part_ac_unit() -> MeshBuilder:
 def part_water_tank() -> MeshBuilder:
     mb = MeshBuilder()
     n, r = 16, 1500
-    pts = [(int(round(r * math.cos(2 * math.pi * k / n))),
-            int(round(r * math.sin(2 * math.pi * k / n)))) for k in range(n)]
+    pts = [(int(round(r * M.cos(2 * M.PI * k / n))),
+            int(round(r * M.sin(2 * M.PI * k / n)))) for k in range(n)]
     for k in range(n):
         a, b = pts[k], pts[(k + 1) % n]
         quad3(mb, "rust", (a[0], a[1], 600), (b[0], b[1], 600), (b[0], b[1], 3600),
@@ -212,8 +219,8 @@ def part_dish() -> MeshBuilder:
     mb = MeshBuilder()
     _pbox(mb, "metal", -30, -30, 0, 30, 30, 600)
     n, r = 12, 450
-    disk = [(int(round(r * math.cos(2 * math.pi * k / n))),
-             int(round(r * math.sin(2 * math.pi * k / n)))) for k in range(n)]
+    disk = [(int(round(r * M.cos(2 * M.PI * k / n))),
+             int(round(r * M.sin(2 * M.PI * k / n)))) for k in range(n)]
     mb.face("metal", Frame((0, -150, 900), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)), disk)
     mb.face("metal", Frame((0, -100, 900), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0)), disk)
     return mb
@@ -307,7 +314,7 @@ def tower(floors: int = 92) -> Spike:
                 k += 1
     mb.face("roof", flat_frame(top), rect(-W // 2, -D // 2, W // 2, D // 2))
     for w in ring_walls(rect(-W // 2, -D // 2, W // 2, D // 2)):
-        wbox(mb, "metal", w, 0, w.L, top, top + 1500, -300, 0, (0, 128, 0, 255), faces="ftb")
+        wbox(mb, "metal", w, 0, w.L, top, top + 1500, -300, 0, (255, 255, 255, 255), faces="ftb")
     sp.masses.append((-W // 2, -D // 2, W // 2, D // 2, PH, top))
     # crown: a setback lantern of louvers
     cw, cd, ch = W - 12000, D - 12000, 9000
@@ -316,7 +323,7 @@ def tower(floors: int = 92) -> Spike:
         mb.face("spandrel", fr, rect(0, top, w.L, top + ch))
         for i in range(w.L // 600):
             wbox(mb, "metal", w, i * 600, i * 600 + 120, top, top + ch, 0, 500,
-                 (0, 128, 0, 255), faces="flr")
+                 (255, 255, 255, 255), faces="flr")
     mb.face("roof", flat_frame(top + ch), rect(-cw // 2, -cd // 2, cw // 2, cd // 2))
     sp.masses.append((-cw // 2, -cd // 2, cw // 2, cd // 2, top, top + ch))
     sp.parts["part.roof.ac_unit"] = part_ac_unit()
@@ -485,8 +492,41 @@ def shanty_stack(levels: int = 4) -> Spike:
             for st in range(14):
                 t = z0 + st * 200
                 wbox(mb, "metal", sw, st * 280, st * 280 + 300, t, t + 60, -900, 0,
-                     (60, 128, 0, 255))
+                     (255, 255, 255, 255))
     sp.cpd = [0.9, 0.85, 0.8, 1.2, 4.0, 0.7, 0.35, rnd(sp.key, "seed")]
+    return sp
+
+
+def tree(leaves: int = 1600) -> Spike:
+    """Not a building: a 9 m tree of thin leaf cards (both faces) on a trunk, to try
+    Nanite's foliage settings (voxel shape preservation) on the kind of mesh AG8 makes."""
+    from .mesh import Frame
+    sp = Spike("spike.tree.plt")
+    mb = sp.shell
+    mb.oriented_box("bark", 0, 0, 0, 450, 450, 4200, 1.0, 0.0)
+    for k in range(6):
+        a = 2 * M.PI * k / 6
+        ux, uy = M.cos(a), M.sin(a)
+        mb.oriented_box("bark", int(1100 * ux), int(1100 * uy), 3600 + 300 * (k % 3), 2200,
+                        160, 160, ux, uy)
+    for k in range(leaves):
+        # a point in the crown (an ellipsoid 3.2 m across, 3.6 m high, at 6.2 m)
+        u, v, w = rnd(sp.key, f"lu{k}"), rnd(sp.key, f"lv{k}"), rnd(sp.key, f"lw{k}")
+        th, ph = 2 * M.PI * u, M.acos(2 * v - 1)
+        r = M.power(w, 1.0 / 3.0)
+        x = int(3200 * r * M.sin(ph) * M.cos(th))
+        y = int(3200 * r * M.sin(ph) * M.sin(th))
+        z = int(6200 + 1800 * r * M.cos(ph))
+        a = 2 * M.PI * rnd(sp.key, f"la{k}")
+        tilt = 0.6 * (rnd(sp.key, f"lt{k}") - 0.5)
+        uax, uay = M.cos(a), M.sin(a)
+        leaf = [(-150, 0), (150, 0), (150, 220), (-150, 220)]
+        fr = Frame((x, y, z), (uax, uay, 0.0), (-uay * tilt, uax * tilt, 1.0 - abs(tilt)))
+        mb.face("leaf", fr, leaf)
+        back = Frame((x, y, z), (-uax, -uay, 0.0), (-uay * tilt, uax * tilt, 1.0 - abs(tilt)))
+        mb.face("leaf", back, leaf)
+    sp.masses.append((-225, -225, 225, 225, 0, 4200))
+    sp.cpd = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, rnd(sp.key, "seed")]
     return sp
 
 
@@ -505,7 +545,7 @@ def _materials(g: G.Gltf) -> dict[str, int]:
 def _glb(sp: Spike, variant: str) -> tuple[bytes, dict]:
     g = G.Gltf(generator=f"assetgen {__version__}", quantized=(variant == "quant"))
     mats = _materials(g)
-    shell = g.mesh(sp.key, sp.shell.primitives(mats), extras={"kind": "shell"})
+    shell = g.mesh(sp.key + ".shell", sp.shell.primitives(mats), extras={"kind": "shell"})
     children = [g.node(sp.key + ".shell", mesh=shell)]
     for kind in sorted(sp.parts):
         mesh = g.mesh(f"{sp.key}.{kind}", sp.parts[kind].primitives(mats),
@@ -566,11 +606,13 @@ def contribution(entries: list[dict]) -> dict:
     return {"version": 1, "stage": "assetgen", "generator": f"assetgen {__version__} (AG0)",
             "frame": "building frame: citygen x east, y north, z up, m; glTF y up; Unreal "
                      "(100 x, -100 y, 100 z) cm, yaw -> -yaw",
-            "layer": 2, "masters": ["facade", "glass", "metal", "neon"], "materials": mats,
+            "layer": 2, "masters": ["facade", "glass", "metal", "neon", "foliage"],
+            "materials": mats,
             "entries": entries}
 
 
-SPIKES = {"tower": tower, "shopfront_row": shopfront_row, "shanty_stack": shanty_stack}
+SPIKES = {"tower": tower, "shopfront_row": shopfront_row, "shanty_stack": shanty_stack,
+          "foliage_test": tree}
 
 
 def write_spike(out_dir: str | Path, quantized: bool = True, which=None) -> dict:

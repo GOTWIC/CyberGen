@@ -552,6 +552,20 @@ samples build at proxy level or on the Windows PC (decision 13.5).
 
 ## 13. Decisions that need Swagnik
 
+**Provisional answers (2026-10-27, until Swagnik overrides).** AG0 took each recommendation
+below as its answer so that AG1 can start; any of them can still change.
+
+| | Provisional answer | Where it is set |
+|---|---|---|
+| 13.1 | No AI models: everything procedural | |
+| 13.2 | U1 for every building, U2 for landmarks and heroes; $k = 4$ discrete genes apart outside a complex; parts shared between buildings when their quantized parameters coincide | asset spec defaults `uniqueness`, `hero_uniqueness`, `min_gene_distance`, `share_parts` |
+| 13.3 | Textures generated; fonts decided later (AG8) | |
+| 13.4 | The RTX 4070 Ti PC at 1440p with Nanite and Lumen sets the budgets; 512 px/m in the street band (256 px/m above) | `texel_density_px_m`, `texel_density_upper_px_m` |
+| 13.5 | The Mac for now (one city's assets and one imported city at a time) | |
+| 13.6 | Interior mapping only (the spike's glass master does it) | |
+| 13.7 | The asset spec written by a session from the prompt through the `assetgen` skill; no mood boards | `.claude/skills/assetgen/SKILL.md` |
+| 13.8 | Pure Python generators, Blender for previews only | |
+
 1. **Local AI models.**
    - (a) None: everything procedural, deterministic, no ML dependency. *Recommended for the
      generator*, and for v1.

@@ -1,0 +1,33 @@
+{
+  "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, every sample's briefs.json, the two small spike buildings' glTF files and a triangulation. Made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86).",
+  "testport_briefs": "ab2040ab2e5e9f414c19c6525c00ee8f53499bdde8d1c94fc07d782a9954effc",
+  "triangulate": "b45c256a71c471e59d9c38b5e3be4c994ee36bf5da2d3fa23b2d81596dac1464",
+  "buildings": {
+    "vesper_bay": {
+      "d01.lm.e790n290.bld": "76d142b29a67f5caacd5d1e0053036475e8e8276b5668da6ba82c855a3bd9c16",
+      "d01.lot.e1021n512.bld": "0071bcacfcd480ad26c596cb7ca2228da93f89e5d6c968cad0ae7322e5ae9918",
+      "d01.lot.e1023n358.bld": "321210ab4dfc968eff814cc3de528883bff64683689328580e65038f56993fed",
+      "d02.lot.e123n1282.bld": "cb4523c0ca18e64a73a3fa6ef981cc30694370093f411b2f71a5f9c7ac3d0059",
+      "d03.lot.e1000n1582.bld": "864ac1a395901c5f75f40758ba8a5fc0ed893b8a19abe770593f908ba261c266",
+      "d04.lot.e1000s1217.bld": "9522d60dba7d174da7725afd5b0fb756b38311d9e3e6f0a798707a7df8ac3bc6",
+      "d04.lot.e1002s1191.bld": "1ce6551d77183bd228eeda5d30b500ca25447d1d6f02d1d27b632d9826b17361"
+    }
+  },
+  "samples": {
+    "archipelago_free_port": "fd291d8e7524b40dd23d5dc7e08fa4fba8d262acb8207b751b9566bafd500c02",
+    "delta_megacity": "c4f0fde8a0d943f573f414eef1f62c1c93303b078f5e12da8b95a05a31771e35",
+    "nexus_city": "1f8711c7ab13e735fe2cc9e9c74717e9a9f7b71c17a647666b418ed75c694593",
+    "peninsula_city": "9d1adaad90df6157bc7781647a95e9e079e0a1e1740f2bb8e7fbb5a5c20b425a",
+    "vesper_bay": "39e05cbcc2a7db73d021bee4b13c9861c72284c276340fcea72412e4a7b01d59"
+  },
+  "spike": {
+    "shopfront_row": "e7a7d6237b4d60f11bac6910ec6f34ec620724dffa6b45324d00a6397e414b68",
+    "shopfront_row_quant": "51921b03e5d71441418c4baea4ada1184eba5fb022be4ba300cd98e46d4980cd",
+    "shopfront_row_gpuinst": "60f63fa60490ec9252ceb5506b53f91c34095d3c4a294259a5c45fd5eda72e6e",
+    "shopfront_row_ubx": "42a659e84eafa8656d4966dafc7ceeb33cce3005bf7dd0fe43d7965a18b3dbb1",
+    "shanty_stack": "5032aaba585a985c2b4270900f7bd81c38f3cb2509accaaca4f445ce624203c2",
+    "shanty_stack_quant": "4fbec851d6f5c74841bcd3179c3e7961fc3d14f6afb52821b829152f554fad17",
+    "shanty_stack_gpuinst": "e5ef3e9af0a46ad3699c18309f09fb675988030703d8878d138ec25fa79ced54",
+    "shanty_stack_ubx": "7c0b0ec5636cf9d10d84fe2501f667efe2342c4f17caf7f273127fbb76f5c32e"
+  }
+}

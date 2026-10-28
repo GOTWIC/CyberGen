@@ -50,7 +50,7 @@ MOUNT_M = 0.5          # a facade prop's mount point within this of a facade: on
 MOUNT_OFF_M = 2.0      # within this: still the building's, off the wall
 PROBES_M = (0.75, 1.5, 2.5, 4.0, 6.0, 9.0, 13.0, 18.0, 24.0, 32.0, 40.0, 50.0, 60.0)
 EYE_M = 1.5            # probes look out at the facade part's base plus this
-MIN_LEN_M = 0.01
+MIN_LEN_M = 0.0005     # stretches and bands are on the millimeter grid: drop only empty ones
 CELL_M = 64.0
 
 CLASSES = ("front", "street", "alley", "canal", "plaza", "park", "courtyard", "atrium",
