@@ -16,6 +16,7 @@ from .. import canon as C
 from . import materials as MT
 from .ctx import Ctx, bbox_center, dump
 from .kit import Mesh, ccw
+from .kit import check as mesh_check
 from .path import Path, Profile, first_exit, unit
 from .pieces import Out, Piece, maker, rnd
 
@@ -118,7 +119,7 @@ def gather(cx: Ctx, s) -> Piece:
 class Road:
     """A segment's geometry: its path, heights and the carriageway's ends."""
 
-    def __init__(self, inp: dict):
+    def __init__(self, inp: dict, tidy: bool = False):
         self.inp = inp
         self.seg = seg = inp["seg"]
         self.cls = inp["cls"]
@@ -133,6 +134,8 @@ class Road:
                 if len(inp["ground_pts"]) == len(self.path.p) else Profile([])
         else:
             self.gp = Profile([])
+        if tidy:
+            self.path = self.path.tidied()      # after the ground samples, which go by its vertices
         self.W = seg["width_m"]
         self.side = cs["sidewalk_m"][0]
         self.h = self.W / 2.0 if self.cls in PEDESTRIAN else self.W / 2.0 - self.side
@@ -230,8 +233,18 @@ class Road:
 
 @maker("road", 1)
 def make(inp: dict) -> Out:
+    """The road from its centerline as given; a road whose mesh fails the winding check (a
+    micro-kink in the line folds its curb's offset lines over each other) is made again
+    from the line without its micro-kinks."""
+    out = _make(inp, False)
+    if out.mesh is not None and mesh_check(out.mesh.slots)["winding"]:
+        out = _make(inp, True)
+    return out
+
+
+def _make(inp: dict, tidy: bool) -> Out:
     try:
-        rd = Road(inp)
+        rd = Road(inp, tidy)
     except ValueError:
         return Out(empty="degenerate centerline")
     seg, cls, style = rd.seg, rd.cls, inp["style"]

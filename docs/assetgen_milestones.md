@@ -118,7 +118,7 @@ citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their h
 | Saltreach Free Port | 3,135 | 15.4 M | 0.76 | 0.91 GB | 46 s |
 | Delta Megacity | 5,417 | 24.0 M | 0.65 | 1.41 GB | 75 s |
 | Nexus City | 6,519 | 21.5 M | 0.59 | 1.27 GB | 71 s |
-| Greyhook | 2,460 | 9.8 M | 0.48 | 0.58 GB | 23 s |
+| Greyhook | 2,671 | 11.4 M | 0.49 | 0.67 GB | 26 s |
 | Vesper Bay Pinned | 6,658 | 20.6 M | 0.54 | 1.22 GB | 62 s |
 | Vesper Bay Stacks | 6,686 | 20.1 M | 0.55 | 1.19 GB | 63 s |
 | Cragmouth | 6,800 | 22.7 M | 0.57 | 1.33 GB | 74 s (3 workers), streets 7 s more |
@@ -134,7 +134,13 @@ files); AG1's tests passed there, the small city's goldens included.
 
 **Exporter**: M15 was not on main, so only the contribution file
 (`unreal_contribution.buildings.json`); `unreal_export.md` ("From AG1") lists the exporter
-work. No Unreal check yet (the coordinating session's call).
+work. After M15 merged, a PR of its own did it: `citygen unreal` layers every
+`assets/unreal_contribution.*.json` over the blockout, each shell an actor at its pivot in
+place of its blockout box, with stage 2's masters reading the tints from Custom Primitive
+Data (saved as the components' defaults) and convex hull collision; the contribution's
+`asset` became the shell node's Interchange name (`<key>_shell`) and the patch slots spell
+out their tint rule (the small city's `testport_files` golden moved with them). Greyhook
+and Cragmouth imported, imported again and checked (`docs/progress/AG1/unreal/`).
 
 **For later milestones**: AG2 gets about 40% of section 11's triangle estimate for parts
 (reveals are in the shells for now), the other facade systems (`systems.FALLBACK`), massing
@@ -343,6 +349,16 @@ no pack. Sidewalks are the largest share (Vesper Bay 441 k triangles), then road
 junctions (180 k) and guideways (123 k). The scope's estimate of 10 to 20 M street triangles
 per city was ten times what the packs need with markings as geometry only where they are.
 
+**Greyhook after its reshape** (headlands and coves, builds on main since #35): 5,209 pieces
+in 117 tiles, 666,112 triangles, 41.0 MB, 2.6 s; the table above is the earlier one-tip
+shape. The reshaped coast gave an avenue two vertices 6 and 8 cm apart (5 mm off the line),
+and the 9 m curb offsets swung round them, folding over each other and leaving one directed
+edge in two triangles (`street_meshes`: winding 1). `roads.make` now makes a road whose mesh
+fails that check again from its line without such micro-kinks (`Path.tidied`: a vertex under
+0.5 m past the last kept one and within 2 cm of the line to the next one is dropped); a road
+that passes keeps its bytes, so the goldens are as they were. Test
+`test_road_with_a_micro_kink_is_made_again_from_a_tidied_line`.
+
 **Regenerations.** M10's eight district regenerations over copies of their base packs write
 17 to 34 tiles of 90 to 157; every changed piece is explained by its own entity or one it
 reads (a junction, crosswalk, tree or door) changing in either build, the farthest 20 to
@@ -354,14 +370,19 @@ Bay's, Nexus City's and Vesper Bay Stacks's packs, parts and contribution byte-i
 the Mac and in `citygen-x86`, where the small test city's tests and golden pass too. Goldens
 in their own file, `tests/assetgen/data/golden_streets.json` (the small test city and Vesper
 Bay, its six heaviest tiles named), written by `tests/assetgen/streets_goldens.py
-[--builds DIR]`. Tests: `tests/assetgen/test_ag_streets.py` (10).
+[--builds DIR]`. Tests: `tests/assetgen/test_ag_streets.py` (10, and the micro-kink one above).
 
 **Unreal.** No exporter code changed (AG1 owns it). `unreal_export.md` gains the street
 contribution's format and what the exporter still needs: read it as a second layer-2 file and
 drop every actor a `replaces` names; the masters road, opaque, metal, emissive, translucent
 (two-sided, blended) and foliage; complex collision; non-Nanite meshes with LOD chains;
 hierarchical instances for parts; walkway z from `graphs.walkways`; the new keys in the
-re-import digests. Not run in Unreal.
+re-import digests. Not run in Unreal. **Exporter** (after M15, with AG1's): all of it, the
+street pieces as actors at their pivots in place of the joined blockout objects (complex
+collision), the sky tube glass as LOD chains, container stacks as instanced actors; AG7's
+sRGB slot colors made linear by the exporter. On the reshaped Greyhook one road piece fails
+`street_meshes` (`rs.w1338n148`, one doubled directed edge). Results:
+`docs/progress/AG1/unreal/`.
 
 **Wiring.** `assetgen build` (AG1) is not on main yet: whichever of AG1 and AG7 merges second
 makes it call `assetgen.streets.build.build(model, model_sha, BUILD/assets, spec, workers)`.

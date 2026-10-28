@@ -26,6 +26,9 @@ from .buildings import systems as SY
 
 FRAME = ("building frame: citygen x east, y north, z up, m; glTF y up; Unreal "
          "(100 x, -100 y, 100 z) cm, yaw -> -yaw")
+# a patch slot's color is its own times this times the building's patch tint (as the
+# Blender preview draws it, `blender/preview_assets.py`); other tinted slots take the tint
+PATCH_TINT_SCALE = 3.1
 
 
 def asset_name(key: str) -> str:
@@ -38,6 +41,8 @@ def materials() -> dict:
         out[name] = {"master": master, "color": SY.srgb_linear(hex_c), "roughness": rough,
                      "metallic": metal,
                      "tint_cpd": SY.CPD_TINT.get(tint) if tint else None}
+        if tint == "patch":
+            out[name].update(tint_scale=PATCH_TINT_SCALE, tint_times_color=True)
     return out
 
 
@@ -46,7 +51,7 @@ def buildings(man: dict) -> dict:
     for key, r in sorted(man["buildings"].items()):
         entries.append({
             "key": key, "kind": "building", "hash": r["hash"][:16], "replaces": [],
-            "glb": r["glb"], "node": r["node"], "asset": asset_name(key),
+            "glb": r["glb"], "node": r["node"], "asset": asset_name(r["node"]),
             "pivot": r["pivot"], "yaw_deg": 0.0,
             "nanite": True, "distance_field": False, "lumen_cards": False,
             "triangles": r["triangles"], "slots": sorted(r["slots"]),

@@ -12,6 +12,8 @@ import math
 from citygen import dmath as M
 
 MITER_CAP = 2.0
+TIDY_SEG_M = 0.5        #`Path.tidied`: a vertex this close to the last kept one ...
+TIDY_OFF_M = 0.02       # ... and this close to the line through its neighbors is dropped
 
 
 def dedupe(pts, tol: float = 0.005) -> list[tuple[float, float]]:
@@ -184,6 +186,22 @@ class Path:
                 t = -dy * ex + dx * ey
                 best = (d2, self.cum[i] + f, t)
         return best[1], best[2]
+
+    def tidied(self, seg_m: float = TIDY_SEG_M, off_m: float = TIDY_OFF_M) -> Path:
+        """The path without its micro-kinks: an inner vertex less than seg_m past the last
+        kept one and within off_m of the chord to the next vertex is dropped. A kink that
+        small barely bends the line, but a curb 9 m out swings round it on a radius of
+        meters, so its offset lines fold over themselves."""
+        keep = [self.p[0]]
+        for i in range(1, len(self.p) - 1):
+            a, b, c = keep[-1], self.p[i], self.p[i + 1]
+            ux, uy = unit(c[0] - a[0], c[1] - a[1])
+            off = abs((b[0] - a[0]) * uy - (b[1] - a[1]) * ux)
+            if dist(a, b) < seg_m and off <= off_m:
+                continue
+            keep.append(b)
+        keep.append(self.p[-1])
+        return self if len(keep) == len(self.p) else Path(keep)
 
     def sub(self, s0: float, s1: float) -> list[tuple[float, float]]:
         pts = [self.point(s0)]
