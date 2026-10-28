@@ -1,0 +1,568 @@
+{
+  "$defs": {
+    "DistrictStyle": {
+      "additionalProperties": false,
+      "description": "Art direction for one district, by its name in the city spec.",
+      "properties": {
+        "era": {
+          "anyOf": [
+            {
+              "enum": [
+                "heritage",
+                "neon_retro",
+                "corporate_glass",
+                "brutalist",
+                "industrial",
+                "clean_tech",
+                "suburban_modern",
+                "transit_modern",
+                "mixed_modern",
+                "aerospace"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Era for every building of the district (default: each building's own).",
+          "title": "Era"
+        },
+        "wear": {
+          "default": 1.0,
+          "description": "Wear multiplier.",
+          "maximum": 3.0,
+          "minimum": 0.0,
+          "title": "Wear",
+          "type": "number"
+        },
+        "ad_density": {
+          "default": 1.0,
+          "description": "Signage and ad density multiplier.",
+          "maximum": 3.0,
+          "minimum": 0.0,
+          "title": "Ad Density",
+          "type": "number"
+        },
+        "neon_palette": {
+          "items": {
+            "description": "#rrggbb, lowercase.",
+            "pattern": "^#[0-9a-f]{6}$",
+            "type": "string"
+          },
+          "title": "Neon Palette",
+          "type": "array"
+        },
+        "systems": {
+          "additionalProperties": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "description": "Weights added to the era's systems here.",
+          "propertyNames": {
+            "enum": [
+              "unitized_curtain_wall",
+              "spandrel_ribbon",
+              "fin_wall",
+              "diagrid",
+              "exoskeleton",
+              "punched_concrete",
+              "precast_panel",
+              "board_marked_concrete",
+              "punched_brick",
+              "stucco_shutters",
+              "timber_infill",
+              "tiled_eaves",
+              "corrugated",
+              "standing_seam",
+              "louvered_industrial",
+              "shanty_patchwork",
+              "capsule_stack",
+              "perforated_skin",
+              "hangar_cladding"
+            ]
+          },
+          "title": "Systems",
+          "type": "object"
+        },
+        "signage_scripts": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              "propertyNames": {
+                "enum": [
+                  "latin",
+                  "hanzi",
+                  "hangul",
+                  "kana",
+                  "cyrillic",
+                  "devanagari"
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Replaces the era's scripts in this district.",
+          "title": "Signage Scripts"
+        }
+      },
+      "title": "DistrictStyle",
+      "type": "object"
+    },
+    "EraStyle": {
+      "additionalProperties": false,
+      "description": "One era's palette. Every field left out comes from the era preset.",
+      "properties": {
+        "systems": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              "propertyNames": {
+                "enum": [
+                  "unitized_curtain_wall",
+                  "spandrel_ribbon",
+                  "fin_wall",
+                  "diagrid",
+                  "exoskeleton",
+                  "punched_concrete",
+                  "precast_panel",
+                  "board_marked_concrete",
+                  "punched_brick",
+                  "stucco_shutters",
+                  "timber_infill",
+                  "tiled_eaves",
+                  "corrugated",
+                  "standing_seam",
+                  "louvered_industrial",
+                  "shanty_patchwork",
+                  "capsule_stack",
+                  "perforated_skin",
+                  "hangar_cladding"
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Facade systems and their weights.",
+          "title": "Systems"
+        },
+        "palette": {
+          "anyOf": [
+            {
+              "items": {
+                "description": "#rrggbb, lowercase.",
+                "pattern": "^#[0-9a-f]{6}$",
+                "type": "string"
+              },
+              "maxItems": 12,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Palette"
+        },
+        "crowns": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "flat",
+                  "parapet",
+                  "lantern",
+                  "halo",
+                  "mast",
+                  "spire",
+                  "stepped",
+                  "pitched",
+                  "pagoda_roof",
+                  "sawtooth",
+                  "dome",
+                  "billboard_frame"
+                ],
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crowns"
+        },
+        "signage_scripts": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              "propertyNames": {
+                "enum": [
+                  "latin",
+                  "hanzi",
+                  "hangul",
+                  "kana",
+                  "cyrillic",
+                  "devanagari"
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signage Scripts"
+        },
+        "window_to_wall": {
+          "anyOf": [
+            {
+              "description": "[low, high]",
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Window-to-wall ratio range.",
+          "title": "Window To Wall"
+        },
+        "bay_m": {
+          "anyOf": [
+            {
+              "description": "[low, high]",
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Bay width range, meters.",
+          "title": "Bay M"
+        },
+        "wear": {
+          "anyOf": [
+            {
+              "maximum": 2.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base wear (grime, stains, replaced panels), 0 to 2.",
+          "title": "Wear"
+        }
+      },
+      "title": "EraStyle",
+      "type": "object"
+    },
+    "LandmarkStyle": {
+      "additionalProperties": false,
+      "description": "A landmark by its name in the city model.",
+      "properties": {
+        "brief": {
+          "default": "",
+          "description": "Art direction in words, for the hero generator.",
+          "title": "Brief",
+          "type": "string"
+        },
+        "palette": {
+          "items": {
+            "description": "#rrggbb, lowercase.",
+            "pattern": "^#[0-9a-f]{6}$",
+            "type": "string"
+          },
+          "title": "Palette",
+          "type": "array"
+        },
+        "crown": {
+          "anyOf": [
+            {
+              "enum": [
+                "flat",
+                "parapet",
+                "lantern",
+                "halo",
+                "mast",
+                "spire",
+                "stepped",
+                "pitched",
+                "pagoda_roof",
+                "sawtooth",
+                "dome",
+                "billboard_frame"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crown"
+        }
+      },
+      "title": "LandmarkStyle",
+      "type": "object"
+    },
+    "OwnerStyle": {
+      "additionalProperties": false,
+      "description": "A property owner's brand (`Property.owner` in the city model).",
+      "properties": {
+        "brand_colors": {
+          "items": {
+            "description": "#rrggbb, lowercase.",
+            "pattern": "^#[0-9a-f]{6}$",
+            "type": "string"
+          },
+          "title": "Brand Colors",
+          "type": "array"
+        },
+        "logo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Repo path of an SVG logo (written by a session, never downloaded).",
+          "title": "Logo"
+        },
+        "facade_bias": {
+          "additionalProperties": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "description": "Weights added to the era's systems for this owner's buildings.",
+          "propertyNames": {
+            "enum": [
+              "unitized_curtain_wall",
+              "spandrel_ribbon",
+              "fin_wall",
+              "diagrid",
+              "exoskeleton",
+              "punched_concrete",
+              "precast_panel",
+              "board_marked_concrete",
+              "punched_brick",
+              "stucco_shutters",
+              "timber_infill",
+              "tiled_eaves",
+              "corrugated",
+              "standing_seam",
+              "louvered_industrial",
+              "shanty_patchwork",
+              "capsule_stack",
+              "perforated_skin",
+              "hangar_cladding"
+            ]
+          },
+          "title": "Facade Bias",
+          "type": "object"
+        }
+      },
+      "title": "OwnerStyle",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "city": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "City name (checked against the model).",
+      "title": "City"
+    },
+    "uniqueness": {
+      "default": "U1",
+      "description": "Section 11 levels; decision 13.2.",
+      "enum": [
+        "U0",
+        "U1",
+        "U2",
+        "U3"
+      ],
+      "title": "Uniqueness",
+      "type": "string"
+    },
+    "hero_uniqueness": {
+      "default": "U2",
+      "description": "Landmarks and hero buildings.",
+      "enum": [
+        "U1",
+        "U2",
+        "U3"
+      ],
+      "title": "Hero Uniqueness",
+      "type": "string"
+    },
+    "min_gene_distance": {
+      "default": 4,
+      "description": "k: discrete genes two buildings outside one complex differ in (5.1.1).",
+      "maximum": 12,
+      "minimum": 1,
+      "title": "Min Gene Distance",
+      "type": "integer"
+    },
+    "share_parts": {
+      "default": true,
+      "description": "Share a part between buildings when their quantized parameters coincide (5.1.4).",
+      "title": "Share Parts",
+      "type": "boolean"
+    },
+    "texel_density_px_m": {
+      "default": 512,
+      "description": "Within reach of the street.",
+      "maximum": 2048,
+      "minimum": 64,
+      "title": "Texel Density Px M",
+      "type": "integer"
+    },
+    "texel_density_upper_px_m": {
+      "default": 256,
+      "description": "Above the street band.",
+      "maximum": 2048,
+      "minimum": 32,
+      "title": "Texel Density Upper Px M",
+      "type": "integer"
+    },
+    "eras": {
+      "additionalProperties": {
+        "$ref": "#/$defs/EraStyle"
+      },
+      "propertyNames": {
+        "enum": [
+          "heritage",
+          "neon_retro",
+          "corporate_glass",
+          "brutalist",
+          "industrial",
+          "clean_tech",
+          "suburban_modern",
+          "transit_modern",
+          "mixed_modern",
+          "aerospace"
+        ]
+      },
+      "title": "Eras",
+      "type": "object"
+    },
+    "districts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/DistrictStyle"
+      },
+      "title": "Districts",
+      "type": "object"
+    },
+    "owners": {
+      "additionalProperties": {
+        "$ref": "#/$defs/OwnerStyle"
+      },
+      "title": "Owners",
+      "type": "object"
+    },
+    "landmarks": {
+      "additionalProperties": {
+        "$ref": "#/$defs/LandmarkStyle"
+      },
+      "title": "Landmarks",
+      "type": "object"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "What the session inferred from the prompt.",
+      "title": "Notes"
+    }
+  },
+  "title": "assetgen asset spec",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
