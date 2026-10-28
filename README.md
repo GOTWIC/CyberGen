@@ -130,11 +130,28 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
 
+<img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
+
+Every facade edge of Vesper Bay by what it faces: the main street (red), other streets,
+alleys, water, plazas and parks, party walls (black), blind walls, yards, and walls above
+their neighbors.
+
+```bash
+.venv/bin/python -m assetgen spec validate cities/vesper_bay/asset_spec.json --build out/vesper_bay
+.venv/bin/python -m assetgen brief out/vesper_bay --spec cities/vesper_bay/asset_spec.json
+.venv/bin/python -m assetgen brief diff out/vesper_bay out/vesper_bay_regenerated
+```
+
+The asset spec (art direction per era, district, owner and landmark) is written from the
+city prompt by a Claude Code session through the repo's `assetgen` skill; the brief stage
+writes `out/<city>/assets/briefs.json`, everything each building's model will be made from,
+with a hash per building, so a regenerated district rebuilds only its own assets.
+
 ### Milestones
 
 | | Milestone | What it adds | Status |
 |---|---|---|---|
-| AG0 | Groundwork | What each building is made from, file formats, three test buildings in Unreal | Planned |
+| AG0 | Groundwork | Art direction spec and skill, a brief of what every building is made from (facade edges by what they face), glTF writer, three test buildings in Unreal | Done |
 | AG1 | Building shells | Walls, floors and window openings for every building | Planned |
 | AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
 | AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |

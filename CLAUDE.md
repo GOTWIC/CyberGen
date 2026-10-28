@@ -523,6 +523,45 @@ regenerations, sweep: `docs/progress/M10/`.
   (no goldens, hashes, "byte for byte", identical builds across machines, check counts or
   sweep tallies; those belong in the milestone log).
 
+## Asset generator (assetgen)
+
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG11, section 14), its log
+`docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
+only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
+`agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
+
+AG0 (contract and spike) is in place:
+- **Asset spec** (`assetgen/spec.py`, era presets in `presets.py`): `.venv/bin/python -m
+  assetgen spec validate SPEC [--build BUILD] [--filled OUT]` and `... spec schema`; skill
+  `.claude/skills/assetgen/SKILL.md`; sample `cities/vesper_bay/asset_spec.json`. Section 13's
+  decisions are provisional (2026-10-27) and set as the spec's defaults.
+- **Briefs** (`brief.py`): `assetgen brief BUILD [--spec S] [--overrides O]` writes
+  `BUILD/assets/briefs.json` (canonical JSON, a sha256 per building), `brief_report.json` and
+  `preview_edges.png` (`preview_edges.py`). Each brief is in the building's frame (origin
+  the middle of its footprint's box, mm): its record, masses with floors, every mass edge
+  split into facade regions (s along the edge by z) classed front, street, alley, canal,
+  plaza, park, courtyard, atrium, party (other building within 0.5 m), blind (3 m), open,
+  upper (above the neighbors that cover below) or hidden (another own mass), neighbors,
+  skybridges, sign slots, mounted props (`on_wall` when the mount point is within 0.5 m of a
+  wall that spans its height), plants, green roofs, POIs, lot, property, district and the
+  spec's sections. What an edge faces comes from probes 0.75 to 60 m out (road corridor,
+  water, open space, another mass at eye height). Schema `assetgen brief schema`
+  (`briefmodel.py`); `assetgen brief diff A B` (`briefdiff.py`, also `seam`: the check that a
+  district regeneration changes only its district's and seam's briefs).
+- **Geometry**: `triangulate.py` (exact integer ear clipping with holes), `mesh.py` (integer
+  mm faces, flat normals, UV0 in meters, UV1 per face, COLOR_0 a multiplier as glTF
+  defines), `gltf.py` (deterministic GLB: glTF frame (x, z, -y), fixed attribute order,
+  optional KHR_mesh_quantization and EXT_mesh_gpu_instancing).
+- **Spike** (`spike.py`, `assetgen spike OUT`): tower (975k triangles), shopfront row,
+  shanty stack and a foliage test tree, with `unreal_contribution.json` (assetgen's
+  manifest entries); Blender preview `assetgen/blender/spike_preview.py`; Unreal
+  `assetgen/ue/spike_import.py`, `spike_shots.py`, driver `unreal_spike.py`. Results:
+  `docs/progress/AG0/` and scope section 11.
+- **Determinism**: `tests/assetgen/data/golden_hashes.json` (small test city, Vesper Bay
+  buildings, the five samples' briefs, small spike buildings, a triangulation), Mac = x86
+  (`citygen-x86`). Write them again with `.venv/bin/python tests/assetgen/goldens.py
+  [--builds DIR]` after a citygen change moves a model, and say why in the PR.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

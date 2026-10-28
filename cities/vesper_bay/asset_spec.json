@@ -1,0 +1,36 @@
+{
+  "$schema": "../../assetgen/schemas/asset_spec.schema.json",
+  "city": "Vesper Bay",
+  "eras": {
+    "heritage": {
+      "signage_scripts": {"hanzi": 0.5, "hangul": 0.3, "latin": 0.2}
+    }
+  },
+  "districts": {
+    "Corporate Core": {"wear": 0.6, "ad_density": 0.6},
+    "Neon Strand": {"wear": 1.2, "ad_density": 1.6,
+                    "neon_palette": ["#ff2a6d", "#05d9e8", "#f9c80e", "#7b2ff7"]},
+    "Old Town": {"wear": 1.3, "ad_density": 1.2,
+                 "neon_palette": ["#ff6b35", "#00a6a6", "#e63946"]},
+    "The Stacks": {"wear": 1.1, "systems": {"capsule_stack": 0.2}},
+    "Highcrest": {"wear": 0.5, "ad_density": 0.3}
+  },
+  "owners": {
+    "tessera": {"brand_colors": ["#101418", "#e0e4e8", "#00c2a8"],
+                "facade_bias": {"unitized_curtain_wall": 0.3}},
+    "orbis_logistics": {"brand_colors": ["#1d3557", "#f1a208"],
+                        "facade_bias": {"standing_seam": 0.2}},
+    "sable_systems": {"brand_colors": ["#0b0b0f", "#c1121f"],
+                      "facade_bias": {"fin_wall": 0.4}},
+    "aurum_bank": {"brand_colors": ["#2b2d42", "#d4af37"],
+                   "facade_bias": {"spandrel_ribbon": 0.3}}
+  },
+  "landmarks": {
+    "Corporate Core Megatower": {
+      "brief": "Three arms of near-black glass rising from the plaza, red light seams up the arm edges, a halo crown visible across the bay.",
+      "palette": ["#0d1117", "#c1121f", "#9fb4c7"],
+      "crown": "halo"
+    }
+  },
+  "notes": "From cities/vesper_bay/prompt.md. Old Town markets and temples: heritage signage weighted to Hanzi and Hangul. Neon Strand, the waterfront entertainment strip: more wear, denser ads, a pink, cyan, amber and violet neon palette. Corporate Core cleaner and quieter than its era; Highcrest (quiet residential heights) cleanest. The Stacks add capsule stacks to the brutalist megablocks. Owners: the four with most buildings in the build, brand colors invented to fit their names (no third-party brands). The megatower brief follows the prompt's three-armed tower. Era presets kept for everything else."
+}

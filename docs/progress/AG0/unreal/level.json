@@ -1,0 +1,31 @@
+{
+ "errors": {},
+ "exit_code": 0,
+ "imports": {},
+ "level": {
+  "path": "/Game/AssetgenSpike/Maps/Spike",
+  "placed": {
+   "foliage_test": {
+    "collision_boxes": 1,
+    "instances": 0
+   },
+   "shanty_stack": {
+    "collision_boxes": 16,
+    "instances": 41
+   },
+   "shopfront_row": {
+    "collision_boxes": 1,
+    "instances": 49
+   },
+   "tower": {
+    "collision_boxes": 3,
+    "instances": 14738
+   }
+  }
+ },
+ "meshes": {},
+ "notes": [],
+ "ok": true,
+ "total_s": 1.6,
+ "wall_s": 15.7
+}
