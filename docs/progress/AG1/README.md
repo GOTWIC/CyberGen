@@ -28,7 +28,9 @@ worker processes on the M4 Pro, shared with other sessions' Blender and Python j
 to 100 during these runs; Vesper Bay takes 50 to 60 s at a load near 10), briefs included (5
 to 28 s of it). So a whole city builds in 1 to 2 minutes with 4 workers, far inside the 20
 minute target. Since AG7 merged, `assetgen build` runs the street stage after the buildings
-(Cragmouth: 7 s more for 12,729 pieces in 130 tiles, 82 s in all with 3 workers). A second
+(Cragmouth: 7 s more for 12,729 pieces in 130 tiles, 82 s in all with 3 workers; Vesper
+Bay from scratch on the merged code: 77 s with 3 workers, 5 s of it streets, its building
+manifest the same bytes as before the merge). A second
 build of the same city writes no file and takes 5 to 14 s (the briefs and records are read
 back, the checks of both stages run again). Section 11's estimate for the shells is its
 $N_b\, t_b + A_r\, \rho_r$ with the city's own bays and roof area; AG1's shells use about
