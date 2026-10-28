@@ -1,0 +1,284 @@
+{
+ "errors": {},
+ "exit_code": 0,
+ "imports": {
+  "Lean": {
+   "tower": {
+    "disk_bytes": 6382417,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit.uasset": 29819,
+     "spike_tower_bld_part_roof_water_tank.uasset": 31345,
+     "spike_tower_bld_part_window_frame.uasset": 29435,
+     "spike_tower_bld_shell.uasset": 6291818
+    },
+    "import_s": 21.97,
+    "meshes": {
+     "/Game/AssetgenSpike/Lean/tower/spike_tower_bld_part_roof_ac_unit": {
+      "bounds_cm": [
+       -45.0,
+       -30.0,
+       0.0,
+       45.0,
+       32.0,
+       70.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Lean/tower/spike_tower_bld_part_roof_water_tank": {
+      "bounds_cm": [
+       -150.0,
+       -150.0,
+       0.0,
+       150.0,
+       150.0,
+       360.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Lean/tower/spike_tower_bld_part_window_frame": {
+      "bounds_cm": [
+       -45.0,
+       -3.0,
+       0.0,
+       45.0,
+       3.0,
+       240.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Lean/tower/spike_tower_bld_shell": {
+      "bounds_cm": [
+       -3630.0,
+       -3030.0,
+       0.0,
+       3630.0,
+       3030.0,
+       35520.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 17527,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 4.62,
+    "static_meshes": 4
+   }
+  },
+  "Plain": {
+   "tower": {
+    "disk_bytes": 6469886,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit.uasset": 30044,
+     "spike_tower_bld_part_roof_water_tank.uasset": 31716,
+     "spike_tower_bld_part_window_frame.uasset": 29660,
+     "spike_tower_bld_shell.uasset": 6378466
+    },
+    "import_s": 3.29,
+    "meshes": {
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_roof_ac_unit": {
+      "bounds_cm": [
+       -45.0,
+       -30.0,
+       0.0,
+       45.0,
+       32.0,
+       70.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_roof_water_tank": {
+      "bounds_cm": [
+       -150.0,
+       -150.0,
+       0.0,
+       150.0,
+       150.0,
+       360.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_window_frame": {
+      "bounds_cm": [
+       -45.0,
+       -3.0,
+       0.0,
+       45.0,
+       3.0,
+       240.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_shell": {
+      "bounds_cm": [
+       -3630.0,
+       -3030.0,
+       0.0,
+       3630.0,
+       3030.0,
+       35520.0
+      ],
+      "box_elems": 3,
+      "convex_elems": 0,
+      "lod0_triangles": 17299,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.58,
+    "static_meshes": 4
+   }
+  },
+  "Quant": {
+   "tower": {
+    "disk_bytes": 6231899,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit_q.uasset": 30351,
+     "spike_tower_bld_part_roof_water_tank_q.uasset": 31996,
+     "spike_tower_bld_part_window_frame_q.uasset": 29978,
+     "spike_tower_bld_shell_q.uasset": 6139574
+    },
+    "import_s": 2.84,
+    "meshes": {
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_part_roof_ac_unit_q": {
+      "bounds_cm": [
+       -45.0,
+       -30.0,
+       -0.0,
+       45.0,
+       32.0,
+       70.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_part_roof_water_tank_q": {
+      "bounds_cm": [
+       -150.0,
+       -150.0,
+       -0.0,
+       150.0,
+       150.0,
+       360.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_part_window_frame_q": {
+      "bounds_cm": [
+       -45.0,
+       -3.0,
+       -0.0,
+       45.0,
+       3.0,
+       240.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_shell_q": {
+      "bounds_cm": [
+       -3630.4,
+       -3030.4,
+       -0.0,
+       3629.6,
+       3029.6,
+       35520.0
+      ],
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 29984,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.43,
+    "static_meshes": 4
+   }
+  }
+ },
+ "meshes": {},
+ "notes": [],
+ "ok": true,
+ "total_s": 33.8,
+ "wall_s": 49.9
+}

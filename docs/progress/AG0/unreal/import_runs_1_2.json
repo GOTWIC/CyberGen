@@ -1,0 +1,1068 @@
+{
+ "assembly": {
+  "available": true,
+  "build_s": 1.72,
+  "disk_bytes": 10209718,
+  "ok": true,
+  "parts_added": 14738
+ },
+ "errors": {},
+ "exit_code": 0,
+ "imports": {
+  "DF": {
+   "foliage_test": {
+    "disk_bytes": 141540,
+    "files": {
+     "spike_tree_plt_shell.uasset": 141540
+    },
+    "import_s": 11.13,
+    "meshes": {
+     "/Game/AssetgenSpike/DF/foliage_test/spike_tree_plt_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 6468,
+      "nanite": true,
+      "slots": [
+       "bark",
+       "leaf"
+      ]
+     }
+    },
+    "objects": 1,
+    "save_s": 0.1,
+    "static_meshes": 1
+   },
+   "shanty_stack": {
+    "disk_bytes": 224079,
+    "files": {
+     "spike_shanty_stack_bld_part_roof_ac_unit.uasset": 29991,
+     "spike_shanty_stack_bld_part_roof_dish.uasset": 29256,
+     "spike_shanty_stack_bld_part_window_frame.uasset": 29671,
+     "spike_shanty_stack_bld_shell.uasset": 135161
+    },
+    "import_s": 6.23,
+    "meshes": {
+     "/Game/AssetgenSpike/DF/shanty_stack/spike_shanty_stack_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shanty_stack/spike_shanty_stack_bld_part_roof_dish": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 32,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shanty_stack/spike_shanty_stack_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shanty_stack/spike_shanty_stack_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 5210,
+      "nanite": true,
+      "slots": [
+       "corrugated",
+       "roof",
+       "tarp",
+       "plaster",
+       "glass",
+       "rust",
+       "metal"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.35,
+    "static_meshes": 4
+   },
+   "shopfront_row": {
+    "disk_bytes": 202088,
+    "files": {
+     "spike_shopfront_row_bld_part_roof_ac_unit.uasset": 30028,
+     "spike_shopfront_row_bld_part_roof_water_tank.uasset": 31573,
+     "spike_shopfront_row_bld_part_shop_awning.uasset": 28689,
+     "spike_shopfront_row_bld_part_shop_sign.uasset": 28828,
+     "spike_shopfront_row_bld_part_window_frame.uasset": 29711,
+     "spike_shopfront_row_bld_shell.uasset": 53259
+    },
+    "import_s": 14.02,
+    "meshes": {
+     "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_part_shop_awning": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 6,
+      "nanite": true,
+      "slots": [
+       "awning"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_part_shop_sign": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 12,
+      "nanite": true,
+      "slots": [
+       "sign"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 613,
+      "nanite": true,
+      "slots": [
+       "plaster",
+       "shopglass",
+       "metal",
+       "brick",
+       "glass",
+       "concrete",
+       "roof"
+      ]
+     }
+    },
+    "objects": 6,
+    "save_s": 0.05,
+    "static_meshes": 6
+   },
+   "tower": {
+    "disk_bytes": 6465688,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit.uasset": 29704,
+     "spike_tower_bld_part_roof_water_tank.uasset": 31212,
+     "spike_tower_bld_part_window_frame.uasset": 29321,
+     "spike_tower_bld_shell.uasset": 6375451
+    },
+    "import_s": 57.08,
+    "meshes": {
+     "/Game/AssetgenSpike/DF/tower/spike_tower_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/tower/spike_tower_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/tower/spike_tower_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/DF/tower/spike_tower_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 17379,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 5.02,
+    "static_meshes": 4
+   }
+  },
+  "GpuInst": {
+   "shanty_stack": {
+    "disk_bytes": 224924,
+    "files": {
+     "spike_shanty_stack_bld_part_roof_ac_unit.uasset": 30201,
+     "spike_shanty_stack_bld_part_roof_dish.uasset": 29466,
+     "spike_shanty_stack_bld_part_window_frame.uasset": 29881,
+     "spike_shanty_stack_bld_shell.uasset": 135376
+    },
+    "import_s": 0.07,
+    "meshes": {
+     "/Game/AssetgenSpike/GpuInst/shanty_stack/spike_shanty_stack_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shanty_stack/spike_shanty_stack_bld_part_roof_dish": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 32,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shanty_stack/spike_shanty_stack_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shanty_stack/spike_shanty_stack_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 5210,
+      "nanite": true,
+      "slots": [
+       "corrugated",
+       "roof",
+       "tarp",
+       "plaster",
+       "glass",
+       "rust",
+       "metal"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.03,
+    "static_meshes": 4
+   },
+   "shopfront_row": {
+    "disk_bytes": 203481,
+    "files": {
+     "spike_shopfront_row_bld_part_roof_ac_unit.uasset": 30238,
+     "spike_shopfront_row_bld_part_roof_water_tank.uasset": 31816,
+     "spike_shopfront_row_bld_part_shop_awning.uasset": 28900,
+     "spike_shopfront_row_bld_part_shop_sign.uasset": 29039,
+     "spike_shopfront_row_bld_part_window_frame.uasset": 29922,
+     "spike_shopfront_row_bld_shell.uasset": 53566
+    },
+    "import_s": 0.06,
+    "meshes": {
+     "/Game/AssetgenSpike/GpuInst/shopfront_row/spike_shopfront_row_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shopfront_row/spike_shopfront_row_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shopfront_row/spike_shopfront_row_bld_part_shop_awning": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 6,
+      "nanite": true,
+      "slots": [
+       "awning"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shopfront_row/spike_shopfront_row_bld_part_shop_sign": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 12,
+      "nanite": true,
+      "slots": [
+       "sign"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shopfront_row/spike_shopfront_row_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/shopfront_row/spike_shopfront_row_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 613,
+      "nanite": true,
+      "slots": [
+       "plaster",
+       "shopglass",
+       "metal",
+       "brick",
+       "glass",
+       "concrete",
+       "roof"
+      ]
+     }
+    },
+    "objects": 6,
+    "save_s": 0.03,
+    "static_meshes": 6
+   },
+   "tower": {
+    "disk_bytes": 6466726,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit.uasset": 29912,
+     "spike_tower_bld_part_roof_water_tank.uasset": 31450,
+     "spike_tower_bld_part_window_frame.uasset": 29528,
+     "spike_tower_bld_shell.uasset": 6375836
+    },
+    "import_s": 3.05,
+    "meshes": {
+     "/Game/AssetgenSpike/GpuInst/tower/spike_tower_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/tower/spike_tower_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/tower/spike_tower_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/GpuInst/tower/spike_tower_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 17299,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.45,
+    "static_meshes": 4
+   }
+  },
+  "Plain": {
+   "foliage_test": {
+    "disk_bytes": 141553,
+    "files": {
+     "spike_tree_plt_shell.uasset": 141553
+    },
+    "import_s": 0.45,
+    "meshes": {
+     "/Game/AssetgenSpike/Plain/foliage_test/spike_tree_plt_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 6468,
+      "nanite": true,
+      "slots": [
+       "bark",
+       "leaf"
+      ]
+     }
+    },
+    "objects": 1,
+    "save_s": 0.06,
+    "static_meshes": 1
+   },
+   "shanty_stack": {
+    "disk_bytes": 224096,
+    "files": {
+     "spike_shanty_stack_bld_part_roof_ac_unit.uasset": 29995,
+     "spike_shanty_stack_bld_part_roof_dish.uasset": 29260,
+     "spike_shanty_stack_bld_part_window_frame.uasset": 29675,
+     "spike_shanty_stack_bld_shell.uasset": 135166
+    },
+    "import_s": 2.93,
+    "meshes": {
+     "/Game/AssetgenSpike/Plain/shanty_stack/spike_shanty_stack_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shanty_stack/spike_shanty_stack_bld_part_roof_dish": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 32,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shanty_stack/spike_shanty_stack_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shanty_stack/spike_shanty_stack_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 5210,
+      "nanite": true,
+      "slots": [
+       "corrugated",
+       "roof",
+       "tarp",
+       "plaster",
+       "glass",
+       "rust",
+       "metal"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.14,
+    "static_meshes": 4
+   },
+   "shopfront_row": {
+    "disk_bytes": 202117,
+    "files": {
+     "spike_shopfront_row_bld_part_roof_ac_unit.uasset": 30032,
+     "spike_shopfront_row_bld_part_roof_water_tank.uasset": 31578,
+     "spike_shopfront_row_bld_part_shop_awning.uasset": 28694,
+     "spike_shopfront_row_bld_part_shop_sign.uasset": 28833,
+     "spike_shopfront_row_bld_part_window_frame.uasset": 29716,
+     "spike_shopfront_row_bld_shell.uasset": 53264
+    },
+    "import_s": 0.26,
+    "meshes": {
+     "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_part_shop_awning": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 6,
+      "nanite": true,
+      "slots": [
+       "awning"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_part_shop_sign": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 12,
+      "nanite": true,
+      "slots": [
+       "sign"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 613,
+      "nanite": true,
+      "slots": [
+       "plaster",
+       "shopglass",
+       "metal",
+       "brick",
+       "glass",
+       "concrete",
+       "roof"
+      ]
+     }
+    },
+    "objects": 6,
+    "save_s": 0.03,
+    "static_meshes": 6
+   },
+   "tower": {
+    "disk_bytes": 6465706,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit.uasset": 29709,
+     "spike_tower_bld_part_roof_water_tank.uasset": 31215,
+     "spike_tower_bld_part_window_frame.uasset": 29325,
+     "spike_tower_bld_shell.uasset": 6375457
+    },
+    "import_s": 70.48,
+    "meshes": {
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_shell": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 17299,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 3.51,
+    "static_meshes": 4
+   }
+  },
+  "Quant": {
+   "shanty_stack": {
+    "disk_bytes": 223696,
+    "files": {
+     "spike_shanty_stack_bld_part_roof_ac_unit_q.uasset": 30348,
+     "spike_shanty_stack_bld_part_roof_dish_q.uasset": 29556,
+     "spike_shanty_stack_bld_part_window_frame_q.uasset": 29981,
+     "spike_shanty_stack_bld_shell_q.uasset": 133811
+    },
+    "import_s": 1.24,
+    "meshes": {
+     "/Game/AssetgenSpike/Quant/shanty_stack/spike_shanty_stack_bld_part_roof_ac_unit_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shanty_stack/spike_shanty_stack_bld_part_roof_dish_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 32,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shanty_stack/spike_shanty_stack_bld_part_window_frame_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shanty_stack/spike_shanty_stack_bld_shell_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 5197,
+      "nanite": true,
+      "slots": [
+       "corrugated",
+       "roof",
+       "tarp",
+       "plaster",
+       "glass",
+       "rust",
+       "metal"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.11,
+    "static_meshes": 4
+   },
+   "shopfront_row": {
+    "disk_bytes": 204162,
+    "files": {
+     "spike_shopfront_row_bld_part_roof_ac_unit_q.uasset": 30392,
+     "spike_shopfront_row_bld_part_roof_water_tank_q.uasset": 31910,
+     "spike_shopfront_row_bld_part_shop_awning_q.uasset": 29019,
+     "spike_shopfront_row_bld_part_shop_sign_q.uasset": 29135,
+     "spike_shopfront_row_bld_part_window_frame_q.uasset": 30035,
+     "spike_shopfront_row_bld_shell_q.uasset": 53671
+    },
+    "import_s": 0.4,
+    "meshes": {
+     "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_part_roof_ac_unit_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_part_roof_water_tank_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_part_shop_awning_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 6,
+      "nanite": true,
+      "slots": [
+       "awning"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_part_shop_sign_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 12,
+      "nanite": true,
+      "slots": [
+       "sign"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_part_window_frame_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_shell_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 613,
+      "nanite": true,
+      "slots": [
+       "plaster",
+       "shopglass",
+       "metal",
+       "brick",
+       "glass",
+       "concrete",
+       "roof"
+      ]
+     }
+    },
+    "objects": 6,
+    "save_s": 0.03,
+    "static_meshes": 6
+   },
+   "tower": {
+    "disk_bytes": 6229599,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit_q.uasset": 30025,
+     "spike_tower_bld_part_roof_water_tank_q.uasset": 31504,
+     "spike_tower_bld_part_window_frame_q.uasset": 29652,
+     "spike_tower_bld_shell_q.uasset": 6138418
+    },
+    "import_s": 96.93,
+    "meshes": {
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_part_roof_ac_unit_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_part_roof_water_tank_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_part_window_frame_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_shell_q": {
+      "box_elems": 0,
+      "convex_elems": 0,
+      "lod0_triangles": 29984,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 5.18,
+    "static_meshes": 4
+   }
+  },
+  "UBX": {
+   "shanty_stack": {
+    "disk_bytes": 240831,
+    "files": {
+     "spike_shanty_stack_bld_part_roof_ac_unit.uasset": 31870,
+     "spike_shanty_stack_bld_part_roof_dish.uasset": 32095,
+     "spike_shanty_stack_bld_part_window_frame.uasset": 31358,
+     "spike_shanty_stack_bld_shell.uasset": 145508
+    },
+    "import_s": 0.09,
+    "meshes": {
+     "/Game/AssetgenSpike/UBX/shanty_stack/spike_shanty_stack_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shanty_stack/spike_shanty_stack_bld_part_roof_dish": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 32,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shanty_stack/spike_shanty_stack_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shanty_stack/spike_shanty_stack_bld_shell": {
+      "box_elems": 16,
+      "convex_elems": 0,
+      "lod0_triangles": 5210,
+      "nanite": true,
+      "slots": [
+       "corrugated",
+       "roof",
+       "tarp",
+       "plaster",
+       "glass",
+       "rust",
+       "metal",
+       "concrete"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.04,
+    "static_meshes": 4
+   },
+   "shopfront_row": {
+    "disk_bytes": 213648,
+    "files": {
+     "spike_shopfront_row_bld_part_roof_ac_unit.uasset": 31902,
+     "spike_shopfront_row_bld_part_roof_water_tank.uasset": 34425,
+     "spike_shopfront_row_bld_part_shop_awning.uasset": 30948,
+     "spike_shopfront_row_bld_part_shop_sign.uasset": 30511,
+     "spike_shopfront_row_bld_part_window_frame.uasset": 31394,
+     "spike_shopfront_row_bld_shell.uasset": 54468
+    },
+    "import_s": 0.05,
+    "meshes": {
+     "/Game/AssetgenSpike/UBX/shopfront_row/spike_shopfront_row_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shopfront_row/spike_shopfront_row_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shopfront_row/spike_shopfront_row_bld_part_shop_awning": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 6,
+      "nanite": true,
+      "slots": [
+       "awning"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shopfront_row/spike_shopfront_row_bld_part_shop_sign": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 12,
+      "nanite": true,
+      "slots": [
+       "sign"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shopfront_row/spike_shopfront_row_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/shopfront_row/spike_shopfront_row_bld_shell": {
+      "box_elems": 1,
+      "convex_elems": 0,
+      "lod0_triangles": 613,
+      "nanite": true,
+      "slots": [
+       "plaster",
+       "shopglass",
+       "metal",
+       "brick",
+       "glass",
+       "concrete",
+       "roof"
+      ]
+     }
+    },
+    "objects": 6,
+    "save_s": 0.02,
+    "static_meshes": 6
+   },
+   "tower": {
+    "disk_bytes": 6474343,
+    "files": {
+     "spike_tower_bld_part_roof_ac_unit.uasset": 31579,
+     "spike_tower_bld_part_roof_water_tank.uasset": 34062,
+     "spike_tower_bld_part_window_frame.uasset": 31003,
+     "spike_tower_bld_shell.uasset": 6377699
+    },
+    "import_s": 3.56,
+    "meshes": {
+     "/Game/AssetgenSpike/UBX/tower/spike_tower_bld_part_roof_ac_unit": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 72,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/tower/spike_tower_bld_part_roof_water_tank": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 94,
+      "nanite": true,
+      "slots": [
+       "rust",
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/tower/spike_tower_bld_part_window_frame": {
+      "box_elems": 0,
+      "convex_elems": 1,
+      "lod0_triangles": 60,
+      "nanite": true,
+      "slots": [
+       "metal"
+      ]
+     },
+     "/Game/AssetgenSpike/UBX/tower/spike_tower_bld_shell": {
+      "box_elems": 3,
+      "convex_elems": 0,
+      "lod0_triangles": 17299,
+      "nanite": true,
+      "slots": [
+       "concrete",
+       "shopglass",
+       "metal",
+       "roof",
+       "glass",
+       "spandrel"
+      ]
+     }
+    },
+    "objects": 4,
+    "save_s": 0.7,
+    "static_meshes": 4
+   }
+  }
+ },
+ "level": {
+  "path": "/Game/AssetgenSpike/Maps/Spike",
+  "placed": {
+   "foliage_test": {
+    "collision_boxes": 1,
+    "instances": 0
+   },
+   "shanty_stack": {
+    "collision_boxes": 16,
+    "instances": 41
+   },
+   "shopfront_row": {
+    "collision_boxes": 1,
+    "instances": 49
+   },
+   "tower": {
+    "collision_boxes": 3,
+    "instances": 14738
+   }
+  }
+ },
+ "meshes": {},
+ "notes": [
+  "MaterialExpressionTransform: input 'Input' is ''"
+ ],
+ "ok": true,
+ "scene_import": {
+  "actors": 8,
+  "components": {
+   "StaticMeshComponent": 6
+  },
+  "ism_instances": 0,
+  "parts_in_file": 49
+ },
+ "total_s": 316.9,
+ "voxel_foliage": {
+  "rebuild_s": 0.25,
+  "shape_preservation": "<NaniteShapePreservation.VOXELIZE: 2>"
+ },
+ "wall_s": 344.5
+}

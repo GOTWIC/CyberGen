@@ -336,8 +336,8 @@ district rewrites only its tiles' street packs.
 - **Plants**: a tree generator (space colonization, Runions 2007) per species (plane, maple,
   ginkgo, birch, linden, elm, oak, ficus, pine, fan palm, date palm), 6 to 10 variants each,
   sized from each plant's height and crown; shrubs, ivy, sedum and scrub as cards and small
-  meshes; Nanite foliage if 5.8 has it in a usable state (experimental in 5.7), else
-  LOD chains with impostors.
+  meshes; Nanite with `ShapePreservation` `Voxelize` (5.8, experimental; AG0's test tree
+  builds with it), else LOD chains with impostors.
 - **Cables, awnings, scaffolding** follow their M6 geometry exactly (catenaries between
   facades, awning depth, scaffold bays).
 
@@ -422,8 +422,8 @@ uses; fonts and scripts per asset spec.
 - **Collision**: simple collision from masses (a convex box per mass part, steps, ramps,
   awning posts), complex collision only in the ground band where players brush walls and
   doorways; checked against the walkway graph.
-- **Foliage**: Nanite foliage if 5.8 makes it usable (AG0 checks), else LOD chains and
-  impostors.
+- **Foliage**: Nanite with `ShapePreservation` `Voxelize` (in 5.8, still experimental;
+  AG0's test tree builds with it from Python), else LOD chains and impostors.
 
 ## 9. Validation (runs every time; a failure means the assets are not delivered)
 
@@ -502,15 +502,48 @@ plus about 2 to 3 M part instances (windows, balconies, equipment), about 1 bill
 triangles drawn through instancing, which Nanite is built for. Street meshes add about 10 to
 20 M, props and plants a few million (instanced).
 
-**Disk.** At the commonly cited Nanite size of about 14 bytes per triangle (not in Epic's
-docs; AG0 measures it):
+**Measured in AG0's spike** (Unreal 5.8.4 on the M4 Pro Mac, shared with other sessions at
+a load of 15 to 25; `docs/progress/AG0/README.md`). The tower: 975,476 source triangles,
+flat-shaded faces (no vertex shared between faces of different planes), UV0, UV1 and vertex
+colors; "lean" is the same tower without UV1 and colors. Sizes per million source triangles:
 
-$$D_{\text{Nanite}} \approx 100\text{ M} \times 14\text{ B} \approx 1.4\text{ GB per city (cooked)}$$
+| Quantity | Tower | Lean tower | Small buildings (shopfront row 1.3 k, shanty 10.6 k triangles) |
+|---|---|---|---|
+| source glTF | 89 MB (68 MB with `KHR_mesh_quantization`) | 68 MB | 111 and 97 MB |
+| Nanite build in the editor (Interchange import) | 72 s | 23 s | 0.3 s and 2.9 s per building |
+| editor package (`.uasset`, the source mesh) | 6.6 MB | 6.5 MB | 158 and 21 MB (fixed overhead dominates) |
+| Nanite, GPU when resident | 73.5 MB | 48.4 MB | |
+| **cooked** (Mac, loose `.uasset`, `.uexp`, `.ubulk`) | **69.6 MB** | **46.3 MB** | 85 and 139 MB |
+| distance field and Lumen cards (per mesh, not per triangle) | +4.3 MB cooked, 10 to 15 s | | +1.8 and +3.3 MB cooked, 4.5 to 6.5 s |
 
-Source glTF at about 40 to 60 bytes per triangle (float positions, normals, two UV sets,
-colors, indices) is 4 to 6 GB per city, roughly half with quantized attributes if Unreal's
-importer reads `KHR_mesh_quantization` (AG0 checks). In the Unreal editor a city's assets
-with their derived data are likely 8 to 15 GB (AG0 measures).
+So Nanite costs about 70 bytes per source triangle as the spike writes meshes (46 without
+UV1 and colors), not 14: its cluster hierarchy holds about twice the source triangles (the
+build log's input counts), and faces that share no vertices and carry two UV sets and colors
+cost the most. `KHR_mesh_quantization` shrinks only the source files (Interchange
+dequantizes; positions within one quantization step, 2 mm on the tower). Distance fields are
+capped at 126 voxels a side, so they cost about the same for a shed as for a tower: 1.6 to
+3.1 MB each.
+
+$$D_{\text{Nanite}} \approx 100\text{ M} \times (46 \text{ to } 70)\text{ B} \approx 4.6 \text{ to } 7\text{ GB per city (cooked)}$$
+
+What this changes, for AG1 onward: weld identical vertices on a face plane and keep UV1 and
+vertex colors only on the slots that need them (glass for interior mapping, signs), which
+brings shells toward the lean figure; push repeated detail (reveals, sills, fins) into
+instanced parts rather than unique shell triangles; leave distance fields and Lumen cards off
+for buildings (about 6,000 × 2 to 4 MB = 12 to 26 GB and hours of build per city) and use
+hardware ray-traced Lumen on the RTX PC (decision 13.4), screen-space GI on the Mac.
+
+Parts: Interchange does not read `EXT_mesh_gpu_instancing` (it imports the prototype once and
+a level import places one actor per node), so instances come from the manifest as
+hierarchical instanced meshes: the tower's 14,738 window frames cost one 12.7 KB prototype
+plus their transforms. Nanite Assemblies (experimental editor plugin in 5.8) build the same
+parts into one mesh in 1.7 s, but that mesh cooked to 125 MB, all inline, so they are not the
+route for parts in 5.8.
+
+Source glTF per city: about 89 bytes per triangle as written (68 quantized, 68 lean; lean and
+quantized not measured, about 47 by the same per-vertex savings), so 5 to 9 GB for 100 M
+triangles; the 6 GB target needs the lean attributes and quantization. In the editor a city's assets are about 0.7 GB of packages
+plus their derived data (Nanite and the rest, about the cooked size) in the DDC: 5 to 8 GB.
 
 Texture library, cooked (BC7 and BC5 at 1 byte per texel, BC1 at half, mips $\times\tfrac43$):
 a 2K set of base color, normal and ORM is about 14 MB; 120 sets (12 per era), 20 trim
@@ -530,12 +563,13 @@ as source images (regenerable, not in git). Signage per city about 0.3 GB.
 - the shared library in under an hour, once per library version;
 - Blender previews in under 10 minutes (districts at full detail, the whole city from proxies:
   100 M triangles do not fit Blender in 24 GB);
-- Unreal import of a city's assets in under an hour (measured in AG0's spike, then in the
-  Unreal checks the coordinating session runs after milestones). For scale,
-  M15 imports Vesper Bay's 8,544 blockout meshes in 79 s on the Mac and deletes meshes at
-  about 50 ms each on a re-import; it leaves distance fields and Lumen cards off because
-  building them took about an hour of editor time for thousands of meshes, a cost AG0
-  measures again on generated assets.
+- Unreal import of a city's assets in under an hour. AG0 measured 23 to 72 s of Nanite
+  build per million triangles (lean and full attributes) and 0.1 to 0.3 s per small
+  building on the shared Mac: 100 M triangles take 40 minutes to 2 hours, so the target
+  holds only with lean meshes, or on the RTX PC, or with imports run in parallel (AG9).
+  For scale, M15 imports Vesper Bay's 8,544 blockout meshes in 79 s on the Mac and deletes
+  meshes at about 50 ms each on a re-import; distance fields and Lumen cards stay off (AG0:
+  4 to 15 s and 2 to 4 MB per mesh).
 
 **Disk targets**: source outputs per city at most 6 GB, the shared library at most 7 GB as
 source, nothing generated in git except previews and small goldens. The Mac has about 90 GB
@@ -551,6 +585,20 @@ samples build at proxy level or on the Windows PC (decision 13.5).
 - Hand modeling (hero replacements come in through overrides, made elsewhere).
 
 ## 13. Decisions that need Swagnik
+
+**Provisional answers (2026-10-27, until Swagnik overrides).** AG0 took each recommendation
+below as its answer so that AG1 can start; any of them can still change.
+
+| | Provisional answer | Where it is set |
+|---|---|---|
+| 13.1 | No AI models: everything procedural | |
+| 13.2 | U1 for every building, U2 for landmarks and heroes; $k = 4$ discrete genes apart outside a complex; parts shared between buildings when their quantized parameters coincide | asset spec defaults `uniqueness`, `hero_uniqueness`, `min_gene_distance`, `share_parts` |
+| 13.3 | Textures generated; fonts decided later (AG8) | |
+| 13.4 | The RTX 4070 Ti PC at 1440p with Nanite and Lumen sets the budgets; 512 px/m in the street band (256 px/m above) | `texel_density_px_m`, `texel_density_upper_px_m` |
+| 13.5 | The Mac for now (one city's assets and one imported city at a time) | |
+| 13.6 | Interior mapping only (the spike's glass master does it) | |
+| 13.7 | The asset spec written by a session from the prompt through the `assetgen` skill; no mood boards | `.claude/skills/assetgen/SKILL.md` |
+| 13.8 | Pure Python generators, Blender for previews only | |
 
 1. **Local AI models.**
    - (a) None: everything procedural, deterministic, no ML dependency. *Recommended for the
@@ -752,7 +800,7 @@ docker image; Windows joins in AG9.
   neon bands), in the fonts decision 13.3 allows.
 - **Unreal:** the variants as instanced kinds replacing M15's prototypes; signs as actors
   per slot; holo-ads and translucent sign faces as non-Nanite meshes with LOD chains;
-  Nanite foliage or LOD chains for trees, as AG0 found.
+  Nanite `Voxelize` for trees (AG0), LOD chains where it falls short.
 - **Done when:** every prop kind, plant species and sign slot has an asset; instance budgets
   are met; Mac = x86.
 - **Shows:** variant sheets per district style; a neon street at night.

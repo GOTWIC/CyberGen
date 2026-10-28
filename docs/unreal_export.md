@@ -61,6 +61,56 @@ Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, 
 | 4 lifegen | traffic, crowd and transit systems on the graphs, spawners |
 | 5 storygen | story actors, triggers, sequences |
 
+## assetgen's contribution (AG0)
+
+assetgen writes its entries as `unreal_contribution.json` beside its glTF packs (AG0: the
+spike's, `assetgen spike OUT`; from AG1: `BUILD/assets/`), layer 2 over stage 1's blockout:
+
+```json
+{"version": 1, "stage": "assetgen", "layer": 2,
+ "masters": ["facade", "glass", "metal", "neon", "foliage"],
+ "materials": {"glass": {"master": "glass", "color": [0.011, 0.017, 0.028],
+                         "roughness": 0.08, "metallic": 0.0}, "...": {}},
+ "entries": [{
+   "key": "d03.lot.e512n88.bld", "kind": "building", "hash": "<brief hash, 16 hex>",
+   "replaces": [], "glb": "tiles/<tile>.glb", "node": "<key>.shell", "asset": "<key, dots to _>",
+   "pivot": [512.0, 88.0, 0.0], "yaw_deg": 0.0, "nanite": true, "triangles": 975476,
+   "slots": ["concrete", "glass", "metal", "roof", "shopglass", "spandrel"],
+   "collision": {"simple": [{"center": [0, 0, 7.5], "extent": [36, 30, 7.5], "yaw_deg": 0}]},
+   "cpd": [0.82, 0.86, 0.9, 0.15, 6.0, 0.4, 0.55, 0.37],
+   "parts": [{"kind": "part.window.frame", "node": "<key>.part.window.frame", "asset": "...",
+              "count": 14720, "triangles": 120, "xforms": [[x, y, z, yaw_deg], "..."]}]}]}
+```
+
+- **Keys**: a building's key is its M10 id, which is also the name of its blockout object
+  (`citygen/blockout.py`), so the entry replaces that actor; `replaces` lists other blockout
+  keys it supersedes (AG7's per-segment street meshes over M15's joined pieces).
+- **Pivot**: the building's own origin (scope section 6), not the world origin as the
+  blockout's meshes; the actor sits at `pivot` (Unreal 100 x, -100 y, 100 z).
+- **Materials**: one material instance per slot, parent by `master`; the masters read the
+  vertex color as a multiplier (grime) and its alpha as a per-window id, and Custom Primitive
+  Data `cpd` per actor: 0 to 2 tint, 3 wear, 4 dirt height (m), 5 neon, 6 lit-window ratio,
+  7 seed.
+- **Collision**: simple boxes per mass (`extent` is half the size, meters) in the mesh's
+  frame; Nanite on, simple collision used as complex until AG3 adds the ground band.
+- **Parts**: one static mesh per part kind and a hierarchical instanced component per
+  building and kind (transforms relative to the pivot, yaw about z), carrying the same
+  Custom Primitive Data.
+
+The spike measured how Unreal takes this (`docs/progress/AG0/README.md`): Interchange reads
+`KHR_mesh_quantization`, not `EXT_mesh_gpu_instancing` (parts come in as one prototype mesh,
+so instances must come from the manifest, as above); simple collision boxes can be written
+into a mesh's body setup from Python.
+
+**What the exporter still needs for it** (in the PR that first ships real assets, AG1, on
+the exporter's own package once M15 is merged and moved): read `unreal_contribution.json` as
+a layer over the blockout manifest and replace the blockout actor of every key it has (and
+of its `replaces`), keeping the blockout's for the rest; import its glTF packs with assets
+keyed by `asset` and hashed by `hash`; spawn actors at `pivot`; make the masters (M_AgOpaque,
+M_AgGlass with interior mapping, as `assetgen/ue/spike_import.py` does) and their instances
+per slot; write the collision boxes; set Custom Primitive Data on every component; build the
+part instances (HISM per building and kind); include the new keys in its re-import digests.
+
 ## Milestones and checks
 
 - **Every milestone** updates the exporter in its own PR for what it adds or changes (a new
@@ -80,3 +130,4 @@ Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, 
 | Milestone | Change to the exporter | Unreal check |
 |---|---|---|
 | M15 | Introduced: manifest by key and hash, glTF tiles through Interchange with Nanite, `M_CityGen` material instances, instanced props and plants, graphs as data assets, player start, default sun and sky, re-import by key and hash, `--check` and `--shots` | the six samples, imported, imported again and checked |
+| AG0 | No code change (M15 was not on main yet): assetgen's contribution format defined (above, written by `assetgen spike`), with the list of what the exporter needs to take it; the spike ran on M15's project setup from its branch | the spike: three generated buildings and a test tree in a throwaway project (`docs/progress/AG0/unreal/`) |

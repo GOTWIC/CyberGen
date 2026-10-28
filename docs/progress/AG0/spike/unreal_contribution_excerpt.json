@@ -1,0 +1,883 @@
+{
+ "entries": [
+  {
+   "asset": "spike_tower_bld",
+   "collision": {
+    "simple": [
+     {
+      "center": [
+       0.0,
+       0.0,
+       7.5
+      ],
+      "extent": [
+       36.0,
+       30.0,
+       7.5
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       0.0,
+       0.0,
+       180.6
+      ],
+      "extent": [
+       27.0,
+       21.0,
+       165.6
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       0.0,
+       0.0,
+       350.7
+      ],
+      "extent": [
+       21.0,
+       15.0,
+       4.5
+      ],
+      "yaw_deg": 0.0
+     }
+    ]
+   },
+   "cpd": [
+    0.82,
+    0.86,
+    0.9,
+    0.15,
+    6.0,
+    0.4,
+    0.55,
+    0.9557
+   ],
+   "glb": "tower.glb",
+   "hash": "3323dfc7d155eede",
+   "key": "spike.tower.bld",
+   "kind": "building",
+   "nanite": true,
+   "node": "spike.tower.bld.shell",
+   "parts": [
+    {
+     "asset": "spike_tower_bld_part_roof_ac_unit",
+     "count": 16,
+     "kind": "part.roof.ac_unit",
+     "node": "spike.tower.bld.part.roof.ac_unit",
+     "triangles": 72,
+     "xforms": [
+      [
+       -32.0,
+       -27.0,
+       15.0,
+       0.0
+      ],
+      [
+       -32.0,
+       27.0,
+       15.0,
+       180.0
+      ],
+      [
+       -29.0,
+       -27.0,
+       15.0,
+       0.0
+      ],
+      "... 13 more"
+     ]
+    },
+    {
+     "asset": "spike_tower_bld_part_roof_water_tank",
+     "count": 2,
+     "kind": "part.roof.water_tank",
+     "node": "spike.tower.bld.part.roof.water_tank",
+     "triangles": 94,
+     "xforms": [
+      [
+       -17.0,
+       0.0,
+       355.2,
+       0.0
+      ],
+      [
+       17.0,
+       0.0,
+       355.2,
+       0.0
+      ]
+     ]
+    },
+    {
+     "asset": "spike_tower_bld_part_window_frame",
+     "count": 14720,
+     "kind": "part.window.frame",
+     "node": "spike.tower.bld.part.window.frame",
+     "triangles": 60,
+     "xforms": [
+      [
+       -26.4,
+       -20.9,
+       15.9,
+       0.0
+      ],
+      [
+       -25.2,
+       -20.9,
+       15.9,
+       0.0
+      ],
+      [
+       -24.0,
+       -20.9,
+       15.9,
+       0.0
+      ],
+      "... 14717 more"
+     ]
+    }
+   ],
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "replaces": [],
+   "slots": [
+    "concrete",
+    "glass",
+    "metal",
+    "roof",
+    "shopglass",
+    "spandrel"
+   ],
+   "triangles": 975476,
+   "yaw_deg": 0.0
+  },
+  {
+   "asset": "spike_shopfront_row_bld",
+   "collision": {
+    "simple": [
+     {
+      "center": [
+       0.0,
+       0.0,
+       7.2
+      ],
+      "extent": [
+       17.5,
+       7.0,
+       7.2
+      ],
+      "yaw_deg": 0.0
+     }
+    ]
+   },
+   "cpd": [
+    0.95,
+    0.9,
+    0.85,
+    0.6,
+    3.0,
+    0.8,
+    0.4,
+    0.5338
+   ],
+   "glb": "shopfront_row.glb",
+   "hash": "f23a2f816caf8edb",
+   "key": "spike.shopfront_row.bld",
+   "kind": "building",
+   "nanite": true,
+   "node": "spike.shopfront_row.bld.shell",
+   "parts": [
+    {
+     "asset": "spike_shopfront_row_bld_part_roof_ac_unit",
+     "count": 8,
+     "kind": "part.roof.ac_unit",
+     "node": "spike.shopfront_row.bld.part.roof.ac_unit",
+     "triangles": 72,
+     "xforms": [
+      [
+       -15.0,
+       4.5,
+       14.4,
+       180.0
+      ],
+      [
+       -10.7,
+       4.5,
+       14.4,
+       180.0
+      ],
+      [
+       -6.4,
+       4.5,
+       14.4,
+       180.0
+      ],
+      "... 5 more"
+     ]
+    },
+    {
+     "asset": "spike_shopfront_row_bld_part_roof_water_tank",
+     "count": 1,
+     "kind": "part.roof.water_tank",
+     "node": "spike.shopfront_row.bld.part.roof.water_tank",
+     "triangles": 94,
+     "xforms": [
+      [
+       13.5,
+       -3.0,
+       14.4,
+       0.0
+      ]
+     ]
+    },
+    {
+     "asset": "spike_shopfront_row_bld_part_shop_awning",
+     "count": 5,
+     "kind": "part.shop.awning",
+     "node": "spike.shopfront_row.bld.part.shop.awning",
+     "triangles": 6,
+     "xforms": [
+      [
+       -14.0,
+       -7.0,
+       3.6,
+       0.0
+      ],
+      [
+       -7.0,
+       -7.0,
+       3.6,
+       0.0
+      ],
+      [
+       0.0,
+       -7.0,
+       3.6,
+       0.0
+      ],
+      "... 2 more"
+     ]
+    },
+    {
+     "asset": "spike_shopfront_row_bld_part_shop_sign",
+     "count": 5,
+     "kind": "part.shop.sign",
+     "node": "spike.shopfront_row.bld.part.shop.sign",
+     "triangles": 12,
+     "xforms": [
+      [
+       -14.0,
+       -7.0,
+       4.5,
+       0.0
+      ],
+      [
+       -7.0,
+       -7.0,
+       4.5,
+       0.0
+      ],
+      [
+       0.0,
+       -7.0,
+       4.5,
+       0.0
+      ],
+      "... 2 more"
+     ]
+    },
+    {
+     "asset": "spike_shopfront_row_bld_part_window_frame",
+     "count": 30,
+     "kind": "part.window.frame",
+     "node": "spike.shopfront_row.bld.part.window.frame",
+     "triangles": 60,
+     "xforms": [
+      [
+       -15.75,
+       -6.85,
+       5.4,
+       0.0
+      ],
+      [
+       -12.25,
+       -6.85,
+       5.4,
+       0.0
+      ],
+      [
+       -15.75,
+       -6.85,
+       8.7,
+       0.0
+      ],
+      "... 27 more"
+     ]
+    }
+   ],
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "replaces": [],
+   "slots": [
+    "brick",
+    "concrete",
+    "glass",
+    "metal",
+    "plaster",
+    "roof",
+    "shopglass"
+   ],
+   "triangles": 1278,
+   "yaw_deg": 0.0
+  },
+  {
+   "asset": "spike_shanty_stack_bld",
+   "collision": {
+    "simple": [
+     {
+      "center": [
+       -6.328,
+       -0.187,
+       1.421
+      ],
+      "extent": [
+       2.672,
+       5.813,
+       1.421
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -1.172,
+       -0.471,
+       1.277
+      ],
+      "extent": [
+       2.484,
+       5.529,
+       1.277
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       4.21,
+       -1.038,
+       1.339
+      ],
+      "extent": [
+       2.898,
+       4.962,
+       1.339
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       8.054,
+       -1.058,
+       1.326
+      ],
+      "extent": [
+       0.946,
+       4.942,
+       1.326
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -6.558,
+       -1.176,
+       4.318
+      ],
+      "extent": [
+       2.442,
+       4.828,
+       1.418
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -2.142,
+       -0.77,
+       4.318
+      ],
+      "extent": [
+       1.974,
+       5.139,
+       1.418
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       2.599,
+       -0.882,
+       4.184
+      ],
+      "extent": [
+       2.767,
+       4.534,
+       1.284
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       6.95,
+       -0.81,
+       4.19
+      ],
+      "extent": [
+       1.584,
+       4.504,
+       1.29
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -6.779,
+       -0.178,
+       7.236
+      ],
+      "extent": [
+       2.221,
+       4.921,
+       1.436
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -2.288,
+       -1.894,
+       7.226
+      ],
+      "extent": [
+       2.27,
+       4.616,
+       1.426
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       2.607,
+       -1.808,
+       7.139
+      ],
+      "extent": [
+       2.625,
+       4.832,
+       1.339
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       7.116,
+       -2.908,
+       7.186
+      ],
+      "extent": [
+       1.884,
+       3.992,
+       1.386
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -6.396,
+       -2.204,
+       10.14
+      ],
+      "extent": [
+       2.604,
+       3.648,
+       1.44
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       -1.046,
+       -1.358,
+       9.956
+      ],
+      "extent": [
+       2.746,
+       3.457,
+       1.256
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       3.685,
+       -1.864,
+       10.022
+      ],
+      "extent": [
+       1.985,
+       4.04,
+       1.322
+      ],
+      "yaw_deg": 0.0
+     },
+     {
+      "center": [
+       7.335,
+       -1.806,
+       10.123
+      ],
+      "extent": [
+       1.665,
+       4.486,
+       1.423
+      ],
+      "yaw_deg": 0.0
+     }
+    ]
+   },
+   "cpd": [
+    0.9,
+    0.85,
+    0.8,
+    1.2,
+    4.0,
+    0.7,
+    0.35,
+    0.7942
+   ],
+   "glb": "shanty_stack.glb",
+   "hash": "f887f81213bcea80",
+   "key": "spike.shanty_stack.bld",
+   "kind": "building",
+   "nanite": true,
+   "node": "spike.shanty_stack.bld.shell",
+   "parts": [
+    {
+     "asset": "spike_shanty_stack_bld_part_roof_ac_unit",
+     "count": 20,
+     "kind": "part.roof.ac_unit",
+     "node": "spike.shanty_stack.bld.part.roof.ac_unit",
+     "triangles": 72,
+     "xforms": [
+      [
+       -7.219,
+       -6.4,
+       1.6,
+       0.0
+      ],
+      [
+       -3.255,
+       -2.125,
+       1.6,
+       90.0
+      ],
+      [
+       -9.4,
+       1.751,
+       1.6,
+       -90.0
+      ],
+      "... 17 more"
+     ]
+    },
+    {
+     "asset": "spike_shanty_stack_bld_part_roof_dish",
+     "count": 2,
+     "kind": "part.roof.dish",
+     "node": "spike.shanty_stack.bld.part.roof.dish",
+     "triangles": 32,
+     "xforms": [
+      [
+       -1.046,
+       -1.358,
+       11.213,
+       0.0
+      ],
+      [
+       7.335,
+       -1.806,
+       11.546,
+       0.0
+      ]
+     ]
+    },
+    {
+     "asset": "spike_shanty_stack_bld_part_window_frame",
+     "count": 19,
+     "kind": "part.window.frame",
+     "node": "spike.shanty_stack.bld.part.window.frame",
+     "triangles": 60,
+     "xforms": [
+      [
+       9.06,
+       -1.058,
+       1.0,
+       90.0
+      ],
+      [
+       8.054,
+       3.944,
+       1.0,
+       180.0
+      ],
+      [
+       7.047,
+       -1.058,
+       1.0,
+       -90.0
+      ],
+      "... 16 more"
+     ]
+    }
+   ],
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "replaces": [],
+   "slots": [
+    "corrugated",
+    "glass",
+    "metal",
+    "plaster",
+    "roof",
+    "rust",
+    "tarp"
+   ],
+   "triangles": 10648,
+   "yaw_deg": 0.0
+  },
+  {
+   "asset": "spike_tree_plt",
+   "collision": {
+    "simple": [
+     {
+      "center": [
+       0.0,
+       0.0,
+       2.1
+      ],
+      "extent": [
+       0.225,
+       0.225,
+       2.1
+      ],
+      "yaw_deg": 0.0
+     }
+    ]
+   },
+   "cpd": [
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.4714
+   ],
+   "glb": "foliage_test.glb",
+   "hash": "8a2ce4a213148e91",
+   "key": "spike.tree.plt",
+   "kind": "building",
+   "nanite": true,
+   "node": "spike.tree.plt.shell",
+   "parts": [],
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "replaces": [],
+   "slots": [
+    "bark",
+    "leaf"
+   ],
+   "triangles": 6470,
+   "yaw_deg": 0.0
+  }
+ ],
+ "frame": "building frame: citygen x east, y north, z up, m; glTF y up; Unreal (100 x, -100 y, 100 z) cm, yaw -> -yaw",
+ "generator": "assetgen 0.1.0 (AG0)",
+ "layer": 2,
+ "masters": [
+  "facade",
+  "glass",
+  "metal",
+  "neon",
+  "foliage"
+ ],
+ "materials": {
+  "awning": {
+   "color": [
+    0.262251,
+    0.028426,
+    0.024158
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.85
+  },
+  "bark": {
+   "color": [
+    0.068478,
+    0.043735,
+    0.025187
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.95
+  },
+  "brick": {
+   "color": [
+    0.194618,
+    0.068478,
+    0.035601
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.9
+  },
+  "concrete": {
+   "color": [
+    0.262251,
+    0.254152,
+    0.238398
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.85
+  },
+  "corrugated": {
+   "color": [
+    0.208637,
+    0.174647,
+    0.132868
+   ],
+   "master": "metal",
+   "metallic": 0.6,
+   "roughness": 0.7
+  },
+  "glass": {
+   "color": [
+    0.01096,
+    0.017642,
+    0.029557
+   ],
+   "master": "glass",
+   "metallic": 0.0,
+   "roughness": 0.08
+  },
+  "leaf": {
+   "color": [
+    0.049707,
+    0.147027,
+    0.023153
+   ],
+   "master": "foliage",
+   "metallic": 0.0,
+   "roughness": 0.7
+  },
+  "metal": {
+   "color": [
+    0.042311,
+    0.049707,
+    0.059511
+   ],
+   "master": "metal",
+   "metallic": 0.9,
+   "roughness": 0.45
+  },
+  "plaster": {
+   "color": [
+    0.48515,
+    0.376262,
+    0.262251
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.9
+  },
+  "roof": {
+   "color": [
+    0.074214,
+    0.07036,
+    0.06301
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.95
+  },
+  "rust": {
+   "color": [
+    0.274677,
+    0.068478,
+    0.024158
+   ],
+   "master": "metal",
+   "metallic": 0.4,
+   "roughness": 0.8
+  },
+  "shopglass": {
+   "color": [
+    0.015996,
+    0.029557,
+    0.045186
+   ],
+   "master": "glass",
+   "metallic": 0.0,
+   "roughness": 0.08
+  },
+  "sign": {
+   "color": [
+    1.0,
+    0.023153,
+    0.152926
+   ],
+   "master": "neon",
+   "metallic": 0.0,
+   "roughness": 0.5
+  },
+  "spandrel": {
+   "color": [
+    0.023153,
+    0.03434,
+    0.051269
+   ],
+   "master": "facade",
+   "metallic": 0.3,
+   "roughness": 0.5
+  },
+  "tarp": {
+   "color": [
+    0.028426,
+    0.114435,
+    0.254152
+   ],
+   "master": "facade",
+   "metallic": 0.0,
+   "roughness": 0.8
+  }
+ },
+ "stage": "assetgen",
+ "version": 1
+}

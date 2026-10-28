@@ -1,0 +1,76 @@
+{
+ "buildings": {
+  "foliage_test": {
+   "bytes": 614208,
+   "gpuinst_bytes": 614208,
+   "gpuinst_sha256": "8a2ce4a213148e91f34924ea9778b2f629a7601ce9ac5bb4d4b2f61b286643b0",
+   "instances": 0,
+   "masses": 1,
+   "part_triangles": {},
+   "quant_bytes": 459164,
+   "quant_sha256": "7c25b9166acbadbeff6ca754e4bee37d32570420679069b429055406a8ccf188",
+   "sha256": "8a2ce4a213148e91f34924ea9778b2f629a7601ce9ac5bb4d4b2f61b286643b0",
+   "triangles": 6470,
+   "ubx_bytes": 616472,
+   "ubx_sha256": "92407bc967bd8a54199c35e40f38b2a3b8f3049a1ce77ff917fe066e6b19e195"
+  },
+  "shanty_stack": {
+   "bytes": 1027652,
+   "gpuinst_bytes": 1029796,
+   "gpuinst_sha256": "f282d0c15a7a1197842ae28c2f40dfe12f6f4c467a2e29d021b79bfca5aaeef2",
+   "instances": 41,
+   "masses": 16,
+   "part_triangles": {
+    "part.roof.ac_unit": 72,
+    "part.roof.dish": 32,
+    "part.window.frame": 60
+   },
+   "quant_bytes": 769824,
+   "quant_sha256": "4ff7846c38c17547c6d023fe8a182acbc8f1bb676727c2f6e8fd3a8ad08cbc20",
+   "sha256": "f887f81213bcea8086951e811c4c02826d5d86271301f45c7a4a7cf0e675d652",
+   "triangles": 10648,
+   "ubx_bytes": 1064320,
+   "ubx_sha256": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
+  },
+  "shopfront_row": {
+   "bytes": 142012,
+   "gpuinst_bytes": 145000,
+   "gpuinst_sha256": "7ce4073159e0e90ed30b1a27de8444fa70472f55bcee9fb59430005d2055ae36",
+   "instances": 49,
+   "masses": 1,
+   "part_triangles": {
+    "part.roof.ac_unit": 72,
+    "part.roof.water_tank": 94,
+    "part.shop.awning": 6,
+    "part.shop.sign": 12,
+    "part.window.frame": 60
+   },
+   "quant_bytes": 111896,
+   "quant_sha256": "fa8b7e992bdd9450bb36473550355d14d3945425dfec826224b35fb7b217afaa",
+   "sha256": "f23a2f816caf8edb6e5ebd46b70d96a7fc9e205c5c979b9eda1c88f6abe5276e",
+   "triangles": 1278,
+   "ubx_bytes": 144236,
+   "ubx_sha256": "e8624a5d669e55d899a97164f376a276cb32d76a082665ac1c8af52f7f6aaa64"
+  },
+  "tower": {
+   "bytes": 86995184,
+   "gpuinst_bytes": 87408864,
+   "gpuinst_sha256": "e4a387701c408170ce3b292fccdf1a289ad17d4e968be4afe0c47dcadfd34dfb",
+   "instances": 14738,
+   "lean_bytes": 66420848,
+   "lean_sha256": "383c8a8ee7a336b49578d9f2d6fbad3e114be82242fea917d8f681e325040ada",
+   "masses": 3,
+   "part_triangles": {
+    "part.roof.ac_unit": 72,
+    "part.roof.water_tank": 94,
+    "part.window.frame": 60
+   },
+   "quant_bytes": 66418304,
+   "quant_sha256": "0057e03134ab870ed3503bc4101dc6c9ec088b00317f64c9823fa3814e17c468",
+   "sha256": "3323dfc7d155eede5a94f926d19907f91ded629a50a7b0992380c2bc42a18f8d",
+   "triangles": 975476,
+   "ubx_bytes": 87001852,
+   "ubx_sha256": "691044ef2529808b7bf2f86563a61406bfe88fd5ec59d53cc21ae3707c4e60a1"
+  }
+ }
+}

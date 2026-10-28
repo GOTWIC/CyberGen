@@ -1,0 +1,1774 @@
+{
+  "$defs": {
+    "At": {
+      "additionalProperties": false,
+      "properties": {
+        "mass": {
+          "title": "Mass",
+          "type": "integer"
+        },
+        "edge": {
+          "title": "Edge",
+          "type": "integer"
+        },
+        "s": {
+          "title": "S",
+          "type": "number"
+        },
+        "d": {
+          "title": "D",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mass",
+        "edge",
+        "s",
+        "d"
+      ],
+      "title": "At",
+      "type": "object"
+    },
+    "BuildingRec": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "use": {
+          "title": "Use",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "landmark": {
+          "title": "Landmark",
+          "type": "boolean"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "lot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lot Id"
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Property Id"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "District Id"
+        },
+        "megasite_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Megasite Id"
+        },
+        "floors": {
+          "title": "Floors",
+          "type": "integer"
+        },
+        "height_m": {
+          "title": "Height M",
+          "type": "number"
+        },
+        "style": {
+          "additionalProperties": true,
+          "title": "Style",
+          "type": "object"
+        },
+        "floor_grid": {
+          "$ref": "#/$defs/FloorGrid"
+        }
+      },
+      "required": [
+        "type",
+        "use",
+        "name",
+        "landmark",
+        "attrs",
+        "lot_id",
+        "property_id",
+        "district_id",
+        "megasite_id",
+        "floors",
+        "height_m",
+        "style",
+        "floor_grid"
+      ],
+      "title": "BuildingRec",
+      "type": "object"
+    },
+    "District": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "archetype": {
+          "title": "Archetype",
+          "type": "string"
+        },
+        "grime": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Grime"
+        },
+        "neon": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Neon"
+        },
+        "greenery": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Greenery"
+        },
+        "wealth": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Wealth"
+        },
+        "danger": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Danger"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "archetype",
+        "grime",
+        "neon",
+        "greenery",
+        "wealth",
+        "danger"
+      ],
+      "title": "District",
+      "type": "object"
+    },
+    "Edge": {
+      "additionalProperties": false,
+      "properties": {
+        "mass": {
+          "title": "Mass",
+          "type": "integer"
+        },
+        "ring": {
+          "description": "0: the exterior; k: the k-th hole (a court).",
+          "title": "Ring",
+          "type": "integer"
+        },
+        "i": {
+          "title": "I",
+          "type": "integer"
+        },
+        "a": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "A",
+          "type": "array"
+        },
+        "b": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "B",
+          "type": "array"
+        },
+        "length_m": {
+          "title": "Length M",
+          "type": "number"
+        },
+        "normal_deg": {
+          "description": "Outward normal, degrees counterclockwise from east.",
+          "title": "Normal Deg",
+          "type": "number"
+        },
+        "class": {
+          "description": "The class with the most facade area (hidden: all hidden).",
+          "enum": [
+            "front",
+            "street",
+            "alley",
+            "canal",
+            "plaza",
+            "park",
+            "courtyard",
+            "atrium",
+            "party",
+            "blind",
+            "open",
+            "upper",
+            "hidden"
+          ],
+          "title": "Class",
+          "type": "string"
+        },
+        "regions": {
+          "items": {
+            "$ref": "#/$defs/Region"
+          },
+          "title": "Regions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mass",
+        "ring",
+        "i",
+        "a",
+        "b",
+        "length_m",
+        "normal_deg",
+        "class",
+        "regions"
+      ],
+      "title": "Edge",
+      "type": "object"
+    },
+    "Entrance": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Segment Id"
+        },
+        "walkway_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Walkway Id"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/At"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "position",
+        "kind",
+        "segment_id",
+        "walkway_id",
+        "at"
+      ],
+      "title": "Entrance",
+      "type": "object"
+    },
+    "FloorGrid": {
+      "additionalProperties": false,
+      "properties": {
+        "floor_height_m": {
+          "title": "Floor Height M",
+          "type": "number"
+        },
+        "base_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "M13: the ground floor over sea level.",
+          "title": "Base M"
+        },
+        "plinth_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "M13: the lowest ground under the footprint.",
+          "title": "Plinth M"
+        }
+      },
+      "required": [
+        "floor_height_m",
+        "base_m",
+        "plinth_m"
+      ],
+      "title": "FloorGrid",
+      "type": "object"
+    },
+    "Floors": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Floor index of the mass's base on the building's grid (None: off the grid).",
+          "title": "First"
+        },
+        "count": {
+          "description": "Floors in the mass (0: none, a spire or thin deck).",
+          "title": "Count",
+          "type": "integer"
+        },
+        "height_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Height M"
+        }
+      },
+      "required": [
+        "first",
+        "count",
+        "height_m"
+      ],
+      "title": "Floors",
+      "type": "object"
+    },
+    "Frontage": {
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": {
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "road_class": {
+          "title": "Road Class",
+          "type": "string"
+        },
+        "length_m": {
+          "title": "Length M",
+          "type": "number"
+        },
+        "line": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Line",
+          "type": "array"
+        }
+      },
+      "required": [
+        "segment_id",
+        "road_class",
+        "length_m",
+        "line"
+      ],
+      "title": "Frontage",
+      "type": "object"
+    },
+    "GreenRoof": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "z_m": {
+          "title": "Z M",
+          "type": "number"
+        },
+        "polygon": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "z_m",
+        "polygon"
+      ],
+      "title": "GreenRoof",
+      "type": "object"
+    },
+    "Lot": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "polygon": {
+          "$ref": "#/$defs/Polygon"
+        },
+        "frontage": {
+          "items": {
+            "$ref": "#/$defs/Frontage"
+          },
+          "title": "Frontage",
+          "type": "array"
+        },
+        "main_segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Main Segment Id"
+        }
+      },
+      "required": [
+        "id",
+        "polygon",
+        "frontage",
+        "main_segment_id"
+      ],
+      "title": "Lot",
+      "type": "object"
+    },
+    "Mass": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "shape": {
+          "title": "Shape",
+          "type": "string"
+        },
+        "z": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Z",
+          "type": "array"
+        },
+        "footprint": {
+          "$ref": "#/$defs/Polygon"
+        },
+        "floors": {
+          "$ref": "#/$defs/Floors"
+        }
+      },
+      "required": [
+        "role",
+        "shape",
+        "z",
+        "footprint",
+        "floors"
+      ],
+      "title": "Mass",
+      "type": "object"
+    },
+    "MountedProp": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "position": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "yaw_deg": {
+          "title": "Yaw Deg",
+          "type": "number"
+        },
+        "scale": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Scale",
+          "type": "array"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/At"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "on_wall": {
+          "description": "Mount point within 0.5 m of a facade spanning its height.",
+          "title": "On Wall",
+          "type": "boolean"
+        },
+        "gap_m": {
+          "title": "Gap M",
+          "type": "number"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Overhead cables: which end (0, 1).",
+          "title": "End"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "position",
+        "yaw_deg",
+        "scale",
+        "attrs",
+        "at",
+        "on_wall",
+        "gap_m"
+      ],
+      "title": "MountedProp",
+      "type": "object"
+    },
+    "Neighbor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "d_m": {
+          "title": "D M",
+          "type": "number"
+        },
+        "relation": {
+          "enum": [
+            "party",
+            "blind"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "height_m": {
+          "title": "Height M",
+          "type": "number"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "d_m",
+        "relation",
+        "height_m",
+        "type"
+      ],
+      "title": "Neighbor",
+      "type": "object"
+    },
+    "Plant": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "species": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Species"
+        },
+        "position": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "height_m": {
+          "title": "Height M",
+          "type": "number"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/At"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "species",
+        "position",
+        "height_m",
+        "attrs",
+        "at"
+      ],
+      "title": "Plant",
+      "type": "object"
+    },
+    "Poi": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "sub": {
+          "title": "Sub",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "unit_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit Index"
+        },
+        "floor": {
+          "title": "Floor",
+          "type": "integer"
+        },
+        "hours": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Hours",
+          "type": "array"
+        },
+        "host_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Host Id"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "sub",
+        "name",
+        "unit_index",
+        "floor",
+        "hours",
+        "host_id"
+      ],
+      "title": "Poi",
+      "type": "object"
+    },
+    "Polygon": {
+      "additionalProperties": false,
+      "properties": {
+        "exterior": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Exterior",
+          "type": "array"
+        },
+        "holes": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Holes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "exterior",
+        "holes"
+      ],
+      "title": "Polygon",
+      "type": "object"
+    },
+    "Portal": {
+      "additionalProperties": false,
+      "properties": {
+        "line_id": {
+          "title": "Line Id",
+          "type": "string"
+        },
+        "z": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Z",
+          "type": "array"
+        },
+        "station": {
+          "title": "Station",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "line_id",
+        "z",
+        "station"
+      ],
+      "title": "Portal",
+      "type": "object"
+    },
+    "Property": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "owner": {
+          "title": "Owner",
+          "type": "string"
+        },
+        "complex": {
+          "title": "Complex",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "building_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Building Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "owner",
+        "complex",
+        "name",
+        "building_ids"
+      ],
+      "title": "Property",
+      "type": "object"
+    },
+    "Region": {
+      "additionalProperties": false,
+      "description": "A rectangle of an edge's facade: s along the edge, z up.",
+      "properties": {
+        "s": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "S",
+          "type": "array"
+        },
+        "z": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Z",
+          "type": "array"
+        },
+        "class": {
+          "enum": [
+            "front",
+            "street",
+            "alley",
+            "canal",
+            "plaza",
+            "park",
+            "courtyard",
+            "atrium",
+            "party",
+            "blind",
+            "open",
+            "upper",
+            "hidden"
+          ],
+          "title": "Class",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "party, blind: the neighbor; hidden: the own mass (m<k>); facing: the road, water, open space or building it faces.",
+          "title": "Ref"
+        },
+        "road_class": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Road Class"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Open space kind faced.",
+          "title": "Kind"
+        }
+      },
+      "required": [
+        "s",
+        "z",
+        "class"
+      ],
+      "title": "Region",
+      "type": "object"
+    },
+    "RoofItem": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "position": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "size": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Size",
+          "type": "array"
+        },
+        "yaw_deg": {
+          "title": "Yaw Deg",
+          "type": "number"
+        },
+        "mass": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The mass whose roof it sits on.",
+          "title": "Mass"
+        }
+      },
+      "required": [
+        "kind",
+        "position",
+        "size",
+        "yaw_deg",
+        "mass"
+      ],
+      "title": "RoofItem",
+      "type": "object"
+    },
+    "SignSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "mount": {
+          "title": "Mount",
+          "type": "string"
+        },
+        "position": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "yaw_deg": {
+          "title": "Yaw Deg",
+          "type": "number"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "height_m": {
+          "title": "Height M",
+          "type": "number"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "prop_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prop Id"
+        },
+        "roof_item": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roof Item"
+        },
+        "emitter": {
+          "title": "Emitter",
+          "type": "boolean"
+        },
+        "two_sided": {
+          "title": "Two Sided",
+          "type": "boolean"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/At"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "mount",
+        "position",
+        "yaw_deg",
+        "width_m",
+        "height_m",
+        "content",
+        "prop_id",
+        "roof_item",
+        "emitter",
+        "two_sided",
+        "at"
+      ],
+      "title": "SignSlot",
+      "type": "object"
+    },
+    "SkybridgeEnd": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "z_m": {
+          "title": "Z M",
+          "type": "number"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "levels": {
+          "title": "Levels",
+          "type": "integer"
+        },
+        "level_height_m": {
+          "title": "Level Height M",
+          "type": "number"
+        },
+        "other": {
+          "title": "Other",
+          "type": "string"
+        },
+        "end": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "End",
+          "type": "array"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/At"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "z_m",
+        "width_m",
+        "levels",
+        "level_height_m",
+        "other",
+        "end",
+        "at"
+      ],
+      "title": "SkybridgeEnd",
+      "type": "object"
+    },
+    "SpecSection": {
+      "additionalProperties": false,
+      "properties": {
+        "uniqueness": {
+          "title": "Uniqueness",
+          "type": "string"
+        },
+        "hero_uniqueness": {
+          "title": "Hero Uniqueness",
+          "type": "string"
+        },
+        "min_gene_distance": {
+          "title": "Min Gene Distance",
+          "type": "integer"
+        },
+        "share_parts": {
+          "title": "Share Parts",
+          "type": "boolean"
+        },
+        "texel_density_px_m": {
+          "title": "Texel Density Px M",
+          "type": "integer"
+        },
+        "texel_density_upper_px_m": {
+          "title": "Texel Density Upper Px M",
+          "type": "integer"
+        },
+        "era": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Era"
+        },
+        "era_style": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Era Style"
+        },
+        "district": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "District"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Owner"
+        },
+        "landmark": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Landmark"
+        }
+      },
+      "required": [
+        "uniqueness",
+        "hero_uniqueness",
+        "min_gene_distance",
+        "share_parts",
+        "texel_density_px_m",
+        "texel_density_upper_px_m",
+        "era",
+        "era_style",
+        "district",
+        "owner",
+        "landmark"
+      ],
+      "title": "SpecSection",
+      "type": "object"
+    },
+    "Unit": {
+      "additionalProperties": false,
+      "properties": {
+        "edge": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            }
+          ],
+          "title": "Edge",
+          "type": "array"
+        },
+        "use": {
+          "title": "Use",
+          "type": "string"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Segment Id"
+        },
+        "awning_m": {
+          "title": "Awning M",
+          "type": "number"
+        },
+        "sign": {
+          "title": "Sign",
+          "type": "boolean"
+        },
+        "entrance": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Entrance"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/At"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "edge",
+        "use",
+        "width_m",
+        "segment_id",
+        "awning_m",
+        "sign",
+        "entrance",
+        "at"
+      ],
+      "title": "Unit",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "brief_version": {
+      "const": 1,
+      "title": "Brief Version",
+      "type": "integer"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "origin": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Origin",
+      "type": "array"
+    },
+    "building": {
+      "$ref": "#/$defs/BuildingRec"
+    },
+    "masses": {
+      "items": {
+        "$ref": "#/$defs/Mass"
+      },
+      "title": "Masses",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/Edge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "neighbors": {
+      "items": {
+        "$ref": "#/$defs/Neighbor"
+      },
+      "title": "Neighbors",
+      "type": "array"
+    },
+    "units": {
+      "items": {
+        "$ref": "#/$defs/Unit"
+      },
+      "title": "Units",
+      "type": "array"
+    },
+    "entrances": {
+      "items": {
+        "$ref": "#/$defs/Entrance"
+      },
+      "title": "Entrances",
+      "type": "array"
+    },
+    "roof_items": {
+      "items": {
+        "$ref": "#/$defs/RoofItem"
+      },
+      "title": "Roof Items",
+      "type": "array"
+    },
+    "portals": {
+      "items": {
+        "$ref": "#/$defs/Portal"
+      },
+      "title": "Portals",
+      "type": "array"
+    },
+    "skybridges": {
+      "items": {
+        "$ref": "#/$defs/SkybridgeEnd"
+      },
+      "title": "Skybridges",
+      "type": "array"
+    },
+    "sign_slots": {
+      "items": {
+        "$ref": "#/$defs/SignSlot"
+      },
+      "title": "Sign Slots",
+      "type": "array"
+    },
+    "props": {
+      "items": {
+        "$ref": "#/$defs/MountedProp"
+      },
+      "title": "Props",
+      "type": "array"
+    },
+    "plants": {
+      "items": {
+        "$ref": "#/$defs/Plant"
+      },
+      "title": "Plants",
+      "type": "array"
+    },
+    "green_roofs": {
+      "items": {
+        "$ref": "#/$defs/GreenRoof"
+      },
+      "title": "Green Roofs",
+      "type": "array"
+    },
+    "pois": {
+      "items": {
+        "$ref": "#/$defs/Poi"
+      },
+      "title": "Pois",
+      "type": "array"
+    },
+    "lot": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Lot"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "property": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Property"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "district": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/District"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "spec": {
+      "$ref": "#/$defs/SpecSection"
+    },
+    "override": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Override"
+    }
+  },
+  "required": [
+    "brief_version",
+    "id",
+    "origin",
+    "building",
+    "masses",
+    "edges",
+    "neighbors",
+    "units",
+    "entrances",
+    "roof_items",
+    "portals",
+    "skybridges",
+    "sign_slots",
+    "props",
+    "plants",
+    "green_roofs",
+    "pois",
+    "lot",
+    "property",
+    "district",
+    "spec",
+    "override"
+  ],
+  "title": "assetgen building brief",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
