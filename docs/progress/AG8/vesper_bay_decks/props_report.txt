@@ -1,0 +1,52 @@
+assetgen props: Vesper Bay Decks: PASS
+
+  [ok] props_coverage: 54533 props (1828 on AG7's barriers), 25742 plants, 17249 sign slots; 0 without an asset
+  [ok] props_families: 20 prop kinds in 5 styles, 15 plant species
+  [ok] props_replaces: 1938 prototype actors, 1938 replaced
+  [ok] props_meshes: no bad triangles
+  [ok] props_budgets: 98688 instances (at most 2618 in a tile, budgets 15000 and 300000), 81951255 triangles drawn through them, 7956039 unique triangles (budget 10000000)
+
+variants 723 in 36 families, instances 98688 (1575 brackets), exact props 1948, signs 17249 (17235 meshes)
+unique triangles 7956039 (signs 6472350, exact 747276), drawn through instances 81951255, disk 433.6 MB
+
+instances by kind:
+  awning: 34050
+  ac_unit: 8042
+  street_light: 3823
+  trash: 2163
+  bollard: 1629
+  bracket: 1575
+  railing: 1507
+  traffic_signal: 1428
+  parked_vehicle: 1155
+  wall_light: 1032
+  hydrant: 830
+  trash_can: 766
+  bench: 591
+  dumpster: 306
+  bus_stop: 76
+  boat: 50
+  planter: 28
+  vending_machine: 18
+  food_stall: 15
+  kiosk: 11
+instances by species:
+  ivy: 20151
+  boxwood: 4766
+  scrub: 4082
+  sedum: 3671
+  maple: 1524
+  ginkgo: 852
+  pine: 835
+  fan_palm: 735
+  linden: 663
+  birch: 657
+  plane: 600
+  oak: 414
+  elm: 391
+  ficus: 236
+  date_palm: 16
+signs: billboard.facade 279, billboard.roof 1337, holo_ad.roof 70, neon.facade 665, shop_sign.channel 398, shop_sign.lightbox 4980, shop_sign.neon 7946, shop_sign.panel 1574
+scripts: cyrillic 167, hangul 1708, hanzi 6366, kana 2201, latin 6807
+files: 36 families made, 106 tiles made, 0 kept, 190 written, 0 removed
+seconds: gather 49.09, families 5.95, tiles 39.65, write 1.1, total 96.47, workers 3

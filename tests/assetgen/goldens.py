@@ -77,10 +77,11 @@ AG6_FILES = ("materials.json", "signs.json", "unreal_contribution.materials.json
 
 def ag1_section() -> dict:
     base = small_assets()
-    a = base / "assets"                    # the building packs (the streets: AG7's goldens)
+    a = base / "assets"                    # the building packs (streets, props: their own)
     tree = {str(p.relative_to(a)): C.sha256_bytes(p.read_bytes())
             for p in sorted(a.rglob("*")) if p.is_file() and
-            ((p.suffix == ".glb" and p.parent.name in ("tiles", "proxies")) or
+            ((p.suffix == ".glb" and p.parent.parent == a and
+              p.parent.name in ("tiles", "proxies")) or
              (p.parent == a and p.name in BD.DELIVERED))}
     return {"testport_manifest": C.sha256_bytes((a / "manifest.json").read_bytes()),
             "testport_files": C.digest(tree)}

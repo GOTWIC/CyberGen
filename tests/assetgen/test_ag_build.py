@@ -78,10 +78,12 @@ def test_second_build_writes_no_file():
 
 
 def _tree(d):
-    """The building packs and delivered files (the street packs are AG7's goldens)."""
+    """The building packs and delivered files (the street and props packs have goldens of
+    their own)."""
     return {str(p.relative_to(d)): C.sha256_bytes(p.read_bytes())
             for p in sorted(d.rglob("*")) if p.is_file() and
-            ((p.suffix == ".glb" and p.parent.name in ("tiles", "proxies")) or
+            ((p.suffix == ".glb" and p.parent.parent == d and
+              p.parent.name in ("tiles", "proxies")) or
              (p.parent == d and p.name in BD.DELIVERED))}
 
 
