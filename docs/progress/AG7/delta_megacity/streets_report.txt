@@ -1,0 +1,62 @@
+assetgen streets: Delta Megacity: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 1503 blockout objects replaced
+  [ok] street_budgets: 1185401 triangles in the city (budget 20000000), at most 28929 in a tile (t-06+04, budget 2500000)
+
+coverage:
+  road_segments: 2748 of 2751 (+3 declared)
+  junctions: 1580 of 1580
+  crosswalks: 1261 of 1261
+  sidewalks: 3613 of 3613
+  bridges: 32 of 32
+  structures: 520 of 520
+  tunnels: 3 of 3
+  quays: 13 of 13
+  waterways: 7 of 7
+  site_elements: 709 of 709
+  transit_lines: 5 of 5
+  megasites: 3 of 3
+  stations: 21 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 10489, tiles 137, triangles 1185401, disk 76.1 MB
+triangles by kind:
+  street.sidewalk: 427009 (3613 pieces)
+  street.road: 245911 (2751 pieces)
+  street.junction: 172102 (1580 pieces)
+  street.transit.tube: 85746 (20 pieces)
+  street.transit.tube.glass: 76944 (0 pieces)
+  street.quay: 54225 (13 pieces)
+  street.crosswalk: 41494 (1261 pieces)
+  street.transit.deck: 23718 (40 pieces)
+  street.tunnel.metro: 15960 (2 pieces)
+  street.bridge: 13657 (32 pieces)
+  street.site.rail_track: 10788 (2 pieces)
+  street.column: 3614 (231 pieces)
+  street.structure.canopy: 2516 (3 pieces)
+  street.site.berth: 2442 (2 pieces)
+  street.transit.pylon: 1868 (106 pieces)
+  street.canal_wall.canal: 1564 (5 pieces)
+  street.site.container_stack: 1328 (664 pieces)
+  street.transit.canopy: 1248 (24 pieces)
+  street.site.gantry_crane: 1236 (6 pieces)
+  street.transit.column: 940 (94 pieces)
+  street.canal_wall.basin: 244 (2 pieces)
+  street.underpass_stair: 232 (2 pieces)
+  street.site.lawn: 193 (13 pieces)
+  street.site.pond: 94 (1 pieces)
+  street.site.truck_gate: 84 (1 pieces)
+  street.tunnel.pedestrian: 64 (1 pieces)
+  street.site.fountain: 58 (1 pieces)
+  street.site.plaza: 40 (3 pieces)
+  street.site.platform: 30 (3 pieces)
+  street.site.bus_bay: 20 (10 pieces)
+  street.site.metro_entrance: 20 (2 pieces)
+  street.site.drop_off: 12 (1 pieces)
+no mesh: inside its junctions 3
+corner pads: 3955 made, 20 skipped (chain 4, no sidewalk 3, same edge 13)
+bridges: footbridge.steel 1, footbridge.stone 16, girder 15
+instances: part.container.c0 2440, part.container.c1 2464, part.container.c2 2470, part.container.c3 2494, part.container.c4 2575, part.container.c5 2581
+files: 137 tiles made, 0 kept, 32 written, 105 same bytes, 0 removed
+seconds: context 1.3, gather 0.62, make 3.57, write 0.34, total 6.9, workers 4

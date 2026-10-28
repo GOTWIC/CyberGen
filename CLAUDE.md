@@ -30,6 +30,17 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
+**Validation (every stage, every PR; Swagnik's rule, 2026-10-27).** Before pushing a PR, make
+sure the outputs look good and nothing breaks: build the cities the change touches, every check
+passes, look at their previews and renders, and the test suite passes (recorded hashes
+regenerated on this Mac where a change moves a model on purpose, saying why). Nothing more:
+no x86, Docker, Windows or other cross-platform comparisons, no stage-trace diffs, no
+`lock --verify` runs, no seed sweeps (unless the work is about robustness), no repeated
+validation runs, and the coordinating session does not validate a PR again (it reviews the
+outputs and the diff, and has the PR merge the latest main first when they overlap). Where a
+scope's "done when" asks for Mac = x86, that part waits for the deferred determinism check in
+`docs/determinism_check.md`, which runs only when Swagnik asks for it.
+
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
 "Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
 
@@ -551,6 +562,7 @@ cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
+- **Validation:** as in "Validation" above; nothing beyond it.
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
   the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
   and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
@@ -606,6 +618,40 @@ AG0 (contract and spike) is in place:
   buildings, the five samples' briefs, small spike buildings, a triangulation), Mac = x86
   (`citygen-x86`). Write them again with `.venv/bin/python tests/assetgen/goldens.py
   [--builds DIR]` after a citygen change moves a model, and say why in the PR.
+
+AG7 (street elements) is in place, in `assetgen/streets/` (tests
+`tests/assetgen/test_ag_streets.py`):
+- **`assetgen streets BUILD [--spec S] [--workers N]`** (`build.py`): every street element as
+  a piece keyed by its citygen id, gathered from the model (`ctx.py`: indexes, M13's ground,
+  the blockout objects each piece replaces, from citygen's own blockout code) into `inputs`
+  that hold everything its generator reads, hashed (`pieces.py`). Pieces: road segments
+  (`roads.py`: carriageway between the junctions' cut edges, markings from the model's
+  lanes, stop lines, arrows, patches, manholes, drains, medians, decks with parapets, joints
+  and underside lights, embankments), sidewalks, crosswalks and junctions with their
+  sidewalk corners (`walks.py`), bridges by kind, road columns, tunnels, portals, approach
+  trenches, underpass stairs, vents (`structures.py`), guideways, sky tubes (glass as a
+  non-Nanite LOD chain), transit columns and station structures, M13's retaining walls
+  (`transit.py`), quays and canal walls (`water.py`), megasite elements with containers as
+  instanced parts (`sites.py`). Meshes on integer millimeters in each piece's frame
+  (`kit.py`: grids, sweeps, exact polygons; folds dropped); lean glTF.
+- **Outputs**: `BUILD/assets/streets/<tile>.glb` (a node per piece, the blockout's tile of
+  the object it replaces), `streets/parts.glb`, `streets/manifest.json`,
+  `unreal_contribution.streets.json` (`docs/unreal_export.md`, AG7 section) and
+  `streets_report.json/.txt` (`checks.py`: coverage, meshes, replaces, budgets). A tile is
+  made again only when its pieces' hashes or the code's hash change; an unchanged city writes
+  no pack. Up to 4 workers, the same bytes for any count.
+- **Ground**: a road's surface is its M13 grade line plus its z profile; sidewalks and
+  crosswalks follow their road (on a deck too, writing the corrected walkway lines), road
+  tunnels their road's grade line, everything else the terrain at its point; 0 on a flat
+  city (Cragmouth is the hilly sample).
+- **`assetgen streets seam BASE REGEN [--district NAME]`** (`seam.py`): which pieces and
+  tiles a district regeneration changed and why (own entity, or an input entity changed).
+- **Previews**: `preview.py` (top-down, from the packs) and
+  `assetgen/blender/streets_preview.py` (the blockout's `city.blend` with the replaced
+  objects removed and the packs imported; its views or custom cameras).
+- Goldens in their own file, `tests/assetgen/data/golden_streets.json`
+  (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
+  generator change: the code hash is in every tile's hash.
 
 ## Working preferences
 
