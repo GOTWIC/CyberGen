@@ -414,13 +414,17 @@ def check_street_duplicates(m: CityModel, n: _Net):
 
 def open_shares(spec: CitySpec, m: CityModel) -> dict[str, tuple[float, float, float]]:
     """District id -> (open share, open m2, lot m2): open space (M2, plus central park and grand
-    plaza reserves) over open space plus lots."""
+    plaza reserves) over open space plus lots. M13's hillside greens (lots too steep to
+    build) count as the lots they were."""
     lot_a: dict = {}
     for lt in m.lots:
         lot_a[lt.district_id] = lot_a.get(lt.district_id, 0.0) + lt.area_m2
     open_a: dict = {}
     for o in m.open_spaces:
-        if o.district_id:
+        if o.district_id and o.attrs.get("slope"):
+            lot_a[o.district_id] = lot_a.get(o.district_id, 0.0) + G.area1(
+                G.from_model_poly(o.polygon))
+        elif o.district_id:
             open_a[o.district_id] = open_a.get(o.district_id, 0.0) + G.area1(
                 G.from_model_poly(o.polygon))
     for s in m.megasites:

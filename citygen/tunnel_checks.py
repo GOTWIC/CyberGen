@@ -60,15 +60,18 @@ def check_grades(m: CityModel) -> Check:
                                f"{TN.MAX_GRADE:.0%} (immersed tubes, cut-and-cover tunnels and "
                                f"their open approaches), metro {TN.METRO_MAX_GRADE:.0%}, "
                                "pedestrian underpasses level")
+    from . import terrain as TE
+
     for t in m.tunnels:
         g = {"metro": TN.METRO_MAX_GRADE, "pedestrian": 0.0}.get(t.kind, TN.MAX_GRADE)
         pts = [(p[0], p[1]) for p in t.line]
         cum = _cum(pts)
+        gz = TE.on_ground(m, pts) if t.kind == "metro" else [0.0] * len(pts)
         for k in range(len(pts) - 1):
             L = cum[k + 1] - cum[k]
             if L < 0.5:
                 continue
-            dz = abs(t.line[k + 1][2] - t.line[k][2])
+            dz = abs(t.line[k + 1][2] + gz[k + 1] - t.line[k][2] - gz[k])
             if (dz - 0.01) / L > g + GRADE_TOL:
                 _limit(c, f"{t.id} ({t.kind}): {dz / L:.1%} at s {cum[k]:.0f} m")
                 break
@@ -77,12 +80,12 @@ def check_grades(m: CityModel) -> Check:
             continue
         pts = [(p[0], p[1]) for p in ln.path]
         cum = _cum(pts)
+        za = [p[2] + g for p, g in zip(ln.path, TE.on_ground(m, pts))]
         for k in range(len(pts) - 1):
             L = cum[k + 1] - cum[k]
-            if L > 0.5 and (abs(ln.path[k + 1][2] - ln.path[k][2]) - 0.01) / L > \
-                    TN.METRO_MAX_GRADE + GRADE_TOL:
-                _limit(c, f"{ln.name} (metro): "
-                          f"{abs(ln.path[k + 1][2] - ln.path[k][2]) / L:.1%} at s {cum[k]:.0f} m")
+            if L > 0.5 and (abs(za[k + 1] - za[k]) - 0.01) / L > TN.METRO_MAX_GRADE + GRADE_TOL:
+                _limit(c, f"{ln.name} (metro): {abs(za[k + 1] - za[k]) / L:.1%} at "
+                          f"s {cum[k]:.0f} m")
                 break
     return c
 
@@ -298,6 +301,8 @@ def check_clashes(m: CityModel) -> Check:
 
 
 def run(spec, m: CityModel) -> list[Check]:
+    if any(t.kind == "bored" for t in m.tunnels):   # M13's bored tunnels: terrain checks
+        m = m.model_copy(update={"tunnels": [t for t in m.tunnels if t.kind != "bored"]})
     with G.canonical():
         return [check_grades(m), check_cover(m), check_portals(m), check_clashes(m)]
 

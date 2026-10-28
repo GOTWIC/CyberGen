@@ -128,6 +128,9 @@ def check_grades(m: CityModel) -> Check:
         if g is None:
             continue
         pts, zs = _track(t)
+        from . import terrain as TE
+
+        zs = [z + g for z, g in zip(zs, TE.on_ground(m, pts))]   # M13: on the ground
         worst = 0.0
         for k in range(len(pts) - 1):
             L = math.dist(pts[k], pts[k + 1])

@@ -504,6 +504,51 @@ M10 (edit, lock, regenerate) is in place:
 Sample builds (the five, the pinned and the stack demo, each with a release lock),
 regenerations, sweep: `docs/progress/M10/`.
 
+M13 (terrain) is in place, in `citygen/terrain.py` (checks in `terrain_checks.py`, preview
+`preview_terrain.py`). A spec without `terrain` builds exactly the flat city it built before
+(the new model fields are left out of the JSON: `Field(exclude_if=...)`); every z elsewhere in
+the model stays measured from the finished ground where it stands, so M7/M9/M5 clearances need
+no change, and grades are measured on ground + z:
+- **Field** (`field`, at the start of each road attempt): the natural ground on a 4 m grid
+  (`terrain.natural`, rows from the south): `hills` and `ridges` as smooth bumps, `relief_m`
+  value noise (blake2b lattice), an `inland_grade`, banks carved down to the water (10%, 12%
+  from the sea), `cliffs` (a district on a plateau; `facing` keeps the cliff to those sides,
+  the rest a `slope_m` escarpment), `flat` districts and every megasite levelled; water at its
+  level (`water_levels`: the sea 0, rivers and separation channels falling to the mouth,
+  waterways at the level of what they join). Numpy elementwise arithmetic and GEOS distances
+  only, no reductions; values on the 1 cm grid. Highways route round steep ground
+  (`roads.SLOPE_COST` on the A* raster).
+- **Grade lines** (`grade`, after M2): one graph of every road (nodes and crossings without a
+  node shared, stations every 10 m), the profile closest to the natural ground in the largest
+  deviation within each class's grade (highway 6%, avenue 8%, street 12%, alley 15%, less what
+  the road's own z profile climbs): integer min-plus Dijkstra from every vertex both ways, the
+  mean of the two. `RoadSegment.ground`, `RoadNode.ground_m`. The finished ground
+  (`terrain.ground`) puts each corridor (width plus 1.5 m) on its grade line, blends small steps
+  over 6 m, and leaves the rest as retaining walls traced on the grid (`structure`
+  `retaining_wall`, line z the wall height); primary roads 14 m under the hill for 40 m are
+  `bored` tunnels, 15 m over the ground for 20 m terrain viaducts (deck and columns). Lots whose
+  ground falls over 15 m become hillside greens (`open_space` green, `attrs.slope`).
+- **After M3**: buildings seated (`base_m` at the main entrance, buildings linked by skybridges
+  on a common floor grid, `plinth_m` at the lowest ground under the footprint); the metro graded
+  on ground + z; props and plants off steep streets, cliffs and terrain viaducts.
+- **Checks** (86 in all): `ground_grades`, `cut_fill` (20 m cut, 18 m fill), `retaining_walls`
+  (no graded step steeper than 1:1.5 without a wall), `building_seats`, `water_levels`;
+  `transit_grades` and the metro in `tunnel_grades` measure on the ground.
+- **Blockout**: the ground a 4 m heightfield per tile (part `grid`), flats draped cell by cell
+  (part `drape`), roads on their grade lines, buildings on their bases with stepped plinths,
+  water at its level, retaining walls; the cameras frame the ground.
+- **With M10**: ids from what and where (`<segment>.wall.<cell>`, `<segment>.viaduct.<cell>`,
+  `<segment>.tvcol.<cell>`, `bore.<cell>`, `<district>.os.slope.<cell>`; `ids.Renamer`
+  also renames `terrain.water_levels[].water_id`). `--district` holds every road's grade
+  line outside the district (`grade(..., held)`: held vertices fixed, the envelopes clamped
+  to the bounds they set), the splice takes `terrain` and the retaining walls from the new
+  build, and `edit._close` lets a building's gameplay rows follow it and drops old lots and
+  open spaces under changed new ground (`_ground_cover`). `junctions.one_way_loops` now reverses a street's
+  z profile with it (main bug: six m8a sweep builds now pass on an earlier try).
+Sample: `cities/cragmouth` (a cliffside port; hills, a ridge, the Crown Heights plateau with a
+cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
+`docs/progress/M13/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build

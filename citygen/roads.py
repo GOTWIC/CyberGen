@@ -54,6 +54,8 @@ REUSE = 0.25
 BRIDGE_JOIN = 8000.0       # joining or crossing an existing bridge on the water
 QUAY_COST = 1.5
 OUTSIDE_COST = 1.25        # land without a district (still allowed)
+SLOPE_FREE = 0.04          # M13: ground up to this steep costs nothing extra
+SLOPE_COST = 40.0          # M13: extra cost per unit of slope over SLOPE_FREE
 
 # Cross-sections and alignment (scope 5.1). Radii in meters.
 CLASSES = {
@@ -140,6 +142,7 @@ class RoadNet:
     variant: int = 0
     elevated: dict = field(default_factory=dict)
     tunnels: list[dict] = field(default_factory=list)
+    terrain: object = None     # M13: (natural Field, Levels, stats) when the spec has terrain
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +183,12 @@ class Grid:
         self.on_city = on_city
         self.reuse = np.zeros(n, dtype=bool)
         self.reuse_hw = np.zeros(n, dtype=bool)
+
+    def slope_cost(self, terrain) -> None:
+        """M13: steep land costs more, so roads go round hills and climb along the slope."""
+        sl = terrain.slope_many(self.xs, self.ys)
+        extra = 1.0 + SLOPE_COST * np.maximum(sl - SLOPE_FREE, 0.0)
+        self.base = np.where(self.wcls == 0, self.base * extra, self.base)
 
     def idx(self, p) -> int:
         i = min(max(int((p[0] - self.x0) // CELL_M), 0), self.nx - 1)
@@ -795,7 +804,7 @@ ROAD_VARIANTS = [(0.62, 0.0, 2.0), (0.55, 15.0, 3.0), (0.70, -10.0, 1.5), (0.50,
 
 class Ctx:
     def __init__(self, spec: CitySpec, h, polygons: dict, district_ids: dict, waterways,
-                 sites, open_polys: list, variant: int = 0):
+                 sites, open_polys: list, variant: int = 0, terrain=None):
         self.spec = spec
         self.variant = variant
         self.ring_share, self.ring_rot, self.shore = ROAD_VARIANTS[variant % len(ROAD_VARIANTS)]
@@ -855,6 +864,8 @@ class Ctx:
         quays = unary_union([q.line for q in waterways.quays]) if waterways.quays else None
         self.grid = Grid(self.canvas, waters, self.closed, quays, self.district_land,
                          self.marsh_parks)
+        if terrain is not None:
+            self.grid.slope_cost(terrain)
         self.fit = Fitter(self)
         self.roads: list[Road] = []
         self.named: list[NamedRoute] = []
@@ -3101,8 +3112,8 @@ def land_pinned_spokes(ctx: Ctx) -> None:
 # ---------------------------------------------------------------------------
 
 def build_roads(spec: CitySpec, h, polygons: dict, district_ids: dict, waterways, sites,
-                open_polys: list, variant: int = 0) -> RoadNet:
-    ctx = Ctx(spec, h, polygons, district_ids, waterways, sites, open_polys, variant)
+                open_polys: list, variant: int = 0, terrain=None) -> RoadNet:
+    ctx = Ctx(spec, h, polygons, district_ids, waterways, sites, open_polys, variant, terrain)
     find_exits(spec, ctx)
     add_pinned_roads(spec, ctx)
     build_highways(spec, ctx)

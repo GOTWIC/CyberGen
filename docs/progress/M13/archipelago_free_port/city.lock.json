@@ -1,0 +1,220 @@
+{
+  "lock_version": 1,
+  "name": "Saltreach Free Port",
+  "release": "1.0",
+  "citygen": "0.1.0",
+  "code_sha256": "a0a252eb2ed62603097edb66faf970a24f81f165130551df525fbf7ca47f7212",
+  "spec": {
+    "$schema": "../../../../citygen/schemas/city_spec.schema.json",
+    "name": "Saltreach Free Port",
+    "seed": 3301,
+    "size_km": [
+      3.4,
+      3.4
+    ],
+    "source": {
+      "prompt": "Archipelago free port: a city spread over five islands in a warm sea. The largest island holds a corporate core with twin towers and a skyport. A container port on the eastern island. A research campus on its own small island. An old town of creeks and canals on the western island. A monorail hops between the islands on long bridges, and a maglev runs to the mainland in the north.",
+      "notes": "Mainland in the north is outside the city (unassigned land, reached by the maglev and a highway exit). The fifth island had no named role; it became a residential island for the free port's workers. Warm sea read as more greenery and palms via the residential and campus presets. M1a2: Lumen Key moved from south_west to north_west. The prompt does not place the research island; with Crown Island in the middle of the sea, the west side has room for Westreef (the western island the prompt asks for) or for a southwest key, not both, so the M0 choice could not be built (the build now reports such a miss instead of silently moving the island)."
+    },
+    "water": {
+      "coast": {
+        "form": "archipelago",
+        "side": "south",
+        "name": "Saltreach Sea",
+        "sea_share": 0.8
+      },
+      "rivers": [],
+      "islands": [
+        {
+          "name": "Crown Island",
+          "position": "center_offshore",
+          "area_km2": 1.5
+        },
+        {
+          "name": "Kettle Island",
+          "position": "east_offshore",
+          "area_km2": 1.0
+        },
+        {
+          "name": "Westreef",
+          "position": "west_offshore",
+          "area_km2": 0.9
+        },
+        {
+          "name": "Lumen Key",
+          "position": "north_west_offshore",
+          "area_km2": 0.35
+        },
+        {
+          "name": "Palm Key",
+          "position": "south_east_offshore",
+          "area_km2": 0.7
+        }
+      ],
+      "district_separation": "water_required",
+      "bridges": {
+        "density": 0.3,
+        "transit_crossing": "shared_deck",
+        "named": [
+          {
+            "name": "Crown Causeway",
+            "kind": "road_rail",
+            "connects": [
+              "Crown Island",
+              "north_exit"
+            ],
+            "crosses": "sea"
+          },
+          {
+            "name": "Kettle Span",
+            "kind": "road_rail",
+            "connects": [
+              "Crown Island",
+              "Kettle Island"
+            ],
+            "crosses": "sea"
+          },
+          {
+            "name": "Reef Bridge",
+            "kind": "road_rail",
+            "connects": [
+              "Crown Island",
+              "Westreef"
+            ],
+            "crosses": "sea"
+          },
+          {
+            "name": "Lumen Footbridge",
+            "kind": "pedestrian",
+            "connects": [
+              "Crown Island",
+              "Lumen Key"
+            ],
+            "crosses": "sea"
+          }
+        ]
+      }
+    },
+    "highways": {
+      "pattern": "spine",
+      "exits": [
+        "north"
+      ],
+      "elevated_share": 0.5
+    },
+    "transit": {
+      "hubs": [
+        "Crown Exchange"
+      ],
+      "lines": [
+        {
+          "mode": "monorail",
+          "name": "Island Hopper",
+          "route": [
+            "Westreef",
+            "Lumen Key",
+            "Crown Exchange",
+            "Kettle Island",
+            "Palm Key"
+          ]
+        },
+        {
+          "mode": "maglev",
+          "name": "Mainland Express",
+          "route": [
+            "Crown Exchange",
+            "north_exit"
+          ]
+        }
+      ]
+    },
+    "districts": [
+      {
+        "name": "Crown Island",
+        "archetype": "corporate_core",
+        "area_share": 0.34,
+        "placement": {
+          "on_island": "Crown Island"
+        },
+        "complexes": [
+          "twin_towers"
+        ],
+        "megasites": [
+          "skyport",
+          {
+            "kind": "transit_nexus",
+            "name": "Crown Exchange",
+            "area_km2": 0.05
+          }
+        ],
+        "places": [
+          {
+            "name": "Freeport Plaza",
+            "kind": "plaza"
+          }
+        ]
+      },
+      {
+        "name": "Kettle Island",
+        "archetype": "industrial_port",
+        "area_share": 0.22,
+        "placement": {
+          "on_island": "Kettle Island"
+        },
+        "megasites": [
+          {
+            "kind": "freight_terminal",
+            "name": "Kettle Container Terminal",
+            "area_km2": 0.35
+          }
+        ]
+      },
+      {
+        "name": "Westreef",
+        "archetype": "old_town",
+        "area_share": 0.2,
+        "placement": {
+          "on_island": "Westreef"
+        },
+        "waterways": {
+          "style": [
+            "creeks",
+            "organic_canals"
+          ],
+          "density": 0.7
+        }
+      },
+      {
+        "name": "Lumen Key",
+        "archetype": "research_campus",
+        "area_share": 0.08,
+        "placement": {
+          "on_island": "Lumen Key"
+        }
+      },
+      {
+        "name": "Palm Key",
+        "archetype": "residential_heights",
+        "area_share": 0.16,
+        "placement": {
+          "on_island": "Palm Key"
+        },
+        "places": [
+          {
+            "name": "Palm Beach",
+            "kind": "beach",
+            "position": "south"
+          }
+        ]
+      }
+    ]
+  },
+  "choices": {
+    "hydro_variant": 0,
+    "road_variant": 0,
+    "layout_salt": 0
+  },
+  "overrides": null,
+  "edits": [],
+  "model_sha256": "edf4e11cc92ee86892ec615fb7c1028ddbc1208e69a9f4489c7b5910ec549b18"
+}
