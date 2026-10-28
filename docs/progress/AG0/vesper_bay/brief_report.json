@@ -1,0 +1,62 @@
+{
+ "buildings": 5793,
+ "edges": {
+  "front": 28255,
+  "street": 20043,
+  "alley": 10854,
+  "canal": 440,
+  "plaza": 584,
+  "park": 724,
+  "courtyard": 246,
+  "atrium": 52,
+  "party": 17735,
+  "blind": 1085,
+  "open": 5746,
+  "upper": 1477,
+  "hidden": 3502
+ },
+ "facade_area_m2": {
+  "front": 3580691,
+  "street": 2488513,
+  "alley": 728622,
+  "canal": 164223,
+  "plaza": 162663,
+  "park": 238847,
+  "courtyard": 24343,
+  "atrium": 21840,
+  "party": 2729276,
+  "blind": 111611,
+  "open": 2896892,
+  "upper": 493225,
+  "hidden": 822126
+ },
+ "props_on_wall": {
+  "ac_unit": 6049,
+  "awning": 10210,
+  "overhead_cable": 3642,
+  "sign": 12630,
+  "wall_light": 701
+ },
+ "props_off_wall": {
+  "ac_unit": 1419,
+  "awning": 484,
+  "overhead_cable": 88,
+  "sign": 573,
+  "wall_light": 17
+ },
+ "props_unmounted": {
+  "ac_unit": 0,
+  "awning": 0,
+  "overhead_cable": 0,
+  "sign": 0,
+  "wall_light": 0
+ },
+ "seconds": {
+  "cover": 2.61,
+  "facing": 1.51,
+  "props": 1.67,
+  "briefs": 9.12,
+  "load": 2.76
+ },
+ "rays": 70532
+}

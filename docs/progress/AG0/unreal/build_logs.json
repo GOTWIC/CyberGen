@@ -1,0 +1,253 @@
+{
+ "import_run_3": {
+  "distance_fields": [],
+  "meshes": {
+   "/Game/AssetgenSpike/Lean/tower/spike_tower_bld_shell": {
+    "build_s": 16.82,
+    "nanite_disk_bytes": 42958728,
+    "nanite_gpu_bytes": 47246736,
+    "nanite_input": {
+     "clusters": 15918,
+     "triangles": 2002459,
+     "vertices": 3662361
+    }
+   }
+  }
+ },
+ "import_runs_1_2": {
+  "distance_fields": [
+   {
+    "build_s": 10.1,
+    "mb": 3.1,
+    "mesh": "spike_tower_bld_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   },
+   {
+    "build_s": 14.8,
+    "mb": 3.1,
+    "mesh": "spike_tower_bld_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   },
+   {
+    "build_s": 1.8,
+    "mb": 0.4,
+    "mesh": "spike_shopfront_row_bld_part_roof_water_tank",
+    "resolution": [
+     63,
+     63,
+     70
+    ]
+   },
+   {
+    "build_s": 2.1,
+    "mb": 0.4,
+    "mesh": "spike_shopfront_row_bld_part_roof_water_tank",
+    "resolution": [
+     63,
+     63,
+     70
+    ]
+   },
+   {
+    "build_s": 5.3,
+    "mb": 1.7,
+    "mesh": "spike_shopfront_row_bld_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   },
+   {
+    "build_s": 6.5,
+    "mb": 2.9,
+    "mesh": "spike_shanty_stack_bld_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   },
+   {
+    "build_s": 4.2,
+    "mb": 1.6,
+    "mesh": "spike_tree_plt_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   },
+   {
+    "build_s": 4.6,
+    "mb": 1.6,
+    "mesh": "spike_tree_plt_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   },
+   {
+    "build_s": 1.0,
+    "mb": 0.1,
+    "mesh": "spike_shopfront_row_bld_part_shop_awning",
+    "resolution": [
+     126,
+     28,
+     14
+    ]
+   },
+   {
+    "build_s": 2.0,
+    "mb": 0.4,
+    "mesh": "spike_shopfront_row_bld_part_roof_water_tank",
+    "resolution": [
+     63,
+     63,
+     70
+    ]
+   },
+   {
+    "build_s": 4.5,
+    "mb": 1.7,
+    "mesh": "spike_shopfront_row_bld_shell",
+    "resolution": [
+     126,
+     126,
+     126
+    ]
+   }
+  ],
+  "meshes": {
+   "/Game/AssetgenSpike/DF/foliage_test/spike_tree_plt_shell": {
+    "build_s": 1.3,
+    "nanite_disk_bytes": 338242,
+    "nanite_gpu_bytes": 491196,
+    "nanite_input": {
+     "clusters": 104,
+     "triangles": 13148,
+     "vertices": 32446
+    }
+   },
+   "/Game/AssetgenSpike/DF/shanty_stack/spike_shanty_stack_bld_shell": {
+    "build_s": 1.65,
+    "nanite_disk_bytes": 995720,
+    "nanite_gpu_bytes": 924752,
+    "nanite_input": {
+     "clusters": 176,
+     "triangles": 22090,
+     "vertices": 52144
+    }
+   },
+   "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_shell": {
+    "build_s": 0.74,
+    "nanite_disk_bytes": 72058,
+    "nanite_gpu_bytes": 89844,
+    "nanite_input": {
+     "clusters": 23,
+     "triangles": 2662,
+     "vertices": 4186
+    }
+   },
+   "/Game/AssetgenSpike/DF/tower/spike_tower_bld_shell": {
+    "build_s": 40.95,
+    "nanite_disk_bytes": 66445110,
+    "nanite_gpu_bytes": 71591988,
+    "nanite_input": {
+     "clusters": 15907,
+     "triangles": 2000065,
+     "vertices": 3810338
+    }
+   },
+   "/Game/AssetgenSpike/Plain/foliage_test/spike_tree_plt_shell": {
+    "build_s": 0.22,
+    "nanite_disk_bytes": 338490,
+    "nanite_gpu_bytes": 491060,
+    "nanite_input": {
+     "clusters": 105,
+     "triangles": 13148,
+     "vertices": 32444
+    }
+   },
+   "/Game/AssetgenSpike/Plain/shanty_stack/spike_shanty_stack_bld_shell": {
+    "build_s": 2.72,
+    "nanite_disk_bytes": 991771,
+    "nanite_gpu_bytes": 923076,
+    "nanite_input": {
+     "clusters": 176,
+     "triangles": 22114,
+     "vertices": 52256
+    }
+   },
+   "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_shell": {
+    "build_s": 0.21,
+    "nanite_disk_bytes": 72058,
+    "nanite_gpu_bytes": 89844,
+    "nanite_input": {
+     "clusters": 23,
+     "triangles": 2662,
+     "vertices": 4186
+    }
+   },
+   "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_shell": {
+    "build_s": 61.55,
+    "nanite_disk_bytes": 66341609,
+    "nanite_gpu_bytes": 71742536,
+    "nanite_input": {
+     "clusters": 15899,
+     "triangles": 2000324,
+     "vertices": 3810650
+    }
+   },
+   "/Game/AssetgenSpike/Quant/shanty_stack/spike_shanty_stack_bld_shell_q": {
+    "build_s": 1.08,
+    "nanite_disk_bytes": 983890,
+    "nanite_gpu_bytes": 916716,
+    "nanite_input": {
+     "clusters": 174,
+     "triangles": 21818,
+     "vertices": 51740
+    }
+   },
+   "/Game/AssetgenSpike/Quant/shopfront_row/spike_shopfront_row_bld_shell_q": {
+    "build_s": 0.37,
+    "nanite_disk_bytes": 72058,
+    "nanite_gpu_bytes": 89844,
+    "nanite_input": {
+     "clusters": 23,
+     "triangles": 2662,
+     "vertices": 4186
+    }
+   },
+   "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_shell_q": {
+    "build_s": 73.69,
+    "nanite_disk_bytes": 66415217,
+    "nanite_gpu_bytes": 71794276,
+    "nanite_input": {
+     "clusters": 15899,
+     "triangles": 2000878,
+     "vertices": 3812633
+    }
+   },
+   "/Game/AssetgenSpike/SceneTest/shopfront_row_gpuinst/StaticMeshes/spike_shopfront_row_bld_shell": {
+    "build_s": 1.46,
+    "nanite_disk_bytes": 72058,
+    "nanite_gpu_bytes": 89844,
+    "nanite_input": {
+     "clusters": 23,
+     "triangles": 2662,
+     "vertices": 4186
+    }
+   }
+  }
+ }
+}

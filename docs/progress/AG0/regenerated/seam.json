@@ -1,0 +1,90 @@
+{
+ "vesper_bay__neon_strand": {
+  "district": "d05",
+  "added": 1835,
+  "removed": 1802,
+  "changed": 27,
+  "same": 3964,
+  "own": 3649,
+  "seam": 15,
+  "unexplained": [],
+  "seam_farthest_m": 165.7
+ },
+ "vesper_bay__old_town": {
+  "district": "d04",
+  "added": 2846,
+  "removed": 2899,
+  "changed": 22,
+  "same": 2872,
+  "own": 5767,
+  "seam": 0,
+  "unexplained": [],
+  "seam_farthest_m": 0.0
+ },
+ "archipelago_free_port__westreef": {
+  "district": "d03",
+  "added": 2305,
+  "removed": 2278,
+  "changed": 14,
+  "same": 843,
+  "own": 4597,
+  "seam": 0,
+  "unexplained": [],
+  "seam_farthest_m": 0.0
+ },
+ "delta_megacity__midtown": {
+  "district": "d02",
+  "added": 865,
+  "removed": 856,
+  "changed": 5,
+  "same": 4556,
+  "own": 1726,
+  "seam": 0,
+  "unexplained": [],
+  "seam_farthest_m": 0.0
+ },
+ "nexus_city__neon_market": {
+  "district": "d04",
+  "added": 1444,
+  "removed": 1508,
+  "changed": 8,
+  "same": 5003,
+  "own": 2960,
+  "seam": 0,
+  "unexplained": [],
+  "seam_farthest_m": 0.0
+ },
+ "peninsula_city__lantern_strip": {
+  "district": "d04",
+  "added": 1377,
+  "removed": 1390,
+  "changed": 7,
+  "same": 1063,
+  "own": 2774,
+  "seam": 0,
+  "unexplained": [],
+  "seam_farthest_m": 0.0
+ },
+ "vesper_bay_pinned__old_town": {
+  "district": "d04",
+  "added": 3257,
+  "removed": 3304,
+  "changed": 21,
+  "same": 3333,
+  "own": 6575,
+  "seam": 7,
+  "unexplained": [],
+  "seam_farthest_m": 184.6
+ },
+ "vesper_bay_stacks__the_stacks": {
+  "district": "d02",
+  "added": 113,
+  "removed": 121,
+  "changed": 34,
+  "same": 6531,
+  "own": 236,
+  "seam": 32,
+  "unexplained": [],
+  "seam_farthest_m": 45.6
+ }
+}

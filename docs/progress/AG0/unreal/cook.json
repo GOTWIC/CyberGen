@@ -1,0 +1,66 @@
+{
+ "exit_code": 0,
+ "sizes": {
+  "/Game/AssetgenSpike/Assembly/SM_tower_assembly": {
+   "SM_tower_assembly.uasset": 1858,
+   "SM_tower_assembly.ubulk": 4,
+   "SM_tower_assembly.uexp": 125179915
+  },
+  "/Game/AssetgenSpike/DF/foliage_test/spike_tree_plt_shell": {
+   "spike_tree_plt_shell.uasset": 1814,
+   "spike_tree_plt_shell.ubulk": 1944498,
+   "spike_tree_plt_shell.uexp": 875237
+  },
+  "/Game/AssetgenSpike/DF/shanty_stack/spike_shanty_stack_bld_shell": {
+   "spike_shanty_stack_bld_shell.uasset": 1914,
+   "spike_shanty_stack_bld_shell.ubulk": 3902872,
+   "spike_shanty_stack_bld_shell.uexp": 903462
+  },
+  "/Game/AssetgenSpike/DF/shopfront_row/spike_shopfront_row_bld_shell": {
+   "spike_shopfront_row_bld_shell.uasset": 1923,
+   "spike_shopfront_row_bld_shell.ubulk": 1775186,
+   "spike_shopfront_row_bld_shell.uexp": 147244
+  },
+  "/Game/AssetgenSpike/DF/tower/spike_tower_bld_shell": {
+   "spike_tower_bld_shell.uasset": 1870,
+   "spike_tower_bld_shell.ubulk": 69596582,
+   "spike_tower_bld_shell.uexp": 2617398
+  },
+  "/Game/AssetgenSpike/Lean/tower/spike_tower_bld_shell": {
+   "spike_tower_bld_shell.uasset": 1874,
+   "spike_tower_bld_shell.ubulk": 42927188,
+   "spike_tower_bld_shell.uexp": 2202567
+  },
+  "/Game/AssetgenSpike/Plain/foliage_test/spike_tree_plt_shell": {
+   "spike_tree_plt_shell.uasset": 1968,
+   "spike_tree_plt_shell.ubulk": 314222,
+   "spike_tree_plt_shell.uexp": 428240
+  },
+  "/Game/AssetgenSpike/Plain/shanty_stack/spike_shanty_stack_bld_shell": {
+   "spike_shanty_stack_bld_shell.uasset": 2820,
+   "spike_shanty_stack_bld_shell.ubulk": 961379,
+   "spike_shanty_stack_bld_shell.uexp": 518009
+  },
+  "/Game/AssetgenSpike/Plain/shopfront_row/spike_shopfront_row_bld_shell": {
+   "spike_shopfront_row_bld_shell.uasset": 2837,
+   "spike_shopfront_row_bld_shell.ubulk": 51662,
+   "spike_shopfront_row_bld_shell.uexp": 54297
+  },
+  "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_part_window_frame": {
+   "spike_tower_bld_part_window_frame.uasset": 1833,
+   "spike_tower_bld_part_window_frame.ubulk": 4,
+   "spike_tower_bld_part_window_frame.uexp": 10880
+  },
+  "/Game/AssetgenSpike/Plain/tower/spike_tower_bld_shell": {
+   "spike_tower_bld_shell.uasset": 1876,
+   "spike_tower_bld_shell.ubulk": 66304457,
+   "spike_tower_bld_shell.uexp": 1578170
+  },
+  "/Game/AssetgenSpike/Quant/tower/spike_tower_bld_shell_q": {
+   "spike_tower_bld_shell_q.uasset": 1882,
+   "spike_tower_bld_shell_q.ubulk": 66378169,
+   "spike_tower_bld_shell_q.uexp": 3908047
+  }
+ },
+ "wall_s": 15.1
+}
