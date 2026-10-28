@@ -408,9 +408,8 @@ with their props (25,837 and 46,354 actors, 785 and 1,818 s; again, nothing chan
 checked. The HISM counts per kind and species equal the report, no M15 prototype is left, every instance stands at its model
 position, plants are Nanite with `Voxelize` and read full from 600 m, holo-ads are
 translucent three-LOD chains, neon and lit faces emissive (a night shot). Two fixes: plants'
-instanced actors had collision (now `NoCollision`); the check's traces down are tried again
-while a freshly streamed cell's collision comes in, and its streaming step no longer reads
-actors that have streamed out. Results:
+instanced actors had collision (now `NoCollision`), and the check's traces down are tried
+again while a freshly streamed cell's collision comes in. Results:
 `docs/progress/AG8/unreal/`.
 
 **Open.** Textures are AG6's: bark, leaves (alpha cards would let leaf clumps be cards),

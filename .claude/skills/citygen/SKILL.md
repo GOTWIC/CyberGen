@@ -566,9 +566,14 @@ editor: streaming, traces onto the ground, roofs and facades, a walk along a sid
 `--shots DIR` renders views (`--view NAME EX EY EZ TX TY TZ [LENS]` adds one, say a
 hillside). Running it again on the same build changes nothing; on a build
 regenerated with `--district`, only what changed. `--new-project` creates the project from
-the First Person template when the .uproject does not exist. Never import into a project the
-user did not name (their game project is theirs to choose). Report the summary lines it
-prints (actors created, updated, deleted, the check lines) and attach the shots.
+the First Person template when the .uproject does not exist. The city becomes the project's
+startup and default map (`--no-startup` leaves them), so opening the project and pressing
+Play puts the user in it: flying by default (a free camera, `--fly-speed`), or walking with
+the project's own character (`--play walk`); the far view (HLODs) is built after the
+import (`--no-hlod` skips it). Never
+import into a project the user did not name (their game project is theirs to choose).
+Report the summary lines it prints (actors created, updated, deleted, Play, the check
+lines) and attach the shots.
 
 ### 7. Report
 

@@ -67,7 +67,9 @@ Two faults of the check, both fixed:
   only then are reported as late (0 in both runs above).
 - **Actors gone after the teleport.** The streaming step counted the stage 2 actors among
   those loaded at the start after teleporting away, when Vesper Bay's start cells had
-  already streamed out (`ObjectInstance is null`); it counts them before the teleport now.
+  already streamed out (`ObjectInstance is null`); it counts them before the teleport now
+  (the play-ready exporter, merged meanwhile, made the same fix; the runs above had this
+  check's).
 
 ## Shots
 
@@ -126,8 +128,10 @@ Old Town street, AC units and the whole city.
   crowns, ivy and shrubs. `stage2` now marks such an instancer `no_collision` (in its hash, so
   an import over an earlier one updates them) and the importer sets its HISM to
   `NoCollision`, as it does for actors.
-- **The check's traces down** are tried again for up to 30 s after a miss, and **its
-  streaming step** counts the start's stage 2 actors before the teleport (above).
+- **The check's traces down** are tried again for up to 30 s after a miss (above).
+- **`test_stage2_from_assetgen`** expects the exact props' keys (their actor changes class
+  from M15's instancer to a static mesh actor) as deleted and created, as `manifest_changes`
+  counts them since the play-ready exporter.
 
 ## Open
 

@@ -68,6 +68,11 @@ EDITOR_GUI = {"darwin": "Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor",
 # GeometryScripting: stage 2 building collision (convex hulls of the mass pieces)
 PLUGINS = ["PythonScriptPlugin", "EditorScriptingUtilities", "GeometryScripting"]
 UE_DIR = Path(__file__).parent / "ue"
+# what Play puts you in: the fly pawn (free camera, no collision) or the project's own game
+# mode and pawn (the First Person template's character with --new-project)
+PLAY_MODES = ("fly", "walk")
+FLY_SPEED_M_S = 50.0          # the fly pawn's top speed (a 4 km city in about 80 s)
+VIEW_M = 1500.0               # how far the level streams in around the player
 
 
 # --- names and hashes ---------------------------------------------------------------------
@@ -770,12 +775,31 @@ def actor_hashes(man: dict) -> dict[str, str]:
     return out
 
 
+def actor_kinds(man: dict) -> dict[str, str]:
+    """Every blockout and stage 2 actor's class by key: a static mesh actor (`mesh`) or an
+    instanced one (`instances`, BP_CityGenInstances)."""
+    out = {o["key"]: "mesh" for t in man["tiles"] for o in t["objects"]}
+    out.update({i["key"]: "instances" for i in man["instances"]})
+    s2 = man.get("stage2")
+    if s2:
+        for k in s2["replaced"]:
+            out.pop(k, None)
+        out.update({a["key"]: "mesh" for a in s2["actors"]})
+        out.update({i["key"]: "instances" for i in s2["instances"]})
+    return out
+
+
 def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
-    """The actors an import of `new` over an import of `old` creates, updates and deletes."""
+    """The actors an import of `new` over an import of `old` creates, updates and deletes.
+    A key whose actor changes class (AG8's exact props over M15's instanced ones) is
+    deleted and created again, as the importer does."""
     a, b = actor_hashes(old), actor_hashes(new)
-    return {"created": sorted(b.keys() - a.keys()),
-            "updated": sorted(k for k in a.keys() & b.keys() if a[k] != b[k]),
-            "deleted": sorted(a.keys() - b.keys())}
+    ka, kb = actor_kinds(old), actor_kinds(new)
+    moved = {k for k in a.keys() & b.keys() if ka.get(k) != kb.get(k)}
+    return {"created": sorted((b.keys() - a.keys()) | moved),
+            "updated": sorted(k for k in a.keys() & b.keys()
+                              if a[k] != b[k] and k not in moved),
+            "deleted": sorted((a.keys() - b.keys()) | moved)}
 
 
 def write_manifest(build_dir: str | Path, name: str | None = None,
@@ -842,6 +866,44 @@ def prepare_project(uproject: str | Path) -> list[str]:
     if added:
         p.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
     return added
+
+
+MAPS_SECTION = "[/Script/EngineSettings.GameMapsSettings]"
+
+
+def set_startup_map(uproject: str | Path, level: str) -> bool:
+    """Make `level` (/Game/CityGen/<City>/Maps/<City>) the map the editor opens and the game
+    starts in: EditorStartupMap and GameDefaultMap in the project's Config/DefaultEngine.ini,
+    the rest of the file as it was (its encoding and line endings too). True when it changed."""
+    ini = Path(uproject).parent / "Config" / "DefaultEngine.ini"
+    ref = f"{level}.{level.rsplit('/', 1)[-1]}"
+    raw = ini.read_bytes() if ini.is_file() else b""
+    bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
+    text = raw.decode("utf-8-sig")
+    nl = "\r\n" if "\r\n" in text else "\n"
+    lines = text.splitlines()
+    want = [("EditorStartupMap", ref), ("GameDefaultMap", ref)]
+    start = next((i for i, ln in enumerate(lines) if ln.strip() == MAPS_SECTION), None)
+    if start is None:
+        lines += ([""] if lines and lines[-1].strip() else []) + [MAPS_SECTION] + \
+            [f"{k}={v}" for k, v in want]
+    else:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")),
+                   len(lines))
+        for k, v in want:
+            at = next((i for i in range(start + 1, end)
+                       if lines[i].split("=", 1)[0].strip() == k), None)
+            if at is None:
+                lines.insert(start + 1, f"{k}={v}")
+                end += 1
+            else:
+                lines[at] = f"{k}={v}"
+    new = bom + (nl.join(lines) + nl).encode("utf-8")
+    if new == raw:
+        return False
+    ini.parent.mkdir(parents=True, exist_ok=True)
+    ini.write_bytes(new)
+    return True
 
 
 def new_project(dest: str | Path, root: Path | None = None,
@@ -920,11 +982,17 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
 
 def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
                 name: str | None = None, timeout: float = 7200.0,
-                assets: bool = True) -> dict:
+                assets: bool = True, play: str = "fly", fly_speed: float = FLY_SPEED_M_S,
+                startup: bool = True, view_m: float = VIEW_M) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
-    stay for the next import with it)."""
+    stay for the next import with it). `play` is what Play puts you in: "fly" (the fly
+    pawn at `fly_speed` m/s) or "walk" (the project's own game mode and pawn); `view_m` how
+    far the level streams around the player; `startup` makes the city the project's
+    startup and default map."""
+    if play not in PLAY_MODES:
+        raise ValueError(f"play: {play!r} is not one of {', '.join(PLAY_MODES)}")
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
     root = find_engine(engine)
@@ -936,11 +1004,16 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     added = prepare_project(up)
     out = man_path.parent
     job = {"mode": "import", "manifest": str(man_path), "build_dir": str(build),
-           "result": str(out / "import_result.json")}
+           "result": str(out / "import_result.json"), "play": play,
+           "fly_speed_m_s": float(fly_speed), "view_m": float(view_m)}
     res = run_editor(root, up, UE_DIR / "import_city.py", job, out / "import_log.txt",
                      timeout=timeout)
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
+    if res.get("ok") and startup:
+        res["startup_map_changed"] = set_startup_map(up, res["level"])
+        res["startup_map"] = res["level"]
+        Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
     return res
 
 
@@ -966,6 +1039,57 @@ def check_city(build_dir: str | Path, uproject: str | Path, engine: str | None =
            "views": views or []}
     return run_editor(root, up, UE_DIR / "check_city.py", job, out / "check_log.txt",
                       timeout=timeout, gui=True, extra=["-RenderOffscreen"])
+
+
+def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
+                timeout: float = 7200.0) -> dict:
+    """`citygen unreal --hlod`: World Partition's HLOD builder on the imported level (a
+    commandlet that renders, so not -nullrhi): the instanced and merged HLOD actors of the
+    level's default HLOD layers, set up and built in the HLOD partitions `streaming` sized;
+    a second run rebuilds only those whose actors changed."""
+    build = Path(build_dir).resolve()
+    up = Path(uproject).resolve()
+    root = find_engine(engine)
+    if root is None:
+        raise RuntimeError("no Unreal Engine found (pass --engine or set CITYGEN_UE_ROOT)")
+    out = build / OUT_DIR
+    man = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    level = f"{man['content_root']}/Maps/{man['folder']}"
+    log = out / "hlod_log.txt"
+    cmd = [str(editor_binary(root)), str(up), "-run=WorldPartitionBuilderCommandlet", level,
+           "-Builder=WorldPartitionHLODsBuilder", "-AllowCommandletRendering", "-unattended",
+           "-nosplash", "-stdout", "-FullStdOutLogOutput"]
+    t = time.time()
+    with open(log, "w", encoding="utf-8", errors="replace") as f:
+        proc = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
+    text = log.read_text(encoding="utf-8", errors="replace")
+    have = re.findall(r"World contains (\d+) HLOD actors", text)
+    res = {"ok": proc.returncode == 0, "exit_code": proc.returncode, "level": level,
+           "hlod_actors": int(have[-1]) if have else None,
+           # the builder looks at every HLOD actor and rebuilds those whose input changed
+           "rebuilt": text.count("final decision: ApproveRebuild"),
+           "wall_s": round(time.time() - t, 1), "log": str(log)}
+    (out / "hlod_result.json").write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+    return res
+
+
+def hlod_summary(res: dict) -> str:
+    if not res.get("ok"):
+        return f"FAIL: HLOD build ({res.get('wall_s')} s); log {res.get('log')}"
+    return (f"PASS: HLODs of {res['level']}: {res['hlod_actors']} HLOD actors, "
+            f"{res['rebuilt']} built (the rest unchanged); {res['wall_s']} s")
+
+
+def play_summary(res: dict) -> str:
+    """What Play puts you in and where, after an import."""
+    p, s = res.get("play") or {}, res.get("streaming") or {}
+    line = ("Play: flying (the fly pawn, {:g} m/s)".format(p.get("fly_speed_m_s", 0.0))
+            if p.get("mode") == "fly" else "Play: walking (the project's own game mode and pawn)")
+    if s.get("set"):
+        line += f"; the level streams in {s['loading_ranges_m'][0]:g} m around the player"
+    if res.get("startup_map"):
+        line += f"; startup and default map {res['startup_map']}"
+    return line
 
 
 def import_summary(res: dict) -> str:
