@@ -16,7 +16,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
 | AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
 | AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Planned | |
-| AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Planned | |
+| AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
 | AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Planned | |
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
 | AG10 | Layered districts: buildings and streets on M14's decks | Planned (after M14) | |
@@ -71,6 +71,134 @@ the exporter work AG0 could not do (M15 not on main) is listed in `unreal_export
 citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their height
 (Vesper Bay: 1,419 AC units, 573 signs, 484 awnings off a wall).
 
+## AG7: street elements
+
+**Built.** Package `assetgen/streets/` (CLI `assetgen streets BUILD [--spec S] [--workers N]
+[--force]`, the short form of `assetgen streets make`; `assetgen streets seam BASE REGEN
+--district NAME`):
+- **Pieces** (`pieces.py`, `build.py`): one per citygen id (road segment, sidewalk, crosswalk,
+  junction, bridge, column, tunnel, open approach, portal, vent, quay, waterway, transit
+  structure, station structure, megasite element group, M13 retaining wall), gathered into the
+  canonical inputs its maker reads (the entity, the neighbors it meets, its district's style,
+  the ground under it); its hash is digest(maker, version, inputs). A tile's hash is that of
+  its pieces' hashes, `STREETS_VERSION` and a hash of the street code itself, so a code change
+  remakes every tile and an unchanged tile is neither made nor written. Up to 4 worker
+  processes (`ASSETGEN_WORKERS`), tiles assembled in sorted order.
+- **Mesh kit** (`kit.py`): integer millimeters in each piece's frame (origin the middle of its
+  box on the 0.01 m grid, z 0), grids along a road (`grid`), polygons (`poly`, `poly_map`,
+  triangulated by AG0's exact triangulator), swept cross-sections (`sweep`, the profile
+  clockwise for outward faces), walls, boxes, oriented boxes, beams and cylinders; every
+  triangle with an expected facing drops when it folds over (a sharp bend's inner edge) and
+  when it is degenerate; normals summed from exact integer cross products; `check` per slot
+  (degenerate, duplicate, winding: no directed edge used twice and explicit normals that agree
+  with their face, indices, UV and normal ranges). Lean glTF (POSITION, NORMAL, UV0 in meters
+  along the road, no UV1 or COLOR_0).
+- **Roads** (`roads.py`): the carriageway between its junctions' cut edges (the first crossing
+  of the centerline with the junction polygon; the cut edge's ends map onto the carriageway's
+  corners), asphalt by class, lane lines, center lines, edge lines, stop lines 1.2 m before a
+  crosswalk (else 1.5 m from the cut) and arrows from the model's lanes; manholes, drains and patches by the district's
+  grime and wear; medians (curbed islands with lawn, highway barriers and outer guard walls);
+  decks (a box girder sweep, parapets, expansion joints every 45 m, underside lights over 4 m)
+  and embankments, chosen as the blockout chooses them (`deck_kind`).
+- **Sidewalks, crosswalks, junctions** (`walks.py`): the slab in the district's paving family
+  (`materials.PAVING`), granite or concrete curbs by era, the curb face, a back face to the
+  lot (to the deck on a raised road), dropped curbs at crosswalks and at garage, loading and
+  gate entrances (and parking), grates under the street trees; zebra or ladder crosswalks with
+  tactile paving on the dropped curb; the junction polygon (holes under 4 m2 or touching the
+  outline dropped, the height blended from each leg's cut edge by inverse distance, a deck slab
+  under a raised junction) and the sidewalk corners between legs: the sector between two legs'
+  sidewalk edges and M2's property-line fillet (`_corner`, replicated), less the junction
+  polygon and the corners already made, by citygen's snapped overlays; walls only on edges used
+  once. Vesper Bay: 4,370 corners, 13 left out (7 with no sidewalk on a leg, 5 with two legs
+  cut by one edge, 1 whose fillet would not chain).
+- **Structures** (`structures.py`): bridges by kind (girder with wall piers every 40 m over
+  the water and abutments; named crossings an arch, or cable-stayed over a 250 m span with H
+  pylons and stay fans; footbridges stone with an arch ring in heritage districts, else steel
+  with railings; steps where their ramps are stairs; a named footbridge with no road gets a
+  deck from its line); columns with pier caps; road tunnels (tile-lined walls, roof, soffit,
+  light strips), portals (headwall, reveals, coping), open approaches (walls to a parapet over
+  the terrain), metro and pedestrian tunnels (lined boxes with track or walkway), underpass
+  stair wells, ventilation buildings.
+- **Water** (`water.py`): quays (paving, coping, wall to the water, bollards every 12 m,
+  stairs every 60 m), canal, basin, inlet and marina walls with copings; creeks keep their
+  natural banks (declared, not missing).
+- **Transit** (`transit.py`): elevated rail troughs with slab tracks and rails, monorail beams,
+  maglev T guideways; sky tubes (floor and ribs Nanite, glass a separate non-Nanite entry
+  `<id>.glass` with a LOD chain of 24, 12 and 6 sides at screen sizes 1.0, 0.25, 0.06);
+  transit columns; station platforms, skywalks, canopies, covered walkways, elevator cores and
+  concourses; M13's retaining walls.
+- **Megasites** (`sites.py`): container stacks as instances of six liveries
+  (`streets/parts.glb`, transforms in the contribution), gantry cranes, fuel tanks, launch
+  pads and lattice towers, berths, rail tracks, truck gates, aprons and flats.
+- **Exact replaces** (`ctx._blockout_keys`): citygen's own blockout functions (`_streets`,
+  `_open_space`, `_sites`, `_tunnels`, and `_terrain` on an M13 model) run read only under
+  `G.canonical()`, so each piece names the very objects M15 imports, and goes into the tile
+  of the first of them.
+- **Outputs**: `assets/streets/<tile>.glb` (a node per piece named by its id), `parts.glb`,
+  `manifest.json`, `assets/unreal_contribution.streets.json` (AG0's format: one entry per
+  piece with `replaces`, pivot, materials, Nanite, LODs, parts; `graphs.walkways` with the
+  corrected z of every walkway on a raised road), `streets_report.json` and `.txt` (checks
+  `street_coverage`, `street_meshes`, `street_replaces`, `street_budgets`, and stats);
+  `preview_streets.png` (`preview.py`, drawn from the packs); street views in Blender
+  (`assetgen/blender/streets_preview.py`: the blockout's `city.blend` with the replaced
+  objects removed and the packs imported, its street cameras or `--eye/--target`).
+
+**Ground (M13).** Written against PR #28's contract: a road on its `ground` grade line plus
+its z profile, a junction at its node's `ground_m`, road tunnels and their portals and
+approaches on their road's grade line, everything else on the finished terrain (bilinear as
+M13's `Field.at`), ground 0 where the model has none. Tested on M13's branch merged locally
+(Cragmouth: 12,729 pieces, every check passing, 1,280 retaining walls, 7 bored tunnels) and
+by a test that lifts the small city on a synthetic terrain; M13 was not on main.
+
+**Samples** (M10 code, 4 workers on the shared Mac, stage time after loading the model):
+
+| City | Pieces | Tiles | Triangles | Disk | Time |
+|---|---|---|---|---|---|
+| Vesper Bay | 10,955 | 148 | 1,187,649 | 74.8 MB | 6.2 s |
+| Saltreach Free Port | 6,383 | 105 | 670,763 | 42.3 MB | 3.7 s |
+| Delta Megacity | 10,489 | 137 | 1,185,401 | 76.1 MB | 6.9 s |
+| Nexus City | 11,126 | 155 | 1,170,152 | 74.3 MB | 5.7 s |
+| Greyhook | 4,590 | 90 | 605,711 | 37.1 MB | 3.1 s |
+| Vesper Bay Pinned | 11,161 | 156 | 1,177,214 | 75.0 MB | 6.8 s |
+| Vesper Bay Stacks | 11,540 | 157 | 1,227,541 | 77.5 MB | 7.4 s |
+| Cragmouth (M13 branch) | 12,729 | 130 | 1,226,030 | 83.6 MB | 8.5 s |
+
+All four checks pass in every city; a rebuild with nothing changed takes 2 to 3 s and writes
+no pack. Sidewalks are the largest share (Vesper Bay 441 k triangles), then roads (261 k),
+junctions (180 k) and guideways (123 k). The scope's estimate of 10 to 20 M street triangles
+per city was ten times what the packs need with markings as geometry only where they are.
+
+**Regenerations.** M10's eight district regenerations over copies of their base packs write
+17 to 34 tiles of 90 to 157; every changed piece is explained by its own entity or one it
+reads (a junction, crosswalk, tree or door) changing in either build, the farthest 20 to
+87 m outside the district, and no tile without a changed piece is written
+(`docs/progress/AG7/regenerated/seam.json`).
+
+**Determinism.** Same bytes for 1 and 3 workers and under another `PYTHONHASHSEED`; Vesper
+Bay's, Nexus City's and Vesper Bay Stacks's packs, parts and contribution byte-identical on
+the Mac and in `citygen-x86`, where the small test city's tests and golden pass too. Goldens
+in their own file, `tests/assetgen/data/golden_streets.json` (the small test city and Vesper
+Bay, its six heaviest tiles named), written by `tests/assetgen/streets_goldens.py
+[--builds DIR]`. Tests: `tests/assetgen/test_ag_streets.py` (10).
+
+**Unreal.** No exporter code changed (AG1 owns it). `unreal_export.md` gains the street
+contribution's format and what the exporter still needs: read it as a second layer-2 file and
+drop every actor a `replaces` names; the masters road, opaque, metal, emissive, translucent
+(two-sided, blended) and foliage; complex collision; non-Nanite meshes with LOD chains;
+hierarchical instances for parts; walkway z from `graphs.walkways`; the new keys in the
+re-import digests. Not run in Unreal.
+
+**Wiring.** `assetgen build` (AG1) is not on main yet: whichever of AG1 and AG7 merges second
+makes it call `assetgen.streets.build.build(model, model_sha, BUILD/assets, spec, workers)`.
+
+**Open.** Open spaces, green areas, ground and water stay the blockout's; markings and grates
+are geometry a few millimeters over the asphalt until AG6's decals; river and sea banks have
+no walls; the ramps of a named footbridge with no road are not in the model; M6's
+`prop.barrier` blocks in highway medians stand on the road pieces' continuous barrier (AG8
+should drop them where a road piece has one); the blockout's sea plane runs under the ground
+over every tile and shows through the open approaches of road tunnels (a stage 1 fix; the
+previews hide it with `--hide city.sea.`).
+
 ## Order
 
 ```
@@ -106,6 +234,8 @@ assets are not in git.
 .venv/bin/python -m assetgen brief diff A B                             # what changed (AG0)
 .venv/bin/python -m assetgen spike OUT --quantized                      # the spike buildings (AG0)
 .venv/bin/python -m assetgen build BUILD [--spec asset_spec.json]       # assets (AG1 on)
+.venv/bin/python -m assetgen streets BUILD [--spec SPEC] [--workers 4]   # street packs (AG7)
+.venv/bin/python -m assetgen streets seam BASE REGEN --district NAME    # what a regeneration changed (AG7)
 .venv/bin/python -m assetgen review BUILD --prev P                      # art-direction round (AG5)
 .venv/bin/python -m citygen unreal BUILD PROJECT                        # the city with its assets in Unreal
 .venv/bin/python -m assetgen sweep --suite m8a --out DIR                # (AG9)

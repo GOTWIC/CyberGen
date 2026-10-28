@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout | M0 to M12 done, M13 to M15 to come |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | Planning |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 and AG7 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -147,6 +147,22 @@ city prompt by a Claude Code session through the repo's `assetgen` skill; the br
 writes `out/<city>/assets/briefs.json`, everything each building's model will be made from,
 with a hash per building, so a regenerated district rebuilds only its own assets.
 
+<img src="docs/progress/AG7/vesper_bay_stacks/streets_interchange.jpg" width="840">
+
+The street elements around Vesper Bay Stacks's stack interchange (8K): ramps on four levels
+with parapets, columns and pier caps, lane markings, sidewalks, crosswalks and the sky tube
+(buildings are still the blockout's).
+
+```bash
+.venv/bin/python -m assetgen streets out/vesper_bay
+```
+
+The street stage writes `out/<city>/assets/streets/`, one glTF pack per 256 m tile with a mesh
+for every road, sidewalk, crosswalk, junction, bridge, viaduct, tunnel, quay, transit structure
+and megasite element, each named by its citygen id and replacing the blockout's street pieces
+in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
+[`docs/progress/AG7`](docs/progress/AG7).
+
 ### Milestones
 
 | | Milestone | What it adds | Status |
@@ -158,7 +174,7 @@ with a hash per building, so a regenerated district rebuilds only its own assets
 | AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
 | AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
 | AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
-| AG7 | Street elements | Roads with markings, sidewalks, bridges, viaducts, tunnels, quays, transit structures | Planned |
+| AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |
 | AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Buildings and streets on stacked decks | Planned |

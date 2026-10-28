@@ -3,7 +3,7 @@ Blender only draws):
 
     blender -b --factory-startup -P assetgen/blender/streets_preview.py -- \\
         BLOCKOUT_DIR ASSETS_DIR OUT_DIR [--width W] [--samples N] [--radius R] \\
-        [VIEW ...] [--eye X Y Z --target X Y Z --lens MM --name NAME]...
+        [--hide PREFIX]... [VIEW ...] [--eye X Y Z --target X Y Z --lens MM --name NAME]...
 
 Opens BLOCKOUT_DIR/city.blend (a `citygen blockout` output), removes every blockout object
 that the street contribution replaces (ASSETS_DIR/unreal_contribution.streets.json: its
@@ -11,6 +11,9 @@ that the street contribution replaces (ASSETS_DIR/unreal_contribution.streets.js
 within --radius of the views' targets, places the container instances from the
 contribution, and renders each VIEW (the blockout's views by name: `street_<n>`,
 `iso_<district>`, ...; and any --eye/--target camera) to OUT_DIR/streets_<name>.jpg.
+--hide also removes the blockout objects whose names start with PREFIX (`city.sea.`: the
+blockout's sea plane fills each whole tile under the ground and shows through the open
+approaches of road tunnels).
 """
 
 import json
@@ -31,7 +34,7 @@ def parse():
     argv = sys.argv[sys.argv.index("--") + 1:]
     src, assets, out = (os.path.abspath(a) for a in argv[:3])
     o = {"src": src, "assets": assets, "out": out, "width": 1920, "samples": 32,
-         "radius": 700.0, "views": [], "custom": []}
+         "radius": 700.0, "views": [], "custom": [], "hide": []}
     rest = argv[3:]
     i = 0
     cur = None
@@ -42,6 +45,9 @@ def parse():
             i += 2
         elif a == "--radius":
             o["radius"] = float(rest[i + 1])
+            i += 2
+        elif a == "--hide":
+            o["hide"].append(rest[i + 1])
             i += 2
         elif a in ("--eye", "--target"):
             if a == "--eye":
@@ -97,7 +103,7 @@ def main():
         gone.update(e.get("replaces", []))
     removed = 0
     for ob in list(bpy.data.objects):
-        if ob.name in gone:
+        if ob.name in gone or any(ob.name.startswith(h) for h in o["hide"]):
             bpy.data.objects.remove(ob, do_unlink=True)
             removed += 1
     targets = [Vector(v[4][:2]) for v in todo]
