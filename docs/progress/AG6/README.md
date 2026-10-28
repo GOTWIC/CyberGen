@@ -129,7 +129,13 @@ slots and, by night, the windows, signs and street lights lit:
 |---|---|
 | <img src="vesper_bay/street_4.jpg" width="420"> | <img src="vesper_bay/street_5.jpg" width="420"> |
 
-NIGHT_DISTRICTS
+| Corporate Core by night | Neon Strand by night |
+|---|---|
+| <img src="vesper_bay/iso_d01_night.jpg" width="420"> | <img src="vesper_bay/iso_d05_night.jpg" width="420"> |
+
+By night from above: each room lit by the building's lit ratio at its own brightness (the
+far towers are proxies with a window grid); the district views carry no sign quads, which
+the street views do.
 
 The Stacks at 8K by day and by night (the root README's pair):
 [`vesper_bay/8k/street_2.jpg`](vesper_bay/8k/street_2.jpg),
