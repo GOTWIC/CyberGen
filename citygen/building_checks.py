@@ -433,6 +433,9 @@ def check_heights(spec: CitySpec, m: CityModel, bx: _B):
         elif b.level:
             base = float(b.attrs.get("deck_top_m", 0.0))   # (on a deck: from its top)
             cap -= base
+            dsp = spec.district(d.name).decks if spec is not None else None
+            if dsp is not None and dsp.upper_height_m:
+                lo, hi = dsp.upper_height_m
         top = min(hi, cap)
         h = b.height_m - base
         # under a cap, the floor grid may leave the building up to one floor below it

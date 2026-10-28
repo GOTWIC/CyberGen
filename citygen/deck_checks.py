@@ -32,7 +32,7 @@ def _samples(poly, step: float) -> list:
 def check_columns(m: CityModel) -> Check:
     c = Check("deck_columns", f"Every deck on columns: no point of a slab farther than "
                               f"{DK.COLUMN_REACH:g} x its column grid from a column "
-                              f"({DK.JUNCTION_REACH:g} x over a ground junction, "
+                              f"({DK.JUNCTION_REACH:g} x over a ground street or junction, "
                               f"{DK.CANTILEVER_M:g} m more within that of its edge), every "
                               "column from the ground to the slab's underside, none in a "
                               "lane, a crosswalk, a junction or a sidewalk's clear path")

@@ -45,11 +45,10 @@ from . import streets as ST
 
 SLAB_M = 1.2            # slab depth
 CLEAR_M = 5.5           # clear height for traffic under the slab or over a ramp
-RAMP_GRADE = 0.10       # steepest ramp grade
-RAMP_TOP_M = 14.0       # level run at the upper node (its junction)
-RAMP_FOOT_M = 16.0      # level run before the edge junction
-RAMP_CURVE_M = 20.0     # vertical curve at each change of grade
-RAMP_STRAIGHT_M = 1.5   # a ramp's centerline within this of its chord
+RAMP_GRADE = 0.12       # steepest ramp grade (a street's, as M13 grades them)
+RAMP_TOP_M = 10.0       # level run at the upper node (its junction)
+RAMP_FOOT_M = 12.0      # level run before the edge junction
+RAMP_CURVE_M = 15.0     # vertical curve at each change of grade
 RAMP_LANE_M = 3.2
 RAMP_BARRIER_M = 0.5
 END_GAP_M = 6.0         # a spoke's twin ends this far short of the edge street's property line
@@ -304,13 +303,12 @@ def _upper(dk: Deck, net, segs: dict, pos: dict, at: dict, B) -> None:
     for sid in spokes:
         s = segs[sid]
         L = ST._plen(s["centerline"])
-        if s["road_class"] != "street" or L < need or s.get("one_way") or \
-                _straight(s["centerline"]) > RAMP_STRAIGHT_M:
+        if s["road_class"] != "street" or L < need or s.get("one_way"):
             continue
         edge = s["end"] if s["start"] in dk.nodes else s["start"]
         cars = [x for x in at[edge] if x != sid and segs[x]["road_class"] in
                 ("street", "avenue", "alley", "service") and _graded(segs[x])]
-        if len(cars) < 2:
+        if not cars:
             continue
         cand.append((round(L, 2), sid, pos[edge]))
     cand.sort(key=lambda c: (-c[0], c[1]))
@@ -526,16 +524,18 @@ def ramp_grade(L: float, H: float) -> float:
 # Finish (M2, after the blocks)
 # ---------------------------------------------------------------------------
 
-WELL_FRONT_M = 28.0     # a light well fronts an upper street this long at least (its stair)
+WELL_FRONT_M = 21.0     # a light well fronts an upper street this long at least (its stair)
 WELL_AREA_M2 = (350.0, 12000.0)
 MIN_WELLS = 2
 SAMPLE_M = 8.0          # walkway sample spacing for the light test
 STAIR_W = 2.4
 STAIR_RUN = 1.75        # stair run per meter of rise (about 30 degrees)
-STAIR_IN_M = 2.8        # stair and elevator centers behind the property line
+STAIR_IN_M = 2.2        # stair (first flight) and elevator centers behind the property line
+STAIR_GAP_M = 2.6       # between the two flights of a stair (a switchback)
 STAIR_START_M = 3.0
 ELEV_W = 3.0
 DECK_MIN_M2 = 3000.0
+UPPER_FRONT_M = 6.0     # an upper lot fronts its deck's streets this long at least
 LIGHT_KINDS = ("sidewalk", "crosswalk", "crossing", "path", "alley", "pedestrian_street",
                "promenade")
 
@@ -576,6 +576,7 @@ class Link:
     low_sw: str
     high_sw: str
     walkway_id: str = ""
+    mid: list = field(default_factory=list)   # (x, y, z) between foot and head
 
 
 def finish(pl: Plan, net, jx: dict, blk: dict) -> dict:
@@ -709,8 +710,8 @@ def _finish(dk: Deck, segs: dict, net, jx: dict, blk: dict, out: dict) -> None:
             t = dk.twin.get(f["segment_id"])
             if t is not None:
                 fr.append({**f, "segment_id": t, "road_class": segs[t]["road_class"]})
-        if not fr:
-            continue
+        if math.fsum(f["length_m"] for f in fr) < UPPER_FRONT_M:
+            continue      # (a corner of a lot touching its street: no lot up there)
         u = {**{k: v for k, v in r.items() if k not in ("attrs",)},
              "id": f"{r['id']}.l1", "polygon": poly[0], "frontage": fr,
              "frontage_ids": [f["segment_id"] for f in fr], "merged_group_id": None,
@@ -770,17 +771,21 @@ def _links(dk: Deck, w: dict, segs: dict, jx: dict) -> list:
         dk.notes.append(f"well {w['id']}: no sidewalk to join")
         return []
     out = []
-    s0, s1 = STAIR_START_M, STAIR_START_M + run
-    foot, head = at(s0, STAIR_IN_M), at(s1, STAIR_IN_M)
+    # a switchback: up along the frontage half the rise, a landing, back up the other half
+    s0, s1 = STAIR_START_M, STAIR_START_M + run / 2
+    d1, d2 = STAIR_IN_M, STAIR_IN_M + STAIR_GAP_M
+    foot, head = at(s0, d1), at(s0, d2)
     hw = STAIR_W / 2
-    fp = Polygon([at(s0, STAIR_IN_M - hw), at(s1, STAIR_IN_M - hw), at(s1, STAIR_IN_M + hw),
-                  at(s0, STAIR_IN_M + hw)])
+    fp = Polygon([at(s0, d1 - hw), at(s1 + hw, d1 - hw), at(s1 + hw, d2 + hw),
+                  at(s0, d2 + hw)])
     lo_line = [tuple(x) for x in low["line"]]
     hi_line = [tuple(x) for x in high["line"]]
+    zm = G.q(dk.top / 2)
     out.append(Link("stairs", dk.id, w["id"], foot, head,
                     ST._pt(*ST._project(lo_line, at(s0, 0.0))[2]),
-                    ST._pt(*ST._project(hi_line, at(s1, 0.0))[2]),
-                    G.qpoly(fp), low["id"], high["id"]))
+                    ST._pt(*ST._project(hi_line, at(s0, 0.0))[2]),
+                    G.qpoly(fp), low["id"], high["id"],
+                    mid=[(*at(s1, d1), zm), (*at(s1, d2), zm)]))
     se = L - STAIR_START_M - ELEV_W / 2
     e = at(se, STAIR_IN_M)
     he = ELEV_W / 2
@@ -893,7 +898,8 @@ def walk_rows(jx: dict, links: list, base: list, tops: dict, deck_of, ramps=()) 
     for i, k in enumerate(links):
         z = tops[k.deck]
         wid = f"l1.{'st' if k.kind == 'stairs' else 'el'}{i + 1:04d}"
-        line = [(k.foot[0], k.foot[1], 0.0), (k.head[0], k.head[1], z)]
+        line = [(k.foot[0], k.foot[1], 0.0)] + [tuple(p) for p in k.mid] + \
+            [(k.head[0], k.head[1], z)]
         rows.append({"id": wid, "kind": k.kind, "line": line,
                      "width_m": STAIR_W if k.kind == "stairs" else ELEV_W, "neighbors": [],
                      "level": 1, "attrs": {"levels": [0, 1], "deck": k.deck, "well": k.well}})
@@ -942,8 +948,8 @@ def rows(pl: Plan, net, dko: dict, well_os: dict) -> tuple[list, list]:
                             "type": f"structure.{'stair' if k.kind == 'stairs' else 'elevator'}",
                             "kind": "stair" if k.kind == "stairs" else "elevator",
                             "footprint": P(k.footprint),
-                            "line": [(k.foot[0], k.foot[1], 0.0),
-                                     (k.head[0], k.head[1], dk.top)],
+                            "line": [(k.foot[0], k.foot[1], 0.0)] +
+                            [tuple(p) for p in k.mid] + [(k.head[0], k.head[1], dk.top)],
                             "z0_m": 0.0, "z1_m": z1, "supports": [k.walkway_id],
                             "attrs": {"deck": dk.id, "well": well_os.get(k.well)}})
     return decks, structs
@@ -1197,9 +1203,11 @@ def per_level(m, run) -> list:
 # Supports (after transit and tunnels)
 # ---------------------------------------------------------------------------
 
-COLUMN_W = 1.0          # square columns, 1 m a side
+COLUMN_R = 0.45         # round columns (octagons), 0.9 m across
+COLUMN_STRIP_M = 1.2    # at a curb: the column strip of a sidewalk without a furniture zone
+CLEAR_PATH_M = 1.8      # (the sidewalk's clear path it leaves, M6)
 COLUMN_REACH = 0.75     # every point of a slab within this share of column_m of a column
-JUNCTION_REACH = 1.3    # (over a ground junction: the slab spans it on deep girders)
+JUNCTION_REACH = 1.3    # (over a ground street or junction: the slab spans it on girders)
 CANTILEVER_M = 6.0      # (within this of its edge a slab may reach this much farther)
 DOOR_GAP_M = 2.5        # columns keep this far from a door
 FINE = 4                # the fill-in candidates: a grid of column_m / FINE
@@ -1216,7 +1224,7 @@ def _keepout(m, P):
             continue
         g = LineString([p[:2] for p in ln.centerline])
         if g.intersects(near):
-            out.append(g.buffer(ln.width_m / 2 + 0.6, cap_style="flat"))
+            out.append(g.buffer(ln.width_m / 2 + 0.3, cap_style="flat"))
     for c in m.crosswalks:
         if not c.level and LineString(c.line).intersects(near):
             out.append(LineString(c.line).buffer(c.width_m / 2 + 0.5, cap_style="flat"))
@@ -1234,7 +1242,10 @@ def _keepout(m, P):
             continue
         band = LineString(w.line).buffer(w.width_m / 2, cap_style="flat")
         side = s.cross_section.sidewalk_m[0]
-        keep = s.width_m / 2 - side + w.curb_m + w.furniture_m
+        zone = w.furniture_m
+        if zone < COLUMN_STRIP_M and side - w.curb_m - COLUMN_STRIP_M >= CLEAR_PATH_M:
+            zone = COLUMN_STRIP_M     # (a column strip at the curb, the clear path kept)
+        keep = s.width_m / 2 - side + w.curb_m + zone
         out.append(band.difference(LineString(s.centerline).buffer(keep, cap_style="flat")))
     for w in m.walkways:
         if w.level or w.kind == "sidewalk" or any(abs(p[2]) > 0.5 for p in w.line):
@@ -1267,7 +1278,10 @@ def _keepout(m, P):
 def _grid(P, step: float, ang: float) -> list:
     """Points of a square grid (rotated by ang, from the slab's lower corner) inside P."""
     ca, sa = M.cos(ang), M.sin(ang)
-    cs = [(x * ca + y * sa, -x * sa + y * ca) for x, y in P.exterior.coords]
+    cs = [(x * ca + y * sa, -x * sa + y * ca)
+          for x, y in shapely.get_coordinates(P).tolist()]
+    if not cs:
+        return []
     u0, u1 = min(c[0] for c in cs), max(c[0] for c in cs)
     v0, v1 = min(c[1] for c in cs), max(c[1] for c in cs)
     pts = []
@@ -1297,8 +1311,8 @@ def supports(m) -> tuple[list, list]:
         reach = COLUMN_REACH * g
         bad = _keepout(m, P)
         inner = G.qpoly(P.buffer(-0.8, join_style="mitre"))
-        # (a column's center keeps half its diagonal off the keep-out)
-        ok_zone = G.diff(inner, G.qpoly(bad.buffer(COLUMN_W * 0.75, join_style="mitre")))
+        # (a column's center keeps its radius off the keep-out)
+        ok_zone = G.diff(inner, G.qpoly(bad.buffer(COLUMN_R + 0.05, join_style="mitre")))
         shapely.prepare(ok_zone)
         cand = []
         # along the streets under the slab: their furniture zones (or just behind the curb)
@@ -1308,7 +1322,7 @@ def supports(m) -> tuple[list, list]:
                 continue
             cs = s.cross_section
             side = cs.sidewalk_m[0]
-            off = s.width_m / 2 - side + cs.curb_m + max(cs.furniture_m, 1.0) / 2
+            off = s.width_m / 2 - side + cs.curb_m + max(cs.furniture_m, COLUMN_STRIP_M) / 2
             pts = [tuple(p) for p in s.centerline]
             for sign in (1.0, -1.0):
                 line = _offset_line(pts, sign * off)
@@ -1344,14 +1358,14 @@ def supports(m) -> tuple[list, list]:
             if near:
                 keep.append(min(near, key=lambda p: (round(ST._dist(p, sp), 6), p)))
         ids = []
-        h = COLUMN_W / 2
+        oct_ = [(COLUMN_R * M.cos(M.PI * (2 * k + 1) / 8), COLUMN_R * M.sin(M.PI * (2 * k + 1) / 8))
+                for k in range(8)]
         for i, (x, y) in enumerate(sorted(keep)):
             cid = f"{dk.id}.col{i + 1:04d}"
             ids.append(cid)
             cols.append({"id": cid, "type": "structure.column", "kind": "column",
-                         "footprint": G.to_model_poly(Polygon([(x - h, y - h), (x + h, y - h),
-                                                               (x + h, y + h),
-                                                               (x - h, y + h)])),
+                         "footprint": G.to_model_poly(Polygon([ST._pt(x + u, y + v)
+                                                               for u, v in oct_])),
                          "line": [], "z0_m": 0.0, "z1_m": G.q(dk.top_m - dk.slab_m),
                          "supports": [dk.id], "attrs": {"deck": dk.id}})
         d = dk.model_dump(mode="python")
@@ -1361,9 +1375,13 @@ def supports(m) -> tuple[list, list]:
 
 
 def span_zone(m, P):
-    """The ground junctions under a slab (the slab spans them on deep girders)."""
+    """The ground streets and junctions under a slab (the slab spans them on deep girders,
+    from the columns at their curbs or behind their property lines)."""
     js = [G.from_model_poly(j.polygon) for j in m.junctions if not j.level]
-    return G.union([G.inter(j, P) for j in js if j.intersects(P)])
+    rs = [G.qpoly(LineString(s.centerline).buffer(s.width_m / 2, cap_style="flat"))
+          for s in m.road_segments if not s.level and "deck" not in s.attrs and
+          not G.apart(LineString(s.centerline), P)]
+    return G.union([G.inter(x, P) for x in js + rs if x.intersects(P)])
 
 
 def _offset_line(pts, d: float) -> list:

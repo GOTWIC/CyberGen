@@ -518,6 +518,9 @@ class Decks(_Model):
     upper: Archetype | None = Field(
         None, description="Program of the buildings on the deck (default: the district's); "
                           "under the deck the lots get low buildings that fit the clear height.")
+    upper_height_m: Annotated[tuple[float, float], _range(3, 600)] | None = Field(
+        None, description="Height range of the buildings on the deck, over its top (default: "
+                          "the district's).")
 
 
 class District(_Model):

@@ -225,6 +225,10 @@ class FloorGrid(_M):
     floor_height_m: float
     base_m: float | None = Field(description="M13: the ground floor over sea level.")
     plinth_m: float | None = Field(description="M13: the lowest ground under the footprint.")
+    level: int = Field(0, description="M14: the street level its ground floor is on (1: a "
+                                      "deck; absent on the ground).")
+    deck_m: float | None = Field(None, description="M14: the deck top its ground floor stands "
+                                                   "on (absent on the ground).")
 
 
 class BuildingRec(_M):

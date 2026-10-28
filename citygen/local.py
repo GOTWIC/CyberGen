@@ -208,17 +208,17 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     net = STR.build_streets(spec, b.hydro, b.layout.polygons, did, b.waterways, b.sites,
                             b.roads, opens, getattr(b, "frame", None))
     # M14: the decks of layered districts (upper twins of their interior streets, ramps)
-    pl = DK.plan(spec, net, net.builder, did)
+    dplan = DK.plan(spec, net, net.builder, did)
     darch = {did[d.name]: d.archetype for d in spec.districts}
     jx = JN.build(net, darch, did, spec.seed or 0)
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])
     T.stage("lanes", jx["lanes"])
-    gnet, gjx = DK.street_view(net, jx, pl)
+    gnet, gjx = DK.street_view(net, jx, dplan)
     blk = BK.build_blocks(spec, net.builder, gnet, gjx, mapper)
-    dko = DK.finish(pl, net, jx, blk)
-    DK.link_walks(pl, jx, dko["links"])
-    out = Local(notes=_dedupe(list(net.notes) + list(blk["notes"]) + pl.notes +
-                              [f"{dk.name}: {t}" for dk in pl.decks for t in dk.notes]))
+    dko = DK.finish(dplan, net, jx, blk)
+    DK.link_walks(dplan, jx, dko["links"])
+    out = Local(notes=_dedupe(list(net.notes) + list(blk["notes"]) + dplan.notes +
+                              [f"{dk.name}: {t}" for dk in dplan.decks for t in dk.notes]))
     P = G.to_model_poly
     # open space (named places first, then by district)
     k_by: dict = {}
@@ -243,8 +243,11 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     n_paths = open_paths(jx["walk"], blk["open"])
     n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, gnet.segments)
     walk = JN.walkways(jx["walk"])
-    if pl.decks:
-        walk = _deck_walks(pl, net, jx, dko, walk)
+    if dplan.decks:
+        walk = _deck_walks(dplan, net, jx, dko, walk)
+        for w in walk:     # (a stair or an elevator names its well's open space)
+            if w["attrs"].get("well") in well_os:
+                w["attrs"]["well"] = well_os[w["attrs"]["well"]]
     T.stage("walkways", walk)
     out.nodes, out.segments, out.bridges = net.nodes, net.segments, net.bridges
     for j in jx["junctions"]:
@@ -263,7 +266,7 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
         r["node_id"] = r.pop("junction_id")
     out.lanes = jx["lanes"]
     out.walkways = walk
-    if pl.decks:
+    if dplan.decks:
         _deck_levels(out, net)
     for bk in blk["blocks"]:
         out.blocks.append({"id": bk["id"], "district_id": bk["district_id"],
@@ -280,9 +283,9 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
         if lt.get("level"):
             rec["level"] = lt["level"]
         out.lots.append(rec)
-    if pl.decks:
-        out.decks, out.structures = DK.rows(pl, net, dko, well_os)
-        out.plan = pl
+    if dplan.decks:
+        out.decks, out.structures = DK.rows(dplan, net, dko, well_os)
+        out.plan = dplan
     for k, pl in enumerate(blk["places"]):
         out.places.append({"id": f"pl{k + 1:02d}", "type": f"place.{pl['kind']}",
                            "name": pl["name"], "kind": pl["kind"],
@@ -295,8 +298,8 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     out.info = {"one_way_loops": jx["one_way"], "open_paths": n_paths,
                 "walkway_links": n_links,
                 "angles": {did[n]: a for n, a in net.angles.items()}}
-    if pl.decks:
-        out.info["decks"] = DK.info(pl, dko)
+    if dplan.decks:
+        out.info["decks"] = DK.info(dplan, dko)
     return out
 
 

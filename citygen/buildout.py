@@ -204,6 +204,8 @@ def _deck_jobs(m, sd, cx, dk, deck_lots: dict, jpolys, cwpolys, swpolys) -> list
         junctions += [swpolys[i] for i, w in enumerate(m.sidewalks) if w.level == 1]
         dsp = sd.decks
         ucx = dataclasses.replace(cx, archetype=dsp.upper or cx.archetype, seed=cx.seed + 211,
+                                  height=tuple(float(v) for v in dsp.upper_height_m)
+                                  if dsp.upper_height_m else cx.height,
                                   roads=roads, junctions=junctions, water=[], opens=[],
                                   block_opens={}, complexes=(), landmarks=[],
                                   cones=[(p, lim - H) for p, lim in cx.cones], notes=[])
@@ -224,7 +226,7 @@ def under(r: dict, deck: str) -> None:
     r["buildings"] = out
 
 
-def lift(r: dict, H: float, deck: str) -> None:
+def lift(r: dict, H: float, deck: str, program: str) -> None:
     """M14: rows of a job on a deck lifted onto it (every z of the model is measured from the
     ground under it)."""
     from .model import COLLECTIONS
@@ -243,7 +245,7 @@ def lift(r: dict, H: float, deck: str) -> None:
         for it in d["roof_items"]:
             x, y, z = it["position"]
             it["position"] = (x, y, G.q(z + H))
-        d["attrs"] = {**d["attrs"], "deck": deck, "deck_top_m": H}
+        d["attrs"] = {**d["attrs"], "deck": deck, "deck_top_m": H, "program": program}
 
     def green(d):
         d["z_m"] = G.q(d["z_m"] + H)
@@ -351,7 +353,7 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
         for r in parts[j]:
             out.notes += r["notes"]
             if job.get("lift"):
-                lift(r, job["lift"], job["deck"])
+                lift(r, job["lift"], job["deck"], job["ctx"].archetype)
             elif tag == "under":
                 under(r, job["deck"])
             for key in ("buildings", "properties", "site_elements", "structures",

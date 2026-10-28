@@ -490,6 +490,8 @@ def _buildings(P: _Plan) -> None:
                                               else "site_default")
         if b.attrs.get("deck_under"):
             wall = "bld_undercity"      # (M14: the low buildings under a deck)
+        elif b.level and f"bld_{b.attrs.get('program')}" in MATERIALS:
+            wall = f"bld_{b.attrs['program']}"   # (M14: on a deck, its own program's)
         parts = []
         for ms in b.masses:
             if ms.role == "void" or ms.z1_m <= ms.z0_m:
@@ -657,13 +659,18 @@ def _decks(P: _Plan) -> None:
                    {"k": "prism", "m": "deck_column", "z0": q(s.z0_m), "z1": q(s.z1_m),
                     "r": ext, "h": holes, "s": "prism"}, s.id)
         elif s.kind == "stair" and len(s.line) >= 2:
-            r = ribbon([p[:2] for p in s.line], 2.4, [p[2] for p in s.line])
-            if r is None:
+            # (a flight per leg of its line: up, the landing, up again)
+            parts = []
+            for p0, p1 in zip(s.line, s.line[1:]):
+                r = ribbon([p0[:2], p1[:2]], 2.4, [p0[2], p1[2]])
+                if r is not None:
+                    parts.append({"k": "ribbon", "m": "deck_stair", "l": r[0], "rr": r[1],
+                                  "t": 0.4})
+            if not parts:
                 continue
             cx, cy = _center([p[:2] for p in s.line])
             P.add(s.id, P.collection(P.district_at(cx, cy), "Decks"), tile_key(cx, cy),
-                  "deck_stair", [{"k": "ribbon", "m": "deck_stair", "l": r[0], "rr": r[1],
-                                  "t": 0.4}],
+                  "deck_stair", parts,
                   {"citygen_id": s.id, "citygen_type": s.type, "deck": a["deck"]})
         elif s.kind == "elevator" and s.footprint is not None:
             ext, holes = _poly_rings(s.footprint)

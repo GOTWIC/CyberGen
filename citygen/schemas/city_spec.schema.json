@@ -259,6 +259,29 @@
           "default": null,
           "description": "Program of the buildings on the deck (default: the district's); under the deck the lots get low buildings that fit the clear height.",
           "title": "Upper"
+        },
+        "upper_height_m": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Height range of the buildings on the deck, over its top (default: the district's).",
+          "title": "Upper Height M"
         }
       },
       "title": "Decks",
