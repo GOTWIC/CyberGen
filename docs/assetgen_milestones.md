@@ -106,7 +106,36 @@ citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their h
 - tests `tests/assetgen/test_ag_shell.py`, `test_ag_build.py`; goldens under `ag1` (the small
   city's manifest and asset files, nine Vesper Bay shells as GLB).
 
-AG1_NUMBERS
+**Samples** (all five checks pass in each; 4 workers on the shared Mac):
+
+| City | Buildings | Shell triangles | Of section 11's estimate | Packs | Build |
+|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 21.8 M | 0.59 | 1.29 GB | 50 to 119 s |
+| Saltreach Free Port | 3,135 | 15.4 M | 0.76 | 0.91 GB | 46 s |
+| Delta Megacity | 5,417 | 24.0 M | 0.65 | 1.41 GB | 75 s |
+| Nexus City | 6,519 | 21.5 M | 0.59 | 1.27 GB | 71 s |
+| Greyhook | 2,460 | 9.8 M | 0.48 | 0.58 GB | 23 s |
+| Vesper Bay Pinned | 6,658 | 20.6 M | 0.54 | 1.22 GB | 62 s |
+| Vesper Bay Stacks | 6,686 | 20.1 M | 0.55 | 1.19 GB | 63 s |
+
+About 58 bytes of glTF per shell triangle (positions, normals and UV0 everywhere; UV1 and
+colors on glass only); proxies 7 to 498 triangles (median 23 to 40). A second build writes
+no file (3 to 9 s). Uniqueness: nearest pair outside a family 4.7 to 6.1 apart (k = 4).
+
+**Mac = x86**: whole-city builds of Vesper Bay and Greyhook byte-identical in `citygen-x86`
+(279 and 171 files); AG1's tests pass there, the small city's goldens included.
+
+**Exporter**: M15 was not on main, so only the contribution file
+(`unreal_contribution.buildings.json`); `unreal_export.md` ("From AG1") lists the exporter
+work. No Unreal check yet (the coordinating session's call).
+
+**For later milestones**: AG2 gets about 40% of section 11's triangle estimate for parts
+(reveals are in the shells for now), the other facade systems (`systems.FALLBACK`), massing
+articulation, wear and the thumbnail hash; AG3 storefront detail and doors (mount panels
+already keep mounts off the glass); AG4 roof equipment (blocks now), skybridge landings and
+portals; AG5 per-type and landmark generators; AG6 reads the slots, tints, UVs and CPD
+layout as the material contract; citygen: footprints with zero-width spikes, self-crossing
+rings and pinched courts (`rings.tidy` cleans them).
 
 ## Order
 

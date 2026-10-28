@@ -96,7 +96,92 @@ boxes where a piece is a rectangle, else convex prisms.
 
 ## Previews
 
-PREVIEWS
+`assetgen preview` (Blender 5.2, EEVEE) on each city's blockout `city.blend` with its
+building boxes taken out: the shells and proxies are imported from the packs, every slot gets
+a flat preview material from its tint (glass with a little sky in it, 3% of the windows lit,
+brick and sheet metal with a procedural pattern, proxies with a window grid from their bay
+and floor height). The rest of the city (ground, roads, water, props, transit) is the
+blockout's.
+
+**Whole cities, every shell** (`city_full`, 8K; open one for full size):
+
+| Vesper Bay | Nexus City |
+|---|---|
+| <img src="vesper_bay/city_full.jpg" width="420"> | <img src="nexus_city/city_full.jpg" width="420"> |
+
+| Delta Megacity | Saltreach Free Port |
+|---|---|
+| <img src="delta_megacity/city_full.jpg" width="420"> | <img src="archipelago_free_port/city_full.jpg" width="420"> |
+
+| Greyhook | Vesper Bay Pinned |
+|---|---|
+| <img src="peninsula_city/city_full.jpg" width="420"> | <img src="vesper_bay_pinned/city_full.jpg" width="420"> |
+
+| Vesper Bay Stacks | Vesper Bay from its proxies (`city`) |
+|---|---|
+| <img src="vesper_bay_stacks/city_full.jpg" width="420"> | <img src="vesper_bay/city.jpg" width="420"> |
+
+Each city's `city.jpg` (from its proxies, 8K) is beside its `city_full.jpg`.
+
+**Vesper Bay's districts at full detail** (`iso_<district>`, the district's shells with the
+rest of the city from proxies, 2400 px; 8K for Corporate Core and Highcrest in `detail/`):
+
+| d01 Corporate Core | d02 The Stacks |
+|---|---|
+| <img src="vesper_bay/iso_d01.jpg" width="420"> | <img src="vesper_bay/iso_d02.jpg" width="420"> |
+
+| d03 Highcrest | d04 Old Town |
+|---|---|
+| <img src="vesper_bay/iso_d03.jpg" width="420"> | <img src="vesper_bay/iso_d04.jpg" width="420"> |
+
+| d05 Neon Strand | d06 Vess Docks |
+|---|---|
+| <img src="vesper_bay/iso_d05.jpg" width="420"> | <img src="vesper_bay/iso_d06.jpg" width="420"> |
+
+| d07 Launch Key | d08 Scholar Isle |
+|---|---|
+| <img src="vesper_bay/iso_d07.jpg" width="420"> | <img src="vesper_bay/iso_d08.jpg" width="420"> |
+
+**Street level** (the blockout's five street cameras, 2400 px; 8K in `detail/`):
+
+| street_1 | street_2 |
+|---|---|
+| <img src="vesper_bay/street_1.jpg" width="420"> | <img src="vesper_bay/street_2.jpg" width="420"> |
+
+| street_3 | street_4 |
+|---|---|
+| <img src="vesper_bay/street_3.jpg" width="420"> | <img src="vesper_bay/street_4.jpg" width="420"> |
+
+<img src="vesper_bay/street_5.jpg" width="420">
+
+**Contact sheets**: 64 buildings drawn across Vesper Bay by id hash, each framed alone
+(8K, 960 px cells):
+
+<img src="vesper_bay/contact_sheet.jpg" width="840">
+
+and one per building type, up to 12 each (`vesper_bay/contact_<type>.jpg`):
+
+| tower | podium_tower |
+|---|---|
+| <img src="vesper_bay/contact_tower.jpg" width="420"> | <img src="vesper_bay/contact_podium_tower.jpg" width="420"> |
+
+| megabuilding | slab |
+|---|---|
+| <img src="vesper_bay/contact_megabuilding.jpg" width="420"> | <img src="vesper_bay/contact_slab.jpg" width="420"> |
+
+| shopfront_row | shanty_stack |
+|---|---|
+| <img src="vesper_bay/contact_shopfront_row.jpg" width="420"> | <img src="vesper_bay/contact_shanty_stack.jpg" width="420"> |
+
+| villa | courtyard_block |
+|---|---|
+| <img src="vesper_bay/contact_villa.jpg" width="420"> | <img src="vesper_bay/contact_courtyard_block.jpg" width="420"> |
+
+| terraced | warehouse |
+|---|---|
+| <img src="vesper_bay/contact_terraced.jpg" width="420"> | <img src="vesper_bay/contact_warehouse.jpg" width="420"> |
+
+The other types: [control_tower](vesper_bay/contact_control_tower.jpg), [gate_house](vesper_bay/contact_gate_house.jpg), [hangar](vesper_bay/contact_hangar.jpg), [lab](vesper_bay/contact_lab.jpg), [landmark.megatower](vesper_bay/contact_landmark.megatower.jpg), [office](vesper_bay/contact_office.jpg), [pagoda](vesper_bay/contact_pagoda.jpg), [parking_structure](vesper_bay/contact_parking_structure.jpg), [shed](vesper_bay/contact_shed.jpg), [straddle_building](vesper_bay/contact_straddle_building.jpg), [temple_hall](vesper_bay/contact_temple_hall.jpg), [terminal](vesper_bay/contact_terminal.jpg), [yard](vesper_bay/contact_yard.jpg).
 
 ## Checks
 
@@ -133,7 +218,22 @@ city, 11 to 28% refused where a run would fold (they are left out, never drawn w
 
 ## Mac = x86
 
-X86_LINE
+In docker `citygen-x86` (x86_64 Linux, Python 3.13, libstdc++ GEOS), on the same city models
+as the Mac:
+
+- **Whole cities**: `assetgen build` of Vesper Bay (with its asset spec) and Greyhook writes
+  the same bytes as the Mac: all 279 and 171 delivered files (every shell and proxy pack,
+  `briefs.json`, `manifest.json`, `unreal_contribution.buildings.json`), so the manifest
+  hashes agree (`1ebe1cc8...` and `8315c422...`).
+- **Tests**: `tests/assetgen/test_ag_shell.py` and `test_ag_build.py` pass there (24 tests),
+  the small test city's goldens included (its manifest and the digest of its asset files);
+  the Vesper Bay shell goldens are covered by the whole-city match above. On the Mac all 67
+  assetgen tests pass.
+
+Goldens (`tests/assetgen/data/golden_hashes.json`, under `ag1`): the small test city's
+manifest and the digest of its asset files, and nine Vesper Bay shells as GLB (a landmark,
+podium tower, shopfront row, shanty stack, megabuilding, villa, warehouse, parking
+structure and tower). AG0's goldens are unchanged (`triangulate` keeps its default).
 
 ## The exporter
 
