@@ -134,7 +134,9 @@ format:
   child `<key>.shell` with the shell mesh (one primitive per material slot). The vertices
   are in the building's frame, so the static mesh asset is made from the child alone and the
   actor placed at `pivot`. `proxies/<tile>.glb` holds the far proxies the same way
-  (`<key>.proxy`, its node at the pivot).
+  (`<key>.proxy`, its node at the pivot). On M13's terrain the pivot's z is the building's
+  `base_m` (its ground floor over sea level), and the shell, proxy and collision reach down
+  below it to the lowest ground under the footprint (a plinth); on flat ground z is 0.
 - **Materials**: one material instance per slot for the whole city, its parent the slot's
   `master`, `color`, `roughness` and `metallic` as its parameters. A slot with `tint_cpd`
   takes its base color from the actor's Custom Primitive Data at that index (three floats,
