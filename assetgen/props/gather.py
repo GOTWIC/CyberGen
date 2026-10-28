@@ -14,6 +14,10 @@ district's style, its variant, its instance transform, and for the meshes made p
 - **Signs**: per slot its text (the point of interest in its unit, else a generated shop
   name; corporations of the city on billboards and holo-ads), script, look, colors (the
   district's neon palette from the asset spec, else its era's) and the gap to its wall.
+- **Ground** (M13): a model z is measured from the ground where it stands, so every
+  placement is lifted by its building's `base_m` when it hangs on a building or stands on
+  its roof (AG1's shells stand there), else by the finished ground at its point (as the
+  blockout lifts M15's instances); nothing on a flat city.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from citygen import dmath as M
 from citygen import geom as G
 
 from .. import canon as C
+from ..streets.ctx import Ground
 from . import materials as MT
 from . import signs as SG
 from . import styles as ST
@@ -106,6 +111,21 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
                 foot[b.id] = G.from_model_poly(b.footprint)
     fids = sorted(foot)
     ftree = shapely.STRtree([foot[i] for i in fids]) if fids else None
+    gd = Ground(model)
+    bases = {b.id: float(b.base_m) for b in model.buildings
+             if getattr(b, "base_m", None) is not None}
+
+    def lift(x, y, z, bid=None) -> float:
+        """The height a placement's z is measured from (module docstring, Ground)."""
+        if gd.flat:
+            return 0.0
+        if bid is None and z > 0.6 and ftree is not None:
+            hit = ftree.query(shapely.points(x, y), predicate="intersects")
+            if len(hit):
+                bid = fids[min(hit.tolist())]
+        if bid in bases:
+            return bases[bid]
+        return gd.at(x, y)
 
     def near_foot(x, y):
         if ftree is None:
@@ -164,8 +184,10 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
             continue
         did = ds.of(p.id, x, y)
         st = style_of(did)
+        mm = mount.get(p.id)
+        z = z + lift(x, y, z, (mm or {}).get("building") or (p.attrs or {}).get("building"))
         if kind in ST.EXACT:
-            item = {"prop": {"id": p.id, "position": [C.m2(v) for v in p.position],
+            item = {"prop": {"id": p.id, "position": [C.m2(x), C.m2(y), C.m2(z)],
                              "yaw_deg": C.deg(p.yaw_deg), "scale": [C.m2(v) for v in p.scale],
                              "attrs": {k: v for k, v in sorted((p.attrs or {}).items())
                                        if k in ("sag_m", "name")}},
@@ -199,7 +221,6 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
             k = ST.pick(n, "ag8.prop", p.id)
         yaw = p.yaw_deg
         if kind == "awning":
-            mm = mount.get(p.id)
             poly = foot.get(mm["building"]) if mm else near_foot(x, y)
             if not _wall_plus_y(poly, x, y, yaw, p.scale[1] / 2.0 + 0.25):
                 yaw = yaw + 180.0
@@ -220,7 +241,6 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
         else:
             xf = [C.m(x - cx), C.m(y - cy), C.m(z), yaw] + [C.m(v) for v in p.scale]
             add(key, kind, "prop", t, ST.variant_name(kind, st, k), xf, p.id)
-        mm = mount.get(p.id)
         if kind in REACH and mm and mm["gap"] > BRACKET_MIN_M and \
                 (p.attrs or {}).get("mount") != "deck":
             a = M.radians(p.yaw_deg)
@@ -240,6 +260,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
         g.species[sp] = g.species.get(sp, 0) + 1
         species_used.add(sp)
         x, y, z = p.position
+        z = z + lift(x, y, z, (p.attrs or {}).get("building"))
         t = tile_of(x, y)
         key = f"plant.{typ}.{t}"
         cx, cy = tile_center(t)
@@ -270,7 +291,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
     g.exact = {t: [(k, k.split(".")[1], exact[t][k]) for k in sorted(exact[t])]
                for t in sorted(exact)}
     # -- signs
-    g.signs = _signs(model, spec, ds, blds, mount)
+    g.signs = _signs(model, spec, ds, blds, mount, lift)
     n_inst = sum(len(p["xforms"]) for gr in g.groups.values() for p in gr["parts"].values())
     g.stats = {"props": len(model.props), "plants": len(model.plants),
                "sign_slots": len(model.sign_slots), "instances": n_inst,
@@ -313,7 +334,7 @@ def _unit_of(b, x: float, y: float) -> int | None:
     return best[1]
 
 
-def _signs(model, spec, ds: _Districts, blds: dict, mount: dict) -> dict:
+def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift) -> dict:
     poi = {}
     for p in sorted(model.pois, key=lambda p: p.id):
         if p.building_id and p.unit_index is not None and p.kind in ("bar", "clinic", "vendor"):
@@ -386,7 +407,8 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict) -> dict:
         # (an "h": Blender's glTF import reads a name ending in a dot and digits as a
         # counter, and a long one overflows it)
         out[t].append({"id": s.id, "node": "sign.h" + dg[:16], "inputs": inp, "digest": dg,
-                       "extra_name": s.id, "pivot": [C.m2(x), C.m2(y), C.m2(z)],
+                       "extra_name": s.id,
+                       "pivot": [C.m2(x), C.m2(y), C.m2(z + lift(x, y, z, s.building_id))],
                        "yaw": C.deg(s.yaw_deg), "kind": s.kind,
                        "prop_id": s.prop_id})
     for t in out:

@@ -859,7 +859,7 @@ AG8 (props, plants and signs) is in place, in `assetgen/props/` (tests
 - **`assetgen props BUILD [--spec S] [--workers N] [--sheets DIR]`** (`build.py`; also the
   last stage of `assetgen build`, `--no-props` skips it): every M6 prop kind a family of 4
   to 12 variants per district style (`styles.py`: sleek, civic, heavy, neon, old from the
-  era; `variants.py`), every plant species 6 to 10 (`trees.py`: space colonization, palms,
+  era; `variants.py`), every plant species 6 or 8 (`trees.py`: space colonization, palms,
   pines, shrubs, sedum, scrub, ivy), each placement's variant a hash of its id
   (`gather.py`); awnings and ivy in segments, facade props off their wall (the briefs'
   `gap_m`) on brackets; cables, scaffolding and market gates exact meshes per tile; M6's

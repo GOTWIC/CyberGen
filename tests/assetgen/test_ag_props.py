@@ -115,6 +115,41 @@ def test_placements_pick_their_variant_from_their_id():
         assert k == ST.pick(ST.PROP_VARIANTS[kind], "ag8.prop", pid)
 
 
+def test_m13_lifts_placements_by_base_or_ground(tmp_path):
+    """On a terrain city a placement stands on its building's base when it hangs on a
+    building, else on the finished ground at its point; on a flat city nothing moves."""
+    from types import SimpleNamespace
+
+    from assetgen.props.gather import gather
+    base, _ = _small()
+    flat = load_model(base)[0]
+    t = SimpleNamespace(x0=-1e4, y0=-1e4, cell_m=1e4, natural=[[5.0] * 3] * 3,
+                        ground=[[5.0] * 3] * 3, water_levels=[])
+    hilly = flat.model_copy(update={
+        "terrain": t, "buildings": [b.model_copy(update={"base_m": 9.0})
+                                    for b in flat.buildings]})
+
+    def zs(g):
+        out = {}
+        for gr in g.groups.values():
+            for p in gr["parts"].values():
+                for i, xf in zip(p["ids"], p["xforms"]):
+                    out.setdefault(i, xf[2])
+        return out
+
+    a, b = gather(flat, None, None, tmp_path), gather(hilly, None, None, tmp_path)
+    za, zb = zs(a), zs(b)
+    assert za.keys() == zb.keys()
+    lifts = {round(zb[i] - za[i], 3) for i in za}
+    assert lifts == {5.0, 9.0}
+    on_bld = {p.id for p in flat.plants if (p.attrs or {}).get("building")}
+    assert on_bld and all(round(zb[i] - za[i], 3) == 9.0 for i in on_bld)
+    sa = {s["id"]: s["pivot"][2] for v in a.signs.values() for s in v}
+    sb = {s["id"]: s["pivot"][2] for v in b.signs.values() for s in v}
+    bid = {s.id: s.building_id for s in flat.sign_slots}
+    assert sa and all(round(sb[i] - sa[i], 3) == (9.0 if bid[i] else 5.0) for i in sa)
+
+
 def test_contributions():
     """Props replace M15's prototype actors by their keys; signs are one actor per slot at
     its position and yaw, shop signs replacing the sign prototypes of their tile; a holo-ad's
