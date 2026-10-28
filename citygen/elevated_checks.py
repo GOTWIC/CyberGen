@@ -32,13 +32,17 @@ def check_grades(m: CityModel) -> Check:
     c = Check("road_grades", f"Every road at most {EL.MAX_GRADE:.0%} steep along its z "
                              "profile (viaducts, ramps, bridge approaches, streets ramping up "
                              "to a raised junction; footbridge stairs aside)")
+    from .decks import RAMP_GRADE
+
     for s in m.road_segments:
         if s.road_class == "footbridge":
             continue
         p = _prof(s)
+        # (M14: a deck's street ramp may be as steep as a street)
+        cap = RAMP_GRADE if s.attrs.get("role") == "deck_ramp" else EL.MAX_GRADE
         for (s0, z0), (s1, z1) in zip(p, p[1:]):
             # (both s and z are on the 1 cm grid: a step of 1 cm in z is rounding)
-            if s1 - s0 > 1e-6 and (abs(z1 - z0) - 0.01) / (s1 - s0) > EL.MAX_GRADE + 1e-4:
+            if s1 - s0 > 1e-6 and (abs(z1 - z0) - 0.01) / (s1 - s0) > cap + 1e-4:
                 _limit(c, f"{s.id} ({s.road_class}): {abs(z1 - z0) / (s1 - s0):.1%} at "
                           f"s {s0:.0f} to {s1:.0f} m")
                 break

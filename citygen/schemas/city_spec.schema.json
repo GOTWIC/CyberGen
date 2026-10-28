@@ -191,6 +191,79 @@
       "title": "Complex",
       "type": "object"
     },
+    "Decks": {
+      "additionalProperties": false,
+      "description": "M14: an upper deck city over part of the district: a slab on columns over a cluster of\nits blocks and the local streets between them, with streets, lots and buildings of its own,\nramps down to the ground streets, light wells with stairs and elevators.",
+      "properties": {
+        "height_m": {
+          "default": 9.0,
+          "description": "Deck top over the ground under it (the lower level keeps 5.5 m of clear height for traffic under the slab).",
+          "maximum": 16,
+          "minimum": 7.5,
+          "title": "Height M",
+          "type": "number"
+        },
+        "cover": {
+          "default": 0.45,
+          "description": "Target share of the district's land under the deck.",
+          "maximum": 0.8,
+          "minimum": 0.1,
+          "title": "Cover",
+          "type": "number"
+        },
+        "column_m": {
+          "default": 18.0,
+          "description": "Column grid: no point of the slab farther than about this from a column.",
+          "maximum": 30,
+          "minimum": 10,
+          "title": "Column M",
+          "type": "number"
+        },
+        "light_m": {
+          "default": 70.0,
+          "description": "No walkway under the deck farther than this from open sky (light wells and the deck edge).",
+          "maximum": 150,
+          "minimum": 30,
+          "title": "Light M",
+          "type": "number"
+        },
+        "ramps": {
+          "default": 2,
+          "description": "Two-way street ramps between the deck and the ground streets.",
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Ramps",
+          "type": "integer"
+        },
+        "upper": {
+          "anyOf": [
+            {
+              "enum": [
+                "corporate_core",
+                "megablock_residential",
+                "midtown_mixed",
+                "entertainment_market",
+                "old_town",
+                "industrial_port",
+                "residential_heights",
+                "research_campus",
+                "transit_hub",
+                "spaceport"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Program of the buildings on the deck (default: the district's); under the deck the lots get low buildings that fit the clear height.",
+          "title": "Upper"
+        }
+      },
+      "title": "Decks",
+      "type": "object"
+    },
     "District": {
       "additionalProperties": false,
       "properties": {
@@ -556,6 +629,18 @@
           "default": null,
           "description": "M11: the faction that holds the district (districts with the same faction share it); default: a generated gang where the district is dangerous, a corporation in corporate districts, else the police.",
           "title": "Faction"
+        },
+        "decks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Decks"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M14: a layered district: an upper deck city over the ground streets."
         }
       },
       "required": [

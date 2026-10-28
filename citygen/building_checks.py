@@ -69,6 +69,8 @@ class _B:
         self.m = m
         self.lot = dict(zip([lt.id for lt in m.lots], F([lt.polygon for lt in m.lots])))
         self.lot_front = {lt.id: set(lt.frontage_ids) for lt in m.lots}
+        self.lot_rec = {lt.id: lt for lt in m.lots}
+        self.deck = {dk.id: dk for dk in m.decks}
         self.prop = {p.id: p for p in m.properties}
         self.bld = {b.id: b for b in m.buildings}
         self.site = {s.id: s for s in m.megasites}
@@ -421,13 +423,24 @@ def check_heights(spec: CitySpec, m: CityModel, bx: _B):
         lo, hi = rng[d.name]
         cap = bx.cap(bx.foot[b.id]) if bx.foot.get(b.id) is not None and bx.cones \
             else math.inf
-        top = min(hi, cap)
         kind = b.type.split(".", 1)[1] if "." in b.type else b.type
+        base = 0.0
+        lot = bx.lot_rec.get(b.lot_id) if b.lot_id else None
+        under = lot.attrs.get("deck_under") if lot is not None else None
+        if under:
+            # M14: under a deck, low buildings up to its slab
+            lo, hi = 0.0, bx.deck[under].top_m - bx.deck[under].slab_m
+        elif b.level:
+            base = float(b.attrs.get("deck_top_m", 0.0))   # (on a deck: from its top)
+            cap -= base
+        top = min(hi, cap)
+        h = b.height_m - base
         # under a cap, the floor grid may leave the building up to one floor below it
         low = 0.0 if kind in ANCILLARY else lo if top >= lo else top - b.floor_height_m
-        if not (low - 0.01 <= b.height_m <= top + 0.01):
-            _limit(c, c.failures, f"{b.id} ({kind}): {b.height_m:g} m outside {low:g} to "
-                                  f"{top:g} m ('{d.name}', {d.archetype})")
+        if not (low - 0.01 <= h <= top + 0.01):
+            _limit(c, c.failures, f"{b.id} ({kind}): {h:g} m outside {low:g} to "
+                                  f"{top:g} m ('{d.name}', {d.archetype}"
+                                  f"{', on its deck' if b.level else ''})")
     return c
 
 
@@ -647,7 +660,9 @@ def check_skybridges(m: CityModel, bx: _B):
             if b is None:
                 _limit(c, c.failures, f"{s.id}: building {bid} missing")
                 continue
-            k = s.z_m / b.floor_height_m
+            # (M14: a deck's building counts its floors from the deck top)
+            k = (s.z_m - (float(b.attrs.get("deck_top_m", 0.0)) if b.level else 0.0)) / \
+                b.floor_height_m
             if abs(k - round(k)) > 0.003:
                 _limit(c, c.failures, f"{s.id}: level {s.z_m:g} m is not a floor of {bid} "
                                       f"({b.floor_height_m:g} m floors)")

@@ -217,6 +217,9 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
                     "lots", "places"):
             data[key] = getattr(local, key)
+        if local.decks:     # M14
+            data["decks"] = local.decks
+            data["structures"] = list(data.get("structures", [])) + local.structures
         data["open_spaces"] = data["open_spaces"] + local.open_spaces
     if m3 is not None:
         data.update(m3)
@@ -705,6 +708,9 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         side()
     b.m3 = out
     m = with_rows(b.model, BO.rows(out))
+    if b.local is not None and b.local.structures:
+        # M14: the stairs and elevator shafts of the light wells (M2 rows)
+        m = with_rows(m, {"structures": list(m.structures) + b.local.structures})
     tg = b.local.terrain if b.local is not None else None
     if tg is not None:
         # M13: buildings seated on the ground, retaining walls, bored tunnels

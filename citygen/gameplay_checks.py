@@ -11,6 +11,7 @@ from shapely.geometry import LineString, Point
 
 from . import geom as G
 from . import gameplay as GP
+from . import decks as DK
 from .buildout import GROUND_WALKS
 from .checks import Check
 from .model import HOUR_BANDS, CityModel
@@ -42,17 +43,17 @@ class _Net:
     def __init__(self, m: CityModel):
         self.roots, self.main = GP.foot_roots(m)
         self.walk = {w.id: w for w in m.walkways}
-        self.ground = [w for w in m.walkways if w.kind in GROUND_WALKS and
-                       all(abs(p[2]) <= 1e-9 for p in w.line)]
+        self.ground = [w for w in m.walkways if DK.on_ground(w)]
         self.glines = [LineString([p[:2] for p in w.line]) for w in self.ground]
         self.ggeo = np.array(self.glines, dtype=object)
         self.gtree = shapely.STRtree(self.glines) if self.glines else None
         self.lane = {ln.id: ln for ln in m.lanes}
         self.scc = GP.largest_scc(GP.lane_graph(m))
         self.seg = {s.id: s for s in m.road_segments}
+        self.tops = {dk.id: dk.top_m for dk in m.decks}
 
     def root(self, w) -> tuple:
-        return self.roots.get(tuple(w.line[0][:2]))
+        return self.roots.get(DK.walk_ends(w)[0])
 
 
 def check_reach_foot(m: CityModel, n: _Net) -> Check:
@@ -67,7 +68,7 @@ def check_reach_foot(m: CityModel, n: _Net) -> Check:
         if w is None:
             _limit(c, f"{oid}: walkway {a.walkway_id} missing")
             continue
-        if w.kind not in GROUND_WALKS or any(abs(p[2]) > 1e-9 for p in w.line):
+        if not DK.on_ground(w):
             _limit(c, f"{oid}: walkway {w.id} ({w.kind}) is not on the ground")
             continue
         r = n.root(w)
@@ -81,7 +82,8 @@ def check_reach_foot(m: CityModel, n: _Net) -> Check:
                       f"{a.walk_link_m} m)")
             continue
         hit = GP._nearest(n.gtree, n.ggeo, Point(a.curb), GP.WALK_REACH_M,
-                          ok=lambda i: n.root(n.ground[i]) in n.main)
+                          ok=lambda i: n.root(n.ground[i]) in n.main and
+                          n.ground[i].level == w.level)
         if hit is None or n.root(n.ground[hit[1]]) != r:
             _limit(c, f"{oid}: curb point {a.curb} is not on the door's walkway component")
     c.notes.append(f"{count} doors")
@@ -100,8 +102,10 @@ def check_reach_car(m: CityModel, n: _Net) -> Check:
             _limit(c, f"{oid}: lane {a.lane_id} missing")
             continue
         s = n.seg.get(ln.segment_id)
+        z0 = n.tops.get(s.attrs.get("deck"), 0.0) if s is not None and ln.level and \
+            s.attrs.get("role") != "deck_ramp" else 0.0     # (M14: a deck's lanes)
         if ln.kind != "lane" or s is None or s.road_class not in GP.DRIVE_CLASSES or \
-                any(abs(p[2]) > 0.5 for p in ln.centerline):
+                any(abs(p[2] - z0) > 0.5 for p in ln.centerline):
             _limit(c, f"{oid}: lane {ln.id} is not a ground drive lane of a local road")
             continue
         if ln.id not in n.scc:

@@ -34,6 +34,7 @@ from . import presets
 from .buildout import GROUND_WALKS
 from .model import HOUR_BANDS
 from .props import _u
+from .decks import on_ground, walk_ends
 from .street_checks import walk_components
 
 q = G.q
@@ -284,7 +285,7 @@ def foot_roots(m) -> tuple[dict, set]:
     main: set = set()
     if not pts:
         return roots, main
-    xy = np.array(pts, dtype=np.float64)
+    xy = np.array([p[:2] for p in pts], dtype=np.float64)
     for lm in m.landmasses:
         if not lm.district_ids:
             continue
@@ -342,33 +343,42 @@ class Ctx:
         self.lot = {lt.id: lt for lt in m.lots}
         # on foot: ground walkways in the main component of their landmass
         roots, main = foot_roots(m)
-        self.walk, self.walk_lines, self.walk_root = [], [], []
+        self.walk, self.walk_lines, self.walk_root, self.walk_lev = [], [], [], []
         for w in m.walkways:
-            if w.kind not in GROUND_WALKS or any(abs(p[2]) > 1e-9 for p in w.line):
+            if not on_ground(w):
                 continue
-            r = roots.get(tuple(w.line[0][:2]))
+            r = roots.get(walk_ends(w)[0])
             if r not in main:
                 continue
             self.walk.append(w)
             self.walk_lines.append(LineString([p[:2] for p in w.line]))
             self.walk_root.append(r)
+            self.walk_lev.append(w.level)
         self.walk_geoms = np.array(self.walk_lines, dtype=object)
         self.walk_ix = {w.id: i for i, w in enumerate(self.walk)}
         self.walk_tree = shapely.STRtree(self.walk_lines) if self.walk_lines else None
         # by car: ground drive lanes of local roads in the lane graph's largest part
         scc = largest_scc(lane_graph(m))
-        self.lanes, self.lane_lines, self.lane_seg = [], [], {}
+        self.lanes, self.lane_lines, self.lane_seg, self.lane_lev = [], [], {}, []
+        tops = {dk.id: dk.top_m for dk in m.decks}
         for ln in m.lanes:
             s = self.seg.get(ln.segment_id)
             if ln.kind != "lane" or s is None or s.road_class not in DRIVE_CLASSES or \
-                    ln.id not in scc or any(abs(p[2]) > 0.5 for p in ln.centerline):
+                    ln.id not in scc:
+                continue
+            # (M14: a deck's lanes at its top; never a ramp's)
+            z0 = tops.get(s.attrs.get("deck"), 0.0) if ln.level and \
+                s.attrs.get("role") != "deck_ramp" else 0.0
+            if any(abs(p[2] - z0) > 0.5 for p in ln.centerline):
                 continue
             self.lane_seg.setdefault(s.id, []).append(len(self.lanes))
             self.lanes.append(ln)
             self.lane_lines.append(LineString([p[:2] for p in ln.centerline]))
+            self.lane_lev.append(ln.level)
         self.lane_geoms = np.array(self.lane_lines, dtype=object)
         self.lane_ix = {ln.id: i for i, ln in enumerate(self.lanes)}
         self.lane_tree = shapely.STRtree(self.lane_lines) if self.lane_lines else None
+        self.decks = bool(m.decks)
         self.names = Names()        # factions and places
         self.zone_names = Names()   # territories and precincts (named after their district)
         self.fields: dict = {}
@@ -381,11 +391,22 @@ class Ctx:
                 return d.id
         return None
 
+    def level_of(self, seg_id: str | None) -> int:
+        """M14: the level of a door facing this road (a deck's street: the deck)."""
+        s = self.seg.get(seg_id) if seg_id else None
+        if s is None or "deck" not in s.attrs or s.attrs.get("role") == "deck_ramp":
+            return 0
+        return s.level
+
     def access(self, pos, kind: str = "main", seg_id: str | None = None,
-               drive_reach: float = DRIVE_REACH_M) -> dict | None:
-        """Door -> its ground walkway and the drive lane a car stops on, or None."""
+               drive_reach: float = DRIVE_REACH_M, level: int | None = None) -> dict | None:
+        """Door -> its ground walkway and the drive lane a car stops on (M14: on the door's
+        level), or None."""
         pt = Point(float(pos[0]), float(pos[1]))
-        w = _nearest(self.walk_tree, self.walk_geoms, pt, WALK_REACH_M)
+        lv = self.level_of(seg_id) if level is None else level
+        wok = (lambda i: self.walk_lev[i] == lv) if self.decks else None
+        lok = (lambda i: self.lane_lev[i] == lv) if self.decks else None
+        w = _nearest(self.walk_tree, self.walk_geoms, pt, WALK_REACH_M, ok=wok)
         if w is None or self.lane_tree is None:
             return None
         lane = None
@@ -395,11 +416,11 @@ class Ctx:
             lane = _nearest(self.lane_tree, self.lane_geoms, pt, CURB_REACH_M,
                             ok=lambda i: i in own_set)
         if lane is None:
-            lane = _nearest(self.lane_tree, self.lane_geoms, pt, drive_reach)
+            lane = _nearest(self.lane_tree, self.lane_geoms, pt, drive_reach, ok=lok)
         if lane is None:
             return None
         curb = G.nearest(self.lane_lines[lane[1]], pt)
-        cw = _nearest(self.walk_tree, self.walk_geoms, Point(curb), WALK_REACH_M)
+        cw = _nearest(self.walk_tree, self.walk_geoms, Point(curb), WALK_REACH_M, ok=wok)
         if cw is None or self.walk_root[cw[1]] != self.walk_root[w[1]]:
             return None
         return {"position": (q(pos[0]), q(pos[1])), "kind": kind,

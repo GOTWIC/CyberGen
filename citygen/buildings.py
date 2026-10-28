@@ -178,6 +178,14 @@ PROGRAMS: dict[str, Program] = {
         unit_uses=SHOP_USES["spaceport"], unit_share=0.0,
         field=(0.0, 0.5, 0.5, 0.0), skew=1.0, green=0.0, roof=("ac_unit", "mechanical",
                                                                  "antenna")),
+    # M14: the lots under a deck (not an archetype of the spec): low shopfronts and stacks
+    # that fit the clear height, no roof items or green roofs under the slab
+    "undercity": Program(
+        mix=(("shopfront_row", 0.7), ("shanty_stack", 0.3)),
+        use="retail", fh=3.5, front=_front(1.0, 0.0, 0.0, 0.0), side=0.0,
+        podium_floors=(1, 1), tower_side=(8.0, 16.0), coverage=0.6, unit_w=(4.0, 8.0),
+        unit_uses=SHOP_USES["entertainment_market"], awning=(0.8, 1.0, 2.0), sign=0.9,
+        field=(0.0, 0.6, 0.4, 0.0), skew=1.0, green=0.0, roof=()),
 }
 
 USE_OF = {"podium_tower": None, "slab": None, "courtyard_block": "residential",

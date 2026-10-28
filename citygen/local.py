@@ -11,6 +11,7 @@ import shapely
 from shapely.geometry import LineString, Point
 
 from . import blocks as BK
+from . import decks as DK
 from . import geom as G
 from . import junctions as JN
 from . import streets as STR
@@ -37,6 +38,9 @@ class Local:
     notes: list = field(default_factory=list)
     info: dict = field(default_factory=dict)
     terrain: dict | None = None    # M13: finished ground, walls, bores, stats
+    decks: list = field(default_factory=list)        # M14: deck rows
+    structures: list = field(default_factory=list)   # M14: stairs and elevator shafts
+    plan: object = None                              # M14: the deck plan (DK.Plan)
 
 
 def open_paths(W: JN.WalkGraph, opens: list[dict]) -> int:
@@ -203,15 +207,22 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
     net = STR.build_streets(spec, b.hydro, b.layout.polygons, did, b.waterways, b.sites,
                             b.roads, opens, getattr(b, "frame", None))
+    # M14: the decks of layered districts (upper twins of their interior streets, ramps)
+    pl = DK.plan(spec, net, net.builder, did)
     darch = {did[d.name]: d.archetype for d in spec.districts}
     jx = JN.build(net, darch, did, spec.seed or 0)
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])
     T.stage("lanes", jx["lanes"])
-    blk = BK.build_blocks(spec, net.builder, net, jx, mapper)
-    out = Local(notes=_dedupe(list(net.notes) + list(blk["notes"])))
+    gnet, gjx = DK.ground_view(net, jx, pl)
+    blk = BK.build_blocks(spec, net.builder, gnet, gjx, mapper)
+    dko = DK.finish(pl, net, jx, blk)
+    DK.link_walks(pl, jx, dko["links"])
+    out = Local(notes=_dedupe(list(net.notes) + list(blk["notes"]) + pl.notes +
+                              [f"{dk.name}: {t}" for dk in pl.decks for t in dk.notes]))
     P = G.to_model_poly
     # open space (named places first, then by district)
     k_by: dict = {}
+    well_os: dict = {}
     for o in blk["open"]:
         d = o["district_id"]
         k_by[d] = k_by.get(d, 0) + 1
@@ -222,13 +233,18 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             if not ps:
                 continue
             o["polygon"] = poly = ps[0]
+        attrs = {"area_m2": G.q(G.area1(poly)), "m2": True}
+        if o.get("light_well"):
+            attrs["light_well"] = o["light_well"]
+            well_os[o["lot"]] = o["id"]
         out.open_spaces.append({"id": o["id"], "type": f"open_space.{o['kind']}",
                                 "kind": o["kind"], "polygon": P(poly), "name": o["name"],
-                                "district_id": d,
-                                "attrs": {"area_m2": G.q(G.area1(poly)), "m2": True}})
+                                "district_id": d, "attrs": attrs})
     n_paths = open_paths(jx["walk"], blk["open"])
-    n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, net.segments)
+    n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, gnet.segments)
     walk = JN.walkways(jx["walk"])
+    if pl.decks:
+        walk = _deck_walks(pl, net, jx, dko, walk)
     T.stage("walkways", walk)
     out.nodes, out.segments, out.bridges = net.nodes, net.segments, net.bridges
     for j in jx["junctions"]:
@@ -247,18 +263,26 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
         r["node_id"] = r.pop("junction_id")
     out.lanes = jx["lanes"]
     out.walkways = walk
+    if pl.decks:
+        _deck_levels(out, net)
     for bk in blk["blocks"]:
         out.blocks.append({"id": bk["id"], "district_id": bk["district_id"],
                            "archetype": bk["archetype"], "polygon": P(bk["polygon"]),
                            "area_m2": bk["area_m2"], "frontage_ids": bk["frontage_ids"],
                            "attrs": bk["attrs"]})
-    for lt in blk["lots"]:
-        out.lots.append({"id": lt["id"], "block_id": lt["block"],
-                         "district_id": lt["district_id"], "archetype": lt["archetype"],
-                         "polygon": P(lt["polygon"]), "area_m2": lt["area_m2"],
-                         "frontage": lt["frontage"], "frontage_ids": lt["frontage_ids"],
-                         "merged_group_id": lt.get("merged_group_id"),
-                         "attrs": lt.get("attrs", {})})
+    for lt in blk["lots"] + dko["upper_lots"]:
+        rec = {"id": lt["id"], "block_id": lt["block"],
+               "district_id": lt["district_id"], "archetype": lt["archetype"],
+               "polygon": P(lt["polygon"]), "area_m2": lt["area_m2"],
+               "frontage": lt["frontage"], "frontage_ids": lt["frontage_ids"],
+               "merged_group_id": lt.get("merged_group_id"),
+               "attrs": lt.get("attrs", {})}
+        if lt.get("level"):
+            rec["level"] = lt["level"]
+        out.lots.append(rec)
+    if pl.decks:
+        out.decks, out.structures = DK.rows(pl, net, dko, well_os)
+        out.plan = pl
     for k, pl in enumerate(blk["places"]):
         out.places.append({"id": f"pl{k + 1:02d}", "type": f"place.{pl['kind']}",
                            "name": pl["name"], "kind": pl["kind"],
@@ -271,4 +295,47 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     out.info = {"one_way_loops": jx["one_way"], "open_paths": n_paths,
                 "walkway_links": n_links,
                 "angles": {did[n]: a for n, a in net.angles.items()}}
+    if pl.decks:
+        out.info["decks"] = DK.info(pl, dko)
     return out
+
+
+def _deck_walks(pl, net, jx: dict, dko: dict, walk: list) -> list:
+    """M14: the decks' walkways (their own walk graph, at the deck top) and the stairs and
+    elevators between the levels."""
+    tops = {dk.id: dk.top for dk in pl.decks}
+    seg_deck = {s["id"]: s["attrs"]["deck"] for s in net.segments if "deck" in s["attrs"]}
+    node_deck = {n["id"]: n["attrs"]["deck"] for n in net.nodes if "deck" in n["attrs"]}
+    j_deck = {j["id"]: node_deck[j["node_id"]] for j in jx["junctions"]
+              if j["node_id"] in node_deck}
+    first = pl.decks[0].id
+
+    def deck_of(a):
+        if a.get("segment") in seg_deck:
+            return seg_deck[a["segment"]]
+        if a.get("junction") in j_deck:
+            return j_deck[a["junction"]]
+        return first
+
+    return DK.walk_rows(jx, dko["links"], walk, tops, deck_of, DK.ramp_walks(pl, net, jx))
+
+
+def _deck_levels(out: Local, net) -> None:
+    """M14: level 1 on the deck's junctions, crosswalks, sidewalks and lanes (its ramps'
+    lanes too)."""
+    seg = {s["id"] for s in net.segments if "deck" in s["attrs"]}
+    node = {n["id"] for n in net.nodes if "deck" in n["attrs"]}
+    jn = set()
+    for j in out.junctions:
+        if j["node_id"] in node:
+            j["level"] = 1
+            jn.add(j["id"])
+    for c in out.crosswalks:
+        if c["junction_id"] in jn:
+            c["level"] = 1
+    for w in out.sidewalks:
+        if w["segment_id"] in seg:
+            w["level"] = 1
+    for r in out.lanes:
+        if (r["segment_id"] in seg) if r["kind"] == "lane" else (r["node_id"] in node):
+            r["level"] = 1
