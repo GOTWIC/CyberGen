@@ -246,7 +246,8 @@ convex corner met (now kept a reveal plus 6 cm from it).
 built) takes them: `tests/test_unreal.py::test_stage2_takes_assetgen_parts` (every listed
 part an instanced actor `<key>.<kind>` with the entry's pivot, Custom Primitive Data and
 transforms, its mesh a node of the tile's part pack, AG2's slots as materials); Vesper
-Bay's manifest: EXPORT. Unreal check: the coordinating session's call.
+Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362
+instances of its contribution. Unreal check: the coordinating session's call.
 
 **For later milestones**: AG3 storefronts, doors, lobbies and docks (the ground band is
 still AG1's storefront glass and door gaps; the arcade and canopy leave room for them); AG4

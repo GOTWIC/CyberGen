@@ -93,8 +93,7 @@ cells):
 
 <img src="vesper_bay/contact_sheet.jpg" width="840">
 
-**Vesper Bay's districts at full detail** (2400 px renders, 1600 px here; Corporate Core
-at 8K in `vesper_bay/detail/`):
+**Vesper Bay's districts at full detail** (2400 px renders, 1600 px here):
 
 | d01 Corporate Core | d02 The Stacks |
 |---|---|
@@ -150,7 +149,8 @@ The exporter's stage 2 import (merged while AG2 was built) takes them as they ar
 instanced actor per building and part kind, keyed `<key>.<kind>`, with the building's pivot
 and Custom Primitive Data, its mesh from the tile's part pack.
 `tests/test_unreal.py::test_stage2_takes_assetgen_parts` checks this on the small city;
-for Vesper Bay, `unreal.build_manifest` gives EXPORT. Unreal check: the coordinating
+for Vesper Bay, `unreal.build_manifest` gives 14,280 instanced actors for its buildings'
+parts, all 1,306,362 instances of its contribution. Unreal check: the coordinating
 session's call.
 
 ## Goldens
