@@ -103,8 +103,9 @@ def tower_views(man: dict, briefs: dict, width: int) -> list[dict]:
     best: dict[str, tuple] = {}
     for bid, r in man["buildings"].items():
         era = (briefs.get(bid) or {}).get("spec", {}).get("era")
-        if not era or r["type"].startswith("building.landmark"):
-            continue
+        if not era or r["type"].startswith("building.landmark") or \
+                not (r.get("genes") or {}).get("body.system"):
+            continue                # landmarks, and megasite structures without a facade
         h = r["bounds"][1][2]
         if era not in best or (h, bid) > best[era][:2]:
             best[era] = (h, bid)
