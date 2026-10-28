@@ -17,10 +17,21 @@ high-level milestone table). Stage 1's milestones are M0 to M15, built in
 `docs/progress/M*`; later stages give their milestones a prefix of their own (set in their
 scope doc) so their progress folders never clash with stage 1's.
 
+**Unreal exporter.** One exporter takes every stage's output into Unreal Engine 5.8. It is
+not a stage and has no milestones of its own: stage 1 introduces it (M15, `citygen unreal`,
+in `citygen/unreal.py` and `citygen/ue/` until it moves to a package of its own after M15
+merges), and every later milestone, in any stage, updates it in the same PR for what that
+milestone adds or changes, so the exporter always matches the generators. Each stage
+contributes its part of the manifest keyed by M10's stable ids, layered in stage order (a
+later stage's entry replaces an earlier one's for the same key; a key it has no entry for
+keeps the earlier one). A milestone session does not have to run Unreal: the coordinating
+session decides whether a finished milestone needs an Unreal check and, if so, dispatches a
+separate local session for it (import the cities it touches into a throwaway project of the
+check's own, import again, `--check`, shots). Spec and the record of what each milestone
+changed in it: `docs/unreal_export.md`.
+
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
-"Vesper Bay Pinned" in `cities/vesper_bay_pinned`). Its build folders in `docs/progress/` up
-to M8d carry an earlier slug (`tests/conftest.py` `OLD_SLUGS`); never use that name in
-anything new.
+"Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
 
 ## Corporate Core (hand-traced demo district)
 
@@ -527,9 +538,10 @@ streaming, traces onto ground, roofs and facades, a walk along sidewalks with he
 sidewalks of a raised road stay at z 0 in the model, an open item), and with `--shots`
 renders from the blockout cameras. citygen makes no network call; the
 official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
-editor) is the interactive route for a Claude session. The test project is
-`/Users/swag/Projects/Unreal Projects/CyberGenImportTest` (outside the repo, the generator's
-own; never import into any other project unasked). Sample imports: `docs/progress/M15/`.
+editor) is the interactive route for a Claude session. Testing is always in a throwaway
+project of the exporter's own (`--new-project` makes one from the First Person template,
+outside the repo); never import into any other project unasked. Spec and record:
+`docs/unreal_export.md`. Sample imports: `docs/progress/M15/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

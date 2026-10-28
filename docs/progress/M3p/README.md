@@ -13,12 +13,12 @@ M3 passed every check but some of its results looked weak (`docs/progress/M3/REA
 Each city folder holds `preview_heights.png`, `preview_massing.png`, `preview_map.png`,
 `preview_detail.png`, `report.json`, `report.txt` and `trace.json`, as in M3 (the model is not
 committed; a build regenerates it byte for byte). The specs are unchanged
-(`docs/progress/M1a2/`, Nyxllor in `cities/nyxllor/`). All 44 checks pass on all five
+(`docs/progress/M1a2/`, Vesper Bay in `cities/vesper_bay/`). All 44 checks pass on all five
 cities. `compare/` holds before and after crops; `docs/progress/M3/` is untouched.
 
 | City | Buildings | Floor area km2: M3p (M3) | Tallest m | Skybridges (km): M3p, M3 | Complexes in place: M3p, M3 | Landmarks | Megasites |
 |---|---|---|---|---|---|---|---|
-| Nyxllor | 5887 | 24.0 (29.7) | 480 | 291 (3.61), 230 (2.57) | 5 of 5, 4 of 5 | 1 | 3 |
+| Vesper Bay | 5887 | 24.0 (29.7) | 480 | 291 (3.61), 230 (2.57) | 5 of 5, 4 of 5 | 1 | 3 |
 | Saltreach Free Port | 3182 | 14.2 (14.0) | 292 | 180 (1.95), 180 (1.95) | 2 of 2, 2 of 2 | 0 | 3 |
 | Delta Megacity | 5457 | 23.2 (22.8) | 480 | 327 (3.78), 328 (3.78) | 4 of 4, 3 of 4 | 1 | 3 |
 | Nexus City | 6424 | 20.1 (19.5) | 480 | 251 (3.01), 255 (3.04) | 6 of 6, 1 of 6 | 4 | 7 |
@@ -27,7 +27,7 @@ cities. `compare/` holds before and after crops; `docs/progress/M3/` is untouche
 ## 1. Megablocks: towers on podiums (`buildings.megabuilding`)
 
 In M3 a megabuilding filled its lot to 120 to 250 m with an atrium and stepped tiers, so a
-megablock district (Greyhook's and Nyxllor's The Stacks) read as one continuous purple mass
+megablock district (Greyhook's and Vesper Bay's The Stacks) read as one continuous purple mass
 from afar. Now every megablock lot gets:
 
 - **A podium** of five to eight floors (16 to 26 m) over the whole buildable lot, with a
@@ -51,20 +51,20 @@ from afar. Now every megablock lot gets:
 
 | City, district | Median / p90 / max height m | Coverage | FAR | Decks |
 |---|---|---|---|---|
-| Nyxllor, The Stacks, M3 | 156.8 / 182.4 / 233.6 | 53% | 20.9 | 27 skybridges, 28 atrium decks |
-| Nyxllor, The Stacks, M3p | 153.6 / 182.4 / 224 | 77% | 13.1 | 61 podium decks + 27 tower skybridges, 131 decks between towers (163 towers on 98 megabuildings) |
+| Vesper Bay, The Stacks, M3 | 156.8 / 182.4 / 233.6 | 53% | 20.9 | 27 skybridges, 28 atrium decks |
+| Vesper Bay, The Stacks, M3p | 153.6 / 182.4 / 224 | 77% | 13.1 | 61 podium decks + 27 tower skybridges, 131 decks between towers (163 towers on 98 megabuildings) |
 | Greyhook, The Stacks, M3 | 160 / 185.6 / 236.8 | 53% | 19.6 | 39 skybridges, 18 atrium decks |
 | Greyhook, The Stacks, M3p | 156.8 / 185.6 / 233.6 | 76% | 13.8 | 78 podium decks + 39 tower skybridges, 125 decks between towers (159 towers on 94 megabuildings) |
 
 Coverage rises from about 53% to about 77% (the podiums), while the floor area ratio falls
 from about 20 to about 13: the towers no longer fill the lot to full height. That is still a
-very dense, tall district, now with legible masses; the lost floor area (Nyxllor 29.7 to
+very dense, tall district, now with legible masses; the lost floor area (Vesper Bay 29.7 to
 24.0 km2 in all, Greyhook 19.4 to 15.1 km2) is the price of the gaps. The previews also tint every building a few
 percent lighter or darker (by id), so neighbors separate in the massing views.
 
 <img src="compare/peninsula_city_stacks.png" width="840">
 
-<img src="compare/nyxllor_stacks.png" width="840">
+<img src="compare/vesper_bay_stacks.png" width="840">
 
 ## 2. Complexes built where they were grouped (`blocks._merged_groups`, `complexes.probe`)
 
@@ -89,7 +89,7 @@ fallback; no sample needs it now.
 
 | City | Complexes | Built in place, M3 | Built in place, M3p |
 |---|---|---|---|
-| Nyxllor | 5 | 4 (straddle moved) | 5 |
+| Vesper Bay | 5 | 4 (straddle moved) | 5 |
 | Saltreach Free Port | 2 | 2 | 2 |
 | Delta Megacity | 4 | 3 (tower cluster moved) | 4 |
 | Nexus City | 6 | 1 (two clusters, straddle, bridged pair, campus moved) | 6 |
@@ -107,7 +107,7 @@ the canal's navigable clearance (4 m), each plus the 1 m structure. Nothing else
 under it: no junction, no road but the two quay roads, no other water and no other lot. The
 first straddle building of a district with canals goes over a canal, the next over a
 street, and so on.
-All three samples with a straddle building (Nyxllor's Neon Strand, Nexus City's Neon Market,
+All three samples with a straddle building (Vesper Bay's Neon Strand, Nexus City's Neon Market,
 Greyhook's Lantern Strip) now span a canal.
 
 The footprint check verifies every span against what it crosses: the building lists them
@@ -134,7 +134,7 @@ that ended there.
 
 **Reproducers.** Building the five sample specs' roads over seeds, district placement
 mutations and all four road variants (273 road networks) hit the drifted end 11 times, for
-example Greyhook with seed 5 (every road variant), Nyxllor with seed 4 and Nexus City with
+example Greyhook with seed 5 (every road variant), Vesper Bay with seed 4 and Nexus City with
 seed 1; on Greyhook seed 5 the network had 23 segments and 11 dead ends instead of 24 and
 10. The collapse to an empty line (the IndexError itself) did not occur in those runs; it is
 reproduced directly with two 3 cm pieces at a right angle and a fitter that keeps the
@@ -147,7 +147,7 @@ entry up to the M2 walkways equals M3's, and the first difference is the M2 `blo
 (the new merged groups), or for Saltreach (whose groups did not change) the first M3 entry.
 
 **Tests** (`tests/test_polish.py`): the 3 cm joint (it raised IndexError before),
-`_on_ends` on the drifted line from Nyxllor seed 9081 road variant 3, a normal joint still
+`_on_ends` on the drifted line from Vesper Bay seed 9081 road variant 3, a normal joint still
 smoothed, and Greyhook seed 5 built with a check that merging keeps every other node with
 its degree (it fails on the old code at (1008.74, 1116.22)).
 
@@ -166,7 +166,7 @@ Median height of the district's buildings within 60 m of the boulevard, and of t
 
 | City, district | Near the boulevard, M3 | Near, M3p | Elsewhere, M3 | Elsewhere, M3p |
 |---|---|---|---|---|
-| Nyxllor, Corporate Core | 184 m | 232 m | 128 m | 128 m |
+| Vesper Bay, Corporate Core | 184 m | 232 m | 128 m | 128 m |
 | Delta Megacity, Corporate Core | 176 m | 222 m | 126 m | 128 m |
 | Delta Megacity, Midtown | 77 m | 91 m | 42 m | 42 m |
 | Nexus City, Corporate Core | 142 m | 198 m | 116 m | 120 m |
@@ -191,7 +191,7 @@ one worker and another `PYTHONHASHSEED` (`citygen trace diff`: no difference in 
 
 | City | Trace entries | Model sha256 (x86_64, libstdc++ GEOS) | libc++ GEOS |
 |---|---|---|---|
-| Nyxllor | 5908 | `b560152efa4cff7e00819d6097db499a5ca18775aa303007528e2324d1178a25` | same |
+| Vesper Bay | 5908 | `b560152efa4cff7e00819d6097db499a5ca18775aa303007528e2324d1178a25` | same |
 | Saltreach Free Port | 61 | `66c3803bd314ec7e25e454526bc113c5d66f9d6bd1104a681ed76ebdc15ea08e` | same |
 | Delta Megacity | 2775 | `b23ae6ea83eb425ada5e0c06066761556ed800b88c3f39290f80f06ae0be5177` | same |
 | Nexus City | 8556 | `efbd3ddc9d971b1a96ba510223235b908ec472db048f440dcafc337179a8a76b` | same |
@@ -214,7 +214,7 @@ and all 44 checks pass on both.
 
 | City | CLI build here (with previews and `--trace`), M3p |
 |---|---|
-| Nyxllor | 84 s |
+| Vesper Bay | 84 s |
 | Saltreach Free Port | 37 s |
 | Delta Megacity | 77 s |
 | Nexus City | 87 s |

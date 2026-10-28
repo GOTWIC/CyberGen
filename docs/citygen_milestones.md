@@ -32,7 +32,7 @@ Implementation notes: `CLAUDE.md` (one section per milestone) and each
 | M12 | Stack interchanges: four-level highway-highway crossings (one highway lifted through the crossing, eight one-way directional ramps, the left turns as flyovers at 18 and 27 m), the turbine as their fallback, M7's crossing where neither fits; 2 checks (81 in all); a stack demo (the pinned demo with two crosstowns), the samples and the pinned demo unchanged | Done | [`docs/progress/M12`](progress/M12) |
 | M13 | Terrain: hills, ridges and cliffs; roads, lots and buildings on slopes; tunnels through hills | In progress | |
 | M14 | Layered districts: streets, lots and buildings stacked on several deck levels, joined by ramps, stairs and elevators | Planned | |
-| M15 | Unreal export tool (end of stage 1): `citygen unreal` puts a built city into an Unreal 5.8 project headless, as a World Partition level with collision, a material per blockout material, props and plants as instanced meshes, citygen ids as actor tags, the lane, walkway and transit graphs as data assets and a player start; importing again updates by id (the same build writes nothing, a district regenerated with M10 changes exactly the actors of what changed); a play-in-editor check (streaming, traces, a walk) and 8K shots; every sample imported and checked | Done | [`docs/progress/M15`](progress/M15) |
+| M15 | Unreal export tool (end of stage 1): `citygen unreal` puts a built city into an Unreal 5.8 project headless, as a World Partition level with collision, a material per blockout material, props and plants as instanced meshes, citygen ids as actor tags, the lane, walkway and transit graphs as data assets and a player start; importing again updates by key (M10's stable ids) and content hash: the same build twice writes no file, and a district regenerated with `citygen build --district` re-imports exactly the actors whose content changed (`unreal.manifest_changes`; Greyhook's Lantern Strip: 1440 created, 344 updated, 1462 deleted, 3362 untouched, both ways); a play-in-editor check (World Partition streaming, traces onto ground, roofs and facades, a walk along sidewalks) and 8K shots; every sample imported in 33 to 79 s, imported again with nothing changed and checked (507 of 507 traces down, 36 of 36 roofs and facades); no generator change (models and blockout plans as on main), but the new files change citygen's code hash, so `citygen lock` refuses a build made before M15 and `lock --verify` of an earlier lock notes the other code; exporter spec in [`unreal_export.md`](unreal_export.md) | Done | [`docs/progress/M15`](progress/M15) |
 
 ## Outputs
 
@@ -47,9 +47,8 @@ transit of M8b and M8c on the same saved layouts; the M8d builds (the trumpet) a
 `docs/progress/M7/`, the 2D maps in `docs/progress/M4/`. Sample specs live in
 `docs/progress/M1a2/<city>/city_spec.json` and `cities/vesper_bay/city_spec.json`; the pinned
 demo's in `cities/vesper_bay_pinned/city_spec.json` (first built in M7b), its round 1 and
-round 2 transit in `docs/progress/M8b/`. Up to M8d, Vesper Bay's build folders carry an
-earlier slug; in M8c its `vesper_bay*/` folders are the same layouts built again under its
-current name.
+round 2 transit in `docs/progress/M8b/vesper_bay_pinned_round1/` and
+`vesper_bay_pinned_round2/`.
 
 While a milestone session runs, it pushes snapshot images to its branch under
 `docs/progress/<milestone>/wip/`; open the branch on GitHub (Branches tab) to see them before

@@ -45,26 +45,6 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 |---|---|
 | <img src="docs/progress/M10/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
 
-### In Unreal
-
-`citygen unreal` imports a built city into an Unreal 5.8 project: a World Partition level
-with collision, materials, instanced props and plants, citygen ids on every actor and the
-lane, walkway and transit graphs as data assets; importing again updates it by id. Every
-sample is imported and checked in play-in-editor (streaming, collision, a walk). Rendered in
-the editor (8K):
-
-| Vesper Bay | Nexus City |
-|---|---|
-| <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/nexus_city/unreal_iso_city.jpg" width="420"> |
-
-| Delta Megacity | Vesper Bay with the hand-traced Corporate Core |
-|---|---|
-| <img src="docs/progress/M15/delta_megacity/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/vesper_bay_pinned/unreal_iso_city.jpg" width="420"> |
-
-| The same street camera in the Blender blockout (8K) | and in Unreal (8K) |
-|---|---|
-| <img src="docs/progress/M15/vesper_bay/blender_street_2.jpg" width="420"> | <img src="docs/progress/M15/vesper_bay/unreal_street_2.jpg" width="420"> |
-
 ### Layers
 
 | Districts, water, roads and lots | Buildings |
@@ -74,6 +54,10 @@ the editor (8K):
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
 | <img src="docs/progress/M10/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M10/vesper_bay/preview_props.png" width="420"> |
+
+| Vesper Bay imported into Unreal 5.8 (8K) | A street of Delta Megacity in Unreal (8K) |
+|---|---|
+| <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/delta_megacity/unreal_street_3.jpg" width="420"> |
 
 Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour.
 
@@ -126,7 +110,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M12 | Stack interchanges | Four-level highway crossings | ✅ Done |
 | M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | 🚧 In progress |
 | M14 | Layered districts | Streets and buildings on stacked deck levels | Planned |
-| M15 | Unreal export | The city as an Unreal Engine 5.8 level, updated in place by id (end of stage 1) | ✅ Done |
+| M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | ✅ Done |
 
 ### Run it
 
@@ -136,22 +120,38 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 ```
 
-`--blockout` needs Blender 5.2. `citygen unreal out/vesper_bay <Project>.uproject --check`
-puts the city into an Unreal 5.8 project and checks it in play-in-editor. To make a new
-city, open Claude Code in this repo and ask for one (the `citygen` skill takes it from
-there). Editing, locking and the other commands:
-[`docs/citygen_milestones.md`](docs/citygen_milestones.md).
+`--blockout` needs Blender 5.2. `citygen unreal out/vesper_bay <Project>.uproject` imports
+the city into an Unreal 5.8 project. To make a new city, open Claude Code in this repo and
+ask for one (the `citygen` skill takes it from there). Editing, locking and the other
+commands: [`docs/citygen_milestones.md`](docs/citygen_milestones.md).
 
 ---
 
 ## Stage 2: assetgen
 
 A unique 3D model for every building in a stage 1 city, generated from its footprint, massing
-and use, plus roads, sidewalks, street furniture and textures.
+and use, plus roads, sidewalks, street furniture and textures. Each milestone's assets go
+into Unreal through the same exporter as stage 1's city, replacing the blockout piece by piece.
+
+Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
+[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
 
 ### Milestones
 
-Being planned.
+| | Milestone | What it adds | Status |
+|---|---|---|---|
+| AG0 | Groundwork | What each building is made from, file formats, three test buildings in Unreal | Planned |
+| AG1 | Building shells | Walls, floors and window openings for every building | Planned |
+| AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
+| AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
+| AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
+| AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
+| AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
+| AG7 | Street elements | Roads with markings, sidewalks, bridges, viaducts, tunnels, quays, transit structures | Planned |
+| AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
+| AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
+| AG10 | Layered districts | Buildings and streets on stacked decks | Planned |
+| AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 
 ---
 
@@ -172,7 +172,7 @@ Being planned.
   `docs/progress/M1a2/<city>/`).
 - `docs/`: each stage's spec (`<generator>_scope.md`) and full milestone log
   (`<generator>_milestones.md`); `docs/progress/<milestone>/` holds each milestone's builds
-  and images.
+  and images; `docs/unreal_export.md` describes the Unreal exporter every stage shares.
 - `maps/`, `pipeline/`, `reference/`, `unreal/`, `out/`: an earlier hand-tracing pipeline; its
   traced Corporate Core map is the pinned demo's input.
 

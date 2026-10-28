@@ -29,7 +29,7 @@ from citygen.cli import EXIT_OK
 from citygen.model import CityModel
 from citygen.validate import validate_spec
 
-from conftest import CITIES, GOLDEN, OLD_SLUGS, ROOT, SMALL, built_sample, write
+from conftest import CITIES, GOLDEN, ROOT, SMALL, built_sample, write
 
 PATTERNS = ["ring", "ring_plus_spine", "spine", "grid", "radial", "coastal", "none"]
 
@@ -440,5 +440,4 @@ def test_report_has_road_stats(small_built):
 
 def test_samples_point_at_m1b_outputs():
     for path in CITIES:
-        slug = OLD_SLUGS.get(path.parent.name, path.parent.name)
-        assert (ROOT / "docs" / "progress" / "M1b" / slug).is_dir()
+        assert (ROOT / "docs" / "progress" / "M1b" / path.parent.name).is_dir()
