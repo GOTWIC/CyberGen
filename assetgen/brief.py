@@ -618,11 +618,13 @@ def origin_of(b) -> tuple[float, float]:
     return C.m2((min(xs) + max(xs)) / 2.0), C.m2((min(ys) + max(ys)) / 2.0)
 
 
-def floors_of(mm, fh: float) -> dict:
+def floors_of(mm, fh: float, base: float = 0.0) -> dict:
+    """Floors of a mass on the building's floor grid (M14: counted from its deck's top for a
+    building on a deck)."""
     h = mm.z1_m - mm.z0_m
     if mm.role in NO_FLOOR_ROLES or h < 0.5 * fh:
         return {"first": None, "count": 0, "height_m": None}
-    n, k0 = h / fh, mm.z0_m / fh
+    n, k0 = h / fh, (mm.z0_m - base) / fh
     first = int(round(k0)) if abs(k0 - round(k0)) < 1e-3 else None
     if abs(n - round(n)) < 1e-3:
         return {"first": first, "count": int(round(n)), "height_m": C.m(fh)}
@@ -754,6 +756,7 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
            sdata: dict, overrides: dict | None) -> dict:
     ox, oy = city.origins[k]
     fh = b.floor_height_m
+    deck = float(b.attrs.get("deck_top_m", 0.0)) if getattr(b, "level", 0) else 0.0
     masses = []
     for j, mm in enumerate(b.masses):
         mass = city.by_b[k][j]
@@ -761,7 +764,7 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
             "role": mm.role, "shape": mm.shape, "z": [C.m(mm.z0_m), C.m(mm.z1_m)],
             "footprint": {"exterior": [C.pt(p, ox, oy) for p in mass.rings[0]],
                           "holes": [[C.pt(p, ox, oy) for p in h] for h in mass.rings[1:]]},
-            "floors": floors_of(mm, fh)})
+            "floors": floors_of(mm, fh, deck)})
     edge_recs = [_edge_record(e, ox, oy, faced, k) for e in edges]
     for rec, e in zip(edge_recs, edges):
         rec["mass"] = e.mass.k
@@ -869,6 +872,9 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
         "district": dist_rec, "spec": spec_rec,
         "override": (overrides or {}).get(b.id),
     }
+    if getattr(b, "level", 0):
+        # M14: a building on a deck: its level and the deck top its ground floor stands on
+        rec["building"]["floor_grid"].update(level=b.level, deck_m=C.m(deck))
     return json.loads(C.dumps(rec))
 
 

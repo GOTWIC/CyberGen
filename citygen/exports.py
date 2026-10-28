@@ -391,10 +391,12 @@ def graphs(m: CityModel, ground=None) -> dict:
         "lanes": [{"id": x.id, "kind": x.kind, "segment_id": x.segment_id,
                    "node_id": x.node_id, "index": x.index, "forward": x.forward,
                    "width_m": x.width_m, "centerline": pts(x.centerline, x.segment_id),
-                   "successors": x.successors, "adjacent_ids": x.adjacent_ids}
+                   "successors": x.successors, "adjacent_ids": x.adjacent_ids,
+                   **({"level": x.level} if x.level else {})}     # (M14: on a deck)
                   for x in m.lanes],
         "walkways": [{"id": w.id, "kind": w.kind, "width_m": w.width_m,
-                      "line": pts(w.line, w.attrs.get("segment")), "neighbors": w.neighbors}
+                      "line": pts(w.line, w.attrs.get("segment")), "neighbors": w.neighbors,
+                      **({"level": w.level} if w.level else {})}
                      for w in m.walkways],
         "transit_lines": [lifted(json.loads(t.model_dump_json()), "path")
                           for t in m.transit_lines],

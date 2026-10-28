@@ -83,6 +83,8 @@ MATERIALS = {
     "plinth": "#5d5a55", "retaining_wall": "#8a8478",
     "tunnel_wall": "#9a9ea8", "tunnel_lid": "#b7a98f", "tunnel_metro": "#4a78d6",
     "tunnel_ped": "#7ee0c3", "tunnel_vent": "#c4c8d2", "soil": "#6b5a45",
+    "deck_slab": "#8c9099", "deck_rail": "#c9ccd2", "deck_column": "#6f737d",
+    "deck_stair": "#b0b4bc", "deck_elevator": "#8fd3ff", "bld_undercity": "#c2334d",
 }
 MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
 MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
@@ -274,6 +276,8 @@ class _Plan:
 
 
 def _group_of(category: str) -> str:
+    if category.startswith("deck_"):
+        return "Decks"
     if category.startswith("road_") or category in ("junction", "crosswalk", "sidewalk"):
         return "Streets"
     if category.startswith("open_") or category == "green_roof":
@@ -345,6 +349,21 @@ def _streets(P: _Plan) -> None:
         if r is None:
             continue
         mid = pts[len(pts) // 2]
+        if "deck" in s.attrs:
+            # M14: a deck's street on its slab; a ramp a solid ramp down to the ground
+            if s.attrs.get("role") == "deck_ramp":
+                P.add(f"{s.id}.ramp", P.collection(did, "Decks"), tile_key(*mid), "deck_ramp",
+                      [{"k": "ribbon", "m": "embankment", "l": r[0], "rr": r[1],
+                        "t": q(max(zs) + 0.3)},
+                       {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
+                        "t": 0.0}],
+                      {"citygen_id": s.id, "citygen_type": s.type, "road_class": s.road_class,
+                       "name": s.name or "", "level": s.level})
+            else:
+                P.join(did, "deck_road", mid[0], mid[1],
+                       {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
+                        "t": 0.0}, s.id)
+            continue
         if s.tunnel:
             # M9: a road in a tunnel, its own object (the tunnel shell is in `_tunnels`)
             t = tile_key(*mid)
@@ -382,22 +401,26 @@ def _streets(P: _Plan) -> None:
         ext, holes = _poly_rings(j.polygon)
         cx, cy = _center(ext)
         # (M7: a junction on a viaduct or an approach sits at its node's height)
-        P.join(P.district_at(cx, cy), "junction", cx, cy,
+        P.join(P.district_at(cx, cy), "deck_junction" if j.level else "junction", cx, cy,
                {"k": "flat", "m": "junction", "z": q(Z_JUNCTION + nz.get(j.node_id, 0.0)),
                 "r": ext, "h": holes}, j.id)
+    # (M14: a deck's crosswalks and sidewalks at its top)
+    jtop = {j.id: nz.get(j.node_id, 0.0) for j in m.junctions if j.level}
+    stop = {s.id: s.z_profile[0].z for s in m.road_segments if "deck" in s.attrs}
     for c in m.crosswalks:
-        r = ribbon(c.line, c.width_m, z=Z_CROSSWALK)
+        r = ribbon(c.line, c.width_m, z=q(Z_CROSSWALK + jtop.get(c.junction_id, 0.0)))
         if r is None:
             continue
         cx, cy = _center(c.line)
-        P.join(P.district_at(cx, cy), "crosswalk", cx, cy,
+        P.join(P.district_at(cx, cy), "deck_crosswalk" if c.level else "crosswalk", cx, cy,
                {"k": "ribbon", "m": "crosswalk", "l": r[0], "rr": r[1], "t": 0.0}, c.id)
     for w in m.sidewalks:
-        r = ribbon(w.line, w.width_m, z=CURB_M)
+        r = ribbon(w.line, w.width_m, z=q(CURB_M + stop.get(w.segment_id, 0.0)))
         if r is None:
             continue
         cx, cy = _center(w.line)
-        P.join(seg_district.get(w.segment_id), "sidewalk", cx, cy,
+        P.join(seg_district.get(w.segment_id), "deck_sidewalk" if w.level else "sidewalk",
+               cx, cy,
                {"k": "ribbon", "m": "sidewalk", "l": r[0], "rr": r[1], "t": CURB_M}, w.id)
 
 
@@ -465,6 +488,10 @@ def _buildings(P: _Plan) -> None:
         arch = P.darch.get(b.district_id, "")
         wall = "landmark" if b.landmark else (f"bld_{arch}" if f"bld_{arch}" in MATERIALS
                                               else "site_default")
+        if b.attrs.get("deck_under"):
+            wall = "bld_undercity"      # (M14: the low buildings under a deck)
+        elif b.level and f"bld_{b.attrs.get('program')}" in MATERIALS:
+            wall = f"bld_{b.attrs['program']}"   # (M14: on a deck, its own program's)
         parts = []
         for ms in b.masses:
             if ms.role == "void" or ms.z1_m <= ms.z0_m:
@@ -491,7 +518,8 @@ def _buildings(P: _Plan) -> None:
               {"citygen_id": b.id, "citygen_type": b.type, "use": b.use,
                "height_m": q(b.height_m), "floors": b.floors, "district": did or "",
                "archetype": arch, "name": b.name or "", "property_id": b.property_id or "",
-               "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or ""})
+               "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or "",
+               **({"level": b.level} if b.level else {})})   # (M14: on a deck)
     for s in m.skybridges:
         (ax, ay), (bx, by) = s.line[0], s.line[-1]
         hh = SKYBRIDGE_H.get(s.kind) or s.levels * s.level_height_m
@@ -544,6 +572,8 @@ def _sites(P: _Plan) -> None:
             continue    # M9: drawn with their tunnel (`_tunnels`)
         if s.kind == "retaining_wall":
             continue    # M13: drawn with the ground (`_terrain`)
+        if a.get("deck"):
+            continue    # M14: drawn with their deck (`_decks`)
         if s.kind == "vent":
             ext, holes = _poly_rings(s.footprint)
             cx, cy = _center(ext)
@@ -579,6 +609,77 @@ def _sites(P: _Plan) -> None:
               tile_key(cx, cy), f"structure_{s.kind}", parts,
               {"citygen_id": s.id, "citygen_type": s.type, "line_id": a.get("line_id", ""),
                "station_id": a.get("station", "")})
+
+
+# --- decks (M14) ---------------------------------------------------------------------------
+
+RAIL_M = 1.1            # railing along a slab's edges and wells
+
+
+def _decks(P: _Plan) -> None:
+    """Every deck: its slab clipped to the tiles (one object per deck and tile) with a
+    railing along its edges and wells, its columns joined per tile, a stair flight and an
+    elevator shaft per link."""
+    m = P.m
+    for dk in m.decks:
+        poly = G.from_model_poly(dk.polygon)
+        z0, z1 = q(dk.top_m - dk.slab_m), q(dk.top_m)
+        rail = G.qpoly(poly.boundary.buffer(0.12, cap_style="flat", join_style="mitre"))
+        x0, y0, x1, y1 = poly.bounds
+        ix0, iy0 = tile_key(x0, y0)
+        ix1, iy1 = tile_key(x1, y1)
+        for ix in range(ix0, ix1 + 1):
+            for iy in range(iy0, iy1 + 1):
+                tb = box(ix * TILE_M, iy * TILE_M, (ix + 1) * TILE_M, (iy + 1) * TILE_M)
+                parts = []
+                for p in G.parts(G.inter(poly, tb)):
+                    ext, holes = _shapely_rings(p)
+                    if len(ext) >= 3:
+                        parts.append({"k": "prism", "m": "deck_slab", "z0": z0, "z1": z1,
+                                      "r": ext, "h": holes, "s": "prism"})
+                for p in G.parts(G.inter(rail, tb)):
+                    ext, holes = _shapely_rings(p)
+                    if len(ext) >= 3:
+                        parts.append({"k": "prism", "m": "deck_rail", "z0": z1,
+                                      "z1": q(z1 + RAIL_M), "r": ext, "h": holes,
+                                      "s": "prism"})
+                if parts:
+                    t = (ix, iy)
+                    P.add(f"{dk.id}.slab.{tile_name(*t)}", P.collection(dk.district_id, "Decks"),
+                          t, "deck_slab", parts,
+                          {"citygen_id": dk.id, "citygen_type": dk.type or "deck",
+                           "level": dk.level, "top_m": z1, "district": dk.district_id})
+    for s in m.structures:
+        a = s.attrs or {}
+        if not a.get("deck"):
+            continue
+        if s.kind == "column":
+            ext, holes = _poly_rings(s.footprint)
+            cx, cy = _center(ext)
+            P.join(P.district_at(cx, cy), "deck_column", cx, cy,
+                   {"k": "prism", "m": "deck_column", "z0": q(s.z0_m), "z1": q(s.z1_m),
+                    "r": ext, "h": holes, "s": "prism"}, s.id)
+        elif s.kind == "stair" and len(s.line) >= 2:
+            # (a flight per leg of its line: up, the landing, up again)
+            parts = []
+            for p0, p1 in zip(s.line, s.line[1:]):
+                r = ribbon([p0[:2], p1[:2]], 2.4, [p0[2], p1[2]])
+                if r is not None:
+                    parts.append({"k": "ribbon", "m": "deck_stair", "l": r[0], "rr": r[1],
+                                  "t": 0.4})
+            if not parts:
+                continue
+            cx, cy = _center([p[:2] for p in s.line])
+            P.add(s.id, P.collection(P.district_at(cx, cy), "Decks"), tile_key(cx, cy),
+                  "deck_stair", parts,
+                  {"citygen_id": s.id, "citygen_type": s.type, "deck": a["deck"]})
+        elif s.kind == "elevator" and s.footprint is not None:
+            ext, holes = _poly_rings(s.footprint)
+            cx, cy = _center(ext)
+            P.add(s.id, P.collection(P.district_at(cx, cy), "Decks"), tile_key(cx, cy),
+                  "deck_elevator", [{"k": "prism", "m": "deck_elevator", "z0": q(s.z0_m),
+                                     "z1": q(s.z1_m), "r": ext, "h": holes, "s": "prism"}],
+                  {"citygen_id": s.id, "citygen_type": s.type, "deck": a["deck"]})
 
 
 # --- props and plants (M6): one instancing object per kind and tile --------------------------
@@ -912,7 +1013,45 @@ def _cameras(P: _Plan) -> dict:
     cut = _cutaway(P)
     if cut is not None:
         out["cutaway"] = cut
+    dcut = _deck_cut(P)
+    if dcut is not None:
+        out["deck"] = dcut
     return out
+
+
+def _deck_cut(P: _Plan) -> dict | None:
+    """M14: a section across the biggest deck, square to its longest street through the
+    street's middle (the city on the camera's side taken away), seen from that side a little
+    over the deck: the ground street under the slab and the deck street over it."""
+    m = P.m
+    if not m.decks:
+        return None
+    dk = max(m.decks, key=lambda d: (d.area_m2, d.id))
+    segs = {s.id: s for s in m.road_segments}
+    streets = [segs[i] for i in dk.segment_ids if i in segs and
+               segs[i].attrs.get("role") not in ("deck_ramp", "deck_end")]
+    if not streets:
+        return None
+    s = max(streets, key=lambda s: (_plen(s.centerline), s.id))
+    pts = [(x, y) for x, y in s.centerline]
+    a, b = pts[0], pts[-1]
+    L = _dist(a, b) or 1.0
+    n = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)      # the cut plane is square to the street
+    if n[0] * ISO_DIR[0] + n[1] * ISO_DIR[1] > 0:
+        n = (-n[0], -n[1])
+    u = (n[1], -n[0])
+    mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+    poly = G.from_model_poly(dk.polygon)
+    span = max(abs((x - mid[0]) * u[0] + (y - mid[1]) * u[1])
+               for x, y in poly.exterior.coords)
+    top = dk.top_m
+    return {"deck": dk.id, "origin": [q(mid[0]), q(mid[1])], "u": [q(u[0]), q(u[1])],
+            "n": [q(n[0]), q(n[1])], "half_len": q(min(span + 80.0, 900.0)),
+            "depth": 900.0, "z": [-60.0, 600.0], "voids": [],
+            "eye": [q(mid[0] + n[0] * 95.0 + u[0] * 22.0),
+                    q(mid[1] + n[1] * 95.0 + u[1] * 22.0), q(top + 3.0)],
+            "target": [q(mid[0]), q(mid[1]), q(top * 0.7)],
+            "lens_mm": 22}
 
 
 def _street_views(P: _Plan, n: int = 4) -> list[dict]:
@@ -1088,6 +1227,7 @@ def make_plan(m: CityModel) -> dict:
         _open_space(P)
         _buildings(P)
         _sites(P)
+        _decks(P)
         _tunnels(P)
         _dressing(P)
         _terrain(P)
@@ -1306,7 +1446,8 @@ def _checks(m, plan, rep, verify, out: Path, render: bool, export: bool) -> list
     if render:
         want = 1 + (1 if plan["cameras"]["districts"] else 0) + \
             len(plan["cameras"]["districts"]) + len(plan["cameras"]["street"]) + \
-            (1 if plan["cameras"].get("cutaway") else 0)
+            (1 if plan["cameras"].get("cutaway") else 0) + \
+            (1 if plan["cameras"].get("deck") else 0)
         got = [r for r in rep["files"].get("renders", []) if (out / r).is_file()]
         out_checks.append(("renders", len(got) == want, f"{len(got)} of {want} renders"))
     return out_checks

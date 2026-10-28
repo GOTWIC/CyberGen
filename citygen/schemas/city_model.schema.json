@@ -506,6 +506,12 @@
           "description": "grime, neon, era.",
           "title": "Style",
           "type": "object"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level its ground floor is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -780,6 +786,12 @@
           "default": false,
           "title": "Signalized",
           "type": "boolean"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -790,6 +802,103 @@
         "width_m"
       ],
       "title": "Crosswalk",
+      "type": "object"
+    },
+    "Deck": {
+      "additionalProperties": false,
+      "description": "M14: the slab of a layered district's upper level, on columns over a cluster of its\nblocks and the local streets between them. Its holes are the light wells (over plazas at\nthe ground) and the slots of the ramps; z is measured from the ground under it, like\nevery z of the model.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "district_id": {
+          "title": "District Id",
+          "type": "string"
+        },
+        "level": {
+          "default": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "polygon": {
+          "$ref": "#/$defs/Polygon"
+        },
+        "top_m": {
+          "description": "Deck top (the upper streets) over the ground.",
+          "title": "Top M",
+          "type": "number"
+        },
+        "slab_m": {
+          "description": "Slab depth: its underside is top_m - slab_m.",
+          "title": "Slab M",
+          "type": "number"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "number"
+        },
+        "segment_ids": {
+          "description": "Its streets and ramps.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Segment Ids",
+          "type": "array"
+        },
+        "well_ids": {
+          "description": "Light wells (open spaces on the ground under them).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Well Ids",
+          "type": "array"
+        },
+        "column_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Column Ids",
+          "type": "array"
+        },
+        "walkway_ids": {
+          "description": "Stairs and elevators between the levels.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Walkway Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "district_id",
+        "polygon",
+        "top_m",
+        "slab_m",
+        "area_m2"
+      ],
+      "title": "Deck",
       "type": "object"
     },
     "District": {
@@ -1224,6 +1333,12 @@
           "default": null,
           "description": "Green roofs: the building it tops.",
           "title": "Building Id"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -1363,6 +1478,12 @@
           },
           "title": "Crosswalk Ids",
           "type": "array"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -1573,6 +1694,12 @@
           },
           "title": "Adjacent Ids",
           "type": "array"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -1659,6 +1786,12 @@
           "default": null,
           "description": "Lots that M3 builds as one complex (twin towers, cluster, ...).",
           "title": "Merged Group Id"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -1874,6 +2007,12 @@
           ],
           "default": null,
           "title": "District Id"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -2174,6 +2313,12 @@
           ],
           "default": null,
           "title": "Species"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -2525,6 +2670,12 @@
           ],
           "title": "Scale",
           "type": "array"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -3227,6 +3378,12 @@
           "default": 0.0,
           "title": "Furniture M",
           "type": "number"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level it is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -3927,7 +4084,9 @@
             "portal",
             "trench",
             "vent",
-            "retaining_wall"
+            "retaining_wall",
+            "stair",
+            "elevator"
           ],
           "title": "Kind",
           "type": "string"
@@ -4677,6 +4836,12 @@
           },
           "title": "Neighbors",
           "type": "array"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level its upper end is on (0 the ground, 1 the deck of a layered district).",
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -5130,6 +5295,14 @@
         "$ref": "#/$defs/Structure"
       },
       "title": "Structures",
+      "type": "array"
+    },
+    "decks": {
+      "description": "M14: deck slabs of layered districts.",
+      "items": {
+        "$ref": "#/$defs/Deck"
+      },
+      "title": "Decks",
       "type": "array"
     },
     "tunnels": {

@@ -158,6 +158,18 @@ basins sit at the level of what they join. Read `preview_terrain.png`. With terr
 `highways.elevated_share` to 0 unless the prompt asks for viaducts: on hills their ramps lock
 the grade line and lift them far over the ground.
 
+**Decks** (a district's `decks`, M14; leave it out for a city on one level). Use it when the
+prompt speaks of an upper city, a deck city, a city built over the old streets, undercity,
+levels or stacked streets: the district gets a slab at `height_m` (default 9, 7.5 to 16) over
+`cover` of its ground (default 0.45) with streets, lots and buildings on it, ramps down to the
+ground streets (`ramps`, at least one is built), light wells (`light_m`: no ground walkway
+farther from the sky, default 70), stairs and elevators, columns on a `column_m` grid. What
+stands on the deck is the `upper` archetype (default the district's) at `upper_height_m`;
+under it the low `undercity` buildings fill the lots up to the slab. Pick a district with long
+straight streets (residential heights, megablock, midtown): a ramp needs about 110 m of
+street out of the deck at 12%. Organic streets (old town) seldom fit one. Read
+`preview_decks.png` (the ground under the deck, the deck, a section) and `render_deck.jpg`.
+
 **Districts** (`districts`, usually 6 to 10). Each needs `name` and `archetype`:
 
 | Prompt words | archetype | preset heights (m) |

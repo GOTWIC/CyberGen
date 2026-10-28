@@ -1264,7 +1264,7 @@ def _underpasses(spec, m, notes: list) -> tuple[list, list, list]:
     sidewalk on the other (frontage streets): stairs down 6.5 m from each sidewalk, a
     passage 4 m under the highway; at most one every 350 m along a highway, none within
     80 m of a node or 120 m of a street that crosses it."""
-    from .buildout import _foot, _ground, _neighbors, _split
+    from .buildout import _foot, _ground, _neighbors, _split, wk_max
     from .elevated import _at, _cum
 
     walks = [w.model_dump(mode="json") for w in m.walkways]
@@ -1376,7 +1376,7 @@ def _underpasses(spec, m, notes: list) -> tuple[list, list, list]:
                         "floor_m": 0.5, "portals": [], "vent_ids": [],
                         "attrs": {"length_m": G.q(_d(ba, bb)), "highway": s.id}})
     walks = _split(walks, gi, glines, splits)
-    k = max(int(w["id"][2:]) for w in walks)
+    k = wk_max(walks)
     by_t = {t["id"]: t for t in tunnels}
     for kind, line3, width, tid in new:
         k += 1

@@ -38,6 +38,7 @@ import math
 import shapely
 from shapely.geometry import LineString, Point, Polygon
 
+from . import decks as DK
 from . import dmath as M
 from . import geom as G
 from . import streets as ST
@@ -579,11 +580,14 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
     cut_row: dict = {}
     junctions, crosswalks, sidewalks = [], [], []
     turnarounds = []
-    W = WalkGraph()
+    # M14: one walk graph per level (a deck's corners lie over the ground's)
+    Ws = {0: WalkGraph()}
+    nlev = {n["id"]: DK.walk_level(n) for n in net.nodes}
     corner_of: dict = {}   # (node, seg id, side) -> walk node
     for nid in sorted(legs):
         lg = legs[nid]
         P = pos[nid]
+        W = Ws.setdefault(nlev.get(nid, 0), WalkGraph())
         cutbacks(lg)
         for x in lg:
             cut[(x.seg["id"], nid)] = x.cut
@@ -656,6 +660,9 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                                     "archetype": node_arch[nid], "classes": ["street"]}})
     # sidewalks and centerline walkways
     for s in net.segments:
+        if s["attrs"].get("role") == "deck_ramp":
+            continue      # (M14: a deck ramp carries no walkway; stairs join the levels)
+        W = Ws.setdefault(DK.walk_level(s), WalkGraph())
         cls = ST.street_class(s)
         pts = [tuple(p) for p in s["centerline"]]
         L = ST._plen(pts)
@@ -699,7 +706,8 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
     T.detail("junctions/polygons", [j["polygon"] for j in junctions])
     T.detail("junctions/lanes", [(r["id"], r["centerline"], r["successors"]) for r in lanes])
     return {"junctions": junctions, "crosswalks": crosswalks, "sidewalks": sidewalks,
-            "lanes": lanes, "walk": W, "cut": cut, "cut_row": cut_row, "one_way": n_oneway,
+            "lanes": lanes, "walk": Ws[0], "walk_levels": {k: v for k, v in Ws.items() if k},
+            "corners": corner_of, "cut": cut, "cut_row": cut_row, "one_way": n_oneway,
             "legs": legs}
 
 

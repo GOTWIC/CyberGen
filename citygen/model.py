@@ -26,6 +26,13 @@ Line3 = Annotated[list[Point3], Field(min_length=2)]
 Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
+def _level(what: str = "it"):
+    """M14: the street level an entity is on (0 the ground, 1 a district's deck); left out of
+    the JSON on the ground, so a city without decks is unchanged."""
+    return Field(0, exclude_if=lambda v: v == 0, description=f"M14: the street level {what} "
+                 "is on (0 the ground, 1 the deck of a layered district).")
+
+
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -254,6 +261,7 @@ class Junction(Entity):
     signalized: bool = False
     corner_radius_m: float
     crosswalk_ids: list[str] = Field(default_factory=list)
+    level: int = _level()
 
 
 class Crosswalk(Entity):
@@ -263,6 +271,7 @@ class Crosswalk(Entity):
     line: Line2 = Field(description="Curb to curb.")
     width_m: float
     signalized: bool = False
+    level: int = _level()
 
 
 class Sidewalk(Entity):
@@ -274,6 +283,7 @@ class Sidewalk(Entity):
     clear_path_m: float
     curb_m: float = 0.15
     furniture_m: float = 0.0
+    level: int = _level()
 
 
 class Lane(Entity):
@@ -291,6 +301,7 @@ class Lane(Entity):
     adjacent_ids: list[str] = Field(default_factory=list,
                                     description="Lanes of the same road and direction next to "
                                                 "this one (lane changes).")
+    level: int = _level()
 
 
 class Walkway(Entity):
@@ -302,17 +313,38 @@ class Walkway(Entity):
     line: Line3
     width_m: float
     neighbors: list[str] = Field(default_factory=list)
+    level: int = _level("its upper end")
 
 
 class Structure(Entity):
     TYPE_PREFIX: ClassVar[str] = "structure"
     kind: Literal["deck", "ramp", "column", "pylon", "tube", "canopy", "portal", "trench",
-                  "vent", "retaining_wall"]
+                  "vent", "retaining_wall", "stair", "elevator"]
     footprint: Polygon | None = None
     line: list[Point3] = Field(default_factory=list)
     z0_m: float
     z1_m: float
     supports: list[str] = Field(default_factory=list, description="Ids carried by this structure.")
+
+
+class Deck(Entity):
+    """M14: the slab of a layered district's upper level, on columns over a cluster of its
+    blocks and the local streets between them. Its holes are the light wells (over plazas at
+    the ground) and the slots of the ramps; z is measured from the ground under it, like
+    every z of the model."""
+    TYPE_PREFIX: ClassVar[str] = "deck"
+    district_id: str
+    level: int = 1
+    polygon: Polygon
+    top_m: float = Field(description="Deck top (the upper streets) over the ground.")
+    slab_m: float = Field(description="Slab depth: its underside is top_m - slab_m.")
+    area_m2: float
+    segment_ids: list[str] = Field(default_factory=list, description="Its streets and ramps.")
+    well_ids: list[str] = Field(default_factory=list, description="Light wells (open spaces "
+                                                                   "on the ground under them).")
+    column_ids: list[str] = Field(default_factory=list)
+    walkway_ids: list[str] = Field(default_factory=list, description="Stairs and elevators "
+                                                                      "between the levels.")
 
 
 # --- tunnels (M9) -------------------------------------------------------------
@@ -412,6 +444,7 @@ class Lot(Entity):
     frontage_ids: list[str] = Field(default_factory=list, description="Road segment ids.")
     merged_group_id: str | None = Field(
         None, description="Lots that M3 builds as one complex (twin towers, cluster, ...).")
+    level: int = _level()
 
 
 class OpenSpace(Entity):
@@ -422,6 +455,7 @@ class OpenSpace(Entity):
     z_m: float = 0.0
     name: str | None = None
     district_id: str | None = None
+    level: int = _level()
 
 
 class Property(Entity):
@@ -512,6 +546,7 @@ class Building(Entity):
     portals: list[Portal] = Field(default_factory=list)
     landmark: bool = False
     style: dict[str, float | str] = Field(default_factory=dict, description="grime, neon, era.")
+    level: int = _level("its ground floor")
 
 
 class Skybridge(Entity):
@@ -554,6 +589,7 @@ class Plant(Entity):
     height_m: float
     crown_radius_m: float
     species: str | None = None
+    level: int = _level()
 
 
 class GreenArea(Entity):
@@ -563,6 +599,7 @@ class GreenArea(Entity):
     line: list[Point2] = Field(default_factory=list)
     z_m: float = 0.0
     building_id: str | None = Field(None, description="Green roofs: the building it tops.")
+    level: int = _level()
 
 
 class Prop(Entity):
@@ -570,6 +607,7 @@ class Prop(Entity):
     position: Point3
     yaw_deg: float = 0.0
     scale: Point3 = (1.0, 1.0, 1.0)
+    level: int = _level()
 
 
 # --- gameplay layer (M11) ---------------------------------------------------------
@@ -732,7 +770,7 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "channels": Channel, "waterways": Waterway, "quays": Quay, "bridges": Bridge,
     "districts": District, "places": Place, "road_nodes": RoadNode, "road_segments": RoadSegment,
     "junctions": Junction, "crosswalks": Crosswalk, "sidewalks": Sidewalk, "lanes": Lane,
-    "walkways": Walkway, "structures": Structure, "tunnels": Tunnel,
+    "walkways": Walkway, "structures": Structure, "decks": Deck, "tunnels": Tunnel,
     "transit_lines": TransitLine, "stations": Station, "megasites": Megasite, "blocks": Block,
     "lots": Lot, "open_spaces": OpenSpace, "properties": Property, "buildings": Building,
     "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
@@ -800,6 +838,8 @@ class CityModel(_Model):
     lanes: list[Lane] = Field(default_factory=list)
     walkways: list[Walkway] = Field(default_factory=list)
     structures: list[Structure] = Field(default_factory=list)
+    decks: list[Deck] = Field(default_factory=list, exclude_if=lambda v: not v,
+                              description="M14: deck slabs of layered districts.")
     tunnels: list[Tunnel] = Field(default_factory=list)
     transit_lines: list[TransitLine] = Field(default_factory=list)
     stations: list[Station] = Field(default_factory=list)

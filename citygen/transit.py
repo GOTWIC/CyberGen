@@ -196,6 +196,7 @@ class Ctx:
     road_z: np.ndarray = None
     blds: list = field(default_factory=list)
     btree: object = None
+    slabs: list = field(default_factory=list)     # M14: (deck polygon, top + clear height)
     water: list = field(default_factory=list)   # (polygon, clearance m, navigable)
     cones: list = field(default_factory=list)   # (polygon, limit m)
     skyb: list = field(default_factory=list)    # (line, z0, z1, complex, id, width)
@@ -382,6 +383,11 @@ def context(spec, m) -> Ctx:
         w = G._strip_width(G.parts(poly)[0]) if G.parts(poly) else 0.0
         c.blds.append(Bld(b.id, poly, b.height_m, removable, bottom, w >= 12.0 and
                           G.area(poly) >= 600.0))
+    # M14: a deck's slab, with the clear height over its streets: a track passes over it
+    # (`_profile_pass`; the routes do not see it)
+    from .decks import CLEAR_M as DECK_CLEAR_M
+
+    c.slabs = [(G.from_model_poly(dk.polygon), dk.top_m + DECK_CLEAR_M) for dk in m.decks]
     c.btree = shapely.STRtree([x.poly for x in c.blds]) if c.blds else None
     for s in m.megasites:
         if s.flight_cone is not None and s.height_limit_m is not None:
@@ -1558,8 +1564,11 @@ class RoadGraph:
         self.pos = {n.id: (n.position[0], n.position[1]) for n in c.m.road_nodes}
         self.adj: dict = {}
         self.major: set = set()     # nodes on avenues and highways
+        # (M14: no track along a deck's streets or the ground streets under its slab)
+        under = {x.attrs.get("twin") for x in c.m.road_segments if x.attrs.get("deck")}
         for k, s in enumerate(c.m.road_segments):
-            if s.road_class not in w or s.attrs.get("role") == "ramp":
+            if s.road_class not in w or s.attrs.get("role") == "ramp" or \
+                    "deck" in s.attrs or s.id in under:
                 continue
             pts = [tuple(p) for p in s.centerline]
             a = self.pos.get(s.start)
@@ -2973,6 +2982,10 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
             if b.id in gone or b.id in ln.portals or b.bottom >= ln.z0 + 6.0:
                 continue
             need[i] = max(need[i], b.top + clear)
+    for poly, top in c.slabs:
+        for i in np.nonzero(shapely.dwithin(poly, arr, WIDTH_M[mode] / 2.0 + SIDE_PAD_M)
+                            )[0].tolist():
+            need[i] = max(need[i], top + deck)
     for s, i in zip(ln.stops, ln.stop_at):
         if s.z is not None:
             need[i] = max(need[i], s.z + (0.0 if mode == "sky_tube" else 1.0))

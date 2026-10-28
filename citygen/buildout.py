@@ -83,9 +83,14 @@ def contexts(spec, m) -> list[dict]:
     """One job per district: its lots and what its buildings need to know around them."""
     by_name = {d.name: d for d in spec.districts}
     lots_by: dict = {}
+    deck_lots: dict = {}
     for lt in m.lots:
         if lt.attrs.get("pinned"):
             continue      # a traced building's lot (pinned_buildings)
+        if lt.level or lt.attrs.get("deck_under"):
+            # M14: the deck's lots and the lots under it are jobs of their own
+            deck_lots.setdefault((lt.district_id, lt.level), []).append(lt)
+            continue
         lots_by.setdefault(lt.district_id, []).append(lt)
     cones = [(G.from_model_poly(s.flight_cone), float(s.height_limit_m))
              for s in m.megasites if s.flight_cone is not None and s.height_limit_m]
@@ -164,7 +169,101 @@ def contexts(spec, m) -> list[dict]:
             block_opens=bopen_by.get(d.id, {}))
         lots = sorted(lots_by.get(d.id, []), key=lambda lt: lt.id)
         jobs.append({"ctx": cx, "lots": [_lot_dict(lt) for lt in lots]})
+        for dk in m.decks:
+            if dk.district_id == d.id:
+                jobs += _deck_jobs(m, sd, cx, dk, deck_lots, jpolys, cwpolys, swpolys)
     return jobs
+
+
+UNDER_ROOM_M = 0.5      # M14: buildings under a deck stop this far under the slab
+
+
+def _deck_jobs(m, sd, cx, dk, deck_lots: dict, jpolys, cwpolys, swpolys) -> list:
+    """M14: the jobs of a deck: the lots under it (low buildings of the `undercity` program
+    under the slab) and the lots on it, built as on the ground (the deck's streets at z 0)
+    and lifted onto the deck afterwards (`lift`)."""
+    H = dk.top_m
+    out = []
+    under = sorted(deck_lots.get((dk.district_id, 0), []), key=lambda lt: lt.id)
+    if under:
+        ucx = dataclasses.replace(cx, archetype="undercity", seed=cx.seed + 101,
+                                  height=(3.5, G.q(H - dk.slab_m - UNDER_ROOM_M)),
+                                  complexes=(), landmarks=[], opens=[], block_opens={},
+                                  skybridge_density=0.0, greenery=0.0, notes=[])
+        out.append({"ctx": ucx, "lots": [_lot_dict(lt) for lt in under], "deck": dk.id,
+                    "tag": "under", "lift": 0.0})
+    upper = sorted(deck_lots.get((dk.district_id, 1), []), key=lambda lt: lt.id)
+    if upper:
+        roads = []
+        for s in m.road_segments:
+            if s.attrs.get("deck") == dk.id and s.attrs.get("role") != "deck_ramp":
+                roads.append((s.id, s.road_class, [tuple(p) for p in s.centerline], s.width_m,
+                              tuple((float(z.s), 0.0) for z in s.z_profile)))
+        junctions = [jpolys[i] for i, j in enumerate(m.junctions) if j.level == 1]
+        junctions += [cwpolys[i] for i, c in enumerate(m.crosswalks) if c.level == 1]
+        junctions += [swpolys[i] for i, w in enumerate(m.sidewalks) if w.level == 1]
+        dsp = sd.decks
+        ucx = dataclasses.replace(cx, archetype=dsp.upper or cx.archetype, seed=cx.seed + 211,
+                                  height=tuple(float(v) for v in dsp.upper_height_m)
+                                  if dsp.upper_height_m else cx.height,
+                                  roads=roads, junctions=junctions, water=[], opens=[],
+                                  block_opens={}, complexes=(), landmarks=[],
+                                  cones=[(p, lim - H) for p, lim in cx.cones], notes=[])
+        out.append({"ctx": ucx, "lots": [_lot_dict(lt) for lt in upper], "deck": dk.id,
+                    "tag": "upper", "lift": H})
+    return out
+
+
+def under(r: dict, deck: str) -> None:
+    """M14: the buildings of a job under a deck name it (`attrs.deck_under`)."""
+    from .model import COLLECTIONS
+
+    out = []
+    for e in r["buildings"]:
+        d = e.model_dump(mode="python")
+        d["attrs"] = {**d["attrs"], "deck_under": deck}
+        out.append(COLLECTIONS["buildings"].model_validate(d))
+    r["buildings"] = out
+
+
+def lift(r: dict, H: float, deck: str, program: str) -> None:
+    """M14: rows of a job on a deck lifted onto it (every z of the model is measured from the
+    ground under it)."""
+    from .model import COLLECTIONS
+
+    def up(e, coll, fn):
+        d = e.model_dump(mode="python")
+        fn(d)
+        d["level"] = 1
+        return COLLECTIONS[coll].model_validate(d)
+
+    def bld(d):
+        for ms in d["masses"]:
+            ms["z0_m"] = G.q(ms["z0_m"] + H)
+            ms["z1_m"] = G.q(ms["z1_m"] + H)
+        d["height_m"] = G.q(d["height_m"] + H)
+        for it in d["roof_items"]:
+            x, y, z = it["position"]
+            it["position"] = (x, y, G.q(z + H))
+        d["attrs"] = {**d["attrs"], "deck": deck, "deck_top_m": H, "program": program}
+
+    def green(d):
+        d["z_m"] = G.q(d["z_m"] + H)
+
+    def elem(d):
+        d["z_m"] = G.q(d["z_m"] + H)
+        for ms in d["masses"]:
+            ms["z0_m"] = G.q(ms["z0_m"] + H)
+            ms["z1_m"] = G.q(ms["z1_m"] + H)
+
+    r["buildings"] = [up(e, "buildings", bld) for e in r["buildings"]]
+    r["green_areas"] = [up(e, "green_areas", green) for e in r["green_areas"]]
+    els = []
+    for e in r["site_elements"]:
+        d = e.model_dump(mode="python")
+        elem(d)
+        els.append(COLLECTIONS["site_elements"].model_validate(d))
+    r["site_elements"] = els
 
 
 CHUNK_LOTS = 300
@@ -248,15 +347,27 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
                                   for job, sk, r in zip(jobs, sky, ra)])
     lap("phase_c")
     for j, job in enumerate(jobs):
-        T.stage(f"buildings/{job['ctx'].did}",
+        tag = job.get("tag")
+        T.stage(f"buildings/{job['ctx'].did}" + (f"/{tag}" if tag else ""),
                 sorted(trace[j], key=lambda t: t[0]) + rc[j]["trace"])
         for r in parts[j]:
             out.notes += r["notes"]
+            if job.get("lift"):
+                lift(r, job["lift"], job["deck"], job["ctx"].archetype)
+            elif tag == "under":
+                under(r, job["deck"])
             for key in ("buildings", "properties", "site_elements", "structures",
                         "green_areas"):
                 getattr(out, key).extend(r[key])
         out.notes += rc[j]["notes"]
-        out.skybridges.extend(rc[j]["skybridges"])
+        if tag == "upper":
+            # (M14: the deck's skybridges, lifted with it, named apart from the ground's)
+            for sb in rc[j]["skybridges"]:
+                sb["id"] = sb["id"].replace(".sb", ".l1.sb", 1)
+                sb["z_m"] = G.q(sb["z_m"] + job["lift"])
+                out.skybridges.append(sb)
+        elif tag is None:
+            out.skybridges.extend(rc[j]["skybridges"])
     T.stage("buildings", [[x.id, x.height_m] for x in out.buildings])
     site = Out()
     out.megasites = SI.build_sites(spec, m, site)
@@ -399,28 +510,55 @@ def JN_dedupe(notes):
 # Walkway graph: entrances, skybridges, megasite paths
 # ---------------------------------------------------------------------------
 
-def _ground(walks) -> list[int]:
+def _ground(walks, level: int = 0) -> list[int]:
+    """Walkways on the ground of a level (M14: a deck's, at its top), none of the stairs or
+    elevators between levels."""
+    if level == 0:
+        return [i for i, w in enumerate(walks) if w["kind"] in GROUND_WALKS and
+                not w.get("level") and all(abs(p[2]) < 1e-9 for p in w["line"])]
     return [i for i, w in enumerate(walks) if w["kind"] in GROUND_WALKS and
-            all(abs(p[2]) < 1e-9 for p in w["line"])]
+            w.get("level") == level and not (w.get("attrs") or {}).get("levels") and
+            all(abs(p[2] - w["line"][0][2]) < 1e-9 for p in w["line"])]
+
+
+class _Level:
+    """The ground walkways of one level, for nearest-walkway queries (indices into the
+    common `gi` and `lines`)."""
+
+    def __init__(self, idx: list, lines: list, walks, gi, land_of):
+        self.idx = idx
+        self.lines = [lines[k] for k in idx]
+        self.gi = [gi[k] for k in idx]
+        self.land = [land_of[k] for k in idx]
+        self.tree = shapely.STRtree(self.lines)
+        self.walks = walks
+
+    def nearest(self, pt, land: int) -> int:
+        return self.idx[_nearest_on(self.tree, self.lines, self.walks, self.gi, self.land, pt,
+                                    land)]
 
 
 def link_entrances(out: Out, walks: list) -> list:
-    """Every entrance records its nearest ground walkway; skybridges, megasite buildings and
-    site paths join the walkway graph."""
-    gi = _ground(walks)
+    """Every entrance records its nearest ground walkway (M14: on its building's level);
+    skybridges, megasite buildings and site paths join the walkway graph."""
+    levels = sorted({0} | {rec.level for rec in out.buildings})
+    per = {lv: _ground(walks, lv) for lv in levels}
+    gi = sorted(i for lv in levels for i in per[lv])
+    pos_of = {i: k for k, i in enumerate(gi)}
     lines = [LineString([p[:2] for p in walks[i]["line"]]) for i in gi]
-    tree = shapely.STRtree(lines)
     ents = []
     for rec in out.buildings:
         for e in rec.entrances:
             ents.append((rec, e))
     line_of: dict = {}
     land_of = _landmass_index(out.landmasses, [l.coords[0] for l in lines])
+    lvs = {lv: _Level([pos_of[i] for i in per[lv]], lines, walks, gi, land_of)
+           for lv in levels if per[lv]}
     if ents:
         pts = shapely.points(np.array([e.position for _, e in ents], dtype=np.float64))
         ent_land = _landmass_index(out.landmasses, [e.position for _, e in ents])
         for k, (rec, e) in enumerate(ents):
-            best = _nearest_on(tree, lines, walks, gi, land_of, pts[k], ent_land[k])
+            best = lvs[rec.level if rec.level in lvs else 0].nearest(pts[k], ent_land[k])
             e.walkway_id = walks[gi[best]]["id"]
             e.link_m = G.q(G.dist(lines[best], pts[k]))
             line_of[id(e)] = best
@@ -442,25 +580,26 @@ def link_entrances(out: Out, walks: list) -> list:
             return
         foot = _foot(lines, walks, gi, line_of[id(e)], e.position)
         splits.setdefault(line_of[id(e)], []).append(foot)
-        new.append(("path", [tuple(e.position), foot], 2.0, 0.0,
-                    {"building": rec.id, "door": True}))
+        new.append(("path", [tuple(e.position), foot], 2.0, _base(rec),
+                    {"building": rec.id, "door": True}, rec.level))
         linked.add(rec.id)
 
     for sb in out.skybridges:
         a, bb = sb["line"]
         z = sb["z_m"]
         ids = []
-        new.append(("skybridge", [a, bb], sb["width_m"], z, {"skybridge": sb["id"]}))
+        lv = by_id[sb["building_ids"][0]].level
+        new.append(("skybridge", [a, bb], sb["width_m"], z, {"skybridge": sb["id"]}, lv))
         ids.append(len(new) - 1)
         for bid, p in zip(sb["building_ids"], (a, bb)):
             rec = by_id[bid]
-            new.append(("elevator", [p, p], 2.0, (0.0, z), {"building": bid,
-                                                            "skybridge": sb["id"]}))
+            new.append(("elevator", [p, p], 2.0, (_base(rec), z),
+                        {"building": bid, "skybridge": sb["id"]}, rec.level))
             ids.append(len(new) - 1)
             e = main_entrance(rec)
             if e is not None and tuple(e.position) != tuple(p):
-                new.append(("path", [p, tuple(e.position)], 2.0, 0.0,
-                            {"building": bid, "lobby": True}))
+                new.append(("path", [p, tuple(e.position)], 2.0, _base(rec),
+                            {"building": bid, "lobby": True}, rec.level))
             door(rec)
         sb["_walk"] = ids
     for rec in out.buildings:
@@ -468,26 +607,30 @@ def link_entrances(out: Out, walks: list) -> list:
         if rec.megasite_id or rec.landmark or (e is not None and e.link_m > DOOR_LINK_M):
             door(rec)   # (a far entrance on a big lot gets a path, like a driveway)
     for sid, (kind, pts, width) in out.site_walks:
-        new.append((kind, [tuple(p) for p in pts], width, 0.0, {"megasite": sid}))
+        new.append((kind, [tuple(p) for p in pts], width, 0.0, {"megasite": sid}, 0))
     link_land = _landmass_index(out.landmasses, [p for _, p in out.site_links])
     for (sid, p), lm in zip(out.site_links, link_land):
-        best = _nearest_on(tree, lines, walks, gi, land_of, Point(p), lm)
+        best = lvs[0].nearest(Point(p), lm)
         foot = _foot(lines, walks, gi, best, p)
         splits.setdefault(best, []).append(foot)
         if foot != tuple(p):
-            new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True}))
+            new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True},
+                        0))
     walks = _split(walks, gi, lines, splits)
     n0 = len(walks)
     k = wk_max(walks)
     first = k + 1
-    for i, (kind, pts, width, z, attrs) in enumerate(new):
+    for i, (kind, pts, width, z, attrs, lv) in enumerate(new):
         k += 1
         if kind == "elevator":
             line = [(pts[0][0], pts[0][1], z[0]), (pts[0][0], pts[0][1], z[1])]
         else:
             line = [(p[0], p[1], z) for p in pts]
-        walks.append({"id": f"wk{k:06d}", "type": "walkway", "kind": kind, "line": line,
-                      "width_m": width, "neighbors": [], "attrs": attrs})
+        rec = {"id": f"wk{k:06d}", "type": "walkway", "kind": kind, "line": line,
+               "width_m": width, "neighbors": [], "attrs": attrs}
+        if lv:
+            rec["level"] = lv
+        walks.append(rec)
     for sb in out.skybridges:
         sb["walkway_ids"] = [f"wk{first + i:06d}" for i in sb.pop("_walk")]
     out.skybridges.sort(key=lambda s_: s_["id"])
@@ -608,14 +751,21 @@ def _cut(pts, ds, feet, line) -> list:
 
 
 def _neighbors(walks) -> None:
+    """Neighbors: the walkways that share an end point (M14: on the same level)."""
+    from .decks import walk_ends
+
     at: dict = {}
-    for w in walks:
-        a, b = tuple(w["line"][0][:2]), tuple(w["line"][-1][:2])
+    ends = [walk_ends(w) for w in walks]
+    for w, (a, b) in zip(walks, ends):
         at.setdefault(a, []).append(w["id"])
         at.setdefault(b, []).append(w["id"])
-    for w in walks:
-        a, b = tuple(w["line"][0][:2]), tuple(w["line"][-1][:2])
+    for w, (a, b) in zip(walks, ends):
         w["neighbors"] = sorted(set(at[a] + at[b]) - {w["id"]})
+
+
+def _base(rec) -> float:
+    """z of a building's ground floor (M14: its deck's top)."""
+    return float(rec.attrs.get("deck_top_m", 0.0)) if rec.level else 0.0
 
 
 # ---------------------------------------------------------------------------

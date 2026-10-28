@@ -182,11 +182,10 @@ def check_lane_graph(m: CityModel, n: _Net):
 
 
 def walk_components(m: CityModel):
-    pairs = []
-    for w in m.walkways:
-        a, b = tuple(w.line[0][:2]), tuple(w.line[-1][:2])
-        pairs.append((a, b))
-    return _uf(pairs)
+    """Union-find root of every walk node: its plan point (with its level on a deck, M14)."""
+    from .decks import walk_ends
+
+    return _uf([walk_ends(w) for w in m.walkways])
 
 
 def check_walkway_graph(m: CityModel, n: _Net, g):
@@ -198,7 +197,7 @@ def check_walkway_graph(m: CityModel, n: _Net, g):
         return c
     roots = walk_components(m)
     pts = sorted(roots)
-    arr = shapely.points(np.array(pts, dtype=np.float64))
+    arr = shapely.points(np.array([p[:2] for p in pts], dtype=np.float64))
     for lm in m.landmasses:
         if not lm.district_ids:
             continue
@@ -399,9 +398,11 @@ def check_street_duplicates(m: CityModel, n: _Net):
     tree = shapely.STRtree(lines)
     for i, s in enumerate(segs):
         a = lines[i]
+        # (M14: a deck street and the ground street under it are on two levels)
         js = [j for j in sorted(int(x) for x in tree.query(a, predicate="dwithin",
                                                            distance=s.width_m / 2 + 24.0))
-              if j > i and not (s.road_class in PRIMARY and segs[j].road_class in PRIMARY)]
+              if j > i and not (s.road_class in PRIMARY and segs[j].road_class in PRIMARY)
+              and ("deck" in s.attrs) == ("deck" in segs[j].attrs)]
         lens = ST.side_by_side_many(a, s.width_m, [lines[j] for j in js],
                                     [segs[j].width_m for j in js])
         for j, L in zip(js, lens):

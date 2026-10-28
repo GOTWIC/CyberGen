@@ -85,4 +85,5 @@ def test_all_scope_entities_present():
     # M11: the gameplay layer
     expected |= {"factions", "zones", "pois", "fields", "densities", "parking",
                  "travel_points", "sign_slots"}
+    expected |= {"decks"}   # M14: layered districts
     assert set(COLLECTIONS) == expected

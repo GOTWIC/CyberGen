@@ -270,7 +270,8 @@ def read_glb_json(path: Path) -> dict:
 def _flat(elems: list[dict]) -> dict:
     """Elements (id, kind, ref, width, points, links by id, attrs) as flat arrays: element i
     has points[point_start[i]:point_start[i + 1]] and links[link_start[i]:link_start[i + 1]]
-    (indices of other elements); links to ids not in the graph are dropped."""
+    (indices of other elements); links to ids not in the graph are dropped. M14: `levels`
+    (0 the ground, 1 a deck) only when an element is off the ground."""
     index = {e["id"]: i for i, e in enumerate(elems)}
     out = {"ids": [], "kinds": [], "refs": [], "widths": [], "point_start": [0],
            "points": [], "link_start": [0], "links": [], "attrs": []}
@@ -287,6 +288,8 @@ def _flat(elems: list[dict]) -> dict:
         out["attrs"].append(json.dumps(e.get("attrs", {}), sort_keys=True,
                                        separators=(",", ":")) if e.get("attrs") else "")
     out["count"] = len(elems)
+    if any(e.get("level") for e in elems):
+        out["levels"] = [int(e.get("level") or 0) for e in elems]
     return out
 
 
@@ -297,9 +300,10 @@ def flat_graphs(graphs: dict) -> dict:
     lanes = [{"id": x["id"], "kind": x["kind"], "ref": x["segment_id"] or x["node_id"],
               "width": x["width_m"], "points": x["centerline"], "links": x["successors"],
               "attrs": {"forward": x["forward"], "index": x["index"],
-                        "adjacent_ids": x["adjacent_ids"]}} for x in graphs["lanes"]]
+                        "adjacent_ids": x["adjacent_ids"]}, "level": x.get("level", 0)}
+             for x in graphs["lanes"]]
     walks = [{"id": w["id"], "kind": w["kind"], "width": w["width_m"], "points": w["line"],
-              "links": w["neighbors"]} for w in graphs["walkways"]]
+              "links": w["neighbors"], "level": w.get("level", 0)} for w in graphs["walkways"]]
     transit = []
     for t in graphs["transit_lines"]:
         transit.append({"id": t["id"], "kind": t.get("mode") or "line", "ref": t.get("name"),
@@ -354,6 +358,15 @@ def _inside(rings: list) -> list[float] | None:
         if best is not None and best[0] > 2.0:
             break
     return None if best is None else [round(best[1], 2), round(best[2], 2)]
+
+
+# M14: the joined objects of a deck's streets, its slab and its ramps stand on level 1
+DECK_LEVEL = {"deck_road": 1, "deck_junction": 1, "deck_crosswalk": 1, "deck_sidewalk": 1,
+              "deck_slab": 1, "deck_ramp": 1}
+
+
+def _level(category: str, props: dict) -> int:
+    return int(props.get("level") or DECK_LEVEL.get(category, 0))
 
 
 def _roof(parts: list[dict]) -> list[float] | None:
@@ -415,6 +428,7 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
         tiles[t["name"]] = {"name": t["name"], "ix": t["ix"], "iy": t["iy"],
                             "bounds": t["bounds"], "glb": None, "objects": []}
     instances = []
+    decks: dict[str, dict] = {}
     for o in plan["objects"]:
         props = o.get("props", {})
         h = content_hash(o)
@@ -433,6 +447,14 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
                "materials": sorted({p["m"] for p in o["parts"]})}
         if o["category"] in ("building", "landmark"):
             obj["roof"] = _roof(o["parts"])
+        if _level(o["category"], props):
+            obj["level"] = _level(o["category"], props)
+        if o["category"] == "deck_slab":
+            dk = decks.setdefault(props["citygen_id"], {
+                "id": props["citygen_id"], "level": int(props.get("level") or 1),
+                "top_m": props.get("top_m"), "district": props.get("district", ""),
+                "keys": []})
+            dk["keys"].append(o["name"])
         tiles[o["tile"]]["objects"].append(obj)
     out_tiles = []
     for t in tiles.values():
@@ -472,6 +494,9 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
                    "instances": sum(i["count"] for i in instances),
                    "prototypes": len(protos)},
     }
+    if decks:
+        # M14: the decks (their slab actors by key), for stage 4's levels
+        man["decks"] = [decks[k] for k in sorted(decks)]
     man["hash"] = content_hash({k: v for k, v in man.items() if k != "plan_sha256"})
     return man, meshes, graphs
 

@@ -513,11 +513,13 @@ def views(plan, res):
     for k, v in enumerate(cams["street"], 1):
         out.append((f"street_{k}", False, v["lens_mm"], v["eye"], v["target"], res,
                     int(res * 9 / 16)))
-    cut = cams.get("cutaway")
-    if cut:
-        # M9: the section along the longest road tunnel (rendered last: it cuts the scene)
-        out.append(("cutaway", False, cut["lens_mm"], cut["eye"], cut["target"], res,
-                    int(res * 9 / 16)))
+    for key in ("cutaway", "deck"):
+        cut = cams.get(key)
+        if cut:
+            # M9: the section along the longest road tunnel; M14: across the biggest deck
+            # (rendered last: they cut the scene)
+            out.append((key, False, cut["lens_mm"], cut["eye"], cut["target"], res,
+                        int(res * 9 / 16)))
     return out
 
 
@@ -542,11 +544,11 @@ def _box_obj(name, corners_xy, z0, z1, mat=None):
     return obj
 
 
-def cutaway(scene, plan):
-    """Cut the scene along the cutaway plane (M9): an earth block under the ground; the
-    ground, water, streets, tunnels and the buildings across the plane cut by a box on the
-    camera's side, everything else on that side hidden. Returns what to undo."""
-    c = plan["cameras"]["cutaway"]
+def cutaway(scene, plan, key="cutaway"):
+    """Cut the scene along a cutaway plane (M9; M14 `deck`): an earth block under the
+    ground; the ground, water, streets, tunnels and the buildings across the plane cut by a
+    box on the camera's side, everything else on that side hidden. Returns what to undo."""
+    c = plan["cameras"][key]
     ox, oy = c["origin"]
     ux, uy = c["u"]
     nx, ny = c["n"]
@@ -564,8 +566,10 @@ def cutaway(scene, plan):
     # collection operand: the boolean takes their union)
     coll = bpy.data.collections.new("citygen_cutters")
     scene.collection.children.link(coll)
-    # (down to 20 m above the earth's bottom: the pit keeps a floor)
-    cutter = _box_obj("citygen_cutter", ring, z0 + 20.0, z1)
+    # (down to 20 m above the earth's bottom: the pit keeps a floor; a deck's section keeps
+    # the ground and its streets whole)
+    deck = key == "deck"
+    cutter = _box_obj("citygen_cutter", ring, -5.0 if deck else z0 + 20.0, z1)
     scene.collection.objects.unlink(cutter)
     coll.objects.link(cutter)
     md = MeshData()
@@ -593,7 +597,7 @@ def cutaway(scene, plan):
     if (sring[1][0] - sring[0][0]) * (sring[2][1] - sring[0][1]) - \
             (sring[1][1] - sring[0][1]) * (sring[2][0] - sring[0][0]) < 0:
         sring = sring[::-1]
-    soil = _box_obj("citygen_soil", sring, z0, -4.0, soil_mat)
+    soil = None if deck else _box_obj("citygen_soil", sring, z0, -4.0, soil_mat)
     # a low light from the camera's side into the section (the tunnels lie under their roofs)
     fill = bpy.data.lights.new("citygen_cut_light", "SUN")
     fill.energy = 2.2
@@ -602,7 +606,7 @@ def cutaway(scene, plan):
     d = Vector((-nx, -ny, -0.12)).normalized()
     lamp.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
     scene.collection.objects.link(lamp)
-    undo = {"mods": [], "hidden": [], "objects": [cutter, soil, lamp] +
+    undo = {"mods": [], "hidden": [], "objects": [cutter, lamp] + ([soil] if soil else []) +
             ([voids] if voids else []), "collection": coll}
 
     def side(obj):
@@ -623,6 +627,8 @@ def cutaway(scene, plan):
             continue        # away from the cut
         cat = obj.get("citygen_category", "")
         straddles = a0 < 0.0 < a1
+        if deck and (cat in CUT_KEEP or cat.startswith("road_") or cat.startswith("open_")):
+            continue        # (the ground stays whole in front of a deck's section)
         if obj is soil or cat in CUT_KEEP or cat.startswith("road_") or \
                 cat.startswith("open_") or (straddles and cat not in tunnel_cats and
                                             obj.get("citygen_tile") is not None and
@@ -668,7 +674,8 @@ def render_view(scene, view, path, width=None, plan=None):
     look(cam, eye, target)
     if width:
         w, h = width, int(round(width * h / w))
-    undo = cutaway(scene, plan) if name == "cutaway" and plan is not None else None
+    undo = cutaway(scene, plan, name) if name in ("cutaway", "deck") and plan is not None \
+        else None
     try:
         return render(scene, path, w, h)
     finally:

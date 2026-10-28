@@ -929,13 +929,20 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
 
         checks += TC.run(spec, m)
     if m.props or m.plants:
+        from . import decks as DK
         from . import prop_checks as PC
 
-        checks += PC.run(spec, m)
+        checks += DK.per_level(m, lambda v: PC.run(spec, v))   # (M14: on every level)
     if m.pois or m.zones or m.fields or m.densities:
         from . import gameplay_checks as GC
 
         checks += GC.run(spec, m)
+    if m.decks and m.buildings:
+        # (M14: on a finished city; the build's early checks run on its M2 model, which has
+        # no columns yet)
+        from . import deck_checks as DC
+
+        checks += DC.run(spec, m)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
@@ -969,6 +976,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import gameplay_checks as GC
 
         st["gameplay"] = GC.stats(m)
+    if m.decks and m.buildings:
+        from . import deck_checks as DC
+
+        st["decks"] = DC.stats(m)
     return checks, st
 
 

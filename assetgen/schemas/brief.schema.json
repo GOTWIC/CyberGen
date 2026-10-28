@@ -412,6 +412,25 @@
           ],
           "description": "M13: the lowest ground under the footprint.",
           "title": "Plinth M"
+        },
+        "level": {
+          "default": 0,
+          "description": "M14: the street level its ground floor is on (1: a deck; absent on the ground).",
+          "title": "Level",
+          "type": "integer"
+        },
+        "deck_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M14: the deck top its ground floor stands on (absent on the ground).",
+          "title": "Deck M"
         }
       },
       "required": [
