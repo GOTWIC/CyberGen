@@ -1,0 +1,55 @@
+assetgen streets: Saltreach Free Port: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 1099 blockout objects replaced
+  [ok] street_budgets: 670763 triangles in the city (budget 20000000), at most 26096 in a tile (t-06-05, budget 2500000)
+
+coverage:
+  road_segments: 1679 of 1680 (+1 declared)
+  junctions: 980 of 980
+  crosswalks: 592 of 592
+  sidewalks: 2198 of 2198
+  bridges: 15 of 15
+  structures: 512 of 512
+  tunnels: 0 of 0
+  quays: 17 of 17
+  waterways: 6 of 11 (+5 declared)
+  site_elements: 378 of 378
+  transit_lines: 2 of 2
+  megasites: 3 of 3
+  stations: 11 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 6383, tiles 105, triangles 670763, disk 42.3 MB
+triangles by kind:
+  street.sidewalk: 253743 (2198 pieces)
+  street.road: 172895 (1680 pieces)
+  street.junction: 101408 (980 pieces)
+  street.quay: 52225 (17 pieces)
+  street.transit.deck: 22032 (39 pieces)
+  street.bridge: 21128 (15 pieces)
+  street.crosswalk: 19234 (592 pieces)
+  street.site.rail_track: 10104 (2 pieces)
+  street.column: 5850 (345 pieces)
+  street.structure.canopy: 3748 (3 pieces)
+  street.site.berth: 2214 (2 pieces)
+  street.canal_wall.canal: 1924 (3 pieces)
+  street.transit.canopy: 1144 (22 pieces)
+  street.transit.column: 960 (96 pieces)
+  street.site.gantry_crane: 824 (4 pieces)
+  street.site.container_stack: 706 (353 pieces)
+  street.canal_wall.basin: 312 (3 pieces)
+  street.transit.pylon: 126 (7 pieces)
+  street.site.truck_gate: 84 (1 pieces)
+  street.site.lawn: 46 (1 pieces)
+  street.site.bus_bay: 20 (10 pieces)
+  street.site.platform: 20 (2 pieces)
+  street.site.drop_off: 12 (1 pieces)
+  street.site.plaza: 4 (2 pieces)
+  street.canal_wall.creek: 0 (5 pieces)
+no mesh: inside its junctions 1, natural banks 5
+corner pads: 2404 made, 7 skipped (no sidewalk 3, same edge 4)
+bridges: arch 2, cable_stayed 2, footbridge.stone 5, girder 6
+instances: part.container.c0 1918, part.container.c1 1870, part.container.c2 1906, part.container.c3 1906, part.container.c4 1964, part.container.c5 1906
+files: 105 tiles made, 0 kept, 36 written, 69 same bytes, 0 removed
+seconds: context 0.63, gather 0.33, make 2.21, write 0.31, total 3.7, workers 4

@@ -1,6 +1,7 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
-diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen build BUILD`,
-`assetgen preview BUILD`.
+diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen build BUILD` (the
+building shells, then the street stage), `assetgen preview BUILD`, `assetgen streets BUILD`,
+`assetgen streets seam BASE REGEN`.
 
 Exit codes: 0 valid (diff: no change; build: every check passes), 1 invalid spec (diff:
 briefs differ; build: a check fails), 2 usage or file error.
@@ -136,7 +137,8 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"error: {args.build}: no city_model.json", file=sys.stderr)
         return EXIT_USAGE
     try:
-        rep = BD.build(src, args.spec, args.overrides, args.workers)
+        rep = BD.build(src, args.spec, args.overrides, args.workers,
+                       streets=not args.no_streets)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
@@ -148,6 +150,56 @@ def cmd_build(args: argparse.Namespace) -> int:
 def cmd_preview(args: argparse.Namespace) -> int:
     from . import previews as PV
     return PV.main(args)
+
+
+def cmd_streets(args: argparse.Namespace) -> int:
+    from . import brief as B
+    from . import spec as S
+    from .streets.build import build as street_build, default_workers
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    model, sha, bdir = B.load_model(src)
+    spec = None
+    if args.spec:
+        res = S.load_spec(args.spec, model)
+        for issue in res.issues:
+            print(issue, file=sys.stderr)
+        if not res.ok:
+            return EXIT_INVALID
+        spec = res.filled
+    out = Path(args.out) if args.out else bdir / "assets"
+    rep = street_build(model, sha, out, spec, workers=args.workers or default_workers(),
+                       force=args.force)
+    st, f = rep["stats"], rep["files"]
+    print(f"{rep['city']}: {st['pieces']} street pieces in {st['tiles']} tiles, "
+          f"{st['triangles']} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
+          f"{f['tiles_made']} tiles made, {f['tiles_written']} written "
+          f"in {rep['seconds']['total']} s")
+    for c in rep["checks"]:
+        if not c["ok"]:
+            print(f"check failed: {c['id']}: {c['detail']}", file=sys.stderr)
+    print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'streets_report.txt'}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
+def cmd_streets_seam(args: argparse.Namespace) -> int:
+    from .streets.seam import seam
+    try:
+        r = seam(Path(args.base), Path(args.regen), args.district)
+    except (OSError, ValueError, KeyError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    if args.json:
+        Path(args.json).write_text(json.dumps(r, indent=1) + "\n", encoding="utf-8",
+                                   newline="\n")
+    print(f"{r['changed']} of {r['pieces']} pieces changed ({r['own']} themselves, "
+          f"{r['seam']} through a neighbor, {len(r['unexplained'])} unexplained); "
+          f"{len(r['changed_tiles'])} of {r['tiles']} tiles changed, "
+          f"{len(r['tiles_without_a_changed_piece'])} without a changed piece")
+    return EXIT_OK if not r["unexplained"] and not r["tiles_without_a_changed_piece"] \
+        else EXIT_INVALID
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -194,12 +246,16 @@ def build_parser() -> argparse.ArgumentParser:
                     help="also write KHR_mesh_quantization copies")
     sp.set_defaults(func=cmd_spike)
 
-    bu = sub.add_parser("build", help="building shells and proxies of a build (BUILD/assets)")
+    bu = sub.add_parser("build", help="building shells and proxies, then the street packs "
+                                      "(BUILD/assets)")
     bu.add_argument("build", help="a citygen build directory (or its city_model.json)")
     bu.add_argument("--spec", help="asset_spec.json (default: the era presets)")
     bu.add_argument("--overrides", help="asset_overrides.json")
     bu.add_argument("--workers", type=int, help="worker processes (default "
                                                 "ASSETGEN_WORKERS, else up to 4)")
+    bu.add_argument("--no-streets", action="store_true",
+                    help="the buildings only (default: then the street stage, as "
+                         "`assetgen streets`)")
     bu.set_defaults(func=cmd_build)
 
     pv = sub.add_parser("preview", help="Blender previews of a build's assets")
@@ -215,6 +271,27 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--cell", type=int, default=480, help="contact sheet cell in pixels")
     pv.add_argument("--blender", help="the Blender executable")
     pv.set_defaults(func=cmd_preview)
+
+    sg = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")
+    ssub2 = sg.add_subparsers(dest="command", required=True)
+    st = ssub2.add_parser("make", help="write BUILD/assets/streets/ (also: assetgen streets "
+                                       "BUILD)")
+    st.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    st.add_argument("--spec", help="asset_spec.json (default: the era presets)")
+    st.add_argument("--out", help="output directory (default BUILD/assets)")
+    st.add_argument("--workers", type=int, help="worker processes (at most 4; default "
+                                                "ASSETGEN_WORKERS or 4)")
+    st.add_argument("--force", action="store_true",
+                    help="make every tile again (the files are still written only if "
+                         "their bytes change)")
+    st.set_defaults(func=cmd_streets)
+    se = ssub2.add_parser("seam", help="what a district regeneration changed in the street "
+                                       "packs, and why")
+    se.add_argument("base", help="the base build (its street stage run)")
+    se.add_argument("regen", help="the regenerated build (its street stage run)")
+    se.add_argument("--district", help="the regenerated district's name")
+    se.add_argument("--json", metavar="FILE", help="also write the result as JSON")
+    se.set_defaults(func=cmd_streets_seam)
     return p
 
 
@@ -223,6 +300,10 @@ def main(argv: list[str] | None = None) -> int:
     # `assetgen brief BUILD` is short for `assetgen brief make BUILD`
     if len(argv) >= 2 and argv[0] == "brief" and argv[1] not in ("make", "diff", "schema",
                                                                  "-h", "--help"):
+        argv.insert(1, "make")
+    # `assetgen streets BUILD` is short for `assetgen streets make BUILD`
+    if len(argv) >= 2 and argv[0] == "streets" and argv[1] not in ("make", "seam", "-h",
+                                                                   "--help"):
         argv.insert(1, "make")
     parser = build_parser()
     try:

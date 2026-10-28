@@ -7,8 +7,8 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout | M0 to M12 done, M13 to M15 to come |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 and AG1 done, AG2 to AG11 to come |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout | M0 to M13 done, M14 and M15 to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1 and AG7 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -44,27 +44,35 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 |---|---|
 | <img src="docs/progress/M10/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
 
+| Cragmouth (hills and cliffs) |
+|---|
+| <img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="840"> |
+
 ### Layers
 
 | Districts, water, roads and lots | Buildings |
 |---|---|
-| <img src="docs/progress/M10/vesper_bay/preview_map.png" width="420"> | <img src="docs/progress/M10/vesper_bay/preview_massing.png" width="420"> |
+| <img src="docs/progress/M13/vesper_bay/preview_map.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_massing.png" width="420"> |
 
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
-| <img src="docs/progress/M10/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M10/vesper_bay/preview_props.png" width="420"> |
+| <img src="docs/progress/M13/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
 
 Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour.
 
-<img src="docs/progress/M10/vesper_bay/preview_gameplay.png" width="840">
+<img src="docs/progress/M13/vesper_bay/preview_gameplay.png" width="840">
 
 | Gameplay, Nexus City | Gameplay, Delta Megacity |
 |---|---|
-| <img src="docs/progress/M10/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M10/delta_megacity/preview_gameplay.png" width="420"> |
+| <img src="docs/progress/M13/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M13/delta_megacity/preview_gameplay.png" width="420"> |
 
 | Road levels: viaducts, ramps, interchanges | Stack interchange levels and ramp profiles |
 |---|---|
-| <img src="docs/progress/M10/vesper_bay/preview_elevated.png" width="420"> | <img src="docs/progress/M10/vesper_bay_stacks/preview_elevated.png" width="420"> |
+| <img src="docs/progress/M13/vesper_bay/preview_elevated.png" width="420"> | <img src="docs/progress/M13/vesper_bay_stacks/preview_elevated.png" width="420"> |
+
+| Terrain: grades, walls, bored tunnels | Old quarter's hill (8K) |
+|---|---|
+| <img src="docs/progress/M13/cragmouth/preview_terrain.png" width="420"> | <img src="docs/progress/M13/cragmouth/render_hillside.jpg" width="420"> |
 
 | Stack interchange (8K) | Trumpet interchange (8K) |
 |---|---|
@@ -80,7 +88,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 
 | Transit, Delta Megacity | Transit, Nexus City | Transit, Vesper Bay |
 |---|---|---|
-| <img src="docs/progress/M10/delta_megacity/preview_transit.png" width="280"> | <img src="docs/progress/M10/nexus_city/preview_transit.png" width="280"> | <img src="docs/progress/M10/vesper_bay/preview_transit.png" width="280"> |
+| <img src="docs/progress/M13/delta_megacity/preview_transit.png" width="280"> | <img src="docs/progress/M13/nexus_city/preview_transit.png" width="280"> | <img src="docs/progress/M13/vesper_bay/preview_transit.png" width="280"> |
 
 | Street level beside a viaduct (Delta Megacity) | Street level in the Corporate Core (Vesper Bay) |
 |---|---|
@@ -103,7 +111,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M10 | Editing | Regenerate one district, keep or change single buildings, freeze a version | ✅ Done |
 | M11 | Gameplay layer | Places, factions, wealth and danger, traffic and crowd data, parking, fast travel | ✅ Done |
 | M12 | Stack interchanges | Four-level highway crossings | ✅ Done |
-| M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | 🚧 In progress |
+| M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | ✅ Done |
 | M14 | Layered districts | Streets and buildings on stacked deck levels | Planned |
 | M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | 🚧 In progress |
 
@@ -163,6 +171,22 @@ What every facade faces, which decides its windows: the main street (red), other
 alleys, water, plazas and parks, party walls (black, no windows), blind walls, yards, and
 walls above their neighbors.
 
+<img src="docs/progress/AG7/vesper_bay_stacks/streets_interchange.jpg" width="840">
+
+The street elements around Vesper Bay Stacks's stack interchange (8K): ramps on four levels
+with parapets, columns and pier caps, lane markings, sidewalks, crosswalks and the sky tube
+(buildings are still the blockout's).
+
+```bash
+.venv/bin/python -m assetgen streets out/vesper_bay
+```
+
+The street stage writes `out/<city>/assets/streets/`, one glTF pack per 256 m tile with a mesh
+for every road, sidewalk, crosswalk, junction, bridge, viaduct, tunnel, quay, transit structure
+and megasite element, each named by its citygen id and replacing the blockout's street pieces
+in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
+[`docs/progress/AG7`](docs/progress/AG7).
+
 ### Milestones
 
 | | Milestone | What it adds | Status |
@@ -174,7 +198,7 @@ walls above their neighbors.
 | AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
 | AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
 | AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
-| AG7 | Street elements | Roads with markings, sidewalks, bridges, viaducts, tunnels, quays, transit structures | Planned |
+| AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |
 | AG8 | Props, plants and signs | Street furniture, trees, neon signs, billboards, holo-ads | Planned |
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Buildings and streets on stacked decks | Planned |

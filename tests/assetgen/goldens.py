@@ -80,9 +80,11 @@ def main():
                (small_build() / "base" / "assets" / "briefs.json").read_bytes()),
            "triangulate": tri_golden(), "buildings": {}, "samples": {}, "spike": {}}
     base = small_assets()
-    tree = {str(p.relative_to(base / "assets")): C.sha256_bytes(p.read_bytes())
-            for p in sorted((base / "assets").rglob("*")) if p.is_file() and
-            (p.suffix == ".glb" or p.name in BD.DELIVERED)}
+    a = base / "assets"                    # the building packs (the streets: AG7's goldens)
+    tree = {str(p.relative_to(a)): C.sha256_bytes(p.read_bytes())
+            for p in sorted(a.rglob("*")) if p.is_file() and
+            ((p.suffix == ".glb" and p.parent.name in ("tiles", "proxies")) or
+             (p.parent == a and p.name in BD.DELIVERED))}
     out["ag1"] = {"testport_manifest": C.sha256_bytes(
         (base / "assets" / "manifest.json").read_bytes()),
         "testport_files": C.digest(tree), "buildings": {}}

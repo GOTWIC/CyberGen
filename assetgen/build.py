@@ -1,5 +1,6 @@
-"""`assetgen build BUILD [--spec S] [--overrides O] [--workers N]` (scope sections 3, 4.4, 6):
-the building assets of a citygen build into `BUILD/assets/`.
+"""`assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]` (scope
+sections 3, 4.4, 6): the building assets of a citygen build into `BUILD/assets/`, then its
+street packs.
 
 1. Briefs (AG0's stage), reused from `briefs.json` when the model, spec and overrides are
    the ones it was made from; written only when they change.
@@ -12,7 +13,12 @@ the building assets of a citygen build into `BUILD/assets/`.
    its pivot, its shell with one primitive per material slot), `proxies/<tile>.glb`.
 4. Checks (`asset_checks`), `manifest.json`, `asset_report.json` and `.txt`,
    `unreal_contribution.buildings.json`; each written only if its bytes change, tiles no
-   longer in the city removed. An unchanged city's rebuild writes no file.
+   longer in the city removed.
+5. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
+   bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
+   `streets_report.json` and `.txt` (the report only when another of its files changed).
+
+An unchanged city's rebuild writes no file.
 """
 
 from __future__ import annotations
@@ -250,17 +256,17 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
-          log=print) -> dict:
+          log=print, streets: bool = True) -> dict:
     t0 = time.perf_counter()
     model, sha, bdir = B.load_model(build_dir)
     out = bdir / "assets"
-    spec = None
+    spec = filled = None
     spec_doc = None
     if spec_path:
         res = S.load_spec(spec_path, model)
         if not res.ok:
             raise ValueError("; ".join(str(i) for i in res.errors))
-        spec = res.spec
+        spec, filled = res.spec, res.filled
     spec_doc = S.dump(S.fill(spec or S.AssetSpec()))
     ov = S.overrides_by_id(S.load_overrides(overrides_path)) if overrides_path else None
     lib = library()
@@ -344,6 +350,24 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     if changed or not (out / "asset_report.json").is_file():
         wrote += MF.write_if_changed(out / "asset_report.json", MF.dumps(rep))
         wrote += MF.write_if_changed(out / "asset_report.txt", report_text(rep))
+    if streets:
+        from .streets.build import build as street_build, default_workers
+        srep = street_build(model, sha, out, filled, workers=workers or default_workers(),
+                            report_always=False)
+        f = srep["files"]
+        n = len(f["written"]) + f["tiles_removed"] + sum(
+            int(bool(f[k])) for k in ("parts_written", "manifest_written",
+                                      "contribution_written", "report_written"))
+        wrote += n
+        st = srep["stats"]
+        rep["streets"] = {"ok": srep["ok"], "pieces": st["pieces"], "tiles": st["tiles"],
+                          "triangles": st["triangles"], "disk_bytes": st["disk_bytes"],
+                          "failed": [c["id"] for c in srep["checks"] if not c["ok"]],
+                          "tiles_made": f["tiles_made"], "files_written": n,
+                          "seconds": srep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and srep["ok"]
+        log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
+            f"made, {n} files written")
     rep["files_written"] = wrote
     return rep
 
@@ -448,4 +472,10 @@ def report_text(rep: dict) -> str:
     s = rep["seconds"]
     lines.append(f"seconds: {s} with {rep['workers']} workers "
                  f"({rep['tiles_made']} tiles made, {rep['tiles_kept']} kept)")
+    st = rep.get("streets")
+    if st is not None:
+        lines.append(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, "
+                     f"{st['triangles']:,} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
+                     f"{'all checks pass' if st['ok'] else 'FAIL ' + ', '.join(st['failed'])}"
+                     f" ({st['tiles_made']} tiles made, {st['seconds']} s; streets_report.txt)")
     return "\n".join(lines) + "\n"

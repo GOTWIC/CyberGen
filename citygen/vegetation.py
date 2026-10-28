@@ -403,6 +403,8 @@ def overhead(c: Ctx) -> tuple:
     polys, under = [], []
     for s in m.structures:
         a = s.attrs or {}
+        if s.kind == "retaining_wall":
+            continue    # M13: a wall in the ground, not over it
         if len(s.line) >= 2 and s.z1_m > 0.5:
             w = a.get("width_m", 4.0)
             polys.append(LineString([p[:2] for p in s.line]).buffer(w / 2.0 + 1.0,

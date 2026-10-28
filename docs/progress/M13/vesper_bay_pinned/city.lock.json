@@ -1,0 +1,253 @@
+{
+  "lock_version": 1,
+  "name": "Vesper Bay Pinned",
+  "release": "1.0",
+  "citygen": "0.1.0",
+  "code_sha256": "a0a252eb2ed62603097edb66faf970a24f81f165130551df525fbf7ca47f7212",
+  "spec": {
+    "$schema": "../../citygen/schemas/city_spec.schema.json",
+    "name": "Vesper Bay Pinned",
+    "seed": 2078,
+    "size_km": [
+      3.5,
+      3.4
+    ],
+    "source": {
+      "prompt": "Vesper Bay with its Corporate Core imported from the hand-traced map (maps/corporate_core_v1.0.1.svg) as an island in the bay; the rest as in cities/vesper_bay.",
+      "notes": "M7b pinned-import demo. The Corporate Core megatower and towers come from the tracing (no spec landmark); the sky tube runs from the island to the northeast as a line, not a loop (a loop cuts the corner past a corner island). The maglev runs from the island to Launch Key only (art-direction round 2: from the east exit through the southwest island to the northwest spaceport it turned back). The Halo Line runs clockwise, Neon Strand, Highcrest, Old Town, The Stacks (round 3: the order through The Stacks first zigzagged and looped back on itself)."
+    },
+    "water": {
+      "coast": {
+        "form": "bay",
+        "side": "west",
+        "name": "Vesper Bay",
+        "sea_share": 0.38
+      },
+      "rivers": [
+        {
+          "name": "Vess River",
+          "from": "east",
+          "to": "bay",
+          "width_m": [
+            70,
+            140
+          ],
+          "meander": 0.4,
+          "delta_branches": 2,
+          "branch_names": [
+            "North Reach",
+            "Lotus Cut"
+          ]
+        }
+      ],
+      "islands": [
+        {
+          "name": "Core Island",
+          "position": "south",
+          "setting": "nearshore",
+          "pinned": {
+            "source": "maps/corporate_core_v1.0.1.svg"
+          }
+        },
+        {
+          "name": "Launch Key",
+          "position": "west",
+          "setting": "offshore",
+          "area_km2": 0.6
+        },
+        {
+          "name": "Scholar Isle",
+          "position": "center",
+          "setting": "mid_river",
+          "river": "Vess River",
+          "area_km2": 0.6
+        }
+      ],
+      "district_separation": "water_preferred",
+      "bridges": {
+        "named": [
+          {
+            "name": "Launch Causeway",
+            "kind": "road_rail",
+            "connects": [
+              "Neon Strand",
+              "Launch Key"
+            ],
+            "crosses": "bay"
+          }
+        ]
+      }
+    },
+    "highways": {
+      "pattern": "ring_plus_spine",
+      "exits": [
+        "east",
+        "north"
+      ]
+    },
+    "transit": {
+      "hubs": [
+        "Corporate Core"
+      ],
+      "lines": [
+        {
+          "mode": "elevated_rail",
+          "name": "Halo Line",
+          "route": [
+            "Neon Strand",
+            "Highcrest",
+            "Old Town",
+            "The Stacks",
+            "Neon Strand"
+          ]
+        },
+        {
+          "mode": "metro",
+          "name": "Spine Line",
+          "route": [
+            "The Stacks",
+            "Corporate Core",
+            "Old Town",
+            "Vess Docks"
+          ]
+        },
+        {
+          "mode": "maglev",
+          "name": "Launch Express",
+          "route": [
+            "Corporate Core",
+            "Launch Key"
+          ]
+        },
+        {
+          "mode": "sky_tube",
+          "name": "Crown Line",
+          "through_towers": true,
+          "route": [
+            "Corporate Core",
+            "The Stacks",
+            "Highcrest"
+          ]
+        }
+      ]
+    },
+    "districts": [
+      {
+        "name": "Corporate Core",
+        "archetype": "corporate_core",
+        "placement": {
+          "on_island": "Core Island"
+        },
+        "grid_angle_deg": 45,
+        "landmarks": [],
+        "places": [
+          {
+            "name": "Meridian Plaza",
+            "kind": "plaza",
+            "position": "center"
+          }
+        ],
+        "complexes": [
+          "twin_towers",
+          "tower_cluster"
+        ],
+        "skybridge_density": 0.8,
+        "greenery": 0.3
+      },
+      {
+        "name": "The Stacks",
+        "archetype": "megablock_residential",
+        "placement": {
+          "edge": "center"
+        }
+      },
+      {
+        "name": "Highcrest",
+        "archetype": "residential_heights",
+        "placement": {
+          "edge": "north_east",
+          "east_of": "The Stacks"
+        }
+      },
+      {
+        "name": "Old Town",
+        "archetype": "old_town",
+        "placement": {
+          "separated_by": "Vess River"
+        },
+        "waterways": {
+          "style": "organic_canals",
+          "density": 0.7
+        },
+        "places": [
+          {
+            "name": "Ember Market",
+            "kind": "market"
+          },
+          {
+            "name": "Lotus Temples",
+            "kind": "temple_complex"
+          }
+        ],
+        "grime": 0.7
+      },
+      {
+        "name": "Neon Strand",
+        "archetype": "entertainment_market",
+        "placement": {
+          "coast": true
+        },
+        "places": [
+          {
+            "name": "Strand Promenade",
+            "kind": "promenade",
+            "position": "west"
+          }
+        ],
+        "neon": 1.0,
+        "greenery": 0.4
+      },
+      {
+        "name": "Vess Docks",
+        "archetype": "industrial_port",
+        "placement": {
+          "coast": true,
+          "edge": "south_west",
+          "west_of": "Old Town"
+        },
+        "waterways": {
+          "style": "harbor_basins",
+          "density": 0.6
+        },
+        "megasites": [
+          {
+            "kind": "freight_terminal",
+            "name": "Vess Freight Terminal"
+          }
+        ]
+      },
+      {
+        "name": "Launch Key",
+        "archetype": "spaceport",
+        "placement": {
+          "on_island": "Launch Key"
+        }
+      },
+      {
+        "name": "Scholar Isle",
+        "archetype": "research_campus",
+        "placement": {
+          "on_island": "Scholar Isle"
+        }
+      }
+    ]
+  },
+  "choices": {
+    "hydro_variant": 4,
+    "road_variant": 0,
+    "layout_salt": 1
+  },
+  "overrides": null,
+  "edits": [],
+  "model_sha256": "2d362ab49246119ff9b576ecf74a1ac0ed5dbf9d582a02d2798446d95b773508"
+}

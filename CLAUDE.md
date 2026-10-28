@@ -30,6 +30,17 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
+**Validation (every stage, every PR; Swagnik's rule, 2026-10-27).** Before pushing a PR, make
+sure the outputs look good and nothing breaks: build the cities the change touches, every check
+passes, look at their previews and renders, and the test suite passes (recorded hashes
+regenerated on this Mac where a change moves a model on purpose, saying why). Nothing more:
+no x86, Docker, Windows or other cross-platform comparisons, no stage-trace diffs, no
+`lock --verify` runs, no seed sweeps (unless the work is about robustness), no repeated
+validation runs, and the coordinating session does not validate a PR again (it reviews the
+outputs and the diff, and has the PR merge the latest main first when they overlap). Where a
+scope's "done when" asks for Mac = x86, that part waits for the deferred determinism check in
+`docs/determinism_check.md`, which runs only when Swagnik asks for it.
+
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
 "Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
 
@@ -504,8 +515,54 @@ M10 (edit, lock, regenerate) is in place:
 Sample builds (the five, the pinned and the stack demo, each with a release lock),
 regenerations, sweep: `docs/progress/M10/`.
 
+M13 (terrain) is in place, in `citygen/terrain.py` (checks in `terrain_checks.py`, preview
+`preview_terrain.py`). A spec without `terrain` builds exactly the flat city it built before
+(the new model fields are left out of the JSON: `Field(exclude_if=...)`); every z elsewhere in
+the model stays measured from the finished ground where it stands, so M7/M9/M5 clearances need
+no change, and grades are measured on ground + z:
+- **Field** (`field`, at the start of each road attempt): the natural ground on a 4 m grid
+  (`terrain.natural`, rows from the south): `hills` and `ridges` as smooth bumps, `relief_m`
+  value noise (blake2b lattice), an `inland_grade`, banks carved down to the water (10%, 12%
+  from the sea), `cliffs` (a district on a plateau; `facing` keeps the cliff to those sides,
+  the rest a `slope_m` escarpment), `flat` districts and every megasite levelled; water at its
+  level (`water_levels`: the sea 0, rivers and separation channels falling to the mouth,
+  waterways at the level of what they join). Numpy elementwise arithmetic and GEOS distances
+  only, no reductions; values on the 1 cm grid. Highways route round steep ground
+  (`roads.SLOPE_COST` on the A* raster).
+- **Grade lines** (`grade`, after M2): one graph of every road (nodes and crossings without a
+  node shared, stations every 10 m), the profile closest to the natural ground in the largest
+  deviation within each class's grade (highway 6%, avenue 8%, street 12%, alley 15%, less what
+  the road's own z profile climbs): integer min-plus Dijkstra from every vertex both ways, the
+  mean of the two. `RoadSegment.ground`, `RoadNode.ground_m`. The finished ground
+  (`terrain.ground`) puts each corridor (width plus 1.5 m) on its grade line, blends small steps
+  over 6 m, and leaves the rest as retaining walls traced on the grid (`structure`
+  `retaining_wall`, line z the wall height); primary roads 14 m under the hill for 40 m are
+  `bored` tunnels, 15 m over the ground for 20 m terrain viaducts (deck and columns). Lots whose
+  ground falls over 15 m become hillside greens (`open_space` green, `attrs.slope`).
+- **After M3**: buildings seated (`base_m` at the main entrance, buildings linked by skybridges
+  on a common floor grid, `plinth_m` at the lowest ground under the footprint); the metro graded
+  on ground + z; props and plants off steep streets, cliffs and terrain viaducts.
+- **Checks** (86 in all): `ground_grades`, `cut_fill` (20 m cut, 18 m fill), `retaining_walls`
+  (no graded step steeper than 1:1.5 without a wall), `building_seats`, `water_levels`;
+  `transit_grades` and the metro in `tunnel_grades` measure on the ground.
+- **Blockout**: the ground a 4 m heightfield per tile (part `grid`), flats draped cell by cell
+  (part `drape`), roads on their grade lines, buildings on their bases with stepped plinths,
+  water at its level, retaining walls; the cameras frame the ground.
+- **With M10**: ids from what and where (`<segment>.wall.<cell>`, `<segment>.viaduct.<cell>`,
+  `<segment>.tvcol.<cell>`, `bore.<cell>`, `<district>.os.slope.<cell>`; `ids.Renamer`
+  also renames `terrain.water_levels[].water_id`). `--district` holds every road's grade
+  line outside the district (`grade(..., held)`: held vertices fixed, the envelopes clamped
+  to the bounds they set), the splice takes `terrain` and the retaining walls from the new
+  build, and `edit._close` lets a building's gameplay rows follow it and drops old lots and
+  open spaces under changed new ground (`_ground_cover`). `junctions.one_way_loops` now reverses a street's
+  z profile with it (main bug: six m8a sweep builds now pass on an earlier try).
+Sample: `cities/cragmouth` (a cliffside port; hills, a ridge, the Crown Heights plateau with a
+cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
+`docs/progress/M13/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
+- **Validation:** as in "Validation" above; nothing beyond it.
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
   the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
   and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
@@ -580,19 +637,24 @@ AG1 (building shells) is in place:
   parapets, cornices, slab bands, beveled past 1.5 offsets), roof equipment blocks until
   AG4. Every part is closed on integer millimeters (`meshbuf.check`); spiked rings and
   courts pinched onto the exterior are cleaned first. UV1 and vertex colors only on glass.
+  On M13's slopes the pivot is the building's `base_m` and every mass on the base gets a
+  plinth down into the lowest ground under the footprint (`shell.plinth_mm`, also in the
+  proxy, collision and envelope; AG5 steps it).
 - **Proxies, collision** (`buildings/proxy.py`, `collision.py`): masses as prisms (at most
   500 triangles), convex pieces per mass (boxes where rectangles).
-- **`assetgen build BUILD [--spec S] [--workers N]`** (`assetgen/build.py`, at most 4
-  workers by default): briefs (kept when model, spec and overrides are unchanged), genomes,
-  asset hash per building (brief, `GEN_VERSION`, material library), 256 m tile packs
-  `tiles/<tile>.glb` and `proxies/<tile>.glb` made in workers only where a tile's hashes
-  changed, `manifest.json` (`assetgen/manifest.py`: other stages' sections kept),
+- **`assetgen build BUILD [--spec S] [--workers N] [--no-streets]`** (`assetgen/build.py`,
+  at most 4 workers by default): briefs (kept when model, spec and overrides are unchanged),
+  genomes, asset hash per building (brief, `GEN_VERSION`, material library), 256 m tile
+  packs `tiles/<tile>.glb` and `proxies/<tile>.glb` made in workers only where a tile's
+  hashes changed, `manifest.json` (`assetgen/manifest.py`: other stages' sections kept),
   `asset_report.json`/`.txt`, `unreal_contribution.buildings.json`
   (`assetgen/contribution.py`); every file written only when its bytes change, so an
   unchanged rebuild writes none. Bump `GEN_VERSION` whenever pack bytes change. Checks
   (`assetgen/asset_checks.py`): `asset_coverage`, `asset_envelope`
   (`buildings/envelope.py`), `asset_meshes`, `asset_unique` ($k$ genes or distance), and
-  `asset_budget` (section 11's estimate); exit 1 on a failure.
+  `asset_budget` (section 11's estimate); then AG7's street stage, the same bytes as
+  `assetgen streets` (its report written only when another of its files changed, so an
+  unchanged rebuild still writes no file); exit 1 on a failure of either.
 - **`assetgen preview BUILD [--blockout DIR]`** (`assetgen/previews.py`,
   `assetgen/blender/preview_assets.py`): on the blockout's city.blend without its building
   boxes, the whole city from proxies (`city_full` with every shell), each district and the
@@ -601,6 +663,40 @@ AG1 (building shells) is in place:
 - **Exporter**: M15 was not on main, so AG1 only writes the contribution;
   `docs/unreal_export.md` lists what the exporter needs for it. Results:
   `docs/progress/AG1/`.
+
+AG7 (street elements) is in place, in `assetgen/streets/` (tests
+`tests/assetgen/test_ag_streets.py`):
+- **`assetgen streets BUILD [--spec S] [--workers N]`** (`build.py`): every street element as
+  a piece keyed by its citygen id, gathered from the model (`ctx.py`: indexes, M13's ground,
+  the blockout objects each piece replaces, from citygen's own blockout code) into `inputs`
+  that hold everything its generator reads, hashed (`pieces.py`). Pieces: road segments
+  (`roads.py`: carriageway between the junctions' cut edges, markings from the model's
+  lanes, stop lines, arrows, patches, manholes, drains, medians, decks with parapets, joints
+  and underside lights, embankments), sidewalks, crosswalks and junctions with their
+  sidewalk corners (`walks.py`), bridges by kind, road columns, tunnels, portals, approach
+  trenches, underpass stairs, vents (`structures.py`), guideways, sky tubes (glass as a
+  non-Nanite LOD chain), transit columns and station structures, M13's retaining walls
+  (`transit.py`), quays and canal walls (`water.py`), megasite elements with containers as
+  instanced parts (`sites.py`). Meshes on integer millimeters in each piece's frame
+  (`kit.py`: grids, sweeps, exact polygons; folds dropped); lean glTF.
+- **Outputs**: `BUILD/assets/streets/<tile>.glb` (a node per piece, the blockout's tile of
+  the object it replaces), `streets/parts.glb`, `streets/manifest.json`,
+  `unreal_contribution.streets.json` (`docs/unreal_export.md`, AG7 section) and
+  `streets_report.json/.txt` (`checks.py`: coverage, meshes, replaces, budgets). A tile is
+  made again only when its pieces' hashes or the code's hash change; an unchanged city writes
+  no pack. Up to 4 workers, the same bytes for any count.
+- **Ground**: a road's surface is its M13 grade line plus its z profile; sidewalks and
+  crosswalks follow their road (on a deck too, writing the corrected walkway lines), road
+  tunnels their road's grade line, everything else the terrain at its point; 0 on a flat
+  city (Cragmouth is the hilly sample).
+- **`assetgen streets seam BASE REGEN [--district NAME]`** (`seam.py`): which pieces and
+  tiles a district regeneration changed and why (own entity, or an input entity changed).
+- **Previews**: `preview.py` (top-down, from the packs) and
+  `assetgen/blender/streets_preview.py` (the blockout's `city.blend` with the replaced
+  objects removed and the packs imported; its views or custom cameras).
+- Goldens in their own file, `tests/assetgen/data/golden_streets.json`
+  (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
+  generator change: the code hash is in every tile's hash.
 
 ## Working preferences
 

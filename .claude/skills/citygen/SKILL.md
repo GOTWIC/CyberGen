@@ -128,6 +128,33 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
 length lifted onto viaducts, M7: the densest stretches with room for ramps go up first),
 `named` routes.
 
+**Terrain** (`terrain`, M13; leave it out for a flat city at sea level). Use it when the
+prompt speaks of hills, slopes, cliffs, a ridge, a hill town, a city climbing from the water,
+terraces or stairs:
+- `hills`: each `at` (a district, a direction or `center`), `height_m` (up to 400),
+  `radius_m` (default 600; the steepest slope is about 1.5 times height over radius: keep it
+  under about 0.2 where people should build), optional `name`.
+- `ridges`: `from` and `to` (districts, directions or `center`), `height_m`, `width_m`
+  (default 500).
+- `cliffs`: a `district` on a plateau `height_m` over its surroundings, its edge a cliff
+  `width_m` wide (default 60); `facing` (directions) keeps the cliff to those sides and lets
+  the others rise over `slope_m` (default 400). A cliff that faces a river or a neighbor
+  forces big cuts and fills on every road across it: face it to the sea or the bay.
+- `flat`: districts levelled to one height (ports, airports, spaceports, parks of flat
+  land); megasites are always levelled.
+- `shore_m` (ground over the water at a low shore, default 2), `inland_grade` (a rise away
+  from the sea, e.g. 0.01), `relief_m` and `relief_scale_m` (a smooth random roll, e.g. 6 and
+  500).
+
+The build fits every road's grade line to the ground (highways 6%, avenues 8%, streets 12%,
+alleys 15%), cuts and fills between retaining walls, bores tunnels where a primary road would
+cut over 14 m deep, puts it on a viaduct where it would stand 15 m over the ground, turns lots
+whose ground falls over 15 m into hillside greens, seats buildings on their entrances with
+stepped plinths, and routes highways round steep ground. Rivers fall to the sea; canals and
+basins sit at the level of what they join. Read `preview_terrain.png`. With terrain, set
+`highways.elevated_share` to 0 unless the prompt asks for viaducts: on hills their ramps lock
+the grade line and lift them far over the ground.
+
 **Districts** (`districts`, usually 6 to 10). Each needs `name` and `archetype`:
 
 | Prompt words | archetype | preset heights (m) |
@@ -473,7 +500,11 @@ folder, later edits start from it.
   junctions cut) changes with it. It takes under a minute for a sample district and runs
   every check. M1 is not rebuilt: water, the district outlines, megasite reserves and
   primary roads stay, so a field M1 reads (`area_share`, `placement`, megasites, the
-  archetype's avenue spacing) needs a full build.
+  archetype's avenue spacing) needs a full build. On a hilly city (M13) the held roads keep
+  their grade lines and the district's new streets are fitted to them; the `terrain` block
+  is M1's, so changing it needs a full build. Read the report: a regeneration whose checks
+  fail (on some layouts a neighbor's streets come back moved, M13 README) is not a release;
+  try another seed or a full build.
 - **What changed:** `citygen model diff <old>/city_model.json <new>/city_model.json` lists the
   entities added, removed and changed by id, per collection (`--all`, `--json FILE`;
   `--png FILE` draws them: the same in grey, removed red, added green, moved yellow). Look at

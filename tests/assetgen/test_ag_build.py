@@ -1,7 +1,9 @@
 """AG1: `assetgen build` on the small test city: every building has a shell and a proxy,
-the checks pass, a second build writes no file, the bytes do not depend on the worker count
-or the hash seed, a regenerated district rebuilds only the tiles whose buildings changed,
-the Unreal contribution covers every building; the goldens (scope section 10)."""
+the checks pass, the street stage runs after the buildings, a second build writes no file,
+the bytes do not depend on the worker count or the hash seed, a regenerated district
+rebuilds only the tiles whose buildings changed, the Unreal contribution covers every
+building; the goldens (scope section 10). The street stage's own properties are AG7's
+tests (`test_ag_streets.py`)."""
 
 import json
 import os
@@ -13,8 +15,9 @@ from assetgen import build as BD
 from assetgen import canon as C
 from assetgen import manifest as MF
 from assetgen.brief import load_model
+from assetgen.streets import build as SB
 
-from agtools import (CITIES, ROOT, built_sample, copy_model, golden, small_assets,
+from agtools import (CITIES, HERE, ROOT, built_sample, copy_model, golden, small_assets,
                      small_assets_report, small_regen)
 
 
@@ -46,26 +49,45 @@ def test_checks_are_the_five():
     assert rep["checks"]["asset_unique"]["pairs"] > 0
 
 
+def test_build_writes_buildings_and_streets():
+    """`assetgen build` runs AG7's street stage after the buildings: both stages' files, the
+    street bytes `assetgen streets` writes (its golden), one verdict for both."""
+    base = small_assets()
+    rep = small_assets_report()
+    st = rep["streets"]
+    assert st["ok"] and st["pieces"] > 0 and not st["failed"]
+    a = base / "assets"
+    for name in BD.DELIVERED + ("streets/manifest.json", "streets/parts.glb",
+                                "unreal_contribution.streets.json", "streets_report.json"):
+        assert (a / name).is_file(), name
+    want = json.loads((HERE / "data" / "golden_streets.json").read_text())["testport"]["all"]
+    assert SB.outputs_digest(a)["all"] == want
+    uc = json.loads((a / "unreal_contribution.streets.json").read_text())
+    assert uc["part"] == "streets" and uc["layer"] == 2
+
+
 def test_second_build_writes_no_file():
     base = small_assets()
     before = {p: p.stat().st_mtime_ns for p in (base / "assets").rglob("*") if p.is_file()}
     rep = BD.build(base, workers=2, log=lambda *a: None)
     assert rep["files_written"] == 0
-    assert rep["tiles_made"] == 0
+    assert rep["tiles_made"] == 0 and rep["streets"]["tiles_made"] == 0
     after = {p: p.stat().st_mtime_ns for p in (base / "assets").rglob("*") if p.is_file()}
     assert after == before
 
 
 def _tree(d):
+    """The building packs and delivered files (the street packs are AG7's goldens)."""
     return {str(p.relative_to(d)): C.sha256_bytes(p.read_bytes())
             for p in sorted(d.rglob("*")) if p.is_file() and
-            (p.suffix == ".glb" or p.name in BD.DELIVERED)}
+            ((p.suffix == ".glb" and p.parent.name in ("tiles", "proxies")) or
+             (p.parent == d and p.name in BD.DELIVERED))}
 
 
 def test_bytes_do_not_depend_on_workers(tmp_path):
     base = small_assets()
     one = copy_model(base, tmp_path / "one")
-    BD.build(one, workers=1, log=lambda *a: None)
+    BD.build(one, workers=1, log=lambda *a: None, streets=False)
     a, b = _tree(one / "assets"), _tree(base / "assets")
     b = {k: v for k, v in b.items() if k in a}
     assert a == b
@@ -76,7 +98,8 @@ def test_same_bytes_with_another_hash_seed(tmp_path):
     d = copy_model(base, tmp_path / "hs")
     env = {**os.environ, "PYTHONHASHSEED": "4242"}
     proc = subprocess.run([sys.executable, "-m", "assetgen", "build", str(d), "--workers",
-                           "2"], cwd=ROOT, env=env, capture_output=True, text=True)
+                           "2", "--no-streets"], cwd=ROOT, env=env, capture_output=True,
+                          text=True)
     assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
     assert (d / "assets" / "manifest.json").read_bytes() == \
         (base / "assets" / "manifest.json").read_bytes()
@@ -88,7 +111,7 @@ def test_regenerated_district_rebuilds_only_changed_tiles(tmp_path):
     d = copy_model(regen, tmp_path / "regen")
     shutil.copytree(base / "assets", d / "assets")
     old = _manifest(base)
-    rep = BD.build(d, workers=2, log=lambda *a: None)
+    rep = BD.build(d, workers=2, log=lambda *a: None, streets=False)
     assert rep["ok"]
     new = _manifest(d)
     kept = [t for t in new["tiles"] if t in old["tiles"] and
