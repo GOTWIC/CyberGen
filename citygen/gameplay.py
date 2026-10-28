@@ -1512,9 +1512,11 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
                             "attrs": {}})
         # neon band at a corner of a mid-rise facade over a shopping street
         if 3 <= b.floors <= 15 and b.units and neon >= 0.4 and _u("neon", b.id) < neon * 0.5:
-            low = [ms for ms in b.masses if ms.z0_m <= 0.5 and ms.role != "void"]
+            # (M14: on a deck, its floors and the band's 8 m count from the deck top)
+            floor = float(b.attrs.get("deck_top_m", 0.0)) if b.level else 0.0
+            low = [ms for ms in b.masses if ms.z0_m <= floor + 0.5 and ms.role != "void"]
             base = max(low, key=lambda ms: (ms.z1_m, -ms.z0_m)) if low else top
-            lo = max(8.0, sign_top.get(b.id, 0.0) + 0.5)
+            lo = max(floor + 8.0, sign_top.get(b.id, 0.0) + 0.5)
             h = q(min(base.z1_m - lo - 1.0, 18.0))
             if h >= 4.0:
                 es = _edges(base.footprint)
