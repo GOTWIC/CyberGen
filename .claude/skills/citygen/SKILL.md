@@ -77,6 +77,9 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
 - `coast.form`: `bay`, `peninsula`, `delta`, `archipelago`, `crescent` or `straight`;
   `coast.side`: compass side where the open sea is (`north` ... `north_west`). Optional `name`
   and `sea_share` (fraction of the map that is sea; defaults by form, about 0.2 to 0.55).
+  A `peninsula` may take `headlands` (2 to 5): below a shallow mainland strip it narrows to a
+  short neck, then fans out into that many headlands with coves between them, instead of one
+  rounded tip.
 - `rivers`: `name`, `from` (edge where it enters), `to` (`sea`, `bay`, an edge, or another river's
   name for a tributary), `width_m` [min, max] (rivers 40 to 150), `meander` 0 to 1,
   `from`/`to` may pin the point along the edge: `{"edge": "east", "at": 0.3}` (0 to 1: west to
