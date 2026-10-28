@@ -360,3 +360,6 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
         fourth["actors"]["deleted"] == fourth["dirty_packages"] == 0
     chk = U.check_city(build2, proj)
     assert chk["ok"], chk
+    # the project and the builds take most of a gigabyte: kept only when the test fails
+    for d in (proj.parent, build, build2):
+        shutil.rmtree(d, ignore_errors=True)
