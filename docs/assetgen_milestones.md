@@ -202,9 +202,13 @@ the thumbnail half of the uniqueness check and budgets per building class
   one root node per part mesh; the building record's `parts`, `instances`,
   `part_triangles`, `thumb`, `thumb_fill` and `class`; the report's parts line and
   instances by part;
-- **previews** (`previews.py`, `blender/preview_assets.py`): parts as geometry-node
-  instances per tile with their building's tints (`--no-parts` leaves them out), towers of
-  each era (`--views towers`), contact sheets with every building's parts;
+- **previews** (`previews.py`, `blender/preview_assets.py`): parts as one geometry-node
+  instancer per pack picking each point's mesh from the pack's collection, with their
+  building's tints (`--no-parts` leaves them out; a node group per part mesh and the glTF
+  importer's per-mesh deletions made a whole city quadratic to load, so the importer's
+  temporary objects now go in one batch), proxies only where a view needs them, whole
+  cities at 16 samples, towers of each era (`--views towers`), contact sheets with every
+  building's parts;
 - **exporter** (`contribution.py`): each building entry's `parts` (kind, type, glb, node,
   asset, count, triangles, xforms, building) and `instances` (`unreal_export.md`, "From
   AG2");

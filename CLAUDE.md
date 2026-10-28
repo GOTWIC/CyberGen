@@ -887,9 +887,12 @@ AG2 (facades) is in place (tests `tests/assetgen/test_ag_facades.py`):
   building class (`asset_checks.CLASSES`) and per city (section 11's estimate plus 40% for
   parts, 3 instances per bay), `asset_meshes` every part mesh, `asset_envelope` every
   instanced part's box.
-- **Previews**: parts drawn as geometry-node instances per tile and part mesh (tints as
-  instance attributes, materials `ag_<slot>.inst`); `--views towers` (the tallest
-  building of each era up close); `--no-parts`. Results: `docs/progress/AG2/`.
+- **Previews**: parts drawn by one geometry-node instancer per pack that picks each
+  point's mesh from the pack's collection (tints as point attributes, materials
+  `ag_<slot>.inst`; a node group per part mesh, or the glTF importer's per-mesh deletions,
+  are quadratic in Blender: the importer's temporary objects go in one batch); whole cities
+  at 16 samples; `--views towers` (the tallest building of each era up close);
+  `--no-parts`. Results: `docs/progress/AG2/`.
 
 ## Working preferences
 
