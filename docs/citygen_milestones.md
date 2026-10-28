@@ -37,7 +37,7 @@ Implementation notes: `CLAUDE.md` (one section per milestone) and each
 
 ## Outputs
 
-`docs/progress/M14/vesper_bay_decks/` has the layered sample's previews (`preview_decks.png`: the ground under the deck, the deck, a section), its build and blockout reports, the 8K whole-city render, `render_deck.jpg` (the built-in deck view) and `render_deck_edge.jpg` (8K: the slab's edge from above); `docs/progress/M14/regenerated/` Highcrest regenerated with `--district`; `docs/progress/M14/cragmouth_decks/` the terrain test (Cragmouth with decks on Hollow and Ridgeback, not a sample). The reshaped Greyhook's folder (`docs/progress/greyhook_reshape/peninsula_city/`) has every
+`docs/progress/M14/vesper_bay_decks/` has the layered sample's previews (`preview_decks.png`: the ground under the deck, the deck, a section), its build and blockout reports, the 8K whole-city render, `render_deck.jpg` (the built-in deck view) and `render_deck_edge.jpg` (8K: the slab's edge from above); `docs/progress/M14/regenerated/` Highcrest regenerated with `--district`; `docs/progress/M14/unreal/` the Unreal check (Vesper Bay Decks imported, imported again and checked, with shots of the deck, and the exporter fix it found); `docs/progress/M14/cragmouth_decks/` the terrain test (Cragmouth with decks on Hollow and Ridgeback, not a sample). The reshaped Greyhook's folder (`docs/progress/greyhook_reshape/peninsula_city/`) has every
 generator preview, the build report, the stage trace, the 8K whole-city render and a release
 lock; `docs/progress/greyhook_reshape/` also has its sweep. Each M15 city folder has the import, re-import and play-in-editor check results, the 8K
 isometric render from the Unreal editor and the blockout's street cameras in Blender and in
