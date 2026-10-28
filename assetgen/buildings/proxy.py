@@ -1,7 +1,7 @@
 """Far proxies (scope section 8): one per building, its masses as prisms with their roofs
-(no bottoms, no openings), 50 to 500 triangles, UV0 in meters (u around the mass, v up) so a
-facade material can draw windows by UV; for Nanite fallback, HLOD inputs and whole-city
-renders. Rings with many vertices are thinned (the vertex whose removal changes the area
+(no bottoms, no openings; on a slope down its plinth), 50 to 500 triangles, UV0 in meters
+(u around the mass, v up) so a facade material can draw windows by UV; for Nanite
+fallback, HLOD inputs and whole-city renders. Rings with many vertices are thinned (the vertex whose removal changes the area
 least goes first, while the ring stays simple) until the proxy fits its budget.
 """
 
@@ -12,6 +12,7 @@ import math
 from ..triangulate import TriangulationError, area2, orient, triangulate
 from . import rings as RG
 from .meshbuf import Buf
+from .shell import plinth_mm
 
 MAX_TRIS = 500
 
@@ -40,10 +41,13 @@ def _thin(ring) -> list | None:
 
 def build(brief: dict, slot_wall: str = "proxy", slot_roof: str = "proxy_roof") -> dict:
     masses = []
+    depth = plinth_mm(brief)
     for m in brief["masses"]:
         z0, z1 = int(round(m["z"][0] * 1000)), int(round(m["z"][1] * 1000))
         if z1 - z0 < 50:
             continue
+        if z0 <= 50 and depth:
+            z0 = -depth                        # down its plinth on a slope
         rings = [RG.tidy(RG.mm_ring(m["footprint"]["exterior"]))[0]] + \
             [RG.tidy(RG.mm_ring(h))[0] for h in m["footprint"]["holes"]]
         rings = [r for r in rings if len(r) >= 3]

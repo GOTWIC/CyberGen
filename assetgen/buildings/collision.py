@@ -1,7 +1,7 @@
 """Simple collision from the masses (scope section 8): every mass's footprint cut into convex
-pieces (`rings.convex_pieces`), each a prism from the mass's base to its top; a piece that
-is a rectangle becomes a box (center, half extents, yaw), any other a convex prism (its ring
-and z range), in the building frame, meters. Spires, masts and thin decks under 0.5 m are
+pieces (`rings.convex_pieces`), each a prism from the mass's base (on a slope, the bottom of
+its plinth) to its top; a piece that is a rectangle becomes a box (center, half extents,
+yaw), any other a convex prism (its ring and z range), in the building frame, meters. Spires, masts and thin decks under 0.5 m are
 left out (nothing walks into them at street level and their boxes would only snag).
 """
 
@@ -14,6 +14,7 @@ from citygen import dmath as M
 from .. import canon as C
 from ..triangulate import orient
 from . import rings as RG
+from .shell import plinth_mm
 
 SKIP_ROLES = ("spire", "mast")
 
@@ -37,10 +38,13 @@ def _box(piece):
 
 def build(brief: dict) -> dict:
     boxes, convex = [], []
+    depth = plinth_mm(brief) / 1000.0
     for m in brief["masses"]:
         z0, z1 = m["z"]
         if z1 - z0 < 0.5 or m["role"] in SKIP_ROLES:
             continue
+        if z0 <= 0.05 and depth:
+            z0 = -depth                        # down its plinth on a slope
         ext = RG.tidy(RG.mm_ring(m["footprint"]["exterior"]))[0]
         holes = [RG.tidy(RG.mm_ring(h))[0] for h in m["footprint"]["holes"]]
         if len(ext) < 3:

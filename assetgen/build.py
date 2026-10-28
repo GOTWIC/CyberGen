@@ -139,7 +139,7 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     rec = {
         "kind": "building", "type": brief["building"]["type"],
         "district": (brief.get("district") or {}).get("id"),
-        "pivot": [C.m2(brief["origin"][0]), C.m2(brief["origin"][1]), 0.0],
+        "pivot": [C.m2(brief["origin"][0]), C.m2(brief["origin"][1]), _base_m(brief)],
         "bounds": [[C.m(v / 1000.0) for v in lo.tolist()],
                    [C.m(v / 1000.0) for v in hi.tolist()]],
         "triangles": int(sum(len(a["tri"]) for a in arrs.values())),
@@ -154,6 +154,12 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "checks": {"mesh": ck, "envelope": env},
     }
     return sh, px, rec
+
+
+def _base_m(brief: dict) -> float:
+    """The pivot's height: M13's base (the ground floor at the main entrance), else 0."""
+    base = brief["building"]["floor_grid"].get("base_m")
+    return C.m(base) if base is not None else 0.0
 
 
 def _node_extras(bid: str, rec: dict) -> dict:
@@ -188,7 +194,8 @@ def tile_job(job: dict) -> dict:
     gp = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     pmats = _materials(gp, ["proxy", "proxy_roof"])
     for bid, brief, sh, px, rec in made:
-        piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)), 0)
+        piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
+               int(round(_base_m(brief) * 1000)))
         ex = _node_extras(bid, rec)
         mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats),
                       extras={"kind": "shell"})

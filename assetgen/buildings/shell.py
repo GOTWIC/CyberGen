@@ -21,7 +21,9 @@ check):
 - ring strips (`rings.strip`) extruded: slab bands at floor lines, cornices at the tops of
   masses, parapets on roof edges no other mass covers; only above 3 m where they leave the
   footprint, never on party, hidden or blind stretches;
-- roof equipment blocks for the brief's roof items (AG4 replaces them).
+- roof equipment blocks for the brief's roof items (AG4 replaces them);
+- on M13's slopes, a plinth under each mass that stands on the base, down into the lowest
+  ground under the footprint (`plinth_mm`; AG5 steps it).
 """
 
 from __future__ import annotations
@@ -50,6 +52,17 @@ SPREAD = {"irregular": (0.7, 0.6), "tight": (0.85, 0.3), "loose": (0.5, 1.0)}
 
 def _u(bid: str, purpose: str) -> float:
     return GN.u(bid, purpose, "ag1.shell")
+
+
+def plinth_mm(brief: dict) -> int:
+    """How far a building on M13's slopes reaches under its base: from its base (mass z 0,
+    the ground floor at the main entrance) down to the lowest ground under its footprint
+    and 0.5 m into it, as the blockout's plinth; 0 on flat ground (scope 14.6: AG5 steps it)."""
+    fg = brief["building"]["floor_grid"]
+    base, low = fg.get("base_m"), fg.get("plinth_m")
+    if base is None or low is None or base - low < 0.3:
+        return 0
+    return int(round((base - low + 0.5) * 1000))
 
 
 class Facade:
@@ -360,6 +373,14 @@ class ShellBuilder:
             if g != "structure":
                 groups.add(g)
             self._mass(ms, g)
+        depth = plinth_mm(br)
+        if depth:
+            for ms in masses:
+                if ms["z0"] <= 50 and ms["z1"] - ms["z0"] >= 50 and ms["shape"] != "ring" and \
+                        len(RG.clean(ms["rings"][0])) >= 3:
+                    self.buf.new_part()
+                    if self._extrude(ms["rings"][0], None, -depth, 0, "structure"):
+                        self.stats["plinths"] = self.stats.get("plinths", 0) + 1
         for it in br["roof_items"]:
             self._roof_item(it)
         self.used["groups"] = [g for g in GN.GROUPS if g in groups]

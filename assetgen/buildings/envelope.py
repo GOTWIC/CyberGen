@@ -1,9 +1,11 @@
 """The envelope check (scope section 9) on one shell: every vertex inside a mass that spans
 its height, or an allowed overhang (a cornice or slab band at most 0.6 m out from a face, its
 miter at a corner at most `OVERHANG_MM` from the footprint, and at least 3 m up, over the
-sidewalk and never down to it; a parapet at most `PARAPET_MM` over its mass's top); roof equipment over a mass's roof. Masses that M3 put
-past their lot (straddle buildings) are the envelope as they are. Distances in IEEE doubles,
-element-wise in a fixed order (scope section 10).
+sidewalk and never down to it; a parapet at most `PARAPET_MM` over its mass's top); roof
+equipment over a mass's roof; on M13's slopes, a mass on the base reaches down by its
+plinth (`shell.plinth_mm`). Masses that M3 put past their lot (straddle buildings) are the
+envelope as they are. Distances in IEEE doubles, element-wise in a fixed order (scope
+section 10).
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..planar import dist_polyline, inside_poly
+from .shell import plinth_mm
 
 OVERHANG_MM = 910            # 0.6 m cornices, mitered up to 1.5 times at corners
 PARAPET_MM = 1210
@@ -20,10 +23,12 @@ TOL_MM = 2.0
 
 def check(brief: dict, arrs: dict) -> dict:
     masses = []
+    depth = float(plinth_mm(brief))
     for m in brief["masses"]:
         ext = [(p[0] * 1000.0, p[1] * 1000.0) for p in m["footprint"]["exterior"]]
         holes = [[(p[0] * 1000.0, p[1] * 1000.0) for p in h] for h in m["footprint"]["holes"]]
-        masses.append((m["z"][0] * 1000.0, m["z"][1] * 1000.0, ext, holes))
+        z0 = m["z"][0] * 1000.0
+        masses.append((z0 - depth if z0 <= 50.0 else z0, m["z"][1] * 1000.0, ext, holes))
     top = max(z1 for _, z1, _, _ in masses) if masses else 0.0
     out = {"vertices": 0, "outside": 0, "too_high": 0, "low_overhang": 0,
            "equipment_off_roof": 0}
