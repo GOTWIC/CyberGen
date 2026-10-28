@@ -31,6 +31,8 @@ script, not this exporter.)
 | props and plants as hierarchical instanced meshes, one actor per kind and tile, with the instances' ids | `BP_CityGenInstances` actors |
 | the lane, walkway and transit graphs as data assets | `BP_CityGenGraph` assets |
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
+| with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
+| stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
 
 Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, `cg.tile` and
 `cg.district` tags. Frames: citygen's (x east, y north, z up, meters) to Unreal's at
@@ -157,26 +159,50 @@ format:
 - **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
   unchanged packs, so a re-import may skip the key.
 
-**What the exporter still needs for it** (M15 was not on main when AG1 finished, so the
-exporter's code is unchanged; this is the work for the first PR that has both):
-- read every `BUILD/assets/unreal_contribution.*.json`, in sorted file order, as stage 2's
-  layer over the blockout manifest, refusing a key that appears in two files;
-- replace the blockout actor of every key it has, and of every key in its `replaces`,
-  keeping the blockout's for the rest; include the new keys and hashes in the re-import
-  digests (an unchanged hash touches nothing);
-- import the packs through Interchange with one static mesh per `<key>.shell` node (and per
-  `<key>.proxy`), assets named by `asset`, and spawn each actor at `pivot` (Unreal
-  100 x, -100 y, 100 z; yaw -yaw);
-- make the masters (`facade`, `glass` with interior mapping, `metal`, as
-  `assetgen/ue/spike_import.py` does) and one material instance per slot, a static switch
-  or scalar picking the CPD index `tint_cpd`;
-- set the 23 Custom Primitive Data floats on every component;
-- write the collision boxes and convex elements into each mesh's body setup;
-- Nanite on, distance fields and Lumen cards off for every building mesh;
-- build parts as hierarchical instanced meshes per building and kind (ready for AG2: the
-  list is empty in AG1);
-- the proxies: as their own meshes for HLOD (AG9) and, where Nanite is off, as the
-  fallback.
+**What the exporter does with it** (done after M15 merged, in the exporter PR for AG1 and
+AG7; `citygen/unreal.py` `stage2`, `citygen/ue/import_city.py`):
+- **Layering**: every `BUILD/assets/unreal_contribution.*.json` is read in sorted file
+  order as layer 2 over the blockout manifest (the manifest's `stage2`); a key in two files
+  is refused, as is a file of another version or layer. `--blockout-only` (or no assets
+  folder) gives exactly the blockout's manifest; imported over stage 2 it takes stage 2's
+  actors out and leaves its meshes and materials in the project, unused, for the next
+  import with stage 2 (Unreal takes about an hour to delete tens of thousands of meshes).
+- **Replacing**: the blockout actor of every entry's key and of every key in its
+  `replaces` is dropped (`stage2.replaced`); the rest stay. The new actors and their hashes
+  are in `actor_hashes`, so `manifest_changes` is exactly what an import does (a building
+  key is "updated" from its blockout box to its shell; a joined street object "deleted";
+  a street piece "created").
+- **Meshes**: the packs go through Interchange with the meshes kept in their nodes' frame
+  (`bake_meshes` off) and their own flat normals (`recompute_normals` off), one static
+  mesh per `<key>.shell` and `<key>.proxy` node under `Assets/Buildings/<tile>` and
+  `Assets/BuildingsProxies/<tile>`, named as Interchange names the node (the
+  contribution's `asset`, `<key>_shell`); each actor stands at `pivot` (Unreal
+  100 x, -100 y, 100 z; yaw -yaw) with the blockout actor's category, district and level,
+  the entry's type and tile, and `cg.stage=2`.
+- **Masters**: `/Game/CityGen/Core/M_CgFacade`, `M_CgGlass` (interior mapping on UV1, a
+  room per pane from the window id in the vertex alpha, lit rooms by Custom Primitive Data
+  6 times `LitScale`; off by default, `Interior` 0, until AG6: in Unreal curtain wall panes
+  that share corners come out with their window ids and UV1 blended per triangle, see
+  `docs/progress/AG1/unreal/`), `M_CgMetal` and the street masters; one instance per part and slot
+  (`Assets/Materials/MI_buildings_<slot>`). A material's `tint_cpd` (one of 0, 8, 11, 14,
+  17, 20) is its `TintChannel`: the master reads a Custom Primitive Data color at each of
+  those indices and the instance picks one; `tint_scale` and `tint_times_color` (the patch
+  slots: 3.1 times the slot's own color) scale it.
+- **Custom Primitive Data**: the 23 floats on every building actor's component, as its
+  saved defaults (`SetDefaultCustomPrimitiveDataFloatArray`; `SetCustomPrimitiveDataFloat`,
+  which AG0's spike used inside one editor run, sets only run-time values that the level
+  does not save).
+- **Collision**: the boxes and convex prisms as exact convex hulls in each shell's body
+  setup, used as complex: Python cannot write `KConvexElem`'s vertices, so the importer
+  extrudes each piece into a GeometryScript dynamic mesh and lets
+  `SetStaticMeshCollisionFromMesh` make one hull per piece (boxes come out as boxes); the
+  project gets the `GeometryScripting` plugin with the other two.
+- **Nanite** on, distance fields and Lumen cards off for every shell.
+- **Parts**: a `BP_CityGenInstances` actor (HISM) per entry and part kind, keyed
+  `<key>.<kind>`, the transforms relative to the pivot, the entry's Custom Primitive Data
+  on the component (AG1's lists are empty; AG7's container stacks use it).
+- **Proxies**: imported as static meshes (Nanite off, no collision), not spawned: ready
+  for HLOD (AG9).
 
 ## assetgen's street contribution (AG7)
 
@@ -235,16 +261,19 @@ citygen id; `streets/parts.glb`, the instanced parts), in AG0's format with `"pa
   put on its deck (the model has them at z 0 under it, an M15 open item); z over the ground,
   as the model's.
 
-**What the exporter still needs for streets** (AG7 changes no exporter code; the AG1
-session owns the exporter): read `unreal_contribution.streets.json` as a second layer-2
-contribution beside the buildings', and drop every blockout actor named in a `replaces`;
-the masters `road`, `opaque`, `metal`, `emissive`, `translucent` (two-sided, blended) and
-`foliage` with their instances per slot; complex collision on street meshes (`"collision":
-{"complex": true}`, Nanite on, simple collision none); non-Nanite meshes with LOD chains
-from the `lods` nodes and screen sizes (sky tube glass), no collision; HISM per entry and
-part kind from `parts` (`streets/parts.glb`); the walkway graph data assets built from
-`graphs.walkways` where it has a line (the corrected z) instead of the model's; the new keys
-in its re-import digests (a regenerated district changes only its tiles' entries).
+**What the exporter does with streets** (done after M15 merged, with the buildings'):
+`unreal_contribution.streets.json` is the second layer-2 contribution (sorted after the
+buildings'), every blockout actor named in a `replaces` dropped; the masters `M_CgRoad`,
+`M_CgOpaque`, `M_CgMetal`, `M_CgEmissive` (emissive strength 4), `M_CgTranslucent`
+(blended, two-sided, opacity 0.35) and `M_CgFoliage` (two-sided), one instance per slot
+(`MI_streets_<slot>`; AG7 writes its colors as sRGB, the exporter makes them linear); a
+static mesh per piece under `Assets/Streets/<tile>`, complex collision, Nanite on; the sky
+tube glass's LOD nodes imported (Nanite off), the chain made as the entry's `asset` from
+them (`SetLodFromStaticMesh`, `SetLodScreenSizes`), its actor without collision; a
+`BP_CityGenInstances` actor per entry and part kind from `parts` (`streets/parts.glb` under
+`Assets/StreetsParts/parts`); the walkway graph data assets take `graphs.walkways` lines
+instead of graphs.json's (on a terrain city the ground under them, graphs.json's z there,
+is added); the new keys in the re-import digests.
 
 ## Milestones and checks
 
@@ -258,7 +287,9 @@ in its re-import digests (a regenerated district changes only its tiles' entries
   touches, imports them again (nothing may change), runs `--check` with `--shots`, puts the
   results in `docs/progress/<milestone>/unreal/` and reports back.
 - **One Unreal editor at a time** on the Mac; heavy scenes go to the Windows PC. For scale,
-  M15 imports a sample city in 33 to 79 s and checks it in 68 to 112 s on the Mac.
+  M15 imports a sample city in 33 to 79 s and checks it in 68 to 112 s on the Mac; with
+  stage 2 (AG1's shells and AG7's streets) a first import takes 5 to 14 minutes, most of it
+  building the Nanite meshes, and an import of an unchanged build 20 to 40 s.
 
 ## Record
 
@@ -271,3 +302,4 @@ in its re-import digests (a regenerated district changes only its tiles' entries
 | AG7 | No code change (the AG1 session owns the exporter): the street contribution defined (above, written by `assetgen streets`): per-piece entries replacing the blockout's joined street objects, sky tube glass as non-Nanite LOD chains, container parts, walkways on raised decks; what the exporter needs to take it listed there | the coordinating session's call |
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`d03.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on; `city.deck_road.<tile>` and `city.deck_sidewalk.<tile>` with no district until the stage 1 fixes), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |
 | Stage 1 fixes | No code change. Keys: a deck's streets and sidewalks are joined per district like the ground's (`d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`, with `cg.district=d03`; they were `city.deck_road.<tile>`, `city.deck_sidewalk.<tile>` with an empty `cg.district`), so importing Vesper Bay Decks over an M14 import replaces those actors under their new keys; its ramps keep theirs (`<segment>.ramp`). Cragmouth's local junctions are level out to their corners (more retaining wall actors on its hills, keys by wall id as before) | Not run (the coordinating session's call; `docs/progress/stage1_fixes/`) |
+| AG1 and AG7 (after M15) | Stage 2 taken as layer 2: every `assets/unreal_contribution.*.json` read in sorted order (`unreal.stage2`, the manifest's `stage2`; a key in two files refused), the blockout actors of each entry's key and `replaces` dropped, an actor per shell and street piece at its pivot (`cg.stage=2`), the packs through Interchange in their nodes' frames with their own normals, stage 2 masters (`M_CgFacade`, `M_CgGlass`, `M_CgMetal`, `M_CgRoad`, `M_CgOpaque`, `M_CgEmissive`, `M_CgTranslucent`, `M_CgFoliage`) and an instance per part and slot reading the actor's Custom Primitive Data tint, the 23 floats as the components' saved defaults, building collision as convex hulls through GeometryScript (`GeometryScripting` plugin), complex collision for streets, the sky tube glass as a non-Nanite LOD chain, container stacks as instanced actors per entry and kind, proxies imported only, `graphs.walkways` lines in the walkway data assets; `--blockout-only`; the check's walk keeps to walkable walkways (no leg over 30%, no step over 0.6 m, not under the terrain) and tries up to eight starts; the buildings contribution's `asset` is the shell node's Interchange name and its patch slots spell out their tint rule | the small test city, Greyhook and Cragmouth: blockout alone, then stage 2 over it (exactly the actors `manifest_changes` names), imported again (nothing changed), checked (507 of 507 traces down, 36 of 36 roofs and facades, 248, 130 and 81 m walked) with shots; first imports with stage 2 5 to 14 minutes, most of it Nanite builds (`docs/progress/AG1/unreal/`) |

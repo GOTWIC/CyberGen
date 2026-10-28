@@ -16,6 +16,14 @@ Unreal needed) writes BUILD_DIR/unreal/:
 - `graphs.json`: the lane, walkway and transit graphs flattened for data assets (ids, kinds,
   widths, points and links as offsets into flat arrays).
 
+Stage 2 (assetgen): when BUILD_DIR/assets holds `unreal_contribution.*.json` (AG1's
+buildings, AG7's streets), they are read in sorted file order as layer 2 over the blockout
+(`stage2`, the manifest's `stage2`): an actor per entry at its own pivot in place of the
+blockout actors of its key and its `replaces`, an instanced actor per entry and part kind,
+the glTF packs to import (one static mesh per node) and a material per part and slot; their
+walkway lines replace graphs.json's. Without them (or with `assets` off) the manifest is the
+blockout's alone, byte for byte.
+
 Then it runs the editor headless (`UnrealEditor-Cmd UPROJECT -run=pythonscript`) on
 `citygen/ue/import_city.py`, which reads only those files (stdlib and the `unreal` module).
 citygen itself makes no network call; the Unreal MCP plugin is the interactive route (a
@@ -57,7 +65,8 @@ EDITOR_CMD = {"darwin": "Mac/UnrealEditor-Cmd", "win32": "Win64/UnrealEditor-Cmd
               "linux": "Linux/UnrealEditor-Cmd"}
 EDITOR_GUI = {"darwin": "Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor",
               "win32": "Win64/UnrealEditor.exe", "linux": "Linux/UnrealEditor"}
-PLUGINS = ["PythonScriptPlugin", "EditorScriptingUtilities"]
+# GeometryScripting: stage 2 building collision (convex hulls of the mass pieces)
+PLUGINS = ["PythonScriptPlugin", "EditorScriptingUtilities", "GeometryScripting"]
 UE_DIR = Path(__file__).parent / "ue"
 
 
@@ -293,16 +302,31 @@ def _flat(elems: list[dict]) -> dict:
     return out
 
 
-def flat_graphs(graphs: dict) -> dict:
+def _walk_line(w: dict, line: list, absolute: bool) -> list:
+    """A walkway's line from stage 2 (`graphs.walkways`: a raised road's sidewalk put on its
+    deck, z over the ground as the model's). On a terrain city graphs.json is absolute and
+    the model has these walkways at z 0, so their graphs.json z is the ground under them:
+    added point by point when the lines match."""
+    if absolute and len(line) == len(w["line"]):
+        return [[p[0], p[1], round(p[2] + q[2], 2)] for p, q in zip(line, w["line"])]
+    return [list(p) for p in line]
+
+
+def flat_graphs(graphs: dict, walk_lines: dict | None = None) -> dict:
     """graphs.json (M4 exports) as three flat graphs: lanes (lanes and junction connectors,
     linked to their successors), walkways (linked to their neighbors) and transit (lines
-    and stations, linked to each other)."""
+    and stations, linked to each other). `walk_lines`: stage 2's walkway lines by id, used
+    over graphs.json's."""
     lanes = [{"id": x["id"], "kind": x["kind"], "ref": x["segment_id"] or x["node_id"],
               "width": x["width_m"], "points": x["centerline"], "links": x["successors"],
               "attrs": {"forward": x["forward"], "index": x["index"],
                         "adjacent_ids": x["adjacent_ids"]}, "level": x.get("level", 0)}
              for x in graphs["lanes"]]
-    walks = [{"id": w["id"], "kind": w["kind"], "width": w["width_m"], "points": w["line"],
+    walk_lines = walk_lines or {}
+    absolute = graphs.get("heights") == "absolute"
+    walks = [{"id": w["id"], "kind": w["kind"], "width": w["width_m"],
+              "points": (_walk_line(w, walk_lines[w["id"]], absolute) if w["id"] in walk_lines
+                         else w["line"]),
               "links": w["neighbors"], "level": w.get("level", 0)} for w in graphs["walkways"]]
     transit = []
     for t in graphs["transit_lines"]:
@@ -423,10 +447,205 @@ def player_start(build: Path, plan: dict) -> dict:
             "yaw_deg": round(yaw, 2), "source": src}
 
 
-def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
+# --- stage 2 (assetgen): layer 2 over the blockout -------------------------------------------
+
+ASSETS_DIR = "assets"                       # BUILD_DIR/assets: assetgen's packs
+CONTRIBUTIONS = "unreal_contribution.*.json"
+STAGE2_FOLDER = "Assets"                    # under the city's content root
+# the Custom Primitive Data indices a stage 2 material may take its tint from (the masters
+# read a color at each: AG1's wall, trim, glass, roof, spandrel and patch tints)
+TINT_CPD = (0, 8, 11, 14, 17, 20)
+SRGB_PARTS = ("streets",)                   # AG7 writes its slot colors as sRGB (0 to 1)
+EMISSIVE2 = {"neon": 8.0, "emissive": 4.0}  # the emissive strength of a master's instances
+
+
+def contributions(build_dir: str | Path) -> list[tuple[str, dict, str]]:
+    """Stage 2's layer: every BUILD_DIR/assets/unreal_contribution.*.json in sorted file
+    order, as (path from BUILD_DIR, contribution, sha256 of the file)."""
+    d = Path(build_dir) / ASSETS_DIR
+    out = []
+    for f in sorted(d.glob(CONTRIBUTIONS)) if d.is_dir() else []:
+        data = f.read_bytes()
+        c = json.loads(data)
+        if c.get("version") != 1 or c.get("layer") != 2:
+            raise ValueError(f"{f}: not a version 1, layer 2 contribution")
+        out.append((f"{ASSETS_DIR}/{f.name}", c, hashlib.sha256(data).hexdigest()))
+    return out
+
+
+def walk_lines(contribs: list) -> dict:
+    """Stage 2's walkway lines by id (`graphs.walkways`), in contribution order."""
+    out = {}
+    for _, c, _ in contribs:
+        out.update((c.get("graphs") or {}).get("walkways") or {})
+    return out
+
+
+def _linear(c) -> list[float]:
+    return [round(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4, 6) for x in c]
+
+
+def stage2(man: dict, build: Path, contribs: list) -> dict:
+    """Stage 2's contributions layered over the blockout manifest `man` (scope: the
+    exporter's contract, `docs/unreal_export.md`): a static mesh actor per entry with a mesh
+    (at its pivot, Custom Primitive Data, its tags), an instanced actor per entry and part
+    kind, the glTF packs to import (one static mesh per shell, proxy, street or part node;
+    collision, Nanite and LODs by entry), the materials (one instance per part and slot)
+    and the blockout actors dropped: every entry's own key and every key in its `replaces`.
+    A key may be in one contribution only."""
+    blockout = {o["key"]: (t["name"], o) for t in man["tiles"] for o in t["objects"]}
+    owner: dict[str, str] = {}
+    mats, packs, actors, insts, chains = {}, {}, [], [], []
+    replaced, missing, files = set(), 0, []
+    sha_of: dict[str, str] = {}
+
+    def pack(part, glb, use):
+        stem = Path(glb).stem
+        folder = {"mesh": f"{STAGE2_FOLDER}/{pascal(part)}/{stem}",
+                  "proxy": f"{STAGE2_FOLDER}/{pascal(part)}Proxies/{stem}",
+                  "part": f"{STAGE2_FOLDER}/{pascal(part)}Parts/{stem}"}[use]
+        k = (glb, folder)
+        if k not in packs:
+            path = build / ASSETS_DIR / glb
+            packs[k] = {"glb": f"{ASSETS_DIR}/{glb}" if path.is_file() else None,
+                        "folder": folder, "part": part, "use": use, "meshes": {}}
+        return packs[k]
+
+    def file_sha(glb):
+        if glb not in sha_of:
+            p = build / ASSETS_DIR / glb
+            sha_of[glb] = hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
+        return sha_of[glb]
+
+    def mesh(pk, node, h, collision, nanite):
+        a = asset_name(node)
+        pk["meshes"][a] = {"asset": a, "hash": content_hash([h, node, collision, nanite]),
+                           "collision": collision, "nanite": nanite}
+        return f"{pk['folder']}/{a}", pk["meshes"][a]["hash"]
+
+    for rel, c, sha in contribs:
+        part = c.get("part") or c.get("stage") or "stage2"
+        files.append({"file": rel, "part": part, "stage": c.get("stage"), "sha256": sha,
+                      "entries": len(c["entries"])})
+        for name, p in sorted(c.get("materials", {}).items()):
+            tint = p.get("tint_cpd")
+            if tint is not None and tint not in TINT_CPD:
+                raise ValueError(f"{rel}: material {name}: tint_cpd {tint} is not one of "
+                                 f"{list(TINT_CPD)}")
+            col = _linear(p["color"]) if part in SRGB_PARTS else list(p["color"])
+            mats[f"{part}.{name}"] = {
+                "asset": "MI_" + asset_name(f"{part}.{name}"), "part": part, "slot": name,
+                "master": p["master"], "color": col, "roughness": p.get("roughness", 0.85),
+                "metallic": p.get("metallic", 0.0),
+                "emissive": EMISSIVE2.get(p["master"], 0.0),
+                "tint_cpd": -1 if tint is None else tint,
+                "tint_scale": p.get("tint_scale", 1.0),
+                "tint_times_color": bool(p.get("tint_times_color", False))}
+        for e in c["entries"]:
+            k = e["key"]
+            if k in owner:
+                raise ValueError(f"{k}: in {owner[k]} and {rel} (a key may be in one "
+                                 "contribution only)")
+            owner[k] = rel
+            bo = blockout.get(k)
+            tags = e.get("tags") or {}
+            col = e.get("collision") or {}
+            if col.get("simple") or col.get("convex"):
+                collision = {"boxes": col.get("simple") or [], "convex": col.get("convex") or []}
+            elif col.get("none"):
+                collision = {"none": True}
+            else:
+                collision = {"complex": True}
+            nanite = bool(e.get("nanite", True))
+            path = h = None
+            if e.get("lods"):
+                # a non-Nanite LOD chain: each LOD node imported, the chain made as `asset`
+                pk = pack(part, e["glb"], "mesh")
+                lods = []
+                for lo in e["lods"]:
+                    p_, _ = mesh(pk, lo["node"], e["hash"], {"none": True}, False)
+                    lods.append({"mesh": p_, "screen_size": lo["screen_size"]})
+                path = f"{pk['folder']}/{asset_name(e['asset'])}"
+                h = content_hash([e["hash"], lods, collision])
+                chains.append({"mesh": path, "hash": h, "lods": lods, "collision": collision})
+            elif e.get("node") and e.get("triangles", 0) > 0:
+                path, h = mesh(pack(part, e["glb"], "mesh"), e["node"], e["hash"], collision,
+                               nanite)
+            if e.get("proxy"):
+                px = e["proxy"]
+                mesh(pack(part, px["glb"], "proxy"), px["node"], e["hash"], {"none": True},
+                     False)
+            tile = tags.get("cg.tile") or e.get("tile") or (bo[0] if bo else "")
+            first = bo or next((blockout[r] for r in e.get("replaces", []) if r in blockout),
+                               None)
+            # the category, district and level of the blockout actor it takes the place of
+            # (its own key's, else the first it replaces), so the check sees the same kinds
+            base = {"category": first[1]["category"] if first else e["kind"].split(".")[0],
+                    "type": tags.get("cg.type") or e["kind"], "tile": tile,
+                    "district": (tags.get("cg.district") or (first[1]["district"] if first
+                                                             else "") or _district(k, {})),
+                    "ids": bo[1]["ids"] if bo else [k]}
+            if first and first[1].get("level"):
+                base["level"] = first[1]["level"]
+            pivot = [float(v) for v in e.get("pivot", [0.0, 0.0, 0.0])]
+            yaw = float(e.get("yaw_deg", 0.0))
+            made = False
+            if path:
+                a = {"key": k, "mesh": path, "pivot": pivot, "yaw_deg": yaw,
+                     "cpd": e.get("cpd") or [], **base}
+                if "none" in collision:
+                    a["no_collision"] = True
+                a["hash"] = content_hash([a, h])
+                actors.append(a)
+                made = True
+            for p in e.get("parts") or []:
+                glb = p.get("glb") or e["glb"]
+                mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb),
+                              {"complex": True}, True)
+                a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
+                     "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [],
+                     "xforms": p["xforms"], **base}
+                a["type"] = p["kind"]
+                a["hash"] = content_hash([a, mh])
+                insts.append(a)
+                made = True
+            if not made:
+                continue
+            if bo:
+                replaced.add(k)
+            for r in e.get("replaces", []):
+                if r in blockout:
+                    replaced.add(r)
+                else:
+                    missing += 1
+    out_packs = []
+    for k in sorted(packs):
+        pk = packs[k]
+        pk["meshes"] = [pk["meshes"][a] for a in sorted(pk["meshes"])]
+        out_packs.append(pk)
+    masters = sorted({m["master"] for m in mats.values()})
+    return {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
+            "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
+            "actors": sorted(actors, key=lambda a: a["key"]),
+            "instances": sorted(insts, key=lambda a: a["key"]),
+            "replaced": sorted(replaced),
+            "counts": {"entries": len(owner), "actors": len(actors),
+                       "instance_actors": len(insts),
+                       "instances": sum(len(a["xforms"]) for a in insts),
+                       "replaced": len(replaced), "replaces_missing": missing,
+                       "packs": len(out_packs),
+                       "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
+                       "materials": len(mats)}}
+
+
+def build_manifest(build_dir: str | Path, name: str | None = None,
+                   assets: bool = True) -> dict:
     """The manifest of a blockout output (see the module docstring), with the prototypes'
-    meshes and the flat graphs beside it: (manifest, prototype meshes, flat graphs)."""
+    meshes and the flat graphs beside it: (manifest, prototype meshes, flat graphs). With
+    `assets` (the default), stage 2's contributions in BUILD_DIR/assets are layered over the
+    blockout (`stage2`); a build without them gives the blockout's manifest alone."""
     build = Path(build_dir)
+    contribs = contributions(build) if assets else []
     plan = json.loads((build / "blockout_plan.json").read_text(encoding="utf-8"))
     city = name or plan["city"]
     mats = {k: material_params(k, v) for k, v in sorted(plan["materials"].items())}
@@ -479,7 +698,8 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
         protos[kind] = {"node": node, "asset": asset_name(node), "hash": content_hash(parts)}
     graphs = None
     if (build / "graphs.json").is_file():
-        graphs = flat_graphs(json.loads((build / "graphs.json").read_text(encoding="utf-8")))
+        graphs = flat_graphs(json.loads((build / "graphs.json").read_text(encoding="utf-8")),
+                             walk_lines(contribs))
     man = {
         "version": MANIFEST_VERSION, "generator": "citygen unreal (M15)",
         "city": city, "slug": slug(city), "folder": pascal(city),
@@ -504,6 +724,9 @@ def build_manifest(build_dir: str | Path, name: str | None = None) -> dict:
     if decks:
         # M14: the decks (their slab actors by key), for stage 4's levels
         man["decks"] = [decks[k] for k in sorted(decks)]
+    if contribs:
+        man["stage2"] = stage2(man, build, contribs)
+        man["counts"]["actors"] = len(actor_hashes(man))
     man["hash"] = content_hash({k: v for k, v in man.items() if k != "plan_sha256"})
     return man, meshes, graphs
 
@@ -517,6 +740,12 @@ def actor_hashes(man: dict) -> dict[str, str]:
     compares it by (`ue/import_city.py` hashes the player start and the lights the same way)."""
     out = {o["key"]: o["hash"] for t in man["tiles"] for o in t["objects"]}
     out.update({i["key"]: i["hash"] for i in man["instances"]})
+    s2 = man.get("stage2")
+    if s2:
+        # stage 2's actors over the blockout's: the keys it replaces dropped, its own added
+        for k in s2["replaced"]:
+            out.pop(k, None)
+        out.update({a["key"]: a["hash"] for a in s2["actors"] + s2["instances"]})
     out["player_start"] = content_hash(man["player_start"])
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
     return out
@@ -530,14 +759,16 @@ def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
             "deleted": sorted(a.keys() - b.keys())}
 
 
-def write_manifest(build_dir: str | Path, name: str | None = None) -> Path:
-    """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json; the manifest's path."""
+def write_manifest(build_dir: str | Path, name: str | None = None,
+                   assets: bool = True) -> Path:
+    """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json; the manifest's path.
+    `assets` False: the blockout alone, stage 2's contributions left out."""
     build = Path(build_dir)
     for f in ("blockout_plan.json", "tiles.json"):
         if not (build / f).is_file():
             raise FileNotFoundError(f"{build / f}: not a blockout output (run citygen build "
                                     f"--blockout or citygen blockout)")
-    man, meshes, graphs = build_manifest(build, name)
+    man, meshes, graphs = build_manifest(build, name, assets)
     out = build / OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     write_glb(meshes, man["materials"], out / "prototypes.glb")
@@ -669,16 +900,19 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
 
 
 def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
-                name: str | None = None, timeout: float = 7200.0) -> dict:
+                name: str | None = None, timeout: float = 7200.0,
+                assets: bool = True) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
-    (created, updated, deleted and unchanged actors and assets, timings)."""
+    (created, updated, deleted and unchanged actors and assets, timings). `assets` False
+    imports the blockout alone (stage 2's actors, if imported before, go; its meshes
+    stay for the next import with it)."""
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
     root = find_engine(engine)
     if root is None:
         raise RuntimeError("no Unreal Engine found (pass --engine or set CITYGEN_UE_ROOT)")
     t = time.time()
-    man_path = write_manifest(build, name)
+    man_path = write_manifest(build, name, assets)
     manifest_s = round(time.time() - t, 1)
     added = prepare_project(up)
     out = man_path.parent
@@ -723,7 +957,18 @@ def import_summary(res: dict) -> str:
             f"{a['updated']} updated, {a['deleted']} deleted, {a['unchanged']} unchanged "
             f"({res['actor_count']} in all); meshes {m['imported']} imported, "
             f"{m['kept']} kept, {m['deleted']} deleted; {res['tiles_imported']} glTF files "
-            f"imported; {res['dirty_packages']} packages saved; {res['wall_s']} s")
+            f"imported; {res['dirty_packages']} packages saved; {res['wall_s']} s"
+            + _stage2_summary(res))
+
+
+def _stage2_summary(res: dict) -> str:
+    s = res.get("stage2")
+    if not s:
+        return ""
+    m = s["meshes"]
+    return (f"; stage 2: {s['actors']} actors over {s['replaced']} blockout actors, "
+            f"meshes {m['imported']} imported, {m['kept']} kept, {m['deleted']} deleted "
+            f"from {s['packs_imported']} glTF packs")
 
 
 def check_summary(res: dict) -> str:
