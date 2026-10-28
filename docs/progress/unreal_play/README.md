@@ -74,6 +74,11 @@ finds the far tile loaded.
   when some had streamed out ("ObjectInstance is null"); it counts them before the teleport.
 - **The flight's speed** is timed on the game's clock: on the wall clock Greyhook's first
   flight came out at 40 m/s, because play-in-editor clamps a long frame.
+- **`manifest_changes` and AG8.** After merging main, the stage 2 import test found 31 keys
+  (AG8's exact overhead cables, scaffolding and gates per tile, which replace M15's instanced
+  ones under the same key) that the importer deletes and creates again, since their class
+  changes, where `manifest_changes` said "updated". It now counts a key whose actor changes
+  class as deleted and created (`unreal.actor_kinds`).
 - **No console speed tip.** The console's `set` would change the fly speed in a game, but the
   editor refuses it ("Set commands not allowed in the editor"); the speed is `--fly-speed`,
   or the pawn's movement component in the editor until the next import.

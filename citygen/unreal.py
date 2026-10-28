@@ -773,12 +773,31 @@ def actor_hashes(man: dict) -> dict[str, str]:
     return out
 
 
+def actor_kinds(man: dict) -> dict[str, str]:
+    """Every blockout and stage 2 actor's class by key: a static mesh actor (`mesh`) or an
+    instanced one (`instances`, BP_CityGenInstances)."""
+    out = {o["key"]: "mesh" for t in man["tiles"] for o in t["objects"]}
+    out.update({i["key"]: "instances" for i in man["instances"]})
+    s2 = man.get("stage2")
+    if s2:
+        for k in s2["replaced"]:
+            out.pop(k, None)
+        out.update({a["key"]: "mesh" for a in s2["actors"]})
+        out.update({i["key"]: "instances" for i in s2["instances"]})
+    return out
+
+
 def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
-    """The actors an import of `new` over an import of `old` creates, updates and deletes."""
+    """The actors an import of `new` over an import of `old` creates, updates and deletes.
+    A key whose actor changes class (AG8's exact props over M15's instanced ones) is
+    deleted and created again, as the importer does."""
     a, b = actor_hashes(old), actor_hashes(new)
-    return {"created": sorted(b.keys() - a.keys()),
-            "updated": sorted(k for k in a.keys() & b.keys() if a[k] != b[k]),
-            "deleted": sorted(a.keys() - b.keys())}
+    ka, kb = actor_kinds(old), actor_kinds(new)
+    moved = {k for k in a.keys() & b.keys() if ka.get(k) != kb.get(k)}
+    return {"created": sorted((b.keys() - a.keys()) | moved),
+            "updated": sorted(k for k in a.keys() & b.keys()
+                              if a[k] != b[k] and k not in moved),
+            "deleted": sorted((a.keys() - b.keys()) | moved)}
 
 
 def write_manifest(build_dir: str | Path, name: str | None = None,
