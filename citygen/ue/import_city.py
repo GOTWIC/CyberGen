@@ -291,7 +291,8 @@ float h3 = frac(sin(dot(c, float2(73.156, 52.235))) * 15731.743);
 float row = RowOverride >= 0.0 ? RowOverride : Row;
 float col = floor(h1 * (Cols - 0.001));
 float2 auv = float2((col + i.x) / Cols, (row + 1.0 - i.y) / Rows);
-return float4(auv, h2 < Lit ? 1.0 : 0.0, (h3 < Blinds && p.y > 1.0 - h2 * 0.9) ? 1.0 : 0.0);
+float lit = h2 < Lit ? 0.35 + 0.65 * frac(h1 * 7.31) : 0.0;
+return float4(auv, lit, (h3 < Blinds && p.y > 1.0 - h2 * 0.9) ? 1.0 : 0.0);
 """
 GLASS_CODE = """
 float slat = 0.75 + 0.25 * frac(UV.y * 25.0);
@@ -299,7 +300,7 @@ float3 bd = float3(0.55, 0.53, 0.5) * slat;
 float3 day = lerp(Day.rgb, bd, Room.w) * 0.2;
 float3 nite = lerp(Nite.rgb * Room.z, float3(1.0, 0.85, 0.65) * 0.45 * Room.z, Room.w)
             + Nite.rgb * 0.02;
-return Interior * lerp(day, nite * 2.6, Night);
+return Interior * lerp(day, nite * 1.2, Night);
 """
 DECAL_UV_CODE = "return (frac(UV) + float2(fmod(Cell, Cols), floor(Cell / Cols))) / float2(Cols, Rows);"
 

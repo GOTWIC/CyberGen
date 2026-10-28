@@ -15,7 +15,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Planned | |
 | AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
 | AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
-| AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Planned | |
+| AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Done | [`docs/progress/AG6`](progress/AG6) |
 | AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
 | AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Planned | |
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
@@ -149,6 +149,109 @@ already keep mounts off the glass); AG4 roof equipment (blocks now), skybridge l
 portals; AG5 per-type and landmark generators; AG6 reads the slots, tints, UVs and CPD
 layout as the material contract; citygen: footprints with zero-width spikes, self-crossing
 rings and pinched courts (`rings.tidy` cleans them).
+
+## AG6: materials and textures
+
+**Built.** Package `assetgen/materials/` (CLI `assetgen library [OUT] [--density 512]
+[--workers 3] [--only ...]`, `assetgen materials preview BUILD [--views ...] [--night |
+--only-night] [--width W] [--eye X Y Z --target X Y Z]`, `assetgen materials board OUT`;
+`assetgen build` runs the stage after the street packs, `--no-textures` keeps AG1's flat
+materials). Everything is generated in numpy and PIL (decisions 13.1, 13.3, 13.8), pixel for
+pixel the same on every run:
+- **Noise and surfaces** (`noise.py`, `surfaces.py`): integer-hash value noise, fbm, ridged
+  noise and Worley cells (F1, F2, cell ids) on lattices that wrap at the tile's edge, warps,
+  smoothsteps and wrapped blurs, all in elementwise float32 (no transcendentals, no float
+  reductions). A surface is color, height, roughness, metallic, tint mask and occlusion; its
+  generators: board-formed concrete, plaster and stucco, brick (running and English bond),
+  precast panels, ribbed and corrugated metal, sheet, fabric, timber, paint, brushed and
+  perforated metal, louvers, stone, flat roofs (membrane, gravel, tar), tiles (square,
+  running, shingle, cobble), asphalt, grass and gravel; stains, rain streaks, grain, mottle and
+  cracks layered on any of them. `pbr.py` packs a surface into base color (height in alpha),
+  an OpenGL tangent normal and occlusion-roughness-metallic (tint mask in alpha), and gives
+  each set its `ref` (the mean linear color where the mask is 1).
+- **Library** (`library.py`, `atlases.py`, `interiors.py`): 113 tileable sets, 60 of them per
+  era (concrete, plaster, brick, panel, cladding, roof in each of the ten eras, `ERA_LOOK`),
+  the rest shared building surfaces (spandrel, trim, structure, metals, louvers, perforated,
+  shanty patches, timber, shutters, sills, roof tiles, pods) and street surfaces (asphalt per
+  class, patches, paint, cast iron, tactile, ten paving families, curbs, formed concrete,
+  stone, glazed tiles, steel, ballast, lawn, containers, tanks, pads); 14 atlases: a trim
+  sheet per era, the decal atlas (16 cells: grime, leaks, rust, cracks, graffiti, posters,
+  stickers, moss), the road atlas (16 cells: oil, cracks, patches, tar snakes, skid marks,
+  manhole, drain, arrows, puddle, sand, dust), the window interiors and a 64 m macro map. A set
+  covers 1 to 4 m at the spec's `texel_density_px_m` (512, decision 13.4) on the street band
+  and half that on roofs, so every map is a power of two. Made once per density in
+  `~/.cache/cybergen/assetgen_library/d<density>` (or `$ASSETGEN_LIBRARY`) by up to 3 worker
+  processes and kept while the generator's code hash is unchanged; `library.json` lists every
+  file with its decoded-pixel sha256. At 512 px/m: 655 MB of PNG, about 966 MB cooked with
+  mips and block compression, 80 s on the M4 with 3 workers (167 s while other builds ran).
+  Not in git: each build links it as `BUILD/assets/library`.
+- **Window interiors** (`interiors.py`, the redesign PR #41 asked for): rooms drawn in
+  one-point perspective (the back wall at `BACK` 0.5 of the window, floor, ceiling and side
+  walls) by a small ray caster, six uses (office, apartment, capsule, shop, club, warehouse)
+  by eight variants, by day and lit by night, in one atlas each. The glass master needs no data
+  per pane or per vertex: UV0 is meters along the facade and up from the base, so a room is a
+  cell of the building's grid (its bay wide, a floor high, Custom Primitive Data 23 and 24),
+  the view ray goes into the cell's box in the facade's tangent frame, and the point it hits is
+  looked up in the atlas; a hash of the cell picks the variant, whether it is lit (the
+  building's lit ratio, at 0.35 to 1 of full brightness) and its blinds. Shared pane corners,
+  split panes and any triangulation give the same room, so the white triangles and sawtooth of
+  the per-pane design are gone by construction. Storefronts always show the shop row. AG1's
+  UV1 and window ids on glass are no longer read.
+- **Signage** (`signage.py`, `glyphs.py`): per city, a cell for every M11 sign slot: the name
+  of the place in its unit (bar, club, clinic, vendor, arcade), else a shop name from M11's word
+  lists with a use word, a neon band's district name, a lobby's brand (an owner of 8 or more
+  properties or a corporate faction) or building name; in a script drawn from the district's
+  weights. Latin as written; Cyrillic, katakana and Hangul transliterated by syllable; Hanzi-like
+  and Devanagari-like signs composed from strokes (decorative, not words); all from in-repo
+  stroke shapes, as neon tubes, lightboxes or LED rows in the district's neon colors. Pages of
+  4096 px (`textures/signs_wide_<k>.png`, `signs_tall_<k>.png`), a logo per brand, two ad pages
+  (16 ads each, holo variants), `signs.json` (cells with their UVs in glTF's convention, slot
+  to cell). Vesper Bay: 15,448 slots on 411 sign texts (165 wide, 246 tall), 15 brands.
+- **Catalog and parameters** (`catalog.py`, `params.py`): every building slot (AG1's and
+  AG2's) and street slot to a master and a set; walls and roofs per era (`ERA_SLOTS`, keyed
+  `<slot>@<era>`, a building's entry maps its slots to its era's). Masters: `facade`, `metal`,
+  `concrete`, `road`, `glass`, `neon`, `sign`, `decal`, plus AG1's and AG7's `opaque`,
+  `emissive`, `translucent` and `foliage`. A tint replaces the set's `ref` where the mask is 1
+  and leaves mortar, joints and rust as they are. Per building, seven channels after AG1's 23
+  (`params.CPD_EXT`): room width, floor height, interior row (by use and type), streak
+  strength, building top, blinds share, era index.
+- **Contributions** (`contrib.py`): `unreal_contribution.buildings.json` and `.streets.json`
+  gain `textures` (file under `library/` or `textures/`, pixel hash, kind color, normal or
+  mask, sRGB), textured materials (master, set, textures by parameter, scalars, vectors) and
+  the entries' era `materials`; `unreal_contribution.materials.json` carries the sign pages
+  and the decal material. `materials.json` is the same table for the Blender previews.
+- **Checks** (`checks.py`, in `materials_report.txt`): `texel_density` reads every pack's
+  UV0 against the set it shows: per slot, at least 99.5% of the textured area at 0.75 of the
+  band's density or better (buildings 100% in every sample; streets 99.5 to 99.9%, the rest
+  tank cylinders, a few curb and barrier sides with plan UVs and the outer edge of tight
+  curves, listed by slot); `texture_budget`: library under 2.5 GB cooked and 7 GB source, a
+  city's sign pages under 0.3 GB cooked (Vesper Bay 69 MB).
+- **Blender** (`assetgen/blender/ag6_materials.py`, `ag6_preview.py`, `ag6_board.py`): the
+  same masters as node trees (tint over ref, macro, grime from the foot of the wall, streaks
+  from the decal atlas, road stains per 8 m cell, the interior ray march, night switch), the
+  previews on the blockout's `city.blend` with the shells and street packs, sign quads on the
+  slots near a street camera and the street lights lit by night; boards per era.
+- **Exporter** (`citygen/unreal.py`, `citygen/ue/import_city.py`, `STAGE2_VERSION` 4,
+  `TEXTURE_VERSION` 1): textures imported once per pixel hash into `/Game/CityGen/Core/Textures`
+  (the library, shared by every city) or `<City>/Assets/Textures` (signs), normal maps with
+  green flipped; masters built from Custom HLSL nodes (`SURFACE_CODE`, `ROOM_CODE`,
+  `GLASS_CODE`, ...) with `MPC_CityGen.Night`; a material instance per material with its
+  textures, scalars and vectors; an actor's era slots set by name. The manifest's `stage2`
+  carries `textures` (asset, folder, hash) and each material's textures with their hashes, so
+  importing again changes only what moved. Test `test_stage2_textures` (no Unreal).
+- **Validation**: the eight samples built (every citygen and assetgen check passes),
+  previews and boards looked at, `pytest tests/assetgen` and `tests/test_unreal.py -k "not
+  unreal_import"` pass. Goldens: `ag6` in `tests/assetgen/data/golden_hashes.json` (decoded
+  pixels of seven maps of a 32 px/m library, the small city's material files);
+  `golden_streets.json`'s contribution hashes and AG1's small-city contribution moved on
+  purpose (textures, materials and CPD in the contributions); every pack is unchanged.
+- **For later**: vertex colors in the shells (grime under sills, edge wear) wait for AG2's
+  shell changes (AG3); UV1 and window ids on glass can go; parts mapped onto the trim sheets
+  (AG3); decals placed from the decal atlas and sign meshes on `signs.json` (AG3, AG8); OFL
+  fonts for real Hanzi, Hangul, kana and Devanagari (AG8, decision 13.3); the Unreal check of
+  the masters (`docs/progress/AG6/README.md` lists what to look at).
+
+Outputs: [`docs/progress/AG6`](progress/AG6).
 
 ## AG7: street elements
 
@@ -330,6 +433,9 @@ assets are not in git.
 .venv/bin/python -m assetgen spike OUT --quantized                      # the spike buildings (AG0)
 .venv/bin/python -m assetgen build BUILD [--spec asset_spec.json]       # assets (AG1 on)
 .venv/bin/python -m assetgen streets BUILD [--spec SPEC] [--workers 4]   # street packs (AG7)
+.venv/bin/python -m assetgen library [OUT] [--density 512]              # texture library (AG6)
+.venv/bin/python -m assetgen materials preview BUILD [--night]          # textured renders (AG6)
+.venv/bin/python -m assetgen materials board OUT                        # material boards (AG6)
 .venv/bin/python -m assetgen streets seam BASE REGEN --district NAME    # what a regeneration changed (AG7)
 .venv/bin/python -m assetgen review BUILD --prev P                      # art-direction round (AG5)
 .venv/bin/python -m citygen unreal BUILD PROJECT                        # the city with its assets in Unreal

@@ -31,8 +31,8 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "01fc47752f56a6c08febf09140c68fcc847fccb55508e4843f511cb2341f3de0",
-    "testport_files": "df752d327530c622bdd27d21e351dfe8de967315a93b9fa8ca99081294deed83",
+    "testport_manifest": "bf284a4575ae04215e7962e46281ae6a92bf3929c77ba0fde2166d5ce33dbcbd",
+    "testport_files": "c2cf415ba618819f5fd12dfff11abfb4e1fc0b93774ceeeb27a294edb6a02e60",
     "buildings": {
       "vesper_bay": {
         "d01.lm.e790n290.bld": "784ac1b43019000305ba7975794a150bec166966712c70f3752d68b06f5dfc45",
@@ -46,5 +46,17 @@
         "d06.lot.e125s1558.bld": "032b514e68e0bda9b45607b3d321271226b261ab126ecb88cd3a48bab06c1d08"
       }
     }
+  },
+  "ag6": {
+    "library": {
+      "sets.brick_heritage.base": "cb66708612aadbd01cc5e480a691c814d8f2aaf1f1c3d7247b41d35101be2706",
+      "sets.panel_brutalist.orm": "ec205798bb9266c6166734b95b9cea5f60edca37a5c13b0a6c49dd6b1aefc79b",
+      "sets.asphalt_street.normal": "7be5c5af0dd8ed34223044380dd3cb60cdd789e13f47c43776059ad02dd46fd6",
+      "atlases.interiors.night": "1949f6ea459865511e4ec427b42bf1a16cb8bd047e3e13e5ceee81b2e54cc81a",
+      "atlases.decals.base": "3850ffd671ff30dbd637ff9dd783230d2bea5dd95eee7e4d02c3f0c8601818a8",
+      "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
+      "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
+    },
+    "testport_materials": "9b75a782be4b3d33db684c8e42a7e4a1f7005ba62cadeb49ca40e2fc03de82b8"
   }
 }

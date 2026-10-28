@@ -15,6 +15,7 @@ from assetgen import build as BD
 from assetgen import canon as C
 from assetgen import manifest as MF
 from assetgen.brief import load_model
+from assetgen.buildings import systems as SY
 from assetgen.streets import build as SB
 
 from agtools import (CITIES, HERE, ROOT, built_sample, copy_model, golden, small_assets,
@@ -139,7 +140,7 @@ def test_unreal_contribution_covers_every_building():
         assert e["glb"] == r["glb"] and e["node"] == f"{e['key']}.shell"
         assert e["pivot"] == r["pivot"] and e["nanite"] and not e["distance_field"]
         assert e["proxy"]["node"] == f"{e['key']}.proxy"
-        assert len(e["cpd"]) == 23
+        assert len(e["cpd"]) == SY.CPD_SIZE + 7        # AG1's channels and AG6's
         assert set(e["slots"]) <= set(uc["materials"])
 
 

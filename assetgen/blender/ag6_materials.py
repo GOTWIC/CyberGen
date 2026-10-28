@@ -322,7 +322,9 @@ def glass(mat, rec, files, part, sky=(0.24, 0.34, 0.48)):
     av = t.m("DIVIDE", t.m("ADD", t.m("SUBTRACT", rows - 1.0, row), iv), rows)
     day, _ = t.tex(files[tx["InteriorDay"]], t.comb(au, av), True)
     nite, _ = t.tex(files[tx["InteriorNight"]], t.comb(au, av), True)
-    lit = t.m("LESS_THAN", h2, t.attr("cg_lit"))
+    # a lit room at 0.35 to 1 of full brightness (lamps differ), else dark
+    lit = t.m("MULTIPLY", t.m("LESS_THAN", h2, t.attr("cg_lit")),
+              t.m("ADD", 0.35, t.m("MULTIPLY", t.m("FRACT", t.m("MULTIPLY", h1, 7.31)), 0.65)))
     # blinds: a share of rooms with a blind down to a height
     blind = t.m("MULTIPLY", t.m("LESS_THAN", h3, t.attr("cg_blinds")),
                 t.m("GREATER_THAN", py, t.m("SUBTRACT", 1.0, t.m("MULTIPLY", h2, 0.9))))
@@ -335,7 +337,7 @@ def glass(mat, rec, files, part, sky=(0.24, 0.34, 0.48)):
     room_nite = t.v("ADD", room_nite, t.v("SCALE", nite, scale=0.02))
     t.link(t.mix(0.35, base, sky + (1.0,)), bsdf.inputs["Base Color"])
     emit = t.mix(night, t.v("SCALE", room_day, scale=0.2),
-                 t.v("SCALE", room_nite, scale=2.6))
+                 t.v("SCALE", room_nite, scale=1.2))
     t.link(emit, bsdf.inputs["Emission Color"])
     bsdf.inputs["Emission Strength"].default_value = 1.0
     return mat
@@ -405,7 +407,7 @@ def proxy(mat):
                   t.m("MULTIPLY", t.attr("cg_seed"), 1000.0))
     lit = t.m("LESS_THAN", t.hash3(cell), t.attr("cg_lit"))
     night = _night(t)
-    t.link(t.m("MULTIPLY", t.m("MULTIPLY", w, lit), t.m("MULTIPLY", night, 1.6)),
+    t.link(t.m("MULTIPLY", t.m("MULTIPLY", w, lit), t.m("MULTIPLY", night, 0.9)),
            bsdf.inputs["Emission Strength"])
     bsdf.inputs["Emission Color"].default_value = (1.0, 0.8, 0.55, 1.0)
     return mat

@@ -93,7 +93,9 @@ def fbm(n: int, period: int, seed: int, octaves: int = 5, gain: float = 0.5,
     p = period
     for k in range(octaves):
         if p > n:
-            break
+            if k:
+                break
+            p = n               # a first octave finer than the image: at its pixels
         out = out + F(amp) * value(n, p, seed + 101 * k, px, py)
         total += amp
         amp *= gain

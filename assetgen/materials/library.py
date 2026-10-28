@@ -338,7 +338,7 @@ def _seed(name: str) -> int:
 
 
 def size_of(entry: dict, density: int) -> int:
-    d = density if entry["band"] == "street" else max(32, density // 2)
+    d = density if entry["band"] == "street" else density // 2
     return int(round(entry["tile_m"] * d))
 
 

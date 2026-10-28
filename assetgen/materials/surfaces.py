@@ -464,7 +464,7 @@ def perforated(n: int, tile_m: float, p: dict) -> Surface:
     hole = N.smooth(float(rad), float(rad) * 0.85, r)
     color = mix(base.color, paint(n, rgb("#101214"), full(n, 1.0)), hole.astype(F))
     return Surface(color, (base.height * (F(1.0) - hole)).astype(F),
-                   (base.rough + F(0.4) * hole).astype(F), (base.metal * (F(1.0) - hole)).astype(F),
+                   np.minimum(base.rough + F(0.4) * hole, F(1.0)).astype(F), (base.metal * (F(1.0) - hole)).astype(F),
                    (base.mask * (F(1.0) - hole)).astype(F), bump=4.0)
 
 
