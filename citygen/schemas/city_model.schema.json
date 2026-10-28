@@ -425,6 +425,32 @@
           "default": null,
           "description": "Ground footprint (masses from z 0)."
         },
+        "base_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M13: the ground floor (mass z 0) over sea level, at the main entrance.",
+          "title": "Base M"
+        },
+        "plinth_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M13: the lowest ground under the footprint; a stepped plinth fills from it up to base_m.",
+          "title": "Plinth M"
+        },
         "masses": {
           "items": {
             "$ref": "#/$defs/Mass"
@@ -2812,6 +2838,19 @@
           "default": 0,
           "title": "Level",
           "type": "integer"
+        },
+        "ground_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M13: the ground (grade line) at the node, over sea level; z is above it.",
+          "title": "Ground M"
         }
       },
       "required": [
@@ -2955,6 +2994,14 @@
             "type": "string"
           },
           "title": "Tunnel Ids",
+          "type": "array"
+        },
+        "ground": {
+          "description": "M13: the grade line along the centerline (the finished ground under the road, over sea level); the surface is ground + z_profile.",
+          "items": {
+            "$ref": "#/$defs/ZSample"
+          },
+          "title": "Ground",
           "type": "array"
         },
         "district_ids": {
@@ -3526,6 +3573,19 @@
           "title": "Z M",
           "type": "number"
         },
+        "base_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M13: the ground z_m is measured from (the first building's base).",
+          "title": "Base M"
+        },
         "width_m": {
           "title": "Width M",
           "type": "number"
@@ -3866,7 +3926,8 @@
             "canopy",
             "portal",
             "trench",
-            "vent"
+            "vent",
+            "retaining_wall"
           ],
           "title": "Kind",
           "type": "string"
@@ -3926,6 +3987,74 @@
         "z1_m"
       ],
       "title": "Structure",
+      "type": "object"
+    },
+    "Terrain": {
+      "additionalProperties": false,
+      "description": "M13: the ground, absolute (sea level 0), on a grid of points `cell_m` apart from\n(x0, y0), `nx` east by `ny` north, row by row from the south. `natural` is the ground the\nspec shapes (hills, ridges, cliffs, flat districts, carved down to the water), `ground`\nthe finished ground (road corridors on their grade lines, embankments, retaining walls).\nEvery other z in the model is over the finished ground where it stands: a road's over its\n`ground` profile, a node's over its `ground_m`, a building's over its `base_m`, anything\nelse over `ground` at its point.",
+      "properties": {
+        "cell_m": {
+          "title": "Cell M",
+          "type": "number"
+        },
+        "x0": {
+          "title": "X0",
+          "type": "number"
+        },
+        "y0": {
+          "title": "Y0",
+          "type": "number"
+        },
+        "nx": {
+          "title": "Nx",
+          "type": "integer"
+        },
+        "ny": {
+          "title": "Ny",
+          "type": "integer"
+        },
+        "natural": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Natural",
+          "type": "array"
+        },
+        "ground": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Ground",
+          "type": "array"
+        },
+        "water_levels": {
+          "items": {
+            "$ref": "#/$defs/WaterLevel"
+          },
+          "title": "Water Levels",
+          "type": "array"
+        },
+        "stats": {
+          "additionalProperties": true,
+          "title": "Stats",
+          "type": "object"
+        }
+      },
+      "required": [
+        "cell_m",
+        "x0",
+        "y0",
+        "nx",
+        "ny",
+        "natural"
+      ],
+      "title": "Terrain",
       "type": "object"
     },
     "Tile": {
@@ -4204,7 +4333,8 @@
             "immersed_tube",
             "cut_and_cover",
             "metro",
-            "pedestrian"
+            "pedestrian",
+            "bored"
           ],
           "title": "Kind",
           "type": "string"
@@ -4558,6 +4688,34 @@
       "title": "Walkway",
       "type": "object"
     },
+    "WaterLevel": {
+      "additionalProperties": false,
+      "description": "M13: the surface of a water body over sea level; a river's falls along its centerline.",
+      "properties": {
+        "water_id": {
+          "title": "Water Id",
+          "type": "string"
+        },
+        "level_m": {
+          "title": "Level M",
+          "type": "number"
+        },
+        "profile": {
+          "description": "Rivers: the level along the centerline.",
+          "items": {
+            "$ref": "#/$defs/ZSample"
+          },
+          "title": "Profile",
+          "type": "array"
+        }
+      },
+      "required": [
+        "water_id",
+        "level_m"
+      ],
+      "title": "WaterLevel",
+      "type": "object"
+    },
     "Waterway": {
       "additionalProperties": false,
       "properties": {
@@ -4828,6 +4986,18 @@
       "default": 256.0,
       "title": "Tile Size M",
       "type": "number"
+    },
+    "terrain": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Terrain"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "M13: the ground; left out on flat cities."
     },
     "land": {
       "items": {

@@ -194,6 +194,8 @@ class RoadNode(Entity):
     TYPE_PREFIX: ClassVar[str] = "road_node"
     position: Point3
     level: int = 0
+    ground_m: float | None = Field(None, exclude_if=lambda v: v is None, description="M13: the ground (grade line) "
+                                   "at the node, over sea level; z is above it.")
 
 
 RoadClass = Literal["highway", "avenue", "street", "alley", "service", "pedestrian",
@@ -223,6 +225,10 @@ class RoadSegment(Entity):
     tunnel: bool = Field(False, description="Runs through a tunnel (M9; level -1, the z "
                                             "profile below the ground).")
     tunnel_ids: list[str] = Field(default_factory=list)
+    ground: list[ZSample] = Field(
+        default_factory=list, exclude_if=lambda v: not v,
+        description="M13: the grade line along the centerline (the finished ground under the "
+                    "road, over sea level); the surface is ground + z_profile.")
     district_ids: list[str] = Field(default_factory=list, description="Districts it serves.")
     name: str | None = None
 
@@ -301,7 +307,7 @@ class Walkway(Entity):
 class Structure(Entity):
     TYPE_PREFIX: ClassVar[str] = "structure"
     kind: Literal["deck", "ramp", "column", "pylon", "tube", "canopy", "portal", "trench",
-                  "vent"]
+                  "vent", "retaining_wall"]
     footprint: Polygon | None = None
     line: list[Point3] = Field(default_factory=list)
     z0_m: float
@@ -326,7 +332,7 @@ class Tunnel(Entity):
     track along the whole sunk stretch (open approaches included); the structure is a box
     `width_m` wide from `floor_m` under the line to `roof_m` over its clear height."""
     TYPE_PREFIX: ClassVar[str] = "tunnel"
-    kind: Literal["immersed_tube", "cut_and_cover", "metro", "pedestrian"]
+    kind: Literal["immersed_tube", "cut_and_cover", "metro", "pedestrian", "bored"]
     name: str | None = None
     segment_ids: list[str] = Field(default_factory=list, description="Roads through it.")
     line_id: str | None = Field(None, description="Metro: its transit line.")
@@ -495,6 +501,10 @@ class Building(Entity):
     floors: int = Field(1, description="Floors of the tallest mass.")
     height_m: float = Field(0.0, description="Top of the tallest mass (spires included).")
     footprint: Polygon | None = Field(None, description="Ground footprint (masses from z 0).")
+    base_m: float | None = Field(None, exclude_if=lambda v: v is None, description="M13: the ground floor (mass z 0) "
+                                 "over sea level, at the main entrance.")
+    plinth_m: float | None = Field(None, exclude_if=lambda v: v is None, description="M13: the lowest ground under the "
+                                   "footprint; a stepped plinth fills from it up to base_m.")
     masses: Annotated[list[Mass], Field(min_length=1)]
     entrances: list[Entrance] = Field(default_factory=list)
     units: list[Unit] = Field(default_factory=list)
@@ -509,6 +519,8 @@ class Skybridge(Entity):
     building_ids: tuple[str, str]
     line: Line2 = Field(description="Facade to facade.")
     z_m: float = Field(description="Deck level (a floor of both buildings).")
+    base_m: float | None = Field(None, exclude_if=lambda v: v is None, description="M13: the ground z_m is measured "
+                                 "from (the first building's base).")
     width_m: float
     levels: int = 1
     level_height_m: float = 4.0
@@ -731,6 +743,33 @@ COLLECTIONS: dict[str, type[Entity]] = {
 }
 
 
+class WaterLevel(_Model):
+    """M13: the surface of a water body over sea level; a river's falls along its centerline."""
+    water_id: str
+    level_m: float
+    profile: list[ZSample] = Field(default_factory=list, description="Rivers: the level "
+                                                                    "along the centerline.")
+
+
+class Terrain(_Model):
+    """M13: the ground, absolute (sea level 0), on a grid of points `cell_m` apart from
+    (x0, y0), `nx` east by `ny` north, row by row from the south. `natural` is the ground the
+    spec shapes (hills, ridges, cliffs, flat districts, carved down to the water), `ground`
+    the finished ground (road corridors on their grade lines, embankments, retaining walls).
+    Every other z in the model is over the finished ground where it stands: a road's over its
+    `ground` profile, a node's over its `ground_m`, a building's over its `base_m`, anything
+    else over `ground` at its point."""
+    cell_m: float
+    x0: float
+    y0: float
+    nx: int
+    ny: int
+    natural: list[list[float]]
+    ground: list[list[float]] = Field(default_factory=list)
+    water_levels: list[WaterLevel] = Field(default_factory=list)
+    stats: dict[str, Any] = Field(default_factory=dict)
+
+
 class CityModel(_Model):
     version: Literal[1] = MODEL_VERSION
     name: str
@@ -739,6 +778,8 @@ class CityModel(_Model):
     frame: Literal["x_east_y_north_z_up_m_origin_center"] = "x_east_y_north_z_up_m_origin_center"
     bounds: tuple[float, float, float, float]
     tile_size_m: float = TILE_SIZE_M
+    terrain: Terrain | None = Field(None, exclude_if=lambda v: v is None, description="M13: the ground; left out "
+                                    "on flat cities.")
 
     land: list[Land] = Field(default_factory=list)
     landmasses: list[Landmass] = Field(default_factory=list)

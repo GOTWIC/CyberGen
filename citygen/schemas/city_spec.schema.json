@@ -41,6 +41,60 @@
       "title": "Bridges",
       "type": "object"
     },
+    "Cliff": {
+      "additionalProperties": false,
+      "description": "A district standing on a plateau: its edges rise `height_m` over `width_m` (a cliff\nwhere narrow, an escarpment where wide); at the sea it is a sea cliff.",
+      "properties": {
+        "district": {
+          "title": "District",
+          "type": "string"
+        },
+        "height_m": {
+          "exclusiveMinimum": 0,
+          "maximum": 200,
+          "title": "Height M",
+          "type": "number"
+        },
+        "width_m": {
+          "default": 60.0,
+          "maximum": 600,
+          "minimum": 10,
+          "title": "Width M",
+          "type": "number"
+        },
+        "facing": {
+          "description": "Sides where the edge is a cliff; on the other sides the plateau rises over a broad slope (`slope_m`). Left out: a cliff all round.",
+          "items": {
+            "enum": [
+              "north",
+              "north_east",
+              "east",
+              "south_east",
+              "south",
+              "south_west",
+              "west",
+              "north_west"
+            ],
+            "type": "string"
+          },
+          "title": "Facing",
+          "type": "array"
+        },
+        "slope_m": {
+          "default": 400.0,
+          "maximum": 2000,
+          "minimum": 50,
+          "title": "Slope M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "district",
+        "height_m"
+      ],
+      "title": "Cliff",
+      "type": "object"
+    },
     "Coast": {
       "additionalProperties": false,
       "properties": {
@@ -584,6 +638,49 @@
         }
       },
       "title": "Highways",
+      "type": "object"
+    },
+    "Hill": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "at": {
+          "description": "Where its top stands: a district (its middle), a direction or 'center'.",
+          "title": "At",
+          "type": "string"
+        },
+        "height_m": {
+          "description": "Rise of the top.",
+          "exclusiveMinimum": 0,
+          "maximum": 400,
+          "title": "Height M",
+          "type": "number"
+        },
+        "radius_m": {
+          "default": 600.0,
+          "description": "Where the slope ends; the steepest slope is about 1.5 times height / radius.",
+          "maximum": 5000,
+          "minimum": 100,
+          "title": "Radius M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "at",
+        "height_m"
+      ],
+      "title": "Hill",
       "type": "object"
     },
     "Island": {
@@ -1210,6 +1307,53 @@
       "title": "Placement",
       "type": "object"
     },
+    "Ridge": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "from": {
+          "description": "One end: a district, a direction or 'center'.",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "description": "The other end.",
+          "title": "To",
+          "type": "string"
+        },
+        "height_m": {
+          "exclusiveMinimum": 0,
+          "maximum": 400,
+          "title": "Height M",
+          "type": "number"
+        },
+        "width_m": {
+          "default": 500.0,
+          "maximum": 3000,
+          "minimum": 100,
+          "title": "Width M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "height_m"
+      ],
+      "title": "Ridge",
+      "type": "object"
+    },
     "River": {
       "additionalProperties": false,
       "properties": {
@@ -1403,6 +1547,81 @@
         }
       },
       "title": "Source",
+      "type": "object"
+    },
+    "Terrain": {
+      "additionalProperties": false,
+      "description": "The ground (M13). Left out, the city is flat at sea level, as before M13.",
+      "properties": {
+        "shore_m": {
+          "default": 2.0,
+          "description": "Ground over the water at a low shore.",
+          "maximum": 20,
+          "minimum": 0.5,
+          "title": "Shore M",
+          "type": "number"
+        },
+        "inland_grade": {
+          "default": 0.0,
+          "description": "How the land rises away from the sea (a fraction, 0.01 = 1%).",
+          "maximum": 0.08,
+          "minimum": 0,
+          "title": "Inland Grade",
+          "type": "number"
+        },
+        "relief_m": {
+          "default": 0.0,
+          "description": "Rolling ground: amplitude of a smooth random relief.",
+          "maximum": 60,
+          "minimum": 0,
+          "title": "Relief M",
+          "type": "number"
+        },
+        "relief_scale_m": {
+          "default": 600.0,
+          "maximum": 3000,
+          "minimum": 150,
+          "title": "Relief Scale M",
+          "type": "number"
+        },
+        "hills": {
+          "items": {
+            "$ref": "#/$defs/Hill"
+          },
+          "title": "Hills",
+          "type": "array"
+        },
+        "ridges": {
+          "items": {
+            "$ref": "#/$defs/Ridge"
+          },
+          "title": "Ridges",
+          "type": "array"
+        },
+        "cliffs": {
+          "items": {
+            "$ref": "#/$defs/Cliff"
+          },
+          "title": "Cliffs",
+          "type": "array"
+        },
+        "flat": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "Districts levelled flat (megasites always are).",
+          "title": "Flat"
+        }
+      },
+      "title": "Terrain",
       "type": "object"
     },
     "Transit": {
@@ -1756,6 +1975,18 @@
       "minItems": 1,
       "title": "Districts",
       "type": "array"
+    },
+    "terrain": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Terrain"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "M13: hills, ridges, cliffs, flat districts. Left out: flat ground."
     }
   },
   "required": [
