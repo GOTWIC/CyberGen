@@ -138,7 +138,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     try:
         rep = BD.build(src, args.spec, args.overrides, args.workers,
-                       streets=not args.no_streets)
+                       streets=not args.no_streets, props=not args.no_props)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
@@ -213,6 +213,10 @@ def cmd_props(args: argparse.Namespace) -> int:
         if not c["ok"]:
             print(f"check failed: {c['id']}: {c['detail']}", file=sys.stderr)
     print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'props_report.txt'}")
+    if args.sheets:
+        from .props.sheets import render
+        for f in render(out, Path(args.sheets)):
+            print(f"wrote {f}")
     return EXIT_OK if rep["ok"] else EXIT_INVALID
 
 
@@ -288,6 +292,8 @@ def build_parser() -> argparse.ArgumentParser:
     bu.add_argument("--no-streets", action="store_true",
                     help="the buildings only (default: then the street stage, as "
                          "`assetgen streets`)")
+    bu.add_argument("--no-props", action="store_true",
+                    help="no props, plants or signs (default: last, as `assetgen props`)")
     bu.set_defaults(func=cmd_build)
 
     pv = sub.add_parser("preview", help="Blender previews of a build's assets")
@@ -334,6 +340,9 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--force", action="store_true",
                     help="make every family and tile again (files are still written only "
                          "if their bytes change)")
+    pr.add_argument("--sheets", metavar="DIR",
+                    help="also render the variant sheets (a sheet per district style, one of "
+                         "the plants) in Blender into DIR")
     pr.set_defaults(func=cmd_props)
     return p
 

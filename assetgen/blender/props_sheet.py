@@ -94,7 +94,7 @@ def main():
 
     def rank(f):
         for p, i in order.items():
-            if f.startswith(p):
+            if (f + ".").startswith(p):
                 return (i, f)
         return (len(order), f)
     fams = {}

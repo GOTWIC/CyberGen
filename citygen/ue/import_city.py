@@ -261,7 +261,8 @@ def tint_color(m, x, y):
 
 def stage2_master(master):
     """/Game/CityGen/Core/M_Cg<Master>: `glass` (interior mapping), `translucent` (blended,
-    two-sided), else opaque (`foliage` two-sided) with an emissive strength; each takes its
+    two-sided; `holo` the same with an emissive strength, AG8's holo-ads), else opaque
+    (`foliage` two-sided) with an emissive strength; each takes its
     color from tint_color. Made, or rebuilt in place when of an older STAGE2_VERSION (its
     instances keep it as their parent)."""
     name = "M_Cg" + "".join(w.capitalize() for w in master.split("_"))
@@ -330,11 +331,20 @@ def stage2_master(master):
         MEL.connect_material_property(base, "", MP.MP_BASE_COLOR)
         MEL.connect_material_property(glow2, "", MP.MP_EMISSIVE_COLOR)
         MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
-    elif master == "translucent":
+    elif master in ("translucent", "holo"):
         op = expr(m, unreal.MaterialExpressionScalarParameter, -300, 460,
-                  parameter_name="Opacity", default_value=0.35)
+                  parameter_name="Opacity", default_value=0.35 if master == "translucent"
+                  else 0.45)
         MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
         MEL.connect_material_property(op, "", MP.MP_OPACITY)
+        if master == "holo":
+            # (AG8's holo-ads: they glow)
+            emi = expr(m, unreal.MaterialExpressionScalarParameter, -300, 540,
+                       parameter_name="Emissive", default_value=0.0)
+            em = expr(m, unreal.MaterialExpressionMultiply, -150, 500)
+            link(col, "", em, "A")
+            link(emi, "", em, "B")
+            MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
         m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
         m.set_editor_property("two_sided", True)
         mode = getattr(unreal.TranslucencyLightingMode, "TLM_SURFACE", None)
@@ -718,8 +728,15 @@ class Importer:
                                        unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE,
                                        NEVER)
         ns = sm.get_editor_property("nanite_settings")
-        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]):
+        shape = rec.get("shape_preservation")
+        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape:
             ns.set_editor_property("enabled", bool(rec["nanite"]))
+            if shape:
+                # AG8's plants: Nanite foliage (5.8, experimental; AG0 built its test tree so)
+                sp = getattr(getattr(unreal, "NaniteShapePreservation", None),
+                             shape.upper(), None)
+                if sp is not None:
+                    ns.set_editor_property("shape_preservation", sp)
             sm.set_editor_property("nanite_settings", ns)     # (builds the mesh again)
         EAL.set_metadata_tag(sm, HASH_TAG, h)
         EAL.save_loaded_asset(sm, only_if_is_dirty=False)
@@ -938,14 +955,17 @@ class Importer:
                 a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
                 comp.set_mobility(unreal.ComponentMobility.STATIC)
                 comp.clear_instances()
+                # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz]
                 comp.add_instances([unreal.Transform(
-                    unreal.Vector(x * 100.0, -y * 100.0, z * 100.0),
-                    unreal.Rotator(roll=0.0, pitch=0.0, yaw=-yaw), unreal.Vector(1, 1, 1))
-                    for x, y, z, yaw in r["xforms"]], False, False)
+                    unreal.Vector(xf[0] * 100.0, -xf[1] * 100.0, xf[2] * 100.0),
+                    unreal.Rotator(roll=0.0, pitch=0.0, yaw=-xf[3]),
+                    unreal.Vector(*(xf[4:7] if len(xf) >= 7 else (1, 1, 1))))
+                    for xf in r["xforms"]], False, False)
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
                 a.set_actor_location_and_rotation(loc, rot, False, False)
-                a.set_editor_property("Ids", [unreal.Name(r["entry"])])
+                a.set_editor_property("Ids", [unreal.Name(i) for i in r.get("ids") or
+                                              [r["entry"]]])
                 a.set_editor_property("Kind", unreal.Name(r["kind"]))
                 a.tags = self.tags(r["key"], h, [r["entry"]], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage]
@@ -958,6 +978,8 @@ class Importer:
         ts = self.man["tile_size_m"]
         tiles = {t["name"]: t for t in self.man["tiles"]}
         for inst in self.man["instances"]:
+            if inst["key"] in self.skip:
+                continue            # (AG8's variants in its place)
             b = tiles[inst["tile"]]["bounds"] if inst["tile"] in tiles else None
             cx, cy = (((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0) if b else
                       (inst["xforms"][0][0], inst["xforms"][0][1]))

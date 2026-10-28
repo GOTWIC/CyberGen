@@ -10,7 +10,7 @@ district's style, its variant, its instance transform, and for the meshes made p
   piece has its continuous barrier (scope 5.3; AG7's notes).
 - **Plants**: species (M6's, else its type's), variant by a hash of the id, scaled to the
   plant's crown and height; facade greenery split into patches of about 1.5 m along its
-  length.
+  length (awnings likewise into segments of about 2 m).
 - **Signs**: per slot its text (the point of interest in its unit, else a generated shop
   name; corporations of the city on billboards and holo-ads), script, look, colors (the
   district's neon palette from the asset spec, else its era's) and the gap to its wall.
@@ -38,6 +38,7 @@ from .trees import BASE
 from .variants import REACH
 
 IVY_PATCH_M = 1.5
+AWNING_SEGMENT_M = 2.0
 BRACKET_MIN_M = 0.02
 
 
@@ -204,8 +205,21 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
                 yaw = yaw + 180.0
         yaw = C.deg(((yaw + 180.0) % 360.0) - 180.0)
         cx, cy = tile_center(t)
-        xf = [C.m(x - cx), C.m(y - cy), C.m(z), yaw] + [C.m(v) for v in p.scale]
-        add(key, kind, "prop", t, ST.variant_name(kind, st, k), xf, p.id)
+        if kind == "awning":
+            # in segments of about 2 m along the facade (arms, ribs and corrugation keep
+            # their size), each a variant of the unit's own family member
+            L = p.scale[0]
+            n = max(1, int(round(L / AWNING_SEGMENT_M)))
+            a = M.radians(yaw)
+            c, s = M.cos(a), M.sin(a)
+            for i in range(n):
+                off = -L / 2.0 + L * (i + 0.5) / n
+                add(key, kind, "prop", t, ST.variant_name(kind, st, k),
+                    [C.m(x + c * off - cx), C.m(y + s * off - cy), C.m(z), yaw,
+                     C.m(L / n), C.m(p.scale[1]), C.m(p.scale[2])], p.id)
+        else:
+            xf = [C.m(x - cx), C.m(y - cy), C.m(z), yaw] + [C.m(v) for v in p.scale]
+            add(key, kind, "prop", t, ST.variant_name(kind, st, k), xf, p.id)
         mm = mount.get(p.id)
         if kind in REACH and mm and mm["gap"] > BRACKET_MIN_M and \
                 (p.attrs or {}).get("mount") != "deck":
@@ -328,7 +342,8 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict) -> dict:
         script = SG.script_of(era, _scripts(spec, d), "ag8.sign", s.id)
         inp = {"kind": s.kind, "mount": s.mount, "w": C.m2(round(s.width_m * 20) / 20.0),
                "h": C.m2(round(s.height_m * 20) / 20.0), "colors": [c1, c2],
-               "face": ST.choice(SG.FACE_COLORS, "ag8.face", s.id), "style": st}
+               "face": (c2 if ST.u("ag8.fsat", s.id) < 0.55 else
+                        ST.choice(SG.FACE_COLORS, "ag8.face", s.id)), "style": st}
         if s.kind == "shop_sign":
             unit = _unit_of(b, x, y)
             name = poi.get((s.building_id, unit)) if unit is not None else None
@@ -368,7 +383,9 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict) -> dict:
                 inp["seed"] = C.digest(["ag8.band", s.id])[:8]
             inp.update(text=text, script=script)
         dg = C.digest(inp)
-        out[t].append({"id": s.id, "node": "sign." + dg[:16], "inputs": inp, "digest": dg,
+        # (an "h": Blender's glTF import reads a name ending in a dot and digits as a
+        # counter, and a long one overflows it)
+        out[t].append({"id": s.id, "node": "sign.h" + dg[:16], "inputs": inp, "digest": dg,
                        "extra_name": s.id, "pivot": [C.m2(x), C.m2(y), C.m2(z)],
                        "yaw": C.deg(s.yaw_deg), "kind": s.kind,
                        "prop_id": s.prop_id})
