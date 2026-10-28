@@ -180,7 +180,7 @@ The tallest building of every era, each in its own facade style (8K).
 
 <img src="docs/progress/AG2/vesper_bay/detail/street_5.jpg" width="840">
 
-A street in Old Town: casement windows with sills, shutters, balconies and AC units (8K).
+A street in Old Town at eye level: sash and lattice windows with sills and lintels, grilles, window AC units and patchwork walls (8K).
 
 ```bash
 .venv/bin/python -m assetgen spec validate cities/vesper_bay/asset_spec.json --build out/vesper_bay
