@@ -41,6 +41,10 @@ class Local:
     decks: list = field(default_factory=list)        # M14: deck rows
     structures: list = field(default_factory=list)   # M14: stairs and elevator shafts
     plan: object = None                              # M14: the deck plan (DK.Plan)
+    # M13: (segment id, node id) -> a junction's run along that leg (to its polygon's edge,
+    # past the curb and sidewalk corners), level on the grade lines of local roads
+    # (`terrain.grade`)
+    cuts: dict = field(default_factory=dict)
 
 
 def open_paths(W: JN.WalkGraph, opens: list[dict]) -> int:
@@ -250,6 +254,14 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                 w["attrs"]["well"] = well_os[w["attrs"]["well"]]
     T.stage("walkways", walk)
     out.nodes, out.segments, out.bridges = net.nodes, net.segments, net.bridges
+    # (each junction's run along each leg's centerline out to its polygon's edge, which is
+    # square to the leg's direction: longer than the cut where the leg bends inside it)
+    for nid in sorted(jx["legs"]):
+        for x in jx["legs"][nid]:
+            r = JN.run_along(x, max(x.cut, x.cut_row))
+            k = (x.seg["id"], nid)
+            if r > out.cuts.get(k, 0.0):
+                out.cuts[k] = r
     for j in jx["junctions"]:
         a = j["attrs"]
         out.junctions.append({

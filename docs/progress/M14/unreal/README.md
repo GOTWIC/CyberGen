@@ -94,7 +94,9 @@ that many because that import predates M10's stable ids (it named buildings
   `district_ids` in the model, so the blockout joins their streets and sidewalks under `city`
   (`city.deck_road.<tile>`, `city.deck_sidewalk.<tile>`) and those actors carry an empty
   `cg.district=`; the deck's junctions, slab and buildings carry `d03`. Giving the twins and
-  ramps their district in `decks.py` moves Vesper Bay Decks' model and plan.
+  ramps their district in `decks.py` moves Vesper Bay Decks' model and plan. Fixed after
+  M15: `d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`
+  ([`stage1_fixes`](../../stage1_fixes/)).
 
 ## Files
 

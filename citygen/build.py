@@ -487,8 +487,9 @@ def replay(result: Result, chosen: dict, workers: int | None = None, local: bool
             b.spec = spec if spec is not None else base
             if salt:
                 b.spec = _salted(b.spec, salt)
-            if salt:
                 b.stats["layout_salt"] = salt
+                if frame is not None and frame.old_entry is not None:
+                    frame.old_entry = _salted_district(frame.old_entry, salt)
             add_local(b, explicit, run, check=not buildings)
             if buildings:
                 add_buildings(b, explicit, run)
@@ -562,8 +563,12 @@ def _pristine(b: Built) -> Built:
 
 def _salted(spec: CitySpec, salt: int) -> CitySpec:
     """The spec with every district seed moved (the local layout drawn again)."""
-    return spec.model_copy(update={"districts": [
-        d.model_copy(update={"seed": int(d.seed) + 7919 * salt}) for d in spec.districts]})
+    return spec.model_copy(update={"districts": [_salted_district(d, salt)
+                                                 for d in spec.districts]})
+
+
+def _salted_district(d, salt: int):
+    return d.model_copy(update={"seed": int(d.seed) + 7919 * salt})
 
 
 def _road_job(b: Built, explicit: set[str], k: int, tracing: bool, worker: bool):
@@ -638,7 +643,8 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
                 old = b.frame.match(sg["centerline"], sg)
                 if old is not None and old.ground:
                     held[sg["id"]] = [(p.s, p.z) for p in old.ground]
-        gr = TE.grade(spec, loc.segments, loc.nodes, nat, TE.water_union(b.model), held)
+        gr = TE.grade(spec, loc.segments, loc.nodes, nat, TE.water_union(b.model), held,
+                      loc.cuts)
         TE.apply_grade(loc, gr)
         gr.stats["slope_greens"] = TE.steep_lots(loc, gr.finished)
         loc.terrain = {"ground": gr.finished, "stats": {**tst, **gr.stats},

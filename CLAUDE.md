@@ -538,7 +538,10 @@ no change, and grades are measured on ground + z:
   node shared, stations every 10 m), the profile closest to the natural ground in the largest
   deviation within each class's grade (highway 6%, avenue 8%, street 12%, alley 15%, less what
   the road's own z profile climbs): integer min-plus Dijkstra from every vertex both ways, the
-  mean of the two. `RoadSegment.ground`, `RoadNode.ground_m`. The finished ground
+  mean of the two; a junction of local roads holds its node's height along each leg out to
+  its polygon's edge, past the curb and sidewalk corners, at most 0.45 of the leg
+  (`Local.cuts`, `junctions.run_along`, the stage 1 fixes), a primary road keeps its grade through
+  its junctions. `RoadSegment.ground`, `RoadNode.ground_m`. The finished ground
   (`terrain.ground`) puts each corridor (width plus 1.5 m) on its grade line, blends small steps
   over 6 m, and leaves the rest as retaining walls traced on the grid (`structure`
   `retaining_wall`, line z the wall height); primary roads 14 m under the hill for 40 m are
@@ -682,6 +685,31 @@ its sweep seeds stay as they were). Its golden hash is under `deck_cities`. A di
 regeneration (`--district Highcrest`) builds a new deck. Terrain test: Cragmouth with decks on
 Hollow and Ridgeback (`docs/progress/M14/cragmouth_decks/`, not a sample). Sample builds:
 `docs/progress/M14/`.
+
+The stage 1 fixes (three open items of M13 to M15) are in place:
+- **District regeneration** (`streets.py`, `edit.py`): every district but the regenerated
+  one is laid without the frame, exactly as in the old city; at the district's turn
+  `_Ghosts` replays its old fill (`Frame.old_entry`, salted in `build.replay`) on a snapshot,
+  and the districts after it are laid against those old streets with its new ones hidden.
+  The shared frame is laid as in the old city unless the district's archetype changed. In the
+  later passes a held street never joins a street the district laid anew
+  (`Builder._laid_anew`; its frame streets are as they were), a held group's link starts at an
+  old node or vertex (`Frame.old_point`), a highway access only at an old node, an avenue's
+  dead end keeps the held link it had (`_end_target`), a new street meeting a bent held road
+  at an old node makes the angle with both legs (`Builder._meets`). `_reconnect` also runs
+  before the clean-up on the vehicle network (`_frame_join`) and picks a link at the district's
+  junction angle. New streets keep off the old bored stretches (`Frame.bored_spans`,
+  `Line.bored`, `BORE_PAD_M`). The splice reassigns seam blocks to territories (`_turfs`),
+  takes walkway-island links from the new build and drops a sign with its slot. A
+  regeneration that picks its seed draws a failing layout again (`REGEN_TRIES` 4, the fewest
+  failures win). Every Cragmouth district regenerates with all 86 checks passing.
+- **Level local junctions** (`terrain.grade(..., level)`): above; Cragmouth's retaining
+  walls 84 to 133 km, cut and fill unchanged, corners stepping over 0.45 m 1223 to 451 (the
+  rest at junctions with a primary road, an open item).
+- **Deck streets' district:** `decks._twin` and `_ramp` set `district_ids`, so the blockout
+  joins them as `d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`.
+Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. Outputs:
+`docs/progress/stage1_fixes/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

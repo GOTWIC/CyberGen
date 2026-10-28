@@ -47,7 +47,7 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
 |---|---|
-| <img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M14/vesper_bay_decks/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/stage1_fixes/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M14/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
@@ -77,7 +77,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 
 | Terrain: grades, walls, bored tunnels | Old quarter's hill (8K) |
 |---|---|
-| <img src="docs/progress/M13/cragmouth/preview_terrain.png" width="420"> | <img src="docs/progress/M13/cragmouth/render_hillside.jpg" width="420"> |
+| <img src="docs/progress/stage1_fixes/cragmouth/preview_terrain.png" width="420"> | <img src="docs/progress/stage1_fixes/cragmouth/render_hillside.jpg" width="420"> |
 
 | Decks: the ground under the slab, the deck, a section | A deck's edge: the undercity under the slab, the city on it (8K) |
 |---|---|
