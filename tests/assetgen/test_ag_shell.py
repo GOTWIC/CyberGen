@@ -197,3 +197,30 @@ def test_uniqueness_flags_twins_outside_a_family():
     assert not AC.unique(recs, 4)["ok"]
     recs["a"]["family"] = recs["b"]["family"] = "p1"
     assert AC.unique(recs, 4)["ok"]
+
+
+def test_tidy_removes_spikes_and_crossings_and_keeps_edge_indices():
+    # a spike of no width (out to x=20000 and back 10 mm apart) on a 10 m square
+    ring = [(0, 0), (10000, 0), (10000, 5000), (20000, 5000), (10000, 5010),
+            (10000, 10000), (0, 10000)]
+    pts, idx = RG.tidy(ring)
+    assert RG.is_simple(pts) and (20000, 5000) not in pts
+    assert idx[0] == 0 and idx[-1] == 6
+    # a long thin triangle is not a spike
+    thin = [(-88960, -3870), (88960, -3870), (88430, 3870)]
+    assert RG.tidy(thin)[0] == thin
+    # a ring that crosses itself is cut at the crossing
+    bow = [(0, 0), (10000, 0), (10000, 10000), (5000, 10000), (5200, 11000),
+           (4800, 11000), (5000, 9000), (0, 10000)]
+    pts, idx = RG.tidy(bow)
+    assert RG.is_simple(pts)
+
+
+def test_shell_survives_a_spiked_footprint():
+    ext = [[0.0, 0.0], [12.0, 0.0], [12.0, 5.0], [20.0, 5.0], [12.0, 5.01], [12.0, 10.0],
+           [0.0, 10.0]]
+    br = brief_of([mass(ext, 0.0, 9.0, 3)])
+    res = SH.build(br, GN.make(br))
+    ck = MB.check(res["arrays"])
+    assert ck["open_edges"] == ck["bad_edges"] == ck["degenerate"] == 0
+    assert EN.check(br, res["arrays"])["ok"]

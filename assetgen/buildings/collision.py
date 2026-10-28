@@ -41,8 +41,8 @@ def build(brief: dict) -> dict:
         z0, z1 = m["z"]
         if z1 - z0 < 0.5 or m["role"] in SKIP_ROLES:
             continue
-        ext = RG.mm_ring(m["footprint"]["exterior"])
-        holes = [RG.mm_ring(h) for h in m["footprint"]["holes"]]
+        ext = RG.tidy(RG.mm_ring(m["footprint"]["exterior"]))[0]
+        holes = [RG.tidy(RG.mm_ring(h))[0] for h in m["footprint"]["holes"]]
         if len(ext) < 3:
             continue
         for piece in RG.convex_pieces(ext, [h for h in holes if len(h) >= 3]):

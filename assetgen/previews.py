@@ -1,8 +1,9 @@
-"""`assetgen preview BUILD [--blockout DIR] [--views ...] [--width W] [--out DIR]`: Blender
+"""`assetgen preview BUILD [--blockout DIR] [--views ...] [--only NAME ...] [--width W]
+[--out DIR]`: Blender
 previews of a build's assets (scope 14.2), written to `BUILD/assets/previews/`:
 
 - `city.jpg`: the whole city from its far proxies, isometric (the blockout's iso_city
-  camera);
+  camera); `city_full.jpg` (only when asked for, `--views city_full`): every shell at once;
 - `iso_<district>.jpg`: every district at full detail (its neighbors from proxies);
 - `street_<n>.jpg`: the blockout's street cameras with the shells around them;
 - `contact_<type>.jpg`: a contact sheet per building type (up to 12 buildings drawn by id
@@ -105,10 +106,16 @@ def plan_views(man: dict, cams: dict, width: int, which: set[str]) -> list[dict]
     views = []
     boxes = [d["box"] for d in cams["districts"]]
     tall = max((r["bounds"][1][2] for r in man["buildings"].values()), default=30.0)
-    if "city" in which and boxes:
+    if boxes:
         box = [min(b[i] for b in boxes) for i in range(3)] + \
             [max(b[i] for b in boxes) for i in range(3, 5)] + [tall]
-        views.append({"name": "city", **_ortho(box, width, 1.6, 8000.0), "shell_tiles": []})
+        if "city" in which:
+            views.append({"name": "city", **_ortho(box, width, 1.6, 8000.0),
+                          "shell_tiles": []})
+        if "city_full" in which:
+            # every shell at once: AG1's 15 to 20 M triangles per city fit Blender
+            views.append({"name": "city_full", **_ortho(box, width, 1.6, 8000.0),
+                          "shell_tiles": sorted(man["tiles"])})
     by_d: dict[str, set] = {}
     for r in man["buildings"].values():
         if r["district"]:
@@ -139,7 +146,7 @@ def _pick(ids: list[str], n: int, purpose: str) -> list[str]:
     return sorted(ids, key=lambda i: (GN.u(i, purpose, "ag1.preview"), i))[:n]
 
 
-def sheet_jobs(bdir: Path, man: dict, out: Path) -> list[dict]:
+def sheet_jobs(bdir: Path, man: dict, out: Path, cell: int = CELL) -> list[dict]:
     """A glTF per sheet with its buildings each at the origin, and a framed view per cell."""
     briefs = json.loads((bdir / "assets" / "briefs.json").read_text())["briefs"]
     by_type: dict[str, list[str]] = {}
@@ -164,7 +171,7 @@ def sheet_jobs(bdir: Path, man: dict, out: Path) -> list[dict]:
             child = g.node(f"{bid}.shell", mesh=mesh, extras=BD._node_extras(bid, rec))
             g.node(bid, children=[child], root=True)
             (x0, y0, z0), (x1, y1, z1) = rec["bounds"]
-            v = _ortho([x0, y0, 0.0, x1, y1, z1], CELL, 1.0, 2000.0, front_dir(briefs[bid]))
+            v = _ortho([x0, y0, 0.0, x1, y1, z1], cell, 1.0, 2000.0, front_dir(briefs[bid]))
             v["scale"] *= 1.04
             cells.append({"key": bid, "file": f"sheets/{name}_{k:02d}.jpg", "view": v,
                           "type": rec["type"], "height": round(z1, 1),
@@ -175,8 +182,9 @@ def sheet_jobs(bdir: Path, man: dict, out: Path) -> list[dict]:
     return jobs
 
 
-def compose(out: Path, sheets: list[dict], man: dict) -> list[Path]:
-    from PIL import Image, ImageDraw
+def compose(out: Path, sheets: list[dict], man: dict, cell: int = CELL) -> list[Path]:
+    from PIL import Image, ImageDraw, ImageFont
+    font = ImageFont.load_default(size=max(12, cell // 30))
     made = []
     for sh in sheets:
         n = len(sh["cells"])
@@ -184,23 +192,23 @@ def compose(out: Path, sheets: list[dict], man: dict) -> list[Path]:
             continue
         cols = 8 if n > 16 else 4
         rows = (n + cols - 1) // cols
-        pad = 26
-        im = Image.new("RGB", (cols * CELL, rows * (CELL + pad) + 40), (24, 25, 28))
+        pad = max(26, cell // 18)
+        im = Image.new("RGB", (cols * cell, rows * (cell + pad) + 2 * pad), (24, 25, 28))
         dr = ImageDraw.Draw(im)
         total = sum(1 for r in man["buildings"].values()
                     if r["type"] == "building." + sh["name"])
         title = "64 buildings drawn across the city" if sh["name"] == "random" else \
             f"{sh['name']}: {n} of {total}"
-        dr.text((10, 12), f"{man['city']}, {title}", fill=(230, 230, 230))
+        dr.text((10, 12), f"{man['city']}, {title}", fill=(230, 230, 230), font=font)
         for k, c in enumerate(sh["cells"]):
             p = out / c["file"]
             if not p.is_file():
                 continue
-            x, y = (k % cols) * CELL, 40 + (k // cols) * (CELL + pad)
-            im.paste(Image.open(p).convert("RGB").resize((CELL, CELL)), (x, y))
+            x, y = (k % cols) * cell, 2 * pad + (k // cols) * (cell + pad)
+            im.paste(Image.open(p).convert("RGB").resize((cell, cell)), (x, y))
             label = c["key"] if sh["name"] != "random" else \
                 f"{c['type'].split('.', 1)[1]}, {c['height']} m"
-            dr.text((x + 6, y + CELL + 6), label, fill=(200, 200, 200))
+            dr.text((x + 6, y + cell + 6), label, fill=(200, 200, 200), font=font)
         f = out / ("contact_sheet.jpg" if sh["name"] == "random" else
                    f"contact_{sh['name']}.jpg")
         im.save(f, quality=90)
@@ -210,7 +218,7 @@ def compose(out: Path, sheets: list[dict], man: dict) -> list[Path]:
 
 def run(build_dir: str | Path, blockout: str | None = None, out: str | None = None,
         which: list[str] | None = None, width: int = 2400, blender: str | None = None,
-        log=print) -> dict:
+        only: list[str] | None = None, cell: int = CELL, log=print) -> dict:
     bdir = Path(build_dir)
     adir = bdir / "assets"
     man = json.loads((adir / "manifest.json").read_text())
@@ -221,7 +229,9 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
     which = set(which or ("city", "districts", "street", "sheets"))
     cams = cameras(bdir, bo)
     views = plan_views(man, cams, width, which)
-    sheets = sheet_jobs(bdir, man, od) if "sheets" in which else []
+    if only:
+        views = [v for v in views if v["name"] in only]
+    sheets = sheet_jobs(bdir, man, od, cell) if "sheets" in which else []
     lit = 0.12
     job = {"assets": str(adir), "out": str(od), "views": views, "sheets": sheets,
            "proxy_tiles": sorted(man["tiles"]) if views else [],
@@ -245,7 +255,7 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
     if proc.returncode != 0 or not (od / "preview_report.json").is_file():
         sys.stderr.write(proc.stdout[-4000:] + proc.stderr[-4000:])
         raise RuntimeError(f"Blender failed ({proc.returncode})")
-    made = compose(od, sheets, man) if sheets else []
+    made = compose(od, sheets, man, cell) if sheets else []
     rep = json.loads((od / "preview_report.json").read_text())
     rep["contact_sheets"] = [p.name for p in made]
     (od / "preview_report.json").write_text(json.dumps(rep, indent=1) + "\n")
@@ -254,7 +264,8 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
 
 def main(args) -> int:
     try:
-        rep = run(args.build, args.blockout, args.out, args.views, args.width, args.blender)
+        rep = run(args.build, args.blockout, args.out, args.views, args.width, args.blender,
+                  args.only, args.cell)
     except (OSError, RuntimeError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

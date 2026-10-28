@@ -332,14 +332,17 @@ class ShellBuilder:
         br = self.br
         masses = []
         for k, m in enumerate(br["masses"]):
-            ext = [(int(round(p[0] * 1000)), int(round(p[1] * 1000)))
-                   for p in m["footprint"]["exterior"]]
-            holes = [[(int(round(p[0] * 1000)), int(round(p[1] * 1000))) for p in h]
-                     for h in m["footprint"]["holes"]]
-            holes = self._unpinched(ext, holes)
+            raw = [[(int(round(p[0] * 1000)), int(round(p[1] * 1000))) for p in ring]
+                   for ring in [m["footprint"]["exterior"]] + m["footprint"]["holes"]]
+            tidied = [RG.tidy(ring) for ring in raw]
+            if any(len(t[0]) != len(RG.clean(r)) for t, r in zip(tidied, raw)):
+                self.stats["rings_tidied"] = self.stats.get("rings_tidied", 0) + 1
+            keep = [0] + self._unpinched(tidied[0][0], [t[0] for t in tidied[1:]])
             masses.append({"k": k, "role": m["role"], "shape": m["shape"],
                            "z0": int(round(m["z"][0] * 1000)), "z1": int(round(m["z"][1] * 1000)),
-                           "rings": [ext] + holes, "floors": int(m["floors"]["count"])})
+                           "rings": [tidied[r][0] for r in keep],
+                           "eidx": [tidied[r][1] for r in keep], "rid": keep,
+                           "floors": int(m["floors"]["count"])})
         self.masses = masses
         edge_of = {}
         for j, e in enumerate(br["edges"]):
@@ -366,21 +369,20 @@ class ShellBuilder:
         return {"buf": self.buf, "arrays": arrs, "stats": self.stats, "used": self.used,
                 "masses": self.mass_info}
 
-    def _unpinched(self, ext, holes):
-        """The courts that touch neither the exterior nor another court (a court pinched onto
-        the exterior at a point would make that corner's walls meet four ways): those that
-        do are filled."""
+    def _unpinched(self, ext, holes) -> list[int]:
+        """The ring numbers (1 on) of the courts that touch neither the exterior nor another
+        court (a court pinched onto the exterior at a point would make that corner's walls
+        meet four ways): those that do are filled."""
         keep = []
         for j, h in enumerate(holes):
             others = [ext] + [o for i, o in enumerate(holes) if i != j]
-            hc = RG.clean(h)
-            touch = len(hc) < 3 or len(set(hc)) != len(hc) or any(
-                RG.inside(p, o) == 0 for o in others for p in hc) or any(
-                RG.inside(p, hc) == 0 for o in others for p in o)
+            touch = len(h) < 3 or len(set(h)) != len(h) or any(
+                RG.inside(p, o) == 0 for o in others for p in h) or any(
+                RG.inside(p, h) == 0 for o in others for p in o)
             if touch:
                 self.stats["courts_filled"] = self.stats.get("courts_filled", 0) + 1
             else:
-                keep.append(h)
+                keep.append(j + 1)
         return keep
 
     def _covered_above(self, ms: dict, a, b) -> bool:
@@ -458,7 +460,7 @@ class ShellBuilder:
                     continue
                 fa = Facade(a, b, u_run)
                 u_run += fa.L / 1000.0
-                j = self.edge_of.get((k, r, i))
+                j = self.edge_of.get((k, ms["rid"][r], ms["eidx"][r][i]))
                 fa.j = j
                 fa.rec = br["edges"][j] if j is not None else None
                 fa.regions = fa.rec["regions"] if fa.rec else []
@@ -544,7 +546,7 @@ class ShellBuilder:
         for r, ring in enumerate(ms["rings"]):
             row = []
             for i in range(len(ring)):
-                j = self.edge_of.get((k, r, i))
+                j = self.edge_of.get((k, ms["rid"][r], ms["eidx"][r][i]))
                 ok = j is not None
                 if ok:
                     for reg in self.br["edges"][j]["regions"]:
@@ -561,12 +563,13 @@ class ShellBuilder:
         """Extrude the ring strips of every run of edges the mask allows."""
         made = False
         for r, ring0 in enumerate(ms["rings"]):
-            ring = ring0
+            # the ring without zero-length edges, the mask carried along
+            n0 = len(ring0)
+            keep = [i for i in range(n0) if ring0[i] != ring0[(i + 1) % n0]]
+            ring = [ring0[i] for i in keep]
+            m = [mask[r][i] for i in keep]
             n = len(ring)
-            m = mask[r]
-            if n < 3 or ring[0] == ring[-1]:
-                continue
-            if any(ring[i] == ring[(i + 1) % n] for i in range(n)):
+            if n < 3:
                 continue
             runs = []
             if all(m):
@@ -698,7 +701,11 @@ class ShellBuilder:
                 c += [a_, b_]
             c.append(L)
             if patch_cols is not None:
-                c = sorted(set(c) | set(patch_cols))
+                # the facade's patch columns, except inside an opening or within 50 mm of a
+                # column this row has (two columns a millimeter apart could round to one point)
+                extra = [x for x in patch_cols if not any(a_ < x < b_ for a_, b_, _ in ops)
+                         and all(abs(x - y) >= 50 for y in c)]
+                c = sorted(set(c) | set(extra))
             cols.append(c)
             ops_by_row.append({a_: (b_, back) for a_, b_, back in ops})
             n_open += len(ops)
@@ -872,10 +879,11 @@ class ShellBuilder:
         n0 = len(ring)
         cx = sum(p[0] for p in ring) / n0
         cy = sum(p[1] for p in ring) / n0
-        far = max(ring, key=lambda p: ((p[0] - cx) ** 2 + (p[1] - cy) ** 2, p))
-        ux, uy = far[0] - cx, far[1] - cy
-        L = math.sqrt(ux * ux + uy * uy) or 1.0
-        ux, uy = ux / L, uy / L
+        # the wheel's plane along the footprint's longest edge (the blockout aims at its
+        # farthest corner, which tilts a thin footprint's wheel out of it)
+        k = max(range(n0), key=lambda i: ((ring[(i + 1) % n0][0] - ring[i][0]) ** 2 +
+                                          (ring[(i + 1) % n0][1] - ring[i][1]) ** 2, -i))
+        ux, uy = _unit(ring[k], ring[(k + 1) % n0])
         zc = ms["z0"] + (ms["z1"] - ms["z0"]) / 2.0
         r = (ms["z1"] - ms["z0"]) / 2.0 - 1000.0      # the rim beams' outer faces on the mass
         n = 32

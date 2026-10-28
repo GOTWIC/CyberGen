@@ -322,3 +322,102 @@ def convex_pieces(outer, holes=()) -> list[list[tuple[int, int]]]:
         if pg is not None:
             out.append([pts[i] for i in pg])
     return out
+
+
+# ---------------------------------------------------------------------------
+# Tidying citygen's rings
+# ---------------------------------------------------------------------------
+
+SPIKE_MM = 50.0              # a fold-back tip narrower than this is a spike of no width
+
+
+def _dist_line(p, a, b) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = math.sqrt(dx * dx + dy * dy)
+    if L == 0:
+        return math.sqrt((p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2)
+    return abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / L
+
+
+def _crossing(ring):
+    """The first two non-adjacent edges (i < j) that meet, or None."""
+    n = len(ring)
+    for i in range(n):
+        a, b = ring[i], ring[(i + 1) % n]
+        for j in range(i + 2, n):
+            if i == 0 and j == n - 1:
+                continue
+            if seg_hit(a, b, ring[j], ring[(j + 1) % n]):
+                return i, j
+    return None
+
+
+def _meet(a, b, c, d):
+    """Where segments a-b and c-d meet (rounded to the millimeter)."""
+    r = (b[0] - a[0], b[1] - a[1])
+    s = (d[0] - c[0], d[1] - c[1])
+    den = r[0] * s[1] - r[1] * s[0]
+    if den == 0:
+        return c if _on_seg(a, b, c) else d
+    t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den
+    return (int(round(a[0] + t * r[0])), int(round(a[1] + t * r[1])))
+
+
+def tidy(ring) -> tuple[list, list[int]]:
+    """A footprint ring as the generators can build it, with each vertex's outgoing edge's
+    index in the given ring (the brief's edge `i`): zero-length edges dropped, fold-back tips
+    narrower than SPIKE_MM removed (a spike of no width), and a ring that crosses itself cut
+    at the crossing, its smaller loop dropped (the envelope check confirms what is left stays
+    inside the footprint)."""
+    pts, idx = [], []
+    n = len(ring)
+    for i in range(n):
+        if ring[i] != ring[(i + 1) % n]:
+            pts.append(tuple(ring[i]))
+            idx.append(i)
+    for _ in range(4 * n + 4):
+        if len(pts) < 4:
+            break
+        m = len(pts)
+        cut = None
+        for i in range(m):
+            a, v, b = pts[i - 1], pts[i], pts[(i + 1) % m]
+            if a == b:
+                cut = i
+                break
+            d1, d2 = _dir(a, v), _dir(v, b)
+            if d1[0] * d2[0] + d1[1] * d2[1] < -0.995 and \
+                    min(_dist_line(a, v, b), _dist_line(b, a, v)) < SPIKE_MM:
+                cut = i
+                break
+        if cut is not None:
+            # the tip goes; the edge left takes the longer of its two edges' indices
+            a, v, b = pts[cut - 1], pts[cut], pts[(cut + 1) % m]
+            keep = idx[cut - 1] if (v[0] - a[0]) ** 2 + (v[1] - a[1]) ** 2 >= \
+                (b[0] - v[0]) ** 2 + (b[1] - v[1]) ** 2 else idx[cut]
+            idx[cut - 1] = keep
+            del pts[cut]
+            del idx[cut]
+            pts, idx = _dedupe(pts, idx)
+            continue
+        hit = _crossing(pts)
+        if hit is None:
+            break
+        i, j = hit
+        x = _meet(pts[i], pts[(i + 1) % m], pts[j], pts[(j + 1) % m])
+        if j - i <= m - (j - i):
+            pts, idx = pts[:i + 1] + [x] + pts[j + 1:], idx[:i + 1] + [idx[j]] + idx[j + 1:]
+        else:
+            pts, idx = [x] + pts[i + 1:j + 1], [idx[i]] + idx[i + 1:j + 1]
+        pts, idx = _dedupe(pts, idx)
+    return pts, idx
+
+
+def _dedupe(pts, idx):
+    out, oi = [], []
+    m = len(pts)
+    for i in range(m):
+        if pts[i] != pts[(i + 1) % m]:
+            out.append(pts[i])
+            oi.append(idx[i])
+    return out, oi

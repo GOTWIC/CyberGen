@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout | M0 to M12 done, M13 to M15 to come |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | Planning |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 and AG1 done, AG2 to AG11 to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -128,31 +128,47 @@ and use, plus roads, sidewalks, street furniture and textures. Each milestone's 
 into Unreal through the same exporter as stage 1's city, replacing the blockout piece by piece.
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
-[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md)
+[`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
+[`docs/progress/AG1`](docs/progress/AG1)
 
-<img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
+### Cities
 
-Every facade edge of Vesper Bay by what it faces: the main street (red), other streets,
-alleys, water, plazas and parks, party walls (black), blind walls, yards, and walls above
-their neighbors.
+Every building modelled: walls with window openings, storefronts, slab bands, parapets and
+cornices, in one of six facade styles chosen per district, owner and building (8K; open one
+for full size).
+
+GALLERY
+
+### Up close
+
+DETAIL
 
 ```bash
 .venv/bin/python -m assetgen spec validate cities/vesper_bay/asset_spec.json --build out/vesper_bay
-.venv/bin/python -m assetgen brief out/vesper_bay --spec cities/vesper_bay/asset_spec.json
-.venv/bin/python -m assetgen brief diff out/vesper_bay out/vesper_bay_regenerated
+.venv/bin/python -m assetgen build out/vesper_bay --spec cities/vesper_bay/asset_spec.json
+.venv/bin/python -m citygen blockout out/vesper_bay/city_model.json out/vesper_bay/blockout
+.venv/bin/python -m assetgen preview out/vesper_bay --blockout out/vesper_bay/blockout
 ```
 
 The asset spec (art direction per era, district, owner and landmark) is written from the
-city prompt by a Claude Code session through the repo's `assetgen` skill; the brief stage
-writes `out/<city>/assets/briefs.json`, everything each building's model will be made from,
-with a hash per building, so a regenerated district rebuilds only its own assets.
+city prompt by a Claude Code session through the repo's `assetgen` skill. `assetgen build`
+writes `out/<city>/assets/`: a glTF pack per 256 m tile with every building's model, far
+proxies, a manifest keyed by building id and the entries the Unreal exporter reads; it
+rebuilds only the buildings whose inputs changed, so a regenerated district rebuilds only
+its own. `assetgen preview` renders the city, its districts and street views in Blender.
+
+<img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
+
+What every facade faces, which decides its windows: the main street (red), other streets,
+alleys, water, plazas and parks, party walls (black, no windows), blind walls, yards, and
+walls above their neighbors.
 
 ### Milestones
 
 | | Milestone | What it adds | Status |
 |---|---|---|---|
 | AG0 | Groundwork | Art direction spec and skill, a brief of what every building is made from (facade edges by what they face), glTF writer, three test buildings in Unreal | Done |
-| AG1 | Building shells | Walls, floors and window openings for every building | Planned |
+| AG1 | Building shells | A model for every building: walls with window openings, storefronts, slabs, parapets and cornices in six facade styles; far models for distant views | Done |
 | AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
 | AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
 | AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |

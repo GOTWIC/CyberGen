@@ -10,7 +10,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | Milestone | What it adds | Status | Outputs |
 |---|---|---|---|
 | AG0 | Contract and spike: package `assetgen/`, asset spec and skill, a brief and hash per building, glTF writer, triangulator, assetgen's part of the Unreal exporter; three generated buildings in Unreal 5.8 to measure Nanite size, import time and Lumen cost | Done | [`docs/progress/AG0`](progress/AG0) |
-| AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the first assets in Unreal | Planned | |
+| AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the contribution for the first assets in Unreal | Done | [`docs/progress/AG1`](progress/AG1) |
 | AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth | Planned | |
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Planned | |
 | AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
@@ -70,6 +70,43 @@ buildings (hardware ray-traced Lumen on the PC); AG8 tries voxel Nanite foliage 
 the exporter work AG0 could not do (M15 not on main) is listed in `unreal_export.md`; asks of
 citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their height
 (Vesper Bay: 1,419 AC units, 573 signs, 484 awnings off a wall).
+
+## AG1: building shells
+
+**Built.** The building line's first generators (`assetgen/buildings/`) and the build:
+- **genome** (`genome.py`): district palette (era preset with the spec over it, district
+  additions, a landmark's palette), property family (a complex's buildings share discrete
+  genes and colors, step continuous ones), building genes per mass group (`base`, `body`,
+  `top`: system, window type, rhythm, bay, window share, sill, head, reveal, corner pier,
+  cornice, parapet, bands) and per building (ground band, crown, corner, finish, base strip,
+  colors, wear, dirt height), all blake2b of ids, quantized; `effective` gives the genes a
+  shell used;
+- **facade systems** (`systems.py`): unitized curtain wall, punched concrete, precast panel,
+  punched brick, corrugated, shanty patchwork; every other system falls back to the nearest
+  (`FALLBACK`), types with a fixed system (`TYPE_SYSTEM`), roles to mass groups, material
+  slots with their tint channel, the 23 CPD floats;
+- **grammar and shell** (`shell.py`, `meshbuf.py`, `rings.py`): floor rows per mass (ground,
+  louver, lantern, parking rows), bays between corner piers at real corners, openings by
+  window type and region class, storefronts per unit, mount panels; walls welded per plane
+  with zipper strips, reveal pockets and panes, caps (`triangulate(..., keep_straight=True)`),
+  ring strips for parapets, cornices and bands (mitered, beveled past 1.5 offsets), roof
+  equipment blocks; spiked rings and pinched courts cleaned; every part closed;
+- **proxies** (`proxy.py`, at most 500 triangles) and **collision** (`collision.py`: convex
+  pieces per mass, boxes where rectangles);
+- **`assetgen build`** (`assetgen/build.py`, `manifest.py`, `asset_checks.py`,
+  `contribution.py`, `buildings/envelope.py`): briefs kept when their inputs are, asset hash
+  per building, 256 m tile packs made in up to 4 worker processes where hashes changed,
+  manifest, report, `unreal_contribution.buildings.json`, files written only when their
+  bytes change; checks `asset_coverage`, `asset_envelope`, `asset_meshes`, `asset_unique`,
+  `asset_budget`;
+- **`assetgen preview`** (`previews.py`, `blender/preview_assets.py`): the city from proxies
+  (and with every shell), districts and the blockout's street cameras at full detail,
+  contact sheets per type and one of 64 buildings across the city, on the blockout's
+  city.blend without its building boxes;
+- tests `tests/assetgen/test_ag_shell.py`, `test_ag_build.py`; goldens under `ag1` (the small
+  city's manifest and asset files, nine Vesper Bay shells as GLB).
+
+AG1_NUMBERS
 
 ## Order
 

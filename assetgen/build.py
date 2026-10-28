@@ -38,7 +38,8 @@ from .buildings import proxy as PX
 from .buildings import shell as SH
 from .buildings import systems as SY
 
-GEN_VERSION = "ag1.7"          # bump whenever the shells' bytes change
+GEN_VERSION = "ag1.10"          # bump whenever the packs' bytes change (they carry only this,
+                               # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
          "spec_sha256", "briefs_sha256", "buildings", "tiles")
@@ -165,7 +166,7 @@ def _node_extras(bid: str, rec: dict) -> dict:
 def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
     """One building's shell alone as a GLB at its own origin (goldens, contact sheets)."""
     sh, _, rec = building_asset(brief, gm or GN.make(brief))
-    g = G.Gltf(generator=f"assetgen {__version__} ({GEN_VERSION})")
+    g = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     mats = _materials(g, sorted(sh["arrays"]))
     mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats))
     child = g.node(f"{bid}.shell", mesh=mesh, extras=_node_extras(bid, rec))
@@ -182,9 +183,9 @@ def tile_job(job: dict) -> dict:
         sh, px, rec = building_asset(brief, gm)
         made.append((bid, brief, sh, px, rec))
     used = sorted({s for _, _, sh, _, _ in made for s in sh["arrays"]})
-    g = G.Gltf(generator=f"assetgen {__version__} ({GEN_VERSION})")
+    g = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     mats = _materials(g, used)
-    gp = G.Gltf(generator=f"assetgen {__version__} ({GEN_VERSION})")
+    gp = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     pmats = _materials(gp, ["proxy", "proxy_roof"])
     for bid, brief, sh, px, rec in made:
         piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)), 0)

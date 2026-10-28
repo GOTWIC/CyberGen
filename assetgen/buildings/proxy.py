@@ -44,8 +44,8 @@ def build(brief: dict, slot_wall: str = "proxy", slot_roof: str = "proxy_roof") 
         z0, z1 = int(round(m["z"][0] * 1000)), int(round(m["z"][1] * 1000))
         if z1 - z0 < 50:
             continue
-        rings = [RG.mm_ring(m["footprint"]["exterior"])] + \
-            [RG.mm_ring(h) for h in m["footprint"]["holes"]]
+        rings = [RG.tidy(RG.mm_ring(m["footprint"]["exterior"]))[0]] + \
+            [RG.tidy(RG.mm_ring(h))[0] for h in m["footprint"]["holes"]]
         rings = [r for r in rings if len(r) >= 3]
         if not rings or len(rings[0]) < 3:
             continue
