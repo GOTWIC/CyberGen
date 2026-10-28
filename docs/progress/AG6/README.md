@@ -234,8 +234,10 @@ a project that has AG1's import, import it again, and look at:
 - **AG2 or AG3**: vertex colors baked into the shells (grime under sills, edge wear), which
   waited for AG2's shell changes to merge; dropping UV1 and the window ids from the glass
   slots (unused now) for leaner meshes; part UVs onto the trim sheets.
-- **AG3 and AG8**: decals placed from the decal atlas (graffiti and posters on party walls,
-  leaks), sign meshes on the sign pages (`signs.json`), the logos and ads.
+- **AG3**: decals placed from the decal atlas (graffiti and posters on party walls, leaks).
+- **With AG8** (merged first, with its own sign meshes and flat-colored props): one sign path
+  (AG8's sign meshes faced with these sign pages through `signs.json`, or the pages dropped),
+  and the props and plants textured from the library (bark, leaves, painted metal).
 - **AG7**: a few street pieces whose UV0 stretches past a quarter of the density (tank
   cylinders, curb and barrier sides with plan-projected UVs, the outer edge of tight curves)
   are listed in `materials_report.txt`; 0.2 % of the street area in Vesper Bay.

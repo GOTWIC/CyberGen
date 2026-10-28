@@ -247,9 +247,12 @@ pixel the same on every run:
   purpose (textures, materials and CPD in the contributions); every pack is unchanged.
 - **For later**: vertex colors in the shells (grime under sills, edge wear) wait for AG2's
   shell changes (AG3); UV1 and window ids on glass can go; parts mapped onto the trim sheets
-  (AG3); decals placed from the decal atlas and sign meshes on `signs.json` (AG3, AG8); OFL
-  fonts for real Hanzi, Hangul, kana and Devanagari (AG8, decision 13.3); the Unreal check of
-  the masters (`docs/progress/AG6/README.md` lists what to look at).
+  (AG3); decals placed from the decal atlas (AG3). AG8 landed first with its own sign meshes
+  (stroke-built glyph geometry) and flat-colored props: one sign path should be chosen (AG8's
+  meshes faced with AG6's sign pages through `signs.json`, or the pages dropped), and the
+  props and plants textured from the library (bark, leaves, painted metal). OFL fonts for
+  real Hanzi, Hangul, kana and Devanagari (decision 13.3); the Unreal check of the masters
+  (`docs/progress/AG6/README.md` lists what to look at).
 
 Outputs: [`docs/progress/AG6`](progress/AG6).
 
