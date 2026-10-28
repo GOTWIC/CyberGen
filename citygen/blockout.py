@@ -84,7 +84,7 @@ MATERIALS = {
     "tunnel_wall": "#9a9ea8", "tunnel_lid": "#b7a98f", "tunnel_metro": "#4a78d6",
     "tunnel_ped": "#7ee0c3", "tunnel_vent": "#c4c8d2", "soil": "#6b5a45",
     "deck_slab": "#8c9099", "deck_rail": "#c9ccd2", "deck_column": "#6f737d",
-    "deck_stair": "#b0b4bc", "deck_elevator": "#8fd3ff", "bld_undercity": "#d9893f",
+    "deck_stair": "#b0b4bc", "deck_elevator": "#8fd3ff", "bld_undercity": "#c2334d",
 }
 MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
 MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
