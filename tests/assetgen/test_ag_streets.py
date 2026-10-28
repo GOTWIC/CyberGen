@@ -188,3 +188,16 @@ def test_vesper_bay_tiles_golden(tmp_path):
     got = SB.outputs_digest(tmp_path)
     assert {t: got["tiles"][t] for t in want["tiles"]} == want["tiles"]
     assert got["all"] == want["all"]
+
+
+def test_road_with_a_micro_kink_is_made_again_from_a_tidied_line():
+    """Greyhook's `rs.w1338n148` (its inputs, tests/assetgen/data/road_micro_kink.json): two
+    vertices 6 and 8 cm apart, 5 mm off the line, swing the 9 m curb offsets over each other
+    and leave a directed edge in two triangles; `make` remakes such a road from its line
+    without the kink."""
+    from assetgen.streets import roads
+    inp = json.loads((HERE / "data" / "road_micro_kink.json").read_text(encoding="utf-8"))
+    assert K.check(roads._make(inp, False).mesh.slots)["winding"] == 1
+    out = roads.make(inp)
+    assert not any(K.check(out.mesh.slots).values())
+    assert out.mesh.triangles == 266
