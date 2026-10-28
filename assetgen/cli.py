@@ -1,7 +1,7 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
 diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen build BUILD` (the
 building shells, then the street stage), `assetgen preview BUILD`, `assetgen streets BUILD`,
-`assetgen streets seam BASE REGEN`.
+`assetgen streets seam BASE REGEN`, `assetgen props BUILD`.
 
 Exit codes: 0 valid (diff: no change; build: every check passes), 1 invalid spec (diff:
 briefs differ; build: a check fails), 2 usage or file error.
@@ -184,6 +184,38 @@ def cmd_streets(args: argparse.Namespace) -> int:
     return EXIT_OK if rep["ok"] else EXIT_INVALID
 
 
+def cmd_props(args: argparse.Namespace) -> int:
+    from . import brief as B
+    from . import spec as S
+    from .props.build import build as props_build, default_workers
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    model, sha, bdir = B.load_model(src)
+    spec = None
+    if args.spec:
+        res = S.load_spec(args.spec, model)
+        for issue in res.issues:
+            print(issue, file=sys.stderr)
+        if not res.ok:
+            return EXIT_INVALID
+        spec = res.filled
+    out = Path(args.out) if args.out else bdir / "assets"
+    rep = props_build(model, sha, out, spec, workers=args.workers or default_workers(),
+                      force=args.force)
+    st, f = rep["stats"], rep["files"]
+    print(f"{rep['city']}: {st['variants']} variants in {st['families']} families, "
+          f"{st['instances']} instances, {st['signs']} signs, {st['unique_triangles']} unique "
+          f"triangles, {st['disk_bytes'] / 1e6:.1f} MB; {f['tiles_made']} tiles made, "
+          f"{len(f['written'])} files written in {rep['seconds']['total']} s")
+    for c in rep["checks"]:
+        if not c["ok"]:
+            print(f"check failed: {c['id']}: {c['detail']}", file=sys.stderr)
+    print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'props_report.txt'}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
 def cmd_streets_seam(args: argparse.Namespace) -> int:
     from .streets.seam import seam
     try:
@@ -292,6 +324,17 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--district", help="the regenerated district's name")
     se.add_argument("--json", metavar="FILE", help="also write the result as JSON")
     se.set_defaults(func=cmd_streets_seam)
+
+    pr = sub.add_parser("props", help="AG8: prop and plant variants, exact props and signs")
+    pr.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    pr.add_argument("--spec", help="asset_spec.json (default: the era presets)")
+    pr.add_argument("--out", help="output directory (default BUILD/assets)")
+    pr.add_argument("--workers", type=int, help="worker processes (at most 4; default "
+                                                "ASSETGEN_WORKERS or 4)")
+    pr.add_argument("--force", action="store_true",
+                    help="make every family and tile again (files are still written only "
+                         "if their bytes change)")
+    pr.set_defaults(func=cmd_props)
     return p
 
 
