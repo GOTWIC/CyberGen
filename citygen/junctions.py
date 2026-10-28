@@ -192,6 +192,24 @@ def cutbacks(legs: list[Leg]) -> None:
         lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L)
 
 
+def run_along(lg: Leg, c: float) -> float:
+    """Length along a leg's centerline to where it crosses the line square to the leg's
+    direction c from the node (the junction polygon's edge across the leg): c on a straight
+    leg, more where the leg bends inside the junction."""
+    if c <= 0.0:
+        return 0.0
+    P, d = lg.p, lg.d
+    acc = 0.0
+    for a, b in zip(lg.pts, lg.pts[1:]):
+        ta = (a[0] - P[0]) * d[0] + (a[1] - P[1]) * d[1]
+        tb = (b[0] - P[0]) * d[0] + (b[1] - P[1]) * d[1]
+        ab = ST._dist(a, b)
+        if tb >= c > ta:
+            return round(acc + ab * (c - ta) / (tb - ta), 2)
+        acc += ab
+    return round(lg.L, 2)
+
+
 def junction_polygon(legs: list[Leg], row: bool = False) -> Polygon:
     n = len(legs)
     P = legs[0].p

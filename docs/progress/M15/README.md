@@ -442,7 +442,9 @@ its own id, and the plinth and wall materials are in the manifest.
   a corner where the grade lines of `rs.w15n19` (54.6 m) and `rs.w109n31` (56.2 m) meet
   1.6 m apart, and the terrain ground between their sidewalks (55.9 m) stands above the
   lower one. The importer draws what the blockout gives; a smooth corner is M13's (the
-  junction's corner heights), so it is a generator item.
+  junction's corner heights), so it is a generator item. Fixed after M15 for junctions of
+  local roads, which are now level out to their corners (both legs at 54.87 m here); a
+  junction with a primary road keeps its grade ([`stage1_fixes`](../stage1_fixes/)).
 - **The ground is a mesh, not a Landscape.** Each tile's ground is the blockout's
   heightfield mesh on the terrain's 4 m grid, the open tunnel approaches left out, keyed and
   re-imported like every other object. An Unreal Landscape would add sculpting, paint layers
