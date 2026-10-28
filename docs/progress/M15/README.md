@@ -280,6 +280,26 @@ batch, and marks an updated actor modified; the Unreal test imports a changed ci
   dialog makes it (`citygen unreal --new-project` does the same); no other project was
   touched.
 
+## On the combined code (M15 with M10 and main)
+
+M15 adds the exporter and changes no generator file, so the cities are the same bytes as
+M10's:
+
+- **x86:** the five samples, the pinned demo and the stack demo built in the x86_64 Linux
+  container (`citygen-x86`, `CITYGEN_WORKERS=3`): every `city_model.json` has the
+  `model_sha256` of M10's lock (`docs/progress/M10/<city>/city.lock.json`), and every stage
+  trace is identical to M10's (`citygen trace diff`).
+- **Sweep:** `citygen sweep --suite m8a --workers 4` passes 58 of 68, build for build as
+  M10's (`docs/progress/M10/sweep.json`: the same status, failing checks, variants, retries,
+  layout salt and sha256 for all 68); [`sweep.md`](sweep.md), [`sweep.json`](sweep.json).
+- **Locks:** the new files change citygen's code hash, so `citygen lock` refuses a build
+  made before M15 ("built with other citygen code ... build it again with this citygen") and
+  `citygen lock --verify` of an earlier lock notes the other code; the models it rebuilds
+  are the same bytes.
+- **Ids:** the import keys are M10's stable ids (`d04.lot.w1478n875.bld`,
+  `rs.w1295n954.deck`; joined pieces by district, category and tile); M15 adds no model
+  collection or field, so `ids.REFS` is unchanged.
+
 ## Tests
 
 `tests/test_unreal.py`: the manifest covers the plan (every object once, keys unique, asset
