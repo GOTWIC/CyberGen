@@ -21,7 +21,10 @@ buildings, AG7's streets), they are read in sorted file order as layer 2 over th
 (`stage2`, the manifest's `stage2`): an actor per entry at its own pivot in place of the
 blockout actors of its key and its `replaces`, an instanced actor per entry and part kind,
 the glTF packs to import (one static mesh per node) and a material per part and slot; their
-walkway lines replace graphs.json's. Without them (or with `assets` off) the manifest is the
+walkway lines replace graphs.json's. From AG6, the materials carry textures (the
+contributions' `textures`: the library's sets and atlases through `assets/library`, the
+city's sign pages under `assets/textures`), texture, scalar and vector parameters, and a
+building's entry maps its wall and roof slots to its era's instances (`materials`). Without them (or with `assets` off) the manifest is the
 blockout's alone, byte for byte.
 
 Then it runs the editor headless (`UnrealEditor-Cmd UPROJECT -run=pythonscript`) on
@@ -457,6 +460,11 @@ STAGE2_FOLDER = "Assets"                    # under the city's content root
 TINT_CPD = (0, 8, 11, 14, 17, 20)
 SRGB_PARTS = ("streets",)                   # AG7 writes its slot colors as sRGB (0 to 1)
 EMISSIVE2 = {"neon": 8.0, "emissive": 4.0}  # the emissive strength of a master's instances
+# AG6: textures imported once per project (the shared library, `set.` and `atlas.`) or per
+# city (its sign pages, `city.`), by pixel hash
+TEXTURE_FOLDER_CORE = "Textures"            # under CONTENT_ROOT/Core
+TEXTURE_FOLDER_CITY = f"{STAGE2_FOLDER}/Textures"
+TEXTURE_KINDS = ("color", "normal", "mask")
 
 
 def contributions(build_dir: str | Path) -> list[tuple[str, dict, str]]:
@@ -495,7 +503,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
     A key may be in one contribution only."""
     blockout = {o["key"]: (t["name"], o) for t in man["tiles"] for o in t["objects"]}
     owner: dict[str, str] = {}
-    mats, packs, actors, insts, chains = {}, {}, [], [], []
+    mats, packs, actors, insts, chains, textures = {}, {}, [], [], [], {}
     replaced, missing, files = set(), 0, []
     sha_of: dict[str, str] = {}
 
@@ -527,6 +535,21 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
         part = c.get("part") or c.get("stage") or "stage2"
         files.append({"file": rel, "part": part, "stage": c.get("stage"), "sha256": sha,
                       "entries": len(c["entries"])})
+        for name, t in sorted((c.get("textures") or {}).items()):
+            if t.get("kind") not in TEXTURE_KINDS:
+                raise ValueError(f"{rel}: texture {name}: kind {t.get('kind')} is not one of "
+                                 f"{list(TEXTURE_KINDS)}")
+            rec = {"file": f"{ASSETS_DIR}/{t['file']}", "hash": t["pixels_sha256"][:16],
+                   "kind": t["kind"], "srgb": bool(t.get("srgb", t["kind"] == "color")),
+                   "size": t.get("size"),
+                   "folder": (f"{man['content_root']}/{TEXTURE_FOLDER_CITY}"
+                              if name.startswith("city.")
+                              else f"{CONTENT_ROOT}/Core/{TEXTURE_FOLDER_CORE}"),
+                   "asset": "T_" + asset_name(name)}
+            if name in textures and textures[name]["hash"] != rec["hash"]:
+                raise ValueError(f"{rel}: texture {name} differs from the one another "
+                                 "contribution names")
+            textures[name] = rec
         for name, p in sorted(c.get("materials", {}).items()):
             tint = p.get("tint_cpd")
             if tint is not None and tint not in TINT_CPD:
@@ -534,13 +557,25 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                                  f"{list(TINT_CPD)}")
             col = _linear(p["color"]) if part in SRGB_PARTS else list(p["color"])
             mats[f"{part}.{name}"] = {
-                "asset": "MI_" + asset_name(f"{part}.{name}"), "part": part, "slot": name,
+                "asset": "MI_" + asset_name(f"{part}.{name}"), "part": part, "key": name,
+                "slot": p.get("slot", name),
                 "master": p["master"], "color": col, "roughness": p.get("roughness", 0.85),
                 "metallic": p.get("metallic", 0.0),
                 "emissive": EMISSIVE2.get(p["master"], 0.0),
                 "tint_cpd": -1 if tint is None else tint,
                 "tint_scale": p.get("tint_scale", 1.0),
                 "tint_times_color": bool(p.get("tint_times_color", False))}
+            if p.get("textures") or p.get("scalars") or p.get("vectors"):
+                # AG6: texture parameters (by texture name, with its pixel hash, so the
+                # instance changes when a texture does), scalars and vectors
+                for t in (p.get("textures") or {}).values():
+                    if t not in textures:
+                        raise ValueError(f"{rel}: material {name}: no texture {t}")
+                mats[f"{part}.{name}"].update(
+                    textures={k: {"texture": t, "hash": textures[t]["hash"]}
+                              for k, t in sorted((p.get("textures") or {}).items())},
+                    scalars=dict(sorted((p.get("scalars") or {}).items())),
+                    vectors=dict(sorted((p.get("vectors") or {}).items())))
         for e in c["entries"]:
             k = e["key"]
             if k in owner:
@@ -593,6 +628,10 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             if path:
                 a = {"key": k, "mesh": path, "pivot": pivot, "yaw_deg": yaw,
                      "cpd": e.get("cpd") or [], **base}
+                if e.get("materials"):
+                    # AG6: the slots this actor gives another instance (its era's walls)
+                    a["materials"] = {slot: "MI_" + asset_name(f"{part}.{m}")
+                                      for slot, m in sorted(e["materials"].items())}
                 if "none" in collision:
                     a["no_collision"] = True
                 a["hash"] = content_hash([a, h])
@@ -623,8 +662,13 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
         pk = packs[k]
         pk["meshes"] = [pk["meshes"][a] for a in sorted(pk["meshes"])]
         out_packs.append(pk)
+    for k, m in mats.items():
+        for t in (m.get("textures") or {}).values():
+            if t["texture"] not in textures:
+                raise ValueError(f"material {k}: no texture {t['texture']}")
     masters = sorted({m["master"] for m in mats.values()})
     return {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
+            "textures": dict(sorted(textures.items())),
             "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
             "actors": sorted(actors, key=lambda a: a["key"]),
             "instances": sorted(insts, key=lambda a: a["key"]),
@@ -635,7 +679,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                        "replaced": len(replaced), "replaces_missing": missing,
                        "packs": len(out_packs),
                        "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
-                       "materials": len(mats)}}
+                       "materials": len(mats), "textures": len(textures)}}
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
@@ -966,9 +1010,12 @@ def _stage2_summary(res: dict) -> str:
     if not s:
         return ""
     m = s["meshes"]
+    t = s.get("textures") or {}
     return (f"; stage 2: {s['actors']} actors over {s['replaced']} blockout actors, "
             f"meshes {m['imported']} imported, {m['kept']} kept, {m['deleted']} deleted "
-            f"from {s['packs_imported']} glTF packs")
+            f"from {s['packs_imported']} glTF packs"
+            + (f", textures {t.get('imported', 0)} imported, {t.get('kept', 0)} kept"
+               if t else ""))
 
 
 def check_summary(res: dict) -> str:

@@ -29,10 +29,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--builds", type=Path)
     args = ap.parse_args()
+    from assetgen import spec as S
+    from assetgen.materials.build import library_for
+    lib = library_for(S.dump(S.fill(S.AssetSpec())))     # AG6: the contribution's textures
     base = small_build() / "base"
     with tempfile.TemporaryDirectory() as d:
         m, sha, _ = load_model(base)
-        SB.build(m, sha, Path(d), None, workers=4)
+        SB.build(m, sha, Path(d), None, workers=4, lib=lib)
         small = SB.outputs_digest(Path(d))
     if args.builds is not None:
         f = args.builds / "vesper_bay" / "city_model.json"
@@ -46,7 +49,7 @@ def main():
         built, _, data = built_sample(path)
         model = built.model
     with tempfile.TemporaryDirectory() as d:
-        SB.build(model, C.sha256_bytes(data), Path(d), None, workers=4)
+        SB.build(model, C.sha256_bytes(data), Path(d), None, workers=4, lib=lib)
         vb = SB.outputs_digest(Path(d))
         man = json.loads((Path(d) / "streets" / "manifest.json").read_text())
     top = sorted(man["tiles"], key=lambda t: (-man["tiles"][t]["triangles"], t))[:PICK]
@@ -55,8 +58,8 @@ def main():
                     "Bay's, as `assetgen.streets.build.outputs_digest` measures them (every "
                     "tile pack, the parts pack and the Unreal contribution; `all` hashes "
                     "them together), with the tiles of Vesper Bay that hold the most "
-                    "triangles. Made on the M4 Mac and confirmed on x86_64 Linux (docker "
-                    "image citygen-x86).",
+                    "triangles, the contribution with AG6's textures (the 512 px/m "
+                    "library). Made on the M4 Mac; x86 deferred (docs/determinism_check.md).",
            "testport": {"all": small["all"]},
            "vesper_bay": {"all": vb["all"], "tiles": {t: vb["tiles"][t] for t in sorted(top)}}}
     (HERE / "data" / "golden_streets.json").write_text(json.dumps(out, indent=2) + "\n",

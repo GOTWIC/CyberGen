@@ -1,7 +1,8 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
 diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen build BUILD` (the
 building shells, then the street stage), `assetgen preview BUILD`, `assetgen streets BUILD`,
-`assetgen streets seam BASE REGEN`.
+`assetgen streets seam BASE REGEN`, `assetgen library [OUT]` (AG6's texture library),
+`assetgen materials preview|board` (textured Blender previews and material boards).
 
 Exit codes: 0 valid (diff: no change; build: every check passes), 1 invalid spec (diff:
 briefs differ; build: a check fails), 2 usage or file error.
@@ -138,7 +139,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     try:
         rep = BD.build(src, args.spec, args.overrides, args.workers,
-                       streets=not args.no_streets)
+                       streets=not args.no_streets, textures=not args.no_textures)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
@@ -170,8 +171,10 @@ def cmd_streets(args: argparse.Namespace) -> int:
             return EXIT_INVALID
         spec = res.filled
     out = Path(args.out) if args.out else bdir / "assets"
+    from .materials.build import library_for
+    lib = library_for(S.dump(spec or S.fill(S.AssetSpec())), out)
     rep = street_build(model, sha, out, spec, workers=args.workers or default_workers(),
-                       force=args.force)
+                       force=args.force, lib=lib)
     st, f = rep["stats"], rep["files"]
     print(f"{rep['city']}: {st['pieces']} street pieces in {st['tiles']} tiles, "
           f"{st['triangles']} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
@@ -182,6 +185,21 @@ def cmd_streets(args: argparse.Namespace) -> int:
             print(f"check failed: {c['id']}: {c['detail']}", file=sys.stderr)
     print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'streets_report.txt'}")
     return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
+def cmd_library(args: argparse.Namespace) -> int:
+    from .materials import library as LB
+    idx = LB.generate(args.out, args.density, args.workers, args.only)
+    d = LB.disk(idx)
+    print(f"library {idx['version']} ({idx['hash']}) in {idx['dir']}: {len(idx['sets'])} "
+          f"sets, {len(idx['atlases'])} atlases, {d['source_bytes'] / 1e6:.0f} MB source, "
+          f"{d['cooked_bytes'] / 1e6:.0f} MB cooked (estimate), {idx['seconds']} s")
+    return EXIT_OK
+
+
+def cmd_materials(args: argparse.Namespace) -> int:
+    from .materials import preview as MV
+    return MV.main(args)
 
 
 def cmd_streets_seam(args: argparse.Namespace) -> int:
@@ -256,7 +274,45 @@ def build_parser() -> argparse.ArgumentParser:
     bu.add_argument("--no-streets", action="store_true",
                     help="the buildings only (default: then the street stage, as "
                          "`assetgen streets`)")
+    bu.add_argument("--no-textures", action="store_true",
+                    help="flat materials (AG1, AG7) without AG6's library and textures")
     bu.set_defaults(func=cmd_build)
+
+    lb = sub.add_parser("library", help="AG6: the shared texture library (made once, kept "
+                                        "while its generator is unchanged)")
+    lb.add_argument("out", nargs="?", help="folder (default $ASSETGEN_LIBRARY, else "
+                                           "~/.cache/cybergen/assetgen_library, /d<density>)")
+    lb.add_argument("--density", type=int, default=512, help="px/m within reach of the "
+                                                              "street (half above)")
+    lb.add_argument("--workers", type=int, help="worker processes (at most 3)")
+    lb.add_argument("--only", nargs="*", help="just these sets or atlases")
+    lb.set_defaults(func=cmd_library)
+
+    ma = sub.add_parser("materials", help="AG6: textured Blender previews and boards")
+    msub = ma.add_subparsers(dest="command", required=True)
+    mp = msub.add_parser("preview", help="textured renders of a build (districts, street "
+                                         "views by day and night)")
+    mp.add_argument("build", help="a citygen build directory with BUILD/assets")
+    mp.add_argument("--out", help="output directory (default BUILD/assets/previews_ag6)")
+    mp.add_argument("--blockout", help="the blockout directory (default BUILD)")
+    mp.add_argument("--views", nargs="*", help="districts, street, city (default districts "
+                                                  "and street) or view names")
+    mp.add_argument("--night", action="store_true", help="also every view by night")
+    mp.add_argument("--only-night", action="store_true", help="only by night")
+    mp.add_argument("--width", type=int, default=1920)
+    mp.add_argument("--samples", type=int, default=32)
+    mp.add_argument("--eye", nargs=3, type=float, action="append", default=[])
+    mp.add_argument("--target", nargs=3, type=float, action="append", default=[])
+    mp.add_argument("--lens", type=float, default=35.0)
+    mp.add_argument("--blender", help="the Blender executable")
+    mp.set_defaults(func=cmd_materials)
+    mb = msub.add_parser("board", help="a material board per era (and the street sets)")
+    mb.add_argument("out", help="output directory")
+    mb.add_argument("--density", type=int, default=512)
+    mb.add_argument("--width", type=int, default=2400)
+    mb.add_argument("--only", nargs="*", help="just these boards (era names, streets)")
+    mb.add_argument("--blender", help="the Blender executable")
+    mb.set_defaults(func=cmd_materials)
 
     pv = sub.add_parser("preview", help="Blender previews of a build's assets")
     pv.add_argument("build", help="a citygen build directory with BUILD/assets")

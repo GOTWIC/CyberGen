@@ -26,9 +26,19 @@ GOLDEN = HERE / "data" / "golden_streets.json"
 _DONE: dict = {}
 
 
+def _lib() -> dict:
+    """AG6's library at the default spec's density (its textures in the contribution, as
+    `assetgen build` and `assetgen streets` write it)."""
+    if "lib" not in _DONE:
+        from assetgen import spec as S
+        from assetgen.materials.build import library_for
+        _DONE["lib"] = library_for(S.dump(S.fill(S.AssetSpec())), log=lambda *a: None)
+    return _DONE["lib"]
+
+
 def _streets(build_dir: Path, out: Path | None = None, workers: int = 2) -> dict:
     model, sha, bdir = load_model(build_dir)
-    return SB.build(model, sha, out or bdir / "assets", None, workers=workers)
+    return SB.build(model, sha, out or bdir / "assets", None, workers=workers, lib=_lib())
 
 
 def _small() -> tuple[Path, dict]:
@@ -182,7 +192,7 @@ def test_small_city_golden():
 def test_vesper_bay_tiles_golden(tmp_path):
     path = next(p for p in CITIES if p.parent.name == "vesper_bay")
     built, _, data = built_sample(path)
-    rep = SB.build(built.model, C.sha256_bytes(data), tmp_path, None, workers=2)
+    rep = SB.build(built.model, C.sha256_bytes(data), tmp_path, None, workers=2, lib=_lib())
     assert rep["ok"], [c for c in rep["checks"] if not c["ok"]]
     want = _golden()["vesper_bay"]
     got = SB.outputs_digest(tmp_path)

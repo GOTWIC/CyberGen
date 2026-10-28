@@ -25,8 +25,11 @@ With stage 2 in the manifest (assetgen's buildings and streets over the blockout
   GeometryScript, complex for streets, none for the sky tube glass and proxies; Nanite on
   except those; the glass's LOD chain made from its LOD meshes), proxies imported only;
 - Assets/Materials/MI_<part>_<slot>: instances of the stage 2 masters (Core/M_CgFacade,
-  M_CgGlass, M_CgMetal, M_CgRoad, M_CgOpaque, M_CgEmissive, M_CgTranslucent, M_CgFoliage,
-  ...), the tint from the actor's Custom Primitive Data;
+  M_CgGlass, M_CgMetal, M_CgConcrete, M_CgRoad, M_CgNeon, M_CgSign, M_CgDecal, M_CgOpaque,
+  M_CgEmissive, M_CgTranslucent, M_CgFoliage), the tint from the actor's Custom Primitive
+  Data; from AG6 textured (Core/Textures: the shared library, imported once per project;
+  Assets/Textures: the city's sign pages; both by pixel hash), with Core/MPC_CityGen's
+  `Night` (0 by day, 1 by night) switching the windows, neon and signs;
 - an actor per entry at its pivot (Custom Primitive Data, `cg.stage=2`) in place of the
   blockout actors it replaces, and a BP_CityGenInstances actor per entry and part kind.
 
@@ -66,11 +69,18 @@ INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "3"
+STAGE2_VERSION = "4"                 # AG6: textured masters
+TEXTURE_VERSION = "1"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
 LIT_CPD = 6                          # the lit-window ratio (AG1's cpd_layout)
+# AG6's Custom Primitive Data (assetgen/materials/params.py): wear, dirt height, seed (AG0),
+# room width, floor height, interior row, rain streaks, top, blinds
+CPD = {"wear": 3, "dirt": 4, "neon": 5, "lit": 6, "seed": 7, "room": 23, "floor": 24,
+       "row": 25, "streaks": 26, "top": 27, "blinds": 28}
+SAMPLER = {"color": "SAMPLERTYPE_COLOR", "normal": "SAMPLERTYPE_NORMAL",
+           "mask": "SAMPLERTYPE_MASKS"}
 STAGE2_FOLDER = "Assets"             # citygen.unreal.STAGE2_FOLDER
 
 
@@ -205,33 +215,93 @@ if (Ch > -0.5) {
 return t;
 """
 
-# the room behind a window (interior mapping on UV1, one room per pane, its look from the
-# window id in the vertex alpha) and whether it is lit (the actor's lit-window ratio); the
-# view in the pane's frame from its normal (along the wall, up), not the mesh's tangents
-# (Nanite derives those per triangle from UV0, which runs in meters across the city)
-ROOM_CODE = """
-float3 n = normalize(N);
-float3 ta = float3(-n.y, n.x, 0.0);
-ta = dot(ta, ta) > 1e-4 ? normalize(ta) : float3(1.0, 0.0, 0.0);
-float3 bi = cross(n, ta);
-float3 d = -normalize(float3(dot(V, ta), dot(V, bi), dot(V, n)));
-d.z = min(d.z, -0.05);
-float2 p = frac(UV);
-float dx = abs(d.x) > 1e-4 ? d.x : 1e-4;
-float dy = abs(d.y) > 1e-4 ? d.y : 1e-4;
-float tx = ((d.x > 0 ? 1.0 : 0.0) - p.x) / dx;
-float ty = ((d.y > 0 ? 1.0 : 0.0) - p.y) / dy;
-float tz = -Depth / d.z;
-float t = min(min(tx, ty), tz);
-float3 h = float3(p, 0.0) + t * d;
-float r = frac(sin(Seed * 91.7 + 1.3) * 43758.5);
-float3 wall = lerp(float3(0.55, 0.50, 0.45), float3(0.33, 0.40, 0.48), r);
-float3 c = wall * 0.65;
-if (t == tz) { c = wall * 0.85; }
-else if (t == ty) { c = d.y < 0 ? float3(0.22, 0.19, 0.17) : float3(0.85, 0.85, 0.80); }
-return c * (0.55 + 0.45 * saturate(1.0 + h.z / Depth));
+# AG6: a textured surface's color: the set's base color with the tint over its tinted pixels
+# (mask = ORM alpha: tint / ref there), occlusion, the macro map, grime from the ground up
+# to the dirt height, rain streaks (the decal atlas's leaks) under the building's top
+SURFACE_CODE = """
+float3 c = Base.rgb;
+if (Textured > 0.5) {
+  c = lerp(c, c * Tint / max(Ref, 0.02), Orm.a);
+  c *= 0.35 + 0.65 * Orm.r;
+} else {
+  c = Tint;
+}
+c *= 0.86 + 0.28 * Macro.r;
+float g = saturate(1.0 - Z / max(Dirt, 0.1));
+g = g * g * (0.25 + 0.6 * Wear) * (0.5 + Macro.b);
+c = lerp(c, float3(0.045, 0.04, 0.032), g * 0.75);
+float d = (Top - Z) / 6.0;
+float s = (d > 0.0 && d < 1.0) ? Leak.a * Streaks * Streak * (1.0 - abs(NZ)) : 0.0;
+c = lerp(c, float3(0.03, 0.03, 0.028), s * 0.6);
+if (Stains > 0.5) { c = lerp(c, Stain.rgb, Stain.a * Gate.z); }
+return c;
 """
-LIT_CODE = "return (Seed > 0.002 && frac(Seed * 13.37) < Lit) ? 1.0 : 0.0;"
+UV_CODE = "return UV / max(TileM, 0.01) + float2(Seed * 37.3, Seed * 71.9);"
+MACRO_UV_CODE = "return float2(WP.x, -WP.y) / 6400.0;"
+STREAK_UV_CODE = """
+float d = clamp((Top - Z) / 6.0, 0.002, 0.998);
+return float2((2.0 + frac(UV.x + Seed * 13.0)) / 4.0, d / 4.0);
+"""
+ROUGH_CODE = """
+float r = Textured > 0.5 ? Orm.g + (Macro.g - 0.5) * 0.12 : Rough;
+if (Stains > 0.5) { r -= 0.3 * Stain.a * Gate.z; }
+return clamp(r, 0.02, 1.0);
+"""
+METAL_CODE = "return Textured > 0.5 ? Orm.b : Metal;"
+# a road's stains: per 8 m cell of UV0 one road-atlas cell (oil, cracks, patches, tar, skid
+# marks, a puddle, dust), placed and picked by a hash of the cell
+STAIN_UV_CODE = """
+float2 c = floor(UV / 8.0);
+float h1 = frac(sin(dot(c, float2(12.9898, 78.233))) * 43758.5453);
+float h2 = frac(sin(dot(c, float2(39.3468, 11.135))) * 24634.6345);
+float h3 = frac(sin(dot(c, float2(73.156, 52.235))) * 15731.743);
+float cells[10] = {0, 1, 2, 3, 4, 5, 6, 7, 13, 15};
+float cell = cells[min(9, (int)floor(h2 * 10.0))];
+float2 l = (UV - c * 8.0) / 2.0 - float2(h3, h1) * 2.0;
+float ins = (l.x > 0.0 && l.x < 1.0 && l.y > 0.0 && l.y < 1.0) ? 1.0 : 0.0;
+float2 auv = (float2(fmod(cell, 4.0), floor(cell / 4.0)) + clamp(l, 0.003, 0.997)) / 4.0;
+return float3(auv, (h1 < 0.55 ? 1.0 : 0.0) * ins);
+"""
+# AG6: the room behind a window. The building's room grid on UV0 (meters: u along the
+# facade, v up from the base): rooms RoomW wide and FloorH high; the view in the facade's
+# tangent frame (x along u, y up, z out of the wall); the ray into the room's box, its hit
+# projected onto the interior atlas's one-point image (back wall at Back of the window); a
+# room per cell by hash, its use's atlas row. Nothing per pane or per vertex: panes that
+# share corners show their rooms whole (AG1's per-pane UV1 and window ids came out per
+# triangle in Unreal). Out: atlas u, v, lit, blind.
+ROOM_CODE = """
+float W = max(RoomW, 1.0);
+float H = max(FloorH, 2.0);
+float D = max(W * 1.1, 3.0);
+float2 f = float2(UV.x / W, UV.y / H);
+float2 cell = floor(f);
+float2 p = frac(f);
+float3 v = normalize(V);
+float3 r = float3(-v.x / W, -v.y / H, max(v.z, 0.03) / D);
+float tx = ((r.x > 0.0 ? 1.0 : 0.0) - p.x) / (abs(r.x) > 1e-5 ? r.x : 1e-5);
+float ty = ((r.y > 0.0 ? 1.0 : 0.0) - p.y) / (abs(r.y) > 1e-5 ? r.y : 1e-5);
+float t = min(min(tx, ty), 1.0 / r.z);
+float3 h = saturate(float3(p, 0.0) + t * r);
+float k = Back / (Back + (1.0 - Back) * h.z);
+float2 i = clamp(0.5 + (h.xy - 0.5) * k, 0.004, 0.996);
+float2 c = cell + Seed * 1000.0 + dot(round(N.xy * 8.0), float2(17.0, 1.0));
+float h1 = frac(sin(dot(c, float2(12.9898, 78.233))) * 43758.5453);
+float h2 = frac(sin(dot(c, float2(39.3468, 11.135))) * 24634.6345);
+float h3 = frac(sin(dot(c, float2(73.156, 52.235))) * 15731.743);
+float row = RowOverride >= 0.0 ? RowOverride : Row;
+float col = floor(h1 * (Cols - 0.001));
+float2 auv = float2((col + i.x) / Cols, (row + 1.0 - i.y) / Rows);
+return float4(auv, h2 < Lit ? 1.0 : 0.0, (h3 < Blinds && p.y > 1.0 - h2 * 0.9) ? 1.0 : 0.0);
+"""
+GLASS_CODE = """
+float slat = 0.75 + 0.25 * frac(UV.y * 25.0);
+float3 bd = float3(0.55, 0.53, 0.5) * slat;
+float3 day = lerp(Day.rgb, bd, Room.w) * 0.2;
+float3 nite = lerp(Nite.rgb * Room.z, float3(1.0, 0.85, 0.65) * 0.45 * Room.z, Room.w)
+            + Nite.rgb * 0.02;
+return Interior * lerp(day, nite * 2.6, Night);
+"""
+DECAL_UV_CODE = "return (frac(UV) + float2(fmod(Cell, Cols), floor(Cell / Cols))) / float2(Cols, Rows);"
 
 
 def tint_color(m, x, y):
@@ -259,11 +329,209 @@ def tint_color(m, x, y):
     return cus
 
 
-def stage2_master(master):
-    """/Game/CityGen/Core/M_Cg<Master>: `glass` (interior mapping), `translucent` (blended,
-    two-sided), else opaque (`foliage` two-sided) with an emissive strength; each takes its
-    color from tint_color. Made, or rebuilt in place when of an older STAGE2_VERSION (its
+def mpc():
+    """/Game/CityGen/Core/MPC_CityGen: `Night` (0 by day, 1 by night), which stage 3 drives;
+    the windows' rooms light, neon and signs glow with it."""
+    path = f"{CORE}/MPC_CityGen"
+    if EAL.does_asset_exist(path):
+        return unreal.load_asset(path)
+    c = AT.create_asset("MPC_CityGen", CORE, unreal.MaterialParameterCollection,
+                        unreal.MaterialParameterCollectionFactoryNew())
+    p = unreal.CollectionScalarParameter()
+    p.set_editor_property("parameter_name", "Night")
+    p.set_editor_property("default_value", 0.0)
+    c.set_editor_property("scalar_parameters", [p])
+    EAL.save_loaded_asset(c)
+    return c
+
+
+def night(m, x, y):
+    return expr(m, unreal.MaterialExpressionCollectionParameter, x, y, collection=mpc(),
+                parameter_name="Night")
+
+
+def sparam(m, name, x, y, default=0.0, cpd=None):
+    """A scalar parameter, read from the actor's Custom Primitive Data at `cpd` if given."""
+    if cpd is None:
+        return expr(m, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name,
+                    default_value=float(default))
+    return expr(m, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name,
+                default_value=float(default), use_custom_primitive_data=True,
+                primitive_data_index=cpd)
+
+
+def tparam(m, name, kind, x, y, uv, defaults):
+    """A texture sample parameter of `kind` (color, normal, mask) at the uv expression."""
+    t = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, x, y, parameter_name=name,
+             sampler_type=getattr(unreal.MaterialSamplerType, SAMPLER[kind]))
+    if defaults.get(kind) is not None:
+        t.set_editor_property("texture", defaults[kind])
+    link(uv, "", t, "UVs")
+    return t
+
+
+def vparam(m, name, x, y, default=(1.0, 1.0, 1.0)):
+    return expr(m, unreal.MaterialExpressionVectorParameter, x, y, parameter_name=name,
+                default_value=unreal.LinearColor(default[0], default[1], default[2], 1.0))
+
+
+F1, F2, F3, F4 = ("CMOT_FLOAT1", "CMOT_FLOAT2", "CMOT_FLOAT3", "CMOT_FLOAT4")
+
+
+def cmot(name):
+    return getattr(unreal.CustomMaterialOutputType, name)
+
+
+def textured_surface(m, master, defaults):
+    """The textured opaque masters (facade, metal, concrete, foliage, road): base color,
+    roughness, metallic and normal from the set, tint, macro map, grime, streaks, stains."""
+    MP = unreal.MaterialProperty
+    col = tint_color(m, -1400, -200)
+    uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2400, 200, coordinate_index=0)
+    tile = sparam(m, "TileM", -2400, 300, 2.0)
+    seed = sparam(m, "Seed", -2400, 380, 0.0, CPD["seed"])
+    uvc = custom(m, -2100, 260, UV_CODE, ["UV", "TileM", "Seed"], cmot(F2), "CgUV")
+    link(uv0, "", uvc, "UV")
+    link(tile, "", uvc, "TileM")
+    link(seed, "", uvc, "Seed")
+    base = tparam(m, "BaseTex", "color", -1800, 100, uvc, defaults)
+    nrm = tparam(m, "NormalTex", "normal", -1800, 400, uvc, defaults)
+    orm = tparam(m, "OrmTex", "mask", -1800, 700, uvc, defaults)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -2400, 1000)
+    muv = custom(m, -2100, 1000, MACRO_UV_CODE, ["WP"], cmot(F2), "CgMacroUV")
+    link(wp, "", muv, "WP")
+    mac = tparam(m, "Macro", "mask", -1800, 1000, muv, defaults)
+    lp = expr(m, unreal.MaterialExpressionLocalPosition, -2400, 1300)
+    z = expr(m, unreal.MaterialExpressionComponentMask, -2200, 1300, r=False, g=False, b=True,
+             a=False)
+    link(lp, "", z, "Input")
+    zm = expr(m, unreal.MaterialExpressionMultiply, -2050, 1300, const_b=0.01)
+    link(z, "", zm, "A")
+    top = sparam(m, "Top", -2400, 1450, 1000.0, CPD["top"])
+    suv = custom(m, -2100, 1450, STREAK_UV_CODE, ["UV", "Z", "Top", "Seed"], cmot(F2),
+                 "CgStreakUV")
+    for a, b in ((uv0, "UV"), (zm, "Z"), (top, "Top"), (seed, "Seed")):
+        link(a, "", suv, b)
+    leak = tparam(m, "Decals", "color", -1800, 1450, suv, defaults)
+    stains = sparam(m, "Stains", -2400, 1750, 0.0)
+    if master == "road":
+        guv = custom(m, -2100, 1750, STAIN_UV_CODE, ["UV"], cmot(F3), "CgStainUV")
+        link(uv0, "", guv, "UV")
+        gmask = expr(m, unreal.MaterialExpressionComponentMask, -1950, 1750, r=True, g=True,
+                     b=False, a=False)
+        link(guv, "", gmask, "Input")
+        stain = tparam(m, "RoadAtlas", "color", -1800, 1750, gmask, defaults)
+    else:
+        guv = expr(m, unreal.MaterialExpressionConstant3Vector, -2100, 1750,
+                   constant=unreal.LinearColor(0, 0, 0, 0))
+        stain = expr(m, unreal.MaterialExpressionConstant4Vector, -1800, 1750,
+                     constant=unreal.LinearColor(0, 0, 0, 0))
+    nz = expr(m, unreal.MaterialExpressionVertexNormalWS, -2400, 2000)
+    nzm = expr(m, unreal.MaterialExpressionComponentMask, -2200, 2000, r=False, g=False,
+               b=True, a=False)
+    link(nz, "", nzm, "Input")
+    params = {"Textured": sparam(m, "Textured", -1500, 2100, 0.0),
+              "Ref": vparam(m, "RefColor", -1500, 2200, (0.2, 0.2, 0.2)),
+              "Dirt": sparam(m, "Dirt", -1500, 2300, 0.8, CPD["dirt"]),
+              "Wear": sparam(m, "Wear", -1500, 2380, 0.5, CPD["wear"]),
+              "Streaks": sparam(m, "Streaks", -1500, 2460, 0.0, CPD["streaks"]),
+              "Streak": sparam(m, "StreakScale", -1500, 2540, 0.0)}
+    sur = custom(m, -1000, 0, SURFACE_CODE,
+                 ["Base", "Orm", "Tint", "Ref", "Macro", "Leak", "Z", "Dirt", "Wear",
+                  "Streaks", "Streak", "Top", "NZ", "Textured", "Stains", "Stain", "Gate"],
+                 cmot(F3), "CgSurface")
+    for a, out, b in ((base, "RGBA", "Base"), (orm, "RGBA", "Orm"), (col, "", "Tint"),
+                      (mac, "RGBA", "Macro"), (leak, "RGBA", "Leak"), (zm, "", "Z"),
+                      (top, "", "Top"), (nzm, "", "NZ"), (stains, "", "Stains"),
+                      (stain, "RGBA" if master == "road" else "", "Stain"), (guv, "", "Gate")):
+        link(a, out, sur, b)
+    for name, node in params.items():
+        link(node, "", sur, name)
+    rough = sparam(m, "Roughness", -1500, 2650, 0.85)
+    metal = sparam(m, "Metallic", -1500, 2730, 0.0)
+    rc = custom(m, -1000, 400, ROUGH_CODE, ["Orm", "Macro", "Textured", "Rough", "Stains",
+                                            "Stain", "Gate"], cmot(F1), "CgRough")
+    for a, out, b in ((orm, "RGBA", "Orm"), (mac, "RGBA", "Macro"),
+                      (params["Textured"], "", "Textured"), (rough, "", "Rough"),
+                      (stains, "", "Stains"),
+                      (stain, "RGBA" if master == "road" else "", "Stain"), (guv, "", "Gate")):
+        link(a, out, rc, b)
+    mc = custom(m, -1000, 550, METAL_CODE, ["Orm", "Textured", "Metal"], cmot(F1), "CgMetal")
+    for a, out, b in ((orm, "RGBA", "Orm"), (params["Textured"], "", "Textured"),
+                      (metal, "", "Metal")):
+        link(a, out, mc, b)
+    flat = expr(m, unreal.MaterialExpressionConstant3Vector, -1300, 700,
+                constant=unreal.LinearColor(0, 0, 1, 0))
+    nl = expr(m, unreal.MaterialExpressionLinearInterpolate, -1000, 700)
+    link(flat, "", nl, "A")
+    link(nrm, "RGB", nl, "B")
+    link(params["Textured"], "", nl, "Alpha")
+    MEL.connect_material_property(sur, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(rc, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(mc, "", MP.MP_METALLIC)
+    MEL.connect_material_property(nl, "", MP.MP_NORMAL)
+    m.set_editor_property("two_sided", master == "foliage")
+
+
+def glass_master(m, defaults):
+    """Opaque reflective glass with interior mapping (ROOM_CODE, GLASS_CODE)."""
+    MP = unreal.MaterialProperty
+    col = tint_color(m, -1400, -300)
+    uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2400, 300, coordinate_index=0)
+    cam = expr(m, unreal.MaterialExpressionCameraVectorWS, -2600, 450)
+    tv = expr(m, unreal.MaterialExpressionTransform, -2400, 450,
+              transform_source_type=unreal.MaterialVectorCoordTransformSource
+              .TRANSFORMSOURCE_WORLD,
+              transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_TANGENT)
+    link(cam, "", tv, "Input")
+    nrm = expr(m, unreal.MaterialExpressionVertexNormalWS, -2400, 550)
+    ins = {"UV": uv0, "V": tv, "N": nrm,
+           "RoomW": sparam(m, "RoomW", -2400, 650, 3.0, CPD["room"]),
+           "FloorH": sparam(m, "FloorH", -2400, 730, 3.5, CPD["floor"]),
+           "Row": sparam(m, "Row", -2400, 810, 0.0, CPD["row"]),
+           "RowOverride": sparam(m, "RowOverride", -2400, 890, -1.0),
+           "Seed": sparam(m, "Seed", -2400, 970, 0.0, CPD["seed"]),
+           "Lit": sparam(m, "LitRatio", -2400, 1050, 0.3, CPD["lit"]),
+           "Blinds": sparam(m, "Blinds", -2400, 1130, 0.3, CPD["blinds"]),
+           "Back": sparam(m, "InteriorBack", -2400, 1210, 0.5),
+           "Cols": sparam(m, "InteriorCols", -2400, 1290, 8.0),
+           "Rows": sparam(m, "InteriorRows", -2400, 1370, 6.0)}
+    room = custom(m, -2000, 600, ROOM_CODE, list(ins), cmot(F4), "CgRoom")
+    for name, node in ins.items():
+        link(node, "", room, name)
+    ruv = expr(m, unreal.MaterialExpressionComponentMask, -1800, 600, r=True, g=True,
+               b=False, a=False)
+    link(room, "", ruv, "Input")
+    day = tparam(m, "InteriorDay", "color", -1600, 450, ruv, defaults)
+    nite = tparam(m, "InteriorNight", "color", -1600, 750, ruv, defaults)
+    inter = sparam(m, "Interior", -1600, 1000, 0.0)
+    nt = night(m, -1600, 1100)
+    g = custom(m, -1200, 700, GLASS_CODE, ["Day", "Nite", "Room", "Night", "UV", "Interior"],
+               cmot(F3), "CgGlass")
+    for a, out, b in ((day, "RGBA", "Day"), (nite, "RGBA", "Nite"), (room, "", "Room"),
+                      (nt, "", "Night"), (uv0, "", "UV"), (inter, "", "Interior")):
+        link(a, out, g, b)
+    g2 = expr(m, unreal.MaterialExpressionMultiply, -900, -300, const_b=2.0)
+    link(col, "", g2, "A")
+    rough = sparam(m, "Roughness", -900, 200, 0.06)
+    metal = sparam(m, "Metallic", -900, 280, 0.15)
+    spec = expr(m, unreal.MaterialExpressionConstant, -900, 360, r=0.8)
+    MEL.connect_material_property(g2, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(g, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(metal, "", MP.MP_METALLIC)
+    MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
+
+
+def stage2_master(master, defaults=None):
+    """/Game/CityGen/Core/M_Cg<Master>. AG6's textured masters: `facade`, `metal`,
+    `concrete`, `foliage`, `road` (textured_surface), `glass` (interior mapping), `neon`
+    (emissive with Night), `sign` (an atlas page, emissive with Night, masked), `decal`
+    (deferred, a cell of the decal atlas); AG1's and AG7's `translucent` (blended,
+    two-sided), `opaque` and `emissive` (flat, an emissive strength). Each takes its color
+    from tint_color. Made, or rebuilt in place when of an older STAGE2_VERSION (its
     instances keep it as their parent)."""
+    defaults = defaults or {}
     name = "M_Cg" + "".join(w.capitalize() for w in master.split("_"))
     path = f"{CORE}/{name}"
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
@@ -274,63 +542,51 @@ def stage2_master(master):
     else:
         MEL.delete_all_material_expressions(m)
     MP = unreal.MaterialProperty
-    col = tint_color(m, -600, 0)
-    rough = expr(m, unreal.MaterialExpressionScalarParameter, -300, 300,
-                 parameter_name="Roughness", default_value=0.85)
-    metal = expr(m, unreal.MaterialExpressionScalarParameter, -300, 380,
-                 parameter_name="Metallic", default_value=0.0)
-    if master == "glass":
-        f1, f3 = (unreal.CustomMaterialOutputType.CMOT_FLOAT1,
-                  unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-        uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 600, coordinate_index=1)
-        cam = expr(m, unreal.MaterialExpressionCameraVectorWS, -1300, 700)
-        nrm = expr(m, unreal.MaterialExpressionVertexNormalWS, -1300, 800)
-        vc = expr(m, unreal.MaterialExpressionVertexColor, -1300, 900)
-        depth = expr(m, unreal.MaterialExpressionConstant, -1300, 1000, r=1.0)
-        room = custom(m, -1000, 700, ROOM_CODE, ["UV", "V", "N", "Seed", "Depth"], f3, "Room")
-        link(uv, "", room, "UV")
-        link(cam, "", room, "V")
-        link(nrm, "", room, "N")
-        link(vc, "A", room, "Seed")
-        link(depth, "", room, "Depth")
-        ratio = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1100,
-                     parameter_name="LitRatio", default_value=0.3,
-                     use_custom_primitive_data=True, primitive_data_index=LIT_CPD)
-        scale = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1200,
-                     parameter_name="LitScale", default_value=0.1)
-        lr = expr(m, unreal.MaterialExpressionMultiply, -1100, 1150)
-        link(ratio, "", lr, "A")
-        link(scale, "", lr, "B")
-        lit = custom(m, -1000, 1000, LIT_CODE, ["Seed", "Lit"], f1, "Lit")
-        link(vc, "A", lit, "Seed")
-        link(lr, "", lit, "Lit")
-        # by day: the glass's tint, a little of the room behind it; the lit rooms glow. The
-        # rooms are off (Interior 0) until AG6's window interiors: Unreal does not keep the
-        # packs' one window id and UV1 per pane where curtain wall panes share corners (the
-        # Nanite build, it seems), so they come out per triangle there
-        inter = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1300,
-                     parameter_name="Interior", default_value=0.0)
-        g2 = expr(m, unreal.MaterialExpressionMultiply, -350, -100, const_b=2.0)
-        link(col, "", g2, "A")
-        roomi = expr(m, unreal.MaterialExpressionMultiply, -800, 650)
-        link(room, "", roomi, "A")
-        link(inter, "", roomi, "B")
-        room = roomi
-        dim = expr(m, unreal.MaterialExpressionMultiply, -600, 650, const_b=0.12)
-        link(room, "", dim, "A")
-        base = expr(m, unreal.MaterialExpressionAdd, -200, 0)
-        link(g2, "", base, "A")
-        link(dim, "", base, "B")
-        glow = expr(m, unreal.MaterialExpressionMultiply, -600, 850)
-        link(room, "", glow, "A")
-        link(lit, "", glow, "B")
-        glow2 = expr(m, unreal.MaterialExpressionMultiply, -350, 850, const_b=3.0)
-        link(glow, "", glow2, "A")
-        spec = expr(m, unreal.MaterialExpressionConstant, -300, 460, r=0.8)
-        MEL.connect_material_property(base, "", MP.MP_BASE_COLOR)
-        MEL.connect_material_property(glow2, "", MP.MP_EMISSIVE_COLOR)
-        MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
+    if master in ("facade", "metal", "concrete", "foliage", "road"):
+        textured_surface(m, master, defaults)
+    elif master == "glass":
+        glass_master(m, defaults)
+    elif master == "sign":
+        uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 0, coordinate_index=0)
+        tex = tparam(m, "SignTex", "color", -700, 0, uv0, defaults)
+        st = sparam(m, "SignStrength", -700, 300, 4.0)
+        masked = sparam(m, "Masked", -700, 380, 0.0)
+        nt = night(m, -700, 460)
+        e = custom(m, -400, 200, "return Tex.rgb * Strength * (0.25 + 0.75 * Night);",
+                   ["Tex", "Strength", "Night"], cmot(F3), "CgSign")
+        for a, out, b in ((tex, "RGBA", "Tex"), (st, "", "Strength"), (nt, "", "Night")):
+            link(a, out, e, b)
+        op = custom(m, -400, 400, "return lerp(1.0, Tex.a, Masked);", ["Tex", "Masked"],
+                    cmot(F1), "CgSignMask")
+        link(tex, "RGBA", op, "Tex")
+        link(masked, "", op, "Masked")
+        b = expr(m, unreal.MaterialExpressionMultiply, -400, 0, const_b=0.15)
+        link(tex, "RGB", b, "A")
+        MEL.connect_material_property(b, "", MP.MP_BASE_COLOR)
+        MEL.connect_material_property(e, "", MP.MP_EMISSIVE_COLOR)
+        MEL.connect_material_property(op, "", MP.MP_OPACITY_MASK)
+        MEL.connect_material_property(expr(m, unreal.MaterialExpressionConstant, -400, 600,
+                                           r=0.35), "", MP.MP_ROUGHNESS)
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    elif master == "decal":
+        uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -1200, 0, coordinate_index=0)
+        ins = {"UV": uv0, "Cell": sparam(m, "Cell", -1200, 100, 0.0),
+               "Cols": sparam(m, "Cols", -1200, 180, 4.0),
+               "Rows": sparam(m, "Rows", -1200, 260, 4.0)}
+        duv = custom(m, -1000, 100, DECAL_UV_CODE, list(ins), cmot(F2), "CgDecalUV")
+        for k2, node in ins.items():
+            link(node, "", duv, k2)
+        base = tparam(m, "BaseTex", "color", -700, 0, duv, defaults)
+        nrm = tparam(m, "NormalTex", "normal", -700, 300, duv, defaults)
+        orm = tparam(m, "OrmTex", "mask", -700, 600, duv, defaults)
+        MEL.connect_material_property(base, "RGB", MP.MP_BASE_COLOR)
+        MEL.connect_material_property(base, "A", MP.MP_OPACITY)
+        MEL.connect_material_property(nrm, "RGB", MP.MP_NORMAL)
+        MEL.connect_material_property(orm, "G", MP.MP_ROUGHNESS)
+        m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     elif master == "translucent":
+        col = tint_color(m, -600, 0)
         op = expr(m, unreal.MaterialExpressionScalarParameter, -300, 460,
                   parameter_name="Opacity", default_value=0.35)
         MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
@@ -341,16 +597,34 @@ def stage2_master(master):
         if mode is not None:
             m.set_editor_property("translucency_lighting_mode", mode)
     else:
+        # opaque, emissive, neon: a flat color; neon glows more by night (Night) and with
+        # the actor's neon level
+        col = tint_color(m, -600, 0)
         emi = expr(m, unreal.MaterialExpressionScalarParameter, -300, 540,
                    parameter_name="Emissive", default_value=0.0)
         em = expr(m, unreal.MaterialExpressionMultiply, -150, 500)
         link(col, "", em, "A")
         link(emi, "", em, "B")
+        out = em
+        if master == "neon":
+            nt = night(m, -300, 640)
+            lvl = sparam(m, "NeonLevel", -300, 720, 0.0, CPD["neon"])
+            k = custom(m, -150, 650, "return (0.15 + 0.85 * Night) * (1.0 + Level);",
+                       ["Night", "Level"], cmot(F1), "CgNeon")
+            link(nt, "", k, "Night")
+            link(lvl, "", k, "Level")
+            out = expr(m, unreal.MaterialExpressionMultiply, 0, 550)
+            link(em, "", out, "A")
+            link(k, "", out, "B")
+        rough = expr(m, unreal.MaterialExpressionScalarParameter, -300, 300,
+                     parameter_name="Roughness", default_value=0.85)
+        metal = expr(m, unreal.MaterialExpressionScalarParameter, -300, 380,
+                     parameter_name="Metallic", default_value=0.0)
         MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
-        MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+        MEL.connect_material_property(out, "", MP.MP_EMISSIVE_COLOR)
+        MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+        MEL.connect_material_property(metal, "", MP.MP_METALLIC)
         m.set_editor_property("two_sided", master == "foliage")
-    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
-    MEL.connect_material_property(metal, "", MP.MP_METALLIC)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.core2", STAGE2_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
@@ -395,6 +669,7 @@ class Importer:
         # stage 2 (assetgen): its materials by (part, slot), the blockout keys it replaces
         self.s2 = man.get("stage2")
         self.mats2 = {}
+        self.mi2, self.tex2 = {}, {}          # AG6: instances by asset, textures by name
         self.skip = set(self.s2["replaced"]) | {a["key"] for a in self.s2["actors"]} \
             if self.s2 else set()
         if self.s2:
@@ -589,25 +864,90 @@ class Importer:
 
     # -- stage 2 (assetgen's layer: buildings, streets) --
 
+    def textures2(self):
+        """AG6's textures (the shared library under Core/Textures, the city's pages under
+        Assets/Textures), each imported once and again only when its pixels change (its
+        hash), with its color space, compression (normal maps with the green channel
+        flipped: the library's are OpenGL) and texture group."""
+        self.tex2 = {}
+        if not self.s2 or not self.s2.get("textures"):
+            return
+        st = self.stats["stage2"].setdefault("textures", {"imported": 0, "kept": 0,
+                                                          "deleted": 0})
+        TCS = unreal.TextureCompressionSettings
+        TG = unreal.TextureGroup
+        for name, t in sorted(self.s2["textures"].items()):
+            path = f"{t['folder']}/{t['asset']}"
+            h = f"{TEXTURE_VERSION}.{t['hash']}"
+            if EAL.does_asset_exist(path):
+                tex = unreal.load_asset(path)
+                if meta(tex, HASH_TAG) == h:
+                    st["kept"] += 1
+                    self.tex2[name] = tex
+                    continue
+            task = unreal.AssetImportTask()
+            for k, v in (("filename", os.path.join(self.build, t["file"])),
+                         ("destination_path", t["folder"]), ("destination_name", t["asset"]),
+                         ("automated", True), ("replace_existing", True), ("save", False)):
+                task.set_editor_property(k, v)
+            AT.import_asset_tasks([task])
+            tex = unreal.load_asset(path)
+            if tex is None:
+                raise RuntimeError(f"texture {name}: import of {t['file']} failed")
+            kind = t["kind"]
+            tex.set_editor_property("srgb", bool(t["srgb"]))
+            tex.set_editor_property("compression_settings",
+                                    TCS.TC_NORMALMAP if kind == "normal" else
+                                    (TCS.TC_MASKS if kind == "mask" else TCS.TC_DEFAULT))
+            if kind == "normal":
+                tex.set_editor_property("flip_green_channel", True)
+            tex.set_editor_property("lod_group", TG.TEXTUREGROUP_WORLD_NORMAL_MAP
+                                    if kind == "normal" else TG.TEXTUREGROUP_WORLD)
+            EAL.set_metadata_tag(tex, HASH_TAG, h)
+            EAL.save_loaded_asset(tex, only_if_is_dirty=False)
+            self.tex2[name] = tex
+            st["imported"] += 1
+        # the city's pages it no longer has (the shared library's stay: other cities)
+        folder = f"{self.root}/{STAGE2_FOLDER}/Textures"
+        want = {f"{t['folder']}/{t['asset']}" for t in self.s2["textures"].values()}
+        if EAL.does_directory_exist(folder):
+            stale = [a for a in EAL.list_assets(folder, recursive=False)
+                     if a.split(".")[0] not in want]
+            st["deleted"] += delete_assets(stale)
+
+    def texture_defaults(self):
+        """A texture of each kind for the masters' sample parameters (any the build has)."""
+        out = {"color": None, "normal": None, "mask": None}
+        for name, t in sorted((self.s2 or {}).get("textures", {}).items()):
+            if out.get(t["kind"]) is None and name in self.tex2 and \
+                    not name.startswith("city."):
+                out[t["kind"]] = self.tex2[name]
+        return out
+
     def materials2(self):
-        """A master per stage 2 master name and an instance per part and slot (its color,
-        roughness, metallic, emissive strength and tint rule); stale instances deleted (none
-        on a blockout-only import: stage 2's meshes, kept, still use them)."""
+        """A master per stage 2 master name and an instance per part and material key (its
+        color, roughness, metallic, emissive strength and tint rule; from AG6 its textures,
+        scalars and vectors); stale instances deleted (none on a blockout-only import:
+        stage 2's meshes, kept, still use them)."""
         if not self.s2:
             return
         folder = f"{self.root}/{STAGE2_FOLDER}/Materials"
         want = set()
-        masters = {m: stage2_master(m) for m in self.s2["masters"]}
+        defaults = self.texture_defaults()
+        masters = {m: stage2_master(m, defaults) for m in self.s2["masters"]}
+        self.mi2 = {}
         st = self.stats["stage2"]["materials"]
         for key, p in sorted(self.s2["materials"].items()):
             path = f"{folder}/{p['asset']}"
             want.add(path)
             h = sha16([p, STAGE2_VERSION])
+            key = p.get("key", p["slot"])
             if EAL.does_asset_exist(path):
                 mi = unreal.load_asset(path)
                 if meta(mi, HASH_TAG) == h:
                     st["kept"] += 1
-                    self.mats2[(p["part"], p["slot"])] = mi
+                    self.mats2[(p["part"], key)] = mi
+                    self.mi2[p["asset"]] = mi
                     continue
                 st["updated"] += 1
             else:
@@ -623,9 +963,21 @@ class Importer:
                             ("TintScale", p["tint_scale"]),
                             ("TintTimesColor", 1.0 if p["tint_times_color"] else 0.0)):
                 MEL.set_material_instance_scalar_parameter_value(mi, name, float(v))
+            # AG6: textures by parameter, scalars (TileM, Textured, StreakScale, Stains,
+            # Interior, ...) and vectors (RefColor, linear)
+            for name, t in sorted((p.get("textures") or {}).items()):
+                MEL.set_material_instance_texture_parameter_value(mi, name,
+                                                                 self.tex2[t["texture"]])
+            for name, v in sorted((p.get("scalars") or {}).items()):
+                MEL.set_material_instance_scalar_parameter_value(
+                    mi, "StreakScale" if name == "Streaks" else name, float(v))
+            for name, v in sorted((p.get("vectors") or {}).items()):
+                MEL.set_material_instance_vector_parameter_value(
+                    mi, name, unreal.LinearColor(v[0], v[1], v[2], 1.0))
             EAL.set_metadata_tag(mi, HASH_TAG, h)
             EAL.save_loaded_asset(mi)
-            self.mats2[(p["part"], p["slot"])] = mi
+            self.mats2[(p["part"], key)] = mi
+            self.mi2[p["asset"]] = mi
         if EAL.does_directory_exist(folder):
             stale = [a for a in EAL.list_assets(folder, recursive=False)
                      if a.split(".")[0] not in want]
@@ -915,6 +1267,12 @@ class Importer:
                 a.set_actor_location_and_rotation(loc, rot, False, False)
                 # (the defaults: the run-time values are not saved with the level)
                 c.set_default_custom_primitive_data_float_array(0, [float(v) for v in r["cpd"]])
+                # AG6: the slots this actor takes another instance for (its era's walls)
+                for slot, asset in sorted((r.get("materials") or {}).items()):
+                    mi = self.mi2.get(asset)
+                    i = c.get_material_index(unreal.Name(slot))
+                    if mi is not None and i >= 0:
+                        c.set_material(i, mi)
                 if r.get("no_collision"):
                     c.set_collision_profile_name("NoCollision")
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
@@ -1115,6 +1473,7 @@ class Importer:
     def run(self):
         base = self.timed("core", base_material)
         self.timed("materials", self.materials, base)
+        self.timed("textures2", self.textures2)
         self.timed("materials2", self.materials2)
         self.timed("meshes", self.meshes)
         self.timed("meshes2", self.meshes2)
