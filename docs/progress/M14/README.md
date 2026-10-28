@@ -77,7 +77,7 @@ Both districts are levelled; it passes all 91 checks with two decks.
 - **assetgen**: the brief of a building on a deck has `floor_grid.level` and `deck_m`.
 - **Unreal exporter**: actors on a deck tagged `cg.level=1`, the manifest's `decks`, lanes
   and walkways with their level in `graphs.json` and the graph data assets
-  (`docs/unreal_export.md`).
+  (`docs/unreal_export.md`). Checked in Unreal 5.8 after the merge: `unreal/`.
 
 ## Fixes since the first sample build
 

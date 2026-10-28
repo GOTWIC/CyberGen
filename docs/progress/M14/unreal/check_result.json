@@ -1,0 +1,107 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 313 of 10477 actors loaded at the start, 1179 after a teleport to (896, -1408) (1175 new)",
+  "collision: 676 of 676 traces down hit (building 235, road_street 66, ground 59, junction 47, water 31, deck_slab 28), 48 of 48 roofs, 48 of 48 facades",
+  "walk: 260 m along a 264 m sidewalk path in 44 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 10477,
+   "loaded_at_start": 313,
+   "loaded_far": 1179,
+   "only_far": 1175,
+   "far_spot_m": [
+    896.0,
+    -1408.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 676,
+    "hits": 676,
+    "by_category": {
+     "water": 31,
+     "structure_deck": 19,
+     "road_pedestrian": 10,
+     "plant_palm": 1,
+     "building": 235,
+     "ground": 59,
+     "junction": 47,
+     "road_avenue": 19,
+     "crosswalk": 3,
+     "road_street": 66,
+     "lawn": 1,
+     "sidewalk": 16,
+     "open_plaza": 16,
+     "plant_street_tree": 2,
+     "elevated": 27,
+     "prop_barrier": 1,
+     "prop_awning": 13,
+     "open_pocket_park": 3,
+     "plant_facade_greenery": 2,
+     "skybridge": 2,
+     "green_roof": 13,
+     "road_alley": 6,
+     "bridge": 1,
+     "embankment": 5,
+     "prop_ac_unit": 1,
+     "prop_sign": 1,
+     "structure_tube": 3,
+     "deck_slab": 28,
+     "deck_junction": 12,
+     "open_park": 7,
+     "deck_road": 18,
+     "deck_sidewalk": 8
+    }
+   },
+   "roofs": {
+    "tried": 48,
+    "hit": 48
+   },
+   "facades": {
+    "tried": 48,
+    "hit": 48
+   },
+   "spots": [
+    [
+     95.97,
+     225.56
+    ],
+    [
+     896.0,
+     -1408.0
+    ],
+    [
+     640.0,
+     -1152.0
+    ],
+    [
+     1152.0,
+     1152.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 264.3,
+   "points": 10,
+   "reached": true,
+   "travelled_m": 260.4,
+   "on_ground": 1.0,
+   "max_drop_m": 0.1,
+   "seconds": 44.1,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Vesper Bay Decks",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 223.6,
+ "exit_code": 0,
+ "wall_s": 292.0
+}

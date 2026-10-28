@@ -366,7 +366,14 @@ DECK_LEVEL = {"deck_road": 1, "deck_junction": 1, "deck_crosswalk": 1, "deck_sid
 
 
 def _level(category: str, props: dict) -> int:
-    return int(props.get("level") or DECK_LEVEL.get(category, 0))
+    """The street level an object stands on: a deck's streets, slab and ramps, a building's
+    `level` (on a deck). A road object's `level` is its road level (M7's viaducts 1 and 2,
+    M9's tunnels -1), not a deck's, so it does not count."""
+    if category in DECK_LEVEL:
+        return int(props.get("level") or DECK_LEVEL[category])
+    if category in ("building", "landmark"):
+        return int(props.get("level") or 0)
+    return 0
 
 
 def _roof(parts: list[dict]) -> list[float] | None:

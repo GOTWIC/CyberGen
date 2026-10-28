@@ -307,6 +307,7 @@ def test_flat_graphs(build, manifest):
     assert g["walkways"]["count"] == len(raw["walkways"])
     assert g["transit"]["count"] == len(raw["transit_lines"]) + len(raw["stations"])
     assert not [k for k in g if "levels" in g[k]] and "decks" not in manifest[0]  # (M14)
+    assert not [o for t in manifest[0]["tiles"] for o in t["objects"] if "level" in o]
     for name, f in g.items():
         n = f["count"]
         assert len(f["ids"]) == len(f["kinds"]) == len(f["refs"]) == len(f["widths"]) == n
@@ -320,6 +321,16 @@ def test_flat_graphs(build, manifest):
     succ = [lanes["ids"][j] for j in lanes["links"][lanes["link_start"][i]:
                                                    lanes["link_start"][i + 1]]]
     assert succ == [s for s in raw["lanes"][i]["successors"] if s in set(lanes["ids"])]
+
+
+def test_levels():
+    """M14: a deck's streets, slab and ramps and the buildings on it stand on its level; a
+    road's own level (M7's viaducts 1 and 2, M9's tunnels -1) is not a deck's."""
+    assert U._level("deck_road", {}) == 1 and U._level("deck_slab", {"level": 1}) == 1
+    assert U._level("deck_ramp", {"level": 0}) == 1
+    assert U._level("building", {"level": 1}) == 1 and U._level("building", {}) == 0
+    assert U._level("elevated", {"level": 2}) == 0 and U._level("bridge", {"level": 1}) == 0
+    assert U._level("tunnel_road", {"level": -1}) == 0
 
 
 def test_cli_manifest_only(build, tmp_path):

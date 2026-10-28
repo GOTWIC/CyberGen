@@ -670,8 +670,9 @@ plants, green areas; `decks`):
 - **Unreal exporter:** actors on a deck tagged `cg.level=1` (manifest `level`), the
   manifest's `decks` (id, level, top, district, slab keys), lanes and walkways with their
   `level` in `graphs.json` and a `levels` array in the flat graphs (data assets' `Levels`,
-  `CORE_VERSION` 2); the check's walk never takes an elevator. A city without decks exports
-  exactly as before.
+  `CORE_VERSION` 2); a road's own `level` (M7, M9) is not a deck's; the check's walk never
+  takes an elevator, its traces cover each deck. A city without decks exports exactly as
+  before. Unreal check: `docs/progress/M14/unreal/`.
 - **Terrain:** a district with decks is levelled like a `flat` district (a slab on columns
   over level ground); the deck checks run only on a finished city (`checks.run_checks` also
   serves the build's early checks on the M2 model, before the columns).

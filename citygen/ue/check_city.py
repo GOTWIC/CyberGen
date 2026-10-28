@@ -281,7 +281,8 @@ def streaming(world, pawn, man, slug):
 def collision(world, pawn, man, slug):
     """Traces down on a 16 m grid within 100 m of three spots (the start and the middles of
     the two busiest tiles 300 m or more from it and from each other; traces outside the
-    city's bounds do not count), down onto roofs and across onto facades."""
+    city's bounds do not count), and one on each deck (M14), down onto roofs and across
+    onto facades."""
     sx, sy, sz = man["player_start"]["position"]
     spots = [(sx, sy)]
 
@@ -292,6 +293,13 @@ def collision(world, pawn, man, slug):
     for t in sorted(man["tiles"], key=lambda t: (-len(t["objects"]), t["name"])):
         if len(spots) < 3 and all(math.dist(mid(t), s) >= 300.0 for s in spots):
             spots.append(mid(t))
+    # M14: and the middle of each deck's busiest slab tile, so traces land on the deck
+    tile_of = {o["key"]: t for t in man["tiles"] for o in t["objects"]}
+    for dk in man.get("decks", []):
+        ts = sorted((tile_of[k] for k in dk["keys"] if k in tile_of),
+                    key=lambda t: (-len(t["objects"]), t["name"]))
+        if ts and mid(ts[0]) not in spots:
+            spots.append(mid(ts[0]))
     bx = man["bounds"]
     roof_at = {o["key"]: o.get("roof") for t in man["tiles"] for o in t["objects"]}
     down = {"traces": 0, "hits": 0, "by_category": {}}
