@@ -282,6 +282,28 @@ def test_peninsula_has_land_tongue():
     assert not h.land.intersects(Point(1100, -1100))
 
 
+@pytest.mark.parametrize("seed", [9081, 404, 1999])
+def test_peninsula_headlands_fan_out(seed):
+    """coast.headlands: below the mainland strip the land narrows to a neck, then fans out
+    into that many headlands; the sea keeps its share, no cove is left as a closed pond."""
+    data = json.loads((ROOT / "docs" / "progress" / "M1a2" / "peninsula_city" /
+                       "city_spec.json").read_text())
+    data["seed"] = seed
+    spec = validate_spec(data).filled
+    assert spec.water.coast.headlands == 3
+    canvas = G.canvas_for(spec.size_km)
+    sea = H.build_sea(spec, canvas, None)
+    assert abs(sea.area / canvas.area - 0.55) < 0.002
+    assert all(p.distance(canvas.exterior) < 1.0 for p in G.parts(sea))
+    land = G.diff(canvas, G.qpoly(sea))
+    top = 1800.0 - H.FAN["main"] * 3600.0   # the mainland coast
+    lam = top + 1800.0                      # from there to the map's south edge
+    neck = land.intersection(box(-1800, top - 0.16 * lam, 1800, top - 0.11 * lam))  # the waist
+    lower = land.intersection(box(-1800, -1800, 1800, top - 0.45 * lam))
+    assert G.qbounds(neck)[2] - G.qbounds(neck)[0] < 1000.0
+    assert len(G.parts(lower)) == 3
+
+
 # --- rivers ----------------------------------------------------------------------------
 
 def test_river_at_pins_entry_and_mouth():

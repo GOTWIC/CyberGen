@@ -408,9 +408,11 @@ M9 (tunnels) is in place, in `citygen/tunnels.py` (checks in `tunnel_checks.py`,
   metro tunnels and underpasses as solid boxes, ventilation buildings; `render_cutaway.jpg`
   (view `cutaway`, also for `citygen rerender`): the city cut along the longest road tunnel,
   earth under the ground, from over its first open approach.
-Samples: Nexus City's ring highway dips under Midtown in a cut-and-cover tunnel, Peninsula
-City's spine crosses its river in an immersed tube (Vesper Bay keeps its trumpet: a tunnel on
-its ring takes the flyover's stem). Sample builds: `docs/progress/M9/`.
+Samples: Nexus City's ring highway dips under Midtown in a cut-and-cover tunnel (Vesper Bay
+keeps its trumpet: a tunnel on its ring takes the flyover's stem). Greyhook's earlier layout
+(one round tip) crossed its river in an immersed tube; it is kept as the test fixture
+`tests/data/peninsula_round_tip.json`, since the reshaped Greyhook crosses its river beside
+the map edge, with no room for a tube's approaches. Sample builds: `docs/progress/M9/`.
 
 M11 (gameplay layer) is in place: the build ends with `citygen/gameplay.py` on the finished
 city (after props) and nine checks in `gameplay_checks.py` (75 in all on M8c, 79 with M9):
@@ -503,6 +505,18 @@ M10 (edit, lock, regenerate) is in place:
   **`citygen model diff A B [--png]`** (`diff.py`, `preview_diff.py`).
 Sample builds (the five, the pinned and the stack demo, each with a release lock),
 regenerations, sweep: `docs/progress/M10/`.
+
+Greyhook reshape (its coastline made more natural and interesting: a peninsula that fans out
+into headlands): `water.coast.headlands` (2 to 5, peninsula only, in `hydro._fan_plan`,
+`_fan_outline`, `_fan_peninsula`) gives a mainland strip 0.15 of the map deep, a short neck
+(shoulders, a waist), a bay on each side, then the headlands rooted on an arc and splayed, a
+U-shaped cove between each two; a centripetal Catmull-Rom spline runs through the control
+points (`_spline`), moved along its normals by the coast noise (`_wobble`); the sea share
+solve scales the headland widths, and a cove the smoothing pinches shut becomes land. Its draws
+come from `derive_seed(seed, "hydro.fan")`, and a spec without `headlands` builds as before.
+Greyhook (3.6 x 3.6 km) has three headlands and two islets (parks); its river is pinned with
+meander 0, so the walled heights north of it keep their share at every seed. Builds:
+`docs/progress/greyhook_reshape/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

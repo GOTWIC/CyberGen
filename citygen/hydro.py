@@ -237,9 +237,9 @@ def _fan_plan(rng, k: int, A: float, Bh: float, a_n: float) -> dict:
         reach = (1.0 - m - root[0]) / ua
         if abs(ub) > 1e-9:
             reach = min(reach, (room * (1 if ub > 0 else -1) - root[1]) / ub)
+        length = reach * float(rng.uniform(*FAN["len"]))
         width = float(rng.uniform(*FAN["width"])) * (1 + FAN["mid"] * (1 - abs(t)))
-        heads.append({"root": root, "phi": phi,
-                      "len": reach * float(rng.uniform(*FAN["len"])), "h0": h0 * width,
+        heads.append({"root": root, "phi": phi, "len": length, "h0": h0 * width,
                       "taper": float(rng.uniform(*FAN["taper"])),
                       "bulge": (float(rng.uniform(*FAN["bulge"])),
                                 float(rng.uniform(*FAN["bulge"])))})

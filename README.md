@@ -38,7 +38,7 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M10/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M10/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/greyhook_reshape/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M10/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
@@ -70,13 +70,9 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 |---|---|
 | <img src="docs/progress/M12/vesper_bay_stacks/render_stack.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay/render_trumpet.jpg" width="420"> |
 
-| Tunnel under a river (Greyhook) | Tunnel under a district (Nexus City) |
+| Tunnel under a district (Nexus City) | Cutaway along the tunnel (8K) |
 |---|---|
-| <img src="docs/progress/M9/peninsula_city/preview_tunnels.png" width="420"> | <img src="docs/progress/M9/nexus_city/preview_tunnels.png" width="420"> |
-
-| Cutaway along the river tunnel (8K) | Cutaway along the district tunnel (8K) |
-|---|---|
-| <img src="docs/progress/M9/peninsula_city/render_cutaway.jpg" width="420"> | <img src="docs/progress/M9/nexus_city/render_cutaway.jpg" width="420"> |
+| <img src="docs/progress/M9/nexus_city/preview_tunnels.png" width="420"> | <img src="docs/progress/M9/nexus_city/render_cutaway.jpg" width="420"> |
 
 | Transit, Delta Megacity | Transit, Nexus City | Transit, Vesper Bay |
 |---|---|---|
