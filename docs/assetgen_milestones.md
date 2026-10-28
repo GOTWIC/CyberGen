@@ -224,7 +224,21 @@ the thumbnail half of the uniqueness check and budgets per building class
 
 **Samples** (every check passes in each; 4 workers on the shared Mac):
 
-TABLE
+| City | Buildings | Shell triangles | Part meshes (triangles) | Part instances | Merged | Unique triangles (of budget) | Drawn | Nearest thumbnails (bits) | Packs (shells + parts) | Build |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 26.2 M | 13,875 (0.8 M) | 1.3 M | 131,282 | 27.0 M (0.53) | 88.0 M | 24 | 1.54 GB + 67 MB | 396 s |
+| Saltreach Free Port | 3,135 | 16.0 M | 9,068 (0.5 M) | 0.9 M | 65,477 | 16.5 M (0.58) | 58.0 M | 20 | 0.94 GB + 41 MB | 43 s |
+| Delta Megacity | 5,417 | 27.2 M | 13,366 (0.7 M) | 1.3 M | 125,209 | 27.9 M (0.54) | 84.9 M | 21 | 1.59 GB + 57 MB | 93 s |
+| Nexus City | 6,519 | 26.4 M | 14,443 (0.8 M) | 1.1 M | 145,183 | 27.2 M (0.53) | 79.9 M | 13 | 1.55 GB + 63 MB | 155 s |
+| Greyhook | 2,671 | 13.9 M | 10,244 (0.6 M) | 0.8 M | 62,490 | 14.5 M (0.45) | 53.3 M | 30 | 0.82 GB + 49 MB | 57 s |
+| Vesper Bay Pinned | 6,658 | 26.5 M | 14,673 (0.9 M) | 1.2 M | 152,488 | 27.3 M (0.51) | 83.7 M | 25 | 1.56 GB + 72 MB | 88 s |
+| Vesper Bay Stacks | 6,686 | 25.8 M | 14,421 (0.8 M) | 1.1 M | 151,018 | 26.6 M (0.52) | 79.8 M | 17 | 1.52 GB + 70 MB | 96 s |
+| Cragmouth | 6,777 | 27.3 M | 13,165 (0.7 M) | 1.0 M | 159,127 | 28.0 M (0.52) | 73.9 M | 30 | 1.60 GB + 60 MB | 88 s |
+| Vesper Bay Decks (checks only) | 5,856 | 25.8 M | 13,834 (0.8 M) | 1.2 M | 132,424 | 26.6 M (0.51) | 84.1 M | 16 | 1.51 GB + 66 MB | 102 s |
+
+Build: the building stage of `assetgen build` with 4 workers on the M4 Pro, shared
+with other sessions' Unreal, Blender and test runs while these ran (load 10 to 50):
+43 to 155 s, Vesper Bay's 396 s under the heaviest load.
 
 **Goldens**: written again on the Mac (`tests/assetgen/goldens.py --builds`): AG2 changes
 every shell (punched widths, articulation, dado, merged parts) and adds the part packs, so
