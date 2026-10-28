@@ -278,8 +278,9 @@ fails `open_space_share` on its last try as on M10 (Launch Key 67% open, 71% on 
 The other 62 builds are byte for byte M10's.
 
 **Cragmouth at eight seeds** (`citygen sweep cities/cragmouth/city_spec.json --seeds
-6133,11,404,1999,3141,5077,8128,27182 --workers 3`, in `sweep_cragmouth.md` and `.json`):
-**6 of 8 pass**.
+6133,11,404,1999,3141,5077,8128,27182 --workers 3`, in `sweep_cragmouth.md` and `.json`, on
+M13 on M10): **6 of 8 pass**, the same seeds with the same failures and full-city tries as on
+M12.
 
 | Seed | Result |
 |---|---|
@@ -293,7 +294,8 @@ limits; see the open items.
 
 ## Tests
 
-The full pytest passes on M13 on M12 (452 passed, 2 skipped).
+The full pytest passes on M13 on M10 (480 passed, 2 skipped, 54 min with the Mac shared with
+the sweep; the tests that read `docs/progress` run again after main's folder renames).
 `tests/test_terrain.py` covers:
 
 - flat models carrying no terrain;
@@ -306,6 +308,10 @@ The full pytest passes on M13 on M12 (452 passed, 2 skipped).
   tower;
 - Cragmouth's golden model and blockout plan hashes, with grid and drape parts and retaining
   walls in the plan.
+- with M10: the held vertices bounding the fit (`test_held_vertices_bound_the_fit`), the hilly
+  test city's ids from what and where (no build counter, every reference and water level
+  naming an entity), and a regeneration of its Old Quarter holding every road outside it,
+  grade line included, with every check passing.
 
 ## Blockout
 
