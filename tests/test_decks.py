@@ -163,3 +163,18 @@ def test_the_layered_sample_golden_hashes():
     plan = BO.make_plan(b.model)
     assert BO.plan_sha256(plan) == golden["blockout_plans"]["vesper_bay_decks"]
     assert plan["cameras"].get("deck") is not None
+
+
+def test_briefs_of_deck_buildings_stand_on_the_deck(decked):
+    """assetgen: a building on a deck counts its floors from the deck top."""
+    from assetgen import brief as B
+
+    m = decked.model
+    briefs = B.build_briefs(m)["briefs"]
+    up = [b for b in m.buildings if b.level]
+    assert up
+    for b in up:
+        fg = briefs[b.id]["building"]["floor_grid"]
+        assert fg["level"] == 1 and fg["deck_m"] == m.decks[0].top_m
+    flat = next(b for b in m.buildings if not b.level)
+    assert "level" not in briefs[flat.id]["building"]["floor_grid"]

@@ -208,7 +208,7 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     net = STR.build_streets(spec, b.hydro, b.layout.polygons, did, b.waterways, b.sites,
                             b.roads, opens, getattr(b, "frame", None))
     # M14: the decks of layered districts (upper twins of their interior streets, ramps)
-    dplan = DK.plan(spec, net, net.builder, did)
+    dplan = DK.plan(spec, net, net.builder, did, getattr(b, "held_lines", None))
     darch = {did[d.name]: d.archetype for d in spec.districts}
     jx = JN.build(net, darch, did, spec.seed or 0)
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])

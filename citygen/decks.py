@@ -37,6 +37,7 @@ import math
 from dataclasses import dataclass, field
 
 import shapely
+import shapely.ops
 from shapely.geometry import LineString, Point, Polygon
 
 from . import dmath as M
@@ -55,6 +56,9 @@ END_GAP_M = 6.0         # a spoke's twin ends this far short of the edge street'
 FACE_MIN_M2 = 1500.0
 FACE_IN = 0.9           # share of a face inside its district
 RAISED_PAD_M = 8.0
+RIM_M = 4.0            # the slab past its streets over a park or plaza (a colonnade)
+HELD_PAD_M = 14.0      # a held transit line (M10) a new deck keeps off: half its width and more
+HELD_DECK_M = 3.0      # its guideway under the track, over the deck clearance
 FACE_MAX_M2 = 80000.0
 CAR = ("street", "alley")
 INTERIOR = ("street", "alley", "pedestrian")
@@ -167,10 +171,11 @@ def _face_poly(pts):
     return ps[0] if ps else Polygon()
 
 
-def plan(spec, net, B, did_by_name: dict) -> Plan:
+def plan(spec, net, B, did_by_name: dict, held: dict | None = None) -> Plan:
     """The decks of every district with `decks`: the cluster, the interior streets, the upper
     twins and the ramps, added to `net` (upper nodes and segments appended, ramps in place of
-    their spokes)."""
+    their spokes). `held`: the transit lines a district regeneration keeps (M10), whose old
+    heights a new deck must pass under."""
     pl = Plan()
     want = [d for d in spec.districts if d.decks is not None and d.name in B.polygons]
     if not want:
@@ -188,11 +193,23 @@ def plan(spec, net, B, did_by_name: dict) -> Plan:
               for s in net.segments if not s.get("bridge") and not s.get("tunnel") and
               (s.get("level", 0) >= 1 or max(p["z"] for p in s["z_profile"]) > 3.0)]
     raised_u = G.union(raised) if raised else Polygon()
+    # (and of a held elevated line too low over it, piece by piece by its lowest end)
+    lines = []
+    for name in sorted(held or {}):
+        row = held[name]
+        if row["mode"] == "metro":
+            continue
+        pts = row["path"]
+        for a, b in zip(pts, pts[1:]):
+            if (a[0], a[1]) != (b[0], b[1]):
+                lines.append((G.qpoly(LineString([a[:2], b[:2]]).buffer(
+                    HELD_PAD_M, cap_style="flat")), min(a[2], b[2])))
     for d in want:
         did = did_by_name[d.name]
         dk = Deck(id=f"{did}.deck01", did=did, name=d.name, spec=d.decks,
                   top=G.q(d.decks.height_m))
-        _cluster(dk, d, B, net, segs, pos, at, raised_u)
+        low = [p for p, z in lines if z < dk.top + CLEAR_M + HELD_DECK_M]
+        _cluster(dk, d, B, net, segs, pos, at, G.union([raised_u] + low) if low else raised_u)
         if not dk.faces:
             pl.notes.append(f"{d.name}: no blocks fit a deck")
             continue
@@ -620,8 +637,15 @@ def _finish(dk: Deck, segs: dict, net, jx: dict, blk: dict, out: dict) -> None:
         row.append(G.qpoly(LineString(line).buffer(t["width_m"] / 2, cap_style="flat",
                                                    join_style="mitre", mitre_limit=2.0)))
     up = set(dk.node_twin.values())
-    row += [j["row_polygon"] for j in jx["junctions"] if j["node_id"] in up and
-            j.get("row_polygon") is not None and not j["row_polygon"].is_empty]
+    js = [j for j in jx["junctions"] if j["node_id"] in up and
+          j.get("row_polygon") is not None and not j["row_polygon"].is_empty]
+    row += [j["row_polygon"] for j in js]
+    # (where its streets pass a park or plaza, no lot under the deck reaches them: the slab
+    # runs on over its edge, a colonnade in the park carries it)
+    parks = [o["polygon"] for o in blk["open"] if o.get("district_id") == dk.did]
+    if parks:
+        rim = G.qpoly(G.union(row).buffer(RIM_M, join_style="mitre"))
+        row.append(G.inter(rim, G.union(parks)))
     body = G.union([r["polygon"] for r in under] + row)
     ps = [p for p in G.parts(body) if G.area1(p) >= DECK_MIN_M2]
     if not ps:
@@ -1350,6 +1374,7 @@ def supports(m) -> tuple[list, list]:
             if samples else []
         fine_ok = [p for p, k in zip(fine, shapely.contains(ok_zone, shapely.points(fine))
                                      .tolist()) if k] if fine else []
+        thin = None
         for sp, w, e in zip(samples, wide, edge):
             r = (JUNCTION_REACH * g if w else reach) + (CANTILEVER_M if e else 0.0)
             if keep and min(ST._dist(sp, q) for q in keep) <= r:
@@ -1357,6 +1382,15 @@ def supports(m) -> tuple[list, list]:
             near = [p for p in fine_ok if ST._dist(p, sp) <= reach]
             if near:
                 keep.append(min(near, key=lambda p: (round(ST._dist(p, sp), 6), p)))
+                continue
+            # (a strip too thin for the fine grid: its nearest point, a little inside it)
+            if thin is None:
+                thin = G.qpoly(ok_zone.buffer(-0.1, join_style="mitre"))
+            if thin.is_empty:
+                continue
+            q = ST._pt(*shapely.ops.nearest_points(thin, Point(sp))[0].coords[0])
+            if ST._dist(q, sp) <= r - 0.1 and thin.contains(Point(q)):
+                keep.append(q)
         ids = []
         oct_ = [(COLUMN_R * M.cos(M.PI * (2 * k + 1) / 8), COLUMN_R * M.sin(M.PI * (2 * k + 1) / 8))
                 for k in range(8)]
