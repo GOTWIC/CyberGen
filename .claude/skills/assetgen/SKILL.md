@@ -125,8 +125,11 @@ entry changes only that district's briefs (`assetgen brief diff A B` shows which
 ```
 
 `assetgen build` makes every building's shell and far proxy (`OUT/assets/tiles/`,
-`proxies/`, `manifest.json`, `asset_report.txt`, `unreal_contribution.buildings.json`) and
-exits 1 if a check fails; a second run with nothing changed writes no file. `assetgen
+`proxies/`, `manifest.json`, `asset_report.txt`, `unreal_contribution.buildings.json`; on a
+hilly city each on a plinth down to the ground), then the street packs as `assetgen streets`
+does (`OUT/assets/streets/`, `streets_report.txt`, `unreal_contribution.streets.json`;
+`--no-streets` skips them), and exits 1 if a check of either fails; a second run with
+nothing changed writes no file. `assetgen
 preview` renders the whole city from proxies, each district and the blockout's street
 cameras at full detail, and contact sheets per building type (`OUT/assets/previews/`). The
 spec steers what the previews show: an era's `systems` pick the facade systems (AG1 builds

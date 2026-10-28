@@ -9,7 +9,7 @@ district rebuilds only the tiles whose buildings changed.
 
 | Command | What it does |
 |---|---|
-| `assetgen build BUILD [--spec S] [--overrides O] [--workers N]` | `BUILD/assets/`: `tiles/<tile>.glb` (shells), `proxies/<tile>.glb`, `manifest.json`, `asset_report.json` and `.txt`, `unreal_contribution.buildings.json`; exit 1 if a check fails |
+| `assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]` | `BUILD/assets/`: `tiles/<tile>.glb` (shells), `proxies/<tile>.glb`, `manifest.json`, `asset_report.json` and `.txt`, `unreal_contribution.buildings.json`; then AG7's street stage (`streets/`, `unreal_contribution.streets.json`, `streets_report.*`); exit 1 if a check of either fails |
 | `assetgen preview BUILD [--blockout DIR] [--views ...] [--only ...] [--width W]` | Blender previews in `BUILD/assets/previews/`: the city from proxies (`city`), every shell at once (`city_full`), districts and the blockout's street cameras at full detail, contact sheets per type |
 
 | City | Buildings | Shell triangles | Section 11 estimate | Openings | Proxy triangles (median, max) | Packs on disk | Build, 4 workers |
@@ -21,14 +21,24 @@ district rebuilds only the tiles whose buildings changed.
 | Greyhook | 2,460 | 9.8 M (3,992 per building) | 20.4 M (0.48) | 0.49 M | 23, 498 | 0.57 GB + 11 MB | 23 s |
 | Vesper Bay Pinned | 6,658 | 20.6 M (3,090 per building) | 38.4 M (0.54) | 0.92 M | 34, 336 | 1.19 GB + 31 MB | 62 s |
 | Vesper Bay Stacks | 6,686 | 20.1 M (3,003 per building) | 36.6 M (0.55) | 0.89 M | 34, 334 | 1.16 GB + 31 MB | 63 s |
+| Cragmouth (M13, on main since) | 6,800 | 22.7 M (3,331 per building) | 40.0 M (0.57) | 1.03 M | 40, 269 | 1.30 GB + 34 MB | 74 s (3 workers) |
 
-Times are `assetgen build` from the city model to the last file with 4 worker processes on
-the M4 Pro, shared with other sessions' Blender and Python jobs (load 15 to 100 during these
-runs; Vesper Bay takes 50 to 60 s at a load near 10), briefs included (5 to 28 s of it). So
-a whole city builds in 1 to 2 minutes with 4 workers, far inside the 20 minute target. A second build of the same city writes no file and takes 5 to 7 s (the briefs and
-records are read back, the checks run again). Section 11's estimate for the shells is its
+Times are `assetgen build` (the buildings) from the city model to the last file with 4
+worker processes on the M4 Pro, shared with other sessions' Blender and Python jobs (load 15
+to 100 during these runs; Vesper Bay takes 50 to 60 s at a load near 10), briefs included (5
+to 28 s of it). So a whole city builds in 1 to 2 minutes with 4 workers, far inside the 20
+minute target. Since AG7 merged, `assetgen build` runs the street stage after the buildings
+(Cragmouth: 7 s more for 12,729 pieces in 130 tiles, 82 s in all with 3 workers). A second
+build of the same city writes no file and takes 5 to 14 s (the briefs and records are read
+back, the checks of both stages run again). Section 11's estimate for the shells is its
 $N_b\, t_b + A_r\, \rho_r$ with the city's own bays and roof area; AG1's shells use about
 half of it, so AG2's parts have the other half.
+
+**Cragmouth** (M13's hilly sample, on main after AG1's first builds): buildings stand on
+their base (the pivot is the brief's `base_m`), and every mass on the base has a plinth down
+into the lowest ground under its footprint and 0.5 m below it, as the blockout's plinth
+(`shell.plinth_mm`, also in the proxy, the collision and the envelope check; 4,359 plinths).
+AG5 steps them. On flat ground there is none, so the other samples' packs are unchanged.
 
 ## How a building is made
 
@@ -117,11 +127,15 @@ blockout's.
 |---|---|
 | <img src="peninsula_city/city_full.jpg" width="420"> | <img src="vesper_bay_pinned/city_full.jpg" width="420"> |
 
-| Vesper Bay Stacks | Vesper Bay from its proxies (`city`) |
+| Vesper Bay Stacks | Cragmouth (buildings on its slopes, with plinths) |
 |---|---|
-| <img src="vesper_bay_stacks/city_full.jpg" width="420"> | <img src="vesper_bay/city.jpg" width="420"> |
+| <img src="vesper_bay_stacks/city_full.jpg" width="420"> | <img src="cragmouth/city_full.jpg" width="420"> |
 
-Each city's `city.jpg` (from its proxies, 8K) is beside its `city_full.jpg`.
+Each city's `city.jpg` (from its proxies, 8K) is beside its `city_full.jpg`; Vesper Bay's:
+
+<img src="vesper_bay/city.jpg" width="420">
+
+CRAG_DETAIL
 
 **Vesper Bay's districts at full detail** (`iso_<district>`, the district's shells with the
 rest of the city from proxies, 2400 px; 8K for Corporate Core and Highcrest in `detail/`):
@@ -144,13 +158,15 @@ rest of the city from proxies, 2400 px; 8K for Corporate Core and Highcrest in `
 
 **Street level** (the blockout's five street cameras, 2400 px; 8K in `detail/`):
 
-| street_1 | street_2 |
+| street_1, Corporate Core | street_2, The Stacks |
 |---|---|
 | <img src="vesper_bay/street_1.jpg" width="420"> | <img src="vesper_bay/street_2.jpg" width="420"> |
 
-| street_3 | street_4 |
+| street_3, Scholar Isle | street_4, Corporate Core under the viaduct |
 |---|---|
 | <img src="vesper_bay/street_3.jpg" width="420"> | <img src="vesper_bay/street_4.jpg" width="420"> |
+
+street_5, Old Town:
 
 <img src="vesper_bay/street_5.jpg" width="420">
 
@@ -195,8 +211,8 @@ All five pass on every sample:
 | `asset_unique` | every two buildings outside one complex family differ in at least $k = 4$ discrete genes or by a genome distance of at least 4 (a discrete gene counts 1, a continuous one $\min(\lvert\Delta\rvert / s, 1)$ with $s$ a clearly visible step), on the genes each shell used |
 | `asset_budget` | the city's shell triangles within section 11's estimate for its bays and roofs |
 
-Uniqueness compares 27 to 28 discrete and 32 to 39 continuous genes over 3 to 22 million
-pairs per city; the nearest pair outside a family is 4.7 to 6.1 apart (median nearest 10.0
+Uniqueness compares 27 to 28 discrete and 32 to 39 continuous genes over 3 to 23 million
+pairs per city; the nearest pair outside a family is 4.4 to 6.1 apart (median nearest 10.0
 to 10.6). Mount panels: 11 to 34 thousand openings per city became a panel because a sign,
 prop, plant or skybridge end would have hung on glass. Ring strips: 5 to 15 thousand per
 city, 11 to 28% refused where a run would fold (they are left out, never drawn wrong).
@@ -218,7 +234,8 @@ city, 11 to 28% refused where a run would fold (they are left out, never drawn w
 
 ## Mac = x86
 
-In docker `citygen-x86` (x86_64 Linux, Python 3.13, libstdc++ GEOS), on the same city models
+Run before the validation rule (2026-10-27) deferred cross-platform checks to
+`docs/determinism_check.md`; kept as a record. In docker `citygen-x86` (x86_64 Linux, Python 3.13, libstdc++ GEOS), on the same city models
 as the Mac:
 
 - **Whole cities**: `assetgen build` of Vesper Bay (with its asset spec) and Greyhook writes

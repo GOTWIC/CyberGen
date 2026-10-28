@@ -90,7 +90,9 @@ citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their h
   window type and region class, storefronts per unit, mount panels; walls welded per plane
   with zipper strips, reveal pockets and panes, caps (`triangulate(..., keep_straight=True)`),
   ring strips for parapets, cornices and bands (mitered, beveled past 1.5 offsets), roof
-  equipment blocks; spiked rings and pinched courts cleaned; every part closed;
+  equipment blocks; spiked rings and pinched courts cleaned; every part closed; on M13's
+  slopes the pivot at the building's `base_m` and a plinth under every mass on the base,
+  down into the lowest ground under the footprint (`shell.plinth_mm`; AG5 steps it);
 - **proxies** (`proxy.py`, at most 500 triangles) and **collision** (`collision.py`: convex
   pieces per mass, boxes where rectangles);
 - **`assetgen build`** (`assetgen/build.py`, `manifest.py`, `asset_checks.py`,
@@ -98,7 +100,9 @@ citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their h
   per building, 256 m tile packs made in up to 4 worker processes where hashes changed,
   manifest, report, `unreal_contribution.buildings.json`, files written only when their
   bytes change; checks `asset_coverage`, `asset_envelope`, `asset_meshes`, `asset_unique`,
-  `asset_budget`;
+  `asset_budget`; then AG7's street stage (`--no-streets` skips it; its report written only
+  when another of its files changed, so an unchanged rebuild writes no file), one verdict
+  for both;
 - **`assetgen preview`** (`previews.py`, `blender/preview_assets.py`): the city from proxies
   (and with every shell), districts and the blockout's street cameras at full detail,
   contact sheets per type and one of 64 buildings across the city, on the blockout's
@@ -117,13 +121,16 @@ citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their h
 | Greyhook | 2,460 | 9.8 M | 0.48 | 0.58 GB | 23 s |
 | Vesper Bay Pinned | 6,658 | 20.6 M | 0.54 | 1.22 GB | 62 s |
 | Vesper Bay Stacks | 6,686 | 20.1 M | 0.55 | 1.19 GB | 63 s |
+| Cragmouth | 6,800 | 22.7 M | 0.57 | 1.33 GB | 74 s (3 workers), streets 7 s more |
 
 About 58 bytes of glTF per shell triangle (positions, normals and UV0 everywhere; UV1 and
 colors on glass only); proxies 7 to 498 triangles (median 23 to 40). A second build writes
-no file (3 to 9 s). Uniqueness: nearest pair outside a family 4.7 to 6.1 apart (k = 4).
+no file (3 to 14 s). Uniqueness: nearest pair outside a family 4.4 to 6.1 apart (k = 4).
+Cragmouth (M13, merged after AG1's first builds): 4,359 plinths.
 
-**Mac = x86**: whole-city builds of Vesper Bay and Greyhook byte-identical in `citygen-x86`
-(279 and 171 files); AG1's tests pass there, the small city's goldens included.
+**Mac = x86** (run before the validation rule deferred it to `docs/determinism_check.md`):
+whole-city builds of Vesper Bay and Greyhook byte-identical in `citygen-x86` (279 and 171
+files); AG1's tests passed there, the small city's goldens included.
 
 **Exporter**: M15 was not on main, so only the contribution file
 (`unreal_contribution.buildings.json`); `unreal_export.md` ("From AG1") lists the exporter

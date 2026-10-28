@@ -145,11 +145,31 @@ Every building modelled: walls with window openings, storefronts, slab bands, pa
 cornices, in one of six facade styles chosen per district, owner and building (8K; open one
 for full size).
 
-GALLERY
+| Vesper Bay | Nexus City |
+|---|---|
+| <img src="docs/progress/AG1/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG1/nexus_city/city_full.jpg" width="420"> |
+
+| Delta Megacity | Saltreach Free Port |
+|---|---|
+| <img src="docs/progress/AG1/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG1/archipelago_free_port/city_full.jpg" width="420"> |
+
+| Greyhook | Vesper Bay with the hand-traced Corporate Core |
+|---|---|
+| <img src="docs/progress/AG1/peninsula_city/city_full.jpg" width="420"> | <img src="docs/progress/AG1/vesper_bay_pinned/city_full.jpg" width="420"> |
+
+| Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
+|---|---|
+| <img src="docs/progress/AG1/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG1/cragmouth/city_full.jpg" width="420"> |
 
 ### Up close
 
-DETAIL
+| Corporate Core, every building at full detail (8K) | A street in Old Town (8K) |
+|---|---|
+| <img src="docs/progress/AG1/vesper_bay/detail/iso_d01.jpg" width="420"> | <img src="docs/progress/AG1/vesper_bay/detail/street_5.jpg" width="420"> |
+
+<img src="docs/progress/AG1/vesper_bay/contact_sheet.jpg" width="840">
+
+64 Vesper Bay buildings drawn at random, each framed alone (8K).
 
 ```bash
 .venv/bin/python -m assetgen spec validate cities/vesper_bay/asset_spec.json --build out/vesper_bay
@@ -161,9 +181,10 @@ DETAIL
 The asset spec (art direction per era, district, owner and landmark) is written from the
 city prompt by a Claude Code session through the repo's `assetgen` skill. `assetgen build`
 writes `out/<city>/assets/`: a glTF pack per 256 m tile with every building's model, far
-proxies, a manifest keyed by building id and the entries the Unreal exporter reads; it
-rebuilds only the buildings whose inputs changed, so a regenerated district rebuilds only
-its own. `assetgen preview` renders the city, its districts and street views in Blender.
+proxies, a manifest keyed by building id and the entries the Unreal exporter reads, then the
+street packs (below); it rebuilds only what changed, so a regenerated district rebuilds only
+its own. On hilly cities buildings stand on plinths down to the ground. `assetgen preview`
+renders the city, its districts and street views in Blender.
 
 <img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
 
@@ -181,10 +202,11 @@ with parapets, columns and pier caps, lane markings, sidewalks, crosswalks and t
 .venv/bin/python -m assetgen streets out/vesper_bay
 ```
 
-The street stage writes `out/<city>/assets/streets/`, one glTF pack per 256 m tile with a mesh
-for every road, sidewalk, crosswalk, junction, bridge, viaduct, tunnel, quay, transit structure
-and megasite element, each named by its citygen id and replacing the blockout's street pieces
-in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
+`assetgen build` also runs it, after the buildings (`--no-streets` skips it). The street
+stage writes `out/<city>/assets/streets/`, one glTF pack per 256 m tile with a mesh for
+every road, sidewalk, crosswalk, junction, bridge, viaduct, tunnel, quay, transit structure
+and megasite element, each named by its citygen id and replacing the blockout's street
+pieces in Unreal; a regenerated district rewrites only the tiles it touches. Street views:
 [`docs/progress/AG7`](docs/progress/AG7).
 
 ### Milestones

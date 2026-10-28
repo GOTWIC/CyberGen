@@ -1,6 +1,7 @@
 """AG1's generators on small made-up briefs: the genome (draws, families, overrides), ring
 strips, triangulation that keeps straight vertices, closed shells with courts, reveals and
-strips, the mesh and envelope checks, proxies within budget, collision boxes, uniqueness."""
+strips, the mesh and envelope checks, proxies within budget, collision boxes, uniqueness,
+buildings on M13's slopes (pivot at the base, plinth down to the ground)."""
 
 import copy
 
@@ -188,6 +189,29 @@ def test_proxy_budget_and_collision():
                             30.0 * __import__("math").sin(k / 40.0 * 6.2831853)]
                            for k in range(40)], 0.0, 30.0 + j, 10) for j in range(12)])
     assert PX.build(many)["triangles"] <= PX.MAX_TRIS
+
+
+def test_building_on_a_slope_gets_a_plinth():
+    flat = court_block()
+    br = copy.deepcopy(flat)
+    br["building"]["floor_grid"].update({"base_m": 42.5, "plinth_m": 38.0})
+    depth = SH.plinth_mm(br)
+    assert depth == 5000 and SH.plinth_mm(flat) == 0
+    res = SH.build(br, GN.make(br))
+    ck = MB.check(res["arrays"])
+    assert ck["open_edges"] == ck["bad_edges"] == ck["duplicate"] == ck["degenerate"] == 0
+    assert res["stats"]["plinths"] == 1                  # the base mass, not the tower on it
+    assert int(res["arrays"]["structure"]["pos"][:, 2].min()) == -depth
+    assert EN.check(br, res["arrays"])["ok"]
+    assert not EN.check(flat, res["arrays"])["ok"]       # flat, the plinth is outside
+    assert int(PX.build(br)["arrays"]["proxy"]["pos"][:, 2].min()) == -depth
+    zs = [b["center"][2] - b["extent"][2] for b in CO.build(br)["boxes"]] + \
+        [c["z"][0] for c in CO.build(br)["convex"]]
+    assert min(zs) == -5.0
+    _, _, rec = BD.building_asset(br, GN.make(br))
+    assert rec["pivot"][2] == 42.5
+    _, _, rec = BD.building_asset(flat, GN.make(flat))
+    assert rec["pivot"][2] == 0.0
 
 
 def test_uniqueness_flags_twins_outside_a_family():
