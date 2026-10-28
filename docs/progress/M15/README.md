@@ -339,7 +339,16 @@ Cragmouth in Unreal 5.8 (8K, the blockout's isometric direction).
   dialog makes it (`citygen unreal --new-project` does the same); no other project was
   touched.
 
-## On the combined code (M15 with M10 and main)
+## On the combined code (M15 with M10, M13 and main)
+
+**With M13** (main up to 0a7f8d9), checked under the repo's validation rule (the outputs look
+good and nothing breaks): Cragmouth builds and passes all 86 checks with the model of M13's
+golden hash, its blockout plan's hash moves with M15 (one object per retaining wall, the
+model the same; the golden is updated), the flat cities' blockout plans are unchanged (no
+retaining walls; their graphs keep heights from the ground at 0), Cragmouth imports,
+imports again with nothing changed and passes the check (above), and the test suite passes.
+
+**With M10** (before M13):
 
 M15 adds the exporter and changes no generator file, so the cities are the same bytes as
 M10's:
