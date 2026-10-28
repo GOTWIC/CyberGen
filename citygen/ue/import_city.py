@@ -67,6 +67,7 @@ INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 # it changes) and the meshes' (stored hashes "<version>.<content hash>", as MESH_VERSION)
 STAGE2_VERSION = "1"
 STAGE2_MESH_VERSION = "2"
+STAGE2_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
 LIT_CPD = 6                          # the lit-window ratio (AG1's cpd_layout)
 STAGE2_FOLDER = "Assets"             # citygen.unreal.STAGE2_FOLDER
@@ -744,7 +745,10 @@ class Importer:
                 self.meshes_s2[f"{pk['folder']}/{a}"] = sm
             if k % 25 == 0:
                 log(f"stage 2 pack {k + 1}/{n} {pk['folder']}")
-        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+        # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
+        # class default object serves)
+        sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
+            unreal.get_default_object(unreal.StaticMeshEditorSubsystem)
         for c in self.s2["lod_chains"]:
             path = f"{self.root}/{c['mesh']}"
             h = f"{STAGE2_MESH_VERSION}.{c['hash']}"
@@ -759,7 +763,6 @@ class Importer:
             sm = EAL.duplicate_asset(src[0].get_path_name().split(".")[0], path)
             for i, lo in enumerate(src[1:], 1):
                 sms.set_lod_from_static_mesh(sm, i, lo, 0, True)
-            sm.set_editor_property("auto_compute_lod_screen_size", False)
             sms.set_lod_screen_sizes(sm, [float(lo["screen_size"]) for lo in c["lods"]])
             EAL.set_metadata_tag(sm, HASH_TAG, h)
             EAL.save_loaded_asset(sm, only_if_is_dirty=False)
@@ -821,10 +824,10 @@ class Importer:
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
-    def place(self, have, key, h, cls, make, update, folder):
+    def place(self, have, key, h, cls, make, update, folder, version=ACTOR_VERSION):
         """The actor of `key`: unchanged when its hash matches, else updated in place, else
         spawned; returns it."""
-        h = f"{ACTOR_VERSION}.{h}"
+        h = f"{version}.{h}"
         a = have.pop(key, None)
         if a is not None:
             if f"{HASH_TAG}={h}" in [str(t) for t in a.tags]:
@@ -902,15 +905,15 @@ class Importer:
                 c.set_static_mesh(sm)
                 c.set_mobility(unreal.ComponentMobility.STATIC)
                 a.set_actor_location_and_rotation(loc, rot, False, False)
-                for i, v in enumerate(r["cpd"]):
-                    c.set_custom_primitive_data_float(i, float(v))
+                # (the defaults: the run-time values are not saved with the level)
+                c.set_default_custom_primitive_data_float_array(0, [float(v) for v in r["cpd"]])
                 if r.get("no_collision"):
                     c.set_collision_profile_name("NoCollision")
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage]
 
             self.place(have, r["key"], r["hash"], sma, make, update,
-                       f"CityGen/{r['category']}")
+                       f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
         for r in self.s2["instances"]:
             sm = self.meshes_s2[r["mesh"]]
@@ -931,8 +934,8 @@ class Importer:
                     unreal.Vector(x * 100.0, -y * 100.0, z * 100.0),
                     unreal.Rotator(roll=0.0, pitch=0.0, yaw=-yaw), unreal.Vector(1, 1, 1))
                     for x, y, z, yaw in r["xforms"]], False, False)
-                for i, v in enumerate(r["cpd"]):
-                    comp.set_custom_primitive_data_float(i, float(v))
+                comp.set_default_custom_primitive_data_float_array(
+                    0, [float(v) for v in r["cpd"]])
                 a.set_actor_location_and_rotation(loc, rot, False, False)
                 a.set_editor_property("Ids", [unreal.Name(r["entry"])])
                 a.set_editor_property("Kind", unreal.Name(r["kind"]))
@@ -940,7 +943,7 @@ class Importer:
                                    r["tile"], r["district"], r.get("level", 0)) + [stage]
 
             self.place(have, r["key"], r["hash"], cls, make, update,
-                       f"CityGen/{r['category']}")
+                       f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
 
     def instances(self, have):
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)

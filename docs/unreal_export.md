@@ -31,6 +31,8 @@ script, not this exporter.)
 | props and plants as hierarchical instanced meshes, one actor per kind and tile, with the instances' ids | `BP_CityGenInstances` actors |
 | the lane, walkway and transit graphs as data assets | `BP_CityGenGraph` assets |
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
+| with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
+| stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
 
 Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, `cg.tile` and
 `cg.district` tags. Frames: citygen's (x east, y north, z up, meters) to Unreal's at
@@ -182,7 +184,10 @@ AG7; `citygen/unreal.py` `stage2`, `citygen/ue/import_city.py`):
   17, 20) is its `TintChannel`: the master reads a Custom Primitive Data color at each of
   those indices and the instance picks one; `tint_scale` and `tint_times_color` (the patch
   slots: 3.1 times the slot's own color) scale it.
-- **Custom Primitive Data**: the 23 floats on every building actor's component.
+- **Custom Primitive Data**: the 23 floats on every building actor's component, as its
+  saved defaults (`SetDefaultCustomPrimitiveDataFloatArray`; `SetCustomPrimitiveDataFloat`,
+  which AG0's spike used inside one editor run, sets only run-time values that the level
+  does not save).
 - **Collision**: the boxes and convex prisms as exact convex hulls in each shell's body
   setup, used as complex: Python cannot write `KConvexElem`'s vertices, so the importer
   extrudes each piece into a GeometryScript dynamic mesh and lets
@@ -278,7 +283,9 @@ is added); the new keys in the re-import digests.
   touches, imports them again (nothing may change), runs `--check` with `--shots`, puts the
   results in `docs/progress/<milestone>/unreal/` and reports back.
 - **One Unreal editor at a time** on the Mac; heavy scenes go to the Windows PC. For scale,
-  M15 imports a sample city in 33 to 79 s and checks it in 68 to 112 s on the Mac.
+  M15 imports a sample city in 33 to 79 s and checks it in 68 to 112 s on the Mac; with
+  stage 2 (AG1's shells and AG7's streets) a first import takes 5 to 14 minutes, most of it
+  building the Nanite meshes, and an import of an unchanged build 20 to 40 s.
 
 ## Record
 

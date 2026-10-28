@@ -35,6 +35,8 @@ RES = {"ok": False, "lines": [], "checks": {}}
 LOAD_WAIT_S = 60.0
 WALK_M = 120.0
 WALK_S = 60.0
+MAX_GRADE = 0.3     # steepest leg the walk takes (a road's is at most 12%)
+MAX_STEP_M = 0.6    # highest step where two walkways join
 
 
 def log(msg):
@@ -86,23 +88,26 @@ def trace(world, a, b, ignore=()):
 
 # --- the walkway graph (the importer's flat graphs) ------------------------------------------
 
-def sidewalk_path(build, start, length_m, clear=None):
+def sidewalk_path(build, start, length_m, clear=None, tries=8):
     """A walk of `length_m` from the sidewalk point nearest `start` (citygen meters): along
-    that sidewalk, then on into its neighbors, preferring sidewalks. `clear(line)` rejects a
-    walkway (one with no head room); the walkways it rejected are counted in `skipped`."""
+    that sidewalk, then on into its neighbors, preferring sidewalks; where it cannot go on
+    that far, from the next sidewalk near the start, the longest of `tries` kept (M13: on a
+    slope a junction's corners can be under the hill). `clear(line)` rejects a walkway (one
+    with no head room); the walkways it rejected are counted in `skipped`."""
     g = json.load(open(os.path.join(build, "unreal", "graphs.json"),
                        encoding="utf-8"))["walkways"]
     ps, pts = g["point_start"], g["points"]
-    skipped = set()
+    skipped, known = set(), {}
 
     def line(i):
         return [(pts[3 * k], pts[3 * k + 1], pts[3 * k + 2]) for k in range(ps[i], ps[i + 1])]
 
     def usable(i):
-        if clear is None or clear(line(i)):
-            return True
-        skipped.add(i)
-        return False
+        if i not in known:
+            known[i] = clear is None or clear(line(i))
+            if not known[i]:
+                skipped.add(i)
+        return known[i]
 
     near = []
     for i, kind in enumerate(g["kinds"]):
@@ -111,10 +116,25 @@ def sidewalk_path(build, start, length_m, clear=None):
         d, k = min(((p[0] - start[0]) ** 2 + (p[1] - start[1]) ** 2, k)
                    for k, p in enumerate(line(i)))
         near.append((d, i, k))
-    best = next((b for b in sorted(near)[:40] if usable(b[1])), None)
-    if best is None:
-        return [], len(skipped)
-    _, i, k = best
+
+    def walk_from(i, k):
+        return _walk_on(g, line, usable, skipped, i, k, length_m)
+
+    best, n = ([], 0.0), 0
+    for _, i, k in sorted(near)[:40]:
+        if not usable(i):
+            continue
+        path, total = walk_from(i, k)
+        if total > best[1]:
+            best = (path, total)
+        n += 1
+        if total >= length_m or n >= tries:
+            break
+    return best[0], len(skipped)
+
+
+def _walk_on(g, line, usable, skipped, i, k, length_m):
+    """sidewalk_path's walk from point k of walkway i: (path, length)."""
     path = line(i)[k:]
     if len(path) < 2:
         path = line(i)[::-1][len(line(i)) - 1 - k:]
@@ -130,10 +150,14 @@ def sidewalk_path(build, start, length_m, clear=None):
             ln = line(j)
             if not ln or not usable(j):
                 continue
-            if math.dist(ln[0][:2], path[-1][:2]) <= math.dist(ln[-1][:2], path[-1][:2]):
-                nxt = (j, ln)
-            else:
-                nxt = (j, ln[::-1])
+            if math.dist(ln[0][:2], path[-1][:2]) > math.dist(ln[-1][:2], path[-1][:2]):
+                ln = ln[::-1]
+            if abs(ln[0][2] - path[-1][2]) > MAX_STEP_M:
+                # (a joint the graph gives two heights: M13's crosswalk ends can keep the
+                # height of the slope beside their curb)
+                skipped.add(j)
+                continue
+            nxt = (j, ln)
             break
         if nxt is None:
             break
@@ -142,7 +166,36 @@ def sidewalk_path(build, start, length_m, clear=None):
         for p in ln:
             total += math.dist(path[-1][:2], p[:2])
             path.append(p)
-    return path, len(skipped)
+    return path, total
+
+
+def walkable(ln):
+    """No leg of 2 m or more steeper than MAX_GRADE and no shorter one rising more than
+    MAX_STEP_M: a sidewalk or crosswalk follows its road (on a terrain city a crosswalk's end
+    can keep the height of the cut slope beside its curb, which no one walks)."""
+    for a, b in zip(ln, ln[1:]):
+        d, dz = math.dist(a[:2], b[:2]), abs(b[2] - a[2])
+        if (d >= 2.0 and dz > MAX_GRADE * d) or (d < 2.0 and dz > MAX_STEP_M):
+            return False
+    return True
+
+
+def above_ground(world, ignore, step_m=5.0):
+    """A test for a walkway: the terrain's surface is not over it, every `step_m` along it
+    (M13: on a slope the ground mesh can stand over a junction's corners, where a walkway
+    ends under the hill)."""
+    def clear(ln):
+        for a, b in zip(ln, ln[1:]):
+            n = max(1, int(math.dist(a[:2], b[:2]) // step_m))
+            for s in range(n + 1):
+                f = s / n
+                x, y, z = (a[k] + (b[k] - a[k]) * f for k in range(3))
+                h = trace(world, ue(x, y, z + 12.0), ue(x, y, z - 1.0), ignore)
+                if h is not None and tag(h["actor"], "cg.category") == "ground" and \
+                        h["point"].z > (z + 0.6) * 100.0:
+                    return False
+        return True
+    return clear
 
 
 def head_room(world, ignore, step_m=5.0):
@@ -413,12 +466,14 @@ def path_z(path, k, loc):
 def walk(world, pawn, man):
     """The player along a sidewalk from the start: movement input toward each next point of
     the path every frame, on the ground all the way. The path keeps to walkways with head
-    room (not an at-grade sidewalk under a ramp's deck, see the M15 README). Where something
+    room (not an at-grade sidewalk under a ramp's deck, see the M15 README) that a player can
+    walk (`walkable`, steps at the joints) and the terrain does not cover. Where something
     stops the player (a bench, a planter), it steps aside, as a player would, and the blocker
     is noted."""
     sx, sy, sz = man["player_start"]["position"]
+    room, ground = head_room(world, [pawn]), above_ground(world, [pawn])
     path, skipped = sidewalk_path(JOB["build_dir"], (sx, sy), WALK_M,
-                                  head_room(world, [pawn]))
+                                  lambda ln: walkable(ln) and ground(ln) and room(ln))
     if len(path) < 2:
         RES["checks"]["walk"] = {"ok": False, "error": "no sidewalk near the start"}
         return

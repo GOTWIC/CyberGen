@@ -783,9 +783,14 @@ AG1 (building shells) is in place:
   boxes, the whole city from proxies (`city_full` with every shell), each district and the
   blockout's street cameras at full detail, contact sheets per type; materials per slot
   tinted from the glTF node extras.
-- **Exporter**: M15 was not on main, so AG1 only writes the contribution;
-  `docs/unreal_export.md` lists what the exporter needs for it. Results:
-  `docs/progress/AG1/`.
+- **Exporter** (after M15): `citygen unreal` reads every `BUILD/assets/
+  unreal_contribution.*.json` as layer 2 over the blockout (`unreal.stage2`, the manifest's
+  `stage2`; a key in one file only): an actor per entry at its pivot in place of the
+  blockout actors of its key and `replaces`, packs imported in their nodes' frames, stage 2
+  masters and an instance per part and slot reading the CPD tints, building collision as
+  convex hulls (GeometryScript), HISM parts, proxies imported only; `--blockout-only`, or no
+  assets, gives exactly the blockout's manifest. Results: `docs/progress/AG1/` and
+  `docs/progress/AG1/unreal/`.
 
 AG7 (street elements) is in place, in `assetgen/streets/` (tests
 `tests/assetgen/test_ag_streets.py`):
