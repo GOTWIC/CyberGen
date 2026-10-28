@@ -30,6 +30,17 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
+**Validation (every stage, every PR; Swagnik's rule, 2026-10-27).** Before pushing a PR, make
+sure the outputs look good and nothing breaks: build the cities the change touches, every check
+passes, look at their previews and renders, and the test suite passes (recorded hashes
+regenerated on this Mac where a change moves a model on purpose, saying why). Nothing more:
+no x86, Docker, Windows or other cross-platform comparisons, no stage-trace diffs, no
+`lock --verify` runs, no seed sweeps (unless the work is about robustness), no repeated
+validation runs, and the coordinating session does not validate a PR again (it reviews the
+outputs and the diff, and has the PR merge the latest main first when they overlap). Where a
+scope's "done when" asks for Mac = x86, that part waits for the deferred determinism check in
+`docs/determinism_check.md`, which runs only when Swagnik asks for it.
+
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
 "Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
 
@@ -595,6 +606,7 @@ outside the repo); never import into any other project unasked. Spec and record:
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
+- **Validation:** as in "Validation" above; nothing beyond it.
 - **Work-in-progress images:** after each major sub-step (and at least every hour or so), build
   the sample cities, commit their preview images to `docs/progress/<milestone>/wip/<NN>_<step>/`
   and push to the session branch, so Swagnik can watch progress on GitHub before the PR exists.
