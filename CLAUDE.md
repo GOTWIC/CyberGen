@@ -619,6 +619,40 @@ AG0 (contract and spike) is in place:
   (`citygen-x86`). Write them again with `.venv/bin/python tests/assetgen/goldens.py
   [--builds DIR]` after a citygen change moves a model, and say why in the PR.
 
+AG7 (street elements) is in place, in `assetgen/streets/` (tests
+`tests/assetgen/test_ag_streets.py`):
+- **`assetgen streets BUILD [--spec S] [--workers N]`** (`build.py`): every street element as
+  a piece keyed by its citygen id, gathered from the model (`ctx.py`: indexes, M13's ground,
+  the blockout objects each piece replaces, from citygen's own blockout code) into `inputs`
+  that hold everything its generator reads, hashed (`pieces.py`). Pieces: road segments
+  (`roads.py`: carriageway between the junctions' cut edges, markings from the model's
+  lanes, stop lines, arrows, patches, manholes, drains, medians, decks with parapets, joints
+  and underside lights, embankments), sidewalks, crosswalks and junctions with their
+  sidewalk corners (`walks.py`), bridges by kind, road columns, tunnels, portals, approach
+  trenches, underpass stairs, vents (`structures.py`), guideways, sky tubes (glass as a
+  non-Nanite LOD chain), transit columns and station structures, M13's retaining walls
+  (`transit.py`), quays and canal walls (`water.py`), megasite elements with containers as
+  instanced parts (`sites.py`). Meshes on integer millimeters in each piece's frame
+  (`kit.py`: grids, sweeps, exact polygons; folds dropped); lean glTF.
+- **Outputs**: `BUILD/assets/streets/<tile>.glb` (a node per piece, the blockout's tile of
+  the object it replaces), `streets/parts.glb`, `streets/manifest.json`,
+  `unreal_contribution.streets.json` (`docs/unreal_export.md`, AG7 section) and
+  `streets_report.json/.txt` (`checks.py`: coverage, meshes, replaces, budgets). A tile is
+  made again only when its pieces' hashes or the code's hash change; an unchanged city writes
+  no pack. Up to 4 workers, the same bytes for any count.
+- **Ground**: a road's surface is its M13 grade line plus its z profile; sidewalks and
+  crosswalks follow their road (on a deck too, writing the corrected walkway lines), road
+  tunnels their road's grade line, everything else the terrain at its point; 0 on a flat
+  city (Cragmouth is the hilly sample).
+- **`assetgen streets seam BASE REGEN [--district NAME]`** (`seam.py`): which pieces and
+  tiles a district regeneration changed and why (own entity, or an input entity changed).
+- **Previews**: `preview.py` (top-down, from the packs) and
+  `assetgen/blender/streets_preview.py` (the blockout's `city.blend` with the replaced
+  objects removed and the packs imported; its views or custom cameras).
+- Goldens in their own file, `tests/assetgen/data/golden_streets.json`
+  (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
+  generator change: the code hash is in every tile's hash.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

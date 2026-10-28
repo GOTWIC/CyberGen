@@ -1,0 +1,361 @@
+{
+ "checks": [
+  {
+   "detail": "0 without an asset",
+   "id": "street_coverage",
+   "ok": true
+  },
+  {
+   "detail": "no bad triangles",
+   "id": "street_meshes",
+   "ok": true
+  },
+  {
+   "detail": "1114 blockout objects replaced",
+   "id": "street_replaces",
+   "ok": true
+  },
+  {
+   "detail": "1226030 triangles in the city (budget 20000000), at most 26348 in a tile (t-05+02, budget 2500000)",
+   "id": "street_budgets",
+   "ok": true
+  }
+ ],
+ "city": "Cragmouth",
+ "coverage": {
+  "bridges": {
+   "assets": 9,
+   "declared": 0,
+   "entities": 9
+  },
+  "crosswalks": {
+   "assets": 1406,
+   "declared": 0,
+   "entities": 1406
+  },
+  "junctions": {
+   "assets": 1839,
+   "declared": 0,
+   "entities": 1839
+  },
+  "megasites": {
+   "assets": 2,
+   "declared": 0,
+   "entities": 2
+  },
+  "quays": {
+   "assets": 6,
+   "declared": 0,
+   "entities": 6
+  },
+  "road_segments": {
+   "assets": 3224,
+   "declared": 2,
+   "entities": 3226
+  },
+  "sidewalks": {
+   "assets": 4555,
+   "declared": 0,
+   "entities": 4555
+  },
+  "site_elements": {
+   "assets": 280,
+   "declared": 0,
+   "entities": 280
+  },
+  "stations": {
+   "entities": 7,
+   "note": "stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here",
+   "structures_with_assets": 7
+  },
+  "structures": {
+   "assets": 1384,
+   "declared": 0,
+   "entities": 1384
+  },
+  "transit_lines": {
+   "assets": 1,
+   "declared": 0,
+   "entities": 1
+  },
+  "tunnels": {
+   "assets": 18,
+   "declared": 0,
+   "entities": 18
+  },
+  "waterways": {
+   "assets": 5,
+   "declared": 1,
+   "entities": 6
+  }
+ },
+ "files": {
+  "contribution_written": true,
+  "manifest_written": true,
+  "parts_written": true,
+  "tiles_kept": 0,
+  "tiles_made": 130,
+  "tiles_removed": 0,
+  "tiles_same_bytes": 0,
+  "tiles_written": 130,
+  "written": [
+   "t+00+00",
+   "t+00+01",
+   "t+00+02",
+   "t+00+03",
+   "t+00+04",
+   "t+00+05",
+   "t+00-01",
+   "t+00-02",
+   "t+01+00",
+   "t+01+01",
+   "t+01+02",
+   "t+01+03",
+   "t+01+04",
+   "t+01+05",
+   "t+01-01",
+   "t+01-02",
+   "t+02+00",
+   "t+02+01",
+   "t+02+02",
+   "t+02+03",
+   "t+02+04",
+   "t+02+05",
+   "t+02-01",
+   "t+02-02",
+   "t+02-03",
+   "t+03+00",
+   "t+03+01",
+   "t+03+02",
+   "t+03+03",
+   "t+03+04",
+   "t+03+05",
+   "t+03-01",
+   "t+03-02",
+   "t+03-03",
+   "t+03-04",
+   "t+04+00",
+   "t+04+01",
+   "t+04+02",
+   "t+04+03",
+   "t+04+04",
+   "t+04+05",
+   "t+04-01",
+   "t+04-02",
+   "t+04-03",
+   "t+04-04",
+   "t+05+00",
+   "t+05+01",
+   "t+05+02",
+   "t+05+03",
+   "t+05+04",
+   "t+05+05",
+   "t+05-01",
+   "t+05-02",
+   "t+05-03",
+   "t+05-04",
+   "t+06+00",
+   "t+06+01",
+   "t+06+02",
+   "t+06+03",
+   "t+06+04",
+   "t+06+05",
+   "t+06-01",
+   "t+06-02",
+   "t+06-03",
+   "t+06-04",
+   "t-01+00",
+   "t-01+01",
+   "t-01+02",
+   "t-01+03",
+   "t-01+04",
+   "t-01+05",
+   "t-01-01",
+   "t-01-02",
+   "t-02+00",
+   "t-02+01",
+   "t-02+02",
+   "t-02+03",
+   "t-02+04",
+   "t-02+05",
+   "t-02-01",
+   "t-02-02",
+   "t-03+00",
+   "t-03+01",
+   "t-03+02",
+   "t-03+03",
+   "t-03+04",
+   "t-03+05",
+   "t-03-01",
+   "t-03-02",
+   "t-03-03",
+   "t-04+00",
+   "t-04+01",
+   "t-04+02",
+   "t-04+03",
+   "t-04+04",
+   "t-04+05",
+   "t-04-01",
+   "t-04-02",
+   "t-04-03",
+   "t-04-04",
+   "t-05+00",
+   "t-05+01",
+   "t-05+02",
+   "t-05+03",
+   "t-05+04",
+   "t-05+05",
+   "t-05-01",
+   "t-05-02",
+   "t-05-03",
+   "t-05-04",
+   "t-06+00",
+   "t-06+01",
+   "t-06+02",
+   "t-06+03",
+   "t-06+04",
+   "t-06+05",
+   "t-06-01",
+   "t-06-02",
+   "t-06-03",
+   "t-06-04",
+   "t-07+00",
+   "t-07+01",
+   "t-07+02",
+   "t-07+03",
+   "t-07+04",
+   "t-07+05",
+   "t-07-01",
+   "t-07-02",
+   "t-07-03",
+   "t-07-04"
+  ]
+ },
+ "ok": true,
+ "seconds": {
+  "context": 2.45,
+  "gather": 0.66,
+  "make": 3.17,
+  "slowest_tiles": [
+   [
+    "t-05+01",
+    0.225
+   ],
+   [
+    "t-05+02",
+    0.215
+   ],
+   [
+    "t-04+04",
+    0.204
+   ],
+   [
+    "t-04+03",
+    0.203
+   ],
+   [
+    "t-06+04",
+    0.199
+   ]
+  ],
+  "total": 6.89,
+  "workers": 4,
+  "write": 0.24
+ },
+ "stats": {
+  "bridges": {
+   "footbridge.steel": 2,
+   "footbridge.stone": 1,
+   "girder": 6
+  },
+  "by_kind": {
+   "street.bridge": 9,
+   "street.canal_wall.basin": 3,
+   "street.canal_wall.canal": 2,
+   "street.canal_wall.creek": 1,
+   "street.column": 67,
+   "street.crosswalk": 1406,
+   "street.junction": 1839,
+   "street.quay": 6,
+   "street.road": 3226,
+   "street.sidewalk": 4555,
+   "street.site.berth": 1,
+   "street.site.container_stack": 260,
+   "street.site.fountain": 1,
+   "street.site.gantry_crane": 1,
+   "street.site.lawn": 12,
+   "street.site.plaza": 1,
+   "street.site.pond": 1,
+   "street.site.rail_track": 2,
+   "street.site.truck_gate": 1,
+   "street.structure.canopy": 1,
+   "street.structure.column": 4,
+   "street.structure.deck": 1,
+   "street.structure.retaining_wall": 1280,
+   "street.transit.canopy": 14,
+   "street.transit.deck": 7,
+   "street.tunnel.bored": 7,
+   "street.tunnel.metro": 6,
+   "street.tunnel.pedestrian": 5,
+   "street.underpass_stair": 10
+  },
+  "corner_pads": {
+   "made": 5059,
+   "skipped": 9,
+   "why": {
+    "chain": 1,
+    "no sidewalk": 6,
+    "same edge": 2
+   }
+  },
+  "disk_bytes": 83577108,
+  "empty": {
+   "inside its junctions": 2,
+   "natural banks": 1
+  },
+  "instances": {
+   "part.container.c0": 1085,
+   "part.container.c1": 1031,
+   "part.container.c2": 1119,
+   "part.container.c3": 1064,
+   "part.container.c4": 1031,
+   "part.container.c5": 1072
+  },
+  "max_tile_triangles": 26348,
+  "pieces": 12729,
+  "tiles": 130,
+  "triangles": 1226030,
+  "triangles_by_kind": {
+   "street.bridge": 3054,
+   "street.canal_wall.basin": 384,
+   "street.canal_wall.canal": 2188,
+   "street.canal_wall.creek": 0,
+   "street.column": 902,
+   "street.crosswalk": 43832,
+   "street.junction": 216742,
+   "street.quay": 37126,
+   "street.road": 263694,
+   "street.sidewalk": 467166,
+   "street.site.berth": 1074,
+   "street.site.container_stack": 520,
+   "street.site.fountain": 58,
+   "street.site.gantry_crane": 206,
+   "street.site.lawn": 178,
+   "street.site.plaza": 30,
+   "street.site.pond": 94,
+   "street.site.rail_track": 4740,
+   "street.site.truck_gate": 84,
+   "street.structure.canopy": 52,
+   "street.structure.column": 40,
+   "street.structure.deck": 208,
+   "street.structure.retaining_wall": 144708,
+   "street.transit.canopy": 728,
+   "street.transit.deck": 534,
+   "street.tunnel.bored": 2208,
+   "street.tunnel.metro": 34000,
+   "street.tunnel.pedestrian": 320,
+   "street.underpass_stair": 1160
+  },
+  "walkways_on_decks": 73
+ }
+}
