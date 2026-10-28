@@ -12,8 +12,10 @@ complex collision for the streets (spec and what was built: `docs/unreal_export.
 .venv/bin/python -m citygen unreal out/greyhook ~/UnrealTest/UnrealTest.uproject --check --shots out/greyhook/shots
 ```
 
-`--blockout-only` imports the blockout alone (stage 2's actors and meshes go if they were
-there). All runs on the M4 Mac, UE 5.8, one editor at a time, in a throwaway project of
+`--blockout-only` imports the blockout alone: over stage 2 it takes stage 2's actors out
+and keeps its meshes and materials, unused, for the next import with it (deleting tens of
+thousands of meshes takes Unreal about an hour; a stage 2 import still deletes the meshes
+its build no longer has). All runs on the M4 Mac, UE 5.8, one editor at a time, in a throwaway project of
 this session's own (`CyberGenStage2`, made with `--new-project`).
 
 ## Imports

@@ -904,7 +904,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
                 assets: bool = True) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
-    imports the blockout alone (stage 2's actors and meshes, if imported before, go)."""
+    imports the blockout alone (stage 2's actors, if imported before, go; its meshes
+    stay for the next import with it)."""
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
     root = find_engine(engine)

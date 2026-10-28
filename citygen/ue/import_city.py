@@ -64,7 +64,8 @@ GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids",
               ("Links", "[int"), ("Attrs", "[string"), ("Levels", "[int")]   # (M14)
 INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
-# it changes) and the meshes' (stored hashes "<version>.<content hash>", as MESH_VERSION)
+# it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
+# MESH_VERSION and ACTOR_VERSION)
 STAGE2_VERSION = "3"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
@@ -572,68 +573,63 @@ class Importer:
             stale = [a for a in EAL.list_assets(folder, recursive=True)
                      if a.split(".")[0] not in want]
             self.stats["meshes"]["deleted"] += delete_assets(stale)
-        # stage 2's meshes (its materials are pruned by materials2); all of them on a
-        # blockout-only import
+        # stage 2's meshes no entry uses (its materials are pruned by materials2). A
+        # blockout-only import leaves them as they are: its actors go, the assets stay for the
+        # next import with stage 2 (deleting tens of thousands of meshes takes Unreal an hour)
         folder = f"{self.root}/{STAGE2_FOLDER}"
-        if not EAL.does_directory_exist(folder):
+        if not self.s2 or not EAL.does_directory_exist(folder):
             return
-        want = set()
-        if self.s2:
-            want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
-                    for m in p["meshes"]}
-            want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
+        want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
+                for m in p["meshes"]}
+        want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
         mats = f"{folder}/Materials/"
         stale = [a for a in EAL.list_assets(folder, recursive=True)
                  if a.split(".")[0] not in want and not a.startswith(mats)]
-        n = delete_assets(stale)
-        if self.s2:
-            self.stats["stage2"]["meshes"]["deleted"] += n
-        else:
-            self.stats["meshes"]["deleted"] += n
+        self.stats["stage2"]["meshes"]["deleted"] += delete_assets(stale)
 
     # -- stage 2 (assetgen's layer: buildings, streets) --
 
     def materials2(self):
         """A master per stage 2 master name and an instance per part and slot (its color,
-        roughness, metallic, emissive strength and tint rule); stale instances deleted."""
+        roughness, metallic, emissive strength and tint rule); stale instances deleted (none
+        on a blockout-only import: stage 2's meshes, kept, still use them)."""
+        if not self.s2:
+            return
         folder = f"{self.root}/{STAGE2_FOLDER}/Materials"
         want = set()
-        if self.s2:
-            masters = {m: stage2_master(m) for m in self.s2["masters"]}
-            st = self.stats["stage2"]["materials"]
-            for key, p in sorted(self.s2["materials"].items()):
-                path = f"{folder}/{p['asset']}"
-                want.add(path)
-                h = sha16([p, STAGE2_VERSION])
-                if EAL.does_asset_exist(path):
-                    mi = unreal.load_asset(path)
-                    if meta(mi, HASH_TAG) == h:
-                        st["kept"] += 1
-                        self.mats2[(p["part"], p["slot"])] = mi
-                        continue
-                    st["updated"] += 1
-                else:
-                    mi = AT.create_asset(p["asset"], folder, unreal.MaterialInstanceConstant,
-                                         unreal.MaterialInstanceConstantFactoryNew())
-                    st["created"] += 1
-                MEL.set_material_instance_parent(mi, masters[p["master"]])
-                r, g, b = p["color"]
-                MEL.set_material_instance_vector_parameter_value(
-                    mi, "BaseColor", unreal.LinearColor(r, g, b, 1.0))
-                for name, v in (("Roughness", p["roughness"]), ("Metallic", p["metallic"]),
-                                ("Emissive", p["emissive"]), ("TintChannel", p["tint_cpd"]),
-                                ("TintScale", p["tint_scale"]),
-                                ("TintTimesColor", 1.0 if p["tint_times_color"] else 0.0)):
-                    MEL.set_material_instance_scalar_parameter_value(mi, name, float(v))
-                EAL.set_metadata_tag(mi, HASH_TAG, h)
-                EAL.save_loaded_asset(mi)
-                self.mats2[(p["part"], p["slot"])] = mi
+        masters = {m: stage2_master(m) for m in self.s2["masters"]}
+        st = self.stats["stage2"]["materials"]
+        for key, p in sorted(self.s2["materials"].items()):
+            path = f"{folder}/{p['asset']}"
+            want.add(path)
+            h = sha16([p, STAGE2_VERSION])
+            if EAL.does_asset_exist(path):
+                mi = unreal.load_asset(path)
+                if meta(mi, HASH_TAG) == h:
+                    st["kept"] += 1
+                    self.mats2[(p["part"], p["slot"])] = mi
+                    continue
+                st["updated"] += 1
+            else:
+                mi = AT.create_asset(p["asset"], folder, unreal.MaterialInstanceConstant,
+                                     unreal.MaterialInstanceConstantFactoryNew())
+                st["created"] += 1
+            MEL.set_material_instance_parent(mi, masters[p["master"]])
+            r, g, b = p["color"]
+            MEL.set_material_instance_vector_parameter_value(
+                mi, "BaseColor", unreal.LinearColor(r, g, b, 1.0))
+            for name, v in (("Roughness", p["roughness"]), ("Metallic", p["metallic"]),
+                            ("Emissive", p["emissive"]), ("TintChannel", p["tint_cpd"]),
+                            ("TintScale", p["tint_scale"]),
+                            ("TintTimesColor", 1.0 if p["tint_times_color"] else 0.0)):
+                MEL.set_material_instance_scalar_parameter_value(mi, name, float(v))
+            EAL.set_metadata_tag(mi, HASH_TAG, h)
+            EAL.save_loaded_asset(mi)
+            self.mats2[(p["part"], p["slot"])] = mi
         if EAL.does_directory_exist(folder):
             stale = [a for a in EAL.list_assets(folder, recursive=False)
                      if a.split(".")[0] not in want]
-            n = delete_assets(stale)
-            if self.s2:
-                self.stats["stage2"]["materials"]["deleted"] += n
+            self.stats["stage2"]["materials"]["deleted"] += delete_assets(stale)
 
     def mat2(self, part, slot):
         """The instance of a mesh's material slot (Interchange may have turned the slot

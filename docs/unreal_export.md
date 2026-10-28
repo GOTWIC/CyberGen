@@ -164,7 +164,9 @@ AG7; `citygen/unreal.py` `stage2`, `citygen/ue/import_city.py`):
 - **Layering**: every `BUILD/assets/unreal_contribution.*.json` is read in sorted file
   order as layer 2 over the blockout manifest (the manifest's `stage2`); a key in two files
   is refused, as is a file of another version or layer. `--blockout-only` (or no assets
-  folder) gives exactly the blockout's manifest.
+  folder) gives exactly the blockout's manifest; imported over stage 2 it takes stage 2's
+  actors out and leaves its meshes and materials in the project, unused, for the next
+  import with stage 2 (Unreal takes about an hour to delete tens of thousands of meshes).
 - **Replacing**: the blockout actor of every entry's key and of every key in its
   `replaces` is dropped (`stage2.replaced`); the rest stay. The new actors and their hashes
   are in `actor_hashes`, so `manifest_changes` is exactly what an import does (a building

@@ -659,7 +659,8 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
 def test_unreal_import_stage2_small_city(small, tmp_path):
     """Stage 2 over the blockout in Unreal: the small city imported alone, then with
     assetgen's buildings and streets (exactly the actors `manifest_changes` names change),
-    imported again (nothing changes), checked in play-in-editor, and back to the blockout."""
+    imported again (nothing changes), checked in play-in-editor, back to the blockout (its
+    actors only: stage 2's meshes stay) and to stage 2 again, every mesh reused."""
     from assetgen.build import build as asset_build
     build = tmp_path / "build"
     build.mkdir()
@@ -696,5 +697,10 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     assert {k: back["keys"][k] for k in want} == U.manifest_changes(new, old)
     assert (back["actor_digest"], back["actor_count"]) == \
         (first["actor_digest"], first["actor_count"])
+    again = U.import_city(build, proj)
+    assert again["ok"], again.get("error")
+    assert {k: again["keys"][k] for k in want} == want
+    assert again["stage2"]["meshes"]["imported"] == again["stage2"]["packs_imported"] == 0
+    assert again["actor_digest"] == second["actor_digest"]
     for d in (proj.parent, build):
         shutil.rmtree(d, ignore_errors=True)

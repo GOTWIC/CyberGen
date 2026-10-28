@@ -588,7 +588,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="write BUILD_DIR/unreal/manifest.json and stop (no Unreal needed)")
     ue.add_argument("--blockout-only", action="store_true",
                     help="leave out stage 2 (assetgen's BUILD_DIR/assets/"
-                         "unreal_contribution.*.json): the blockout alone")
+                         "unreal_contribution.*.json): the blockout's actors alone (stage "
+                         "2's meshes stay in the project for the next import with it)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk")
