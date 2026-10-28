@@ -887,6 +887,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_tunnels.png")
         render_tunnels(b, paths[-1])
+    if b.model.decks:
+        from .preview_decks import render_decks
+
+        paths.append(out / "preview_decks.png")
+        render_decks(b, paths[-1])
     if b.model.pois or b.model.zones:
         from .preview_gameplay import render_gameplay
 
