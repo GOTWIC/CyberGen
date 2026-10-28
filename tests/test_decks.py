@@ -80,6 +80,8 @@ def test_levels_on_streets_lots_walkways_props(decked):
     assert up and all(s.level == 1 and all(z.z == dk.top_m for z in s.z_profile) for s in up)
     ramps = [s for s in m.road_segments if s.attrs.get("role") == "deck_ramp"]
     assert ramps and all(not s.one_way and s.lanes == 2 for s in ramps)
+    # (the deck's streets and ramps name its district: the blockout joins them under it)
+    assert all(s.district_ids == [dk.district_id] for s in up + ramps)
     assert any(lt.level == 1 for lt in m.lots)
     assert any(lt.attrs.get("deck_under") for lt in m.lots)
     assert any(ln.level == 1 for ln in m.lanes)

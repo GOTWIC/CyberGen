@@ -472,7 +472,8 @@ def _twin(s: dict, sid: str, start: str, end: str, line, dk: Deck, car: bool) ->
     L = G.q(ST._plen(pts))
     t.update({"id": sid, "start": start, "end": end, "centerline": pts, "level": 1,
               "z_profile": [{"s": 0.0, "z": dk.top}, {"s": L, "z": dk.top}],
-              "bridge": False, "bridge_ids": [], "clearance_m": None})
+              "bridge": False, "bridge_ids": [], "clearance_m": None,
+              "district_ids": [dk.did]})     # (the blockout joins a deck's streets by it)
     t["attrs"] = {**s["attrs"], "length_m": L, "deck": dk.id, "twin": s["id"]}
     if t.get("name"):
         t["name"] = f"Upper {t['name']}"
@@ -504,7 +505,8 @@ def _ramp(s: dict, dk: Deck) -> None:
     else:
         s["end"] = dk.node_twin[a]
     s.update({"level": 1, "z_profile": [{"s": x, "z": z} for x, z in prof],
-              "cross_section": cs, "width_m": w, "lanes": 2, "one_way": False})
+              "cross_section": cs, "width_m": w, "lanes": 2, "one_way": False,
+              "district_ids": [dk.did]})
     s["attrs"] = {**s["attrs"], "role": "deck_ramp", "deck": dk.id}
 
 
