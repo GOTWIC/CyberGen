@@ -548,7 +548,8 @@ Partition level `/Game/CityGen/<City>/Maps/<City>`, a static mesh actor per bloc
 instanced meshes, the lane, walkway and transit graphs as data assets, a player start, every
 actor tagged `cg.key=`, `cg.id=`, `cg.type=` and more. `--check` then plays the level in the
 editor: streaming, traces onto the ground, roofs and facades, a walk along a sidewalk;
-`--shots DIR` renders views. Running it again on the same build changes nothing; on a build
+`--shots DIR` renders views (`--view NAME EX EY EZ TX TY TZ [LENS]` adds one, say a
+hillside). Running it again on the same build changes nothing; on a build
 regenerated with `--district`, only what changed. `--new-project` creates the project from
 the First Person template when the .uproject does not exist. Never import into a project the
 user did not name (their game project is theirs to choose). Report the summary lines it

@@ -581,7 +581,12 @@ editor (`-ExecCmds="py ..."`; `-ExecutePythonScript` quits when the script retur
 `WorldPartitionSubsystem.is_streaming_completed`, found through `unreal.ObjectIterator`):
 streaming, traces onto ground, roofs and facades, a walk along sidewalks with head room (the
 sidewalks of a raised road stay at z 0 in the model, an open item), and with `--shots`
-renders from the blockout cameras. citygen makes no network call; the
+renders from the blockout cameras (`--view NAME EX EY EZ TX TY TZ [LENS]` adds one). On a
+terrain city (M13) the ground is a heightfield actor per tile and `graphs.json` carries
+absolute heights (`exports.graphs(m, ground)`, `"heights": "absolute"`), which the data
+assets, the player start and the walk use; the blockout draws one object per retaining wall,
+so walls, bored tunnels and terrain viaduct columns are keyed by their ids. citygen makes no
+network call; the
 official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
 editor) is the interactive route for a Claude session. Testing is always in a throwaway
 project of the exporter's own (`--new-project` makes one from the First Person template,

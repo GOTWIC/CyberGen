@@ -1,0 +1,56 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 11933,
+  "updated": 0,
+  "deleted": 0,
+  "unchanged": 0
+ },
+ "meshes": {
+  "imported": 10133,
+  "kept": 0,
+  "deleted": 0
+ },
+ "tiles_imported": 169,
+ "materials": {
+  "created": 74,
+  "updated": 0,
+  "kept": 0,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 3,
+  "kept": 0
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 1.09,
+  "meshes": 68.51,
+  "level": 0.77,
+  "actors": 29.09,
+  "graphs": 0.39,
+  "save": 6.91,
+  "prune": 0.29,
+  "save_pruned": 0.0,
+  "digests": 0.47
+ },
+ "dirty_packages": 12007,
+ "actor_count": 11933,
+ "actor_digest": "7e4d3c133de1f83c",
+ "asset_count": 10210,
+ "asset_digest": "8c6512b52ea6d365",
+ "level": "/Game/CityGen/Cragmouth/Maps/Cragmouth",
+ "content_root": "/Game/CityGen/Cragmouth",
+ "city": "Cragmouth",
+ "counts": {
+  "tiles": 168,
+  "objects": 10102,
+  "instance_actors": 1827,
+  "instances": 86778,
+  "prototypes": 31
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 107.6,
+ "exit_code": 0,
+ "wall_s": 125.6
+}

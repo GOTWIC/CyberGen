@@ -335,12 +335,19 @@ def collision(world, pawn, man, slug):
                     break
             else:
                 roofs.setdefault("missed", []).append(tag(a, "cg.key"))
-            # across onto a facade at 2 m, from 40 m out on the side nearest the start
-            z = o.z - e.z + 200.0
+            # across onto a facade at 2 m, from 40 m out on the side nearest the start, 2 m over
+            # the ground there but under the roof (M13: on a slope the actor's bottom, a
+            # plinth's foot, can lie deep under the ground the trace starts from, and a house
+            # downhill can stand lower than that ground)
             d = unreal.Vector(o.x - here.x, o.y - here.y, 0.0)
             ln = math.hypot(d.x, d.y) or 1.0
-            start = unreal.Vector(o.x - d.x / ln * (max(e.x, e.y) + 4000.0),
-                                  o.y - d.y / ln * (max(e.x, e.y) + 4000.0), z)
+            sx_ = o.x - d.x / ln * (max(e.x, e.y) + 4000.0)
+            sy_ = o.y - d.y / ln * (max(e.x, e.y) + 4000.0)
+            g = trace(world, unreal.Vector(sx_, sy_, top + 500.0),
+                      unreal.Vector(sx_, sy_, o.z - e.z - 100.0), [pawn])
+            z = min(max(o.z - e.z, g["point"].z if g is not None else -1e9) + 200.0,
+                    top - 100.0)
+            start = unreal.Vector(sx_, sy_, z)
             h = trace(world, start, unreal.Vector(o.x, o.y, z), [pawn])
             facades["tried"] += 1
             if h is not None:
@@ -378,6 +385,16 @@ def blocker(world, pawn, loc, fx, fy):
     return "nothing found"
 
 
+def path_z(path, k, loc):
+    """The height of the path (Unreal cm) at the player's place along its leg to point k."""
+    a, b = path[k - 1], path[k]
+    px, py = loc.x / 100.0, -loc.y / 100.0
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    n = dx * dx + dy * dy
+    f = min(1.0, max(0.0, ((px - a[0]) * dx + (py - a[1]) * dy) / n)) if n > 0 else 0.0
+    return (a[2] + f * (b[2] - a[2])) * 100.0
+
+
 def walk(world, pawn, man):
     """The player along a sidewalk from the start: movement input toward each next point of
     the path every frame, on the ground all the way. The path keeps to walkways with head
@@ -395,6 +412,7 @@ def walk(world, pawn, man):
     mc = pawn.get_movement_component()
     start = pawn.get_actor_location()
     k, t, on_ground, frames, low = 1, time.time(), 0, 0, 1e9
+    lift0 = start.z - path[0][2] * 100.0      # the player's height over the path at the start
     travelled, last = 0.0, start
     mark, mark_t, side_until, side, blockers, stops = start, time.time(), 0.0, 1.0, {}, []
     while k < len(path) and time.time() - t < WALK_S:
@@ -422,14 +440,16 @@ def walk(world, pawn, man):
         frames += 1
         if mc is not None and mc.is_moving_on_ground():
             on_ground += 1
-        low = min(low, loc.z)
+        # how far the player is over the path where it is (M13: the path climbs and falls
+        # with the ground)
+        low = min(low, loc.z - path_z(path, k, loc))
         travelled += math.hypot(loc.x - last.x, loc.y - last.y)
         last = loc
         yield
     length = sum(math.dist(path[j][:2], path[j + 1][:2]) for j in range(len(path) - 1))
     reached = k >= len(path)
     share = on_ground / max(frames, 1)
-    z_drop = (start.z - low) / 100.0
+    z_drop = (lift0 - low) / 100.0     # fallen below the path, not walked downhill
     ok = (reached or travelled / 100.0 >= 0.9 * length) and share >= 0.9 and z_drop < 3.0
     RES["checks"]["walk"] = {"ok": ok, "path_m": round(length, 1), "points": len(path),
                              "reached": reached, "travelled_m": round(travelled / 100.0, 1),
@@ -464,7 +484,7 @@ def shots(man):
     dist = 2.3 * size        # the whole city in a 30 degree field of view
     views = [("iso_city", (cx - d[0] * dist, cy - d[1] * dist, -d[2] * dist), (cx, cy, 0.0),
               30.0)]
-    for v in man["cameras"].get("street", [])[:3]:
+    for v in man["cameras"].get("street", [])[:3] + JOB.get("views", []):
         views.append((v["name"], tuple(v["eye"]), tuple(v["target"]),
                       2.0 * math.degrees(math.atan(18.0 / v.get("lens_mm", 28)))))
     files = []

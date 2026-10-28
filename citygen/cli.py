@@ -305,8 +305,14 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                 print(res.get("error", ""), file=sys.stderr)
                 return EXIT_INVALID
         if args.check or args.check_only:
+            if any(len(v) not in (7, 8) for v in args.view):
+                print("error: --view NAME EX EY EZ TX TY TZ [LENS]", file=sys.stderr)
+                return EXIT_USAGE
+            views = [{"name": v[0], "eye": [float(x) for x in v[1:4]],
+                      "target": [float(x) for x in v[4:7]],
+                      "lens_mm": float(v[7]) if len(v) == 8 else 28.0} for v in args.view]
             chk = U.check_city(build, args.uproject, engine=args.engine, shots=args.shots,
-                               timeout=args.timeout, width=args.shot_width)
+                               timeout=args.timeout, width=args.shot_width, views=views)
             print(U.check_summary(chk))
             if not chk.get("ok"):
                 print(chk.get("error", ""), file=sys.stderr)
@@ -584,6 +590,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "ground traces, a walk along a sidewalk")
     ue.add_argument("--check-only", action="store_true", help="the check without importing")
     ue.add_argument("--shots", metavar="DIR", help="with --check: rendered views into DIR")
+    ue.add_argument("--view", nargs="+", action="append", default=[],
+                    metavar="NAME EX EY EZ TX TY TZ [LENS]",
+                    help="with --shots: one more view, eye and target in citygen meters "
+                         "(z over sea level, a terrain city's ground included), lens in mm "
+                         "(default 28); repeatable")
     ue.add_argument("--shot-width", type=int, default=3840,
                     help="width of the rendered views in pixels (default 3840; 7680 for 8K)")
     ue.add_argument("--timeout", type=float, default=7200.0,

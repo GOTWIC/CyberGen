@@ -253,6 +253,65 @@ the unsaved changes), and an actor whose only change was its tags was never save
 importer now lets a destroyed actor's meshes go, saves, then deletes the unused meshes in one
 batch, and marks an updated actor modified; the Unreal test imports a changed city twice.
 
+## Terrain (M13): Cragmouth
+
+M13 gives a city ground that rises and falls, with heights in the model relative to the
+finished ground; the blockout makes them absolute, and the exporter takes the blockout's
+objects as they are, so most of M13 arrives without importer changes. What M15 changed for
+it: one blockout object per retaining wall (it joined them per tile before), the graphs with
+absolute heights, and the check (below). Every new piece is keyed on M13's stable ids:
+
+| M13 adds | In Unreal | Key, for example |
+|---|---|---|
+| the terrain height field | the ground of each 256 m tile as one heightfield mesh on the finished ground's 4 m grid (under water its bed), the open tunnel approaches left out; not flat, not a Landscape | `city.ground.t-03-01` |
+| water at its own levels | the sea at 0 m, the river falling along its profile, basins at 2.75 and 2.91 m | `city.sea.<tile>`, `city.water.<tile>` |
+| roads on grade lines | streets, sidewalks and junctions at their grade lines' heights | as before |
+| retaining walls | one actor per wall (1280 in Cragmouth, 84 km) | `rs.w1686s915.wall.w1700s922` along a road, `wall.w927n729` elsewhere |
+| bored tunnels | one actor per bore (7) | `bore.w487n577.tunnel` |
+| terrain viaducts and their columns | one actor each | `rs.e814n566.viaduct.e814n566`, `rs.e814n566.tvcol.e766n565` |
+| buildings on stepped plinths | the plinth in the building's own actor (4322 of them), material `plinth` | `d05.lot.e1259n510.bld` |
+| hillside greens | joined open space per district, category and tile like every open space, the slope ids as `cg.id` tags | `d03.open_green.t-03-01`, tag `cg.id=d03.os.slope.w540s2` |
+| heights in the graphs | `graphs.json` and the graph data assets in absolute meters (`"heights": "absolute"`); a walkway takes its road's grade line | |
+
+| City | Tiles | Actors | Static meshes, instanced, always loaded | Props and plants | Meshes | First import | Imported again |
+|---|---|---|---|---|---|---|---|
+| Cragmouth | 168 | 11933 | 10102, 1827, 4 | 86778 | 10133 | 126 s | 20 s: 0 actors changed, 0 files saved, digests equal |
+
+| City | Actors loaded at the start, after a teleport | Traces down | Roofs | Facades | Walk, on the ground | Check |
+|---|---|---|---|---|---|---|
+| Cragmouth | 467, 1607 | 507/507 | 36/36 | 36/36 | 143 m, 100% | pass (120 s) |
+
+The traces down hit buildings 221 times, streets 74, the terrain ground 38, hillside and
+other greens 33, junctions 35, avenues 27 and embankments 3; the ground runs from 0 to 95 m,
+inside the traces' window (600 m down to 3 m below 0). Two check fixes for slopes: a facade
+trace starts over the ground found by a trace down at its spot, clamped under the roof (from
+a fixed height it began underground below a plateau, or above a house downhill: 30, then 31
+of 36), and the walk measures a fall from its path's own height, not from where it started.
+The walk stopped 4 m short of its end, held by a step at a corner (open items).
+
+```bash
+citygen build cities/cragmouth/city_spec.json out/cragmouth --blockout
+citygen unreal out/cragmouth "<path>/<Project>.uproject"
+citygen unreal out/cragmouth "<path>/<Project>.uproject" --check-only --shots out/cragmouth/shots \
+  --shot-width 7680 --view hillside 450 -650 220 -150 250 50 35 --view ridgeback 1500 150 85 1170 500 75 30
+```
+
+`--view NAME EX EY EZ TX TY TZ [LENS]` adds a camera of one's own to the shots (eye and
+target in citygen meters, absolute heights), as `citygen rerender --eye ... --target ...`
+does in Blender.
+
+<img src="cragmouth/unreal_iso_city.jpg" width="840">
+
+Cragmouth in Unreal 5.8 (8K, the blockout's isometric direction).
+
+| Crown Heights over terraced slopes (8K) | Ridgeback's towers among hillside greens |
+|---|---|
+| <img src="cragmouth/unreal_hillside.jpg" width="420"> | <img src="cragmouth/unreal_ridgeback.jpg" width="420"> |
+
+| Street view 1 | Street view 2 | Street view 3 |
+|---|---|---|
+| <img src="cragmouth/unreal_street_1.jpg" width="280"> | <img src="cragmouth/unreal_street_2.jpg" width="280"> | <img src="cragmouth/unreal_street_3.jpg" width="280"> |
+
 ## Decisions (made without the owner, as asked)
 
 - **Headless editor Python, the MCP plugin as the interactive route.** UE 5.8 ships the
@@ -319,6 +378,10 @@ that over it (the actors created, updated and deleted are exactly `manifest_chan
 rest unchanged), imports it again (nothing changes, nothing saved: the changes were saved)
 and runs the check on it (6 min on the M4 Mac). Also: every building's roof point lies inside its highest footprint,
 and the interior point of a U and of a square with a hole lies inside them.
+`test_terrain_city` (M13's hilly test city): `graphs.json` heights are absolute (a walkway on
+its road's grade line, the player start over the ground), the ground is one keyed object per
+tile, every retaining wall, bored tunnel, terrain viaduct and column is an object keyed by
+its own id, and the plinth and wall materials are in the manifest.
 
 ## Open items
 
@@ -363,7 +426,14 @@ and the interior point of a U and of a square with a hole lies inside them.
 - **The MCP route is documented, not automated.** A Claude session with the Unreal MCP
   plugin running in the editor can run the same two scripts; there is no MCP driver in the
   repo (citygen makes no network calls).
-- **M13 terrain.** The importer takes whatever objects the glTF tiles carry, so a ground mesh
-  from M13 imports as more objects of its tiles; the check's traces down then end on terrain
-  above or below 0 m, so their window (600 m down to 3 m below 0) may need M13's height
-  range.
+- **A step where two grade lines meet.** Cragmouth's walk stopped 4 m short at (-55, -7):
+  a corner where the grade lines of `rs.w15n19` (54.6 m) and `rs.w109n31` (56.2 m) meet
+  1.6 m apart, and the terrain ground between their sidewalks (55.9 m) stands above the
+  lower one. The importer draws what the blockout gives; a smooth corner is M13's (the
+  junction's corner heights), so it is a generator item.
+- **The ground is a mesh, not a Landscape.** Each tile's ground is the blockout's
+  heightfield mesh on the terrain's 4 m grid, the open tunnel approaches left out, keyed and
+  re-imported like every other object. An Unreal Landscape would add sculpting, paint layers
+  and its own level of detail, but needs a heightmap at the engine's component sizes and a
+  visibility layer for the approaches, and changes as one actor; a later exporter update (or
+  stage 3) can make one from the same grid.

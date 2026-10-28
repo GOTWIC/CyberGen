@@ -59,9 +59,9 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 |---|---|
 | <img src="docs/progress/M13/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
 
-| Vesper Bay imported into Unreal 5.8 (8K) | A street of Delta Megacity in Unreal (8K) |
+| Vesper Bay imported into Unreal 5.8 (8K) | Cragmouth's terraced hills in Unreal (8K) |
 |---|---|
-| <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/delta_megacity/unreal_street_3.jpg" width="420"> |
+| <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/cragmouth/unreal_hillside.jpg" width="420"> |
 
 Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour.
 

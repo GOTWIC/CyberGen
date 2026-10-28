@@ -331,7 +331,7 @@ def _ids(props: dict) -> list[str]:
     if props.get("citygen_id"):
         return [props["citygen_id"]]
     ids = props.get("citygen_ids") or ""
-    return [x for x in ids.split(";") if x]
+    return [x for x in (ids.split(";") if isinstance(ids, str) else ids) if x]
 
 
 def _inside(rings: list) -> list[float] | None:
@@ -661,10 +661,11 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
 
 def check_city(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
                shots: str | Path | None = None, timeout: float = 3600.0,
-               width: int = 3840) -> dict:
+               width: int = 3840, views: list[dict] | None = None) -> dict:
     """`citygen unreal --check`: the imported level played in the editor: World Partition
     streaming around the player, line traces onto the ground, streets and roofs, the
-    player walked along a sidewalk; with `shots`, rendered views of the city."""
+    player walked along a sidewalk; with `shots`, rendered views of the city (the isometric
+    one, the blockout's street views and `views`: {name, eye, target} in citygen meters)."""
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
     root = find_engine(engine)
@@ -676,7 +677,8 @@ def check_city(build_dir: str | Path, uproject: str | Path, engine: str | None =
         raise FileNotFoundError(f"{man_path}: import the city first")
     job = {"mode": "check", "manifest": str(man_path), "build_dir": str(build),
            "result": str(out / "check_result.json"),
-           "shots": str(Path(shots).resolve()) if shots else None, "width": width}
+           "shots": str(Path(shots).resolve()) if shots else None, "width": width,
+           "views": views or []}
     return run_editor(root, up, UE_DIR / "check_city.py", job, out / "check_log.txt",
                       timeout=timeout, gui=True, extra=["-RenderOffscreen"])
 

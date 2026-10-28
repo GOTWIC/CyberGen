@@ -22,6 +22,7 @@ from citygen.cli import main
 from citygen.validate import validate_spec
 
 from conftest import SMALL
+from test_terrain import hilly_data
 
 
 REGEN = "Old Quarter"     # the small city's district regenerated (M10, `build --district`)
@@ -56,7 +57,8 @@ def _blockout_files(m, out: Path) -> Path:
     (out / "blockout_plan.json").write_text(BO.plan_json(plan) + "\n", encoding="utf-8")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": BO.TILE_M,
                                                 "tiles": plan["tiles"]}) + "\n")
-    (out / "graphs.json").write_text(json.dumps(X.graphs(m)) + "\n")
+    ground = BO._Ground(m) if m.terrain is not None else None     # as run_blockout does
+    (out / "graphs.json").write_text(json.dumps(X.graphs(m, ground)) + "\n")
     (out / "gameplay.json").write_text(json.dumps(X.gameplay(m)) + "\n")
     return out
 
@@ -206,6 +208,50 @@ def test_district_regeneration_changes_only_its_neighborhood(small, regenerated,
     assert not others, others[:5]
     blds = [k for k in U.actor_hashes(new) if k.endswith(".bld") and not k.startswith(did)]
     assert blds
+
+
+@pytest.fixture(scope="module")
+def hilly():
+    res = validate_spec(hilly_data())
+    assert res.ok, res.issues
+    return build_city(res).model
+
+
+def test_terrain_city(hilly, tmp_path):
+    """M13: a terrain city's graphs carry absolute heights (sidewalks and lanes over their
+    road's grade line, the rest over the finished ground), the player start stands on the
+    ground, and the manifest keys the terrain's pieces by their stable ids: one actor per
+    retaining wall, bored tunnel and terrain viaduct column, the ground a heightfield per
+    tile, plinths in their building's actor."""
+    ground = BO._Ground(hilly)
+    rel, g = X.graphs(hilly), X.graphs(hilly, ground)
+    assert g["heights"] == "absolute" and "heights" not in rel
+    walks = {w.id: w for w in hilly.walkways}
+    side = [w for w in g["walkways"] if walks[w["id"]].attrs.get("segment") in ground.segs]
+    assert side
+    for w in side[:50]:
+        sid = walks[w["id"]].attrs["segment"]
+        for (x, y, z), p in zip(w["line"], walks[w["id"]].line):
+            assert abs(z - (p[2] + ground.road(sid, x, y))) < 0.011
+    assert any(abs(p[2] - q[2]) > 1.0 for w in g["walkways"]
+               for p, q in zip(w["line"], walks[w["id"]].line))
+    build = _blockout_files(hilly, tmp_path / "b")
+    man = U.build_manifest(build)[0]
+    objs = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    x, y, z = man["player_start"]["position"]
+    assert 0.5 < z - ground.at(x, y) < 20.0
+    walls = {s.id for s in hilly.structures if s.kind == "retaining_wall"}
+    keyed = [k for k, o in objs.items() if o["category"] == "retaining_wall"]
+    assert keyed and set(keyed) <= walls and all(objs[k]["ids"] == [k] for k in keyed)
+    for t in hilly.tunnels:
+        if t.kind == "bored":
+            assert objs[f"{t.id}.tunnel"]["ids"] == [t.id]
+    cols = [s.id for s in hilly.structures if ".tvcol." in s.id]
+    assert all(c in objs for c in cols)
+    grounds = [o for o in objs.values() if o["category"] == "ground"]
+    assert grounds and all(o["key"].startswith("city.ground.t") for o in grounds)
+    assert any("plinth" in o["materials"] for o in objs.values() if o["category"] == "building")
+    assert "plinth" in man["materials"] and "retaining_wall" in man["materials"]
 
 
 def _glb(path):

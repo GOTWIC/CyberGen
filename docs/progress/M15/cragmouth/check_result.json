@@ -1,0 +1,139 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 467 of 11933 actors loaded at the start, 1607 after a teleport to (-1152, 1152) (1603 new)",
+  "collision: 507 of 507 traces down hit (building 221, road_street 74, ground 38, junction 35, open_green 33, road_avenue 27), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 143 m along a 147 m sidewalk path in 60 s, 100% of frames on the ground, did not reach its end, stepped round 17 x ground@-45"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 11933,
+   "loaded_at_start": 467,
+   "loaded_far": 1607,
+   "only_far": 1603,
+   "far_spot_m": [
+    -1152.0,
+    1152.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "road_street": 74,
+     "ground": 38,
+     "plant_park_tree": 13,
+     "open_green": 33,
+     "road_avenue": 27,
+     "junction": 35,
+     "lawn": 7,
+     "plant_street_tree": 3,
+     "plant_palm": 3,
+     "green_roof": 3,
+     "building": 221,
+     "prop_awning": 11,
+     "road_alley": 16,
+     "sidewalk": 16,
+     "prop_ac_unit": 2,
+     "embankment": 3,
+     "crosswalk": 2
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     25.55,
+     59.93
+    ],
+    [
+     -896.0,
+     1152.0
+    ],
+    [
+     -1152.0,
+     896.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 146.6,
+   "points": 13,
+   "reached": false,
+   "travelled_m": 142.9,
+   "on_ground": 1.0,
+   "max_drop_m": 0.0,
+   "seconds": 60.0,
+   "stopped_by": {
+    "ground@-45": 17
+   },
+   "stops": [
+    [
+     -55.0,
+     -7.34,
+     55.58,
+     "ground@-45"
+    ],
+    [
+     -55.01,
+     -7.32,
+     55.64,
+     "ground@-45"
+    ],
+    [
+     -54.99,
+     -7.31,
+     55.64,
+     "ground@-45"
+    ],
+    [
+     -55.01,
+     -7.32,
+     55.66,
+     "ground@-45"
+    ],
+    [
+     -55.0,
+     -7.31,
+     55.66,
+     "ground@-45"
+    ],
+    [
+     -55.01,
+     -7.32,
+     55.65,
+     "ground@-45"
+    ],
+    [
+     -55.0,
+     -7.31,
+     55.65,
+     "ground@-45"
+    ],
+    [
+     -55.01,
+     -7.32,
+     55.65,
+     "ground@-45"
+    ]
+   ],
+   "skipped_low_walkways": 6
+  }
+ },
+ "city": "Cragmouth",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 77.6,
+ "exit_code": 0,
+ "wall_s": 120.4
+}
