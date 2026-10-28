@@ -2,15 +2,21 @@
   "$schema": "../../../../citygen/schemas/city_spec.schema.json",
   "name": "Greyhook",
   "seed": 9081,
-  "size_km": [3.0, 3.6],
+  "size_km": [3.6, 3.6],
   "source": {
-    "prompt": "A narrow peninsula city pointing south into a cold grey sea. A spaceport at the tip. Megablock towers stacked along the spine. A dense entertainment strip on the western shore with a Ferris wheel. Walled residential heights in the north where the peninsula meets the mainland. A single river cuts across the neck. Sky tubes run down the spine through the megablocks, an elevated rail line follows the east shore, and a stadium sits near the neck.",
-    "notes": "Map is taller than wide (3.0 x 3.6 km) to fit a long north-south peninsula. Districts the prompt implies but does not name: a transit hub at the neck (holding the stadium, where the sky tube and rail meet) and an east-shore dock district for the elevated rail to follow. Cold grey mood read as more grime and less greenery."
+    "prompt": "A peninsula city reaching south into a cold grey sea: below a walled mainland it narrows to a short neck, then fans out into three hooked headlands with coves between them and islets off their tips. A spaceport on the long middle headland. Megablock towers stacked along the spine. A dense entertainment strip with a Ferris wheel on the west headland. Docks round the east cove. Walled residential heights in the north on the mainland. A single river runs across the north. Sky tubes run down the spine through the megablocks, an elevated rail line runs out to the docks, and a stadium sits at the neck.",
+    "notes": "Square map (3.6 x 3.6 km) so the peninsula can fan out: a shallow mainland strip across the top, a short neck, then three headlands (coast.headlands 3) with a cove between each two. Districts the prompt implies but does not name: a transit hub at the neck (holding the stadium, where the sky tube and rail meet) and a dock district round the east cove for the elevated rail. The river runs close to the mainland coast with gentle bends, so the walled heights north of it keep their size. The two islets are parks. Cold grey mood read as more grime and less greenery."
   },
   "water": {
-    "coast": {"form": "peninsula", "side": "south", "name": "Grey Sea", "sea_share": 0.5},
+    "coast": {"form": "peninsula", "side": "south", "name": "Grey Sea", "sea_share": 0.55,
+              "headlands": 3},
     "rivers": [
-      {"name": "Neckwater", "from": "west", "to": "east", "width_m": [50, 80], "meander": 0.3}
+      {"name": "Neckwater", "from": {"edge": "west", "at": 0.9}, "to": {"edge": "east", "at": 0.9},
+       "width_m": [45, 65], "meander": 0.0}
+    ],
+    "islands": [
+      {"name": "Gull Rock", "position": "south_west", "setting": "nearshore", "area_km2": 0.06},
+      {"name": "Hook Islet", "position": "south_east", "setting": "nearshore", "area_km2": 0.08}
     ],
     "district_separation": "water_preferred",
     "bridges": {
@@ -35,24 +41,24 @@
     ]
   },
   "districts": [
-    {"name": "Wallgate Heights", "archetype": "residential_heights", "area_share": 0.2,
+    {"name": "Wallgate Heights", "archetype": "residential_heights", "area_share": 0.215,
      "placement": {"edge": "north", "coast": false, "separated_by": "wall"},
      "grime": 0.3, "greenery": 0.5},
-    {"name": "Neckgate", "archetype": "transit_hub", "area_share": 0.12,
+    {"name": "Neckgate", "archetype": "transit_hub", "area_share": 0.17,
      "placement": {"south_of": "Wallgate Heights", "separated_by": "Neckwater"},
      "megasites": ["transit_nexus", {"kind": "stadium", "name": "Neck Arena"}]},
-    {"name": "The Stacks", "archetype": "megablock_residential", "area_share": 0.22,
+    {"name": "The Stacks", "archetype": "megablock_residential", "area_share": 0.23,
      "placement": {"south_of": "Neckgate"},
      "complexes": [{"kind": "megabuilding_campus", "count": 3}], "skybridge_density": 0.8,
      "grime": 0.7, "greenery": 0.1},
-    {"name": "Lantern Strip", "archetype": "entertainment_market", "area_share": 0.13,
+    {"name": "Lantern Strip", "archetype": "entertainment_market", "area_share": 0.12,
      "placement": {"west_of": "The Stacks", "coast": true},
      "landmarks": [{"kind": "ferris_wheel", "name": "Lantern Wheel"}],
      "places": [{"name": "Neon Pier", "kind": "pier", "position": "west"}]},
-    {"name": "Eastside Docks", "archetype": "industrial_port", "area_share": 0.13,
+    {"name": "Eastside Docks", "archetype": "industrial_port", "area_share": 0.11,
      "placement": {"east_of": "The Stacks", "coast": true},
      "megasites": []},
-    {"name": "Hook Spaceport", "archetype": "spaceport", "area_share": 0.2,
-     "placement": {"edge": "south", "south_of": "The Stacks", "coast": true}}
+    {"name": "Hook Spaceport", "archetype": "spaceport", "area_share": 0.155,
+     "placement": {"south_of": "The Stacks", "coast": true}}
   ]
 }

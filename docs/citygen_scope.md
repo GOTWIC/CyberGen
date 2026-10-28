@@ -140,7 +140,8 @@ after districts so roads and transit can connect to them.)
 
 What the spec can express about water, so prompts like "districts split by rivers, canals
 running into the old town" always have somewhere to land:
-- coast form and side: bay, peninsula, delta, archipelago, crescent, straight coast
+- coast form and side: bay, peninsula (one rounded tip, or fanning out into headlands with
+  coves between them), delta, archipelago, crescent, straight coast
 - rivers: count, names, entry and mouth, width range, meander, delta branches
 - islands: count, names, position, size, which district sits on each
 - district separation: by water (preferred, required, none) per district or for the whole city

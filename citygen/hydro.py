@@ -1,10 +1,12 @@
 """Stage 1, coast and hydrology: sea, rivers, sea channels, delta branches, islands, landmasses.
 
 Everything is built in meters on the canvas (origin at the city center). The sea comes from the
-coast form, solved by bisection so it covers `sea_share` of the map; a river with a delta
-builds a lobe of land into the sea, so it ends at the coast, not at the map center. Rivers run
-from their entry edge to their mouth as sine-generated curves (meanders of varying size and
-spacing, about 11 widths apart) that widen downstream. Tributaries join their parent downstream
+coast form, solved by bisection so it covers `sea_share` of the map (a peninsula with
+`headlands` narrows to a short neck below the mainland, then fans out into that many headlands
+with U-shaped coves between them, a centripetal spline through their control points); a river
+with a delta builds a lobe of land into the sea, so it ends at the coast, not at the map
+center. Rivers run from their entry edge to their mouth as sine-generated curves (meanders of
+varying size and spacing, about 11 widths apart) that widen downstream. Tributaries join their parent downstream
 of their entry at 45 degrees to its flow (or where `to.at` pins it). Deltas split well inland:
 curved distributaries fan out to mouths spread along the coast, the main channel narrowing
 below the split, so the land between channels becomes separate landmasses. Islands are smooth
@@ -22,7 +24,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import shapely
 from shapely import affinity
-from shapely.geometry import LineString, MultiLineString, Point, Polygon
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon
 from shapely.ops import nearest_points, substring, unary_union
 
 from . import dmath as M
@@ -169,6 +171,145 @@ def _peninsula(w0: float, neck_frac: float, A: float, Bh: float, noise, noise2) 
     return band.difference(tongue)
 
 
+def _spline(pts: np.ndarray, per: int = 24) -> np.ndarray:
+    """Closed centripetal Catmull-Rom curve through `pts` (`per` points a span)."""
+    n = len(pts)
+    t = np.arange(per, dtype=float)[:, None] / per
+    out = []
+    for i in range(n):
+        p0, p1, p2, p3 = pts[i - 1], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]
+        d01, d12, d23 = (max(np.sqrt(M.norm(q - p)), 1e-6)
+                         for p, q in ((p0, p1), (p1, p2), (p2, p3)))
+        t1, t2, t3 = d01, d01 + d12, d01 + d12 + d23
+        u = t1 + t * d12
+        a1 = ((t1 - u) * p0 + u * p1) / t1
+        a2 = ((t2 - u) * p1 + (u - t1) * p2) / d12
+        a3 = ((t3 - u) * p2 + (u - t2) * p3) / d23
+        b1 = ((t2 - u) * a1 + u * a2) / t2
+        b2 = ((t3 - u) * a2 + (u - t1) * a3) / (t3 - t1)
+        out.append(((t2 - u) * b1 + (u - t1) * b2) / d12)
+    return np.vstack(out)
+
+
+def _wobble(pts: np.ndarray, fn) -> np.ndarray:
+    """Closed outline moved along its normals by fn(arc length) meters."""
+    d = np.roll(pts, -1, axis=0) - np.roll(pts, 1, axis=0)
+    n = M.hypot(d[:, 0], d[:, 1])
+    n[n == 0] = 1.0
+    seg = M.hypot(*np.diff(np.vstack([pts, pts[:1]]), axis=0).T)
+    off = fn(np.concatenate([[0.0], np.cumsum(seg)[:-1]]))
+    return pts + np.column_stack([-d[:, 1] / n, d[:, 0] / n]) * off[:, None]
+
+
+# A peninsula with headlands. Lengths are fractions of lam, the depth from the mainland coast
+# to the map's sea edge; pairs are the range of a random draw. main: the mainland strip, as a
+# share of the map's depth; neck, waist: the neck's half-width and where its waist is; root,
+# arc: depth of the middle headland's root and how much deeper the outer roots sit; half, gap:
+# headland half-width and the gap between roots; spread: angle of the outer headlands from the
+# axis (degrees); len: headland length, of the room to the map margin; width, mid: half-width
+# factor and the middle headlands' extra width; taper: tip half-width over root half-width;
+# bulge: how far a side bows out at its middle; cove, cove_w: a cove head's depth along the
+# shorter headland and its width; bay: where the bay beside the neck curves in (along, across);
+# rough: amplitude of the coast's wobble, of the coast noise.
+FAN = {"main": 0.15, "neck": 0.1, "waist": 0.14, "root": 0.22, "arc": 0.18, "half": 0.15,
+       "gap": 0.04, "spread": 50.0, "len": (0.75, 0.95), "width": (0.85, 1.25), "mid": 0.25,
+       "taper": (0.55, 0.8), "bulge": (0.85, 1.3), "cove": (0.3, 0.5), "cove_w": (0.08, 0.12),
+       "bay": (0.5, 0.5), "rough": 0.7}
+
+
+def _fan_plan(rng, k: int, A: float, Bh: float, a_n: float) -> dict:
+    """The random part of a peninsula that fans out into k headlands, west to east, drawn once
+    (the sea share solve scales its widths). Frame as `_sea_canonical` (a toward the sea, b
+    along the coast), in units of the depth lam from the mainland coast to the map edge."""
+    lam = A - a_n
+    m = 0.06 * 2 * A / lam
+    room = Bh / lam - m
+    sp = min(2 * FAN["half"] + FAN["gap"], 1.4 * room / (k - 1))
+    h0 = FAN["half"] * sp / (2 * FAN["half"] + FAN["gap"])
+    heads = []
+    tilt = float(rng.uniform(-6.0, 6.0))  # the whole fan leans a little east or west
+    for i in range(k):
+        t = -1.0 + 2.0 * i / (k - 1)
+        root = (FAN["root"] + FAN["arc"] * abs(t) + float(rng.uniform(-0.04, 0.04)),
+                t * 0.5 * (k - 1) * sp + float(rng.uniform(-0.08, 0.08)) * sp)
+        phi = M.radians(FAN["spread"] * t + tilt + float(rng.uniform(-5.0, 5.0)))
+        ua, ub = M.cos(phi), M.sin(phi)
+        reach = (1.0 - m - root[0]) / ua
+        if abs(ub) > 1e-9:
+            reach = min(reach, (room * (1 if ub > 0 else -1) - root[1]) / ub)
+        width = float(rng.uniform(*FAN["width"])) * (1 + FAN["mid"] * (1 - abs(t)))
+        heads.append({"root": root, "phi": phi,
+                      "len": reach * float(rng.uniform(*FAN["len"])), "h0": h0 * width,
+                      "taper": float(rng.uniform(*FAN["taper"])),
+                      "bulge": (float(rng.uniform(*FAN["bulge"])),
+                                float(rng.uniform(*FAN["bulge"])))})
+    coves = [(float(rng.uniform(*FAN["cove"])), float(rng.uniform(*FAN["cove_w"])))
+             for _ in range(k - 1)]
+    return {"lam": lam, "a_n": a_n, "heads": heads, "coves": coves}
+
+
+def _fan_outline(plan: dict, s: float) -> np.ndarray:
+    """Control points of the land south of the mainland coast, in meters, widths times `s`: a
+    neck (shoulders, a waist), a bay on each side, a body that widens to the headland roots on
+    an arc, the headlands splayed, west to east, with a U-shaped cove between each two."""
+    heads, coves = plan["heads"], plan["coves"]
+
+    def at(h, t, off):  # t along headland h from its root, off to its left (+b at phi 0)
+        cu, su = M.cos(h["phi"]), M.sin(h["phi"])
+        return (h["root"][0] + t * cu - off * su, h["root"][1] + t * su + off * cu)
+
+    def side(h, sign, t0=0.0):  # from t0 to the tip on its -left (sign -1) or left side
+        L, h0 = h["len"], h["h0"] * s
+        h1 = h0 * h["taper"]
+        hw = lambda t: h0 + (h1 - h0) * t / (L - h1)  # noqa: E731
+        t1 = 0.5 * (t0 + L - h1)
+        bl = h["bulge"][sign > 0]
+        if t0 > 0.0:
+            bl = min(bl, 1.0)  # a cove wall does not bow into the cove
+        return [at(h, t0, sign * hw(t0)), at(h, t1, sign * hw(t1) * bl),
+                at(h, L - h1, sign * h1), at(h, L - 0.3 * h1, sign * 0.72 * h1)]
+
+    def bay(r, sign):  # between the waist and a first or last headland's root
+        return (wa + FAN["bay"][0] * (r[0] - wa), sign * nw + FAN["bay"][1] * (r[1] - sign * nw))
+
+    nw, wa = FAN["neck"], FAN["waist"]
+    west = [(-0.12, -1.6 * nw), (0.015, -1.15 * nw), (wa, -nw)]
+    pts = list(west)
+    for i, h in enumerate(heads):
+        if i == 0:
+            sw = side(h, -1)
+            pts += [bay(sw[0], -1)] + sw
+        pts.append(at(h, h["len"], 0.0))
+        if i == len(heads) - 1:
+            se = side(h, 1)[::-1]
+            pts += se + [bay(se[-1], 1)]
+            continue
+        g = heads[i + 1]
+        depth, wide = coves[i]
+        tc = depth * min(h["len"], g["len"])
+        se, sw = side(h, 1, tc)[::-1], side(g, -1, tc)
+        e, w = se[-1], sw[0]
+        mx, my = 0.5 * (e[0] + w[0]), 0.5 * (e[1] + w[1])
+        da = M.cos(h["phi"]) + M.cos(g["phi"])
+        db = M.sin(h["phi"]) + M.sin(g["phi"])
+        dn = M.hypot(da, db)
+        da, db = da / dn, db / dn  # the cove's axis, out to sea; (-db, da) across it eastward
+        r = 0.5 * wide  # a U-shaped head of its own width, the walls flaring out from it
+        pts += se[:-1] + [(mx + r * db, my - r * da), (mx - r * da, my - r * db),
+                          (mx - r * db, my + r * da)] + sw[1:]
+    pts += [(a, -b) for a, b in west[::-1]]
+    p = np.asarray(pts, dtype=float) * plan["lam"]
+    return np.column_stack([plan["a_n"] + p[:, 0], p[:, 1]])
+
+
+def _fan_peninsula(plan: dict, s: float, A: float, Bh: float, noise, wobble) -> object:
+    a_n = plan["a_n"]
+    bs = np.arange(-1.6 * Bh, 1.6 * Bh + 10, 10.0)
+    band = Polygon(list(zip(a_n + noise(bs), bs)) + [(4 * A, bs[-1]), (4 * A, bs[0])])
+    ring = _wobble(_spline(_fan_outline(plan, s)), wobble)
+    return band.difference(G.polygonal(shapely.make_valid(Polygon(ring))))
+
+
 def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | None,
               lobe: float = 0.0) -> object:
     coast = spec.water.coast
@@ -187,19 +328,33 @@ def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | N
         b0 = float(np.clip(b0_world[0] * vx + b0_world[1] * vy, -0.5 * Bh, 0.5 * Bh))
     target = coast.sea_share * canvas.area
     to_world = [ux, vx, uy, vy, 0, 0]
+    plan = wobble = None
+    if coast.form == "peninsula" and coast.headlands:
+        neck = 1.0 - FAN["main"]  # the mainland strip is a fixed share of the map's depth
+        frng = np.random.default_rng(derive_seed(spec.seed, "hydro.fan"))
+        plan = _fan_plan(frng, coast.headlands, A, Bh, A - neck * 2 * A)
+        base3 = G.noise1d(frng, 420.0)
+        wobble = lambda t: FAN["rough"] * amp * base3(t)  # noqa: E731
 
     def sea_for(param: float, neck: float = 0.0):
-        if coast.form == "peninsula":
+        if plan is not None:
+            g = _fan_peninsula(plan, param, A, Bh, noise, wobble)
+        elif coast.form == "peninsula":
             g = _peninsula(param, neck, A, Bh, noise, noise2)
         else:
             g = _sea_canonical(coast.form, param, A, Bh, noise, b0, lobe)
         g = affinity.affine_transform(g, to_world)
         g = g.buffer(COAST_SMOOTH_M).buffer(-2 * COAST_SMOOTH_M).buffer(COAST_SMOOTH_M)
-        return G.polygonal(g.intersection(canvas))
+        g = G.polygonal(g.intersection(canvas))
+        if plan is not None:  # a cove pinched shut by the smoothing leaves a pond: land
+            g = G.polygonal(MultiPolygon([p for p in G.parts(g)
+                                          if p.distance(canvas.exterior) < 1.0]))
+        return g
 
     if coast.form == "peninsula":
         neck = min(max(coast.sea_share + 0.22, 0.4), 0.85)
-        lo, hi = 0.0, 1.2 * Bh  # tongue half-width: wider tongue, less sea
+        # tongue half-width (a fan: its headlands' base half-width): wider, less sea
+        lo, hi = (0.2, 2.5) if plan is not None else (0.0, 1.2 * Bh)
         for _ in range(26):
             mid = (lo + hi) / 2
             if sea_for(mid, neck).area > target:

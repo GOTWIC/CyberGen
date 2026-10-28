@@ -99,6 +99,21 @@
           "default": null,
           "description": "Fraction of the map that is sea, offshore islands included (they are carved out of it). Default by form.",
           "title": "Sea Share"
+        },
+        "headlands": {
+          "anyOf": [
+            {
+              "maximum": 5,
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Peninsula only: the land widens from a neck toward the sea and fans out into this many headlands with coves between them, instead of ending in one rounded tip.",
+          "title": "Headlands"
         }
       },
       "required": [

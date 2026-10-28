@@ -15,7 +15,7 @@ from citygen.build import build_city
 from citygen.streets import _foot_profile
 from citygen.validate import validate_spec
 
-from conftest import ROOT, MINIMAL
+from conftest import ROOT, ROUND_TIP, MINIMAL
 
 SAMPLES = ROOT / "docs" / "progress" / "M1a2"
 
@@ -133,7 +133,10 @@ def test_sweep_table_and_retries():
 
 
 def test_roads_leaving_a_node_together_become_one():
-    # peninsula s11: a waterfront avenue and a connector left one node side by side for
-    # 286 m (road_duplicates); the connector now branches off the avenue where they part
-    b = _roads(_spec("peninsula_city", 11))
+    # peninsula s11 (Greyhook's earlier layout): a waterfront avenue and a connector left one
+    # node side by side for 286 m (road_duplicates); the connector now branches off the avenue
+    # where they part
+    data = json.loads(ROUND_TIP.read_text(encoding="utf-8"))
+    data["seed"] = 11
+    b = _roads(data)
     assert not _failures(b, {"road_duplicates", "curve_radius", "segment_length"})
