@@ -116,16 +116,22 @@ def report(model, g, man: dict, con_p: dict, con_s: dict) -> dict:
                              + (f"; left: {', '.join(left[:6])}" if left else "")})
     # meshes
     badm = Counter()
+    where = []
     for f in man["families"].values():
-        for r in f["meshes"].values():
-            badm.update(r.get("checks") or {})
-    for tr in man["tiles"].values():
+        for node, r in f["meshes"].items():
+            if r.get("checks"):
+                badm.update(r["checks"])
+                where.append(node)
+    for t, tr in man["tiles"].items():
         for part in ("props_nodes", "signs_nodes"):
-            for r in (tr.get(part) or {}).values():
-                badm.update(r.get("checks") or {})
+            for node, r in (tr.get(part) or {}).items():
+                if r.get("checks"):
+                    badm.update(r["checks"])
+                    where.append(f"{t}/{node}")
     checks.append({"id": "props_meshes", "ok": not badm,
                    "detail": "no bad triangles" if not badm else
-                   ", ".join(f"{k} {v}" for k, v in sorted(badm.items()))})
+                   ", ".join(f"{k} {v}" for k, v in sorted(badm.items())) +
+                   f" in {', '.join(sorted(where)[:6])}"})
     # budgets
     over = []
     unique = 0

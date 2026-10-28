@@ -14,7 +14,7 @@ from .. import canon as C
 from ..gltf import Gltf
 from . import materials as MT
 from . import styles as ST
-from .shapes import check
+from .shapes import check, dedupe
 
 
 def record(mesh) -> dict:
@@ -35,6 +35,7 @@ def pack(meshes: list[tuple[str, object, dict | None]], what: str) -> tuple[byte
     mats = MT.gltf_materials(g, slots)
     info = {}
     for name, m, trans in meshes:
+        dedupe(m)
         if not m.triangles:
             continue
         mi = g.mesh(name, m.finish(mats))

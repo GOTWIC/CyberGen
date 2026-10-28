@@ -260,6 +260,26 @@ def catenary(a, b, sag: float, n: int = 10) -> list[tuple[float, float, float]]:
     return out
 
 
+def dedupe(m: Mesh) -> int:
+    """Drop a triangle that repeats one before it in its slot (the same three positions:
+    two parts of a merged mesh, two cables or glyph strokes, landing on the same
+    millimeters); the number dropped."""
+    n = 0
+    for sl in m.slots.values():
+        seen = set()
+        keep = []
+        for t in range(0, len(sl.idx), 3):
+            tri = sl.idx[t:t + 3]
+            key = tuple(sorted(sl.pos[i] for i in tri))
+            if key in seen:
+                n += 1
+                continue
+            seen.add(key)
+            keep += tri
+        sl.idx = keep
+    return n
+
+
 def check(slots: dict) -> dict:
     """Mesh validity for props (scope section 9) on the integer positions: degenerate and
     duplicate triangles (the same three positions in a slot: two faces fighting), normals

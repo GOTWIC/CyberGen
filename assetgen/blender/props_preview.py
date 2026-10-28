@@ -336,7 +336,7 @@ def main():
         glow_pts.sort(key=lambda p: (Vector(p[:3]) - eye).length)
         for i, (x, y, z, c) in enumerate(glow_pts[:200]):
             ld = bpy.data.lights.new(f"glow{i}", "POINT")
-            ld.energy = 60.0
+            ld.energy = 110.0
             ld.color = c
             ld.shadow_soft_size = 0.6
             lo = bpy.data.objects.new(f"glow{i}", ld)
