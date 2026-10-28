@@ -18,7 +18,7 @@ district rebuilds only the tiles whose buildings changed.
 | Saltreach Free Port | 3,135 | 15.4 M (4,906 per building) | 20.3 M (0.76) | 0.82 M | 34, 367 | 0.90 GB + 15 MB | 46 s |
 | Delta Megacity | 5,417 | 24.0 M (4,424 per building) | 36.9 M (0.65) | 1.22 M | 40, 268 | 1.39 GB + 27 MB | 75 s |
 | Nexus City | 6,519 | 21.5 M (3,303 per building) | 36.8 M (0.59) | 1.03 M | 35, 335 | 1.24 GB + 31 MB | 71 s |
-| Greyhook | 2,460 | 9.8 M (3,992 per building) | 20.4 M (0.48) | 0.49 M | 23, 498 | 0.57 GB + 11 MB | 23 s |
+| Greyhook | 2,671 | 11.4 M (4,260 per building) | 23.3 M (0.49) | 0.58 M | 23, 498 | 0.66 GB + 12 MB | 26 s |
 | Vesper Bay Pinned | 6,658 | 20.6 M (3,090 per building) | 38.4 M (0.54) | 0.92 M | 34, 336 | 1.19 GB + 31 MB | 62 s |
 | Vesper Bay Stacks | 6,686 | 20.1 M (3,003 per building) | 36.6 M (0.55) | 0.89 M | 34, 334 | 1.16 GB + 31 MB | 63 s |
 | Cragmouth (M13, on main since) | 6,800 | 22.7 M (3,331 per building) | 40.0 M (0.57) | 1.03 M | 40, 269 | 1.30 GB + 34 MB | 74 s (3 workers) |
