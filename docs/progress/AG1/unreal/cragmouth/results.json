@@ -1,0 +1,158 @@
+{
+ "1_scratch": {
+  "ok": true,
+  "city": "Cragmouth",
+  "actors": {
+   "created": 23641,
+   "updated": 0,
+   "deleted": 0,
+   "unchanged": 0
+  },
+  "meshes": {
+   "imported": 10133,
+   "kept": 0,
+   "deleted": 0
+  },
+  "tiles_imported": 169,
+  "dirty_packages": 23716,
+  "actor_count": 23641,
+  "timings": {
+   "core": 0.0,
+   "materials": 0.38,
+   "materials2": 0.08,
+   "meshes": 29.29,
+   "meshes2": 567.02,
+   "level": 17.34,
+   "actors": 83.5,
+   "graphs": 0.46,
+   "save": 17.43,
+   "prune": 3.5,
+   "save_pruned": 0.09,
+   "digests": 3.93
+  },
+  "stage2": {
+   "actors": 19526,
+   "instance_actors": 1282,
+   "replaced": 9100,
+   "meshes": {
+    "imported": 26332,
+    "kept": 0,
+    "deleted": 0
+   },
+   "packs_imported": 375,
+   "materials": {
+    "created": 68,
+    "updated": 0,
+    "kept": 0,
+    "deleted": 0
+   },
+   "hulls": 6650,
+   "boxes_only": 150,
+   "complex_fallback": 0,
+   "lod_chains": 0
+  },
+  "wall_s": 829.7,
+  "total_s": 723.3,
+  "engine": "5.8.4-58902052+++UE5+Release-5.8",
+  "keys_changed": {
+   "created": 23641,
+   "updated": 0,
+   "deleted": 0
+  }
+ },
+ "2_again": {
+  "ok": true,
+  "city": "Cragmouth",
+  "actors": {
+   "created": 0,
+   "updated": 0,
+   "deleted": 0,
+   "unchanged": 23641
+  },
+  "meshes": {
+   "imported": 0,
+   "kept": 10133,
+   "deleted": 0
+  },
+  "tiles_imported": 0,
+  "dirty_packages": 0,
+  "actor_count": 23641,
+  "timings": {
+   "core": 0.0,
+   "materials": 0.01,
+   "materials2": 0.01,
+   "meshes": 2.04,
+   "meshes2": 11.03,
+   "level": 6.8,
+   "actors": 0.19,
+   "graphs": 0.14,
+   "save": 0.03,
+   "prune": 0.62,
+   "save_pruned": 0.01,
+   "digests": 0.81
+  },
+  "stage2": {
+   "actors": 19526,
+   "instance_actors": 1282,
+   "replaced": 9100,
+   "meshes": {
+    "imported": 0,
+    "kept": 26332,
+    "deleted": 0
+   },
+   "packs_imported": 0,
+   "materials": {
+    "created": 0,
+    "updated": 0,
+    "kept": 68,
+    "deleted": 0
+   },
+   "hulls": 0,
+   "boxes_only": 0,
+   "complex_fallback": 0,
+   "lod_chains": 0
+  },
+  "wall_s": 38.5,
+  "total_s": 22.0,
+  "engine": "5.8.4-58902052+++UE5+Release-5.8",
+  "keys_changed": {
+   "created": 0,
+   "updated": 0,
+   "deleted": 0
+  }
+ },
+ "check": {
+  "ok": true,
+  "lines": [
+   "streaming: 625 of 23641 actors loaded at the start, 3472 after a teleport to (-1152, 1152) (3468 new)",
+   "collision: 507 of 507 traces down hit (building 221, ground 57, road_street 56, junction 40, open_green 33, road_avenue 31), 36 of 36 roofs, 36 of 36 facades",
+   "walk: 81 m along a 83 m sidewalk path in 14 s, 100% of frames on the ground, reached its end"
+  ],
+  "walk": {
+   "ok": true,
+   "path_m": 82.9,
+   "points": 3,
+   "reached": true,
+   "travelled_m": 81.0,
+   "on_ground": 1.0,
+   "max_drop_m": 0.55,
+   "seconds": 13.7,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 49
+  },
+  "streaming": {
+   "ok": true,
+   "actors": 23641,
+   "loaded_at_start": 625,
+   "stage2_at_start": 420,
+   "loaded_far": 3472,
+   "only_far": 3468,
+   "far_spot_m": [
+    -1152.0,
+    1152.0
+   ],
+   "far_tile_loaded": true
+  }
+ }
+}

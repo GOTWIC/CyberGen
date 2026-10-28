@@ -65,7 +65,7 @@ GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids",
 INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes) and the meshes' (stored hashes "<version>.<content hash>", as MESH_VERSION)
-STAGE2_VERSION = "1"
+STAGE2_VERSION = "3"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
@@ -205,9 +205,15 @@ return t;
 """
 
 # the room behind a window (interior mapping on UV1, one room per pane, its look from the
-# window id in the vertex alpha) and whether it is lit (the actor's lit-window ratio)
+# window id in the vertex alpha) and whether it is lit (the actor's lit-window ratio); the
+# view in the pane's frame from its normal (along the wall, up), not the mesh's tangents
+# (Nanite derives those per triangle from UV0, which runs in meters across the city)
 ROOM_CODE = """
-float3 d = -normalize(V);
+float3 n = normalize(N);
+float3 ta = float3(-n.y, n.x, 0.0);
+ta = dot(ta, ta) > 1e-4 ? normalize(ta) : float3(1.0, 0.0, 0.0);
+float3 bi = cross(n, ta);
+float3 d = -normalize(float3(dot(V, ta), dot(V, bi), dot(V, n)));
 d.z = min(d.z, -0.05);
 float2 p = frac(UV);
 float dx = abs(d.x) > 1e-4 ? d.x : 1e-4;
@@ -276,17 +282,14 @@ def stage2_master(master):
         f1, f3 = (unreal.CustomMaterialOutputType.CMOT_FLOAT1,
                   unreal.CustomMaterialOutputType.CMOT_FLOAT3)
         uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -1300, 600, coordinate_index=1)
-        cam = expr(m, unreal.MaterialExpressionCameraVectorWS, -1500, 750)
-        tr = expr(m, unreal.MaterialExpressionTransform, -1300, 750,
-                  transform_source_type=unreal.MaterialVectorCoordTransformSource
-                  .TRANSFORMSOURCE_WORLD,
-                  transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_TANGENT)
-        link(cam, "", tr, "Input")
+        cam = expr(m, unreal.MaterialExpressionCameraVectorWS, -1300, 700)
+        nrm = expr(m, unreal.MaterialExpressionVertexNormalWS, -1300, 800)
         vc = expr(m, unreal.MaterialExpressionVertexColor, -1300, 900)
         depth = expr(m, unreal.MaterialExpressionConstant, -1300, 1000, r=1.0)
-        room = custom(m, -1000, 700, ROOM_CODE, ["UV", "V", "Seed", "Depth"], f3, "Room")
+        room = custom(m, -1000, 700, ROOM_CODE, ["UV", "V", "N", "Seed", "Depth"], f3, "Room")
         link(uv, "", room, "UV")
-        link(tr, "", room, "V")
+        link(cam, "", room, "V")
+        link(nrm, "", room, "N")
         link(vc, "A", room, "Seed")
         link(depth, "", room, "Depth")
         ratio = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1100,
@@ -300,9 +303,18 @@ def stage2_master(master):
         lit = custom(m, -1000, 1000, LIT_CODE, ["Seed", "Lit"], f1, "Lit")
         link(vc, "A", lit, "Seed")
         link(lr, "", lit, "Lit")
-        # by day: the glass's tint, a little of the room behind it; the lit rooms glow
+        # by day: the glass's tint, a little of the room behind it; the lit rooms glow. The
+        # rooms are off (Interior 0) until AG6's window interiors: Unreal does not keep the
+        # packs' one window id and UV1 per pane where curtain wall panes share corners (the
+        # Nanite build, it seems), so they come out per triangle there
+        inter = expr(m, unreal.MaterialExpressionScalarParameter, -1300, 1300,
+                     parameter_name="Interior", default_value=0.0)
         g2 = expr(m, unreal.MaterialExpressionMultiply, -350, -100, const_b=2.0)
         link(col, "", g2, "A")
+        roomi = expr(m, unreal.MaterialExpressionMultiply, -800, 650)
+        link(room, "", roomi, "A")
+        link(inter, "", roomi, "B")
+        room = roomi
         dim = expr(m, unreal.MaterialExpressionMultiply, -600, 650, const_b=0.12)
         link(room, "", dim, "A")
         base = expr(m, unreal.MaterialExpressionAdd, -200, 0)

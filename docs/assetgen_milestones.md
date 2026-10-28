@@ -134,7 +134,13 @@ files); AG1's tests passed there, the small city's goldens included.
 
 **Exporter**: M15 was not on main, so only the contribution file
 (`unreal_contribution.buildings.json`); `unreal_export.md` ("From AG1") lists the exporter
-work. No Unreal check yet (the coordinating session's call).
+work. After M15 merged, a PR of its own did it: `citygen unreal` layers every
+`assets/unreal_contribution.*.json` over the blockout, each shell an actor at its pivot in
+place of its blockout box, with stage 2's masters reading the tints from Custom Primitive
+Data (saved as the components' defaults) and convex hull collision; the contribution's
+`asset` became the shell node's Interchange name (`<key>_shell`) and the patch slots spell
+out their tint rule (the small city's `testport_files` golden moved with them). Greyhook
+and Cragmouth imported, imported again and checked (`docs/progress/AG1/unreal/`).
 
 **For later milestones**: AG2 gets about 40% of section 11's triangle estimate for parts
 (reveals are in the shells for now), the other facade systems (`systems.FALLBACK`), massing
@@ -260,7 +266,12 @@ contribution's format and what the exporter still needs: read it as a second lay
 drop every actor a `replaces` names; the masters road, opaque, metal, emissive, translucent
 (two-sided, blended) and foliage; complex collision; non-Nanite meshes with LOD chains;
 hierarchical instances for parts; walkway z from `graphs.walkways`; the new keys in the
-re-import digests. Not run in Unreal.
+re-import digests. Not run in Unreal. **Exporter** (after M15, with AG1's): all of it, the
+street pieces as actors at their pivots in place of the joined blockout objects (complex
+collision), the sky tube glass as LOD chains, container stacks as instanced actors; AG7's
+sRGB slot colors made linear by the exporter. On the reshaped Greyhook one road piece fails
+`street_meshes` (`rs.w1338n148`, one doubled directed edge). Results:
+`docs/progress/AG1/unreal/`.
 
 **Wiring.** `assetgen build` (AG1) is not on main yet: whichever of AG1 and AG7 merges second
 makes it call `assetgen.streets.build.build(model, model_sha, BUILD/assets, spec, workers)`.
