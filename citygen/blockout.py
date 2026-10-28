@@ -518,7 +518,8 @@ def _buildings(P: _Plan) -> None:
               {"citygen_id": b.id, "citygen_type": b.type, "use": b.use,
                "height_m": q(b.height_m), "floors": b.floors, "district": did or "",
                "archetype": arch, "name": b.name or "", "property_id": b.property_id or "",
-               "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or ""})
+               "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or "",
+               **({"level": b.level} if b.level else {})})   # (M14: on a deck)
     for s in m.skybridges:
         (ax, ay), (bx, by) = s.line[0], s.line[-1]
         hh = SKYBRIDGE_H.get(s.kind) or s.levels * s.level_height_m

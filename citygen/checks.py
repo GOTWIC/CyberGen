@@ -937,7 +937,9 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import gameplay_checks as GC
 
         checks += GC.run(spec, m)
-    if m.decks:
+    if m.decks and m.buildings:
+        # (M14: on a finished city; the build's early checks run on its M2 model, which has
+        # no columns yet)
         from . import deck_checks as DC
 
         checks += DC.run(spec, m)
@@ -974,7 +976,7 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import gameplay_checks as GC
 
         st["gameplay"] = GC.stats(m)
-    if m.decks:
+    if m.decks and m.buildings:
         from . import deck_checks as DC
 
         st["decks"] = DC.stats(m)

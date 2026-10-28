@@ -12,7 +12,7 @@ makes, under /Game/CityGen/<City>:
   prop or plant kind and tile (instanced static meshes, the instances' citygen ids), a
   player start; every actor tagged `cg.city=`, `cg.key=` (its blockout name), `cg.hash=`
   (its content), `cg.id=` (its citygen ids), `cg.type=`, `cg.category=`, `cg.tile=` and
-  `cg.district=`;
+  `cg.district=` (M14: `cg.level=` on a deck);
 - Meshes/<tile>/<object>, Props/<kind>: static meshes, each with its content hash as
   `cg.hash` metadata;
 - Materials/MI_<material>: instances of /Game/CityGen/Core/M_CityGen;
@@ -33,7 +33,7 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 CORE = "/Game/CityGen/Core"
-CORE_VERSION = "1"  # of the core assets (BP_CityGenInstances, BP_CityGenGraph)
+CORE_VERSION = "2"  # of the core assets (BP_CityGenInstances, BP_CityGenGraph)
 NEVER = unreal.PropertyAccessChangeNotifyMode.NEVER
 T0 = time.time()
 EAL = unreal.EditorAssetLibrary
@@ -48,7 +48,7 @@ ACTOR_VERSION = "1"
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
               ("Kinds", "[name"), ("Refs", "[name"), ("Widths", "[real"),
               ("PointStart", "[int"), ("Points", "[vector"), ("LinkStart", "[int"),
-              ("Links", "[int"), ("Attrs", "[string")]
+              ("Links", "[int"), ("Attrs", "[string"), ("Levels", "[int")]   # (M14)
 INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 
 
@@ -371,9 +371,11 @@ class Importer:
         self.stats["actors"]["deleted"] += 1
         self.keys["deleted"].append(key)
 
-    def tags(self, key, h, ids, typ, cat, tile, district):
+    def tags(self, key, h, ids, typ, cat, tile, district, level=0):
         t = [f"cg.city={self.city}", f"cg.key={key}", f"{HASH_TAG}={h}", f"cg.type={typ}",
              f"cg.category={cat}", f"cg.tile={tile}", f"cg.district={district}"]
+        if level:
+            t.append(f"cg.level={level}")      # (M14: on a deck)
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
@@ -424,7 +426,7 @@ class Importer:
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
                     a.tags = self.tags(o["key"], h, o["ids"], o["type"], o["category"],
-                                       t["name"], o["district"])
+                                       t["name"], o["district"], o.get("level", 0))
 
                 self.place(have, o["key"], o["hash"], sma, make, update,
                            f"CityGen/{o['category']}")
@@ -553,6 +555,8 @@ class Importer:
             da.set_editor_property("LinkStart", g["link_start"])
             da.set_editor_property("Links", g["links"])
             da.set_editor_property("Attrs", g["attrs"])
+            # (M14: each element's level, 0 the ground, 1 a deck; empty when all are on it)
+            da.set_editor_property("Levels", g.get("levels", []))
             EAL.set_metadata_tag(da, HASH_TAG, summary["hash"])
             EAL.save_loaded_asset(da, only_if_is_dirty=False)
             self.stats["graphs"]["written"] += 1

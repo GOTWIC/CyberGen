@@ -306,6 +306,7 @@ def test_flat_graphs(build, manifest):
     assert g["lanes"]["count"] == len(raw["lanes"])
     assert g["walkways"]["count"] == len(raw["walkways"])
     assert g["transit"]["count"] == len(raw["transit_lines"]) + len(raw["stations"])
+    assert not [k for k in g if "levels" in g[k]] and "decks" not in manifest[0]  # (M14)
     for name, f in g.items():
         n = f["count"]
         assert len(f["ids"]) == len(f["kinds"]) == len(f["refs"]) == len(f["widths"]) == n

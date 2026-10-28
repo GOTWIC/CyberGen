@@ -178,3 +178,26 @@ def test_briefs_of_deck_buildings_stand_on_the_deck(decked):
         assert fg["level"] == 1 and fg["deck_m"] == m.decks[0].top_m
     flat = next(b for b in m.buildings if not b.level)
     assert "level" not in briefs[flat.id]["building"]["floor_grid"]
+
+
+def test_unreal_manifest_carries_the_levels(decked, tmp_path):
+    """The exporter (M15): deck actors carry their level, the manifest lists the decks with
+    their slab actors, and the lane and walkway graphs a level per element."""
+    from test_unreal import _blockout_files
+
+    from citygen import unreal as U
+
+    m = decked.model
+    man, _, graphs = U.build_manifest(_blockout_files(m, tmp_path / "b"))
+    objs = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    (dk,) = man["decks"]
+    assert dk["id"] == m.decks[0].id and dk["top_m"] == m.decks[0].top_m and dk["keys"]
+    assert all(objs[k]["level"] == 1 and objs[k]["category"] == "deck_slab"
+               for k in dk["keys"])
+    up = [b for b in m.buildings if b.level]
+    assert all(objs[b.id]["level"] == 1 for b in up if b.id in objs)
+    assert not [o for o in objs.values() if o["category"] == "building" and
+                o.get("level") and o["key"] not in {b.id for b in up}]
+    for g, coll in (("walkways", m.walkways), ("lanes", m.lanes)):
+        lv = dict(zip(graphs[g]["ids"], graphs[g]["levels"]))
+        assert all(lv[x.id] == x.level for x in coll)

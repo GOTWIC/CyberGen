@@ -125,7 +125,7 @@ def sidewalk_path(build, start, length_m, clear=None):
         links = g["links"][g["link_start"][cur]:g["link_start"][cur + 1]]
         nxt = None
         for j in sorted(links, key=lambda j: (g["kinds"][j] != "sidewalk", j)):
-            if j in seen:
+            if j in seen or g["kinds"][j] == "elevator":    # (M14: a lift is not walked)
                 continue
             ln = line(j)
             if not ln or not usable(j):
