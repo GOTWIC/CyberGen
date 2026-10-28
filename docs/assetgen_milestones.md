@@ -143,12 +143,13 @@ citygen (scope 4.5) gained the facade props M6 hangs where no wall spans their h
   (`assetgen/blender/streets_preview.py`: the blockout's `city.blend` with the replaced
   objects removed and the packs imported, its street cameras or `--eye/--target`).
 
-**Ground (M13).** Written against PR #28's contract: a road on its `ground` grade line plus
+**Ground (M13).** Written against M13's contract: a road on its `ground` grade line plus
 its z profile, a junction at its node's `ground_m`, road tunnels and their portals and
 approaches on their road's grade line, everything else on the finished terrain (bilinear as
-M13's `Field.at`), ground 0 where the model has none. Tested on M13's branch merged locally
-(Cragmouth: 12,729 pieces, every check passing, 1,280 retaining walls, 7 bored tunnels) and
-by a test that lifts the small city on a synthetic terrain; M13 was not on main.
+M13's `Field.at`), ground 0 where the model has none. M13 merged into main near AG7's end
+(main merged in; until then tested on its branch merged locally): Cragmouth builds with 12,729
+pieces, every check passing, 1,280 retaining walls, 7 bored tunnels; a test lifts the small
+city on a synthetic terrain; the flat samples are unchanged by M13.
 
 **Samples** (M10 code, 4 workers on the shared Mac, stage time after loading the model):
 
@@ -161,7 +162,7 @@ by a test that lifts the small city on a synthetic terrain; M13 was not on main.
 | Greyhook | 4,590 | 90 | 605,711 | 37.1 MB | 3.1 s |
 | Vesper Bay Pinned | 11,161 | 156 | 1,177,214 | 75.0 MB | 6.8 s |
 | Vesper Bay Stacks | 11,540 | 157 | 1,227,541 | 77.5 MB | 7.4 s |
-| Cragmouth (M13 branch) | 12,729 | 130 | 1,226,030 | 83.6 MB | 8.5 s |
+| Cragmouth | 12,729 | 130 | 1,226,030 | 83.6 MB | 8.5 s |
 
 All four checks pass in every city; a rebuild with nothing changed takes 2 to 3 s and writes
 no pack. Sidewalks are the largest share (Vesper Bay 441 k triangles), then roads (261 k),

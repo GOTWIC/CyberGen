@@ -643,7 +643,7 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
 - **Ground**: a road's surface is its M13 grade line plus its z profile; sidewalks and
   crosswalks follow their road (on a deck too, writing the corrected walkway lines), road
   tunnels their road's grade line, everything else the terrain at its point; 0 on a flat
-  city. Tested on M13's branch (Cragmouth) by a local merge.
+  city (Cragmouth is the hilly sample).
 - **`assetgen streets seam BASE REGEN [--district NAME]`** (`seam.py`): which pieces and
   tiles a district regeneration changed and why (own entity, or an input entity changed).
 - **Previews**: `preview.py` (top-down, from the packs) and

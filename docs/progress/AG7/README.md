@@ -70,7 +70,7 @@ writes no pack, manifest or contribution (only the report, which carries timings
 | Greyhook | 4,590 | 90 | 605,711 | 37.1 MB | 3.1 s |
 | Vesper Bay Pinned | 11,161 | 156 | 1,177,214 | 75.0 MB | 6.8 s |
 | Vesper Bay Stacks | 11,540 | 157 | 1,227,541 | 77.5 MB | 7.4 s |
-| Cragmouth (M13's branch) | 12,729 | 130 | 1,226,030 | 83.6 MB | 8.5 s |
+| Cragmouth | 12,729 | 130 | 1,226,030 | 83.6 MB | 8.5 s |
 
 Every check passes in every city (coverage, meshes, replaces, budgets). Times are the whole
 stage after loading the model (1 to 2 s), 4 workers, on the Mac shared with other sessions;
@@ -98,26 +98,26 @@ and a few of our own. Flat slot colors; buildings, props and plants are still th
 <img src="vesper_bay/streets_street_4.jpg" width="420"> <img src="vesper_bay/streets_street_5.jpg" width="420">
 <img src="vesper_bay/streets_causeway.jpg" width="420"> <img src="vesper_bay/streets_footbridge.jpg" width="420">
 <img src="vesper_bay/streets_trumpet.jpg" width="420"> <img src="vesper_bay_stacks/streets_under_the_stack.jpg" width="420">
-<img src="nexus_city/streets_tunnel_portal.jpg" width="420"> <img src="cragmouth_m13/streets_street_1.jpg" width="420">
+<img src="nexus_city/streets_tunnel_portal.jpg" width="420"> <img src="cragmouth/streets_street_1.jpg" width="420">
 
 Vesper Bay under its ring viaduct; a market street with its median island and crosswalks; the
 Launch Causeway (cable-stayed main span over the bay); a steel footbridge's stairs over a
 canal, with the quay's bollards; the trumpet interchange from above (its loop, the flyover and
 the sky tube); under the stack interchange; the Midtown Tunnel's portal from its open approach
 (Nexus City; the blockout's sea plane hidden, below); a Cragmouth street climbing between
-retaining walls (M13's hilly sample, on M13's branch). More in each city's folder.
+retaining walls (M13's hilly sample). More in each city's folder.
 
 ## Ground (M13)
 
-Written against M13's contract (PR #28) from the start: a road's surface is its grade line
+Written against M13's contract from the start: a road's surface is its grade line
 (`RoadSegment.ground`) plus its z profile; sidewalks and crosswalks follow their road; a
 junction stands at its node's `ground_m`; road tunnels, their portals and approaches follow
 their road's grade line (as M13's blockout lifts them); everything else stands on the
 terrain's finished ground at its point; M13's retaining walls get pieces of their own and
-replace its joined wall objects. Where the model has none of these (main today), the ground is
-0. M13 was not merged while AG7 ran: Cragmouth, its hilly sample, was built on M13's branch
-merged locally with AG7 and passes every street check (18 tunnels, 7 of them bored, 1,280
-retaining walls).
+replace its joined wall objects. Where the model has none of these (a flat city), the ground
+is 0. M13 merged into main near AG7's end (until then tested on its branch merged locally);
+on the merged code Cragmouth, its hilly sample, passes every street check (18 tunnels, 7 of
+them bored, 1,280 retaining walls), and the flat samples are unchanged.
 
 **Sidewalks on raised roads** (an M15 open item): the model's sidewalks and walkways of a
 raised road sit at z 0 under its deck. The sidewalk pieces follow the road's profile, so they
