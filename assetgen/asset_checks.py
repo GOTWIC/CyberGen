@@ -35,7 +35,7 @@ CLASSES = {
     "low": {"k": 3.0, "base": 4000, "i": 8.0, "ibase": 60},
     "mid": {"k": 2.4, "base": 6000, "i": 8.0, "ibase": 100},
     "high": {"k": 2.0, "base": 10000, "i": 7.0, "ibase": 200},
-    "tower": {"k": 1.8, "base": 20000, "i": 6.0, "ibase": 400},
+    "tower": {"k": 2.0, "base": 20000, "i": 6.0, "ibase": 400},
     "mega": {"k": 2.0, "base": 20000, "i": 6.0, "ibase": 400},
 }
 MEGA = ("building.megabuilding", "building.straddle_building")

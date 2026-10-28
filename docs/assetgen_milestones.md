@@ -239,7 +239,10 @@ dark grey) were still 5 to 7 bits apart, since a difference hash keeps only the 
 gradients, hence the tone bits (23 to 70 bits after); three long warehouses in Delta filling 5 to 8% of their thumbnails, hence the
 sliver line at 10% (under 0.4% of any city's buildings); a bay with paired windows placed
 its balcony twice (now once per bay, `test_no_part_is_placed_twice`); diagrid pockets at a
-convex corner met (now kept a reveal plus 6 cm from it).
+convex corner met (now kept a reveal plus 6 cm from it); a terraced tower over 100 m on
+Vesper Bay Decks with paired windows (two openings a bay, about 56 shell triangles a bay)
+came to 1.03 of the tower class's budget at $k = 1.8$, hence $k = 2.0$ for towers, as for
+high and mega buildings.
 
 **Exporter**: no code change; the parts are in the contribution in the format of
 `unreal_export.md` ("From AG2"), and the exporter's stage 2 import (merged while AG2 was
