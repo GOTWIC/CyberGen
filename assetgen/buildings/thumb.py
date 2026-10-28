@@ -8,8 +8,9 @@ facing the view and the box of every instanced part that stands out of the wall
 (balconies, fins, members, pods, screens, shutters, canopies: frames and caps sit in the
 openings), flat shaded from the slot's color (the building's tint where the slot takes
 one) and a fixed sun. The hash compares the image's `GRID` x `GRID` block sums with their
-right and lower neighbors (a difference hash, 480 bits); two thumbnails are told apart by
-the number of bits that differ. How much of the thumbnail a building fills is kept beside
+right and lower neighbors (a difference hash, 480 bits) and codes each block's mean shade
+in four steps (1,024 bits: the tone a difference hash drops); two thumbnails are told
+apart by the number of bits that differ. How much of the thumbnail a building fills is kept beside
 it: a sliver (a shed 300 m long and 4 m wide) draws as a line in any contact sheet.
 
 Everything is IEEE element-wise arithmetic in a fixed order and integer sums (scope section
@@ -29,7 +30,8 @@ from . import systems as SY
 
 SIZE = 64
 GRID = 16
-BITS = 2 * GRID * (GRID - 1)
+TONES = (48, 96, 144, 192)      # a block's mean shade (0 to 255) at or over each: one bit
+BITS = 2 * GRID * (GRID - 1) + len(TONES) * GRID * GRID
 BG = 0.16                       # the background's shade (linear)
 SUN = (0.42, -0.58, 0.70)       # toward the sun
 # instanced families drawn as boxes (the rest sit in their openings)
@@ -215,11 +217,15 @@ def render(brief: dict, arrs: dict, inst: list[dict], tints: dict) -> np.ndarray
 
 
 def dhash(img: np.ndarray) -> str:
-    """The difference hash of a thumbnail: GRID x GRID block sums, each compared with its
-    right and lower neighbors; hex."""
+    """The hash of a thumbnail, hex: over GRID x GRID blocks, each block's sum compared with
+    its right and lower neighbors (a difference hash: the drawing's structure), then each
+    block's mean shade as a thermometer code over `TONES` (its tone, which a difference
+    hash drops: a white roof and a grey one of the same shed differ only there)."""
     b = SIZE // GRID
     g = img.astype(np.int64).reshape(GRID, b, GRID, b).sum(axis=(1, 3))
-    bits = np.concatenate([(g[:, :-1] > g[:, 1:]).reshape(-1), (g[:-1, :] > g[1:, :]).reshape(-1)])
+    tone = (g // (b * b))[:, :, None] >= np.array(TONES, dtype=np.int64)[None, None, :]
+    bits = np.concatenate([(g[:, :-1] > g[:, 1:]).reshape(-1), (g[:-1, :] > g[1:, :]).reshape(-1),
+                           tone.reshape(-1)])
     return np.packbits(bits).tobytes().hex()
 
 

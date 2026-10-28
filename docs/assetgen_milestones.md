@@ -196,7 +196,8 @@ the thumbnail half of the uniqueness check and budgets per building class
   highest roof), instanced parts by the corners of their boxes;
 - **thumbnails** (`thumb.py`): each building drawn as the contact sheet frames it, 64 px,
   by a small z-buffered rasterizer (shell triangles and the boxes of parts that stand out),
-  shaded by slot tint; a 480 bit difference hash over 16 x 16 blocks;
+  shaded by slot tint; over 16 x 16 blocks a difference hash (480 bits: the drawing's
+  structure) and each block's mean shade in four steps (1,024 bits: its tone);
 - **checks** (`asset_checks.py`): `asset_unique` also asks every pair of buildings outside
   a family to differ by 8 bits of their thumbnails (a building filling under 10% of its
   thumbnail, a long thin shed, is told apart by its genes alone); `asset_budget` per class
@@ -232,16 +233,20 @@ spike and the triangulation do not.
 
 **Found in the sample builds**: plain industrial sheds of one size drew the same thumbnail
 in Nexus City and Delta Megacity (3 to 7 bits apart; their metal walls and dark roofs left
-nothing for 4 px blocks to tell apart), hence the dado and the industrial roofs (13 to 81
-bits after); three long warehouses in Delta filling 5 to 8% of their thumbnails, hence the
+nothing for 4 px blocks to tell apart), hence the dado and the industrial roofs; then
+sheds whose roofs differed only in tone (a white membrane and galvanized metal, tar and
+dark grey) were still 5 to 7 bits apart, since a difference hash keeps only the signs of
+gradients, hence the tone bits (23 to 70 bits after); three long warehouses in Delta filling 5 to 8% of their thumbnails, hence the
 sliver line at 10% (under 0.4% of any city's buildings); a bay with paired windows placed
 its balcony twice (now once per bay, `test_no_part_is_placed_twice`); diagrid pockets at a
 convex corner met (now kept a reveal plus 6 cm from it).
 
 **Exporter**: no code change; the parts are in the contribution in the format of
-`unreal_export.md` ("From AG2"). The exporter's parts import was in its own open PR (`claude/ag-unreal-layer`), so no test of the
-exporter's manifest with AG2's parts here; its `build_manifest` took Vesper Bay's
-contribution (EXPORT). Unreal check: the coordinating session's call.
+`unreal_export.md` ("From AG2"), and the exporter's stage 2 import (merged while AG2 was
+built) takes them: `tests/test_unreal.py::test_stage2_takes_assetgen_parts` (every listed
+part an instanced actor `<key>.<kind>` with the entry's pivot, Custom Primitive Data and
+transforms, its mesh a node of the tile's part pack, AG2's slots as materials); Vesper
+Bay's manifest: EXPORT. Unreal check: the coordinating session's call.
 
 **For later milestones**: AG3 storefronts, doors, lobbies and docks (the ground band is
 still AG1's storefront glass and door gaps; the arcade and canopy leave room for them); AG4

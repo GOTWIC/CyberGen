@@ -27,7 +27,7 @@ T_BAY = 24          # section 11: shell triangles per bay
 RHO_ROOF = 1.0      # and per m2 of roof
 PARTS_SHARE = 0.4   # AG2's parts: 40% of section 11's shell estimate on top of it
 I_CITY = 3.0        # section 11: 2 to 3 M part instances for 1.4 M bays
-THUMB_MIN = 8       # bits of 480 two thumbnails must differ by
+THUMB_MIN = 8       # bits of 1,504 two thumbnails must differ by
 THUMB_FILL = 0.1    # a building filling less of its thumbnail (a sliver) is told by genes
 # per building class: unique triangles at most k times section 11's estimate for its bays and
 # roof plus a base, and instances at most i per bay plus a base

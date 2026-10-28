@@ -596,6 +596,34 @@ def test_stage2_from_assetgen(staged, manifest):
     assert _dump(U.build_manifest(staged)[0]) == _dump(m2)
 
 
+def test_stage2_takes_assetgen_parts(staged):
+    """AG2's facade parts: every part a building's entry lists is an instanced actor keyed
+    `<key>.<kind>` with the entry's pivot, Custom Primitive Data and the part's transforms,
+    its mesh one node of the tile's part pack, and every part slot a material."""
+    m2, _, _ = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
+    want = {(e["key"], p["kind"]): (e, p) for e in con["entries"] for p in e["parts"]}
+    assert want
+    got = {(a["entry"], a["kind"]): a for a in s2["instances"]
+           if a["entry"] in {e["key"] for e in con["entries"]}}
+    assert set(got) == set(want)
+    for (key, kind), (e, p) in want.items():
+        a = got[(key, kind)]
+        assert a["key"] == f"{key}.{kind}" and a["xforms"] == p["xforms"]
+        assert a["pivot"] == [float(v) for v in e["pivot"]] and a["cpd"] == e["cpd"]
+        assert a["mesh"].endswith("/" + U.asset_name(p["node"]))
+    packs = {pk["glb"]: pk for pk in s2["packs"]}
+    for e, p in want.values():
+        pk = packs[f"{U.ASSETS_DIR}/{p['glb']}"]
+        assert pk["use"] == "part" and U.asset_name(p["node"]) in {m["asset"]
+                                                                  for m in pk["meshes"]}
+    assert {f"{con['part']}.{m}" for m in con["materials"]} <= set(s2["materials"])
+    assert {"frame", "balcony", "dado"} <= set(con["materials"])
+    assert sum(len(a["xforms"]) for a in got.values()) == sum(e["instances"]
+                                                              for e in con["entries"])
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()

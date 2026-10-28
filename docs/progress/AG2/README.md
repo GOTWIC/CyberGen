@@ -21,7 +21,7 @@ Build times are `assetgen build` with 4 workers on the shared M4 Pro (buildings 
 street stage adds 5 to 10 s). Unique triangles are the shells plus one copy of each part
 mesh, against the budget (section 11's estimate for the city's bays and roofs, plus 40%
 for parts); drawn triangles count every instance. Nearest thumbnails: the fewest bits of
-480 by which two buildings outside one family differ (at least 8 asked).
+1,504 by which two buildings outside one family differ (at least 8 asked).
 
 ## What AG2 adds
 
@@ -136,7 +136,7 @@ All five pass on every sample:
 | `asset_coverage` | (as AG1) |
 | `asset_envelope` | every instanced part's box at each placement and every merged part by its slot's reach: flush parts (frames, sills, caps, shutters, grilles, members, columns) up to 0.16 m out at any height, strips (fins, sunshades, louvers, pods, screens, AC units, dishes) as AG1's cornices, deep parts (balconies, canopies) up to 1.81 m out at least 3 m up; masts and spires within $\max(12, 0.2 h) + 1.5$ m over the highest roof |
 | `asset_meshes` | every part mesh closed, as the shells |
-| `asset_unique` | also every two buildings outside one family 8 bits apart of their 480 bit thumbnail hash (a 64 px z-buffered drawing from the contact sheet's view, shaded by slot tint; a difference hash over 16 x 16 blocks); a building filling under 10% of its thumbnail (a long thin shed, drawn as a line in any contact sheet) is told apart by its genes alone |
+| `asset_unique` | also every two buildings outside one family 8 bits apart of their 1,504 bit thumbnail hash (a 64 px z-buffered drawing from the contact sheet's view, shaded by slot tint; over 16 x 16 blocks, a difference hash for its structure and each block's mean shade in four steps for its tone); a building filling under 10% of its thumbnail (a long thin shed, drawn as a line in any contact sheet) is told apart by its genes alone |
 | `asset_budget` | per building class (low under 12 m, mid under 40 m, high under 100 m, tower, and mega for megabuildings, straddle buildings and landmarks): unique triangles at most $k$ times section 11's estimate for the building's bays and roof plus a base, instances at most $i$ per bay plus a base; the city's part meshes within 40% of its shell estimate and its instances within 3 per bay |
 
 UNIQUE
@@ -146,9 +146,11 @@ UNIQUE
 No exporter code changes here. Each building entry of `unreal_contribution.buildings.json`
 lists its instanced parts (kind, type, glb, node, asset, count, triangles, transforms and the
 building's id) and its instance count; `docs/unreal_export.md` ("From AG2") has the format.
-The exporter's parts import is in its own PR (`claude/ag-unreal-layer`, open when AG2's PR
-opened), so this PR has no test of the exporter's manifest with AG2's parts; that branch's
-`build_manifest` took Vesper Bay's AG2 contribution: EXPORT. Unreal check: the coordinating
+The exporter's stage 2 import (merged while AG2 was built) takes them as they are: an
+instanced actor per building and part kind, keyed `<key>.<kind>`, with the building's pivot
+and Custom Primitive Data, its mesh from the tile's part pack.
+`tests/test_unreal.py::test_stage2_takes_assetgen_parts` checks this on the small city;
+for Vesper Bay, `unreal.build_manifest` gives EXPORT. Unreal check: the coordinating
 session's call.
 
 ## Goldens
