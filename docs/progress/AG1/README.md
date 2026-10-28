@@ -133,14 +133,28 @@ blockout's.
 |---|---|
 | <img src="vesper_bay_stacks/city_full.jpg" width="420"> | <img src="cragmouth/city_full.jpg" width="420"> |
 
-Each city's `city.jpg` (from its proxies, 8K) is beside its `city_full.jpg`; Vesper Bay's:
+Vesper Bay from its proxies (`city`; 1600 px here):
 
 <img src="vesper_bay/city.jpg" width="420">
 
-CRAG_DETAIL
+**Cragmouth on its slopes** (1600 px here; every building on its base with a plinth down to
+the ground):
+
+| d03 Crown Heights, on the plateau over the bay | d04 Old Quarter |
+|---|---|
+| <img src="cragmouth/iso_d03.jpg" width="420"> | <img src="cragmouth/iso_d04.jpg" width="420"> |
+
+| street_1, Crown Heights | street_2, Ridgeback |
+|---|---|
+| <img src="cragmouth/street_1.jpg" width="420"> | <img src="cragmouth/street_2.jpg" width="420"> |
+
+| street_3, Hollow | street_4, Lantern Steps |
+|---|---|
+| <img src="cragmouth/street_3.jpg" width="420"> | <img src="cragmouth/street_4.jpg" width="420"> |
 
 **Vesper Bay's districts at full detail** (`iso_<district>`, the district's shells with the
-rest of the city from proxies, 2400 px; 8K for Corporate Core and Highcrest in `detail/`):
+rest of the city from proxies; rendered at 2400 px, 1600 px here; Corporate Core at 8K in
+`detail/`):
 
 | d01 Corporate Core | d02 The Stacks |
 |---|---|
@@ -158,7 +172,8 @@ rest of the city from proxies, 2400 px; 8K for Corporate Core and Highcrest in `
 |---|---|
 | <img src="vesper_bay/iso_d07.jpg" width="420"> | <img src="vesper_bay/iso_d08.jpg" width="420"> |
 
-**Street level** (the blockout's five street cameras, 2400 px; 8K in `detail/`):
+**Street level** (the blockout's five street cameras, 1600 px here; street_5 at 8K in
+`detail/`):
 
 | street_1, Corporate Core | street_2, The Stacks |
 |---|---|
