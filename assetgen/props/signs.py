@@ -138,8 +138,13 @@ def put_text(m: Mesh, slot: str, strokes, origin, right, up, unit: float, mode: 
             d = mul(d, 1.0 / L)
             p = cross(normal, d)
             a2, b2 = sub(a, mul(d, t)), add(b, mul(d, t))
-            quad_out(m, slot, sub(a2, mul(p, t)), sub(b2, mul(p, t)), add(b2, mul(p, t)),
-                     add(a2, mul(p, t)), normal)
+            q = (sub(a2, mul(p, t)), sub(b2, mul(p, t)), add(b2, mul(p, t)), add(a2, mul(p, t)))
+            # (two strokes of a generated glyph can land on the same millimeters)
+            qk = tuple(sorted(tuple(int(round(v * 1000.0)) for v in c) for c in q))
+            if qk in seen:
+                continue
+            seen.add(qk)
+            quad_out(m, slot, *q, normal)
 
 
 def fit(strokes_wh, w: float, h: float) -> float:
