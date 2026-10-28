@@ -144,7 +144,8 @@ class MeshBuilder:
         top = Frame((corners[0][0], corners[0][1], z0 + up), (ux, uy, 0.0), (vx, vy, 0.0))
         self.quad(material, top, 0, 0, along, across, color)
 
-    def primitives(self, materials: dict[str, int]) -> list[Primitive]:
+    def primitives(self, materials: dict[str, int], lean: bool = False) -> list[Primitive]:
+        """glTF primitives per slot; `lean` leaves out UV1 and the vertex colors."""
         out = []
         for name, pr in self.slots.items():
             if not pr.idx:
@@ -153,8 +154,9 @@ class MeshBuilder:
                 material=materials[name], positions=np.array(pr.pos, dtype=np.int64),
                 indices=np.array(pr.idx, dtype=np.int64),
                 normals=np.array(pr.nrm, dtype=np.float64),
-                uv0=np.array(pr.uv0, dtype=np.float64), uv1=np.array(pr.uv1, dtype=np.float64),
-                colors=np.array(pr.col, dtype=np.uint8)))
+                uv0=np.array(pr.uv0, dtype=np.float64),
+                uv1=None if lean else np.array(pr.uv1, dtype=np.float64),
+                colors=None if lean else np.array(pr.col, dtype=np.uint8)))
         return out
 
 

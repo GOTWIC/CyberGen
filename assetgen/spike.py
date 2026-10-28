@@ -17,8 +17,9 @@ building. Randomness is blake2b of (salt, id, purpose).
 
 `write_spike(out)` writes per building `<name>.glb` (shell and part prototypes, the import
 the exporter uses), `<name>_gpuinst.glb` (parts with EXT_mesh_gpu_instancing),
-`<name>_quant.glb` (KHR_mesh_quantization) and `<name>_ubx.glb` (UBX_ collision nodes),
-plus `unreal_contribution.json` (assetgen's entries in the exporter's manifest format) and
+`<name>_quant.glb` (KHR_mesh_quantization), `<name>_ubx.glb` (UBX_ collision nodes) and
+`tower_lean.glb` (no UV1 or vertex colors, to measure what they cost in Nanite), plus
+`unreal_contribution.json` (assetgen's entries in the exporter's manifest format) and
 `spike_report.json`.
 """
 
@@ -545,7 +546,8 @@ def _materials(g: G.Gltf) -> dict[str, int]:
 def _glb(sp: Spike, variant: str) -> tuple[bytes, dict]:
     g = G.Gltf(generator=f"assetgen {__version__}", quantized=(variant == "quant"))
     mats = _materials(g)
-    shell = g.mesh(sp.key + ".shell", sp.shell.primitives(mats), extras={"kind": "shell"})
+    shell = g.mesh(sp.key + ".shell", sp.shell.primitives(mats, lean=(variant == "lean")),
+                   extras={"kind": "shell"})
     children = [g.node(sp.key + ".shell", mesh=shell)]
     for kind in sorted(sp.parts):
         mesh = g.mesh(f"{sp.key}.{kind}", sp.parts[kind].primitives(mats),
@@ -625,7 +627,10 @@ def write_spike(out_dir: str | Path, quantized: bool = True, which=None) -> dict
             continue
         sp = make()
         info = None
-        for variant in ("main", "gpuinst", "ubx") + (("quant",) if quantized else ()):
+        variants = ("main", "gpuinst", "ubx") + (("quant",) if quantized else ())
+        if name == "tower":
+            variants += ("lean",)
+        for variant in variants:
             data, info_v = _glb(sp, variant)
             fn = f"{name}.glb" if variant == "main" else f"{name}_{variant}.glb"
             (out / fn).write_bytes(data)

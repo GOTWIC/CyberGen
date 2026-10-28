@@ -21,7 +21,7 @@ T0 = time.time()
 RES = {"ok": False, "shots": []}
 # (name, eye, target, horizontal field of view): citygen meters, the spike level's layout
 VIEWS = [
-    ("tower", (-470.0, -650.0, 190.0), (-40.0, 0.0, 165.0), 40.0),
+    ("tower", (-560.0, -820.0, 120.0), (-50.0, 0.0, 180.0), 45.0),
     ("tower_base", (-48.0, -62.0, 8.0), (-10.0, -20.0, 22.0), 80.0),
     ("shopfront_row", (52.0, -75.0, 3.0), (72.0, -45.0, 6.0), 80.0),
     ("shanty_stack", (96.0, -68.0, 4.0), (110.0, -42.0, 5.0), 80.0),

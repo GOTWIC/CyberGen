@@ -11,6 +11,7 @@ makes one; `new_project` here only adds the plugins the spike needs to such a pr
 from __future__ import annotations
 
 import json
+import re
 import os
 import subprocess
 import sys
@@ -93,3 +94,41 @@ def cook(root: Path, uproject: Path, packages: list[str], log: Path,
                     files[f.name] = f.stat().st_size
         sizes[p] = files
     return {"exit_code": proc.returncode, "wall_s": round(time.time() - t, 1), "sizes": sizes}
+
+
+_NANITE = re.compile(r"Input: (\d+) Clusters, (\d+) Triangles and (\d+) Vertices")
+_SIZE = re.compile(r"Total GPU size: (\d+) bytes, Total disk size: (\d+) bytes")
+_BUILT = re.compile(r"Built static mesh \[([\d.]+)s\] (/Game/\S+?)\.")
+_DF = re.compile(r"Finished distance field build in ([\d.]+)s - (\d+)x(\d+)x(\d+) sparse "
+                 r"distance field, ([\d.]+)Mb total.*?, (\S+)$")
+
+
+def parse_log(path: Path) -> dict:
+    """What the editor log tells and Python cannot read: per mesh shell, the Nanite build
+    (input clusters and triangles, which count every level of its cluster hierarchy, GPU
+    and disk size, build time); per distance field, its build time, resolution and size."""
+    meshes, dfs = {}, []
+    last_in = last_size = None
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
+        m = _NANITE.search(line)
+        if m and "Output" not in line:
+            last_in = tuple(int(v) for v in m.groups())
+            continue
+        m = _SIZE.search(line)
+        if m:
+            last_size = tuple(int(v) for v in m.groups())
+            continue
+        m = _BUILT.search(line)
+        if m and "shell" in m.group(2) and last_size is not None:
+            meshes[m.group(2)] = {"build_s": float(m.group(1)),
+                                  "nanite_input": {"clusters": last_in[0], "triangles": last_in[1],
+                                                   "vertices": last_in[2]} if last_in else None,
+                                  "nanite_gpu_bytes": last_size[0],
+                                  "nanite_disk_bytes": last_size[1]}
+            continue
+        m = _DF.search(line)
+        if m:
+            dfs.append({"mesh": m.group(6), "build_s": float(m.group(1)),
+                        "resolution": [int(m.group(k)) for k in (2, 3, 4)],
+                        "mb": float(m.group(5))})
+    return {"meshes": meshes, "distance_fields": dfs}

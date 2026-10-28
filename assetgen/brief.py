@@ -436,6 +436,64 @@ def facing_class(city: City, hit, main_seg: str | None, own_id: str) -> tuple:
     return "open", (None if rid == own_id else rid), None
 
 
+def ring_dist(a: np.ndarray, b: np.ndarray) -> float:
+    """Smallest distance between two closed rings (0 where they touch, cross or one holds
+    the other's first vertex); the same value either way round."""
+    def pt_seg(p, r):
+        q = np.roll(r, -1, axis=0)
+        d = q - r
+        L2 = d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1]
+        L2 = np.where(L2 == 0.0, 1.0, L2)
+        f = ((p[:, None, 0] - r[None, :, 0]) * d[None, :, 0] +
+             (p[:, None, 1] - r[None, :, 1]) * d[None, :, 1]) / L2[None, :]
+        f = np.clip(f, 0.0, 1.0)
+        ex = p[:, None, 0] - (r[None, :, 0] + f * d[None, :, 0])
+        ey = p[:, None, 1] - (r[None, :, 1] + f * d[None, :, 1])
+        return np.sqrt(ex * ex + ey * ey).min()
+
+    d = min(pt_seg(a, b), pt_seg(b, a))
+    if d == 0.0:
+        return 0.0
+    if PL.inside_ring(a[:1, 0], a[:1, 1], b)[0] or PL.inside_ring(b[:1, 0], b[:1, 1], a)[0]:
+        return 0.0
+    a2, b2 = np.roll(a, -1, axis=0), np.roll(b, -1, axis=0)
+
+    def orient(p, q, r):
+        return ((q[..., 0] - p[..., 0]) * (r[..., 1] - p[..., 1]) -
+                (q[..., 1] - p[..., 1]) * (r[..., 0] - p[..., 0]))
+
+    A, A2, B, B2 = a[:, None], a2[:, None], b[None, :], b2[None, :]
+    o1, o2 = orient(A, A2, B), orient(A, A2, B2)
+    o3, o4 = orient(B, B2, A), orient(B, B2, A2)
+    if (((o1 > 0) & (o2 < 0) | (o1 < 0) & (o2 > 0)) &
+            ((o3 > 0) & (o4 < 0) | (o3 < 0) & (o4 > 0))).any():
+        return 0.0
+    return float(d)
+
+
+def neighbors_of(city: City, k: int) -> list[tuple[str, float]]:
+    """(id, distance) of every other building with a mass within 3 m of one of this
+    building's masses at a height they share, by id. Symmetric: each pair is measured the
+    same way from both sides."""
+    best: dict[str, float] = {}
+    for mass in city.by_b[k]:
+        x0, y0, x1, y1 = mass.box
+        a = np.array(mass.rings[0])
+        for j in city.index.query(x0 - BLIND_M, y0 - BLIND_M, x1 + BLIND_M, y1 + BLIND_M):
+            o = city.masses[j]
+            if o.b == k or o.z1 <= mass.z0 or o.z0 >= mass.z1:
+                continue
+            bx0, by0, bx1, by1 = o.box
+            if bx0 > x1 + BLIND_M or bx1 < x0 - BLIND_M or by0 > y1 + BLIND_M or \
+                    by1 < y0 - BLIND_M:
+                continue
+            oid = city.m.buildings[o.b].id
+            d = ring_dist(a, np.array(o.rings[0]))
+            if d <= BLIND_M and (oid not in best or d < best[oid]):
+                best[oid] = d
+    return sorted(best.items())
+
+
 # ---------------------------------------------------------------------------
 # Locating things on facades
 # ---------------------------------------------------------------------------
@@ -707,23 +765,16 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
     edge_recs = [_edge_record(e, ox, oy, faced, k) for e in edges]
     for rec, e in zip(edge_recs, edges):
         rec["mass"] = e.mass.k
-    neighbors: dict[str, list] = {}
-    for e in edges:
-        for c in e.covers:
-            if c[0] in ("party", "blind"):
-                cur = neighbors.get(c[5])
-                rel = c[0] if c[6] <= PARTY_M else "blind"
-                if cur is None or c[6] < cur[0]:
-                    neighbors[c[5]] = [c[6], rel]
     nb = []
-    for nid in sorted(neighbors):
+    for nid, d in neighbors_of(city, k):
         o = city.m.buildings[city.bidx[nid]]
-        d, rel = neighbors[nid]
         nb.append({"id": nid, "d_m": C.m(d), "relation": "party" if d <= PARTY_M else "blind",
                    "height_m": C.m(o.height_m), "type": o.type})
 
     def loc(x, y, z):
-        return at(locate(edges, x, y, z))
+        """On the facade of a mass that spans z, else on the nearest facade at any height
+        (a blade sign over a lower shack, a skybridge end on a setback)."""
+        return at(locate(edges, x, y, z) or locate(edges, x, y, z, tol_z=math.inf))
 
     units = []
     for u in b.units:

@@ -58,8 +58,9 @@ def test_glb_structure_and_frame():
     doc, binary = parse_glb(data)
     assert doc["asset"]["version"] == "2.0"
     prim = doc["meshes"][0]["primitives"][0]
-    assert list(prim["attributes"]) == ["POSITION", "NORMAL", "TEXCOORD_0", "TEXCOORD_1",
-                                        "COLOR_0"]
+    # the binary layout is in a fixed attribute order (the JSON keys are sorted)
+    order = ["POSITION", "NORMAL", "TEXCOORD_0", "TEXCOORD_1", "COLOR_0"]
+    assert [prim["attributes"][k] for k in order] == sorted(prim["attributes"].values())
     pos = read_acc(doc, binary, prim["attributes"]["POSITION"])
     acc = doc["accessors"][prim["attributes"]["POSITION"]]
     assert acc["min"] == pos.min(axis=0).tolist() and acc["max"] == pos.max(axis=0).tolist()

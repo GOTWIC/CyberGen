@@ -63,7 +63,7 @@ def main():
     args = ap.parse_args()
     out = {"about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json "
                     "(tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few "
-                    "Vesper Bay buildings, every sample's briefs.json, the two small spike "
+                    "Vesper Bay buildings, the five samples' briefs.json, the two small spike "
                     "buildings' glTF files and a triangulation. Made on the M4 Mac and "
                     "confirmed on x86_64 Linux (docker image citygen-x86).",
            "testport_briefs": C.sha256_bytes(

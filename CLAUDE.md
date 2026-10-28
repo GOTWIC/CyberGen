@@ -558,7 +558,7 @@ AG0 (contract and spike) is in place:
   `assetgen/ue/spike_import.py`, `spike_shots.py`, driver `unreal_spike.py`. Results:
   `docs/progress/AG0/` and scope section 11.
 - **Determinism**: `tests/assetgen/data/golden_hashes.json` (small test city, Vesper Bay
-  buildings, every sample's briefs, small spike buildings, a triangulation), Mac = x86
+  buildings, the five samples' briefs, small spike buildings, a triangulation), Mac = x86
   (`citygen-x86`). Write them again with `.venv/bin/python tests/assetgen/goldens.py
   [--builds DIR]` after a citygen change moves a model, and say why in the PR.
 

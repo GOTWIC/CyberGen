@@ -2,9 +2,9 @@
 
 Meshes arrive as integer millimeters in a building's frame (citygen's: x east, y north, z
 up); the writer turns them into glTF's frame (x, z, -y: y up, right-handed) in meters. The
-same input gives the same bytes on every machine: attributes in a fixed order (POSITION,
-NORMAL, TEXCOORD_0, TEXCOORD_1, COLOR_0), buffer views in the order they are added, 4-byte
-alignment with zero padding, canonical JSON (sorted keys, no spaces) padded with spaces,
+same input gives the same bytes on every machine: attributes written to the buffer in a
+fixed order (POSITION, NORMAL, TEXCOORD_0, TEXCOORD_1, COLOR_0), buffer views in that order,
+4-byte alignment with zero padding, canonical JSON (sorted keys, no spaces) padded with spaces,
 float32 values from correctly rounded conversions, accessor bounds from those float32
 values.
 
@@ -202,7 +202,7 @@ class Gltf:
             f = (pos.astype(np.float64) / 1000.0).astype(np.float32)
             attrs["POSITION"] = w.accessor(f, FLOAT, "VEC3", bounds=True)
         else:
-            q = ((pos - qoff) // qscale).astype(np.int16)
+            q = ((pos - qoff + qscale // 2) // qscale).astype(np.int16)   # nearest step
             attrs["POSITION"] = w.accessor(q, SHORT, "VEC3", bounds=True)
         if p.normals is not None:
             n = to_gltf_vec(p.normals)

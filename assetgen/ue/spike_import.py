@@ -283,6 +283,9 @@ def import_one(variant, name, glb, df=False, by_name=False):
                 ag = bs.get_editor_property("agg_geom")
                 info["box_elems"] = len(ag.get_editor_property("box_elems"))
                 info["convex_elems"] = len(ag.get_editor_property("convex_elems"))
+            box = a.get_bounding_box()
+            info["bounds_cm"] = [round(v, 1) for v in (box.min.x, box.min.y, box.min.z,
+                                                       box.max.x, box.max.y, box.max.z)]
             meshes[p.split(".")[0]] = info
     files = content_files(folder)
     rec = {"import_s": round(t_import, 2), "save_s": round(t_save, 2),
@@ -296,6 +299,13 @@ def import_one(variant, name, glb, df=False, by_name=False):
 
 def imports():
     sp = JOB["spike"]
+    only = JOB.get("only")
+    if only:
+        for variant, name, suffix in only:
+            df, by_name = variant == "DF", variant == "UBX"
+            attempt(f"{variant}/{name}", import_one, variant, name, f"{sp}/{name}{suffix}.glb",
+                    df, by_name)
+        return
     for name in NAMES:
         attempt(f"Plain/{name}", import_one, "Plain", name, f"{sp}/{name}.glb")
     for name in NAMES:
@@ -451,7 +461,7 @@ def level(mats):
                 h.set_custom_primitive_data_float(i, float(v))
             n_inst += len(xf)
         placed[name] = {"collision_boxes": boxes, "instances": n_inst}
-    if RES.get("assembly", {}).get("ok"):
+    if EAL.does_asset_exist(f"{ROOT}/Assembly/SM_tower_assembly"):
         am = unreal.load_asset(f"{ROOT}/Assembly/SM_tower_assembly")
         a = eas.spawn_actor_from_class(unreal.StaticMeshActor, ue(-110.0, 0.0, 0.0))
         a.set_actor_label("spike.tower.assembly")
@@ -459,7 +469,8 @@ def level(mats):
         for i, v in enumerate(entry("tower")["cpd"]):
             a.static_mesh_component.set_custom_primitive_data_float(i, float(v))
     sun = eas.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 50000))
-    sun.set_actor_rotation(unreal.Rotator(0.0, -38.0, 125.0), False)
+    # the sun in the south-west (light travelling north-east), on the faces the shots see
+    sun.set_actor_rotation(unreal.Rotator(0.0, -38.0, -50.0), False)
     sun.light_component.set_editor_property("atmosphere_sun_light", True)
     sky = eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 40000))
     sky.light_component.set_editor_property("real_time_capture", True)
@@ -497,16 +508,27 @@ def scene_import():
     for a in actors:
         for c in a.get_components_by_class(unreal.InstancedStaticMeshComponent):
             inst += c.get_instance_count()
+    parts = sum(p["count"] for p in entry("shopfront_row")["parts"])
     RES["scene_import"] = {"actors": len(actors) - before, "components": comps,
-                           "ism_instances": inst,
-                           "parts_in_file": sum(p["count"] for p in entry("shopfront_row")["parts"])}
+                           "ism_instances": inst, "parts_in_file": parts}
     les.save_current_level()
 
 
 def main():
     log("start")
     mats = material_instances()
+    if JOB.get("relevel"):
+        # the level again from the imported meshes (materials, collision and Custom
+        # Primitive Data set again, as after a re-import that reset them)
+        attempt("level", level, mats)
+        RES["ok"] = not RES["errors"]
+        RES["total_s"] = round(time.time() - T0, 1)
+        return
     imports()
+    if JOB.get("only"):
+        RES["ok"] = not RES["errors"]
+        RES["total_s"] = round(time.time() - T0, 1)
+        return
     attempt("voxel_foliage", voxel_foliage)
     attempt("assembly", assembly)
     attempt("level", level, mats)
