@@ -287,7 +287,9 @@ def maker_for(st) -> str | None:
 
 @maker("retaining_wall", 1)
 def make_retaining_wall(inp: dict) -> Out:
-    """M13's retaining walls: line z is the wall's height over its lower side."""
+    """M13's retaining walls: line z is the wall's height over its lower side; the ground
+    at the line is about halfway up, so the wall runs from under the lower ground to a
+    0.3 m parapet over the upper (as M13's blockout draws it)."""
     st = inp["st"]
     line = st.get("line") or []
     if len(line) < 2:
@@ -304,18 +306,18 @@ def make_retaining_wall(inp: dict) -> Out:
             continue
         ux, uy = unit(q[0] - p[0], q[1] - p[1])
         ox, oy = -uy * 0.2, ux * 0.2
-        za, zb = gnd[k], gnd[k + 1]
         ha, hb = max(p[2], 0.3), max(q[2], 0.3)
+        ta, tb = gnd[k] + ha / 2.0 + 0.3, gnd[k + 1] + hb / 2.0 + 0.3
+        ba, bb = gnd[k] - ha / 2.0 - 0.7, gnd[k + 1] - hb / 2.0 - 0.7
         for s in (1.0, -1.0):
             a_ = (p[0] + ox * s, p[1] + oy * s)
             b_ = (q[0] + ox * s, q[1] + oy * s)
             if s > 0:
-                a_, b_ = b_, a_
-                mesh.wall("concrete", a_, b_, zb - 0.5, zb + hb, za - 0.5, za + ha)
+                mesh.wall("concrete", b_, a_, bb, tb, ba, ta)
             else:
-                mesh.wall("concrete", a_, b_, za - 0.5, za + ha, zb - 0.5, zb + hb)
-        mesh.quad("stone.coping", (p[0] - ox, p[1] - oy, za + ha), (q[0] - ox, q[1] - oy, zb + hb),
-                  (q[0] + ox, q[1] + oy, zb + hb), (p[0] + ox, p[1] + oy, za + ha))
+                mesh.wall("concrete", a_, b_, ba, ta, bb, tb)
+        mesh.quad("stone.coping", (p[0] - ox, p[1] - oy, ta), (q[0] - ox, q[1] - oy, tb),
+                  (q[0] + ox, q[1] + oy, tb), (p[0] + ox, p[1] + oy, ta))
     return Out(mesh=mesh)
 
 

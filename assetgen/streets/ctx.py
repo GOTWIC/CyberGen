@@ -75,6 +75,19 @@ class Ground:
             return None
         return [C.m(self.at(p[0], p[1])) for p in pts]
 
+    def along_road(self, seg, pts) -> list[float] | None:
+        """The road's grade line under points near it (M13 lifts a road tunnel, its portals
+        and open approaches by it), else the terrain; None on a flat city."""
+        if self.flat:
+            return None
+        g = getattr(seg, "ground", None) if seg is not None else None
+        if not g:
+            return self.samples(pts)
+        from .path import Path, Profile
+        path = Path(seg.centerline)
+        prof = Profile.of(g)
+        return [C.m(prof(path.project(p[0], p[1])[0])) for p in pts]
+
     def water_level(self, wid: str | None, default: float) -> float:
         if self.flat or wid is None or wid not in self.water:
             return default
@@ -235,6 +248,8 @@ def _blockout_keys(m: CityModel) -> tuple[dict[str, list[str]], dict[str, str]]:
         BO._open_space(P)
         BO._sites(P)
         BO._tunnels(P)
+        if getattr(m, "terrain", None) is not None and hasattr(BO, "_terrain"):
+            BO._terrain(P)          # M13: the joined retaining walls
     keys: dict[str, list[str]] = defaultdict(list)
     tiles: dict[str, str] = {}
     for o in P.objects:

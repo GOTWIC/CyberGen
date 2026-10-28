@@ -156,7 +156,9 @@ def make_sidewalk(inp: dict) -> Out:
         c = row[0]
         b = row[-1]
         bot = (c[0], c[1], z)
-        gnd = (b[0], b[1], rd.ground(rd.path.project(b[0], b[1])[0]) - 0.02)
+        # the back face down to the lot's ground, or on a deck down to the deck
+        g = rd.ground(rd.path.project(b[0], b[1])[0])
+        gnd = (b[0], b[1], g - 0.02 if z - g < 0.5 else z - ROAD_DZ)
         if sgn > 0:
             face.append([bot, c])
             back.append([b, gnd])

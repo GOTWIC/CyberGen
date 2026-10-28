@@ -430,10 +430,20 @@ def make_column(inp: dict) -> Out:
 # Tunnels
 # ---------------------------------------------------------------------------
 
+def _tunnel_ground(cx: Ctx, t, pts):
+    """Ground under a tunnel's points: its road's grade line for a road tunnel (as M13's
+    blockout lifts it), the terrain for a metro tunnel or an underpass."""
+    if t is not None and t.kind not in ("metro", "pedestrian") and t.segment_ids:
+        return cx.ground.along_road(cx.seg.get(t.segment_ids[0]), pts)
+    return cx.ground.samples(pts)
+
+
 def gather_tunnel(cx: Ctx, t) -> Piece:
     pts = [(p[0], p[1]) for p in t.line]
-    inputs = {"tunnel": dump(t), "ground": cx.ground.samples(t.line),
+    inputs = {"tunnel": dump(t), "ground": _tunnel_ground(cx, t, t.line),
               "origin": list(bbox_center(pts))}
+    if t.segment_ids:
+        inputs["roads"] = list(t.segment_ids)
     return Piece(t.id, f"street.tunnel.{t.kind}", "tunnel", cx.tile_for(t.id, pts),
                  cx.keys.get(t.id, []), inputs)
 
@@ -549,8 +559,11 @@ def gather_trench(cx: Ctx, st) -> Piece:
     ring = st.footprint.exterior
     c = bbox_center(ring)
     inputs = {"st": dump(st), "tunnel": dump(t) if t is not None else None,
-              "ground": cx.ground.samples(t.line) if t is not None else None,
-              "ground_c": cx.ground.samples([c]), "origin": list(c)}
+              "ground": _tunnel_ground(cx, t, t.line) if t is not None else None,
+              "ground_c": _tunnel_ground(cx, t, [c]), "origin": list(c)}
+    if t is not None and t.kind not in ("metro", "pedestrian") and not cx.ground.flat:
+        # the open approach's parapet stands on the terrain
+        inputs["terrain"] = cx.ground.samples(t.line)
     return Piece(st.id, f"street.{(st.attrs or {}).get('role', 'trench')}", "trench",
                  cx.tile_for(st.id, ring), cx.keys.get(st.id, []), inputs)
 
@@ -574,7 +587,7 @@ def make_trench(inp: dict) -> Out:
         return Out(empty="no portal")
     p = min(ps, key=lambda v: abs(v - s_c))
     s0, s1 = (0.0, p) if s_c < p else (p, ln.L)
-    gnd = inp["ground"]
+    gnd = inp.get("terrain") or inp["ground"]
     gl = Line3([(q[0], q[1], 0.0) for q in t["line"]], gnd) if gnd else None
 
     def top(s):
@@ -629,7 +642,7 @@ def gather_portal(cx: Ctx, st) -> Piece:
     ring = st.footprint.exterior
     c = bbox_center(ring)
     inputs = {"st": dump(st), "tunnel": dump(t) if t is not None else None,
-              "ground_c": cx.ground.samples([c]), "origin": list(c)}
+              "ground_c": _tunnel_ground(cx, t, [c]), "origin": list(c)}
     return Piece(st.id, "street.portal", "portal", cx.tile_for(st.id, ring),
                  cx.keys.get(st.id, []), inputs)
 
