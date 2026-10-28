@@ -445,6 +445,17 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
             if own_n.cls.get(i, "out") != "out" or (i in io[c] and
                                                     own_o.cls.get(i, "out") != "out"):
                 src[i] = "n"
+    # M13: retaining walls are traced on the ground, which comes from the new build (the
+    # ones it has as they were stay old rows)
+    for i, e in io["structures"].items():
+        if e.get("kind") == "retaining_wall":
+            if inn["structures"].get(i) == e:
+                src[i] = "o"
+            else:
+                src.pop(i, None)
+    for i, e in inn["structures"].items():
+        if e.get("kind") == "retaining_wall" and io["structures"].get(i) != e:
+            src[i] = "n"
     first = {k: v for k, v in src.items()}
     dangling = _close(src, io, inn, coll_of)
     # rows: the old order for the old ones, then the new ones in the new build's order
@@ -455,8 +466,11 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
         if c in ID.SORTED:
             rows.sort(key=lambda e: e["id"])
         out[c] = rows
-    for k in ("spec_sha256",):
-        out[k] = N.get(k)
+    # (M13: the ground of the new build, whose grade lines keep the held roads' own, so
+    # it differs from the old one only around the district's new streets)
+    for k in ("spec_sha256", "terrain"):
+        if k in N or k in out:
+            out[k] = N.get(k)
     _fields(out, O, N, did, zone)
     _factions(out, io["factions"], inn["factions"])
     n_taxi = _spacing(out, src)
@@ -552,8 +566,11 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
         for j in rev["o"].get(i, ()):
             if src.get(j) != "o":
                 continue
-            if present and coll_of[j] in STAY:
+            if present and coll_of[j] in STAY and not (coll_of[j] in ID.DERIVED and
+                                                       j.startswith(i + ".")):
                 continue   # it still names something that is there: it stays as it was
+            # (a gameplay row named after what it names, a building's points of interest,
+            # follows it)
             if ent(j, "n") is None:
                 del src[j]
                 gone.append(j)
@@ -587,6 +604,7 @@ def _close(src: dict, io: dict, inn: dict, coll_of: dict) -> list:
             old_referrers(i)
         if not work and not gone:
             _ground_neighbors(src, io, inn, take, gone, changed, probed)
+            _ground_cover(src, io, inn, take, gone, changed, probed)
     return dangling
 
 
@@ -649,6 +667,38 @@ def _ground_neighbors(src, io, inn, take, gone, changed, probed: set) -> None:
         g = _ground_shape(c, e)
         if g is not None:
             hit.update(int(j) for j in tree.query(g, predicate="dwithin", distance=reach[k]))
+    for k in sorted(hit):
+        c, i = olds[k]
+        if src.get(i) != "o":
+            continue
+        if inn[c].get(i) is None:
+            del src[i]
+            gone.append(i)
+        elif changed(i):
+            take(i)
+
+
+def _ground_cover(src, io, inn, take, gone, changed, probed: set) -> None:
+    """Old lots and open spaces under a lot, open space or building the new build changed
+    (a seam block of another district split again: a park where a new lot now is)."""
+    olds = [(c, i) for c in ("lots", "open_spaces") for i in io[c] if src.get(i) == "o"]
+    if not olds:
+        return
+    polys = [G.from_model_poly(io[c][i]["polygon"]) for c, i in olds]
+    tree = shapely.STRtree(polys)
+    hit = set()
+    for c in ("lots", "open_spaces", "buildings"):
+        for i, e in inn[c].items():
+            key = ("cover", i)
+            if key in probed or src.get(i) != "n" or not changed(i):
+                continue
+            probed.add(key)
+            g = _ground_shape(c, e)
+            if g is None:
+                continue
+            for k in sorted(int(k) for k in tree.query(g, predicate="intersects")):
+                if olds[k][1] != i and G.area(polys[k].intersection(g)) > 1.0:
+                    hit.add(k)
     for k in sorted(hit):
         c, i = olds[k]
         if src.get(i) != "o":

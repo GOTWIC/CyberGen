@@ -542,6 +542,59 @@ class District(_Model):
 # City
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Terrain (M13)
+# ---------------------------------------------------------------------------
+
+At = Annotated[str, Field(description="A district name, a map direction or 'center'.")]
+
+
+class Hill(_Model):
+    name: Name | None = None
+    at: At = Field(description="Where its top stands: a district (its middle), a direction or "
+                               "'center'.")
+    height_m: Annotated[float, Field(gt=0, le=400)] = Field(description="Rise of the top.")
+    radius_m: Annotated[float, Field(ge=100, le=5000)] = Field(
+        600.0, description="Where the slope ends; the steepest slope is about 1.5 times "
+                           "height / radius.")
+
+
+class Ridge(_Model):
+    name: Name | None = None
+    from_: At = Field(alias="from", description="One end: a district, a direction or 'center'.")
+    to: At = Field(description="The other end.")
+    height_m: Annotated[float, Field(gt=0, le=400)]
+    width_m: Annotated[float, Field(ge=100, le=3000)] = 500.0
+
+
+class Cliff(_Model):
+    """A district standing on a plateau: its edges rise `height_m` over `width_m` (a cliff
+    where narrow, an escarpment where wide); at the sea it is a sea cliff."""
+    district: Name
+    height_m: Annotated[float, Field(gt=0, le=200)]
+    width_m: Annotated[float, Field(ge=10, le=600)] = 60.0
+    facing: list[Direction] = Field(default_factory=list, description="Sides where the edge "
+                                    "is a cliff; on the other sides the plateau rises over a "
+                                    "broad slope (`slope_m`). Left out: a cliff all round.")
+    slope_m: Annotated[float, Field(ge=50, le=2000)] = 400.0
+
+
+class Terrain(_Model):
+    """The ground (M13). Left out, the city is flat at sea level, as before M13."""
+    shore_m: Annotated[float, Field(ge=0.5, le=20)] = Field(
+        2.0, description="Ground over the water at a low shore.")
+    inland_grade: Annotated[float, Field(ge=0, le=0.08)] = Field(
+        0.0, description="How the land rises away from the sea (a fraction, 0.01 = 1%).")
+    relief_m: Annotated[float, Field(ge=0, le=60)] = Field(
+        0.0, description="Rolling ground: amplitude of a smooth random relief.")
+    relief_scale_m: Annotated[float, Field(ge=150, le=3000)] = 600.0
+    hills: list[Hill] = Field(default_factory=list)
+    ridges: list[Ridge] = Field(default_factory=list)
+    cliffs: list[Cliff] = Field(default_factory=list)
+    flat: StrOrList = Field(default_factory=list, description="Districts levelled flat "
+                                                             "(megasites always are).")
+
+
 class Source(_Model):
     prompt: str | None = None
     image: str | None = Field(None, description="Repo path of the concept image, if any.")
@@ -561,6 +614,8 @@ class CitySpec(_Model):
     highways: Highways = Field(default_factory=Highways)
     transit: Transit = Field(default_factory=Transit)
     districts: Annotated[list[District], Field(min_length=1, max_length=24)]
+    terrain: Terrain | None = Field(None, description="M13: hills, ridges, cliffs, flat "
+                                                      "districts. Left out: flat ground.")
 
     def district(self, name: str) -> District | None:
         return next((d for d in self.districts if d.name == name), None)

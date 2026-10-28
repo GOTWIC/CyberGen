@@ -191,6 +191,13 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
             b["ramp_length_m"] = a.pop("ramp_length_m")
             b.pop("road_class", None)
         data["tunnels"] = [dict(t) for t in roads.tunnels]
+    if roads is not None and roads.terrain is not None:
+        from . import terrain as TE
+
+        f, lv, tst = roads.terrain
+        graded = getattr(local, "terrain", None) if local is not None else None
+        data["terrain"] = TE.terrain_rows(f, lv, tst if graded is None else graded["stats"],
+                                          None if graded is None else graded["ground"])
     if local is not None:
         data["road_nodes"] = local.nodes
         data["road_segments"] = local.segments
@@ -524,8 +531,16 @@ def road_attempt(b: Built, explicit: set[str], k: int) -> _RoadTry:
     sites, site_notes = MS.place_megasites(spec, b.layout.polygons, b.hydro, b.waterways, did)
     T.stage(f"v{b.variant}/megasites", sites)
     opens = [G.from_model_poly(o.polygon) for o in b.model.open_spaces]
+    ground = None
+    if spec.terrain is not None:
+        from . import terrain as TE
+
+        ground = TE.field(spec, assemble(spec, b.hydro, b.layout, b.waterways, explicit, sites))
+        if T.on():
+            T.stage(f"v{b.variant}/terrain", ground[0].rows())
     net = RD.build_roads(spec, b.hydro, b.layout.polygons, did, b.waterways, sites, opens,
-                         variant=k)
+                         variant=k, terrain=ground[0] if ground else None)
+    net.terrain = ground
     model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, sites, net)
     T.stage(f"v{b.variant}/roads{k}", [net.nodes, net.segments, net.bridges])
     checks, st = C.run_checks(spec, model, roads=True)
@@ -609,6 +624,23 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
         return run.map(_blocks_job, [(fn.__name__, j) for j in jobs])
 
     loc = LC.build_local(spec, b, did, mapper)
+    if b.roads.terrain is not None:
+        from . import terrain as TE
+
+        nat, lv, tst = b.roads.terrain
+        held = {}
+        if b.frame is not None:
+            # M10: a held road keeps its grade line; the district's streets fit to it
+            for sg in loc.segments:
+                old = b.frame.match(sg["centerline"], sg)
+                if old is not None and old.ground:
+                    held[sg["id"]] = [(p.s, p.z) for p in old.ground]
+        gr = TE.grade(spec, loc.segments, loc.nodes, nat, TE.water_union(b.model), held)
+        TE.apply_grade(loc, gr)
+        gr.stats["slope_greens"] = TE.steep_lots(loc, gr.finished)
+        loc.terrain = {"ground": gr.finished, "stats": {**tst, **gr.stats},
+                       "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
+        T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
     b.notes = b.notes + loc.notes
@@ -673,6 +705,16 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         side()
     b.m3 = out
     m = with_rows(b.model, BO.rows(out))
+    tg = b.local.terrain if b.local is not None else None
+    if tg is not None:
+        # M13: buildings seated on the ground, retaining walls, bored tunnels
+        from . import terrain as TE
+
+        m = with_rows(m, TE.seat(m, tg["ground"]))
+        m = with_rows(m, {"structures": list(m.structures) + TE.wall_rows(tg["walls"]) +
+                          TE.viaduct_rows(tg["viaducts"], [s.model_dump(mode="json")
+                                                           for s in m.road_segments],
+                                          b.roads.terrain[0])})
     tr = None
     if spec.transit.lines:
         tr = TR.build(spec, m, b.held_lines)
@@ -682,6 +724,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
 
     tn = TN.build(spec, m)
     m = with_rows(m, tn.rows)
+    if tg is not None:
+        m = with_rows(m, {"tunnels": list(m.tunnels) + TE.bore_rows(
+            tg["bores"], [s.model_dump(mode="json") for s in m.road_segments],
+            b.roads.terrain[0], {d.id: d.name for d in m.districts})})
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
     # M10: stable ids for everything built so far, so the props, the plants and the
@@ -699,6 +745,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
                   tn.notes]
     pr = PR.build(spec, m)
     m = with_rows(m, pr.rows)
+    if tg is not None:
+        rows, dst = TE.dressing(m)
+        m = with_rows(m, rows)
+        tg["stats"].update(dst)
     # M11: the gameplay layer on the finished city
     gp = GP.build(spec, m)
     m = with_rows(m, gp.rows)
@@ -709,10 +759,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
                                       for lm in m.landmasses})
     bx = BC._B(m)
     from . import elevated_checks as EC
-
+    from . import terrain_checks as TGC
     from . import tunnel_checks as TNC
 
-    late = {c.id: c for c in TNC.run(spec, m)}
+    late = {c.id: c for c in TNC.run(spec, m) + TGC.run(spec, m)}
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
         TC.run(spec, m) + PC.run(spec, m) + GC.run(spec, m)
@@ -721,6 +771,9 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st = early["stats"]
     st["elevated"] = EC.stats(m)
     st["tunnels"] = TNC.stats(m)
+    if m.terrain is not None:
+        st["terrain"] = {**TGC.stats(m), **{k: v for k, v in tg["stats"].items()
+                                            if k not in m.terrain.stats}}
     if "local" in st:
         st["local"] = SC.stats(spec, m)
     st["buildings"] = BC.stats(spec, m, bx)
@@ -809,6 +862,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_elevated.png")
         render_elevated(b, paths[-1])
+    if b.model.terrain is not None:
+        from .preview_terrain import render_terrain
+
+        paths.append(out / "preview_terrain.png")
+        render_terrain(b, paths[-1])
     if b.model.tunnels:
         from .preview_tunnels import render_tunnels
 

@@ -1,0 +1,167 @@
+{
+  "$schema": "../../citygen/schemas/city_spec.schema.json",
+  "name": "Cragmouth",
+  "seed": 6133,
+  "size_km": [
+    3.4,
+    3.0
+  ],
+  "source": {
+    "prompt": "A cliffside port city climbing out of a small bay. A flat harbor of cranes and container stacks at the waterline, an entertainment strip of neon stairs and terraces on the slope above it, a corporate crown of towers on a cliff-edged plateau looking down on the bay, an old quarter of crooked streets on a hill to the west, megablocks stacked along a ridge to the east, and a river valley running down from the north. Highways tunnel through the hills; a metro runs deep under them.",
+    "notes": "M13's hilly sample. Art direction: the bay on the south side so the iso camera (from the south) looks up the slopes at the crown; the crown is a plateau 30 m over the harbor with a hill on it, so its towers stand highest; the old quarter and the ridge frame it; the harbor is levelled flat. Highways stay on the ground (no viaducts): they climb in cuts and bore through the hills."
+  },
+  "water": {
+    "coast": {
+      "form": "bay",
+      "side": "south",
+      "name": "Gull Bay",
+      "sea_share": 0.28
+    },
+    "rivers": [
+      {
+        "name": "Cragwater",
+        "from": "north",
+        "to": "sea",
+        "width_m": [
+          30,
+          50
+        ],
+        "meander": 0.4
+      }
+    ],
+    "district_separation": "none",
+    "bridges": {
+      "density": 0.5
+    }
+  },
+  "highways": {
+    "pattern": "ring_plus_spine",
+    "exits": [
+      "north",
+      "east",
+      "west"
+    ],
+    "elevated_share": 0.0
+  },
+  "transit": {
+    "lines": [
+      {
+        "mode": "metro",
+        "name": "Hill Line",
+        "route": [
+          "Old Quarter",
+          "Lantern Steps",
+          "Low Harbor",
+          "Crown Heights",
+          "Ridgeback"
+        ]
+      }
+    ]
+  },
+  "districts": [
+    {
+      "name": "Low Harbor",
+      "archetype": "industrial_port",
+      "area_share": 0.12,
+      "placement": {
+        "edge": "south",
+        "coast": true
+      }
+    },
+    {
+      "name": "Lantern Steps",
+      "archetype": "entertainment_market",
+      "area_share": 0.14,
+      "placement": {
+        "west_of": "Low Harbor",
+        "coast": true
+      }
+    },
+    {
+      "name": "Crown Heights",
+      "archetype": "corporate_core",
+      "area_share": 0.16,
+      "placement": {
+        "north_of": "Low Harbor"
+      },
+      "landmarks": [
+        {
+          "kind": "megatower",
+          "name": "Crown Spire"
+        }
+      ]
+    },
+    {
+      "name": "Old Quarter",
+      "archetype": "old_town",
+      "area_share": 0.16,
+      "placement": {
+        "west_of": "Crown Heights",
+        "north_of": "Lantern Steps"
+      }
+    },
+    {
+      "name": "Ridgeback",
+      "archetype": "megablock_residential",
+      "area_share": 0.2,
+      "placement": {
+        "east_of": "Crown Heights",
+        "north_of": "Low Harbor"
+      }
+    },
+    {
+      "name": "Hollow",
+      "archetype": "midtown_mixed",
+      "area_share": 0.18,
+      "placement": {
+        "edge": "north",
+        "north_of": "Crown Heights"
+      }
+    }
+  ],
+  "terrain": {
+    "shore_m": 2.0,
+    "inland_grade": 0.012,
+    "relief_m": 8.0,
+    "relief_scale_m": 500,
+    "hills": [
+      {
+        "name": "Old Hill",
+        "at": "Old Quarter",
+        "height_m": 75,
+        "radius_m": 950
+      },
+      {
+        "name": "Crown Hill",
+        "at": "Crown Heights",
+        "height_m": 40,
+        "radius_m": 650
+      }
+    ],
+    "ridges": [
+      {
+        "name": "Ridgeback",
+        "from": "Ridgeback",
+        "to": "north_east",
+        "height_m": 70,
+        "width_m": 1000
+      }
+    ],
+    "cliffs": [
+      {
+        "district": "Crown Heights",
+        "height_m": 34,
+        "width_m": 110,
+        "facing": [
+          "south",
+          "south_east",
+          "south_west"
+        ],
+        "slope_m": 450
+      }
+    ],
+    "flat": [
+      "Low Harbor"
+    ]
+  }
+}
