@@ -174,9 +174,11 @@ def plan_views(man: dict, cams: dict, width: int, which: set[str]) -> list[dict]
             views.append({"name": "city", **_ortho(box, width, 1.6, 8000.0),
                           "shell_tiles": []})
         if "city_full" in which:
-            # every shell at once: AG1's 15 to 20 M triangles per city fit Blender
+            # every shell and part at once (AG2: 26 to 28 M unique triangles, about a
+            # million part instances); 16 samples, since EEVEE redraws the whole city each
+            # sample and the view is meant to be seen scaled down
             views.append({"name": "city_full", **_ortho(box, width, 1.6, 8000.0),
-                          "shell_tiles": sorted(man["tiles"])})
+                          "shell_tiles": sorted(man["tiles"]), "samples": 16})
     by_d: dict[str, set] = {}
     for r in man["buildings"].values():
         if r["district"]:
@@ -326,7 +328,9 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
     lit = 0.03
     job = {"assets": str(adir), "out": str(od), "views": views, "sheets": sheets,
            "instances": str(inst_path), "parts_on": parts,
-           "proxy_tiles": sorted(man["tiles"]) if views else [],
+           # proxies only where some view does not draw the tile at full detail
+           "proxy_tiles": sorted(set(man["tiles"]) - set.intersection(
+               *(set(v.get("shell_tiles", [])) for v in views))) if views else [],
            "blend": str(bo / "city.blend") if bo and (bo / "city.blend").is_file() else None,
            "slots": {k: [v[0], SY.srgb_linear(v[1]), v[2], v[3], v[4]]
                      for k, v in SY.SLOTS.items()}, "lit": lit, "samples": 32}

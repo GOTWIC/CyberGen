@@ -284,30 +284,44 @@ MATS_INST = {}
 TINTS = ("cg_wall", "cg_trim", "cg_glass", "cg_roof", "cg_spandrel", "cg_patch")
 
 
-def instance_group(proto):
-    ng = bpy.data.node_groups.new(f"ag_parts.{proto.name}", "GeometryNodeTree")
+def instance_group(coll):
+    """A geometry-node group that puts, at every point, the child of `coll` its `proto`
+    attribute picks (children sorted by name, as Collection Info sorts them). One group
+    and one instancer per pack: a group per part mesh would make every new link update
+    thousands of trees, and Blender 5 has no Python access to a modifier's inputs."""
+    ng = bpy.data.node_groups.new(f"ag_parts.{coll.name}", "GeometryNodeTree")
     ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     N, L = ng.nodes, ng.links
     gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
     iop = N.new("GeometryNodeInstanceOnPoints")
-    oi = N.new("GeometryNodeObjectInfo")
-    oi.transform_space = "ORIGINAL"
-    oi.inputs["As Instance"].default_value = True
-    oi.inputs["Object"].default_value = proto
+    iop.inputs["Pick Instance"].default_value = True
+    ci = N.new("GeometryNodeCollectionInfo")
+    ci.transform_space = "ORIGINAL"
+    ci.inputs["Collection"].default_value = coll
+    ci.inputs["Separate Children"].default_value = True
+    ci.inputs["Reset Children"].default_value = True
     rot = N.new("GeometryNodeInputNamedAttribute")
     rot.data_type = "FLOAT_VECTOR"
     rot.inputs["Name"].default_value = "rot"
+    idx = N.new("GeometryNodeInputNamedAttribute")
+    idx.data_type = "INT"
+    idx.inputs["Name"].default_value = "proto"
     L.new(gi.outputs["Geometry"], iop.inputs["Points"])
-    L.new(oi.outputs["Geometry"], iop.inputs["Instance"])
+    L.new(ci.outputs["Instances"], iop.inputs["Instance"])
+    L.new(idx.outputs["Attribute"], iop.inputs["Instance Index"])
     L.new(rot.outputs["Attribute"], iop.inputs["Rotation"])
     L.new(iop.outputs["Instances"], go.inputs["Geometry"])
     return ng
 
 
+PACKS = [0]
+
+
 def load_parts(glb, inst, tag, by_building=False):
-    """A part pack's meshes as hidden prototypes and their placements as instancers: one
-    per part mesh, or per building and part mesh (`by_building`)."""
+    """A part pack's meshes as hidden prototypes in a collection of their own (renamed in
+    the order of their node names) and their placements as one instancer, or one per
+    building (`by_building`)."""
     objs = import_glb(glb, tag)
     protos = {}
     for o in objs:
@@ -324,42 +338,81 @@ def load_parts(glb, inst, tag, by_building=False):
         o.hide_render = True
         o.location = (0.0, 0.0, -5000.0)
     made = list(objs)
-    groups_of = {}
+    PACKS[0] += 1
+    coll = bpy.data.collections.new(f"agp{PACKS[0]:05d}")
+    coll["ag_parts"] = True
+    index = {}
+    for k, node in enumerate(sorted(n for n in inst.get("parts", {}) if n in protos)):
+        o = protos[node]
+        o.name = f"agp{PACKS[0]:05d}.{k:06d}"
+        coll.objects.link(o)
+        index[node] = k
+    if not index:
+        return made
+    ng = instance_group(coll)
     tints = inst.get("tints", [])
-    for node in sorted(inst.get("parts", {})):
-        proto = protos.get(node)
-        if proto is None:
-            continue
-        if proto.name not in groups_of:
-            groups_of[proto.name] = instance_group(proto)
-        pts = inst["parts"][node]
-        groups = {}
-        for p in pts:
-            groups.setdefault(p[4] if by_building else -1, []).append(p)
-        for bi, pl in sorted(groups.items()):
-            me = bpy.data.meshes.new(f"inst.{node}")
-            me.vertices.add(len(pl))
-            me.vertices.foreach_set("co", [v for p in pl for v in (p[0], p[1], p[2])])
-            a = me.attributes.new("rot", "FLOAT_VECTOR", "POINT")
-            a.data.foreach_set("vector", [v for p in pl for v in (0.0, 0.0, p[3])])
-            for k, name in enumerate(TINTS):
-                at = me.attributes.new(name, "FLOAT_VECTOR", "POINT")
-                at.data.foreach_set("vector", [v for p in pl for v in tints[p[4]][k]])
-            me.update()
-            ob = bpy.data.objects.new(f"inst.{node}", me)
-            mod = ob.modifiers.new("parts", "NODES")
-            mod.node_group = groups_of[proto.name]
-            ob["ag_tag"] = tag
-            ob["ag_building"] = int(bi)
-            bpy.context.scene.collection.objects.link(ob)
-            made.append(ob)
+    groups = {}
+    for node, k in sorted(index.items()):
+        for p in inst["parts"][node]:
+            groups.setdefault(p[4] if by_building else -1, []).append((k, p))
+    for bi, pl in sorted(groups.items()):
+        me = bpy.data.meshes.new(f"inst.{coll.name}")
+        me.vertices.add(len(pl))
+        me.vertices.foreach_set("co", [v for _, p in pl for v in (p[0], p[1], p[2])])
+        a = me.attributes.new("rot", "FLOAT_VECTOR", "POINT")
+        a.data.foreach_set("vector", [v for _, p in pl for v in (0.0, 0.0, p[3])])
+        a = me.attributes.new("proto", "INT", "POINT")
+        a.data.foreach_set("value", [k for k, _ in pl])
+        for j, name in enumerate(TINTS):
+            at = me.attributes.new(name, "FLOAT_VECTOR", "POINT")
+            at.data.foreach_set("vector", [v for _, p in pl for v in tints[p[4]][j]])
+        me.update()
+        ob = bpy.data.objects.new(f"inst.{coll.name}", me)
+        mod = ob.modifiers.new("parts", "NODES")
+        mod.node_group = ng
+        ob["ag_tag"] = tag
+        ob["ag_building"] = int(bi)
+        bpy.context.scene.collection.objects.link(ob)
+        made.append(ob)
     return made
+
+
+GLTF_TMP = []
+
+
+def _defer_gltf_tmp():
+    """The glTF importer makes a temporary object per mesh and deletes it at once, and a
+    deletion scans the whole file: with a city's packs loaded that is quadratic. Deleted
+    here in one batch per import instead (the importer's own steps otherwise)."""
+    try:
+        from io_scene_gltf2.blender.imp import mesh as GM
+    except ImportError:
+        return
+
+    def create_mesh(gltf, mesh_idx, skin_idx):
+        pymesh = gltf.data.meshes[mesh_idx]
+        GM.import_user_extensions('gather_import_mesh_before_hook', gltf, pymesh)
+        mesh = bpy.data.meshes.new(pymesh.name or 'Mesh_%d' % mesh_idx)
+        tmp_ob = bpy.data.objects.new('##gltf-import:tmp-object##', mesh)
+        GLTF_TMP.append(tmp_ob)
+        GM.do_primitives(gltf, mesh_idx, skin_idx, mesh, tmp_ob)
+        GM.set_extras(mesh, pymesh.extras, exclude=['targetNames'])
+        GM.import_user_extensions('gather_import_mesh_after_hook', gltf, pymesh, mesh)
+        return mesh
+
+    if all(hasattr(GM, n) for n in ("create_mesh", "do_primitives", "set_extras",
+                                    "import_user_extensions")):
+        GM.create_mesh = create_mesh
 
 
 def import_glb(path, tag):
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=path, import_shading="FLAT")
+    if GLTF_TMP:
+        bpy.data.batch_remove(GLTF_TMP)
+        GLTF_TMP.clear()
     new = [o for o in bpy.data.objects if o not in before]
+    old_mats = set()
     for o in new:
         o["ag_tag"] = tag
         if o.type != "MESH":
@@ -372,10 +425,9 @@ def import_glb(path, tag):
                 continue
             base = ms.material.name.split(".")[0]
             if base in MATS:
-                old = ms.material
+                old_mats.add(ms.material)
                 o.material_slots[i].material = MATS[base]
-                if old.users == 0:
-                    bpy.data.materials.remove(old)
+    bpy.data.batch_remove([m for m in old_mats if m.users == 0])
     return new
 
 
@@ -387,6 +439,8 @@ def remove(objs):
     bpy.data.batch_remove(list(objs))
     bpy.data.batch_remove([m for m in meshes if m.users == 0])
     bpy.data.batch_remove([g for g in groups if g.users == 0])
+    bpy.data.batch_remove([c for c in bpy.data.collections if c.get("ag_parts") and
+                           c.users == 0])
 
 
 # --- cameras -------------------------------------------------------------------------------
@@ -417,6 +471,10 @@ def render(scene, v, path):
     scene.render.resolution_x, scene.render.resolution_y = v["w"], v["h"]
     scene.render.resolution_percentage = 100
     scene.render.filepath = path
+    try:
+        scene.eevee.taa_render_samples = v.get("samples", JOB.get("samples", 32))
+    except AttributeError:
+        pass
     bpy.ops.render.render(write_still=True)
     bpy.data.objects.remove(cam, do_unlink=True)
 
@@ -425,6 +483,7 @@ def render(scene, v, path):
 
 def main():
     global MATS, MATS_INST
+    _defer_gltf_tmp()
     scene = start_scene()
     MATS = materials()
     MATS_INST = inst_materials()
@@ -455,6 +514,7 @@ def main():
                 hidden.append(proxies[o.name])
         tris = sum(len(o.data.polygons) for o in shells
                    if o.type == "MESH" and not o.name.startswith("inst."))
+        log(f"{v['name']}: loaded in {time.time() - t:.1f} s")
         render(scene, v, f"{out}/{v['name']}.jpg")
         report["views"].append({"name": v["name"], "shell_tiles": len(v.get("shell_tiles", [])),
                                 "faces": tris, "seconds": round(time.time() - t, 1)})
