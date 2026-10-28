@@ -601,8 +601,19 @@ renders from the blockout cameras (`--view NAME EX EY EZ TX TY TZ [LENS]` adds o
 terrain city (M13) the ground is a heightfield actor per tile and `graphs.json` carries
 absolute heights (`exports.graphs(m, ground)`, `"heights": "absolute"`), which the data
 assets, the player start and the walk use; the blockout draws one object per retaining wall,
-so walls, bored tunnels and terrain viaduct columns are keyed by their ids. citygen makes no
-network call; the
+so walls, bored tunnels and terrain viaduct columns are keyed by their ids. Each import
+makes the city the project's startup and default map (`unreal.set_startup_map`;
+`--no-startup`) and sets what Play puts you in: the fly pawn (`--play fly`, the default;
+`Core/BP_CityGenFlyPawn`, a SpectatorPawn with no collision at `--fly-speed`, spawned by
+`GM_CityGenFly`, the level's game mode override) or the project's own (`--play walk`);
+World Partition's main grid is 256 m cells loaded `--view-range` (1500 m) around the
+player and the level's instanced HLOD layer reaches the whole city (its merged parent
+layer cut off; partitions set by C++ property name, `CellSize`, `LoadingRange`; every
+master `used_with_instanced_static_meshes`, or the HLODs draw flat gray), and the HLODs are
+built after the import (the WorldPartitionHLODsBuilder
+commandlet, rebuilding only what changed; `--no-hlod` skips it); `--check` walks with the
+project's pawn, then flies. User guide: `docs/unreal_export.md`, "Import, open and
+play". citygen makes no network call; the
 official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
 editor) is the interactive route for a Claude session. Testing is always in a throwaway
 project of the exporter's own (`--new-project` makes one from the First Person template,
