@@ -675,6 +675,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
 
     from . import building_checks as BC
     from . import buildout as BO
+    from . import decks as DK
+    from . import deck_checks as DC
     from . import elevated as EL
     from . import gameplay as GP
     from . import gameplay_checks as GC
@@ -736,6 +738,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
             b.roads.terrain[0], {d.id: d.name for d in m.districts})})
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
+    if m.decks:
+        # M14: the deck slabs' columns (after the transit structures and road columns)
+        cols, dks = DK.supports(m)
+        m = with_rows(m, {"structures": list(m.structures) + cols, "decks": dks})
     # M10: stable ids for everything built so far, so the props, the plants and the
     # gameplay layer key their draws and names on them (not on build order)
     pinned = frozenset(x.id for x in b.frame.pin_buildings) if b.frame is not None \
@@ -749,7 +755,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     b.notes = [ID.text(n, mp) for n in b.notes]
     late_notes = [ID.text(n, mp) for n in out.notes + (tr.notes if tr is not None else []) +
                   tn.notes]
-    pr = PR.build(spec, m)
+    pr = DK.props(spec, m, PR.build)     # (M14: on every level)
     m = with_rows(m, pr.rows)
     if tg is not None:
         rows, dst = TE.dressing(m)
@@ -771,7 +777,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     late = {c.id: c for c in TNC.run(spec, m) + TGC.run(spec, m)}
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
-        TC.run(spec, m) + PC.run(spec, m) + GC.run(spec, m)
+        TC.run(spec, m) + DK.per_level(m, lambda v: PC.run(spec, v)) + GC.run(spec, m) + \
+        DC.run(spec, m)
     with G.canonical():
         checks.append(EC.check_supports(m))
     st = early["stats"]
@@ -787,6 +794,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         st["transit"] = {**TC.stats(m), "generator": tr.info}
     st["props"] = {**PC.stats(m), "generator": pr.info}
     st["gameplay"] = {**GC.stats(m), "generator": gp.info}
+    if m.decks:
+        st["decks"] = DC.stats(m)
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)

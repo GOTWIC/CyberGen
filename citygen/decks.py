@@ -540,7 +540,7 @@ LIGHT_KINDS = ("sidewalk", "crosswalk", "crossing", "path", "alley", "pedestrian
                "promenade")
 
 
-def ground_view(net, jx: dict, pl: Plan):
+def street_view(net, jx: dict, pl: Plan):
     """The ground level of the street network, as the block stage sees it: no deck streets,
     each ramp as the street it replaced (so the lots beside it are those of a city without
     the deck)."""
@@ -1017,3 +1017,364 @@ def on_ground(w) -> bool:
     if not la:
         return all(abs(p[2]) < 1e-9 for p in line)
     return all(abs(p[2] - line[0][2]) < 1e-9 for p in line)
+
+
+# ---------------------------------------------------------------------------
+# Level views (M6 and its checks see one ground at a time)
+# ---------------------------------------------------------------------------
+
+TREES = ("street_tree", "median_tree", "palm", "park_tree", "conifer")
+
+
+def _deck_streets(m, dk) -> set:
+    return {s.id for s in m.road_segments if s.attrs.get("deck") == dk.id and
+            s.attrs.get("role") != "deck_ramp"}
+
+
+def ground_view(m):
+    """The ground level of a city with decks: without the decks' streets, junctions,
+    walkways, lots and buildings, with each slab as an overhead structure (so a street light
+    under it is hung from it and trees fit under it)."""
+    from .model import Structure
+
+    up = {sid for dk in m.decks for sid in _deck_streets(m, dk)}
+    ups = {b.id for b in m.buildings if b.level}
+    slabs = [Structure(id=f"{dk.id}.slab", type="structure.deck", kind="deck",
+                       footprint=dk.polygon, z0_m=G.q(dk.top_m - dk.slab_m), z1_m=dk.top_m)
+             for dk in m.decks]
+    return m.model_copy(update={
+        "road_segments": [s for s in m.road_segments if s.id not in up],
+        "junctions": [x for x in m.junctions if not x.level],
+        "crosswalks": [x for x in m.crosswalks if not x.level],
+        "sidewalks": [x for x in m.sidewalks if not x.level],
+        "lanes": [x for x in m.lanes if not x.level],
+        "walkways": [x for x in m.walkways if not x.level],
+        "lots": [x for x in m.lots if not x.level],
+        "buildings": [x for x in m.buildings if not x.level],
+        "open_spaces": [x for x in m.open_spaces if not x.level],
+        "green_areas": [x for x in m.green_areas if not x.level],
+        "skybridges": [x for x in m.skybridges if not set(x.building_ids) & ups],
+        "props": [x for x in m.props if not x.level],
+        "plants": [x for x in m.plants if not x.level],
+        "structures": list(m.structures) + slabs})
+
+
+def deck_view(m, dk):
+    """A deck as a ground of its own: its streets, junctions, walkways, lots and buildings,
+    every z measured from its top."""
+    H = dk.top_m
+    segs = _deck_streets(m, dk)
+    nodes = {s.start for s in m.road_segments if s.id in segs} | \
+        {s.end for s in m.road_segments if s.id in segs}
+    jns = {j.id for j in m.junctions if j.node_id in nodes}
+    blds = {b.id for b in m.buildings if b.level and b.attrs.get("deck") == dk.id}
+    lots = {lt.id for lt in m.lots if lt.level and lt.attrs.get("deck") == dk.id}
+
+    def down(e, fn):
+        d = e.model_dump(mode="python")
+        fn(d)
+        return type(e).model_validate(d)
+
+    def seg(d):
+        d["z_profile"] = [{"s": z["s"], "z": G.q(z["z"] - H)} for z in d["z_profile"]]
+
+    def node(d):
+        x, y, z = d["position"]
+        d["position"] = (x, y, G.q(z - H))
+
+    def line3(key):
+        def f(d):
+            d[key] = [(p[0], p[1], G.q(p[2] - H)) for p in d[key]]
+        return f
+
+    def bld(d):
+        for ms in d["masses"]:
+            ms["z0_m"] = G.q(ms["z0_m"] - H)
+            ms["z1_m"] = G.q(ms["z1_m"] - H)
+        d["height_m"] = G.q(d["height_m"] - H)
+        for it in d["roof_items"]:
+            x, y, z = it["position"]
+            it["position"] = (x, y, G.q(z - H))
+
+    def zm(d):
+        d["z_m"] = G.q(d["z_m"] - H)
+
+    return m.model_copy(update={
+        "road_nodes": [down(n, node) for n in m.road_nodes if n.id in nodes],
+        "road_segments": [down(s, seg) for s in m.road_segments if s.id in segs],
+        "junctions": [j for j in m.junctions if j.id in jns],
+        "crosswalks": [c for c in m.crosswalks if c.junction_id in jns],
+        "sidewalks": [w for w in m.sidewalks if w.segment_id in segs],
+        "lanes": [down(ln, line3("centerline")) for ln in m.lanes if
+                  (ln.segment_id in segs if ln.kind == "lane" else ln.node_id in nodes)],
+        "walkways": [down(w, line3("line")) for w in m.walkways if w.level and on_ground(w)
+                     and (w.attrs.get("deck") in (None, dk.id))],
+        "lots": [lt for lt in m.lots if lt.id in lots],
+        "buildings": [down(b, bld) for b in m.buildings if b.id in blds],
+        "open_spaces": [o for o in m.open_spaces if o.level and
+                        o.district_id == dk.district_id],
+        "green_areas": [down(g, zm) for g in m.green_areas if g.level and
+                        g.building_id in blds],
+        "skybridges": [down(s, zm) for s in m.skybridges if set(s.building_ids) & blds],
+        "site_elements": [down(e, zm) for e in m.site_elements if e.lot_id in lots],
+        "structures": [], "tunnels": [], "stations": [], "transit_lines": [],
+        "props": [down(p, _pos_down(H)) for p in m.props if p.level],
+        "plants": [down(p, _pos_down(H)) for p in m.plants if p.level],
+        "bridges": [], "quays": []})
+
+
+def _pos_down(H: float):
+    def f(d):
+        x, y, z = d["position"]
+        d["position"] = (x, y, G.q(z - H))
+    return f
+
+
+def props(spec, m, build):
+    """M6 on every level: the ground (no trees under a slab, lights hung from it) and each
+    deck (its props and plants lifted onto it, level 1, ids `.up<n>`)."""
+    from .props import Out
+
+    if not m.decks:
+        return build(spec, m)
+    g = build(spec, ground_view(m))
+    polys = [G.from_model_poly(dk.polygon) for dk in m.decks]
+    covered = G.union(polys)
+    shapely.prepare(covered)
+    rows = {"props": list(g.rows["props"]),
+            "plants": [p for p in g.rows["plants"]
+                       if not (p["type"].split(".", 1)[1] in TREES and
+                               covered.contains(Point(p["position"][:2])))],
+            "green_areas": list(g.rows["green_areas"])}
+    info = {"ground": g.info}
+    notes = list(g.notes)
+    for dk, poly in zip(m.decks, polys):
+        H = dk.top_m
+        inner = G.qpoly(poly.buffer(-0.3, join_style="mitre"))
+        shapely.prepare(inner)
+        u = build(spec, deck_view(m, dk))
+        for key in ("props", "plants"):
+            for p in u.rows[key]:
+                x, y, z = p["position"]
+                if not inner.contains(Point(x, y)):
+                    continue
+                head, n = p["id"].rsplit(".", 1)
+                rows[key].append({**p, "id": f"{head}.up{n}", "level": 1,
+                                  "position": [x, y, G.q(z + H)]})
+        have = {x.id if hasattr(x, "id") else x["id"] for x in rows["green_areas"]}
+        for ga in u.rows["green_areas"]:
+            gid = ga.id if hasattr(ga, "id") else ga["id"]
+            if gid not in have:
+                d = ga.model_dump(mode="python") if hasattr(ga, "model_dump") else dict(ga)
+                d["z_m"] = G.q(d.get("z_m", 0.0) + H)
+                d["level"] = 1
+                rows["green_areas"].append(d)
+        info[dk.id] = u.info
+        notes += u.notes
+    return Out(rows, info, notes)
+
+
+def per_level(m, run) -> list:
+    """Checks run on every level (`run(view)`), their failures and notes merged by check,
+    each deck's prefixed with its id."""
+    if not m.decks:
+        return run(m)
+    out = run(ground_view(m))
+    by = {c.id: c for c in out}
+    for dk in m.decks:
+        for c in run(deck_view(m, dk)):
+            o = by.get(c.id)
+            if o is None:
+                by[c.id] = c
+                out.append(c)
+                continue
+            o.failures += [f"{dk.id}: {f}" for f in c.failures]
+            o.notes += [f"{dk.id}: {n}" for n in c.notes]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Supports (after transit and tunnels)
+# ---------------------------------------------------------------------------
+
+COLUMN_W = 1.0          # square columns, 1 m a side
+COLUMN_REACH = 0.75     # every point of a slab within this share of column_m of a column
+JUNCTION_REACH = 1.3    # (over a ground junction: the slab spans it on deep girders)
+CANTILEVER_M = 6.0      # (within this of its edge a slab may reach this much farther)
+DOOR_GAP_M = 2.5        # columns keep this far from a door
+FINE = 4                # the fill-in candidates: a grid of column_m / FINE
+
+
+def _keepout(m, P):
+    """Where a column may not stand under a slab: lanes, crosswalks, junctions, the
+    sidewalks' clear paths, walkways off the sidewalks, doors, structures, tunnels."""
+    F = G.from_model_poly
+    near = P.buffer(5.0)
+    out = []
+    for ln in m.lanes:
+        if ln.level:
+            continue
+        g = LineString([p[:2] for p in ln.centerline])
+        if g.intersects(near):
+            out.append(g.buffer(ln.width_m / 2 + 0.6, cap_style="flat"))
+    for c in m.crosswalks:
+        if not c.level and LineString(c.line).intersects(near):
+            out.append(LineString(c.line).buffer(c.width_m / 2 + 0.5, cap_style="flat"))
+    for j in m.junctions:
+        if not j.level:
+            jp = F(j.polygon)
+            if jp.intersects(near):
+                out.append(jp.buffer(0.5))
+    segs = {s.id: s for s in m.road_segments}
+    for w in m.sidewalks:
+        if w.level or not LineString(w.line).intersects(near):
+            continue
+        s = segs.get(w.segment_id)
+        if s is None:
+            continue
+        band = LineString(w.line).buffer(w.width_m / 2, cap_style="flat")
+        side = s.cross_section.sidewalk_m[0]
+        keep = s.width_m / 2 - side + w.curb_m + w.furniture_m
+        out.append(band.difference(LineString(s.centerline).buffer(keep, cap_style="flat")))
+    for w in m.walkways:
+        if w.level or w.kind == "sidewalk" or any(abs(p[2]) > 0.5 for p in w.line):
+            continue
+        g = LineString([p[:2] for p in w.line])
+        if g.intersects(near):
+            out.append(g.buffer(w.width_m / 2 + 0.3))
+    for b in m.buildings:
+        if b.level:
+            continue
+        for e in b.entrances:
+            if near.contains(Point(e.position)):
+                out.append(Point(e.position).buffer(DOOR_GAP_M))
+    for st in m.structures:
+        if st.footprint is not None and st.z0_m < 0.5:
+            sp = F(st.footprint)
+            if sp.intersects(near):
+                out.append(sp.buffer(1.0))
+        elif len(st.line) >= 2 and min(p[2] for p in st.line) < 0.5:
+            g = LineString([p[:2] for p in st.line])
+            if g.intersects(near):
+                out.append(g.buffer(2.0))
+    for t in m.tunnels:
+        g = LineString([p[:2] for p in t.line])
+        if g.intersects(near):
+            out.append(g.buffer(t.width_m / 2 + 2.0, cap_style="flat"))
+    return G.union([G.qpoly(x) for x in out if not x.is_empty])
+
+
+def _grid(P, step: float, ang: float) -> list:
+    """Points of a square grid (rotated by ang, from the slab's lower corner) inside P."""
+    ca, sa = M.cos(ang), M.sin(ang)
+    cs = [(x * ca + y * sa, -x * sa + y * ca) for x, y in P.exterior.coords]
+    u0, u1 = min(c[0] for c in cs), max(c[0] for c in cs)
+    v0, v1 = min(c[1] for c in cs), max(c[1] for c in cs)
+    pts = []
+    nu = int((u1 - u0) / step) + 1
+    nv = int((v1 - v0) / step) + 1
+    for i in range(nu + 1):
+        for j in range(nv + 1):
+            u = u0 + step / 2 + i * step
+            v = v0 + step / 2 + j * step
+            pts.append(ST._pt(u * ca - v * sa, u * sa + v * ca))
+    if not pts:
+        return []
+    inside = shapely.contains(P, shapely.points(pts)).tolist()
+    return [p for p, k in zip(pts, inside) if k]
+
+
+def supports(m) -> tuple[list, list]:
+    """(column rows, deck rows with their column ids): columns under every slab on a grid of
+    its column_m, in the furniture zones along its streets and in the lots under it, then
+    filled in where a part of the slab is farther than COLUMN_REACH x column_m from one."""
+    from . import massing as MS
+
+    cols, decks = [], []
+    for dk in m.decks:
+        P = G.from_model_poly(dk.polygon)
+        g = float(dk.attrs.get("column_m", 18.0))
+        reach = COLUMN_REACH * g
+        bad = _keepout(m, P)
+        inner = G.qpoly(P.buffer(-0.8, join_style="mitre"))
+        # (a column's center keeps half its diagonal off the keep-out)
+        ok_zone = G.diff(inner, G.qpoly(bad.buffer(COLUMN_W * 0.75, join_style="mitre")))
+        shapely.prepare(ok_zone)
+        cand = []
+        # along the streets under the slab: their furniture zones (or just behind the curb)
+        under = {x.attrs.get("twin") for x in m.road_segments if x.attrs.get("deck") == dk.id}
+        for s in m.road_segments:
+            if s.level or s.attrs.get("deck") or s.id not in under:
+                continue
+            cs = s.cross_section
+            side = cs.sidewalk_m[0]
+            off = s.width_m / 2 - side + cs.curb_m + max(cs.furniture_m, 1.0) / 2
+            pts = [tuple(p) for p in s.centerline]
+            for sign in (1.0, -1.0):
+                line = _offset_line(pts, sign * off)
+                if len(line) < 2:
+                    continue
+                Ll = ST._plen(line)
+                k = 0
+                while g / 2 + k * g < Ll:
+                    cand.append(ST._pt(*ST._along(line, g / 2 + k * g)[0]))
+                    k += 1
+        cand += _grid(inner, g, MS.obb_angle(P))
+        fine = _grid(inner, g / FINE, MS.obb_angle(P))
+        keep = []
+        if cand:
+            ok = shapely.contains(ok_zone, shapely.points(cand)).tolist()
+            for p, k in zip(cand, ok):
+                if k and all(ST._dist(p, q) >= g / 3 for q in keep):
+                    keep.append(p)
+        # fill in: every sample of the slab within reach of a column
+        samples = _grid(P, 6.0, MS.obb_angle(P))
+        over = span_zone(m, P)
+        wide = shapely.contains(over, shapely.points(samples)).tolist() if samples and \
+            not over.is_empty else [False] * len(samples)
+        edge = (G.dists(P.boundary, shapely.points(samples)) <= CANTILEVER_M).tolist() \
+            if samples else []
+        fine_ok = [p for p, k in zip(fine, shapely.contains(ok_zone, shapely.points(fine))
+                                     .tolist()) if k] if fine else []
+        for sp, w, e in zip(samples, wide, edge):
+            r = (JUNCTION_REACH * g if w else reach) + (CANTILEVER_M if e else 0.0)
+            if keep and min(ST._dist(sp, q) for q in keep) <= r:
+                continue
+            near = [p for p in fine_ok if ST._dist(p, sp) <= reach]
+            if near:
+                keep.append(min(near, key=lambda p: (round(ST._dist(p, sp), 6), p)))
+        ids = []
+        h = COLUMN_W / 2
+        for i, (x, y) in enumerate(sorted(keep)):
+            cid = f"{dk.id}.col{i + 1:04d}"
+            ids.append(cid)
+            cols.append({"id": cid, "type": "structure.column", "kind": "column",
+                         "footprint": G.to_model_poly(Polygon([(x - h, y - h), (x + h, y - h),
+                                                               (x + h, y + h),
+                                                               (x - h, y + h)])),
+                         "line": [], "z0_m": 0.0, "z1_m": G.q(dk.top_m - dk.slab_m),
+                         "supports": [dk.id], "attrs": {"deck": dk.id}})
+        d = dk.model_dump(mode="python")
+        d["column_ids"] = ids
+        decks.append(d)
+    return cols, decks
+
+
+def span_zone(m, P):
+    """The ground junctions under a slab (the slab spans them on deep girders)."""
+    js = [G.from_model_poly(j.polygon) for j in m.junctions if not j.level]
+    return G.union([G.inter(j, P) for j in js if j.intersects(P)])
+
+
+def _offset_line(pts, d: float) -> list:
+    from . import junctions as JN
+
+    return JN._offset(pts, d)
+
+
+def walk_points(line, step: float) -> list:
+    """Points every `step` along a polyline (both ends), on the grid."""
+    pts = [tuple(p[:2]) for p in line]
+    L = ST._plen(pts)
+    n = max(1, int(L / step))
+    return [ST._pt(*ST._along(pts, L * k / n)[0]) for k in range(n + 1)]

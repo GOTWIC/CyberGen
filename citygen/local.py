@@ -213,7 +213,7 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     jx = JN.build(net, darch, did, spec.seed or 0)
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])
     T.stage("lanes", jx["lanes"])
-    gnet, gjx = DK.ground_view(net, jx, pl)
+    gnet, gjx = DK.street_view(net, jx, pl)
     blk = BK.build_blocks(spec, net.builder, gnet, gjx, mapper)
     dko = DK.finish(pl, net, jx, blk)
     DK.link_walks(pl, jx, dko["links"])
