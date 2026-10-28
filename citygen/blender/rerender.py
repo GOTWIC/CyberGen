@@ -5,7 +5,8 @@
 
 BLOCKOUT_DIR holds `city.blend` and `blockout_plan.json` (a `citygen blockout` output). VIEW
 names a render of `build.views`: `top`, `iso_city`, `iso_<district>`, `street_<n>` or
-`cutaway` (M9, the section along the longest road tunnel); each is
+`cutaway` (M9, the section along the longest road tunnel) or `deck` (M14, the section across
+the biggest deck); each is
 written as TO_DIR/render_<VIEW>.jpg with the same camera as the build, `--width` pixels wide
 (README images use 7680). `citygen rerender` runs it.
 """

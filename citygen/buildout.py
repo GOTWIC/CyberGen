@@ -212,6 +212,18 @@ def _deck_jobs(m, sd, cx, dk, deck_lots: dict, jpolys, cwpolys, swpolys) -> list
     return out
 
 
+def under(r: dict, deck: str) -> None:
+    """M14: the buildings of a job under a deck name it (`attrs.deck_under`)."""
+    from .model import COLLECTIONS
+
+    out = []
+    for e in r["buildings"]:
+        d = e.model_dump(mode="python")
+        d["attrs"] = {**d["attrs"], "deck_under": deck}
+        out.append(COLLECTIONS["buildings"].model_validate(d))
+    r["buildings"] = out
+
+
 def lift(r: dict, H: float, deck: str) -> None:
     """M14: rows of a job on a deck lifted onto it (every z of the model is measured from the
     ground under it)."""
@@ -340,6 +352,8 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
             out.notes += r["notes"]
             if job.get("lift"):
                 lift(r, job["lift"], job["deck"])
+            elif tag == "under":
+                under(r, job["deck"])
             for key in ("buildings", "properties", "site_elements", "structures",
                         "green_areas"):
                 getattr(out, key).extend(r[key])
