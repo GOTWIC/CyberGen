@@ -15,7 +15,7 @@ parks. The other cities are unchanged.
 | <img src="peninsula_city/preview_map.png" width="420"> | <img src="peninsula_city/preview_massing.png" width="420"> |
 
 - Build: `peninsula_city/` (every preview, `report.txt`, `trace.json`, `blockout_report.txt`,
-  `render_top.jpg`, the 8K `render_iso_city.jpg`, `city.lock.json`). All 81 checks pass on
+  `render_top.jpg`, the 8K `render_iso_city.jpg`, `city.lock.json`), on main with M13 and M15. All 86 checks pass on
   the first full-city try.
 - Shapes tried (`wip/`): three headlands with islets (kept), four headlands (Lantern Strip and
   the spaceport each spread over two lobes, the spaceport east of The Stacks), three headlands

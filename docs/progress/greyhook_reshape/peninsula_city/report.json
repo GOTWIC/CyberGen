@@ -215,6 +215,41 @@
       "notes": []
     },
     {
+      "id": "ground_grades",
+      "title": "M13 (no terrain: nothing to check)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "cut_fill",
+      "title": "M13 (no terrain: nothing to check)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "retaining_walls",
+      "title": "M13 (no terrain: nothing to check)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "building_seats",
+      "title": "M13 (no terrain: nothing to check)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "water_levels",
+      "title": "M13 (no terrain: nothing to check)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "street_graph",
       "title": "Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it",
       "passed": true,

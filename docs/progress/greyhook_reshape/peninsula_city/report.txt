@@ -37,6 +37,11 @@ checks:
   [pass] tunnel_cover: Cover over every tunnel roof: at least 1 m of ground (40 m into the tunnel from a portal: the roof under the ground), 1.5 m under the water bed (canal 3, river 7, sea 12 m deep), 0.5 m under a road over a pedestrian underpass
   [pass] tunnel_portals: Every road tunnel has a portal at each end on dry land, 5.5 m clear inside, an open approach at most 6% steep, and nothing on or over its open approaches: no road node within 20 m of their top, no other road, building or structure on them
   [pass] tunnel_clash: No tunnel within 1 m (in height, where they overlap in plan) of another tunnel, a metro station box, a building's foundations and basements (4 to 18 m deep by height) or a column footing
+  [pass] ground_grades: M13 (no terrain: nothing to check)
+  [pass] cut_fill: M13 (no terrain: nothing to check)
+  [pass] retaining_walls: M13 (no terrain: nothing to check)
+  [pass] building_seats: M13 (no terrain: nothing to check)
+  [pass] water_levels: M13 (no terrain: nothing to check)
   [pass] street_graph: Street graph connected: every vehicle road (highway to alley and service lane) in one network, every pedestrian street and footbridge joined to it
   [pass] lane_graph: Lane graph strongly connected (every lane reaches every other through junction connectors and lane changes) and every vehicle road has lanes
   [pass] walkway_graph: Walkway graph connected on every landmass with districts (sidewalks, crossings, crosswalks, pedestrian streets, promenades, footbridges, alleys, paths into open space)
