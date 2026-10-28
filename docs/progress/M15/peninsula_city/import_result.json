@@ -1,0 +1,54 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 5136,
+  "updated": 0,
+  "deleted": 0,
+  "unchanged": 0
+ },
+ "meshes": {
+  "imported": 3965,
+  "kept": 0,
+  "deleted": 0
+ },
+ "tiles_imported": 193,
+ "materials": {
+  "created": 76,
+  "updated": 0,
+  "kept": 0,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 3,
+  "kept": 0
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.4,
+  "meshes": 11.54,
+  "level": 0.22,
+  "actors": 5.18,
+  "prune": 0.09,
+  "graphs": 0.13,
+  "save": 3.01,
+  "digests": 0.16
+ },
+ "dirty_packages": 5216,
+ "actor_count": 5136,
+ "actor_digest": "075313ca119c49f0",
+ "asset_count": 4044,
+ "asset_digest": "19c553a1e64d1f75",
+ "level": "/Game/CityGen/Greyhook/Maps/Greyhook",
+ "content_root": "/Game/CityGen/Greyhook",
+ "city": "Greyhook",
+ "counts": {
+  "tiles": 192,
+  "objects": 3933,
+  "instance_actors": 1199,
+  "instances": 37085,
+  "prototypes": 32
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 20.7,
+ "wall_s": 32.7
+}

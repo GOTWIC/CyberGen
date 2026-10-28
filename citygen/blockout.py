@@ -1223,7 +1223,9 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
     start = views[0]["eye"] if views else None
     (out / "unreal" / "corporate_core_plan.json").write_text(
         json.dumps(X.legacy_plan(m, start), indent=1) + "\n", encoding="utf-8")
-    (out / "graphs.json").write_text(json.dumps(X.graphs(m)) + "\n", encoding="utf-8")
+    # (M13: a terrain city's graphs with absolute heights, as the blockout draws them)
+    ground = _Ground(m) if m.terrain is not None else None
+    (out / "graphs.json").write_text(json.dumps(X.graphs(m, ground)) + "\n", encoding="utf-8")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": TILE_M, "tiles": plan["tiles"]},
                                                indent=1) + "\n", encoding="utf-8")
     (out / "props.csv").write_text(X.props_csv(m), encoding="utf-8")
@@ -1639,8 +1641,8 @@ def _plinth(b, gd: _Ground) -> list[dict]:
 
 def _walls(P: _Plan, gd: _Ground) -> None:
     """Retaining walls: a 0.5 m slab along each wall, from under the lower ground to a
-    parapet over the upper."""
-    by: dict = {}
+    parapet over the upper; one object per wall, named by its id (M15: the Unreal exporter
+    keys its actors by stable id)."""
     for w in P.m.structures:
         if w.kind != "retaining_wall" or len(w.line) < 2:
             continue
@@ -1650,11 +1652,7 @@ def _walls(P: _Plan, gd: _Ground) -> None:
         if r is None:
             continue
         cx, cy = _center(pts)
-        by.setdefault(tile_key(cx, cy), []).append(
-            ({"k": "ribbon", "m": "retaining_wall", "abs": True, "l": r[0], "rr": r[1],
-              "t": q(max(h for _, _, h in w.line) + 1.0)}, w.id))
-    for t, items in sorted(by.items()):
-        P.add(f"city.retaining_wall.{tile_name(*t)}", [P.city, "Ground", "Retaining walls"],
-              t, "retaining_wall", [p for p, _ in items],
-              {"citygen_type": "structure.retaining_wall",
-               "citygen_ids": [i for _, i in items]})
+        P.add(w.id, [P.city, "Ground", "Retaining walls"], tile_key(cx, cy), "retaining_wall",
+              [{"k": "ribbon", "m": "retaining_wall", "abs": True, "l": r[0], "rr": r[1],
+                "t": q(max(h for _, _, h in w.line) + 1.0)}],
+              {"citygen_id": w.id, "citygen_type": "structure.retaining_wall"})

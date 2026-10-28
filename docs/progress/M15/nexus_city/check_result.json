@@ -1,0 +1,95 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 991 of 11211 actors loaded at the start, 1058 after a teleport to (-896, -1408) (1054 new)",
+  "collision: 507 of 507 traces down hit (building 252, road_street 58, junction 39, sidewalk 30, elevated 27, road_alley 19), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 123 m along a 134 m sidewalk path in 21 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 11211,
+   "loaded_at_start": 991,
+   "loaded_far": 1058,
+   "only_far": 1054,
+   "far_spot_m": [
+    -896.0,
+    -1408.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "elevated": 27,
+     "road_street": 58,
+     "prop_awning": 13,
+     "building": 252,
+     "road_alley": 19,
+     "open_plaza": 7,
+     "open_green": 2,
+     "junction": 39,
+     "sidewalk": 30,
+     "plant_park_tree": 2,
+     "structure_canopy": 1,
+     "prop_barrier": 1,
+     "prop_overhead_cable": 1,
+     "road_highway": 4,
+     "ground": 3,
+     "water": 2,
+     "bridge": 14,
+     "road_pedestrian": 4,
+     "quay": 2,
+     "open_pocket_park": 8,
+     "prop_sign": 1,
+     "plant_facade_greenery": 1,
+     "embankment": 2,
+     "road_avenue": 10,
+     "crosswalk": 4
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     -37.91,
+     181.44
+    ],
+    [
+     -896.0,
+     -1408.0
+    ],
+    [
+     -384.0,
+     -896.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 134.0,
+   "points": 24,
+   "reached": true,
+   "travelled_m": 123.3,
+   "on_ground": 1.0,
+   "max_drop_m": 0.05,
+   "seconds": 21.3,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Nexus City",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 41.0,
+ "wall_s": 68.5
+}

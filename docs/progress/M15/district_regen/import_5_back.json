@@ -1,0 +1,61 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 1462,
+  "updated": 344,
+  "deleted": 1440,
+  "unchanged": 3362
+ },
+ "meshes": {
+  "imported": 1572,
+  "kept": 2409,
+  "deleted": 1427
+ },
+ "tiles_imported": 18,
+ "materials": {
+  "created": 0,
+  "updated": 0,
+  "kept": 76,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 3,
+  "kept": 0
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.01,
+  "meshes": 6.85,
+  "level": 1.37,
+  "actors": 2.78,
+  "graphs": 0.16,
+  "save": 2.06,
+  "prune": 75.5,
+  "save_pruned": 0.0,
+  "digests": 0.17
+ },
+ "dirty_packages": 3246,
+ "actor_count": 5168,
+ "actor_digest": "acfc6308dd075991",
+ "asset_count": 4060,
+ "asset_digest": "ace07f9046603ef4",
+ "keys": {
+  "created": "1462 keys",
+  "updated": "344 keys",
+  "deleted": "1440 keys"
+ },
+ "level": "/Game/CityGen/GreyhookM10/Maps/GreyhookM10",
+ "content_root": "/Game/CityGen/GreyhookM10",
+ "city": "Greyhook M10",
+ "counts": {
+  "tiles": 192,
+  "objects": 3949,
+  "instance_actors": 1215,
+  "instances": 37002,
+  "prototypes": 32
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 88.9,
+ "exit_code": 0,
+ "wall_s": 101.8
+}
