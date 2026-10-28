@@ -1,5 +1,5 @@
 {
-  "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation. Made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86). Greyhook reshape (its coastline made more natural and interesting: a peninsula that fans out into headlands): peninsula_city's briefs change with its model, made on the M4 Mac.",
+  "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation. Made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86).",
   "testport_briefs": "1556a3fa92de5ef134c5103b9e0a09b9201e57ddfbce800682226ee893a67d56",
   "triangulate": "b45c256a71c471e59d9c38b5e3be4c994ee36bf5da2d3fa23b2d81596dac1464",
   "buildings": {
