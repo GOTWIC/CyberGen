@@ -249,7 +249,7 @@ def _blockout_keys(m: CityModel) -> tuple[dict[str, list[str]], dict[str, str]]:
         BO._sites(P)
         BO._tunnels(P)
         if getattr(m, "terrain", None) is not None and hasattr(BO, "_terrain"):
-            BO._terrain(P)          # M13: the joined retaining walls
+            BO._terrain(P)          # M13: the retaining walls (one object each since M15)
     keys: dict[str, list[str]] = defaultdict(list)
     tiles: dict[str, str] = {}
     for o in P.objects:

@@ -370,20 +370,44 @@ def _obb_box(add, poly, cat, z0, h, cyl=False):
 
 # --- graphs, tiles, props -------------------------------------------------------------------
 
-def graphs(m: CityModel) -> dict:
-    return {
+def graphs(m: CityModel, ground=None) -> dict:
+    """The lane, walkway and transit graphs. With `ground` (a terrain city's heights, the
+    blockout's `_Ground`), every z is absolute, as the blockout draws it: a lane or sidewalk
+    over its road's grade line, the rest over the finished ground; the model keeps its z
+    over the ground where it stands (M13)."""
+    def pts(line, sid=None):
+        if ground is None:
+            return [list(p) for p in line]
+        h = (lambda x, y: ground.road(sid, x, y)) if sid in ground.segs else ground.at
+        return [[p[0], p[1], round(p[2] + h(p[0], p[1]), 2)] for p in line]
+
+    def lifted(e: dict, key: str) -> dict:
+        if ground is not None and e.get(key):
+            e[key] = pts(e[key])
+        return e
+
+    out = {
         "city": m.name, "frame": m.frame,
         "lanes": [{"id": x.id, "kind": x.kind, "segment_id": x.segment_id,
                    "node_id": x.node_id, "index": x.index, "forward": x.forward,
-                   "width_m": x.width_m, "centerline": [list(p) for p in x.centerline],
-                   "successors": x.successors, "adjacent_ids": x.adjacent_ids}
+                   "width_m": x.width_m, "centerline": pts(x.centerline, x.segment_id),
+                   "successors": x.successors, "adjacent_ids": x.adjacent_ids,
+                   **({"level": x.level} if x.level else {})}     # (M14: on a deck)
                   for x in m.lanes],
         "walkways": [{"id": w.id, "kind": w.kind, "width_m": w.width_m,
-                      "line": [list(p) for p in w.line], "neighbors": w.neighbors}
+                      "line": pts(w.line, w.attrs.get("segment")), "neighbors": w.neighbors,
+                      **({"level": w.level} if w.level else {})}
                      for w in m.walkways],
-        "transit_lines": [json.loads(t.model_dump_json()) for t in m.transit_lines],
+        "transit_lines": [lifted(json.loads(t.model_dump_json()), "path")
+                          for t in m.transit_lines],
         "stations": [json.loads(s.model_dump_json()) for s in m.stations],
     }
+    if ground is not None:
+        for s in out["stations"]:
+            x, y, z = s["position"]
+            s["position"] = [x, y, round(z + ground.at(x, y), 2)]
+        out["heights"] = "absolute"
+    return out
 
 
 PROP_FIELDS = ["id", "type", "x", "y", "z", "yaw_deg", "sx", "sy", "sz", "tile", "height_m",

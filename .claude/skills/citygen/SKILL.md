@@ -1,6 +1,6 @@
 ---
 name: citygen
-description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, build the Blender blockout (.blend, USD, glTF tiles, renders, 2D map), and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
+description: Turn a city prompt (and an optional concept image) into a validated citygen city_spec.json, build its water, districts, waterways, roads, local streets, blocks, lots, open space, buildings, skybridges, landmarks and megasites, check them, build the Blender blockout (.blend, USD, glTF tiles, renders, 2D map), import it into an Unreal 5.8 project when asked, and report. Use when asked to make, generate, design or revise a city or city layout with citygen, or to write or fix a city spec.
 ---
 
 # citygen: prompt (+ image) to city spec
@@ -77,6 +77,9 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
 - `coast.form`: `bay`, `peninsula`, `delta`, `archipelago`, `crescent` or `straight`;
   `coast.side`: compass side where the open sea is (`north` ... `north_west`). Optional `name`
   and `sea_share` (fraction of the map that is sea; defaults by form, about 0.2 to 0.55).
+  A `peninsula` may take `headlands` (2 to 5): below a shallow mainland strip it narrows to a
+  short neck, then fans out into that many headlands with coves between them, instead of one
+  rounded tip.
 - `rivers`: `name`, `from` (edge where it enters), `to` (`sea`, `bay`, an edge, or another river's
   name for a tributary), `width_m` [min, max] (rivers 40 to 150), `meander` 0 to 1,
   `from`/`to` may pin the point along the edge: `{"edge": "east", "at": 0.3}` (0 to 1: west to
@@ -154,6 +157,18 @@ stepped plinths, and routes highways round steep ground. Rivers fall to the sea;
 basins sit at the level of what they join. Read `preview_terrain.png`. With terrain, set
 `highways.elevated_share` to 0 unless the prompt asks for viaducts: on hills their ramps lock
 the grade line and lift them far over the ground.
+
+**Decks** (a district's `decks`, M14; leave it out for a city on one level). Use it when the
+prompt speaks of an upper city, a deck city, a city built over the old streets, undercity,
+levels or stacked streets: the district gets a slab at `height_m` (default 9, 7.5 to 16) over
+`cover` of its ground (default 0.45) with streets, lots and buildings on it, ramps down to the
+ground streets (`ramps`, at least one is built), light wells (`light_m`: no ground walkway
+farther from the sky, default 70), stairs and elevators, columns on a `column_m` grid. What
+stands on the deck is the `upper` archetype (default the district's) at `upper_height_m`;
+under it the low `undercity` buildings fill the lots up to the slab. Pick a district with long
+straight streets (residential heights, megablock, midtown): a ramp needs about 110 m of
+street out of the deck at 12%. Organic streets (old town) seldom fit one. Read
+`preview_decks.png` (the ground under the deck, the deck, a section) and `render_deck.jpg`.
 
 **Districts** (`districts`, usually 6 to 10). Each needs `name` and `archetype`:
 
@@ -531,6 +546,29 @@ folder, later edits start from it.
   overrides, the regenerations in order, the search's choices, citygen version and code
   hash, model hash). `citygen lock --verify <out>/city.lock.json [--out DIR]` builds the city
   again from the lock alone and must give the same bytes; run it before handing a city on.
+
+### 6d. Unreal import (M15)
+
+To put a passing city into an Unreal 5.8 project (only when asked; it needs Unreal installed,
+found at `/Users/Shared/Epic Games/UE_5.*`, `$CITYGEN_UE_ROOT` or `--engine`):
+
+```bash
+citygen unreal cities/<slug>/out/blockout/ "<path>/<Project>.uproject" --check --shots <folder>
+```
+
+It writes `<blockout>/unreal/manifest.json`, `prototypes.glb` and `graphs.json`, enables the
+Python and editor-scripting plugins in the .uproject, then runs the editor headless: a World
+Partition level `/Game/CityGen/<City>/Maps/<City>`, a static mesh actor per blockout object
+(complex collision, a material instance per blockout material), props and plants as
+instanced meshes, the lane, walkway and transit graphs as data assets, a player start, every
+actor tagged `cg.key=`, `cg.id=`, `cg.type=` and more. `--check` then plays the level in the
+editor: streaming, traces onto the ground, roofs and facades, a walk along a sidewalk;
+`--shots DIR` renders views (`--view NAME EX EY EZ TX TY TZ [LENS]` adds one, say a
+hillside). Running it again on the same build changes nothing; on a build
+regenerated with `--district`, only what changed. `--new-project` creates the project from
+the First Person template when the .uproject does not exist. Never import into a project the
+user did not name (their game project is theirs to choose). Report the summary lines it
+prints (actors created, updated, deleted, the check lines) and attach the shots.
 
 ### 7. Report
 

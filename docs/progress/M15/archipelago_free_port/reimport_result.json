@@ -1,0 +1,61 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 0,
+  "updated": 0,
+  "deleted": 0,
+  "unchanged": 6179
+ },
+ "meshes": {
+  "imported": 0,
+  "kept": 5001,
+  "deleted": 0
+ },
+ "tiles_imported": 0,
+ "materials": {
+  "created": 0,
+  "updated": 0,
+  "kept": 71,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 0,
+  "kept": 3
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.01,
+  "meshes": 1.87,
+  "level": 1.88,
+  "actors": 0.04,
+  "graphs": 0.06,
+  "save": 0.0,
+  "prune": 0.05,
+  "save_pruned": 0.0,
+  "digests": 0.14
+ },
+ "dirty_packages": 0,
+ "actor_count": 6179,
+ "actor_digest": "830e78ac0062e042",
+ "asset_count": 5075,
+ "asset_digest": "5964338d496c50ae",
+ "keys": {
+  "created": [],
+  "updated": [],
+  "deleted": []
+ },
+ "level": "/Game/CityGen/SaltreachFreePort/Maps/SaltreachFreePort",
+ "content_root": "/Game/CityGen/SaltreachFreePort",
+ "city": "Saltreach Free Port",
+ "counts": {
+  "tiles": 196,
+  "objects": 4970,
+  "instance_actors": 1205,
+  "instances": 43808,
+  "prototypes": 31
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 4.1,
+ "exit_code": 0,
+ "wall_s": 15.7
+}

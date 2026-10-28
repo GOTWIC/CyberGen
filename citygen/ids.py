@@ -60,6 +60,8 @@ REFS: dict[str, tuple[str, ...]] = {
     "lanes": ("segment_id", "node_id", "successors[]", "adjacent_ids[]"),
     "walkways": ("neighbors[]",),
     "structures": ("supports[]",),
+    "decks": ("district_id", "segment_ids[]", "well_ids[]", "column_ids[]",
+              "walkway_ids[]"),                                                    # M14
     "tunnels": ("segment_ids[]", "line_id", "walkway_ids[]", "crosses[]", "vent_ids[]"),   # M9
     "transit_lines": ("station_ids[]",),
     "stations": ("line_ids[]", "building_id", "access_ids[]"),
@@ -94,7 +96,7 @@ ORDER = ("land", "seas", "districts", "fields", "tiles", "factions", "landmasses
          "rivers", "channels", "waterways", "quays", "megasites", "places", "open_spaces",
          "bridges", "road_nodes", "road_segments", "junctions", "crosswalks", "sidewalks",
          "lanes", "walkways", "tunnels", "transit_lines", "stations", "blocks", "lots",
-         "properties", "buildings", "skybridges", "structures", "site_elements",
+         "properties", "buildings", "skybridges", "decks", "structures", "site_elements",
          "green_areas", "plants", "props") + DERIVED
 NAMED = {"islands": "isl", "rivers": "rv", "transit_lines": "tl", "stations": "stn"}
 
@@ -279,7 +281,8 @@ class Renamer:
         if coll == "lanes" and e.get("kind", "lane") == "lane":
             return f"{self.new[e['segment_id']]}.{'f' if e['forward'] else 'b'}{e['index']}"
         if coll == "lots":
-            return f"{e['district_id']}.lot.{anchor(e)}"
+            lv = e.get("level") or 0
+            return f"{e['district_id']}.lot.{anchor(e)}" + (f".l{lv}" if lv else "")
         return self.derived(old, coll not in DERIVED, e)
 
     def _key(self, e: dict, depth: int = 1) -> str:

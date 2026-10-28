@@ -1,6 +1,6 @@
 """Command line: `citygen spec validate|render|schema|diff`, `citygen build` (M10: `--district`),
 `citygen blockout`, `citygen rerender`, `citygen review`, `citygen model schema|diff`,
-`citygen lock`, `citygen trace diff`.
+`citygen lock`, `citygen trace diff`, `citygen unreal` (M15).
 
 Exit codes: 0 valid (build: every check passed), 1 invalid spec or a failed build check,
 2 usage or file error.
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -268,6 +269,60 @@ def cmd_rerender(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_unreal(args: argparse.Namespace) -> int:
+    """M15: import a blockout output into an Unreal project (headless), optionally check it
+    in play-in-editor."""
+    from . import unreal as U
+
+    build = Path(args.build_dir)
+    if not (build / "blockout_plan.json").is_file():
+        print(f"error: {build}: no blockout_plan.json (run citygen build --blockout or "
+              "citygen blockout)", file=sys.stderr)
+        return EXIT_USAGE
+    if args.manifest_only:
+        path = U.write_manifest(build, args.name)
+        print(f"wrote {path}")
+        return EXIT_OK
+    if args.uproject and args.new_project and not Path(args.uproject).is_file():
+        up = Path(args.uproject)
+        try:
+            made = U.new_project(up.parent, U.find_engine(args.engine))
+        except (RuntimeError, FileNotFoundError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return EXIT_USAGE
+        print(f"created {made} from the First Person template")
+        args.uproject = str(made)
+    if not args.uproject or not Path(args.uproject).is_file():
+        print(f"error: {args.uproject}: no such .uproject (--new-project makes one)",
+              file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        res = U.import_city(build, args.uproject, engine=args.engine, name=args.name,
+                            timeout=args.timeout) if not args.check_only else None
+        if res is not None:
+            print(U.import_summary(res))
+            if not res.get("ok"):
+                print(res.get("error", ""), file=sys.stderr)
+                return EXIT_INVALID
+        if args.check or args.check_only:
+            if any(len(v) not in (7, 8) for v in args.view):
+                print("error: --view NAME EX EY EZ TX TY TZ [LENS]", file=sys.stderr)
+                return EXIT_USAGE
+            views = [{"name": v[0], "eye": [float(x) for x in v[1:4]],
+                      "target": [float(x) for x in v[4:7]],
+                      "lens_mm": float(v[7]) if len(v) == 8 else 28.0} for v in args.view]
+            chk = U.check_city(build, args.uproject, engine=args.engine, shots=args.shots,
+                               timeout=args.timeout, width=args.shot_width, views=views)
+            print(U.check_summary(chk))
+            if not chk.get("ok"):
+                print(chk.get("error", ""), file=sys.stderr)
+                return EXIT_INVALID
+    except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    return EXIT_OK
+
+
 def _blockout_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--blender", help="Blender executable (default: $BLENDER, the newest "
                                      "/Applications/Blender*.app, or blender on PATH)")
@@ -514,6 +569,37 @@ def build_parser() -> argparse.ArgumentParser:
     sw.add_argument("--no-previews", action="store_true", help="reports only, no previews")
     sw.add_argument("--keep-model", action="store_true", help="keep city_model.json")
     sw.set_defaults(func=cmd_sweep)
+
+    ue = sub.add_parser("unreal", help="import a blockout into an Unreal 5.8 project "
+                                       "(World Partition level, meshes with collision, "
+                                       "instanced props, graphs as data assets); importing "
+                                       "again updates by id")
+    ue.add_argument("build_dir", help="a `citygen build --blockout` or `citygen blockout` "
+                                      "output")
+    ue.add_argument("uproject", nargs="?", help="the project's .uproject")
+    ue.add_argument("--engine", help="engine root or editor binary (default: "
+                                     "$CITYGEN_UE_ROOT or the newest installed UE_5.*)")
+    ue.add_argument("--name", help="city name for the content folder (default: the plan's)")
+    ue.add_argument("--new-project", action="store_true",
+                    help="create the project (FOLDER/FOLDER.uproject) from the engine's "
+                         "First Person template when it does not exist")
+    ue.add_argument("--manifest-only", action="store_true",
+                    help="write BUILD_DIR/unreal/manifest.json and stop (no Unreal needed)")
+    ue.add_argument("--check", action="store_true",
+                    help="after the import, play the level in the editor: streaming, "
+                         "ground traces, a walk along a sidewalk")
+    ue.add_argument("--check-only", action="store_true", help="the check without importing")
+    ue.add_argument("--shots", metavar="DIR", help="with --check: rendered views into DIR")
+    ue.add_argument("--view", nargs="+", action="append", default=[],
+                    metavar="NAME EX EY EZ TX TY TZ [LENS]",
+                    help="with --shots: one more view, eye and target in citygen meters "
+                         "(z over sea level, a terrain city's ground included), lens in mm "
+                         "(default 28); repeatable")
+    ue.add_argument("--shot-width", type=int, default=3840,
+                    help="width of the rendered views in pixels (default 3840; 7680 for 8K)")
+    ue.add_argument("--timeout", type=float, default=7200.0,
+                    help="seconds per editor run (default 7200)")
+    ue.set_defaults(func=cmd_unreal)
 
     model = sub.add_parser("model", help="city model tools")
     msub = model.add_subparsers(dest="command", required=True)

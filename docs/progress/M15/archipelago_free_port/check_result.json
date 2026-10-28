@@ -1,0 +1,99 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 369 of 6179 actors loaded at the start, 1046 after a teleport to (-896, -1152) (1042 new)",
+  "collision: 507 of 507 traces down hit (building 204, ground 58, road_street 56, junction 40, sidewalk 26, structure_deck 18), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 136 m along a 138 m sidewalk path in 23 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 6179,
+   "loaded_at_start": 369,
+   "loaded_far": 1046,
+   "only_far": 1042,
+   "far_spot_m": [
+    -896.0,
+    -1152.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "ground": 58,
+     "road_street": 56,
+     "prop_parked_vehicle": 2,
+     "building": 204,
+     "sidewalk": 26,
+     "road_avenue": 8,
+     "crosswalk": 6,
+     "junction": 40,
+     "structure_deck": 18,
+     "structure_canopy": 5,
+     "open_plaza": 18,
+     "plant_street_tree": 2,
+     "green_roof": 3,
+     "site_platform": 3,
+     "site_plaza": 10,
+     "plant_park_tree": 1,
+     "elevated": 2,
+     "prop_awning": 9,
+     "open_pocket_park": 9,
+     "road_alley": 9,
+     "plant_facade_greenery": 1,
+     "open_green": 4,
+     "embankment": 5,
+     "skybridge": 1,
+     "prop_sign": 1,
+     "prop_scaffolding": 1,
+     "prop_ac_unit": 1,
+     "plant_median_tree": 3,
+     "lawn": 1
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     -95.04,
+     -116.36
+    ],
+    [
+     -896.0,
+     -1152.0
+    ],
+    [
+     -1152.0,
+     -896.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 137.8,
+   "points": 9,
+   "reached": true,
+   "travelled_m": 136.2,
+   "on_ground": 1.0,
+   "max_drop_m": 0.1,
+   "seconds": 22.9,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Saltreach Free Port",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 41.9,
+ "wall_s": 88.1
+}

@@ -10,6 +10,9 @@ EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
 CITIES = sorted((ROOT / "docs" / "progress" / "M1a2").glob("*/city_spec.json")) + [
     ROOT / "cities" / "vesper_bay" / "city_spec.json"]
 GOLDEN = ROOT / "tests" / "data" / "golden_hashes.json"
+# Greyhook's earlier layout (a long peninsula ending in one round tip), kept for the tests
+# written against it: its immersed tube and the regressions found at its seeds 5 and 11.
+ROUND_TIP = ROOT / "tests" / "data" / "peninsula_round_tip.json"
 
 _BUILT: dict = {}
 

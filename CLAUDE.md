@@ -111,6 +111,9 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 - citygen's blockout exports `city.usdc` (whole city) and one `tiles/<tile>.glb` per 256 m tile
   (custom properties as glTF extras) for World Partition style imports, plus
   `unreal/corporate_core_plan.json`, which `build_greybox_unreal.py` reads unchanged.
+- `citygen unreal <build_dir> <uproject>` (M15) imports a whole built city headless: a World
+  Partition level with collision, per-category materials, instanced props, actor tags by
+  citygen id, the graphs as data assets and a player start; importing again updates by id.
 
 ## Known open items
 
@@ -419,9 +422,11 @@ M9 (tunnels) is in place, in `citygen/tunnels.py` (checks in `tunnel_checks.py`,
   metro tunnels and underpasses as solid boxes, ventilation buildings; `render_cutaway.jpg`
   (view `cutaway`, also for `citygen rerender`): the city cut along the longest road tunnel,
   earth under the ground, from over its first open approach.
-Samples: Nexus City's ring highway dips under Midtown in a cut-and-cover tunnel, Peninsula
-City's spine crosses its river in an immersed tube (Vesper Bay keeps its trumpet: a tunnel on
-its ring takes the flyover's stem). Sample builds: `docs/progress/M9/`.
+Samples: Nexus City's ring highway dips under Midtown in a cut-and-cover tunnel (Vesper Bay
+keeps its trumpet: a tunnel on its ring takes the flyover's stem). Greyhook's earlier layout
+(one round tip) crossed its river in an immersed tube; it is kept as the test fixture
+`tests/data/peninsula_round_tip.json`, since the reshaped Greyhook crosses its river beside
+the map edge, with no room for a tube's approaches. Sample builds: `docs/progress/M9/`.
 
 M11 (gameplay layer) is in place: the build ends with `citygen/gameplay.py` on the finished
 city (after props) and nine checks in `gameplay_checks.py` (75 in all on M8c, 79 with M9):
@@ -559,6 +564,124 @@ no change, and grades are measured on ground + z:
 Sample: `cities/cragmouth` (a cliffside port; hills, a ridge, the Crown Heights plateau with a
 cliff over the bay). Its golden hash is under `terrain_cities`. Sample builds:
 `docs/progress/M13/`.
+
+M15 (Unreal export, the end of stage 1) is in place: `citygen unreal <build_dir> <uproject>
+[--check] [--shots DIR] [--new-project]` imports a blockout output into an Unreal 5.8 project.
+`citygen/unreal.py` (venv side, no Unreal) writes `<build_dir>/unreal/manifest.json` (an actor
+per blockout object of the glTF tiles, keyed by its name, with the sha256 of its plan entry;
+props and plants as one instanced actor per kind and tile with their citygen ids; a
+material per blockout material; the player start on the sidewalk of the fast-travel point
+nearest the middle; the blockout cameras), `prototypes.glb` (the prop and plant kinds, written
+there from the plan's parts) and `graphs.json` (lane, walkway and transit graphs as flat
+arrays), enables PythonScriptPlugin and EditorScriptingUtilities in the .uproject and runs
+`UnrealEditor-Cmd -run=pythonscript` on `citygen/ue/import_city.py` (stdlib and `unreal`
+only). Under `/Game/CityGen/<City>` that makes a World Partition level, static meshes through
+Interchange (no imported materials, no distance fields or Lumen cards, complex collision,
+the hash as `cg.hash` metadata), material instances of `/Game/CityGen/Core/M_CityGen`,
+`BP_CityGenInstances` actors (an HISM and the instances' ids) and `BP_CityGenGraph` data
+assets (Blueprint classes the importer makes, so no C++ compile), a player start, a sun, a
+sky light and the sky atmosphere. Actors carry `cg.city=`, `cg.key=`, `cg.hash=`, `cg.id=`,
+`cg.type=`, `cg.category=`, `cg.tile=` and `cg.district=` tags. Importing again updates by
+key and hash (a tile's glTF only when one of its objects changed; `MESH_VERSION` and
+`ACTOR_VERSION` re-apply importer changes); the same build twice writes no file, and
+`unreal.manifest_changes(old, new)` is exactly what an import over another does (the result's
+`keys`: created, updated, deleted). An updated actor is marked modified (setting tags alone
+does not dirty it), a destroyed one lets go of its meshes, and the meshes no object uses are
+deleted after the save in one batch (deleting an asset the open level still names reloads
+the level and drops unsaved changes). `--check` runs `citygen/ue/check_city.py` in the full
+editor (`-ExecCmds="py ..."`; `-ExecutePythonScript` quits when the script returns;
+`Slate.bAllowThrottling 0` or play-in-editor does not tick unfocused; it waits on
+`WorldPartitionSubsystem.is_streaming_completed`, found through `unreal.ObjectIterator`):
+streaming, traces onto ground, roofs and facades, a walk along sidewalks with head room (the
+sidewalks of a raised road stay at z 0 in the model, an open item), and with `--shots`
+renders from the blockout cameras (`--view NAME EX EY EZ TX TY TZ [LENS]` adds one). On a
+terrain city (M13) the ground is a heightfield actor per tile and `graphs.json` carries
+absolute heights (`exports.graphs(m, ground)`, `"heights": "absolute"`), which the data
+assets, the player start and the walk use; the blockout draws one object per retaining wall,
+so walls, bored tunnels and terrain viaduct columns are keyed by their ids. citygen makes no
+network call; the
+official Unreal MCP plugin (`Experimental/ModelContextProtocol`, an HTTP server in the
+editor) is the interactive route for a Claude session. Testing is always in a throwaway
+project of the exporter's own (`--new-project` makes one from the First Person template,
+outside the repo); never import into any other project unasked. Spec and record:
+`docs/unreal_export.md`. Sample imports: `docs/progress/M15/`.
+
+Greyhook reshape (its coastline made more natural and interesting: a peninsula that fans out
+into headlands): `water.coast.headlands` (2 to 5, peninsula only, in `hydro._fan_plan`,
+`_fan_outline`, `_fan_peninsula`) gives a mainland strip 0.17 of the map deep, a short neck
+(shoulders, a waist), a bay on each side, then the headlands rooted on an arc and splayed, a
+U-shaped cove between each two; a centripetal Catmull-Rom spline runs through the control
+points (`_spline`), moved along its normals by the coast noise (`_wobble`); the sea share
+solve scales the headland widths, and a cove the smoothing pinches shut becomes land. Its draws
+come from `derive_seed(seed, "hydro.fan")` (a hydrology variant past 0 draws the fan afresh),
+and a spec without `headlands` builds as before.
+Greyhook (3.6 x 3.6 km) has three headlands and two islets (parks); its river is pinned with
+meander 0, so the walled heights north of it keep their share at every seed. Builds:
+`docs/progress/greyhook_reshape/`.
+
+M14 (layered districts) is in place, in `citygen/decks.py` (checks in `deck_checks.py`,
+preview `preview_decks.py`): a district with `decks` (spec `District.decks`: `height_m` 9,
+`cover` 0.45, `column_m` 18, `light_m` 70, `ramps` 2, `upper` archetype and `upper_height_m`
+for what stands on it) gets a deck city at level 1 over its ground streets. A city without
+decks is byte-identical (every new field is left out of the JSON at its default: `level` on
+junctions, crosswalks, sidewalks, lanes, walkways, lots, open spaces, buildings, props,
+plants, green areas; `decks`):
+- **Plan** (M2, after the local streets, before the junctions; `DK.plan`): the faces of the
+  at-grade street graph, a cluster grown from the face nearest the district's middle across
+  interior streets until `cover` of the district, keeping off roads raised over 3 m (and, in
+  a regeneration, the held transit lines too low over it). Interior streets get an upper twin
+  (`l1.<id>`, level 1, z the deck top; nodes `<id>.l1`), spokes out of the cluster end 6 m
+  short of the edge street or become ramps (`deck_ramp`, two lanes, 12% with 10 m top and
+  12 m foot runs and 15 m curves, `ramp_profile`), at least one per upper component (one
+  without is dropped); the ground network stays connected.
+- **Per level:** `JN.build` makes the lane and walkway graphs per level (walk keys `(x, y)` on
+  the ground, `(x, y, level)` up; `DK.key`, `walk_ends`, `end_levels`); a walkway between
+  levels carries `attrs.levels`.
+- **Finish** (after the blocks; `DK.finish`): the slab is the lots under the deck (in its
+  faces, fronting a twin) with the twins' corridors and the upper junctions, and 4 m over a
+  park or plaza its streets pass (a colonnade carries it); light wells (lots opened to the
+  sky, greedily until every ground walkway under it is within `light_m`, at least two), each
+  with a switchback stair and an elevator from the ground sidewalk to the deck's; upper lots
+  (`<lot>.l1`) where a lot under has 6 m on a twin.
+- **M3:** lots under the deck build the low `undercity` program up to the slab's underside
+  (`attrs.deck_under`); upper lots build the `upper` archetype from the deck top
+  (`attrs.deck`, `deck_top_m`, level 1); skybridges per level.
+- **After transit and tunnels** (`DK.supports`): round columns under every slab in the
+  furniture zones of the streets under it, on its grid in the lots, then filled in (the
+  nearest allowed point of a thin strip) wherever the slab is farther than 0.75 x the grid
+  from one (1.3 x over a ground street or junction, 6 m more at the edge); none in a lane,
+  crosswalk, junction, clear path, door, tunnel or structure.
+- **Views:** `DK.ground_view` (the ground with each slab as an overhead structure: lights
+  hang from it, trees fit under it) and `DK.deck_view` (a deck as a ground of its own, z
+  from its top); props and plants (`DK.props`) and the prop checks (`DK.per_level`, also in
+  `checks.run_checks`) run on every level. Gameplay places are reached on their own level's
+  walkways and lanes; transit routes off the deck streets and passes over the slabs at the
+  road clearance; elevated roads keep off the deck streets.
+- **Checks** (five, only on a city with decks; 91 on the sample): `deck_columns` (reach,
+  ground to underside, keep-outs), `deck_headroom` (5.5 m over the ground streets, the
+  buildings under it below the slab, nothing else through it), `deck_light`, `deck_links`
+  (two stairs and an elevator, one walkway component with the ground's, a ramp, the deck's
+  lanes in the largest strongly connected part), `deck_levels`.
+- **Blockout:** the slab per tile with its rail, columns, stair flights, elevator shafts,
+  deck streets, junctions, crosswalks and sidewalks at their level, ramps; buildings under a
+  deck in their own color; `render_deck.jpg` (view `deck`, also for `citygen rerender`): a
+  section across the deck from beside it, the ground whole.
+- **assetgen:** a brief of a building on a deck has `floor_grid.level` and `deck_m`.
+- **Unreal exporter:** actors on a deck tagged `cg.level=1` (manifest `level`), the
+  manifest's `decks` (id, level, top, district, slab keys), lanes and walkways with their
+  `level` in `graphs.json` and a `levels` array in the flat graphs (data assets' `Levels`,
+  `CORE_VERSION` 2); a road's own `level` (M7, M9) is not a deck's; the check's walk never
+  takes an elevator, its traces cover each deck. A city without decks exports exactly as
+  before. Unreal check: `docs/progress/M14/unreal/`.
+- **Terrain:** a district with decks is levelled like a `flat` district (a slab on columns
+  over level ground); the deck checks run only on a finished city (`checks.run_checks` also
+  serves the build's early checks on the M2 model, before the columns).
+Sample: `cities/vesper_bay_decks` (Vesper Bay Decks: Vesper Bay with a deck over Highcrest,
+its long residential streets leaving room for the ramps; a separate city so Vesper Bay and
+its sweep seeds stay as they were). Its golden hash is under `deck_cities`. A district
+regeneration (`--district Highcrest`) builds a new deck. Terrain test: Cragmouth with decks on
+Hollow and Ridgeback (`docs/progress/M14/cragmouth_decks/`, not a sample). Sample builds:
+`docs/progress/M14/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

@@ -1,0 +1,88 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 506 of 11036 actors loaded at the start, 1364 after a teleport to (1152, -1408) (1360 new)",
+  "collision: 507 of 507 traces down hit (building 243, junction 49, road_street 44, sea 42, sidewalk 25, road_alley 22), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 124 m along a 138 m sidewalk path in 21 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 11036,
+   "loaded_at_start": 506,
+   "loaded_far": 1364,
+   "only_far": 1360,
+   "far_spot_m": [
+    1152.0,
+    -1408.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "sea": 42,
+     "road_pedestrian": 8,
+     "open_plaza": 2,
+     "ground": 19,
+     "structure_deck": 9,
+     "junction": 49,
+     "road_avenue": 20,
+     "road_alley": 22,
+     "lawn": 3,
+     "sidewalk": 25,
+     "road_street": 44,
+     "crosswalk": 4,
+     "building": 243,
+     "prop_awning": 7,
+     "structure_canopy": 1,
+     "green_roof": 2,
+     "open_pocket_park": 6,
+     "plant_facade_greenery": 1
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     -50.05,
+     690.8
+    ],
+    [
+     1152.0,
+     -1408.0
+    ],
+    [
+     1408.0,
+     -896.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 138.0,
+   "points": 28,
+   "reached": true,
+   "travelled_m": 124.1,
+   "on_ground": 1.0,
+   "max_drop_m": 0.0,
+   "seconds": 21.4,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 0
+  }
+ },
+ "city": "Vesper Bay Pinned",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 40.6,
+ "wall_s": 68.1
+}

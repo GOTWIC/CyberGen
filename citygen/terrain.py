@@ -514,7 +514,10 @@ def field(spec, model) -> tuple[Field, Levels, dict]:
         H[js, iss] = H[js, iss] + lift
         stats["cliffs"].append({"district": cl.district, "height_m": cl.height_m})
     # flat districts and megasites
-    flats = [(n, _district_poly(model, n), FLAT_BAND_M) for n in t.flat]
+    # (M14: a district with decks is levelled too: a slab on columns over level ground)
+    names = list(t.flat) + [d.name for d in spec.districts
+                            if d.decks is not None and d.name not in t.flat]
+    flats = [(n, _district_poly(model, n), FLAT_BAND_M) for n in names]
     flats += [(s.name or s.id, G.from_model_poly(s.polygon), SITE_BAND_M)
               for s in model.megasites]
     for name, poly, band in flats:

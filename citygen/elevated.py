@@ -2952,6 +2952,8 @@ def raised_segments(m) -> list:
     for s in m.road_segments:
         if s.road_class in ("footbridge",):
             continue
+        if "deck" in s.attrs:
+            continue      # (M14: a deck's streets are on its slab, its ramps solid)
         if any(under_m(z.z) >= SUPPORT_MIN_UNDER_M for z in s.z_profile):
             out.append(s)
     return out

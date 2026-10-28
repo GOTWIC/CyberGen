@@ -7,7 +7,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout | M0 to M13 done, M14 and M15 to come |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1 and AG7 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
@@ -18,7 +18,8 @@ your machine.
 ## Stage 1: layoutgen
 
 `citygen` turns a prompt (and an optional concept image) into a complete city layout, then
-builds a 3D blockout of it in Blender and exports it for game engines such as Unreal.
+builds a 3D blockout of it in Blender and puts it into Unreal Engine 5.8 as a level that
+streams and can be walked.
 
 Spec: [`docs/citygen_scope.md`](docs/citygen_scope.md) · Full milestone log:
 [`docs/citygen_milestones.md`](docs/citygen_milestones.md) · Builds:
@@ -38,15 +39,15 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M10/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M10/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/greyhook_reshape/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M10/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
 | <img src="docs/progress/M10/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
 
-| Cragmouth (hills and cliffs) |
-|---|
-| <img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="840"> |
+| Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
+|---|---|
+| <img src="docs/progress/M13/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M14/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
@@ -57,6 +58,10 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
 | <img src="docs/progress/M13/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
+
+| Vesper Bay imported into Unreal 5.8 (8K) | Cragmouth's terraced hills in Unreal (8K) |
+|---|---|
+| <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/cragmouth/unreal_hillside.jpg" width="420"> |
 
 Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour.
 
@@ -74,17 +79,17 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 |---|---|
 | <img src="docs/progress/M13/cragmouth/preview_terrain.png" width="420"> | <img src="docs/progress/M13/cragmouth/render_hillside.jpg" width="420"> |
 
+| Decks: the ground under the slab, the deck, a section | A deck's edge: the undercity under the slab, the city on it (8K) |
+|---|---|
+| <img src="docs/progress/M14/vesper_bay_decks/preview_decks.png" width="420"> | <img src="docs/progress/M14/vesper_bay_decks/render_deck_edge.jpg" width="420"> |
+
 | Stack interchange (8K) | Trumpet interchange (8K) |
 |---|---|
 | <img src="docs/progress/M12/vesper_bay_stacks/render_stack.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay/render_trumpet.jpg" width="420"> |
 
-| Tunnel under a river (Greyhook) | Tunnel under a district (Nexus City) |
+| Tunnel under a district (Nexus City) | Cutaway along the tunnel (8K) |
 |---|---|
-| <img src="docs/progress/M9/peninsula_city/preview_tunnels.png" width="420"> | <img src="docs/progress/M9/nexus_city/preview_tunnels.png" width="420"> |
-
-| Cutaway along the river tunnel (8K) | Cutaway along the district tunnel (8K) |
-|---|---|
-| <img src="docs/progress/M9/peninsula_city/render_cutaway.jpg" width="420"> | <img src="docs/progress/M9/nexus_city/render_cutaway.jpg" width="420"> |
+| <img src="docs/progress/M9/nexus_city/preview_tunnels.png" width="420"> | <img src="docs/progress/M9/nexus_city/render_cutaway.jpg" width="420"> |
 
 | Transit, Delta Megacity | Transit, Nexus City | Transit, Vesper Bay |
 |---|---|---|
@@ -112,8 +117,8 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M11 | Gameplay layer | Places, factions, wealth and danger, traffic and crowd data, parking, fast travel | ✅ Done |
 | M12 | Stack interchanges | Four-level highway crossings | ✅ Done |
 | M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | ✅ Done |
-| M14 | Layered districts | Streets and buildings on stacked deck levels | Planned |
-| M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | 🚧 In progress |
+| M14 | Layered districts | Deck cities over the streets: upper streets, lots and buildings, ramps, stairs, elevators, light wells | ✅ Done |
+| M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | ✅ Done |
 
 ### Run it
 
@@ -123,9 +128,10 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 ```
 
-`--blockout` needs Blender 5.2. To make a new city, open Claude Code in this repo and ask for
-one (the `citygen` skill takes it from there). Editing, locking and the other commands:
-[`docs/citygen_milestones.md`](docs/citygen_milestones.md).
+`--blockout` needs Blender 5.2. `citygen unreal out/vesper_bay <Project>.uproject` imports
+the city into an Unreal 5.8 project. To make a new city, open Claude Code in this repo and
+ask for one (the `citygen` skill takes it from there). Editing, locking and the other
+commands: [`docs/citygen_milestones.md`](docs/citygen_milestones.md).
 
 ---
 

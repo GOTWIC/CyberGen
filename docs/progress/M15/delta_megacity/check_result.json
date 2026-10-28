@@ -1,0 +1,94 @@
+{
+ "ok": true,
+ "lines": [
+  "streaming: 388 of 9915 actors loaded at the start, 1305 after a teleport to (-1408, 896) (1301 new)",
+  "collision: 507 of 507 traces down hit (building 221, water 53, road_street 49, junction 46, bridge 36, open_park 13), 36 of 36 roofs, 36 of 36 facades",
+  "walk: 132 m along a 135 m sidewalk path in 22 s, 100% of frames on the ground, reached its end"
+ ],
+ "checks": {
+  "streaming": {
+   "ok": true,
+   "actors": 9915,
+   "loaded_at_start": 388,
+   "loaded_far": 1305,
+   "only_far": 1301,
+   "far_spot_m": [
+    -1408.0,
+    896.0
+   ],
+   "far_tile_loaded": true
+  },
+  "collision": {
+   "ok": true,
+   "down": {
+    "traces": 507,
+    "hits": 507,
+    "by_category": {
+     "bridge": 36,
+     "water": 53,
+     "structure_tube": 6,
+     "open_park": 13,
+     "ground": 8,
+     "building": 221,
+     "hedge": 1,
+     "plant_park_tree": 2,
+     "junction": 46,
+     "open_plaza": 11,
+     "sidewalk": 12,
+     "road_street": 49,
+     "green_roof": 5,
+     "prop_parked_vehicle": 1,
+     "plant_shrub": 1,
+     "road_alley": 10,
+     "prop_awning": 10,
+     "open_pocket_park": 9,
+     "prop_sign": 1,
+     "plant_facade_greenery": 1,
+     "road_pedestrian": 7,
+     "quay": 2,
+     "open_green": 1,
+     "prop_boat": 1
+    }
+   },
+   "roofs": {
+    "tried": 36,
+    "hit": 36
+   },
+   "facades": {
+    "tried": 36,
+    "hit": 36
+   },
+   "spots": [
+    [
+     252.78,
+     -133.88
+    ],
+    [
+     -1408.0,
+     896.0
+    ],
+    [
+     -1408.0,
+     1408.0
+    ]
+   ]
+  },
+  "walk": {
+   "ok": true,
+   "path_m": 135.2,
+   "points": 6,
+   "reached": true,
+   "travelled_m": 132.5,
+   "on_ground": 1.0,
+   "max_drop_m": 0.1,
+   "seconds": 22.3,
+   "stopped_by": {},
+   "stops": [],
+   "skipped_low_walkways": 2
+  }
+ },
+ "city": "Delta Megacity",
+ "pawn": "BP_FirstPersonCharacter_C",
+ "total_s": 49.4,
+ "wall_s": 83.3
+}

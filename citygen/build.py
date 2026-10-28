@@ -217,6 +217,9 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
                     "lots", "places"):
             data[key] = getattr(local, key)
+        if local.decks:     # M14
+            data["decks"] = local.decks
+            data["structures"] = list(data.get("structures", [])) + local.structures
         data["open_spaces"] = data["open_spaces"] + local.open_spaces
     if m3 is not None:
         data.update(m3)
@@ -672,6 +675,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
 
     from . import building_checks as BC
     from . import buildout as BO
+    from . import decks as DK
+    from . import deck_checks as DC
     from . import elevated as EL
     from . import gameplay as GP
     from . import gameplay_checks as GC
@@ -705,6 +710,9 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         side()
     b.m3 = out
     m = with_rows(b.model, BO.rows(out))
+    if b.local is not None and b.local.structures:
+        # M14: the stairs and elevator shafts of the light wells (M2 rows)
+        m = with_rows(m, {"structures": list(m.structures) + b.local.structures})
     tg = b.local.terrain if b.local is not None else None
     if tg is not None:
         # M13: buildings seated on the ground, retaining walls, bored tunnels
@@ -730,6 +738,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
             b.roads.terrain[0], {d.id: d.name for d in m.districts})})
     # M7: columns under the raised road decks (after the transit structures they avoid)
     m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
+    if m.decks:
+        # M14: the deck slabs' columns (after the transit structures and road columns)
+        cols, dks = DK.supports(m)
+        m = with_rows(m, {"structures": list(m.structures) + cols, "decks": dks})
     # M10: stable ids for everything built so far, so the props, the plants and the
     # gameplay layer key their draws and names on them (not on build order)
     pinned = frozenset(x.id for x in b.frame.pin_buildings) if b.frame is not None \
@@ -743,7 +755,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     b.notes = [ID.text(n, mp) for n in b.notes]
     late_notes = [ID.text(n, mp) for n in out.notes + (tr.notes if tr is not None else []) +
                   tn.notes]
-    pr = PR.build(spec, m)
+    pr = DK.props(spec, m, PR.build)     # (M14: on every level)
     m = with_rows(m, pr.rows)
     if tg is not None:
         rows, dst = TE.dressing(m)
@@ -765,7 +777,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     late = {c.id: c for c in TNC.run(spec, m) + TGC.run(spec, m)}
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
-        TC.run(spec, m) + PC.run(spec, m) + GC.run(spec, m)
+        TC.run(spec, m) + DK.per_level(m, lambda v: PC.run(spec, v)) + GC.run(spec, m) + \
+        DC.run(spec, m)
     with G.canonical():
         checks.append(EC.check_supports(m))
     st = early["stats"]
@@ -781,6 +794,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         st["transit"] = {**TC.stats(m), "generator": tr.info}
     st["props"] = {**PC.stats(m), "generator": pr.info}
     st["gameplay"] = {**GC.stats(m), "generator": gp.info}
+    if m.decks:
+        st["decks"] = DC.stats(m)
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)
@@ -872,6 +887,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_tunnels.png")
         render_tunnels(b, paths[-1])
+    if b.model.decks:
+        from .preview_decks import render_decks
+
+        paths.append(out / "preview_decks.png")
+        render_decks(b, paths[-1])
     if b.model.pois or b.model.zones:
         from .preview_gameplay import render_gameplay
 

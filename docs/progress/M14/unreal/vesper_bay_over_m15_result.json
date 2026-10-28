@@ -1,0 +1,56 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 6938,
+  "updated": 3061,
+  "deleted": 6961,
+  "unchanged": 414
+ },
+ "meshes": {
+  "imported": 8089,
+  "kept": 444,
+  "deleted": 6864
+ },
+ "tiles_imported": 150,
+ "materials": {
+  "created": 0,
+  "updated": 0,
+  "kept": 83,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 3,
+  "kept": 0
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.01,
+  "meshes": 23.45,
+  "level": 5.24,
+  "actors": 26.53,
+  "graphs": 0.36,
+  "save": 8.77,
+  "prune": 439.76,
+  "save_pruned": 0.0,
+  "digests": 0.33
+ },
+ "dirty_packages": 16960,
+ "actor_count": 10413,
+ "actor_digest": "f76487b3190dd9b4",
+ "asset_count": 8619,
+ "asset_digest": "a816730f2fdeaced",
+ "level": "/Game/CityGen/VesperBay/Maps/VesperBay",
+ "content_root": "/Game/CityGen/VesperBay",
+ "city": "Vesper Bay",
+ "counts": {
+  "tiles": 196,
+  "objects": 8500,
+  "instance_actors": 1909,
+  "instances": 75749,
+  "prototypes": 33
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 504.5,
+ "exit_code": 0,
+ "wall_s": 517.7
+}

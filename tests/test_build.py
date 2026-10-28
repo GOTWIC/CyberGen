@@ -73,15 +73,18 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M13/<city>/report.json is committed, passes and matches a fresh build."""
+    """docs/progress/M13/<city>/report.json (Greyhook's in docs/progress/greyhook_reshape) is
+    committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        committed = ROOT / "docs" / "progress" / "M13" / slug / "report.json"
+        folder = ROOT / "docs" / "progress" / (
+            "greyhook_reshape" if slug == "peninsula_city" else "M13") / slug
+        committed = folder / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
         assert rep["passed"], slug
-        assert (ROOT / "docs" / "progress" / "M13" / slug / "preview_gameplay.png").is_file()
-        assert (ROOT / "docs" / "progress" / "M13" / slug / "preview_transit.png").is_file()
+        assert (folder / "preview_gameplay.png").is_file()
+        assert (folder / "preview_transit.png").is_file()
         built, _, _ = built_sample(path)
         assert rep == json.loads(json.dumps(built.report())), slug
 
@@ -283,6 +286,28 @@ def test_peninsula_has_land_tongue():
     assert h.land.intersects(Point(0, -600))
     assert not h.land.intersects(Point(-1100, -1100))
     assert not h.land.intersects(Point(1100, -1100))
+
+
+@pytest.mark.parametrize("seed", [9081, 404, 1999])
+def test_peninsula_headlands_fan_out(seed):
+    """coast.headlands: below the mainland strip the land narrows to a neck, then fans out
+    into that many headlands; the sea keeps its share, no cove is left as a closed pond."""
+    data = json.loads((ROOT / "docs" / "progress" / "M1a2" / "peninsula_city" /
+                       "city_spec.json").read_text())
+    data["seed"] = seed
+    spec = validate_spec(data).filled
+    assert spec.water.coast.headlands == 3
+    canvas = G.canvas_for(spec.size_km)
+    sea = H.build_sea(spec, canvas, None)
+    assert abs(sea.area / canvas.area - 0.55) < 0.002
+    assert all(p.distance(canvas.exterior) < 1.0 for p in G.parts(sea))
+    land = G.diff(canvas, G.qpoly(sea))
+    top = 1800.0 - H.FAN["main"] * 3600.0   # the mainland coast
+    lam = top + 1800.0                      # from there to the map's south edge
+    neck = land.intersection(box(-1800, top - 0.16 * lam, 1800, top - 0.11 * lam))  # the waist
+    lower = land.intersection(box(-1800, -1800, 1800, top - 0.45 * lam))
+    assert G.qbounds(neck)[2] - G.qbounds(neck)[0] < 1000.0
+    assert len(G.parts(lower)) == 3
 
 
 # --- rivers ----------------------------------------------------------------------------

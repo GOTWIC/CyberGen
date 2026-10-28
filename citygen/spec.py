@@ -152,6 +152,16 @@ class Coast(_Model):
     sea_share: Annotated[float, Field(ge=0.05, le=0.8)] | None = Field(
         None, description="Fraction of the map that is sea, offshore islands included (they "
                           "are carved out of it). Default by form.")
+    headlands: Annotated[int, Field(ge=2, le=5)] | None = Field(
+        None, description="Peninsula only: the land widens from a neck toward the sea and fans "
+                          "out into this many headlands with coves between them, instead of "
+                          "ending in one rounded tip.")
+
+    @model_validator(mode="after")
+    def _headlands_on_peninsula(self) -> Coast:
+        if self.headlands is not None and self.form != "peninsula":
+            raise ValueError("'headlands' needs coast form 'peninsula'")
+        return self
 
 
 _DIRECTION_LIST = ["north", "north_east", "east", "south_east", "south", "south_west", "west",
@@ -498,6 +508,31 @@ class Megasite(_Model):
         None, description="Building height cap around the site (spaceport flight cone).")
 
 
+class Decks(_Model):
+    """M14: an upper deck city over part of the district: a slab on columns over a cluster of
+    its blocks and the local streets between them, with streets, lots and buildings of its own,
+    ramps down to the ground streets, light wells with stairs and elevators."""
+    height_m: Annotated[float, Field(ge=7.5, le=16)] = Field(
+        9.0, description="Deck top over the ground under it (the lower level keeps 5.5 m of "
+                         "clear height for traffic under the slab).")
+    cover: Annotated[float, Field(ge=0.1, le=0.8)] = Field(
+        0.45, description="Target share of the district's land under the deck.")
+    column_m: Annotated[float, Field(ge=10, le=30)] = Field(
+        18.0, description="Column grid: no point of the slab farther than about this from a "
+                          "column.")
+    light_m: Annotated[float, Field(ge=30, le=150)] = Field(
+        70.0, description="No walkway under the deck farther than this from open sky (light "
+                          "wells and the deck edge).")
+    ramps: Annotated[int, Field(ge=1, le=6)] = Field(
+        2, description="Two-way street ramps between the deck and the ground streets.")
+    upper: Archetype | None = Field(
+        None, description="Program of the buildings on the deck (default: the district's); "
+                          "under the deck the lots get low buildings that fit the clear height.")
+    upper_height_m: Annotated[tuple[float, float], _range(3, 600)] | None = Field(
+        None, description="Height range of the buildings on the deck, over its top (default: "
+                          "the district's).")
+
+
 class District(_Model):
     name: Name
     archetype: Archetype
@@ -536,6 +571,8 @@ class District(_Model):
         None, description="M11: the faction that holds the district (districts with the same "
                           "faction share it); default: a generated gang where the district is "
                           "dangerous, a corporation in corporate districts, else the police.")
+    decks: Decks | None = Field(None, description="M14: a layered district: an upper deck "
+                                                   "city over the ground streets.")
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,54 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 9915,
+  "updated": 0,
+  "deleted": 0,
+  "unchanged": 0
+ },
+ "meshes": {
+  "imported": 8045,
+  "kept": 0,
+  "deleted": 0
+ },
+ "tiles_imported": 197,
+ "materials": {
+  "created": 81,
+  "updated": 0,
+  "kept": 0,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 3,
+  "kept": 0
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.44,
+  "meshes": 24.21,
+  "level": 0.44,
+  "actors": 18.32,
+  "prune": 0.19,
+  "graphs": 0.3,
+  "save": 6.18,
+  "digests": 0.33
+ },
+ "dirty_packages": 10000,
+ "actor_count": 9915,
+ "actor_digest": "f41073fcaa20023b",
+ "asset_count": 8129,
+ "asset_digest": "20f4ec443105db2d",
+ "level": "/Game/CityGen/DeltaMegacity/Maps/DeltaMegacity",
+ "content_root": "/Game/CityGen/DeltaMegacity",
+ "city": "Delta Megacity",
+ "counts": {
+  "tiles": 196,
+  "objects": 8012,
+  "instance_actors": 1899,
+  "instances": 75504,
+  "prototypes": 33
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 50.5,
+ "wall_s": 63.4
+}

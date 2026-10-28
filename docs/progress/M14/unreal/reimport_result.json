@@ -1,0 +1,56 @@
+{
+ "ok": true,
+ "actors": {
+  "created": 0,
+  "updated": 0,
+  "deleted": 0,
+  "unchanged": 10477
+ },
+ "meshes": {
+  "imported": 0,
+  "kept": 8568,
+  "deleted": 0
+ },
+ "tiles_imported": 0,
+ "materials": {
+  "created": 0,
+  "updated": 0,
+  "kept": 90,
+  "deleted": 0
+ },
+ "graphs": {
+  "written": 0,
+  "kept": 3
+ },
+ "timings": {
+  "core": 0.0,
+  "materials": 0.01,
+  "meshes": 1.55,
+  "level": 1.58,
+  "actors": 0.06,
+  "graphs": 0.1,
+  "save": 0.0,
+  "prune": 0.08,
+  "save_pruned": 0.0,
+  "digests": 0.24
+ },
+ "dirty_packages": 0,
+ "actor_count": 10477,
+ "actor_digest": "f52635c17eed0889",
+ "asset_count": 8661,
+ "asset_digest": "39725847e915d2d5",
+ "level": "/Game/CityGen/VesperBayDecks/Maps/VesperBayDecks",
+ "content_root": "/Game/CityGen/VesperBayDecks",
+ "city": "Vesper Bay Decks",
+ "counts": {
+  "tiles": 196,
+  "objects": 8535,
+  "instance_actors": 1938,
+  "instances": 80275,
+  "prototypes": 33
+ },
+ "engine": "5.8.4-58902052+++UE5+Release-5.8",
+ "total_s": 3.7,
+ "exit_code": 0,
+ "wall_s": 23.8
+}
