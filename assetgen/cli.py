@@ -1,5 +1,5 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
-diff A B`, `assetgen brief schema`, `assetgen spike OUT`.
+diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen streets BUILD`.
 
 Exit codes: 0 valid (diff: no change), 1 invalid spec (diff: briefs differ), 2 usage or
 file error.
@@ -128,6 +128,38 @@ def cmd_spike(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_streets(args: argparse.Namespace) -> int:
+    from . import brief as B
+    from . import spec as S
+    from .streets.build import build as street_build, default_workers
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    model, sha, bdir = B.load_model(src)
+    spec = None
+    if args.spec:
+        res = S.load_spec(args.spec, model)
+        for issue in res.issues:
+            print(issue, file=sys.stderr)
+        if not res.ok:
+            return EXIT_INVALID
+        spec = res.filled
+    out = Path(args.out) if args.out else bdir / "assets"
+    rep = street_build(model, sha, out, spec, workers=args.workers or default_workers(),
+                       force=args.force)
+    st, f = rep["stats"], rep["files"]
+    print(f"{rep['city']}: {st['pieces']} street pieces in {st['tiles']} tiles, "
+          f"{st['triangles']} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
+          f"{f['tiles_made']} tiles made, {f['tiles_written']} written "
+          f"in {rep['seconds']['total']} s")
+    for c in rep["checks"]:
+        if not c["ok"]:
+            print(f"check failed: {c['id']}: {c['detail']}", file=sys.stderr)
+    print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'streets_report.txt'}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="assetgen",
                                 description="Offline building, street and texture assets.")
@@ -171,6 +203,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--quantized", action="store_true",
                     help="also write KHR_mesh_quantization copies")
     sp.set_defaults(func=cmd_spike)
+
+    st = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")
+    st.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    st.add_argument("--spec", help="asset_spec.json (default: the era presets)")
+    st.add_argument("--out", help="output directory (default BUILD/assets)")
+    st.add_argument("--workers", type=int, help="worker processes (at most 4; default "
+                                                "ASSETGEN_WORKERS or 4)")
+    st.add_argument("--force", action="store_true",
+                    help="make every tile again (the files are still written only if "
+                         "their bytes change)")
+    st.set_defaults(func=cmd_streets)
     return p
 
 
