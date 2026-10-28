@@ -211,7 +211,7 @@ def _wobble(pts: np.ndarray, fn) -> np.ndarray:
 # bulge: how far a side bows out at its middle; cove, cove_w: a cove head's depth along the
 # shorter headland and its width; bay: where the bay beside the neck curves in (along, across);
 # rough: amplitude of the coast's wobble, of the coast noise.
-FAN = {"main": 0.15, "neck": 0.1, "waist": 0.14, "root": 0.22, "arc": 0.18, "half": 0.15,
+FAN = {"main": 0.17, "neck": 0.1, "waist": 0.14, "root": 0.22, "arc": 0.18, "half": 0.15,
        "gap": 0.04, "spread": 50.0, "len": (0.75, 0.95), "width": (0.85, 1.25), "mid": 0.25,
        "taper": (0.55, 0.8), "bulge": (0.85, 1.3), "cove": (0.3, 0.5), "cove_w": (0.08, 0.12),
        "bay": (0.5, 0.5), "rough": 0.7}
@@ -311,7 +311,7 @@ def _fan_peninsula(plan: dict, s: float, A: float, Bh: float, noise, wobble) -> 
 
 
 def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | None,
-              lobe: float = 0.0) -> object:
+              lobe: float = 0.0, variant: int = 0) -> object:
     coast = spec.water.coast
     ux, uy, vx, vy = G.frame(coast.side)
     corners = list(canvas.exterior.coords)[:4]
@@ -331,7 +331,9 @@ def build_sea(spec: CitySpec, canvas: Polygon, b0_world: tuple[float, float] | N
     plan = wobble = None
     if coast.form == "peninsula" and coast.headlands:
         neck = 1.0 - FAN["main"]  # the mainland strip is a fixed share of the map's depth
-        frng = np.random.default_rng(derive_seed(spec.seed, "hydro.fan"))
+        # a hydrology variant draws the fan afresh (its shape is free, like a river's course)
+        frng = np.random.default_rng(derive_seed(spec.seed, "hydro.fan", *(
+            [variant] if variant else [])))
         plan = _fan_plan(frng, coast.headlands, A, Bh, A - neck * 2 * A)
         base3 = G.noise1d(frng, 420.0)
         wobble = lambda t: FAN["rough"] * amp * base3(t)  # noqa: E731
@@ -1216,7 +1218,7 @@ def build_hydro(spec: CitySpec, canvas: Polygon, variant: Variant) -> Hydro:
         bh = max(abs(x * vx + y * vy) for x, y in list(canvas.exterior.coords)[:4])
         lobe_b0 = float(np.clip(b0[0] * vx + b0[1] * vy, -0.5 * bh, 0.5 * bh))
     # Every sub-stage hands on coordinates on the 0.01 m grid (determinism across machines).
-    sea = G.qpoly(build_sea(spec, canvas, b0, lobe))
+    sea = G.qpoly(build_sea(spec, canvas, b0, lobe, variant.index))
     T.stage("coast", sea)
     bodies = quantize_bodies(build_rivers(spec, canvas, sea, variant, lobe_b0))
     T.stage("rivers", bodies)

@@ -3,7 +3,7 @@
   "name": "Greyhook",
   "release": "1.0",
   "citygen": "0.1.0",
-  "code_sha256": "1c3aa0fed29fefac460ba104805d3447f253f314ecc13efabfd6b6a77971430a",
+  "code_sha256": "a14537814aab019773a4b697ae70a9335343724f32acbecc0d86e63764184369",
   "spec": {
     "$schema": "../../../../citygen/schemas/city_spec.schema.json",
     "name": "Greyhook",
@@ -220,5 +220,5 @@
   },
   "overrides": null,
   "edits": [],
-  "model_sha256": "2506d2a0ca1e30a41ff644a9d02aa1d8299879e669c7af469a00ce83b99b72e2"
+  "model_sha256": "045803facd09b3b8d3c5a65977ca535502af9701742b17dc8cca19ddb701193c"
 }

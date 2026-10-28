@@ -508,12 +508,13 @@ regenerations, sweep: `docs/progress/M10/`.
 
 Greyhook reshape (its coastline made more natural and interesting: a peninsula that fans out
 into headlands): `water.coast.headlands` (2 to 5, peninsula only, in `hydro._fan_plan`,
-`_fan_outline`, `_fan_peninsula`) gives a mainland strip 0.15 of the map deep, a short neck
+`_fan_outline`, `_fan_peninsula`) gives a mainland strip 0.17 of the map deep, a short neck
 (shoulders, a waist), a bay on each side, then the headlands rooted on an arc and splayed, a
 U-shaped cove between each two; a centripetal Catmull-Rom spline runs through the control
 points (`_spline`), moved along its normals by the coast noise (`_wobble`); the sea share
 solve scales the headland widths, and a cove the smoothing pinches shut becomes land. Its draws
-come from `derive_seed(seed, "hydro.fan")`, and a spec without `headlands` builds as before.
+come from `derive_seed(seed, "hydro.fan")` (a hydrology variant past 0 draws the fan afresh),
+and a spec without `headlands` builds as before.
 Greyhook (3.6 x 3.6 km) has three headlands and two islets (parks); its river is pinned with
 meander 0, so the walled heights north of it keep their share at every seed. Builds:
 `docs/progress/greyhook_reshape/`.
