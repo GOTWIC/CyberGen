@@ -878,10 +878,12 @@ AG2 (facades) is in place (tests `tests/assetgen/test_ag_facades.py`):
   the other bays); pockets at convex corners start a reveal plus 6 cm from the corner;
   irregularity by `irreg` (grime times low wealth): boards, infills, replaced frames, AC
   units, grilles, dishes, closed-in balconies, add-on boxes; a shed of one tall floor with
-  a blank ground gets a clerestory.
+  a blank ground gets a clerestory; industrial walls on the ground a block or concrete dado
+  (`dado`, `dado_m`) and industrial roofs a palette of their own (`ROOFS_INDUSTRIAL`), so
+  plain sheds differ in their thumbnails.
 - **Checks**: `asset_unique` also compares contact-sheet thumbnails (`buildings/thumb.py`:
   a 64 px z-buffered rasterizer, a 480-bit difference hash, at least 8 bits apart; a
-  building filling under 5% of its thumbnail is told by genes alone), `asset_budget` per
+  building filling under 10% of its thumbnail, a long thin shed, is told by genes alone), `asset_budget` per
   building class (`asset_checks.CLASSES`) and per city (section 11's estimate plus 40% for
   parts, 3 instances per bay), `asset_meshes` every part mesh, `asset_envelope` every
   instanced part's box.
