@@ -1,0 +1,52 @@
+assetgen props: Nexus City: PASS
+
+  [ok] props_coverage: 59023 props (2209 on AG7's barriers), 23966 plants, 17456 sign slots; 0 without an asset
+  [ok] props_families: 20 prop kinds in 5 styles, 15 plant species
+  [ok] props_replaces: 2095 prototype actors, 2095 replaced
+  [ok] props_meshes: no bad triangles
+  [ok] props_budgets: 99579 instances (at most 2685 in a tile, budgets 15000 and 300000), 97723964 triangles drawn through them, 7545489 unique triangles (budget 10000000)
+
+variants 723 in 36 families, instances 99579 (1735 brackets), exact props 1852, signs 17456 (17443 meshes)
+unique triangles 7545489 (signs 6106580, exact 702496), drawn through instances 97723964, disk 421.5 MB
+
+instances by kind:
+  awning: 34553
+  ac_unit: 8191
+  street_light: 3792
+  bollard: 3310
+  parked_vehicle: 3235
+  railing: 2470
+  traffic_signal: 1885
+  bracket: 1735
+  trash: 1031
+  trash_can: 887
+  hydrant: 857
+  wall_light: 844
+  bench: 676
+  dumpster: 172
+  bus_stop: 101
+  boat: 65
+  planter: 52
+  vending_machine: 14
+  kiosk: 9
+  food_stall: 1
+instances by species:
+  ivy: 17136
+  boxwood: 4163
+  sedum: 3574
+  maple: 1598
+  scrub: 1568
+  plane: 1307
+  birch: 1165
+  linden: 1086
+  ginkgo: 1002
+  pine: 871
+  fan_palm: 818
+  oak: 611
+  elm: 546
+  date_palm: 166
+  ficus: 88
+signs: billboard.facade 366, billboard.roof 1302, holo_ad.roof 41, neon.facade 637, shop_sign.channel 550, shop_sign.lightbox 5071, shop_sign.neon 7263, shop_sign.panel 2226
+scripts: hangul 1601, hanzi 6662, kana 2455, latin 6738
+files: 36 families made, 110 tiles made, 0 kept, 193 written, 0 removed
+seconds: gather 19.13, families 2.74, tiles 31.48, write 1.24, total 55.35, workers 3

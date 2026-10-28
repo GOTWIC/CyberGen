@@ -863,7 +863,8 @@ AG8 (props, plants and signs) is in place, in `assetgen/props/` (tests
   pines, shrubs, sedum, scrub, ivy), each placement's variant a hash of its id
   (`gather.py`); awnings and ivy in segments, facade props off their wall (the briefs'
   `gap_m`) on brackets; cables, scaffolding and market gates exact meshes per tile; M6's
-  highway median barriers dropped where AG7's road piece has its barrier.
+  highway median barriers dropped where AG7's road piece has its barrier. On M13 a
+  placement stands on its building's `base_m` (facade, roof) else the ground at its point.
 - **Signs** (`signs.py`, `glyphs.py`): an asset per M11 sign slot (box, panel, neon and
   channel shop signs, blade signs, billboards, holo-ads as non-Nanite LOD chains, neon
   bands), text from POI names or generated shop names, an in-repo stroke font for Latin and

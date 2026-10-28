@@ -1,0 +1,51 @@
+assetgen props: Greyhook: PASS
+
+  [ok] props_coverage: 27800 props (557 on AG7's barriers), 15109 plants, 8183 sign slots; 0 without an asset
+  [ok] props_families: 20 prop kinds in 5 styles, 14 plant species
+  [ok] props_replaces: 1578 prototype actors, 1578 replaced
+  [ok] props_meshes: no bad triangles
+  [ok] props_budgets: 48162 instances (at most 1911 in a tile, budgets 15000 and 300000), 56200978 triangles drawn through them, 3677613 unique triangles (budget 10000000)
+
+variants 715 in 35 families, instances 48162 (475 brackets), exact props 471, signs 8183 (8179 meshes)
+unique triangles 3677613 (signs 2788022, exact 180380), drawn through instances 56200978, disk 209.2 MB
+
+instances by kind:
+  awning: 15835
+  ac_unit: 3586
+  street_light: 3102
+  trash: 2044
+  traffic_signal: 1141
+  bollard: 1048
+  railing: 1017
+  hydrant: 693
+  trash_can: 631
+  parked_vehicle: 541
+  bracket: 475
+  bench: 463
+  dumpster: 285
+  bus_stop: 62
+  boat: 29
+  wall_light: 27
+  planter: 17
+  food_stall: 14
+  vending_machine: 8
+  kiosk: 6
+instances by species:
+  boxwood: 4157
+  sedum: 3133
+  ivy: 2912
+  maple: 1163
+  fan_palm: 1122
+  plane: 1078
+  scrub: 828
+  birch: 620
+  oak: 567
+  elm: 546
+  pine: 456
+  linden: 378
+  date_palm: 106
+  ficus: 72
+signs: billboard.facade 177, billboard.roof 547, holo_ad.roof 29, neon.facade 311, shop_sign.channel 220, shop_sign.lightbox 2820, shop_sign.neon 2787, shop_sign.panel 1292
+scripts: cyrillic 216, hangul 3, hanzi 2199, kana 1964, latin 3801
+files: 35 families made, 87 tiles made, 0 kept, 142 written, 0 removed
+seconds: gather 9.55, families 2.69, tiles 9.94, write 0.31, total 22.9, workers 3

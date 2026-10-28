@@ -17,7 +17,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
 | AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Planned | |
 | AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
-| AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Planned | |
+| AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Done | [`docs/progress/AG8`](progress/AG8) |
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
 | AG10 | Layered districts: buildings and streets on M14's decks | Planned (after M14) | |
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
@@ -293,6 +293,123 @@ no walls; the ramps of a named footbridge with no road are not in the model; M6'
 should drop them where a road piece has one); the blockout's sea plane runs under the ground
 over every tile and shows through the open approaches of road tunnels (a stage 1 fix; the
 previews hide it with `--hide city.sea.`).
+
+## AG8: props, plants and signs
+
+**Built.** Package `assetgen/props/` (CLI `assetgen props BUILD [--spec S] [--workers N]
+[--force] [--sheets DIR]`; `assetgen build` runs it after the streets, `--no-props` skips it):
+- **Styles** (`styles.py`): five district styles from citygen's era per archetype, as AG7's
+  paving follows it: sleek (corporate glass, clean tech, aerospace), civic (mixed, suburban
+  and transit modern), heavy (brutalist, industrial), neon (neon retro) and old (heritage).
+  Every draw is a blake2b hash of a key (`u`, `pick`, `choice`, `rng`), as citygen's
+  `props._u`.
+- **Prop variants** (`variants.py`): a generator per M6 kind, 4 to 12 variants per style
+  (123 per style, 615 in all): street lights (masts, arms, heads, neon trims), wall lights,
+  traffic signals, trash cans, bus shelters, hydrants, bollards, benches, kiosks, vending
+  machines, food stalls with stools, planters, parked vehicles (12 per style from wedges,
+  sedans, pods, hatchbacks, SUVs, taxis, vans, pickups, box trucks, kei cars and tuk-tuks),
+  boats, barriers, railings, awnings, AC units, dumpsters, litter (bags, boxes and cans) and
+  wall brackets, each style with its own forms, materials and colors. Meshes on integer
+  millimeters with AG7's `Mesh` and props' own `shapes.py` (lathes, tubes by parallel transport,
+  extrusions, catenaries); `shapes.check` as AG7's but without the shared directed edge rule
+  (parts of one variant touch), and `dedupe` drops a triangle repeating another's corners.
+- **Plants** (`trees.py`): 15 species, 6 or 8 variants each (108). Broadleaf trees (plane,
+  maple, ginkgo, birch, linden, elm, oak, ficus) by space colonization (Runions, Lane and
+  Prusinkiewicz 2007) in a species envelope: attraction points in the crown, nodes grown
+  toward the mean direction of the points they are nearest (numpy elementwise distances and
+  argmin), branch radii by the pipe model ($r^2 = \sum_i r_i^2$), chains swept as
+  tubes, lobed leaf clumps at the twig ends in two tones. Pines by whorls with needle sprays,
+  fan palms with pleated fans, date palms with leaflets, boxwood, scrub and sedum (ground
+  cover), ivy in 1.5 m patches. A plant takes M6's species (else its type's), its variant
+  from a hash of its id, scaled to M6's crown and height.
+- **Exact props** (per tile): overhead cables (one to three catenary strands, lanterns in
+  neon and old districts), scaffolding (tubes, boards and a net on the wall side) and market
+  gates with their words, made in their tile's pack.
+- **Signs** (`signs.py`, `glyphs.py`): an asset per M11 sign slot. Shop signs by the
+  district style's looks: facade lightboxes (lit face, dark letters), panels (dark face, lit
+  letters), neon (tubes along the strokes on a backboard with an outline) and channel letters
+  on a raceway, on standoffs where the brief finds the wall farther; blade signs as
+  lightboxes or neon skeleton frames. Billboards on facades and roofs
+  (two-sided on roofs, a brand, a line and a logo), holo-ads over tower roofs (a translucent
+  emissive screen, non-Nanite with a LOD chain at screen sizes 1.0, 0.3 and 0.08) and neon
+  bands. Text: the POI's name where the slot's unit has one, else a shop name from the unit's
+  use and citygen's name words; corporations' names on billboards. Fonts wait for decision
+  13.3, so text is an in-repo stroke font: Latin and Cyrillic on a 4 by 6 grid, and generated
+  glyphs for hanzi (boxes split into radicals of 2 to 4 strokes), kana, hangul (jamo blocks)
+  and devanagari (under a head bar), the script drawn from the district era's weights. Neon text is four-sided tubes along
+  the strokes, lightbox text flat strokes over an emissive face. Identical signs share one
+  mesh (Vesper Bay: 15,448 slots, 15,439 meshes).
+- **Placement** (`gather.py`): every prop's variant from its kind, its district's style and a
+  hash of its id; AC units and wall lights on a bracket where the brief's mount (`gap_m`)
+  is off the wall; awnings in 2 m segments turned to their wall; the M6 highway median
+  barriers on an AG7 road piece with a median barrier are dropped (a `drop` entry per
+  prototype); instances grouped as M15 groups its prototypes (`prop.<kind>.<tile>`,
+  `plant.<type>.<tile>`), so each group replaces exactly one blockout actor. On M13's
+  terrain a model z is measured from the ground where it stands, so a placement that hangs
+  on a building or stands on its roof is lifted by the building's `base_m` (where AG1's
+  shell stands) and anything else by the finished ground at its point, as the blockout
+  lifts M15's instances (Cragmouth; a test on a synthetic terrain).
+- **Outputs**: `assets/props/variants/<kind>.glb` (a family pack per kind, every style),
+  `props/plants/<species>.glb`, `props/tiles/<tile>.glb` (exact props), `props/signs/<tile>.glb`
+  (a node per distinct sign), `props/manifest.json`, `unreal_contribution.props.json` and
+  `unreal_contribution.signs.json` (`docs/unreal_export.md`, AG8 section), `props_report.json`
+  and `.txt`. A tile pack is made again only when the hash of its inputs or of the props code
+  changes, a file is written only when its bytes do (an unchanged rebuild writes none), and
+  the bytes do not depend on the worker count.
+- **Checks** (`checks.py`): `props_coverage` (every prop, plant and sign slot has an asset
+  or a drop), `props_families` (every kind and species used has its family), `props_replaces`
+  (every M15 prototype actor replaced, computed with citygen's own `blockout.PROTOTYPES`),
+  `props_meshes`, `props_budgets` (a variant 3,000 triangles, a plant 16,000, a sign 6,000;
+  10 M unique triangles per city; 15,000 instances per tile, 300,000 per city).
+- **Previews**: `assetgen props BUILD --sheets DIR` (variant sheets per style and one of the
+  plants, `props_sheet.py`); `assetgen/blender/props_preview.py` (the blockout with AG1's
+  shells, AG7's streets and the props as geometry nodes instances of the family packs, signs
+  in place; `--night` adds lights at the lamps and glow at the signs).
+
+**Samples** (main's specs, Greyhook reshaped, 3 workers on a Mac shared with other
+sessions' builds, so the times vary; the props stage alone, after AG7's streets):
+
+| City | Variants | Instances | Signs | Exact props | Unique triangles | Drawn triangles | Disk | Time |
+|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 723 | 90,048 | 15,448 | 1,902 | 7.37 M | 79.0 M | 400 MB | 18 s |
+| Saltreach Free Port | 685 | 52,999 | 7,632 | 919 | 3.53 M | 41.6 M | 189 MB | 16 s |
+| Delta Megacity | 715 | 92,928 | 14,983 | 1,620 | 5.98 M | 81.4 M | 342 MB | 30 s |
+| Nexus City | 723 | 99,579 | 17,456 | 1,852 | 7.55 M | 97.7 M | 422 MB | 55 s |
+| Greyhook | 715 | 48,162 | 8,183 | 471 | 3.68 M | 56.2 M | 209 MB | 23 s |
+| Vesper Bay Pinned | 723 | 90,187 | 16,209 | 2,356 | 8.01 M | 98.5 M | 433 MB | 107 s |
+| Vesper Bay Stacks | 723 | 90,742 | 16,219 | 2,337 | 8.02 M | 96.9 M | 432 MB | 48 s |
+| Cragmouth | 693 | 105,364 | 19,694 | 2,462 | 8.88 M | 119.7 M | 489 MB | 37 s |
+| Vesper Bay Decks | 723 | 98,688 | 17,249 | 1,948 | 7.96 M | 82.0 M | 434 MB | 96 s |
+
+Every props check passes in every city, and every citygen build passes its checks. Signs
+are most of the unique triangles (Vesper Bay 5.9 M of 7.4 M) and of the disk (they are
+unique per slot); awnings, ivy, AC units and boxwood are most of the instances (Vesper Bay
+29,330, 16,399, 7,468 and 4,682). Cragmouth, the largest, uses 8.9 M of the 10 M unique
+triangle budget and 2,758 instances in its fullest tile. A city makes only the families it
+uses (Saltreach Free Port has no food stalls or ficus, Delta Megacity no ficus, Greyhook no
+ginkgo, Cragmouth no food stalls). A rebuild with nothing changed writes no file. Nexus
+City's first build found two repeated triangles in one tile's meshes (`props_meshes`; that
+build was gone before they were named); `pack` now drops any triangle that repeats another
+in its slot, and the check names the nodes.
+
+**Unreal exporter** (`citygen/unreal.py`, `citygen/ue/import_city.py`, surgical): M15's
+prototype instancer keys are blockout keys for stage 2, so the props entries keyed by them
+replace them (and `drop` entries remove them); instance transforms take a scale
+(`[x, y, z, yaw, sx, sy, sz]`) and per-instance ids; a mesh record may carry
+`shape_preservation` (`Voxelize` for plants, set in `finish2`, part of the mesh hash); a
+`holo` master (translucent, emissive 3.0). Tests in `tests/test_unreal.py` without Unreal
+(`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` counting the
+replaced prototypes); not run in Unreal. What a check there should look at: the HISM counts
+per kind against the report, plant Nanite with `Voxelize` (AG0's finding), holo-ad LODs and
+translucency, the emissive neon at night, AC units and wall lights on their walls.
+
+**Open.** Textures are AG6's: bark, leaves (alpha cards would let leaf clumps be cards),
+painted metal, sign faces, billboard and holo-ad content; every slot now a flat color, neon
+and sign faces emissive. Plants and signs have no collision (trunk capsules later). Lawns,
+hedges and green roofs stay the blockout's green areas. Sign faces are opaque emissive, so
+only holo-ads are translucent. The sign packs are the largest files; quantized positions
+(`KHR_mesh_quantization`) would halve them. Mac = x86 waits for the deferred determinism
+check.
 
 ## Order
 
