@@ -278,8 +278,8 @@ check (Mac = x86) waits for `docs/determinism_check.md`.
 
 **Built.** The ground band of every building (`assetgen/buildings/fronts.py`, the part kit's
 street-front families in `frontparts.py`):
-- **band** (`band_top`): every prism mass on the ground has a band from its foot to its
-  first floor line (the whole mass when less than 1 m is left above, at most 7.5 m), built
+- **band** (`band_top`): every prism mass on the ground (for a building on an M14 deck, on
+  the deck's top: `shell.ground_mm`) has a band from its foot to its first floor line (the whole mass when less than 1 m is left above, at most 7.5 m), built
   apart from the rest of the shell as the building's second mesh (`<id>.front`, layer 1 of
   the mesh buffer, `meshbuf.split`). Per zone (the industrial dado or the base strip, then
   the wall) the wall is one polygon with the openings as holes, or as notches where they
@@ -333,12 +333,13 @@ street-front families in `frontparts.py`):
   own that juts beside it, then straight to the walkway's nearest point with no building in
   between; the model's walkway when it reaches it, else the ground walkway in front of the
   door, written into the record for stage 4; a door facing a neighbor or with no walkway
-  ahead in reach is reported, not failed: the model put the entrance there) and
+  within 15 m ahead (a road without a sidewalk on its side, open ground, a canal) is
+  reported, not failed: the model put the entrance there) and
   `asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never
   on glass, `fronts.mount_check`; one on an edge the shells tidy away, a spike of the lot's
   ring, is reported apart); `asset_budget` counts 1,500 triangles per ground-floor unit and
   per street front on top of section 11's estimate;
-- **build** (`build.py`, `GEN_VERSION` ag3.3): the front node beside the shell in the tile
+- **build** (`build.py`, `GEN_VERSION` ag3.4): the front node beside the shell in the tile
   pack, the decal mesh per tile, the record's `front` (node, triangles, slots, `band_m`),
   `doors`, `checks.mounts`, `checks.doors`, `level` on a deck, and the stats' units and
   decals; materials: every AG3 slot in AG6's catalog (doors, steps, steel, rubber, roll-up

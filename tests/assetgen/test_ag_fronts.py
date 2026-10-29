@@ -119,6 +119,25 @@ def test_the_band_is_its_own_closed_mesh_inside_the_envelope():
     assert min(zs) >= 4000 - 1
 
 
+def test_a_building_on_a_deck_has_its_front_on_the_deck():
+    """M14: a building on a deck stands on the deck's top (its masses from `deck_m` over a
+    pivot on the ground): its band, doors and collision start there."""
+    br = row()
+    for m in br["masses"]:
+        m["z"] = [m["z"][0] + 9.0, m["z"][1] + 9.0]
+    for e in br["edges"]:
+        for r in e["regions"]:
+            r["z"] = [r["z"][0] + 9.0, r["z"][1] + 9.0]
+    br["building"]["floor_grid"].update(level=1, deck_m=9.0)
+    res = SH.build(br, GN.make(br))
+    assert res["band_m"] == 13.0 and res["checks"]["access"]["missing"] == 0
+    assert all(d["pos"][2] >= 9000 for d in res["doors"])
+    shell, front = MB.split(res["arrays"])
+    assert _closed(shell) and _closed(front)
+    col = CO.build(br, res["band_m"])
+    assert all(abs(b["center"][2] - b["extent"][2] - 13.0) < 1e-6 for b in col["boxes"])
+
+
 def test_mounts_sit_on_solid_wall():
     br = row()
     res = SH.build(br, GN.make(br))

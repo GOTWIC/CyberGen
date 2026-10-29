@@ -75,6 +75,13 @@ def _u(bid: str, purpose: str) -> float:
     return GN.u(bid, purpose, "ag1.shell")
 
 
+def ground_mm(brief: dict) -> int:
+    """Where the building's street front stands, over its pivot: 0, or for a building on an
+    M14 deck (`floor_grid.level`) the deck's top."""
+    fg = brief["building"]["floor_grid"]
+    return int(round(float(fg.get("deck_m") or 0.0) * 1000)) if fg.get("level") else 0
+
+
 def plinth_mm(brief: dict) -> int:
     """How far a building on M13's slopes reaches under its base: from its base (mass z 0,
     the ground floor at the main entrance) down to the lowest ground under its footprint
@@ -388,6 +395,8 @@ class ShellBuilder:
         # check), the entrances and units given a door, the facades per brief edge
         self.doors: list[dict] = []
         self.decals: list[dict] = []
+        # (the ground the street front stands on: an M14 deck's top for a building on one)
+        self.ground = ground_mm(brief)
         self.opened: dict[int, list] = {}
         self.done_units: set[int] = set()
         self.done_ents: set[int] = set()
@@ -596,7 +605,8 @@ class ShellBuilder:
                          doors)
         # AG3: a mass on the ground has its street front (`fronts`) up to its first floor
         # line; the rows above it are the shell's
-        band = FR.band_top(ms) if ms["z0"] <= 50 and ms["shape"] == "prism" else None
+        band = FR.band_top(ms) if ms["z0"] <= self.ground + 50 and ms["shape"] == "prism" \
+            else None
         ground_row = None
         if band is not None:
             # (a floor taller than the band keeps what lies over the band in the shell: a

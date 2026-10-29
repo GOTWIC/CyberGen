@@ -4,7 +4,8 @@ its plinth) to its top; a piece that is a rectangle becomes a box (center, half 
 yaw), any other a convex prism (its ring and z range), in the building frame, meters. Spires, masts and thin decks under 0.5 m are
 left out (nothing walks into them at street level and their boxes would only snag).
 
-AG3: a mass on the ground starts at the street front's top (`band_m`): the front under it
+AG3: a mass on the ground (or on an M14 deck's top) starts at the street front's top
+(`band_m`): the front under it
 (doorways, steps, recesses, plinths, arcade columns) is its own mesh and collides as drawn
 (complex collision in Unreal); a mass the front takes whole has none here.
 """
@@ -18,7 +19,7 @@ from citygen import dmath as M
 from .. import canon as C
 from ..triangulate import orient
 from . import rings as RG
-from .shell import plinth_mm
+from .shell import ground_mm, plinth_mm
 
 SKIP_ROLES = ("spire", "mast")
 
@@ -43,11 +44,12 @@ def _box(piece):
 def build(brief: dict, band_m: float | None = None) -> dict:
     boxes, convex = [], []
     depth = plinth_mm(brief) / 1000.0
+    ground = ground_mm(brief) / 1000.0
     for m in brief["masses"]:
         z0, z1 = m["z"]
         if z1 - z0 < 0.5 or m["role"] in SKIP_ROLES:
             continue
-        if z0 <= 0.05 and band_m is not None and m["shape"] == "prism":
+        if z0 <= ground + 0.05 and band_m is not None and m["shape"] == "prism":
             if z1 <= band_m + 0.05:
                 continue                       # (the street front takes it whole)
             z0 = band_m

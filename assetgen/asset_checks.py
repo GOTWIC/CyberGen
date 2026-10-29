@@ -253,6 +253,8 @@ REACH_M = 40.0          # how far from a door its walkway may be
 OWN_M = 3.6             # the path may cross its own building this near the door (an arcade)
 STEP_M = 1.0            # the first leg of the path: straight out of the doorway
 STEPS_M = (STEP_M, 3.0, 6.0)   # (further out where a corner of its own juts beside it)
+AHEAD_M = 15.0          # a walkway this near in front of a door is its own (a street's
+                        # width); one farther is across the block
 
 
 def _walk_index(model):
@@ -285,9 +287,9 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     stage 4. Where the city leaves a door no walkway to open to, it is counted apart, the
     city's to change (scope 4.5), not as a failure: against a neighbor (its facade a party or
     blind wall: the brief's classes, `facing_neighbor`), or with no ground walkway ahead of it
-    within reach (open ground, a canal, its walkway behind the building: `unreachable`). A
-    failure is a missing door, or a door with a walkway ahead that another building walls
-    off."""
+    within `AHEAD_M` (open ground, a canal, a road without a sidewalk on its side, its walkway
+    behind the building: `unreachable`). A failure is a missing door, or a door with a
+    walkway just ahead that another building walls off."""
     import shapely
     from shapely.geometry import LineString, Point
     walks = _walk_index(model)
@@ -369,9 +371,10 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                     faced.append(d["id"])
                     continue
                 ahead = False
-                for k in tree.query(q.buffer(REACH_M)).tolist():
+                for k in tree.query(q.buffer(AHEAD_M)).tolist():
                     f = geoms[k].interpolate(geoms[k].project(q))
-                    if (f.x - x) * nx + (f.y - y) * ny > 0.0:
+                    if (f.x - x) * nx + (f.y - y) * ny > 0.0 and \
+                            (f.x - qx) ** 2 + (f.y - qy) ** 2 <= AHEAD_M * AHEAD_M:
                         ahead = True
                         break
                 if not ahead:

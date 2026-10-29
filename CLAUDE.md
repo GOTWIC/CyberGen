@@ -967,8 +967,9 @@ AG6 (materials and textures) is in place, in `assetgen/materials/` (tests
 
 AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontparts.py` (tests
 `tests/assetgen/test_ag_fronts.py`):
-- **Band**: every prism mass on the ground has a ground band (its foot to its first floor
-  line, at most 7.5 m) built apart as the building's second mesh, `<id>.front` (layer 1 of
+- **Band**: every prism mass on the ground (or an M14 deck's top) has a ground band (its
+  foot to its first floor line, at most 7.5 m) built apart as the building's second mesh,
+  `<id>.front` (layer 1 of
   `meshbuf.Buf`, `meshbuf.split`); zones as polygons with notches and holes, pockets, caps
   that close both meshes; collision hulls start at its top (`band_m`), the front collides as
   drawn in Unreal.

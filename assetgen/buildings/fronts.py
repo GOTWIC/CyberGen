@@ -1173,7 +1173,8 @@ def walls(sb) -> None:
         tot = sum(cls_area.values()) or 1.0
         blank = (cls_area.get("blind", 0.0) + cls_area.get("firewall", 0.0)) / tot
         # a downpipe on a blind or fire wall standing on the ground
-        if ms["z0"] <= 50 and blank >= 0.5 and fa.L >= 5000 and ms["z1"] - ms["z0"] >= 6000:
+        if ms["z0"] <= sb.ground + 50 and blank >= 0.5 and fa.L >= 5000 and \
+                ms["z1"] - ms["z0"] >= 6000:
             for sl in (fa.c0 + 250, fa.L - fa.c1 - 250, fa.L // 2):
                 s = sl + fa.soff
                 if sl < 200 or sl > fa.L - 200:
@@ -1206,7 +1207,7 @@ def walls(sb) -> None:
             sb.stats["murals"] = sb.stats.get("murals", 0) + 1
         # decals on the street band (AG6's atlas): grime, leaks, rust, graffiti, posters,
         # cracks and moss
-        if ms["z0"] <= 50 and "band" in ms:
+        if ms["z0"] <= sb.ground + 50 and "band" in ms:
             _decals(sb, fa, ms, key, grime, danger, neon)
 
 
