@@ -55,16 +55,28 @@ def _complete(lib: dict) -> bool:
 
 def link(out: Path, target: Path) -> None:
     """BUILD/assets/library -> the library folder (a symbolic link; replaced when it points
-    elsewhere)."""
+    elsewhere). On Windows without the symlink privilege (WinError 1314) it is a directory
+    junction, which needs none."""
     p = out / LINK
     out.mkdir(parents=True, exist_ok=True)
     if p.is_symlink():
         if Path(os.readlink(p)) == target:
             return
         p.unlink()
+    elif p.is_junction():
+        if p.resolve() == target.resolve():
+            return
+        p.rmdir()                                 # the junction only, not the library
     elif p.exists():
         return
-    p.symlink_to(target, target_is_directory=True)
+    try:
+        p.symlink_to(target, target_is_directory=True)
+    except OSError as e:
+        if getattr(e, "winerror", None) != 1314:
+            raise
+        import _winapi
+
+        _winapi.CreateJunction(str(target.resolve()), str(p))
 
 
 def signage(model, out: Path, spec_doc: dict, log=print) -> dict:

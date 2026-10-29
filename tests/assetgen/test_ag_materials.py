@@ -176,7 +176,8 @@ def test_materials_stage_on_the_small_city():
     rep = small_assets_report()
     assert rep["materials"]["ok"], rep["materials"]
     a = base / "assets"
-    assert (a / "library").is_symlink() and (a / "library" / "library.json").is_file()
+    lib = a / "library"
+    assert (lib.is_symlink() or lib.is_junction()) and (lib / "library.json").is_file()
     man = json.loads((a / "manifest.json").read_text())
     con = json.loads((a / "unreal_contribution.buildings.json").read_text())
     for name, t in con["textures"].items():
