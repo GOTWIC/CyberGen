@@ -29,6 +29,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -1307,9 +1308,44 @@ def find_blender(explicit: str | None = None) -> str | None:
     return shutil.which("blender")
 
 
-def _run(cmd: list[str], marker: str, timeout: float) -> tuple[dict | None, str]:
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    out = proc.stdout + proc.stderr
+# Blender's stages on the progress line (citygen/blender/build.py's progress lines)
+BLENDER_LABELS = {"blender_start": "Blender start", "objects": "Blender: objects",
+                  "save": "Blender: saving city.blend", "usd": "Blender: USD export",
+                  "gltf": "Blender: glTF tiles", "renders": "Blender: renders"}
+
+
+def _run(cmd: list[str], marker: str, timeout: float,
+         start: str | None = None) -> tuple[dict | None, str]:
+    """Blender's output (its progress lines to the active progress, a `start` stage until
+    the first) and the JSON of its `marker` line."""
+    from . import progress as PG
+
+    relay = PG.Relay(PG.active(), BLENDER_LABELS)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                            encoding="utf-8", errors="replace")
+    if start:
+        relay.open(start)
+    lines: list[str] = []
+
+    def pump():
+        for line in proc.stdout:
+            lines.append(line)
+            if PG.MARKER in line:
+                relay.feed(line)
+
+    th = threading.Thread(target=pump, daemon=True)
+    th.start()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        th.join(10)
+        relay.close(ok=False)
+        raise
+    th.join(15)     # (a process Blender started may hold the pipe: not waited for long)
+    relay.close(ok=proc.returncode == 0)
+    out = "".join(lines)
     for line in out.splitlines():
         if line.startswith(marker + " "):
             return json.loads(line[len(marker) + 1:]), out
@@ -1347,15 +1383,21 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
     report (also written as blockout_report.json and .txt)."""
     from . import exports as X
 
+    from . import progress as PG
+
+    P = PG.active()
     t0 = time.perf_counter()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    ps = P.begin("blockout plan")
     m = CityModel.from_json(Path(model_path).read_text(encoding="utf-8"))
     plan = make_plan(m)
     text = plan_json(plan) + "\n"
     (out / "blockout_plan.json").write_text(text, encoding="utf-8", newline="\n")
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
     t_plan = time.perf_counter() - t0
+    ps.finish()
+    ps = P.begin("2D map and exports")
     X.map_svg(m, out / "map_2d.svg")
     X.map_png(m, out / "map_2d.png")
     (out / "unreal").mkdir(exist_ok=True)
@@ -1374,6 +1416,7 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
         (out / "gameplay.json").write_text(json.dumps(X.gameplay(m)) + "\n",
                                            encoding="utf-8", newline="\n")
     t_exports = time.perf_counter() - t0 - t_plan
+    ps.finish()
     exe = find_blender(blender)
     checks = []
     blender_rep, verify = None, None
@@ -1387,15 +1430,17 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
             cmd.append("--no-render")
         if not export:
             cmd.append("--no-export")
-        done, log = _run(cmd, "CITYGEN_BLOCKOUT_DONE", timeout=3 * BUDGET_S)
+        done, log = _run(cmd, "CITYGEN_BLOCKOUT_DONE", timeout=3 * BUDGET_S,
+                         start="blender_start")
         (out / "blender_log.txt").write_text(log, encoding="utf-8", newline="\n")
         if done is not None and (out / "blender_report.json").is_file():
             blender_rep = json.loads((out / "blender_report.json").read_text())
         checks.append(("blender_build", blender_rep is not None,
                        "built" if blender_rep else "Blender failed; see blender_log.txt"))
         if blender_rep is not None:
-            verify, vlog = _run([exe, "-b", str(out / "city.blend"), "--python-expr", VERIFY],
-                                "CITYGEN_VERIFY", timeout=BUDGET_S)
+            with P.stage("blockout check (city.blend reopened)"):
+                verify, vlog = _run([exe, "-b", str(out / "city.blend"), "--python-expr",
+                                     VERIFY], "CITYGEN_VERIFY", timeout=BUDGET_S)
             checks += _checks(m, plan, blender_rep, verify, out, render, export)
     total = time.perf_counter() - t0
     if blender_rep is not None:

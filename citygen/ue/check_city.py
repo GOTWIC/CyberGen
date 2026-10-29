@@ -51,6 +51,13 @@ def log(msg):
     unreal.log(f"citygen check: {msg} ({time.time() - T0:.1f} s)")
 
 
+PROGRESS = "CYBERGEN_PROGRESS"     # progress lines `citygen unreal --check` draws
+
+
+def say(op, **fields):
+    print(PROGRESS + " " + json.dumps({"op": op, **fields}, separators=(",", ":")), flush=True)
+
+
 def ue(x, y, z):
     return unreal.Vector(x * 100.0, -y * 100.0, z * 100.0)
 
@@ -233,6 +240,7 @@ def run():
     RES["city"] = man["city"]
     path = f"{man['content_root']}/Maps/{man['folder']}"
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    say("begin", label="check_load")
     if not les.load_level(path):
         raise RuntimeError(f"cannot load {path} (import the city first)")
     yield from wait(2.0)
@@ -242,10 +250,14 @@ def run():
     # game mode override, `--play`), then a flight with the fly pawn; the level is not saved
     own = game_mode(None)
     log("play in editor: walking")
+    say("begin", label="check_walk")
     world, pawn = yield from begin_play(les)
     RES["pawn"] = pawn.get_class().get_name()
+    say("note", text="streaming around the player")
     yield from streaming(world, pawn, man, slug)
+    say("note", text="traces onto the ground, roofs and facades")
     yield from collision(world, pawn, man, slug)
+    say("note", text="walking the sidewalks")
     yield from walk(world, pawn, man)
     yield from cheats(world, pawn)
     les.editor_request_end_play()
@@ -253,6 +265,7 @@ def run():
     if unreal.EditorAssetLibrary.does_asset_exist(FLY_MODE):
         game_mode(FLY_MODE)
         log("play in editor: flying")
+        say("begin", label="check_fly")
         world, pawn = yield from begin_play(les)
         yield from fly(world, pawn, man, slug)
         les.editor_request_end_play()
@@ -261,6 +274,7 @@ def run():
         RES["checks"]["fly"] = {"ok": False,
                                 "error": f"no {FLY_MODE} (import the city again)"}
     game_mode(own)
+    say("end")
     RES["ok"] = all(c.get("ok") for c in RES["checks"].values())
 
 
@@ -724,7 +738,8 @@ def shots(man):
                       2.0 * math.degrees(math.atan(18.0 / v.get("lens_mm", 28)))))
     files = []
     w = int(JOB.get("width") or 3840)
-    for name, eye, target, fov in views:
+    say("begin", label="check_shots", total=len(views))
+    for k, (name, eye, target, fov) in enumerate(views):
         cam = eas.spawn_actor_from_class(unreal.CameraActor, ue(*eye), transient=True)
         e, tg = ue(*eye), ue(*target)
         rot = unreal.MathLibrary.find_look_at_rotation(e, tg)
@@ -744,6 +759,7 @@ def shots(man):
         if os.path.exists(path):
             files.append(path)
             log(f"wrote {path}")
+        say("update", done=k + 1)
     RES["shots"] = files
 
 
