@@ -126,15 +126,17 @@ def _roof_entries(man: dict) -> list[dict]:
                 p["ids"].append(key)
     out = []
     for t, v in sorted(by.items()):
+        # no collision, as AG2's parts (a body per instance; the roof is the building's)
         parts = [{"kind": n, "type": p["type"], "glb": v["glb"], "node": n,
                   "asset": asset_name(n), "count": len(p["xforms"]),
-                  "triangles": p["triangles"], "xforms": p["xforms"], "ids": p["ids"]}
+                  "triangles": p["triangles"], "collision": {"none": True},
+                  "xforms": p["xforms"], "ids": p["ids"]}
                  for n, p in sorted(v["parts"].items())]
         out.append({"key": f"roofs.{t}", "kind": "roof_equipment",
                     "hash": man["tiles"][t]["hash"][:16], "replaces": [],
                     "pivot": [0.0, 0.0, 0.0], "yaw_deg": 0.0, "nanite": True,
                     "distance_field": False, "lumen_cards": False, "triangles": 0,
-                    "slots": [], "collision": {"complex": True}, "cpd": [], "parts": parts,
+                    "slots": [], "collision": {"none": True}, "cpd": [], "parts": parts,
                     "instances": sum(p["count"] for p in parts),
                     "tags": {"cg.type": "roof_equipment", "cg.district": "", "cg.tile": t}})
     return out

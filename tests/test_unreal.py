@@ -959,8 +959,9 @@ def test_stage2_takes_assetgen_fronts(staged):
 def test_stage2_takes_assetgen_roofs_and_skybridges(staged):
     """AG4: roof equipment leaves the buildings' entries for one entry per tile
     (`roofs.<tile>`): an instanced actor per mesh at the origin with one building id per
-    transform, its mesh a node of the tile's part pack; the green-roof objects a building
-    replaces are blockout objects; every skybridge an actor of its own with its links."""
+    transform, its mesh a node of the tile's part pack, without collision or era materials;
+    the green-roof objects a building replaces are blockout objects; every skybridge an
+    actor of its own with its links."""
     m2, _, _ = U.build_manifest(staged)
     s2 = m2["stage2"]
     con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
@@ -980,6 +981,7 @@ def test_stage2_takes_assetgen_roofs_and_skybridges(staged):
         for p in e["parts"]:
             a = inst[f"{e['key']}.{p['kind']}"]
             assert a["ids"] == p["ids"] and len(a["ids"]) == len(a["xforms"]) == p["count"]
+            assert a["no_collision"] and "materials" not in a   # (as AG2's parts; no era)
             assert set(a["ids"]) <= set(man["buildings"])
             assert p["glb"] == f"parts/{t}.glb"
             n += p["count"]

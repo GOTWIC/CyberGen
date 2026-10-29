@@ -81,7 +81,7 @@ an enclosed skybridge, a portal in The Stacks) and [`wip/02_vesper_bay/`](wip/02
   through one).
 - **Roof equipment**: one instanced actor per mesh and tile (`roofs.<tile>.<kind>`), the
   HISM counts equal the manifest's roof parts, every instance on its roof (none floating
-  over a pitched roof: those stand on their dunnage).
+  over a pitched roof: those stand on their dunnage), `NoCollision` like AG2's parts.
 - **Portals and sky stations**: the sky tube's glass (AG7) passing through each portal
   without touching the lining; the station platforms either side at the tube's floor.
 - **Green roofs**: the blockout green-roof objects in `replaces` gone; where an object also

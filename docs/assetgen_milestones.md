@@ -522,7 +522,7 @@ and AG4's detail slots reach as their families. AG3 fix: a door `rehome` moves n
 along its facade into a court (one Vesper Bay unit door, blocked by a neighbor there).
 
 **Exporter** (`docs/unreal_export.md`, "From AG4"): roof equipment one entry per tile
-(`roofs.<tile>`, parts only, a building id per instance), buildings' `replaces` the
+(`roofs.<tile>`, parts only, a building id per instance, no collision), buildings' `replaces` the
 blockout green-roof objects whose every green area they built (`green_replaces`), the
 skybridges' contribution (an entry per skybridge by id, complex collision, `links`), a
 stage 2 entry's `links` on its actor and tagged `cg.link=` by the importer
@@ -564,7 +564,10 @@ the Vesper Bay buildings move; the buildings' contribution (roof equipment entri
 roof `replaces`) and `materials.json` (AG4's slots) move AG6's digest. The props golden had
 gone stale on main (main's own code writes `9ea0...` for the small city, the golden held
 `3f78...`); main wrote it again meanwhile, to the same value, and AG4 changes nothing
-there. AG7's streets golden is unchanged.
+there. AG7's streets golden is unchanged. After main's AG2 and AG6 Unreal check
+(building parts without collision), the roof equipment entries and their parts say
+`collision: {"none": true}` too, which moves the small city's file digest and AG6's
+digest again (the buildings' contribution is in both).
 
 **Found on the way**:
 - A small-city tower whose footprint has a 1 m notch measured 0.3 m thick (the ring's
