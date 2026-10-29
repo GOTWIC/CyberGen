@@ -283,7 +283,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
               "citygen blockout)", file=sys.stderr)
         return EXIT_USAGE
     if args.manifest_only:
-        path = U.write_manifest(build, args.name, not args.blockout_only)
+        path = U.write_manifest(build, args.name, not args.blockout_only, not args.no_play)
         print(f"wrote {path}")
         return EXIT_OK
     if args.uproject and args.new_project and not Path(args.uproject).is_file():
@@ -303,7 +303,8 @@ def cmd_unreal(args: argparse.Namespace) -> int:
         res = U.import_city(build, args.uproject, engine=args.engine, name=args.name,
                             timeout=args.timeout, assets=not args.blockout_only,
                             play=args.play, fly_speed=args.fly_speed,
-                            startup=not args.no_startup, view_m=args.view_range) \
+                            startup=not args.no_startup, view_m=args.view_range,
+                            play_features=not args.no_play) \
             if not args.check_only else None
         if res is not None:
             print(U.import_summary(res))
@@ -311,6 +312,7 @@ def cmd_unreal(args: argparse.Namespace) -> int:
                 print(res.get("error", ""), file=sys.stderr)
                 return EXIT_INVALID
             print(U.play_summary(res))
+            print(U.play_features_summary(res))
         if not args.no_hlod and res is not None:
             hl = U.build_hlods(build, args.uproject, engine=args.engine, timeout=args.timeout)
             print(U.hlod_summary(hl))
@@ -634,6 +636,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="leave the project's startup and default map as they are (default: "
                          "the imported city becomes both in Config/DefaultEngine.ini; with "
                          "several cities in one project the last import wins)")
+    ue.add_argument("--no-play", action="store_true",
+                    help="leave out the play features (default: the CityGenPlay plugin is "
+                         "built into the project, a C++ compiler needed, for a minimap, the "
+                         "map with teleport on M, a free camera on '.', and a developer menu "
+                         "on Tab with day and night; without a compiler the city imports "
+                         "without them)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
                          "ground traces, a walk along a sidewalk (always the walking "

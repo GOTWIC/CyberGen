@@ -69,7 +69,8 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
     for key, r in sorted(man["buildings"].items()):
         entries.append({
             "key": key, "kind": "building", "hash": r["hash"][:16], "replaces": [],
-            "glb": r["glb"], "node": r["node"], "asset": asset_name(r["node"]),
+            "glb": r["glb"], "node": r["node"],
+            "asset": asset_name(r["node"]) if r["node"] else None,
             "pivot": r["pivot"], "yaw_deg": 0.0,
             "nanite": True, "distance_field": False, "lumen_cards": False,
             "triangles": r["triangles"], "slots": sorted(r["slots"]),
@@ -90,9 +91,11 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
         })
         fr = r.get("front") or {}
         if fr.get("node") and fr.get("triangles", 0) > 0:
+            # (a building with no shell mesh, its street front its whole height: the front
+            # takes the place of the building's blockout actor)
             entries.append({
                 "key": f"{key}.front", "kind": "building.front", "hash": r["hash"][:16],
-                "replaces": [], "glb": r["glb"], "node": fr["node"],
+                "replaces": [] if r["node"] else [key], "glb": r["glb"], "node": fr["node"],
                 "asset": asset_name(fr["node"]), "pivot": r["pivot"], "yaw_deg": 0.0,
                 "nanite": True, "fallback_full": True, "distance_field": False,
                 "lumen_cards": False, "triangles": fr["triangles"],

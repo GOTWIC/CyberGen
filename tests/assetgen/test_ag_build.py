@@ -42,6 +42,17 @@ def test_every_building_has_a_shell_and_a_proxy():
         for sub in ("tiles", "proxies"):
             data = (base / "assets" / sub / f"{t}.glb").read_bytes()
             assert C.sha256_bytes(data) == info[sub]["sha256"]
+            # (glTF has no mesh without primitives; a shell node carries a mesh exactly when
+            # its record names it)
+            doc = json.loads(data[20:20 + int.from_bytes(data[12:16], "little")])
+            assert all(m["primitives"] for m in doc["meshes"]), t
+            if sub == "tiles":
+                meshed = {n["name"] for n in doc["nodes"] if "mesh" in n}
+                for n in doc["nodes"]:
+                    if n["name"].endswith(".shell"):
+                        bid = n["name"][:-len(".shell")]
+                        assert man["buildings"][bid]["node"] == \
+                            (n["name"] if n["name"] in meshed else None), bid
 
 
 def test_checks_are_the_seven():
@@ -145,9 +156,15 @@ def test_unreal_contribution_covers_every_building():
     assert fronts == {f"{k}.front" for k, r in man["buildings"].items()
                       if r["front"]["triangles"]}
     assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals"}
+    front = {e["key"]: e for e in uc["entries"] if e["kind"] == "building.front"}
     for e in blds:
         r = man["buildings"][e["key"]]
-        assert e["glb"] == r["glb"] and e["node"] == f"{e['key']}.shell"
+        # (a building its street front takes whole, a gate house, has no shell mesh: no
+        # node, and its front takes the place of its blockout actor)
+        shell = r["triangles"] - r["front"]["triangles"]
+        assert e["glb"] == r["glb"] and e["node"] == (f"{e['key']}.shell" if shell else None)
+        if not shell:
+            assert e["asset"] is None and front[f"{e['key']}.front"]["replaces"] == [e["key"]]
         assert e["pivot"] == r["pivot"] and e["nanite"] and not e["distance_field"]
         assert e["proxy"]["node"] == f"{e['key']}.proxy"
         assert len(e["cpd"]) == SY.CPD_SIZE + 7        # AG1's channels and AG6's

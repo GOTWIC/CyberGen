@@ -1,0 +1,18 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "CityGen Play",
+	"Description": "Play features of a city imported by citygen unreal: a minimap, a map with teleport, a free camera and a developer menu with day and night.",
+	"Category": "CityGen",
+	"CreatedBy": "CyberGen",
+	"CanContainContent": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "CityGenPlay",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

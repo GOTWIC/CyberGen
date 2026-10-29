@@ -37,6 +37,12 @@ With stage 2 in the manifest (assetgen's buildings and streets over the blockout
 - an actor per entry at its pivot (Custom Primitive Data, `cg.stage=2`) in place of the
   blockout actors it replaces, and a BP_CityGenInstances actor per entry and part kind.
 
+With the manifest's `play` and the CityGenPlay plugin built into the project (`citygen
+unreal` builds it first; citygen/ue/CityGenPlay): Play/T_<City>_Map (the map image) and the
+play actor (key `play`, always loaded) with the map's corners, the walkway points, the lamp
+heads, district labels and MPC_CityGen: the minimap, the map (M), the free camera (.) and
+the developer menu (Tab) in the game. Every master is usable on instanced and Nanite meshes.
+
 Importing again updates by key and hash: a tile's meshes are imported again only when one
 of its objects changed or is missing, an actor is changed only when its hash changed, and
 what the build no longer has is deleted. The same build twice changes nothing.
@@ -70,6 +76,7 @@ GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids",
               ("PointStart", "[int"), ("Points", "[vector"), ("LinkStart", "[int"),
               ("Links", "[int"), ("Attrs", "[string"), ("Levels", "[int")]   # (M14)
 INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
+PLAY_KEY = "play"                           # citygen.unreal.PLAY_KEY: the play actor's key
 FLY_PAWN = f"{CORE}/BP_CityGenFlyPawn"      # what Play puts you in with `--play fly`
 FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
@@ -1724,7 +1731,14 @@ class Importer:
         n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
         if self.s2:
             n += len(self.s2["actors"]) + len(self.s2["instances"])
+        n += int(self.plays())           # (the play features' actor)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
+
+    def plays(self):
+        """Whether the import makes the play features' actor: the manifest has them, the
+        job wants them and the CityGenPlay plugin's class is there."""
+        return bool(self.man.get("play")) and JOB.get("play_features", True) and \
+            getattr(unreal, "CityGenPlay", None) is not None
 
     def place(self, have, key, h, cls, make, update, folder, version=ACTOR_VERSION):
         """The actor of `key`: unchanged when its hash matches, else updated in place, else
@@ -1829,10 +1843,13 @@ class Importer:
                            f"CityGen/{o['category']}")
         self.instances(have)
         self.actors2(have)
+        # (the last few: no more offloads, the always-loaded lighting and play actors among
+        # them stay loaded with the last chunk)
+        self.offload_n = 0
         self.player_start(have)
         self.lighting(have)
+        self.play_features(have)
         REPORT.update(self.placed, self.to_place, force=True)
-        self.offload_n = 0
         self.live = []
         self.reload()
         for key, a in sorted(have.items()):
@@ -2002,6 +2019,85 @@ class Importer:
                 a.tags = self.tags(key, hv, [], "lighting", "lighting", "", "")
 
             self.place(have, key, h, cls.static_class(), make, update, "CityGen/Lighting")
+
+    # -- the play features (the CityGenPlay plugin: minimap, map, free camera, menu) --
+
+    def map_texture(self, info):
+        """Play/T_<City>_Map: the map image (unreal/map.png), imported again only when its
+        pixels change; mipmapped (the minimap shows it shrunk) and never streamed."""
+        folder = f"{self.root}/Play"
+        name = f"T_{self.man['folder']}_Map"
+        path = f"{folder}/{name}"
+        h = f"{TEXTURE_VERSION}.{info['map_sha256'][:16]}"
+        if EAL.does_asset_exist(path):
+            tex = unreal.load_asset(path)
+            if meta(tex, HASH_TAG) == h:
+                return tex
+        task = unreal.AssetImportTask()
+        for k, v in (("filename", os.path.join(self.build, info["map"])),
+                     ("destination_path", folder), ("destination_name", name),
+                     ("automated", True), ("replace_existing", True), ("save", False)):
+            task.set_editor_property(k, v)
+        AT.import_asset_tasks([task])
+        tex = unreal.load_asset(path)
+        if tex is None:
+            raise RuntimeError(f"map texture: import of {info['map']} failed")
+        tex.set_editor_property("srgb", True)
+        tex.set_editor_property("compression_settings",
+                                unreal.TextureCompressionSettings.TC_DEFAULT)
+        tex.set_editor_property("compression_no_alpha", True)
+        tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
+        tex.set_editor_property("never_stream", True)
+        tex.set_editor_property("filter", unreal.TextureFilter.TF_TRILINEAR)
+        EAL.set_metadata_tag(tex, HASH_TAG, h)
+        EAL.save_loaded_asset(tex, only_if_is_dirty=False)
+        return tex
+
+    def play_features(self, have):
+        """The play features' actor (the CityGenPlay plugin's class, which `citygen unreal`
+        builds into the project first), always loaded: the city's map texture and its corners,
+        the walkway points (where a walking player lands), the lamp heads (the night's lights)
+        and district labels, and MPC_CityGen (its Night). None without the plugin's class or
+        the manifest's `play`: an actor of an earlier import then goes with the rest."""
+        info = self.man.get("play")
+        cls = getattr(unreal, "CityGenPlay", None)
+        if not self.plays():
+            self.stats["play_features"] = {
+                "made": False, "reason": "no CityGenPlay class (the plugin is not built)"
+                if info and cls is None else "the manifest has no play features"}
+            return
+        data = json.load(open(os.path.join(self.build, info["data"]), encoding="utf-8"))
+        tex = self.map_texture(info)
+
+        def make():
+            return self.eas.spawn_actor_from_class(cls, unreal.Vector(0.0, 0.0, 0.0))
+
+        def update(a, hv):
+            x0, y0, x1, y1 = info["map_bounds"]
+            w, lp, lab = data["walk"], data["lamps"], data["labels"]
+            for k, v in (
+                    ("is_spatially_loaded", False), ("city", self.man["city"]),
+                    ("map_texture", tex),
+                    # the image's top left is citygen (x0, y1), its bottom right (x1, y0)
+                    ("map_top_left", unreal.Vector2D(x0 * 100.0, -y1 * 100.0)),
+                    ("map_bottom_right", unreal.Vector2D(x1 * 100.0, -y0 * 100.0)),
+                    ("walk_points", [ue_loc(w[i], w[i + 1], w[i + 2])
+                                     for i in range(0, len(w), 3)]),
+                    ("lamp_points", [ue_loc(lp[i], lp[i + 1], lp[i + 2])
+                                     for i in range(0, len(lp), 3)]),
+                    ("lamp_kinds", list(data["lamp_kinds"])),
+                    ("label_names", [r["name"] for r in lab]),
+                    ("label_points", [unreal.Vector2D(r["x"] * 100.0, -r["y"] * 100.0)
+                                      for r in lab]),
+                    ("night_collection", mpc())):
+                a.set_editor_property(k, v)
+            a.tags = self.tags(PLAY_KEY, hv, [], "play", "play", "", "")
+
+        self.place(have, PLAY_KEY, info["hash"], cls.static_class(), make, update, "CityGen")
+        self.stats["play_features"] = {"made": True, "walk_points": len(data["walk"]) // 3,
+                                       "lamps": len(data["lamp_kinds"]),
+                                       "labels": len(data["labels"]),
+                                       "map": tex.get_path_name()}
 
     # -- what Play puts you in, and how far the level streams around you --
 

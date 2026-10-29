@@ -344,8 +344,10 @@ street-front families in `frontparts.py`):
   reported apart); on a deck city the access check's paths are blocked only by
   buildings of the door's own level; `asset_budget` counts 1,500 triangles per ground-floor
   unit and per street front on top of section 11's estimate;
-- **build** (`build.py`, `GEN_VERSION` ag3.5): the front node beside the shell in the tile
-  pack, the decal mesh per tile, the record's `front` (node, triangles, slots, `band_m`),
+- **build** (`build.py`, `GEN_VERSION` ag3.5; ag3.6 after the merge: a shell with no
+  triangles, its front the building's whole height, has a node with no mesh and the record's
+  `node` null, the front's contribution entry replacing the building's blockout actor): the
+  front node beside the shell in the tile pack, the decal mesh per tile, the record's `front` (node, triangles, slots, `band_m`),
   `doors`, `checks.mounts`, `checks.doors`, `level` on a deck, and the stats' units and
   decals; materials: every AG3 slot in AG6's catalog (doors, steps, steel, rubber, roll-up
   doors, stanchions, fascias, mounts, trellises, pipes, risers, lit faces, neon and screens,
