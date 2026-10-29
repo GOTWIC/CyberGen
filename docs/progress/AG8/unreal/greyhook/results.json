@@ -1,0 +1,423 @@
+{
+ "0_first": {
+  "ok": true,
+  "city": "Greyhook",
+  "actors": {
+   "created": 25837,
+   "updated": 0,
+   "deleted": 0,
+   "unchanged": 0
+  },
+  "meshes": {
+   "imported": 4619,
+   "kept": 0,
+   "deleted": 0
+  },
+  "tiles_imported": 257,
+  "dirty_packages": 26215,
+  "actor_count": 25837,
+  "timings": {
+   "core": 0.68,
+   "materials": 0.3,
+   "materials2": 2.69,
+   "meshes": 22.85,
+   "meshes2": 313.57,
+   "level": 20.48,
+   "actors": 214.52,
+   "graphs": 5.23,
+   "save": 29.42,
+   "prune": 64.98,
+   "save_pruned": 0.03,
+   "digests": 2.22
+  },
+  "stage2": {
+   "actors": 16127,
+   "instance_actors": 8791,
+   "replaced": 5250,
+   "meshes": {
+    "imported": 19295,
+    "kept": 0,
+    "deleted": 299
+   },
+   "packs_imported": 489,
+   "materials": {
+    "created": 203,
+    "updated": 0,
+    "kept": 0,
+    "deleted": 0
+   },
+   "hulls": 2625,
+   "boxes_only": 46,
+   "complex_fallback": 0,
+   "lod_chains": 33
+  },
+  "wall_s": 785.2,
+  "total_s": 677.3,
+  "engine": "5.8.4-58902052+++UE5+Release-5.8",
+  "keys_changed": {
+   "created": 25837,
+   "updated": 0,
+   "deleted": 0
+  }
+ },
+ "1_again": {
+  "ok": true,
+  "city": "Greyhook",
+  "actors": {
+   "created": 0,
+   "updated": 0,
+   "deleted": 0,
+   "unchanged": 25837
+  },
+  "meshes": {
+   "imported": 0,
+   "kept": 4619,
+   "deleted": 0
+  },
+  "tiles_imported": 0,
+  "dirty_packages": 0,
+  "actor_count": 25837,
+  "timings": {
+   "core": 0.0,
+   "materials": 0.02,
+   "materials2": 0.05,
+   "meshes": 2.53,
+   "meshes2": 15.77,
+   "level": 14.62,
+   "actors": 0.27,
+   "graphs": 0.17,
+   "save": 0.03,
+   "prune": 0.82,
+   "save_pruned": 0.02,
+   "digests": 1.5
+  },
+  "stage2": {
+   "actors": 16127,
+   "instance_actors": 8791,
+   "replaced": 5250,
+   "meshes": {
+    "imported": 0,
+    "kept": 19295,
+    "deleted": 0
+   },
+   "packs_imported": 0,
+   "materials": {
+    "created": 0,
+    "updated": 0,
+    "kept": 203,
+    "deleted": 0
+   },
+   "hulls": 0,
+   "boxes_only": 0,
+   "complex_fallback": 0,
+   "lod_chains": 0
+  },
+  "wall_s": 69.3,
+  "total_s": 36.0,
+  "engine": "5.8.4-58902052+++UE5+Release-5.8",
+  "keys_changed": {
+   "created": 0,
+   "updated": 0,
+   "deleted": 0
+  }
+ },
+ "level": {
+  "ok": true,
+  "actors": 25837,
+  "doubled_keys": [],
+  "m15_prototypes_left": [],
+  "replaced_left": [],
+  "stage2_actors": 24918,
+  "missing_instance_actors": [],
+  "missing_actors": [],
+  "instances_by_kind": {
+   "awning": 15835,
+   "ac_unit": 3586,
+   "street_light": 3102,
+   "trash": 2044,
+   "traffic_signal": 1141,
+   "bollard": 1048,
+   "railing": 1017,
+   "hydrant": 693,
+   "trash_can": 631,
+   "parked_vehicle": 541,
+   "bracket": 475,
+   "bench": 463,
+   "dumpster": 285,
+   "bus_stop": 62,
+   "boat": 29,
+   "wall_light": 27,
+   "planter": 17,
+   "food_stall": 14,
+   "vending_machine": 8,
+   "kiosk": 6
+  },
+  "instances_by_species": {
+   "boxwood": 4157,
+   "sedum": 3133,
+   "ivy": 2912,
+   "maple": 1163,
+   "fan_palm": 1122,
+   "plane": 1078,
+   "scrub": 828,
+   "birch": 620,
+   "oak": 567,
+   "elm": 546,
+   "pine": 456,
+   "linden": 378,
+   "date_palm": 106,
+   "ficus": 72
+  },
+  "instances_other": {
+   "part": 873
+  },
+  "instances_total": 49035,
+  "instance_worst_offset_m": 0.0,
+  "collision_profiles": {
+   "part:BlockAllDynamic": 590,
+   "plant:NoCollision": 3714,
+   "prop:BlockAllDynamic": 4487
+  },
+  "instance_actors_with_wrong_id_count": 0,
+  "sign_and_exact_actors": {
+   "sign_slot.shop_sign": 7119,
+   "sign_slot.billboard": 724,
+   "sign_slot.neon": 311,
+   "prop.scaffolding": 12,
+   "sign_slot.holo_ad": 58,
+   "prop.overhead_cable": 19
+  },
+  "sign_and_exact_collision": {
+   "NoCollision": 8243
+  },
+  "plant_meshes": {
+   "(True, '<NaniteShapePreservation.VOXELIZE: 2>')": 100
+  },
+  "prop_sign_materials": {
+   "props:opaque:M_CgOpaque:emissive=0.0": 36,
+   "props:metal:M_CgMetal:emissive=0.0": 21,
+   "props:foliage:M_CgFoliage:emissive=0.0": 24,
+   "props:emissive:M_CgEmissive:emissive=4.0": 10,
+   "props:neon:M_CgNeon:emissive=8.0": 5,
+   "signs:emissive:M_CgEmissive:emissive=4.0": 19,
+   "signs:holo:M_CgHolo:emissive=3.0": 4,
+   "signs:metal:M_CgMetal:emissive=0.0": 5,
+   "signs:neon:M_CgNeon:emissive=8.0": 9,
+   "signs:opaque:M_CgOpaque:emissive=0.0": 2
+  },
+  "sign_meshes_nanite_sample": {
+   "want True got True": 338,
+   "want False got False": 51
+  },
+  "s": 23.2,
+  "holo_chains": {
+   "count": 29,
+   "lods": [
+    3
+   ],
+   "screen_sizes": [
+    1.0,
+    0.3,
+    0.08
+   ],
+   "nanite": [
+    false
+   ],
+   "masters": [
+    "M_CgHolo"
+   ],
+   "blend": [
+    "<BlendMode.BLEND_TRANSLUCENT: 2>"
+   ],
+   "emissive": [
+    3.0
+   ]
+  }
+ },
+ "check_first": {
+  "ok": false,
+  "lines": [
+   "streaming: 1374 of 25837 actors loaded at the start, 763 after a teleport to (-1152, 128) (759 new)",
+   "collision: 346 of 507 traces down hit (ground 140, building 76, elevated 37, green_roof 31, junction 16, open_plaza 15), 36 of 36 roofs, 35 of 36 facades",
+   "walk: 130 m along a 132 m sidewalk path in 29 s, 100% of frames on the ground, reached its end"
+  ],
+  "checks": {
+   "streaming": {
+    "ok": true,
+    "actors": 25837,
+    "loaded_at_start": 1374,
+    "stage2_at_start": 1286,
+    "loaded_far": 763,
+    "only_far": 759,
+    "far_spot_m": [
+     -1152.0,
+     128.0
+    ],
+    "far_tile_loaded": true
+   },
+   "collision": {
+    "ok": false,
+    "down": {
+     "traces": 507,
+     "hits": 346,
+     "by_category": {
+      "green_roof": 31,
+      "ground": 140,
+      "open_park": 3,
+      "junction": 16,
+      "building": 76,
+      "elevated": 37,
+      "road_avenue": 4,
+      "structure_canopy": 1,
+      "road_service": 3,
+      "sidewalk": 4,
+      "open_plaza": 15,
+      "road_street": 3,
+      "road_alley": 2,
+      "prop_awning": 3,
+      "quay": 8
+     }
+    },
+    "roofs": {
+     "tried": 36,
+     "hit": 36
+    },
+    "facades": {
+     "tried": 36,
+     "hit": 35,
+     "missed": [
+      "d04.mg.w1129s214.bld.w1147s210"
+     ]
+    },
+    "spots": [
+     [
+      -2.43,
+      90.03
+     ],
+     [
+      -1152.0,
+      128.0
+     ],
+     [
+      -1152.0,
+      -384.0
+     ]
+    ]
+   },
+   "walk": {
+    "ok": true,
+    "path_m": 131.6,
+    "points": 12,
+    "reached": true,
+    "travelled_m": 129.9,
+    "on_ground": 1.0,
+    "max_drop_m": 0.0,
+    "seconds": 28.8,
+    "stopped_by": {},
+    "stops": [],
+    "skipped_low_walkways": 0
+   }
+  },
+  "total_s": 470.0,
+  "wall_s": 598.7
+ },
+ "check": {
+  "ok": true,
+  "lines": [
+   "streaming: 1374 of 25837 actors loaded at the start, 4270 after a teleport to (-1152, 128) (4266 new)",
+   "collision: 507 of 507 traces down hit (building 251, elevated 37, junction 34, ground 33, green_roof 31, open_plaza 22), 36 of 36 roofs, 36 of 36 facades",
+   "walk: 134 m along a 132 m sidewalk path in 23 s, 100% of frames on the ground, reached its end, stepped round 1 x nothing found"
+  ],
+  "checks": {
+   "streaming": {
+    "ok": true,
+    "actors": 25837,
+    "loaded_at_start": 1374,
+    "stage2_at_start": 1286,
+    "loaded_far": 4270,
+    "only_far": 4266,
+    "far_spot_m": [
+     -1152.0,
+     128.0
+    ],
+    "far_tile_loaded": true
+   },
+   "collision": {
+    "ok": true,
+    "down": {
+     "traces": 507,
+     "hits": 507,
+     "by_category": {
+      "green_roof": 31,
+      "ground": 33,
+      "open_park": 3,
+      "junction": 34,
+      "building": 251,
+      "elevated": 37,
+      "road_avenue": 4,
+      "structure_canopy": 1,
+      "road_service": 3,
+      "sidewalk": 13,
+      "open_plaza": 22,
+      "road_street": 17,
+      "road_alley": 12,
+      "open_green": 2,
+      "prop_awning": 13,
+      "skybridge": 1,
+      "road_pedestrian": 17,
+      "street": 1,
+      "water": 9,
+      "quay": 3
+     },
+     "late": 0
+    },
+    "roofs": {
+     "tried": 36,
+     "hit": 36
+    },
+    "facades": {
+     "tried": 36,
+     "hit": 36
+    },
+    "spots": [
+     [
+      -2.43,
+      90.03
+     ],
+     [
+      -1152.0,
+      128.0
+     ],
+     [
+      -1152.0,
+      -384.0
+     ]
+    ]
+   },
+   "walk": {
+    "ok": true,
+    "path_m": 131.6,
+    "points": 12,
+    "reached": true,
+    "travelled_m": 133.9,
+    "on_ground": 1.0,
+    "max_drop_m": 0.0,
+    "seconds": 22.9,
+    "stopped_by": {
+     "nothing found": 1
+    },
+    "stops": [
+     [
+      112.02,
+      78.49,
+      1.18,
+      "nothing found"
+     ]
+    ],
+    "skipped_low_walkways": 0
+   }
+  },
+  "total_s": 229.6,
+  "wall_s": 299.9
+ }
+}

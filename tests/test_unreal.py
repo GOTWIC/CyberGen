@@ -658,6 +658,7 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     a = inst[f"{props_k}.prop.test.civic.v0"]
     assert a["xforms"] == xf and a["ids"] == ["a.prop.1", "a.prop.2"]
     assert a["category"] == next(i["category"] for i in man["instances"] if i["key"] == props_k)
+    assert "no_collision" not in a and inst[f"{plant_k}.plant.oak.v3"]["no_collision"]
     plants = next(p for p in s2["packs"] if p["folder"].endswith("PropsParts/oak"))
     (oak,) = plants["meshes"]
     assert oak["shape_preservation"] == "voxelize" and oak["collision"] == {"none": True}
@@ -677,6 +678,7 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'if inst["key"] in self.skip:' in src and "xf[4:7]" in src
     assert 'r.get("ids")' in src and "NaniteShapePreservation" in src
+    assert src.count('if r.get("no_collision"):') == 2
 
 
 @pytest.fixture(scope="module")
@@ -716,9 +718,14 @@ def test_stage2_from_assetgen(staged, manifest):
     assert set(blds) <= actor_keys
     ch = U.manifest_changes(man, m2)
     s2keys = actor_keys | {a["key"] for a in s2["instances"]}
-    assert ch["deleted"] == sorted(set(s2["replaced"]) - s2keys)
-    assert ch["updated"] == sorted(s2keys & (set(blockout) | protos))
-    assert ch["created"] == sorted(s2keys - set(blockout) - protos)
+    # AG8's exact props (cables, scaffolding, gates) take the key of M15's instanced actor
+    # they replace: a static mesh actor in its place is deleted and created
+    ka, kb = U.actor_kinds(man), U.actor_kinds(m2)
+    moved = {k for k in ka.keys() & kb.keys() if ka[k] != kb[k]}
+    assert moved and moved <= protos and all(kb[k] == "mesh" for k in moved)
+    assert ch["deleted"] == sorted((set(s2["replaced"]) - s2keys) | moved)
+    assert ch["updated"] == sorted((s2keys & (set(blockout) | protos)) - moved)
+    assert ch["created"] == sorted((s2keys - set(blockout) - protos) | moved)
     # AG8: every prop and plant prototype actor of M15 replaced by props, plants and signs
     assert protos <= set(s2["replaced"])
     assert all(len(a["cpd"]) == 23 for a in s2["actors"] if a["key"] in set(blds))

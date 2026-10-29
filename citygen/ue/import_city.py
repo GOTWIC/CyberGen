@@ -1011,6 +1011,8 @@ class Importer:
                     for xf in r["xforms"]], False, False)
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
+                if r.get("no_collision"):
+                    comp.set_collision_profile_name("NoCollision")
                 a.set_actor_location_and_rotation(loc, rot, False, False)
                 a.set_editor_property("Ids", [unreal.Name(i) for i in r.get("ids") or
                                               [r["entry"]]])

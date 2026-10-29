@@ -44,6 +44,7 @@ MAX_STEP_M = 0.6    # highest step where two walkways join
 FLY_MODE = "/Game/CityGen/Core/GM_CityGenFly"     # the importer's (import_city.FLY_MODE)
 FLY_S = 8.0         # the flight's straight run
 FLY_Z_M = 40.0      # its height over the player start: through the buildings in its way
+TRACE_RETRY_S = 30.0  # how long a trace down that missed is tried again after settling
 
 
 def log(msg):
@@ -402,24 +403,39 @@ def collision(world, pawn, man, slug):
             spots.append(mid(ts[0]))
     bx = man["bounds"]
     roof_at = {o["key"]: o.get("roof") for t in man["tiles"] for o in t["objects"]}
-    down = {"traces": 0, "hits": 0, "by_category": {}}
+    down = {"traces": 0, "hits": 0, "by_category": {}, "late": 0}
     roofs = {"tried": 0, "hit": 0}
     facades = {"tried": 0, "hit": 0}
     for x0, y0 in spots:
         teleport(pawn, x0, y0, 300.0)
         yield from wait(0.5)
         yield from settle(world, slug, at=ue(x0, y0, 0.0))
+        todo = []
         for i in range(-6, 7):
             for j in range(-6, 7):
                 x, y = x0 + 16.0 * i, y0 + 16.0 * j
                 if not (bx[0] < x < bx[2] and bx[1] < y < bx[3]):
                     continue
-                h = trace(world, ue(x, y, 600.0), ue(x, y, -3.0), [pawn])
                 down["traces"] += 1
-                if h is not None:
-                    down["hits"] += 1
-                    c = tag(h["actor"], "cg.category") or h["actor"].get_class().get_name()
-                    down["by_category"][c] = down["by_category"].get(c, 0) + 1
+                todo.append((x, y))
+        # a cell reported streamed in still registers its components over a few frames (with
+        # stage 2's props, twice the actors per cell): a trace that misses is tried again for
+        # up to TRACE_RETRY_S, and the hits only after the first try are counted as late
+        t, first = time.time(), True
+        while todo and (first or time.time() - t < TRACE_RETRY_S):
+            if not first:
+                yield from wait(0.5)
+            left = []
+            for x, y in todo:
+                h = trace(world, ue(x, y, 600.0), ue(x, y, -3.0), [pawn])
+                if h is None:
+                    left.append((x, y))
+                    continue
+                down["hits"] += 1
+                down["late"] += 0 if first else 1
+                c = tag(h["actor"], "cg.category") or h["actor"].get_class().get_name()
+                down["by_category"][c] = down["by_category"].get(c, 0) + 1
+            todo, first = left, False
         here = ue(x0, y0, 0.0)
         blds = [a for a in city_actors(world, slug) if tag(a, "cg.category") == "building"]
         blds.sort(key=lambda a: (a.get_actor_bounds(False)[0] - here).length())
@@ -475,6 +491,7 @@ def collision(world, pawn, man, slug):
         f"collision: {down['hits']} of {down['traces']} traces down hit (" +
         ", ".join(f"{k} {v}" for k, v in sorted(down["by_category"].items(),
                                                 key=lambda kv: -kv[1])[:6]) +
+        (f"; {down['late']} after a wait" if down["late"] else "") +
         f"), {roofs['hit']} of {roofs['tried']} roofs, {facades['hit']} of "
         f"{facades['tried']} facades")
     teleport(pawn, sx, sy, sz)
