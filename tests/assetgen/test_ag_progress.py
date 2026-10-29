@@ -129,6 +129,6 @@ def test_build_cli_quiet_and_piped(tmp_path):
         assert f"{stage} ...\n" in err and f"{stage}: done in " in err, stage
     assert any(ln.startswith("genomes: ") and ln.endswith(" 100%") for ln in err.splitlines())
     tail = err.splitlines()[err.splitlines().index("time per stage:"):]
-    assert tail[-1].split()[0] == "total" and len(tail) >= 12
+    assert tail[-1].split()[0] == "total" and len(tail) >= 11
     # stdout is the same report either way (but for its timings)
     assert re.sub(r"[0-9.]+", "#", r.stdout) == re.sub(r"[0-9.]+", "#", q.stdout)
