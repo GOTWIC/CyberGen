@@ -429,6 +429,7 @@ class ShellBuilder:
         # AG4: what the asset keeps out of, roof forms, the roof items' assets, green roofs
         self.clear = RF.Clear(brief)
         self.bridges = RF.Clear(brief, ("skybridge",))
+        self.tubes = CN.tube_axes(brief)
         self.landings = CN.landings_of(self)
         self.landed: dict[str, dict] = {}
         self.portal_recs: list[dict] = []
@@ -1725,8 +1726,9 @@ class ShellBuilder:
             b, arrs = PT.mesh(fam, p)
             if not arrs:
                 continue
-            if self.bridges.segs and PT.REACH.get(fam) in ("strip", "deep"):
-                # AG4: no part that stands out of a wall enters a skybridge's corridor
+            if (self.bridges.segs or self.tubes) and PT.REACH.get(fam) in ("strip", "deep"):
+                # AG4: no part that stands out of a wall enters a skybridge's corridor or
+                # comes near a sky tube passing through a portal
                 lo, hi = PT.bounds(arrs)
                 keep = []
                 for a in at:
@@ -1735,10 +1737,14 @@ class ShellBuilder:
                         for cy in (lo[1], hi[1]):
                             xs.append(a[0] + cx * a[3] - cy * a[4])
                             ys.append(a[1] + cx * a[4] + cy * a[3])
-                    if self.bridges.hits(min(xs), min(ys), max(xs), max(ys), a[2] + lo[2],
-                                         a[2] + hi[2]):
+                    box_ = (min(xs), min(ys), max(xs), max(ys), a[2] + lo[2], a[2] + hi[2])
+                    if self.bridges.hits(*box_):
                         self.stats["parts_off_bridges"] = \
                             self.stats.get("parts_off_bridges", 0) + 1
+                        continue
+                    if self.tubes and CN.in_tube(self.tubes, *box_):
+                        self.stats["parts_off_portals"] = \
+                            self.stats.get("parts_off_portals", 0) + 1
                         continue
                     keep.append(a)
                 at = keep

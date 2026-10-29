@@ -307,6 +307,44 @@ def landing_records(sb) -> list[dict]:
 # Portals and sky stations
 # ---------------------------------------------------------------------------
 
+TUBE_MARGIN = 100           # past the portal test's radius (its axis sampled every 100 mm)
+
+
+def tube_axes(brief: dict) -> list[tuple]:
+    """The sky tubes of a building's portals as axis segments (mm, building frame) with the
+    radius the portal test keeps clear (`envelope.clearances`) and `TUBE_MARGIN`."""
+    out = []
+    for pr in brief.get("portals") or []:
+        half = pr["diameter_m"] * 500.0
+        R = half + 150.0 + TUBE_MARGIN
+        for ln in pr.get("lines") or []:
+            for p, q in zip(ln, ln[1:]):
+                out.append(((p[0] * 1000.0, p[1] * 1000.0, p[2] * 1000.0 - half),
+                            (q[0] * 1000.0, q[1] * 1000.0, q[2] * 1000.0 - half), R))
+    return out
+
+
+def in_tube(axes: list, x0, y0, x1, y1, z0, z1) -> bool:
+    """A box (mm) within a portal tube's clear radius: the exact distance from the box of
+    the tube's axis, sampled every 100 mm."""
+    import numpy as np
+    for a, b, R in axes:
+        if min(a[0], b[0]) - R > x1 or max(a[0], b[0]) + R < x0 or \
+                min(a[1], b[1]) - R > y1 or max(a[1], b[1]) + R < y0 or \
+                min(a[2], b[2]) - R > z1 or max(a[2], b[2]) + R < z0:
+            continue
+        n = int(math.dist(a, b) // 100) + 2
+        t = np.linspace(0.0, 1.0, n)
+        d2 = 0.0
+        for k, (lo, hi) in enumerate(((x0, x1), (y0, y1), (z0, z1))):
+            c = a[k] + (b[k] - a[k]) * t
+            e = np.maximum(np.maximum(lo - c, 0.0), c - hi)
+            d2 = d2 + e * e
+        if bool((d2 < R * R).any()):
+            return True
+    return False
+
+
 def _poly_m(rings_mm):
     from shapely.geometry import Polygon
     return Polygon([(p[0] / 1000.0, p[1] / 1000.0) for p in rings_mm[0]],
