@@ -1,7 +1,7 @@
 #include "SCityGenOverlay.h"
 
 #include "CityGenPlayActor.h"
-#include "Engine/Engine.h"
+#include "CoreGlobals.h"
 #include "Engine/Texture2D.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -22,11 +22,12 @@ namespace
 	constexpr double MinScale = 8.0;        // cm per Slate unit, zoomed in all the way
 	enum EMenuRow : int32 { RowNight = 1, RowFreeCam = 2, RowMinimap = 3, RowMessages = 4 };
 
-	/** The engine's on-screen debug messages (a big city's "texture streaming pool ...
-	 *  exhausted" among them, drawn over the minimap): on or off for the whole editor. */
+	/** The engine's on-screen messages (a big city's "texture streaming pool ... exhausted"
+	 *  among them, drawn over the minimap): shown or not, the switch the console's
+	 *  DisableAllScreenMessages and EnableAllScreenMessages set. */
 	bool EngineMessages()
 	{
-		return GEngine && GEngine->bEnableOnScreenDebugMessages;
+		return GAreScreenMessagesEnabled;
 	}
 
 	FVector2f F(const FVector2D& V) { return FVector2f(float(V.X), float(V.Y)); }
@@ -344,9 +345,9 @@ FReply SCityGenOverlay::OnMouseButtonDown(const FGeometry& Geometry, const FPoin
 			{
 				P->bShowMinimap = !P->bShowMinimap;
 			}
-			else if (Row.Value == RowMessages && GEngine)
+			else if (Row.Value == RowMessages)
 			{
-				GEngine->bEnableOnScreenDebugMessages = !GEngine->bEnableOnScreenDebugMessages;
+				GAreScreenMessagesEnabled = !GAreScreenMessagesEnabled;
 			}
 			return FReply::Handled();
 		}
