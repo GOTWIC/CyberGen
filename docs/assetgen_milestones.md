@@ -537,7 +537,69 @@ the materials on the object wherever no other object draws its mesh (AG2's parts
 families go through geometry nodes, which take the mesh's materials;
 `ag6_preview.import_glb`).
 
-RESULTS_PLACEHOLDER
+**Samples** (every check passes in each: the eleven building checks, AG7's streets, AG8's
+props, AG6's materials; 4 workers on the shared Mac):
+
+| City | Buildings | Shell triangles | Roof forms (mansard / pagoda / hip / gable / sawtooth / barrel) | Roof items (AC / tank / antenna / penthouse / helipad / AV pad; billboards) | Green roofs | Skybridges (enclosed / stack / open deck / catwalk / cable) | Landing doors (off a floor line) | Portals cut / passing, sky stations | Build |
+|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 31.97 M | 1,115 (969 / 38 / 24 / 26 / 50 / 8) | 15,597 (12,110 / 1,100 / 818 / 222 / 19 / 42; 1,286) | 494 of 494 | 258 (60 / 1 / 77 / 86 / 34) | 513 of 516 (3) | 14 / 6, 2 | 4:45 |
+| Greyhook | 2,671 | 17.58 M | 293 (258 / 0 / 0 / 8 / 18 / 9) | 7,789 (6,176 / 672 / 75 / 308 / 0 / 11; 547) | 430 of 430 | 170 (43 / 0 / 127 / 0 / 0) | 338 of 340 (2) | 8 / 6, 1 | 1:56 |
+| Cragmouth | 6,777 | 34.07 M | 1,269 (1,124 / 59 / 25 / 32 / 29 / 0) | 18,553 (13,974 / 1,229 / 1,109 / 556 / 11 / 34; 1,640) | 338 of 338 | 279 (75 / 0 / 54 / 99 / 51) | 533 of 558 (24, 1 at a ground floor) | none | 7:00 |
+| Vesper Bay Decks (checks only) | 5,856 | 32.32 M | 1,024 (917 / 26 / 23 / 23 / 28 / 7) | 15,850 (12,267 / 1,109 / 836 / 249 / 16 / 36; 1,337) | 494 of 494 | 266 (57 / 1 / 81 / 84 / 43) | 531 of 532 (1) | 10 / 11, 2 | 6:48 |
+
+Facade details (Vesper Bay / Greyhook / Cragmouth): fire escapes 143 / 20 / 147, kitchen
+ducts 622 / 322 / 834, cameras 880 / 431 / 831, wall vents 2,998 / 763 / 4,114, conduits
+1,739 / 694 / 2,026, corner downpipes 3,867 / 3,965 / 2,545; access huts 149 / 3 / 144,
+skylights 874 / 452 / 1,047, roof vents 6,344 / 3,924 / 8,357. Skybridges 88,596 / 35,256 /
+103,080 triangles. No sample has a roof item under a corridor (`roof_items_lowered`; the
+tests build one). Builds: `assetgen build` whole (tiles, checks, streets, props, materials),
+with other sessions' Blender runs on the machine. Images: `docs/progress/AG4/README.md`.
+
+**Goldens**: written again on the Mac (`tests/assetgen/goldens.py --builds`, then
+`--sections ag1 vesper ag6` after the last shell change, which moved nothing): briefs v2
+change every brief (clearances, portal lines, skybridge decks in the building frame), so the
+small city's briefs, the five samples' briefs and the Vesper Bay brief hashes move; AG4
+changes every shell (roofs, details, landing doors), so the small city's asset digest and
+the Vesper Bay buildings move; the buildings' contribution (roof equipment entries, green
+roof `replaces`) and `materials.json` (AG4's slots) move AG6's digest. The props golden was
+already stale on main (main's own code writes `9ea0...` for the small city, the golden held
+`3f78...`); it is written again with AG4 changing nothing there. AG7's streets golden is
+unchanged.
+
+**Found on the way**:
+- A small-city tower whose footprint has a 1 m notch measured 0.3 m thick (the ring's
+  least width), so its skybridge got no door: the door now asks how far the mass reaches
+  in behind the wall it lands on (`shell._depth`).
+- Vesper Bay Decks' sky tube passes megabuilding towers whose balconies reached into its
+  clear radius beside the portal: such parts are dropped (`parts_off_portals`: 15 there and
+  in Vesper Bay, 4 in Greyhook).
+- `assetgen materials preview --views city_full` took over an hour on Vesper Bay without
+  getting through the import (three quadratic steps in Blender, above).
+- M6 places facade AC units where M3p's podium decks land (24 in Vesper Bay and Cragmouth,
+  6 in Greyhook); the landing door wins and the mount check counts them apart, while AG8
+  still draws the unit there (the city's to move).
+- M5 puts a portal on megabuildings whose tube runs between the towers over the podium
+  (6 in Vesper Bay and Greyhook, 11 in Vesper Bay Decks): nothing to cut, counted as
+  passing.
+- A few skybridge decks meet a building between two floors (M3's floor grids apart; on
+  Cragmouth's slopes two buildings seated at different heights): reported, not failed.
+
+**Exporter**: as above; `tests/test_unreal.py` (`test_stage2_skybridge_links`,
+`test_stage2_takes_assetgen_roofs_and_skybridges`, and `test_stage2_from_assetgen` knowing
+the roof equipment entries, which have no node). Unreal check: the coordinating session's
+call (`docs/progress/AG4/README.md` lists what it should look at).
+
+**Open.** For AG5: one mechanical penthouse family (variants by era), no dormers on the
+pitched roofs, the plinths on slopes still one block (the landings at a ground floor and
+the shopfronts over a plinth wait for the steps). In Unreal a building collides as its
+masses' convex hulls, which close the landing doors: a walk across a skybridge meets the
+facade (the landing floors want the street front's drawn collision, or hulls cut at the
+door). Fire escapes are not
+put on shanty stacks (their own clutter does the part). The blockout green-roof objects
+that also draw a lawn stay in Unreal under AG4's beds (their plates sit under the gravel
+border, so nothing flickers). Shell vertex colors and trim-sheet UVs stay open from AG3. The whole-city previews
+draw AG8's props only near a perspective camera (AG6's preview), so parks read bare
+there. Mac = x86 waits for the deferred determinism check.
 
 ## AG6: materials and textures
 

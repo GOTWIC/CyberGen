@@ -154,18 +154,19 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7)
 
 ### Cities
 
 Every building modelled: framed windows, mullions, spandrels, balconies, fins, louvers,
 shutters, capsule pods and structural frames on walls in one of nineteen facade styles
 chosen per district, owner and building, with chamfered and rounded corners, setback ledges,
-crowns, arcades and the wear of poor districts (8K; open one for full size).
+crowns, arcades and the wear of poor districts; Vesper Bay, Greyhook and Cragmouth also
+with their roofs, roof equipment and skybridges (8K; open one for full size).
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/AG2/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG2/nexus_city/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG4/vesper_bay/8k/city_full.jpg" width="420"> | <img src="docs/progress/AG2/nexus_city/city_full.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
@@ -173,11 +174,11 @@ crowns, arcades and the wear of poor districts (8K; open one for full size).
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/AG2/peninsula_city/city_full.jpg" width="420"> | <img src="docs/progress/AG2/vesper_bay_pinned/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG4/greyhook/8k/city_full.jpg" width="420"> | <img src="docs/progress/AG2/vesper_bay_pinned/city_full.jpg" width="420"> |
 
 | Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
 |---|---|
-| <img src="docs/progress/AG2/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG2/cragmouth/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG2/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG4/cragmouth/8k/city_full.jpg" width="420"> |
 
 ### Up close
 
@@ -288,6 +289,20 @@ rust, posters and graffiti. In Unreal the street front collides as drawn, so doo
 steps can be walked, and every door is listed with the walkway it opens to. More:
 [`docs/progress/AG3`](docs/progress/AG3).
 
+| Roofs over Vesper Bay's Old Town (8K) | A sky station in the Corporate Core (8K) |
+|---|---|
+| <img src="docs/progress/AG4/vesper_bay/8k/roofs.jpg" width="420"> | <img src="docs/progress/AG4/vesper_bay/8k/sky_station.jpg" width="420"> |
+
+Every roof finished: gabled, hipped, mansard and pagoda roofs where the era has them,
+sawtooth and vaulted sheds, gravel, pavers or membrane on flat roofs with metal or stone
+copings, green roofs with their beds and paths, and an AC unit, water tank, antenna,
+helipad or penthouse for every one the city places, with access huts, vents and skylights;
+fire escapes, kitchen ducts, cables and cameras on the walls. Skybridges by kind (glazed,
+stacked, open decks, catwalks, cable bridges) land in doors on both buildings, and sky
+tubes pass through towers in portals, with platforms where a station stands. In Unreal
+each skybridge replaces its blockout piece and the roof equipment is instanced per tile.
+More: [`docs/progress/AG4`](docs/progress/AG4).
+
 <img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
 
 Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).
@@ -304,7 +319,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG1 | Building shells | A model for every building: walls with window openings, storefronts, slabs, parapets and cornices in six facade styles; far models for distant views | Done |
 | AG2 | Facades | Windows, balconies, fins, louvers and frames as instanced parts; nineteen facade styles; corner cuts, setbacks, crowns and arcades; wear by district | Done |
 | AG3 | Street fronts | A shopfront for every shop by its use, doors at every entrance, lobbies, loading docks, garages, shutters and grilles, mounts for signs and awnings, fire walls, grime and graffiti; walkable doorways in Unreal | Done |
-| AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
+| AG4 | Roofs and connections | Pitched, sawtooth and vaulted roofs, roof finishes, AC units, water tanks, antennas, helipads and penthouses on every roof, green roofs, fire escapes, ducts and cameras, skybridges with landing doors, sky tube portals through towers and sky stations | Done |
 | AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
 | AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signs in each district's scripts, textured materials in Blender and Unreal | Done |
 | AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |

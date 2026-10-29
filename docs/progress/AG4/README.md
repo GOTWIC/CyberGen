@@ -43,7 +43,32 @@ between a megabuilding's towers over its podium and meets no wall.
 
 ## Images
 
-IMAGES
+Whole cities (8K, every shell, part, skybridge and street piece textured; AG8's props
+are drawn only near a perspective camera, so the parks read bare from this far):
+
+- [`vesper_bay/8k/city_full.jpg`](vesper_bay/8k/city_full.jpg): Vesper Bay.
+- [`greyhook/8k/city_full.jpg`](greyhook/8k/city_full.jpg): Greyhook.
+- [`cragmouth/8k/city_full.jpg`](cragmouth/8k/city_full.jpg): Cragmouth.
+
+Up close (Vesper Bay unless named):
+
+- [`vesper_bay/8k/roofs.jpg`](vesper_bay/8k/roofs.jpg): an aerial over Old Town's roofs
+  (8K): mansards, gables, hips and pagodas, water tanks on dunnage, AC units, antennas,
+  access huts, billboard frames, green roofs with their gravel border.
+- [`vesper_bay/stack_bridge.jpg`](vesper_bay/stack_bridge.jpg): the two-level stacked
+  skybridge high in the Corporate Core, landing doors in both towers.
+- [`vesper_bay/catwalk_alley.jpg`](vesper_bay/catwalk_alley.jpg): an Old Town alley under
+  its catwalks and cable bridges, fire escapes on the shopfront rows.
+- [`vesper_bay/tube_into_tower.jpg`](vesper_bay/tube_into_tower.jpg): the sky tube entering
+  its tower in the Corporate Core through the portal, the lit frame at its mouth.
+- [`vesper_bay/8k/sky_station.jpg`](vesper_bay/8k/sky_station.jpg): inside that portal
+  (8K): the sky station's platform beside the tube, the portal's ceiling over it.
+- [`cragmouth/old_quarter.jpg`](cragmouth/old_quarter.jpg): Cragmouth's Old Quarter: mansard
+  roofs, AC units, water tanks, antennas and billboards over the shopfront streets.
+
+Work in progress: [`wip/01_greyhook/`](wip/01_greyhook/) (the first full build: roofs,
+an enclosed skybridge, a portal in The Stacks) and [`wip/02_vesper_bay/`](wip/02_vesper_bay/)
+(after the fixes it found).
 
 ## What an Unreal check should look at
 

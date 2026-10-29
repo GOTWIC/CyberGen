@@ -33,7 +33,7 @@ script, not this exporter.)
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
 | a fly pawn and its game mode, the level's game mode override unless `--play walk` | `/Game/CityGen/Core/BP_CityGenFlyPawn`, `GM_CityGenFly` |
 | the far view: the level's instanced HLODs, built after the import | World Partition HLOD actors |
-| with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
+| with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind; AG4's skybridges by id and roof equipment instanced per tile | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
 | stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
 | with AG6: textures (the shared library, imported once per project; a city's sign pages), textured masters, `Night` in a parameter collection, an instance per material key (era variants of the wall and roof slots) | `/Game/CityGen/Core/Textures/`, `Core/MPC_CityGen`, `/Game/CityGen/<City>/Assets/Textures/` |
 
@@ -361,6 +361,63 @@ a second node beside the shell in the tile's pack (`<id>.front`) and its own ent
 - the decal meshes as non-Nanite static mesh actors without collision, their slots the
   decal instances (`M_CgDecal`, deferred decal domain: a mesh decal over the wall behind).
 
+### From AG4: roofs, roof equipment and skybridges
+
+`assetgen build` (AG4) adds roof forms, finishes, copings, green roofs, facade details,
+portals and sky stations to the shells (no new entry: they are in each building's shell,
+front and parts), and three things the exporter takes:
+
+- **Roof equipment** (AC units, water tanks, antennas, helipads and AV pads, access huts,
+  dunnage, roof vents, skylights; `roofparts.ROOF`, always instanced) leaves the
+  buildings' `parts` for one entry per tile in `unreal_contribution.buildings.json`:
+
+  ```json
+  {"key": "roofs.t+02+00", "kind": "roof_equipment", "hash": "...", "replaces": [],
+   "pivot": [0.0, 0.0, 0.0], "yaw_deg": 0.0, "nanite": true, "triangles": 0,
+   "slots": [], "collision": {"complex": true}, "cpd": [], "instances": 412,
+   "parts": [{"kind": "part.ac_unit.box.h957c3355d6", "type": "part.ac_unit.box",
+              "glb": "parts/t+02+00.glb", "node": "part.ac_unit.box.h957c3355d6",
+              "asset": "part_ac_unit_box_h957c3355d6", "count": 96, "triangles": 220,
+              "xforms": [[512.4, 88.1, 31.2, 90.0]],
+              "ids": ["d03.lot.e512n88.bld"]}],
+   "tags": {"cg.type": "roof_equipment", "cg.district": "", "cg.tile": "t+02+00"}}
+  ```
+
+  Transforms in the city frame (x, y, z in meters, yaw in degrees), one building id per
+  transform; the meshes are nodes of the tile's part pack. Their slots take no tint (no
+  building's Custom Primitive Data reaches a tile's instances). Merged roof parts
+  (penthouses, billboard frames) stay in their building's shell.
+- **Green roofs**: a building entry's `replaces` lists the blockout's joined green-roof
+  objects (`d03.green_roof.<tile>`) whose every green area is a green roof its shells
+  built (each object given to the smallest building id among them); an object that also
+  draws a lawn, or a green roof too small to build, stays.
+- **Skybridges** (and M3p's podium decks, open-deck skybridges): a part of their own,
+  `unreal_contribution.connections.json`, packs `connections/<tile>.glb` (a node per
+  skybridge at its middle, turned to its line), an entry per skybridge keyed by its id, so
+  it replaces the blockout's skybridge object of that name:
+
+  ```json
+  {"key": "d03.sb.e183n553", "kind": "skybridge", "hash": "...", "replaces": [],
+   "glb": "connections/t+00+02.glb", "node": "d03.sb.e183n553",
+   "asset": "d03_sb_e183n553", "pivot": [183.1, 553.4, 0.0], "yaw_deg": 92.6,
+   "nanite": true, "collision": {"complex": true}, "cpd": [], "ids": ["d03.sb.e183n553"],
+   "links": ["building:d03.lot.e164n586.bld", "building:d03.lot.e180n524.bld",
+             "walkway:wk.e183n553"],
+   "tags": {"cg.type": "skybridge.enclosed", "cg.district": "", "cg.tile": "t+00+02"}}
+  ```
+
+  Complex collision (its floor is walked), untinted materials (`bridge_*`, planters,
+  lamps) on the building table of AG6's catalog, `links`: the two buildings it joins and
+  its walkways, for stage 4.
+
+**What the exporter does with them** (`citygen/unreal.py`, `citygen/ue/import_city.py`):
+- the roof entries as any parts-only entry: an instanced actor per mesh (`roofs.<tile>.
+  <kind>`), its ids per instance (`test_stage2_takes_assetgen_roofs_and_skybridges`);
+- a stage 2 entry's `links` reach its actor (in its hash) and the importer tags each one
+  `cg.link=<link>` (`test_stage2_skybridge_links`);
+- the connections part like any other: its folder `Assets/Connections/<tile>/`, its
+  materials `connections.<slot>`.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -637,4 +694,5 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |
 | AG3 | Street fronts: each building's ground band its own entry and node (`<id>.front`, kind `building.front`) with complex collision and `fallback_full` (the mesh record and its hash; the importer sets the Nanite fallback to every triangle), its building's id, CPD and materials; doors tagged on the front's actor (`cg.door=<id>@<walkway>`) and gathered into a fourth flat graph, `doors` (`doors_of`); a stage 2 entry's own `ids` and `level` reach its actor; the tiles' decal meshes as entries (`decals.<tile>`, no Nanite, no collision, `decal.<cell>` slots with their cell index); tests without Unreal (`test_stage2_takes_assetgen_fronts`; `test_stage2_from_assetgen` and `test_stage2_takes_assetgen_parts` read the new entries) | Not run (the coordinating session's call; what to look for: `docs/progress/AG3/README.md`) |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |
+| AG4 | Roofs and connections: roof equipment one entry per tile (`roofs.<tile>`, parts only, an instanced actor per mesh with a building id per instance); buildings' `replaces` the blockout green-roof objects their shells build; skybridges a part of their own (`unreal_contribution.connections.json`, `connections/<tile>.glb`, an entry per skybridge by id with complex collision); a stage 2 entry's `links` carried to its actor (in its hash) and tagged `cg.link=<link>` by the importer; tests without Unreal (`test_stage2_skybridge_links`, `test_stage2_takes_assetgen_roofs_and_skybridges`) | Not run (the coordinating session's call; what to look for: `docs/progress/AG4/README.md`) |
 | AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Not run (the coordinating session's call; what to look for: leaves masked and two-sided up close and full at distance, sign faces showing their page cells upright, holo-ads textured, textured props) |
