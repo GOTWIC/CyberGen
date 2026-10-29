@@ -801,7 +801,7 @@ def test_stage2_from_assetgen(staged, manifest):
     blockout = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
     protos = {i["key"] for i in man["instances"]}
     con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
-    blds = [e["key"] for e in con["entries"]]
+    blds = [e["key"] for e in con["entries"] if e["kind"] == "building"]
     assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
     assert set(blds) <= set(s2["replaced"])
     assert s2["counts"]["replaces_missing"] == 0
@@ -844,7 +844,8 @@ def test_stage2_takes_assetgen_parts(staged):
     m2, _, _ = U.build_manifest(staged)
     s2 = m2["stage2"]
     con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
-    want = {(e["key"], p["kind"]): (e, p) for e in con["entries"] for p in e["parts"]}
+    want = {(e["key"], p["kind"]): (e, p) for e in con["entries"]
+            for p in e.get("parts", [])}
     assert want
     got = {(a["entry"], a["kind"]): a for a in s2["instances"]
            if a["entry"] in {e["key"] for e in con["entries"]}}
@@ -861,7 +862,7 @@ def test_stage2_takes_assetgen_parts(staged):
                                                                   for m in pk["meshes"]}
     assert {f"{con['part']}.{m}" for m in con["materials"]} <= set(s2["materials"])
     assert {"frame", "balcony", "dado"} <= set(con["materials"])
-    assert sum(len(a["xforms"]) for a in got.values()) == sum(e["instances"]
+    assert sum(len(a["xforms"]) for a in got.values()) == sum(e.get("instances", 0)
                                                               for e in con["entries"])
     # no collision on a building's parts (AG2's contract: its simple collision covers its
     # masses), meshes and instancers; AG7's container stacks keep theirs
@@ -871,6 +872,50 @@ def test_stage2_takes_assetgen_parts(staged):
     cont = [a for a in s2["instances"] if a["kind"].startswith("part.container")]
     assert all(not a.get("no_collision") and pm[a["mesh"]]["collision"] == {"complex": True}
                for a in cont)
+
+
+def test_stage2_takes_assetgen_fronts(staged):
+    """AG3's street fronts: an actor per building's front keyed `<key>.front` at its
+    building's pivot with its Custom Primitive Data and id, complex collision on a Nanite
+    mesh whose fallback keeps every triangle, a `cg.door` tag per door (its id and walkway),
+    and the doors graph (one element per door at its world point, its walkway as ref); the
+    tiles' decal meshes as actors without Nanite or collision, each slot a decal material."""
+    m2, _, g2 = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
+    fronts = {e["key"]: e for e in con["entries"] if e["kind"] == "building.front"}
+    assert fronts
+    actors = {a["key"]: a for a in s2["actors"]}
+    meshes = {f"{p['folder']}/{m['asset']}": m for p in s2["packs"] for m in p["meshes"]}
+    ndoors = 0
+    for key, e in fronts.items():
+        a = actors[key]
+        b = key[:-len(".front")]
+        assert a["ids"] == [b] and a["pivot"] == actors[b]["pivot"] and a["cpd"] == e["cpd"]
+        assert a["type"] == "building.front" and a["category"] == "building"
+        m = meshes[a["mesh"]]
+        assert m["collision"] == {"complex": True} and m["nanite"] and m["fallback_full"]
+        assert a.get("doors", []) == [f"{d['id']}@{d.get('walkway_id') or ''}"
+                                      for d in e["doors"]]
+        ndoors += len(e["doors"])
+    assert ndoors and g2["doors"]["count"] == ndoors
+    by = {d["id"]: (e, d) for e in fronts.values() for d in e["doors"]}
+    assert sorted(g2["doors"]["ids"]) == sorted(by)
+    for k, did in enumerate(g2["doors"]["ids"]):
+        e, d = by[did]
+        assert g2["doors"]["refs"][k] == (d.get("walkway_id") or "")
+        p = g2["doors"]["points"][3 * k:3 * k + 3]
+        assert p == pytest.approx([e["pivot"][j] + d["position"][j] for j in range(3)],
+                                  abs=1e-3)
+    assert "doors" in m2["graphs"]
+    dec = [e for e in con["entries"] if e["kind"] == "decals"]
+    assert dec
+    for e in dec:
+        a = actors[e["key"]]
+        assert a["no_collision"] and not meshes[a["mesh"]]["nanite"]
+        for s in e["slots"]:
+            mat = s2["materials"][f"buildings.{s}"]
+            assert mat["master"] == "decal" and "Cell" in mat["scalars"]
 
 
 def test_stage2_textured_props_and_signs(staged):

@@ -12,7 +12,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG0 | Contract and spike: package `assetgen/`, asset spec and skill, a brief and hash per building, glTF writer, triangulator, assetgen's part of the Unreal exporter; three generated buildings in Unreal 5.8 to measure Nanite size, import time and Lumen cost | Done | [`docs/progress/AG0`](progress/AG0) |
 | AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the contribution for the first assets in Unreal | Done | [`docs/progress/AG1`](progress/AG1) |
 | AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth, thumbnail uniqueness and budgets per building class | Done | [`docs/progress/AG2`](progress/AG2) |
-| AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Planned | |
+| AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Done | [`docs/progress/AG3`](progress/AG3) |
 | AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
 | AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
 | AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Done | [`docs/progress/AG6`](progress/AG6) |
@@ -273,6 +273,161 @@ generators (shanty and industrial sheds share the generic grammar; the thumbnail
 slivers are long sheds), landmarks and stepped plinths on slopes; AG6 materials per slot
 (the slots and tints are the contract; parts carry their building's CPD); the determinism
 check (Mac = x86) waits for `docs/determinism_check.md`.
+
+## AG3: street fronts
+
+**Built.** The ground band of every building (`assetgen/buildings/fronts.py`, the part kit's
+street-front families in `frontparts.py`):
+- **band** (`band_top`): every prism mass on the ground (for a building on an M14 deck, on
+  the deck's top: `shell.ground_mm`) has a band from its foot to its first floor line (the
+  whole mass when less than 1 m is left above, at most 7.5 m), built apart from the rest of
+  the shell as the building's second mesh (`<id>.front`, layer 1 of the mesh buffer,
+  `meshbuf.split`). Per zone (the industrial dado or the base strip, then
+  the wall) the wall is one polygon with the openings as holes, or as notches where they
+  reach the pavement (`_pieces`: every zone line meets the openings of the zone beside it,
+  so no T-junction); each opening a pocket (head, jambs split at the zone line, sill unless
+  it is a notch, the pane at the back); the cap under the mass notched at every notch, the
+  cap at the top the interface with the shell above, so both meshes are closed. Upper
+  regions over a party region are fire walls (`firewall`, no windows). A pocket keeps off
+  the corners (`_clear`), off other edges of the mass (`_blocked`) and off the recesses
+  already cut down to the pavement on the other facades (`_meets`: two recesses either side
+  of an acute corner);
+- **shopfronts**: one per ground-floor unit by its use (food, bar, club, arcade, cyberware,
+  clinic, pawn, convenience, laundromat and the rest): frame by the genome's front genes
+  (aluminum, painted, steel, timber), riser (tile, stone, dark, paint, wall), a recess of
+  0.25 to 0.45 m by use, transom, mullions, a door at the unit's entrance (glass, panel, barred, revolving),
+  shutters (box, half down, down) and grilles by grime and wealth, counters for food,
+  frosted glass for clinics, posters, a light box, screens for arcades, a dark club front
+  with its canopy and a rope queue, neon on the fascia; the fascia plate over the opening is
+  where AG8's sign box and awning hang (the opening's head stops under a mount);
+- **doors**: a door at every entrance the units do not take: main (one or two leaves of the
+  genome's style in a recess 0.45 to 0.9 m deep, steps up inside it, a canopy over it where
+  the facade has room and no podium canopy), service, loading dock (opening 1.2 m up, steel
+  lip, bumpers, seal) or roll-up door, garage mouth (height bar, barrier arm, half-raised
+  grille), yard gate. A door that cannot be cut where the model has it shifts up to 1.2 m
+  along the facade, then into the corner piers (a short facade), else hangs flush on the
+  wall (always on a band too low for a door: a platform, a dock's plinth); a main
+  entrance between two units keeps room for its own door (the shopfronts stop short: a
+  lobby between the shops); a unit or entrance the model put on a wall a neighbor stands
+  against, or on a facade too short for it, goes to the nearest facade of its mass with room
+  and not into a court (`Band.rehome`, in place of the ground windows there) else flush on
+  the nearest band facade, open walls first (`leftovers`), marked `moved`. Each door's record: id (`<building>.door.e<k>` or
+  `.u<k>`), kind, entrance or unit, use, walkway, position, outward normal, size, depth,
+  steps, flush, moved, class;
+- **mounts**: AG1's panels wherever a mount would fall on glass now also cover awnings;
+  plates behind wall lights and cable ends, trellises under facade greenery, scaffold ties on
+  the piers behind scaffolding (`hardware`); downpipes on blind and fire walls and murals on
+  fire walls of 5 x 5 m and more (`walls`);
+- **decals** (`_decals`, cells of AG6's decal atlas, at most 14 a building): grime along the
+  foot of the wall, leaks under the band's windows, rust beside metal doors, graffiti on
+  blank stretches by grime and the district's danger (more on alleys, blind and fire walls),
+  posters and stickers on the piers between shopfronts, cracks and moss on blind walls by
+  wear and greenery. A tile's decals are one mesh of quads 1 cm off the walls in its pack
+  (`decals.<tile>`, a primitive per cell, UV0 0 to 1 over each quad): mesh decals in
+  Unreal, alpha quads in Blender;
+- **genome** (`GENOME_VERSION` 3): front frame, riser, door style, steps, fascia and paint,
+  recess depth and shutter share, drawn under purposes of their own (`front.*`), so every
+  earlier gene keeps its draw; `effective` adds the front genes a building used;
+- **collision** (`collision.py`): a ground mass's hulls start at the band's top; the front
+  collides as drawn in Unreal (complex collision);
+- **checks** (`asset_checks.py`): `asset_access` (a door at every entrance and unit, each
+  open to its walkway: a step out of the doorway, 1 m, else 3 or 6 m past a corner of its
+  own that juts beside it, then straight to the walkway's nearest point with no building in
+  between; the model's walkway when it reaches it, else the ground walkway in front of the
+  door, written into the record for stage 4; a door facing a neighbor or with no walkway
+  within 15 m ahead (a road without a sidewalk on its side, open ground, a canal) is
+  reported, not failed: the model put the entrance there) and
+  `asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never
+  on glass, `fronts.mount_check`; one on a stretch of its edge the shells tidy away, a spike
+  of the lot's ring (all of the edge or all but a stub of it, `ShellBuilder.kept`), or over
+  or under every wall of its edge, a shop sign over a low building under an M14 deck, is
+  reported apart); on a deck city the access check's paths are blocked only by
+  buildings of the door's own level; `asset_budget` counts 1,500 triangles per ground-floor
+  unit and per street front on top of section 11's estimate;
+- **build** (`build.py`, `GEN_VERSION` ag3.5): the front node beside the shell in the tile
+  pack, the decal mesh per tile, the record's `front` (node, triangles, slots, `band_m`),
+  `doors`, `checks.mounts`, `checks.doors`, `level` on a deck, and the stats' units and
+  decals; materials: every AG3 slot in AG6's catalog (doors, steps, steel, rubber, roll-up
+  doors, stanchions, fascias, mounts, trellises, pipes, risers, lit faces, neon and screens,
+  paints, posters, graffiti, murals; a bar's dark glazing its own interior row), decal slots
+  `decal.<cell>` on the `decal` master with the cell's index;
+- **previews** (`materials/preview.py`, `blender/ag6_preview.py`): AG6's textured previews
+  now draw the fronts and decals with the shells, AG2's instanced parts (one geometry-node
+  instancer per pack, the building's tints on each instance, the materials reading them from
+  the instance), beside the props, plants and signs AG8 on AG6 draws;
+- **exporter**: below;
+- tests `tests/assetgen/test_ag_fronts.py` (new), `test_ag_facades.py` (the part kit has
+  AG3's families; the band's top cap is a `structure` face), `tests/test_unreal.py`.
+
+**Samples** (every check passes in each; 4 workers on the shared Mac):
+
+| City | Buildings | Front triangles (shell) | Doors | Shop / main / service / dock / garage / gate | Flush | Moved | Facing a neighbor / nothing ahead | Mounts | Decals | Tile packs | Build |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Greyhook | 2,671 | 4.2 M (12.4 M) | 10,388 | 8,570 / 1,376 / 348 / 61 / 21 / 12 | 200 (1.9%) | 279 | 109 / 2 | 9,479 | 10,827 | 1.04 GB | 58 s |
+| Cragmouth | 6,777 | 8.0 M (24.8 M) | 25,331 | 21,094 / 2,491 / 1,670 / 57 / 6 / 13 | 1,062 (4.2%) | 1,700 | 496 / 26 | 29,832 | 22,576 | 2.06 GB | 156 s |
+| Vesper Bay Decks (checks only) | 5,856 | 7.3 M (23.9 M) | 22,710 | 18,989 / 2,335 / 1,280 / 82 / 11 / 13 | 992 (4.4%) | 1,510 | 466 / 12 | 26,654 | 20,341 | 1.95 GB | 130 s |
+
+Front triangles are the street fronts' own (the shell's in brackets, without them); doors by
+kind; flush doors hang on the wall (no recess fits, or the band is too low); moved doors
+left a wall a neighbor stands against or a facade too short; "facing a neighbor / nothing
+ahead" are the access check's reported doors (the model put the entrance there); mounts are
+sign slots, wall props and facade plants checked against the band's openings. Build: the
+building stage of `assetgen build` (tiles and checks), with other sessions' Unreal and
+Blender runs on the machine.
+
+**Goldens**: written again on the Mac (`tests/assetgen/goldens.py --sections ag1 ag6
+vesper`, the new `vesper` section rewriting the Vesper Bay buildings alone): AG3 changes
+every shell (the band cut out, its own node), adds the decal meshes to the tile packs and
+the fronts and decals to the buildings' contribution, so the small city's manifest, files
+and materials files and the Vesper Bay buildings move; the briefs, the spike, the
+triangulation, the library pixels, the street and prop goldens do not. Written again
+(`--sections ag1 ag6`) after merging AG8 on AG6 from main: the small city's files and
+materials move again (AG8's textured props and the `ag6.2` library in the contributions),
+its manifest is AG3's.
+
+**Found in the sample builds**:
+- M3 puts ground-floor units on walls a neighbor stands against: a shopfront row in the
+  small test city had four of its six units on party walls. Their doors now move to the
+  nearest open facade.
+- Main entrances fall between two units, or just outside one, on facades the shops fill;
+  hence the lobby room kept between the shopfronts.
+- Short facades left no room inside their corner piers; hence doors into the piers.
+- Shop signs hang 2 m up over narrow units; hence door heads stop under a mount.
+- The access check's first straight path clipped a building's own corner where it juts out
+  beside a door (Cragmouth); hence steps 3 and 6 m out.
+- Some Cragmouth streets have no sidewalk on the building's side, so the only walkways
+  "ahead" were across the block; hence "ahead" means within 15 m.
+- On Vesper Bay Decks:
+  - buildings under the slab blocked the paths of doors on it; hence buildings of the
+    door's own level only;
+  - shop signs at 5 to 6 m hang over 3.5 m undercity buildings, and street signs fall
+    under buildings standing on the deck; these are reported apart;
+  - a temple platform (1.5 m) and a loading-dock plinth (1.2 m) took a door taller than
+    their band, which opened the band's top; hence no cut door in a band under 1.65 m.
+- A lot ring with a 5 m spike carried a facade plant (Cragmouth); reported apart.
+- Scaffolds stand 0.8 m off their walls, so none got ties until the filter allowed 1.5 m.
+- Two sessions on different branches rewrite the shared texture library cache in turn
+  (`~/.cache/cybergen/assetgen_library`, a few minutes each time); builds here used a
+  folder of their own (`ASSETGEN_LIBRARY`).
+
+**Exporter**: as `unreal_export.md` ("From AG3: street fronts, doors and decals"):
+`citygen/unreal.py` (`fallback_full` in the mesh record and its hash, an entry's own `ids`
+and `level` on its actor, door tags, `doors_of` and the `doors` flat graph) and
+`citygen/ue/import_city.py` (the Nanite fallback at every triangle, `cg.door=` tags);
+`tests/test_unreal.py::test_stage2_takes_assetgen_fronts`. Unreal check: the coordinating
+session's call.
+
+**Open.** Shell vertex colors for grime and edge wear are not written (the masters draw grime
+from the ground by the building's dirt height, CPD, and read no vertex colors; COLOR_0 on
+every slot and both masters would change), and frames, sills and seals map their sets by
+UV0 in meters, not trim-sheet strips (a master path without the per-building UV offset is
+needed): AG9, or a follow-up of AG6. Awnings stay AG8's props (their posts collide as AG8's
+props do). Doors the city puts against a neighbor or before a road without a sidewalk are
+reported, for the city to change. On a slope a building's front stands at its base (the
+main entrance's ground), so on the downhill side its shopfronts sit over the blank plinth
+down to the lowest ground, and AG8's awnings there hang on the plinth: AG5 steps the
+plinths and the band with them. Buildings on a deck have their fronts on the slab (AG10
+does the rest). Mac = x86 waits for the deferred determinism check.
 
 ## AG6: materials and textures
 
@@ -697,6 +852,25 @@ again while a freshly streamed cell's collision comes in. Results:
   (the props' and signs' materials, the new sets), and `golden_streets.json`'s `all` and
   `ag1.testport_files` (every contribution carries the library's version and hash); every
   street and building pack and the library's pixels are unchanged.
+
+**Seen from below** (a fix after AG3's street close-ups: some awnings showed only their
+frames). The canvas was there and opaque, but drawn as a single sheet facing up, and the
+stage 2 masters are one-sided (two-sided only for foliage, leaf cards and translucent
+ones), so from the street it was a back face; AG8's Blender preview, keeping the glTF
+importer's one-sided materials, culled it the same way. Fixed in the meshes:
+- `shapes.blk` boxes are closed (a bottom by default: flat and glass awnings, sign boxes,
+  lamp heads, kiosk roofs; 3% more triangles in the variants);
+- `shapes.sheet` draws a sheet and its underside 4 mm under it (moved straight down unless
+  upright, so a corrugation stays closed): corrugated and tiled awnings, the sloped bus
+  shelter roof, the kiosk pavilion and container stall roofs, dumpster lids, signal visors,
+  scaffolding boards and the market gate's roof;
+- the curved bus shelter roof had both layers facing the wrong way (its arc runs the
+  other way from the barrel awning's), the cart umbrella's underside faced up, and two lamp
+  shades (davit street lights, a wall light) were drawn inside out (profiles top-down).
+Tests: every awning variant has a canvas over its whole footprint, seen from below and
+above, in an opaque material; rays straight up under every variant meet a front face first
+(boats and litter left out). Vesper Bay: 2.57 M unique props triangles (2.48 M before),
+every check passing; a close-up in `docs/progress/AG8/textures/`. No exporter change.
 
 **Open.** Plants and signs have no collision (trunk capsules later). Lawns, hedges and green
 roofs stay the blockout's green areas. Sign faces are opaque emissive, so only holo-ads are

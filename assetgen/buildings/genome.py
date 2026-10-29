@@ -25,6 +25,12 @@ building the massing articulation (corner cut and size, setback ledge, podium ca
 arcade under a cantilevered first floor) and an irregularity rate that scales what grime
 and low wealth add (boarded and blocked windows, AC units, grilles, replaced frames,
 closed-in balconies, dishes).
+
+AG3 adds per building its street front (`front_*`, by the era's weights,
+`systems.FRONT`): the shopfront frame (aluminum, painted, steel, timber), the riser, the
+main door's leaves and recess, the steps up to it, the fascia over the shopfronts and how
+often its shops have roll-up shutters; each unit then draws its own paint, glazing and door
+side from its index (`fronts.py`).
 """
 
 from __future__ import annotations
@@ -33,7 +39,7 @@ import hashlib
 
 from . import systems as SY
 
-GENOME_VERSION = 2
+GENOME_VERSION = 3
 SALT = "ag1.genome"
 GROUPS = ("base", "body", "top")
 GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay_m", "wwr",
@@ -42,11 +48,14 @@ GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay
                "member_m", "pod_m")
 BUILDING_GENES = ("ground", "crown", "corner", "finish", "base", "wall", "trim", "glass",
                   "roof", "mech_every", "cut", "cut_m", "setback", "setback_at",
-                  "setback_m", "canopy", "canopy_m", "arcade", "arcade_m", "irreg")
+                  "setback_m", "canopy", "canopy_m", "arcade", "arcade_m", "irreg",
+                  "front_frame", "front_riser", "front_door", "front_steps", "front_fascia",
+                  "front_paint")
 CONTINUOUS = ("bay_m", "wwr", "sill_m", "head_m", "reveal_m", "corner_m", "cornice_m",
               "parapet_m", "band_m", "open_p", "patch_w", "patch_h", "wear", "dirt_m",
               "wall_v", "wall_w", "trim_v", "roof_v", "balcony_m", "fin_m", "member_m",
-              "pod_m", "cut_m", "setback_at", "setback_m", "canopy_m", "arcade_m", "irreg")
+              "pod_m", "cut_m", "setback_at", "setback_m", "canopy_m", "arcade_m", "irreg",
+              "front_recess_m", "front_shutter")
 # what one unit of genome distance is for a continuous gene (a clearly visible change)
 SCALE = {"bay_m": 0.3, "wwr": 0.08, "sill_m": 0.15, "head_m": 0.15, "reveal_m": 0.05,
          "corner_m": 0.25, "cornice_m": 0.15, "parapet_m": 0.2, "band_m": 0.05,
@@ -54,7 +63,7 @@ SCALE = {"bay_m": 0.3, "wwr": 0.08, "sill_m": 0.15, "head_m": 0.15, "reveal_m": 
          "wear": 0.25, "dirt_m": 2.0, "wall_v": 0.06, "wall_w": 0.04, "trim_v": 0.06,
          "roof_v": 0.06, "balcony_m": 0.25, "fin_m": 0.12, "member_m": 0.12, "pod_m": 0.1,
          "cut_m": 0.6, "setback_at": 0.1, "setback_m": 0.8, "canopy_m": 0.3,
-         "arcade_m": 0.5, "irreg": 0.3}
+         "arcade_m": 0.5, "irreg": 0.3, "front_recess_m": 0.2, "front_shutter": 0.3}
 LIT_BY_USE = {"residential": 0.35, "hotel": 0.45, "office": 0.6, "retail": 0.5,
               "civic": 0.4, "industrial": 0.15, "parking": 0.05}
 
@@ -233,6 +242,17 @@ def make(brief: dict) -> dict:
                             ("setback_m", (1.5, 4.0), 0.1), ("canopy_m", (1.0, 1.5), 0.1),
                             ("arcade_m", (1.5, 3.0), 0.1)):
         cont[gene] = draw(fkey, gene, rng[0], rng[1], step, salt)
+    # AG3: the street front by the era's weights
+    fr = SY.FRONT.get(spec.get("era") or "", SY.FRONT_DEFAULT)
+    genes["front_frame"] = pick(fkey, "front.frame", SY.FRAMES_FRONT, fr["frame"], salt)
+    genes["front_riser"] = pick(fkey, "front.riser", SY.RISERS, fr["riser"], salt)
+    genes["front_door"] = pick(fkey, "front.door", ("glass", "panel"), (0.65, 0.35), salt)
+    genes["front_steps"] = pick(fkey, "front.steps", (0, 1, 2), fr["steps"], salt)
+    genes["front_fascia"] = pick(fkey, "front.fascia", ("plate", "none"), (0.75, 0.25), salt)
+    genes["front_paint"] = pick(fkey, "front.paint", fr["paints"], None, salt)
+    cont["front_recess_m"] = draw(fkey, "front.recess_m", 0.45, 0.9, 0.05, salt)
+    cont["front_shutter"] = quant(min(fr["shutter"] * (0.5 + u(fkey, "front.shutter", salt)),
+                                      1.0), 0.05)
     # colors: the era's palette (a landmark's own), an owner's brand colors over it
     pal = list((spec.get("landmark") or {}).get("palette") or era_style.get("palette") or
                ["#8c8a86"])
@@ -355,6 +375,16 @@ def effective(genome: dict, used: dict) -> dict:
     if used.get("dado"):
         out["dado"] = genes["dado"]
         out["dado_m"] = cont["dado_m"]
+    fr = used.get("front") or {}
+    for gene in ("front_frame", "front_riser", "front_paint", "front_fascia"):
+        if fr.get("shops"):
+            out[gene] = genes[gene]
+    if fr.get("shops"):
+        out["front_shutter"] = cont["front_shutter"]
+    if fr.get("main"):
+        out["front_door"] = genes["front_door"]
+        out["front_steps"] = genes["front_steps"]
+        out["front_recess_m"] = cont["front_recess_m"]
     for gene in ("wear", "dirt_m", "wall_v", "wall_w", "roof_v"):
         out[gene] = cont[gene]
     return out

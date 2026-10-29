@@ -55,12 +55,14 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag2.8"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag3.5"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
          "spec_sha256", "briefs_sha256", "buildings", "tiles")
 MAX_WORKERS = 4
+DECAL_OFF_MM = 10              # AG3: a decal quad stands this far off its wall (mesh decals)
+DECAL_UV = (0.004, 0.996)      # its atlas cell's own UVs, inset so it never reads a neighbor
 # the files a build delivers besides its packs (the report holds timings, so it is not one)
 DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json")
 
@@ -145,12 +147,33 @@ def _part_rec(x: dict) -> dict:
                         PT.yaw_deg(a[3], a[4])] for a in x["at"]]}
 
 
+def _doors(sh: dict) -> list[dict]:
+    """A building's doors in meters (its frame): AG3's records for the access check, the
+    contribution and stage 4."""
+    out = []
+    for d in sh["doors"]:
+        out.append({"id": d["id"], "kind": d["kind"], "entrance": d["entrance"],
+                    "unit": d["unit"], "use": d["use"], "walkway_id": d["walkway_id"],
+                    "position": [C.m(d["pos"][0] / 1000.0), C.m(d["pos"][1] / 1000.0),
+                                 C.m(d["pos"][2] / 1000.0)],
+                    "normal": d["normal"], "width_m": C.m(d["w"] / 1000.0),
+                    "height_m": C.m(d["h"] / 1000.0), "depth_m": C.m(d["depth"] / 1000.0),
+                    "steps": d["steps"], "flush": d["flush"], "moved": bool(d.get("moved")),
+                    "class": d["class"]})
+    return sorted(out, key=lambda d: d["id"])
+
+
 def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
-    """(shell result, proxy result, record) of one building."""
+    """(shell result, proxy result, record) of one building. AG3: the shell result's
+    `shell` and `front` are its two meshes' arrays (the ground band, layer 1, apart)."""
     sh = SH.build(brief, gm)
     arrs = sh["arrays"]
+    sh["shell"], sh["front"] = MB.split(arrs)
     px = PX.build(brief)
-    ck = MB.check(arrs)
+    ck = MB.check(sh["shell"])
+    ckf = MB.check(sh["front"])
+    for key in ("triangles", "degenerate", "duplicate", "open_edges", "bad_edges", "parts"):
+        ck[key] += ckf[key]
     ck["uv0"] = True
     inst = sh["parts"]
     env = EN.check(brief, arrs, EN.part_points(inst))
@@ -162,6 +185,8 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     st = dict(sh["stats"])
     st["roof_m2"] = round(_area_m2(arrs, "roof"), 2)
     st["bays_s11"] = round(_bays_s11(brief), 2)
+    st["units"] = len(brief["units"])
+    st["decals"] = len(sh.get("decals", []))
     rec = {
         "kind": "building", "type": brief["building"]["type"],
         "district": (brief.get("district") or {}).get("id"),
@@ -171,17 +196,24 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "triangles": int(sum(len(a["tri"]) for a in arrs.values())),
         "slots": {k: int(len(a["tri"])) for k, a in arrs.items()},
         "proxy": {"triangles": int(px["triangles"])},
-        "collision": CO.build(brief),
+        "collision": CO.build(brief, sh["band_m"]),
+        "front": {"triangles": int(sum(len(a["tri"]) for a in sh["front"].values())),
+                  "slots": {k: int(len(a["tri"])) for k, a in sh["front"].items()},
+                  "band_m": sh["band_m"]},
+        "doors": _doors(sh),
         "tints": tints, "cpd": _cpd(gm, tints),
         "family": gm["family"], "genes": GN.effective(gm, sh["used"]),
         "bay_m": gm["cont"]["body.bay_m"],
         "floor_m": float(brief["building"]["floor_grid"]["floor_height_m"]),
         "stats": st, "masses": sh["masses"],
-        "checks": {"mesh": ck, "envelope": env},
+        "checks": {"mesh": ck, "envelope": env, "mounts": sh["checks"]["mounts"],
+                   "doors": sh["checks"]["access"]},
         "parts": [_part_rec(x) for x in inst],
         "instances": int(sum(len(x["at"]) for x in inst)),
         "part_triangles": int(sum(x["triangles"] for x in inst)),
     }
+    if brief["building"]["floor_grid"].get("level"):
+        rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
     rec["class"] = AC.budget_class(rec)
     return sh, px, rec
@@ -207,8 +239,11 @@ def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
     pm = [(x, PT.mesh(x["family"], x["params"])) for x in sh["parts"]]
     g = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     mats = _materials(g, sorted(set(sh["arrays"]) | {s for _, (_, a) in pm for s in a}))
-    mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats))
+    mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["shell"], mats))
     kids = [g.node(f"{bid}.shell", mesh=mesh, extras=_node_extras(bid, rec))]
+    if sh["front"]:
+        fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats))
+        kids.append(g.node(f"{bid}.front", mesh=fm, extras=_node_extras(bid, rec)))
     for x, (b, arrs) in pm:
         m = g.mesh(x["node"], b.primitives(arrs, mats))
         for k, a in enumerate(x["at"]):
@@ -216,6 +251,60 @@ def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
                                rotation=G.quat_z(PT.yaw_deg(a[3], a[4]))))
     g.node(bid, children=kids, root=True)
     return g.to_glb()
+
+
+def decal_slot(cell: str) -> str:
+    return f"decal.{cell}"
+
+
+def _decal_mesh(g: G.Gltf, tile: str, made: list) -> dict | None:
+    """AG3's decals of a tile's buildings (grime, leaks, rust, graffiti, posters, cracks,
+    moss on their street bands) as one mesh of quads at the tile's middle, a primitive per
+    decal atlas cell (slot `decal.<cell>`, UV0 0 to 1 over the quad, v down): mesh decals
+    in Unreal, alpha quads in Blender. Its record: node, count, slots, translation."""
+    by: dict[str, list] = {}
+    for bid, brief, sh, _, _ in made:
+        piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
+               int(round(_base_m(brief) * 1000)))
+        for d in sh.get("decals", []):
+            by.setdefault(d["cell"], []).append((piv, d))
+    if not by:
+        return None
+    ix, iy = int(tile[1:4]), int(tile[4:7])
+    o = (int((ix + 0.5) * TILE_M * 1000), int((iy + 0.5) * TILE_M * 1000), 0)
+    a0, a1 = DECAL_UV
+    prims, slots, n = [], {}, 0
+    for cell in sorted(by):
+        pos, nrm, uv, idx = [], [], [], []
+        for piv, d in by[cell]:
+            nx, ny = d["normal"]
+            tx, ty = -ny, nx                     # along the wall, left to right seen from out
+            cx = piv[0] + d["pos"][0] + nx * DECAL_OFF_MM - o[0]
+            cy = piv[1] + d["pos"][1] + ny * DECAL_OFF_MM - o[1]
+            cz = piv[2] + d["pos"][2]
+            hw, hh = d["w"] / 2.0, d["h"] / 2.0
+            k = len(pos)
+            for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                pos.append((int(round(cx + su * hw * tx)), int(round(cy + su * hw * ty)),
+                            int(round(cz + sv * hh))))
+                nrm.append((nx, ny, 0.0))
+                uv.append((a0 if su < 0 else a1, a1 if sv < 0 else a0))
+            idx += [k, k + 1, k + 2, k, k + 2, k + 3]
+            n += 1
+        name = decal_slot(cell)
+        mi = g.material(name, (1.0, 1.0, 1.0, 1.0), 0.0, 0.8,
+                        extras={"slot": name, "master": "decal", "cell": cell})
+        prims.append(G.Primitive(material=mi, positions=np.array(pos, dtype=np.int64),
+                                 indices=np.array(idx, dtype=np.int64),
+                                 normals=np.array(nrm, dtype=np.float64),
+                                 uv0=np.array(uv, dtype=np.float64)))
+        slots[name] = len(by[cell])
+    node = f"decals.{tile}"
+    m = g.mesh(node, prims, extras={"kind": "decals"})
+    g.node(node, mesh=m, translation=o, root=True,
+           extras={"cg": {"key": node, "kind": "decals", "tile": tile}})
+    return {"node": node, "count": n, "slots": slots,
+            "translation": [C.m(o[0] / 1000.0), C.m(o[1] / 1000.0), 0.0]}
 
 
 def tile_job(job: dict) -> dict:
@@ -256,10 +345,16 @@ def tile_job(job: dict) -> dict:
         piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
                int(round(_base_m(brief) * 1000)))
         ex = _node_extras(bid, rec)
-        mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats),
+        mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["shell"], mats),
                       extras={"kind": "shell"})
-        child = g.node(f"{bid}.shell", mesh=mesh, extras=ex)
-        g.node(bid, translation=piv, children=[child], root=True,
+        kids = [g.node(f"{bid}.shell", mesh=mesh, extras=ex)]
+        if sh["front"]:
+            # AG3: the street front, its own mesh (Unreal collides it as drawn)
+            fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats),
+                        extras={"kind": "front"})
+            kids.append(g.node(f"{bid}.front", mesh=fm, extras=ex))
+            rec["front"]["node"] = f"{bid}.front"
+        g.node(bid, translation=piv, children=kids, root=True,
                extras={"cg": {"key": bid, "kind": "building", "type": rec["type"]}})
         pm = gp.mesh(f"{bid}.proxy", px["buf"].primitives(px["arrays"], pmats),
                      extras={"kind": "proxy"})
@@ -270,6 +365,7 @@ def tile_job(job: dict) -> dict:
         rec["tile"] = job["tile"]
         if rec["parts"]:
             rec["parts_glb"] = f"parts/{job['tile']}.glb"
+    decals = _decal_mesh(g, job["tile"], made)
     shells = g.to_glb()
     proxies = gp.to_glb()
     wrote = 0
@@ -286,6 +382,8 @@ def tile_job(job: dict) -> dict:
         records[bid] = rec
     files = {"tiles": {"bytes": len(shells), "sha256": C.sha256_bytes(shells)},
              "proxies": {"bytes": len(proxies), "sha256": C.sha256_bytes(proxies)}}
+    if decals is not None:
+        files["decals"] = decals
     if parts_glb is not None:
         files["parts"] = {"bytes": len(parts_glb), "sha256": C.sha256_bytes(parts_glb),
                           "meshes": part_checks["parts"],
@@ -372,7 +470,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     for t in keep:
         for bid in tiles[t]:
             records[bid] = old_b[bid]
-        files[t] = {k: old_tiles[t][k] for k in ("tiles", "proxies", "parts")
+        files[t] = {k: old_tiles[t][k] for k in ("tiles", "proxies", "parts", "decals")
                     if old_tiles[t].get(k) is not None}
     jobs = [{"tile": t, "out": str(out),
              "items": [(bid, briefs[bid], genomes[bid]) for bid in tiles[t]]} for t in todo]
@@ -395,9 +493,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     lib = MS.library_for(spec_doc, out, log=log) if textures else None
     k = int(spec_doc["min_gene_distance"])
     tile_parts = {t: files[t].get("parts") for t in sorted(files)}
+    acc = AC.access(model, records, briefs)
     checks = [AC.coverage(model, records), AC.envelope(records),
               AC.meshes(records, tile_parts), AC.unique(records, k),
-              AC.budget(records, tile_parts)]
+              AC.budget(records, tile_parts), acc, AC.mounts(records)]
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,

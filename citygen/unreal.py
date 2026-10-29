@@ -320,11 +320,40 @@ def _walk_line(w: dict, line: list, absolute: bool) -> list:
     return [list(p) for p in line]
 
 
-def flat_graphs(graphs: dict, walk_lines: dict | None = None) -> dict:
+def doors_of(contribs: list) -> list[dict]:
+    """Stage 2's doors (AG3: the street fronts' entries) as graph elements: id, kind (the
+    entrance's, or `shop.<use>`), ref the walkway it opens to, width, its point (the
+    threshold's middle on the facade, z over the building's pivot), attrs (building,
+    entrance or unit index, outward yaw, height, flush, where its walkway came from)."""
+    out = []
+    for _, c, _ in contribs:
+        for e in c.get("entries", []):
+            px, py, pz = (float(v) for v in e.get("pivot", [0.0, 0.0, 0.0]))
+            bid = (e.get("ids") or [e["key"]])[0]
+            for d in e.get("doors") or []:
+                x, y, z = d["position"]
+                nx, ny = d["normal"]
+                kind = d["kind"] if d["kind"] != "shop" else f"shop.{d.get('use') or 'unit'}"
+                attrs = {"building": bid, "yaw": round(math.degrees(math.atan2(ny, nx)), 2),
+                         "height": d["height_m"], "flush": bool(d.get("flush"))}
+                for k in ("entrance", "unit", "walkway_from"):
+                    if d.get(k) is not None:
+                        attrs[k] = d[k]
+                out.append({"id": d["id"], "kind": kind, "ref": d.get("walkway_id") or "",
+                            "width": d["width_m"],
+                            "points": [[round(px + x, 3), round(py + y, 3),
+                                        round(pz + z, 3)]],
+                            "attrs": attrs, "level": e.get("level", 0)})
+    return sorted(out, key=lambda d: d["id"])
+
+
+def flat_graphs(graphs: dict, walk_lines: dict | None = None,
+                doors: list | None = None) -> dict:
     """graphs.json (M4 exports) as three flat graphs: lanes (lanes and junction connectors,
     linked to their successors), walkways (linked to their neighbors) and transit (lines
     and stations, linked to each other). `walk_lines`: stage 2's walkway lines by id, used
-    over graphs.json's."""
+    over graphs.json's; `doors` (AG3, `doors_of`): a fourth graph, the doors, each with the
+    walkway it opens to as its ref."""
     lanes = [{"id": x["id"], "kind": x["kind"], "ref": x["segment_id"] or x["node_id"],
               "width": x["width_m"], "points": x["centerline"], "links": x["successors"],
               "attrs": {"forward": x["forward"], "index": x["index"],
@@ -348,6 +377,8 @@ def flat_graphs(graphs: dict, walk_lines: dict | None = None) -> dict:
                         "links": s.get("line_ids", []),
                         "attrs": {"building_id": s.get("building_id")}})
     out = {"lanes": _flat(lanes), "walkways": _flat(walks), "transit": _flat(transit)}
+    if doors:
+        out["doors"] = _flat(doors)        # (AG3: a door per entrance and unit, stage 4's)
     for g in out.values():
         g["hash"] = content_hash(g)
     return out
@@ -532,7 +563,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             sha_of[glb] = hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
         return sha_of[glb]
 
-    def mesh(pk, node, h, collision, nanite, shape=None):
+    def mesh(pk, node, h, collision, nanite, shape=None, fallback=False):
         a = asset_name(node)
         pk["meshes"][a] = {"asset": a, "hash": content_hash([h, node, collision, nanite]),
                            "collision": collision, "nanite": nanite}
@@ -540,6 +571,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             # (AG8's plants: Nanite foliage, `voxelize`, AG0)
             pk["meshes"][a]["shape_preservation"] = shape
             pk["meshes"][a]["hash"] = content_hash([h, node, collision, nanite, shape])
+        if fallback:
+            # (AG3's street fronts: complex collision is built from the Nanite fallback, so
+            # it keeps every triangle and doorways and steps collide as drawn)
+            pk["meshes"][a]["fallback_full"] = True
+            pk["meshes"][a]["hash"] = content_hash([h, node, collision, nanite, "full"])
         return f"{pk['folder']}/{a}", pk["meshes"][a]["hash"]
 
     for rel, c, sha in contribs:
@@ -624,7 +660,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 chains.append({"mesh": path, "hash": h, "lods": lods, "collision": collision})
             elif e.get("node") and e.get("triangles", 0) > 0:
                 path, h = mesh(pack(part, e["glb"], "mesh"), e["node"], e["hash"], collision,
-                               nanite)
+                               nanite, fallback=bool(e.get("fallback_full")))
             if e.get("proxy"):
                 px = e["proxy"]
                 mesh(pack(part, px["glb"], "proxy"), px["node"], e["hash"], {"none": True},
@@ -638,9 +674,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     "type": tags.get("cg.type") or e["kind"], "tile": tile,
                     "district": (tags.get("cg.district") or (first[1]["district"] if first
                                                              else "") or _district(k, {})),
-                    "ids": bo[1]["ids"] if bo else [k]}
+                    "ids": e.get("ids") or (bo[1]["ids"] if bo else [k])}
             if first and first[1].get("level"):
                 base["level"] = first[1]["level"]
+            elif e.get("level"):
+                base["level"] = e["level"]          # (AG3: a street front on a deck)
             pivot = [float(v) for v in e.get("pivot", [0.0, 0.0, 0.0])]
             yaw = float(e.get("yaw_deg", 0.0))
             made = False
@@ -653,6 +691,9 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                                       for slot, m in sorted(e["materials"].items())}
                 if "none" in collision:
                     a["no_collision"] = True
+                if e.get("doors"):
+                    # (AG3: the doors of a street front, tagged on its actor for stage 4)
+                    a["doors"] = [f"{d['id']}@{d.get('walkway_id') or ''}" for d in e["doors"]]
                 a["hash"] = content_hash([a, h])
                 actors.append(a)
                 made = True
@@ -775,7 +816,7 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     graphs = None
     if (build / "graphs.json").is_file():
         graphs = flat_graphs(json.loads((build / "graphs.json").read_text(encoding="utf-8")),
-                             walk_lines(contribs))
+                             walk_lines(contribs), doors_of(contribs))
     man = {
         "version": MANIFEST_VERSION, "generator": "citygen unreal (M15)",
         "city": city, "slug": slug(city), "folder": pascal(city),
@@ -869,9 +910,10 @@ def write_manifest(build_dir: str | Path, name: str | None = None,
     write_glb(meshes, man["materials"], out / "prototypes.glb")
     if graphs is not None:
         (out / "graphs.json").write_text(json.dumps(graphs, separators=(",", ":")) + "\n",
-                                         encoding="utf-8")
+                                         encoding="utf-8", newline="\n")
     path = out / "manifest.json"
-    path.write_text(json.dumps(man, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(man, indent=1, ensure_ascii=False) + "\n",
+                    encoding="utf-8", newline="\n")
     return path
 
 
@@ -916,7 +958,7 @@ def prepare_project(uproject: str | Path) -> list[str]:
                 added.append(n)
     data["Plugins"] += [{"Name": n, "Enabled": True} for n in added if n not in have]
     if added:
-        p.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
+        p.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8", newline="\n")
     return added
 
 
@@ -993,7 +1035,7 @@ def new_project(dest: str | Path, root: Path | None = None,
     data = json.loads((tdir / f"{template}.uproject").read_text(encoding="utf-8-sig"))
     ver = json.loads((root / "Engine" / "Build" / "Build.version").read_text())
     data["EngineAssociation"] = f"{ver['MajorVersion']}.{ver['MinorVersion']}"
-    up.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
+    up.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8", newline="\n")
     prepare_project(up)
     return up
 
@@ -1004,7 +1046,7 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
     """Run `script` in the editor on `uproject` (headless commandlet, or the full editor for
     play-in-editor checks and renders) with the job in $CITYGEN_UE_JOB; the job's result."""
     job_path = log.with_suffix(".job.json")
-    job_path.write_text(json.dumps(job, indent=1) + "\n", encoding="utf-8")
+    job_path.write_text(json.dumps(job, indent=1) + "\n", encoding="utf-8", newline="\n")
     result_path = Path(job["result"])
     if result_path.exists():
         result_path.unlink()
@@ -1028,7 +1070,7 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
     res["exit_code"] = proc.returncode
     res["wall_s"] = round(time.time() - t, 1)     # the editor's start and quit included
     res["log"] = str(log)
-    result_path.write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+    result_path.write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8", newline="\n")
     return res
 
 
@@ -1065,7 +1107,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     if res.get("ok") and startup:
         res["startup_map_changed"] = set_startup_map(up, res["level"])
         res["startup_map"] = res["level"]
-        Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+        Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n",
+                                       encoding="utf-8", newline="\n")
     return res
 
 
@@ -1121,7 +1164,8 @@ def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None 
            # the builder looks at every HLOD actor and rebuilds those whose input changed
            "rebuilt": text.count("final decision: ApproveRebuild"),
            "wall_s": round(time.time() - t, 1), "log": str(log)}
-    (out / "hlod_result.json").write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+    (out / "hlod_result.json").write_text(json.dumps(res, indent=1) + "\n",
+                                          encoding="utf-8", newline="\n")
     return res
 
 

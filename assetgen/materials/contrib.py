@@ -42,7 +42,9 @@ def buildings(con: dict, man: dict, lib: dict | None) -> dict:
     base = con["materials"]
     used: set[tuple[str, str]] = set()
     for e in con["entries"]:
-        r = man["buildings"].get(e["key"]) or {}
+        # (AG3: a street front takes its building's materials and parameters)
+        bid = e["ids"][0] if e.get("kind") == "building.front" else e["key"]
+        r = man["buildings"].get(bid) or {}
         mat = r.get("material")
         if mat is None:
             continue

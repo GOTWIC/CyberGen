@@ -4,8 +4,9 @@ briefs, the shells, the spike or the triangulator, and say why in the PR):
     .venv/bin/python tests/assetgen/goldens.py [--builds DIR]
 
 With --builds, the sample models are read from DIR/<city>/city_model.json (each must have
-citygen's golden sha256) instead of being built. With --sections ag1 ag6, only those
-sections are made again (the rest kept from the file).
+citygen's golden sha256) instead of being built. With --sections ag1 ag6 vesper, only those
+sections are made again (the rest kept from the file; `vesper`: the Vesper Bay buildings'
+GLB goldens of ag1).
 """
 
 import argparse
@@ -79,7 +80,7 @@ AG6_FILES = ("materials.json", "signs.json", "unreal_contribution.materials.json
 def ag1_section() -> dict:
     base = small_assets()
     a = base / "assets"                    # the building packs (streets, props: their own)
-    tree = {str(p.relative_to(a)): C.sha256_bytes(p.read_bytes())
+    tree = {p.relative_to(a).as_posix(): C.sha256_bytes(p.read_bytes())
             for p in sorted(a.rglob("*")) if p.is_file() and
             ((p.suffix == ".glb" and p.parent.parent == a and
               p.parent.name in ("tiles", "proxies", "parts")) or
@@ -98,10 +99,20 @@ def ag6_section() -> dict:
                                             for f in AG6_FILES})}
 
 
+def vesper_shells(model, res) -> dict:
+    """AG1's Vesper Bay buildings, one per kind, as GLB bytes (shell and instanced parts)."""
+    shells = {}
+    for kind in AG1_KINDS:
+        ids = sorted(b.id for b in model.buildings if b.type.startswith(kind))
+        if ids:
+            shells[ids[0]] = C.sha256_bytes(BD.building_glb(ids[0], res["briefs"][ids[0]]))
+    return dict(sorted(shells.items()))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--builds", type=Path)
-    ap.add_argument("--sections", nargs="*", help="only these sections (ag1, ag6)")
+    ap.add_argument("--sections", nargs="*", help="only these sections (ag1, ag6, vesper)")
     args = ap.parse_args()
     if args.sections:
         out = json.loads(GOLDEN.read_text(encoding="utf-8"))
@@ -109,6 +120,10 @@ def main():
             out["ag1"].update(ag1_section())
         if "ag6" in args.sections:
             out["ag6"] = ag6_section()
+        if "vesper" in args.sections:
+            path = next(p for p in CITIES if p.parent.name == "vesper_bay")
+            model, _ = model_of(path, args.builds)
+            out["ag1"]["buildings"]["vesper_bay"] = vesper_shells(model, B.build_briefs(model))
         GOLDEN.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(f"wrote {GOLDEN} ({', '.join(args.sections)})")
         return
@@ -142,13 +157,7 @@ def main():
             if sky:
                 pick[sky[0]] = B.brief_hash(res["briefs"][sky[0]])
             out["buildings"]["vesper_bay"] = dict(sorted(pick.items()))
-            shells = {}
-            for kind in AG1_KINDS:
-                ids = sorted(b.id for b in model.buildings if b.type.startswith(kind))
-                if ids:
-                    shells[ids[0]] = C.sha256_bytes(BD.building_glb(ids[0],
-                                                                   res["briefs"][ids[0]]))
-            out["ag1"]["buildings"]["vesper_bay"] = dict(sorted(shells.items()))
+            out["ag1"]["buildings"]["vesper_bay"] = vesper_shells(model, res)
         print(path.parent.name, out["samples"][path.parent.name], flush=True)
     with tempfile.TemporaryDirectory() as d:
         rep = SP.write_spike(d, quantized=True, which=("shopfront_row", "shanty_stack"))

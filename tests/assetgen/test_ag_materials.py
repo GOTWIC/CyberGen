@@ -176,13 +176,18 @@ def test_materials_stage_on_the_small_city():
     rep = small_assets_report()
     assert rep["materials"]["ok"], rep["materials"]
     a = base / "assets"
-    assert (a / "library").is_symlink() and (a / "library" / "library.json").is_file()
+    lib = a / "library"
+    assert (lib.is_symlink() or lib.is_junction()) and (lib / "library.json").is_file()
     man = json.loads((a / "manifest.json").read_text())
     con = json.loads((a / "unreal_contribution.buildings.json").read_text())
     for name, t in con["textures"].items():
         assert (a / t["file"]).is_file(), name
     for e in con["entries"]:
-        r = man["buildings"][e["key"]]
+        if e["kind"] == "decals":
+            assert all(con["materials"][s]["master"] == "decal" for s in e["slots"])
+            continue
+        # (AG3: a street front takes its building's parameters)
+        r = man["buildings"][e["ids"][0] if e["kind"] == "building.front" else e["key"]]
         assert len(e["cpd"]) == SY.CPD_SIZE + 7 and e["cpd"][SY.CPD_SIZE:] == \
             r["material"]["cpd"]
         for slot, key in (e.get("materials") or {}).items():

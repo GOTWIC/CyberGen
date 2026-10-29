@@ -1249,8 +1249,22 @@ class Importer:
                                        NEVER)
         ns = sm.get_editor_property("nanite_settings")
         shape = rec.get("shape_preservation")
-        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape:
+        full = rec.get("fallback_full")
+        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape or full:
             ns.set_editor_property("enabled", bool(rec["nanite"]))
+            if full:
+                # AG3's street fronts: complex collision is built from the fallback mesh, so
+                # the fallback keeps every triangle (doorways, steps and posts as drawn)
+                tgt = getattr(unreal, "NaniteFallbackTarget", None)
+                for k, v in (("fallback_target", getattr(tgt, "PERCENT_TRIANGLES", None)),
+                             ("fallback_percent_triangles", 1.0),
+                             ("fallback_relative_error", 0.0)):
+                    if v is None:
+                        continue
+                    try:
+                        ns.set_editor_property(k, v)
+                    except Exception as ex:     # (a property this engine version lacks)
+                        log(f"nanite {k}: {ex}")
             if shape:
                 # AG8's plants: Nanite foliage (5.8, experimental; AG0 built its test tree so)
                 sp = getattr(getattr(unreal, "NaniteShapePreservation", None),
@@ -1460,8 +1474,11 @@ class Importer:
                         c.set_material(i, mi)
                 if r.get("no_collision"):
                     c.set_collision_profile_name("NoCollision")
+                # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's)
+                doors = [unreal.Name(f"cg.door={d}") for d in r.get("doors", [])]
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
-                                   r["tile"], r["district"], r.get("level", 0)) + [stage]
+                                   r["tile"], r["district"], r.get("level", 0)) + [stage] + \
+                    doors
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)

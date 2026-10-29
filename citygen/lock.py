@@ -49,7 +49,8 @@ def make(build_dir, release: str | None = None) -> dict:
 def write(lock: dict, path) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(lock, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    p.write_text(json.dumps(lock, indent=2, ensure_ascii=False) + "\n",
+                 encoding="utf-8", newline="\n")
     return p
 
 

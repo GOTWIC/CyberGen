@@ -46,13 +46,14 @@ from citygen import dmath as M
 
 from ..triangulate import TriangulationError, triangulate
 from . import articulate as AR
+from . import fronts as FR
 from . import genome as GN
 from . import parts as PT
 from . import rings as RG
 from . import systems as SY
 from .meshbuf import Buf
 
-NO_WINDOW = ("party", "hidden")
+NO_WINDOW = ("party", "hidden", "firewall")
 STRIP_MIN_Z = 3000           # strips that leave the footprint stay this high (sidewalks)
 PIER_MIN = 75
 GAP_MIN = 60                 # between openings
@@ -74,6 +75,13 @@ def _u(bid: str, purpose: str) -> float:
     return GN.u(bid, purpose, "ag1.shell")
 
 
+def ground_mm(brief: dict) -> int:
+    """Where the building's street front stands, over its pivot: 0, or for a building on an
+    M14 deck (`floor_grid.level`) the deck's top."""
+    fg = brief["building"]["floor_grid"]
+    return int(round(float(fg.get("deck_m") or 0.0) * 1000)) if fg.get("level") else 0
+
+
 def plinth_mm(brief: dict) -> int:
     """How far a building on M13's slopes reaches under its base: from its base (mass z 0,
     the ground floor at the main entrance) down to the lowest ground under its footprint
@@ -89,7 +97,7 @@ class Facade:
     """One mass edge: a -> b (mm), outward to the right; s along it in mm, 0..L; `soff` the
     s of its start along the brief edge it lies on (a cut or a setback moves it)."""
     __slots__ = ("a", "b", "L", "ux", "uy", "nx", "ny", "j", "u0", "rec", "c0", "c1",
-                 "regions", "soff")
+                 "regions", "soff", "d_in", "d_nx", "reveal", "podium")
 
     def __init__(self, a, b, u0: float):
         self.a, self.b = a, b
@@ -100,6 +108,8 @@ class Facade:
         self.nx, self.ny = self.uy, -self.ux
         self.u0 = u0
         self.soff = 0
+        self.podium = False
+        self.reveal = 0
 
     def P(self, s: int, z: int) -> tuple[int, int, int]:
         L2 = 2 * self.L
@@ -380,6 +390,21 @@ class ShellBuilder:
             if at is not None:
                 self.units_by_edge.setdefault(at["edge"], []).append(un)
         self.mounts = self._mounts()
+        self.mounts_raw = self._mounts(0)
+        # AG3: the street fronts' doors, every opening cut (per brief edge, for the mounts
+        # check), the entrances and units given a door, the facades per brief edge
+        self.doors: list[dict] = []
+        self.decals: list[dict] = []
+        # (the ground the street front stands on: an M14 deck's top for a building on one)
+        self.ground = ground_mm(brief)
+        self.opened: dict[int, list] = {}
+        self.done_units: set[int] = set()
+        self.done_ents: set[int] = set()
+        self.band_facades: list[tuple] = []
+        self.all_facades: list[tuple] = []
+        self.checks: dict = {}
+        self.band_z: int | None = None
+        self.used["front"] = {}
         # AG2
         self.parts = PT.PartSet()
         self.marks = AR.marks(brief, self.units_by_edge)
@@ -391,7 +416,10 @@ class ShellBuilder:
 
     # -- what must fall on a panel -------------------------------------------------------
 
-    def _mounts(self) -> dict[int, list[tuple]]:
+    def _mounts(self, pad: int = MOUNT_PAD) -> dict[int, list[tuple]]:
+        """Per brief edge, (s0, s1, z0, z1) mm of everything that must hang on solid wall:
+        sign slots, mounted props (AG3: awnings too), facade plants, skybridge ends; `pad`
+        round each."""
         out: dict[int, list] = {}
         br = self.br
 
@@ -400,9 +428,8 @@ class ShellBuilder:
                 return
             s = int(round(at["s"] * 1000))
             out.setdefault(at["edge"], []).append(
-                (s - w // 2 - MOUNT_PAD, s + w // 2 + MOUNT_PAD,
-                 int(round(z * 1000)) - h // 2 - MOUNT_PAD, int(round(z * 1000)) + h // 2 +
-                 MOUNT_PAD))
+                (s - w // 2 - pad, s + w // 2 + pad,
+                 int(round(z * 1000)) - h // 2 - pad, int(round(z * 1000)) + h // 2 + pad))
         for s in br["sign_slots"]:
             if s["mount"] == "roof":
                 continue
@@ -411,7 +438,13 @@ class ShellBuilder:
         size = {"ac_unit": (1000, 800), "wall_light": (400, 400), "sign": (300, 1500),
                 "overhead_cable": (300, 300)}
         for p in br["props"]:
-            if not p["on_wall"] or p["kind"] not in size:
+            if not p["on_wall"]:
+                continue
+            if p["kind"] == "awning":
+                # (AG3) the awning's rail along its unit, on the fascia over the shopfront
+                add(p["at"], p["position"][2], int(p["scale"][0] * 1000), 300)
+                continue
+            if p["kind"] not in size:
                 continue
             w, h = size[p["kind"]]
             add(p["at"], p["position"][2], w, h)
@@ -447,6 +480,20 @@ class ShellBuilder:
         for j, e in enumerate(br["edges"]):
             edge_of[(e["mass"], e["ring"], e["i"])] = j
         self.edge_of = edge_of
+        # what of each brief edge the tidied rings keep (s spans in mm, before articulation):
+        # a mount off them stood on a stretch the tidying took away (`fronts.mount_check`)
+        kept: dict[int, list[tuple[float, float]]] = {}
+        for ms in masses:
+            for ring, eidx, rid in zip(ms["rings"], ms["eidx"], ms["rid"]):
+                for i in range(len(ring)):
+                    j = edge_of.get((ms["k"], rid, eidx[i]))
+                    if j is None:
+                        continue
+                    a0, ux, uy, _ = AR._edge_geom(br, j)
+                    s = [(p[0] - a0[0]) * ux + (p[1] - a0[1]) * uy
+                         for p in (ring[i], ring[(i + 1) % len(ring)])]
+                    kept.setdefault(j, []).append((min(s), max(s)))
+        self.kept = kept
         AR.articulate(self)
         masses = self.masses
         groups = set()
@@ -469,20 +516,30 @@ class ShellBuilder:
             for ms in masses:
                 if ms["z0"] <= 50 and ms["z1"] - ms["z0"] >= 50 and ms["shape"] != "ring" and \
                         len(RG.clean(ms["rings"][0])) >= 3:
+                    self.buf.layer = 1
                     self.buf.new_part()
                     if self._extrude(ms["rings"][0], None, -depth, 0, "structure"):
                         self.stats["plinths"] = self.stats.get("plinths", 0) + 1
+                    self.buf.layer = 0
         for it in br["roof_items"]:
             self._roof_item(it)
         self._mast()
         self._columns()
+        # AG3: doors for what no band could take, the mounts' hardware, blind and fire walls
+        FR.leftovers(self)
+        FR.hardware(self)
+        FR.walls(self)
+        self.checks = {"mounts": FR.mount_check(self), "access": FR.door_check(self)}
         self._finish_parts()
         self.used["groups"] = [g for g in GN.GROUPS if g in groups]
         self.used["trim"] = self.stats["strips"] > 0
         self.used["glass"] = self.stats["openings"] > 0
         arrs = self.buf.arrays()
         return {"buf": self.buf, "arrays": arrs, "stats": self.stats, "used": self.used,
-                "masses": self.mass_info, "parts": self.inst}
+                "masses": self.mass_info, "parts": self.inst, "doors": self.doors,
+                "decals": self.decals,
+                "band_m": None if self.band_z is None else self.band_z / 1000.0,
+                "checks": self.checks}
 
     def _unpinched(self, ext, holes) -> list[int]:
         """The ring numbers (1 on) of the courts that touch neither the exterior nor another
@@ -560,6 +617,18 @@ class ShellBuilder:
             g in ("base", "body") and ms["floors"] >= 3
         rows = mass_rows(ms, g, gm, is_top, ground, self.tall, self.parking, cornice_h,
                          doors)
+        # AG3: a mass on the ground has its street front (`fronts`) up to its first floor
+        # line; the rows above it are the shell's
+        band = FR.band_top(ms) if ms["z0"] <= self.ground + 50 and ms["shape"] == "prism" \
+            else None
+        ground_row = None
+        if band is not None:
+            # (a floor taller than the band keeps what lies over the band in the shell: a
+            # shed's clerestory)
+            ground_row = next((r for r in rows if r[5] < band and r[0] < band - 400), None)
+            rows = [r for r in rows if r[5] >= band or r[0] >= band]
+            ms["band"] = band
+            self.band_z = band if self.band_z is None else min(self.band_z, band)
         reveal = int(round(cont[f"{g}.reveal_m"] * 1000)) if sysname else 0
         corner = int(round(cont[f"{g}.corner_m"] * 1000)) if sysname else 0
         corner = {"heavy": corner * 2, "tight": max(corner // 2, 100)}.get(genes["corner"],
@@ -568,6 +637,8 @@ class ShellBuilder:
         allow = sysname is not None and thick >= THIN_MM
         info = {"mass": k, "group": g, "system": sysname, "rows": len(rows), "openings": 0}
         self.buf.new_part()
+        up_part = self.buf.part
+        facades = []
         u_run = 0.0
         all_edges = [(ring[i], ring[(i + 1) % len(ring)]) for ring in rings
                      for i in range(len(ring)) if ring[i] != ring[(i + 1) % len(ring)]]
@@ -587,7 +658,7 @@ class ShellBuilder:
                     fa.regions = []
                 else:
                     fa.j = j
-                    fa.regions = fa.rec["regions"] if fa.rec else []
+                    fa.regions = _fire(fa.rec["regions"]) if fa.rec else []
                     if fa.rec is not None:
                         a0, ux, uy, _ = AR._edge_geom(br, j)
                         fa.soff = int(round((a[0] - a0[0]) * ux + (a[1] - a0[1]) * uy))
@@ -614,9 +685,25 @@ class ShellBuilder:
                             _corner_clear(d_out, d_nx, reveal),
                             reveal + EDGE_CLEAR if _convex(d_out, d_nx) else 0)
                 ok = allow and not _blocked(fa, reveal + EDGE_CLEAR, all_edges)
-                info["openings"] += self._facade(ms, g, fa, rows, wall, sysname, reveal, bay,
-                                                 ok)
-        self._caps(ms, wall)
+                fa.d_in, fa.d_nx, fa.reveal = d_in, d_nx, max(reveal, 60)
+                facades.append((fa, r, i, ok))
+                self.all_facades.append((fa, ms))
+                if band is None or band < ms["z1"]:
+                    info["openings"] += self._facade(ms, g, fa, rows, wall, sysname, reveal,
+                                                     bay, ok)
+        if band is not None:
+            self.buf.layer = 1
+            self.buf.new_part()
+            fb = FR.Band(self, ms, g, wall, sysname, reveal, bay, band, ground_row, facades)
+            plans = [(fa, r, i, fb.plan(fa, ok)) for fa, r, i, ok in facades]
+            fb.rehome(plans)
+            for fa, r, i, ops in plans:
+                fb.emit(fa, r, i, ops)
+                self.band_facades.append((fa, ms))
+            FR.caps(fb, roof=band >= ms["z1"])
+            self.buf.layer = 0
+            self.buf.part = up_part
+        self._caps(ms, wall, band)
         self.mass_info.append(info)
         if sysname is None:
             return
@@ -737,10 +824,12 @@ class ShellBuilder:
                     self.stats["strips_refused"] += 1
                     continue
                 outer, hole = res
+                self.buf.layer = 1 if z1 <= ms.get("band", -1) else 0
                 self.buf.new_part()
                 if self._extrude(outer, hole, z0, z1, slot):
                     made = True
                     self.stats["strips"] += 1
+                self.buf.layer = 0
         return made
 
     def _extrude(self, outer, hole, z0: int, z1: int, slot: str) -> bool:
@@ -876,6 +965,10 @@ class ShellBuilder:
                 row_ops[a_] = (b_, back, jb, pl, pr)
             ops_by_row.append(row_ops)
             n_open += len(ops)
+            if fa.j is not None:
+                rec = self.opened.setdefault(fa.j, [])
+                for a_, b_, *_ in ops:
+                    rec.append((a_ + so, b_ + so, lo, hi))
         self.stats["openings"] += n_open
         self._wall(ms, fa, rows, cols, ops_by_row, wall, reveal, key, g, sysname, cuts, balc)
         if allow and sysname:
@@ -951,20 +1044,21 @@ class ShellBuilder:
                     tri(s, (B[i], zb), (T[j + 1], zt), (T[j], zt))
                     j += 1
 
-        z0, z1 = ms["z0"], ms["z1"]
+        z0, z1 = ms.get("band", ms["z0"]), ms["z1"]
         prev, pz = [0, L], z0
         o = (int(round(-fa.nx * reveal)), int(round(-fa.ny * reveal)))
         base = self.gm["genes"]["base"]
         # an industrial wall on the ground: its dado line (the same on every facade of the
         # mass, so the corners stay welded) where the first row starts 0.3 m above it
         dado = 0
-        if sysname in SY.INDUSTRIAL and z0 <= 50 and self.gm["genes"]["dado"] != "none":
+        if sysname in SY.INDUSTRIAL and z0 <= 50 and self.gm["genes"]["dado"] != "none" and \
+                "band" not in ms:
             dz = int(round(self.gm["cont"]["dado_m"] * 1000))
             if (rows[0][0] if rows else z1) >= z0 + dz + 300:
                 dado = dz
                 self.used["dado"] = True
         plinth = base if rows and z0 <= 50 and base != "wall" and wall != "structure" and \
-            not dado else None
+            not dado and "band" not in ms else None
         if plinth:
             self.used["base"] = True        # the strip under the ground row in its finish
         if dado:
@@ -1364,6 +1458,7 @@ class ShellBuilder:
             return
         self.parts.on(fa, "canopy", {"L": PT.q(s1 - s0), "d": d, "t": 300}, (s0 + s1) // 2,
                       zc - 150)
+        fa.podium = True
         if "canopy" not in self.used["articulation"]:
             self.used["articulation"].append("canopy")
 
@@ -1390,8 +1485,10 @@ class ShellBuilder:
                 res = RG.strip(ring, 0, len(ring), 550, 0, 0)
                 if res is None:
                     continue
+                self.buf.layer = 1 if zt <= ms.get("band", -1) else 0
                 if self._sloped(ring, res[0], res[1], zt, zl, zbot, "tile"):
                     made = True
+                self.buf.layer = 0
         if made:
             self.used["parts"].setdefault(g, set()).add("eaves")
             self.stats["eaves"] = self.stats.get("eaves", 0) + 1
@@ -1522,8 +1619,13 @@ class ShellBuilder:
             if not arrs:
                 continue
             if len(at) < PT.INSTANCE_MIN and all(PT.survives(arrs, a) for a in at):
+                zlo = PT.bounds(arrs)[0][2]
                 for a in at:
+                    # (AG3) a part reaching down into the street band is the front's
+                    self.buf.layer = 1 if self.band_z is not None and \
+                        a[2] + zlo < self.band_z - 1 else 0
                     PT.merge_into(self.buf, b, arrs, a)
+                self.buf.layer = 0
                 merged += len(at)
                 continue
             inst.append({"family": fam, "params": p, "type": PT.type_of(fam, p),
@@ -1534,7 +1636,11 @@ class ShellBuilder:
         self.stats["parts_instanced"] = sum(len(x["at"]) for x in inst)
         self.stats["part_kinds"] = len(inst)
 
-    def _caps(self, ms: dict, wall: str) -> None:
+    def _caps(self, ms: dict, wall: str, band: int | None = None) -> None:
+        """The roof and the cap under the mass; on a mass with a street front, under the
+        shell's part from the band's top (none where the band takes the whole mass)."""
+        if band is not None and band >= ms["z1"]:
+            return
         rings = [RG.clean(r) for r in ms["rings"]]
         outer, holes = rings[0], [h for h in rings[1:] if len(h) >= 3]
         try:
@@ -1544,7 +1650,7 @@ class ShellBuilder:
             self.stats["cap_failures"] += 1
             return
         pts = list(outer) + [p for h in holes for p in h]
-        z0, z1 = ms["z0"], ms["z1"]
+        z0, z1 = (ms["z0"] if band is None else band), ms["z1"]
         buf = self.buf
         top = buf.plane((0.0, 0.0, 1.0), (0, 0, z1), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
         bot = buf.plane((0.0, 0.0, -1.0), (0, 0, z0), (1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
@@ -1630,6 +1736,23 @@ class ShellBuilder:
                    nrm[0] * ax_[1] - nrm[1] * ax_[0])
             pl = buf.plane(nrm, f[0], ax_, bx_)
             buf.quad("structure", pl, *f)
+
+
+def _fire(regions: list[dict]) -> list[dict]:
+    """A facade's regions with every `upper` stretch that stands on a party wall (the wall
+    over a lower neighbor built against it) made a fire wall: blank, as lot-line walls are
+    (AG3)."""
+    party = [r for r in regions if r["class"] == "party"]
+    if not party:
+        return regions
+    out = []
+    for r in regions:
+        if r["class"] == "upper" and any(
+                q["s"][0] < r["s"][1] - 0.01 and q["s"][1] > r["s"][0] + 0.01 and
+                abs(q["z"][1] - r["z"][0]) <= 0.05 for q in party):
+            r = dict(r, **{"class": "firewall"})
+        out.append(r)
+    return out
 
 
 def _blocked(fa: Facade, depth: int, edges) -> bool:

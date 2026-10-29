@@ -372,8 +372,98 @@ SLOTS: dict[str, tuple] = {
     "column": ("facade", "#8b8780", 0.85, 0.0, "trim"),
     "proxy": ("facade", "#8c8a86", 0.9, 0.0, "wall"),
     "proxy_roof": ("facade", "#4d4b47", 0.95, 0.0, "roof"),
+    # AG3: street fronts (doors, docks, shutters, risers, mounts, painted surfaces)
+    "storefront_dark": ("glass", "#0b0e12", 0.05, 0.0, None),
+    "door_metal": ("metal", "#3b4046", 0.55, 0.6, None),
+    "door_wood": ("facade", "#5a3b26", 0.7, 0.0, None),
+    "step": ("facade", "#9c978d", 0.85, 0.0, None),
+    "steel": ("metal", "#5d6166", 0.45, 0.8, None),
+    "rubber": ("facade", "#1c1c1c", 0.9, 0.0, None),
+    "seal": ("facade", "#22262a", 0.85, 0.0, None),
+    "rollup": ("metal", "#8e9399", 0.5, 0.6, None),
+    "rope": ("facade", "#7a1420", 0.8, 0.0, None),
+    "stanchion": ("metal", "#b8a26a", 0.35, 0.9, None),
+    "fascia": ("facade", "#bdb6aa", 0.7, 0.0, "trim"),
+    "mount": ("metal", "#4a4f55", 0.5, 0.7, None),
+    "trellis": ("metal", "#2f3a33", 0.6, 0.6, None),
+    "pipe": ("metal", "#5b6168", 0.5, 0.6, "trim"),
+    "cabinet": ("metal", "#15171a", 0.5, 0.4, None),
+    "frosted": ("facade", "#d7dde0", 0.3, 0.0, None),
+    "club": ("metal", "#16181c", 0.45, 0.5, None),
+    "riser_tile": ("facade", "#3f5c63", 0.35, 0.0, None),
+    "riser_stone": ("facade", "#a49d91", 0.8, 0.0, None),
+    "riser_dark": ("facade", "#26292c", 0.5, 0.1, None),
+    "lit_menu": ("neon", "#ffe7b8", 0.5, 0.0, None),
+    "lit_white": ("neon", "#e8f4ff", 0.5, 0.0, None),
 }
-GLASS_SLOTS = ("glass", "storefront")     # UV1 and vertex colors (window ids) only here
+# AG3: a shopfront's paint (frame, fascia, riser, door) per unit, from its era's list
+PAINTS = {"paint_red": "#7e1f1c", "paint_green": "#1f4a36", "paint_blue": "#1d3557",
+          "paint_black": "#17191b", "paint_cream": "#d6cbb0", "paint_teal": "#1f6a66",
+          "paint_ochre": "#b07e2a", "paint_white": "#e6e6e1", "paint_grey": "#5a5f65",
+          "paint_wine": "#57202b", "paint_yellow": "#d9b21f", "paint_orange": "#c4561d"}
+# neon tubes (bar frames, club lines), game screens, posters, murals and graffiti
+NEONS = ("ff2a6d", "05d9e8", "b967ff", "ffb000", "39ff8a")
+SCREENS = {"screen_blue": "#3a7bff", "screen_green": "#3dff9a", "screen_magenta": "#ff3df0"}
+POSTERS = {"poster_a": "#d8452b", "poster_b": "#f2c230", "poster_c": "#2b7bd8",
+           "poster_d": "#e9e4d8"}
+MURALS = {"mural_a": "#c23b6b", "mural_b": "#2a8fa8", "mural_c": "#e0a43a",
+          "mural_d": "#5b3fa6"}
+GRAFFITI = {"graffiti_a": "#e8324f", "graffiti_b": "#36c8e8", "graffiti_c": "#f3e23a",
+            "graffiti_d": "#7be84a", "graffiti_e": "#efefef"}
+for _n, _c in PAINTS.items():
+    SLOTS[_n] = ("metal", _c, 0.55, 0.3, None)
+for _c in NEONS:
+    SLOTS[f"neon_{_c}"] = ("neon", f"#{_c}", 0.5, 0.0, None)
+for _d, _r in ((SCREENS, 0.4), (POSTERS, 0.7), (MURALS, 0.85), (GRAFFITI, 0.6)):
+    for _n, _c in _d.items():
+        SLOTS[_n] = ("neon" if _d is SCREENS else "facade", _c, _r, 0.0, None)
+GLASS_SLOTS = ("glass", "storefront", "storefront_dark")   # UV1 and window ids only here
+
+# AG3: street fronts by era: the frame of a shopfront (aluminum, painted, steel, timber),
+# its riser (glazed tile, stone, dark, painted, the wall's own), the paints a unit draws,
+# how often a shop has a roll-up shutter or a grille (times the district's danger), and the
+# steps up to a main entrance (0, 1, 2)
+FRONT = {
+    "heritage": {"frame": (0.0, 0.5, 0.1, 0.4), "riser": (0.25, 0.35, 0.1, 0.2, 0.1),
+                 "paints": ("paint_green", "paint_wine", "paint_black", "paint_cream",
+                            "paint_blue", "paint_red", "paint_ochre"),
+                 "shutter": 0.5, "steps": (0.3, 0.4, 0.3)},
+    "neon_retro": {"frame": (0.3, 0.4, 0.3, 0.0), "riser": (0.35, 0.05, 0.35, 0.15, 0.1),
+                   "paints": ("paint_black", "paint_red", "paint_teal", "paint_yellow",
+                              "paint_wine", "paint_blue", "paint_orange"),
+                   "shutter": 0.7, "steps": (0.7, 0.3, 0.0)},
+    "corporate_glass": {"frame": (0.85, 0.1, 0.05, 0.0), "riser": (0.0, 0.5, 0.4, 0.0, 0.1),
+                        "paints": ("paint_black", "paint_grey", "paint_white"),
+                        "shutter": 0.15, "steps": (0.6, 0.3, 0.1)},
+    "brutalist": {"frame": (0.3, 0.1, 0.6, 0.0), "riser": (0.0, 0.2, 0.3, 0.0, 0.5),
+                  "paints": ("paint_grey", "paint_black", "paint_ochre", "paint_red"),
+                  "shutter": 0.6, "steps": (0.5, 0.4, 0.1)},
+    "industrial": {"frame": (0.2, 0.2, 0.6, 0.0), "riser": (0.0, 0.0, 0.4, 0.2, 0.4),
+                   "paints": ("paint_grey", "paint_yellow", "paint_blue", "paint_black",
+                              "paint_orange"),
+                   "shutter": 0.8, "steps": (0.9, 0.1, 0.0)},
+    "clean_tech": {"frame": (0.8, 0.2, 0.0, 0.0), "riser": (0.0, 0.3, 0.2, 0.4, 0.1),
+                   "paints": ("paint_white", "paint_grey", "paint_teal"),
+                   "shutter": 0.1, "steps": (0.8, 0.2, 0.0)},
+    "suburban_modern": {"frame": (0.4, 0.5, 0.0, 0.1), "riser": (0.1, 0.3, 0.1, 0.4, 0.1),
+                        "paints": ("paint_white", "paint_green", "paint_blue", "paint_cream",
+                                   "paint_red"),
+                        "shutter": 0.2, "steps": (0.5, 0.4, 0.1)},
+    "transit_modern": {"frame": (0.7, 0.2, 0.1, 0.0), "riser": (0.1, 0.3, 0.4, 0.1, 0.1),
+                       "paints": ("paint_grey", "paint_black", "paint_blue", "paint_white",
+                                  "paint_teal"),
+                       "shutter": 0.4, "steps": (0.8, 0.2, 0.0)},
+    "mixed_modern": {"frame": (0.45, 0.35, 0.15, 0.05), "riser": (0.2, 0.25, 0.25, 0.2, 0.1),
+                     "paints": ("paint_black", "paint_grey", "paint_red", "paint_green",
+                                "paint_blue", "paint_teal", "paint_cream", "paint_wine"),
+                     "shutter": 0.45, "steps": (0.6, 0.3, 0.1)},
+    "aerospace": {"frame": (0.8, 0.0, 0.2, 0.0), "riser": (0.0, 0.2, 0.3, 0.3, 0.2),
+                  "paints": ("paint_white", "paint_grey", "paint_orange"),
+                  "shutter": 0.2, "steps": (0.9, 0.1, 0.0)},
+}
+FRONT_DEFAULT = FRONT["mixed_modern"]
+FRAMES_FRONT = ("alu", "paint", "steel", "timber")
+RISERS = ("riser_tile", "riser_stone", "riser_dark", "paint", "wall")
 
 # Custom Primitive Data per actor (Unreal), extends AG0's 0 to 7: a tint triple per channel.
 CPD_TINT = {"wall": 0, "trim": 8, "glass": 11, "roof": 14, "spandrel": 17, "patch": 20}

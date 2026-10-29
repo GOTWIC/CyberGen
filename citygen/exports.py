@@ -148,7 +148,7 @@ def map_svg(m: CityModel, path: Path) -> Path:
            f'<title>{escape(m.name)}: citygen map (1 unit = 1 m, origin at '
            f'{_f(-m.bounds[0])},{_f(m.bounds[3])})</title>\n'
            + "\n".join(layers) + "\n</svg>\n")
-    path.write_text(svg, encoding="utf-8")
+    path.write_text(svg, encoding="utf-8", newline="\n")
     return path
 
 

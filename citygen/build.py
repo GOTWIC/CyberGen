@@ -851,10 +851,11 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     paths = [out / "city_model.json", out / "report.json", out / "report.txt",
              out / "preview_map.png"]
-    paths[0].write_text(b.model_text or (b.model.to_json() + "\n"), encoding="utf-8")
+    paths[0].write_text(b.model_text or (b.model.to_json() + "\n"), encoding="utf-8", newline="\n")
     rep = b.report()
-    paths[1].write_text(json.dumps(rep, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    paths[2].write_text(C.report_text(rep), encoding="utf-8")
+    paths[1].write_text(json.dumps(rep, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+    paths[2].write_text(C.report_text(rep), encoding="utf-8", newline="\n")
     local = bool(b.model.blocks)
     render(b, paths[3], dpi=150 if local else dpi)
     if local:

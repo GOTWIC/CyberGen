@@ -11,6 +11,11 @@ AG6's materials (`ag6_materials.py`: a building's era for its walls and roof, it
 parameters as object properties), sign quads placed on the sign slots with their atlas
 cells where AG8 has not made the signs, and the view rendered by day and, with lights at
 the street lights and the windows, signs and neon lit, by night.
+
+AG3: the street fronts (`<id>.front`) and the tiles' decal meshes (`decals.<tile>`, alpha
+quads from the decal atlas) come with the shells; AG2's instanced parts (`parts/<tile>.glb`)
+are put on points by geometry nodes, one instancer per pack, their materials reading the
+building's tints from the instance.
 """
 
 import json
@@ -39,14 +44,20 @@ def log(*a):
 MATS = {}
 
 
-def mat_for(part, key):
-    k = (part, key)
+def mat_for(part, key, inst=False):
+    k = (part, key, inst)
     if k not in MATS:
         rec = JOB["materials"]["buildings" if part == "buildings" else part].get(key)
         if rec is None:
             return None
-        MATS[k] = AM.make(f"ag6_{part}_{key}", rec, JOB["files"], part)
+        AM.ATTR[0] = "INSTANCER" if inst else "OBJECT"
+        MATS[k] = AM.make(f"ag6_{part}_{key}{'.inst' if inst else ''}", rec, JOB["files"],
+                          part)
+        AM.ATTR[0] = "OBJECT"
     return MATS[k]
+
+
+OWN = (".shell", ".front", ".proxy")
 
 
 def start():
@@ -174,10 +185,9 @@ def import_glb(path, part):
             continue
         key = None
         era = None
-        if part == "buildings":
-            base = o.name.rsplit(".shell", 1)[0] if ".shell" in o.name else \
-                o.name.rsplit(".proxy", 1)[0]
-            pr = props.get(base)
+        if part in ("buildings", "parts"):
+            base = next((o.name.rsplit(x, 1)[0] for x in OWN if x in o.name), o.name)
+            pr = props.get(base) if part == "buildings" else None
             if pr is not None:
                 era = pr["era"]
                 for k, v in pr.items():
@@ -190,15 +200,101 @@ def import_glb(path, part):
             key = slot
             if part == "buildings" and era and slot in JOB["era_slots"]:
                 key = f"{slot}@{era}"
-                if (part, key) not in MATS and key not in JOB["materials"]["buildings"]:
+                if key not in JOB["materials"]["buildings"]:
                     key = slot
-            m = mat_for(part, key)
+            m = mat_for("buildings" if part == "parts" else part, key, part == "parts")
             if m is not None:
                 old = ms.material
                 o.material_slots[i].material = m
                 if old.users == 0:
                     bpy.data.materials.remove(old)
     return new
+
+
+TINTS = ("cg_wall", "cg_trim", "cg_glass", "cg_roof", "cg_spandrel", "cg_patch")
+
+
+def _points(name, pts, attrs):
+    """A point cloud: pts [(x, y, z, yaw_rad, ...)], attrs {name: (kind, values)}."""
+    me = bpy.data.meshes.new(name)
+    me.vertices.add(len(pts))
+    me.vertices.foreach_set("co", [v for p in pts for v in p[:3]])
+    a = me.attributes.new("rot", "FLOAT_VECTOR", "POINT")
+    a.data.foreach_set("vector", [v for p in pts for v in (0.0, 0.0, p[3])])
+    for an, (kind, vals) in attrs.items():
+        at = me.attributes.new(an, kind, "POINT")
+        at.data.foreach_set("vector" if kind == "FLOAT_VECTOR" else "value", vals)
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def _group(name, coll):
+    """Geometry nodes putting, at every point, the child of `coll` its `proto` attribute
+    picks (AG2's parts: one group per pack)."""
+    ng = bpy.data.node_groups.new(name, "GeometryNodeTree")
+    ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    N, L = ng.nodes, ng.links
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    iop = N.new("GeometryNodeInstanceOnPoints")
+
+    def named(attr, kind):
+        n = N.new("GeometryNodeInputNamedAttribute")
+        n.data_type = kind
+        n.inputs["Name"].default_value = attr
+        return n.outputs["Attribute"]
+    iop.inputs["Pick Instance"].default_value = True
+    ci = N.new("GeometryNodeCollectionInfo")
+    ci.transform_space = "ORIGINAL"
+    ci.inputs["Collection"].default_value = coll
+    ci.inputs["Separate Children"].default_value = True
+    ci.inputs["Reset Children"].default_value = True
+    L.new(ci.outputs["Instances"], iop.inputs["Instance"])
+    L.new(named("proto", "INT"), iop.inputs["Instance Index"])
+    L.new(gi.outputs["Geometry"], iop.inputs["Points"])
+    L.new(named("rot", "FLOAT_VECTOR"), iop.inputs["Rotation"])
+    L.new(iop.outputs["Instances"], go.inputs["Geometry"])
+    return ng
+
+
+def _proto_key(name):
+    """A part node's name without Blender's copy number (`part.<family>.<style>.h<hash>`)."""
+    return SUFFIX.sub("", name)
+
+
+def load_parts(glb, inst):
+    """AG2's part pack of a tile: its meshes hidden in a collection of their own (in the
+    order of their node names), their placements one instancer with the building's tints
+    on every point."""
+    objs = import_glb(glb, "parts")
+    protos = {}
+    for o in objs:
+        if o.type == "MESH":
+            protos.setdefault(_proto_key(o.name), o)
+        o.hide_render = True
+    nodes = sorted(n for n in inst.get("parts", {}) if n in protos)
+    if not nodes:
+        return objs
+    coll = bpy.data.collections.new(f"ag6p.{os.path.basename(glb)}")
+    for k, node in enumerate(nodes):
+        o = protos[node]
+        o.name = f"{coll.name}.{k:06d}"
+        o.location = (0.0, 0.0, 0.0)
+        coll.objects.link(o)
+    pts, idx = [], []
+    for k, node in enumerate(nodes):
+        for p in inst["parts"][node]:
+            pts.append(p)
+            idx.append(k)
+    tints = inst.get("tints", [])
+    attrs = {"proto": ("INT", idx)}
+    for j, name in enumerate(TINTS):
+        attrs[name] = ("FLOAT_VECTOR", [v for p in pts for v in tints[p[4]][j]])
+    ob = _points(f"inst.{coll.name}", pts, attrs)
+    ob.modifiers.new("parts", "NODES").node_group = _group(f"ag6p.{coll.name}", coll=coll)
+    return objs + [ob]
 
 
 def remove(objs):
@@ -384,6 +480,10 @@ def main():
             p = f"{JOB['assets']}/streets/{tile}.glb"
             if os.path.isfile(p):
                 objs += import_glb(p, "streets")
+        for tile, inst in sorted(v.get("parts", {}).items()):
+            p = f"{JOB['assets']}/parts/{tile}.glb"
+            if os.path.isfile(p):
+                objs += load_parts(p, inst)
         for o in objs:
             if ".glass.lod" in o.name and not o.name.endswith(".lod0"):
                 o.hide_render = True

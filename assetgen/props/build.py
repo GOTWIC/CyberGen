@@ -277,10 +277,10 @@ def build(model, model_sha: str, out_dir: Path, spec=None, briefs: dict | None =
             path = out_dir / f"props/{'tiles' if part == 'props' else 'signs'}/{t}.glb"
             if data:
                 if _write_if_changed(path, data):
-                    written.append(str(path.relative_to(out_dir)))
+                    written.append(path.relative_to(out_dir).as_posix())
             elif path.exists():
                 path.unlink()
-                written.append(str(path.relative_to(out_dir)))
+                written.append(path.relative_to(out_dir).as_posix())
             rec[part] = {"bytes": len(data), "sha256": C.sha256_bytes(data) if data else ""}
         rec["props_nodes"] = r["props_nodes"]
         rec["signs_nodes"] = r["signs_nodes"]
@@ -364,7 +364,7 @@ def outputs_digest(out_dir: Path) -> dict:
     report): the goldens' measure."""
     out_dir = Path(out_dir)
     files = sorted(p for p in (out_dir / "props").rglob("*.glb"))
-    d = {str(p.relative_to(out_dir)): C.sha256_bytes(p.read_bytes()) for p in files}
+    d = {p.relative_to(out_dir).as_posix(): C.sha256_bytes(p.read_bytes()) for p in files}
     for n in ("unreal_contribution.props.json", "unreal_contribution.signs.json"):
         d[n] = C.sha256_bytes((out_dir / n).read_bytes())
     return {"files": d, "all": C.digest(d)}

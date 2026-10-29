@@ -168,8 +168,9 @@ def review(out_dir: str | Path, spec_path: str | Path | None = None,
            "passed": rep["passed"], "failed": failed, "numbers": nums, "spec": spec,
            "spec_changes": changes,
            "previews": [p for p, _ in PREVIEWS if (out / p).is_file()]}
-    (out / "review.json").write_text(json.dumps(rec, indent=1) + "\n", encoding="utf-8")
-    (out / "review.md").write_text(_markdown(rec, prev_rec), encoding="utf-8")
+    (out / "review.json").write_text(json.dumps(rec, indent=1) + "\n",
+                                     encoding="utf-8", newline="\n")
+    (out / "review.md").write_text(_markdown(rec, prev_rec), encoding="utf-8", newline="\n")
     return rec
 
 

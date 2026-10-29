@@ -64,7 +64,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         return EXIT_INVALID
     if args.filled:
         Path(args.filled).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.filled).write_text(dump_spec(result.filled), encoding="utf-8")
+        Path(args.filled).write_text(dump_spec(result.filled), encoding="utf-8", newline="\n")
     print(_summary(result))
     return EXIT_OK
 
@@ -344,7 +344,7 @@ def _blockout_args(p: argparse.ArgumentParser) -> None:
 def _write_json(data: dict, out: str | None) -> int:
     text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if out:
-        Path(out).write_text(text, encoding="utf-8")
+        Path(out).write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {out}")
     else:
         sys.stdout.write(text)
@@ -433,7 +433,7 @@ def cmd_model_diff(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     d = DF.diff(a, b)
     if args.json:
-        Path(args.json).write_text(json.dumps(d, indent=1) + "\n", encoding="utf-8")
+        Path(args.json).write_text(json.dumps(d, indent=1) + "\n", encoding="utf-8", newline="\n")
     if args.png:
         from .preview_diff import render  # matplotlib only here
 
