@@ -139,7 +139,7 @@ def write(path: str | Path, city: str, model_sha256: str, entries: list) -> None
                       ensure_ascii=False)
     rows = ",\n".join("    " + json.dumps(e) for e in entries)
     text = head[:-2] + ',\n  "entries": [\n' + rows + "\n  ]\n}\n"
-    Path(path).write_text(text, encoding="utf-8")
+    Path(path).write_text(text, encoding="utf-8", newline="\n")
 
 
 def diff(a: dict, b: dict) -> list[str]:

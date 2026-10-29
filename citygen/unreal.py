@@ -861,9 +861,10 @@ def write_manifest(build_dir: str | Path, name: str | None = None,
     write_glb(meshes, man["materials"], out / "prototypes.glb")
     if graphs is not None:
         (out / "graphs.json").write_text(json.dumps(graphs, separators=(",", ":")) + "\n",
-                                         encoding="utf-8")
+                                         encoding="utf-8", newline="\n")
     path = out / "manifest.json"
-    path.write_text(json.dumps(man, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(man, indent=1, ensure_ascii=False) + "\n",
+                    encoding="utf-8", newline="\n")
     return path
 
 
@@ -908,7 +909,7 @@ def prepare_project(uproject: str | Path) -> list[str]:
                 added.append(n)
     data["Plugins"] += [{"Name": n, "Enabled": True} for n in added if n not in have]
     if added:
-        p.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
+        p.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8", newline="\n")
     return added
 
 
@@ -985,7 +986,7 @@ def new_project(dest: str | Path, root: Path | None = None,
     data = json.loads((tdir / f"{template}.uproject").read_text(encoding="utf-8-sig"))
     ver = json.loads((root / "Engine" / "Build" / "Build.version").read_text())
     data["EngineAssociation"] = f"{ver['MajorVersion']}.{ver['MinorVersion']}"
-    up.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
+    up.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8", newline="\n")
     prepare_project(up)
     return up
 
@@ -996,7 +997,7 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
     """Run `script` in the editor on `uproject` (headless commandlet, or the full editor for
     play-in-editor checks and renders) with the job in $CITYGEN_UE_JOB; the job's result."""
     job_path = log.with_suffix(".job.json")
-    job_path.write_text(json.dumps(job, indent=1) + "\n", encoding="utf-8")
+    job_path.write_text(json.dumps(job, indent=1) + "\n", encoding="utf-8", newline="\n")
     result_path = Path(job["result"])
     if result_path.exists():
         result_path.unlink()
@@ -1020,7 +1021,7 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
     res["exit_code"] = proc.returncode
     res["wall_s"] = round(time.time() - t, 1)     # the editor's start and quit included
     res["log"] = str(log)
-    result_path.write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+    result_path.write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8", newline="\n")
     return res
 
 
@@ -1057,7 +1058,8 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     if res.get("ok") and startup:
         res["startup_map_changed"] = set_startup_map(up, res["level"])
         res["startup_map"] = res["level"]
-        Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+        Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n",
+                                       encoding="utf-8", newline="\n")
     return res
 
 
@@ -1113,7 +1115,8 @@ def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None 
            # the builder looks at every HLOD actor and rebuilds those whose input changed
            "rebuilt": text.count("final decision: ApproveRebuild"),
            "wall_s": round(time.time() - t, 1), "log": str(log)}
-    (out / "hlod_result.json").write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8")
+    (out / "hlod_result.json").write_text(json.dumps(res, indent=1) + "\n",
+                                          encoding="utf-8", newline="\n")
     return res
 
 

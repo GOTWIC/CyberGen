@@ -125,12 +125,12 @@ def run_job(label: str, data: dict, seed: int, out: str, upto: str, previews: bo
         else:
             d.mkdir(parents=True, exist_ok=True)
             (d / "report.json").write_text(json.dumps(b.report(), indent=2) + "\n",
-                                           encoding="utf-8")
+                                           encoding="utf-8", newline="\n")
     except BaseException:
         row["traceback"] = traceback.format_exc()
         row["seconds"] = round(time.perf_counter() - t0, 1)
         d.mkdir(parents=True, exist_ok=True)
-        (d / "traceback.txt").write_text(row["traceback"], encoding="utf-8")
+        (d / "traceback.txt").write_text(row["traceback"], encoding="utf-8", newline="\n")
     return row
 
 
@@ -195,8 +195,9 @@ def sweep(jobs: list[tuple[str, dict, int]], out: str | Path, workers: int = 4,
     rows: list[dict] = []
 
     def save():
-        (out / "sweep.json").write_text(json.dumps(rows, indent=1) + "\n", encoding="utf-8")
-        (out / "sweep.md").write_text(table(rows), encoding="utf-8")
+        (out / "sweep.json").write_text(json.dumps(rows, indent=1) + "\n",
+                                        encoding="utf-8", newline="\n")
+        (out / "sweep.md").write_text(table(rows), encoding="utf-8", newline="\n")
 
     ctx = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(max(1, workers), mp_context=ctx, max_tasks_per_child=1) as pool:

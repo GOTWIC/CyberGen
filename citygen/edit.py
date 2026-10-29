@@ -80,7 +80,8 @@ def new_state(spec_data: dict, built, overrides: dict | None = None) -> dict:
 
 def write_state(out_dir, state: dict) -> Path:
     p = Path(out_dir) / STATE_FILE
-    p.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    p.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n",
+                 encoding="utf-8", newline="\n")
     return p
 
 

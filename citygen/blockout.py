@@ -1353,7 +1353,7 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
     m = CityModel.from_json(Path(model_path).read_text(encoding="utf-8"))
     plan = make_plan(m)
     text = plan_json(plan) + "\n"
-    (out / "blockout_plan.json").write_text(text, encoding="utf-8")
+    (out / "blockout_plan.json").write_text(text, encoding="utf-8", newline="\n")
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
     t_plan = time.perf_counter() - t0
     X.map_svg(m, out / "map_2d.svg")
@@ -1362,15 +1362,17 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
     views = plan["cameras"]["street"]
     start = views[0]["eye"] if views else None
     (out / "unreal" / "corporate_core_plan.json").write_text(
-        json.dumps(X.legacy_plan(m, start), indent=1) + "\n", encoding="utf-8")
+        json.dumps(X.legacy_plan(m, start), indent=1) + "\n", encoding="utf-8", newline="\n")
     # (M13: a terrain city's graphs with absolute heights, as the blockout draws them)
     ground = _Ground(m) if m.terrain is not None else None
-    (out / "graphs.json").write_text(json.dumps(X.graphs(m, ground)) + "\n", encoding="utf-8")
+    (out / "graphs.json").write_text(json.dumps(X.graphs(m, ground)) + "\n",
+                                     encoding="utf-8", newline="\n")
     (out / "tiles.json").write_text(json.dumps({"tile_size_m": TILE_M, "tiles": plan["tiles"]},
-                                               indent=1) + "\n", encoding="utf-8")
-    (out / "props.csv").write_text(X.props_csv(m), encoding="utf-8")
+                                               indent=1) + "\n", encoding="utf-8", newline="\n")
+    (out / "props.csv").write_text(X.props_csv(m), encoding="utf-8", newline="\n")
     if m.pois or m.zones or m.densities:
-        (out / "gameplay.json").write_text(json.dumps(X.gameplay(m)) + "\n", encoding="utf-8")
+        (out / "gameplay.json").write_text(json.dumps(X.gameplay(m)) + "\n",
+                                           encoding="utf-8", newline="\n")
     t_exports = time.perf_counter() - t0 - t_plan
     exe = find_blender(blender)
     checks = []
@@ -1386,7 +1388,7 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
         if not export:
             cmd.append("--no-export")
         done, log = _run(cmd, "CITYGEN_BLOCKOUT_DONE", timeout=3 * BUDGET_S)
-        (out / "blender_log.txt").write_text(log, encoding="utf-8")
+        (out / "blender_log.txt").write_text(log, encoding="utf-8", newline="\n")
         if done is not None and (out / "blender_report.json").is_file():
             blender_rep = json.loads((out / "blender_report.json").read_text())
         checks.append(("blender_build", blender_rep is not None,
@@ -1409,8 +1411,8 @@ def run_blockout(model_path: str | Path, out_dir: str | Path, blender: str | Non
                     "total_s": round(total, 1)},
     }
     (out / "blockout_report.json").write_text(json.dumps(report, indent=2) + "\n",
-                                              encoding="utf-8")
-    (out / "blockout_report.txt").write_text(report_text(report), encoding="utf-8")
+                                              encoding="utf-8", newline="\n")
+    (out / "blockout_report.txt").write_text(report_text(report), encoding="utf-8", newline="\n")
     return report
 
 
