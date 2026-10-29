@@ -77,6 +77,11 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # MESH_VERSION and ACTOR_VERSION)
 STAGE2_VERSION = "5"                 # AG6: textured masters; AG8: leaves, textured holo
 TEXTURE_VERSION = "1"
+# a prune of more assets than this deletes their package files itself, on an empty level: the
+# editor's delete makes a reachability pass over every loaded object per package (8435 meshes
+# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without)
+PRUNE_FILES = 500
+EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
@@ -305,12 +310,26 @@ def fly_classes(speed_m_s):
     return mode_cls, saved
 
 
+def usage_flags(m):
+    """The usage flags a master needs: instanced static meshes (the props' and parts'
+    instances, and the instanced HLODs of the far view) and, opaque or masked on a surface,
+    Nanite (the blockout tiles and stage 2's packs). Without them a game draws the default
+    material, flat gray; so does play in the editor when nothing drew them in the editor
+    before (the editor sets them in memory only, and recompiles on every launch)."""
+    flags = ["used_with_instanced_static_meshes"]
+    if m.get_editor_property("material_domain") == unreal.MaterialDomain.MD_SURFACE and \
+            m.get_editor_property("blend_mode") in (unreal.BlendMode.BLEND_OPAQUE,
+                                                     unreal.BlendMode.BLEND_MASKED):
+        flags.append("used_with_nanite")
+    return flags
+
+
 def instanced(m):
-    """A master usable on instanced static meshes (the props' and parts' instances, and the
-    instanced HLODs of the far view): without the usage flag a game draws them with the
-    default material, flat gray. Saved only when it was missing."""
-    if not m.get_editor_property("used_with_instanced_static_meshes"):
-        m.set_editor_property("used_with_instanced_static_meshes", True)
+    """A master with its usage flags (`usage_flags`), saved only when one was missing."""
+    missing = [f for f in usage_flags(m) if not m.get_editor_property(f)]
+    for f in missing:
+        m.set_editor_property(f, True)
+    if missing:
         MEL.recompile_material(m)
         EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m
@@ -339,7 +358,8 @@ def base_material():
     MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     m.set_editor_property("two_sided", True)
-    m.set_editor_property("used_with_instanced_static_meshes", True)
+    for f in usage_flags(m):
+        m.set_editor_property(f, True)
     MEL.recompile_material(m)
     EAL.save_loaded_asset(m)
     return m
@@ -868,7 +888,8 @@ def stage2_master(master, defaults=None):
         MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
         MEL.connect_material_property(metal, "", MP.MP_METALLIC)
         m.set_editor_property("two_sided", master == "foliage")
-    m.set_editor_property("used_with_instanced_static_meshes", True)  # (HLODs, HISMs)
+    for f in usage_flags(m):
+        m.set_editor_property(f, True)        # (HLODs, HISMs, Nanite)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.core2", STAGE2_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
@@ -891,6 +912,41 @@ def delete_assets(paths):
     for p in left:
         EAL.delete_asset(p)
     return len(paths) - sum(1 for p in left if EAL.does_asset_exist(p.split(".")[0]))
+
+
+def delete_files(paths):
+    """Delete the assets at `paths` by their package files (`PRUNE_FILES`): nothing names them
+    (their actors were destroyed, the level saved and unloaded), so their packages are
+    unloaded, their files deleted and the asset registry scans their folders again (a forced
+    scan drops what is gone); how many were deleted."""
+    if not paths:
+        return 0
+    names = sorted({p.split(".")[0] for p in paths})
+    loaded = [k for k in (unreal.find_package(n) for n in names) if k is not None]
+    if loaded:
+        unreal.EditorLoadingAndSavingUtils.unload_packages(loaded)
+    del loaded
+    unreal.SystemLibrary.collect_garbage()
+    content = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir())
+    for n in names:
+        base = os.path.join(content, n[len("/Game/"):])
+        for ext in (".uasset", ".uexp", ".ubulk"):
+            if os.path.exists(base + ext):
+                os.remove(base + ext)
+    folders = sorted({n.rsplit("/", 1)[0] for n in names})
+    unreal.AssetRegistryHelpers.get_asset_registry().scan_paths_synchronous(folders, True)
+    gone = sum(1 for n in names if not EAL.does_asset_exist(n))
+    log(f"deleted {gone} of {len(names)} assets by their files")
+    return gone
+
+
+def own_textures(mi, names):
+    """Whether the instance `mi` holds a texture of its own for every parameter in `names`
+    (one deleted under it leaves the parameter empty; reading it through
+    get_material_instance_texture_parameter_value would give the master's default)."""
+    have = {str(v.parameter_info.name): v.parameter_value
+            for v in mi.get_editor_property("texture_parameter_values")}
+    return all(have.get(n) is not None for n in names)
 
 
 class Importer:
@@ -1137,29 +1193,38 @@ class Importer:
                 for t in self.man["tiles"] for o in t["objects"]}
         want |= {f"{self.root}/Props/{v['asset']}"
                  for v in self.man["prototypes"]["kinds"].values()}
+        stale = []
         for folder in (f"{self.root}/Meshes", f"{self.root}/Props"):
-            if not EAL.does_directory_exist(folder):
-                continue
-            stale = [a for a in EAL.list_assets(folder, recursive=True)
-                     if a.split(".")[0] not in want]
-            if stale:
-                REPORT.note(f"deleting {len(stale)} blockout meshes no object uses")
-            self.stats["meshes"]["deleted"] += delete_assets(stale)
+            if EAL.does_directory_exist(folder):
+                stale += [a for a in EAL.list_assets(folder, recursive=True)
+                          if a.split(".")[0] not in want]
+        if stale:
+            REPORT.note(f"deleting {len(stale)} blockout meshes no object uses")
         # stage 2's meshes no entry uses (its materials are pruned by materials2). A
         # blockout-only import leaves them as they are: its actors go, the assets stay for the
         # next import with stage 2 (deleting tens of thousands of meshes takes Unreal an hour)
         folder = f"{self.root}/{STAGE2_FOLDER}"
-        if not self.s2 or not EAL.does_directory_exist(folder):
-            return
-        want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
-                for m in p["meshes"]}
-        want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
-        mats = f"{folder}/Materials/"
-        stale = [a for a in EAL.list_assets(folder, recursive=True)
-                 if a.split(".")[0] not in want and not a.startswith(mats)]
-        if stale:
-            REPORT.note(f"deleting {len(stale)} stage 2 meshes no entry uses")
-        self.stats["stage2"]["meshes"]["deleted"] += delete_assets(stale)
+        stale2 = []
+        if self.s2 and EAL.does_directory_exist(folder):
+            want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
+                    for m in p["meshes"]}
+            want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
+            # (the city's texture pages too: textures2 prunes them; they were deleted here
+            # after every import, under the sign instances that use them)
+            keep = (f"{folder}/Materials/", f"{folder}/Textures/")
+            stale2 = [a for a in EAL.list_assets(folder, recursive=True)
+                      if a.split(".")[0] not in want and not a.startswith(keep)]
+        if stale2:
+            REPORT.note(f"deleting {len(stale2)} stage 2 meshes no entry uses")
+        files = len(stale) + len(stale2) > PRUNE_FILES
+        if files:
+            self.les.load_level(EMPTY_LEVEL)
+        delete = delete_files if files else delete_assets
+        self.stats["meshes"]["deleted"] += delete(stale)
+        if stale2:
+            self.stats["stage2"]["meshes"]["deleted"] += delete(stale2)
+        if files:
+            self.level()            # (the digests read its actors)
 
     # -- stage 2 (assetgen's layer: buildings, streets) --
 
@@ -1299,7 +1364,7 @@ class Importer:
             key = p.get("key", p["slot"])
             if EAL.does_asset_exist(path):
                 mi = unreal.load_asset(path)
-                if meta(mi, HASH_TAG) == h:
+                if meta(mi, HASH_TAG) == h and own_textures(mi, p.get("textures") or {}):
                     st["kept"] += 1
                     self.mats2[(p["part"], key)] = mi
                     self.mi2[p["asset"]] = mi
@@ -1827,6 +1892,11 @@ class Importer:
                     for xf in r["xforms"]], False, False)
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
+                for slot, asset in sorted((r.get("materials") or {}).items()):
+                    mi = self.mi2.get(asset)
+                    i = comp.get_material_index(unreal.Name(slot))
+                    if mi is not None and i >= 0:
+                        comp.set_material(i, mi)
                 if r.get("no_collision"):
                     comp.set_collision_profile_name("NoCollision")
                 a.set_actor_location_and_rotation(loc, rot, False, False)

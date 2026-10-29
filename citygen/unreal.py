@@ -702,16 +702,24 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 made = True
             for p in e.get("parts") or []:
                 glb = p.get("glb") or e["glb"]
-                mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb),
-                              p.get("collision") or {"complex": True}, p.get("nanite", True),
-                              p.get("shape_preservation"))
+                # a building's parts have none (AG2: its simple collision covers its masses;
+                # a body per instance, 1.3 M in Vesper Bay, is more than play can stream)
+                pcol = p.get("collision") or ({"none": True} if base["category"] in
+                                              ("building", "landmark") else {"complex": True})
+                mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb), pcol,
+                              p.get("nanite", True), p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
                      "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [],
                      "xforms": p["xforms"], **base}
                 if p.get("ids"):
                     a["ids"] = p["ids"]          # (one citygen id per transform)
-                if (p.get("collision") or {}).get("none"):
-                    a["no_collision"] = True     # (AG8's plants)
+                if pcol.get("none"):
+                    a["no_collision"] = True     # (AG8's plants, AG2's parts)
+                if e.get("materials"):
+                    # AG6: the era's walls on AG2's parts too (panels, concrete, plaster),
+                    # as on the parts merged into the shell
+                    a["materials"] = {slot: "MI_" + asset_name(f"{part}.{m}")
+                                      for slot, m in sorted(e["materials"].items())}
                 a["type"] = p["kind"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
