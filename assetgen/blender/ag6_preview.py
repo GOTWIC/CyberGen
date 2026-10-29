@@ -237,7 +237,10 @@ def import_glb(path, part):
             m = mat_for("buildings" if part == "parts" else part, key, part == "parts")
             if m is not None:
                 old_mats.add(ms.material)
-                o.material_slots[i].material = m
+                # (on the object: a slot linked to the mesh walks every object of the file
+                # on each assignment, quadratic over a whole city)
+                ms.link = "OBJECT"
+                ms.material = m
     # (in one batch: one by one is quadratic)
     bpy.data.batch_remove([m for m in old_mats if m.users == 0])
     return new
