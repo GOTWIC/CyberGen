@@ -13,7 +13,7 @@ at a time, on a Mac shared with other sessions' builds.
 .venv/bin/python -m assetgen build out/greyhook --workers 4
 .venv/bin/python -m citygen unreal out/greyhook ~/UnrealTest/UnrealTest.uproject --new-project
 .venv/bin/python -m citygen unreal out/greyhook ~/UnrealTest/UnrealTest.uproject --check --shots out/greyhook/shots \
-    --view tower_close 268.7 -33.7 30 330 70 70 35
+    --view leaves_close 517.7 75.9 5.6 523.66 79.94 7.1 28 --view trees_600m -75.0 75.2 330.0 525 75 4.0 50
 ```
 
 ## Imports
@@ -90,7 +90,12 @@ checked with shots:
   names (two blade signs of the shopping street matched against `signs_tall_0.png`: the
   same katakana and glyphs, the same colors), neon frames lit; the five city pages in
   `Assets/Textures` and every sign instance with its textures.
-- **Holo-ads** (`M_CgHolo` with `SignTex`): HOLO49
+- **Holo-ads** (`M_CgHolo`): the image's face on its page instance (`holopage.ads_1`:
+  `SignTex` the city's ads page, `Textured` 1, emissive 3, opacity 0.6), its frame on the
+  untextured holo colors; the importer kept every instance by its own-texture test, so the
+  face has its page. By day the face blows out to near white against the sky (emissive 3
+  over the day exposure), so whether the page reads on it was not seen: the night shot is an
+  open item.
 - **Props**: trunks with bark, palm trunks ringed, bollards banded, cars with painted bodies,
   glass, lit lamps and wheel rims; white blotches on the black van's paint (most likely the
   canopy's sky in its reflections; not followed up).
@@ -102,13 +107,23 @@ checked with shots:
 | Greyhook | 28,627 of 36,454 at the start, 25,981 after a teleport | 507 of 507 (building 252) | 36 of 36 | 36 of 36 | 130 m, all frames on the ground |
 | Vesper Bay, before the fixes | 41,349 of 60,634 at the start | 157 and 169 of 507: failed | 34 and 33 of 36 | 36 and 35 of 36 | fell through |
 | Greyhook with the fixes and #49 | 28,622 of 36,454 at the start, 23,716 after a teleport | 507 of 507 (building 251) | 35 of 36 | 36 of 36 | 129 m, all frames on the ground |
-VBCHECK
 
-Vesper Bay's play session ran at about one frame every 12 to 14 s with the Mac's free memory
-down to 13%: its 1.3 million part instances had complex collision (a physics body per
-instance, against AG2's contract: the building's simple collision covers its masses) and the
-stage 2 masters lacked the Nanite usage flag (272 warnings, every instanced Nanite mesh
-falling back to the default material and recompiling at each launch). Both are fixed here.
+Vesper Bay's play session ran at about one frame every 12 to 14 s, with the Mac's free
+memory down to 13%, and its traces fell through the streamed cells that had not yet built
+their collision. Its editor log points at two causes, both fixed here, but Vesper Bay was not
+imported and checked again with the fixes (an open item):
+
+- **Part collision**: its 1,306,362 part instances had complex collision, a physics body per
+  instance on 17,227 instancers, against AG2's contract (the building's simple collision
+  covers its masses).
+- **Nanite usage flag**: 272 "needed to set usage flag Nanite" lines, one per stage 2
+  material instance drawn on a Nanite mesh. The editor sets the flag in memory and compiles
+  those shaders again in every session, during play; a cooked game would draw them with the
+  default material.
+
+Greyhook's last check ran with both fixes, with no usage flag line in its log, while another
+session's Unreal import ran on the same Mac (its first roof miss, 35 of 36, is within the
+check's pass).
 
 ## Fixes
 
@@ -133,7 +148,31 @@ falling back to the default material and recompiling at each launch). Both are f
 
 ## Open items
 
-OPEN49
+- **Vesper Bay with the fixes** (the coordinator folds it into the next Unreal check):
+  build it from main, import it into a new throwaway project and check it in play:
+
+  ```bash
+  .venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
+  .venv/bin/python -m assetgen build out/vesper_bay --workers 4
+  .venv/bin/python -m citygen unreal out/vesper_bay ~/UnrealTest/UnrealTest.uproject --new-project
+  .venv/bin/python -m citygen unreal out/vesper_bay ~/UnrealTest/UnrealTest.uproject --check-only
+  ```
+
+  Look for: no "needed to set usage flag" line in the project's editor log
+  (`~/Library/Logs/Unreal Engine/UnrealTestEditor/UnrealTest.log`); the part instancers
+  `NoCollision`; the check passing (507 of 507 traces down, the walk on the ground); play
+  ticking well under a second a frame (12 to 14 s before), with memory to spare
+  (`vm_stat`). Run it alone: one Unreal editor on the Mac at a time.
+- **Holo-ads by night**: a night shot of a holo-ad (`MPC_CityGen.Night` at 1) to see its
+  ads page on the face; by day the face is blown out (lighting is stage 3's).
+- **Prunes under 500 assets** still go through the editor's delete with the city loaded:
+  Greyhook's first import pruned 304 unused family variants in 76 s, Vesper Bay's 200 in
+  313 s. The file route (verified here on 8,435) would take well under a minute; lowering
+  `PRUNE_FILES` wants a first import to try it on.
+- **Rain streaks and grime** at the foot of walls are hard to see at street distance.
+- **White blotches** on a black van's paint (likely reflections; not followed up).
+- **Tests**: `tests/test_unreal.py`'s `test_unreal_import*` tests start Unreal; run the file
+  with `-k "not test_unreal_import"` while another editor runs.
 
 ## Shots
 
@@ -175,4 +214,3 @@ AG8 on AG6 (Greyhook):
 | Parked cars | Bark, palms and crowns along an avenue |
 |---|---|
 | <img src="greyhook/ag8_car_close.jpg" width="420"> | <img src="greyhook/ag8_street_trees_bark.jpg" width="420"> |
-NIGHTSHOTS
