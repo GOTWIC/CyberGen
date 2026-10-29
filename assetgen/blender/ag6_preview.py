@@ -493,6 +493,10 @@ def main():
                 o.hide_render = True
         sobjs = signs(v.get("signs", [])) + ag8(v, protos)
         cam = camera(sc, v)
+        try:
+            sc.eevee.taa_render_samples = v.get("samples") or JOB.get("samples", 32)
+        except AttributeError:
+            pass
         sc.render.resolution_x, sc.render.resolution_y = v["w"], v["h"]
         sc.render.resolution_percentage = 100
         lobjs = []

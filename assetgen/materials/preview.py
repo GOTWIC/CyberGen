@@ -11,7 +11,8 @@ textured Blender renders.
   AG8 has not run, the sign slots as quads showing their atlas cells); by night
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
-  street cameras (`street_<n>`), the city, or cameras of one's own (`--eye`, `--target`).
+  street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
+  part, skybridge and street piece at once), or cameras of one's own (`--eye`, `--target`).
 - **board**: a material board per era (its wall sets, roof, trims, metals, a window with
   its rooms) and one of the street sets, each a slab of the material under a low sun.
 
@@ -144,8 +145,9 @@ def run(args) -> dict:
     bo = Path(args.blockout) if args.blockout else bdir
     cams = PV.cameras(bdir, bo)
     which = set(args.views or ["districts", "street"])
-    views = PV.plan_views(man, cams, args.width, which & {"city", "districts", "street"})
-    named = [v for v in (args.views or []) if v not in ("city", "districts", "street")]
+    kinds = {"city", "city_full", "districts", "street"}
+    views = PV.plan_views(man, cams, args.width, which & kinds)
+    named = [v for v in (args.views or []) if v not in kinds]
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
         views = [v for v in allv if v["name"] in named]

@@ -1,8 +1,8 @@
 """Roofs (scope 5.1.3, AG4): roof forms, finishes, copings, green roofs, the equipment of
 every roof item, access huts, vents and skylights.
 
-**Roof forms** (the crown gene of eras that have them, `systems.ROOF_FORMS`; sheds by their
-own gene): a pitched roof stands inside the building's envelope, in its top floor (the
+**Roof forms** (the crown gene of eras that have them, `systems.AG4_CROWNS`; sheds by their
+own gene, `systems.SHED_FORMS`): a pitched roof stands inside the building's envelope, in its top floor (the
 attic: the mass's walls stop a floor lower, `plan`), or for a one-floor shed in the top of
 its tall floor, so it never rises over the model's mass:
 
@@ -10,11 +10,13 @@ its tall floor, so it never rises over the model's mass:
 |---|---|---|
 | hip, gable | heritage and suburban crowns `pitched`, a rectangular top | slopes to a ridge at the era's pitch; gable ends flush with the facades below (in the wall's slot), hips where the ends are free |
 | pagoda | heritage crown `pagoda_roof`, a rectangle | a hip whose four corners curl up |
-| mansard | the same crowns on any other top, or where the ridge would rise past the attic, or roof items need a flat top | slopes from the eave to a flat top inset by the run (a hip with a flat top when the slope is low) |
+| mansard | the same crowns on any other top, or roof items need a flat top | slopes from the eave to a flat top inset by the run (a hip with a flat top when the slope is low) |
 | sawtooth | industrial crown `sawtooth`, sheds and warehouses by gene | teeth with their glazing facing north |
 | barrel | aerospace crown `dome`, hangars, some sheds | a segmental vault across the short side |
 
-Eaves overhang by the era's eave on edges no neighbor or own mass stands against (none on
+A gable or hip whose ridge would rise past the attic is flattened to fit, down to 8 degrees
+(`FLATTEST`); a shed's own form needs a rectangle (else its roof stays flat). Eaves overhang
+by the era's eave on edges no neighbor or own mass stands against (none on
 party, hidden and blind stretches), always under 0.6 m. A one-floor storey set on another mass (a villa's
 top tier) is all roof, its eaves on the mass below. A form needs its mass on top of the
 building (nothing over it), one ring (no court), nothing mounted above the eave line, and no
@@ -55,6 +57,8 @@ from . import systems as SY
 
 FASCIA = 200                    # eave fascia (mm)
 EAVE_MAX = 550                  # an eave's overhang at most (its corner under 0.8 m out)
+EAVE_CORNER = 850               # a mitred eave corner at most this far out (the envelope: 0.9)
+GREEN_BASE = 80                 # a green roof's gravel border and the bed's foot (mm)
 MIN_ATTIC = 1200                # a form needs at least this rise
 SHED_WALL = 4000                # a one-floor shed keeps this much wall under its roof form
 ROOF_STOREY = 4600              # a one-floor storey on another mass this low is all roof
@@ -470,9 +474,19 @@ def _ring_form(sb, rf: dict) -> bool:
     h = zt - zf
     if h < 600:
         return False
-    B = miter(ring, e)
+    B = None
+    for k in range(3):
+        # (an eave mitred at an acute corner reaches further out: halved, then none, so
+        # every corner stays within the cornice allowance, `EAVE_CORNER`)
+        B = miter(ring, e)
+        if B is not None and all(math.hypot(B[i][0] - ring[i][0], B[i][1] - ring[i][1]) <=
+                                 EAVE_CORNER for i in range(len(ring))):
+            break
+        B = None
+        e = [ei // 2 for ei in e] if k == 0 else [0] * len(e)
     if B is None:
         return False
+    rf["eave"] = e
     tanp = float(M.tan(M.radians(rf["pitch"])))
     run0 = h / max(tanp, 0.2)
     I = None
@@ -828,12 +842,14 @@ def green_roofs(sb) -> None:
         z = int(round(g["z_m"] * 1000))
         made = False
         for ext, holes in shapes(pg, 0.0):
-            made |= slab(buf, ext, holes, z, z + 50, "roof_gravel", "roof_gravel")
+            # (0.08 m: over the blockout's flat green plate at 0.05, which stays where its
+            # joined object also draws a lawn)
+            made |= slab(buf, ext, holes, z, z + GREEN_BASE, "roof_gravel", "roof_gravel")
         if not made:
             continue
         for bed, bh in shapes(pg, 0.5):
-            if abs(area2(bed)) < 2 * 4_000_000 or not slab(buf, bed, bh, z + 50, z + 250,
-                                                           "green_roof", "soil"):
+            if abs(area2(bed)) < 2 * 4_000_000 or not slab(
+                    buf, bed, bh, z + GREEN_BASE, z + GREEN_BASE + 200, "green_roof", "soil"):
                 continue
             if abs(area2(bed)) / 2.0e6 < 150.0 or bh:
                 continue
@@ -849,7 +865,8 @@ def green_roofs(sb) -> None:
             pts = [(int(round(c[0] + ux * t - uy * s_)), int(round(c[1] + uy * t + ux * s_)))
                    for t, s_ in ((lo + 300, w), (lo + 300, -w), (hi - 300, -w), (hi - 300, w))]
             if all(RG.inside(p, bed) == 1 for p in pts) and RG.is_simple(pts):
-                slab(buf, pts, [], z + 250, z + 290, "roof_paver", "roof_paver")
+                slab(buf, pts, [], z + GREEN_BASE + 200, z + GREEN_BASE + 240, "roof_paver",
+                     "roof_paver")
         sb.green_done.append(g["id"])
         sb.stats["green_roofs"] = sb.stats.get("green_roofs", 0) + 1
 
@@ -882,8 +899,17 @@ def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int, z:
     if leg < LEG_MIN:
         return 0
     leg = int(math.ceil(leg / 100.0)) * 100
-    _place(sb, "dunnage", {"w": PT.q(w + 200), "d": PT.q(d + 200), "leg": leg}, x, y, z - leg,
-           ux, uy)
+    # the frame 0.1 m past the item, else as big as it or smaller where its box (the
+    # envelope checks an instanced part's box) would reach past the roof's edge under it
+    ring = rf["ring"]
+    for grow in (200, 0, -200, -400):
+        fw, fd = max(w + grow, 400), max(d + grow, 400)
+        hx, hy = fw / 2 + 20, fd / 2 + 20
+        if all(RG.in_poly((int(round(x + ux * sx * hx - uy * sy * hy)),
+                           int(round(y + uy * sx * hx + ux * sy * hy))), [ring]) == 1
+               for sx in (-1, 1) for sy in (-1, 1)):
+            break
+    _place(sb, "dunnage", {"w": PT.q(fw), "d": PT.q(fd), "leg": leg}, x, y, z - leg, ux, uy)
     return leg
 
 

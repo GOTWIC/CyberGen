@@ -18,15 +18,19 @@ Its shell side (`landings`, in the shell's facade grammar): the floor a skybridg
 is a door row on its mass (as AG2's balcony rows: sill at 150 mm, the other bays' lower
 panes behind spandrel panels), the landing an opening of the bridge's width with a frame
 and two glazed leaves (`roofparts.gen_landing`); the window rows over it within the
-bridge's height stay a solid panel (AG1's mounts). A landing that finds no door row (its
-deck off the floor lines) hangs on the panel and is reported.
+bridge's height stay a solid panel (AG1's mounts); a mass too thin for windows still takes
+the door, and a mechanical floor a bridge lands on keeps its windows. A landing that finds
+no door row (its deck off the floor lines) hangs on the panel and is reported, as is one
+that lands straight into an open portal (a sky station's own bridge).
 
 **Portals** (`portals`): where a sky tube passes through a tower, every mass across the
 portal's floors is split there and its portal storey cut by the tube's corridor (the
 tube's line, 1 m clear round its 7 m section, and a sky station's platform footprint): the
 corridor's walls are a metal lining (no windows, unless a station's glazing), the storey
 over it a lined soffit, the one under it the portal floor; a frame with a light strip rings
-each mouth. A sky station's platforms flank the tube at the level of its floor.
+each mouth (its jamb narrowed where the mouth is near the facade's corner). A sky station's
+platforms flank the tube at the level of its floor. A tube that meets no mass at the
+portal's height (between a megabuilding's towers) has nothing to cut.
 
 **Decks** (masses of role `deck`, M3p's open decks between towers): paving on top, glass
 balustrades on the edges that are not inside a tower, planters.
