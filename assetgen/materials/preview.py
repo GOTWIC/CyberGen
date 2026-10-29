@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import math
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -127,15 +126,18 @@ def _lights(model, center, r) -> list[list[float]]:
     return out[:MAX_LIGHTS]
 
 
-def run(args) -> dict:
+def run(args, progress=None) -> dict:
     from ..brief import load_model
+    from ..progress import Progress
+    P = progress if progress is not None else Progress(quiet=True)
     bdir = Path(args.build)
     adir = bdir / "assets"
-    man = json.loads((adir / "manifest.json").read_text())
-    mats = json.loads((adir / "materials.json").read_text())
-    signs = json.loads((adir / "signs.json").read_text())
-    con = json.loads((adir / "unreal_contribution.streets.json").read_text())
-    model, _, _ = load_model(bdir)
+    with P.stage("load"):
+        man = json.loads((adir / "manifest.json").read_text())
+        mats = json.loads((adir / "materials.json").read_text())
+        signs = json.loads((adir / "signs.json").read_text())
+        con = json.loads((adir / "unreal_contribution.streets.json").read_text())
+        model, _, _ = load_model(bdir)
     od = Path(args.out) if args.out else adir / "previews_ag6"
     od.mkdir(parents=True, exist_ok=True)
     bo = Path(args.blockout) if args.blockout else bdir
@@ -152,17 +154,19 @@ def run(args) -> dict:
                       "eye": list(eye), "target": list(tgt), "w": args.width,
                       "h": int(args.width * 9 / 16), "shell_tiles": sorted(near)})
     stiles = sorted({e["tile"] for e in con["entries"]})
-    for v in views:
-        tgt = v["target"]
-        v["parts"] = PV.instances(man, v["shell_tiles"])
-        if v["ortho"]:
-            v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
-            v["signs"], v["lights"] = [], []
-        else:
-            v["street_tiles"] = [t for t in stiles if _tile_near(t, v["eye"], STREET_R)]
-            v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R)
-            v["lights"] = _lights(model, v["eye"], LIGHT_R)
-    ag8 = _ag8(adir, views)
+    with P.stage("views", total=len(views)) as st:
+        for v in views:
+            tgt = v["target"]
+            v["parts"] = PV.instances(man, v["shell_tiles"])
+            if v["ortho"]:
+                v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
+                v["signs"], v["lights"] = [], []
+            else:
+                v["street_tiles"] = [t for t in stiles if _tile_near(t, v["eye"], STREET_R)]
+                v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R)
+                v["lights"] = _lights(model, v["eye"], LIGHT_R)
+            st.advance()
+        ag8 = _ag8(adir, views)
     modes = ["night"] if args.only_night else (["day", "night"] if args.night else ["day"])
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
@@ -173,7 +177,7 @@ def run(args) -> dict:
            "ag8_families": (ag8 or {}).get("families", []),
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
-    return _blender(job, "ag6_preview.py", args.blender, od)
+    return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))
 
 
 def _tile_near(name: str, p, r) -> bool:
@@ -183,8 +187,14 @@ def _tile_near(name: str, p, r) -> bool:
     return dx * dx + dy * dy <= r * r
 
 
-def _blender(job: dict, script: str, blender: str | None, od: Path) -> dict:
+def _blender(job: dict, script: str, blender: str | None, od: Path, progress=None,
+             total: int | None = None) -> dict:
+    """Run a script on the job; `progress`: a bar over its views or boards (each script's
+    `CGPROGRESS` lines, `assetgen/blenderrun.py`); without it Blender's log lines print."""
     from citygen.blockout import find_blender
+    from ..blenderrun import run as run_blender
+    from ..progress import Progress
+    P = progress if progress is not None else Progress(quiet=True)
     exe = find_blender(blender)
     if exe is None:
         raise RuntimeError("no Blender (set BLENDER or --blender)")
@@ -192,20 +202,20 @@ def _blender(job: dict, script: str, blender: str | None, od: Path) -> dict:
         json.dump(job, f)
         jp = f.name
     sp = Path(__file__).resolve().parent.parent / "blender" / script
-    proc = subprocess.run([exe, "-b", "--factory-startup", "-P", str(sp), "--", jp],
-                          capture_output=True, text=True)
-    for line in proc.stdout.splitlines():
-        if line.startswith("[ag6"):
-            print(line, flush=True)
+    with P.stage("blender", total=total) as st:
+        code, sout, serr = run_blender(
+            [exe, "-b", "--factory-startup", "-P", str(sp), "--", jp], st, keep="[ag6",
+            log=(lambda m: print(m, flush=True)) if progress is None else None)
     rep_p = od / "ag6_report.json"
-    if proc.returncode != 0 or not rep_p.is_file():
-        sys.stderr.write(proc.stdout[-4000:] + proc.stderr[-4000:])
-        raise RuntimeError(f"Blender failed ({proc.returncode})")
+    if code != 0 or not rep_p.is_file():
+        sys.stderr.write(sout[-4000:] + serr[-4000:])
+        raise RuntimeError(f"Blender failed ({code})")
     return json.loads(rep_p.read_text())
 
 
-def board_job(args) -> dict:
-    lib = LB.load(None, args.density) or LB.generate(None, args.density)
+def board_job(args, progress=None) -> dict:
+    from .build import generate
+    lib = LB.load(None, args.density) or generate(None, args.density, progress=progress)
     od = Path(args.out)
     od.mkdir(parents=True, exist_ok=True)
     boards = []
@@ -261,14 +271,18 @@ def board_job(args) -> dict:
 
 
 def main(args) -> int:
+    from ..progress import Progress
+    prog = Progress(quiet=True if getattr(args, "quiet", False) else None)
     try:
         if args.command == "board":
-            job = board_job(args)
-            rep = _blender(job, "ag6_board.py", args.blender, Path(args.out))
+            job = board_job(args, prog)
+            rep = _blender(job, "ag6_board.py", args.blender, Path(args.out), prog,
+                           len(job["boards"]))
         else:
-            rep = run(args)
+            rep = run(args, prog)
     except (OSError, RuntimeError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
+    prog.summary()
     print(f"rendered {len(rep.get('files', []))} images")
     return 0
