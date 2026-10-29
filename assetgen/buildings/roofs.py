@@ -1058,8 +1058,8 @@ def _spots(ring, holes, ux, uy, w, d, inset, step):
             a = a0 + (a1 - a0) * (i / (na - 1) if na > 1 else 0.5)
             b = b0 + (b1 - b0) * (j / (nb - 1) if nb > 1 else 0.5)
             x, y = c[0] + ux * a - uy * b, c[1] + uy * a + ux * b
-            corners = [(int(round(x + ux * sa * w / 2 - uy * sb_ * (d / 2 + inset))),
-                        int(round(y + uy * sa * w / 2 + ux * sb_ * (d / 2 + inset))))
+            corners = [(int(round(x + ux * sa * (w / 2 + inset) - uy * sb_ * (d / 2 + inset))),
+                        int(round(y + uy * sa * (w / 2 + inset) + ux * sb_ * (d / 2 + inset))))
                        for sa in (-1, 1) for sb_ in (-1, 1)]
             if all(RG.in_poly(q, [ring] + holes) == 1 for q in corners):
                 out.append((int(round(x)), int(round(y))))
@@ -1090,11 +1090,13 @@ def extras(sb) -> None:
     z = ms["z1"]
     kinds = {it["kind"] for it in br["roof_items"]}
     clear = sb.clear
+    from . import envelope as EN
     if b["floors"] >= 3 and "mechanical" not in kinds and b["type"] not in SY.SHED_TYPES:
         w, d, h = HUT
         for x, y in _spots(ring, holes, ux, uy, w, d, 900, 2500):
             bx = _bbox(x, y, ux, uy, w, d + 400)
-            if not _free(bx, taken) or clear.hits(*bx, z, z + h + 700):
+            if not _free(bx, taken) or clear.hits(*bx, z, z + h + 700) or \
+                    not EN.fits(br, "hut", {"w": w, "d": d, "h": h}, x, y, z, ux, uy):
                 continue
             _place(sb, "hut", {"w": w, "d": d, "h": h}, x, y, z, ux, uy)
             taken.append((bx[0] - 1500, bx[1] - 1500, bx[2] + 1500, bx[3] + 1500))
@@ -1115,7 +1117,6 @@ def extras(sb) -> None:
             # catwalk faces out)
             bx = _bbox(x, y, ux, uy, w, 4000)
             p = {"w": w, "h": 3500, "back": 1800}
-            from . import envelope as EN
             if RG.in_poly((x, y), [ring] + holes) == 1 and _free(bx, taken) and \
                     not clear.hits(*bx, z, z + 6000) and \
                     EN.fits(sb.br, "billboard_frame", p, x, y, z, ux, uy):
@@ -1142,11 +1143,16 @@ def extras(sb) -> None:
             continue
         if nsk > 0 and _u(f"{sb.bid}|{x}|{y}", "sky") < 0.5:
             st = "dome" if sb.gm.get("era") not in ("industrial",) else "flat"
-            _place(sb, "skylight", {"w": 1800, "d": 1200, "style": st}, x, y, z, ux, uy)
+            p = {"w": 1800, "d": 1200, "style": st}
+            if not EN.fits(br, "skylight", p, x, y, z, ux, uy):
+                continue
+            _place(sb, "skylight", p, x, y, z, ux, uy)
             nsk -= 1
             sb.stats["skylights"] = sb.stats.get("skylights", 0) + 1
         elif nv > 0:
             st = styles[int(_u(f"{sb.bid}|{x}|{y}", "vst") * 3) % 3]
+            if not EN.fits(br, "roof_vent", {"style": st}, x, y, z, ux, uy):
+                continue
             _place(sb, "roof_vent", {"style": st}, x, y, z, ux, uy)
             nv -= 1
             sb.stats["roof_vents"] = sb.stats.get("roof_vents", 0) + 1

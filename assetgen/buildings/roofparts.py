@@ -9,7 +9,7 @@ item is turned to, y across it, z up from the roof it stands on, millimeters):
 | water_tank | a timber barrel tank on a steel stand with a conical roof (`timber`), a steel cylinder on a plinth (`steel`) or a sectional panel tank on a skid (`panel`) |
 | antenna | a triangular lattice mast (`lattice`), a tapered pole with cross arms and whips (`whip`) or a pole with two dishes (`dish`), an aviation light on top |
 | pad | a helipad or an AV pad: the deck on a steel frame, its markings (the helipad's border, aiming circle and H; the AV pad's ring and cross) and edge lights |
-| penthouse | the mechanical penthouse: louver bands, a door, a roof lip, exhaust stacks |
+| penthouse | the mechanical penthouse: louver bands, a door, a roof lip, exhaust stacks (merged into its shell, its walls in the building's wall tint; no stacks under a corridor with no room) |
 | hut | a roof access hut (the stair bulkhead): a door under a canopy, a lamp |
 | dunnage | the steel frame an item stands on where the roof under it slopes (AG4's pitched roofs) |
 | billboard_frame | an empty billboard frame (posts, rails, struts, catwalk): the neon era's crown where no billboard stands |
