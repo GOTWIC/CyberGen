@@ -144,6 +144,20 @@ move, the mouse to look, E or Space up, Q or C down). `--play walk` walks it wit
 project's own character instead, and `--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
 alone). Controls, flags and streaming: [`docs/unreal_export.md`](docs/unreal_export.md).
 
+While playing:
+
+| Key | |
+|---|---|
+| (minimap) | top left, the city around you with your heading |
+| M | the map: wheel to zoom, right drag to pan, left click to teleport there |
+| . | a free camera (W A S D, E and Q up and down, wheel for speed); `.` again goes back |
+| Tab | the developer menu: day or night (by night the windows, neon, signs and street lights come on) |
+
+These come from a small C++ plugin that `citygen unreal` builds into the project, so they
+need a compiler Unreal 5.8 accepts (Visual Studio 2022 17.14 on Windows, Xcode on a Mac);
+without one, or with `--no-play`, the city imports without them. A big city's first Play
+takes a few minutes to load: [opening a big city](docs/unreal_export.md#opening-a-big-city).
+
 ---
 
 ## Stage 2: assetgen

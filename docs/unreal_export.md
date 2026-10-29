@@ -13,7 +13,9 @@ script, not this exporter.)
   [--new-project]` (and the play options below): `citygen/unreal.py` on the venv side (manifest, glTF prototypes, flat
   graphs, engine discovery, project preparation, editor runs; no Unreal needed, tested in
   pytest) and `citygen/ue/import_city.py`, `citygen/ue/check_city.py` inside the editor
-  (stdlib and `unreal` only). Details: `docs/progress/M15/README.md`.
+  (stdlib and `unreal` only). Details: `docs/progress/M15/README.md`. The play features
+  (below) add `citygen/unreal_play.py` (venv side) and the C++ plugin
+  `citygen/ue/CityGenPlay`, built into the project.
 - **After M15 merges**, a small refactor moves it into a package of its own beside the
   generators, split into a core (the manifest format, layering, project and editor
   handling, the import and check scripts, the shared engine assets) and stage 1's
@@ -100,6 +102,98 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 | `--new-project` | off | make the project from the First Person template if it is missing |
 | `--blockout-only` | off | leave out stage 2's buildings and streets |
 | `--check`, `--check-only`, `--shots DIR`, `--view ...` | | play and check the level, render views |
+
+### Opening a big city
+
+- **The first Play** of a large city takes minutes, not seconds: Unreal shows nothing until
+  every cell within `--view-range` of the player has loaded (Delta Megacity's middle: about
+  46,000 meshes), and Windows marks the editor "Not Responding" meanwhile. It is loading, not
+  frozen; later Plays in the same editor session are much faster. `--view-range 800` loads a
+  smaller ring (the far view shows the rest).
+- **On Windows**, add the project folder and the engine folder to Windows Security's
+  exclusions (Virus & threat protection, Manage settings, Exclusions): Defender otherwise
+  scans each of the level's files (one per actor, over 100,000 for a big city) as Unreal
+  opens it.
+- **In the editor** (not playing), a World Partition level loads nothing until asked ("no
+  regions loaded"): Window > World Partition > World Partition Editor, drag a box over an
+  area, right-click, Load Region From Selection. Keep the boxes small.
+- **"Texture streaming pool memory has been exhausted"** in red over the play window: a
+  stage 2 city's textures (AG6's library at 512 px/m) want more than the GPU's pool (70% of
+  its memory by default), so the farthest stream at a lower resolution. It is the
+  engine's on-screen debug text, drawn over the minimap: the developer menu's "Engine
+  messages" row (or the console's `DisableAllScreenMessages`) hides it.
+- **The engine** is found where the Epic Games Launcher put it (its
+  `LauncherInstalled.dat`), the usual `C:\Program Files\Epic Games\UE_5.*` or
+  `/Users/Shared/Epic Games/UE_5.*` too; `--engine` or `CITYGEN_UE_ROOT` names another.
+
+## Play features
+
+Every import gives the level a minimap, a map you can teleport with, a free camera and a
+developer menu with day and night, unless `--no-play`:
+
+| Key | What it does |
+|---|---|
+| (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, day or night, the keys |
+| M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
+| . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
+| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages; click a row to change it; Tab or Esc closes it |
+
+By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
+each building's lit share), neon and signs glow brighter, the sun becomes a dim blue moon
+high in the sky, the sky light dims, the exposure is held (a fixed EV100, or the eye would
+adapt until the night looked like the day), and the street and wall lights nearest the view
+(48 by default) become real point lights, warm and without shadows, the farthest of them
+fading so a lamp entering the set does not pop. Stage 3 (atmosgen) takes the lighting over
+when it comes; the menu's switch is a developer's.
+
+**How it is built.** The play features are game logic (input, a drawn overlay, possession,
+teleporting), which Unreal's Python cannot write into a Blueprint's graph, so they are a
+small C++ runtime plugin, `CityGenPlay` (`citygen/ue/CityGenPlay`), that `citygen unreal`
+copies into the project (`Plugins/CityGenPlay`, enabled in the .uproject) and builds with
+UnrealBuildTool for the editor before the import (`unreal_play.build_plugin`, about 20 s
+the first time, skipped when its source is unchanged). It needs a C++ compiler UE 5.8
+accepts: on Windows Visual Studio 2022 17.14 or later with its MSVC 14.44 (UE 5.8 bans
+14.39 to 14.43 and 14.44 before build 35211), on a Mac Xcode. Where it cannot be built, the
+city imports without the play features (the summary line says why): a plugin never built
+is taken out of the project again, one built before stays as it was built (the level's
+play actor keeps its class, so the import can delete it). The build passes `-NoHotReloadFromIDE`, so an editor open on
+another project with Live Coding does not block it; the project being imported must be
+closed, as for any import.
+
+- **The actor**: `CityGenPlay` (key `play`, always loaded, `cg.type=play`): the map texture
+  (`Play/T_<City>_Map`, imported again only when its pixels change) and the world
+  rectangle of its corners, the walkway points, the lamp heads and kinds, district label
+  points, `MPC_CityGen`; settings (minimap radius 250 m, free camera speed 30 m/s, 48 lamp
+  lights of 2,400 cd for a street light and 600 for a wall light, 28 m radius, night
+  exposure -3 EV100, the moon at 3% of the sun, start at night, show the minimap) are its
+  properties, editable on the actor in the level.
+- **The data** (`citygen/unreal_play.py`, written beside the manifest, the manifest's `play`
+  names them with their hash): `unreal/map.png`, the city from above drawn from the
+  blockout plan (sea, land, water, parks, plazas, sidewalks, streets by class, highways in
+  amber, bridges, the transit tubes, buildings in their district's hue, landmarks lighter;
+  4,096 pixels on its long side; drawn again only when the plan changes) and
+  `unreal/play.json` (the map's bounds and size; the walkway graph's lines sampled every
+  5 m and thinned to one point per 3 m cell and level, stairs, lifts, skybridges, elevated
+  and underpass walkways left out; each street and wall light's lamp head, its prototype's
+  `prop_light` part placed by the instance's transform; a point inside each district from
+  `city_model.json`, else the gameplay layer's zones).
+- **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
+  [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
+  `CityGen.Teleport X Y` (citygen meters), `CityGen.Status` (the state as one JSON line).
+  The actor's functions are callable from Python too (`set_night`, `set_map_open`,
+  `set_free_cam`, `teleport_player_to_citygen`, `get_status`).
+- **The check** (`--check`): with the walking pawn, the overlay up, the map and the menu
+  open and close, night lights lamps near the player, the free camera there and back to the
+  same pawn, a teleport across the city that waits for streaming and lands on the ground;
+  with `--shots` the minimap, the map, the menu and the night as the play window shows them
+  (`unreal_play_*.png`, the editor's own `shot showui`).
+
+**Plan for more** (each in the actor and the overlay, the data from the venv side):
+markers on the map from the gameplay layer (points of interest, fast travel and taxi
+points, transit stations, faction turfs as a toggle), a waypoint set by a click with its
+route along the walkway or lane graph, a time-of-day slider and weather once stage 3 has
+them, a speed and field-of-view slider for the free camera, a photo mode (UI hidden, a
+high resolution shot), and showing the lane and walkway graphs over the city for stage 4.
 
 ## Contract for every stage
 
@@ -643,3 +737,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG3 | Street fronts: each building's ground band its own entry and node (`<id>.front`, kind `building.front`) with complex collision and `fallback_full` (the mesh record and its hash; the importer sets the Nanite fallback to every triangle), its building's id, CPD and materials; doors tagged on the front's actor (`cg.door=<id>@<walkway>`) and gathered into a fourth flat graph, `doors` (`doors_of`); a stage 2 entry's own `ids` and `level` reach its actor; the tiles' decal meshes as entries (`decals.<tile>`, no Nanite, no collision, `decal.<cell>` slots with their cell index); tests without Unreal (`test_stage2_takes_assetgen_fronts`; `test_stage2_from_assetgen` and `test_stage2_takes_assetgen_parts` read the new entries) | Not run (the coordinating session's call; what to look for: `docs/progress/AG3/README.md`) |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |
 | AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Not run (the coordinating session's call; what to look for: leaves masked and two-sided up close and full at distance, sign faces showing their page cells upright, holo-ads textured, textured props) |
+| Play features (an exporter update on its own) | The play features above: `citygen/unreal_play.py` (the map image and play data, the plugin's install and build), the C++ plugin `citygen/ue/CityGenPlay` (the `CityGenPlay` actor, its overlay, free camera and console commands), the manifest's `play` and the play actor (key `play`, in `actor_hashes`), `--no-play`; every master also "used with Nanite" (`import_city.USAGES`: the editor compiled the usage again at every launch and drew the default material until then); the engine found through the Epic Games Launcher's install list (`unreal.launcher_engines`); a building whose street front takes it whole has no shell mesh (AG3's gate houses: the entry's `node` null, the front's `replaces` its key); tests `test_unreal_play.py`, `test_manifest_play` | Testport into a throwaway project (`CityDev`): import, `--check` with the play features, shots; Delta Megacity into another (`CityDelta`): import, HLODs, `--check`, shots (`docs/progress/play_features/`) |

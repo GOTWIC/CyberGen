@@ -27,6 +27,10 @@ city's sign pages under `assets/textures`), texture, scalar and vector parameter
 building's entry maps its wall and roof slots to its era's instances (`materials`). Without them (or with `assets` off) the manifest is the
 blockout's alone, byte for byte.
 
+The play features (`unreal_play`, docs/unreal_export.md "Play features"): `map.png` and
+`play.json` beside the manifest (its `play`), and the CityGenPlay plugin (C++) installed and
+built in the project before the import, the city imported without them when it cannot be.
+
 Then it runs the editor headless (`UnrealEditor-Cmd UPROJECT -run=pythonscript`) on
 `citygen/ue/import_city.py`, which reads only those files (stdlib and the `unreal` module).
 citygen itself makes no network call; the Unreal MCP plugin is the interactive route (a
@@ -748,11 +752,13 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
-                   assets: bool = True) -> dict:
+                   assets: bool = True, play: bool = False) -> dict:
     """The manifest of a blockout output (see the module docstring), with the prototypes'
     meshes and the flat graphs beside it: (manifest, prototype meshes, flat graphs). With
     `assets` (the default), stage 2's contributions in BUILD_DIR/assets are layered over the
-    blockout (`stage2`); a build without them gives the blockout's manifest alone."""
+    blockout (`stage2`); a build without them gives the blockout's manifest alone. With
+    `play`, the play features' map and data are written to BUILD_DIR/unreal (`unreal_play`)
+    and the manifest's `play` names them."""
     build = Path(build_dir)
     contribs = contributions(build) if assets else []
     plan = json.loads((build / "blockout_plan.json").read_text(encoding="utf-8"))
@@ -833,6 +839,9 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     if decks:
         # M14: the decks (their slab actors by key), for stage 4's levels
         man["decks"] = [decks[k] for k in sorted(decks)]
+    if play:
+        from . import unreal_play
+        man["play"] = unreal_play.write_play(build, man["plan_sha256"], plan, instances, graphs)
     if contribs:
         man["stage2"] = stage2(man, build, contribs)
         man["counts"]["actors"] = len(actor_hashes(man))
@@ -842,6 +851,7 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
 
 # the importer's always-loaded lighting actors (`ue/import_city.py`, `Importer.lighting`)
 LIGHTING = ("lighting.sun", "lighting.sky", "lighting.atmosphere")
+PLAY_KEY = "play"             # the play features' actor (`Importer.play_features`)
 
 
 def actor_hashes(man: dict) -> dict[str, str]:
@@ -857,6 +867,8 @@ def actor_hashes(man: dict) -> dict[str, str]:
         out.update({a["key"]: a["hash"] for a in s2["actors"] + s2["instances"]})
     out["player_start"] = content_hash(man["player_start"])
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
+    if man.get("play"):
+        out[PLAY_KEY] = man["play"]["hash"]      # (the play features' actor)
     return out
 
 
@@ -871,6 +883,8 @@ def actor_kinds(man: dict) -> dict[str, str]:
             out.pop(k, None)
         out.update({a["key"]: "mesh" for a in s2["actors"]})
         out.update({i["key"]: "instances" for i in s2["instances"]})
+    if man.get("play"):
+        out[PLAY_KEY] = "play"
     return out
 
 
@@ -888,15 +902,16 @@ def manifest_changes(old: dict, new: dict) -> dict[str, list[str]]:
 
 
 def write_manifest(build_dir: str | Path, name: str | None = None,
-                   assets: bool = True) -> Path:
-    """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json; the manifest's path.
-    `assets` False: the blockout alone, stage 2's contributions left out."""
+                   assets: bool = True, play: bool = True) -> Path:
+    """BUILD_DIR/unreal/manifest.json, prototypes.glb and graphs.json (and with `play` the
+    play features' map.png and play.json); the manifest's path. `assets` False: the blockout
+    alone, stage 2's contributions left out."""
     build = Path(build_dir)
     for f in ("blockout_plan.json", "tiles.json"):
         if not (build / f).is_file():
             raise FileNotFoundError(f"{build / f}: not a blockout output (run citygen build "
                                     f"--blockout or citygen blockout)")
-    man, meshes, graphs = build_manifest(build, name, assets)
+    man, meshes, graphs = build_manifest(build, name, assets, play)
     out = build / OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     write_glb(meshes, man["materials"], out / "prototypes.glb")
@@ -915,9 +930,28 @@ def _version_key(path: str) -> tuple:
     return tuple(int(x) for x in re.findall(r"\d+", Path(path).name))
 
 
+def launcher_engines() -> list[str]:
+    """The engines the Epic Games Launcher installed (its LauncherInstalled.dat), wherever
+    they were put: on Windows the Launcher lets one install them outside Program Files."""
+    files = {"win32": [Path(os.environ.get("PROGRAMDATA", "C:/ProgramData"))
+                       / "Epic" / "UnrealEngineLauncher" / "LauncherInstalled.dat"],
+             "darwin": [Path.home() / "Library" / "Application Support" / "Epic"
+                        / "UnrealEngineLauncher" / "LauncherInstalled.dat"]}
+    out = []
+    for f in files.get(sys.platform, []):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        for app in data.get("InstallationList", []):
+            if str(app.get("AppName", "")).startswith("UE_5") and app.get("InstallLocation"):
+                out.append(str(Path(app["InstallLocation"])))
+    return out
+
+
 def find_engine(explicit: str | None = None) -> Path | None:
     """The engine root: `explicit` (a root or an editor binary), $CITYGEN_UE_ROOT, else the
-    newest UE_5.* in the platform's usual place."""
+    newest UE_5.* in the platform's usual place or the Epic Games Launcher's install list."""
     for cand in (explicit, os.environ.get("CITYGEN_UE_ROOT")):
         if cand:
             p = Path(cand)
@@ -926,8 +960,10 @@ def find_engine(explicit: str | None = None) -> Path | None:
             return p if (p / "Engine" / "Binaries").is_dir() else None
     roots = []
     for g in ENGINE_GLOBS.get(sys.platform, []):
-        roots += [r for r in glob.glob(g) if (Path(r) / "Engine" / "Binaries").is_dir()]
-    roots.sort(key=_version_key, reverse=True)
+        roots += glob.glob(g)
+    roots = sorted({r for r in roots + launcher_engines()
+                    if (Path(r) / "Engine" / "Binaries").is_dir()},
+                   key=lambda r: (_version_key(r), r), reverse=True)
     return Path(roots[0]) if roots else None
 
 
@@ -1069,33 +1105,43 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
 def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None = None,
                 name: str | None = None, timeout: float = 7200.0,
                 assets: bool = True, play: str = "fly", fly_speed: float = FLY_SPEED_M_S,
-                startup: bool = True, view_m: float = VIEW_M) -> dict:
+                startup: bool = True, view_m: float = VIEW_M,
+                play_features: bool = True) -> dict:
     """`citygen unreal`: the manifest, then the headless import; the importer's result
     (created, updated, deleted and unchanged actors and assets, timings). `assets` False
     imports the blockout alone (stage 2's actors, if imported before, go; its meshes
     stay for the next import with it). `play` is what Play puts you in: "fly" (the fly
     pawn at `fly_speed` m/s) or "walk" (the project's own game mode and pawn); `view_m` how
     far the level streams around the player; `startup` makes the city the project's
-    startup and default map."""
+    startup and default map. `play_features`: the CityGenPlay plugin built into the project
+    first (`unreal_play.build_plugin`), then its actor with the city's map and data; when
+    the plugin cannot be built, the city imports without them (`play_plugin` says why)."""
     if play not in PLAY_MODES:
         raise ValueError(f"play: {play!r} is not one of {', '.join(PLAY_MODES)}")
+    from . import unreal_play
     build = Path(build_dir).resolve()
     up = Path(uproject).resolve()
     root = find_engine(engine)
     if root is None:
         raise RuntimeError("no Unreal Engine found (pass --engine or set CITYGEN_UE_ROOT)")
+    (build / OUT_DIR).mkdir(parents=True, exist_ok=True)
+    # (with --no-play a plugin built before stays, so the importer can delete its actor)
+    plugin = (unreal_play.build_plugin(root, up, build / OUT_DIR / "plugin_build_log.txt")
+              if play_features else {"ok": False, "built": False, "error": "--no-play"})
     t = time.time()
-    man_path = write_manifest(build, name, assets)
+    man_path = write_manifest(build, name, assets, play=plugin["ok"])
     manifest_s = round(time.time() - t, 1)
     added = prepare_project(up)
     out = man_path.parent
     job = {"mode": "import", "manifest": str(man_path), "build_dir": str(build),
            "result": str(out / "import_result.json"), "play": play,
-           "fly_speed_m_s": float(fly_speed), "view_m": float(view_m)}
+           "fly_speed_m_s": float(fly_speed), "view_m": float(view_m),
+           "play_features": bool(plugin["ok"])}
     res = run_editor(root, up, UE_DIR / "import_city.py", job, out / "import_log.txt",
                      timeout=timeout)
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
+    res["play_plugin"] = plugin
     if res.get("ok") and startup:
         res["startup_map_changed"] = set_startup_map(up, res["level"])
         res["startup_map"] = res["level"]
@@ -1166,6 +1212,19 @@ def hlod_summary(res: dict) -> str:
         return f"FAIL: HLOD build ({res.get('wall_s')} s); log {res.get('log')}"
     return (f"PASS: HLODs of {res['level']}: {res['hlod_actors']} HLOD actors, "
             f"{res['rebuilt']} built (the rest unchanged); {res['wall_s']} s")
+
+
+def play_features_summary(res: dict) -> str:
+    """Whether the play features came with the import, and the keys."""
+    pl, pf = res.get("play_plugin") or {}, res.get("play_features") or {}
+    if pl.get("ok") and pf.get("made"):
+        built = (f"plugin built in {pl['seconds']:g} s" if pl.get("built")
+                 else "plugin up to date")
+        return ("Play features: minimap, M map (wheel zoom, right drag pan, left click "
+                "teleport), . free camera, Tab developer menu (day and night); "
+                f"{pf.get('walk_points', 0)} walkway points, {pf.get('lamps', 0)} lamps; {built}")
+    why = pl.get("error") or pf.get("reason") or "not made"
+    return f"Play features: left out ({why})"
 
 
 def play_summary(res: dict) -> str:

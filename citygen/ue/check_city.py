@@ -17,6 +17,10 @@ import_city.py) it:
      spots of the city, down onto building roofs and across onto their facades;
    - walking: the player walked along a sidewalk of the walkway graph from the player start,
      on the ground all the way;
+   - the play features (when the import made them): the overlay, the map and the developer
+     menu, night with lamps lit, the free camera and back, a teleport across the city that
+     lands on the ground; with `shots` the minimap, map, menu and night as the play window
+     shows them;
 3. plays it again with the fly pawn's game mode: its speed in a straight flight through the
    buildings in its way, the city streamed in where it ends, and with `shots` two views from
    it (what streaming has loaded around it).
@@ -248,6 +252,7 @@ def run():
     yield from collision(world, pawn, man, slug)
     yield from walk(world, pawn, man)
     yield from cheats(world, pawn)
+    yield from play_features(world, man, slug)
     les.editor_request_end_play()
     yield from wait(2.0)
     if unreal.EditorAssetLibrary.does_asset_exist(FLY_MODE):
@@ -613,6 +618,121 @@ def cheats(world, pawn):
     RES["lines"].append("console: " + ", ".join(
         f"{c} {v['mode']}{'' if v['collision'] else ' without collision'}"
         for c, v in got.items()))
+
+
+def status(actor):
+    return json.loads(actor.get_status())
+
+
+def play_features(world, man, slug):
+    """The play features (the CityGenPlay plugin's actor), when the import made them: the
+    overlay on screen, the map and the developer menu open and close, night and day (the
+    lamps nearest the player lit by night), the free camera there and back, and a teleport
+    across the city onto a walkway, the player held until the city streamed in there and on
+    the ground after. With `shots`: the minimap, the map and the street by night."""
+    if not man.get("play"):
+        return
+    cls = getattr(unreal, "CityGenPlay", None)
+    found = unreal.GameplayStatics.get_all_actors_of_class(world, cls) if cls else []
+    if not found:
+        RES["checks"]["play_features"] = {"ok": False, "error": "no CityGenPlay actor playing"
+                                          if cls else "no CityGenPlay class (plugin not built)"}
+        return
+    a = found[0]
+    got = {"start": status(a)}
+    pawn0 = got["start"]["pawn"]
+    if JOB.get("shots"):
+        yield from ui_shot(world, "play_minimap")
+    a.set_map_open(True)
+    yield from wait(1.0)
+    got["map"] = status(a)["map"]
+    if JOB.get("shots"):
+        yield from ui_shot(world, "play_map")
+    a.set_map_open(False)
+    a.set_dev_menu_open(True)
+    yield from wait(0.5)
+    got["menu"] = status(a)["menu"]
+    if JOB.get("shots"):
+        yield from ui_shot(world, "play_menu")
+    a.set_dev_menu_open(False)
+    a.set_night(True)
+    yield from wait(2.0)
+    got["night"] = status(a)
+    if JOB.get("shots"):
+        yield from ui_shot(world, "play_night")
+    a.set_free_cam(True)
+    yield from wait(1.0)
+    got["free_cam"] = status(a)
+    a.set_free_cam(False)
+    yield from wait(1.0)
+    got["back"] = status(a)
+    a.set_night(False)
+    # a teleport to the walkway nearest the far corner of the city from the start
+    sx, sy, _ = man["player_start"]["position"]
+    b = man["bounds"]
+    tx = b[0] + 0.2 * (b[2] - b[0]) if sx > (b[0] + b[2]) / 2.0 else b[2] - 0.2 * (b[2] - b[0])
+    ty = b[1] + 0.2 * (b[3] - b[1]) if sy > (b[1] + b[3]) / 2.0 else b[3] - 0.2 * (b[3] - b[1])
+    a.teleport_player_to_citygen(tx, ty)
+    t = time.time()
+    yield from wait(1.0)
+    while status(a)["waiting"] and time.time() - t < 120:
+        yield
+    yield from wait(2.0)
+    got["teleport"] = status(a)
+    p = unreal.GameplayStatics.get_player_pawn(world, 0)
+    loc = p.get_actor_location()
+    down = trace(world, loc, unreal.Vector(loc.x, loc.y, loc.z - 1000.0), [p])
+    tp = got["teleport"]
+    moved = math.hypot(tp["x"] - sx, tp["y"] - sy)
+    ok = (got["start"]["ready"] and got["start"]["overlay"] and got["start"]["map_texture"]
+          and got["map"] and got["menu"] and got["night"]["night"]
+          and (got["night"]["lamps_lit"] > 0 or got["night"]["lamp_points"] == 0)
+          and got["free_cam"]["free_cam"] and got["free_cam"]["pawn"].startswith("CityGenFreeCam")
+          and not got["back"]["free_cam"] and got["back"]["pawn"] == pawn0
+          and not tp["waiting"] and moved > 100.0 and down is not None)
+    RES["checks"]["play_features"] = {
+        "ok": ok, "pawn": pawn0, "walk_points": got["start"]["walk_points"],
+        "lamp_points": got["start"]["lamp_points"], "lamps_lit": got["night"]["lamps_lit"],
+        "teleport_to": [round(tx, 1), round(ty, 1)],
+        "teleported_m": round(moved, 1), "landed": down is not None, "states": got}
+    RES["lines"].append(
+        f"play features: map, menu, night ({got['night']['lamps_lit']} lamps lit), free camera "
+        f"and back, teleport {moved:.0f} m "
+        + ("onto the ground" if down is not None else "with nothing under the player"))
+
+
+def ui_shot(world, name):
+    """A screenshot of the play window with its overlay (HighResShot leaves the UI out)."""
+    out = JOB["shots"]
+    os.makedirs(out, exist_ok=True)
+    path = os.path.join(out, f"unreal_{name}.png").replace("\\", "/")
+    if os.path.exists(path):
+        os.remove(path)
+    shots_dir = os.path.join(unreal.Paths.project_saved_dir(), "Screenshots")
+
+    def pngs():
+        found = {}
+        for root, _, files in os.walk(shots_dir):
+            for f in files:
+                if f.lower().endswith(".png"):
+                    p = os.path.join(root, f)
+                    found[p] = os.path.getmtime(p)
+        return found
+
+    before = pngs()
+    yield from wait(1.0)
+    # `shot showui`: the play window as drawn, overlay included, into Saved/Screenshots
+    unreal.SystemLibrary.execute_console_command(world, "shot showui")
+    t, new = time.time(), []
+    while not new and time.time() - t < 30:
+        yield
+        new = [p for p, m in pngs().items() if p not in before or m > before[p]]
+    yield from wait(1.0)
+    if new:
+        import shutil
+        shutil.copyfile(max(new, key=os.path.getmtime), path)
+        RES.setdefault("play_shots", []).append(path)
+        log(f"wrote {path}")
 
 
 def fly(world, pawn, man, slug):
