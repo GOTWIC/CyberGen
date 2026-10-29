@@ -252,6 +252,7 @@ OUT_M = 0.15            # the path to the walkway starts this far out of the doo
 REACH_M = 40.0          # how far from a door its walkway may be
 OWN_M = 3.6             # the path may cross its own building this near the door (an arcade)
 STEP_M = 1.0            # the first leg of the path: straight out of the doorway
+STEPS_M = (STEP_M, 3.0, 6.0)   # (further out where a corner of its own juts beside it)
 
 
 def _walk_index(model):
@@ -276,9 +277,9 @@ def _walk_index(model):
 def access(model, records: dict, briefs: dict | None = None) -> dict:
     """A door at every entrance and every unit's entrance (the shells' `doors` checks), each
     open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
-    by stepping `STEP_M` out of the doorway and walking straight to the walkway's nearest
-    point, crossing no other building (its own only within `OWN_M` of the door, under an
-    arcade). An entrance keeps the model's walkway when that one is open to it; otherwise,
+    by stepping `STEP_M` out of the doorway (else further out, `STEPS_M`, past a corner of
+    its own beside it) and walking straight to the walkway's nearest point, crossing no other
+    building (its own only within `OWN_M` of the door, under an arcade). An entrance keeps the model's walkway when that one is open to it; otherwise,
     and for every unit's door, the door takes the nearest open one (the smallest id among
     equals), written into its record (`walkway_id`, `walkway_from`: model or front) for
     stage 4. Where the city leaves a door no walkway to open to, it is counted apart, the
@@ -336,23 +337,31 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             x, y = px + d["position"][0], py + d["position"][1]
             nx, ny = d["normal"]
             ox, oy = x + nx * OUT_M, y + ny * OUT_M
-            qx, qy = x + nx * STEP_M, y + ny * STEP_M
-            q = Point(qx, qy)
             best = None
             model_w = d.get("model_walkway_id", d.get("walkway_id")) \
                 if d.get("entrance") is not None else None
-            out_ok = leg_clear(bid, ox, oy, qx, qy, x, y)
-            for k in sorted(tree.query(q.buffer(REACH_M)).tolist(), key=lambda k: ids[k]):
-                line = geoms[k]
-                f = line.interpolate(line.project(q))
-                dist = ((f.x - qx) ** 2 + (f.y - qy) ** 2) ** 0.5
-                if dist > REACH_M:
-                    continue
-                key = (0 if ids[k] == model_w else 1, round(dist, 3), ids[k])
-                if best is not None and key >= best[0]:
-                    continue
-                if out_ok and leg_clear(bid, qx, qy, f.x, f.y, x, y):
-                    best = (key, ids[k])
+            # (out of the doorway STEP_M, else further out past a corner of its own that
+            # juts beside it, then straight to the walkway)
+            for step in STEPS_M:
+                qx, qy = x + nx * step, y + ny * step
+                q = Point(qx, qy)
+                if not leg_clear(bid, ox, oy, qx, qy, x, y):
+                    break
+                for k in sorted(tree.query(q.buffer(REACH_M)).tolist(), key=lambda k: ids[k]):
+                    line = geoms[k]
+                    f = line.interpolate(line.project(q))
+                    dist = ((f.x - qx) ** 2 + (f.y - qy) ** 2) ** 0.5 + step - STEP_M
+                    if dist > REACH_M:
+                        continue
+                    key = (0 if ids[k] == model_w else 1, round(dist, 3), ids[k])
+                    if best is not None and key >= best[0]:
+                        continue
+                    if leg_clear(bid, qx, qy, f.x, f.y, x, y):
+                        best = (key, ids[k])
+                if best is not None:
+                    break
+            qx, qy = x + nx * STEP_M, y + ny * STEP_M
+            q = Point(qx, qy)
             if best is None:
                 d["walkway_from"] = "none"
                 if d.get("class") in ("party", "blind", "hidden"):
@@ -387,15 +396,18 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
 
 
 def mounts(records: dict) -> dict:
-    """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building)."""
-    n = glass = nowall = 0
+    """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building).
+    A mount on an edge of the footprint the shells tidy away (a spike or sliver of the lot's
+    ring: no wall stands there) is counted apart, the city's to change."""
+    n = glass = nowall = tidied = 0
     first = []
     for k in sorted(records):
         m = records[k]["checks"].get("mounts") or {}
         n += m.get("mounts", 0)
         glass += m.get("on_glass", 0)
         nowall += m.get("no_wall", 0)
+        tidied += m.get("tidied", 0)
         if (m.get("on_glass") or m.get("no_wall")) and len(first) < 5:
             first.append(f"{k}: {m.get('first')}")
     return {"name": "asset_mounts", "ok": glass == 0 and nowall == 0, "mounts": n,
-            "on_glass": glass, "no_wall": nowall, "first": first}
+            "on_glass": glass, "no_wall": nowall, "on_tidied_edge": tidied, "first": first}

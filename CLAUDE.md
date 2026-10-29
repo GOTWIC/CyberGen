@@ -965,6 +965,30 @@ AG6 (materials and textures) is in place, in `assetgen/materials/` (tests
   `ag6_preview.py`, `ag6_board.py`). `assetgen build --no-textures` gives AG1's flat
   materials. Exporter: `docs/unreal_export.md`, AG6 section. Results: `docs/progress/AG6/`.
 
+AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontparts.py` (tests
+`tests/assetgen/test_ag_fronts.py`):
+- **Band**: every prism mass on the ground has a ground band (its foot to its first floor
+  line, at most 7.5 m) built apart as the building's second mesh, `<id>.front` (layer 1 of
+  `meshbuf.Buf`, `meshbuf.split`); zones as polygons with notches and holes, pockets, caps
+  that close both meshes; collision hulls start at its top (`band_m`), the front collides as
+  drawn in Unreal.
+- **Openings**: a shopfront per unit by use (`part.shopfront.<use>`), a door at every other
+  entrance (`part.door.<main|service|dock|rollup|garage|gate>`), the ground row's windows; a
+  door shifts, then cuts into corner piers, else hangs flush; units and entrances on a wall
+  a neighbor stands against move to an open facade of the mass (`Band.rehome`) or the
+  building (`leftovers`), `moved`. Door records (id `<building>.door.e<k>|u<k>`, kind,
+  walkway, position, normal, size) go to the contribution and the exporter's `doors` graph.
+- **Mounts, walls, decals**: panels under awnings too, plates, trellises and scaffold ties
+  (`hardware`), downpipes and murals on blind and fire walls (`walls`), decals of AG6's atlas
+  on the band (`_decals`; one mesh per tile, `decals.<tile>`, mesh decals in Unreal).
+  AG8 keeps every object it draws; AG3 gives the wall its fascia, panel, pier or plate.
+- **Checks**: `asset_access` (a door per entrance and unit, open to a walkway; facing a
+  neighbor or with no walkway ahead reported, not failed) and `asset_mounts` (never on
+  glass); budget allowances per unit and per front.
+- **Previews**: AG6's `assetgen materials preview` now draws fronts, decals, AG2's parts and
+  AG8's props and plants. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
+  grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

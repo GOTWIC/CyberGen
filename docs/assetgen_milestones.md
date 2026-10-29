@@ -274,6 +274,86 @@ slivers are long sheds), landmarks and stepped plinths on slopes; AG6 materials 
 (the slots and tints are the contract; parts carry their building's CPD); the determinism
 check (Mac = x86) waits for `docs/determinism_check.md`.
 
+## AG3: street fronts
+
+**Built.** The ground band of every building (`assetgen/buildings/fronts.py`, the part kit's
+street-front families in `frontparts.py`):
+- **band** (`band_top`): every prism mass on the ground has a band from its foot to its
+  first floor line (the whole mass when less than 1 m is left above, at most 7.5 m), built
+  apart from the rest of the shell as the building's second mesh (`<id>.front`, layer 1 of
+  the mesh buffer, `meshbuf.split`). Per zone (the industrial dado or the base strip, then
+  the wall) the wall is one polygon with the openings as holes, or as notches where they
+  reach the pavement (`_pieces`: every zone line meets the openings of the zone beside it,
+  so no T-junction); each opening a pocket (head, jambs split at the zone line, sill unless
+  it is a notch, the pane at the back); the cap under the mass notched at every notch, the
+  cap at the top the interface with the shell above, so both meshes are closed. Upper
+  regions over a party region are fire walls (`firewall`, no windows). A pocket keeps off
+  the corners (`_clear`), off other edges of the mass (`_blocked`) and off the recesses
+  already cut down to the pavement on the other facades (`_meets`: two recesses either side
+  of an acute corner);
+- **shopfronts**: one per ground-floor unit by its use (shop, food, bar, club, clinic,
+  laundromat, arcade, office and the rest): frame by the genome's front genes (aluminum,
+  painted, steel, timber), riser (tile, stone, dark, paint, wall), recess 0.45 to 0.9 m,
+  transom, mullions, a door at the unit's entrance (glass, panel, barred, revolving),
+  shutters (box, half down, down) and grilles by grime and wealth, counters for food,
+  frosted glass for clinics, posters, a light box, screens for arcades, a dark club front
+  with its canopy and a rope queue, neon on the fascia; the fascia plate over the opening is
+  where AG8's sign box and awning hang (the opening's head stops under a mount);
+- **doors**: a door at every entrance the units do not take: main (one or two leaves of the
+  genome's style in a recess, steps up inside it, a canopy over it where the facade has
+  room and no podium canopy), service, loading dock (opening 1.2 m up, steel lip, bumpers,
+  seal) or roll-up door, garage mouth (height bar, barrier arm, half-raised grille), yard
+  gate. A door that cannot be cut where the model has it shifts up to 1.2 m along the
+  facade, then into the corner piers (a short facade), else hangs flush on the wall; a main
+  entrance between two units keeps room for its own door (the shopfronts stop short: a
+  lobby between the shops); a unit or entrance the model put on a wall a neighbor stands
+  against, or on a facade too short for it, goes to the nearest facade of its mass with room
+  and not into a court (`Band.rehome`, in place of the ground windows there) else flush on
+  the nearest band facade, open walls first (`leftovers`), marked `moved`. Each door's record: id (`<building>.door.e<k>` or
+  `.u<k>`), kind, entrance or unit, use, walkway, position, outward normal, size, depth,
+  steps, flush, moved, class;
+- **mounts**: AG1's panels wherever a mount would fall on glass now also cover awnings;
+  plates behind wall lights and cable ends, trellises under facade greenery, scaffold ties on
+  the piers behind scaffolding (`hardware`); downpipes on blind and fire walls and murals on
+  fire walls of 5 x 5 m and more (`walls`);
+- **decals** (`_decals`, cells of AG6's decal atlas, at most 14 a building): grime along the
+  foot of the wall, leaks under the band's windows, rust beside metal doors, graffiti on
+  blank stretches by grime and the district's danger (more on alleys, blind and fire walls),
+  posters and stickers on the piers between shopfronts, cracks and moss on blind walls by
+  wear and greenery. A tile's decals are one mesh of quads 1 cm off the walls in its pack
+  (`decals.<tile>`, a primitive per cell, UV0 0 to 1 over each quad): mesh decals in
+  Unreal, alpha quads in Blender;
+- **genome** (`GENOME_VERSION` 3): front frame, riser, door style, steps, fascia and paint,
+  recess depth and shutter share, drawn under purposes of their own (`front.*`), so every
+  earlier gene keeps its draw; `effective` adds the front genes a building used;
+- **collision** (`collision.py`): a ground mass's hulls start at the band's top; the front
+  collides as drawn in Unreal (complex collision);
+- **checks** (`asset_checks.py`): `asset_access` (a door at every entrance and unit, each
+  open to its walkway: a step out of the doorway, 1 m, else 3 or 6 m past a corner of its
+  own that juts beside it, then straight to the walkway's nearest point with no building in
+  between; the model's walkway when it reaches it, else the ground walkway in front of the
+  door, written into the record for stage 4; a door facing a neighbor or with no walkway
+  ahead in reach is reported, not failed: the model put the entrance there) and
+  `asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never
+  on glass, `fronts.mount_check`; one on an edge the shells tidy away, a spike of the lot's
+  ring, is reported apart); `asset_budget` counts 1,500 triangles per ground-floor unit and
+  per street front on top of section 11's estimate;
+- **build** (`build.py`, `GEN_VERSION` ag3.3): the front node beside the shell in the tile
+  pack, the decal mesh per tile, the record's `front` (node, triangles, slots, `band_m`),
+  `doors`, `checks.mounts`, `checks.doors`, `level` on a deck, and the stats' units and
+  decals; materials: every AG3 slot in AG6's catalog (doors, steps, steel, rubber, roll-up
+  doors, stanchions, fascias, mounts, trellises, pipes, risers, lit faces, neon and screens,
+  paints, posters, graffiti, murals; a bar's dark glazing its own interior row), decal slots
+  `decal.<cell>` on the `decal` master with the cell's index;
+- **previews** (`materials/preview.py`, `blender/ag6_preview.py`): AG6's textured previews
+  now draw the fronts and decals with the shells, AG2's instanced parts (one geometry-node
+  instancer per pack, the building's tints on each instance, the materials reading them from
+  the instance) and AG8's props and plants near a street view (a geometry-node instancer
+  per variant, the exact props of the tiles in reach; M15's prototypes left out);
+- **exporter**: below;
+- tests `tests/assetgen/test_ag_fronts.py` (new), `test_ag_facades.py` (the part kit has
+  AG3's families; the band's top cap is a `structure` face), `tests/test_unreal.py`.
+
 ## AG6: materials and textures
 
 **Built.** Package `assetgen/materials/` (CLI `assetgen library [OUT] [--density 512]
