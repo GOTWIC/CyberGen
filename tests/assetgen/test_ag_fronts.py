@@ -184,7 +184,7 @@ def test_every_street_front_slot_has_a_material():
 def test_small_city_fronts_doors_and_checks():
     out = small_assets()
     rep = small_assets_report()
-    checks = {c["name"]: c for c in rep["checks"]}
+    checks = rep["checks"]
     assert checks["asset_access"]["ok"], checks["asset_access"]
     assert checks["asset_mounts"]["ok"], checks["asset_mounts"]
     man = json.loads((out / "assets" / "manifest.json").read_text())

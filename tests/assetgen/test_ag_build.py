@@ -138,9 +138,14 @@ def test_unreal_contribution_covers_every_building():
     man = _manifest(base)
     uc = json.loads((base / "assets" / "unreal_contribution.buildings.json").read_text())
     assert uc["stage"] == "assetgen" and uc["layer"] == 2 and uc["part"] == "buildings"
-    keys = [e["key"] for e in uc["entries"]]
-    assert keys == sorted(man["buildings"])
-    for e in uc["entries"]:
+    blds = [e for e in uc["entries"] if e["kind"] == "building"]
+    assert [e["key"] for e in blds] == sorted(man["buildings"])
+    # (AG3: a street front per building that has one, a decal mesh per tile)
+    fronts = {e["key"] for e in uc["entries"] if e["kind"] == "building.front"}
+    assert fronts == {f"{k}.front" for k, r in man["buildings"].items()
+                      if r["front"]["triangles"]}
+    assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals"}
+    for e in blds:
         r = man["buildings"][e["key"]]
         assert e["glb"] == r["glb"] and e["node"] == f"{e['key']}.shell"
         assert e["pivot"] == r["pivot"] and e["nanite"] and not e["distance_field"]
@@ -161,6 +166,8 @@ def test_parts_packs_and_their_instances():
     nodes: dict[str, bytes] = {}
     n = 0
     for e in uc["entries"]:
+        if e["kind"] != "building":
+            continue
         r = man["buildings"][e["key"]]
         assert len({p["kind"] for p in e["parts"]}) == len(e["parts"])
         assert e["instances"] == sum(p["count"] for p in e["parts"])
