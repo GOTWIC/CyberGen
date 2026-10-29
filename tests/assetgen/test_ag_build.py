@@ -36,17 +36,19 @@ def test_every_building_has_a_shell_and_a_proxy():
     for bid, r in man["buildings"].items():
         assert r["triangles"] > 0 and r["proxy"]["triangles"] > 0, bid
         assert r["checks"]["mesh"]["open_edges"] == 0
-        assert r["collision"]["boxes"] or r["collision"]["convex"]
+        # (AG3: a building its street front takes whole collides as the front is drawn)
+        assert r["collision"]["boxes"] or r["collision"]["convex"] or r["front"]["triangles"]
     for t, info in man["tiles"].items():
         for sub in ("tiles", "proxies"):
             data = (base / "assets" / sub / f"{t}.glb").read_bytes()
             assert C.sha256_bytes(data) == info[sub]["sha256"]
 
 
-def test_checks_are_the_five():
+def test_checks_are_the_seven():
     rep = small_assets_report()
-    assert sorted(rep["checks"]) == ["asset_budget", "asset_coverage", "asset_envelope",
-                                     "asset_meshes", "asset_unique"]
+    assert sorted(rep["checks"]) == ["asset_access", "asset_budget", "asset_coverage",
+                                     "asset_envelope", "asset_meshes", "asset_mounts",
+                                     "asset_unique"]
     assert rep["checks"]["asset_unique"]["pairs"] > 0
 
 
