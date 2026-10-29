@@ -219,7 +219,7 @@ def _write_text(path: Path, text: str) -> bool:
 
 
 def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None = None,
-          force: bool = False, report_always: bool = True) -> dict:
+          force: bool = False, report_always: bool = True, lib: dict | None = None) -> dict:
     """Make the street packs of a city into out_dir (BUILD/assets); returns the report.
     `report_always=False` (`assetgen build`) writes the report only when another file
     changed or it is missing, so an unchanged rebuild writes no file."""
@@ -325,7 +325,7 @@ def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None =
                 "tiles": tiles_out, "pieces": pieces_out}
     man_text = json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False) + "\n"
     man_written = _write_text(mf, man_text)
-    contrib = contribution(manifest)
+    contrib = contribution(manifest, lib)
     con_text = json.dumps(contrib, sort_keys=True, indent=1, ensure_ascii=False) + "\n"
     con_written = _write_text(out_dir / "unreal_contribution.streets.json", con_text)
     t_write = time.perf_counter()
@@ -353,7 +353,7 @@ def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None =
     return rep
 
 
-def contribution(manifest: dict) -> dict:
+def contribution(manifest: dict, lib: dict | None = None) -> dict:
     """assetgen's Unreal entries for the street pieces (AG0's format, `docs/unreal_export.md`):
     one static mesh actor per piece at its own pivot, `replaces` naming the blockout objects
     it supersedes; sky tube glass as non-Nanite meshes with a LOD chain; container stacks as
@@ -396,9 +396,11 @@ def contribution(manifest: dict) -> dict:
                 slots |= set(lo["slots"])
         for k, v in (r.get("notes", {}).get("walkways") or {}).items():
             walkways[k] = v
-    return {"version": 1, "stage": "assetgen", "part": "streets", "layer": 2,
-            "masters": list(MT.MASTERS), "materials": MT.contribution_materials(slots),
-            "entries": entries, "graphs": {"walkways": walkways}}
+    con = {"version": 1, "stage": "assetgen", "part": "streets", "layer": 2,
+           "masters": list(MT.MASTERS), "materials": MT.contribution_materials(slots),
+           "entries": entries, "graphs": {"walkways": walkways}}
+    from ..materials import contrib as MC      # AG6: textures with a library
+    return MC.streets(con, lib)
 
 
 def _pivot(r: dict) -> list[float]:

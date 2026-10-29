@@ -145,6 +145,19 @@ massing articulation (corner cuts, setback ledges, podium canopies, arcades) fol
 (`systems.ARTICULATION`). `assetgen preview ... --views towers` adds the tallest building of
 every era up close.
 
+Since AG6 `assetgen build` also textures everything: it makes the shared texture library
+once (about a minute, `~/.cache/cybergen/assetgen_library`), the city's sign, ad and logo
+pages (`OUT/assets/textures/`, `signs.json`) and `materials_report.txt` (texel density,
+texture budgets). The spec steers them too: an era sets the wall and roof textures of its
+buildings (each era has its own look), `signage_scripts` the scripts of a district's signs,
+a district's `neon_palette` their colors and its `wear` the grime, an owner's
+`brand_colors` its logo and ads. Textured renders, by day and by night:
+
+```bash
+.venv/bin/python -m assetgen materials preview OUT --night
+.venv/bin/python -m assetgen materials board OUT/boards
+```
+
 ### 6. Report
 
 Report the spec's path, what it sets and why (one line per entry), the validation result, the

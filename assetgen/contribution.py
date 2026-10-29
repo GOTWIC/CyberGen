@@ -46,7 +46,10 @@ def materials() -> dict:
     return out
 
 
-def buildings(man: dict) -> dict:
+def buildings(man: dict, lib: dict | None = None) -> dict:
+    """The buildings' contribution; with the material library `lib` (AG6), textured
+    materials, per-building material maps and AG6's Custom Primitive Data
+    (`materials/contrib.py`)."""
     entries = []
     for key, r in sorted(man["buildings"].items()):
         entries.append({
@@ -70,8 +73,10 @@ def buildings(man: dict) -> dict:
             "tags": {"cg.type": r["type"], "cg.district": r["district"] or "",
                      "cg.tile": r["tile"]},
         })
-    return {"version": 1, "stage": "assetgen", "part": "buildings", "layer": 2,
-            "generator": f"assetgen {__version__} ({man['generator']})", "frame": FRAME,
-            "city": man["city"], "model_sha256": man["model_sha256"],
-            "masters": ["facade", "glass", "metal", "neon", "foliage"],
-            "materials": materials(), "cpd_layout": SY.CPD_LAYOUT, "entries": entries}
+    con = {"version": 1, "stage": "assetgen", "part": "buildings", "layer": 2,
+           "generator": f"assetgen {__version__} ({man['generator']})", "frame": FRAME,
+           "city": man["city"], "model_sha256": man["model_sha256"],
+           "masters": ["facade", "glass", "metal", "neon", "foliage"],
+           "materials": materials(), "cpd_layout": SY.CPD_LAYOUT, "entries": entries}
+    from .materials import contrib as MC
+    return MC.buildings(con, man, lib)

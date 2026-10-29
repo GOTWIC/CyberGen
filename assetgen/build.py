@@ -321,7 +321,8 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
-          log=print, streets: bool = True, props: bool = True) -> dict:
+          log=print, streets: bool = True, textures: bool = True,
+          props: bool = True) -> dict:
     t0 = time.perf_counter()
     model, sha, bdir = B.load_model(build_dir)
     out = bdir / "assets"
@@ -385,6 +386,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         files[r["tile"]] = r["files"]
         wrote += r["wrote"]
     t4 = time.perf_counter()
+    from .materials import build as MS
+    from .materials import params as MP
+    MP.annotate(records, briefs, genomes)          # AG6: era, interior, extra CPD
+    lib = MS.library_for(spec_doc, out, log=log) if textures else None
     k = int(spec_doc["min_gene_distance"])
     tile_parts = {t: files[t].get("parts") for t in sorted(files)}
     checks = [AC.coverage(model, records), AC.envelope(records),
@@ -411,7 +416,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                 wrote += 1
     from . import contribution as UC
     wrote += MF.write_if_changed(out / "unreal_contribution.buildings.json",
-                                 MF.dumps(UC.buildings(man)))
+                                 MF.dumps(UC.buildings(man, lib)))
     secs = {"load": round(t1 - t0, 2), "briefs": round(t2 - t1, 2),
             "genomes": round(t3 - t2, 2), "tiles": round(t4 - t3, 2),
             "checks": round(t5 - t4, 2), "total": round(time.perf_counter() - t0, 2)}
@@ -422,7 +427,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     if streets:
         from .streets.build import build as street_build, default_workers
         srep = street_build(model, sha, out, filled, workers=workers or default_workers(),
-                            report_always=False)
+                            report_always=False, lib=lib)
         f = srep["files"]
         n = len(f["written"]) + f["tiles_removed"] + sum(
             int(bool(f[k])) for k in ("parts_written", "manifest_written",
@@ -437,6 +442,13 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         rep["ok"] = rep["ok"] and srep["ok"]
         log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
             f"made, {n} files written")
+    if lib is not None:
+        mrep = MS.stage(model, sha, out, spec_doc, lib, log)
+        wrote += mrep["files_written"]
+        rep["materials"] = {"ok": mrep["ok"], "textures": mrep["textures"],
+                            "failed": [c for c, v in mrep["checks"].items() if not v["ok"]],
+                            "seconds": mrep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and mrep["ok"]
     if props:
         from .props.build import build as props_build, default_workers as props_workers
         prep = props_build(model, sha, out, filled, briefs=briefs,

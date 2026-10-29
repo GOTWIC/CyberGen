@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1, AG2, AG7 and AG8 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1, AG2, AG6, AG7 and AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -154,7 +154,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG2`](docs/progress/AG2)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7)
 
 ### Cities
 
@@ -255,6 +255,26 @@ Asian and Indic scripts. Each prop and plant picks its variant from its id, and 
 variants replace the blockout's stand-ins as instances. Sheets of every style and the
 plants, and street views: [`docs/progress/AG8`](docs/progress/AG8).
 
+| A street in The Stacks, Vesper Bay (8K) | The same street by night (8K) |
+|---|---|
+| <img src="docs/progress/AG6/vesper_bay/8k/street_2.jpg" width="420"> | <img src="docs/progress/AG6/vesper_bay/8k/street_2_night.jpg" width="420"> |
+
+Every building and street piece textured: a library of tileable surfaces in each era's look
+(concrete, plaster, brick, panels, cladding, roofs, asphalt, paving, metals), a room behind
+every window by day and lit by night, rain streaks and grime, and each city's own shop, bar
+and clinic signs in its districts' scripts, brand logos and ads.
+
+```bash
+.venv/bin/python -m assetgen library
+.venv/bin/python -m assetgen materials preview out/vesper_bay --night
+```
+
+`assetgen build` makes the library the first time (about a minute, 658 MB, kept in
+`~/.cache/cybergen/assetgen_library`) and the city's sign pages, and gives every building and
+street piece its textured materials, which the Unreal exporter imports with the city.
+`assetgen materials preview` renders them in Blender, `assetgen materials board` a board of
+each era's surfaces. More: [`docs/progress/AG6`](docs/progress/AG6).
+
 <img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
 
 Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).
@@ -273,7 +293,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
 | AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
 | AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
-| AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signage | Planned |
+| AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signs in each district's scripts, textured materials in Blender and Unreal | Done |
 | AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |
 | AG8 | Props, plants and signs | Street furniture and parked cars in variants per district style, trees by species, shrubs and ivy, shop signs with their text, neon, billboards, holo-ads | Done |
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
