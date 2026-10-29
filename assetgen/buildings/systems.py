@@ -465,6 +465,7 @@ SLOTS: dict[str, tuple] = {
     "pad_paint_white": ("facade", "#e8e8e2", 0.6, 0.0, None),
     "pad_paint_yellow": ("facade", "#d9b21f", 0.6, 0.0, None),
     "roof_wall": ("facade", "#9a968e", 0.85, 0.0, None),
+    "penthouse": ("facade", "#9a968e", 0.85, 0.0, "wall"),
     "escape": ("metal", "#1f2326", 0.6, 0.7, None),
     "duct": ("metal", "#9ea3a7", 0.5, 0.6, None),
     "cable": ("facade", "#141414", 0.7, 0.0, None),

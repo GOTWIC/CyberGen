@@ -88,6 +88,7 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "lamp_green": ("neon", None), "lamp_amber": ("neon", None), "lamp_white": ("neon", None),
     "pad_deck": ("facade", "pad_concrete"), "pad_paint_white": ("facade", "road_paint"),
     "pad_paint_yellow": ("facade", "road_paint"), "roof_wall": ("facade", "structure"),
+    "penthouse": ("facade", "structure"),
     "escape": ("metal", "metal_dark"), "duct": ("metal", "metal_galvanized"),
     "cable": ("facade", "rubber"), "camera": ("facade", "plastic"),
     "camera_lens": ("metal", None), "portal_lining": ("metal", "panel_corporate_glass"),

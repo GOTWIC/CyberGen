@@ -97,6 +97,10 @@ def test_pitched_roofs_and_mansards():
     gm, res = _with(br, crown="pitched")
     _ok(br, res)
     assert _kinds(res) <= {"gable", "hip"} and len(_kinds(res)) == 1
+    br = _tower("stucco_shutters", 3, btype="building.villa", w=16.0, d=11.0, fh=3.2)
+    gm, res = _with(br, crown="pagoda_roof")
+    _ok(br, res)
+    assert _kinds(res) == {"pagoda"}
     # an L: no rectangle, so a mansard on its ring
     ell = [[-10.0, -8.0], [10.0, -8.0], [10.0, 2.0], [0.0, 2.0], [0.0, 8.0], [-10.0, 8.0]]
     br = brief_of([mass(ell, 0.0, 9.6, 3)], btype="building.villa")
@@ -181,7 +185,10 @@ def _bridged():
         dict(end, id="sb.on_floor", z_m=6 * 3.4, at={"mass": 0, "edge": 1, "s": 10.0, "d": 0.0}),
         dict(end, id="sb.off_floor", z_m=6 * 3.4 + 1.5,
              at={"mass": 0, "edge": 3, "s": 10.0, "d": 0.0}),
-        dict(end, id="sb.no_edge", z_m=6 * 3.4, at=None)]
+        dict(end, id="sb.no_edge", z_m=6 * 3.4, at=None),
+        # a cable bridge's narrow deck, landing in a corner pier: still a door
+        dict(end, id="sb.cable", kind="cable", width_m=1.2, z_m=3 * 3.4,
+             at={"mass": 0, "edge": 0, "s": 1.0, "d": 0.0})]
     return br
 
 
@@ -190,14 +197,14 @@ def test_landing_doors_where_a_skybridge_meets_a_floor_line():
     gm, res = _with(br)
     _ok(br, res)
     ld = {x["id"]: x for x in res["landings"]}
-    assert ld["sb.on_floor"]["door"]
+    assert ld["sb.on_floor"]["door"] and ld["sb.cable"]["door"]
     assert not ld["sb.off_floor"]["door"] and ld["sb.off_floor"]["why"] == "off_floor"
     assert ld["sb.no_edge"]["why"] == "no_edge"
     assert any(x["family"] == "landing" for x in res["parts"]) or \
         res["stats"].get("parts_merged", 0) > 0
     rec = {"b": {"landings": res["landings"]}}
     c = AC.landings(rec)
-    assert c["ok"] and c["doors"] == 1 and c["off_floor"] == 1 and c["no_edge"] == 1
+    assert c["ok"] and c["doors"] == 2 and c["off_floor"] == 1 and c["no_edge"] == 1
 
 
 def _portal(station: bool):

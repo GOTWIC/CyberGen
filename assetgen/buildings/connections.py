@@ -60,7 +60,10 @@ GIRDER_T = 400               # box girder under it (the deck structure: 1.0 m in
 COLLAR = 250
 LANDING_TOL = 400            # a landing's deck within this of a floor line: a door row
 LANDING_THIN = 1000          # a mass too thin for windows still takes a landing door
+DOOR_MIN = 900               # a landing door at least this wide
+LANDING_CORNER = 400         # and at least this far from a corner (a reveal and 6 cm)
 FRAME_JAMB = 600             # a portal frame's jambs, beside its mouth
+FRAME_DEPTH = 340            # and how far it stands out of the facade, with its light strip
 PORTAL_CLEAR = 1000          # the corridor round a sky tube's section
 PLATFORM_GAP = 2750          # a sky station's platform edge from the tube's axis
 TUBE_FLOOR = 2520            # the tube's floor (AG7) under its axis
@@ -231,9 +234,13 @@ def landing_ops(sb, fa, row: tuple, ops: list) -> list:
         if abs(zf - ld["z"]) > LANDING_TOL or hi - lo < 1900:
             continue
         s = ld["s"] - fa.soff
-        a_ = max(s - ld["w"] // 2 + 300, fa.c0)
-        b_ = min(s + ld["w"] // 2 - 300, fa.L - fa.c1)
-        if b_ - a_ < 1000:
+        # (the bridge's width less its collars; at least DOOR_MIN for a catwalk or a cable
+        # bridge's narrow deck)
+        hw = max(ld["w"] // 2 - 300, DOOR_MIN // 2)
+        # (into a corner pier if the bridge lands there, LANDING_CORNER from the corner)
+        a_ = max(s - hw, min(fa.c0, LANDING_CORNER))
+        b_ = min(s + hw, fa.L - min(fa.c1, LANDING_CORNER))
+        if b_ - a_ < DOOR_MIN - 100:
             continue
         ops = [op for op in ops if op[1] < a_ - 200 or op[0] > b_ + 200]
         ops.append((a_, b_, "storefront", -2))
@@ -535,7 +542,10 @@ def _mouths(sb, line, za: int, zb: int, half: int, seen: set) -> None:
             sn = abs(tx * uy - ty * ux)
             if sn < 0.3:
                 continue
-            w = PT.q(min(2 * half / sn, L - 600))
+            # (the mouth's width along the facade, and on a slanted tube room for the
+            # frame's depth, so no jamb stands in the tube's corridor)
+            cs = abs(tx * ux + ty * uy)
+            w = PT.q(min(2 * (half + FRAME_DEPTH * cs) / sn, L - 600))
             s_ = (hit.x - a[0]) * ux + (hit.y - a[1]) * uy
             room = (s_ - w / 2, L - s_ - w / 2)
             if min(room) < 0:

@@ -9,3 +9,4 @@ First full build with roofs and connections (every assetgen check passing), draw
 - `skybridge.jpg`: an enclosed skybridge between two towers (glazed walls on a box girder).
 - `portal.jpg`: the sky tube entering a tower in The Stacks through its portal, the lit
   frame at its mouth; a podium deck below.
+- `stacks.jpg`: The Stacks from above: penthouses on the towers, the sky tube between them through its portals, podium decks.

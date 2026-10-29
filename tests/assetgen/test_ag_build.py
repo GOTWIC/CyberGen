@@ -144,7 +144,9 @@ def test_unreal_contribution_covers_every_building():
     fronts = {e["key"] for e in uc["entries"] if e["kind"] == "building.front"}
     assert fronts == {f"{k}.front" for k, r in man["buildings"].items()
                       if r["front"]["triangles"]}
-    assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals"}
+    # (AG4: the roof equipment of a tile, `roofs.<tile>`)
+    assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals",
+                                                  "roof_equipment"}
     for e in blds:
         r = man["buildings"][e["key"]]
         assert e["glb"] == r["glb"] and e["node"] == f"{e['key']}.shell"

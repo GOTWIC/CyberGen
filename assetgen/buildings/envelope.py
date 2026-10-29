@@ -55,7 +55,10 @@ SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "dish": "strip", "tile": "strip", "louver": "strip",
               "stanchion": "street", "rope": "street"}
 SLOT_REACH.update({"court_paving": "court", "planter": "court", "green_roof": "court",
-                   "coping": "flush", "coping_stone": "flush"})
+                   "coping": "flush", "coping_stone": "flush",
+                   # AG4's facade details and portal frames, merged, reach as their family
+                   "escape": "deep", "duct": "strip", "cable": "flush", "camera": "strip",
+                   "camera_lens": "strip", "portal_lining": "strip", "lamp_white": "strip"})
 for _s in SY.SLOTS:
     if _s not in SLOT_REACH and (_s.startswith(("paint_", "neon_", "screen_", "poster_",
                                                 "mural_", "graffiti_", "riser_", "lit_",
@@ -181,7 +184,9 @@ def clearances(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     """AG4 (scope 9): nothing the asset adds to its masses (overhangs, roof forms, roof
     equipment, masts) inside the corridor of a skybridge, a transit guideway and its
     trains or a sky tube passing near it (the brief's `clearances`), and every portal open
-    (no point of the building inside its sky tube's section and 0.15 m round it)."""
+    (no point of the building inside its sky tube's section and 0.15 m round it). A sky
+    tube that passes through one of the building's portals is held to the portal's test:
+    its corridor's margin there is the portal's lining, frame and platforms."""
     pts = [np.unique(a["pos"], axis=0).astype(np.float64) for a in arrs.values()]
     pts += [np.asarray(p, dtype=np.float64) for p, _ in (parts or [])]
     out = {"corridors": len(brief.get("clearances") or []), "hits": 0, "portal_hits": 0,
@@ -201,7 +206,10 @@ def clearances(brief: dict, arrs: dict, parts: list | None = None) -> dict:
             d = dist_polyline(x, y, ext + ext[:1])
             inside |= (z >= z0 - TOL_MM) & (z <= z1 + TOL_MM) & \
                 (inside_poly(x, y, ext, holes) | (d <= TOL_MM))
+        through = {p["line_id"] for p in brief.get("portals") or []}
         for c in brief["clearances"]:
+            if c["kind"] == "sky_tube" and any(c["id"].startswith(f"{t}.") for t in through):
+                continue
             h = c["half_m"] * 1000.0 - 20.0
             ln = c["line"]
             for p, q in zip(ln, ln[1:]):

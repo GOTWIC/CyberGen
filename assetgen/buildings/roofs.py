@@ -568,9 +568,9 @@ def _rect_form(sb, ms: dict, rf: dict, wall: str) -> bool:
             rx0 = rx1 = (x0 + x1) / 2.0
         c0, c1, c2, c3 = P(x0, y0, zf), P(x1, y0, zf), P(x1, y1, zf), P(x0, y1, zf)
         R0, R1 = P(rx0, ym, zr), P(rx1, ym, zr)
-        pface(buf, "soffit", [P(x0, y0, zb), P(x1, y0, zb), P(x1, y1, zb), P(x0, y1, zb)],
-              (0.0, 0.0, -1.0))
         if kind == "hip":
+            pface(buf, "soffit", [P(x0, y0, zb), P(x1, y0, zb), P(x1, y1, zb), P(x0, y1, zb)],
+                  (0.0, 0.0, -1.0))
             for a, b, o in ((P(x0, y0, zb), P(x1, y0, zb), "s"),
                             (P(x1, y0, zb), P(x1, y1, zb), "e"),
                             (P(x1, y1, zb), P(x0, y1, zb), "n"),

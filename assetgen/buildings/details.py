@@ -5,8 +5,9 @@ mount, inside the envelope:
 - **corner downpipes**: AG3's downpipe (`frontparts.gen_pipe`) at the convex corners of
   every building up to 12 floors on the ground whose system is not a curtain wall, on the
   facades AG3 leaves (AG3 puts one on blind and fire walls);
-- **fire escapes** (`roofparts.gen_escape`): on residential, mixed and hotel buildings of
-  three to eight floors in the eras that had them (heritage, neon, mixed modern, brutalist),
+- **fire escapes** (`roofparts.gen_escape`): on residential, mixed and hotel buildings and
+  shopfront rows (flats over the shops) of three to eight floors in the eras that had them
+  (heritage, neon, mixed modern, brutalist),
   on an alley, street, court or open facade with room for 1.2 m and no shop under it;
 - **kitchen exhaust ducts** (`gen_duct`): for food and bar units, on a back facade of their
   mass (alley, blind, court or open), up past the roof;
@@ -30,6 +31,7 @@ from . import systems as SY
 
 ESCAPE_ERAS = {"heritage": 0.6, "neon_retro": 0.5, "mixed_modern": 0.25, "brutalist": 0.15}
 ESCAPE_USES = ("residential", "mixed", "hotel")
+ESCAPE_TYPES = ("building.shopfront_row",)      # (flats over the shops)
 DUCT_USES = ("food", "bar")
 BACK = ("alley", "blind", "courtyard", "atrium", "open")
 MAX_PIPES = 4
@@ -140,8 +142,8 @@ def escape(sb) -> None:
     br = sb.br
     b = br["building"]
     era = sb.gm.get("era")
-    if b["use"] not in ESCAPE_USES or not 3 <= b["floors"] <= 8 or \
-            _u(sb.bid, "escape") >= ESCAPE_ERAS.get(era, 0.0):
+    if (b["use"] not in ESCAPE_USES and b["type"] not in ESCAPE_TYPES) or \
+            not 3 <= b["floors"] <= 8 or _u(sb.bid, "escape") >= ESCAPE_ERAS.get(era, 0.0):
         return
     if sb.gm["genes"].get("body.balcony", "none") not in ("none", "balconette"):
         return

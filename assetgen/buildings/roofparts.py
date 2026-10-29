@@ -295,12 +295,13 @@ STACK_UP = 1200      # a penthouse's exhaust stacks rise this (and a 0.1 m cap) 
 def gen_penthouse(p: dict, b) -> None:
     w, d, h = p["w"], p["d"], p["h"]
     hw, hd = w // 2, d // 2
-    box(b, "roof_wall", -hw, hw, -hd, hd, 0, h - 300)
+    # (merged into its building's shell: its walls in the building's wall tint)
+    box(b, "penthouse", -hw, hw, -hd, hd, 0, h - 300)
     lip = 150
-    box(b, "roof_wall", -hw, hw, -hd, -hd + lip, h - 300, h)
-    box(b, "roof_wall", -hw, hw, hd - lip, hd, h - 300, h)
-    box(b, "roof_wall", -hw, -hw + lip, -hd + lip, hd - lip, h - 300, h)
-    box(b, "roof_wall", hw - lip, hw, -hd + lip, hd - lip, h - 300, h)
+    box(b, "penthouse", -hw, hw, -hd, -hd + lip, h - 300, h)
+    box(b, "penthouse", -hw, hw, hd - lip, hd, h - 300, h)
+    box(b, "penthouse", -hw, -hw + lip, -hd + lip, hd - lip, h - 300, h)
+    box(b, "penthouse", hw - lip, hw, -hd + lip, hd - lip, h - 300, h)
     if w >= 2500 and h >= 3000:
         for y0, y1 in ((-hd - 40, -hd), (hd, hd + 40)):
             box(b, "equip_dark", -hw + 600, hw - 600, y0, y1, h * 45 // 100, h - 600)
@@ -534,7 +535,8 @@ FIXED = {"hut": "access", "dunnage": "frame", "penthouse": "mechanical",
 INSTANCE_ALWAYS = frozenset(ROOF)
 # the slots of roof equipment merged into a shell (penthouses, billboard frames), which the
 # envelope check holds to its roof rule: on a roof, or inside the masses
-ROOF_SLOTS = ("equipment", "mast", "equip_dark", "equip_rust", "equip_steel", "roof_wall")
+ROOF_SLOTS = ("equipment", "mast", "equip_dark", "equip_rust", "equip_steel", "roof_wall",
+              "penthouse")
 
 
 def register() -> None:
