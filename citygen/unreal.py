@@ -1139,7 +1139,16 @@ def _copy(proc, log_file, on_line, stop=None):
             log_file.write(raw)
         except ValueError:          # (the log closed: the editor is gone, see _streamed)
             return
-        on_line(raw.decode("utf-8", "replace"))
+        if on_line is None:
+            continue
+        try:
+            on_line(raw.decode("utf-8", "replace"))
+        except Exception as ex:
+            # the progress is only shown: a fault in it must not stop this copy, or the
+            # pipe fills and the editor blocks on its next line of output
+            print(f"progress: {ex!r}; the editor's progress is no longer shown",
+                  file=sys.stderr)
+            on_line = None
     try:
         log_file.flush()
     except ValueError:
@@ -1195,7 +1204,7 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
     cmd += extra or []
     env = {**os.environ, "CITYGEN_UE_JOB": str(job_path)}
     p = PG.active()
-    est = ImportEstimate(p) if estimate else None
+    est = ImportEstimate(p) if estimate and not p.quiet else None    # (none shown: none)
     relay = PG.Relay(p, STAGE_LABELS, on_begin=est.begin if est else None,
                      on_end=est.end if est else None, on_other=est.plan if est else None)
     t = time.time()
