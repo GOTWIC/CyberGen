@@ -97,6 +97,84 @@ def test_families_and_meshes():
         {k: (s.pos, s.idx) for k, s in b.slots.items()}
 
 
+def _first_faces(m, step: float = 50.0, down: bool = True, points=None):
+    """Rays straight up (down=True) or down through a variant (mm), on a `step` grid over
+    its plan or at `points`: per ray its (x, y), the height of the first face it meets,
+    whether that face faces the ray's start and its slot; rays that meet nothing are left
+    out."""
+    import numpy as np
+    names, tri = [], []
+    for name, sl in m.slots.items():
+        p = np.array(sl.pos, float)
+        i = np.array(sl.idx).reshape(-1, 3)
+        tri.append(p[i])
+        names += [name] * len(i)
+    T = np.concatenate(tri)
+    A, B, C = T[:, 0], T[:, 1], T[:, 2]
+    nz = np.cross(B - A, C - A)[:, 2]
+    keep = np.abs(nz) > 1e-6
+    A, B, C, nz, names = A[keep], B[keep], C[keep], nz[keep], np.array(names)[keep]
+    lo, hi = T[:, :, :2].reshape(-1, 2).min(0), T[:, :, :2].reshape(-1, 2).max(0)
+    P = np.array(points if points is not None else
+                 [(x, y) for x in np.arange(lo[0] + step / 2, hi[0], step)
+                  for y in np.arange(lo[1] + step / 2, hi[1], step)], float)
+    v0, v1 = (C - A)[:, :2], (B - A)[:, :2]
+    d00, d01, d11 = (v0 * v0).sum(1), (v0 * v1).sum(1), (v1 * v1).sum(1)
+    den = d00 * d11 - d01 * d01
+    out = []
+    for k in range(0, len(P), 256):
+        Q = P[k:k + 256]
+        v2 = Q[:, None, :] - A[None, :, :2]
+        d20, d21 = (v2 * v0[None]).sum(2), (v2 * v1[None]).sum(2)
+        u = (d11 * d20 - d01 * d21) / den
+        v = (d00 * d21 - d01 * d20) / den
+        inside = (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1 + 1e-9)
+        z = A[None, :, 2] + u * (C - A)[None, :, 2] + v * (B - A)[None, :, 2]
+        z = np.where(inside, z, np.inf if down else -np.inf)
+        first = z.min(1) if down else z.max(1)
+        for r in np.flatnonzero(np.isfinite(first)):
+            at = np.flatnonzero(np.abs(z[r] - first[r]) <= 0.5)
+            facing = (nz[at] < 0).any() if down else (nz[at] > 0).any()
+            out.append((tuple(Q[r]), float(first[r]), bool(facing), str(names[at[0]])))
+    return out
+
+
+def test_awnings_have_canvas_seen_from_both_sides():
+    """Every awning variant has a canvas over its whole unit footprint, its underside
+    facing the street and its top facing up (the stage 2 masters are one-sided, so a sheet
+    drawn once showed only the awning's frame from below), in an opaque material."""
+    from assetgen.materials import catalog as CT
+    grid = [(-425.0 + 50.0 * i, -425.0 + 50.0 * j) for i in range(18) for j in range(18)]
+    for st in ST.STYLES:
+        for k in range(ST.PROP_VARIANTS["awning"]):
+            m = V.make("awning", st, k)
+            for down in (True, False):
+                rays = _first_faces(m, down=down, points=grid)
+                assert len(rays) == len(grid), (st, k, down)
+                bad = [r for r in rays if not r[2]]
+                assert not bad, (st, k, "from below" if down else "from above", bad[:3])
+                for _, _, _, slot in rays:
+                    assert MT.slot_spec(slot)[0] not in ("holo", "translucent"), (st, k, slot)
+                    assert CT.prop_set(slot)[0] not in ("leaves", "sign", "holo"), (st, k, slot)
+
+
+def test_nothing_overhead_is_open_from_below():
+    """Seen from under it, every variant shows front faces: roofs, canopies, visors, lamp
+    shades and boxes are closed or two-layered (a ray's first face faces down), except where
+    the prop stands (its lowest 5 cm). Boats (seen from the quay) and litter are left out."""
+    for kind, n in ST.PROP_VARIANTS.items():
+        if kind in ("boat", "trash"):
+            continue
+        for st in ST.STYLES:
+            for k in range(n):
+                m = V.make(kind, st, k)
+                rays = _first_faces(m, step=80.0)
+                base = min(p[2] for sl in m.slots.values() for p in sl.pos) if kind not in (
+                    "awning", "ac_unit", "wall_light", "bracket") else float("-inf")
+                bad = [r for r in rays if not r[2] and r[1] > base + 50.0]
+                assert not bad, (kind, st, k, bad[:3])
+
+
 def test_placements_pick_their_variant_from_their_id():
     """A prop's variant is the hash of its id within its kind and style's family, not its
     order: the contribution's parts hold every prop id once, under the variant the hash

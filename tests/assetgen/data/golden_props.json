@@ -1,7 +1,7 @@
 {
   "about": "sha256 goldens of assetgen's props stage (AG8): the small test city's family packs, exact prop and sign tiles and its two Unreal contributions (tests/conftest.py SMALL, built by the citygen CLI, its street stage run first), as `assetgen.props.build.outputs_digest` measures them. Made on the M4 Mac (Mac = x86 deferred to docs/determinism_check.md).",
   "small": {
-    "all": "24db0ee019f1f267b4bf34af56b6b7b478bf43d5b3ecc7607d184cec63d87318",
+    "all": "3f789ae2ecea73b9286ba6d29ba6d143a44d22ac673525f3ddec54e2b4f8e71b",
     "files": 98
   }
 }

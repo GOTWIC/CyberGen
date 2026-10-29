@@ -24,7 +24,8 @@ from __future__ import annotations
 from citygen import dmath as M
 
 from . import styles as ST
-from .shapes import Mesh, arcs, beam, blk, catenary, extrude, fan, lathe, obb, quad_out, ring, tube
+from .shapes import (Mesh, arcs, beam, blk, catenary, extrude, fan, lathe, obb, quad_out, ring,
+                     sheet, tube)
 
 REACH = {"ac_unit": 0.3, "wall_light": 0.2}
 GENERATORS: dict = {}
@@ -195,7 +196,7 @@ def street_light(m: Mesh, d: D) -> None:
             a = M.PI * i / 8
             pts.append((arm * 0.5 * (1.0 - M.cos(a)), 0.0, h - 0.4 + 0.4 * M.sin(a)))
         tube(m, pslot, pts, 0.055, 6)
-        lathe(m, pslot, [(0.05, h - 0.45), (0.28, h - 0.62), (0.3, h - 0.66)], 10, arm, 0.0)
+        lathe(m, pslot, [(0.3, h - 0.66), (0.28, h - 0.62), (0.05, h - 0.45)], 10, arm, 0.0)
         m.poly(lens, [(arm + 0.26 * c, 0.26 * s) for c, s in ring(10)], z=h - 0.665, up=False)
     elif form == "post_top":
         lathe(m, pslot, [(0.06, h), (0.25, h + 0.05), (0.25, h + 0.1)], 12)
@@ -285,7 +286,7 @@ def wall_light(m: Mesh, d: D) -> None:
             a = M.PI / 2.0 * i / 7
             pts.append((w + 0.45 * M.sin(a), 0.0, 0.25 * (1.0 - M.cos(a)) + 0.1 * M.sin(a)))
         tube(m, met, pts, 0.018, 5)
-        lathe(m, met, [(0.03, 0.2), (0.17, 0.03), (0.18, 0.0)], 10, w + 0.45, 0.0)
+        lathe(m, met, [(0.18, 0.0), (0.17, 0.03), (0.03, 0.2)], 10, w + 0.45, 0.0)
         m.poly(lens, [(w + 0.45 + 0.16 * c, 0.16 * s) for c, s in ring(10)], z=-0.004, up=False)
     elif form in ("cage", "tube"):
         beam(m, met, (w, 0.0, 0.0), (w + 0.18, 0.0, 0.0), 0.04)
@@ -432,21 +433,21 @@ def awning(m: Mesh, d: D) -> None:
             fan(m, fab, (x, 0.5, -drop - 0.1), [(x, y, z) for y, z in pts] + [(x, 0.5, -drop)],
                 (s, 0.0, 0.0))
     elif form == "corrugated":
-        sheet = d.c(("metal.galv", "metal.rust", "fabric.tarp", "plastic.green"), "sheet")
+        mat = d.c(("metal.galv", "metal.rust", "fabric.tarp", "plastic.green"), "sheet")
         n = 10
         for i in range(n):
             x0 = -0.5 + i / n
             x1 = x0 + 0.5 / n
             x2 = x0 + 1.0 / n
-            quad_out(m, sheet, (x0, 0.5, 0.0), (x1, 0.5, 0.012), (x1, -0.5, -drop + 0.012),
-                     (x0, -0.5, -drop), (0.0, -0.3, 1.0))
-            quad_out(m, sheet, (x1, 0.5, 0.012), (x2, 0.5, 0.0), (x2, -0.5, -drop),
-                     (x1, -0.5, -drop + 0.012), (0.0, -0.3, 1.0))
+            sheet(m, mat, (x0, 0.5, 0.0), (x1, 0.5, 0.012), (x1, -0.5, -drop + 0.012),
+                  (x0, -0.5, -drop), (0.0, -0.3, 1.0))
+            sheet(m, mat, (x1, 0.5, 0.012), (x2, 0.5, 0.0), (x2, -0.5, -drop),
+                  (x1, -0.5, -drop + 0.012), (0.0, -0.3, 1.0))
         for x in (-0.45, 0.45):
             beam(m, "wood", (x, 0.5, -drop - 0.3), (x, -0.4, -drop + 0.02), 0.04)
     elif form == "tiled":
-        quad_out(m, "wood.red", (-0.5, 0.5, 0.0), (0.5, 0.5, 0.0), (0.5, -0.5, -drop),
-                 (-0.5, -0.5, -drop), (0.0, -0.4, 1.0))
+        sheet(m, "wood.red", (-0.5, 0.5, 0.0), (0.5, 0.5, 0.0), (0.5, -0.5, -drop),
+              (-0.5, -0.5, -drop), (0.0, -0.4, 1.0))
         for i in range(8):
             x = -0.5 + (i + 0.5) / 8
             tube(m, "concrete.dark", [(x, 0.5, 0.03), (x, -0.5, -drop + 0.03)], 0.03, 4)
@@ -497,10 +498,10 @@ def traffic_signal(m: Mesh, d: D) -> None:
                 for s in (-1.0, 1.0):
                     pts = [(hx + 0.1 * c, s * 0.145, zz + 0.1 * sn) for c, sn in ring(10)]
                     fan(m, col, (hx, s * 0.145, zz), pts, (0.0, s, 0.0))
-                    quad_out(m, "metal.black", (hx - 0.13, s * 0.145, zz + 0.12),
-                             (hx + 0.13, s * 0.145, zz + 0.12),
-                             (hx + 0.13, s * 0.3, zz + 0.12), (hx - 0.13, s * 0.3, zz + 0.12),
-                             (0.0, 0.0, 1.0))
+                    sheet(m, "metal.black", (hx - 0.13, s * 0.145, zz + 0.12),
+                          (hx + 0.13, s * 0.145, zz + 0.12),
+                          (hx + 0.13, s * 0.3, zz + 0.12), (hx - 0.13, s * 0.3, zz + 0.12),
+                          (0.0, 0.0, 1.0))
         beam(m, met, (0.0, 0.0, z0 + 0.5), (hx - 0.1, 0.0, z0 + 0.5), 0.06)
     if form.endswith("ped") or form == "three_screen":
         z = 2.5
@@ -596,9 +597,9 @@ def bus_stop(m: Mesh, d: D) -> None:
         blk(m, met if met != "concrete" else "metal.dark", -hx - 0.1, hx + 0.1, -0.85, 0.8,
             top, top + 0.1)
     elif form == "slope":
-        quad_out(m, met if met != "concrete" else "metal.galv", (-hx - 0.1, 0.8, top + 0.2),
-                 (hx + 0.1, 0.8, top + 0.2), (hx + 0.1, -0.9, top), (-hx - 0.1, -0.9, top),
-                 (0.0, 0.1, 1.0))
+        sheet(m, met if met != "concrete" else "metal.galv", (-hx - 0.1, 0.8, top + 0.2),
+              (hx + 0.1, 0.8, top + 0.2), (hx + 0.1, -0.9, top), (-hx - 0.1, -0.9, top),
+              (0.0, 0.1, 1.0))
         blk(m, "metal.dark", -hx - 0.1, hx + 0.1, -0.92, -0.86, top - 0.08, top + 0.02)
     elif form == "curve":
         pts = []
@@ -607,8 +608,10 @@ def bus_stop(m: Mesh, d: D) -> None:
             pts.append((0.85 * M.cos(a) * -1.0, top + 0.25 * M.sin(a)))
         rows = [[(x, y, z) for y, z in pts] for x in (-hx - 0.1, hx + 0.1)]
         uvs = [[(x, v) for v in arcs(pts)] for x in (-hx - 0.1, hx + 0.1)]
-        m.grid("glass.prop" if d.style == "sleek" else met, rows, uvs, flip=True)
-        m.grid(met, [[(x, y, z - 0.01) for y, z in pts] for x in (-hx - 0.1, hx + 0.1)], uvs)
+        # the arc runs from -y to +y, so the top faces up unflipped and its underside flipped
+        m.grid("glass.prop" if d.style == "sleek" else met, rows, uvs)
+        m.grid(met, [[(x, y, z - 0.01) for y, z in pts] for x in (-hx - 0.1, hx + 0.1)], uvs,
+               flip=True)
     elif form == "slab":
         blk(m, "concrete", -hx - 0.3, hx + 0.3, -1.0, 0.85, top, top + 0.3)
         blk(m, "concrete", -hx, -hx + 0.25, 0.4, 0.85, 0.0, top)
@@ -788,8 +791,8 @@ def kiosk(m: Mesh, d: D) -> None:
     blk(m, "wood", 1.05, 1.3, -0.95, 0.95, 0.95, 1.02)
     if form == "pavilion":
         for s in (-1.0, 1.0):
-            quad_out(m, "wood.red", (-1.4, 0.0, 3.0), (1.4, 0.0, 3.0), (1.5, s * 1.5, 2.45),
-                     (-1.5, s * 1.5, 2.45), (0.0, s * 0.5, 1.0))
+            sheet(m, "wood.red", (-1.4, 0.0, 3.0), (1.4, 0.0, 3.0), (1.5, s * 1.5, 2.45),
+                  (-1.5, s * 1.5, 2.45), (0.0, s * 0.5, 1.0))
         lantern(m, "metal.black", "light.red", 1.2, 0.0, 1.9, 0.5)
     else:
         blk(m, wall, -1.3, 1.3, -1.3, 1.3, 2.45, 2.6)
@@ -868,8 +871,8 @@ def food_stall(m: Mesh, d: D) -> None:
     if form == "container":
         blk(m, d.c(("metal.blue", "metal.rust", "metal.green"), "c"), -1.5, 1.5, -1.0, 1.0, 0.0, 2.5)
         blk(m, "metal.dark", 1.5, 1.52, -0.8, 0.8, 0.95, 2.0)
-        quad_out(m, "metal.galv", (1.5, -1.0, 2.5), (1.5, 1.0, 2.5), (2.4, 1.0, 2.2),
-                 (2.4, -1.0, 2.2), (0.3, 0.0, 1.0))
+        sheet(m, "metal.galv", (1.5, -1.0, 2.5), (1.5, 1.0, 2.5), (2.4, 1.0, 2.2),
+              (2.4, -1.0, 2.2), (0.3, 0.0, 1.0))
         blk(m, "screen.amber", 1.51, 1.53, -0.9, 0.9, 2.1, 2.4)
         return
     blk(m, wood, -1.4, 1.4, -0.9, 0.9, 0.2, 1.0)
@@ -882,7 +885,7 @@ def food_stall(m: Mesh, d: D) -> None:
         for x, y in ((-1.3, -0.8), (1.3, -0.8), (-1.3, 0.8), (1.3, 0.8)):
             tube(m, "metal.galv", [(x, y, 1.05), (x, y, 2.3)], 0.025, 5)
         lathe(m, fab, [(1.9, 2.3), (0.05, 2.75)], 12)
-        lathe(m, fab, [(1.9, 2.296), (0.0, 2.29)], 12, caps=False)
+        lathe(m, fab, [(0.0, 2.29), (1.9, 2.296)], 12, caps=False)    # its underside, facing down
     elif form == "booth":
         blk(m, d.c(("metal.white", "metal.galv"), "b"), -1.4, 1.4, -0.9, 0.9, 1.25, 2.4)
         blk(m, "glass.prop", -1.38, 1.38, -0.92, -0.9, 1.3, 2.1)
@@ -1202,11 +1205,11 @@ def dumpster(m: Mesh, d: D) -> None:
         blk(m, col, -0.75, 0.75, s * 0.66 - 0.04, s * 0.66 + 0.04, 0.6, 0.75)
     if form in ("lidded", "closed", "bin"):
         lid = "plastic.black" if form != "closed" else col
-        quad_out(m, lid, (-1.02, -0.7, 1.25), (1.02, -0.7, 1.25), (1.02, 0.7, 1.32),
-                 (-1.02, 0.7, 1.32), (0.0, -0.1, 1.0))
+        sheet(m, lid, (-1.02, -0.7, 1.25), (1.02, -0.7, 1.25), (1.02, 0.7, 1.32),
+              (-1.02, 0.7, 1.32), (0.0, -0.1, 1.0))
         if form == "bin":
-            quad_out(m, "plastic.black", (-0.98, 0.7, 1.32), (0.98, 0.7, 1.32), (0.98, 1.1, 1.9),
-                     (-0.98, 1.1, 1.9), (0.0, -0.8, 0.6))
+            sheet(m, "plastic.black", (-0.98, 0.7, 1.32), (0.98, 0.7, 1.32), (0.98, 1.1, 1.9),
+                  (-0.98, 1.1, 1.9), (0.0, -0.8, 0.6))
     elif form == "open":
         m.poly("bag.black", [(-0.95, -0.6), (0.95, -0.6), (0.95, 0.62), (-0.95, 0.62)], z=1.1)
         for k in range(3):
@@ -1308,7 +1311,7 @@ def scaffold(m: Mesh, p: dict, wall_sign: float) -> None:
                 u1 = u0 + bw - 0.1
                 ring4 = [P(u0, back + 0.05, w + 0.2), P(u1, back + 0.05, w + 0.2),
                          P(u1, front - 0.05, w + 0.2), P(u0, front - 0.05, w + 0.2)]
-                quad_out(m, "wood.light", *ring4, (0.0, 0.0, 1.0))
+                sheet(m, "wood.light", *ring4, (0.0, 0.0, 1.0))
             tube(m, "metal.galv", [P(-L / 2.0, front, w + 1.1), P(L / 2.0, front, w + 1.1)], 0.02, 4)
     for i in range(bays):
         u0 = -L / 2.0 + i * bw
@@ -1341,9 +1344,9 @@ def gate(m: Mesh, p: dict, style: str, words) -> None:
     tube(m, red, [P(-W / 2.0 - 0.2, 0.0, 4.2), P(W / 2.0 + 0.2, 0.0, 4.2)], 0.16, 6)
     if style in ("old", "neon"):
         for sv in (-1.0, 1.0):
-            quad_out(m, "concrete.dark", P(-W / 2.0 - 0.6, 0.0, 6.6), P(W / 2.0 + 0.6, 0.0, 6.6),
-                     P(W / 2.0 + 1.0, sv * 1.2, 6.0), P(-W / 2.0 - 1.0, sv * 1.2, 6.0),
-                     (-s * sv * 0.5, c * sv * 0.5, 1.0))
+            sheet(m, "concrete.dark", P(-W / 2.0 - 0.6, 0.0, 6.6), P(W / 2.0 + 0.6, 0.0, 6.6),
+                  P(W / 2.0 + 1.0, sv * 1.2, 6.0), P(-W / 2.0 - 1.0, sv * 1.2, 6.0),
+                  (-s * sv * 0.5, c * sv * 0.5, 1.0))
         tube(m, "concrete.dark", [P(-W / 2.0 - 1.1, 0.0, 6.9), P(-W / 2.0 - 0.5, 0.0, 6.62),
                                   P(W / 2.0 + 0.5, 0.0, 6.62), P(W / 2.0 + 1.1, 0.0, 6.9)], 0.12, 6)
     else:

@@ -75,9 +75,23 @@ def quad_out(m: Mesh, slot: str, a, b, c, d, out, uvs=None) -> None:
     m.quad(slot, a, b, c, d, uvs)
 
 
+def sheet(m: Mesh, slot: str, a, b, c, d, out, gap: float = 0.004) -> None:
+    """A thin sheet seen from both sides (a roof, an awning's canvas): the quad facing `out`
+    and its underside `gap` behind it facing away (the masters are one-sided). A sheet that
+    is not upright moves straight down (or up), so sheets sharing an edge (a corrugation)
+    keep it closed underneath."""
+    quad_out(m, slot, a, b, c, d, out)
+    n = norm(cross(sub(b, a), sub(c, a)))
+    if dot(n, out) < 0.0:
+        n = mul(n, -1.0)
+    k = (0.0, 0.0, -gap if n[2] > 0.0 else gap) if abs(n[2]) >= 0.1 else mul(n, -gap)
+    quad_out(m, slot, add(a, k), add(b, k), add(c, k), add(d, k), mul(out, -1.0))
+
+
 def blk(m: Mesh, slot: str, x0: float, x1: float, y0: float, y1: float, z0: float,
-        z1: float, bottom: bool = False) -> None:
-    """An axis-aligned box from its bounds (frame axes)."""
+        z1: float, bottom: bool = True) -> None:
+    """An axis-aligned box from its bounds (frame axes), closed: a box over the street
+    (an awning, a sign, a lamp head) is seen from below, and the masters are one-sided."""
     if x1 - x0 < 0.002 or y1 - y0 < 0.002 or z1 - z0 < 0.002:
         return
     m.prism(slot, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], z0, z1, True, bottom)

@@ -698,6 +698,25 @@ again while a freshly streamed cell's collision comes in. Results:
   `ag1.testport_files` (every contribution carries the library's version and hash); every
   street and building pack and the library's pixels are unchanged.
 
+**Seen from below** (a fix after AG3's street close-ups: some awnings showed only their
+frames). The canvas was there and opaque, but drawn as a single sheet facing up, and the
+stage 2 masters are one-sided (two-sided only for foliage, leaf cards and translucent
+ones), so from the street it was a back face; AG8's Blender preview, keeping the glTF
+importer's one-sided materials, culled it the same way. Fixed in the meshes:
+- `shapes.blk` boxes are closed (a bottom by default: flat and glass awnings, sign boxes,
+  lamp heads, kiosk roofs; 3% more triangles in the variants);
+- `shapes.sheet` draws a sheet and its underside 4 mm under it (moved straight down unless
+  upright, so a corrugation stays closed): corrugated and tiled awnings, the sloped bus
+  shelter roof, the kiosk pavilion and container stall roofs, dumpster lids, signal visors,
+  scaffolding boards and the market gate's roof;
+- the curved bus shelter roof had both layers facing the wrong way (its arc runs the
+  other way from the barrel awning's), the cart umbrella's underside faced up, and two lamp
+  shades (davit street lights, a wall light) were drawn inside out (profiles top-down).
+Tests: every awning variant has a canvas over its whole footprint, seen from below and
+above, in an opaque material; rays straight up under every variant meet a front face first
+(boats and litter left out). Vesper Bay: 2.57 M unique props triangles (2.48 M before),
+every check passing; a close-up in `docs/progress/AG8/textures/`. No exporter change.
+
 **Open.** Plants and signs have no collision (trunk capsules later). Lawns, hedges and green
 roofs stay the blockout's green areas. Sign faces are opaque emissive, so only holo-ads are
 translucent. Leaf textures are one per clump set, tinted per species; real leaf atlases per
