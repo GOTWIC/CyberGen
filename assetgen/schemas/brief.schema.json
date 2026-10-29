@@ -1739,7 +1739,7 @@
   "additionalProperties": false,
   "properties": {
     "brief_version": {
-      "const": 1,
+      "const": 2,
       "title": "Brief Version",
       "type": "integer"
     },

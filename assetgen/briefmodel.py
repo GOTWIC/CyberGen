@@ -283,7 +283,7 @@ class SpecSection(_M):
 
 
 class Brief(_M):
-    brief_version: Literal[1]
+    brief_version: Literal[2]
     id: str
     origin: P2
     building: BuildingRec

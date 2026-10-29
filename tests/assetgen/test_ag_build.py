@@ -44,11 +44,12 @@ def test_every_building_has_a_shell_and_a_proxy():
             assert C.sha256_bytes(data) == info[sub]["sha256"]
 
 
-def test_checks_are_the_seven():
+def test_checks_are_the_eleven():
     rep = small_assets_report()
-    assert sorted(rep["checks"]) == ["asset_access", "asset_budget", "asset_coverage",
-                                     "asset_envelope", "asset_meshes", "asset_mounts",
-                                     "asset_unique"]
+    assert sorted(rep["checks"]) == ["asset_access", "asset_budget", "asset_clearance",
+                                     "asset_coverage", "asset_envelope", "asset_landings",
+                                     "asset_meshes", "asset_mounts", "asset_roofs",
+                                     "asset_skybridges", "asset_unique"]
     assert rep["checks"]["asset_unique"]["pairs"] > 0
 
 

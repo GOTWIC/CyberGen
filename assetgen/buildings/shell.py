@@ -190,6 +190,12 @@ def _thickness(ring) -> int:
     return int(best if best is not None else 0)
 
 
+def _depth(ring, fa) -> int:
+    """How far the footprint reaches in behind a facade: the most any vertex lies inside
+    its line (a notch elsewhere in the ring does not make the wall thin)."""
+    return int(max(-((p[0] - fa.a[0]) * fa.nx + (p[1] - fa.a[1]) * fa.ny) for p in ring))
+
+
 # ---------------------------------------------------------------------------
 # Rows
 # ---------------------------------------------------------------------------
@@ -654,7 +660,6 @@ class ShellBuilder:
                 self.used["finish"] = True
         rings = ms["rings"]
         thick = _thickness(RG.clean(rings[0]))
-        ms["thick"] = thick
         is_top = not any(o is not ms and o["z0"] >= ms["z1"] - 50 and
                          RG.in_poly(_centroid(o["rings"][0]), [rings[0]]) >= 0
                          for o in self.masses)
@@ -1035,7 +1040,8 @@ class ShellBuilder:
                         else:
                             merged.append(op)
                     ops = merged
-            elif sysname and fa.j in self.landings and ms["thick"] >= CN.LANDING_THIN:
+            elif sysname and fa.j in self.landings and \
+                    _depth(ms["rings"][0], fa) >= CN.LANDING_THIN:
                 # AG4: a skybridge landing on a mass too thin for windows: its door alone
                 ops = CN.landing_ops(self, fa, (lo, hi, kind, f, full, zf), [])
             c = [0]
