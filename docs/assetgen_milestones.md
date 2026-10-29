@@ -561,10 +561,10 @@ change every brief (clearances, portal lines, skybridge decks in the building fr
 small city's briefs, the five samples' briefs and the Vesper Bay brief hashes move; AG4
 changes every shell (roofs, details, landing doors), so the small city's asset digest and
 the Vesper Bay buildings move; the buildings' contribution (roof equipment entries, green
-roof `replaces`) and `materials.json` (AG4's slots) move AG6's digest. The props golden was
-already stale on main (main's own code writes `9ea0...` for the small city, the golden held
-`3f78...`); it is written again with AG4 changing nothing there. AG7's streets golden is
-unchanged.
+roof `replaces`) and `materials.json` (AG4's slots) move AG6's digest. The props golden had
+gone stale on main (main's own code writes `9ea0...` for the small city, the golden held
+`3f78...`); main wrote it again meanwhile, to the same value, and AG4 changes nothing
+there. AG7's streets golden is unchanged.
 
 **Found on the way**:
 - A small-city tower whose footprint has a 1 m notch measured 0.3 m thick (the ring's
@@ -1072,6 +1072,23 @@ Every milestone updates the shared Unreal exporter for what it adds (scope secti
 have to run Unreal: when it is done, the coordinating session decides whether an Unreal check
 is needed and runs it in a separate session; its results go in `docs/progress/AG<n>/unreal/`
 and its entry here notes it.
+
+## Progress output
+
+`assetgen build`, `preview`, `materials preview|board`, `library`, `streets` and `props` say
+what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1's
+`citygen/progress.py`, which it will import once that lands): a line per stage (load, briefs,
+genomes, shells and parts, the library on first use, building checks, streets, signage,
+props, materials), a bar with n of N and the time left where the count is known (tiles as the
+workers return them, buildings, library sets and atlases, the packs the density check reads,
+Blender's views, sheet cells and boards), the time of each stage at the end. The streets and
+props stages (seconds) and the library's own loop are wrapped from their callers, since
+their code is in the code hashes their manifests and contributions record (`assetgen
+library` drives its bar from the library's log lines, `materials/build.generate`). On a terminal
+the bar is one line redrawn in place; piped, plain lines at 0, 25, 50, 75 and 100 % or every
+30 s. Worker processes never print; the Blender scripts print `CGPROGRESS start|done <name>`
+per view, which `assetgen/blenderrun.py` reads as Blender runs. `--quiet` (or
+`CYBERGEN_QUIET=1`) turns it off. Stdout keeps the reports; no output file changes.
 
 ## Outputs
 

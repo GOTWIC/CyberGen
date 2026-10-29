@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -31,17 +32,35 @@ LINK = "library"
 
 
 def library_for(spec_doc: dict | None, out: Path | None = None, workers: int | None = None,
-                log=print) -> dict:
+                log=print, progress=None) -> dict:
     """The library at the spec's density (made or kept), linked from BUILD/assets/library
     when `out` (the assets folder) is given."""
     density = int((spec_doc or {}).get("texel_density_px_m", LB.DENSITY))
     lib = LB.load(None, density)
     want = LB.code_hash()
     if lib is None or lib.get("code_hash") != want or not _complete(lib):
-        lib = LB.generate(None, density, workers, log=log)
+        lib = generate(None, density, workers, log=log, progress=progress)
     if out is not None:
         link(out, Path(lib["dir"]))
     return lib
+
+
+def generate(out=None, density: int = LB.DENSITY, workers: int | None = None,
+             only: list[str] | None = None, log=print, progress=None) -> dict:
+    """`library.generate` with a progress stage (`assetgen/progress.py`) driven by its log
+    lines: the count to make, then a line per set or atlas made. (The library's own code
+    stays as it is: it is in the library's code hash, which the contributions record.)"""
+    if progress is None:
+        return LB.generate(out, density, workers, only, log=log)
+    with progress.stage("library") as st:
+        def line(text: str) -> None:
+            m = re.match(r"library: (\d+) sets and (\d+) atlases to make", text)
+            if m:
+                st.set_total(int(m.group(1)) + int(m.group(2)))
+                st.note(text)
+            elif text.startswith(("  set ", "  atlas ")):
+                st.advance()
+        return LB.generate(out, density, workers, only, log=line)
 
 
 def _complete(lib: dict) -> bool:
@@ -86,13 +105,17 @@ def signage(model, out: Path, spec_doc: dict, log=print) -> dict:
 
 
 def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print,
-          signs: dict | None = None) -> dict:
-    """`signs`: the pages already made this build (`signage`), else made here."""
+          signs: dict | None = None, progress=None) -> dict:
+    """`signs`: the pages already made this build (`signage`), else made here. `progress`:
+    stage lines and a bar over the packs the density check reads (`assetgen/progress.py`)."""
+    from ..progress import Progress
+    P = progress if progress is not None else Progress(quiet=True)
     t0 = time.perf_counter()
     density = int(spec_doc.get("texel_density_px_m", LB.DENSITY))
     upper = int(spec_doc.get("texel_density_upper_px_m", LB.UPPER))
     if signs is None:
-        signs = signage(model, out, spec_doc, log)
+        with P.stage("signage") as st:
+            signs = signage(model, out, spec_doc, log if progress is None else st.note)
     wrote = signs.pop("wrote")
     t1 = time.perf_counter()
     con = CO.materials_part(model.name, model_sha, lib, signs)
@@ -111,7 +134,8 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
     doc["textures"] = dict(sorted(doc["textures"].items()))
     wrote += int(MF.write_if_changed(out / "materials.json", MF.dumps(doc)))
     t2 = time.perf_counter()
-    dens = CK.texel_density(out, lib, density, upper)
+    with P.stage("materials: texel density", total=CK.packs(out)) as st:
+        dens = CK.texel_density(out, lib, density, upper, step=st.advance)
     t3 = time.perf_counter()
     bud = CK.budget(LB.disk(lib), signs, out)
     checks = [dens, bud]
@@ -129,9 +153,10 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
         wrote += int(MF.write_if_changed(out / "materials_report.json", MF.dumps(rep)))
         wrote += int(MF.write_if_changed(out / "materials_report.txt", report_text(rep)))
     rep["files_written"] = wrote
-    log(f"materials: {rep['textures']} textures, {signs['counts']['texts']} sign texts, "
-        f"texel density {'ok' if dens['ok'] else 'FAILS'} over {dens['triangles']:,} "
-        f"triangles, {wrote} files written")
+    if progress is None:
+        log(f"materials: {rep['textures']} textures, {signs['counts']['texts']} sign texts, "
+            f"texel density {'ok' if dens['ok'] else 'FAILS'} over {dens['triangles']:,} "
+            f"triangles, {wrote} files written")
     return rep
 
 

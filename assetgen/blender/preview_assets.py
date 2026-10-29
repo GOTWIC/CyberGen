@@ -41,6 +41,11 @@ def log(*a):
     print(f"[ag preview {time.time() - T0:6.1f}s]", *a, flush=True)
 
 
+def mark(what, name):
+    """`CGPROGRESS start|done <name>`: the driver's progress bar (`assetgen/blenderrun.py`)."""
+    print(f"CGPROGRESS {what} {name}", flush=True)
+
+
 # --- scene ---------------------------------------------------------------------------------
 
 def start_scene():
@@ -503,6 +508,7 @@ def main():
                     proxies[o.name.rsplit(".proxy", 1)[0]] = o
         log(f"proxies: {len(proxies)}")
     for v in JOB["views"]:
+        mark("start", v["name"])
         t = time.time()
         shells = []
         hidden = []
@@ -527,6 +533,7 @@ def main():
         remove(shells)
         for o in hidden:
             o.hide_render = False
+        mark("done", v["name"])
     if JOB["sheets"]:
         for o in proxies.values():
             o.hide_render = True
@@ -558,10 +565,12 @@ def main():
                 o.hide_render = True
             root = roots.get(cell["key"])
             if root is None:
+                mark("done", cell["file"])
                 continue
             for o in [root] + list(root.children_recursive) + inst_of.get(k, []):
                 o.hide_render = False
             render(scene, cell["view"], f"{out}/{cell['file']}")
+            mark("done", cell["file"])
         remove(objs + parts)
         report["sheets"].append({"name": sh["name"], "cells": len(sh["cells"])})
         log(f"sheet {sh['name']}: {len(sh['cells'])}")
