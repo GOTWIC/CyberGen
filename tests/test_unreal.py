@@ -531,7 +531,8 @@ def test_without_assets_the_manifest_is_the_blockouts(build, manifest, tmp_path)
     only = U.build_manifest(staged, assets=False)
     assert _dump(only[0]) == _dump(man) and _dump(only[2]) == _dump(graphs)
     assert "stage2" in U.build_manifest(staged)[0]
-    assert main(["unreal", str(staged), "--manifest-only", "--blockout-only"]) == 0
+    # (--no-play: the play features' map and data are the same either way, test_manifest_play)
+    assert main(["unreal", str(staged), "--manifest-only", "--blockout-only", "--no-play"]) == 0
     written = json.loads((staged / "unreal" / "manifest.json").read_text())
     assert _dump(written) == _dump(man)
 

@@ -641,6 +641,9 @@ def play_features(world, man, slug):
     a = found[0]
     got = {"start": status(a)}
     pawn0 = got["start"]["pawn"]
+    # (the engine's own on-screen debug text, a big city's texture pool notice among it,
+    # would be drawn over the minimap in the shots)
+    unreal.SystemLibrary.execute_console_command(world, "DisableAllScreenMessages")
     if JOB.get("shots"):
         yield from ui_shot(world, "play_minimap")
     a.set_map_open(True)
@@ -663,10 +666,23 @@ def play_features(world, man, slug):
     a.set_free_cam(True)
     yield from wait(1.0)
     got["free_cam"] = status(a)
+    if JOB.get("shots"):
+        # the free camera 120 m over the player, looking at the city's middle by night
+        cam = unreal.GameplayStatics.get_player_pawn(world, 0)
+        pc = unreal.GameplayStatics.get_player_controller(world, 0)
+        b = man["bounds"]
+        here = cam.get_actor_location()
+        eye = unreal.Vector(here.x, here.y, here.z + 12000.0)
+        cam.set_actor_location(eye, False, True)
+        pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(
+            eye, ue((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0, 0.0)))
+        yield from wait(3.0)
+        yield from ui_shot(world, "play_free_cam_night")
     a.set_free_cam(False)
     yield from wait(1.0)
     got["back"] = status(a)
     a.set_night(False)
+    unreal.SystemLibrary.execute_console_command(world, "EnableAllScreenMessages")
     # a teleport to the walkway nearest the far corner of the city from the start
     sx, sy, _ = man["player_start"]["position"]
     b = man["bounds"]
