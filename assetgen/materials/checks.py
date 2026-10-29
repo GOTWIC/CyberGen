@@ -110,52 +110,62 @@ FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
            ("signs", "props/signs", "t*.glb"))
 
 
-def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int) -> dict:
+def packs(assets: Path) -> list[tuple[str, str, Path]]:
+    """(part, folder, file) of every pack the check reads."""
+    out = []
+    for part, folder, pat in FOLDERS:
+        d = assets / folder
+        if d.is_dir():
+            out += [(part, folder, f) for f in sorted(d.glob(pat))]
+    return out
+
+
+def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int,
+                  step=None) -> dict:
     """The check over every pack of a build's assets (tiles/, AG2's parts/ in their own
-    frames, streets/, and AG8's props/: variants, plants, exact props, signs)."""
+    frames, streets/, and AG8's props/: variants, plants, exact props, signs); `step()` after
+    each pack (a progress bar's)."""
     per: dict[str, dict] = {}
     parts: dict[str, list[float]] = {}
     tris = 0
     worst: dict[str, tuple] = {}
-    for part, folder, pat in FOLDERS:
-        d = assets / folder
-        if not d.is_dir():
-            continue
-        for f in sorted(d.glob(pat)):
-            for node, t, mat, pos, uv, tri in read_glb(f):
-                master, s = CT.set_for(mat, None, part)
-                if s is None or s not in lib["sets"]:
-                    continue
-                st = lib["sets"][s]
-                px_uv = st["files"]["base"]["size"][0] / st["tile_m"]
-                rho, area, nz, zc, ok = _density(pos, uv, tri)
-                rho = rho * px_uv
-                if part == "buildings":
-                    near = (zc < STREET_BAND_M) & (nz < 0.7)
-                else:
-                    near = np.ones(len(tri), dtype=bool)
-                need = np.where(near, street_px, upper_px)
-                bad = ok & (rho < need * TOLERANCE)
-                tris += int(ok.sum())
-                a_ok = float(area[ok].sum())
-                a_bad = float(area[bad].sum())
-                pa = parts.setdefault(part, [0.0, 0.0])
-                pa[0] += a_ok
-                pa[1] += a_bad
-                rec = per.setdefault(f"{part}.{mat}", {"triangles": 0, "area_m2": 0.0,
-                                                       "below_m2": 0.0, "min_px_m": None,
-                                                       "set": s})
-                rec["triangles"] += int(ok.sum())
-                rec["area_m2"] += a_ok
-                rec["below_m2"] += a_bad
-                if ok.any():
-                    v = float(rho[ok].min())
-                    rec["min_px_m"] = v if rec["min_px_m"] is None else min(rec["min_px_m"], v)
-                if bad.any():
-                    i = int(np.flatnonzero(bad)[np.argmin(rho[bad])])
-                    w = (float(rho[i]), node, f"{folder}/{f.name}")
-                    if f"{part}.{mat}" not in worst or w < worst[f"{part}.{mat}"]:
-                        worst[f"{part}.{mat}"] = w
+    for part, folder, f in packs(assets):
+        if step is not None:
+            step()
+        for node, t, mat, pos, uv, tri in read_glb(f):
+            master, s = CT.set_for(mat, None, part)
+            if s is None or s not in lib["sets"]:
+                continue
+            st = lib["sets"][s]
+            px_uv = st["files"]["base"]["size"][0] / st["tile_m"]
+            rho, area, nz, zc, ok = _density(pos, uv, tri)
+            rho = rho * px_uv
+            if part == "buildings":
+                near = (zc < STREET_BAND_M) & (nz < 0.7)
+            else:
+                near = np.ones(len(tri), dtype=bool)
+            need = np.where(near, street_px, upper_px)
+            bad = ok & (rho < need * TOLERANCE)
+            tris += int(ok.sum())
+            a_ok = float(area[ok].sum())
+            a_bad = float(area[bad].sum())
+            pa = parts.setdefault(part, [0.0, 0.0])
+            pa[0] += a_ok
+            pa[1] += a_bad
+            rec = per.setdefault(f"{part}.{mat}", {"triangles": 0, "area_m2": 0.0,
+                                                   "below_m2": 0.0, "min_px_m": None,
+                                                   "set": s})
+            rec["triangles"] += int(ok.sum())
+            rec["area_m2"] += a_ok
+            rec["below_m2"] += a_bad
+            if ok.any():
+                v = float(rho[ok].min())
+                rec["min_px_m"] = v if rec["min_px_m"] is None else min(rec["min_px_m"], v)
+            if bad.any():
+                i = int(np.flatnonzero(bad)[np.argmin(rho[bad])])
+                w = (float(rho[i]), node, f"{folder}/{f.name}")
+                if f"{part}.{mat}" not in worst or w < worst[f"{part}.{mat}"]:
+                    worst[f"{part}.{mat}"] = w
     shares = {p: round(1.0 - b / a, 5) if a > 0 else 1.0 for p, (a, b) in parts.items()}
     for k, r in per.items():
         r["area_m2"] = round(r["area_m2"], 1)

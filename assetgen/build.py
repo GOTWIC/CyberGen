@@ -44,6 +44,7 @@ from . import brief as B
 from . import canon as C
 from . import gltf as G
 from . import manifest as MF
+from .progress import Progress
 from . import spec as S
 from .buildings import collision as CO
 from .buildings import envelope as EN
@@ -423,9 +424,14 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
-          props: bool = True) -> dict:
+          props: bool = True, progress: Progress | None = None) -> dict:
+    """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
+    to its notes then, else to `log`."""
     t0 = time.perf_counter()
-    model, sha, bdir = B.load_model(build_dir)
+    P = progress if progress is not None else Progress(quiet=True)
+    with P.stage("load") as st:
+        model, sha, bdir = B.load_model(build_dir)
+        st.note(f"{model.name}: {len(model.buildings)} buildings")
     out = bdir / "assets"
     spec = filled = None
     spec_doc = None
@@ -443,9 +449,15 @@ def build(build_dir: str | Path, spec_path: str | None = None,
               "generator": GEN_VERSION}
     old = MF.load(out)
     t1 = time.perf_counter()
-    briefs, bh, wrote = _briefs(model, sha, bdir, out, spec, ov, inputs, old, log)
+    with P.stage("briefs") as st:
+        briefs, bh, wrote = _briefs(model, sha, bdir, out, spec, ov, inputs, old,
+                                    log if progress is None else st.note)
     t2 = time.perf_counter()
-    genomes = {bid: GN.make(briefs[bid]) for bid in sorted(briefs)}
+    genomes = {}
+    with P.stage("genomes", total=len(briefs)) as st:
+        for bid in sorted(briefs):
+            genomes[bid] = GN.make(briefs[bid])
+            st.advance()
     hashes = {bid: asset_hash(bh[bid], lib_hash) for bid in sorted(briefs)}
     tiles: dict[str, list[str]] = {}
     for bid in sorted(briefs):
@@ -478,25 +490,29 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     jobs.sort(key=lambda j: (-sum(len(b["edges"]) * max(1, b["building"]["floors"])
                                   for _, b, _ in j["items"]), j["tile"]))
     nw = _workers(workers, len(jobs))
-    log(f"tiles: {len(tiles)} ({len(todo)} to make, {len(keep)} kept), {nw} workers")
-    for r in _run(jobs, nw, log):
-        for bid, rec in r["records"].items():
-            rec["hash"] = hashes[bid]
-            rec["brief"] = bh[bid]
-            records[bid] = rec
-        files[r["tile"]] = r["files"]
-        wrote += r["wrote"]
+    with P.stage("shells and parts", total=len(jobs)) as st:
+        (log if progress is None else st.note)(
+            f"tiles: {len(tiles)} ({len(todo)} to make, {len(keep)} kept), {nw} workers")
+        for r in _run(jobs, nw, log if progress is None else (lambda *a: None)):
+            for bid, rec in r["records"].items():
+                rec["hash"] = hashes[bid]
+                rec["brief"] = bh[bid]
+                records[bid] = rec
+            files[r["tile"]] = r["files"]
+            wrote += r["wrote"]
+            st.advance()
     t4 = time.perf_counter()
     from .materials import build as MS
     from .materials import params as MP
     MP.annotate(records, briefs, genomes)          # AG6: era, interior, extra CPD
-    lib = MS.library_for(spec_doc, out, log=log) if textures else None
+    lib = MS.library_for(spec_doc, out, log=log, progress=progress) if textures else None
     k = int(spec_doc["min_gene_distance"])
     tile_parts = {t: files[t].get("parts") for t in sorted(files)}
-    acc = AC.access(model, records, briefs)
-    checks = [AC.coverage(model, records), AC.envelope(records),
-              AC.meshes(records, tile_parts), AC.unique(records, k),
-              AC.budget(records, tile_parts), acc, AC.mounts(records)]
+    with P.stage("building checks"):
+        acc = AC.access(model, records, briefs)
+        checks = [AC.coverage(model, records), AC.envelope(records),
+                  AC.meshes(records, tile_parts), AC.unique(records, k),
+                  AC.budget(records, tile_parts), acc, AC.mounts(records)]
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,
@@ -529,7 +545,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     if streets:
         from .streets.build import build as street_build, default_workers
         srep = street_build(model, sha, out, filled, workers=workers or default_workers(),
-                            report_always=False, lib=lib)
+                            report_always=False, lib=lib, progress=progress)
         f = srep["files"]
         n = len(f["written"]) + f["tiles_removed"] + sum(
             int(bool(f[k])) for k in ("parts_written", "manifest_written",
@@ -542,14 +558,19 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                           "tiles_made": f["tiles_made"], "files_written": n,
                           "seconds": srep["seconds"]["total"]}
         rep["ok"] = rep["ok"] and srep["ok"]
-        log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
-            f"made, {n} files written")
+        if progress is None:
+            log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
+                f"made, {n} files written")
     # AG6's sign pages before AG8's signs show them; its materials and checks after them
-    signs = MS.signage(model, out, spec_doc, log) if lib is not None else None
+    signs = None
+    if lib is not None:
+        with P.stage("signage") as st:
+            signs = MS.signage(model, out, spec_doc, log if progress is None else st.note)
     if props:
         from .props.build import build as props_build, default_workers as props_workers
         prep = props_build(model, sha, out, filled, briefs=briefs,
-                           workers=workers or props_workers(), report_always=False, lib=lib)
+                           workers=workers or props_workers(), report_always=False, lib=lib,
+                           progress=progress)
         f = prep["files"]
         n = len(f["written"]) + len(f["removed"]) + int(bool(f["manifest_written"])) + \
             sum(int(bool(x)) for x in f["contribution_written"]) + int(f["report_written"])
@@ -563,10 +584,11 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                         "tiles_made": f["tiles_made"], "files_written": n,
                         "seconds": prep["seconds"]["total"]}
         rep["ok"] = rep["ok"] and prep["ok"]
-        log(f"props: {st['variants']} variants, {st['instances']} instances, {st['signs']} "
-            f"signs, {f['tiles_made']} tiles made, {n} files written")
+        if progress is None:
+            log(f"props: {st['variants']} variants, {st['instances']} instances, "
+                f"{st['signs']} signs, {f['tiles_made']} tiles made, {n} files written")
     if lib is not None:
-        mrep = MS.stage(model, sha, out, spec_doc, lib, log, signs=signs)
+        mrep = MS.stage(model, sha, out, spec_doc, lib, log, signs=signs, progress=progress)
         wrote += mrep["files_written"]
         rep["materials"] = {"ok": mrep["ok"], "textures": mrep["textures"],
                             "failed": [c for c, v in mrep["checks"].items() if not v["ok"]],
@@ -713,4 +735,9 @@ def report_text(rep: dict) -> str:
                      f"{pr['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if pr['ok'] else 'FAIL ' + ', '.join(pr['failed'])}"
                      f" ({pr['tiles_made']} tiles made, {pr['seconds']} s; props_report.txt)")
+    ma = rep.get("materials")
+    if ma is not None:
+        lines.append(f"materials: {ma['textures']} textures; "
+                     f"{'all checks pass' if ma['ok'] else 'FAIL ' + ', '.join(ma['failed'])}"
+                     f" ({ma['seconds']} s; materials_report.txt)")
     return "\n".join(lines) + "\n"

@@ -901,6 +901,20 @@ have to run Unreal: when it is done, the coordinating session decides whether an
 is needed and runs it in a separate session; its results go in `docs/progress/AG<n>/unreal/`
 and its entry here notes it.
 
+## Progress output
+
+`assetgen build`, `preview`, `materials preview|board`, `library`, `streets` and `props` say
+what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1's
+`citygen/progress.py`, which it will import once that lands): a line per stage (load, briefs,
+genomes, shells and parts, the library on first use, building checks, streets, signage,
+props, materials), a bar with n of N and the time left where the count is known (tiles as the
+workers return them, buildings, library sets and atlases, the packs the density check reads,
+Blender's views, sheet cells and boards), the time of each stage at the end. On a terminal
+the bar is one line redrawn in place; piped, plain lines at 0, 25, 50, 75 and 100 % or every
+30 s. Worker processes never print; the Blender scripts print `CGPROGRESS start|done <name>`
+per view, which `assetgen/blenderrun.py` reads as Blender runs. `--quiet` (or
+`CYBERGEN_QUIET=1`) turns it off. Stdout keeps the reports; no output file changes.
+
 ## Outputs
 
 Each milestone's builds, previews and report go in `docs/progress/AG<n>/`; while a session

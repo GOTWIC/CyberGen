@@ -219,16 +219,22 @@ def _write_text(path: Path, text: str) -> bool:
 
 
 def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None = None,
-          force: bool = False, report_always: bool = True, lib: dict | None = None) -> dict:
+          force: bool = False, report_always: bool = True, lib: dict | None = None,
+          progress=None) -> dict:
     """Make the street packs of a city into out_dir (BUILD/assets); returns the report.
     `report_always=False` (`assetgen build`) writes the report only when another file
-    changed or it is missing, so an unchanged rebuild writes no file."""
+    changed or it is missing, so an unchanged rebuild writes no file. `progress`: stage lines
+    and a tile bar on stderr (`assetgen/progress.py`)."""
+    from ..progress import Progress
+    P = progress if progress is not None else Progress(quiet=True)
     t0 = time.perf_counter()
     out_dir = Path(out_dir)
     sdir = out_dir / "streets"
-    cx = Ctx(model, spec)
-    t_ctx = time.perf_counter()
-    pieces = gather(cx)
+    with P.stage("streets: pieces") as st:
+        cx = Ctx(model, spec)
+        t_ctx = time.perf_counter()
+        pieces = gather(cx)
+        st.note(f"{len(pieces)} pieces")
     t_gather = time.perf_counter()
     ids = {}
     for p in pieces:
@@ -264,16 +270,21 @@ def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None =
     n_workers = max(1, min(workers or MAX_WORKERS, MAX_WORKERS, len(jobs) or 1))
     results = {}
     t_make0 = time.perf_counter()
-    if n_workers == 1 or len(jobs) <= 1:
-        for j in jobs:
-            r = _make_job(j)
-            results[r["tile"]] = r
-    else:
-        # big tiles first, so the workers finish together
-        jobs.sort(key=lambda j: (-len(j[1]), j[0]))
-        with ProcessPoolExecutor(max_workers=n_workers) as ex:
-            for r in ex.map(_make_job, jobs, chunksize=1):
+    with P.stage("streets: tiles", total=len(jobs)) as st:
+        st.note(f"{len(by_tile)} tiles: {len(todo)} to make, {len(keep)} kept, "
+                f"{n_workers} workers")
+        if n_workers == 1 or len(jobs) <= 1:
+            for j in jobs:
+                r = _make_job(j)
                 results[r["tile"]] = r
+                st.advance()
+        else:
+            # big tiles first, so the workers finish together
+            jobs.sort(key=lambda j: (-len(j[1]), j[0]))
+            with ProcessPoolExecutor(max_workers=n_workers) as ex:
+                for r in ex.map(_make_job, jobs, chunksize=1):
+                    results[r["tile"]] = r
+                    st.advance()
     t_make = time.perf_counter()
     written, unchanged_files = [], 0
     tiles_out, pieces_out, tile_seconds = {}, {}, {}

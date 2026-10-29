@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 import math
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -306,7 +305,12 @@ def compose(out: Path, sheets: list[dict], man: dict, cell: int = CELL) -> list[
 def run(build_dir: str | Path, blockout: str | None = None, out: str | None = None,
         which: list[str] | None = None, width: int = 2400, blender: str | None = None,
         only: list[str] | None = None, cell: int = CELL, log=print,
-        parts: bool = True) -> dict:
+        parts: bool = True, progress=None) -> dict:
+    """`progress`: stage lines and a bar over Blender's views and sheet cells on stderr
+    (`assetgen/progress.py`); Blender's own log lines go to `log` without it."""
+    from .blenderrun import run as run_blender
+    from .progress import Progress
+    P = progress if progress is not None else Progress(quiet=True)
     bdir = Path(build_dir)
     adir = bdir / "assets"
     man = json.loads((adir / "manifest.json").read_text())
@@ -343,16 +347,21 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
         json.dump(job, f)
         jp = f.name
     script = Path(__file__).resolve().parent / "blender" / "preview_assets.py"
-    log(f"blender: {len(views)} views, {sum(len(s['cells']) for s in sheets)} sheet cells")
-    proc = subprocess.run([exe, "-b", "--factory-startup", "-P", str(script), "--", jp],
-                          capture_output=True, text=True)
-    for line in proc.stdout.splitlines():
-        if line.startswith("[ag preview"):
-            log(line)
-    if proc.returncode != 0 or not (od / "preview_report.json").is_file():
-        sys.stderr.write(proc.stdout[-4000:] + proc.stderr[-4000:])
-        raise RuntimeError(f"Blender failed ({proc.returncode})")
-    made = compose(od, sheets, man, cell) if sheets else []
+    n_cells = sum(len(s["cells"]) for s in sheets)
+    if progress is None:
+        log(f"blender: {len(views)} views, {n_cells} sheet cells")
+    with P.stage("blender", total=len(views) + n_cells) as st:
+        st.note(f"{len(views)} views, {n_cells} sheet cells")
+        code, sout, serr = run_blender(
+            [exe, "-b", "--factory-startup", "-P", str(script), "--", jp], st,
+            keep="[ag preview", log=log if progress is None else None)
+    if code != 0 or not (od / "preview_report.json").is_file():
+        sys.stderr.write(sout[-4000:] + serr[-4000:])
+        raise RuntimeError(f"Blender failed ({code})")
+    made = []
+    if sheets:
+        with P.stage("contact sheets"):
+            made = compose(od, sheets, man, cell)
     if inst_path.is_file():
         inst_path.unlink()
     rep = json.loads((od / "preview_report.json").read_text())
@@ -362,12 +371,16 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
 
 
 def main(args) -> int:
+    from .progress import Progress
+    prog = Progress(quiet=True if getattr(args, "quiet", False) else None)
     try:
         rep = run(args.build, args.blockout, args.out, args.views, args.width, args.blender,
-                  args.only, args.cell, parts=not getattr(args, "no_parts", False))
+                  args.only, args.cell, parts=not getattr(args, "no_parts", False),
+                  progress=prog)
     except (OSError, RuntimeError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
+    prog.summary()
     print(f"previews: {len(rep['views'])} views, {len(rep['contact_sheets'])} contact sheets")
     return 0
 

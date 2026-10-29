@@ -132,19 +132,33 @@ def cmd_spike(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _progress(args: argparse.Namespace):
+    """Stage lines and bars on stderr (`assetgen/progress.py`); `--quiet` or CYBERGEN_QUIET=1
+    turns them off."""
+    from .progress import Progress
+    return Progress(quiet=True if getattr(args, "quiet", False) else None)
+
+
+def _quiet(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--quiet", action="store_true",
+                   help="no progress on stderr (also CYBERGEN_QUIET=1)")
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     from . import build as BD
     src = Path(args.build)
     if not (src / "city_model.json").is_file() and not src.is_file():
         print(f"error: {args.build}: no city_model.json", file=sys.stderr)
         return EXIT_USAGE
+    prog = _progress(args)
     try:
         rep = BD.build(src, args.spec, args.overrides, args.workers,
                        streets=not args.no_streets, textures=not args.no_textures,
-                       props=not args.no_props)
+                       props=not args.no_props, progress=prog)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
+    prog.summary()
     sys.stdout.write(BD.report_text(rep))
     print(f"files written: {rep['files_written']}")
     return EXIT_OK if rep["ok"] else EXIT_INVALID
@@ -163,7 +177,9 @@ def cmd_streets(args: argparse.Namespace) -> int:
     if not (src / "city_model.json").is_file() and not src.is_file():
         print(f"error: {args.build}: no city_model.json", file=sys.stderr)
         return EXIT_USAGE
-    model, sha, bdir = B.load_model(src)
+    prog = _progress(args)
+    with prog.stage("load"):
+        model, sha, bdir = B.load_model(src)
     spec = None
     if args.spec:
         res = S.load_spec(args.spec, model)
@@ -174,9 +190,10 @@ def cmd_streets(args: argparse.Namespace) -> int:
         spec = res.filled
     out = Path(args.out) if args.out else bdir / "assets"
     from .materials.build import library_for
-    lib = library_for(S.dump(spec or S.fill(S.AssetSpec())), out)
+    lib = library_for(S.dump(spec or S.fill(S.AssetSpec())), out, progress=prog)
     rep = street_build(model, sha, out, spec, workers=args.workers or default_workers(),
-                       force=args.force, lib=lib)
+                       force=args.force, lib=lib, progress=prog)
+    prog.summary()
     st, f = rep["stats"], rep["files"]
     print(f"{rep['city']}: {st['pieces']} street pieces in {st['tiles']} tiles, "
           f"{st['triangles']} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
@@ -191,7 +208,9 @@ def cmd_streets(args: argparse.Namespace) -> int:
 
 def cmd_library(args: argparse.Namespace) -> int:
     from .materials import library as LB
-    idx = LB.generate(args.out, args.density, args.workers, args.only)
+    prog = _progress(args)
+    idx = LB.generate(args.out, args.density, args.workers, args.only, progress=prog)
+    prog.summary()
     d = LB.disk(idx)
     print(f"library {idx['version']} ({idx['hash']}) in {idx['dir']}: {len(idx['sets'])} "
           f"sets, {len(idx['atlases'])} atlases, {d['source_bytes'] / 1e6:.0f} MB source, "
@@ -212,7 +231,9 @@ def cmd_props(args: argparse.Namespace) -> int:
     if not (src / "city_model.json").is_file() and not src.is_file():
         print(f"error: {args.build}: no city_model.json", file=sys.stderr)
         return EXIT_USAGE
-    model, sha, bdir = B.load_model(src)
+    prog = _progress(args)
+    with prog.stage("load"):
+        model, sha, bdir = B.load_model(src)
     spec = None
     if args.spec:
         res = S.load_spec(args.spec, model)
@@ -226,9 +247,11 @@ def cmd_props(args: argparse.Namespace) -> int:
     if (out / "library").exists():
         # AG6 ran on this build: textured materials and the sign pages on the faces
         from .materials.build import library_for
-        lib = library_for(S.dump(spec if spec is not None else S.fill(S.AssetSpec())), out)
+        lib = library_for(S.dump(spec if spec is not None else S.fill(S.AssetSpec())), out,
+                          progress=prog)
     rep = props_build(model, sha, out, spec, workers=args.workers or default_workers(),
-                      force=args.force, lib=lib)
+                      force=args.force, lib=lib, progress=prog)
+    prog.summary()
     st, f = rep["stats"], rep["files"]
     print(f"{rep['city']}: {st['variants']} variants in {st['families']} families, "
           f"{st['instances']} instances, {st['signs']} signs, {st['unique_triangles']} unique "
@@ -321,6 +344,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="flat materials (AG1, AG7) without AG6's library and textures")
     bu.add_argument("--no-props", action="store_true",
                     help="no props, plants or signs (default: last, as `assetgen props`)")
+    _quiet(bu)
     bu.set_defaults(func=cmd_build)
 
     lb = sub.add_parser("library", help="AG6: the shared texture library (made once, kept "
@@ -331,6 +355,7 @@ def build_parser() -> argparse.ArgumentParser:
                                                               "street (half above)")
     lb.add_argument("--workers", type=int, help="worker processes (at most 3)")
     lb.add_argument("--only", nargs="*", help="just these sets or atlases")
+    _quiet(lb)
     lb.set_defaults(func=cmd_library)
 
     ma = sub.add_parser("materials", help="AG6: textured Blender previews and boards")
@@ -350,6 +375,7 @@ def build_parser() -> argparse.ArgumentParser:
     mp.add_argument("--target", nargs=3, type=float, action="append", default=[])
     mp.add_argument("--lens", type=float, default=35.0)
     mp.add_argument("--blender", help="the Blender executable")
+    _quiet(mp)
     mp.set_defaults(func=cmd_materials)
     mb = msub.add_parser("board", help="a material board per era (and the street sets)")
     mb.add_argument("out", help="output directory")
@@ -357,6 +383,7 @@ def build_parser() -> argparse.ArgumentParser:
     mb.add_argument("--width", type=int, default=2400)
     mb.add_argument("--only", nargs="*", help="just these boards (era names, streets)")
     mb.add_argument("--blender", help="the Blender executable")
+    _quiet(mb)
     mb.set_defaults(func=cmd_materials)
 
     pv = sub.add_parser("preview", help="Blender previews of a build's assets")
@@ -373,6 +400,7 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--blender", help="the Blender executable")
     pv.add_argument("--no-parts", action="store_true",
                     help="leave the instanced parts out (shells and merged parts only)")
+    _quiet(pv)
     pv.set_defaults(func=cmd_preview)
 
     sg = sub.add_parser("streets", help="AG7: every street element as per-tile glTF packs")
@@ -387,6 +415,7 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--force", action="store_true",
                     help="make every tile again (the files are still written only if "
                          "their bytes change)")
+    _quiet(st)
     st.set_defaults(func=cmd_streets)
     se = ssub2.add_parser("seam", help="what a district regeneration changed in the street "
                                        "packs, and why")
@@ -408,6 +437,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--sheets", metavar="DIR",
                     help="also render the variant sheets (a sheet per district style, one of "
                          "the plants) in Blender into DIR")
+    _quiet(pr)
     pr.set_defaults(func=cmd_props)
     return p
 

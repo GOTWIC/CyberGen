@@ -999,6 +999,14 @@ AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontpar
   beside AG8's props. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
   grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.
 
+Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
+and `props` print a line per stage, a bar (n of N, time left) where the count is known and
+the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
+redrawn line on a terminal, plain lines when piped; workers never print, the parent advances;
+Blender scripts print `CGPROGRESS start|done <name>`, read by `assetgen/blenderrun.py`);
+`--quiet` or `CYBERGEN_QUIET=1` silences it. A new long stage takes a `progress=None`
+parameter and wraps its work in `P.stage(...)`.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

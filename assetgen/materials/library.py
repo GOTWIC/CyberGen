@@ -432,10 +432,14 @@ def library_dir(root: str | Path | None = None, density: int = DENSITY) -> Path:
 
 
 def generate(out: str | Path | None = None, density: int = DENSITY,
-             workers: int | None = None, only: list[str] | None = None, log=print) -> dict:
+             workers: int | None = None, only: list[str] | None = None, log=print,
+             progress=None) -> dict:
     """Make (or keep) every set and atlas in `out` (default: `default_root()/d<density>`);
-    write `library.json`. Returns the index."""
+    write `library.json`. Returns the index. `progress`: a stage line and a bar over the sets
+    and atlases on stderr (`assetgen/progress.py`); the log lines go to its notes then."""
+    from ..progress import Progress
     from . import atlases as A
+    P = progress if progress is not None else Progress(quiet=True)
     t0 = time.perf_counter()
     od = library_dir(out, density)
     od.mkdir(parents=True, exist_ok=True)
@@ -472,16 +476,21 @@ def generate(out: str | Path | None = None, density: int = DENSITY,
             continue
         atl.append({"name": name, "density": density, "hash": h, "dir": str(od)})
     nw = max(1, min(workers or MAX_WORKERS, MAX_WORKERS))
-    log(f"library: {len(jobs)} sets and {len(atl)} atlases to make, "
-        f"{len(keep) + len(akeep)} kept, {nw} workers")
-    made_sets = dict(keep)
-    for r in _run(_set_job, sorted(jobs, key=lambda j: -j["size"]), nw):
-        made_sets[r["name"]] = r
-        log(f"  set {r['name']} {r['files']['base']['size'][0]} px {r['seconds']} s")
-    made_atl = dict(akeep)
-    for r in _run(_atlas_job, atl, nw):
-        made_atl[r["name"]] = r
-        log(f"  atlas {r['name']} {r['seconds']} s")
+    with P.stage("library", total=len(jobs) + len(atl)) as st:
+        say = log if progress is None else st.note
+        say(f"library: {len(jobs)} sets and {len(atl)} atlases to make, "
+            f"{len(keep) + len(akeep)} kept, {nw} workers, in {od}")
+        each = log if progress is None else (lambda *a: None)
+        made_sets = dict(keep)
+        for r in _run(_set_job, sorted(jobs, key=lambda j: -j["size"]), nw):
+            made_sets[r["name"]] = r
+            each(f"  set {r['name']} {r['files']['base']['size'][0]} px {r['seconds']} s")
+            st.advance()
+        made_atl = dict(akeep)
+        for r in _run(_atlas_job, atl, nw):
+            made_atl[r["name"]] = r
+            each(f"  atlas {r['name']} {r['seconds']} s")
+            st.advance()
     if only:
         made_sets = {**(old.get("sets") or {}), **made_sets}
         made_atl = {**(old.get("atlases") or {}), **made_atl}
