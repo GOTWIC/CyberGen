@@ -298,12 +298,20 @@ def cmd_unreal(args: argparse.Namespace) -> int:
         return EXIT_USAGE
     try:
         res = U.import_city(build, args.uproject, engine=args.engine, name=args.name,
-                            timeout=args.timeout, assets=not args.blockout_only) \
+                            timeout=args.timeout, assets=not args.blockout_only,
+                            play=args.play, fly_speed=args.fly_speed,
+                            startup=not args.no_startup, view_m=args.view_range) \
             if not args.check_only else None
         if res is not None:
             print(U.import_summary(res))
             if not res.get("ok"):
                 print(res.get("error", ""), file=sys.stderr)
+                return EXIT_INVALID
+            print(U.play_summary(res))
+        if not args.no_hlod and res is not None:
+            hl = U.build_hlods(build, args.uproject, engine=args.engine, timeout=args.timeout)
+            print(U.hlod_summary(hl))
+            if not hl.get("ok"):
                 return EXIT_INVALID
         if args.check or args.check_only:
             if any(len(v) not in (7, 8) for v in args.view):
@@ -574,7 +582,14 @@ def build_parser() -> argparse.ArgumentParser:
     ue = sub.add_parser("unreal", help="import a blockout into an Unreal 5.8 project "
                                        "(World Partition level, meshes with collision, "
                                        "instanced props, graphs as data assets); importing "
-                                       "again updates by id")
+                                       "again updates by id",
+                        description="Import a built city into an Unreal 5.8 project. The "
+                                    "city becomes the project's startup and default map "
+                                    "(the last import wins; --no-startup opts out), so "
+                                    "opening the project and pressing Play puts you in it: "
+                                    "flying by default (WASD to move, E or Space up, Q or C "
+                                    "down, the mouse to look, no collision), or walking "
+                                    "with --play walk (the project's own character).")
     ue.add_argument("build_dir", help="a `citygen build --blockout` or `citygen blockout` "
                                       "output")
     ue.add_argument("uproject", nargs="?", help="the project's .uproject")
@@ -590,9 +605,27 @@ def build_parser() -> argparse.ArgumentParser:
                     help="leave out stage 2 (assetgen's BUILD_DIR/assets/"
                          "unreal_contribution.*.json): the blockout's actors alone (stage "
                          "2's meshes stay in the project for the next import with it)")
+    ue.add_argument("--play", choices=("fly", "walk"), default="fly",
+                    help="what Play puts you in: fly (default), a free camera with no "
+                         "collision; walk, the project's own game mode and pawn (the First "
+                         "Person character in a --new-project project)")
+    ue.add_argument("--fly-speed", type=float, default=50.0, metavar="M_PER_S",
+                    help="the fly pawn's top speed in m/s (default 50)")
+    ue.add_argument("--view-range", type=float, default=1500.0, metavar="M",
+                    help="how far around the player the level streams in, in meters "
+                         "(default 1500)")
+    ue.add_argument("--no-hlod", action="store_true",
+                    help="skip building the level's HLODs after the import (default: built, "
+                         "the far view beyond --view-range while flying; minutes for a "
+                         "whole city, an import over it rebuilds only what changed)")
+    ue.add_argument("--no-startup", action="store_true",
+                    help="leave the project's startup and default map as they are (default: "
+                         "the imported city becomes both in Config/DefaultEngine.ini; with "
+                         "several cities in one project the last import wins)")
     ue.add_argument("--check", action="store_true",
                     help="after the import, play the level in the editor: streaming, "
-                         "ground traces, a walk along a sidewalk")
+                         "ground traces, a walk along a sidewalk (always the walking "
+                         "character, whatever --play is), then a flight with the fly pawn")
     ue.add_argument("--check-only", action="store_true", help="the check without importing")
     ue.add_argument("--shots", metavar="DIR", help="with --check: rendered views into DIR")
     ue.add_argument("--view", nargs="+", action="append", default=[],

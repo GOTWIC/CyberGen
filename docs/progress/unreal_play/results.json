@@ -1,0 +1,636 @@
+{
+ "vesper_bay": {
+  "import_over_earlier": {
+   "ok": true,
+   "actors": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0,
+    "unchanged": 10413
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 8533,
+    "deleted": 0
+   },
+   "tiles_imported": 0,
+   "materials": {
+    "created": 0,
+    "updated": 0,
+    "kept": 83,
+    "deleted": 0
+   },
+   "graphs": {
+    "written": 0,
+    "kept": 3
+   },
+   "timings": {
+    "core": 0.0,
+    "materials": 0.02,
+    "materials2": 0.0,
+    "meshes": 3.61,
+    "meshes2": 0.0,
+    "level": 2.82,
+    "actors": 0.07,
+    "play": 0.15,
+    "streaming": 0.0,
+    "graphs": 0.1,
+    "save": 0.88,
+    "prune": 0.18,
+    "save_pruned": 0.0,
+    "digests": 0.35
+   },
+   "play": {
+    "mode": "fly",
+    "fly_speed_m_s": 50.0,
+    "game_mode": "/Game/CityGen/Core/GM_CityGenFly.GM_CityGenFly_C",
+    "fly_classes_saved": true
+   },
+   "streaming": {
+    "set": true,
+    "changed": 3,
+    "cells_m": [
+     256.0,
+     512.0,
+     1024.0
+    ],
+    "loading_ranges_m": [
+     1500.0,
+     3000.0,
+     6000.0
+    ]
+   },
+   "dirty_packages": 1,
+   "actor_count": 10413,
+   "actor_digest": "f76487b3190dd9b4",
+   "asset_count": 8619,
+   "asset_digest": "a816730f2fdeaced",
+   "level": "/Game/CityGen/VesperBay/Maps/VesperBay",
+   "content_root": "/Game/CityGen/VesperBay",
+   "city": "Vesper Bay",
+   "counts": {
+    "tiles": 196,
+    "objects": 8500,
+    "instance_actors": 1909,
+    "instances": 75749,
+    "prototypes": 33
+   },
+   "engine": "5.8.4-58902052+++UE5+Release-5.8",
+   "total_s": 8.2,
+   "exit_code": 0,
+   "wall_s": 24.6
+  },
+  "hlod_first": {
+   "ok": true,
+   "exit_code": 0,
+   "level": "/Game/CityGen/VesperBay/Maps/VesperBay",
+   "hlod_actors": 319,
+   "built": 319,
+   "wall_s": 98.2
+  },
+  "import_final": {
+   "ok": true,
+   "actors": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0,
+    "unchanged": 10413
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 8533,
+    "deleted": 0
+   },
+   "tiles_imported": 0,
+   "materials": {
+    "created": 0,
+    "updated": 0,
+    "kept": 83,
+    "deleted": 0
+   },
+   "graphs": {
+    "written": 0,
+    "kept": 3
+   },
+   "timings": {
+    "core": 0.29,
+    "materials": 0.02,
+    "materials2": 0.0,
+    "meshes": 3.21,
+    "meshes2": 0.0,
+    "level": 2.98,
+    "actors": 0.06,
+    "play": 0.0,
+    "streaming": 0.0,
+    "graphs": 0.13,
+    "save": 0.0,
+    "prune": 0.09,
+    "save_pruned": 0.0,
+    "digests": 0.26
+   },
+   "play": {
+    "mode": "fly",
+    "fly_speed_m_s": 50.0,
+    "game_mode": "/Game/CityGen/Core/GM_CityGenFly.GM_CityGenFly_C",
+    "fly_classes_saved": false
+   },
+   "streaming": {
+    "set": true,
+    "changed": 0,
+    "hlod_layer": "VesperBay_HLODLayer_Instanced",
+    "cells_m": [
+     256.0,
+     512.0,
+     1024.0
+    ],
+    "loading_ranges_m": [
+     1500.0,
+     4879.55,
+     6000.0
+    ]
+   },
+   "dirty_packages": 0,
+   "actor_count": 10413,
+   "actor_digest": "f76487b3190dd9b4",
+   "asset_count": 8619,
+   "asset_digest": "a816730f2fdeaced",
+   "level": "/Game/CityGen/VesperBay/Maps/VesperBay",
+   "content_root": "/Game/CityGen/VesperBay",
+   "city": "Vesper Bay",
+   "counts": {
+    "tiles": 196,
+    "objects": 8500,
+    "instance_actors": 1909,
+    "instances": 75749,
+    "prototypes": 33
+   },
+   "engine": "5.8.4-58902052+++UE5+Release-5.8",
+   "total_s": 7.1,
+   "exit_code": 0,
+   "wall_s": 26.0,
+   "manifest_s": 1.2,
+   "plugins_enabled": [],
+   "startup_map_changed": false,
+   "startup_map": "/Game/CityGen/VesperBay/Maps/VesperBay"
+  },
+  "hlod_final": {
+   "ok": true,
+   "exit_code": 0,
+   "level": "/Game/CityGen/VesperBay/Maps/VesperBay",
+   "hlod_actors": 244,
+   "rebuilt": 244,
+   "wall_s": 42.1
+  },
+  "check": {
+   "ok": true,
+   "lines": [
+    "streaming: 6855 of 10413 actors loaded at the start, 5355 after a teleport to (896, -1408) (3070 new)",
+    "collision: 507 of 507 traces down hit (building 228, road_street 50, junction 46, water 37, sidewalk 25, elevated 23), 36 of 36 roofs, 36 of 36 facades",
+    "walk: 253 m along a 258 m sidewalk path in 43 s, 100% of frames on the ground, reached its end",
+    "console: ghost flying without collision, fly flying, walk walking",
+    "fly: BP_CityGenFlyPawn_C at 50 m/s flew 397 m in 7.9 s through d01.lot.e43n235.bld, 6819 actors loaded where it ended"
+   ],
+   "checks": {
+    "streaming": {
+     "ok": true,
+     "actors": 10413,
+     "loaded_at_start": 6855,
+     "stage2_at_start": 0,
+     "loaded_far": 5355,
+     "only_far": 3070,
+     "far_spot_m": [
+      896.0,
+      -1408.0
+     ],
+     "far_tile_loaded": true
+    },
+    "collision": {
+     "ok": true,
+     "down": {
+      "traces": 507,
+      "hits": 507,
+      "by_category": {
+       "water": 37,
+       "ground": 16,
+       "building": 228,
+       "green_roof": 7,
+       "structure_canopy": 1,
+       "sidewalk": 25,
+       "road_avenue": 9,
+       "road_pedestrian": 3,
+       "plant_shrub": 1,
+       "junction": 46,
+       "lawn": 3,
+       "plant_roof_tree": 1,
+       "open_plaza": 6,
+       "road_street": 50,
+       "crosswalk": 1,
+       "open_park": 1,
+       "elevated": 23,
+       "road_alley": 19,
+       "skybridge": 2,
+       "prop_awning": 12,
+       "open_pocket_park": 1,
+       "open_green": 2,
+       "site_courtyard": 10,
+       "plant_facade_greenery": 1,
+       "prop_sign": 1,
+       "prop_ac_unit": 1
+      }
+     },
+     "roofs": {
+      "tried": 36,
+      "hit": 36
+     },
+     "facades": {
+      "tried": 36,
+      "hit": 36
+     }
+    },
+    "walk": {
+     "ok": true,
+     "path_m": 257.6,
+     "points": 7,
+     "reached": true,
+     "travelled_m": 253.1,
+     "on_ground": 1.0,
+     "max_drop_m": 0.05,
+     "seconds": 42.9,
+     "stopped_by": {},
+     "skipped_low_walkways": 0
+    },
+    "cheats": {
+     "ok": true,
+     "ghost": {
+      "mode": "flying",
+      "collision": false
+     },
+     "fly": {
+      "mode": "flying",
+      "collision": true
+     },
+     "walk": {
+      "mode": "walking",
+      "collision": true
+     }
+    },
+    "fly": {
+     "ok": true,
+     "pawn": "BP_CityGenFlyPawn_C",
+     "speed_m_s": 50.0,
+     "flew_m": 396.6,
+     "seconds": 7.9,
+     "through": "d01.lot.e43n235.bld",
+     "loaded_at_end": 6819,
+     "end_tile_loaded": true
+    }
+   },
+   "city": "Vesper Bay",
+   "pawn": "BP_FirstPersonCharacter_C",
+   "fly_pawn": "BP_CityGenFlyPawn_C",
+   "total_s": 384.0,
+   "exit_code": 0,
+   "wall_s": 435.9
+  }
+ },
+ "greyhook": {
+  "import_over_m15": {
+   "ok": true,
+   "actors": {
+    "created": 9786,
+    "updated": 987,
+    "deleted": 3951,
+    "unchanged": 198
+   },
+   "meshes": {
+    "imported": 4392,
+    "kept": 227,
+    "deleted": 3244
+   },
+   "tiles_imported": 202,
+   "materials": {
+    "created": 0,
+    "updated": 0,
+    "kept": 73,
+    "deleted": 3
+   },
+   "graphs": {
+    "written": 3,
+    "kept": 0
+   },
+   "timings": {
+    "core": 0.0,
+    "materials": 0.39,
+    "materials2": 0.72,
+    "meshes": 12.34,
+    "meshes2": 99.93,
+    "level": 4.47,
+    "actors": 34.48,
+    "play": 0.07,
+    "streaming": 0.0,
+    "graphs": 0.23,
+    "save": 10.4,
+    "prune": 3928.89,
+    "save_pruned": 0.09,
+    "digests": 2.4
+   },
+   "stage2": {
+    "actors": 7884,
+    "instance_actors": 590,
+    "replaced": 3672,
+    "meshes": {
+     "imported": 10573,
+     "kept": 0,
+     "deleted": 0
+    },
+    "packs_imported": 348,
+    "materials": {
+     "created": 68,
+     "updated": 0,
+     "kept": 0,
+     "deleted": 0
+    },
+    "hulls": 2625,
+    "boxes_only": 46,
+    "complex_fallback": 0,
+    "lod_chains": 4
+   },
+   "play": {
+    "mode": "fly",
+    "fly_speed_m_s": 50.0,
+    "game_mode": "/Game/CityGen/Core/GM_CityGenFly.GM_CityGenFly_C",
+    "fly_classes_saved": false
+   },
+   "streaming": {
+    "set": true,
+    "changed": 3,
+    "cells_m": [
+     256.0,
+     512.0,
+     1024.0
+    ],
+    "loading_ranges_m": [
+     1500.0,
+     3000.0,
+     6000.0
+    ]
+   },
+   "dirty_packages": 14727,
+   "actor_count": 10971,
+   "actor_digest": "b0f113abbd2c0eb6",
+   "asset_count": 15336,
+   "asset_digest": "b19228bc3721cb32",
+   "level": "/Game/CityGen/Greyhook/Maps/Greyhook",
+   "content_root": "/Game/CityGen/Greyhook",
+   "city": "Greyhook",
+   "counts": {
+    "tiles": 256,
+    "objects": 4587,
+    "instance_actors": 1578,
+    "instances": 42909,
+    "prototypes": 32,
+    "actors": 10971
+   },
+   "engine": "5.8.4-58902052+++UE5+Release-5.8",
+   "total_s": 4094.5,
+   "exit_code": 0,
+   "wall_s": 4152.4,
+   "manifest_s": 0.9,
+   "plugins_enabled": [],
+   "startup_map_changed": true,
+   "startup_map": "/Game/CityGen/Greyhook/Maps/Greyhook"
+  },
+  "hlod_first": {
+   "ok": true,
+   "exit_code": 0,
+   "level": "/Game/CityGen/Greyhook/Maps/Greyhook",
+   "hlod_actors": 360,
+   "rebuilt": 360,
+   "wall_s": 563.9
+  },
+  "import_final": {
+   "ok": true,
+   "actors": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0,
+    "unchanged": 10971
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 4619,
+    "deleted": 0
+   },
+   "tiles_imported": 0,
+   "materials": {
+    "created": 0,
+    "updated": 0,
+    "kept": 73,
+    "deleted": 0
+   },
+   "graphs": {
+    "written": 0,
+    "kept": 3
+   },
+   "timings": {
+    "core": 0.0,
+    "materials": 0.03,
+    "materials2": 1.86,
+    "meshes": 4.77,
+    "meshes2": 13.63,
+    "level": 9.0,
+    "actors": 0.18,
+    "play": 0.0,
+    "streaming": 0.01,
+    "graphs": 0.15,
+    "save": 2.84,
+    "prune": 0.77,
+    "save_pruned": 0.01,
+    "digests": 1.29
+   },
+   "stage2": {
+    "actors": 7884,
+    "instance_actors": 590,
+    "replaced": 3672,
+    "meshes": {
+     "imported": 0,
+     "kept": 10573,
+     "deleted": 0
+    },
+    "packs_imported": 0,
+    "materials": {
+     "created": 0,
+     "updated": 0,
+     "kept": 68,
+     "deleted": 0
+    },
+    "hulls": 0,
+    "boxes_only": 0,
+    "complex_fallback": 0,
+    "lod_chains": 0
+   },
+   "play": {
+    "mode": "fly",
+    "fly_speed_m_s": 50.0,
+    "game_mode": "/Game/CityGen/Core/GM_CityGenFly.GM_CityGenFly_C",
+    "fly_classes_saved": false
+   },
+   "streaming": {
+    "set": true,
+    "changed": 2,
+    "hlod_layer": "Greyhook_HLODLayer_Instanced",
+    "cells_m": [
+     256.0,
+     512.0,
+     1024.0
+    ],
+    "loading_ranges_m": [
+     1500.0,
+     5091.17,
+     6000.0
+    ]
+   },
+   "dirty_packages": 1,
+   "actor_count": 10971,
+   "actor_digest": "b0f113abbd2c0eb6",
+   "asset_count": 15336,
+   "asset_digest": "b19228bc3721cb32",
+   "level": "/Game/CityGen/Greyhook/Maps/Greyhook",
+   "content_root": "/Game/CityGen/Greyhook",
+   "city": "Greyhook",
+   "counts": {
+    "tiles": 256,
+    "objects": 4587,
+    "instance_actors": 1578,
+    "instances": 42909,
+    "prototypes": 32,
+    "actors": 10971
+   },
+   "engine": "5.8.4-58902052+++UE5+Release-5.8",
+   "total_s": 34.7,
+   "exit_code": 0,
+   "wall_s": 65.4,
+   "manifest_s": 2.7,
+   "plugins_enabled": [],
+   "startup_map_changed": true,
+   "startup_map": "/Game/CityGen/Greyhook/Maps/Greyhook"
+  },
+  "hlod_final": {
+   "ok": true,
+   "exit_code": 0,
+   "level": "/Game/CityGen/Greyhook/Maps/Greyhook",
+   "hlod_actors": 285,
+   "rebuilt": 285,
+   "wall_s": 164.0
+  },
+  "check": {
+   "ok": true,
+   "lines": [
+    "streaming: 8847 of 10971 actors loaded at the start, 7451 after a teleport to (-1152, 128) (1010 new)",
+    "collision: 507 of 507 traces down hit (building 251, elevated 37, junction 34, ground 33, green_roof 31, open_plaza 22), 36 of 36 roofs, 36 of 36 facades",
+    "walk: 129 m along a 132 m sidewalk path in 24 s, 100% of frames on the ground, reached its end",
+    "console: ghost flying without collision, fly flying, walk walking",
+    "fly: BP_CityGenFlyPawn_C at 50 m/s flew 365 m in 7.3 s through d03.lot.e32s178.bld, 7701 actors loaded where it ended"
+   ],
+   "checks": {
+    "streaming": {
+     "ok": true,
+     "actors": 10971,
+     "loaded_at_start": 8847,
+     "stage2_at_start": 6954,
+     "loaded_far": 7451,
+     "only_far": 1010,
+     "far_spot_m": [
+      -1152.0,
+      128.0
+     ],
+     "far_tile_loaded": true
+    },
+    "collision": {
+     "ok": true,
+     "down": {
+      "traces": 507,
+      "hits": 507,
+      "by_category": {
+       "green_roof": 31,
+       "ground": 33,
+       "open_park": 2,
+       "junction": 34,
+       "building": 251,
+       "elevated": 37,
+       "road_avenue": 2,
+       "plant_park_tree": 2,
+       "structure_canopy": 1,
+       "road_service": 3,
+       "plant_median_tree": 2,
+       "sidewalk": 13,
+       "open_plaza": 22,
+       "road_street": 17,
+       "road_alley": 12,
+       "open_green": 1,
+       "prop_awning": 11,
+       "plant_facade_greenery": 1,
+       "skybridge": 1,
+       "road_pedestrian": 16,
+       "prop_ac_unit": 1,
+       "street": 2,
+       "water": 9,
+       "quay": 3
+      }
+     },
+     "roofs": {
+      "tried": 36,
+      "hit": 36
+     },
+     "facades": {
+      "tried": 36,
+      "hit": 36
+     }
+    },
+    "walk": {
+     "ok": true,
+     "path_m": 131.6,
+     "points": 12,
+     "reached": true,
+     "travelled_m": 129.2,
+     "on_ground": 1.0,
+     "max_drop_m": 0.0,
+     "seconds": 24.1,
+     "stopped_by": {},
+     "skipped_low_walkways": 0
+    },
+    "cheats": {
+     "ok": true,
+     "ghost": {
+      "mode": "flying",
+      "collision": false
+     },
+     "fly": {
+      "mode": "flying",
+      "collision": true
+     },
+     "walk": {
+      "mode": "walking",
+      "collision": true
+     }
+    },
+    "fly": {
+     "ok": true,
+     "pawn": "BP_CityGenFlyPawn_C",
+     "speed_m_s": 50.0,
+     "flew_m": 364.6,
+     "seconds": 7.3,
+     "through": "d03.lot.e32s178.bld",
+     "loaded_at_end": 7701,
+     "end_tile_loaded": true
+    }
+   },
+   "city": "Greyhook",
+   "pawn": "BP_FirstPersonCharacter_C",
+   "fly_pawn": "BP_CityGenFlyPawn_C",
+   "total_s": 717.7,
+   "exit_code": 0,
+   "wall_s": 821.4
+  }
+ }
+}

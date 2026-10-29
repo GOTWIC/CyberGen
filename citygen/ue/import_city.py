@@ -16,7 +16,11 @@ makes, under /Game/CityGen/<City>:
 - Meshes/<tile>/<object>, Props/<kind>: static meshes, each with its content hash as
   `cg.hash` metadata;
 - Materials/MI_<material>: instances of /Game/CityGen/Core/M_CityGen;
-- Data/DA_<City>_Lanes, _Walkways, _Transit: BP_CityGenGraph data assets (flat arrays).
+- Data/DA_<City>_Lanes, _Walkways, _Transit: BP_CityGenGraph data assets (flat arrays);
+- the level's Play: its game mode override GM_CityGenFly (Core, spawning BP_CityGenFlyPawn,
+  a SpectatorPawn with no collision at the job's speed) with `play` "fly", else none (the
+  project's own game mode and pawn); its World Partition grid sized for flying (`view_m`
+  around the player, the HLOD partitions out to the whole city).
 
 With stage 2 in the manifest (assetgen's buildings and streets over the blockout), also:
 
@@ -66,6 +70,8 @@ GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids",
               ("PointStart", "[int"), ("Points", "[vector"), ("LinkStart", "[int"),
               ("Links", "[int"), ("Attrs", "[string"), ("Levels", "[int")]   # (M14)
 INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
+FLY_PAWN = f"{CORE}/BP_CityGenFlyPawn"      # what Play puts you in with `--play fly`
+FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
@@ -139,10 +145,50 @@ def blueprint(path, parent, variables, hism=False):
     return BEL.generated_class(bp)
 
 
+def fly_classes(speed_m_s):
+    """The fly pawn, a SpectatorPawn (its built-in bindings: WASD, E or Space up, Q or C down,
+    the mouse to look) at `speed_m_s` with no collision, and the game mode that spawns it;
+    made once, the speed set again when it changes. The game mode's class, and whether
+    either Blueprint was saved."""
+    pawn_cls = blueprint(FLY_PAWN, unreal.SpectatorPawn, [])
+    mode_cls = blueprint(FLY_MODE, unreal.GameModeBase, [])
+    pawn = unreal.get_default_object(pawn_cls)
+    mc = pawn.get_editor_property("movement_component")
+    cc = pawn.get_editor_property("collision_component")
+    speed = float(speed_m_s) * 100.0
+    saved = False
+    if mc.get_editor_property("max_speed") != speed or \
+            str(cc.get_collision_profile_name()) != "NoCollision":
+        mc.set_editor_property("max_speed", speed)
+        mc.set_editor_property("acceleration", speed * 4.0)     # full speed in 1/4 s
+        mc.set_editor_property("deceleration", speed * 8.0)
+        cc.set_collision_profile_name("NoCollision")
+        EAL.save_loaded_asset(unreal.load_asset(FLY_PAWN), only_if_is_dirty=False)
+        saved = True
+    mode = unreal.get_default_object(mode_cls)
+    have = mode.get_editor_property("default_pawn_class")
+    if have is None or have.get_path_name() != pawn_cls.get_path_name():
+        mode.set_editor_property("default_pawn_class", pawn_cls)
+        EAL.save_loaded_asset(unreal.load_asset(FLY_MODE), only_if_is_dirty=False)
+        saved = True
+    return mode_cls, saved
+
+
+def instanced(m):
+    """A master usable on instanced static meshes (the props' and parts' instances, and the
+    instanced HLODs of the far view): without the usage flag a game draws them with the
+    default material, flat gray. Saved only when it was missing."""
+    if not m.get_editor_property("used_with_instanced_static_meshes"):
+        m.set_editor_property("used_with_instanced_static_meshes", True)
+        MEL.recompile_material(m)
+        EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
+
+
 def base_material():
     path = f"{CORE}/M_CityGen"
     if EAL.does_asset_exist(path):
-        return unreal.load_asset(path)
+        return instanced(unreal.load_asset(path))
     m = AT.create_asset("M_CityGen", CORE, unreal.Material, unreal.MaterialFactoryNew())
     col = MEL.create_material_expression(m, unreal.MaterialExpressionVectorParameter, -500, 0)
     col.set_editor_property("parameter_name", "BaseColor")
@@ -162,6 +208,7 @@ def base_material():
     MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     m.set_editor_property("two_sided", True)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
     MEL.recompile_material(m)
     EAL.save_loaded_asset(m)
     return m
@@ -538,7 +585,7 @@ def stage2_master(master, defaults=None):
     path = f"{CORE}/{name}"
     m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if m is not None and meta(m, "cg.core2") == STAGE2_VERSION:
-        return m
+        return instanced(m)
     if m is None:
         m = AT.create_asset(name, CORE, unreal.Material, unreal.MaterialFactoryNew())
     else:
@@ -636,6 +683,7 @@ def stage2_master(master, defaults=None):
         MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
         MEL.connect_material_property(metal, "", MP.MP_METALLIC)
         m.set_editor_property("two_sided", master == "foliage")
+    m.set_editor_property("used_with_instanced_static_meshes", True)  # (HLODs, HISMs)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.core2", STAGE2_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
@@ -1322,6 +1370,8 @@ class Importer:
                     for xf in r["xforms"]], False, False)
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
+                if r.get("no_collision"):
+                    comp.set_collision_profile_name("NoCollision")
                 a.set_actor_location_and_rotation(loc, rot, False, False)
                 a.set_editor_property("Ids", [unreal.Name(i) for i in r.get("ids") or
                                               [r["entry"]]])
@@ -1417,6 +1467,68 @@ class Importer:
 
             self.place(have, key, h, cls.static_class(), make, update, "CityGen/Lighting")
 
+    # -- what Play puts you in, and how far the level streams around you --
+
+    def world_settings(self):
+        return unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world() \
+            .get_world_settings()
+
+    def play(self):
+        """The level's game mode override: the fly pawn's game mode (`fly`), else none, so
+        the project's own game mode and pawn (`walk`). The fly classes are made either way
+        (the check flies the city with them)."""
+        mode = JOB.get("play", "fly")
+        fly, saved = fly_classes(JOB.get("fly_speed_m_s", 50.0))
+        want = fly if mode == "fly" else None
+        ws = self.world_settings()
+        have = ws.get_editor_property("default_game_mode")
+        if (have.get_path_name() if have else "") != (want.get_path_name() if want else ""):
+            ws.set_editor_property("default_game_mode", want)
+        self.stats["play"] = {"mode": mode, "fly_speed_m_s": JOB.get("fly_speed_m_s", 50.0),
+                              "game_mode": want.get_path_name() if want else "",
+                              "fly_classes_saved": saved}
+
+    def streaming(self):
+        """World Partition for flying over the city: the main partition's cells a tile wide
+        (256 m), loaded `view_m` around the player; the far view (the HLODs `citygen unreal`
+        builds after the import) the level's instanced HLOD layer alone, the city's own
+        meshes and materials in cells twice as wide out to the whole city, nothing baked
+        (the merged layer the engine puts over it is cut off), the last HLOD partition left
+        unused at twice that. Set only where they differ."""
+        view = int(round(float(JOB.get("view_m", 1500.0)) * 100.0))
+        b = self.man["bounds"]
+        span = int(math.ceil(math.hypot(b[2] - b[0], b[3] - b[1]) * 100.0))
+        wp = self.world_settings().get_editor_property("world_partition")
+        base = wp.get_path_name() + ".WorldPartitionRuntimeHashSet_0"
+        parts = [p for p in (unreal.find_object(None, f"{base}.RuntimePartitionLHGrid_{i}")
+                             for i in range(8)) if p is not None]
+        if len(parts) != 3:
+            self.stats["streaming"] = {"set": False, "partitions": len(parts)}
+            log(f"streaming: {len(parts)} grid partitions, not the main and two HLOD ones; "
+                "left as they are")
+            return
+        # the main partition has the smallest cells, each HLOD one twice its parent's
+        parts.sort(key=lambda p: (p.get_editor_property("CellSize"), p.get_name()))
+        cell = int(self.man["tile_size_m"] * 100.0)
+        want = [(cell, view), (2 * cell, max(2 * view, span)),
+                (4 * cell, max(4 * view, span))]
+        changed = 0
+        for p, (c, r) in zip(parts, want):
+            if p.get_editor_property("CellSize") != c or p.get_editor_property("LoadingRange") != r:
+                p.modify()
+                p.set_editor_property("CellSize", c)
+                p.set_editor_property("LoadingRange", r)
+                changed += 1
+        hl = wp.get_editor_property("default_hlod_layer")
+        if hl is not None and hl.get_editor_property("parent_layer") is not None:
+            hl.set_editor_property("parent_layer", None)
+            EAL.save_loaded_asset(hl, only_if_is_dirty=False)
+            changed += 1
+        self.stats["streaming"] = {"set": True, "changed": changed,
+                                   "hlod_layer": hl.get_name() if hl else "",
+                                   "cells_m": [c / 100.0 for c, _ in want],
+                                   "loading_ranges_m": [r / 100.0 for _, r in want]}
+
     # -- graphs --
 
     def graphs(self):
@@ -1502,6 +1614,8 @@ class Importer:
         self.timed("meshes2", self.meshes2)
         self.timed("level", self.level)
         self.timed("actors", self.actors)
+        self.timed("play", self.play)
+        self.timed("streaming", self.streaming)
         self.timed("graphs", self.graphs)
         # saved before the meshes no object uses are deleted: deleting an asset that the open
         # level still names reloads the level, which drops what was not saved

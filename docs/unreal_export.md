@@ -10,7 +10,7 @@ script, not this exporter.)
 ## Where it lives
 
 - **M15** introduces it as `citygen unreal BUILD UPROJECT [--check] [--shots DIR]
-  [--new-project]`: `citygen/unreal.py` on the venv side (manifest, glTF prototypes, flat
+  [--new-project]` (and the play options below): `citygen/unreal.py` on the venv side (manifest, glTF prototypes, flat
   graphs, engine discovery, project preparation, editor runs; no Unreal needed, tested in
   pytest) and `citygen/ue/import_city.py`, `citygen/ue/check_city.py` inside the editor
   (stdlib and `unreal` only). Details: `docs/progress/M15/README.md`.
@@ -31,6 +31,8 @@ script, not this exporter.)
 | props and plants as hierarchical instanced meshes, one actor per kind and tile, with the instances' ids | `BP_CityGenInstances` actors |
 | the lane, walkway and transit graphs as data assets | `BP_CityGenGraph` assets |
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
+| a fly pawn and its game mode, the level's game mode override unless `--play walk` | `/Game/CityGen/Core/BP_CityGenFlyPawn`, `GM_CityGenFly` |
+| the far view: the level's instanced HLODs, built after the import | World Partition HLOD actors |
 | with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
 | stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
 | with AG6: textures (the shared library, imported once per project; a city's sign pages), textured masters, `Night` in a parameter collection, an instance per material key (era variants of the wall and roof slots) | `/Game/CityGen/Core/Textures/`, `Core/MPC_CityGen`, `/Game/CityGen/<City>/Assets/Textures/` |
@@ -38,6 +40,66 @@ script, not this exporter.)
 Actors carry `cg.city`, `cg.key`, `cg.hash`, `cg.id`, `cg.type`, `cg.category`, `cg.tile` and
 `cg.district` tags. Frames: citygen's (x east, y north, z up, meters) to Unreal's at
 (100 x, -100 y, 100 z) centimeters, a citygen yaw to Unreal yaw -yaw.
+
+## Import, open and play
+
+```bash
+.venv/bin/python -m citygen build cities/vesper_bay/city_spec.json out/vesper_bay --blockout
+.venv/bin/python -m citygen unreal out/vesper_bay ~/CityTest/CityTest.uproject --new-project
+```
+
+On Windows (PowerShell) it is the same with the venv's Python and Windows paths:
+
+```powershell
+.venv\Scripts\python -m citygen unreal out\vesper_bay "$HOME\Documents\Unreal Projects\CityTest\CityTest.uproject" --new-project
+```
+
+`--new-project` makes the project from the engine's First Person template the first time and
+uses it as it is after that. The importer runs Unreal itself, headless, so close the project
+in the editor before importing. It uses the newest UE 5.x in the usual place
+(`C:\Program Files\Epic Games\UE_5.8` on Windows, `/Users/Shared/Epic Games/UE_5.8` on a
+Mac); `--engine` or `CITYGEN_UE_ROOT` names another.
+
+Then open the project: the editor opens on the city, and Play (Alt+P) puts you in it.
+
+- **Startup map.** Each import makes the city the project's `EditorStartupMap` and
+  `GameDefaultMap` (`Config/DefaultEngine.ini`). With several cities in one project the last
+  import wins; File > Open Level opens another (`/Game/CityGen/<City>/Maps/<City>`), and
+  `--no-startup` leaves the project's maps as they are.
+- **Flying** (the default, `--play fly`): a free camera with no collision, at 50 m/s
+  (`--fly-speed`). W, A, S and D (or the arrow keys) move, the mouse looks, E or Space
+  rises, Q or C sinks; a gamepad works too. The speed is set at import; in the editor it is
+  the Max Speed of `/Game/CityGen/Core/BP_CityGenFlyPawn`'s movement component (in
+  centimeters per second) until the next import sets it again.
+- **Walking** (`--play walk`): the project's own game mode and character (the First Person
+  template's with `--new-project`), with collision: W, A, S, D, the mouse, Space to jump.
+  The console's `ghost` (through walls), `fly` (flying, with collision) and `walk` work as
+  usual.
+- **Switching without importing again:** the level's World Settings, GameMode Override:
+  `GM_CityGenFly` flies, None walks. Shift+F1 frees the mouse while playing, Esc stops.
+- **Streaming.** The city loads in 256 m cells within 1500 m of you (`--view-range`), far
+  enough ahead for flying. Beyond that you see the far view, World Partition's HLODs (the
+  city's own meshes and materials, instanced in 512 m cells, out to the whole city), which
+  each import builds after the city: about 2 minutes for a blockout city and 10 with stage
+  2's buildings on a Mac the first time, under a minute when nothing changed (only the cells
+  whose actors changed are built again).
+  `--no-hlod` skips them, and the city then ends at the view range. A sample city is about
+  3.5 km across: `--view-range 3000` loads most of it around you, for more memory.
+- **`--check`** plays the level twice in the editor, without saving it: walking with the
+  project's character whatever `--play` set (streaming, collision, a walk along a sidewalk),
+  then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
+  With `--shots DIR` it renders views of the city and two from the fly pawn.
+
+| Flag | Default | |
+|---|---|---|
+| `--play fly` or `walk` | `fly` | what Play puts you in |
+| `--fly-speed M_PER_S` | 50 | the fly pawn's top speed |
+| `--view-range M` | 1500 | how far around you the city streams in |
+| `--no-hlod` | off | skip building the far view (HLODs) after the import |
+| `--no-startup` | off | leave the project's startup and default map as they are |
+| `--new-project` | off | make the project from the First Person template if it is missing |
+| `--blockout-only` | off | leave out stage 2's buildings and streets |
+| `--check`, `--check-only`, `--shots DIR`, `--view ...` | | play and check the level, render views |
 
 ## Contract for every stage
 
@@ -156,7 +218,7 @@ format:
   complex until AG3 adds the ground band.
 - **Proxy**: the building's far proxy, its masses as prisms (7 to 500 triangles), a Nanite
   fallback and HLOD input (AG9 sets up the HLOD layers); as a static mesh of its own.
-- **Parts**: empty until AG2 (hierarchical instanced meshes per building and kind).
+- **Parts**: AG2's instanced parts (next section); empty in AG1.
 - **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
   unchanged packs, so a re-import may skip the key.
 
@@ -204,6 +266,46 @@ AG7; `citygen/unreal.py` `stage2`, `citygen/ue/import_city.py`):
   on the component (AG1's lists are empty; AG7's container stacks use it).
 - **Proxies**: imported as static meshes (Nanite off, no collision), not spawned: ready
   for HLOD (AG9).
+
+### From AG2: facade parts
+
+`assetgen build` (AG2) fills each building entry's `parts` with its instanced facade parts
+and writes their meshes beside the shells, one pack per tile: `parts/<tile>.glb`, a root
+node per part mesh at the origin, named by the hash of the part's type and parameters
+(`part.window.casement.h29779f5c63`), so every building of the tile whose part has the same
+parameters uses the same mesh. A part a building places fewer than 8 times is merged into
+its shell instead and not listed (as is one that would fold a thin triangle when turned to
+its facade and rounded to the millimeter).
+
+```json
+{"key": "d03.lot.e512n88.bld", "...": "...", "instances": 412,
+ "parts": [{"kind": "part.window.casement.h29779f5c63", "type": "part.window.casement",
+            "glb": "parts/t+02+00.glb", "node": "part.window.casement.h29779f5c63",
+            "asset": "part_window_casement_h29779f5c63", "count": 96, "triangles": 80,
+            "xforms": [[-6.12, 4.5, 3.35, 135.0], "..."], "building": "d03.lot.e512n88.bld"}]}
+```
+
+- **Kinds**: `kind` is the part's node name, unique within the entry (a building can have
+  several window sizes of one type); `type` the semantic type for tags and stage 3 and 4
+  (`part.window.<style>`, `part.cap.mullion`, `part.spandrel.panel`, `part.balcony.<style>`,
+  `part.louver.panel`, `part.fin.vertical`, `part.fin.crown`, `part.shade.blade`,
+  `part.shutter.open`, `part.grille.bars`, `part.panel.<board|infill|screen|eggcrate|addon>`,
+  `part.member.<column|beam|diagonal>`, `part.pod.capsule`, `part.ac.window`,
+  `part.dish.satellite`, `part.column.arcade`, `part.balconette.rail`,
+  `part.canopy.podium`, `part.mast.<mast|spire>`).
+- **Transforms**: `xforms` are `[x, y, z, yaw]` in the building frame (meters relative to
+  the entry's `pivot`, yaw in degrees counterclockwise about z), as AG7's container parts:
+  an HISM instance at `pivot + (x, y, z)` turned by yaw (Unreal: `(100 x, -100 y, 100 z)`,
+  yaw `-yaw`). A part's own frame: x along its facade, y into the wall, z up.
+- **Material and CPD**: the parts' slots are in the contribution's `materials` like the
+  shells' (tints only from the six channels of `cpd_layout`); the HISM carries the
+  building's 23 CPD floats, so a part takes its building's colors.
+- **Building ids**: `building` names the entry each instance belongs to (one HISM per
+  building and kind, keyed `<key>.<kind>`, its `Ids` the building's key).
+- **Collision**: none needed from the parts (the building's simple collision covers its
+  masses; AG3 adds the ground band); Nanite on, distance fields and Lumen cards off.
+- **Re-import**: a part's mesh is named by its parameters' hash and its pack changes only
+  when the tile's buildings change, so an unchanged building's HISMs change nothing.
 
 ## assetgen's street contribution (AG7)
 
@@ -350,7 +452,9 @@ id per transform), `collision`, `nanite` and `shape_preservation` (on its mesh r
 its hash); transforms may carry a scale (`[x, y, z, yaw, sx, sy, sz]`); `EMISSIVE2` gains
 `holo`. The importer skips the replaced prototype actors, applies the scale and ids, sets
 `NaniteShapePreservation.VOXELIZE` on a mesh whose record asks for it, and makes `M_CgHolo`
-(the translucent master with an emissive strength).
+(the translucent master with an emissive strength). A part with `collision: {"none": true}`
+(plants) makes its instanced actor `no_collision` (the HISM's profile `NoCollision`; fixed in
+AG8's Unreal check, `docs/progress/AG8/unreal/`).
 
 ## assetgen's materials (AG6)
 
@@ -456,5 +560,8 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`d03.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on; `city.deck_road.<tile>` and `city.deck_sidewalk.<tile>` with no district until the stage 1 fixes), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |
 | Stage 1 fixes | No code change. Keys: a deck's streets and sidewalks are joined per district like the ground's (`d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`, with `cg.district=d03`; they were `city.deck_road.<tile>`, `city.deck_sidewalk.<tile>` with an empty `cg.district`), so importing Vesper Bay Decks over an M14 import replaces those actors under their new keys; its ramps keep theirs (`<segment>.ramp`). Cragmouth's local junctions are level out to their corners (more retaining wall actors on its hills, keys by wall id as before) | Not run (the coordinating session's call; `docs/progress/stage1_fixes/`) |
 | AG1 and AG7 (after M15) | Stage 2 taken as layer 2: every `assets/unreal_contribution.*.json` read in sorted order (`unreal.stage2`, the manifest's `stage2`; a key in two files refused), the blockout actors of each entry's key and `replaces` dropped, an actor per shell and street piece at its pivot (`cg.stage=2`), the packs through Interchange in their nodes' frames with their own normals, stage 2 masters (`M_CgFacade`, `M_CgGlass`, `M_CgMetal`, `M_CgRoad`, `M_CgOpaque`, `M_CgEmissive`, `M_CgTranslucent`, `M_CgFoliage`) and an instance per part and slot reading the actor's Custom Primitive Data tint, the 23 floats as the components' saved defaults, building collision as convex hulls through GeometryScript (`GeometryScripting` plugin), complex collision for streets, the sky tube glass as a non-Nanite LOD chain, container stacks as instanced actors per entry and kind, proxies imported only, `graphs.walkways` lines in the walkway data assets; `--blockout-only`; the check's walk keeps to walkable walkways (no leg over 30%, no step over 0.6 m, not under the terrain) and tries up to eight starts; the buildings contribution's `asset` is the shell node's Interchange name and its patch slots spell out their tint rule | the small test city, Greyhook and Cragmouth: blockout alone, then stage 2 over it (exactly the actors `manifest_changes` names), imported again (nothing changed), checked (507 of 507 traces down, 36 of 36 roofs and facades, 248, 130 and 81 m walked) with shots; first imports with stage 2 5 to 14 minutes, most of it Nanite builds (`docs/progress/AG1/unreal/`) |
-| AG8 | Props, plants and signs taken: `unreal_contribution.props.json` and `.signs.json` (above); `stage2` replaces M15's prop and plant prototype actors by key (entries keyed by them, or `replaces`, or `drop`), parts with per-instance ids, scales, collision, Nanite and `shape_preservation`; the importer skips the replaced prototypes, scales instances, sets voxel Nanite foliage, makes `M_CgHolo`; tests without Unreal (`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` now with every prototype replaced) | the coordinating session's call |
+| AG8 | Props, plants and signs taken: `unreal_contribution.props.json` and `.signs.json` (above); `stage2` replaces M15's prop and plant prototype actors by key (entries keyed by them, or `replaces`, or `drop`), parts with per-instance ids, scales, collision, Nanite and `shape_preservation`; the importer skips the replaced prototypes, scales instances, sets voxel Nanite foliage, makes `M_CgHolo`; tests without Unreal (`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` now with every prototype replaced) | Greyhook and Vesper Bay imported with their props (25,837 and 46,354 actors, 785 and 1,818 s), imported again (nothing changed, 69 and 74 s) and checked (507 of 507 traces down, 36 of 36 roofs and facades, 134 and 253 m walked): the HISM counts per kind equal `props_report.txt`, no M15 prototype left, every instance at its model position, plants Nanite with `Voxelize`, holo-ads translucent 3-LOD chains, neon and lit faces emissive; shots of props by day and a neon street at night (`docs/progress/AG8/unreal/`) |
+| Play-ready (after AG1 and AG7) | Open into the city and play it: each import makes the city the project's `EditorStartupMap` and `GameDefaultMap` (`unreal.set_startup_map`, the rest of `Config/DefaultEngine.ini` as it was; `--no-startup`); `Core/BP_CityGenFlyPawn` (a SpectatorPawn, its built-in bindings, no collision, `--fly-speed` 50 m/s) and `Core/GM_CityGenFly`, the level's game mode override with `--play fly` (the default), none with `--play walk`; World Partition for flying: the main grid 256 m cells loaded `--view-range` (1500 m) around the player, the instanced HLOD layer in 512 m cells out to the city's diagonal (its merged parent layer cut off), set by the partitions' C++ property names; the HLODs built after the import (`unreal.build_hlods`, the WorldPartitionHLODsBuilder commandlet, only what changed; `--no-hlod`); every master `used_with_instanced_static_meshes` (without it the far view drew the default material, flat gray); `--check` walks with the project's own pawn whatever `--play` set, runs `ghost`, `fly` and `walk`, then flies with the fly pawn (its speed on the game's clock, through a building, the city loaded where it ends) and with `--shots` takes two views from it; an unchanged build imported again saves nothing; `unreal.manifest_changes` counts a key whose actor changes class (AG8's exact props over M15's instanced ones) as deleted and created, as the importer does | Vesper Bay (blockout only) and Greyhook (with stage 2) imported over their earlier imports, imported again, HLODs built (244 and 285), checked in both modes (507 of 507 traces down, 36 of 36 roofs and facades, 253 and 129 m walked, the console commands, 50 m/s flights) with shots from the fly pawn (`docs/progress/unreal_play/`) |
+| AG8 Unreal check | Plants' instanced actors without collision (a part's `collision: {"none": true}` now makes its HISM `NoCollision`; it reached only the mesh record before); the check tries a missed trace down again for up to 30 s (`TRACE_RETRY_S`) and counts those hits as late (the first play session after an import traced before the streamed cells' collision was in place: 346 of 507) (its streaming step's read of actors that had streamed out, which stopped Vesper Bay's first check, was fixed the same way by the play-ready exporter); `test_stage2_from_assetgen` expects the exact props' keys, whose actor changes class, as deleted and created (`manifest_changes` since the play-ready exporter) | as AG8's row |
+| AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |

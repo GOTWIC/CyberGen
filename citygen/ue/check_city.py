@@ -9,13 +9,17 @@ import_city.py) it:
 
 1. with `shots`, renders views of the city in the editor world (all actors loaded): the
    isometric view from the blockout's iso direction and its street views;
-2. plays the level in the editor (the project's game mode and pawn) and checks:
+2. plays the level in the editor with the project's own game mode and pawn (whatever the
+   level's Play is set to, `--play`) and checks:
    - streaming: the World Partition cells around the player load, those far away do not,
      and after a teleport across the city the new neighborhood loads;
    - collision: line traces down onto the ground, streets and sidewalks around several
      spots of the city, down onto building roofs and across onto their facades;
    - walking: the player walked along a sidewalk of the walkway graph from the player start,
-     on the ground all the way.
+     on the ground all the way;
+3. plays it again with the fly pawn's game mode: its speed in a straight flight through the
+   buildings in its way, the city streamed in where it ends, and with `shots` two views from
+   it (what streaming has loaded around it).
 
 The script runs as a generator on the editor's tick (play-in-editor needs frames), writes
 the job's result file and quits the editor.
@@ -37,6 +41,10 @@ WALK_M = 120.0
 WALK_S = 60.0
 MAX_GRADE = 0.3     # steepest leg the walk takes (a road's is at most 12%)
 MAX_STEP_M = 0.6    # highest step where two walkways join
+FLY_MODE = "/Game/CityGen/Core/GM_CityGenFly"     # the importer's (import_city.FLY_MODE)
+FLY_S = 8.0         # the flight's straight run
+FLY_Z_M = 40.0      # its height over the player start: through the buildings in its way
+TRACE_RETRY_S = 30.0  # how long a trace down that missed is tried again after settling
 
 
 def log(msg):
@@ -230,7 +238,49 @@ def run():
     yield from wait(2.0)
     if JOB.get("shots"):
         yield from shots(man)
-    log("play in editor")
+    # the walk with the project's own game mode and pawn, whatever the level's Play is (its
+    # game mode override, `--play`), then a flight with the fly pawn; the level is not saved
+    own = game_mode(None)
+    log("play in editor: walking")
+    world, pawn = yield from begin_play(les)
+    RES["pawn"] = pawn.get_class().get_name()
+    yield from streaming(world, pawn, man, slug)
+    yield from collision(world, pawn, man, slug)
+    yield from walk(world, pawn, man)
+    yield from cheats(world, pawn)
+    les.editor_request_end_play()
+    yield from wait(2.0)
+    if unreal.EditorAssetLibrary.does_asset_exist(FLY_MODE):
+        game_mode(FLY_MODE)
+        log("play in editor: flying")
+        world, pawn = yield from begin_play(les)
+        yield from fly(world, pawn, man, slug)
+        les.editor_request_end_play()
+        yield from wait(2.0)
+    else:
+        RES["checks"]["fly"] = {"ok": False,
+                                "error": f"no {FLY_MODE} (import the city again)"}
+    game_mode(own)
+    RES["ok"] = all(c.get("ok") for c in RES["checks"].values())
+
+
+def game_mode(mode):
+    """Set the level's game mode override (in memory) to `mode`: a Blueprint's path, a class,
+    or None for the project's own; returns the one it had."""
+    ws = ed().get_editor_world().get_world_settings()
+    old = ws.get_editor_property("default_game_mode")
+    if isinstance(mode, str):
+        bp = unreal.load_asset(mode) if unreal.EditorAssetLibrary.does_asset_exist(mode) \
+            else None
+        if bp is None:
+            raise RuntimeError(f"{mode}: no such game mode (import the city again)")
+        mode = unreal.BlueprintEditorLibrary.generated_class(bp)
+    ws.set_editor_property("default_game_mode", mode)
+    return old
+
+
+def begin_play(les):
+    """Play in the editor; the play world and the player's pawn, once it has one."""
     les.editor_request_begin_play()
     world = None
     t = time.time()
@@ -239,14 +289,7 @@ def run():
             raise RuntimeError("play-in-editor did not start")
         yield
         world = ed().get_game_world()
-    pawn = unreal.GameplayStatics.get_player_pawn(world, 0)
-    RES["pawn"] = pawn.get_class().get_name()
-    yield from streaming(world, pawn, man, slug)
-    yield from collision(world, pawn, man, slug)
-    yield from walk(world, pawn, man)
-    les.editor_request_end_play()
-    yield from wait(2.0)
-    RES["ok"] = all(c.get("ok") for c in RES["checks"].values())
+    return world, unreal.GameplayStatics.get_player_pawn(world, 0)
 
 
 def streamed(world, at=None, radius_m=150.0):
@@ -311,6 +354,8 @@ def streaming(world, pawn, man, slug):
     far = [t for t in man["tiles"] if math.dist(mid(t), (sx, sy)) >= 600.0] or man["tiles"]
     fx, fy = mid(max(far, key=lambda t: (len(t["objects"]), t["name"])))
     near_start = {tag(a, "cg.key") for a in at_start}
+    # (read before the teleport: actors the start no longer needs stream out after it)
+    stage2_start = sum(1 for a in at_start if "cg.stage=2" in tags_of(a))
     teleport(pawn, fx, fy, 400.0)       # high up: nothing to stand on until it loads
     yield from wait(1.0)
     yield from settle(world, slug, at=ue(fx, fy, 0.0))
@@ -323,7 +368,7 @@ def streaming(world, pawn, man, slug):
               t["name"] == far_tile for t in man["tiles"])))
     RES["checks"]["streaming"] = {
         "ok": ok, "actors": total, "loaded_at_start": len(at_start),
-        "stage2_at_start": sum(1 for a in at_start if "cg.stage=2" in tags_of(a)),
+        "stage2_at_start": stage2_start,
         "loaded_far": len(at_far), "only_far": len(near_far - near_start),
         "far_spot_m": [round(fx, 1), round(fy, 1)], "far_tile_loaded": far_tile in tiles}
     RES["lines"].append(f"streaming: {len(at_start)} of {total} actors loaded at the start, "
@@ -358,24 +403,39 @@ def collision(world, pawn, man, slug):
             spots.append(mid(ts[0]))
     bx = man["bounds"]
     roof_at = {o["key"]: o.get("roof") for t in man["tiles"] for o in t["objects"]}
-    down = {"traces": 0, "hits": 0, "by_category": {}}
+    down = {"traces": 0, "hits": 0, "by_category": {}, "late": 0}
     roofs = {"tried": 0, "hit": 0}
     facades = {"tried": 0, "hit": 0}
     for x0, y0 in spots:
         teleport(pawn, x0, y0, 300.0)
         yield from wait(0.5)
         yield from settle(world, slug, at=ue(x0, y0, 0.0))
+        todo = []
         for i in range(-6, 7):
             for j in range(-6, 7):
                 x, y = x0 + 16.0 * i, y0 + 16.0 * j
                 if not (bx[0] < x < bx[2] and bx[1] < y < bx[3]):
                     continue
-                h = trace(world, ue(x, y, 600.0), ue(x, y, -3.0), [pawn])
                 down["traces"] += 1
-                if h is not None:
-                    down["hits"] += 1
-                    c = tag(h["actor"], "cg.category") or h["actor"].get_class().get_name()
-                    down["by_category"][c] = down["by_category"].get(c, 0) + 1
+                todo.append((x, y))
+        # a cell reported streamed in still registers its components over a few frames (with
+        # stage 2's props, twice the actors per cell): a trace that misses is tried again for
+        # up to TRACE_RETRY_S, and the hits only after the first try are counted as late
+        t, first = time.time(), True
+        while todo and (first or time.time() - t < TRACE_RETRY_S):
+            if not first:
+                yield from wait(0.5)
+            left = []
+            for x, y in todo:
+                h = trace(world, ue(x, y, 600.0), ue(x, y, -3.0), [pawn])
+                if h is None:
+                    left.append((x, y))
+                    continue
+                down["hits"] += 1
+                down["late"] += 0 if first else 1
+                c = tag(h["actor"], "cg.category") or h["actor"].get_class().get_name()
+                down["by_category"][c] = down["by_category"].get(c, 0) + 1
+            todo, first = left, False
         here = ue(x0, y0, 0.0)
         blds = [a for a in city_actors(world, slug) if tag(a, "cg.category") == "building"]
         blds.sort(key=lambda a: (a.get_actor_bounds(False)[0] - here).length())
@@ -431,6 +491,7 @@ def collision(world, pawn, man, slug):
         f"collision: {down['hits']} of {down['traces']} traces down hit (" +
         ", ".join(f"{k} {v}" for k, v in sorted(down["by_category"].items(),
                                                 key=lambda kv: -kv[1])[:6]) +
+        (f"; {down['late']} after a wait" if down["late"] else "") +
         f"), {roofs['hit']} of {roofs['tried']} roofs, {facades['hit']} of "
         f"{facades['tried']} facades")
     teleport(pawn, sx, sy, sz)
@@ -532,6 +593,110 @@ def walk(world, pawn, man):
                         f"path in {time.time() - t:.0f} s, {100 * share:.0f}% of frames on "
                         f"the ground, {'reached its end' if reached else 'did not reach its end'}"
                         + stops)
+
+
+def cheats(world, pawn):
+    """The console's ghost, fly and walk on the walking pawn (the cheat manager's, which
+    play-in-editor allows): flying without collision, flying with it, back on its feet."""
+    mc = pawn.get_movement_component()
+    got = {}
+    for cmd in ("ghost", "fly", "walk"):
+        unreal.SystemLibrary.execute_console_command(world, cmd)
+        yield from wait(0.5)
+        mode = str(mc.get_editor_property("movement_mode")) if mc is not None else ""
+        got[cmd] = {"mode": mode.split("MOVE_")[-1].split(":")[0].lower(),
+                    "collision": bool(pawn.get_actor_enable_collision())}
+    ok = (got["ghost"]["mode"] == "flying" and not got["ghost"]["collision"]
+          and got["fly"]["mode"] == "flying" and got["fly"]["collision"]
+          and got["walk"]["mode"] in ("walking", "falling") and got["walk"]["collision"])
+    RES["checks"]["cheats"] = {"ok": ok, **got}
+    RES["lines"].append("console: " + ", ".join(
+        f"{c} {v['mode']}{'' if v['collision'] else ' without collision'}"
+        for c, v in got.items()))
+
+
+def fly(world, pawn, man, slug):
+    """The fly pawn: its class and top speed; a straight run of FLY_S seconds at full input
+    from FLY_Z_M over the player start toward the city's middle, through whatever stands in
+    its way (no collision); the city streamed in where it ends; with `shots`, two views from
+    it. The speed is measured on the game's clock (a long frame is clamped there)."""
+    RES["fly_pawn"] = pawn.get_class().get_name()
+    mc = pawn.get_movement_component()
+    speed = mc.get_editor_property("max_speed") / 100.0
+    sx, sy, sz = man["player_start"]["position"]
+    b = man["bounds"]
+    cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
+    dx, dy = cx - sx, cy - sy
+    n = math.hypot(dx, dy)
+    dx, dy = (dx / n, dy / n) if n > 50.0 else (1.0, 0.0)
+    teleport(pawn, sx, sy, sz + FLY_Z_M)
+    yield from wait(1.0)
+    a = pawn.get_actor_location()
+    t, g = time.time(), unreal.GameplayStatics.get_time_seconds(world)
+    while time.time() - t < FLY_S:
+        pawn.add_movement_input(unreal.Vector(dx, -dy, 0.0), 1.0, False)
+        yield
+    secs = unreal.GameplayStatics.get_time_seconds(world) - g
+    e = pawn.get_actor_location()
+    dist = math.hypot(e.x - a.x, e.y - a.y) / 100.0
+    # what stands in the line it flew (the pawn would have stopped there with collision)
+    hit = trace(world, a, e, [pawn])
+    through = (tag(hit["actor"], "cg.key") or hit["actor"].get_name()) if hit else None
+    ex, ey = e.x / 100.0, -e.y / 100.0
+    yield from settle(world, slug, at=ue(ex, ey, 0.0))
+    here = city_actors(world, slug)
+    tile = f"t{math.floor(ex / man['tile_size_m']):+03d}{math.floor(ey / man['tile_size_m']):+03d}"
+    tiles = {tag(x, "cg.tile") for x in here}
+    ok = (RES["fly_pawn"].startswith("BP_CityGenFlyPawn") and dist >= 0.8 * speed * secs
+          and (tile in tiles or not any(t_["name"] == tile for t_ in man["tiles"])))
+    RES["checks"]["fly"] = {"ok": ok, "pawn": RES["fly_pawn"], "speed_m_s": round(speed, 1),
+                            "flew_m": round(dist, 1), "seconds": round(secs, 1),
+                            "through": through, "loaded_at_end": len(here),
+                            "end_tile_loaded": tile in tiles}
+    RES["lines"].append(
+        f"fly: {RES['fly_pawn']} at {speed:g} m/s flew {dist:.0f} m in {secs:.1f} s"
+        + (f" through {through}" if through else "") + f", {len(here)} actors loaded where it "
+        "ended")
+    if JOB.get("shots"):
+        yield from fly_shots(world, pawn, man, slug)
+
+
+def fly_shots(world, pawn, man, slug):
+    """Views from the fly pawn while playing, what the streaming has loaded around it: over
+    the city toward its middle, and low over the first street view's street."""
+    out = JOB["shots"]
+    os.makedirs(out, exist_ok=True)
+    b = man["bounds"]
+    cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
+    d = man["cameras"].get("iso_dir") or [0.28, 0.77, -0.57]
+    h = math.hypot(d[0], d[1]) or 1.0
+    views = [("fly_over", (cx - d[0] / h * 700.0, cy - d[1] / h * 700.0, 220.0), (cx, cy, 0.0))]
+    st = man["cameras"].get("street", [])
+    if st:
+        ex, ey, ez = st[0]["eye"]
+        views.append(("fly_low", (ex, ey, ez + 25.0), tuple(st[0]["target"])))
+    pc = unreal.GameplayStatics.get_player_controller(world, 0)
+    w = int(JOB.get("width") or 3840)
+    files = []
+    for name, eye, target in views:
+        teleport(pawn, *eye)
+        pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(ue(*eye), ue(*target)))
+        yield from wait(1.0)
+        yield from settle(world, slug, at=ue(eye[0], eye[1], 0.0))
+        yield from wait(3.0)
+        path = os.path.join(out, f"unreal_{name}.png").replace("\\", "/")
+        if os.path.exists(path):
+            os.remove(path)
+        unreal.SystemLibrary.execute_console_command(
+            world, f'HighResShot {w}x{w * 9 // 16} filename="{path}"')
+        t = time.time()
+        while not os.path.exists(path) and time.time() - t < 120:
+            yield
+        yield from wait(1.0)
+        if os.path.exists(path):
+            files.append(path)
+            log(f"wrote {path}")
+    RES["fly_shots"] = files
 
 
 # --- shots ------------------------------------------------------------------------------------

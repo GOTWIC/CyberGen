@@ -144,14 +144,12 @@ def test_glyphs_every_script():
 
 
 def test_catalog_covers_every_slot():
-    """Every building slot (AG1's and AG2's) and street slot maps to a master, and every set
-    it names is in the library."""
+    """Every building slot (AG1's and AG2's, `systems.SLOTS`) has its own catalog entry (none
+    falls back untextured) and every street slot maps to a master; every set named is in the
+    library."""
     lib = small_library()
-    ag2 = ("band_panel", "board_concrete", "stucco", "infill", "seam", "hangar", "dado",
-           "frame", "sill", "mullion", "spandrel_panel", "balcony", "railing", "glazing",
-           "fin", "member", "timber", "shutter", "grille", "perforated", "pod", "ac", "dish",
-           "tile", "canopy", "mast", "column")
-    for slot in list(SY.SLOTS) + list(ag2):
+    for slot in SY.SLOTS:
+        assert slot in CT.BUILDING or slot in CT.ERA_SLOTS, slot
         for era in (None,) + LB.ERAS:
             master, s = CT.set_for(slot, era)
             assert master in CT.MASTERS, slot

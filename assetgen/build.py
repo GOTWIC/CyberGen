@@ -10,7 +10,10 @@
    hashes are all as in the previous manifest keeps its files and records, the others are
    made in worker processes (each tile a pure function of its briefs, so the bytes do not
    depend on the worker count): `tiles/<tile>.glb` (a node per building, named by id, at
-   its pivot, its shell with one primitive per material slot), `proxies/<tile>.glb`.
+   its pivot, its shell with one primitive per material slot and the parts merged into
+   it), `proxies/<tile>.glb`, `parts/<tile>.glb` (AG2: one mesh per instanced part of the
+   tile's buildings, at the origin, named by the hash of its parameters, so buildings whose
+   parts coincide share it; the placements are in each building's record).
 4. Checks (`asset_checks`), `manifest.json`, `asset_report.json` and `.txt`,
    `unreal_contribution.buildings.json`; each written only if its bytes change, tiles no
    longer in the city removed.
@@ -44,10 +47,12 @@ from .buildings import envelope as EN
 from .buildings import genome as GN
 from .buildings import meshbuf as MB
 from .buildings import proxy as PX
+from .buildings import parts as PT
 from .buildings import shell as SH
 from .buildings import systems as SY
+from .buildings import thumb as TH
 
-GEN_VERSION = "ag1.10"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag2.8"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -68,7 +73,8 @@ def library() -> dict:
     """What the material library is today: the slots and the systems' tables."""
     return {"slots": {k: list(v) for k, v in sorted(SY.SLOTS.items())},
             "systems": SY.SYSTEMS, "fallback": SY.FALLBACK, "type_system": SY.TYPE_SYSTEM,
-            "cpd": SY.CPD_TINT}
+            "cpd": SY.CPD_TINT, "articulation": SY.ARTICULATION,
+            "features": SY.FEATURE_GENES, "parts": PT.PARTS_VERSION}
 
 
 def asset_hash(brief_hash: str, lib_hash: str) -> str:
@@ -129,6 +135,13 @@ def _bays_s11(brief: dict) -> float:
     return side / (3.0 * fh)
 
 
+def _part_rec(x: dict) -> dict:
+    return {"node": x["node"], "type": x["type"], "family": x["family"],
+            "count": len(x["at"]), "triangles": x["triangles"],
+            "xforms": [[C.m(a[0] / 1000.0), C.m(a[1] / 1000.0), C.m(a[2] / 1000.0),
+                        PT.yaw_deg(a[3], a[4])] for a in x["at"]]}
+
+
 def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     """(shell result, proxy result, record) of one building."""
     sh = SH.build(brief, gm)
@@ -136,7 +149,8 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     px = PX.build(brief)
     ck = MB.check(arrs)
     ck["uv0"] = True
-    env = EN.check(brief, arrs)
+    inst = sh["parts"]
+    env = EN.check(brief, arrs, EN.part_points(inst))
     tints = _tints(gm)
     lo = np.min(np.concatenate([a["pos"] for a in arrs.values()]), axis=0) if arrs else \
         np.zeros(3, dtype=np.int64)
@@ -161,7 +175,12 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "floor_m": float(brief["building"]["floor_grid"]["floor_height_m"]),
         "stats": st, "masses": sh["masses"],
         "checks": {"mesh": ck, "envelope": env},
+        "parts": [_part_rec(x) for x in inst],
+        "instances": int(sum(len(x["at"]) for x in inst)),
+        "part_triangles": int(sum(x["triangles"] for x in inst)),
     }
+    rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
+    rec["class"] = AC.budget_class(rec)
     return sh, px, rec
 
 
@@ -179,13 +198,20 @@ def _node_extras(bid: str, rec: dict) -> dict:
 
 
 def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
-    """One building's shell alone as a GLB at its own origin (goldens, contact sheets)."""
+    """One building alone as a GLB at its own origin (goldens): its shell and every
+    placement of its instanced parts as a node of its own."""
     sh, _, rec = building_asset(brief, gm or GN.make(brief))
+    pm = [(x, PT.mesh(x["family"], x["params"])) for x in sh["parts"]]
     g = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
-    mats = _materials(g, sorted(sh["arrays"]))
+    mats = _materials(g, sorted(set(sh["arrays"]) | {s for _, (_, a) in pm for s in a}))
     mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats))
-    child = g.node(f"{bid}.shell", mesh=mesh, extras=_node_extras(bid, rec))
-    g.node(bid, children=[child], root=True)
+    kids = [g.node(f"{bid}.shell", mesh=mesh, extras=_node_extras(bid, rec))]
+    for x, (b, arrs) in pm:
+        m = g.mesh(x["node"], b.primitives(arrs, mats))
+        for k, a in enumerate(x["at"]):
+            kids.append(g.node(f"{x['node']}.i{k}", mesh=m, translation=a[:3],
+                               rotation=G.quat_z(PT.yaw_deg(a[3], a[4]))))
+    g.node(bid, children=kids, root=True)
     return g.to_glb()
 
 
@@ -202,6 +228,27 @@ def tile_job(job: dict) -> dict:
     mats = _materials(g, used)
     gp = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     pmats = _materials(gp, ["proxy", "proxy_roof"])
+    # the tile's instanced parts, one mesh each (buildings whose parts coincide share it)
+    pdefs = {}
+    for _, _, sh, _, _ in made:
+        for x in sh["parts"]:
+            pdefs.setdefault(x["node"], (x["family"], x["params"]))
+    part_checks = {"parts": 0, "bad": []}
+    parts_glb = None
+    if pdefs:
+        gq = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
+        pm = {node: PT.mesh(*pdefs[node]) for node in sorted(pdefs)}
+        qmats = _materials(gq, sorted({s for _, a in pm.values() for s in a}))
+        for node in sorted(pm):
+            b, arrs = pm[node]
+            ck = MB.check(arrs)
+            part_checks["parts"] += 1
+            if ck["degenerate"] or ck["duplicate"] or ck["open_edges"] or ck["bad_edges"]:
+                part_checks["bad"].append(node)
+            mesh = gq.mesh(node, b.primitives(arrs, qmats), extras={"kind": "part"})
+            gq.node(node, mesh=mesh, root=True,
+                    extras={"cg": {"part": PT.type_of(*pdefs[node]), "kind": "part"}})
+        parts_glb = gq.to_glb()
     for bid, brief, sh, px, rec in made:
         piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
                int(round(_base_m(brief) * 1000)))
@@ -218,17 +265,32 @@ def tile_job(job: dict) -> dict:
         rec["node"] = f"{bid}.shell"
         rec["proxy"].update({"glb": f"proxies/{job['tile']}.glb", "node": f"{bid}.proxy"})
         rec["tile"] = job["tile"]
+        if rec["parts"]:
+            rec["parts_glb"] = f"parts/{job['tile']}.glb"
     shells = g.to_glb()
     proxies = gp.to_glb()
     wrote = 0
     wrote += MF.write_if_changed(out / "tiles" / f"{job['tile']}.glb", shells)
     wrote += MF.write_if_changed(out / "proxies" / f"{job['tile']}.glb", proxies)
+    ppath = out / "parts" / f"{job['tile']}.glb"
+    if parts_glb is not None:
+        wrote += MF.write_if_changed(ppath, parts_glb)
+    elif ppath.is_file():
+        ppath.unlink()
+        wrote += 1
     records = {}
     for bid, brief, sh, px, rec in made:
         records[bid] = rec
-    return {"tile": job["tile"], "records": records, "wrote": wrote,
-            "files": {"tiles": {"bytes": len(shells), "sha256": C.sha256_bytes(shells)},
-                      "proxies": {"bytes": len(proxies), "sha256": C.sha256_bytes(proxies)}}}
+    files = {"tiles": {"bytes": len(shells), "sha256": C.sha256_bytes(shells)},
+             "proxies": {"bytes": len(proxies), "sha256": C.sha256_bytes(proxies)}}
+    if parts_glb is not None:
+        files["parts"] = {"bytes": len(parts_glb), "sha256": C.sha256_bytes(parts_glb),
+                          "meshes": part_checks["parts"],
+                          "triangles": int(sum(len(a["tri"]) for _, arrs in
+                                               (PT.mesh(*pdefs[n]) for n in sorted(pdefs))
+                                               for a in arrs.values())),
+                          "bad": part_checks["bad"]}
+    return {"tile": job["tile"], "records": records, "wrote": wrote, "files": files}
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +360,8 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         fresh = ot is not None and ot.get("hash") == tile_hash[t] and \
             all(bid in old_b for bid in tiles[t]) and \
             _file_ok(out / "tiles" / f"{t}.glb", ot.get("tiles")) and \
-            _file_ok(out / "proxies" / f"{t}.glb", ot.get("proxies"))
+            _file_ok(out / "proxies" / f"{t}.glb", ot.get("proxies")) and \
+            (ot.get("parts") is None or _file_ok(out / "parts" / f"{t}.glb", ot.get("parts")))
         (keep if fresh else todo).append(t)
     t3 = time.perf_counter()
     records: dict[str, dict] = {}
@@ -306,7 +369,8 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     for t in keep:
         for bid in tiles[t]:
             records[bid] = old_b[bid]
-        files[t] = {"tiles": old_tiles[t]["tiles"], "proxies": old_tiles[t]["proxies"]}
+        files[t] = {k: old_tiles[t][k] for k in ("tiles", "proxies", "parts")
+                    if old_tiles[t].get(k) is not None}
     jobs = [{"tile": t, "out": str(out),
              "items": [(bid, briefs[bid], genomes[bid]) for bid in tiles[t]]} for t in todo]
     # biggest first, so the pool ends together (results do not depend on the order)
@@ -327,8 +391,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     MP.annotate(records, briefs, genomes)          # AG6: era, interior, extra CPD
     lib = MS.library_for(spec_doc, out, log=log) if textures else None
     k = int(spec_doc["min_gene_distance"])
-    checks = [AC.coverage(model, records), AC.envelope(records), AC.meshes(records),
-              AC.unique(records, k), AC.budget(records)]
+    tile_parts = {t: files[t].get("parts") for t in sorted(files)}
+    checks = [AC.coverage(model, records), AC.envelope(records),
+              AC.meshes(records, tile_parts), AC.unique(records, k),
+              AC.budget(records, tile_parts)]
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,
@@ -343,7 +409,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     wrote += changed
     # tiles no longer in the city
     for t in sorted(set(old_tiles) - set(tiles)):
-        for sub in ("tiles", "proxies"):
+        for sub in ("tiles", "proxies", "parts"):
             p = out / sub / f"{t}.glb"
             if p.is_file():
                 p.unlink()
@@ -460,6 +526,18 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
     pt = sorted(r["proxy"]["triangles"] for r in recs.values())
     disk_t = sum(t["tiles"]["bytes"] for t in man["tiles"].values())
     disk_p = sum(t["proxies"]["bytes"] for t in man["tiles"].values())
+    tparts = [t["parts"] for t in man["tiles"].values() if t.get("parts")]
+    disk_q = sum(t["bytes"] for t in tparts)
+    by_part: dict[str, list] = {}
+    drawn = 0
+    for r in recs.values():
+        for x in r.get("parts", []):
+            v = by_part.setdefault(x["type"], [0, 0])
+            v[0] += x["count"]
+            v[1] += x["count"] * x["triangles"]
+            drawn += x["count"] * x["triangles"]
+    meshes = sum(t["meshes"] for t in tparts)
+    mesh_tri = sum(t["triangles"] for t in tparts)
     return {
         "city": man["city"], "assetgen": man["assetgen"], "generator": man["generator"],
         "buildings": len(recs), "tiles": len(man["tiles"]),
@@ -468,8 +546,14 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
                       "proxy": {"min": pt[0] if pt else 0, "median": pt[len(pt) // 2] if pt
                                 else 0, "max": pt[-1] if pt else 0},
                       "by_slot": dict(sorted(by_slot.items())),
-                      "by_type": dict(sorted(by_type.items()))},
-        "disk": {"tiles_bytes": disk_t, "proxies_bytes": disk_p,
+                      "by_type": dict(sorted(by_type.items())),
+                      "part_meshes": mesh_tri, "unique": tri + mesh_tri,
+                      "drawn": tri + drawn},
+        "parts": {"meshes": meshes, "instances": sum(v[0] for v in by_part.values()),
+                  "merged": int(stats.get("parts_merged", 0)),
+                  "by_type": {k: {"instances": v[0], "triangles": v[1]}
+                              for k, v in sorted(by_part.items())}},
+        "disk": {"tiles_bytes": disk_t, "proxies_bytes": disk_p, "parts_bytes": disk_q,
                  "bytes_per_triangle": round(disk_t / max(tri, 1), 1)},
         "stats": {k: round(v, 2) if isinstance(v, float) else v
                   for k, v in sorted(stats.items())},
@@ -487,9 +571,13 @@ def report_text(rep: dict) -> str:
              f"shell triangles {t['shells']:,} ({t['per_building']} per building), "
              f"proxies {t['proxies']:,} (min {t['proxy']['min']}, median "
              f"{t['proxy']['median']}, max {t['proxy']['max']})",
+             f"parts: {rep['parts']['meshes']:,} meshes ({t['part_meshes']:,} triangles), "
+             f"{rep['parts']['instances']:,} instances, {rep['parts']['merged']:,} merged "
+             f"into shells; unique triangles {t['unique']:,}, drawn {t['drawn']:,}",
              f"disk: tiles {rep['disk']['tiles_bytes'] / 1e6:.1f} MB "
              f"({rep['disk']['bytes_per_triangle']} B per triangle), proxies "
-             f"{rep['disk']['proxies_bytes'] / 1e6:.1f} MB", ""]
+             f"{rep['disk']['proxies_bytes'] / 1e6:.1f} MB, parts "
+             f"{rep['disk']['parts_bytes'] / 1e6:.1f} MB", ""]
     for name, c in rep["checks"].items():
         extra = {k: v for k, v in c.items() if k not in ("name", "ok", "first")}
         lines.append(f"{'PASS' if c['ok'] else 'FAIL'} {name}: {extra}")
@@ -502,6 +590,8 @@ def report_text(rep: dict) -> str:
                      f"max {v['max']:,}, proxy max {v['proxy_max']}")
     lines.append("triangles by slot: " + ", ".join(f"{k} {v:,}" for k, v in
                                                     t["by_slot"].items()))
+    lines.append("instances by part: " + ", ".join(
+        f"{k} {v['instances']:,}" for k, v in rep["parts"]["by_type"].items()))
     lines.append("stats: " + ", ".join(f"{k} {v}" for k, v in rep["stats"].items()))
     s = rep["seconds"]
     lines.append(f"seconds: {s} with {rep['workers']} workers "

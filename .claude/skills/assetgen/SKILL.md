@@ -126,17 +126,24 @@ entry changes only that district's briefs (`assetgen brief diff A B` shows which
 
 `assetgen build` makes every building's shell and far proxy (`OUT/assets/tiles/`,
 `proxies/`, `manifest.json`, `asset_report.txt`, `unreal_contribution.buildings.json`; on a
-hilly city each on a plinth down to the ground), then the street packs as `assetgen streets`
+hilly city each on a plinth down to the ground) with its facade parts (AG2: windows,
+balconies, fins, louvers, members, shutters and the rest, merged into the shell or
+instanced from `OUT/assets/parts/`), then the street packs as `assetgen streets`
 does (`OUT/assets/streets/`, `streets_report.txt`, `unreal_contribution.streets.json`;
 `--no-streets` skips them), and exits 1 if a check of either fails; a second run with
 nothing changed writes no file. `assetgen
 preview` renders the whole city from proxies, each district and the blockout's street
 cameras at full detail, and contact sheets per building type (`OUT/assets/previews/`). The
-spec steers what the previews show: an era's `systems` pick the facade systems (AG1 builds
-unitized curtain wall, punched concrete, precast panel, punched brick, corrugated and shanty
-patchwork; the others fall back to the nearest of these until AG2), its `palette` the wall
-and trim colors, `bay_m` and `window_to_wall` the facade rhythm, a district's `wear` the
-grime, an owner's `brand_colors` and `facade_bias` its buildings.
+spec steers what the previews show: an era's `systems` pick the facade systems (all of
+`presets.FACADE_SYSTEMS` are built; a few need a size of building, `systems.FLOORS`), its
+`palette` the wall and trim colors, `crowns` the tower tops (AG2 builds flat, parapet,
+lantern, stepped, halo, mast and spire; pitched, pagoda, sawtooth, dome and billboard
+crowns are AG4's roofs), `bay_m` and `window_to_wall` the facade rhythm, a district's
+`wear` the grime (with the district's wealth it sets how many windows are boarded, fitted
+with AC units or grilles), an owner's `brand_colors` and `facade_bias` its buildings. The
+massing articulation (corner cuts, setback ledges, podium canopies, arcades) follows the era
+(`systems.ARTICULATION`). `assetgen preview ... --views towers` adds the tallest building of
+every era up close.
 
 Since AG6 `assetgen build` also textures everything: it makes the shared texture library
 once (about a minute, `~/.cache/cybergen/assetgen_library`), the city's sign, ad and logo

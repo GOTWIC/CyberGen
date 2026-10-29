@@ -8,7 +8,13 @@ glTF node and asset, its pivot (the building's own origin, scope section 6), mat
 (one material instance each, parent by master), simple collision from the masses (boxes and
 convex prisms, building frame, meters), Custom Primitive Data (`cpd_layout`), Nanite on with
 distance fields and Lumen cards off (AG0's measurements), its far proxy (Nanite fallback and
-HLOD input), and its parts (none until AG2).
+HLOD input), and its parts (AG2): one per instanced part kind of the building, its mesh in
+the tile's part pack (`parts/<tile>.glb`, the node named by the hash of the part's
+parameters, so buildings whose parts coincide share one mesh), its count, triangles and
+transforms (x, y, z in meters relative to the building's pivot, yaw in degrees
+counterclockwise; a hierarchical instanced mesh in Unreal carrying the building's Custom
+Primitive Data), and the building it belongs to. Parts a building places fewer than
+`parts.INSTANCE_MIN` times are merged into its shell and not listed.
 """
 
 from __future__ import annotations
@@ -58,7 +64,12 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
             "proxy": {"glb": r["proxy"]["glb"], "node": r["proxy"]["node"],
                       "asset": asset_name(key) + "_proxy",
                       "triangles": r["proxy"]["triangles"]},
-            "parts": [],
+            "parts": [{"kind": x["node"], "type": x["type"], "glb": r["parts_glb"],
+                       "node": x["node"], "asset": asset_name(x["node"]),
+                       "count": x["count"], "triangles": x["triangles"],
+                       "xforms": x["xforms"], "building": key}
+                      for x in r.get("parts", [])],
+            "instances": r.get("instances", 0),
             "tags": {"cg.type": r["type"], "cg.district": r["district"] or "",
                      "cg.tile": r["tile"]},
         })
