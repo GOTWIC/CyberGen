@@ -1007,7 +1007,9 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
     rep = BO.run_blockout(build / "city_model.json", build, render=False)
     assert rep["passed"], rep
-    proj = U.new_project(tmp_path / "Proj", UE_ROOT)
+    # (not "Proj": UnrealBuildTool names modules without case, and the engine has PROJ, the
+    # GeoReferencing plugin's projection library, so the play plugin could not be built)
+    proj = U.new_project(tmp_path / "CityTest", UE_ROOT)
     first = U.import_city(build, proj)
     assert first["ok"], first.get("error")
     # the player start, the sun, the sky light and the atmosphere, and the play features'
@@ -1073,7 +1075,9 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
     assert BO.run_blockout(build / "city_model.json", build, render=False)["passed"]
     assert asset_build(build, workers=2, log=lambda *a: None)["ok"]
-    proj = U.new_project(tmp_path / "Proj", UE_ROOT)
+    # (not "Proj": UnrealBuildTool names modules without case, and the engine has PROJ, the
+    # GeoReferencing plugin's projection library, so the play plugin could not be built)
+    proj = U.new_project(tmp_path / "CityTest", UE_ROOT)
     first = U.import_city(build, proj, assets=False)
     assert first["ok"], first.get("error")
     old = json.loads((build / "unreal" / "manifest.json").read_text())

@@ -168,7 +168,10 @@ city imports without the play features (the summary line says why): a plugin nev
 is taken out of the project again, one built before stays as it was built (the level's
 play actor keeps its class, so the import can delete it). The build passes `-NoHotReloadFromIDE`, so an editor open on
 another project with Live Coding does not block it; the project being imported must be
-closed, as for any import.
+closed, as for any import. A project named like one of the engine's modules cannot build it:
+UnrealBuildTool compares module names without case, so a project `Proj` meets the
+GeoReferencing plugin's `PROJ` ("Expecting to find a type ... named 'PROJ'"); the city then
+imports without the play features.
 
 - **The actor**: `CityGenPlay` (key `play`, always loaded, `cg.type=play`): the map texture
   (`Play/T_<City>_Map`, imported again only when its pixels change) and the world
