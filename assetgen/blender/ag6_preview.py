@@ -202,7 +202,11 @@ def _defer_gltf_tmp():
         GM.create_mesh = create_mesh
 
 
-def import_glb(path, part):
+def import_glb(path, part, shared=False):
+    """A pack's objects with AG6's materials. `shared`: meshes that other objects draw too
+    (AG2's parts and AG8's families through geometry nodes, AG8's signs as copies), whose
+    materials go on the mesh; every other object's go on the object (a slot linked to the
+    mesh walks every object of the file on each assignment, quadratic over a whole city)."""
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=path, import_shading="FLAT")
     if GLTF_TMP:
@@ -237,9 +241,8 @@ def import_glb(path, part):
             m = mat_for("buildings" if part == "parts" else part, key, part == "parts")
             if m is not None:
                 old_mats.add(ms.material)
-                # (on the object: a slot linked to the mesh walks every object of the file
-                # on each assignment, quadratic over a whole city)
-                ms.link = "OBJECT"
+                if not shared:
+                    ms.link = "OBJECT"
                 ms.material = m
     # (in one batch: one by one is quadratic)
     bpy.data.batch_remove([m for m in old_mats if m.users == 0])
@@ -303,7 +306,7 @@ def load_parts(glb, inst):
     """AG2's part pack of a tile: its meshes hidden in a collection of their own (in the
     order of their node names), their placements one instancer with the building's tints
     on every point."""
-    objs = import_glb(glb, "parts")
+    objs = import_glb(glb, "parts", shared=True)
     protos = {}
     for o in objs:
         if o.type == "MESH":
@@ -432,7 +435,7 @@ def ag8(v, protos):
         objs += import_glb(path, "props")
     meshes = {}
     for path in sorted({s["glb"] for s in a8.get("signs", [])}):
-        for o in import_glb(path, "signs"):
+        for o in import_glb(path, "signs", shared=True):
             o.hide_render = True
             meshes.setdefault(SUFFIX.sub("", o.name), o)    # (a sign shared by two tiles)
             objs.append(o)
@@ -497,7 +500,7 @@ def main():
     log(f"proxies: {len(proxies)}")
     protos = {}
     for p in JOB.get("ag8_families", []):
-        for o in import_glb(p, "props"):
+        for o in import_glb(p, "props", shared=True):
             o.hide_render = True
             o.hide_viewport = True
             protos[SUFFIX.sub("", o.name)] = o
