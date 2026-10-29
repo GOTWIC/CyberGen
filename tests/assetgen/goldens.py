@@ -4,7 +4,8 @@ briefs, the shells, the spike or the triangulator, and say why in the PR):
     .venv/bin/python tests/assetgen/goldens.py [--builds DIR]
 
 With --builds, the sample models are read from DIR/<city>/city_model.json (each must have
-citygen's golden sha256) instead of being built.
+citygen's golden sha256) instead of being built. With --sections ag1 ag6, only those
+sections are made again (the rest kept from the file).
 """
 
 import argparse
@@ -66,10 +67,51 @@ def model_of(path: Path, builds: Path | None):
     return built.model, data
 
 
+# AG6: decoded pixels of these maps of a 32 px/m library (test_ag_materials.small_library)
+AG6_MAPS = (("sets", "brick_heritage", "base"), ("sets", "panel_brutalist", "orm"),
+            ("sets", "asphalt_street", "normal"), ("atlases", "interiors", "night"),
+            ("atlases", "decals", "base"), ("atlases", "road", "base"),
+            ("atlases", "trim_heritage", "base"))
+AG6_FILES = ("materials.json", "signs.json", "unreal_contribution.materials.json",
+             "unreal_contribution.buildings.json", "unreal_contribution.streets.json")
+
+
+def ag1_section() -> dict:
+    base = small_assets()
+    a = base / "assets"                    # the building packs (streets, props: their own)
+    tree = {str(p.relative_to(a)): C.sha256_bytes(p.read_bytes())
+            for p in sorted(a.rglob("*")) if p.is_file() and
+            ((p.suffix == ".glb" and p.parent.parent == a and
+              p.parent.name in ("tiles", "proxies", "parts")) or
+             (p.parent == a and p.name in BD.DELIVERED))}
+    return {"testport_manifest": C.sha256_bytes((a / "manifest.json").read_bytes()),
+            "testport_files": C.digest(tree)}
+
+
+def ag6_section() -> dict:
+    from test_ag_materials import small_library
+    lib = small_library()
+    a = small_assets() / "assets"
+    return {"library": {f"{g}.{k}.{m}": lib[g][k]["files"][m]["pixels_sha256"]
+                        for g, k, m in AG6_MAPS},
+            "testport_materials": C.digest({f: C.sha256_bytes((a / f).read_bytes())
+                                            for f in AG6_FILES})}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--builds", type=Path)
+    ap.add_argument("--sections", nargs="*", help="only these sections (ag1, ag6)")
     args = ap.parse_args()
+    if args.sections:
+        out = json.loads(GOLDEN.read_text(encoding="utf-8"))
+        if "ag1" in args.sections:
+            out["ag1"].update(ag1_section())
+        if "ag6" in args.sections:
+            out["ag6"] = ag6_section()
+        GOLDEN.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
+        print(f"wrote {GOLDEN} ({', '.join(args.sections)})")
+        return
     out = {"about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json "
                     "(tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few "
                     "Vesper Bay buildings, the five samples' briefs.json, the two small spike "
@@ -82,16 +124,8 @@ def main():
            "testport_briefs": C.sha256_bytes(
                (small_build() / "base" / "assets" / "briefs.json").read_bytes()),
            "triangulate": tri_golden(), "buildings": {}, "samples": {}, "spike": {}}
-    base = small_assets()
-    a = base / "assets"                    # the building packs (streets, props: their own)
-    tree = {str(p.relative_to(a)): C.sha256_bytes(p.read_bytes())
-            for p in sorted(a.rglob("*")) if p.is_file() and
-            ((p.suffix == ".glb" and p.parent.parent == a and
-              p.parent.name in ("tiles", "proxies", "parts")) or
-             (p.parent == a and p.name in BD.DELIVERED))}
-    out["ag1"] = {"testport_manifest": C.sha256_bytes(
-        (base / "assets" / "manifest.json").read_bytes()),
-        "testport_files": C.digest(tree), "buildings": {}}
+    out["ag1"] = {**ag1_section(), "buildings": {}}
+    out["ag6"] = ag6_section()
     for path in CITIES:
         model, data = model_of(path, args.builds)
         res = B.build_briefs(model)

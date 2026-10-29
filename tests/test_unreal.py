@@ -598,6 +598,72 @@ def test_stage2_refuses(build, manifest, tmp_path):
         U.build_manifest(_with_contributions(build, tmp_path / "layer", old))
 
 
+def test_stage2_textures(build, manifest, tmp_path):
+    """AG6: textures by name with their pixel hashes (the shared library in Core, the
+    city's pages in the city's folder), materials with texture, scalar and vector
+    parameters, an entry's era materials as its actor's overrides; a texture's pixels move
+    its materials, not the actors; an entry's material map moves only its actor; a material
+    naming a texture no contribution lists, or a texture of an unknown kind, is refused."""
+    man = manifest[0]
+    fake, blds = _fake(man, json.loads((build / "graphs.json").read_text()))[:2]
+    b = fake["buildings"]
+    b["textures"] = {
+        "set.brick_heritage.base": {"file": "library/sets/brick_heritage_base.png",
+                                    "pixels_sha256": "a" * 64, "size": [1024, 1024],
+                                    "srgb": True, "kind": "color"},
+        "set.brick_heritage.normal": {"file": "library/sets/brick_heritage_normal.png",
+                                      "pixels_sha256": "b" * 64, "size": [1024, 1024],
+                                      "srgb": False, "kind": "normal"},
+        "city.signs_wide_0": {"file": "textures/signs_wide_0.png", "pixels_sha256": "c" * 64,
+                              "size": [4096, 1024], "srgb": True, "kind": "color"}}
+    b["materials"]["brick@heritage"] = dict(
+        b["materials"]["brick"], slot="brick",
+        textures={"BaseTex": "set.brick_heritage.base",
+                  "NormalTex": "set.brick_heritage.normal"},
+        scalars={"TileM": 2.0, "Textured": 1.0}, vectors={"RefColor": [0.2, 0.08, 0.05]})
+    b["entries"][0]["materials"] = {"brick": "brick@heritage"}
+    b["entries"][0]["cpd"] = [0.5] * 30
+    m2 = U.build_manifest(_with_contributions(build, tmp_path / "t1", fake))[0]
+    s2 = m2["stage2"]
+    t = s2["textures"]
+    assert sorted(t) == sorted(b["textures"]) and s2["counts"]["textures"] == 3
+    assert t["set.brick_heritage.base"]["folder"] == "/Game/CityGen/Core/Textures"
+    assert t["city.signs_wide_0"]["folder"] == m2["content_root"] + "/Assets/Textures"
+    assert t["set.brick_heritage.normal"]["file"] == \
+        "assets/library/sets/brick_heritage_normal.png"
+    assert t["set.brick_heritage.normal"]["kind"] == "normal" and \
+        not t["set.brick_heritage.normal"]["srgb"]
+    mat = s2["materials"]["buildings.brick@heritage"]
+    assert mat["slot"] == "brick" and mat["key"] == "brick@heritage"
+    assert mat["textures"]["BaseTex"] == {"texture": "set.brick_heritage.base",
+                                          "hash": "a" * 16}
+    assert mat["scalars"] == {"Textured": 1.0, "TileM": 2.0}
+    assert "textures" not in s2["materials"]["buildings.brick"]
+    a = {x["key"]: x for x in s2["actors"]}
+    assert a[blds[0]]["materials"] == {"brick": "MI_" + U.asset_name("buildings.brick@heritage")}
+    assert "materials" not in a[blds[1]] and len(a[blds[0]]["cpd"]) == 30
+    # new pixels: the materials that read them change, no actor does
+    f2 = copy.deepcopy(fake)
+    f2["buildings"]["textures"]["set.brick_heritage.base"]["pixels_sha256"] = "d" * 64
+    m3 = U.build_manifest(_with_contributions(build, tmp_path / "t2", f2))[0]
+    assert U.manifest_changes(m2, m3) == {"created": [], "updated": [], "deleted": []}
+    assert m3["stage2"]["materials"]["buildings.brick@heritage"] != mat
+    assert m3["stage2"]["materials"]["buildings.brick"] == s2["materials"]["buildings.brick"]
+    # another era for one building: that actor only
+    f3 = copy.deepcopy(fake)
+    f3["buildings"]["entries"][0]["materials"] = {}
+    m4 = U.build_manifest(_with_contributions(build, tmp_path / "t3", f3))[0]
+    assert U.manifest_changes(m2, m4) == {"created": [], "updated": [blds[0]], "deleted": []}
+    bad = copy.deepcopy(fake)
+    bad["buildings"]["materials"]["brick@heritage"]["textures"]["OrmTex"] = "set.nope.orm"
+    with pytest.raises(ValueError, match="no texture set.nope.orm"):
+        U.build_manifest(_with_contributions(build, tmp_path / "t4", bad))
+    bad = copy.deepcopy(fake)
+    bad["buildings"]["textures"]["city.signs_wide_0"]["kind"] = "hdr"
+    with pytest.raises(ValueError, match="kind hdr"):
+        U.build_manifest(_with_contributions(build, tmp_path / "t5", bad))
+
+
 def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     """AG8 over M15's prototype actors: an entry keyed by a prototype actor's key replaces
     it with its variants (transforms with a scale, an id per instance; plants as Nanite
@@ -683,13 +749,25 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
 
 @pytest.fixture(scope="module")
 def staged(small, build, manifest, tmp_path_factory):
-    """The small city with its assets built by assetgen (shells, proxies, streets) beside
-    the blockout files."""
+    """The small city with its assets built by assetgen (shells, proxies, streets, AG6's
+    materials on a 64 px/m library of its own) beside the blockout files."""
+    import os
     from assetgen.build import build as asset_build
     out = tmp_path_factory.mktemp("ue2") / "build"
     shutil.copytree(build, out)
     (out / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
-    rep = asset_build(out, workers=2, log=lambda *a: None)
+    spec = out / "asset_spec.json"
+    spec.write_text(json.dumps({"version": 1, "texel_density_px_m": 64,
+                                "texel_density_upper_px_m": 32}))
+    old = os.environ.get("ASSETGEN_LIBRARY")
+    os.environ["ASSETGEN_LIBRARY"] = str(tmp_path_factory.mktemp("library"))
+    try:
+        rep = asset_build(out, str(spec), workers=2, log=lambda *a: None)
+    finally:
+        if old is None:
+            os.environ.pop("ASSETGEN_LIBRARY", None)
+        else:
+            os.environ["ASSETGEN_LIBRARY"] = old
     assert rep["ok"], rep.get("checks")
     return out
 
@@ -728,7 +806,15 @@ def test_stage2_from_assetgen(staged, manifest):
     assert ch["created"] == sorted((s2keys - set(blockout) - protos) | moved)
     # AG8: every prop and plant prototype actor of M15 replaced by props, plants and signs
     assert protos <= set(s2["replaced"])
-    assert all(len(a["cpd"]) == 23 for a in s2["actors"] if a["key"] in set(blds))
+    assert all(len(a["cpd"]) == 30 for a in s2["actors"] if a["key"] in set(blds))
+    # AG6: every texture a material names is in the build (the library through its link)
+    assert s2["textures"] and all((staged / t["file"]).is_file()
+                                  for t in s2["textures"].values())
+    assert {"facade", "glass", "metal", "road", "concrete", "sign", "decal"} <= \
+        set(s2["masters"])
+    era = [a for a in s2["actors"] if a.get("materials")]
+    assert era and all(v in {m["asset"] for m in s2["materials"].values()}
+                       for a in era for v in a["materials"].values())
     assert _dump(U.build_manifest(staged)[0]) == _dump(m2)
 
 
