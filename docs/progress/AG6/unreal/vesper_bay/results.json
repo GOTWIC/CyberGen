@@ -1,0 +1,187 @@
+{
+ "city": "Vesper Bay",
+ "imports": {
+  "first": {
+   "ok": true,
+   "total_s": 2542.7,
+   "keys": {
+    "created": 60634,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 60920,
+   "timings": {
+    "materials": 1.03,
+    "textures2": 3.29,
+    "meshes": 32.58,
+    "meshes2": 1035.0,
+    "level": 40.67,
+    "actors": 997.13,
+    "save": 104.44,
+    "prune": 313.34,
+    "digests": 12.26
+   },
+   "meshes": {
+    "imported": 8533,
+    "kept": 0,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 32315,
+    "instance_actors": 27234,
+    "replaced": 9328,
+    "meshes": {
+     "imported": 52639,
+     "kept": 0,
+     "deleted": 200
+    },
+    "packs_imported": 735,
+    "materials": {
+     "created": 280,
+     "updated": 0,
+     "kept": 0,
+     "deleted": 0
+    },
+    "hulls": 5634,
+    "boxes_only": 159,
+    "complex_fallback": 0,
+    "lod_chains": 56,
+    "textures": {
+     "imported": 44,
+     "kept": 217,
+     "deleted": 0
+    }
+   }
+  },
+  "again": {
+   "ok": true,
+   "total_s": 69.0,
+   "keys": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 0,
+   "timings": {
+    "meshes": 4.07,
+    "meshes2": 27.55,
+    "level": 27.99,
+    "prune": 1.83,
+    "digests": 4.18
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 8533,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 32315,
+    "instance_actors": 27234,
+    "replaced": 9328,
+    "meshes": {
+     "imported": 0,
+     "kept": 52639,
+     "deleted": 0
+    },
+    "packs_imported": 0,
+    "materials": {
+     "created": 0,
+     "updated": 0,
+     "kept": 280,
+     "deleted": 0
+    },
+    "hulls": 0,
+    "boxes_only": 0,
+    "complex_fallback": 0,
+    "lod_chains": 0,
+    "textures": {
+     "imported": 0,
+     "kept": 261,
+     "deleted": 0
+    }
+   }
+  }
+ },
+ "hlods": {
+  "first": 238
+ },
+ "level": {
+  "ok": true,
+  "textures": {
+   "color srgb=True TC_DEFAULT flip=False 2048": 27,
+   "normal srgb=False TC_NORMALMAP flip=True 2048": 24,
+   "mask srgb=False TC_MASKS flip=False 2048": 24,
+   "mask srgb=False TC_MASKS flip=False 1024": 58,
+   "color srgb=True TC_DEFAULT flip=False 4096": 4,
+   "color srgb=True TC_DEFAULT flip=False 1024": 58,
+   "normal srgb=False TC_NORMALMAP flip=True 1024": 57,
+   "color srgb=True TC_DEFAULT flip=False 512": 3,
+   "normal srgb=False TC_NORMALMAP flip=True 512": 3,
+   "mask srgb=False TC_MASKS flip=False 512": 3
+  },
+  "texture_folders": {
+   "/Game/CityGen/Core/Textures": 256,
+   "/Game/CityGen/VesperBay/Assets/Textures": 5
+  },
+  "instances_missing_textures": [],
+  "actors": 60634,
+  "doubled_keys": [],
+  "missing_actors": [],
+  "missing_instancers": [],
+  "era_slots": {
+   "ok": 8248,
+   "part ok": 96
+  },
+  "era_problems": [],
+  "building_cpd_lengths": {
+   "30": 5793
+  },
+  "part_instancers": 17227,
+  "part_instances_by_type": {
+   "window": 892087,
+   "spandrel": 83850,
+   "panel": 77449,
+   "shutter": 59894,
+   "balcony": 46311,
+   "member": 37801,
+   "shade": 31285,
+   "ac": 19248,
+   "container": 14546,
+   "cap": 14081,
+   "louver": 13119,
+   "fin": 10793,
+   "pod": 7899,
+   "balconette": 5868,
+   "grille": 4697,
+   "dish": 1916,
+   "column": 64
+  },
+  "part_instances": 1320908,
+  "part_count_mismatches": [],
+  "s": 52.6
+ },
+ "checks": {
+  "before_the_fixes": [
+   {
+    "ok": false,
+    "lines": [
+     "streaming: 41349 of 60634 actors loaded at the start, 40639 after a teleport to (896, -1408) (0 new)",
+     "collision: 157 of 507 traces down hit (building 33, water 25, elevated 23, ground 14, sidewalk 13, road_avenue 11), 34 of 36 roofs, 36 of 36 facades",
+     "walk: 254 m along a 258 m sidewalk path in 62 s, 0% of frames on the ground, did not reach its end",
+     "console: ghost flying without collision, fly flying, walk falling",
+     "fly: BP_CityGenFlyPawn_C at 50 m/s flew 20 m in 0.4 s, 41349 actors loaded where it ended"
+    ]
+   },
+   {
+    "ok": false,
+    "lines": [
+     "streaming: 41349 of 60634 actors loaded at the start, 38620 after a teleport to (896, -1408) (5 new)",
+     "collision: 169 of 507 traces down hit (water 37, building 33, elevated 23, ground 14, sidewalk 13, road_avenue 11), 33 of 36 roofs, 35 of 36 facades",
+     "walk: 257 m along a 258 m sidewalk path in 59 s, 0% of frames on the ground, reached its end",
+     "console: ghost flying without collision, fly flying, walk falling",
+     "fly: BP_CityGenFlyPawn_C at 50 m/s flew 40 m in 0.8 s, 41036 actors loaded where it ended"
+    ]
+   }
+  ]
+ }
+}

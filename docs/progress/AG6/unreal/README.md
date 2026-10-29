@@ -21,10 +21,10 @@ at a time, on a Mac shared with other sessions' builds.
 | City | Import | Actors | Stage 2 | Time |
 |---|---|---|---|---|
 | Greyhook | first, blockout and stage 2 at once | 36,454 created | 16,127 stage 2 actors and 19,408 instanced actors over 5,250 blockout actors; 29,539 meshes from 603 packs; 237 textures imported, 255 material instances | 824 s (stage 2 meshes 330 s, actors 344 s, prune 76 s, textures 13 s); HLODs 285 built in 178 s |
-| | again | nothing changed, 0 packages saved | 5 textures and 5 instances healed (the prune fault below), then nothing: 237 textures and 255 instances kept | 48, 39, 34 s |
+| | again (three times, while fixing the prune) | nothing changed, 0 packages saved | the city's 5 sign pages, which the prune deleted after every import, imported again and their 5 instances rebuilt (fixed below); then nothing: 237 textures and 255 instances kept | 48, 39, 34 s |
 | Vesper Bay | first, over the same project | 60,634 created | 32,315 stage 2 actors and 27,234 instanced actors over 9,328 blockout actors; 52,639 meshes from 735 packs; 44 textures imported, 217 kept from `Core/Textures` (Greyhook's), 280 instances | 2,543 s (stage 2 meshes 1,035 s, actors 997 s, prune 313 s, save 104 s); HLODs 238 built in 163 s |
 | | again | nothing changed, 0 packages saved, all 261 textures and 280 instances kept | | 69 s |
-| Greyhook with AG8 on AG6 (#49), over its AG6 import | after `assetgen build` again | 16,054 updated (8,212 signs: 7,119 shop signs, 1,093 billboards, neon bands and holo-ads; 7,842 prop and plant instancers), none created or deleted, no shell or street actor | 4,329 new sign meshes, 8,150 renamed away, 507 prop and sign meshes changed; 98 prop and sign material instances changed, 25 new, 37 gone; 39 new library textures (none of the 237 changed); masters `M_CgLeaves` added (`STAGE2_VERSION` 5) | the delete of 8,435 stale meshes stalled (over 90 minutes, stopped); with the prune fixed, the import again: nothing changed, 8,435 deleted by their files in 5 s, 72 s in all GHLOD |
+| Greyhook with AG8 on AG6 (#49), over its AG6 import | after `assetgen build` again | 16,054 updated (8,212 signs: 7,119 shop signs, 1,093 billboards, neon bands and holo-ads; 7,842 prop and plant instancers), none created or deleted, no shell or street actor | 4,329 new sign meshes, 8,150 renamed away, 507 prop and sign meshes changed; 98 prop and sign material instances changed, 25 new, 37 gone; 39 new library textures (none of the 237 changed); masters `M_CgLeaves` added (`STAGE2_VERSION` 5) | the delete of 8,435 stale meshes stalled (over 90 minutes, stopped); with the prune fixed, the import again: nothing changed, 8,435 deleted by their files in 5 s, 72 s in all; HLODs 285 rebuilt in 155 s (the props changed); imported again: nothing changed, no HLOD rebuilt, 58 s |
 
 ## What the level holds
 
@@ -43,12 +43,10 @@ Read back from the level in the editor:
 
 1. **Window interiors on curtain walls.** Every pane shows one whole room: back wall, floor at
    the bottom, ceiling at the top, side walls, moving with the view, the right way up. No
-   white triangles, diamonds or sawtooth where panes share corners, near (30 m) or far
-   (500 m); towers whose glass is a reflective curtain wall read as glass by day with rooms
-   behind it.
-2. **Lit windows at night.** Whole rooms lit, about each building's lit ratio of them
-   (warm and cool rooms, some dark floors), none lit per triangle; storefronts show shop
-   interiors by day and glow by night.
+   white triangles, diamonds or sawtooth where panes share corners, up close or across a
+   district; by day the glass reads as glass with the rooms behind it.
+2. **Lit windows at night.** Whole rooms lit, about each building's lit ratio of them, the
+   rest dark, none lit per triangle; storefronts show shops.
 3. **Textures and orientation.** Brick courses horizontal, grey mortar, the building's tint on
    the bricks only; corrugated and paneled walls level and upright; weathering as dark spots
    and patches on the panels; rain streaks and grime at the foot of the walls are faint at
@@ -57,8 +55,7 @@ Read back from the level in the editor:
 4. **Tints over textures.** Each building keeps its AG1 tint over its texture (beige brick
    stays beige brick); era walls as above.
 5. **Roads.** Asphalt with aggregate, dark patches, markings and crosswalk stripes; setts on
-   the sidewalks of the heritage streets (Vesper Bay's road shot), other paving in other
-   districts.
+   the sidewalks of Vesper Bay's heritage streets (its road shot).
 6. **Re-import.** Nothing changes on a second import, by pixel hash and by parameters; the
    library is imported once per project into `Core/Textures` and Vesper Bay's import reused
    Greyhook's 217 there.
@@ -73,15 +70,30 @@ Read back from the level in the editor:
 One `BP_CityGenInstances` actor per building and part kind (`<building>.<kind>`, 17 kinds:
 windows, spandrels, panels, balconies, shutters, members, AC units, balconettes, dishes,
 shades, grilles, louvers, caps, pods, fins, columns, containers), its instance count the
-contribution's, the era walls on its slots. Up close the parts sit on their walls: frames in
-the window openings, balconies at their floor slabs, AC units and dishes against the wall,
+contribution's, the era walls on its slots. In the close shots the parts sit on their walls,
 nothing floating and nothing doubled.
 
-PARTS49
+With the fixes the part meshes carry no collision and their instancers are `NoCollision`
+(10,617 instancers updated on Greyhook's import with them; the 590 container instancers keep
+complex collision).
 
 ## AG8 on AG6
 
-AG849
+Greyhook built again with #49 (`assetgen build`, props, signs and materials only), imported
+over its AG6 import (table above), imported again (nothing changed, HLODs none rebuilt) and
+checked with shots:
+
+- **Leaves** (`M_CgLeaves`): masked leaf cards with the sky through their gaps up close, both
+  sides drawn (cards facing away are not missing); crowns full at 250 m and still full at
+  600 m (Nanite `Voxelize`), no thinning or holes.
+- **Sign faces**: upright, their text reading the right way, each the cell of AG6's page it
+  names (two blade signs of the shopping street matched against `signs_tall_0.png`: the
+  same katakana and glyphs, the same colors), neon frames lit; the five city pages in
+  `Assets/Textures` and every sign instance with its textures.
+- **Holo-ads** (`M_CgHolo` with `SignTex`): HOLO49
+- **Props**: trunks with bark, palm trunks ringed, bollards banded, cars with painted bodies,
+  glass, lit lamps and wheel rims; white blotches on the black van's paint (most likely the
+  canopy's sky in its reflections; not followed up).
 
 ## Check
 
@@ -89,7 +101,8 @@ AG849
 |---|---|---|---|---|---|
 | Greyhook | 28,627 of 36,454 at the start, 25,981 after a teleport | 507 of 507 (building 252) | 36 of 36 | 36 of 36 | 130 m, all frames on the ground |
 | Vesper Bay, before the fixes | 41,349 of 60,634 at the start | 157 and 169 of 507: failed | 34 and 33 of 36 | 36 and 35 of 36 | fell through |
-CHECK49
+| Greyhook with the fixes and #49 | 28,622 of 36,454 at the start, 23,716 after a teleport | 507 of 507 (building 251) | 35 of 36 | 36 of 36 | 129 m, all frames on the ground |
+VBCHECK
 
 Vesper Bay's play session ran at about one frame every 12 to 14 s with the Mac's free memory
 down to 13%: its 1.3 million part instances had complex collision (a physics body per
@@ -124,4 +137,42 @@ OPEN49
 
 ## Shots
 
-SHOTS49
+3840 px for AG6's shots, 2560 px for AG8 on AG6's; by night `MPC_CityGen.Night` at 1, the
+sun low and the sky dimmed (exposure fixed). Greyhook:
+
+| Curtain-wall towers by day | The same by night |
+|---|---|
+| <img src="greyhook/tower_close_day.jpg" width="420"> | <img src="greyhook/tower_close_night.jpg" width="420"> |
+
+| A street by day | The same street by night |
+|---|---|
+| <img src="greyhook/street_day.jpg" width="420"> | <img src="greyhook/street_night.jpg" width="420"> |
+
+| A district from above by night | The far view (HLODs) |
+|---|---|
+| <img src="greyhook/district_above_night.jpg" width="420"> | <img src="greyhook/fly_over_far_view.jpg" width="420"> |
+
+Vesper Bay:
+
+| A heritage brick street | Brick close up |
+|---|---|
+| <img src="vesper_bay/brick_street_day.jpg" width="420"> | <img src="vesper_bay/brick_wall.jpg" width="420"> |
+
+| Asphalt and setts | The Corporate Core from above |
+|---|---|
+| <img src="vesper_bay/road_paving.jpg" width="420"> | <img src="vesper_bay/corporate_core_above.jpg" width="420"> |
+
+AG8 on AG6 (Greyhook):
+
+| Leaf cards up close | Avenue trees at 250 m |
+|---|---|
+| <img src="greyhook/ag8_leaves_close.jpg" width="420"> | <img src="greyhook/ag8_trees_250m.jpg" width="420"> |
+
+| Trees at 600 m | Sign faces in a shopping street |
+|---|---|
+| <img src="greyhook/ag8_trees_600m.jpg" width="420"> | <img src="greyhook/ag8_signs_shopping_street.jpg" width="420"> |
+
+| Parked cars | Bark, palms and crowns along an avenue |
+|---|---|
+| <img src="greyhook/ag8_car_close.jpg" width="420"> | <img src="greyhook/ag8_street_trees_bark.jpg" width="420"> |
+NIGHTSHOTS
