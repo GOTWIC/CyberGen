@@ -10,6 +10,10 @@ corner of its instanced parts inside a mass that spans its height, or an allowed
   "deep" (balconies, podium canopies) up to `DEEP_MM` out at least 3 m up (the facade's
   room for them, over a sidewalk, a lot or a park and never over a lane, is the
   generator's rule: `shell.Facade.room`);
+- AG3's street fronts: shopfronts, doors, mounts, pipes and painted surfaces "flush" (what
+  goes deeper stays inside its opening's recess), entrance canopies "deep", a club's queue
+  rail "street" (on a street or avenue sidewalk, at most `STREET_MM` out and `STREET_Z`
+  high);
 - roof equipment over a mass's roof; a crown mast or spire over the highest roof, at most
   `mast_cap` tall;
 - on M13's slopes, a mass on the base reaches down by its plinth (`shell.plinth_mm`).
@@ -23,6 +27,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..planar import dist_polyline, inside_poly
+from . import systems as SY
 from .shell import plinth_mm
 
 OVERHANG_MM = 910            # 0.6 m cornices, mitered up to 1.5 times at corners
@@ -30,6 +35,8 @@ PARAPET_MM = 1210
 STRIP_MIN_MM = 2999
 FLUSH_MM = 160
 DEEP_MM = 1810
+STREET_MM = 810
+STREET_Z = 1210
 TOL_MM = 2.0
 # merged parts keep their slots: how far each slot may reach (the rest: AG1's rule)
 SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
@@ -37,7 +44,15 @@ SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "member": "flush", "timber": "flush", "patch_ply": "flush", "column": "flush",
               "balcony": "deep", "railing": "deep", "glazing": "deep", "canopy": "deep",
               "fin": "strip", "perforated": "strip", "pod": "strip", "ac": "strip",
-              "dish": "strip", "tile": "strip", "louver": "strip"}
+              "dish": "strip", "tile": "strip", "louver": "strip",
+              "stanchion": "street", "rope": "street"}
+for _s in SY.SLOTS:
+    if _s not in SLOT_REACH and (_s.startswith(("paint_", "neon_", "screen_", "poster_",
+                                                "mural_", "graffiti_", "riser_", "lit_",
+                                                "door_")) or _s in (
+            "step", "steel", "rubber", "seal", "rollup", "mount", "trellis", "pipe",
+            "cabinet", "frosted", "club", "storefront_dark", "fascia")):
+        SLOT_REACH[_s] = "flush"
 
 
 def mast_cap(height_mm: float) -> float:
@@ -99,6 +114,8 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
             allowed |= near <= FLUSH_MM
         if reach == "deep":
             allowed |= (near <= DEEP_MM) & high
+        if reach == "street":
+            allowed |= (near <= STREET_MM) & (z <= STREET_Z)
         bad = over & ~allowed
         out["outside"] += int(bad.sum())
         out["low_overhang"] += int((bad & (near <= DEEP_MM) & ~high).sum())

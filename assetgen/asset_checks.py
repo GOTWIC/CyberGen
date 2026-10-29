@@ -15,6 +15,13 @@ thumbnails differ by `THUMB_MIN` bits of their difference hash (`buildings/thumb
 triangles, its shell and its own part meshes, per section 11 bay, and instances per bay)
 and the city to section 11's estimate with 40% more for parts (`PARTS_SHARE`) and
 `I_CITY` instances per bay.
+
+AG3: `asset_access` (a door at every entrance and every unit's entrance, each open to its
+walkway: the walkway in front of it and no other building between; a unit's door takes the
+nearest ground walkway of its level, written into its record for stage 4) and
+`asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never on
+glass: `fronts.mount_check`); the budgets count section 11's shopfronts, `T_UNIT` triangles
+per ground-floor unit.
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ from .buildings import genome as GN
 
 T_BAY = 24          # section 11: shell triangles per bay
 RHO_ROOF = 1.0      # and per m2 of roof
+T_UNIT = 1500       # and per shopfront (AG3)
 PARTS_SHARE = 0.4   # AG2's parts: 40% of section 11's shell estimate on top of it
 I_CITY = 3.0        # section 11: 2 to 3 M part instances for 1.4 M bays
 THUMB_MIN = 8       # bits of 1,504 two thumbnails must differ by
@@ -194,17 +202,19 @@ def budget(records: dict, tile_parts: dict | None = None) -> dict:
     and the instances within `I_CITY` per bay. Every building within its class's budget."""
     bays = sum(r["stats"]["bays_s11"] for r in records.values())
     roof = sum(r["stats"]["roof_m2"] for r in records.values())
+    units = sum(r["stats"].get("units", 0) for r in records.values())
     tris = sum(r["triangles"] for r in records.values())
     ptris = sum(t["triangles"] for t in (tile_parts or {}).values() if t)
     inst = sum(r.get("instances", 0) for r in records.values())
-    est = int(bays * T_BAY + roof * RHO_ROOF)
+    est = int(bays * T_BAY + roof * RHO_ROOF + units * T_UNIT)
     city = int(est * (1.0 + PARTS_SHARE))
     over = []
     by: dict[str, dict] = {}
     for k in sorted(records):
         r = records[k]
         c = CLASSES[r.get("class") or budget_class(r)]
-        own = r["stats"]["bays_s11"] * T_BAY + r["stats"]["roof_m2"] * RHO_ROOF
+        own = r["stats"]["bays_s11"] * T_BAY + r["stats"]["roof_m2"] * RHO_ROOF + \
+            r["stats"].get("units", 0) * T_UNIT
         tb = int(c["k"] * own + c["base"])
         ib = int(c["i"] * r["stats"]["bays_s11"] + c["ibase"])
         u = r["triangles"] + r.get("part_triangles", 0)
@@ -225,3 +235,163 @@ def budget(records: dict, tile_parts: dict | None = None) -> dict:
             "instances": inst, "instance_budget": int(I_CITY * bays), "bays": int(bays),
             "roof_m2": int(roof), "ratio": round((tris + ptris) / city, 3) if city else None,
             "over": len(over), "first": over[:5], "classes": by}
+
+
+# ---------------------------------------------------------------------------
+# AG3: access and mounts
+# ---------------------------------------------------------------------------
+
+WALK_SKIP = ("skybridge", "elevated", "stairs", "escalator", "elevator", "footbridge",
+             "underpass")
+FRONT_TOL_M = 1.0       # a walkway this close to a door counts as in front of it
+OUT_M = 0.15            # the path to the walkway starts this far out of the doorway
+REACH_M = 40.0          # how far from a door its walkway may be
+OWN_M = 3.6             # the path may cross its own building this near the door (an arcade)
+STEP_M = 1.0            # the first leg of the path: straight out of the doorway
+
+
+def _walk_index(model):
+    """Per level, the ground walkways a door may open to (sorted by id; not the paths
+    citygen runs inside buildings and stations) and their tree."""
+    import shapely
+    from shapely.geometry import LineString
+    by: dict[int, list] = {}
+    for w in sorted(model.walkways, key=lambda w: w.id):
+        a = w.attrs or {}
+        if w.kind in WALK_SKIP or len(w.line) < 2 or a.get("lobby") or a.get("concourse"):
+            continue
+        by.setdefault(int(getattr(w, "level", 0) or 0), []).append(
+            (w.id, LineString([(p[0], p[1]) for p in w.line])))
+    out = {}
+    for lv, rows in by.items():
+        geoms = [g for _, g in rows]
+        out[lv] = ([i for i, _ in rows], geoms, shapely.STRtree(geoms))
+    return out
+
+
+def access(model, records: dict, briefs: dict | None = None) -> dict:
+    """A door at every entrance and every unit's entrance (the shells' `doors` checks), each
+    open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
+    by stepping `STEP_M` out of the doorway and walking straight to the walkway's nearest
+    point, crossing no other building (its own only within `OWN_M` of the door, under an
+    arcade). An entrance keeps the model's walkway when that one is open to it; otherwise,
+    and for every unit's door, the door takes the nearest open one (the smallest id among
+    equals), written into its record (`walkway_id`, `walkway_from`: model or front) for
+    stage 4. Where the city leaves a door no walkway to open to, it is counted apart, the
+    city's to change (scope 4.5), not as a failure: against a neighbor (its facade a party or
+    blind wall: the brief's classes, `facing_neighbor`), or with no ground walkway ahead of it
+    within reach (open ground, a canal, its walkway behind the building: `unreachable`). A
+    failure is a missing door, or a door with a walkway ahead that another building walls
+    off."""
+    import shapely
+    from shapely.geometry import LineString, Point
+    walks = _walk_index(model)
+    blds = sorted((b.id, b) for b in model.buildings if b.footprint is not None)
+    from citygen import geom as G
+    with G.canonical():
+        feet = [G.from_model_poly(b.footprint) for _, b in blds]
+    fids = [i for i, _ in blds]
+    own = {i: k for k, i in enumerate(fids)}
+    ftree = shapely.STRtree(feet) if feet else None
+    level = {b.id: int(getattr(b, "level", 0) or 0) for b in model.buildings}
+    miss = blocked = nowalk = relinked = neighbor = unreach = 0
+    doors = flush = moved = 0
+    first = []
+    faced = []
+
+    def leg_clear(bid, ax, ay, bx, by, x, y) -> bool:
+        if (bx - ax) ** 2 + (by - ay) ** 2 < 0.0025 or ftree is None:
+            return True
+        seg = LineString([(ax, ay), (bx, by)])
+        for i in ftree.query(seg, predicate="intersects").tolist():
+            if fids[i] != bid:
+                return False
+            # its own building only near the door (an arcade, a recess)
+            far = seg.difference(Point(x, y).buffer(OWN_M, 8))
+            if not far.is_empty and far.intersects(feet[own[bid]]):
+                return False
+        return True
+
+    for bid in sorted(records):
+        r = records[bid]
+        dc = r["checks"].get("doors") or {}
+        if dc.get("missing"):
+            miss += dc["missing"]
+            if len(first) < 5:
+                first.append(f"{bid}: no door at {dc.get('first')}")
+        px, py = r["pivot"][0], r["pivot"][1]
+        idx = walks.get(level.get(bid, 0)) or walks.get(0)
+        for d in r.get("doors", []):
+            doors += 1
+            flush += int(d["flush"])
+            moved += int(d.get("moved", False))
+            if idx is None:
+                nowalk += 1
+                continue
+            ids, geoms, tree = idx
+            x, y = px + d["position"][0], py + d["position"][1]
+            nx, ny = d["normal"]
+            ox, oy = x + nx * OUT_M, y + ny * OUT_M
+            qx, qy = x + nx * STEP_M, y + ny * STEP_M
+            q = Point(qx, qy)
+            best = None
+            model_w = d.get("model_walkway_id", d.get("walkway_id")) \
+                if d.get("entrance") is not None else None
+            out_ok = leg_clear(bid, ox, oy, qx, qy, x, y)
+            for k in sorted(tree.query(q.buffer(REACH_M)).tolist(), key=lambda k: ids[k]):
+                line = geoms[k]
+                f = line.interpolate(line.project(q))
+                dist = ((f.x - qx) ** 2 + (f.y - qy) ** 2) ** 0.5
+                if dist > REACH_M:
+                    continue
+                key = (0 if ids[k] == model_w else 1, round(dist, 3), ids[k])
+                if best is not None and key >= best[0]:
+                    continue
+                if out_ok and leg_clear(bid, qx, qy, f.x, f.y, x, y):
+                    best = (key, ids[k])
+            if best is None:
+                d["walkway_from"] = "none"
+                if d.get("class") in ("party", "blind", "hidden"):
+                    neighbor += 1
+                    faced.append(d["id"])
+                    continue
+                ahead = False
+                for k in tree.query(q.buffer(REACH_M)).tolist():
+                    f = geoms[k].interpolate(geoms[k].project(q))
+                    if (f.x - x) * nx + (f.y - y) * ny > 0.0:
+                        ahead = True
+                        break
+                if not ahead:
+                    unreach += 1
+                    faced.append(d["id"])
+                    continue
+                blocked += 1
+                if len(first) < 5:
+                    first.append(f"{d['id']}: no walkway open to it")
+                continue
+            if model_w is not None:
+                d["model_walkway_id"] = model_w
+            d["walkway_id"] = best[1]
+            d["walkway_from"] = "model" if best[1] == model_w else "front"
+            relinked += int(model_w is not None and best[1] != model_w)
+    ok = miss == 0 and blocked == 0 and nowalk == 0
+    return {"name": "asset_access", "ok": ok, "doors": doors, "missing": miss,
+            "blocked": blocked, "no_walkway": nowalk, "facing_neighbor": neighbor,
+            "unreachable": unreach,
+            "flush": flush, "moved": moved, "entrances_relinked": relinked,
+            "first": first + [f"{i}: faces a neighbor or no walkway" for i in faced[:3]]}
+
+
+def mounts(records: dict) -> dict:
+    """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building)."""
+    n = glass = nowall = 0
+    first = []
+    for k in sorted(records):
+        m = records[k]["checks"].get("mounts") or {}
+        n += m.get("mounts", 0)
+        glass += m.get("on_glass", 0)
+        nowall += m.get("no_wall", 0)
+        if (m.get("on_glass") or m.get("no_wall")) and len(first) < 5:
+            first.append(f"{k}: {m.get('first')}")
+    return {"name": "asset_mounts", "ok": glass == 0 and nowall == 0, "mounts": n,
+            "on_glass": glass, "no_wall": nowall, "first": first}

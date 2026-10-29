@@ -3,6 +3,10 @@ pieces (`rings.convex_pieces`), each a prism from the mass's base (on a slope, t
 its plinth) to its top; a piece that is a rectangle becomes a box (center, half extents,
 yaw), any other a convex prism (its ring and z range), in the building frame, meters. Spires, masts and thin decks under 0.5 m are
 left out (nothing walks into them at street level and their boxes would only snag).
+
+AG3: a mass on the ground starts at the street front's top (`band_m`): the front under it
+(doorways, steps, recesses, plinths, arcade columns) is its own mesh and collides as drawn
+(complex collision in Unreal); a mass the front takes whole has none here.
 """
 
 from __future__ import annotations
@@ -36,14 +40,18 @@ def _box(piece):
     return (cx, cy), (ex / 2.0, ey / 2.0), yaw
 
 
-def build(brief: dict) -> dict:
+def build(brief: dict, band_m: float | None = None) -> dict:
     boxes, convex = [], []
     depth = plinth_mm(brief) / 1000.0
     for m in brief["masses"]:
         z0, z1 = m["z"]
         if z1 - z0 < 0.5 or m["role"] in SKIP_ROLES:
             continue
-        if z0 <= 0.05 and depth:
+        if z0 <= 0.05 and band_m is not None and m["shape"] == "prism":
+            if z1 <= band_m + 0.05:
+                continue                       # (the street front takes it whole)
+            z0 = band_m
+        elif z0 <= 0.05 and depth:
             z0 = -depth                        # down its plinth on a slope
         ext = RG.tidy(RG.mm_ring(m["footprint"]["exterior"]))[0]
         holes = [RG.tidy(RG.mm_ring(h))[0] for h in m["footprint"]["holes"]]
