@@ -30,4 +30,38 @@ workers, on a Mac shared with other sessions.
 
 ## Street views
 
-@@IMAGES@@
+All renders are AG6's textured street views (`assetgen materials preview`, Blender 5.2,
+Cycles at 32 samples): AG3's fronts and decals with AG1's shells, AG2's parts, AG7's streets
+and AG8's props and plants. The `street_<n>` views are the blockout's street cameras; the
+shopfront views stand on a sidewalk 3.5 m out from the row with the most shop doors in a
+district.
+
+### Greyhook
+
+| | |
+|---|---|
+| ![Shopfront row in d03](greyhook/shopfronts_d03.jpg) | ![The same row at night](greyhook/shopfronts_d03_night.jpg) |
+| A shopfront row in d03: roller shutters, grilles, counters and awnings | The same row at night: lit interiors and neon |
+| ![Shopfronts in d02](greyhook/shopfronts_d02.jpg) | ![A shop street](greyhook/street_3.jpg) |
+| Shopfronts in d02 under their signs | A shop street: grilles, recessed doors, blade signs on their plates |
+| ![Under the viaduct](greyhook/street_1.jpg) | ![A plaza corner](greyhook/street_2.jpg) |
+| A street beside a viaduct, a podium's band on the left | A plaza corner: a shuttered front with a poster behind its grille |
+| ![An avenue crossing](greyhook/street_4.jpg) | |
+| An avenue crossing, shopfronts under the takeaway and taco signs | |
+
+8K: [day](greyhook/8k/shopfronts.jpg), [night](greyhook/8k/shopfronts_night.jpg) (the d03
+row).
+
+### Cragmouth (slopes)
+
+| | |
+|---|---|
+| ![Shopfront lane](cragmouth/shopfronts_lane.jpg) | ![A shop avenue](cragmouth/street_4.jpg) |
+| Shutters down a lane beside a retaining wall | A shop avenue: neon, grilles, a median of trees |
+| ![A hillside street](cragmouth/street_1.jpg) | ![A cut street](cragmouth/street_2.jpg) |
+| A hillside street under the towers | A street cut between retaining walls |
+| ![A park over a wall](cragmouth/street_3.jpg) | |
+| A park above a retaining wall | |
+
+On a slope the band sits at the building's base (`base_m`, its main entrance), so on the
+downhill side the shopfronts stand over the blank plinth; stepping the plinth is AG5's.
