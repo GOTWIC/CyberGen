@@ -420,7 +420,10 @@ every slot and both masters would change), and frames, sills and seals map their
 UV0 in meters, not trim-sheet strips (a master path without the per-building UV offset is
 needed): AG9, or a follow-up of AG6. Awnings stay AG8's props (their posts collide as AG8's
 props do). Doors the city puts against a neighbor or before a road without a sidewalk are
-reported, for the city to change. Buildings on a deck have their fronts on the slab (AG10
+reported, for the city to change. On a slope a building's front stands at its base (the
+main entrance's ground), so on the downhill side its shopfronts sit over the blank plinth
+down to the lowest ground, and AG8's awnings there hang on the plinth: AG5 steps the
+plinths and the band with them. Buildings on a deck have their fronts on the slab (AG10
 does the rest). Mac = x86 waits for the deferred determinism check.
 
 ## AG6: materials and textures
