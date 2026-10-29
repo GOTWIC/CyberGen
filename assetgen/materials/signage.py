@@ -18,7 +18,8 @@ with `signs.json`.
 
 `signs.json` gives every sign slot its page, cell, UV rectangle (glTF convention: (0, 0) at
 the image's top left, so a quad mapped onto it shows the text upright), text, script, style
-and color, for AG8's sign meshes and the previews.
+and color. AG8's sign meshes read it (`assetgen/props/gather.py`): their flat faces show
+these cells, their neon tubes and channel letters spell the same texts in the same strokes.
 """
 
 from __future__ import annotations
@@ -180,6 +181,18 @@ def slot_texts(model, styles: dict) -> tuple[dict, dict]:
                           "color2": _pick(st["palette"], city, base, "color2")}
         slots[s.id] = key
     return slots, texts
+
+
+def ad_slots(model, slots: dict) -> dict:
+    """Every holo-ad slot to a holo ad (the second ad page), every billboard to one of the
+    first (in place; returned)."""
+    for s in model.sign_slots:
+        if s.kind == "holo_ad" and slots.get(s.id, "").startswith("ad:"):
+            k = int(slots[s.id][3:]) % ADS_PER_PAGE + ADS_PER_PAGE
+            slots[s.id] = f"ad:{k}"
+        elif s.kind == "billboard" and slots.get(s.id, "").startswith("ad:"):
+            slots[s.id] = f"ad:{int(slots[s.id][3:]) % ADS_PER_PAGE}"
+    return slots
 
 
 # --- drawing -----------------------------------------------------------------------------------
@@ -425,13 +438,7 @@ def build(model, spec: dict, out_dir: Path, density: int, log=print) -> dict:
             cells[f"ad:{k}"] = {"page": f"ads_{pg}", "uv": [c / 4, r / 4, (c + 1) / 4,
                                                             (r + 1) / 4], "holo": holo}
         save(f"ads_{pg}", img)
-    # every holo-ad slot takes a holo ad
-    for s in model.sign_slots:
-        if s.kind == "holo_ad" and slots.get(s.id, "").startswith("ad:"):
-            k = int(slots[s.id][3:]) % ADS_PER_PAGE + ADS_PER_PAGE
-            slots[s.id] = f"ad:{k}"
-        elif s.kind == "billboard" and slots.get(s.id, "").startswith("ad:"):
-            slots[s.id] = f"ad:{int(slots[s.id][3:]) % ADS_PER_PAGE}"
+    ad_slots(model, slots)
     doc = {"version": 1, "city": model.name, "density_px_m": density,
            "files": dict(sorted(files.items())), "cells": dict(sorted(cells.items())),
            "slots": dict(sorted(slots.items())),

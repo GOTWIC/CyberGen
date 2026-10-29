@@ -56,10 +56,21 @@ on a building on the building's base (its shell's floor).
 |---|---|
 | <img src="cragmouth/props_street_1.jpg" width="420"> | <img src="cragmouth/props_street_4.jpg" width="420"> |
 
+## Textured (on AG6)
+
+The props, plants and signs with AG6's library and sign pages (leaf cards, bark, painted
+metal, sign faces showing their page cells): [`textures/`](textures/README.md).
+
+| Neon Strand at night | Tree-lined avenue |
+|---|---|
+| <img src="textures/neon_strand_night.jpg" width="420"> | <img src="textures/avenue_day.jpg" width="420"> |
+
 ## Samples
 
 Each city's `props_report.txt` and `.json` are in its folder (main's specs, Greyhook
-reshaped, 3 workers on the shared Mac, the props stage alone):
+reshaped, 3 workers on the shared Mac, the props stage alone; before AG6, whose page cells
+took the signs from 5.9 M to 1.2 M unique triangles in Vesper Bay, counts in
+[`textures/`](textures/README.md)):
 
 | City | Variants | Instances | Signs | Exact props | Unique triangles | Drawn triangles | Disk | Time |
 |---|---|---|---|---|---|---|---|---|

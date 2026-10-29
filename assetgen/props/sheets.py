@@ -8,6 +8,7 @@ signs, a neon band, a billboard and a holo-ad), and one of the plant species; re
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -26,35 +27,32 @@ PROP_ORDER = ("street_light", "wall_light", "traffic_signal", "bus_stop", "bench
 
 def sign_samples(style: str) -> list[tuple[str, dict, float]]:
     """(node name, inputs, yaw so the face looks south at the sheet's camera) of a style's
-    sample signs, four of each look."""
+    sample signs, four of each look, with flat faces (a sheet has no sign pages)."""
     pal = list(MT.NEON_ERA[{"sleek": "corporate_glass", "civic": "mixed_modern",
                             "heavy": "industrial", "neon": "neon_retro",
                             "old": "heritage"}[style]])
     script = {"sleek": "kana", "civic": "hanzi", "heavy": "hangul", "neon": "kana",
               "old": "hanzi"}[style]
-    uses = ("food", "bar", "cyberware", "pawn")
+    texts = ("JADE KOI RAMEN", "NEON BAR", "CHROME OPTICS", "GOLD PAWN")
     out = []
     for k in range(4):
-        c1, c2 = pal[k % len(pal)], pal[(k + 1) % len(pal)]
-        base = {"colors": [c1, c2], "face": c2 if k % 2 else SG.FACE_COLORS[k],
-                "style": style}
-        text = SG.shop_text(uses[k], None, "sheet", style, k)
-        for look in ("lightbox", "panel", "neon"):
+        base = {"colors": [pal[k % len(pal)], pal[(k + 1) % len(pal)]], "style": style,
+                "text": texts[k], "script": "latin" if k % 2 else script}
+        for look in ("lightbox", "led", "neon", "channel"):
             out.append((f"sign.{style}.facade_{look}.v{k}",
                         {**base, "kind": "shop_sign", "mount": "facade", "w": 3.6, "h": 0.9,
-                         "text": text, "script": script, "glyphs": 3, "look": look}, -90.0))
+                         "look": look}, -90.0))
         for look in ("lightbox", "neon"):
             out.append((f"sign.{style}.blade_{look}.v{k}",
                         {**base, "kind": "shop_sign", "mount": "blade", "w": 1.2, "h": 3.2,
-                         "text": text.split()[-1], "script": script, "glyphs": 3,
-                         "look": look}, 0.0))
+                         "text": texts[k].split()[-1], "look": look}, 0.0))
         out.append((f"sign.{style}.band.v{k}",
                     {**base, "kind": "neon", "mount": "facade", "w": 1.2, "h": 8.0,
-                     "text": SG.BAND_WORDS[k + 2 * len(style)], "script": "latin"}, -90.0))
+                     "text": ("LANTERN STEPS", "NEON STRAND", "OLD TOWN", "THE STACKS")[k]},
+                    -90.0))
         out.append((f"sign.{style}.billboard.v{k}",
                     {**base, "kind": "billboard", "mount": "roof", "w": 7.0, "h": 3.2,
-                     "text": "NIMBUS" if k % 2 else "ORISON SKY", "sub": "DRINK NOVA",
-                     "two_sided": True, "script": "latin", "logo_right": bool(k % 2)}, -90.0))
+                     "two_sided": True}, -90.0))
     return out
 
 
@@ -87,24 +85,34 @@ def render(assets: Path, out: Path, blender: str | None = None, width: int = 240
     plants = sorted((assets / "props" / "plants").glob("*.glb"))
     done = []
     with tempfile.TemporaryDirectory(prefix="ag8_sheet_") as tmp:
+        mats = []
+        mj = assets / "materials.json"
+        if mj.is_file():
+            # AG6 ran: the slots' textured materials and the files they read
+            doc = json.loads(mj.read_text(encoding="utf-8"))
+            recs = {**doc["parts"].get("signs", {}), **doc["parts"].get("props", {})}
+            files = {k: str((assets / v["file"]).resolve()) for k, v in doc["textures"].items()}
+            (Path(tmp) / "mats.json").write_text(json.dumps({"materials": recs,
+                                                             "files": files}))
+            mats = ["--materials", str(Path(tmp) / "mats.json")]
         for st in ST.STYLES:
             sg = Path(tmp) / f"signs_{st}.glb"
             sg.write_bytes(signs_glb(st))
             match = []
             for k in PROP_ORDER:
                 match += ["--match", f"prop.{k}.{st}."]
-            for look in ("facade_lightbox", "facade_panel", "facade_neon", "blade_lightbox",
-                         "blade_neon", "band", "billboard"):
+            for look in ("facade_lightbox", "facade_led", "facade_neon", "facade_channel",
+                         "blade_lightbox", "blade_neon", "band", "billboard"):
                 match += ["--match", f"sign.{st}.{look}"]
             path = out / f"sheet_{st}.jpg"
             subprocess.run([str(exe), "-b", "--factory-startup", "-P", str(script), "--",
                             str(path)] + [str(v) for v in variants] + [str(sg)] + match +
-                           ["--width", str(width)],
+                           ["--width", str(width)] + mats,
                            check=True, capture_output=True)
             done.append(path)
         path = out / "sheet_plants.jpg"
         subprocess.run([str(exe), "-b", "--factory-startup", "-P", str(script), "--", str(path)]
-                       + [str(p) for p in plants] + ["--width", str(width)],
+                       + [str(p) for p in plants] + ["--width", str(width)] + mats,
                        check=True, capture_output=True)
         done.append(path)
     return done

@@ -5,7 +5,8 @@ every city, rebuilt only when its generator changes): `assetgen library [OUT]`.
   plaster, brick, panel, cladding) and its roof, in the era's look (wear, bond, joints, board
   marks, profiles); the shared building surfaces (spandrel, trim, metals, patches, timber,
   stone, roof tiles, AG2's parts); the street surfaces (asphalt by class, paint, paving
-  families, curbs, concrete, stone, steel, ballast, lawn, containers). Each set is three
+  families, curbs, concrete, stone, steel, ballast, lawn, containers); AG8's prop surfaces
+  (plastic, car paint, galvanized and rusty metal, bark, leaf clumps). Each set is three
   maps (`pbr`): base color with height, normal, occlusion-roughness-metallic with the tint
   mask. A set covers `tile_m` meters at the texel density of its band: 512 px/m for what is
   within reach of the street, 256 px/m above (roofs), so its size is a power of two.
@@ -30,7 +31,7 @@ from pathlib import Path
 
 from .. import canon as C
 
-LIB_VERSION = "ag6.1"
+LIB_VERSION = "ag6.2"
 DENSITY = 512           # px/m within reach of the street (decision 13.4)
 UPPER = 256             # px/m above it
 MAX_WORKERS = 3
@@ -320,9 +321,47 @@ STREET_SETS: dict[str, dict] = {
 }
 
 
+# AG8's props and plants: plastics, car paint, galvanized and rusty metal, bark, and leaf
+# clumps for the alpha-cut leaf cards (a card shows the whole tile: `leaves` is not tileable)
+PROP_SETS: dict[str, dict] = {
+    "plastic": {"gen": "smooth_paint", "tile_m": 1.0, "band": "street",
+                "params": {"color": "#5a5e63", "rough": 0.55, "wear": 0.15,
+                           "under": "#3a3a3a"}},
+    "car_paint": {"gen": "smooth_paint", "tile_m": 2.0, "band": "street",
+                  "params": {"color": "#8c9095", "rough": 0.22, "metallic": 0.45,
+                             "wear": 0.08, "under": "#2a2a2a"}},
+    "metal_galvanized": {"gen": "sheet", "tile_m": 1.0, "band": "street",
+                         "params": {"color": "#8c9298", "wear": 0.25, "sheet_m": 1.0,
+                                    "spangle": 0.5, "metallic": 0.85}},
+    "metal_rusty": {"gen": "smooth_paint", "tile_m": 2.0, "band": "street",
+                    "params": {"color": "#6e3a22", "rough": 0.8, "wear": 0.95,
+                               "under": "#5a2e18", "metal_under": True}},
+    "bark_furrowed": {"gen": "bark", "tile_m": 1.0, "band": "street",
+                      "params": {"kind": "furrowed", "color": "#4a3a2e"}},
+    "bark_smooth": {"gen": "bark", "tile_m": 1.0, "band": "street",
+                    "params": {"kind": "smooth", "color": "#d8d4c8", "lichen": 0.1}},
+    "bark_ringed": {"gen": "bark", "tile_m": 1.0, "band": "street",
+                    "params": {"kind": "ringed", "color": "#7a6650", "lichen": 0.15}},
+    "leaves_broad": {"gen": "leaves", "tile_m": 1.0, "band": "street",
+                     "params": {"shape": "broad", "leaf_m": 0.13, "aspect": 0.5,
+                                "twigs": 7, "per": 9}},
+    "leaves_lobed": {"gen": "leaves", "tile_m": 1.0, "band": "street",
+                     "params": {"shape": "lobed", "leaf_m": 0.13, "aspect": 0.75}},
+    "leaves_fan": {"gen": "leaves", "tile_m": 1.0, "band": "street",
+                   "params": {"shape": "fan", "leaf_m": 0.08, "aspect": 0.8,
+                              "twigs": 7, "per": 8}},
+    "leaves_needle": {"gen": "leaves", "tile_m": 1.0, "band": "street",
+                      "params": {"shape": "needle", "leaf_m": 0.13, "aspect": 1.0,
+                                 "twigs": 7, "per": 8, "rough": 0.7}},
+    "leaves_small": {"gen": "leaves", "tile_m": 1.0, "band": "street",
+                     "params": {"shape": "small", "leaf_m": 0.05, "aspect": 0.5,
+                                "twigs": 10, "per": 12}},
+}
+
+
 def sets() -> dict[str, dict]:
     out = _era_sets()
-    for d in (BUILDING_SETS, STREET_SETS):
+    for d in (BUILDING_SETS, STREET_SETS, PROP_SETS):
         for k, v in d.items():
             if k in out:
                 raise ValueError(f"set {k} twice")

@@ -665,12 +665,144 @@ def gravel(n: int, tile_m: float, p: dict) -> Surface:
                    full(n, 1.0), bump=30.0)
 
 
+def bark(n: int, tile_m: float, p: dict) -> Surface:
+    """Tree bark, u along the branch (AG8's tubes run UV0 along them): `kind` furrowed
+    (ridges and plates split by furrows), smooth (pale, with dark lenticels across the stem
+    and peeling patches) or ringed (a palm's leaf scars and fibres); lichen patches keep
+    their own grey-green (mask 0)."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#4a3a2e"))
+    kind = p.get("kind", "furrowed")
+    px, py = N.grid(n)
+    fine = grain(n, s + 1, 1)
+    if kind == "smooth":
+        dash = N.value(n, max(8, count(tile_m, 0.02)), s + 2, px, (py * F(0.15)).astype(F))
+        lent = N.smooth(0.78, 0.86, dash)
+        peel = N.smooth(0.62, 0.7, N.fbm(n, 4, s + 3, 4))
+        shade = F(1.0) + F(0.04) * fine - F(0.65) * lent - F(0.25) * peel
+        height = F(0.6) - F(0.3) * lent + F(0.1) * peel + F(0.03) * fine
+        rough = F(0.6) + F(0.2) * lent
+    elif kind == "ringed":
+        k = count(tile_m, 0.09)
+        fx = (px * F(k) + F(0.15) * N.fbm(n, 4, s + 2, 3)).astype(F)
+        t = (fx - np.floor(fx)).astype(F)
+        scar = N.smooth(0.1, 0.0, np.minimum(t, F(1.0) - t))
+        fib = N.value(n, max(8, count(tile_m, 0.01)), s + 3, px, (py * F(0.2)).astype(F))
+        shade = F(1.0) - F(0.45) * scar + F(0.15) * (fib - F(0.5)) + F(0.05) * fine
+        height = F(0.6) - F(0.5) * scar + F(0.1) * (fib - F(0.5))
+        rough = F(0.9) - F(0.0) * scar
+    else:
+        ridge = N.fbm(n, max(4, count(tile_m, 0.06)), s + 2, 4, 0.5, (px * F(0.2)).astype(F),
+                      py)
+        furrow = N.smooth(0.38, 0.62, ridge)
+        d, sid = N.cells(n, count(tile_m, 0.12), s + 3, 0.9)
+        plate = N.smooth(0.85, 0.5, d)
+        top = (furrow * (F(0.6) + F(0.4) * plate)).astype(F)
+        shade = F(0.45) + F(0.7) * top + F(0.15) * (sid - F(0.5)) + F(0.06) * fine
+        height = F(0.1) + F(0.8) * top + F(0.05) * fine
+        rough = F(0.95) - F(0.1) * top
+    lichen = N.smooth(0.7, 0.78, N.fbm(n, 6, s + 5, 4)) * F(float(p.get("lichen", 0.3)))
+    col = mix(paint(n, c, shade.astype(F)), paint(n, rgb("#7f8a6d"), (F(0.85) + F(0.3) * fine)
+                                                    .astype(F)), lichen.astype(F))
+    return Surface(col, np.clip(height, 0, 1).astype(F), np.clip(rough, 0, 1).astype(F),
+                   full(n, 0.0), (F(1.0) - lichen).astype(F), bump=6.0)
+
+
+def _r(*key) -> float:
+    """A uniform number in [0, 1) from a hash of the key (the leaves' layout)."""
+    return (N.seed_of(*key) >> 8) / 16777216.0
+
+
+def leaves(n: int, tile_m: float, p: dict) -> Surface:
+    """A clump of leaves for alpha-cut cards (AG8's trees, shrubs and ivy): twigs from the
+    middle, leaves of `shape` (broad, lobed, fan, needle, small) along them within a circle
+    of the tile, the rest cut away. The tint mask is the leaf cover, which the `leaves`
+    master also takes as opacity; a tone per leaf, a midrib and veins, a dome for the normal
+    map. Not tileable: a card shows the whole tile."""
+    from citygen import dmath as M
+    s = p["seed"]
+    shape = p.get("shape", "broad")
+    c = rgb(p.get("color", "#5b7a34"))
+    L0 = float(p.get("leaf_m", 0.1)) / tile_m
+    asp = float(p.get("aspect", 0.5))
+    twigs, per = int(p.get("twigs", 6)), int(p.get("per", 7))
+    px, py = N.grid(n)
+    col = np.zeros((n, n, 3), dtype=F) + (c * F(0.7))[None, None, :]
+    hgt = np.zeros((n, n), dtype=F)
+    cov = np.zeros((n, n), dtype=F)
+    items = []
+    for t in range(twigs):
+        a0 = 2.0 * M.PI * (t + 0.4 * _r(s, "ta", t)) / twigs
+        tl = 0.24 + 0.12 * _r(s, "tl", t)
+        for j in range(per + 1):
+            f = 0.12 + 0.88 * (j + 0.5) / (per + 1)
+            side = 0.0 if j == per else (1.0 if j % 2 else -1.0)
+            ang = a0 + side * (0.55 + 0.35 * _r(s, "la", t, j))
+            sc = (0.75 + 0.45 * _r(s, "ls", t, j)) * (1.0 - 0.25 * (1.0 - f))
+            items.append((0.5 + M.cos(a0) * tl * f, 0.5 + M.sin(a0) * tl * f, ang, sc,
+                          _r(s, "tone", t, j)))
+    for bx, by, ang, sc, tone in items:
+        L, W = L0 * sc, L0 * sc * asp
+        R = L * 1.15
+        i0, i1 = max(0, int((by - R) * n)), min(n, int((by + R) * n) + 2)
+        j0, j1 = max(0, int((bx - R) * n)), min(n, int((bx + R) * n) + 2)
+        if i0 >= i1 or j0 >= j1:
+            continue
+        ca, sa = F(M.cos(ang)), F(M.sin(ang))
+        dx = px[i0:i1, j0:j1] - F(bx)
+        dy = py[i0:i1, j0:j1] - F(by)
+        u = ((dx * ca + dy * sa) / F(L)).astype(F)
+        v = ((dy * ca - dx * sa) / F(W)).astype(F)
+        if shape == "fan":
+            r2 = u * u + (v * F(asp)) * (v * F(asp))
+            inside = (u > F(0.05)) & (r2 < F(1.0)) & (np.abs(v * F(asp)) < u * F(1.15)) & \
+                ~((np.abs(v) < F(0.06)) & (r2 > F(0.55)))
+            hw = np.maximum(u * F(1.15) / F(asp), F(0.05))
+            ribs = N.smooth(0.12, 0.0, np.abs(((v / hw) * F(6.0)) - np.round((v / hw) * F(6.0))))
+        elif shape == "needle":
+            inside = np.zeros(u.shape, dtype=bool)
+            for k in range(5):
+                b = (k - 2) * 0.22
+                cb, sb = F(M.cos(b)), F(M.sin(b))
+                uu = u * cb + v * F(asp) * sb
+                vv = (v * F(asp) * cb - u * sb) / F(0.045)
+                inside |= (uu > F(0.0)) & (uu < F(1.0)) & (np.abs(vv) < F(1.0) - uu * F(0.6))
+            hw = F(1.0)
+            ribs = np.zeros(u.shape, dtype=F)
+        else:
+            body = u * (F(1.0) - u) * F(4.0)
+            hw = np.maximum(F(0.5) * body * (F(1.15) - F(0.3) * u), F(0.0))
+            inside = (u > F(0.0)) & (u < F(1.0)) & (np.abs(v) < hw)
+            if shape == "lobed":
+                for lu, lv in ((0.45, 0.62), (0.45, -0.62), (0.2, 0.45), (0.2, -0.45)):
+                    du = (u - F(lu)) / F(0.3)
+                    dv = (v - F(lv)) / F(0.32)
+                    inside |= (du * du + dv * dv) < F(1.0)
+                hw = np.maximum(hw, F(0.6))
+            ribs = N.smooth(0.1, 0.0, np.abs(((u - np.abs(v) * F(0.9)) * F(7.0))
+                                              - np.round((u - np.abs(v) * F(0.9)) * F(7.0))))
+        rel = np.clip(np.abs(v) / np.maximum(hw, F(0.05)), F(0.0), F(1.0))
+        mid = N.smooth(0.07, 0.0, np.abs(v)) * (u > F(0.0))
+        dome = F(1.0) - rel * rel
+        shade = (F(0.78) + F(0.4) * F(tone) + F(0.18) * mid - F(0.12) * ribs
+                 - F(0.2) * (F(1.0) - dome)).astype(F)
+        lc = np.clip(c[None, None, :] * shade[:, :, None], 0.0, 1.0).astype(F)
+        sub_c = col[i0:i1, j0:j1]
+        col[i0:i1, j0:j1] = np.where(inside[:, :, None], lc, sub_c)
+        hgt[i0:i1, j0:j1] = np.where(inside, F(0.45) + F(0.4) * dome - F(0.1) * mid,
+                                     hgt[i0:i1, j0:j1])
+        cov[i0:i1, j0:j1] = np.where(inside, F(1.0), cov[i0:i1, j0:j1])
+    rough = full(n, float(p.get("rough", 0.6)))
+    return Surface(col, hgt, rough, full(n, 0.0), cov, ao=(F(0.7) + F(0.3) * hgt).astype(F),
+                   bump=1.5)
+
+
 GENERATORS = {
     "concrete": concrete, "plaster": plaster, "brick": brick, "panel": panel,
     "ribbed": ribbed, "sheet": sheet, "fabric": fabric, "wood": wood,
     "smooth_paint": smooth_paint, "brushed": brushed, "perforated": perforated,
     "louver": louver, "stone": stone, "roof": roof, "tiles": tiles, "asphalt": asphalt,
-    "grass": grass, "gravel": gravel,
+    "grass": grass, "gravel": gravel, "bark": bark, "leaves": leaves,
 }
 
 

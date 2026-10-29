@@ -20,6 +20,11 @@ slot's own color (streets).
 
 Era-varied slots (`ERA_SLOTS`: walls and roofs) have one material per era, keyed
 `<slot>@<era>`; a building's entry maps its slots to its era's (`materials`).
+
+AG8's props, plants and signs (`PROP`, `prop_set`): their slots tinted by the slot's own
+color as the streets', the leaf cards on `leaves` (the leaf clump tile, cut where it has no
+leaf), sign faces on `sign` with the city's sign page (`page.<page>`), holo-ad screens on
+`holo` with the holo ad page.
 """
 
 from __future__ import annotations
@@ -99,9 +104,48 @@ STREET: dict[str, tuple[str, str | None]] = {
     "tank": ("metal", "tank_metal"), "pad": ("concrete", "pad_concrete"),
     "crane": ("metal", "steel_painted"),
 }
-TEXTURED = ("facade", "concrete", "metal", "road", "foliage")
+# AG8's prop and plant slots (`assetgen/props/materials.py`) to (master, set or None); a
+# slot's darker tone (`<slot>.d`) takes its slot's; neon tubes (`neon.<hex>`) and lit faces
+# (`lit.<hex>`) glow untextured; sign faces show the city's sign pages (`page.<page>`,
+# master `sign`; `holopage.<page>`, master `holo`: AG6's ad pages on AG8's meshes)
+PAINTED = ("metal.dark", "metal.black", "metal.green", "metal.yellow", "metal.red",
+           "metal.blue", "metal.white", "sign.box", "sign.frame", "holo.base")
+PROP: dict[str, tuple[str, str | None]] = {
+    **{k: ("metal", "metal_painted") for k in PAINTED},
+    "metal.galv": ("metal", "metal_galvanized"), "metal.steel": ("metal", "steel_mill"),
+    "metal.chrome": ("metal", "aluminum"), "metal.bronze": ("metal", "aluminum"),
+    "metal.rust": ("metal", "metal_rusty"),
+    "concrete": ("concrete", "concrete_smooth"), "concrete.dark": ("concrete",
+                                                                     "concrete_smooth"),
+    "stone": ("concrete", "stone_dressed"), "soil": ("concrete", "ballast"),
+    "wood": ("concrete", "timber"), "wood.light": ("concrete", "timber"),
+    "wood.red": ("concrete", "timber"), "cardboard": ("concrete", "plywood"),
+    "rubber": ("concrete", "rubber"), "bag.black": ("concrete", "plastic"),
+    "paint.white": ("concrete", "trim_paint"), "net.debris": ("metal", "perforated"),
+    "sign.face": ("concrete", "plastic"), "sign.back": ("concrete", "plastic"),
+    "glass.prop": ("metal", None), "glass.dark": ("metal", None),
+    "bark.dark": ("concrete", "bark_furrowed"), "bark.grey": ("concrete", "bark_furrowed"),
+    "bark.plane": ("concrete", "bark_furrowed"), "bark.ginkgo": ("concrete",
+                                                                 "bark_furrowed"),
+    "bark.birch": ("concrete", "bark_smooth"), "bark.palm": ("concrete", "bark_ringed"),
+    "leaf.plane": ("leaves", "leaves_lobed"), "leaf.maple": ("leaves", "leaves_lobed"),
+    "leaf.oak": ("leaves", "leaves_lobed"), "leaf.ginkgo": ("leaves", "leaves_fan"),
+    "leaf.birch": ("leaves", "leaves_broad"), "leaf.linden": ("leaves", "leaves_broad"),
+    "leaf.elm": ("leaves", "leaves_broad"), "leaf.ficus": ("leaves", "leaves_broad"),
+    "leaf.ivy": ("leaves", "leaves_broad"), "leaf.pine": ("leaves", "leaves_needle"),
+    "leaf.boxwood": ("leaves", "leaves_small"),
+    "sign.white": ("neon", None), "billboard.lamp": ("emissive", None),
+}
+PROP_PREFIX: dict[str, tuple[str, str | None]] = {
+    "plastic": ("concrete", "plastic"), "fabric": ("concrete", "patch_tarp"),
+    "car": ("metal", "car_paint"), "hull": ("concrete", "pod"),
+    "foliage": ("foliage", "grass"), "light": ("emissive", None),
+    "screen": ("emissive", None), "neon": ("neon", None), "lit": ("emissive", None),
+    "holo": ("holo", None), "page": ("sign", None), "holopage": ("holo", None),
+}
+TEXTURED = ("facade", "concrete", "metal", "road", "foliage", "leaves")
 MASTERS = ("facade", "glass", "metal", "concrete", "road", "neon", "sign", "decal",
-           "opaque", "emissive", "translucent", "foliage")
+           "opaque", "emissive", "translucent", "foliage", "leaves", "holo")
 
 
 def _master_of_building(slot: str) -> tuple[str, str | None]:
@@ -115,10 +159,22 @@ def _master_of_building(slot: str) -> tuple[str, str | None]:
     return master, None
 
 
+def prop_set(slot: str) -> tuple[str, str | None]:
+    """(master, library set) of an AG8 prop, plant or sign slot."""
+    if slot.endswith(".d"):
+        slot = slot[:-2]
+    if slot in PROP:
+        return PROP[slot]
+    pre = slot.split(".", 1)[0]
+    return PROP_PREFIX.get(pre, ("concrete", "concrete_smooth"))
+
+
 def set_for(slot: str, era: str | None, part: str = "buildings") -> tuple[str, str | None]:
     """(master, library set) of a slot (for an era-varied slot, in that era)."""
     if part == "streets":
         return STREET.get(slot, ("concrete", "concrete_smooth"))
+    if part in ("props", "signs"):
+        return prop_set(slot)
     master, s = _master_of_building(slot)
     if slot in ERA_SLOTS:
         return master, f"{s}_{era or DEFAULT_ERA}"

@@ -861,6 +861,36 @@ def test_stage2_takes_assetgen_parts(staged):
                                                               for e in con["entries"])
 
 
+def test_stage2_textured_props_and_signs(staged):
+    """AG8 with AG6's library: leaf cards on the `leaves` master with their leaf tile, bark
+    and painted metal textured, sign faces on the `sign` master with the city's sign page
+    (the same texture record the materials contribution lists), holo screens on the `holo`
+    master with its holo page; the importer builds both masters."""
+    m2, _, _ = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    mats = s2["materials"]
+    leaf = [m for k, m in mats.items() if k.startswith("props.leaf.")]
+    assert leaf and all(m["master"] == "leaves" and m["textures"]["BaseTex"]["texture"]
+                        .startswith("set.leaves_") for m in leaf)
+    bark = [m for k, m in mats.items() if k.startswith("props.bark.")]
+    assert bark and all(m["textures"]["BaseTex"]["texture"].startswith("set.bark_")
+                        for m in bark)
+    assert any(k.startswith("props.metal.") and m.get("textures") for k, m in mats.items())
+    faces = {k: m for k, m in mats.items() if k.startswith("signs.page.")}
+    assert faces and all(m["master"] == "sign" for m in faces.values())
+    for k, m in faces.items():
+        page = k.split(".", 2)[2]
+        assert m["textures"]["SignTex"]["texture"] == f"city.{page}"
+        assert m["textures"]["SignTex"] == mats[f"materials.{page}"]["textures"]["SignTex"]
+    assert "leaves" in s2["masters"] and "sign" in s2["masters"]
+    con = json.loads((staged / "assets" / "unreal_contribution.signs.json").read_text())
+    faced = [e for e in con["entries"] if any(s.startswith("page.") for s in e["slots"])]
+    assert faced
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert 'elif master == "leaves":' in src and "MP_OPACITY_MASK" in src
+    assert 'tparam(m, "SignTex", "color"' in src and "HOLO_CODE" in src
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()
