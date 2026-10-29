@@ -1,0 +1,334 @@
+{
+ "city": "Greyhook",
+ "imports": {
+  "first": {
+   "ok": true,
+   "total_s": 823.5,
+   "keys": {
+    "created": 36454,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 36837,
+   "timings": {
+    "textures2": 13.24,
+    "materials2": 2.55,
+    "meshes": 11.96,
+    "meshes2": 330.26,
+    "level": 11.98,
+    "actors": 343.76,
+    "play": 2.27,
+    "save": 27.17,
+    "prune": 75.93,
+    "digests": 2.68
+   },
+   "meshes": {
+    "imported": 4619,
+    "kept": 0,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 16127,
+    "instance_actors": 19408,
+    "replaced": 5250,
+    "meshes": {
+     "imported": 29539,
+     "kept": 0,
+     "deleted": 304
+    },
+    "packs_imported": 603,
+    "materials": {
+     "created": 255,
+     "updated": 0,
+     "kept": 0,
+     "deleted": 0
+    },
+    "hulls": 2625,
+    "boxes_only": 46,
+    "complex_fallback": 0,
+    "lod_chains": 33,
+    "textures": {
+     "imported": 237,
+     "kept": 0,
+     "deleted": 0
+    }
+   }
+  },
+  "again_healing_the_pages": {
+   "ok": true,
+   "total_s": 48.3,
+   "keys": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 0,
+   "timings": {
+    "textures2": 1.92,
+    "meshes": 2.03,
+    "meshes2": 13.99,
+    "level": 16.36,
+    "prune": 9.89,
+    "digests": 2.52
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 4619,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 16127,
+    "instance_actors": 19408,
+    "replaced": 5250,
+    "meshes": {
+     "imported": 0,
+     "kept": 29539,
+     "deleted": 5
+    },
+    "packs_imported": 0,
+    "materials": {
+     "created": 0,
+     "updated": 0,
+     "kept": 255,
+     "deleted": 0
+    },
+    "hulls": 0,
+    "boxes_only": 0,
+    "complex_fallback": 0,
+    "lod_chains": 0,
+    "textures": {
+     "imported": 5,
+     "kept": 232,
+     "deleted": 0
+    }
+   }
+  },
+  "again": {
+   "ok": true,
+   "total_s": 33.6,
+   "keys": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 0,
+   "timings": {
+    "meshes": 1.68,
+    "meshes2": 13.3,
+    "level": 15.11,
+    "digests": 1.24
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 4619,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 16127,
+    "instance_actors": 19408,
+    "replaced": 5250,
+    "meshes": {
+     "imported": 0,
+     "kept": 29539,
+     "deleted": 0
+    },
+    "packs_imported": 0,
+    "materials": {
+     "created": 0,
+     "updated": 0,
+     "kept": 255,
+     "deleted": 0
+    },
+    "hulls": 0,
+    "boxes_only": 0,
+    "complex_fallback": 0,
+    "lod_chains": 0,
+    "textures": {
+     "imported": 0,
+     "kept": 237,
+     "deleted": 0
+    }
+   }
+  },
+  "ag8_on_ag6_prune_by_files": {
+   "ok": true,
+   "total_s": 72.2,
+   "keys": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 0,
+   "timings": {
+    "meshes": 1.95,
+    "meshes2": 12.93,
+    "level": 21.15,
+    "prune": 31.61,
+    "digests": 2.42
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 4619,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 16127,
+    "instance_actors": 19408,
+    "replaced": 5250,
+    "meshes": {
+     "imported": 0,
+     "kept": 25718,
+     "deleted": 8435
+    },
+    "packs_imported": 0,
+    "materials": {
+     "created": 0,
+     "updated": 0,
+     "kept": 243,
+     "deleted": 0
+    },
+    "hulls": 0,
+    "boxes_only": 0,
+    "complex_fallback": 0,
+    "lod_chains": 0,
+    "textures": {
+     "imported": 0,
+     "kept": 276,
+     "deleted": 0
+    }
+   }
+  },
+  "ag8_on_ag6_again": {
+   "ok": true,
+   "total_s": 36.0,
+   "keys": {
+    "created": 0,
+    "updated": 0,
+    "deleted": 0
+   },
+   "dirty_packages": 0,
+   "timings": {
+    "meshes": 2.04,
+    "meshes2": 12.69,
+    "level": 17.44,
+    "digests": 1.08
+   },
+   "meshes": {
+    "imported": 0,
+    "kept": 4619,
+    "deleted": 0
+   },
+   "stage2": {
+    "actors": 16127,
+    "instance_actors": 19408,
+    "replaced": 5250,
+    "meshes": {
+     "imported": 0,
+     "kept": 25718,
+     "deleted": 0
+    },
+    "packs_imported": 0,
+    "materials": {
+     "created": 0,
+     "updated": 0,
+     "kept": 243,
+     "deleted": 0
+    },
+    "hulls": 0,
+    "boxes_only": 0,
+    "complex_fallback": 0,
+    "lod_chains": 0,
+    "textures": {
+     "imported": 0,
+     "kept": 276,
+     "deleted": 0
+    }
+   }
+  }
+ },
+ "hlods": {
+  "first": 285
+ },
+ "level": {
+  "ok": true,
+  "textures": {
+   "color srgb=True TC_DEFAULT flip=False 2048": 26,
+   "normal srgb=False TC_NORMALMAP flip=True 2048": 23,
+   "mask srgb=False TC_MASKS flip=False 2048": 23,
+   "mask srgb=False TC_MASKS flip=False 1024": 51,
+   "color srgb=True TC_DEFAULT flip=False 1024": 50,
+   "normal srgb=False TC_NORMALMAP flip=True 1024": 50,
+   "color srgb=True TC_DEFAULT flip=False 512": 3,
+   "normal srgb=False TC_NORMALMAP flip=True 512": 3,
+   "mask srgb=False TC_MASKS flip=False 512": 3
+  },
+  "texture_folders": {
+   "/Game/CityGen/Core/Textures": 232,
+   "/Game/CityGen/Greyhook/Assets/Textures": 5
+  },
+  "instances_missing_textures": [],
+  "actors": 36454,
+  "doubled_keys": [],
+  "missing_actors": [],
+  "missing_instancers": [],
+  "era_slots": {
+   "ok": 3810,
+   "part ok": 94
+  },
+  "era_problems": [],
+  "building_cpd_lengths": {
+   "30": 2671
+  },
+  "part_instancers": 11207,
+  "part_instances_by_type": {
+   "window": 466168,
+   "spandrel": 89947,
+   "panel": 89939,
+   "balcony": 52825,
+   "shutter": 49888,
+   "member": 26283,
+   "ac": 25653,
+   "balconette": 6683,
+   "dish": 4907,
+   "shade": 4760,
+   "grille": 4399,
+   "louver": 3985,
+   "cap": 3623,
+   "pod": 3503,
+   "container": 873,
+   "fin": 240,
+   "column": 18
+  },
+  "part_instances": 833694,
+  "part_count_mismatches": [],
+  "s": 32.1
+ },
+ "checks": {
+  "ag6": {
+   "ok": true,
+   "lines": [
+    "streaming: 28627 of 36454 actors loaded at the start, 25981 after a teleport to (-1152, 128) (103 new)",
+    "collision: 507 of 507 traces down hit (building 252, elevated 37, junction 35, ground 32, green_roof 31, open_plaza 22), 36 of 36 roofs, 36 of 36 facades",
+    "walk: 130 m along a 132 m sidewalk path in 22 s, 100% of frames on the ground, reached its end",
+    "console: ghost flying without collision, fly flying, walk walking",
+    "fly: BP_CityGenFlyPawn_C at 50 m/s flew 194 m in 3.9 s, 27614 actors loaded where it ended"
+   ]
+  },
+  "fixes_and_ag8_on_ag6": {
+   "ok": true,
+   "lines": [
+    "streaming: 28622 of 36454 actors loaded at the start, 23716 after a teleport to (-1152, 128) (1599 new)",
+    "collision: 507 of 507 traces down hit (building 251, elevated 37, junction 34, ground 33, green_roof 31, open_plaza 22), 35 of 36 roofs, 36 of 36 facades",
+    "walk: 129 m along a 132 m sidewalk path in 24 s, 100% of frames on the ground, reached its end",
+    "console: ghost flying without collision, fly flying, walk walking",
+    "fly: BP_CityGenFlyPawn_C at 50 m/s flew 80 m in 1.6 s, 28187 actors loaded where it ended"
+   ]
+  }
+ },
+ "texture_memory": {
+  "textures": 223,
+  "full_mb": 539,
+  "resident_mb": 65,
+  "pool_mb": 1000
+ }
+}

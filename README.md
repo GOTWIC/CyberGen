@@ -128,8 +128,11 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 ```
 
-`--blockout` needs Blender 5.2. To make a new city, open Claude Code in this repo and ask
-for one (the `citygen` skill takes it from there). Editing, locking and the other commands:
+`--blockout` needs Blender 5.2. While a build runs it prints each stage on stderr (water
+and districts, roads, local streets, buildings, transit, tunnels, props, gameplay, the
+blockout and its Blender steps) with its time, the layout search's tries as they happen, and a
+bar with the time left where a stage has a count; `--quiet` turns it off. To make a new city,
+open Claude Code in this repo and ask for one (the `citygen` skill takes it from there). Editing, locking and the other commands:
 [`docs/citygen_milestones.md`](docs/citygen_milestones.md).
 
 To see the city in Unreal Engine 5.8, import it into a project (on Windows:
@@ -142,7 +145,10 @@ To see the city in Unreal Engine 5.8, import it into a project (on Windows:
 Open the project and press Play: you fly over the city with a free camera (W, A, S, D to
 move, the mouse to look, E or Space up, Q or C down). `--play walk` walks it with the
 project's own character instead, and `--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
-alone). Controls, flags and streaming: [`docs/unreal_export.md`](docs/unreal_export.md).
+alone). The import shows the same kind of progress: each stage in Unreal (packs and meshes,
+actors, saving, pruning, the HLOD build, `--check`) with a bar, the time left, and on a first
+import an estimate of the time left in all. Controls, flags and streaming:
+[`docs/unreal_export.md`](docs/unreal_export.md).
 
 While playing:
 

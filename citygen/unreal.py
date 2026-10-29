@@ -53,8 +53,11 @@ import re
 import struct
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+
+from . import progress as PG
 
 MANIFEST_VERSION = 1
 OUT_DIR = "unreal"            # BUILD_DIR/unreal (beside corporate_core_plan.json)
@@ -703,16 +706,24 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 made = True
             for p in e.get("parts") or []:
                 glb = p.get("glb") or e["glb"]
-                mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb),
-                              p.get("collision") or {"complex": True}, p.get("nanite", True),
-                              p.get("shape_preservation"))
+                # a building's parts have none (AG2: its simple collision covers its masses;
+                # a body per instance, 1.3 M in Vesper Bay, is more than play can stream)
+                pcol = p.get("collision") or ({"none": True} if base["category"] in
+                                              ("building", "landmark") else {"complex": True})
+                mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb), pcol,
+                              p.get("nanite", True), p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
                      "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [],
                      "xforms": p["xforms"], **base}
                 if p.get("ids"):
                     a["ids"] = p["ids"]          # (one citygen id per transform)
-                if (p.get("collision") or {}).get("none"):
-                    a["no_collision"] = True     # (AG8's plants)
+                if pcol.get("none"):
+                    a["no_collision"] = True     # (AG8's plants, AG2's parts)
+                if e.get("materials"):
+                    # AG6: the era's walls on AG2's parts too (panels, concrete, plaster),
+                    # as on the parts merged into the shell
+                    a["materials"] = {slot: "MI_" + asset_name(f"{part}.{m}")
+                                      for slot, m in sorted(e["materials"].items())}
                 a["type"] = p["kind"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
@@ -1068,11 +1079,158 @@ def new_project(dest: str | Path, root: Path | None = None,
     return up
 
 
+# what the stages the editor scripts report are called on the progress line
+STAGE_LABELS = {"start": "editor start", "materials": "materials and textures",
+                "meshes": "blockout meshes", "meshes2": "stage 2 packs and meshes",
+                "level": "level", "actors": "actors", "settings": "play, streaming and graphs",
+                "save": "saving", "prune": "pruning unused meshes", "digests": "digests",
+                "shutdown": "editor shutdown", "check_start": "check: editor start",
+                "check_shutdown": "check: editor shutdown",
+                "check_load": "check: loading the level",
+                "check_shots": "check: shots", "check_walk": "check: walk",
+                "check_fly": "check: flight", "hlod": "HLOD build"}
+# rough seconds of a first import's stages on the M4 Mac (AG8's Unreal check, this
+# importer) from the counts the importer reports first: the overall estimate, scaled by how
+# long the stages done so far took against theirs (actors: every spawn looks at every actor
+# already in the level)
+FIRST_IMPORT_S = {
+    "start": lambda c: 30.0,
+    "materials": lambda c: 3.0 + 0.15 * c.get("textures", 0),
+    "meshes": lambda c: 0.004 * c.get("objects", 0),
+    "meshes2": lambda c: 0.018 * c.get("meshes2", 0),
+    "level": lambda c: 0.0009 * c.get("actors", 0),
+    "actors": lambda c: 0.0025 * c.get("actors", 0) + 2e-7 * c.get("actors", 0) ** 2,
+    "settings": lambda c: 5.0,
+    "save": lambda c: 0.0012 * c.get("actors", 0),
+    "prune": lambda c: 0.003 * c.get("meshes2", 0),
+    "digests": lambda c: 0.0002 * (c.get("actors", 0) + c.get("meshes2", 0)),
+    "shutdown": lambda c: 10.0,
+}
+
+
+SPEED_DAMP_S = 300.0
+
+
+class ImportEstimate:
+    """The time an import has left in all: the importer's first line gives its counts
+    (`plan`), each stage then its rate. Only for a first import (an import over an earlier
+    one skips most of the work, in ways the counts do not show)."""
+
+    def __init__(self, progress):
+        self.p = progress
+        self.prior: dict | None = None
+        self.done: dict[str, float] = {}
+        self.cur, self.stage = None, None
+
+    def plan(self, msg: dict) -> None:
+        if msg.get("op") != "plan" or not msg.get("first"):
+            return
+        self.prior = {k: f(msg) for k, f in FIRST_IMPORT_S.items()}
+        what = ", ".join(x for x in (
+            f"{msg['packs']} stage 2 packs ({msg['meshes2']} meshes)" if msg.get("packs") else "",
+            f"{msg.get('objects', 0)} blockout objects", f"{msg.get('actors', 0)} actors") if x)
+        self.p.note(f"first import: {what}; about {PG.fmt_s(self.left())} in all (an "
+                    "estimate from this Mac's times)")
+        self.p.set_extra(self.text)
+
+    def begin(self, key, stage) -> None:
+        self.cur, self.stage = key, stage
+
+    def end(self, key, seconds) -> None:
+        self.done[key] = self.done.get(key, 0.0) + seconds
+        if key == self.cur:
+            self.cur, self.stage = None, None
+
+    def left(self) -> float:
+        prior = self.prior or {}
+        # how fast this machine goes: the stages done against their estimates (the editor's
+        # start and shutdown aside), damped by SPEED_DAMP_S so one short stage does not
+        # rescale the rest
+        big = [k for k in self.done if k not in ("start", "shutdown") and
+               prior.get(k, 0.0) >= 5.0]
+        est = sum(prior[k] for k in big)
+        act = sum(self.done[k] for k in big)
+        speed = min(5.0, max(0.2, (act + SPEED_DAMP_S) / (est + SPEED_DAMP_S)))
+        rest = sum(v * speed for k, v in prior.items() if k not in self.done and k != self.cur)
+        if self.cur in prior and self.stage is not None:
+            now = self.stage.left_s()
+            rest += now if now is not None else max(0.0, prior[self.cur] * speed -
+                                                    self.stage.elapsed())
+        return rest
+
+    def text(self) -> str:
+        left = self.left() if self.prior else 0.0
+        return f"about {PG.fmt_s(left)} left in all" if left >= 1.0 else ""
+
+
+def _pump(proc, log_file, relay, done_marker="CITYGEN_UE_DONE"):
+    """The editor's output into its log, byte for byte, its progress lines to `relay`; at
+    the script's done line the editor's shutdown begins."""
+    def on_line(line):
+        if PG.MARKER in line:
+            relay.feed(line)
+        elif done_marker in line:
+            relay.open("shutdown")
+
+    _copy(proc, log_file, on_line)
+
+
+def _copy(proc, log_file, on_line, stop=None):
+    for raw in iter(proc.stdout.readline, b""):
+        if stop is not None and stop.is_set():
+            return
+        try:
+            log_file.write(raw)
+        except ValueError:          # (the log closed: the editor is gone, see _streamed)
+            return
+        if on_line is None:
+            continue
+        try:
+            on_line(raw.decode("utf-8", "replace"))
+        except Exception as ex:
+            # the progress is only shown: a fault in it must not stop this copy, or the
+            # pipe fills and the editor blocks on its next line of output
+            print(f"progress: {ex!r}; the editor's progress is no longer shown",
+                  file=sys.stderr)
+            on_line = None
+    try:
+        log_file.flush()
+    except ValueError:
+        pass
+
+
+PIPE_GRACE_S = 15.0
+
+
+def _streamed(cmd: list[str], log: Path, on_line, timeout: float, env=None) -> int:
+    """Run `cmd` with its output copied to `log` byte for byte and each line to `on_line`
+    as it comes; its exit code. A process the editor starts (a trace or cache server) can
+    keep the pipe open after the editor exits: the copy is then given a few seconds."""
+    stop = threading.Event()
+    with open(log, "wb") as f:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+        th = threading.Thread(target=_copy, args=(proc, f, on_line, stop), daemon=True)
+        th.start()
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            stop.set()
+            th.join(10)
+            raise
+        th.join(PIPE_GRACE_S)
+        stop.set()
+    return proc.returncode
+
+
 def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
-               timeout: float = 7200.0, gui: bool = False, extra: list[str] | None = None
-               ) -> dict:
+               timeout: float = 7200.0, gui: bool = False, extra: list[str] | None = None,
+               estimate: bool = False) -> dict:
     """Run `script` in the editor on `uproject` (headless commandlet, or the full editor for
-    play-in-editor checks and renders) with the job in $CITYGEN_UE_JOB; the job's result."""
+    play-in-editor checks and renders) with the job in $CITYGEN_UE_JOB; the job's result.
+    The script's progress lines go to the active progress (`citygen.progress`), with an
+    overall estimate for a first import when `estimate`."""
     job_path = log.with_suffix(".job.json")
     job_path.write_text(json.dumps(job, indent=1) + "\n", encoding="utf-8", newline="\n")
     result_path = Path(job["result"])
@@ -1089,13 +1247,32 @@ def run_editor(root: Path, uproject: Path, script: Path, job: dict, log: Path,
                "-unattended", "-nosplash", "-nullrhi", "-stdout", "-FullStdOutLogOutput"]
     cmd += extra or []
     env = {**os.environ, "CITYGEN_UE_JOB": str(job_path)}
+    p = PG.active()
+    est = ImportEstimate(p) if estimate and not p.quiet else None    # (none shown: none)
+    relay = PG.Relay(p, STAGE_LABELS, on_begin=est.begin if est else None,
+                     on_end=est.end if est else None, on_other=est.plan if est else None)
     t = time.time()
-    with open(log, "w", encoding="utf-8", errors="replace") as f:
-        proc = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, env=env,
-                              timeout=timeout)
+
+    pre = "check_" if gui else ""          # (the full editor: the check's own start, quit)
+
+    def on_line(line):
+        if PG.MARKER in line:
+            relay.feed(line)
+        elif "CITYGEN_UE_DONE" in line:
+            relay.open(pre + "shutdown")
+
+    relay.open(pre + "start")
+    try:
+        code = _streamed(cmd, log, on_line, timeout, env)
+    except subprocess.TimeoutExpired:
+        relay.close(ok=False)
+        p.set_extra("")
+        raise
+    relay.close(ok=code == 0)
+    p.set_extra("")
     res = (json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file()
            else {"ok": False, "error": "the editor wrote no result (see the log)"})
-    res["exit_code"] = proc.returncode
+    res["exit_code"] = code
     res["wall_s"] = round(time.time() - t, 1)     # the editor's start and quit included
     res["log"] = str(log)
     result_path.write_text(json.dumps(res, indent=1) + "\n", encoding="utf-8", newline="\n")
@@ -1138,7 +1315,7 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
            "fly_speed_m_s": float(fly_speed), "view_m": float(view_m),
            "play_features": bool(plugin["ok"])}
     res = run_editor(root, up, UE_DIR / "import_city.py", job, out / "import_log.txt",
-                     timeout=timeout)
+                     timeout=timeout, estimate=True)
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
     res["play_plugin"] = plugin
@@ -1193,11 +1370,26 @@ def build_hlods(build_dir: str | Path, uproject: str | Path, engine: str | None 
            "-Builder=WorldPartitionHLODsBuilder", "-AllowCommandletRendering", "-unattended",
            "-nosplash", "-stdout", "-FullStdOutLogOutput"]
     t = time.time()
-    with open(log, "w", encoding="utf-8", errors="replace") as f:
-        proc = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
+    p = PG.active()
+    stage = p.begin(STAGE_LABELS["hlod"])
+
+    def on_line(line):
+        # the builder's count of HLOD actors, then a decision per actor (built or kept)
+        m = re.search(r"World contains (\d+) HLOD actors", line)
+        if m:
+            stage.set_total(int(m.group(1)))
+        elif "final decision:" in line:
+            stage.advance()
+
+    try:
+        code = _streamed(cmd, log, on_line, timeout)
+    except subprocess.TimeoutExpired:
+        stage.finish(ok=False)
+        raise
+    stage.finish(ok=code == 0)
     text = log.read_text(encoding="utf-8", errors="replace")
     have = re.findall(r"World contains (\d+) HLOD actors", text)
-    res = {"ok": proc.returncode == 0, "exit_code": proc.returncode, "level": level,
+    res = {"ok": code == 0, "exit_code": code, "level": level,
            "hlod_actors": int(have[-1]) if have else None,
            # the builder looks at every HLOD actor and rebuilds those whose input changed
            "rebuilt": text.count("final decision: ApproveRebuild"),

@@ -637,7 +637,7 @@ streamed in), `.` a free camera (a spectator pawn, back to the player after), Ta
 developer menu (day or night: `Night`, a dim moon, a fixed night exposure, the 48 lamps
 nearest the view as real lights); console commands `CityGen.*`; `--check` drives them
 (Python calls the actor's UFUNCTIONs) and shoots them with `shot showui`. Python cannot write
-Blueprint graphs, hence the C++. Every master is also "used with Nanite" (`USAGES`). Spec:
+Blueprint graphs, hence the C++. Spec:
 `docs/unreal_export.md`, "Play features". Results: `docs/progress/play_features/`.
 
 Greyhook reshape (its coastline made more natural and interesting: a peninsula that fans out
@@ -1018,6 +1018,16 @@ AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontpar
 - **Previews**: AG6's `assetgen materials preview` now draws fronts, decals and AG2's parts
   beside AG8's props. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
   grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.
+
+Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
+and `props` print a line per stage, a bar (n of N, time left) where the count is known and
+the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
+redrawn line on a terminal, plain lines when piped; workers never print, the parent advances;
+Blender scripts print `CGPROGRESS start|done <name>`, read by `assetgen/blenderrun.py`);
+`--quiet` or `CYBERGEN_QUIET=1` silences it. A new long stage takes a `progress=None`
+parameter and wraps its work in `P.stage(...)`, but never inside a package whose code hash
+an output records (`streets/`, `props/`, the library's `CODE`): wrap those from the caller,
+or the goldens move.
 
 ## Working preferences
 
