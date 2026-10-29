@@ -13,7 +13,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the contribution for the first assets in Unreal | Done | [`docs/progress/AG1`](progress/AG1) |
 | AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth, thumbnail uniqueness and budgets per building class | Done | [`docs/progress/AG2`](progress/AG2) |
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Done | [`docs/progress/AG3`](progress/AG3) |
-| AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
+| AG4 | Roofs and connections: roof forms and finishes, roof equipment for every roof item, helipads, green roofs, facade details, skybridges with landing doors, sky tube portals and stations | Done | [`docs/progress/AG4`](progress/AG4) |
 | AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
 | AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Done | [`docs/progress/AG6`](progress/AG6) |
 | AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
@@ -428,6 +428,114 @@ main entrance's ground), so on the downhill side its shopfronts sit over the bla
 down to the lowest ground, and AG8's awnings there hang on the plinth: AG5 steps the
 plinths and the band with them. Buildings on a deck have their fronts on the slab (AG10
 does the rest). Mac = x86 waits for the deferred determinism check.
+
+## AG4: roofs and connections
+
+**Built.** What stands on and between the buildings, in the shell builder's passes
+(`assetgen/buildings/roofs.py`, `connections.py`, `details.py`, the part kit's AG4 families
+in `roofparts.py`) and a stage of its own for the skybridges (`assetgen/skybridges.py`):
+- **roof forms** (`roofs.plan`, before the masses are built; `build_form`): a pitched roof
+  stands in the building's top floor (its attic: the mass's walls stop a floor lower), or
+  for a one-floor shed in the top of its tall floor, so it never rises over the model's
+  mass. Hip and gable (a rectangular top, the era's gable share), pagoda (curled corners),
+  mansard (any other top, or where roof items need a flat top) by the crowns `pitched` and
+  `pagoda_roof` up to 12 floors; sheds, warehouses, hangars and yards by their own gene
+  (`roof_form`: sawtooth with north glazing, gable, barrel, flat); the aerospace crown
+  `dome` a barrel vault. A ridge that would rise past the attic is flattened to fit, down to
+  8 degrees (`FLATTEST`); a shed's own form needs a rectangle, else its roof stays flat; a
+  window row that then starts on the street front's top keeps a 0.1 m sill strip.
+  Eaves by the era (under 0.6 m) only on edges nothing stands against; a one-floor storey
+  on another mass is all roof. AC units, tanks and antennas on a slope stand on steel
+  dunnage down to it;
+- **finishes and copings**: every flat roof open to the sky in its era's surface with a
+  gravel field, a paver terrace or a membrane with a walkway (gene `roof_finish`); a metal
+  or stone coping on every parapet (gene `coping`);
+- **green roofs**: M3's green areas on the building as a planted bed 0.5 m in on its soil,
+  a gravel border and a paver path through the larger ones (`green_roofs`, canonical
+  geometry from citygen's `geom`, so a court touching the edge never breaks the mesh);
+- **roof items** (`items`): an asset for every one: AC units (four styles), water tanks
+  (timber, steel, panel), antennas (whip, dish, lattice), helipads and AV pads with their
+  markings and edge lights, mechanical penthouses with exhaust stacks (merged, in the
+  building's wall tint); billboards stay
+  AG8's signs. An item under a corridor (a guideway or skybridge over the roof) is made
+  lower: a shorter antenna, a squat panel tank, a penthouse without stacks
+  (`roof_items_lowered`). Access huts on roofs of three floors or more, vents and skylights
+  by roof area, the empty billboard frame crown of the neon era where no billboard stands,
+  each only where `envelope.fits` (a skylight straddling a notch of the roof is moved);
+- **parts** (`roofparts.py`): roof equipment (`ROOF`) is always instanced
+  (`parts.INSTANCE_ALWAYS`, even once in a building), on slots that take no tint, so the
+  exporter gathers it per tile; penthouses and billboard frames merge into the shell. Every
+  part closed on integer millimeters, named by its parameters;
+- **facade details** (`details.py`, after the grammar, on solid wall, off every mount,
+  each placed only where `envelope.fits`): corner downpipes (AG3's pipe at the convex
+  corners), fire escapes on three to eight floor residential, mixed and hotel buildings and
+  shopfront rows (flats over the shops) of the eras that had them, kitchen exhaust ducts
+  for food and bar units on a back facade,
+  louvered wall vents by grime, cable conduits along a floor line by grime and low wealth,
+  CCTV cameras over doors by danger. The line: AG3 keeps its street fronts, mounts and
+  blind-wall downpipes; AG8 keeps every facade prop M6 places (AC units, wall lights, signs,
+  awnings, scaffolding, overhead cables, ivy);
+- **skybridges** (`connections.skybridge`, the skybridge stage): every model skybridge a
+  piece of its own in its frame (x along its line, 0.15 m into each facade), by kind:
+  enclosed (deck on a box girder, glazed walls between mullions, roof, lit soffit, collars),
+  stack (a floor and a spandrel band per level), open deck (M3p's podium decks: paving,
+  glass balustrades, planters), catwalk (a grating on two Warren trusses), cable (a light
+  deck under two catenaries); packs `connections/<tile>.glb`, the manifest's `skybridges`,
+  `unreal_contribution.connections.json`. In the briefs a skybridge's deck is in the
+  building frame (M13: from each one's base);
+- **landing doors** (`connections.landings_of`, `landing_ops`): the floor a skybridge lands
+  on is a door row of its mass (sill 150 mm), the landing an opening of the bridge's width
+  with a frame and two glazed leaves (at least 0.9 m wide for a catwalk or cable bridge,
+  into a corner pier where the bridge lands there); a wall too thin for windows still takes
+  the door where its mass reaches 0.5 m in behind it (`shell._depth`: a notch elsewhere in
+  the footprint does not make the wall thin), and a mechanical floor a bridge lands on keeps
+  its windows.
+  A bridge landing at the ground floor (on M13's slopes, an open deck from a building
+  standing higher) meets the street front; a deck off every floor line of its mass (M3's
+  floor grids apart) is reported, not failed (`landing_records`, `why`);
+- **portals and sky stations** (`connections.portals`, `station`, `mouth_frames`): where a
+  sky tube passes through a tower, every mass across the portal's floors is split there and
+  its portal storey cut by the tube's corridor (its top line from M5, 1 m clear round the
+  7 m section, a sky station's platform footprint); the corridor's walls lined, a lit frame
+  at each mouth that has room for it, the station's platforms on both sides of the tube
+  with tactile edges. A tube that meets no mass at the portal's height (between a
+  megabuilding's towers) has nothing to cut. No balcony or other part standing out of a
+  wall comes within the tube's clear radius (`connections.in_tube`), as none enters a
+  skybridge's corridor (`parts_off_portals`, `parts_off_bridges`);
+- **decks and courts**: M3p's tower decks paved with glass balustrades and planters; a
+  court on the ground paved, planters at its corners, galleries at the podium's floor
+  lines;
+- **briefs** (`BRIEF_VERSION` 2): `clearances` (the corridors of skybridges, guideways with
+  their trains and sky tubes passing near the building, in its frame), portals with their
+  tube's lines, diameter, station and platform.
+
+**Checks** (`asset_checks`): `asset_clearance` (nothing a building adds inside a corridor,
+every portal open; `envelope.clearances`; a tower's own sky tube is held to its portal's
+test, the corridor's margin there being the lining, frame and platforms), `asset_roofs` (every roof item an asset, every
+green roof of 4 m2 or more built, every portal cut or passing, every sky station with its
+platforms), `asset_landings` (a door wherever a skybridge meets a floor line),
+`asset_skybridges` (every skybridge a closed mesh); the envelope check knows roof
+equipment (on a roof or inside the masses), courts, copings; a mount in a landing door is
+counted apart (`in_landing`: M6 does not know where the bridges land). Every detail is
+placed only where `envelope.fits` (its family's reach and its slots', as it may be merged),
+and AG4's detail slots reach as their families. AG3 fix: a door `rehome` moves never slides
+along its facade into a court (one Vesper Bay unit door, blocked by a neighbor there).
+
+**Exporter** (`docs/unreal_export.md`, "From AG4"): roof equipment one entry per tile
+(`roofs.<tile>`, parts only, a building id per instance), buildings' `replaces` the
+blockout green-roof objects whose every green area they built (`green_replaces`), the
+skybridges' contribution (an entry per skybridge by id, complex collision, `links`), a
+stage 2 entry's `links` on its actor and tagged `cg.link=` by the importer
+(`citygen/unreal.py`, `citygen/ue/import_city.py`); tests without Unreal. AG6: every new
+slot in the catalog; the connections packs in the texel density check and `materials.json`.
+Previews: `assetgen materials preview` draws the skybridges and leaves out the blockout's
+skybridges and replaced green roofs; `--views city_full` every shell at once, textured. Its
+import of a whole city was quadratic in Blender (the importer's temporary objects and the
+replaced materials removed one by one, and AG6's materials set on slots linked to the mesh,
+each of which walks every object of the file): they go in one batch per import now, and
+the materials on the object (`ag6_preview.import_glb`).
+
+RESULTS_PLACEHOLDER
 
 ## AG6: materials and textures
 

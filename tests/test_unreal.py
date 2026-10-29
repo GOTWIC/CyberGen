@@ -822,7 +822,9 @@ def test_stage2_from_assetgen(staged, manifest):
     assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
     assert set(blds) <= set(s2["replaced"])
     assert s2["counts"]["replaces_missing"] == 0
-    assert all(e["asset"] == U.asset_name(e["node"]) for e in con["entries"])
+    # (AG4's roof equipment entries, `roofs.<tile>`, are instanced parts with no node)
+    assert all(e["asset"] == U.asset_name(e["node"]) for e in con["entries"] if "node" in e)
+    assert all("node" in e or e["kind"] == "roof_equipment" for e in con["entries"])
     for p in s2["packs"]:
         assert p["glb"], p["folder"]
         nodes = {U.asset_name(n["name"]) for n in U.read_glb_json(staged / p["glb"])["nodes"]
