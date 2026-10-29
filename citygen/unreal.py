@@ -668,6 +668,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     a["ids"] = p["ids"]          # (one citygen id per transform)
                 if (p.get("collision") or {}).get("none"):
                     a["no_collision"] = True     # (AG8's plants)
+                if e.get("materials"):
+                    # AG6: the era's walls on AG2's parts too (panels, concrete, plaster),
+                    # as on the parts merged into the shell
+                    a["materials"] = {slot: "MI_" + asset_name(f"{part}.{m}")
+                                      for slot, m in sorted(e["materials"].items())}
                 a["type"] = p["kind"]
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)

@@ -708,6 +708,15 @@ def delete_assets(paths):
     return len(paths) - sum(1 for p in left if EAL.does_asset_exist(p.split(".")[0]))
 
 
+def own_textures(mi, names):
+    """Whether the instance `mi` holds a texture of its own for every parameter in `names`
+    (one deleted under it leaves the parameter empty; reading it through
+    get_material_instance_texture_parameter_value would give the master's default)."""
+    have = {str(v.parameter_info.name): v.parameter_value
+            for v in mi.get_editor_property("texture_parameter_values")}
+    return all(have.get(n) is not None for n in names)
+
+
 class Importer:
     def __init__(self, man, build_dir):
         self.man = man
@@ -916,9 +925,11 @@ class Importer:
         want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
                 for m in p["meshes"]}
         want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
-        mats = f"{folder}/Materials/"
+        # (the city's texture pages too: textures2 prunes them; they were deleted here after
+        # every import, under the sign instances that use them)
+        keep = (f"{folder}/Materials/", f"{folder}/Textures/")
         stale = [a for a in EAL.list_assets(folder, recursive=True)
-                 if a.split(".")[0] not in want and not a.startswith(mats)]
+                 if a.split(".")[0] not in want and not a.startswith(keep)]
         self.stats["stage2"]["meshes"]["deleted"] += delete_assets(stale)
 
     # -- stage 2 (assetgen's layer: buildings, streets) --
@@ -1003,7 +1014,7 @@ class Importer:
             key = p.get("key", p["slot"])
             if EAL.does_asset_exist(path):
                 mi = unreal.load_asset(path)
-                if meta(mi, HASH_TAG) == h:
+                if meta(mi, HASH_TAG) == h and own_textures(mi, p.get("textures") or {}):
                     st["kept"] += 1
                     self.mats2[(p["part"], key)] = mi
                     self.mi2[p["asset"]] = mi
@@ -1370,6 +1381,11 @@ class Importer:
                     for xf in r["xforms"]], False, False)
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
+                for slot, asset in sorted((r.get("materials") or {}).items()):
+                    mi = self.mi2.get(asset)
+                    i = comp.get_material_index(unreal.Name(slot))
+                    if mi is not None and i >= 0:
+                        comp.set_material(i, mi)
                 if r.get("no_collision"):
                     comp.set_collision_profile_name("NoCollision")
                 a.set_actor_location_and_rotation(loc, rot, False, False)

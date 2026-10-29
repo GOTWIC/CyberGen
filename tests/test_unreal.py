@@ -654,6 +654,21 @@ def test_stage2_textures(build, manifest, tmp_path):
     f3["buildings"]["entries"][0]["materials"] = {}
     m4 = U.build_manifest(_with_contributions(build, tmp_path / "t3", f3))[0]
     assert U.manifest_changes(m2, m4) == {"created": [], "updated": [blds[0]], "deleted": []}
+    # AG2's instanced parts of that building take its era's instances too, as the parts
+    # merged into its shell do (the importer sets them on the HISM, as on the actor); the
+    # importer keeps the city's texture pages out of the mesh prune and gives an instance
+    # whose texture was deleted under it its textures again
+    f5 = copy.deepcopy(fake)
+    f5["buildings"]["entries"][0]["parts"] = [
+        {"kind": "part.panel.infill", "glb": "parts/t+00+00.glb",
+         "node": "part.panel.infill.std.h01", "asset": "part_panel_infill_std_h01",
+         "count": 1, "triangles": 12, "xforms": [[1.0, 2.0, 3.0, 0.0]]}]
+    m5 = U.build_manifest(_with_contributions(build, tmp_path / "t6", f5))[0]
+    (pi,) = [x for x in m5["stage2"]["instances"] if x["entry"] == blds[0]]
+    assert pi["materials"] == a[blds[0]]["materials"]
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert 'f"{folder}/Textures/"' in src and "own_textures(mi, " in src
+    assert "comp.get_material_index(unreal.Name(slot))" in src
     bad = copy.deepcopy(fake)
     bad["buildings"]["materials"]["brick@heritage"]["textures"]["OrmTex"] = "set.nope.orm"
     with pytest.raises(ValueError, match="no texture set.nope.orm"):
