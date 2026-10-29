@@ -138,6 +138,21 @@ def test_a_building_on_a_deck_has_its_front_on_the_deck():
     assert all(abs(b["center"][2] - b["extent"][2] - 13.0) < 1e-6 for b in col["boxes"])
 
 
+def test_a_band_too_low_for_a_door_stays_closed():
+    """A platform 1.4 m high (a temple's base, a loading dock's plinth) takes no door cut
+    into its band: its entrance's door hangs flush on it, and both meshes close."""
+    br = brief_of([mass(rect(-10.0, -6.0, 10.0, 6.0), 0.0, 1.4, 1),
+                   mass(rect(-7.0, -4.0, 7.0, 4.0), 1.4, 10.0, 2, role="hall")],
+                  btype="building.temple_hall")
+    S = ([-10.0, -6.0], [10.0, -6.0])
+    br["entrances"] = [_entrance(0, 10.0, "main", *S)]
+    res = SH.build(br, GN.make(br))
+    (door,) = res["doors"]
+    assert door["flush"] and door["h"] <= 1400 and res["checks"]["access"]["missing"] == 0
+    shell, front = MB.split(res["arrays"])
+    assert _closed(shell) and _closed(front)
+
+
 def test_mounts_sit_on_solid_wall():
     br = row()
     res = SH.build(br, GN.make(br))

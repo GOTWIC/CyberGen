@@ -451,7 +451,9 @@ class Band:
             w, hh, d = DOOR_W["service"], min(2300, H - HEAD_GAP - 50), \
                 max(DOOR_R["service"], self.reveal)
         if hh < 1950:
-            hh = max(H - HEAD_GAP, 1500)
+            hh = H - HEAD_GAP
+            if hh < 1500:
+                return None                # (a band too low for a door: a platform, a dock)
         lo = z0 + (DOCK_Z if dk == "dock" else 0)
         for m0, m1, za, _ in mounts:
             # (a sign or awning low over it: the door's head stops under it)
@@ -1022,10 +1024,10 @@ def leftovers(sb) -> None:
                 continue
             px, py = ax + fa.ux * t, ay + fa.uy * t
             d = math.hypot(px - x, py - y)
-            # (an open wall first: a door against a neighbor or into a court only where
-            # there is no other)
+            # (a wall a door fits under and open first: a door against a neighbor, into a
+            # court or on a low platform only where there is no other)
             wall = fa.cls(t, ms["z0"] + 1200) in ("party", "hidden", "blind") + INNER
-            key = (wall, round(d), fa.j if fa.j is not None else -1, t)
+            key = (hh < 1800, wall, round(d), fa.j if fa.j is not None else -1, t)
             if best is None or key < best[0]:
                 best = (key, fa, ms, t)
         if best is None:
@@ -1316,7 +1318,9 @@ def mount_check(sb) -> dict:
     """Every mount on a panel or pier, never on glass (scope 9): each sign slot on a facade,
     each mounted prop on the wall (`on_wall`) and each facade plant, at its point (s, z) on
     its brief edge, outside every opening cut there. A mount on an edge the shell tidied
-    away (a spike of the ring) is counted apart (`tidied`)."""
+    away (a spike of the ring) or over or under every wall of its edge (a shop sign over a
+    low building under an M14 deck, a street's sign under a building on the deck) is counted
+    apart (`tidied`, `off`)."""
     br = sb.br
     items = []
     for sl in br["sign_slots"]:
@@ -1331,13 +1335,20 @@ def mount_check(sb) -> dict:
         at = pl.get("at")
         if at is not None and at["d"] <= 0.5 and pl["type"].endswith("facade_greenery"):
             items.append(("greenery", pl["id"], at, pl["position"][2] + 0.5))
-    bad, nowall, tidied = [], 0, 0
-    built = {fa.j for fa, _ in sb.all_facades}
+    bad, nowall, tidied, off = [], 0, 0, 0
+    span: dict[int, tuple[int, int]] = {}
+    for fa, ms in sb.all_facades:
+        lo, hi = span.get(fa.j, (ms["z0"], ms["z1"]))
+        span[fa.j] = (min(lo, ms["z0"]), max(hi, ms["z1"]))
     for kind, iid, at, z in items:
         s = int(round(at["s"] * 1000))
         zz = int(round(z * 1000))
-        if at["edge"] not in built:
+        if at["edge"] not in span:
             tidied += 1                     # (a spike of the ring: no wall stands there)
+            continue
+        lo, hi = span[at["edge"]]
+        if not lo - 500 <= zz <= hi + 500:
+            off += 1                        # (over or under every wall of its edge)
             continue
         if _facade_at(sb, at["edge"], s, zz) is None:
             nowall += 1
@@ -1347,7 +1358,7 @@ def mount_check(sb) -> dict:
                for a, b, lo, hi in sb.opened.get(at["edge"], ())):
             bad.append(f"{kind} {iid}")
     return {"mounts": len(items), "on_glass": len(bad) - nowall, "no_wall": nowall,
-            "tidied": tidied, "first": bad[:3]}
+            "tidied": tidied, "off": off, "first": bad[:3]}
 
 
 def door_check(sb) -> dict:

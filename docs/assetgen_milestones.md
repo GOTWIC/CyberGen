@@ -304,7 +304,8 @@ street-front families in `frontparts.py`):
   room and no podium canopy), service, loading dock (opening 1.2 m up, steel lip, bumpers,
   seal) or roll-up door, garage mouth (height bar, barrier arm, half-raised grille), yard
   gate. A door that cannot be cut where the model has it shifts up to 1.2 m along the
-  facade, then into the corner piers (a short facade), else hangs flush on the wall; a main
+  facade, then into the corner piers (a short facade), else hangs flush on the wall (on a
+  band too low for a door, a platform or a dock's plinth, always); a main
   entrance between two units keeps room for its own door (the shopfronts stop short: a
   lobby between the shops); a unit or entrance the model put on a wall a neighbor stands
   against, or on a facade too short for it, goes to the nearest facade of its mass with room
@@ -337,9 +338,11 @@ street-front families in `frontparts.py`):
   reported, not failed: the model put the entrance there) and
   `asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never
   on glass, `fronts.mount_check`; one on an edge the shells tidy away, a spike of the lot's
-  ring, is reported apart); `asset_budget` counts 1,500 triangles per ground-floor unit and
-  per street front on top of section 11's estimate;
-- **build** (`build.py`, `GEN_VERSION` ag3.4): the front node beside the shell in the tile
+  ring, or over or under every wall of its edge, a shop sign over a low building under an
+  M14 deck, is reported apart); on a deck city the access check's paths are blocked only by
+  buildings of the door's own level; `asset_budget` counts 1,500 triangles per ground-floor
+  unit and per street front on top of section 11's estimate;
+- **build** (`build.py`, `GEN_VERSION` ag3.5): the front node beside the shell in the tile
   pack, the decal mesh per tile, the record's `front` (node, triangles, slots, `band_m`),
   `doors`, `checks.mounts`, `checks.doors`, `level` on a deck, and the stats' units and
   decals; materials: every AG3 slot in AG6's catalog (doors, steps, steel, rubber, roll-up

@@ -275,6 +275,19 @@ street piece its textured materials, which the Unreal exporter imports with the 
 `assetgen materials preview` renders them in Blender, `assetgen materials board` a board of
 each era's surfaces. More: [`docs/progress/AG6`](docs/progress/AG6).
 
+| Shopfronts in Greyhook's old town (8K) | The same street by night (8K) |
+|---|---|
+| <img src="docs/progress/AG3/greyhook/8k/shopfronts.jpg" width="420"> | <img src="docs/progress/AG3/greyhook/8k/shopfronts_night.jpg" width="420"> |
+
+Every building's street front: a shopfront for each shop by what it sells (bars, food,
+clinics, arcades, clubs, laundromats), recessed with its door, transom, riser and fascia, a
+shutter or grille where the district is rough; lobby doors with steps and canopies, loading
+docks, roll-up doors, garage mouths and yard gates at the other entrances; solid wall under
+every sign, awning, AC unit and lamp; fire walls with downpipes and murals; grime, leaks,
+rust, posters and graffiti. In Unreal the street front collides as drawn, so doorways and
+steps can be walked, and every door is listed with the walkway it opens to. More:
+[`docs/progress/AG3`](docs/progress/AG3).
+
 <img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
 
 Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).

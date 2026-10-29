@@ -301,6 +301,7 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     own = {i: k for k, i in enumerate(fids)}
     ftree = shapely.STRtree(feet) if feet else None
     level = {b.id: int(getattr(b, "level", 0) or 0) for b in model.buildings}
+    flev = [level.get(i, 0) for i in fids]
     miss = blocked = nowalk = relinked = neighbor = unreach = 0
     doors = flush = moved = 0
     first = []
@@ -311,6 +312,8 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             return True
         seg = LineString([(ax, ay), (bx, by)])
         for i in ftree.query(seg, predicate="intersects").tolist():
+            if flev[i] != level.get(bid, 0):
+                continue                       # (M14: under or on a deck, not in the way)
             if fids[i] != bid:
                 return False
             # its own building only near the door (an arcade, a recess)
@@ -401,8 +404,9 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
 def mounts(records: dict) -> dict:
     """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building).
     A mount on an edge of the footprint the shells tidy away (a spike or sliver of the lot's
-    ring: no wall stands there) is counted apart, the city's to change."""
-    n = glass = nowall = tidied = 0
+    ring: no wall stands there) or over or under every wall of its edge (M14's decks) is
+    counted apart, the city's to change."""
+    n = glass = nowall = tidied = off = 0
     first = []
     for k in sorted(records):
         m = records[k]["checks"].get("mounts") or {}
@@ -410,7 +414,9 @@ def mounts(records: dict) -> dict:
         glass += m.get("on_glass", 0)
         nowall += m.get("no_wall", 0)
         tidied += m.get("tidied", 0)
+        off += m.get("off", 0)
         if (m.get("on_glass") or m.get("no_wall")) and len(first) < 5:
             first.append(f"{k}: {m.get('first')}")
     return {"name": "asset_mounts", "ok": glass == 0 and nowall == 0, "mounts": n,
-            "on_glass": glass, "no_wall": nowall, "on_tidied_edge": tidied, "first": first}
+            "on_glass": glass, "no_wall": nowall, "on_tidied_edge": tidied,
+            "off_its_walls": off, "first": first}
