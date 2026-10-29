@@ -252,21 +252,20 @@ Remove-Item Env:CITYGEN_UE_FAST
 ## What is left in the exporter
 
 - **The Nanite builds** are now most of the import (the packs' import and build: 364 s of
-  pair 2's 814 s in the editor). They run on every core, so a loaded Mac shows it most.
-- **Memory:** with the packs in flight at once the import's editor peaks at 42 to 43 GB (the
-  engine's count of its footprint; main 38.5 GB), on this 24 GB Mac mostly in swap. A machine
-  with less memory may want fewer imports in flight than Interchange's default (half the
-  worker threads).
+  pair 2's 814 s in the editor, 138 s of 400 s on #54). They run on every core, so a loaded
+  Mac shows it most.
+- **Memory:** the import's editor peaks at 35 GB on #54 (42 to 43 GB in pairs 1 and 2, under
+  heavy load; the engine's count of its footprint) against main's path's 33.4 GB, on this 24 GB
+  Mac mostly in swap. It is the city's meshes the import holds, not the imports in flight (see
+  "On main with #54"); letting stage 2's meshes go once saved could lower it on either path (not tried).
 - **Hulls on the game thread** (71 to 86 s): GeometryScript's convex decomposition per
   building mesh, one at a time. Hulls in the packs would remove it (below).
 - **Saving the meshes** (83 to 92 s for 28k packages) and **the actors** (World Partition
   writes a package per actor: 39k files, now saved along the way).
-- **The prune** still takes most of a minute to delete 5 assets: a garbage collection over
-  all the import holds, then the delete's own search for references. Those 5 are the city's
-  sign pages, which it should not delete at all (below); with that fixed, a first import has
-  nothing to prune.
-- **A reimport's prune** with many meshes to delete can be far slower: one in another
-  session on this Mac ran past 90 minutes (not profiled here).
+- **The prune** took most of a minute in pairs 1 and 2 to delete 5 assets (the city's sign
+  pages, below); with #54's fix a first import has nothing to prune (1.5 s on #54).
+- **A reimport's prune** with many meshes to delete was far slower (one in another session ran
+  past 90 minutes); #54 deletes more than 500 by their files on an empty level.
 - **A crashed editor's crash reporter** (`CrashReportClient -Unattended`) spun a core until
   stopped, hours after the crash; an import that crashes could stop it.
 - **A fresh engine install compiles its shaders** the first time a project opens in the full
