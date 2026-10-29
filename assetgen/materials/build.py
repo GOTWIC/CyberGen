@@ -134,7 +134,7 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
     doc["textures"] = dict(sorted(doc["textures"].items()))
     wrote += int(MF.write_if_changed(out / "materials.json", MF.dumps(doc)))
     t2 = time.perf_counter()
-    with P.stage("materials: texel density", total=len(CK.packs(out))) as st:
+    with P.stage("materials: texel density", total=CK.packs(out)) as st:
         dens = CK.texel_density(out, lib, density, upper, step=st.advance)
     t3 = time.perf_counter()
     bud = CK.budget(LB.disk(lib), signs, out)
