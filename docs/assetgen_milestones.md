@@ -533,7 +533,9 @@ skybridges and replaced green roofs; `--views city_full` every shell at once, te
 import of a whole city was quadratic in Blender (the importer's temporary objects and the
 replaced materials removed one by one, and AG6's materials set on slots linked to the mesh,
 each of which walks every object of the file): they go in one batch per import now, and
-the materials on the object (`ag6_preview.import_glb`).
+the materials on the object wherever no other object draws its mesh (AG2's parts and AG8's
+families go through geometry nodes, which take the mesh's materials;
+`ag6_preview.import_glb`).
 
 RESULTS_PLACEHOLDER
 

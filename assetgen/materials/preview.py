@@ -201,8 +201,11 @@ def _blender(job: dict, script: str, blender: str | None, od: Path) -> dict:
         json.dump(job, f)
         jp = f.name
     sp = Path(__file__).resolve().parent.parent / "blender" / script
-    proc = subprocess.run([exe, "-b", "--factory-startup", "-P", str(sp), "--", jp],
-                          capture_output=True, text=True)
+    try:
+        proc = subprocess.run([exe, "-b", "--factory-startup", "-P", str(sp), "--", jp],
+                              capture_output=True, text=True)
+    finally:
+        Path(jp).unlink(missing_ok=True)        # (a whole city's job is ~90 MB)
     for line in proc.stdout.splitlines():
         if line.startswith("[ag6"):
             print(line, flush=True)
