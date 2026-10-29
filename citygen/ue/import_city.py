@@ -75,7 +75,7 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "4"                 # AG6: textured masters
+STAGE2_VERSION = "5"                 # AG6: textured masters; AG8: leaves, textured holo
 TEXTURE_VERSION = "1"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
@@ -521,6 +521,45 @@ def textured_surface(m, master, defaults):
     m.set_editor_property("two_sided", master == "foliage")
 
 
+LEAF_CODE = """
+float3 c = Base.rgb;
+c = lerp(c, c * Tint / max(Ref, 0.02), Orm.a);
+return c * (0.35 + 0.65 * Orm.r);
+"""
+HOLO_CODE = "return Tint * Strength * lerp(float3(1, 1, 1), Tex.rgb * 2.0, Textured);"
+HOLO_OPACITY_CODE = """
+float l = max(Tex.r, max(Tex.g, Tex.b));
+return Opacity * lerp(1.0, 0.25 + 0.75 * l, Textured);
+"""
+
+
+def leaves_master(m, defaults):
+    """AG8's leaf cards: a leaf clump tile on UV0 / TileM, the tint over its leaves, cut
+    where the tile has no leaf (the tint mask, ORM alpha), two-sided."""
+    MP = unreal.MaterialProperty
+    col = tint_color(m, -1400, -200)
+    uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2100, 200, coordinate_index=0)
+    tile = sparam(m, "TileM", -2100, 300, 1.0)
+    uvd = expr(m, unreal.MaterialExpressionDivide, -1950, 250)
+    link(uv0, "", uvd, "A")
+    link(tile, "", uvd, "B")
+    base = tparam(m, "BaseTex", "color", -1800, 100, uvd, defaults)
+    nrm = tparam(m, "NormalTex", "normal", -1800, 400, uvd, defaults)
+    orm = tparam(m, "OrmTex", "mask", -1800, 700, uvd, defaults)
+    ref = vparam(m, "RefColor", -1500, 900, (0.2, 0.2, 0.2))
+    c = custom(m, -1000, 0, LEAF_CODE, ["Base", "Orm", "Tint", "Ref"], cmot(F3), "CgLeaf")
+    for a, out, b in ((base, "RGBA", "Base"), (orm, "RGBA", "Orm"), (col, "", "Tint"),
+                      (ref, "", "Ref")):
+        link(a, out, c, b)
+    MEL.connect_material_property(c, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(orm, "G", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(nrm, "RGB", MP.MP_NORMAL)
+    MEL.connect_material_property(orm, "A", MP.MP_OPACITY_MASK)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    m.set_editor_property("opacity_mask_clip_value", 0.5)      # as the Blender preview cuts
+    m.set_editor_property("two_sided", True)
+
+
 def glass_master(m, defaults):
     """Opaque reflective glass with interior mapping (ROOM_CODE, GLASS_CODE)."""
     MP = unreal.MaterialProperty
@@ -575,8 +614,9 @@ def stage2_master(master, defaults=None):
     """/Game/CityGen/Core/M_Cg<Master>. AG6's textured masters: `facade`, `metal`,
     `concrete`, `foliage`, `road` (textured_surface), `glass` (interior mapping), `neon`
     (emissive with Night), `sign` (an atlas page, emissive with Night, masked), `decal`
-    (deferred, a cell of the decal atlas); AG1's and AG7's `translucent` (blended,
-    two-sided; `holo` the same with an emissive strength, AG8's holo-ads), `opaque` and
+    (deferred, a cell of the decal atlas), `leaves` (AG8's leaf cards: masked by the leaf
+    cover, two-sided); AG1's and AG7's `translucent` (blended, two-sided; `holo` the same
+    with an emissive strength and AG6's holo ad page, AG8's holo-ads), `opaque` and
     `emissive` (flat, an emissive strength). Each takes its color
     from tint_color. Made, or rebuilt in place when of an older STAGE2_VERSION (its
     instances keep it as their parent)."""
@@ -595,6 +635,8 @@ def stage2_master(master, defaults=None):
         textured_surface(m, master, defaults)
     elif master == "glass":
         glass_master(m, defaults)
+    elif master == "leaves":
+        leaves_master(m, defaults)
     elif master == "sign":
         uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 0, coordinate_index=0)
         tex = tparam(m, "SignTex", "color", -700, 0, uv0, defaults)
@@ -640,15 +682,27 @@ def stage2_master(master, defaults=None):
                   parameter_name="Opacity", default_value=0.35 if master == "translucent"
                   else 0.45)
         MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
-        MEL.connect_material_property(op, "", MP.MP_OPACITY)
         if master == "holo":
-            # (AG8's holo-ads: they glow)
+            # (AG8's holo-ads: they glow, showing AG6's holo ad page where Textured)
+            uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 300,
+                       coordinate_index=0)
+            tex = tparam(m, "SignTex", "color", -700, 300, uv0, defaults)
+            txd = sparam(m, "Textured", -700, 620, 0.0)
             emi = expr(m, unreal.MaterialExpressionScalarParameter, -300, 540,
                        parameter_name="Emissive", default_value=0.0)
-            em = expr(m, unreal.MaterialExpressionMultiply, -150, 500)
-            link(col, "", em, "A")
-            link(emi, "", em, "B")
+            em = custom(m, -150, 500, HOLO_CODE, ["Tint", "Strength", "Tex", "Textured"],
+                        cmot(F3), "CgHolo")
+            for a, out, b in ((col, "", "Tint"), (emi, "", "Strength"), (tex, "RGBA", "Tex"),
+                              (txd, "", "Textured")):
+                link(a, out, em, b)
             MEL.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+            oc = custom(m, -150, 640, HOLO_OPACITY_CODE, ["Opacity", "Tex", "Textured"],
+                        cmot(F1), "CgHoloOpacity")
+            for a, out, b in ((op, "", "Opacity"), (tex, "RGBA", "Tex"), (txd, "", "Textured")):
+                link(a, out, oc, b)
+            MEL.connect_material_property(oc, "", MP.MP_OPACITY)
+        else:
+            MEL.connect_material_property(op, "", MP.MP_OPACITY)
         m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
         m.set_editor_property("two_sided", True)
         mode = getattr(unreal.TranslucencyLightingMode, "TLM_SURFACE", None)

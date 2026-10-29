@@ -8,8 +8,10 @@ pulls its nearest node, each pulled node grows one step toward the mean of its p
 points within the kill radius of a node are removed, until none is left or none can be
 reached. Branch radii follow the pipe model ($r^2 = \\sum r_{child}^2$) from a tip radius,
 scaled so the trunk has the species' base radius. Chains of nodes become tubes (6 sides on
-the trunk and limbs, 4 on branches, none under 1.5 cm), leaves are small flat polygons in
-clusters along the twigs.
+the trunk and limbs, 4 on branches, none under 1.5 cm), leaves are alpha-cut cards along
+the twigs (two crossed quads each, showing a whole tile of AG6's leaf clumps of the
+species' leaf shape: `leaves_<shape>`), as are pine needles, the loose leaves of shrubs and
+ivy; palms, sedum, scrub and the body of a shrub are solid foliage.
 
 Determinism: the attraction points and every draw come from blake2b hashes of (species,
 variant, purpose); the distances are numpy elementwise products and sums of three terms in a
@@ -29,7 +31,7 @@ import numpy as np
 from citygen import dmath as M
 
 from . import styles as ST
-from .shapes import Mesh, add, cross, fan, lathe, mul, norm, ring, sub, tube
+from .shapes import Mesh, add, cross, fan, lathe, mul, norm, quad_out, ring, sub, tube
 
 # crown radius, height (m) of each species' variants before the instance scales them
 BASE = {"plane": (4.0, 12.0), "maple": (3.5, 10.0), "ginkgo": (2.6, 11.0),
@@ -275,35 +277,29 @@ def _skeleton_mesh(m: Mesh, nodes, parents, radii, bark: str, key) -> None:
         tube(m, bark, pts, rr, sides, caps=True, phase=0.37 * ci)
 
 
-def leaf_shape(size: float) -> list[tuple[float, float]]:
-    """A leaf outline in its own plane (u along the leaf, v across): a pointed oval."""
-    return [(0.0, 0.0), (size * 0.3, -size * 0.22), (size * 0.75, -size * 0.18),
-            (size, 0.0), (size * 0.75, size * 0.18), (size * 0.3, size * 0.22)]
+CARD = 0.65            # a card's half side, as a share of its clump's size
+CARD_UV = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))   # the whole leaf tile (1 m)
 
 
-def _leaf(m: Mesh, slot: str, base, d, up, size: float) -> None:
-    """One flat leaf from `base` along direction d, its blade turned toward `up`."""
-    s = norm(cross(d, up))
-    if s == (0.0, 0.0, 1.0) and abs(d[2]) > 0.99:
-        s = (1.0, 0.0, 0.0)
-    n = cross(s, d)
-    pts = [add(base, add(mul(d, u), mul(s, v))) for u, v in leaf_shape(size)]
-    c = add(base, mul(d, size * 0.45))
-    fan(m, slot, c, pts[1:] + pts[:1], n if n[2] >= 0 else mul(n, -1.0))
+def _card(m: Mesh, slot: str, c, a, b, n3, ha: float, hb: float) -> None:
+    quad_out(m, slot, add(c, add(mul(a, -ha), mul(b, -hb))), add(c, add(mul(a, ha), mul(b, -hb))),
+             add(c, add(mul(a, ha), mul(b, hb))), add(c, add(mul(a, -ha), mul(b, hb))), n3,
+             CARD_UV)
 
 
-def _clump(m: Mesh, slot: str, c, n3, size: float, key, k: int = 7) -> None:
-    """A clump of leaves: a lobed flat outline round c facing n3 (k lobes)."""
+def _clump(m: Mesh, slot: str, c, n3, size: float, key) -> None:
+    """A clump of leaves round c facing n3: two crossed alpha-cut cards (the second tipped
+    60 degrees about the first's axis), turned by a hash in their plane."""
     n3 = norm(n3)
     a = norm(cross(n3, (0.0, 0.0, 1.0) if abs(n3[2]) < 0.95 else (1.0, 0.0, 0.0)))
     b = cross(n3, a)
-    pts = []
-    for j in range(k):
-        t = 2.0 * M.PI * (j + 0.3 * _u(key, "t", j)) / k
-        r = size * (0.55 + 0.45 * _u(key, "r", j))
-        ct, st = M.cos(t), M.sin(t)
-        pts.append(add(c, add(mul(a, r * ct), mul(b, r * st))))
-    fan(m, slot, c, pts, n3)
+    t = 2.0 * M.PI * _u(key, "t")
+    ct, st = M.cos(t), M.sin(t)
+    a, b = add(mul(a, ct), mul(b, st)), add(mul(b, ct), mul(a, -st))
+    h = size * CARD
+    _card(m, slot, c, a, b, n3, h, h)
+    b2 = add(mul(b, 0.5), mul(n3, 0.866))
+    _card(m, slot, c, a, b2, cross(a, b2), h, h * 0.8)
 
 
 def _leaves(m: Mesh, nodes, parents, radii, slot: str, size: float, per: int, key) -> None:
@@ -359,17 +355,25 @@ def pine(m: Mesh, key) -> None:
                 L = 1.1 * (1.0 - 0.15 * f) * (0.8 + 0.4 * (1.0 - t))
                 d = norm((c, s, -0.35))
                 for up in ((0.0, 0.0, 1.0), (-s, c, 0.0)):
-                    _spray(m, "leaf.pine" if f % 2 else "leaf.pine.d", at, d, up, L, 0.45 * L)
+                    _spray(m, "leaf.pine" if f % 2 else "leaf.pine.d", at, d, up, L, 0.45 * L,
+                           True)
         z += 0.55 + 0.35 * _u(key, "dz", whorl)
         whorl += 1
     # the leader
-    _spray(m, "leaf.pine", (0.0, 0.0, h0 * 0.92), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), 0.9, 0.3)
-    _spray(m, "leaf.pine", (0.0, 0.0, h0 * 0.92), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), 0.9, 0.3)
+    _spray(m, "leaf.pine", (0.0, 0.0, h0 * 0.92), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), 0.9, 0.3,
+           True)
+    _spray(m, "leaf.pine", (0.0, 0.0, h0 * 0.92), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), 0.9, 0.3,
+           True)
 
 
-def _spray(m: Mesh, slot: str, base, d, up, L: float, w: float) -> None:
+def _spray(m: Mesh, slot: str, base, d, up, L: float, w: float, card: bool = False) -> None:
+    """A flat tuft from `base` along d (L long, w wide): a solid outline (palm leaflets),
+    or with `card` an alpha-cut card of needles."""
     s = norm(cross(d, up))
     n = cross(s, d)
+    if card:
+        _card(m, slot, add(base, mul(d, L / 2.0)), d, s, n, L / 2.0, w / 2.0)
+        return
     pts = [add(base, add(mul(d, u), mul(s, v))) for u, v in
            ((0.0, 0.0), (L * 0.3, -w * 0.5), (L * 0.8, -w * 0.35), (L, 0.0), (L * 0.8, w * 0.35),
             (L * 0.3, w * 0.5))]
@@ -413,7 +417,7 @@ def palm(m: Mesh, species: str, key) -> None:
                 blade.append(add(stalk_end, add(add(mul(w, rad * M.cos(b) * 0.9),
                                                     mul(side, rad * M.sin(b))),
                                                 mul(d, pleat + 0.15 * rad * (1.0 - M.cos(b))))))
-            fan(m, "leaf.palm" if f % 3 else "leaf.palm.d", stalk_end, blade, d)
+            fan(m, "foliage.palm" if f % 3 else "foliage.palm.d", stalk_end, blade, d)
         else:
             # a pinnate frond: an arching rachis with leaflets on both sides
             rach = []
@@ -430,7 +434,7 @@ def palm(m: Mesh, species: str, key) -> None:
                     ll = L * 0.42 * (1.0 - 0.6 * (j / 6) ** 2)
                     dd = norm(add(mul(side, sg), mul(d, 0.5)))
                     dd = (dd[0], dd[1], dd[2] - 0.35)
-                    _spray(m, "leaf.palm" if j % 2 else "leaf.palm.d", p0, norm(dd),
+                    _spray(m, "foliage.palm" if j % 2 else "foliage.palm.d", p0, norm(dd),
                            (0.0, 0.0, 1.0), ll, 0.22)
     # dead frond skirt and the crown shaft
     lathe(m, "bark.palm", [(rb * 0.75, top - 0.6), (rb * 1.25, top - 0.2), (rb * 0.6, top + 0.1)],
@@ -458,21 +462,20 @@ def shrub(m: Mesh, key) -> None:
         a = 2.0 * M.PI * (i + _u(key, "a", i)) / lobes
         d = r0 * 0.45 * _u(key, "d", i)
         c = (d * M.cos(a), d * M.sin(a), 0.0)
-        _blob(m, "leaf.boxwood", c, r0 * (0.5 + 0.3 * _u(key, "r", i)),
-              h0 * (0.6 + 0.4 * _u(key, "h", i)), (*key, i))
-    # loose leaves over the lobes so the outline is not smooth
-    for j in range(60):
+        _blob(m, "foliage.boxwood", c, r0 * (0.45 + 0.3 * _u(key, "r", i)),
+              h0 * (0.55 + 0.4 * _u(key, "h", i)), (*key, i))
+    # leaf cards over the lobes so the outline is not smooth
+    for j in range(16):
         a = 2.0 * M.PI * _u(key, "la", j)
-        rr = r0 * (0.4 + 0.55 * _u(key, "lr", j))
-        z = h0 * (0.3 + 0.65 * _u(key, "lz", j)) * (1.0 - 0.5 * (rr / r0) ** 2)
-        base = (rr * M.cos(a), rr * M.sin(a), z)
-        d = norm((M.cos(a), M.sin(a), 0.6 * _u(key, "ld", j) - 0.1))
-        _leaf(m, "leaf.boxwood", base, d, (0.0, 0.0, 1.0), 0.14)
+        rr = r0 * (0.4 + 0.5 * _u(key, "lr", j))
+        z = h0 * (0.35 + 0.6 * _u(key, "lz", j)) * (1.0 - 0.45 * (rr / r0) ** 2)
+        c = (rr * M.cos(a), rr * M.sin(a), z)
+        _clump(m, "leaf.boxwood", c, (M.cos(a), M.sin(a), 0.7), 0.42, (*key, "lc", j))
 
 
 def sedum(m: Mesh, key) -> None:
     r0, h0 = BASE["sedum"]
-    slot = "leaf.sedum" if _u(key, "col") < 0.65 else "leaf.sedum_red"
+    slot = "foliage.sedum" if _u(key, "col") < 0.65 else "foliage.sedum_red"
     pts = [(r0 * (0.85 + 0.25 * _u(key, "o", i)) * c, r0 * (0.85 + 0.25 * _u(key, "o", i)) * s,
             0.02) for i, (c, s) in enumerate(ring(10))]
     fan(m, slot, (0.0, 0.0, 0.06), pts, (0.0, 0.0, 1.0))
@@ -486,7 +489,7 @@ def sedum(m: Mesh, key) -> None:
 
 def scrub(m: Mesh, key) -> None:
     r0, h0 = BASE["scrub"]
-    slot = "leaf.scrub" if _u(key, "dry") < 0.7 else "leaf.dry"
+    slot = "foliage.scrub" if _u(key, "dry") < 0.7 else "foliage.dry"
     for j in range(36):
         a = 2.0 * M.PI * _u(key, "a", j)
         rr = r0 * math.sqrt(_u(key, "r", j))
@@ -517,11 +520,14 @@ def ivy(m: Mesh, key) -> None:
             t = j / 6
             pts.append((x0 + 0.15 * M.sin(3.0 * t + 6.0 * _u(key, "p", i)), 0.0, h0 * t * (0.7 + 0.3 * _u(key, "hh", i))))
         tube(m, "bark.dark", pts, 0.012, 3)
-    for j in range(150):
-        x = -w / 2.0 + w * _u(key, "x", j)
-        z = h0 * (_u(key, "z", j) ** 0.8)
+    # leaf cards flat on the wall on both sides, overlapping, turned by a hash
+    for j in range(14):
+        x = -w / 2.0 + w * (0.08 + 0.84 * _u(key, "x", j))
+        z = h0 * (0.12 + 0.8 * _u(key, "z", j) ** 0.8)
         side = 1.0 if j % 2 else -1.0
-        base = (x, side * (0.02 + 0.06 * _u(key, "y", j)), z)
-        a = 2.0 * M.PI * _u(key, "a", j)
-        d = norm((M.cos(a), 0.0, M.sin(a)))
-        _leaf(m, "leaf.ivy", base, d, (0.0, side, 0.0), 0.12 + 0.06 * _u(key, "sz", j))
+        t = 2.0 * M.PI * _u(key, "a", j)
+        a = (M.cos(t), 0.0, M.sin(t))
+        b = (-M.sin(t), 0.0, M.cos(t))
+        h = 0.32 + 0.12 * _u(key, "sz", j)
+        _card(m, "leaf.ivy", (x, side * (0.03 + 0.03 * _u(key, "y", j)), z), a, b,
+              (0.0, side, 0.0), h, h)

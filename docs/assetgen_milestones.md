@@ -353,8 +353,7 @@ street-front families in `frontparts.py`):
 - **previews** (`materials/preview.py`, `blender/ag6_preview.py`): AG6's textured previews
   now draw the fronts and decals with the shells, AG2's instanced parts (one geometry-node
   instancer per pack, the building's tints on each instance, the materials reading them from
-  the instance) and AG8's props and plants near a street view (a geometry-node instancer
-  per variant, the exact props of the tiles in reach; M15's prototypes left out);
+  the instance), beside the props, plants and signs AG8 on AG6 draws;
 - **exporter**: below;
 - tests `tests/assetgen/test_ag_fronts.py` (new), `test_ag_facades.py` (the part kit has
   AG3's families; the band's top cap is a `structure` face), `tests/test_unreal.py`.
@@ -380,7 +379,10 @@ vesper`, the new `vesper` section rewriting the Vesper Bay buildings alone): AG3
 every shell (the band cut out, its own node), adds the decal meshes to the tile packs and
 the fronts and decals to the buildings' contribution, so the small city's manifest, files
 and materials files and the Vesper Bay buildings move; the briefs, the spike, the
-triangulation, the library pixels, the street and prop goldens do not.
+triangulation, the library pixels, the street and prop goldens do not. Written again
+(`--sections ag1 ag6`) after merging AG8 on AG6 from main: the small city's files and
+materials move again (AG8's textured props and the `ag6.2` library in the contributions),
+its manifest is AG3's.
 
 **Found in the sample builds**:
 - M3 puts ground-floor units on walls a neighbor stands against: a shopfront row in the
@@ -527,10 +529,8 @@ pixel the same on every run:
   test holds it); its part packs are in the density check; the roof tile set is on the street
   band for its tiled eaves.
 - **For later**: vertex colors in the shells (grime under sills, edge wear), AG3's; UV1 and window ids on glass can go; parts mapped onto the trim sheets
-  (AG3); decals placed from the decal atlas (AG3). AG8 landed first with its own sign meshes
-  (stroke-built glyph geometry) and flat-colored props: one sign path should be chosen (AG8's
-  meshes faced with AG6's sign pages through `signs.json`, or the pages dropped), and the
-  props and plants textured from the library (bark, leaves, painted metal). OFL fonts for
+  (AG3); decals placed from the decal atlas (AG3). AG8's sign meshes now show AG6's pages
+  and its props and plants take library sets (AG8's entry, "On AG6"). OFL fonts for
   real Hanzi, Hangul, kana and Devanagari (decision 13.3); the Unreal check of the masters
   (`docs/progress/AG6/README.md` lists what to look at).
 
@@ -798,13 +798,67 @@ instanced actors had collision (now `NoCollision`), and the check's traces down 
 again while a freshly streamed cell's collision comes in. Results:
 `docs/progress/AG8/unreal/`.
 
-**Open.** Textures are AG6's: bark, leaves (alpha cards would let leaf clumps be cards),
-painted metal, sign faces, billboard and holo-ad content; every slot now a flat color, neon
-and sign faces emissive. Plants and signs have no collision (trunk capsules later). Lawns,
-hedges and green roofs stay the blockout's green areas. Sign faces are opaque emissive, so
-only holo-ads are translucent. The sign packs are the largest files; quantized positions
-(`KHR_mesh_quantization`) would halve them. Mac = x86 waits for the deferred determinism
-check.
+**On AG6** (after AG6 merged; one sign path, textures from the library):
+- **One sign path.** AG6's signage (`signs.json`, `materials/signage.py`, `ad_slots` shared)
+  decides every slot's text, script, brand, colors and page cell; AG8 builds the body. A
+  flat face (lightbox, LED panel, blade box, billboard, holo-ad screen) is one quad showing
+  its page cell on UV0 (upright: the cell's top on the face's top), material
+  `page.<page>` (master `sign`, `SignTex` the page) or `holopage.<page>` (master `holo`);
+  neon tubes and channel letters run along AG6's glyph strokes
+  (`assetgen.materials.glyphs`), so AG8's own `glyphs.py` is gone and both stages write the
+  same words. The look comes from the district style (neon, LED panels, channel letters on
+  sleek facades, else lightboxes). AG6's preview drops its sign quads where AG8's signs
+  stand, so nothing is drawn twice. Kept over the alternative (pages dropped) because a page
+  cell carries the text at two triangles a face: Vesper Bay's signs fell from 5.9 M to
+  1.2 M unique triangles and the props stage from 400 to 136 MB on disk. `assetgen props`
+  on a build without the library (`assets/library`) still draws flat strokes on lit faces.
+- **Textures.** Every prop, plant and sign slot maps to an AG6 master and library set
+  (`catalog.PROP`, `PROP_PREFIX`, `prop_set`; a test holds it): painted and galvanized metal,
+  rusty metal, concrete, plywood, tarp for awnings and stall roofs, pod shells for hulls,
+  car paint, plastic, glass; emissive slots (neon, lit faces, lamps) have none. New library
+  sets (`LIB_VERSION` ag6.2, 125 sets): `plastic`, `car_paint`, `metal_galvanized`,
+  `metal_rusty`, three barks (`surfaces.bark`: furrowed plates, smooth with lenticels and
+  peel for birch, ringed for palms) and five leaf clump sets (`surfaces.leaves`: broad,
+  lobed, fan, needle, small; leaves on twigs from the middle, the tint mask the leaf cover).
+  Every variant has UV0 in meters: lathes by arc length round the profile, tubes along
+  their length, fans and roofs planar, curved awnings and shelter roofs along the arc
+  (`shapes.arcs`).
+- **Leaves** (the Unreal check's finding that clumps read as big flat polygons up close):
+  each clump is two crossed cards (`trees._clump`, the second tipped 60 degrees), each
+  showing a whole leaf tile; master `leaves` uses the set's tint mask as an opacity mask
+  (masked, two-sided). Pines use cards for their needle sprays, shrubs, ivy and boxwood
+  their own clumps; palms, sedum and scrub stay solid (`foliage.*` slots, grass). Plants
+  stay Nanite with `Voxelize` at distance.
+- **Texel density.** AG6's check reads AG8's packs too (variants and plants in their own
+  frames, exact props, signs; all within reach of the street): props and signs meet 512 px/m
+  on all their textured area (a leaf card counts the tile's pixels over its side).
+- **Build order** (`assetgen build`): buildings, streets, AG6's signage, AG8's props (with
+  the library), then AG6's materials over every part.
+- **Previews.** `assetgen materials preview` draws AG8's props and plants (geometry nodes
+  instances of the family packs), exact props and signs with their textures and the
+  pages; `props_sheet.py --materials` textures the variant sheets.
+- **Exporter** (`STAGE2_VERSION` 5): master `M_CgLeaves` (masked, two-sided, the ORM alpha
+  as the opacity mask), `M_CgHolo` reads `SignTex`; page materials as AG6's sign materials.
+  Test `test_stage2_textured_props_and_signs` (no Unreal).
+- **Samples** (3 workers, the props stage with its textures): Vesper Bay 723 variants,
+  90,048 instances, 15,448 signs (8,056 meshes; 10,794 faced with page cells, the rest
+  neon or channel letters), 2.48 M unique triangles (signs 1.20 M), 49.4 M drawn, 136 MB;
+  Greyhook 715 variants, 48,162 instances, 8,183 signs (4,358 meshes), 1.34 M unique
+  triangles (signs 0.61 M), 40.4 M drawn, 77 MB. Every check passes in both, texel density
+  included. Renders by day and night of Neon Strand and a tree-lined avenue:
+  `docs/progress/AG8/textures/`.
+- **Goldens** moved on purpose: `golden_props.json` (the packs), `ag6.testport_materials`
+  (the props' and signs' materials, the new sets), and `golden_streets.json`'s `all` and
+  `ag1.testport_files` (every contribution carries the library's version and hash); every
+  street and building pack and the library's pixels are unchanged.
+
+**Open.** Plants and signs have no collision (trunk capsules later). Lawns, hedges and green
+roofs stay the blockout's green areas. Sign faces are opaque emissive, so only holo-ads are
+translucent. Leaf textures are one per clump set, tinted per species; real leaf atlases per
+species (and wind) later. The sign packs are the largest files; quantized positions
+(`KHR_mesh_quantization`) would halve them. The Unreal check of the textured props: leaves
+masked and two-sided, Nanite `Voxelize` still full at distance, sign faces showing their
+page cells, holo-ads textured. Mac = x86 waits for the deferred determinism check.
 
 ## Order
 

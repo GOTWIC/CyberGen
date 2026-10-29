@@ -20,9 +20,12 @@
 5. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
    bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
    `streets_report.json` and `.txt` (the report only when another of its files changed).
-6. The props stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the
-   variant families, exact props and signs, `unreal_contribution.props.json` and
-   `.signs.json`, `props_report.json` and `.txt` (likewise).
+6. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
+   stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
+   families, exact props and signs (their faces showing those pages),
+   `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
+   (likewise); then AG6's materials and checks over every contribution and pack
+   (`materials/build.stage`).
 
 An unchanged city's rebuild writes no file.
 """
@@ -541,17 +544,12 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         rep["ok"] = rep["ok"] and srep["ok"]
         log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
             f"made, {n} files written")
-    if lib is not None:
-        mrep = MS.stage(model, sha, out, spec_doc, lib, log)
-        wrote += mrep["files_written"]
-        rep["materials"] = {"ok": mrep["ok"], "textures": mrep["textures"],
-                            "failed": [c for c, v in mrep["checks"].items() if not v["ok"]],
-                            "seconds": mrep["seconds"]["total"]}
-        rep["ok"] = rep["ok"] and mrep["ok"]
+    # AG6's sign pages before AG8's signs show them; its materials and checks after them
+    signs = MS.signage(model, out, spec_doc, log) if lib is not None else None
     if props:
         from .props.build import build as props_build, default_workers as props_workers
         prep = props_build(model, sha, out, filled, briefs=briefs,
-                           workers=workers or props_workers(), report_always=False)
+                           workers=workers or props_workers(), report_always=False, lib=lib)
         f = prep["files"]
         n = len(f["written"]) + len(f["removed"]) + int(bool(f["manifest_written"])) + \
             sum(int(bool(x)) for x in f["contribution_written"]) + int(f["report_written"])
@@ -567,6 +565,13 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         rep["ok"] = rep["ok"] and prep["ok"]
         log(f"props: {st['variants']} variants, {st['instances']} instances, {st['signs']} "
             f"signs, {f['tiles_made']} tiles made, {n} files written")
+    if lib is not None:
+        mrep = MS.stage(model, sha, out, spec_doc, lib, log, signs=signs)
+        wrote += mrep["files_written"]
+        rep["materials"] = {"ok": mrep["ok"], "textures": mrep["textures"],
+                            "failed": [c for c, v in mrep["checks"].items() if not v["ok"]],
+                            "seconds": mrep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and mrep["ok"]
     rep["files_written"] = wrote
     return rep
 

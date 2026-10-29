@@ -130,15 +130,14 @@ def make_tile(job: dict) -> dict:
 def _gate_words(it: dict):
     """The market's name on a gate's lintel, both faces, in neon (a builder for
     `variants.gate`)."""
-    from . import glyphs as GL
     from . import materials as MT
     from . import signs as SG
     name = (it["prop"].get("attrs") or {}).get("name") or "MARKET"
     col = MT.neon_slot(it["color"])
 
     def words(m, P, W):
-        strokes, wh = GL.layout(name.upper(), "latin")
-        u = SG.fit(wh, W - 1.6, 0.6)
+        strokes, wh = SG.layout(name.upper(), "latin", False)
+        u = min((W - 1.6) / wh[0], 0.6 / wh[1])
         if u <= 0:
             return
         # the board between the beams, and the name on both faces
@@ -200,18 +199,21 @@ def default_workers() -> int:
 
 def build(model, model_sha: str, out_dir: Path, spec=None, briefs: dict | None = None,
           workers: int | None = None, force: bool = False,
-          report_always: bool = True) -> dict:
+          report_always: bool = True, lib: dict | None = None) -> dict:
     """Make the props, plants and signs of a city into out_dir (BUILD/assets); the report.
     `briefs` (by building id) give the facade props their gaps to the wall; without them
     they are read from out_dir/briefs.json, or made. `report_always=False` (`assetgen
-    build`) writes the report only when another file changed or it is missing."""
+    build`) writes the report only when another file changed or it is missing. With AG6's
+    library `lib` the contributions' materials are textured (`materials/contrib.props`) and
+    the sign faces show the city's sign pages (out_dir/signs.json, AG6's signage, made
+    before this stage)."""
     from . import gather as GA
     t0 = time.perf_counter()
     out_dir = Path(out_dir)
     pdir = out_dir / "props"
     if briefs is None:
         briefs = _load_briefs(model, model_sha, out_dir, spec)
-    g = GA.gather(model, spec, briefs, out_dir)
+    g = GA.gather(model, spec, briefs, out_dir, pages=lib is not None)
     t_gather = time.perf_counter()
     code = code_hash()
     nw_max = max(1, min(workers or MAX_WORKERS, MAX_WORKERS))
@@ -313,9 +315,13 @@ def build(model, model_sha: str, out_dir: Path, spec=None, briefs: dict | None =
                           for t in sorted(g.signs) for s in g.signs[t]},
                 "placements": g.stats}
     man_written = _write_if_changed(mf, _dump(manifest))
+    from ..materials import contrib as AC6
     from . import contribution as CB
-    con_p = CB.props(manifest, g)
-    con_s = CB.signs(manifest, g)
+    signs_doc = None
+    if lib is not None and (out_dir / "signs.json").is_file():
+        signs_doc = json.loads((out_dir / "signs.json").read_text(encoding="utf-8"))
+    con_p = AC6.props(CB.props(manifest, g), lib)
+    con_s = AC6.props(CB.signs(manifest, g), lib, signs_doc)
     p_written = _write_if_changed(out_dir / "unreal_contribution.props.json", _dump(con_p))
     s_written = _write_if_changed(out_dir / "unreal_contribution.signs.json", _dump(con_s))
     t_write = time.perf_counter()

@@ -24,7 +24,7 @@ from __future__ import annotations
 from citygen import dmath as M
 
 from . import styles as ST
-from .shapes import Mesh, beam, blk, catenary, extrude, fan, lathe, obb, quad_out, ring, tube
+from .shapes import Mesh, arcs, beam, blk, catenary, extrude, fan, lathe, obb, quad_out, ring, tube
 
 REACH = {"ac_unit": 0.3, "wall_light": 0.2}
 GENERATORS: dict = {}
@@ -425,7 +425,7 @@ def awning(m: Mesh, d: D) -> None:
             a = M.PI / 2.0 * i / 8
             pts.append((0.5 - 1.0 * M.sin(a), -drop + (drop + 0.15) * M.cos(a) - 0.15))
         rows = [[(x, y, z) for y, z in pts] for x in (-0.5, 0.5)]
-        uvs = [[(x, y) for y, z in pts] for x in (-0.5, 0.5)]
+        uvs = [[(x, v) for v in arcs(pts)] for x in (-0.5, 0.5)]
         m.grid(fab, rows, uvs, flip=True)
         m.grid(fab, [[(x, y, z - 0.004) for y, z in pts] for x in (-0.5, 0.5)], uvs)
         for x, s in ((-0.5, -1.0), (0.5, 1.0)):
@@ -606,7 +606,7 @@ def bus_stop(m: Mesh, d: D) -> None:
             a = M.PI * i / 8
             pts.append((0.85 * M.cos(a) * -1.0, top + 0.25 * M.sin(a)))
         rows = [[(x, y, z) for y, z in pts] for x in (-hx - 0.1, hx + 0.1)]
-        uvs = [[(x, y) for y, z in pts] for x in (-hx - 0.1, hx + 0.1)]
+        uvs = [[(x, v) for v in arcs(pts)] for x in (-hx - 0.1, hx + 0.1)]
         m.grid("glass.prop" if d.style == "sleek" else met, rows, uvs, flip=True)
         m.grid(met, [[(x, y, z - 0.01) for y, z in pts] for x in (-hx - 0.1, hx + 0.1)], uvs)
     elif form == "slab":
@@ -938,7 +938,7 @@ def planter(m: Mesh, d: D) -> None:
     elif form == "urn":
         lathe(m, "stone", [(0.25, 0.0), (0.25, 0.1), (0.12, 0.2), (0.15, 0.3), (0.45, h * 0.8),
                            (0.5, h), (0.45, h + 0.02)], 12)
-    leaf = d.c(("leaf.boxwood", "leaf.ivy", "leaf.scrub"), "leaf")
+    leaf = d.c(("foliage.boxwood", "foliage.scrub", "foliage.sedum"), "leaf")
     leaf_blob(m, leaf, 0.0, 0.0, h - 0.05, d.r(0.4, 0.55, "br"), d.r(0.35, 0.7, "bh"),
               (*d.key, "blob"))
 
@@ -1072,7 +1072,7 @@ def boat(m: Mesh, d: D) -> None:
         sec[0] = (x, -hw, dz)
         sec[-1] = (x, hw, dz)
         rows.append(sec)
-        uvs.append([(x, p[1]) for p in sec])
+        uvs.append([(x, v) for v in arcs(sec)])
     m.grid(hull, rows, uvs, flip=True)
     deck_ring = [(p[0], p[1]) for p in (r[-1] for r in rows)] + \
         [(p[0], p[1]) for p in (r[0] for r in rows[::-1])]
@@ -1107,9 +1107,9 @@ def boat(m: Mesh, d: D) -> None:
             pts.append((-1.1 * M.cos(a), deck + 0.6 + 0.6 * M.sin(a)))
         rows2 = [[(x, y, z) for y, z in pts] for x in (-2.0, 0.6)]
         m.grid("fabric.cream" if d.u("roof") < 0.5 else "cardboard", rows2,
-               [[(x, y) for y, z in pts] for x in (-2.0, 0.6)], flip=True)
+               [[(x, v) for v in arcs(pts)] for x in (-2.0, 0.6)], flip=True)
         m.grid("cardboard", [[(x, y, z - 0.01) for y, z in pts] for x in (-2.0, 0.6)],
-               [[(x, y) for y, z in pts] for x in (-2.0, 0.6)])
+               [[(x, v) for v in arcs(pts)] for x in (-2.0, 0.6)])
 
 
 # ---------------------------------------------------------------------------------------
