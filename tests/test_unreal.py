@@ -669,6 +669,10 @@ def test_stage2_textures(build, manifest, tmp_path):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'f"{folder}/Textures/"' in src and "own_textures(mi, " in src
     assert "comp.get_material_index(unreal.Name(slot))" in src
+    # the masters' usage flags: Nanite too (opaque and masked), on new and existing masters
+    assert '"used_with_nanite"' in src and src.count("in usage_flags(m)") == 3
+    # a big prune deletes package files on an empty level, then loads the city again
+    assert "delete_files if files else delete_assets" in src and "scan_paths_synchronous(" in src
     bad = copy.deepcopy(fake)
     bad["buildings"]["materials"]["brick@heritage"]["textures"]["OrmTex"] = "set.nope.orm"
     with pytest.raises(ValueError, match="no texture set.nope.orm"):
@@ -859,6 +863,14 @@ def test_stage2_takes_assetgen_parts(staged):
     assert {"frame", "balcony", "dado"} <= set(con["materials"])
     assert sum(len(a["xforms"]) for a in got.values()) == sum(e["instances"]
                                                               for e in con["entries"])
+    # no collision on a building's parts (AG2's contract: its simple collision covers its
+    # masses), meshes and instancers; AG7's container stacks keep theirs
+    assert all(a["no_collision"] for a in got.values())
+    pm = {f"{pk['folder']}/{m['asset']}": m for pk in s2["packs"] for m in pk["meshes"]}
+    assert all(pm[a["mesh"]]["collision"] == {"none": True} for a in got.values())
+    cont = [a for a in s2["instances"] if a["kind"].startswith("part.container")]
+    assert all(not a.get("no_collision") and pm[a["mesh"]]["collision"] == {"complex": True}
+               for a in cont)
 
 
 def test_stage2_textured_props_and_signs(staged):
