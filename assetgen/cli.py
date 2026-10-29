@@ -191,8 +191,9 @@ def cmd_streets(args: argparse.Namespace) -> int:
     out = Path(args.out) if args.out else bdir / "assets"
     from .materials.build import library_for
     lib = library_for(S.dump(spec or S.fill(S.AssetSpec())), out, progress=prog)
-    rep = street_build(model, sha, out, spec, workers=args.workers or default_workers(),
-                       force=args.force, lib=lib, progress=prog)
+    with prog.stage("streets"):
+        rep = street_build(model, sha, out, spec, workers=args.workers or default_workers(),
+                           force=args.force, lib=lib)
     prog.summary()
     st, f = rep["stats"], rep["files"]
     print(f"{rep['city']}: {st['pieces']} street pieces in {st['tiles']} tiles, "
@@ -207,9 +208,10 @@ def cmd_streets(args: argparse.Namespace) -> int:
 
 
 def cmd_library(args: argparse.Namespace) -> int:
+    from .materials import build as MS
     from .materials import library as LB
     prog = _progress(args)
-    idx = LB.generate(args.out, args.density, args.workers, args.only, progress=prog)
+    idx = MS.generate(args.out, args.density, args.workers, args.only, progress=prog)
     prog.summary()
     d = LB.disk(idx)
     print(f"library {idx['version']} ({idx['hash']}) in {idx['dir']}: {len(idx['sets'])} "
@@ -249,8 +251,9 @@ def cmd_props(args: argparse.Namespace) -> int:
         from .materials.build import library_for
         lib = library_for(S.dump(spec if spec is not None else S.fill(S.AssetSpec())), out,
                           progress=prog)
-    rep = props_build(model, sha, out, spec, workers=args.workers or default_workers(),
-                      force=args.force, lib=lib, progress=prog)
+    with prog.stage("props"):
+        rep = props_build(model, sha, out, spec, workers=args.workers or default_workers(),
+                          force=args.force, lib=lib)
     prog.summary()
     st, f = rep["stats"], rep["files"]
     print(f"{rep['city']}: {st['variants']} variants in {st['families']} families, "

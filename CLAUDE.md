@@ -1005,7 +1005,9 @@ the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` inter
 redrawn line on a terminal, plain lines when piped; workers never print, the parent advances;
 Blender scripts print `CGPROGRESS start|done <name>`, read by `assetgen/blenderrun.py`);
 `--quiet` or `CYBERGEN_QUIET=1` silences it. A new long stage takes a `progress=None`
-parameter and wraps its work in `P.stage(...)`.
+parameter and wraps its work in `P.stage(...)`, but never inside a package whose code hash
+an output records (`streets/`, `props/`, the library's `CODE`): wrap those from the caller,
+or the goldens move.
 
 ## Working preferences
 

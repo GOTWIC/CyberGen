@@ -109,6 +109,8 @@ class Stage:
             s = f"{d}/{self.total} {pct}%"
             if 0 < d < self.total and el > 1.0:
                 s += f" {_left(el * (self.total - d) / d)} left"
+            elif d < self.total and el >= 5.0:
+                s += f", {duration(el)} so far"     # nothing done yet to estimate from
             return s
         if self.done:
             return f"{self.done} done, {duration(el)}"

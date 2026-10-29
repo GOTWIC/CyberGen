@@ -159,13 +159,10 @@ def _gate_words(it: dict):
 
 
 def _run(fn, jobs, nw):
-    """The results in the jobs' order, each as it comes (the parent advances the bar)."""
     if nw <= 1 or len(jobs) <= 1:
-        for j in jobs:
-            yield fn(j)
-        return
+        return [fn(j) for j in jobs]
     with ProcessPoolExecutor(max_workers=nw) as ex:
-        yield from ex.map(fn, jobs, chunksize=1)
+        return list(ex.map(fn, jobs, chunksize=1))
 
 
 # ---------------------------------------------------------------------------------------
@@ -202,25 +199,21 @@ def default_workers() -> int:
 
 def build(model, model_sha: str, out_dir: Path, spec=None, briefs: dict | None = None,
           workers: int | None = None, force: bool = False,
-          report_always: bool = True, lib: dict | None = None, progress=None) -> dict:
+          report_always: bool = True, lib: dict | None = None) -> dict:
     """Make the props, plants and signs of a city into out_dir (BUILD/assets); the report.
     `briefs` (by building id) give the facade props their gaps to the wall; without them
     they are read from out_dir/briefs.json, or made. `report_always=False` (`assetgen
     build`) writes the report only when another file changed or it is missing. With AG6's
     library `lib` the contributions' materials are textured (`materials/contrib.props`) and
     the sign faces show the city's sign pages (out_dir/signs.json, AG6's signage, made
-    before this stage). `progress`: stage lines and bars on stderr (`assetgen/progress.py`)."""
-    from ..progress import Progress
+    before this stage)."""
     from . import gather as GA
-    P = progress if progress is not None else Progress(quiet=True)
     t0 = time.perf_counter()
     out_dir = Path(out_dir)
     pdir = out_dir / "props"
-    with P.stage("props: placements") as st:
-        if briefs is None:
-            briefs = _load_briefs(model, model_sha, out_dir, spec)
-        g = GA.gather(model, spec, briefs, out_dir, pages=lib is not None)
-        st.note(f"{len(g.families)} families, {len(set(g.exact) | set(g.signs))} tiles")
+    if briefs is None:
+        briefs = _load_briefs(model, model_sha, out_dir, spec)
+    g = GA.gather(model, spec, briefs, out_dir, pages=lib is not None)
     t_gather = time.perf_counter()
     code = code_hash()
     nw_max = max(1, min(workers or MAX_WORKERS, MAX_WORKERS))
@@ -247,16 +240,14 @@ def build(model, model_sha: str, out_dir: Path, spec=None, briefs: dict | None =
         else:
             fam_jobs.append((what, name))
     fam_jobs.sort(key=lambda j: (j[0] != "plant", j[1]))
-    with P.stage("props: families", total=len(fam_jobs)) as st:
-        for r in _run(_family_job, fam_jobs, min(nw_max, len(fam_jobs)) if fam_jobs else 1):
-            sub = "variants" if r["what"] == "prop" else "plants"
-            rel = f"props/{sub}/{r['name']}.glb"
-            if _write_if_changed(out_dir / rel, r["glb"]):
-                written.append(rel)
-            families[f"{r['what']}.{r['name']}"] = {
-                "glb": rel, "bytes": len(r["glb"]), "sha256": C.sha256_bytes(r["glb"]),
-                "meshes": r["meshes"]}
-            st.advance()
+    for r in _run(_family_job, fam_jobs, min(nw_max, len(fam_jobs)) if fam_jobs else 1):
+        sub = "variants" if r["what"] == "prop" else "plants"
+        rel = f"props/{sub}/{r['name']}.glb"
+        if _write_if_changed(out_dir / rel, r["glb"]):
+            written.append(rel)
+        families[f"{r['what']}.{r['name']}"] = {
+            "glb": rel, "bytes": len(r["glb"]), "sha256": C.sha256_bytes(r["glb"]),
+            "meshes": r["meshes"]}
     t_fam = time.perf_counter()
     # -- the tiles (exact props and signs)
     tiles = sorted(set(g.exact) | set(g.signs))
@@ -279,25 +270,23 @@ def build(model, model_sha: str, out_dir: Path, spec=None, briefs: dict | None =
                                for s in g.signs.get(t, [])]})
     jobs.sort(key=lambda j: (-(len(j["signs"]) + 4 * len(j["exact"])), j["tile"]))
     tile_secs = {}
-    with P.stage("props: tiles", total=len(jobs)) as st:
-        for r in _run(make_tile, jobs, min(nw_max, len(jobs)) if jobs else 1):
-            t = r["tile"]
-            rec = {"hash": hashes[t]}
-            for part, data in (("props", r["props_glb"]), ("signs", r["signs_glb"])):
-                path = out_dir / f"props/{'tiles' if part == 'props' else 'signs'}/{t}.glb"
-                if data:
-                    if _write_if_changed(path, data):
-                        written.append(path.relative_to(out_dir).as_posix())
-                elif path.exists():
-                    path.unlink()
+    for r in _run(make_tile, jobs, min(nw_max, len(jobs)) if jobs else 1):
+        t = r["tile"]
+        rec = {"hash": hashes[t]}
+        for part, data in (("props", r["props_glb"]), ("signs", r["signs_glb"])):
+            path = out_dir / f"props/{'tiles' if part == 'props' else 'signs'}/{t}.glb"
+            if data:
+                if _write_if_changed(path, data):
                     written.append(path.relative_to(out_dir).as_posix())
-                rec[part] = {"bytes": len(data), "sha256": C.sha256_bytes(data) if data else ""}
-            rec["props_nodes"] = r["props_nodes"]
-            rec["signs_nodes"] = r["signs_nodes"]
-            rec["lods"] = r["lods"]
-            tiles_out[t] = rec
-            tile_secs[t] = r["seconds"]
-            st.advance()
+            elif path.exists():
+                path.unlink()
+                written.append(path.relative_to(out_dir).as_posix())
+            rec[part] = {"bytes": len(data), "sha256": C.sha256_bytes(data) if data else ""}
+        rec["props_nodes"] = r["props_nodes"]
+        rec["signs_nodes"] = r["signs_nodes"]
+        rec["lods"] = r["lods"]
+        tiles_out[t] = rec
+        tile_secs[t] = r["seconds"]
     removed = []
     for sub in ("tiles", "signs"):
         d = pdir / sub

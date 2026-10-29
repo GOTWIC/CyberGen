@@ -909,7 +909,10 @@ what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1'
 genomes, shells and parts, the library on first use, building checks, streets, signage,
 props, materials), a bar with n of N and the time left where the count is known (tiles as the
 workers return them, buildings, library sets and atlases, the packs the density check reads,
-Blender's views, sheet cells and boards), the time of each stage at the end. On a terminal
+Blender's views, sheet cells and boards), the time of each stage at the end. The streets and
+props stages (seconds) and the library's own loop are wrapped from their callers, since
+their code is in the code hashes their manifests and contributions record (`assetgen
+library` drives its bar from the library's log lines, `materials/build.generate`). On a terminal
 the bar is one line redrawn in place; piped, plain lines at 0, 25, 50, 75 and 100 % or every
 30 s. Worker processes never print; the Blender scripts print `CGPROGRESS start|done <name>`
 per view, which `assetgen/blenderrun.py` reads as Blender runs. `--quiet` (or

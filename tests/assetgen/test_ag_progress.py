@@ -125,8 +125,7 @@ def test_build_cli_quiet_and_piped(tmp_path):
     err = r.stderr
     assert "\r" not in err
     for stage in ("load", "briefs", "genomes", "shells and parts", "building checks",
-                  "streets: pieces", "streets: tiles", "signage", "props: tiles",
-                  "materials: texel density"):
+                  "streets", "signage", "props", "materials: texel density"):
         assert f"{stage} ...\n" in err and f"{stage}: done in " in err, stage
     assert any(ln.startswith("genomes: ") and ln.endswith(" 100%") for ln in err.splitlines())
     tail = err.splitlines()[err.splitlines().index("time per stage:"):]

@@ -214,7 +214,8 @@ def _blender(job: dict, script: str, blender: str | None, od: Path, progress=Non
 
 
 def board_job(args, progress=None) -> dict:
-    lib = LB.load(None, args.density) or LB.generate(None, args.density, progress=progress)
+    from .build import generate
+    lib = LB.load(None, args.density) or generate(None, args.density, progress=progress)
     od = Path(args.out)
     od.mkdir(parents=True, exist_ok=True)
     boards = []

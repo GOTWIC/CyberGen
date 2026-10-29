@@ -544,8 +544,12 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         wrote += MF.write_if_changed(out / "asset_report.txt", report_text(rep))
     if streets:
         from .streets.build import build as street_build, default_workers
-        srep = street_build(model, sha, out, filled, workers=workers or default_workers(),
-                            report_always=False, lib=lib, progress=progress)
+        with P.stage("streets") as sst:
+            srep = street_build(model, sha, out, filled,
+                                workers=workers or default_workers(), report_always=False,
+                                lib=lib)
+            sst.note(f"{srep['stats']['pieces']} pieces in {srep['stats']['tiles']} tiles, "
+                     f"{srep['files']['tiles_made']} made")
         f = srep["files"]
         n = len(f["written"]) + f["tiles_removed"] + sum(
             int(bool(f[k])) for k in ("parts_written", "manifest_written",
@@ -568,9 +572,12 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             signs = MS.signage(model, out, spec_doc, log if progress is None else st.note)
     if props:
         from .props.build import build as props_build, default_workers as props_workers
-        prep = props_build(model, sha, out, filled, briefs=briefs,
-                           workers=workers or props_workers(), report_always=False, lib=lib,
-                           progress=progress)
+        with P.stage("props") as pst:
+            prep = props_build(model, sha, out, filled, briefs=briefs,
+                               workers=workers or props_workers(), report_always=False,
+                               lib=lib)
+            pst.note(f"{prep['stats']['variants']} variants, {prep['stats']['instances']} "
+                     f"instances, {prep['files']['tiles_made']} tiles made")
         f = prep["files"]
         n = len(f["written"]) + len(f["removed"]) + int(bool(f["manifest_written"])) + \
             sum(int(bool(x)) for x in f["contribution_written"]) + int(f["report_written"])

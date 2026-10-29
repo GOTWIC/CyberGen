@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -38,10 +39,28 @@ def library_for(spec_doc: dict | None, out: Path | None = None, workers: int | N
     lib = LB.load(None, density)
     want = LB.code_hash()
     if lib is None or lib.get("code_hash") != want or not _complete(lib):
-        lib = LB.generate(None, density, workers, log=log, progress=progress)
+        lib = generate(None, density, workers, log=log, progress=progress)
     if out is not None:
         link(out, Path(lib["dir"]))
     return lib
+
+
+def generate(out=None, density: int = LB.DENSITY, workers: int | None = None,
+             only: list[str] | None = None, log=print, progress=None) -> dict:
+    """`library.generate` with a progress stage (`assetgen/progress.py`) driven by its log
+    lines: the count to make, then a line per set or atlas made. (The library's own code
+    stays as it is: it is in the library's code hash, which the contributions record.)"""
+    if progress is None:
+        return LB.generate(out, density, workers, only, log=log)
+    with progress.stage("library") as st:
+        def line(text: str) -> None:
+            m = re.match(r"library: (\d+) sets and (\d+) atlases to make", text)
+            if m:
+                st.set_total(int(m.group(1)) + int(m.group(2)))
+                st.note(text)
+            elif text.startswith(("  set ", "  atlas ")):
+                st.advance()
+        return LB.generate(out, density, workers, only, log=line)
 
 
 def _complete(lib: dict) -> bool:
