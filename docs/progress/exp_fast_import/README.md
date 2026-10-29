@@ -55,6 +55,31 @@ own as above, on a quieter Mac (1 min load 4.7 to 20, median 12; pair 2's median
   packs queued 60 at a time at 35.0 GB. The peak is the city's meshes the import holds
   (28k), so a knob for imports in flight would save little; it was tried and taken out.
 
+## With the play features (#57, 2026-10-29 evening)
+
+The branch with #57 merged (the CityGenPlay plugin, the play actor, the minimap, map and
+teleport, free camera, day and night, the check's play steps; #57's AG3 fix remade
+Greyhook's 115 building tiles), one first import into a new project (median load 8.7):
+
+- **The plugin** built with Xcode in 25.9 s before the import (UnrealBuildTool's Mac build of
+  the project's editor modules), up to date on the second import.
+- **The import:** 7m08s for the whole command (the plugin build included; 6m37s in the
+  editor, against 6m57s on #54 without the play features), 38,989
+  actors (the play actor besides the 38,988), peak 35.1 GB; 276 of 276 textures (all matched
+  by the texture step), the pack step's 603 packs none unmatched, nothing pruned.
+- **The play features made:** the map texture (`Play/T_Greyhook_Map`), 54,423 walkway points,
+  3,129 lamps, 6 district labels. The play actor is placed after the offloads stop, with the
+  player start and the lighting, so the always-loaded actors stay loaded.
+- **A second import** changed nothing (38,989 actors unchanged, no package saved).
+- **`--check` passed**, the play features too: the map, the menu, night (47 lamps lit), the
+  free camera and back, a teleport of 1,216 m onto the ground; 507 of 507 traces down, 35 of
+  36 roofs (a balcony part, as on #54), 36 of 36 facades, the walk to its end, the flight.
+- **Found:** the Unreal import tests made their projects as `Proj`, and UnrealBuildTool
+  compares module names without case: the engine's `PROJ` (the GeoReferencing plugin's
+  projection library) took the name, so the plugin never built there and the tests passed
+  with the city imported without the play features. The tests' projects are `CityTest` now
+  (the plugin then built in the stage 2 test's project; both Unreal import tests pass).
+
 ## Conditions
 
 - The M4 Pro Mac (14 cores, 24 GB), shared with other sessions' work. **The absolute numbers
@@ -225,6 +250,10 @@ Not run on Windows yet; from reading the branch, nothing in it is Mac-only:
   cache (Zen, shared by the machine's projects), not the per-project store of these runs.
   With `-fastexit` an entry the editor had not yet handed to the cache server is built again
   by the next user; nothing saved is lost.
+- **The play features** need a C++ compiler UE 5.8 accepts: Visual Studio 2022 17.14 or later
+  with MSVC 14.44 on Windows (`docs/unreal_export.md`, "Play features"); without one the city
+  imports without them, and `--no-play` leaves them out. Name the project after none of the
+  engine's modules (a project `Proj` meets the engine's `PROJ`).
 - **Memory:** the engine's peak for Greyhook was 35 GB on #54 (42 GB in pair 2, under heavy
   load) against main's 33.4 GB (38.5 GB in pairs 1 and 2), on this 24 GB Mac mostly in swap.
   On Windows that is RAM plus page file; with less RAM the page file takes the rest, more
