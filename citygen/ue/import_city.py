@@ -88,6 +88,15 @@ CPD = {"wear": 3, "dirt": 4, "neon": 5, "lit": 6, "seed": 7, "room": 23, "floor"
 SAMPLER = {"color": "SAMPLERTYPE_COLOR", "normal": "SAMPLERTYPE_NORMAL",
            "mask": "SAMPLERTYPE_MASKS"}
 STAGE2_FOLDER = "Assets"             # citygen.unreal.STAGE2_FOLDER
+# the folders under it that stage 2's mesh prune leaves alone: materials2 deletes the
+# instances no entry names, textures2 the city's sign pages it no longer has
+# (citygen.unreal.TEXTURE_FOLDER_CITY)
+STAGE2_KEPT = ("Materials", "Textures")
+
+
+def stage2_kept(root, path):
+    """An asset under `<root>/Assets` that is not stage 2's mesh prune's to delete."""
+    return any(path.startswith(f"{root}/{STAGE2_FOLDER}/{f}/") for f in STAGE2_KEPT)
 
 
 def log(msg):
@@ -1019,18 +1028,18 @@ class Importer:
             if stale:
                 REPORT.note(f"deleting {len(stale)} blockout meshes no object uses")
             self.stats["meshes"]["deleted"] += delete_assets(stale)
-        # stage 2's meshes no entry uses (its materials are pruned by materials2). A
-        # blockout-only import leaves them as they are: its actors go, the assets stay for the
-        # next import with stage 2 (deleting tens of thousands of meshes takes Unreal an hour)
+        # stage 2's meshes no entry uses (its materials are pruned by materials2, the city's
+        # sign pages by textures2). A blockout-only import leaves them as they are: its actors
+        # go, the assets stay for the next import with stage 2 (deleting tens of thousands of
+        # meshes takes Unreal an hour)
         folder = f"{self.root}/{STAGE2_FOLDER}"
         if not self.s2 or not EAL.does_directory_exist(folder):
             return
         want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
                 for m in p["meshes"]}
         want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
-        mats = f"{folder}/Materials/"
         stale = [a for a in EAL.list_assets(folder, recursive=True)
-                 if a.split(".")[0] not in want and not a.startswith(mats)]
+                 if a.split(".")[0] not in want and not stage2_kept(self.root, a)]
         if stale:
             REPORT.note(f"deleting {len(stale)} stage 2 meshes no entry uses")
         self.stats["stage2"]["meshes"]["deleted"] += delete_assets(stale)

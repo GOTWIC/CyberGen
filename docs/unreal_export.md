@@ -605,7 +605,9 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
   another era updates only that actor;
 - `textures2`: each texture imported (`AssetImportTask`) when missing or of another hash,
   with its color space, compression (`TC_NormalMap` with the green channel flipped,
-  `TC_Masks`, default) and texture group; the city's pages it no longer has deleted;
+  `TC_Masks`, default) and texture group; the city's pages it no longer has deleted (the
+  stage 2 mesh prune leaves `Assets/Textures` to it, and `Assets/Materials` to
+  `materials2`);
 - `/Game/CityGen/Core/MPC_CityGen` with `Night` (0 by day; stage 3 drives it): the rooms
   light, neon and signs glow with it;
 - the masters rebuilt (`STAGE2_VERSION` 4) with Custom HLSL nodes for the surface, the

@@ -921,6 +921,29 @@ def test_stage2_textured_props_and_signs(staged):
     assert 'tparam(m, "SignTex", "color"' in src and "HOLO_CODE" in src
 
 
+def test_stage2_prune_keeps_materials_and_sign_pages():
+    """Stage 2's mesh prune deletes the meshes no entry names, never the city's material
+    instances or AG6 sign pages (materials2 and textures2 prune those): the importer's rule,
+    run outside Unreal."""
+    import ast
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    names = ("STAGE2_FOLDER", "STAGE2_KEPT")
+    body = [n for n in ast.parse(src).body
+            if (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in names
+                                                  for t in n.targets))
+            or (isinstance(n, ast.FunctionDef) and n.name == "stage2_kept")]
+    ns = {}
+    exec(compile(ast.Module(body=body, type_ignores=[]), "import_city.py", "exec"), ns)
+    assert ns["STAGE2_FOLDER"] == U.STAGE2_FOLDER
+    kept, root = ns["stage2_kept"], "/Game/CityGen/Greyhook"
+    assert kept(root, f"{root}/{U.TEXTURE_FOLDER_CITY}/T_city_ads_0.T_city_ads_0")
+    assert kept(root, f"{root}/Assets/Materials/MI_signs_page_ads_0.MI_signs_page_ads_0")
+    assert not kept(root, f"{root}/Assets/Buildings/t+00+00/d03_lot_e1n1_bld_shell.x")
+    assert not kept(root, f"{root}/Assets/PropsParts/birch/plant_birch_v0.plant_birch_v0")
+    assert not kept(root, f"{root}/Assets/TexturesOld/x.x")
+    assert "not stage2_kept(self.root, a)" in src
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()
