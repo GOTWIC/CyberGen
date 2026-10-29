@@ -26,6 +26,22 @@ in [`docs/assetgen_milestones.md`](../../../assetgen_milestones.md)).
   clumps as two crossed alpha-cut cards showing a leaf tile (broad, lobed, fan, needle,
   small), tinted per species; shrubs with leaf clumps over a solid body.
 
+## Awnings seen from below
+
+A shopfront street in Old Town (`--eye 877.6 -1232 1.6 --target 880.6 -1200 3.4`, lens 22,
+2400 px) after the fix: corrugated and tiled awnings show their undersides from the street.
+Before it, a canvas drawn once facing up was a back face from below, and the one-sided
+masters (Unreal, and AG8's Blender preview) culled it, leaving the frame.
+
+<img src="awnings_old_town.jpg" width="840">
+
+The same awnings alone, back faces culled as in Unreal (Blender Workbench): main above,
+the fix below; the corrugated sheets on the right show only their frame on main.
+
+<img src="awnings_culled_main_vs_fix.jpg" width="420">
+
+## Cameras
+
 Cameras (`--eye ... --target ...`, lens 22, 2400 px): Neon Strand from
 (-767.3, 1032.7, 2.3) to (-717.0, 989.4, 8.5); the avenue from (1015, 927.5, 1.7) to
 (1250, 932, 5).
