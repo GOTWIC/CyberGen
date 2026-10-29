@@ -11,7 +11,7 @@ from pathlib import Path
 from assetgen import canon as C
 from assetgen.brief import load_model
 from assetgen.props import build as PB
-from assetgen.props import glyphs as GL
+from assetgen.props import materials as MT
 from assetgen.props import signs as SG
 from assetgen.props import styles as ST
 from assetgen.props import trees as TR
@@ -74,7 +74,7 @@ def test_bytes_do_not_depend_on_workers(tmp_path):
 
 
 def test_families_and_meshes():
-    """4 to 12 variants per prop kind and style, 6 to 10 per tree species, every one a
+    """4 to 12 variants per prop kind and style, 6 or 8 per plant species, every one a
     valid mesh within its budget; the same parameters give the same mesh."""
     for kind, n in ST.PROP_VARIANTS.items():
         assert 4 <= n <= 12, kind
@@ -88,6 +88,10 @@ def test_families_and_meshes():
         assert (6 if sp in TR.TREES else 4) <= n <= 10, sp
         m = TR.make(sp, 0)
         assert 0 < m.triangles <= PB.PLANT_TRIANGLES and not any(check(m.slots).values())
+        # leaves on alpha-cut cards, each showing the whole leaf tile
+        for name, sl in m.slots.items():
+            if name.startswith("leaf."):
+                assert set(sl.uv) <= set(TR.CARD_UV) and len(sl.pos) % 4 == 0, (sp, name)
     a, b = TR.make("oak", 3), TR.make("oak", 3)
     assert {k: (s.pos, s.idx) for k, s in a.slots.items()} == \
         {k: (s.pos, s.idx) for k, s in b.slots.items()}
@@ -182,18 +186,56 @@ def test_contributions():
             assert not re.search(r"\.\d+$", n), n
 
 
-def test_glyphs():
-    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
-        assert GL.latin_glyph(ch), ch
-    strokes, (w, h) = GL.layout("NOODLES 24", "latin")
-    assert h == GL.CAP and 50 < w < 60 and strokes
-    a, _ = GL.layout("xxx", "hanzi", ("A",))
-    b, _ = GL.layout("xxx", "hanzi", ("B",))
-    assert a != b and a == GL.layout("xxx", "hanzi", ("A",))[0]
-    v, (vw, vh) = GL.layout("BAR", "latin", vertical=True)
-    assert vw == 6.0 and vh > 3 * GL.CAP
-    assert SG.shop_text("food", "Velvet Koi", "k") == "VELVET KOI"
-    assert SG.shop_text("bar", None, "k") == SG.shop_text("bar", None, "k")
+def test_signs_follow_ag6():
+    """One sign path: every sign says what AG6's signage gives its slot (text, script; the
+    style decides the body), a face shows its page cell on UV0 (read upright: the cell's
+    top on the face's top), and the text is laid out in AG6's strokes."""
+    from assetgen import spec as S
+    from assetgen.materials import signage as SG6
+    base, _ = _small()
+    model = load_model(base)[0]
+    doc = S.dump(S.fill(S.AssetSpec()))
+    slots, texts = SG6.slot_texts(model, SG6.district_styles(model, doc))
+    man = json.loads((base / "assets" / "props" / "manifest.json").read_text())
+    shop = [s for s in model.sign_slots if s.kind in ("shop_sign", "neon")]
+    assert shop
+    for s in shop:
+        rec = man["signs"][s.id]
+        assert rec["text"] == texts[slots[s.id]]["text"]
+        assert rec["script"] == texts[slots[s.id]]["script"]
+    st, (w, h) = SG.layout("NOODLES 24", "latin", False)
+    assert h == 6.0 and 45 < w < 55 and st
+    _, (vw, vh) = SG.layout("BAR", "latin", True)
+    assert vw <= 6.0 and vh > 3 * 6.0
+    inp = {"kind": "shop_sign", "mount": "facade", "w": 3.0, "h": 0.8, "look": "lightbox",
+           "text": "JADE KOI", "script": "latin", "colors": ["#ff3fb4", "#2fe0ff"],
+           "cell": {"slot": "page.signs_wide_0", "uv": [0.25, 0.5, 0.375, 0.53125]}}
+    m, _ = SG.make(inp)
+    f = m.slots["page.signs_wide_0"]
+    assert len(f.pos) == 4 and "sign.back" not in m.slots       # the text is the page's
+    top = max(p[2] for p in f.pos)
+    assert {uv for p, uv in zip(f.pos, f.uv) if p[2] == top} == {(0.25, 0.5), (0.375, 0.5)}
+    flat, _ = SG.make({k: v for k, v in inp.items() if k != "cell"})
+    assert "sign.back" in flat.slots                            # no pages: the strokes
+
+
+def test_every_slot_has_a_catalog_entry():
+    """Every material slot of the props, plants and signs maps to one of AG6's masters and
+    a library set (or none for what glows), and every leaf card slot to a leaf clump set."""
+    from assetgen.materials import catalog as CT
+    from assetgen.materials import library as LB
+    sets = LB.sets()
+    names = set(MT.SLOTS) | {n + ".d" for n in MT.SLOTS} | {
+        MT.neon_slot("#ff2a6d"), MT.face_slot("#ff2a6d"), MT.holo_slot("#ff2a6d"),
+        "page.signs_wide_0", "holopage.ads_1"}
+    for n in sorted(names):
+        master, st = CT.prop_set(n)
+        assert master in CT.MASTERS, n
+        assert st is None or st in sets, n
+        if n.startswith("leaf."):
+            assert master == "leaves" and st.startswith("leaves_"), n
+        if n.startswith(("bark.", "metal.", "car.", "fabric.", "plastic.")):
+            assert st is not None, n
 
 
 def test_golden():

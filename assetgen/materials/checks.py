@@ -12,8 +12,10 @@ building's base that is not a roof, every street piece) needs the spec's
 `texel_density_px_m` (512), the others `texel_density_upper_px_m` (256). A triangle meets it
 at three quarters of that or more (UV0 runs along a road's center line, so the outer edge
 of a curve, a bevel or a cylinder stretches it), and the check passes when at least 99.5 %
-of each part's textured area (buildings, streets) meets it; it lists the slots and pieces
-below it. The packs are read back (every triangle of every pack; positions and UV0 only).
+of each part's textured area (buildings, streets, AG8's props and signs) meets it; it lists
+the slots and pieces below it. The packs are read back (every triangle of every pack;
+positions and UV0 only). A leaf card shows a whole leaf tile, so its density is the tile's
+pixels over the card's side.
 
 **Library budget.** Section 11: the shared library at most 2.5 GB cooked (BC7 and BC5 at a
 byte per texel, mips 4/3) and 7 GB of source images; a city's signage at most 0.3 GB
@@ -100,18 +102,26 @@ def _density(pos, uv, tri):
     return rho, area, nz, zc, ok
 
 
+# the packs read: (part, folder, files); AG8's in their own frames (the variants and plants
+# before an instance scales them), every one within reach of the street
+FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
+           ("streets", "streets", "t*.glb"), ("props", "props/variants", "*.glb"),
+           ("props", "props/plants", "*.glb"), ("props", "props/tiles", "t*.glb"),
+           ("signs", "props/signs", "t*.glb"))
+
+
 def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int) -> dict:
     """The check over every pack of a build's assets (tiles/, AG2's parts/ in their own
-    frames, and streets/)."""
+    frames, streets/, and AG8's props/: variants, plants, exact props, signs)."""
     per: dict[str, dict] = {}
     parts: dict[str, list[float]] = {}
     tris = 0
     worst: dict[str, tuple] = {}
-    for part, folder in (("buildings", "tiles"), ("buildings", "parts"), ("streets", "streets")):
+    for part, folder, pat in FOLDERS:
         d = assets / folder
         if not d.is_dir():
             continue
-        for f in sorted(d.glob("t*.glb")):
+        for f in sorted(d.glob(pat)):
             for node, t, mat, pos, uv, tri in read_glb(f):
                 master, s = CT.set_for(mat, None, part)
                 if s is None or s not in lib["sets"]:

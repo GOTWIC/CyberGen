@@ -64,12 +64,15 @@ def rot(x: float, y: float, yaw_deg: float) -> tuple[float, float]:
     return (x * c - y * s, x * s + y * c)
 
 
-def quad_out(m: Mesh, slot: str, a, b, c, d, out) -> None:
-    """A planar quad a-b-c-d (in order round it), facing `out` (its winding fixed to it)."""
+def quad_out(m: Mesh, slot: str, a, b, c, d, out, uvs=None) -> None:
+    """A planar quad a-b-c-d (in order round it), facing `out` (its winding fixed to it);
+    UV0 in meters along its edges, or `uvs` per corner (a sign face's page cell)."""
     n = cross(sub(b, a), sub(c, a))
     if dot(n, out) < 0.0:
         a, b, c, d = a, d, c, b
-    m.quad(slot, a, b, c, d)
+        if uvs is not None:
+            uvs = (uvs[0], uvs[3], uvs[2], uvs[1])
+    m.quad(slot, a, b, c, d, uvs)
 
 
 def blk(m: Mesh, slot: str, x0: float, x1: float, y0: float, y1: float, z0: float,
@@ -161,10 +164,15 @@ def lathe(m: Mesh, slot: str, prof, n: int = 12, cx: float = 0.0, cy: float = 0.
     the bottom up; caps where the first or last radius is not zero."""
     rows, uvs = [], []
     rg = ring(n)
+    # v: meters along the profile, u: round it (at the profile's widest radius)
+    vs = [0.0]
+    for (r0, z0), (r1, z1) in zip(prof, prof[1:]):
+        vs.append(vs[-1] + math.sqrt((r1 - r0) ** 2 + (z1 - z0) ** 2))
+    rmax = max(r for r, _ in prof)
     for k in range(n + 1):
         c, s = rg[k % n]
         rows.append([(cx + r * c, cy + r * s, z) for r, z in prof])
-        uvs.append([(r * 2.0 * M.PI * k / n, z) for r, z in prof])
+        uvs.append([(rmax * 2.0 * M.PI * k / n, v) for v in vs])
     m.grid(slot, rows, uvs)
     if caps:
         r0, z0 = prof[0]
@@ -180,10 +188,15 @@ def tube(m: Mesh, slot: str, pts, radii, n: int = 6, caps: bool = True,
     """A tube along a 3D polyline (radius per point or one radius), parallel-transport
     frames so it does not twist; flat caps at both ends."""
     pts = [tuple(p) for p in pts]
+    rr = list(radii) if isinstance(radii, (list, tuple)) else [radii] * len(pts)
+    # a point repeated at the same radius adds nothing but a ring with no tangent
+    keep = [0] + [i for i in range(1, len(pts))
+                  if sum((pts[i][j] - pts[i - 1][j]) ** 2 for j in range(3)) > 2.5e-7
+                  or rr[i] != rr[i - 1]]
+    pts, rr = [pts[i] for i in keep], [rr[i] for i in keep]
     k = len(pts)
     if k < 2:
         return
-    rr = radii if isinstance(radii, (list, tuple)) else [radii] * k
     tans = []
     for i in range(k):
         a = pts[max(i - 1, 0)]
@@ -203,8 +216,9 @@ def tube(m: Mesh, slot: str, pts, radii, n: int = 6, caps: bool = True,
         bi = cross(t, nrm)
         frames.append((nrm, bi))
         if i:
+            # along the surface: a radius step at one point (a flat ring) advances it too
             d = sub(pts[i], pts[i - 1])
-            s_acc += math.sqrt(dot(d, d))
+            s_acc += math.sqrt(dot(d, d) + (rr[i] - rr[i - 1]) ** 2)
         ring_pts = []
         uv_row = []
         for j in range(n + 1):
@@ -237,16 +251,27 @@ def fan(m: Mesh, slot: str, center, pts3, out) -> None:
     n3 = norm(out)
     c = m.P(*center)
     ci = m._add(sl, c, n3, (0.0, 0.0))
+    # UV0 in meters on the fan's own plane
+    ea = norm(cross(n3, (0.0, 0.0, 1.0) if abs(n3[2]) < 0.9 else (1.0, 0.0, 0.0)))
+    eb = cross(n3, ea)
     ids = []
     for p in pts3:
         q = m.P(*p)
-        ids.append(m._add(sl, q, n3, ((p[0] - center[0]) + (p[1] - center[1]),
-                                      p[2] - center[2])))
+        d = sub(p, center)
+        ids.append(m._add(sl, q, n3, (dot(d, ea), dot(d, eb))))
     e = (int(round(out[0] * 1000)), int(round(out[1] * 1000)), int(round(out[2] * 1000)))
     for i in range(len(ids)):
         a, b = ids[i], ids[(i + 1) % len(ids)]
         if not m._tri(sl, ci, a, b, e):
             m._tri(sl, ci, b, a, e)
+
+
+def arcs(pts) -> list[float]:
+    """Cumulative lengths along a 2D or 3D polyline (a curved grid's UV0 across it)."""
+    out = [0.0]
+    for p, q in zip(pts, pts[1:]):
+        out.append(out[-1] + math.sqrt(sum((q[k] - p[k]) ** 2 for k in range(len(p)))))
+    return out
 
 
 def catenary(a, b, sag: float, n: int = 10) -> list[tuple[float, float, float]]:

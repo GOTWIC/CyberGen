@@ -3,12 +3,14 @@ materials.
 
 1. `library_for(spec)`: the library at the spec's texel densities (`library.generate`,
    kept when its generator is unchanged), linked as `BUILD/assets/library`.
-2. After the buildings and the streets (`stage`): the city's sign, ad and logo pages
-   (`signage`, `BUILD/assets/textures/`, `signs.json`), `materials.json` (every material of
-   the city's contributions with its master, textures and parameters, and the texture
-   table), `unreal_contribution.materials.json` (`contrib.materials_part`), the checks
-   (texel density from the packs' UVs, texture budgets) and `materials_report.json` /
-   `.txt` (written only when another file changed, so an unchanged rebuild writes none).
+2. After the buildings and the streets: the city's sign, ad and logo pages (`signage`,
+   `BUILD/assets/textures/`, `signs.json`), which AG8's sign meshes then show.
+3. After AG8's props (`stage`): `materials.json` (every material of the city's
+   contributions with its master, textures and parameters, and the texture table),
+   `unreal_contribution.materials.json` (`contrib.materials_part`), the checks (texel
+   density from the packs' UVs, AG8's props and plants among them, texture budgets) and
+   `materials_report.json` / `.txt` (written only when another file changed, so an
+   unchanged rebuild writes none).
 """
 
 from __future__ import annotations
@@ -65,11 +67,20 @@ def link(out: Path, target: Path) -> None:
     p.symlink_to(target, target_is_directory=True)
 
 
-def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print) -> dict:
+def signage(model, out: Path, spec_doc: dict, log=print) -> dict:
+    """The city's sign pages and signs.json (`signage.build`; "wrote": files written)."""
+    density = int(spec_doc.get("texel_density_px_m", LB.DENSITY))
+    return SG.build(model, spec_doc, out / "textures", density, log)
+
+
+def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print,
+          signs: dict | None = None) -> dict:
+    """`signs`: the pages already made this build (`signage`), else made here."""
     t0 = time.perf_counter()
     density = int(spec_doc.get("texel_density_px_m", LB.DENSITY))
     upper = int(spec_doc.get("texel_density_upper_px_m", LB.UPPER))
-    signs = SG.build(model, spec_doc, out / "textures", density, log)
+    if signs is None:
+        signs = signage(model, out, spec_doc, log)
     wrote = signs.pop("wrote")
     t1 = time.perf_counter()
     con = CO.materials_part(model.name, model_sha, lib, signs)
@@ -77,7 +88,7 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
                                      MF.dumps(con)))
     doc = {"version": 1, "city": model.name, "library": con["library"],
            "parts": {}, "textures": {}}
-    for part in ("buildings", "streets", "materials"):
+    for part in ("buildings", "streets", "props", "signs", "materials"):
         p = out / f"unreal_contribution.{part}.json"
         if not p.is_file():
             continue

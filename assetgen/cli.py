@@ -222,8 +222,13 @@ def cmd_props(args: argparse.Namespace) -> int:
             return EXIT_INVALID
         spec = res.filled
     out = Path(args.out) if args.out else bdir / "assets"
+    lib = None
+    if (out / "library").exists():
+        # AG6 ran on this build: textured materials and the sign pages on the faces
+        from .materials.build import library_for
+        lib = library_for(S.dump(spec if spec is not None else S.fill(S.AssetSpec())), out)
     rep = props_build(model, sha, out, spec, workers=args.workers or default_workers(),
-                      force=args.force)
+                      force=args.force, lib=lib)
     st, f = rep["stats"], rep["files"]
     print(f"{rep['city']}: {st['variants']} variants in {st['families']} families, "
           f"{st['instances']} instances, {st['signs']} signs, {st['unique_triangles']} unique "

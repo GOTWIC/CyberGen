@@ -11,7 +11,9 @@ compute (`citygen/ue/import_city.py`, `stage2_master`), so the previews show the
   by floor height), the view ray into the room in the facade's frame (along the wall, up,
   into the wall), the hit point projected onto the interior atlas's one-point image, a room
   per cell by hash, its blinds, lit at night by the building's lit ratio;
-- `neon`, `emissive`: emission; `sign`: an atlas page as emission; `translucent`.
+- `neon`, `emissive`: emission; `sign`: an atlas page as emission; `translucent`;
+- `leaves` (AG8's leaf cards): the leaf clump tile, tinted, cut by its leaf cover; `holo`
+  (AG8's holo-ads): the holo ad page glowing, see-through by its brightness.
 
 A building's parameters come from the object's custom properties (`cg_wall`... tints from
 the glTF node extras, the rest set by the preview script: `cg_room`, `cg_floorh`, `cg_row`,
@@ -144,6 +146,13 @@ def srgb_linear(c):
     return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
 
 
+LINEAR_PARTS = ("buildings", "props", "signs")      # (AG7 writes its colors as sRGB)
+
+
+def _lin(rec, part):
+    return rec["color"] if part in LINEAR_PARTS else srgb_linear(rec["color"])
+
+
 def _tint(t, rec, part):
     """The tint (linear RGB) a textured material puts over its set's tinted pixels."""
     tc = rec.get("tint_cpd")
@@ -155,10 +164,7 @@ def _tint(t, rec, part):
             col = t.v("MULTIPLY", t.v("SCALE", col, scale=rec.get("tint_scale", 1.0)),
                       tuple(rec["color"]))
         return col
-    c = rec["color"]
-    if part != "buildings":
-        c = srgb_linear(c)      # AG7 writes sRGB
-    return tuple(c)
+    return tuple(_lin(rec, part))
 
 
 def textured(mat, rec, files, part):
@@ -346,7 +352,7 @@ def glass(mat, rec, files, part, sky=(0.24, 0.34, 0.48)):
 def emissive(mat, rec, part, strength):
     t = T(mat)
     bsdf = t.n["Principled BSDF"]
-    c = rec["color"] if part == "buildings" else srgb_linear(rec["color"])
+    c = _lin(rec, part)
     bsdf.inputs["Base Color"].default_value = (c[0], c[1], c[2], 1.0)
     bsdf.inputs["Emission Color"].default_value = (c[0], c[1], c[2], 1.0)
     night = _night(t)
@@ -369,9 +375,70 @@ def sign(mat, path, strength):
     return mat
 
 
+def leaves(mat, rec, files, part):
+    """AG8's leaf cards: the leaf clump tile on UV0 / TileM, the tint over its leaves, cut
+    where the tile has no leaf (the tint mask: ORM alpha), two-sided."""
+    t = T(mat)
+    bsdf = t.n["Principled BSDF"]
+    sc = rec.get("scalars", {})
+    uv = t.new("ShaderNodeUVMap", uv_map="UVMap").outputs["UV"]
+    tuv = t.v("SCALE", uv, scale=1.0 / sc.get("TileM", 1.0))
+    tx = rec["textures"]
+    base, _ = t.tex(files[tx["BaseTex"]], tuv, True)
+    nrm, _ = t.tex(files[tx["NormalTex"]], tuv, False)
+    orm, mask = t.tex(files[tx["OrmTex"]], tuv, False)
+    ao, rough, _ = t.xyz(orm)
+    ref = rec.get("vectors", {}).get("RefColor", [0.2, 0.2, 0.2])
+    ratio = t.v("DIVIDE", _tint(t, rec, part), tuple(max(c, 0.02) for c in ref))
+    col = t.v("SCALE", t.v("MULTIPLY", base, ratio),
+              scale=t.m("ADD", 0.35, t.m("MULTIPLY", ao, 0.65)))
+    t.link(col, bsdf.inputs["Base Color"])
+    t.link(rough, bsdf.inputs["Roughness"])
+    t.link(t.m("GREATER_THAN", mask, 0.5), bsdf.inputs["Alpha"])
+    nm = t.new("ShaderNodeNormalMap", space="TANGENT", uv_map="UVMap")
+    t.link(nrm, nm.inputs["Color"])
+    t.link(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    try:
+        mat.surface_render_method = "DITHERED"
+    except AttributeError:
+        mat.blend_method = "CLIP"
+    mat.use_backface_culling = False
+    return mat
+
+
+def holo(mat, rec, files, part):
+    """A holo-ad screen: its color, AG6's holo ad page where it has one, glowing and
+    see-through by its brightness."""
+    t = T(mat)
+    bsdf = t.n["Principled BSDF"]
+    sc = rec.get("scalars", {})
+    c = _lin(rec, part)
+    strength = sc.get("Emissive", 3.0)
+    path = files.get((rec.get("textures") or {}).get("SignTex", ""))
+    bsdf.inputs["Base Color"].default_value = (0.0, 0.0, 0.0, 1.0)
+    if path:
+        uv = t.new("ShaderNodeUVMap", uv_map="UVMap").outputs["UV"]
+        tc, _ = t.tex(path, uv, True)
+        t.link(t.v("MULTIPLY", tc, tuple(2.0 * x for x in c)), bsdf.inputs["Emission Color"])
+        cx, cy, cz = t.xyz(tc)
+        lum = t.m("MAXIMUM", cx, t.m("MAXIMUM", cy, cz))
+        t.link(t.m("MULTIPLY", sc.get("Opacity", 0.6), t.m("ADD", 0.25, t.m("MULTIPLY", lum, 0.75))),
+               bsdf.inputs["Alpha"])
+    else:
+        bsdf.inputs["Emission Color"].default_value = (c[0], c[1], c[2], 1.0)
+        bsdf.inputs["Alpha"].default_value = sc.get("Opacity", 0.45)
+    bsdf.inputs["Emission Strength"].default_value = strength
+    try:
+        mat.surface_render_method = "BLENDED"
+    except AttributeError:
+        mat.blend_method = "BLEND"
+    mat.use_backface_culling = False
+    return mat
+
+
 def flat(mat, rec, part):
     bsdf = mat.node_tree.nodes["Principled BSDF"]
-    c = rec["color"] if part == "buildings" else srgb_linear(rec["color"])
+    c = _lin(rec, part)
     bsdf.inputs["Base Color"].default_value = (c[0], c[1], c[2], 1.0)
     bsdf.inputs["Roughness"].default_value = rec.get("roughness", 0.8)
     bsdf.inputs["Metallic"].default_value = rec.get("metallic", 0.0)
@@ -423,6 +490,13 @@ def make(name, rec, files, part):
     if master in ("facade", "concrete", "metal", "road", "foliage") and \
             rec.get("scalars", {}).get("Textured", 0.0) > 0:
         return textured(mat, rec, files, part)
+    if master == "leaves" and rec.get("scalars", {}).get("Textured", 0.0) > 0:
+        return leaves(mat, rec, files, part)
+    if master == "holo":
+        return holo(mat, rec, files, part)
+    if master == "sign" and "SignTex" in (rec.get("textures") or {}):
+        return sign(mat, files[rec["textures"]["SignTex"]],
+                    rec.get("scalars", {}).get("SignStrength", 4.0))
     if master == "glass":
         return glass(mat, rec, files, part)
     if master in ("neon", "emissive"):

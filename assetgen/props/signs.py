@@ -1,100 +1,61 @@
-"""Sign assets (scope 5.5): an asset for every M11 sign slot.
+"""Sign assets (scope 5.5): an asset for every M11 sign slot, one sign path with AG6.
 
-Each slot is gathered into inputs (`inputs`: its kind, mount, size, text, script, look, neon
-colors and the gap to its wall from the brief), and made from them alone (`make`), in the
+AG6 (`assetgen/materials/signage.py`) decides what every slot says and how it shows it: the
+text (a point of interest's name, a shop name drawn for its district and use, a district's
+or a brand's name), the script, the style (neon, lightbox or LED), the two colors, and for
+the flat styles a cell of the city's sign pages (`signs.json`); billboards and holo-ads a
+cell of its ad pages. AG8 makes the sign itself from those inputs alone (`make`), in the
 slot's frame: x the direction it faces, y to its left along the face, z up, the origin the
-middle of its face (M11's position). Text reads left to right for a viewer in front.
+middle of its face (M11's position).
 
 | slot | made as |
 |---|---|
-| shop sign, facade | a lightbox (lit face, dark letters), a panel (dark face, lit letters), neon tubes along the glyph strokes on a backboard with an outline, or channel letters on a raceway; standoffs back to the wall where the brief finds it off the wall |
-| shop sign, blade | a vertical box on two arms from the wall, the text stacked down both faces, lit or in neon tubes |
-| billboard | a steel frame and a lit content face (a headline, a color band, a logo disc), lamps on arms, a truss and catwalk on roofs (two faces), a standoff box on facades |
-| holo-ad | a projector on the roof (Nanite) and the image: translucent emissive planes with the text, frame and scan bands, as a non-Nanite LOD chain (`extra`) |
-| neon band | a backboard on the facade with a stacked word in neon tubes, an outline and chevrons |
+| shop sign, facade | neon: tubes along the text's strokes (AG6's glyphs) on a backboard with an outline; lightbox: a box whose face shows the page cell; LED: a dark panel whose face shows the page cell; channel letters (a lightbox in a sleek district, by a hash): lit letters on a raceway; standoffs back to the wall where the brief finds it off the wall |
+| shop sign, blade | neon: an open skeleton with the text stacked in tubes; lightbox and LED: a box on two arms, both faces showing the (tall) page cell |
+| billboard | a steel frame, the ad's cell on its face (both faces on roofs), lamps on arms, a truss and catwalk on roofs |
+| holo-ad | a projector on the roof (Nanite) and the image: the holo ad's cell on translucent emissive planes with frame and scan bands, as a non-Nanite LOD chain (`extra`) |
+| neon band | a backboard on the facade with the district's name stacked in neon tubes, an outline and chevrons |
 
-Text: a point of interest's name where one is in the sign's unit, else a generated shop name
-for the unit's use (`USE_WORDS` and citygen's name lists), billboard and holo-ad brands from
-the city's corporations; the second line in the district's script (`glyphs.py`).
+A face is a quad whose UV0 is its page cell (slot `page.<page>`, AG6's `sign` master;
+`holopage.<page>` on the holo master), so the text, the brand and the ad are AG6's pixels;
+neon and channel letters are geometry in AG6's strokes, so they read the same as AG6 would
+draw them. Without the pages (no library: `--no-textures`) a lightbox or LED face is lit
+flat and carries the text as flat strokes, and an ad face is lit flat.
 """
 
 from __future__ import annotations
 
-from . import glyphs as GL
+from ..materials import glyphs as GL
 from . import materials as MT
-from . import styles as ST
 from .shapes import Mesh, add, blk, cross, fan, mul, quad_out, ring, sub, tube
 
-USE_WORDS = {
-    "food": ("NOODLES", "RAMEN", "DUMPLINGS", "GRILL", "TACOS", "PHO", "SUSHI", "KEBAB",
-             "BAO", "CURRY", "EATS", "WOK", "BBQ", "DINER"),
-    "bar": ("BAR", "LOUNGE", "TAVERN", "SAKE", "PUB", "COCKTAILS", "TAPROOM"),
-    "club": ("CLUB", "DISCO", "LIVE", "DANCE", "NIGHT", "BASS", "RAVE"),
-    "arcade": ("ARCADE", "GAMES", "VR", "PLAY", "PACHINKO", "SLOTS"),
-    "cyberware": ("CYBERWARE", "CHROME", "IMPLANTS", "MODS", "AUGS", "OPTICS"),
-    "clinic": ("CLINIC", "PHARMACY", "MEDS", "DOC", "DENTAL", "LAB"),
-    "pawn": ("PAWN", "CASH", "GOLD", "LOANS", "BUY SELL", "TRADE"),
-    "convenience": ("24/7", "MART", "SHOP", "MINI MART", "STORE", "DELI"),
-    "laundromat": ("LAUNDRY", "WASH", "COIN WASH", "DRY CLEAN"),
-    "lobby": ("LOBBY", "HOTEL", "OFFICES", "RESIDENCE", "TOWER"),
-    "shop": ("SHOP", "STORE", "GOODS", "SUPPLY"),
-}
-BAND_WORDS = ("HOTEL", "LIVE", "BAR", "KARAOKE", "MAHJONG", "OPEN", "TATTOO", "CAFE",
-              "NOODLE", "MASSAGE", "CLUB", "24H", "CAPSULE", "LOUNGE")
-AD_WORDS = ("DRINK", "WEAR", "FEEL", "UPGRADE", "TRUST", "FLY", "LIVE", "BUY", "CHOOSE",
-            "DREAM", "PLUG IN", "GO")
-PRODUCTS = ("COLA", "ENERGY", "OPTICS", "CHROME", "NOODLE", "VAPOR", "JET", "SKIN", "SYNTH",
-            "PULSE", "ZERO", "NOVA", "BLISS", "LINK")
-LOOKS_FACADE = {"sleek": ("channel", "lightbox", "panel"), "civic": ("lightbox", "panel", "channel"),
-                "heavy": ("lightbox", "panel", "lightbox"), "neon": ("neon", "neon", "lightbox", "panel"),
-                "old": ("neon", "lightbox", "panel", "neon")}
-LOOKS_BLADE = {"sleek": ("panel", "lightbox"), "civic": ("lightbox", "panel"),
-               "heavy": ("lightbox", "panel"), "neon": ("neon", "neon", "lightbox"),
-               "old": ("neon", "lightbox", "neon")}
-FACE_COLORS = ("#f4f1ea", "#ffe39a", "#ffd0e0", "#d0f4ff", "#fff4d0", "#ff5050", "#ffcc33",
-               "#33ccff", "#ff66cc")
 TIP_MIN = 0.007
-
-
-def _words(seq, *key) -> str:
-    return ST.choice(seq, *key)
-
-
-def shop_text(use: str, poi: str | None, *key) -> str:
-    """A shop sign's text: its point of interest's name, else a generated name for its use
-    (a use word, sometimes with a name from citygen's lists in front)."""
-    if poi:
-        return poi.upper()
-    from citygen.gameplay import ADJ, NOUN, SURNAME
-    w = _words(USE_WORDS.get(use, USE_WORDS["shop"]), *key, "w")
-    r = ST.u(*key, "n")
-    if r < 0.3:
-        return f"{_words(ADJ, *key, 'a').upper()} {w}"
-    if r < 0.5:
-        return f"{_words(SURNAME, *key, 's').upper()} {w}"
-    if r < 0.6:
-        return f"{_words(NOUN, *key, 'o').upper()} {w}"
-    return w
-
-
-def script_of(era: str, weights: dict | None, *key) -> str:
-    """The script a sign's second line is in: by the era's (or the spec's) weights."""
-    from ..presets import ERA_PRESETS
-    w = weights or ERA_PRESETS.get(era, {}).get("signage_scripts") or {"latin": 1.0}
-    items = sorted(w.items())
-    tot = sum(v for _, v in items)
-    r = ST.u(*key, "script") * tot
-    acc = 0.0
-    for name, v in items:
-        acc += v
-        if r < acc:
-            return name
-    return items[-1][0]
+ROW = 7.2                       # a stacked piece's height in glyph units (AG6's `_fit`)
 
 
 # ---------------------------------------------------------------------------------------
 # text on a plane
 # ---------------------------------------------------------------------------------------
+
+def layout(text: str, script: str, vertical: bool):
+    """Strokes (glyph units: x right, y up, the block's bottom left at the origin) and the
+    block's size, as AG6 lays a sign's text out: one line, or the pieces stacked one per
+    row (blade signs, bands)."""
+    if not vertical:
+        st, tw = GL.layout(text, script)
+        if tw <= 0:
+            st, tw = GL.layout("OPEN", "latin")
+        return st, (float(tw), 6.0)
+    pieces = GL.units(text, script)[:8] or ["O"]
+    rows = [GL.unit_layout(p, script) for p in pieces]
+    wmax = max(float(w) for _, w in rows) or 1.0
+    n = len(rows)
+    out = []
+    for i, (st, w) in enumerate(rows):
+        ox, oy = (wmax - float(w)) / 2.0, (n - 1 - i) * ROW
+        out += [[(x + ox, y + oy) for x, y in s] for s in st]
+    return out, (wmax, n * ROW - (ROW - 6.0))
+
 
 def put_text(m: Mesh, slot: str, strokes, origin, right, up, unit: float, mode: str,
              normal, thick: float = 0.85) -> None:
@@ -139,7 +100,7 @@ def put_text(m: Mesh, slot: str, strokes, origin, right, up, unit: float, mode: 
             p = cross(normal, d)
             a2, b2 = sub(a, mul(d, t)), add(b, mul(d, t))
             q = (sub(a2, mul(p, t)), sub(b2, mul(p, t)), add(b2, mul(p, t)), add(a2, mul(p, t)))
-            # (two strokes of a generated glyph can land on the same millimeters)
+            # (two strokes of a composed glyph can land on the same millimeters)
             qk = tuple(sorted(tuple(int(round(v * 1000.0)) for v in c) for c in q))
             if qk in seen:
                 continue
@@ -147,12 +108,17 @@ def put_text(m: Mesh, slot: str, strokes, origin, right, up, unit: float, mode: 
             quad_out(m, slot, *q, normal)
 
 
-def fit(strokes_wh, w: float, h: float) -> float:
-    """The unit that fits a text block of (width, height) units into w by h meters."""
-    tw, th = strokes_wh
+def place(m: Mesh, slot: str, inp: dict, center, right, up, normal, bw: float, bh: float,
+          mode: str, vertical: bool = False, thick: float = 0.85) -> None:
+    """A slot's text fitted into bw x bh meters round `center` on the plane (right, up)."""
+    strokes, (tw, th) = layout(inp["text"], inp.get("script", "latin"), vertical)
     if tw <= 0 or th <= 0:
-        return 0.0
-    return min(w / tw, h / th)
+        return
+    u = min(bw / tw, bh / th)
+    if u <= 0:
+        return
+    origin = sub(sub(center, mul(right, tw * u / 2.0)), mul(up, th * u / 2.0))
+    put_text(m, slot, strokes, origin, right, up, u, mode, normal, thick)
 
 
 def outline(m: Mesh, slot: str, cy: float, cz: float, w: float, h: float, x: float,
@@ -165,6 +131,23 @@ def outline(m: Mesh, slot: str, cy: float, cz: float, w: float, h: float, x: flo
         pts = [(cy - w / 2, x, cz - h / 2), (cy + w / 2, x, cz - h / 2), (cy + w / 2, x, cz + h / 2),
                (cy - w / 2, x, cz + h / 2), (cy - w / 2, x, cz - h / 2 + 0.001)]
     tube(m, slot, pts, r, 4, caps=False)
+
+
+def face(m: Mesh, inp: dict, x: float, y0: float, y1: float, z0: float, z1: float, s: float,
+         lit: str) -> bool:
+    """A sign's flat face at x (looking along s x): its page cell when it has one (True),
+    else lit flat in `lit` (False). The cell reads upright for a viewer in front."""
+    n = (s, 0.0, 0.0)
+    cell = inp.get("cell")
+    # the viewer on side s has "right" along s y
+    a, b = (x, -s * (y1 - y0) / 2.0 + (y0 + y1) / 2.0, z0), (x, s * (y1 - y0) / 2.0 + (y0 + y1) / 2.0, z0)
+    c, d = (b[0], b[1], z1), (a[0], a[1], z1)
+    if cell:
+        u0, v0, u1, v1 = cell["uv"]
+        quad_out(m, cell["slot"], a, b, c, d, n, ((u0, v1), (u1, v1), (u1, v0), (u0, v0)))
+        return True
+    quad_out(m, lit, a, b, c, d, n)
+    return False
 
 
 # ---------------------------------------------------------------------------------------
@@ -188,56 +171,36 @@ def make(inp: dict) -> tuple[Mesh, list]:
     return m, []
 
 
-def _lines(inp: dict, vertical: bool = False):
-    """(main strokes and size, second strokes and size or None)."""
-    main = GL.layout(inp["text"], "latin", (), vertical)
-    sec = None
-    if inp.get("script", "latin") != "latin" and inp.get("glyphs", 0):
-        sec = GL.layout("x" * inp["glyphs"], inp["script"], (inp["text"],), vertical)
-        if inp["script"] == "cyrillic":
-            sec = GL.layout(inp["text"], "cyrillic", (), vertical)
-    return main, sec
-
-
 def facade(m: Mesh, inp: dict) -> None:
     w, h, look = inp["w"], inp["h"], inp["look"]
     neon, neon2 = MT.neon_slot(inp["colors"][0]), MT.neon_slot(inp["colors"][1])
-    lit = MT.face_slot(inp["face"])
+    lit = MT.face_slot(inp["colors"][0])
     d = 0.15
     gap = inp.get("gap", 0.0)
-    (main, mwh), sec = _lines(inp)
+    xn = (1.0, 0.0, 0.0)
     if look == "lightbox":
         blk(m, "sign.box", -d, -0.012, -w / 2, w / 2, -h / 2, h / 2)
-        blk(m, lit, -0.012, 0.0, -w / 2 + 0.03, w / 2 - 0.03, -h / 2 + 0.03, h / 2 - 0.03)
-        tcol, mode = "sign.back", "flat"
-    elif look == "panel":
-        blk(m, "sign.face", -d, 0.0, -w / 2, w / 2, -h / 2, h / 2)
-        tcol, mode = lit, "flat"
+        if not face(m, inp, 0.0, -w / 2 + 0.03, w / 2 - 0.03, -h / 2 + 0.03, h / 2 - 0.03, 1.0,
+                    MT.face_slot("#f4f1ea")):
+            place(m, "sign.back", inp, (0.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), xn,
+                  w * 0.86, h * 0.62, "flat")
+    elif look == "led":
+        blk(m, "sign.face", -d, -0.004, -w / 2, w / 2, -h / 2, h / 2)
+        if not face(m, inp, 0.0, -w / 2 + 0.02, w / 2 - 0.02, -h / 2 + 0.02, h / 2 - 0.02, 1.0,
+                    "sign.face"):
+            place(m, lit, inp, (0.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), xn,
+                  w * 0.86, h * 0.62, "flat")
     elif look == "channel":
         blk(m, "sign.box", -d, -d + 0.06, -w / 2, w / 2, -h * 0.12, h * 0.12)
-        tcol, mode = lit, "flat"
+        place(m, lit, inp, (0.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), xn, w * 0.9,
+              h * 0.8, "flat")
+        blk(m, "sign.box", -d, -0.02, -w / 2 + 0.05, w / 2 - 0.05, -h / 2, h / 2)
     else:
         blk(m, "sign.back", -d, -d + 0.04, -w / 2, w / 2, -h / 2, h / 2)
         outline(m, neon2, 0.0, 0.0, w - 0.08, h - 0.08, -d + 0.07, 0.015)
         blk(m, "sign.box", -d - 0.02, -d, w / 2 - 0.35, w / 2 - 0.1, -h / 2 + 0.05, -h / 2 + 0.25)
-        tcol, mode = neon, "tube"
-    face_x = 0.0 if look != "neon" else -d + 0.04
-    mw, mh = (w - 0.16, h * (0.62 if sec else 0.8))
-    u = fit(mwh, mw, mh)
-    if u > 0:
-        y0 = -mwh[0] * u / 2.0
-        z0 = (h / 2 - 0.06 - mwh[1] * u) if sec else -mwh[1] * u / 2.0
-        put_text(m, tcol, main, (face_x, y0, z0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), u, mode,
-                 (1.0, 0.0, 0.0))
-    if sec:
-        swh = sec[1]
-        u2 = fit(swh, w - 0.2, h * 0.26)
-        if u2 > 0:
-            put_text(m, neon2 if mode == "tube" else tcol, sec[0],
-                     (face_x, -swh[0] * u2 / 2.0, -h / 2 + 0.06), (0.0, 1.0, 0.0),
-                     (0.0, 0.0, 1.0), u2, mode, (1.0, 0.0, 0.0))
-    if look == "channel":
-        blk(m, "sign.box", -d, -0.02, -w / 2 + 0.05, w / 2 - 0.05, -h / 2, h / 2)
+        place(m, neon, inp, (-d + 0.04, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), xn,
+              w * 0.86, h * 0.62, "tube")
     if gap > 0.02:
         for y in (-w / 2 + 0.2, w / 2 - 0.2):
             for z in (-h / 4, h / 4):
@@ -250,17 +213,8 @@ def blade(m: Mesh, inp: dict) -> None:
     w, h, look = inp["w"], inp["h"], inp["look"]
     t = 0.24
     neon, neon2 = MT.neon_slot(inp["colors"][0]), MT.neon_slot(inp["colors"][1])
-    lit = MT.face_slot(inp["face"])
-    if look == "lightbox":
-        blk(m, "sign.box", -w / 2, w / 2, -t / 2 + 0.012, t / 2 - 0.012, -h / 2, h / 2)
-        for s in (-1.0, 1.0):
-            y0, y1 = sorted((s * (t / 2 - 0.012), s * t / 2))
-            blk(m, lit, -w / 2 + 0.04, w / 2 - 0.04, y0, y1, -h / 2 + 0.04, h / 2 - 0.04)
-        tcol, mode, face = "sign.back", "flat", t / 2
-    elif look == "panel":
-        blk(m, "sign.face", -w / 2, w / 2, -t / 2, t / 2, -h / 2, h / 2)
-        tcol, mode, face = lit, "flat", t / 2
-    else:
+    lit = MT.face_slot(inp["colors"][0])
+    if look == "neon":
         # neon on an open skeleton: a frame round the sign, the tubes once in its middle
         # plane (read from both sides, mirrored from the back, as on a real one)
         for z0, z1 in ((-h / 2, -h / 2 + 0.05), (h / 2 - 0.05, h / 2)):
@@ -268,7 +222,22 @@ def blade(m: Mesh, inp: dict) -> None:
         for x0, x1 in ((-w / 2, -w / 2 + 0.05), (w / 2 - 0.05, w / 2)):
             blk(m, "sign.frame", x0, x1, -0.04, 0.04, -h / 2 + 0.05, h / 2 - 0.05)
         outline(m, neon2, 0.0, 0.0, w - 0.16, h - 0.16, 0.0, 0.014, plane="xz")
-        tcol, mode, face = neon, "tube", 0.0
+        place(m, neon, inp, (0.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0),
+              (0.0, 1.0, 0.0), w * 0.72, h * 0.9, "tube", vertical=True)
+    else:
+        box = "sign.box" if look == "lightbox" else "sign.face"
+        blk(m, box, -w / 2, w / 2, -t / 2 + 0.012, t / 2 - 0.012, -h / 2, h / 2)
+        for s in (-1.0, 1.0):
+            # each face in the blade's xz plane, read from its side: the frame turned so
+            # that face's normal is the frame's x
+            g = Mesh((0.0, 0.0))
+            ok = face(g, inp, 0.0, -w / 2 + 0.04, w / 2 - 0.04, -h / 2 + 0.04, h / 2 - 0.04, 1.0,
+                      MT.face_slot("#f4f1ea") if look == "lightbox" else "sign.face")
+            if not ok:
+                place(g, "sign.back" if look == "lightbox" else lit, inp, (0.0, 0.0, 0.0),
+                      (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), w * 0.72, h * 0.9,
+                      "flat", vertical=True)
+            _turned(m, g, s, t / 2)
     # cap and the arms back to the wall
     blk(m, "sign.frame", -w / 2 - 0.03, w / 2 + 0.03, -t / 2 - 0.03, t / 2 + 0.03, h / 2,
         h / 2 + 0.06)
@@ -276,69 +245,40 @@ def blade(m: Mesh, inp: dict) -> None:
     for z in (h / 2 - 0.15, -h / 2 + 0.15):
         blk(m, "metal.dark", wall, -w / 2, -0.03, 0.03, z - 0.03, z + 0.03)
     blk(m, "metal.dark", wall, wall + 0.02, -0.12, 0.12, -h / 2 + 0.05, h / 2 - 0.05)
-    (main, mwh), sec = _lines(inp, vertical=True)
-    cols = [(main, mwh, tcol)]
-    if sec:
-        cols.append((sec[0], sec[1], neon2 if mode == "tube" else tcol))
-    n = len(cols)
-    colw = (w - 0.14) / n
-    for i, (strokes, wh, col) in enumerate(cols):
-        u = fit(wh, colw * 0.8, h - 0.2)
-        if u <= 0:
-            continue
-        cx = -w / 2 + 0.07 + colw * (i + 0.5)
-        for s in ((1.0,) if mode == "tube" else (-1.0, 1.0)):
-            # the viewer on side s has "right" along -s x
-            right = (-s, 0.0, 0.0)
-            origin = (cx, s * face, wh[1] * u / 2.0)
-            put_text(m, col, strokes, origin, right, (0.0, 0.0, 1.0), u, mode, (0.0, s, 0.0))
+
+
+def _turned(m: Mesh, g: Mesh, s: float, off: float) -> None:
+    """g (a face made looking along +x) put on the blade's side s: its x to s y at `off`,
+    its y to -s x."""
+    si = 1 if s > 0 else -1
+    shift = int(round(s * off * 1000.0))
+    for name, sl in g.slots.items():
+        dst = m._slot(name)
+        base = len(dst.pos)
+        for (x, y, z), uv in zip(sl.pos, sl.uv):
+            dst.pos.append((-si * y, si * x + shift, z))
+            dst.uv.append(uv)
+        for n in sl.nrm:
+            dst.nrm.append(None if n is None else (-si * n[1], si * n[0], n[2]))
+        dst.auto = dst.auto or sl.auto
+        dst.idx += [i + base for i in sl.idx]
 
 
 def billboard(m: Mesh, inp: dict) -> None:
     w, h = inp["w"], inp["h"]
     roof = inp["mount"] == "roof"
     two = inp.get("two_sided", roof)
-    base = MT.face_slot(inp["face"])
-    band = MT.face_slot(inp["colors"][0])
-    text = inp["text"]
     sides = (1.0, -1.0) if two else (1.0,)
     fx = 0.15 if two else 0.35
     if two:
         blk(m, "sign.frame", -0.15, 0.15, -w / 2, w / 2, -h / 2, h / 2)
     else:
         blk(m, "sign.frame", 0.0, 0.33, -w / 2, w / 2, -h / 2, h / 2)
-    (main, mwh) = GL.layout(text, "latin")
-    sub_t = GL.layout(inp.get("sub", ""), "latin") if inp.get("sub") else None
     for s in sides:
         x = s * fx
-        n = (s, 0.0, 0.0)
-        right = (0.0, s, 0.0)
         inset = min(0.25, 0.03 * w)
-        # the content face, a band, a logo disc, the headline
-        y0, y1 = -w / 2 + inset, w / 2 - inset
-        z0, z1 = -h / 2 + inset, h / 2 - inset
-        quad_out(m, base, (x + s * 0.002, y0, z0), (x + s * 0.002, y1, z0), (x + s * 0.002, y1, z1),
-                 (x + s * 0.002, y0, z1), n)
-        bz0 = z0 + (z1 - z0) * 0.12
-        bz1 = bz0 + (z1 - z0) * 0.2
-        quad_out(m, band, (x + s * 0.006, y0, bz0), (x + s * 0.006, y1, bz0),
-                 (x + s * 0.006, y1, bz1), (x + s * 0.006, y0, bz1), n)
-        r = (z1 - z0) * 0.22
-        cy = s * (y1 - r * 1.3) if inp.get("logo_right", True) else s * (y0 + r * 1.3)
-        pts = [(x + s * 0.008, cy + r * c, z1 - r * 1.3 + r * sn) for c, sn in ring(16)]
-        fan(m, MT.face_slot(inp["colors"][1]), (x + s * 0.008, cy, z1 - r * 1.3), pts, n)
-        u = fit(mwh, (y1 - y0) * 0.62, (z1 - z0) * 0.32)
-        if u > 0:
-            ty = -s * (y1 - y0) * 0.45
-            put_text(m, "sign.back" if inp.get("dark_text") else "sign.white", main,
-                     (x + s * 0.008, ty, bz1 + (z1 - z0) * 0.12), right, (0.0, 0.0, 1.0), u,
-                     "flat", n, 1.1)
-        if sub_t is not None:
-            u2 = fit(sub_t[1], (y1 - y0) * 0.6, (bz1 - bz0) * 0.6)
-            if u2 > 0:
-                put_text(m, base, sub_t[0], (x + s * 0.01, -s * (y1 - y0) * 0.45,
-                                             bz0 + (bz1 - bz0) * 0.2), right, (0.0, 0.0, 1.0),
-                         u2, "flat", n, 1.0)
+        face(m, inp, x + s * 0.002, -w / 2 + inset, w / 2 - inset, -h / 2 + inset,
+             h / 2 - inset, s, MT.face_slot(inp["colors"][0]))
         # lamps on arms along the bottom, pointing up at the face
         nl = max(2, int(w / 4.0))
         for i in range(nl):
@@ -370,25 +310,10 @@ def holo(m: Mesh, inp: dict) -> list:
     blk(m, "holo.base", -1.0, 1.0, -1.4, 1.4, roof, roof + 0.8)
     pts = [(0.7 * c, 0.7 * s, roof + 0.81) for c, s in ring(12)]
     fan(m, MT.neon_slot(inp["colors"][0]), (0.0, 0.0, roof + 0.81), pts, (0.0, 0.0, 1.0))
-    (main, mwh) = GL.layout(inp["text"], "latin")
-    sec = None
-    if inp.get("script", "latin") != "latin":
-        sec = GL.layout("x" * 3, inp["script"], (inp["text"],))
     lods = []
     for lod in range(3):
         q = Mesh((0.0, 0.0))
-        quad_out(q, c1, (0.0, -w / 2, -h / 2), (0.0, w / 2, -h / 2), (0.0, w / 2, h / 2),
-                 (0.0, -w / 2, h / 2), (1.0, 0.0, 0.0))
-        if lod < 2:
-            u = fit(mwh, w * 0.85, h * 0.25)
-            if u > 0:
-                put_text(q, c2, main, (0.03, -mwh[0] * u / 2.0, h * 0.12), (0.0, 1.0, 0.0),
-                         (0.0, 0.0, 1.0), u, "flat", (1.0, 0.0, 0.0), 1.0)
-            if sec:
-                u2 = fit(sec[1], w * 0.7, h * 0.35)
-                if u2 > 0:
-                    put_text(q, c2, sec[0], (0.03, -sec[1][0] * u2 / 2.0, -h * 0.4),
-                             (0.0, 1.0, 0.0), (0.0, 0.0, 1.0), u2, "flat", (1.0, 0.0, 0.0), 1.0)
+        face(q, inp, 0.0, -w / 2, w / 2, -h / 2, h / 2, 1.0, c1)
         if lod == 0:
             # frame strips, scan bands, the beam from the projector
             for z0, z1 in ((h / 2 - 0.25, h / 2), (-h / 2, -h / 2 + 0.25)):
@@ -407,23 +332,17 @@ def holo(m: Mesh, inp: dict) -> list:
 
 
 def band(m: Mesh, inp: dict) -> None:
-    """A neon band on a facade corner: a backboard (the wall at x = 0), a stacked word in
+    """A neon band on a facade corner: a backboard (the wall at x = 0), its text stacked in
     neon tubes, an outline and chevrons."""
     w, h = inp["w"], inp["h"]
     neon, neon2 = MT.neon_slot(inp["colors"][0]), MT.neon_slot(inp["colors"][1])
     blk(m, "sign.back", 0.0, 0.1, -w / 2, w / 2, -h / 2, h / 2)
     outline(m, neon2, 0.0, 0.0, w - 0.1, h - 0.1, 0.13, 0.018)
-    text = inp["text"]
-    script = inp.get("script", "latin")
-    strokes, wh = GL.layout(text, script, (inp.get("seed", text),), vertical=True)
     room = h - 0.3 - (1.2 if h > 6.0 else 0.0)
-    u = fit(wh, w * 0.7, room)
-    if u > 0:
-        put_text(m, neon, strokes, (0.1, 0.0, h / 2 - 0.15), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0),
-                 u, "tube", (1.0, 0.0, 0.0))
+    place(m, neon, inp, (0.1, 0.0, h / 2 - 0.15 - room / 2.0), (0.0, 1.0, 0.0),
+          (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), w * 0.7, room, "tube", vertical=h > w)
     if h > 6.0:
         for k in range(3):
             z = -h / 2 + 0.25 + k * 0.35
             tube(m, neon2, [(0.14, -w * 0.32, z), (0.14, 0.0, z + 0.22), (0.14, w * 0.32, z)],
                  0.016, 5)
-
