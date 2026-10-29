@@ -64,6 +64,7 @@ GAP_MIN = 60                 # between openings
 EDGE_CLEAR = 60              # an opening's pocket from the neighbor facade's plane
 MOUNT_PAD = 100
 THIN_MM = 2500               # masses thinner than this get no openings
+SILL_MIN = 100               # a window row's sill strip over the street front's band
 MAX_WIN_MM = 4000            # window height cap outside curtain walls
 DOOR_MIN_Z = 3200            # a balcony's floor line: its slab's underside 3 m up
 SNAP = 50                    # punched opening widths (mm), so frames repeat across facades
@@ -689,6 +690,11 @@ class ShellBuilder:
             # shed's clerestory)
             ground_row = next((r for r in rows if r[5] < band and r[0] < band - 400), None)
             rows = [r for r in rows if r[5] >= band or r[0] >= band]
+            # (AG4: a row of a floor under the band that starts on its top, e.g. a shed's tall
+            # window whose wall a roof form lowered, keeps a sill strip over it)
+            rows = [(max(r[0], band + SILL_MIN), r[1], r[2], r[3], max(r[4], band + SILL_MIN),
+                     r[5]) if r[5] < band and r[0] < band + SILL_MIN else r for r in rows]
+            rows = [r for r in rows if r[1] - r[0] >= 400]
             ms["band"] = band
             self.band_z = band if self.band_z is None else min(self.band_z, band)
         reveal = int(round(cont[f"{g}.reveal_m"] * 1000)) if sysname else 0
