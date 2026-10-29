@@ -338,9 +338,10 @@ street-front families in `frontparts.py`):
   within 15 m ahead (a road without a sidewalk on its side, open ground, a canal) is
   reported, not failed: the model put the entrance there) and
   `asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never
-  on glass, `fronts.mount_check`; one on an edge the shells tidy away, a spike of the lot's
-  ring, or over or under every wall of its edge, a shop sign over a low building under an
-  M14 deck, is reported apart); on a deck city the access check's paths are blocked only by
+  on glass, `fronts.mount_check`; one on a stretch of its edge the shells tidy away, a spike
+  of the lot's ring (all of the edge or all but a stub of it, `ShellBuilder.kept`), or over
+  or under every wall of its edge, a shop sign over a low building under an M14 deck, is
+  reported apart); on a deck city the access check's paths are blocked only by
   buildings of the door's own level; `asset_budget` counts 1,500 triangles per ground-floor
   unit and per street front on top of section 11's estimate;
 - **build** (`build.py`, `GEN_VERSION` ag3.5): the front node beside the shell in the tile

@@ -160,6 +160,25 @@ def test_mounts_sit_on_solid_wall():
     assert mc["mounts"] >= 1 and mc["on_glass"] == 0 and mc["no_wall"] == 0
 
 
+def test_a_mount_on_a_tidied_crack_is_counted_apart():
+    """A crack of no width cut 12 m into the footprint (out along one edge, back along the
+    next, 1 cm apart): the shell fills it, keeping a 1 cm stub of the first edge at its
+    mouth. A billboard on that edge stands where no wall is left: counted apart (`tidied`),
+    not as a mount with no wall."""
+    ext = [[-12.0, -6.0], [12.0, -6.0], [12.0, 6.0], [-12.0, 6.0], [-12.0, 0.01],
+           [0.0, 0.0], [-12.0, 0.0]]
+    br = brief_of([mass(ext, 0.0, 12.0, 3)], btype="building.perimeter",
+                  classes={(0, 0, 4): "open", (0, 0, 5): "open"})
+    br["sign_slots"] = [{"at": {"d": 0.0, "edge": 4, "mass": 0, "s": 6.0},
+                         "id": "d01.lot.e0n0.bld.slot.billboard", "mount": "facade",
+                         "position": [-6.0, 0.005, 8.0], "width_m": 4.0, "height_m": 2.0}]
+    sb = SH.ShellBuilder(br, GN.make(br))
+    sb.build()
+    assert [(round(a), round(b)) for a, b in sb.kept[4]] == [(0, 0)] and 5 not in sb.kept
+    mc = sb.checks["mounts"]
+    assert mc["mounts"] == 1 and mc["tidied"] == 1 and mc["no_wall"] == 0
+
+
 def test_decals_on_the_band():
     br = row()
     br["building"]["style"] = {"era": "heritage", "grime": 0.95, "neon": 0.6}

@@ -509,9 +509,9 @@ def landings(records: dict, skybridges: dict | None = None) -> dict:
 
 def mounts(records: dict) -> dict:
     """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building).
-    A mount on an edge of the footprint the shells tidy away (a spike or sliver of the lot's
-    ring: no wall stands there), over or under every wall of its edge (M14's decks) or in a
-    skybridge's landing door (AG4) is counted apart, the city's to change."""
+    A mount on a stretch of a footprint edge the shells tidy away (a spike or sliver of the
+    lot's ring: no wall stands there), over or under every wall of its edge (M14's decks) or
+    in a skybridge's landing door (AG4) is counted apart, the city's to change."""
     n = glass = nowall = tidied = off = landing = 0
     first = []
     for k in sorted(records):

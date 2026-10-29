@@ -1317,11 +1317,12 @@ MOUNT_KINDS = ("ac_unit", "wall_light", "sign", "awning", "overhead_cable")
 def mount_check(sb) -> dict:
     """Every mount on a panel or pier, never on glass (scope 9): each sign slot on a facade,
     each mounted prop on the wall (`on_wall`) and each facade plant, at its point (s, z) on
-    its brief edge, outside every opening cut there. A mount on an edge the shell tidied
-    away (a spike of the ring) or over or under every wall of its edge (a shop sign over a
-    low building under an M14 deck, a street's sign under a building on the deck) is counted
-    apart (`tidied`, `off`), and so is one in a skybridge's landing door (AG4: M6 does not
-    know where the bridges land; `in_landing`)."""
+    its brief edge, outside every opening cut there. A mount on a stretch of its edge the
+    shell tidied away (a spike of the ring, all of the edge or all but a stub of it) or over
+    or under every wall of its edge (a shop sign over a low building under an M14 deck, a
+    street's sign under a building on the deck) is counted apart (`tidied`, `off`), and so
+    is one in a skybridge's landing door (AG4: M6 does not know where the bridges land;
+    `in_landing`)."""
     br = sb.br
     items = []
     for sl in br["sign_slots"]:
@@ -1357,6 +1358,9 @@ def mount_check(sb) -> dict:
             off += 1                        # (over or under every wall of its edge)
             continue
         if _facade_at(sb, at["edge"], s, zz) is None:
+            if not any(a - 1 <= s <= b + 1 for a, b in sb.kept.get(at["edge"], ())):
+                tidied += 1                 # (off the stretch of its edge the tidying kept)
+                continue
             nowall += 1
             bad.append(f"{kind} {iid} (no wall)")
             continue

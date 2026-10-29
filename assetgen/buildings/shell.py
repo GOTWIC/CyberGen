@@ -497,6 +497,20 @@ class ShellBuilder:
         for j, e in enumerate(br["edges"]):
             edge_of[(e["mass"], e["ring"], e["i"])] = j
         self.edge_of = edge_of
+        # what of each brief edge the tidied rings keep (s spans in mm, before articulation):
+        # a mount off them stood on a stretch the tidying took away (`fronts.mount_check`)
+        kept: dict[int, list[tuple[float, float]]] = {}
+        for ms in masses:
+            for ring, eidx, rid in zip(ms["rings"], ms["eidx"], ms["rid"]):
+                for i in range(len(ring)):
+                    j = edge_of.get((ms["k"], rid, eidx[i]))
+                    if j is None:
+                        continue
+                    a0, ux, uy, _ = AR._edge_geom(br, j)
+                    s = [(p[0] - a0[0]) * ux + (p[1] - a0[1]) * uy
+                         for p in (ring[i], ring[(i + 1) % len(ring)])]
+                    kept.setdefault(j, []).append((min(s), max(s)))
+        self.kept = kept
         AR.articulate(self)
         CN.portals(self)
         RF.plan(self)
