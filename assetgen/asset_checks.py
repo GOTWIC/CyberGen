@@ -281,8 +281,9 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
     by stepping `STEP_M` out of the doorway (else further out, `STEPS_M`, past a corner of
     its own beside it) and walking straight to the walkway's nearest point, crossing no other
-    building (its own only within `OWN_M` of the door, under an arcade). An entrance keeps the model's walkway when that one is open to it; otherwise,
-    and for every unit's door, the door takes the nearest open one (the smallest id among
+    building of its level (its own only within `OWN_M` of the door, under an arcade). An
+    entrance keeps the model's walkway when that one is open to it; otherwise, and for
+    every unit's door, the door takes the nearest open one (the smallest id among
     equals), written into its record (`walkway_id`, `walkway_from`: model or front) for
     stage 4. Where the city leaves a door no walkway to open to, it is counted apart, the
     city's to change (scope 4.5), not as a failure: against a neighbor (its facade a party or
