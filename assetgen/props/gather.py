@@ -11,9 +11,9 @@ district's style, its variant, its instance transform, and for the meshes made p
 - **Plants**: species (M6's, else its type's), variant by a hash of the id, scaled to the
   plant's crown and height; facade greenery split into patches of about 1.5 m along its
   length (awnings likewise into segments of about 2 m).
-- **Signs**: per slot its text (the point of interest in its unit, else a generated shop
-  name; corporations of the city on billboards and holo-ads), script, look, colors (the
-  district's neon palette from the asset spec, else its era's) and the gap to its wall.
+- **Signs**: per slot AG6's text, script, style and colors (`materials/signage.py`, the
+  same draw its sign pages make), the page cell that shows it when the city's pages are made
+  (`BUILD/assets/signs.json`), the body AG8 makes it as and the gap to its wall.
 - **Ground** (M13): a model z is measured from the ground where it stands, so every
   placement is lifted by its building's `base_m` when it hangs on a building or stands on
   its roof (AG1's shells stand there), else by the finished ground at its point (as the
@@ -36,7 +36,6 @@ from citygen import geom as G
 from .. import canon as C
 from ..streets.ctx import Ground
 from . import materials as MT
-from . import signs as SG
 from . import styles as ST
 from .build import tile_center, tile_of
 from .trees import BASE
@@ -100,7 +99,8 @@ def _seg_dist(px, py, a, b) -> float:
     return math.sqrt(qx * qx + qy * qy)
 
 
-def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
+def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False) -> Gathered:
+    """`pages`: the sign faces show the city's sign pages (AG6's library is there)."""
     g = Gathered()
     ds = _Districts(model)
     blds = {b.id: b for b in model.buildings}
@@ -291,7 +291,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path) -> Gathered:
     g.exact = {t: [(k, k.split(".")[1], exact[t][k]) for k in sorted(exact[t])]
                for t in sorted(exact)}
     # -- signs
-    g.signs = _signs(model, spec, ds, blds, mount, lift)
+    g.signs = _signs(model, spec, ds, blds, mount, lift, out_dir if pages else None)
     n_inst = sum(len(p["xforms"]) for gr in g.groups.values() for p in gr["parts"].values())
     g.stats = {"props": len(model.props), "plants": len(model.plants),
                "sign_slots": len(model.sign_slots), "instances": n_inst,
@@ -311,42 +311,24 @@ def _palette(spec, d, did) -> list[str]:
     return list(MT.NEON_ERA.get(era, MT.NEON))
 
 
-def _scripts(spec, d) -> dict | None:
-    if spec is None or d is None:
-        return None
-    sd = (getattr(spec, "districts", None) or {}).get(d.name)
-    if sd is not None and getattr(sd, "signage_scripts", None):
-        return dict(sd.signage_scripts)
-    es = (getattr(spec, "eras", None) or {}).get(ST.era_of(d.archetype))
-    if es is not None and getattr(es, "signage_scripts", None):
-        return dict(es.signage_scripts)
-    return None
-
-
-def _unit_of(b, x: float, y: float) -> int | None:
-    if b is None or not b.units:
-        return None
-    best = None
-    for i, u in enumerate(b.units):
-        d = _seg_dist(x, y, u.edge[0], u.edge[1])
-        if best is None or d < best[0] - 1e-9:
-            best = (d, i)
-    return best[1]
-
-
-def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift) -> dict:
-    poi = {}
-    for p in sorted(model.pois, key=lambda p: p.id):
-        if p.building_id and p.unit_index is not None and p.kind in ("bar", "clinic", "vendor"):
-            poi.setdefault((p.building_id, p.unit_index), p.name)
-    corps_by_d = defaultdict(list)
-    corps = []
-    for f in sorted(model.factions, key=lambda f: f.id):
-        if f.kind == "corporate":
-            corps.append(f.name)
-            if f.home_district_id:
-                corps_by_d[f.home_district_id].append(f.name)
-    from citygen.gameplay import CORP_A
+def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift, out_dir) -> dict:
+    """Per tile its signs: per slot AG6's text, script, style and colors (`signage`: the
+    same draw its pages make), the cell of the city's sign pages that shows it (`signs.json`,
+    where the pages are made and the cell says the same text), the body AG8 makes it as
+    (`signs.make`) and the gap to its wall."""
+    from .. import spec as S
+    from ..materials import signage as SG6
+    doc = S.dump(spec if spec is not None else S.fill(S.AssetSpec()))
+    styles6 = SG6.district_styles(model, doc)
+    slots, texts = SG6.slot_texts(model, styles6)
+    SG6.ad_slots(model, slots)
+    cells = {}
+    p = Path(out_dir) / "signs.json" if out_dir is not None else None
+    if p is not None and p.is_file():
+        try:
+            cells = json.loads(p.read_text(encoding="utf-8")).get("cells") or {}
+        except (OSError, ValueError):
+            cells = {}
     out: dict = defaultdict(list)
     for s in sorted(model.sign_slots, key=lambda s: s.id):
         x, y, z = s.position
@@ -354,55 +336,38 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift) -> dict:
         b = blds.get(s.building_id) if s.building_id else None
         did = b.district_id if b is not None and b.district_id in ds.d else ds.of(s.id, x, y)
         d = ds.d.get(did)
-        era = ST.era_of(d.archetype if d is not None else None)
         st = ST.style_of(d.archetype if d is not None else None)
-        pal = _palette(spec, d, did)
-        c1 = ST.choice(pal, "ag8.c1", s.id)
-        rest = [c for c in pal if c != c1] or pal
-        c2 = ST.choice(rest, "ag8.c2", s.id)
-        script = SG.script_of(era, _scripts(spec, d), "ag8.sign", s.id)
+        key = slots.get(s.id, "")
+        cell = cells.get(key)
         inp = {"kind": s.kind, "mount": s.mount, "w": C.m2(round(s.width_m * 20) / 20.0),
-               "h": C.m2(round(s.height_m * 20) / 20.0), "colors": [c1, c2],
-               "face": (c2 if ST.u("ag8.fsat", s.id) < 0.55 else
-                        ST.choice(SG.FACE_COLORS, "ag8.face", s.id)), "style": st}
-        if s.kind == "shop_sign":
-            unit = _unit_of(b, x, y)
-            name = poi.get((s.building_id, unit)) if unit is not None else None
-            text = SG.shop_text(s.content, name, "ag8.shop", s.id)
-            blade = s.mount == "blade"
-            # a name too long for its sign keeps only its use word
-            limit = int(s.height_m / 0.32) if blade else int(s.width_m / 0.3)
-            if len(text) > max(limit, 3):
-                words = text.split()
-                text = words[-1] if len(words[-1]) <= max(limit, 3) else words[-1][:max(limit, 3)]
-            inp.update(text=text, script=script,
-                       glyphs=(2 + ST.pick(3, "ag8.gl", s.id)) if script != "latin" else 0,
-                       look=ST.choice((SG.LOOKS_BLADE if blade else SG.LOOKS_FACADE)[st],
-                                      "ag8.look", s.id))
+               "h": C.m2(round(s.height_m * 20) / 20.0), "style": st}
+        if key.startswith("ad:"):
+            pal = (styles6.get((b.district_id if b is not None else None) or "") or {}).get(
+                "palette") or list(SG6.ACCENTS)
+            c1 = ST.choice(pal, "ag8.c1", s.id)
+            c2 = ST.choice([c for c in pal if c != c1] or pal, "ag8.c2", s.id)
+            inp.update(colors=[c1, c2], two_sided=bool(s.two_sided), ad=key)
+            if cell is not None:
+                inp["cell"] = {"slot": ("holopage." if s.kind == "holo_ad" else "page.")
+                               + cell["page"], "uv": cell["uv"]}
+        else:
+            info = texts[key]
+            if s.kind == "neon" or info["style"] == "neon":
+                look = "neon"
+            elif info["style"] == "led":
+                look = "led"
+            elif s.mount != "blade" and st == "sleek" and ST.u("ag8.channel", s.id) < 0.5:
+                look = "channel"
+            else:
+                look = "lightbox"
+            inp.update(text=info["text"], script=info["script"], look=look,
+                       colors=[info["color"], info["color2"]])
+            if look in ("lightbox", "led") and cell is not None and \
+                    cell.get("text") == info["text"]:
+                inp["cell"] = {"slot": "page." + cell["page"], "uv": cell["uv"]}
             mm = mount.get(s.prop_id) if s.prop_id else None
             if mm and mm["gap"] > BRACKET_MIN_M:
                 inp["gap"] = C.m2(mm["gap"])
-            if script == "latin":
-                inp["script"] = "latin"
-        elif s.kind in ("billboard", "holo_ad"):
-            names = corps_by_d.get(did) or corps
-            if s.content == "corporate" and names:
-                brand = ST.choice(names, "ag8.brand", s.id).split()[0]
-            else:
-                brand = ST.choice(CORP_A, "ag8.brand", s.id)
-            prod = ST.choice(SG.PRODUCTS, "ag8.prod", s.id)
-            inp.update(text=brand.upper() if ST.u("ag8.bt", s.id) < 0.5 else f"{brand} {prod}".upper(),
-                       sub=f"{ST.choice(SG.AD_WORDS, 'ag8.ad', s.id)} {prod}",
-                       two_sided=bool(s.two_sided), script=script,
-                       dark_text=ST.u("ag8.dt", s.id) < 0.3,
-                       logo_right=ST.u("ag8.lr", s.id) < 0.5)
-        else:
-            if script in ("latin", "cyrillic"):
-                text = ST.choice(SG.BAND_WORDS, "ag8.band", s.id)
-            else:
-                text = "x" * (3 + ST.pick(3, "ag8.bn", s.id))
-                inp["seed"] = C.digest(["ag8.band", s.id])[:8]
-            inp.update(text=text, script=script)
         dg = C.digest(inp)
         # (an "h": Blender's glTF import reads a name ending in a dot and digits as a
         # counter, and a long one overflows it)
@@ -417,4 +382,3 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift) -> dict:
             if e["kind"] == "holo_ad":
                 e["node"] = e["id"]
     return {t: out[t] for t in sorted(out)}
-

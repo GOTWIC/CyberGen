@@ -4,11 +4,13 @@
 
 `assetgen materials preview` writes the job (`assetgen/materials/preview.py`). The scene is
 the blockout's city.blend without its building boxes and the street objects AG7 replaces;
-every far proxy is loaded once; per view the shells of its tiles and the street pieces near
-it are imported, their slots given AG6's materials (`ag6_materials.py`: a building's era
-for its walls and roof, its parameters as object properties), sign quads placed on the sign
-slots with their atlas cells, and the view rendered by day and, with lights at the street
-lights and the windows, signs and neon lit, by night.
+every far proxy is loaded once, and AG8's variant families as hidden prototypes; per view
+the shells of its tiles, the street pieces near it, AG8's instances (geometry nodes on a
+point cloud per variant), exact props and signs near it are imported, their slots given
+AG6's materials (`ag6_materials.py`: a building's era for its walls and roof, its
+parameters as object properties), sign quads placed on the sign slots with their atlas
+cells where AG8 has not made the signs, and the view rendered by day and, with lights at
+the street lights and the windows, signs and neon lit, by night.
 """
 
 import json
@@ -19,7 +21,7 @@ import sys
 import time
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -250,6 +252,71 @@ def signs(items):
     return objs
 
 
+def instance_group(name, proto):
+    """Geometry nodes: the prototype on every point, turned by `rot`, scaled by `scl`."""
+    ng = bpy.data.node_groups.new(f"ag8.{name}", "GeometryNodeTree")
+    ng.interface.new_socket(name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket(name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    N, L = ng.nodes, ng.links
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    iop = N.new("GeometryNodeInstanceOnPoints")
+    oi = N.new("GeometryNodeObjectInfo")
+    oi.transform_space = "ORIGINAL"
+    oi.inputs["As Instance"].default_value = True
+    oi.inputs["Object"].default_value = proto
+    att = {}
+    for a in ("rot", "scl"):
+        att[a] = N.new("GeometryNodeInputNamedAttribute")
+        att[a].data_type = "FLOAT_VECTOR"
+        att[a].inputs["Name"].default_value = a
+    L.new(gi.outputs["Geometry"], iop.inputs["Points"])
+    L.new(oi.outputs["Geometry"], iop.inputs["Instance"])
+    L.new(att["rot"].outputs["Attribute"], iop.inputs["Rotation"])
+    L.new(att["scl"].outputs["Attribute"], iop.inputs["Scale"])
+    L.new(iop.outputs["Instances"], go.inputs["Geometry"])
+    return ng
+
+
+def ag8(v, protos):
+    """AG8's instances, exact props and signs near a view; the objects made."""
+    objs = []
+    a8 = v.get("ag8") or {}
+    for node, pts in a8.get("points", {}).items():
+        proto = protos.get(node)
+        if proto is None:
+            continue
+        me = bpy.data.meshes.new(f"inst.{node}")
+        me.vertices.add(len(pts))
+        me.vertices.foreach_set("co", [c for p in pts for c in p[:3]])
+        r = me.attributes.new("rot", "FLOAT_VECTOR", "POINT")
+        r.data.foreach_set("vector", [c for p in pts for c in (0.0, 0.0, math.radians(p[3]))])
+        sc = me.attributes.new("scl", "FLOAT_VECTOR", "POINT")
+        sc.data.foreach_set("vector", [c for p in pts for c in p[4:7]])
+        me.update()
+        ob = bpy.data.objects.new(f"inst.{node}", me)
+        bpy.context.scene.collection.objects.link(ob)
+        ob.modifiers.new("instances", "NODES").node_group = instance_group(node, proto)
+        objs.append(ob)
+    for path in a8.get("exact", []):
+        objs += import_glb(path, "props")
+    meshes = {}
+    for path in sorted({s["glb"] for s in a8.get("signs", [])}):
+        for o in import_glb(path, "signs"):
+            o.hide_render = True
+            meshes.setdefault(SUFFIX.sub("", o.name), o)    # (a sign shared by two tiles)
+            objs.append(o)
+    for s in a8.get("signs", []):
+        src = meshes.get(s["node"])
+        if src is None or src.type != "MESH":
+            continue
+        ob = bpy.data.objects.new(s["key"], src.data)
+        ob.matrix_world = Matrix.Translation(Vector(s["pivot"])) @ \
+            Matrix.Rotation(math.radians(s["yaw"]), 4, "Z")
+        bpy.context.scene.collection.objects.link(ob)
+        objs.append(ob)
+    return objs
+
+
 def lamps(points):
     objs = []
     for k, (x, y, z) in enumerate(points):
@@ -296,6 +363,13 @@ def main():
                 if o.type == "MESH":
                     proxies[o.name.rsplit(".proxy", 1)[0]] = o
     log(f"proxies: {len(proxies)}")
+    protos = {}
+    for p in JOB.get("ag8_families", []):
+        for o in import_glb(p, "props"):
+            o.hide_render = True
+            o.hide_viewport = True
+            protos[SUFFIX.sub("", o.name)] = o
+    log(f"AG8 variants: {len(protos)}")
     rep = {"files": [], "views": []}
     for v in JOB["views"]:
         t = time.time()
@@ -313,7 +387,7 @@ def main():
         for o in objs:
             if ".glass.lod" in o.name and not o.name.endswith(".lod0"):
                 o.hide_render = True
-        sobjs = signs(v.get("signs", []))
+        sobjs = signs(v.get("signs", [])) + ag8(v, protos)
         cam = camera(sc, v)
         sc.render.resolution_x, sc.render.resolution_y = v["w"], v["h"]
         sc.render.resolution_percentage = 100

@@ -1,13 +1,16 @@
 """Variant sheets of AG8's prop and plant families (stdlib and bpy only; Blender only draws):
 
     blender -b --factory-startup -P assetgen/blender/props_sheet.py -- OUT.jpg GLB... \\
-        [--match PREFIX]... [--width W] [--samples N] [--night] [--title TEXT]
+        [--match PREFIX]... [--width W] [--samples N] [--night] [--title TEXT] \\
+        [--materials MATS.json]
 
 Imports the family packs (`BUILD/assets/props/variants/<kind>.glb`, `plants/<species>.glb`),
 keeps the nodes whose names start with one of the --match prefixes (`prop.street_light.sleek.`,
 `plant.oak.`; all when none), lays each family out as a row (its variants side by side, in
 index order; rows in the order of the prefixes, then by name), labels the rows and renders
 an isometric view from the south-west, by day or (--night) with the lamps and neon lit.
+With --materials (AG6's records of the props' slots and the texture files) the slots take
+AG6's textured materials (`ag6_materials.py`): bark, painted metal, the leaf cards cut.
 """
 
 import json
@@ -20,24 +23,28 @@ import time
 import bpy
 from mathutils import Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ag6_materials as AM  # noqa: E402
+
 T0 = time.time()
+SUFFIX = re.compile(r"\.\d{3}$")
 
 
 def parse():
     argv = sys.argv[sys.argv.index("--") + 1:]
     o = {"out": os.path.abspath(argv[0]), "glbs": [], "match": [], "width": 2400,
-         "samples": 32, "night": False, "title": ""}
+         "samples": 32, "night": False, "title": "", "materials": None}
     i = 1
     while i < len(argv):
         a = argv[i]
         if a in ("--width", "--samples"):
             o[a[2:]] = int(argv[i + 1])
             i += 2
-        elif a in ("--match", "--title"):
+        elif a in ("--match", "--title", "--materials"):
             if a == "--match":
                 o["match"].append(argv[i + 1])
             else:
-                o["title"] = argv[i + 1]
+                o[a[2:]] = argv[i + 1]
             i += 2
         elif a == "--night":
             o["night"] = True
@@ -68,6 +75,24 @@ def tune(night):
                 m.surface_render_method = "BLENDED"
             except AttributeError:
                 pass
+
+
+def textured(path, objs):
+    """Every slot AG6 has a record for given its textured material."""
+    with open(path, encoding="utf-8") as f:
+        job = json.load(f)
+    made = {}
+    for ob in objs:
+        for ms in ob.material_slots:
+            if ms.material is None:
+                continue
+            slot = SUFFIX.sub("", ms.material.name)
+            rec = job["materials"].get(slot)
+            if rec is None:
+                continue
+            if slot not in made:
+                made[slot] = AM.make(f"ag6_{slot}", rec, job["files"], "props")
+            ms.material = made[slot]
 
 
 def family_of(name):
@@ -167,6 +192,9 @@ def main():
     me.materials.append(gm)
     scene.collection.objects.link(g)
     tune(o["night"])
+    if o["materials"]:
+        textured(o["materials"], keep)
+        AM.set_night(1.0 if o["night"] else 0.0)
     # render setup
     scene.render.engine = "BLENDER_EEVEE"
     try:

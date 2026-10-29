@@ -440,8 +440,21 @@ its packs: `unreal_contribution.props.json` (`"part": "props"`) and
   (the planes, text, frame and scan bands; the text; one plane) on the `holo` master.
 - **Materials**: linear colors (no conversion, unlike AG7's); `neon` (emissive 8), `emissive`
   (lamps, screens, lit faces; 4), `holo` (translucent, two-sided, emissive 3), `foliage`
-  (two-sided). Flat colors until AG6's library: bark, leaves, painted metal, sign faces and
-  billboard content are what AG6 or a later pass textures.
+  (two-sided). With AG6's library (after AG6, `materials/contrib.props`) every slot takes
+  its catalog master and set (`catalog.PROP`), tinted by its color, with `textures`,
+  `scalars` and `vectors` as AG6's records and the contribution's `textures` table: painted,
+  galvanized and rusty metal, plastic, car paint, timber, fabric, bark (`bark_furrowed`,
+  `bark_smooth`, `bark_ringed`); leaf cards (`leaf.<species>`) on the `leaves` master with a
+  leaf clump set (`leaves_broad`, `_lobed`, `_fan`, `_needle`, `_small`; UV0 spans the whole
+  tile on each card); solid foliage (`foliage.<species>`: palms, sedum, scrub, a shrub's
+  body) on `foliage` with `grass`.
+- **One sign path with AG6**: AG6's signage gives every slot its text, script, style and
+  colors and draws the flat faces on the city's sign pages; AG8's sign faces are quads whose
+  UV0 is the slot's page cell, slot `page.<page>` (master `sign`, `SignTex` the page's
+  texture `city.<page>`, the same record as in `unreal_contribution.materials.json`) and a
+  holo-ad's screen `holopage.ads_1` (master `holo` with `SignTex`, `Textured` 1); neon tubes
+  and channel letters spell the same text in AG6's strokes. AG6's own sign quads are only a
+  preview of where AG8 has not run.
 - **Collision**: none on plants, signs and exact props (they stand off the walkways or over
   head); complex on prop variants.
 
@@ -454,7 +467,11 @@ its hash); transforms may carry a scale (`[x, y, z, yaw, sx, sy, sz]`); `EMISSIV
 `NaniteShapePreservation.VOXELIZE` on a mesh whose record asks for it, and makes `M_CgHolo`
 (the translucent master with an emissive strength). A part with `collision: {"none": true}`
 (plants) makes its instanced actor `no_collision` (the HISM's profile `NoCollision`; fixed in
-AG8's Unreal check, `docs/progress/AG8/unreal/`).
+AG8's Unreal check, `docs/progress/AG8/unreal/`). With AG6's materials (`STAGE2_VERSION` 5):
+`M_CgLeaves` (the leaf tile on UV0 / TileM, the tint over its leaves, the opacity mask its
+tint mask, masked and two-sided, Nanite `Voxelize` at distance as before) and `M_CgHolo`
+reading `SignTex` (the holo ad page as emission, the opacity by its brightness, where
+`Textured`).
 
 ## assetgen's materials (AG6)
 
@@ -565,3 +582,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG8 Unreal check | Plants' instanced actors without collision (a part's `collision: {"none": true}` now makes its HISM `NoCollision`; it reached only the mesh record before); the check tries a missed trace down again for up to 30 s (`TRACE_RETRY_S`) and counts those hits as late (the first play session after an import traced before the streamed cells' collision was in place: 346 of 507) (its streaming step's read of actors that had streamed out, which stopped Vesper Bay's first check, was fixed the same way by the play-ready exporter); `test_stage2_from_assetgen` expects the exact props' keys, whose actor changes class, as deleted and created (`manifest_changes` since the play-ready exporter) | as AG8's row |
 | AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |
+| AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Not run (the coordinating session's call; what to look for: leaves masked and two-sided up close and full at distance, sign faces showing their page cells upright, holo-ads textured, textured props) |

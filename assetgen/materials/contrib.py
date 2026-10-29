@@ -1,8 +1,8 @@
 """AG6's part of the Unreal contributions (`docs/unreal_export.md`, AG6): textured materials
-for the buildings' and streets' slots, the textures they read, per-building material maps
-and Custom Primitive Data, and a third file, `unreal_contribution.materials.json`, with the
-sign, ad and logo pages (masters `sign`) and the decal material for AG3's and AG8's
-placements.
+for the buildings', streets' and AG8's props' and signs' slots, the textures they read,
+per-building material maps and Custom Primitive Data, and a third file,
+`unreal_contribution.materials.json`, with the sign, ad and logo pages (masters `sign`) and
+the decal material for AG3's placements.
 
 Every material record keeps AG1's and AG7's fields (master, color, roughness, metallic,
 tint rule) and adds `textures` (parameter -> texture name), `scalars` and `vectors`; the
@@ -81,18 +81,59 @@ def streets(con: dict, lib: dict | None) -> dict:
     return con
 
 
+SIGN_STRENGTH = 4.0            # a sign page's emissive strength (the holo ads' page: 2)
+HOLO = {"Opacity": 0.6, "Emissive": 3.0}
+
+
+def page_texture(page: str, signs: dict) -> tuple[str, dict]:
+    """A sign page's texture name and record (the same in every contribution naming it)."""
+    f = signs["files"][page]
+    return f"city.{page}", {"file": f["file"], "pixels_sha256": f["pixels_sha256"],
+                            "size": f["size"], "srgb": True, "kind": "color"}
+
+
+def props(con: dict, lib: dict | None, signs: dict | None = None) -> dict:
+    """AG8's props or signs contribution with AG6's materials (in place; returned): every
+    slot its catalog master and set (`catalog.PROP`, tinted by the slot's color), a sign
+    face its page (`page.<page>`, master `sign`), a holo-ad screen its holo page
+    (`holopage.<page>`, master `holo`, translucent)."""
+    if lib is None:
+        return con
+    tex: set[str] = set()
+    city: dict[str, dict] = {}
+    mats = con["materials"]
+    for slot in sorted(mats):
+        pre, _, page = slot.partition(".")
+        if pre in ("page", "holopage"):
+            if signs is None or page not in signs["files"]:
+                continue
+            name, rec = page_texture(page, signs)
+            city[name] = rec
+            mats[slot].update(
+                master="sign" if pre == "page" else "holo", textures={"SignTex": name},
+                scalars=({"SignStrength": 2.0 if page.startswith("ads_1") else SIGN_STRENGTH,
+                          "Masked": 0.0} if pre == "page" else {**HOLO, "Textured": 1.0}),
+                vectors={})
+            continue
+        _decorate(mats, slot, slot, None, lib, con["part"], tex)
+    con["masters"] = sorted({m["master"] for m in mats.values()})
+    con["textures"] = dict(sorted({**CT.texture_table(tex, lib), **city}.items()))
+    con["library"] = {"version": lib["version"], "hash": lib["hash"],
+                      "density_px_m": lib["density_px_m"]}
+    return con
+
+
 def materials_part(city: str, model_sha: str, lib: dict, signs: dict) -> dict:
     """`unreal_contribution.materials.json`: no actors; a sign material per page (ads and
     holo-ads, logos with their alpha), the decal material, and their textures."""
     mats: dict[str, dict] = {}
     tex: dict[str, dict] = {}
-    for name, f in sorted(signs["files"].items()):
-        tname = f"city.{name}"
-        tex[tname] = {"file": f["file"], "pixels_sha256": f["pixels_sha256"],
-                      "size": f["size"], "srgb": True, "kind": "color"}
+    for name in sorted(signs["files"]):
+        tname, tex[tname] = page_texture(name, signs)
         mats[name] = {"master": "sign", "color": [1.0, 1.0, 1.0], "roughness": 0.4,
                       "metallic": 0.0, "textures": {"SignTex": tname},
-                      "scalars": {"SignStrength": 2.0 if name.startswith("ads_1") else 4.0,
+                      "scalars": {"SignStrength": 2.0 if name.startswith("ads_1")
+                                  else SIGN_STRENGTH,
                                   "Masked": 1.0 if name == "logos" else 0.0},
                       "vectors": {}}
     dt = CT.texture_table({CT.atlas_tex("decals", k) for k in ("base", "normal", "orm")}, lib)

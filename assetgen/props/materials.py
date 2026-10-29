@@ -1,14 +1,18 @@
 """Material slots of the props, plants and signs, and the masters they map to in Unreal.
 
 A slot is a material instance: its master, a flat color (sRGB hex), roughness and metallic.
-AG6's library gives them textures (bark, leaves, painted metal, sign faces, billboard
-content); until then flat colors carry the look, emissive slots (lamps, neon, screens, lit
-sign faces) glow. Neon colors are slots of their own, named by color (`neon.ff2a6d`), so a
-district's neon palette in the asset spec makes the slots it needs.
+AG6's catalog (`assetgen/materials/catalog.py`, `PROP`) gives each slot its textured
+master and library set (painted, galvanized and rusty metal, plastic, car paint, timber,
+fabric, bark, leaf clumps), the slot's color tinting the set; without the library the flat
+colors carry the look. Emissive slots (lamps, neon, screens, lit faces) glow. Neon colors
+are slots of their own, named by color (`neon.ff2a6d`), so a district's neon palette makes
+the slots it needs; sign faces are `page.<page>` (a cell of the city's sign pages, AG6's
+`sign` master) and holo-ad screens `holopage.<page>`.
 
-Masters: `opaque`, `metal`, `foliage` (two-sided), `emissive` (lamps, screens), `neon`
-(tubes and lit faces, brighter), `translucent` (bus shelter and kiosk glass where it is a
-separate non-Nanite mesh) and `holo` (holo-ads: translucent, two-sided, emissive).
+Flat masters: `opaque`, `metal`, `foliage` (two-sided), `emissive` (lamps, screens),
+`neon` (tubes and lit faces, brighter), `translucent` and `holo` (holo-ads: translucent,
+two-sided, emissive). Textured: AG6's `metal`, `concrete`, `foliage`, `leaves` (the leaf
+cards: two-sided, cut by the leaf cover), `sign`, `holo`.
 """
 
 from __future__ import annotations
@@ -98,13 +102,14 @@ SLOTS: dict[str, tuple[str, str, float, float]] = {
     "leaf.oak": ("foliage", "#3b5824", 0.8, 0.0),
     "leaf.ficus": ("foliage", "#2c5426", 0.6, 0.0),
     "leaf.pine": ("foliage", "#28452a", 0.85, 0.0),
-    "leaf.palm": ("foliage", "#4d6b2e", 0.7, 0.0),
     "leaf.boxwood": ("foliage", "#2e4e22", 0.8, 0.0),
-    "leaf.sedum": ("foliage", "#7a8a36", 0.8, 0.0),
-    "leaf.sedum_red": ("foliage", "#8a4a32", 0.8, 0.0),
     "leaf.ivy": ("foliage", "#2c4c20", 0.7, 0.0),
-    "leaf.scrub": ("foliage", "#5e6c32", 0.9, 0.0),
-    "leaf.dry": ("foliage", "#8a7a46", 0.9, 0.0),
+    "foliage.palm": ("foliage", "#4d6b2e", 0.7, 0.0),
+    "foliage.boxwood": ("foliage", "#2a4820", 0.85, 0.0),
+    "foliage.sedum": ("foliage", "#7a8a36", 0.8, 0.0),
+    "foliage.sedum_red": ("foliage", "#8a4a32", 0.8, 0.0),
+    "foliage.scrub": ("foliage", "#5e6c32", 0.9, 0.0),
+    "foliage.dry": ("foliage", "#8a7a46", 0.9, 0.0),
     "soil": ("opaque", "#3a2e24", 0.95, 0.0),
     # signs
     "sign.face": ("opaque", "#1a1b20", 0.5, 0.0),
@@ -161,6 +166,11 @@ def slot_spec(name: str) -> tuple[str, str, float, float]:
         return ("emissive", "#" + h, 0.4, 0.0)
     if pre == "holo":
         return ("holo", "#" + h, 0.1, 0.0)
+    if pre == "page":
+        # a face showing a cell of the city's sign pages (AG6), white under the page
+        return ("emissive", "#ffffff", 0.4, 0.0)
+    if pre == "holopage":
+        return ("holo", "#ffffff", 0.1, 0.0)
     raise KeyError(name)
 
 

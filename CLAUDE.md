@@ -922,11 +922,18 @@ AG8 (props, plants and signs) is in place, in `assetgen/props/` (tests
   `gap_m`) on brackets; cables, scaffolding and market gates exact meshes per tile; M6's
   highway median barriers dropped where AG7's road piece has its barrier. On M13 a
   placement stands on its building's `base_m` (facade, roof) else the ground at its point.
-- **Signs** (`signs.py`, `glyphs.py`): an asset per M11 sign slot (box, panel, neon and
+- **Signs** (`signs.py`): an asset per M11 sign slot (lightbox, LED panel, neon and
   channel shop signs, blade signs, billboards, holo-ads as non-Nanite LOD chains, neon
-  bands), text from POI names or generated shop names, an in-repo stroke font for Latin and
-  Cyrillic, generated glyphs for hanzi, kana, hangul and devanagari (decision 13.3 defers
-  fonts). Node names never end in a dot and digits (Blender's glTF import overflows).
+  bands). One sign path with AG6: its `signs.json` gives each slot's text, script, colors
+  and page cell; a flat face is a quad on its page cell (slots `page.<page>`,
+  `holopage.<page>`), neon tubes and channel letters follow AG6's glyph strokes
+  (`assetgen.materials.glyphs`). Without the library, lit flat strokes. Node names never end
+  in a dot and digits (Blender's glTF import overflows).
+- **Textures**: every slot mapped to an AG6 master and library set (`catalog.prop_set`;
+  bark, leaf clump, plastic, car paint, galvanized and rusty metal sets), UV0 in meters on
+  every variant; leaf clumps are two crossed alpha-cut cards on the `leaves` master (still
+  Nanite `Voxelize`); AG6's texel density check reads the props packs. `assetgen build`
+  runs AG6's signage before the props and its materials stage after them.
 - **Outputs**: `assets/props/variants/<kind>.glb`, `plants/<species>.glb`,
   `tiles/<tile>.glb`, `signs/<tile>.glb`, `props/manifest.json`,
   `unreal_contribution.props.json` and `.signs.json` (entries keyed by M15's prototype
@@ -935,14 +942,16 @@ AG8 (props, plants and signs) is in place, in `assetgen/props/` (tests
   `props_budgets`). A tile is made again only when its inputs or the code change.
 - **Previews**: `assetgen/blender/props_preview.py` (the blockout with AG1's shells, AG7's
   streets and AG8's instances through geometry nodes; `--night` adds lamp and sign lights)
-  and `props_sheet.py` (variant sheets). Golden: `tests/assetgen/data/golden_props.json`
+  and `props_sheet.py` (variant sheets, `--materials` textured); `assetgen materials
+  preview` draws them textured. Golden: `tests/assetgen/data/golden_props.json`
   (`tests/assetgen/props_goldens.py`).
 
 AG6 (materials and textures) is in place, in `assetgen/materials/` (tests
 `tests/assetgen/test_ag_materials.py`):
 - **Library** (`library.py`, `surfaces.py`, `noise.py`, `pbr.py`, `atlases.py`,
   `interiors.py`; `assetgen library [OUT] [--density 512]`): tileable sets per era (walls
-  and roofs in each era's look) and shared ones (building parts, street surfaces), each base
+  and roofs in each era's look) and shared ones (building parts, street surfaces, AG8's
+  props and plants), each base
   color with height, OpenGL normal, occlusion-roughness-metallic with the tint mask, at 512
   px/m within reach of the street (256 above); trim sheets per era, decal, road, interior
   (day and night, one-point room images per use) and macro atlases. Integer-hash noise and

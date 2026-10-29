@@ -4,9 +4,11 @@ textured Blender renders.
 - **preview**: the blockout's `city.blend` with its building boxes and the street objects
   AG7 replaces taken out; per view the shells of its tiles and the street pieces near it
   with AG6's materials (`assetgen/blender/ag6_materials.py`), the rest of the city from the
-  far proxies; the sign slots near a street view as quads showing their atlas cells; by
-  night (`--night`) the windows lit by each building's lit ratio, the signs and neon, a
-  point light at every street light near the camera. Views: the districts (`iso_<id>`), the
+  far proxies; AG8's props and plants near a street view as instances of their variant
+  families and its signs (their faces showing the sign pages), with AG6's materials (where
+  AG8 has not run, the sign slots as quads showing their atlas cells); by night
+  (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
+  light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city, or cameras of one's own (`--eye`, `--target`).
 - **board**: a material board per era (its wall sets, roof, trims, metals, a window with
   its rooms) and one of the street sets, each a slab of the material under a low sun.
@@ -29,6 +31,7 @@ from . import library as LB
 
 STREET_R = 600.0
 SIGN_R = 260.0
+PROPS_R = 320.0
 LIGHT_R = 220.0
 MAX_LIGHTS = 160
 
@@ -69,6 +72,47 @@ def _signs(model, signs: dict, assets: Path, center, r) -> list[dict]:
                     "h": s.height_m, "two": bool(s.two_sided), "mount": s.mount,
                     "kind": s.kind, "file": str((assets / f).resolve()), "uv": cell["uv"]})
     return out
+
+
+def _ag8(adir: Path, views: list) -> dict | None:
+    """AG8's props, plants and signs for the views (its contributions): the family packs,
+    the blockout keys they replace, and per perspective view the instances near its eye
+    (by variant node, world transforms), the exact prop tiles and the signs."""
+    pp, sp = adir / "unreal_contribution.props.json", adir / "unreal_contribution.signs.json"
+    if not (pp.is_file() and sp.is_file()):
+        return None
+    cp = json.loads(pp.read_text(encoding="utf-8"))
+    cs = json.loads(sp.read_text(encoding="utf-8"))
+    fams = sorted({str((adir / q["glb"]).resolve()) for e in cp["entries"]
+                   for q in e.get("parts", [])})
+    removed = sorted({k for c in (cp, cs) for e in c["entries"]
+                      for k in [e["key"]] + list(e.get("replaces", []))})
+    for v in views:
+        v["ag8"] = {"points": {}, "exact": [], "signs": []}
+        if v["ortho"]:
+            continue
+        eye = v["eye"]
+        pts: dict[str, list] = {}
+        exact = set()
+        for e in cp["entries"]:
+            px, py, pz = e["pivot"]
+            if e.get("glb") and _near(e["pivot"], eye, PROPS_R):
+                exact.add(str((adir / e["glb"]).resolve()))
+            for q in e.get("parts", []):
+                for xf in q["xforms"]:
+                    x, y = xf[0] + px, xf[1] + py
+                    if _near((x, y), eye, PROPS_R):
+                        pts.setdefault(q["node"], []).append(
+                            [x, y, xf[2] + pz, xf[3]] + (list(xf[4:7]) if len(xf) > 4
+                                                         else [1.0, 1.0, 1.0]))
+        v["ag8"]["points"] = dict(sorted(pts.items()))
+        v["ag8"]["exact"] = sorted(exact)
+        v["ag8"]["signs"] = [{"key": e["key"], "node": e["node"],
+                              "glb": str((adir / e["glb"]).resolve()), "pivot": e["pivot"],
+                              "yaw": e["yaw_deg"], "slots": e.get("slots", [])}
+                             for e in cs["entries"] if _near(e["pivot"], eye, SIGN_R)]
+        v["signs"] = []                    # (AG8's signs show the cells: no quads)
+    return {"families": fams, "removed": removed}
 
 
 def _lights(model, center, r) -> list[list[float]]:
@@ -116,12 +160,15 @@ def run(args) -> dict:
             v["street_tiles"] = [t for t in stiles if _tile_near(t, v["eye"], STREET_R)]
             v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R)
             v["lights"] = _lights(model, v["eye"], LIGHT_R)
+    ag8 = _ag8(adir, views)
     modes = ["night"] if args.only_night else (["day", "night"] if args.night else ["day"])
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
            "files": _files(adir, mats["textures"]), "props": _props(man),
            "removed": sorted({e["key"] for e in con["entries"]} |
-                             {r for e in con["entries"] for r in e.get("replaces", [])}),
+                             {r for e in con["entries"] for r in e.get("replaces", [])} |
+                             set((ag8 or {}).get("removed", []))),
+           "ag8_families": (ag8 or {}).get("families", []),
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
     return _blender(job, "ag6_preview.py", args.blender, od)
