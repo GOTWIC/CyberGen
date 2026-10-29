@@ -43,6 +43,7 @@ BAND_MAX = 7500              # mm: the street front's height at most
 PIER_U = 250                 # a shopfront stops this far inside its unit's ends
 GAP_MIN = 60
 EDGE_CLEAR = 60
+MAIN_KEEP = 1300             # half the room a main entrance between shopfronts keeps
 SHOP_MIN = 1500              # a unit narrower than this after its piers takes a door only
 DOOR_SHIFT = 1200            # how far a door may move along the facade from its entrance
 HEAD_GAP = 150               # wall left over every opening under the band's top
@@ -93,11 +94,12 @@ class Op:
 # Clearances
 # ---------------------------------------------------------------------------
 
-def _clear(fa, depth: int, end: int) -> int:
-    """How far from its start (end 0) or its end (1) a pocket `depth` deep must keep."""
+def _clear(fa, depth: int, end: int, pier: bool = True) -> int:
+    """How far from its start (end 0) or its end (1) a pocket `depth` deep must keep (with
+    `pier`, past the facade's corner pier too)."""
     from .shell import _convex, _corner_clear
     d_in, d_out = (fa.d_in, (fa.ux, fa.uy)) if end == 0 else ((fa.ux, fa.uy), fa.d_nx)
-    base = fa.c0 if end == 0 else fa.c1
+    base = (fa.c0 if end == 0 else fa.c1) if pier else EDGE_CLEAR
     return max(base, _corner_clear(d_in, d_out, depth),
                depth + EDGE_CLEAR if _convex(d_in, d_out) else 0)
 
@@ -148,12 +150,12 @@ def _meets(q: list, boxes: list) -> bool:
 
 
 def _fit(fa, want_a: int, want_b: int, depth: int, edges, taken, mounts, lo: int,
-         hi: int, shift: int, shrink: int = 0, boxes=None):
+         hi: int, shift: int, shrink: int = 0, boxes=None, pier: bool = True):
     """(a, b, depth) of an opening wanted from want_a to want_b: moved along the facade by
     at most `shift` (or, with `shrink`, cut back to the corners' clearance but not under
     that width) to clear the corners and the openings already taken, as deep as the mass
     allows (`depth`, else the facade's reveal) and clear of the recesses `boxes` already
-    cut down to the pavement on its other facades."""
+    cut down to the pavement on its other facades; without `pier`, into the corner piers."""
     w = want_b - want_a
     offs = [0]
     for k in range(100, shift + 1, 100):
@@ -161,7 +163,7 @@ def _fit(fa, want_a: int, want_b: int, depth: int, edges, taken, mounts, lo: int
     for d in sorted({depth, min(depth, fa.reveal)}, reverse=True):
         if d <= 0:
             continue
-        c0, c1 = _clear(fa, d, 0), _clear(fa, d, 1)
+        c0, c1 = _clear(fa, d, 0, pier), _clear(fa, d, 1, pier)
         for off in offs:
             if shrink:
                 a, b = max(want_a, c0), min(want_b, fa.L - c1)
@@ -250,8 +252,7 @@ class Band:
         L = fa.L
         so = fa.soff
         z0 = self.z0
-        mounts = [(m0 - so, m1 - so, a, b) for m0, m1, a, b in
-                  (sb.mounts_raw.get(fa.j, []) if fa.j is not None else [])]
+        mounts = self._mounts(fa)
         taken: list[Op] = []
         units = []
         if fa.j is not None:
@@ -271,11 +272,23 @@ class Band:
                 s = int(round(at["s"] * 1000)) - so
                 if -500 <= s <= L + 500:
                     ents.append((k, en, s))
+        # a main entrance not well inside a unit keeps room for its own door: the shopfronts
+        # either side of it stop short (a lobby between the shops)
+        spans = [(su - wu // 2 + PIER_U, su + wu // 2 - PIER_U) for _, un, su in units
+                 for wu in (int(round(un["width_m"] * 1000)),)]
+        keep = [se for _, en, se in ents if en["kind"] == "main" and
+                not any(a <= se <= b for a, b in spans)]
         # shopfronts, each taking an entrance that falls inside it
         for k, un, s in units:
             w = int(round(un["width_m"] * 1000))
             use = un["use"]
             want_a, want_b = s - w // 2 + PIER_U, s + w // 2 - PIER_U
+            for se in keep:
+                if want_a < se + MAIN_KEEP and want_b > se - MAIN_KEEP:
+                    if se < s:
+                        want_a = max(want_a, se + MAIN_KEEP)
+                    else:
+                        want_b = min(want_b, se - MAIN_KEEP)
             inside = [(ke, en, se) for ke, en, se in ents
                       if s - w // 2 <= se <= s + w // 2]
             head = self._head(fa, want_a, want_b, mounts, "shop", un)
@@ -325,6 +338,51 @@ class Band:
             if op.depth > 0 and op.lo <= z0:
                 self.boxes.append(_quad(fa, op.a, op.b, op.depth))
         return taken
+
+    def rehome(self, plans: list) -> None:
+        """Entrances and units of the mass no facade took (on a wall a neighbor stands
+        against, or a facade too short for their door): a door on the band's nearest facade
+        that has room, in place of the ground windows there (`moved`)."""
+        sb, br, k_ms = self.sb, self.sb.br, self.ms["k"]
+        want = [(k, en, en["position"]) for k, en in enumerate(br["entrances"])
+                if k not in sb.done_ents and (en.get("at") or {}).get("mass") == k_ms]
+        want += [(None, {"kind": "unit", "unit": k, "un": un}, un["entrance"] or un["edge"][0])
+                 for k, un in enumerate(br["units"])
+                 if k not in sb.done_units and (un.get("at") or {}).get("mass") == k_ms]
+        for k, en, pos in want:
+            x, y = int(round(pos[0] * 1000)), int(round(pos[1] * 1000))
+            cand = []
+            for n, (fa, r, i, ops) in enumerate(plans):
+                if fa.L < 1600:
+                    continue
+                t = int(min(max((x - fa.a[0]) * fa.ux + (y - fa.a[1]) * fa.uy, 0), fa.L))
+                q = fa.P(t, 0)
+                cand.append((round(math.hypot(q[0] - x, q[1] - y)), n, t))
+            for _, n, t in sorted(cand)[:6]:
+                fa, r, i, ops = plans[n]
+                own = [_quad(fa, o.a, o.b, o.depth) for o in ops
+                       if o.depth > 0 and o.lo <= self.z0]
+                keep, self.boxes = self.boxes, [b for b in self.boxes if b not in own]
+                taken = [o for o in ops if o.kind != "window"]
+                op = self._door(fa, k, en, t, taken, self._mounts(fa), True)
+                self.boxes = keep
+                if op is None:
+                    continue
+                op.info["moved"] = True
+                ops[:] = sorted([o for o in ops if o.kind != "window" or not (
+                    o.a < op.b + GAP_MIN and o.b > op.a - GAP_MIN)] + [op], key=lambda o: o.a)
+                if op.depth > 0 and op.lo <= self.z0:
+                    self.boxes.append(_quad(fa, op.a, op.b, op.depth))
+                if k is not None:
+                    sb.done_ents.add(k)
+                else:
+                    sb.done_units.add(en["unit"])
+                break
+
+    def _mounts(self, fa) -> list:
+        so = fa.soff
+        return [(m0 - so, m1 - so, a, b) for m0, m1, a, b in
+                (self.sb.mounts_raw.get(fa.j, []) if fa.j is not None else [])]
 
     def _head(self, fa, a: int, b: int, mounts, kind: str, un=None) -> int | None:
         """An opening's head: under the band's top and under anything mounted over it."""
@@ -384,6 +442,11 @@ class Band:
         if hh < 1950:
             hh = max(H - HEAD_GAP, 1500)
         lo = z0 + (DOCK_Z if dk == "dock" else 0)
+        for m0, m1, za, _ in mounts:
+            # (a sign or awning low over it: the door's head stops under it)
+            if m0 < s + w // 2 + DOOR_SHIFT and m1 > s - w // 2 - DOOR_SHIFT and \
+                    lo + 1950 + MOUNT_GAP <= za < lo + hh + MOUNT_GAP:
+                hh = za - MOUNT_GAP - lo
         hi = lo + hh
         cls = fa.cls(min(max(s, 0), fa.L), z0 + 1200)
         info = {"door": dk, "entrance": k, "en": en, "entrance_s": s}
@@ -401,17 +464,25 @@ class Band:
                     w = w2
                     got = _fit(fa, s - w // 2, s + w // 2, d, self.edges, taken, mounts, lo,
                                hi, DOOR_SHIFT, 0, self.boxes if lo <= z0 else None)
+            if got is None:
+                # (a short facade: into its corner piers, as far as the corner allows)
+                got = _fit(fa, s - w // 2, s + w // 2, d, self.edges, taken, mounts, lo, hi,
+                           DOOR_SHIFT, 0, self.boxes if lo <= z0 else None, pier=False)
             if got is not None:
                 a, b, dd = got
                 back = "void" if dk in ("garage", "gate") else "storefront" if dk in (
                     "main", "unit") else "structure"
                 return Op(a, b, lo, hi, "door", back, dd, info)
-        # flush: a door on the wall at the entrance (within the facade)
+        else:
+            return None                    # (a neighbor against it: `leftovers` moves it)
+        # flush: a door on the wall at the entrance (within the facade; a facade too short
+        # for one leaves it to the nearest that has room, `leftovers`)
         w = min(w, 1200)
         hh = min(hh, 2300, H - HEAD_GAP)
-        a = min(max(s - w // 2, 100), max(fa.L - w - 100, 100))
-        if a + w > fa.L - 50:
-            w = max(fa.L - 2 * a, 600)
+        if fa.L < 1000 or hh < 1800:
+            return None
+        w = min(w, fa.L - 200)
+        a = min(max(s - w // 2, 100), fa.L - w - 100)
         if any(a < t.b + 20 and a + w > t.a - 20 for t in taken):
             # (beside a shopfront or another door: on the nearer free stretch)
             for t in sorted(taken, key=lambda t: t.a):
@@ -932,14 +1003,19 @@ def leftovers(sb) -> None:
         for fa, ms in sb.band_facades:
             if fa.L < 1600:
                 continue
+            hh = min(2200, FR_band(ms) - ms["z0"] - HEAD_GAP)
             ax, ay = fa.a
             t = ((x - ax) * fa.ux + (y - ay) * fa.uy)
-            t = min(max(t, 800), fa.L - 800)
+            t = _free_spot(sb, fa, int(min(max(t, 800), fa.L - 800)), 1000, ms["z0"], hh)
+            if t is None:
+                continue
             px, py = ax + fa.ux * t, ay + fa.uy * t
             d = math.hypot(px - x, py - y)
-            key = (round(d), fa.j if fa.j is not None else -1, round(t))
+            # (an open wall first: a door against a neighbor only where there is no other)
+            wall = fa.cls(t, ms["z0"] + 1200) in ("party", "hidden", "blind")
+            key = (wall, round(d), fa.j if fa.j is not None else -1, t)
             if best is None or key < best[0]:
-                best = (key, fa, ms, int(t))
+                best = (key, fa, ms, t)
         if best is None:
             continue
         _, fa, ms, t = best
@@ -963,6 +1039,26 @@ def leftovers(sb) -> None:
             "s": int(t + fa.soff), "class": fa.cls(t, ms["z0"] + 1200), "moved": True})
         (sb.done_ents if tag == "e" else sb.done_units).add(k)
         sb.stats["doors_moved"] = sb.stats.get("doors_moved", 0) + 1
+
+
+def _free_spot(sb, fa, t: int, w: int, z0: int, hh: int) -> int | None:
+    """The nearest point to t (in steps of 0.2 m, at most 6 m off) where a flush door w
+    wide is clear of the facade's openings and doors, 0.8 m in from its ends."""
+    if fa.j is None:
+        return t if not any(d["edge"] is None and abs(d["s"] - t) < w + 200
+                            for d in sb.doors) else None
+    for k in range(61):
+        for u in ((t + 200 * (k // 2 + 1)) if k % 2 else (t - 200 * (k // 2)),):
+            if u < 800 or u > fa.L - 800:
+                continue
+            s0, s1 = u - w // 2 - 100 + fa.soff, u + w // 2 + 100 + fa.soff
+            if _open_at(sb, fa.j, s0, s1, z0, z0 + hh):
+                continue
+            if any(d["edge"] == fa.j and abs(d["s"] - u - fa.soff) < w + 200
+                   for d in sb.doors):
+                continue
+            return u
+    return None
 
 
 def FR_band(ms) -> int:
@@ -1094,44 +1190,108 @@ def walls(sb) -> None:
             sb.parts.on(fa, "surface", {"style": "mural", "w": w, "h": h, "slot": slot}, sm,
                         zm)
             sb.stats["murals"] = sb.stats.get("murals", 0) + 1
-        # graffiti on blank stretches of the street band
-        if ms["z0"] > 50 or "band" not in ms:
+        # decals on the street band (AG6's atlas): grime, leaks, rust, graffiti, posters,
+        # cracks and moss
+        if ms["z0"] <= 50 and "band" in ms:
+            _decals(sb, fa, ms, key, grime, danger, neon)
+
+
+DECALS_MAX = 14              # a building's decals at most
+GREEN = ("moss",)
+
+
+def _free(sb, fa, ms, z0: int, z1: int, pad: int = 150) -> list[tuple[int, int]]:
+    """Stretches of a facade (its own s) with no opening cut between z0 and z1."""
+    spans = sorted((a - fa.soff, b - fa.soff) for a, b, lo, hi in sb.opened.get(fa.j, ())
+                   if lo < z1 and hi > z0)
+    out, x = [], fa.c0 + pad
+    for a, b in spans + [(fa.L - fa.c1 - pad, fa.L)]:
+        if a - x >= 600:
+            out.append((x, a - pad))
+        x = max(x, b + pad)
+    return out
+
+
+def _decal(sb, fa, ms, cell: str, s: int, z: int, w: int, h: int) -> None:
+    if len(sb.decals) >= DECALS_MAX:
+        return
+    x, y, _ = fa.P(s, ms["z0"])
+    sb.decals.append({"cell": cell, "pos": [x, y, z], "normal": [round(fa.nx, 6),
+                                                                  round(fa.ny, 6)],
+                      "w": PT.q(w), "h": PT.q(h)})
+
+
+def _decals(sb, fa, ms, key: str, grime: float, danger: float, neon: float) -> None:
+    """Decals on a facade's street band, by its class, the building's wear and grime and
+    the district's danger: grime at the wall's foot, leaks under the band's windows, rust
+    beside its metal doors, graffiti on blank stretches, posters on the piers between
+    shopfronts, cracks and moss on blind walls."""
+    zb = ms["band"]
+    z0 = ms["z0"]
+    wear = float(sb.gm["cont"]["wear"])
+    green = float((sb.br.get("district") or {}).get("greenery") or 0.3)
+    cls = fa.cls(fa.L // 2, z0 + 1200)
+    if cls in ("party", "hidden"):
+        return
+
+    def u(p):
+        return GN.u(key, p, "ag3.decal")
+    # grime along the foot of the wall
+    for m, (a, b) in enumerate(_free(sb, fa, ms, z0, z0 + 1200)[:3]):
+        if u(f"grime{m}") > 0.25 + 0.6 * wear:
             continue
-        zb = ms["band"]
-        cls = fa.cls(fa.L // 2, ms["z0"] + 1200)
-        if cls in ("party", "hidden"):
+        w = min(b - a, int(1500 + 1500 * u(f"gw{m}")))
+        h = int(700 + 600 * u(f"gh{m}"))
+        sc = a + (b - a - w) // 2 + w // 2
+        _decal(sb, fa, ms, "grime_ground", sc, z0 + h // 2, w, h)
+    # leaks under the band's windows, rust beside metal doors
+    for a, b, lo, hi in sb.opened.get(fa.j, ()):
+        sa, sbb = a - fa.soff, b - fa.soff
+        if not (0 <= sa and sbb <= fa.L) or hi > zb:
             continue
-        k_cls = 1.5 if cls in ("alley", "blind", "firewall") else 0.6
-        if GN.u(key, "graffiti", "ag3.front") > grime * (0.25 + danger) * k_cls:
+        if lo >= z0 + 1500 and u(f"leak{a}") < 0.15 + 0.45 * wear:
+            h = min(int(800 + 700 * u(f"lh{a}")), lo - z0 - 300)
+            if h >= 500:
+                _decal(sb, fa, ms, "leaks_a" if u(f"lk{a}") < 0.5 else "leaks_b",
+                       (sa + sbb) // 2, lo - h // 2 - 20, int((sbb - sa) * 0.8), h)
+    for d in sb.doors:
+        if d["edge"] != fa.j or d["kind"] not in ("service", "dock", "rollup", "garage") or \
+                d["flush"]:
             continue
-        spans = sorted((a - fa.soff, b - fa.soff) for a, b, lo, hi in sb.opened.get(fa.j, ())
-                       if lo < zb and hi > ms["z0"])
-        free, x = [], fa.c0 + 200
-        for a, b in spans + [(fa.L - fa.c1 - 200, fa.L)]:
-            if a - x >= 2500:
-                free.append((x, a))
-            x = max(x, b + 200)
-        made = 0
-        for m, (a, b) in enumerate(free[:2]):
-            gw = PT.q(min(b - a - 600, 1200 + 2800 * GN.u(key, f"gw{m}", "ag3.front")))
-            gh = PT.q(min(700 + 1100 * GN.u(key, f"gh{m}", "ag3.front"), zb - ms["z0"] - 900))
-            if gw < 1000 or gh < 500:
+        if u(f"rust{d['id']}") < 0.2 + 0.6 * grime:
+            s = d["s"] - fa.soff + d["w"] // 2 + 300
+            if s + 300 < fa.L - fa.c1:
+                _decal(sb, fa, ms, "rust_drip" if u(f"rk{d['id']}") < 0.5 else "rust_bleed",
+                       s, z0 + 900, 500, 1500)
+    # graffiti on blank stretches, the more where it is grimy and dangerous
+    k_cls = 1.6 if cls in ("alley", "blind", "firewall") else 0.6
+    if u("graffiti") < grime * (0.3 + danger) * k_cls:
+        for m, (a, b) in enumerate(_free(sb, fa, ms, z0, min(zb, z0 + 2800))[:2]):
+            if b - a < 2000:
                 continue
-            zg = ms["z0"] + PT.q(300 + 400 * GN.u(key, f"gz{m}", "ag3.front"))
-            if sb.mounts_raw and any(m0 - fa.soff < b and m1 - fa.soff > a and z0 < zg + gh
-                                     for m0, m1, z0, z1 in sb.mounts_raw.get(fa.j, ())):
-                continue
-            ring = []
-            for t in range(10):
-                ang = 2.0 * math.pi * t / 10.0
-                f = 0.78 + 0.22 * GN.u(key, f"g{m}.{t}", "ag3.front")
-                ring.append((PT.q(gw / 2 * f * math.cos(ang)),
-                             PT.q(gh / 2 + gh / 2 * f * math.sin(ang))))
-            slot = GN.pick(key, f"gslot{m}", sorted(SY.GRAFFITI), None, "ag3.front")
-            sb.parts.on(fa, "surface", {"style": "graffiti", "ring": [list(q) for q in ring],
-                                        "slot": slot}, (a + b) // 2, zg)
-            made += 1
-        sb.stats["graffiti"] = sb.stats.get("graffiti", 0) + made
+            gw = int(min(b - a - 200, 1500 + 2500 * u(f"gw{m}")))
+            gh = int(min(900 + 1100 * u(f"gh{m}"), zb - z0 - 700))
+            cell = ("graffiti_a", "graffiti_b", "graffiti_c")[int(3 * u(f"gc{m}")) % 3]
+            _decal(sb, fa, ms, cell, (a + b) // 2, z0 + 300 + gh // 2, gw, gh)
+            sb.stats["graffiti"] = sb.stats.get("graffiti", 0) + 1
+    # posters and stickers on the piers between shopfronts
+    shops = sorted((a - fa.soff, b - fa.soff) for a, b, lo, hi in sb.opened.get(fa.j, ())
+                   if lo <= z0 and hi > z0 + 2000)
+    for m in range(len(shops) - 1):
+        gap = shops[m + 1][0] - shops[m][1]
+        if 380 <= gap <= 2400 and u(f"post{m}") < 0.2 + 0.4 * neon + 0.3 * grime:
+            cell = ("poster_a", "poster_b", "poster_c", "stickers")[int(4 * u(f"pc{m}")) % 4]
+            pw = min(gap - 120, 600)
+            _decal(sb, fa, ms, cell, (shops[m][1] + shops[m + 1][0]) // 2,
+                   z0 + 1500, pw, int(pw * 1.4))
+    # cracks and moss on blind walls at street level
+    if cls in ("blind", "firewall", "alley"):
+        for m, (a, b) in enumerate(_free(sb, fa, ms, z0, min(zb, z0 + 2500))[:2]):
+            if u(f"crack{m}") < 0.3 + 0.4 * wear and b - a >= 1200:
+                _decal(sb, fa, ms, "cracks_a" if u(f"ck{m}") < 0.5 else "cracks_b",
+                       a + (b - a) // 3, z0 + 1400, 1000, 1000)
+            if u(f"moss{m}") < green * 0.8 and b - a >= 1500:
+                _decal(sb, fa, ms, "moss", b - (b - a) // 3, z0 + 450, 1300, 900)
 
 
 MOUNT_KINDS = ("ac_unit", "wall_light", "sign", "awning", "overhead_cable")

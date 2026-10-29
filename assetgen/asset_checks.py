@@ -21,7 +21,8 @@ walkway: the walkway in front of it and no other building between; a unit's door
 nearest ground walkway of its level, written into its record for stage 4) and
 `asset_mounts` (every sign slot, mounted prop and facade plant on a panel or pier, never on
 glass: `fronts.mount_check`); the budgets count section 11's shopfronts, `T_UNIT` triangles
-per ground-floor unit.
+per ground-floor unit, and `T_FRONT` per building with a street front (its band's zones,
+caps, pockets and doors).
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from .buildings import genome as GN
 T_BAY = 24          # section 11: shell triangles per bay
 RHO_ROOF = 1.0      # and per m2 of roof
 T_UNIT = 1500       # and per shopfront (AG3)
+T_FRONT = 1500      # and per street front (AG3: Greyhook's bands take about this each)
 PARTS_SHARE = 0.4   # AG2's parts: 40% of section 11's shell estimate on top of it
 I_CITY = 3.0        # section 11: 2 to 3 M part instances for 1.4 M bays
 THUMB_MIN = 8       # bits of 1,504 two thumbnails must differ by
@@ -203,10 +205,11 @@ def budget(records: dict, tile_parts: dict | None = None) -> dict:
     bays = sum(r["stats"]["bays_s11"] for r in records.values())
     roof = sum(r["stats"]["roof_m2"] for r in records.values())
     units = sum(r["stats"].get("units", 0) for r in records.values())
+    fronts = sum(1 for r in records.values() if (r.get("front") or {}).get("triangles"))
     tris = sum(r["triangles"] for r in records.values())
     ptris = sum(t["triangles"] for t in (tile_parts or {}).values() if t)
     inst = sum(r.get("instances", 0) for r in records.values())
-    est = int(bays * T_BAY + roof * RHO_ROOF + units * T_UNIT)
+    est = int(bays * T_BAY + roof * RHO_ROOF + units * T_UNIT + fronts * T_FRONT)
     city = int(est * (1.0 + PARTS_SHARE))
     over = []
     by: dict[str, dict] = {}
@@ -214,7 +217,8 @@ def budget(records: dict, tile_parts: dict | None = None) -> dict:
         r = records[k]
         c = CLASSES[r.get("class") or budget_class(r)]
         own = r["stats"]["bays_s11"] * T_BAY + r["stats"]["roof_m2"] * RHO_ROOF + \
-            r["stats"].get("units", 0) * T_UNIT
+            r["stats"].get("units", 0) * T_UNIT + \
+            (T_FRONT if (r.get("front") or {}).get("triangles") else 0)
         tb = int(c["k"] * own + c["base"])
         ib = int(c["i"] * r["stats"]["bays_s11"] + c["ibase"])
         u = r["triangles"] + r.get("part_triangles", 0)

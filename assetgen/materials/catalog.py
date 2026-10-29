@@ -55,8 +55,31 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "dish": ("metal", "metal_painted"), "tile": ("facade", "roof_tile"),
     "canopy": ("metal", "aluminum"), "mast": ("metal", "aluminum"),
     "column": ("facade", "structure"), "proxy": ("facade", None),
+    # AG3: street fronts (doors, docks, shutters, risers, fascias, mounts, painted surfaces)
+    "storefront_dark": ("glass", None), "door_metal": ("metal", "metal_dark"),
+    "door_wood": ("facade", "timber"), "step": ("facade", "stone_dressed"),
+    "steel": ("metal", "steel_mill"), "rubber": ("facade", "rubber"),
+    "seal": ("facade", "rubber"), "rollup": ("metal", "louver"), "rope": ("facade", None),
+    "stanchion": ("metal", "aluminum"), "fascia": ("facade", "trim_paint"),
+    "mount": ("metal", "metal_dark"), "trellis": ("metal", "metal_painted"),
+    "pipe": ("metal", "metal_painted"), "cabinet": ("metal", "metal_dark"),
+    "frosted": ("facade", None), "club": ("metal", "metal_dark"),
+    "riser_tile": ("facade", "tile_glazed"), "riser_stone": ("facade", "stone_dressed"),
+    "riser_dark": ("facade", "stone_dressed"), "lit_menu": ("neon", None),
+    "lit_white": ("neon", None),
 }
+for _s in SY.SLOTS:
+    if _s.startswith("paint_"):
+        BUILDING[_s] = ("metal", "metal_painted")
+    elif _s.startswith(("neon_", "screen_")):
+        BUILDING[_s] = ("neon", None)
+    elif _s.startswith(("poster_", "graffiti_")):
+        BUILDING[_s] = ("facade", None)
+    elif _s.startswith("mural_"):
+        BUILDING[_s] = ("facade", "stucco")
 INTERIOR_SHOP = 3              # the interior atlas row a storefront always shows
+DECAL_PREFIX = "decal."        # AG3's decal slots, one per cell of the decal atlas
+INTERIOR_BAR = 4               # and a bar's dark glazing (AG3: the club row)
 
 # street slots (AG7) to (master, set or None): asphalt by class, paint, paving by family
 STREET: dict[str, tuple[str, str | None]] = {
@@ -105,6 +128,8 @@ MASTERS = ("facade", "glass", "metal", "concrete", "road", "neon", "sign", "deca
 
 
 def _master_of_building(slot: str) -> tuple[str, str | None]:
+    if slot.startswith(DECAL_PREFIX):
+        return "decal", None                   # (AG3's mesh decals: a cell of the atlas)
     if slot in ERA_SLOTS:
         surf = ERA_SLOTS[slot]
         master = "metal" if surf == "cladding" else "facade"
@@ -144,6 +169,14 @@ def material(slot: str, era: str | None, lib: dict, part: str = "buildings") -> 
     scalars and vectors (the contribution's and the Blender preview's)."""
     master, s = set_for(slot, era, part)
     rec: dict = {"master": master, "textures": {}, "scalars": {}, "vectors": {}}
+    if master == "decal":
+        from .atlases import DECAL_CELLS
+        rec["textures"] = {"BaseTex": atlas_tex("decals", "base"),
+                           "NormalTex": atlas_tex("decals", "normal"),
+                           "OrmTex": atlas_tex("decals", "orm")}
+        rec["scalars"] = {"Cell": float(DECAL_CELLS.index(slot[len(DECAL_PREFIX):])),
+                          "Cols": 4.0, "Rows": 4.0}
+        return rec
     if s is not None and s in lib["sets"]:
         st = lib["sets"][s]
         rec["textures"] = {"BaseTex": tex_name(s, "base"), "NormalTex": tex_name(s, "normal"),
@@ -171,7 +204,8 @@ def material(slot: str, era: str | None, lib: dict, part: str = "buildings") -> 
                               InteriorRows=float((ia.get("grid") or [8, 6])[1]),
                               InteriorBack=float(ia.get("back", 0.5)),
                               RowOverride=float(INTERIOR_SHOP) if slot == "storefront"
-                              else -1.0)
+                              else (float(INTERIOR_BAR) if slot == "storefront_dark"
+                                    else -1.0))
     if master == "neon":
         rec["scalars"]["NeonStrength"] = 6.0
     return rec

@@ -387,6 +387,7 @@ class ShellBuilder:
         # AG3: the street fronts' doors, every opening cut (per brief edge, for the mounts
         # check), the entrances and units given a door, the facades per brief edge
         self.doors: list[dict] = []
+        self.decals: list[dict] = []
         self.opened: dict[int, list] = {}
         self.done_units: set[int] = set()
         self.done_ents: set[int] = set()
@@ -513,6 +514,7 @@ class ShellBuilder:
         arrs = self.buf.arrays()
         return {"buf": self.buf, "arrays": arrs, "stats": self.stats, "used": self.used,
                 "masses": self.mass_info, "parts": self.inst, "doors": self.doors,
+                "decals": self.decals,
                 "band_m": None if self.band_z is None else self.band_z / 1000.0,
                 "checks": self.checks}
 
@@ -669,8 +671,10 @@ class ShellBuilder:
             self.buf.layer = 1
             self.buf.new_part()
             fb = FR.Band(self, ms, g, wall, sysname, reveal, bay, band, ground_row, facades)
-            for fa, r, i, ok in facades:
-                fb.emit(fa, r, i, fb.plan(fa, ok))
+            plans = [(fa, r, i, fb.plan(fa, ok)) for fa, r, i, ok in facades]
+            fb.rehome(plans)
+            for fa, r, i, ops in plans:
+                fb.emit(fa, r, i, ops)
                 self.band_facades.append((fa, ms))
             FR.caps(fb, roof=band >= ms["z1"])
             self.buf.layer = 0

@@ -52,12 +52,14 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag3.1"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag3.2"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
          "spec_sha256", "briefs_sha256", "buildings", "tiles")
 MAX_WORKERS = 4
+DECAL_OFF_MM = 10              # AG3: a decal quad stands this far off its wall (mesh decals)
+DECAL_UV = (0.004, 0.996)      # its atlas cell's own UVs, inset so it never reads a neighbor
 # the files a build delivers besides its packs (the report holds timings, so it is not one)
 DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json")
 
@@ -181,6 +183,7 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     st["roof_m2"] = round(_area_m2(arrs, "roof"), 2)
     st["bays_s11"] = round(_bays_s11(brief), 2)
     st["units"] = len(brief["units"])
+    st["decals"] = len(sh.get("decals", []))
     rec = {
         "kind": "building", "type": brief["building"]["type"],
         "district": (brief.get("district") or {}).get("id"),
@@ -206,6 +209,8 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "instances": int(sum(len(x["at"]) for x in inst)),
         "part_triangles": int(sum(x["triangles"] for x in inst)),
     }
+    if brief["building"]["floor_grid"].get("level"):
+        rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
     rec["class"] = AC.budget_class(rec)
     return sh, px, rec
@@ -243,6 +248,60 @@ def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
                                rotation=G.quat_z(PT.yaw_deg(a[3], a[4]))))
     g.node(bid, children=kids, root=True)
     return g.to_glb()
+
+
+def decal_slot(cell: str) -> str:
+    return f"decal.{cell}"
+
+
+def _decal_mesh(g: G.Gltf, tile: str, made: list) -> dict | None:
+    """AG3's decals of a tile's buildings (grime, leaks, rust, graffiti, posters, cracks,
+    moss on their street bands) as one mesh of quads at the tile's middle, a primitive per
+    decal atlas cell (slot `decal.<cell>`, UV0 0 to 1 over the quad, v down): mesh decals
+    in Unreal, alpha quads in Blender. Its record: node, count, slots, translation."""
+    by: dict[str, list] = {}
+    for bid, brief, sh, _, _ in made:
+        piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
+               int(round(_base_m(brief) * 1000)))
+        for d in sh.get("decals", []):
+            by.setdefault(d["cell"], []).append((piv, d))
+    if not by:
+        return None
+    ix, iy = int(tile[1:4]), int(tile[4:7])
+    o = (int((ix + 0.5) * TILE_M * 1000), int((iy + 0.5) * TILE_M * 1000), 0)
+    a0, a1 = DECAL_UV
+    prims, slots, n = [], {}, 0
+    for cell in sorted(by):
+        pos, nrm, uv, idx = [], [], [], []
+        for piv, d in by[cell]:
+            nx, ny = d["normal"]
+            tx, ty = -ny, nx                     # along the wall, left to right seen from out
+            cx = piv[0] + d["pos"][0] + nx * DECAL_OFF_MM - o[0]
+            cy = piv[1] + d["pos"][1] + ny * DECAL_OFF_MM - o[1]
+            cz = piv[2] + d["pos"][2]
+            hw, hh = d["w"] / 2.0, d["h"] / 2.0
+            k = len(pos)
+            for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                pos.append((int(round(cx + su * hw * tx)), int(round(cy + su * hw * ty)),
+                            int(round(cz + sv * hh))))
+                nrm.append((nx, ny, 0.0))
+                uv.append((a0 if su < 0 else a1, a1 if sv < 0 else a0))
+            idx += [k, k + 1, k + 2, k, k + 2, k + 3]
+            n += 1
+        name = decal_slot(cell)
+        mi = g.material(name, (1.0, 1.0, 1.0, 1.0), 0.0, 0.8,
+                        extras={"slot": name, "master": "decal", "cell": cell})
+        prims.append(G.Primitive(material=mi, positions=np.array(pos, dtype=np.int64),
+                                 indices=np.array(idx, dtype=np.int64),
+                                 normals=np.array(nrm, dtype=np.float64),
+                                 uv0=np.array(uv, dtype=np.float64)))
+        slots[name] = len(by[cell])
+    node = f"decals.{tile}"
+    m = g.mesh(node, prims, extras={"kind": "decals"})
+    g.node(node, mesh=m, translation=o, root=True,
+           extras={"cg": {"key": node, "kind": "decals", "tile": tile}})
+    return {"node": node, "count": n, "slots": slots,
+            "translation": [C.m(o[0] / 1000.0), C.m(o[1] / 1000.0), 0.0]}
 
 
 def tile_job(job: dict) -> dict:
@@ -303,6 +362,7 @@ def tile_job(job: dict) -> dict:
         rec["tile"] = job["tile"]
         if rec["parts"]:
             rec["parts_glb"] = f"parts/{job['tile']}.glb"
+    decals = _decal_mesh(g, job["tile"], made)
     shells = g.to_glb()
     proxies = gp.to_glb()
     wrote = 0
@@ -319,6 +379,8 @@ def tile_job(job: dict) -> dict:
         records[bid] = rec
     files = {"tiles": {"bytes": len(shells), "sha256": C.sha256_bytes(shells)},
              "proxies": {"bytes": len(proxies), "sha256": C.sha256_bytes(proxies)}}
+    if decals is not None:
+        files["decals"] = decals
     if parts_glb is not None:
         files["parts"] = {"bytes": len(parts_glb), "sha256": C.sha256_bytes(parts_glb),
                           "meshes": part_checks["parts"],
@@ -405,7 +467,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     for t in keep:
         for bid in tiles[t]:
             records[bid] = old_b[bid]
-        files[t] = {k: old_tiles[t][k] for k in ("tiles", "proxies", "parts")
+        files[t] = {k: old_tiles[t][k] for k in ("tiles", "proxies", "parts", "decals")
                     if old_tiles[t].get(k) is not None}
     jobs = [{"tile": t, "out": str(out),
              "items": [(bid, briefs[bid], genomes[bid]) for bid in tiles[t]]} for t in todo]

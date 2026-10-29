@@ -307,6 +307,60 @@ its facade and rounded to the millimeter).
 - **Re-import**: a part's mesh is named by its parameters' hash and its pack changes only
   when the tile's buildings change, so an unchanged building's HISMs change nothing.
 
+### From AG3: street fronts, doors and decals
+
+`assetgen build` (AG3) cuts every building's ground band (from its foot to its first floor
+line, at most 7.5 m) out of the shell into a mesh of its own: shopfronts, doors, docks,
+garage mouths, gates, steps, recesses, risers, fascias and the band's own windows. It is
+a second node beside the shell in the tile's pack (`<id>.front`) and its own entry:
+
+```json
+{"key": "d03.lot.e512n88.bld.front", "kind": "building.front", "hash": "...",
+ "glb": "tiles/t+02+00.glb", "node": "d03.lot.e512n88.bld.front",
+ "asset": "d03_lot_e512n88_bld_front", "pivot": [512.4, 88.1, 0.0], "yaw_deg": 0.0,
+ "nanite": true, "fallback_full": true, "collision": {"complex": true},
+ "cpd": ["... 30 floats"], "ids": ["d03.lot.e512n88.bld"], "band_m": 4.2,
+ "doors": [{"id": "d03.lot.e512n88.bld.door.e0", "kind": "main", "entrance": 0,
+            "unit": null, "use": null, "walkway_id": "wk.e510n80",
+            "walkway_from": "model", "position": [3.1, -7.9, 0.0],
+            "normal": [0.0, -1.0], "width_m": 2.0, "height_m": 2.4, "flush": false}],
+ "tags": {"cg.type": "building.front", "cg.district": "d03", "cg.tile": "t+02+00"}}
+```
+
+- **Where**: at its building's pivot, with its building's CPD and materials (its era's walls:
+  `materials` as the building's); its building's id in `ids`, so the actor's `cg.id` is the
+  building's; `level` 1 for a building on an M14 deck.
+- **Collision**: complex (its own triangles: doorways, steps, posts and recesses collide as
+  drawn). The building's convex hulls now start at the band's top (`band_m`); a mass the
+  band takes whole (a one-floor shop) has none. `fallback_full`: the Nanite fallback keeps
+  every triangle (`PercentTriangles` 1.0, relative error 0), since complex collision is
+  built from it.
+- **Doors** (for stage 4): one per entrance and per ground-floor unit, in the building
+  frame: kind (`main`, `service`, `dock`, `rollup`, `garage`, `gate`, `shop`), the model's
+  entrance or unit index and use, the walkway it opens to (`walkway_id`: the model's when
+  the access check reaches it, else the ground walkway in front of the door; `walkway_from`
+  `model`, `front` or `none`),
+  the threshold's middle and outward normal, size, and `flush` (a door drawn on the wall,
+  where no recess fits). A door the model put on a wall a neighbor stands against is moved
+  to the nearest open facade of its building.
+- **Decals** (with AG6's library): a tile's decals on the street bands (grime at the foot,
+  leaks under windows, rust beside metal doors, graffiti, posters, cracks, moss) are one
+  mesh of quads in the tile's pack (`decals.<tile>`, 1 cm off the walls, at the tile's
+  middle), its own entry keyed `decals.<tile>`: Nanite off, `collision: {"none": true}`,
+  a slot per atlas cell (`decal.<cell>`), each a `decal` material with its `Cell` index
+  (`Cols` and `Rows` 4) over the decal atlas: mesh decals.
+
+**What the exporter does with them** (`citygen/unreal.py`, `citygen/ue/import_city.py`):
+- the front's actor like any entry's, its mesh's record with `fallback_full` (in the mesh's
+  hash), which the importer applies to the Nanite settings;
+- a `cg.door=<door id>@<walkway id>` tag per door on the front's actor;
+- the manifest's flat graphs gain `doors` (`doors_of`): one element per door, kind (the
+  door's, `shop.<use>` for a unit's), ref its walkway, width, its world point (pivot plus
+  position), attrs (building, entrance or unit, outward yaw, height, flush, walkway source),
+  level; a `BP_CityGenGraph` data asset like the others;
+- the decal meshes as non-Nanite static mesh actors without collision, their slots the
+  decal instances (`M_CgDecal`, deferred decal domain: a mesh decal over the wall behind).
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -564,4 +618,5 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | Play-ready (after AG1 and AG7) | Open into the city and play it: each import makes the city the project's `EditorStartupMap` and `GameDefaultMap` (`unreal.set_startup_map`, the rest of `Config/DefaultEngine.ini` as it was; `--no-startup`); `Core/BP_CityGenFlyPawn` (a SpectatorPawn, its built-in bindings, no collision, `--fly-speed` 50 m/s) and `Core/GM_CityGenFly`, the level's game mode override with `--play fly` (the default), none with `--play walk`; World Partition for flying: the main grid 256 m cells loaded `--view-range` (1500 m) around the player, the instanced HLOD layer in 512 m cells out to the city's diagonal (its merged parent layer cut off), set by the partitions' C++ property names; the HLODs built after the import (`unreal.build_hlods`, the WorldPartitionHLODsBuilder commandlet, only what changed; `--no-hlod`); every master `used_with_instanced_static_meshes` (without it the far view drew the default material, flat gray); `--check` walks with the project's own pawn whatever `--play` set, runs `ghost`, `fly` and `walk`, then flies with the fly pawn (its speed on the game's clock, through a building, the city loaded where it ends) and with `--shots` takes two views from it; an unchanged build imported again saves nothing; `unreal.manifest_changes` counts a key whose actor changes class (AG8's exact props over M15's instanced ones) as deleted and created, as the importer does | Vesper Bay (blockout only) and Greyhook (with stage 2) imported over their earlier imports, imported again, HLODs built (244 and 285), checked in both modes (507 of 507 traces down, 36 of 36 roofs and facades, 253 and 129 m walked, the console commands, 50 m/s flights) with shots from the fly pawn (`docs/progress/unreal_play/`) |
 | AG8 Unreal check | Plants' instanced actors without collision (a part's `collision: {"none": true}` now makes its HISM `NoCollision`; it reached only the mesh record before); the check tries a missed trace down again for up to 30 s (`TRACE_RETRY_S`) and counts those hits as late (the first play session after an import traced before the streamed cells' collision was in place: 346 of 507) (its streaming step's read of actors that had streamed out, which stopped Vesper Bay's first check, was fixed the same way by the play-ready exporter); `test_stage2_from_assetgen` expects the exact props' keys, whose actor changes class, as deleted and created (`manifest_changes` since the play-ready exporter) | as AG8's row |
 | AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |
+| AG3 | Street fronts: each building's ground band its own entry and node (`<id>.front`, kind `building.front`) with complex collision and `fallback_full` (the mesh record and its hash; the importer sets the Nanite fallback to every triangle), its building's id, CPD and materials; doors tagged on the front's actor (`cg.door=<id>@<walkway>`) and gathered into a fourth flat graph, `doors` (`doors_of`); a stage 2 entry's own `ids` and `level` reach its actor; the tiles' decal meshes as entries (`decals.<tile>`, no Nanite, no collision, `decal.<cell>` slots with their cell index); tests without Unreal (`test_stage2_takes_assetgen_fronts`; `test_stage2_from_assetgen` and `test_stage2_takes_assetgen_parts` read the new entries) | Not run (the coordinating session's call; what to look for: `docs/progress/AG3/README.md`) |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |

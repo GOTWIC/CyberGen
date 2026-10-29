@@ -4,7 +4,9 @@ textured Blender renders.
 - **preview**: the blockout's `city.blend` with its building boxes and the street objects
   AG7 replaces taken out; per view the shells of its tiles and the street pieces near it
   with AG6's materials (`assetgen/blender/ag6_materials.py`), the rest of the city from the
-  far proxies; the sign slots near a street view as quads showing their atlas cells; by
+  far proxies; AG3's street fronts and decals with the shells, AG2's instanced parts on
+  them, AG8's props and plants near a street view; the sign slots near a street view as
+  quads showing their atlas cells; by
   night (`--night`) the windows lit by each building's lit ratio, the signs and neon, a
   point light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city, or cameras of one's own (`--eye`, `--target`).
@@ -31,6 +33,7 @@ STREET_R = 600.0
 SIGN_R = 260.0
 LIGHT_R = 220.0
 MAX_LIGHTS = 160
+PROPS_R = 260.0
 
 
 def _files(assets: Path, textures: dict) -> dict[str, str]:
@@ -82,6 +85,33 @@ def _lights(model, center, r) -> list[list[float]]:
     return out[:MAX_LIGHTS]
 
 
+def _props_near(con: dict | None, assets: Path, eye, r) -> tuple[dict, list[str]]:
+    """AG8's variant placements within r of a view's eye ({node: [(x, y, z, yaw_rad, sx, sy,
+    sz)]}) and the exact-prop packs of the tiles there."""
+    if con is None:
+        return {}, []
+    pts: dict[str, list] = {}
+    tiles = set()
+    for e in con["entries"]:
+        # (an entry's pivot is its tile's middle: the tile within reach, then each prop)
+        if not _near(e["pivot"], eye, r + PV.BD.TILE_M * 0.71):
+            continue
+        if e.get("glb") and e.get("tile") and not e.get("parts"):
+            tiles.add(e["tile"])
+        px, py, pz = e["pivot"]
+        for q in e.get("parts") or []:
+            for xf in q["xforms"]:
+                x, y = xf[0] + px, xf[1] + py
+                if not _near((x, y), eye, r):
+                    continue
+                sc = xf[4:7] if len(xf) > 4 else [1.0, 1.0, 1.0]
+                pts.setdefault(q["node"], []).append(
+                    [x, y, xf[2] + pz, math.radians(xf[3])] + list(sc))
+    files = [str((assets / "props" / "tiles" / f"{t}.glb").resolve()) for t in sorted(tiles)
+             if (assets / "props" / "tiles" / f"{t}.glb").is_file()]
+    return pts, files
+
+
 def run(args) -> dict:
     from ..brief import load_model
     bdir = Path(args.build)
@@ -90,6 +120,8 @@ def run(args) -> dict:
     mats = json.loads((adir / "materials.json").read_text())
     signs = json.loads((adir / "signs.json").read_text())
     con = json.loads((adir / "unreal_contribution.streets.json").read_text())
+    pp = adir / "unreal_contribution.props.json"
+    pcon = json.loads(pp.read_text()) if pp.is_file() else None
     model, _, _ = load_model(bdir)
     od = Path(args.out) if args.out else adir / "previews_ag6"
     od.mkdir(parents=True, exist_ok=True)
@@ -109,6 +141,9 @@ def run(args) -> dict:
     stiles = sorted({e["tile"] for e in con["entries"]})
     for v in views:
         tgt = v["target"]
+        v["parts"] = PV.instances(man, v["shell_tiles"])
+        v["props"], v["prop_tiles"] = ({}, []) if v["ortho"] else \
+            _props_near(pcon, adir, v["eye"], PROPS_R)
         if v["ortho"]:
             v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
             v["signs"], v["lights"] = [], []
@@ -116,14 +151,26 @@ def run(args) -> dict:
             v["street_tiles"] = [t for t in stiles if _tile_near(t, v["eye"], STREET_R)]
             v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R)
             v["lights"] = _lights(model, v["eye"], LIGHT_R)
+    gone = {e["key"] for e in con["entries"]} | \
+        {r for e in con["entries"] for r in e.get("replaces", [])}
+    if any(v["props"] for v in views):
+        # (M15's prototype instancers and prop actors: AG8's variants take their place)
+        for part in ("props", "signs"):
+            f = adir / f"unreal_contribution.{part}.json"
+            if f.is_file():
+                for e in json.loads(f.read_text())["entries"]:
+                    gone.add(e["key"])
+                    gone.update(e.get("replaces", []))
     modes = ["night"] if args.only_night else (["day", "night"] if args.night else ["day"])
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
            "files": _files(adir, mats["textures"]), "props": _props(man),
-           "removed": sorted({e["key"] for e in con["entries"]} |
-                             {r for e in con["entries"] for r in e.get("replaces", [])}),
+           "removed": sorted(gone),
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
-           "era_slots": sorted(CT.ERA_SLOTS)}
+           "era_slots": sorted(CT.ERA_SLOTS),
+           "prop_protos": [str(f.resolve()) for sub in ("variants", "plants")
+                           for f in sorted((adir / "props" / sub).glob("*.glb"))]
+           if any(v["props"] for v in views) else []}
     return _blender(job, "ag6_preview.py", args.blender, od)
 
 

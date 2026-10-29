@@ -25,6 +25,11 @@ fallback is what complex collision uses), its building's id, and its doors (`doo
 kind, entrance or unit index, use, walkway id, position in the building frame, outward
 normal, size), which the exporter tags on the front's actor and gathers into the `doors`
 graph for stage 4.
+
+AG3 with AG6's library: a tile's decals (grime, leaks, rust, graffiti, posters, cracks and
+moss on the street bands) are one mesh of quads in the tile's pack (`decals.<tile>`, at the
+tile's middle), its own entry keyed `decals.<tile>`: no Nanite (mesh decals), no collision,
+a slot per decal atlas cell (`decal.<cell>`, master `decal` with the cell's index).
 """
 
 from __future__ import annotations
@@ -103,10 +108,30 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
                 "tags": {"cg.type": "building.front", "cg.district": r["district"] or "",
                          "cg.tile": r["tile"]},
             })
+            if r.get("level"):
+                entries[-1]["level"] = r["level"]          # (M14: a front on a deck)
+    mats = materials()
+    if lib is not None:
+        from .materials.atlases import DECAL_CELLS
+        for cell in DECAL_CELLS:
+            mats[f"decal.{cell}"] = {"master": "decal", "color": [1.0, 1.0, 1.0],
+                                     "roughness": 0.8, "metallic": 0.0, "tint_cpd": None}
+        for t, tr in sorted(man["tiles"].items()):
+            dc = tr.get("decals")
+            if not dc:
+                continue
+            entries.append({
+                "key": dc["node"], "kind": "decals", "hash": tr["hash"][:16],
+                "replaces": [], "glb": f"tiles/{t}.glb", "node": dc["node"],
+                "asset": asset_name(dc["node"]), "pivot": dc["translation"], "yaw_deg": 0.0,
+                "nanite": False, "distance_field": False, "lumen_cards": False,
+                "triangles": 2 * dc["count"], "slots": sorted(dc["slots"]),
+                "collision": {"none": True}, "cpd": [], "decals": dc["count"],
+                "tags": {"cg.type": "decals", "cg.district": "", "cg.tile": t}})
     con = {"version": 1, "stage": "assetgen", "part": "buildings", "layer": 2,
            "generator": f"assetgen {__version__} ({man['generator']})", "frame": FRAME,
            "city": man["city"], "model_sha256": man["model_sha256"],
            "masters": ["facade", "glass", "metal", "neon", "foliage"],
-           "materials": materials(), "cpd_layout": SY.CPD_LAYOUT, "entries": entries}
+           "materials": mats, "cpd_layout": SY.CPD_LAYOUT, "entries": entries}
     from .materials import contrib as MC
     return MC.buildings(con, man, lib)

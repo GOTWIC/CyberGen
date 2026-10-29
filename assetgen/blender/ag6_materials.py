@@ -25,6 +25,8 @@ import bpy
 
 IMAGES = {}
 NIGHT = []                          # every Night value node, set by set_night()
+ATTR = ["OBJECT"]                   # where `T.attr` reads: the object, or (AG2's part
+                                    # instances, AG3's previews) the instance ("INSTANCER")
 
 
 def image(path, color=True):
@@ -99,7 +101,7 @@ class T:
         return n.outputs[0]
 
     def attr(self, name, out="Fac"):
-        n = self.new("ShaderNodeAttribute", attribute_type="OBJECT", attribute_name=name)
+        n = self.new("ShaderNodeAttribute", attribute_type=ATTR[0], attribute_name=name)
         return n.outputs[out]
 
     def mix(self, fac, a, b):
@@ -413,6 +415,43 @@ def proxy(mat):
     return mat
 
 
+def decal(mat, rec, files):
+    """AG3's mesh decals: a cell of the decal atlas over the quad (UV0 0 to 1, v down in
+    glTF), its coverage as alpha, blended over the wall behind."""
+    t = T(mat)
+    bsdf = t.n["Principled BSDF"]
+    sc = rec.get("scalars", {})
+    cols, rows = sc.get("Cols", 4.0), sc.get("Rows", 4.0)
+    cell = int(sc.get("Cell", 0.0))
+    col, row = cell % int(cols), cell // int(cols)
+    uv = t.new("ShaderNodeUVMap", uv_map="UVMap").outputs["UV"]
+    u, v, _ = t.xyz(uv)
+    auv = t.comb(t.m("DIVIDE", t.m("ADD", u, float(col)), cols),
+                 t.m("DIVIDE", t.m("ADD", v, float(rows - 1 - row)), rows))
+    tx = rec.get("textures", {})
+    c, a = t.tex(files[tx["BaseTex"]], auv, True)
+    t.link(c, bsdf.inputs["Base Color"])
+    t.link(a, bsdf.inputs["Alpha"])
+    if "NormalTex" in tx:
+        nc, _ = t.tex(files[tx["NormalTex"]], auv, False)
+        nm = t.new("ShaderNodeNormalMap")
+        t.link(nc, nm.inputs["Color"])
+        t.link(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    if "OrmTex" in tx:
+        oc, _ = t.tex(files[tx["OrmTex"]], auv, False)
+        _, g, _ = t.xyz(oc)
+        t.link(g, bsdf.inputs["Roughness"])
+    try:
+        mat.surface_render_method = "BLENDED"
+    except AttributeError:
+        pass
+    try:
+        mat.use_backface_culling = True
+    except AttributeError:
+        pass
+    return mat
+
+
 def make(name, rec, files, part):
     """A Blender material for one record of materials.json."""
     mat = bpy.data.materials.new(name)
@@ -423,6 +462,8 @@ def make(name, rec, files, part):
     if master in ("facade", "concrete", "metal", "road", "foliage") and \
             rec.get("scalars", {}).get("Textured", 0.0) > 0:
         return textured(mat, rec, files, part)
+    if master == "decal" and "BaseTex" in rec.get("textures", {}):
+        return decal(mat, rec, files)
     if master == "glass":
         return glass(mat, rec, files, part)
     if master in ("neon", "emissive"):
