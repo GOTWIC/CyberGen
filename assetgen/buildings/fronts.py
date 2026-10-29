@@ -12,8 +12,14 @@ facade, `GAP_MIN` apart):
   it where the facade has room), a service door, a loading dock (its opening at the dock's
   height, bumpers and a seal round it) or a roll-up door, a garage mouth (deep, the dark
   garage behind), a gate; one that cannot be cut there (a thin wall, a corner) shifts along
-  the facade, else hangs flush on the wall;
+  the facade, then into the corner piers, else hangs flush on the wall; a main entrance
+  between units keeps room for its own door (the shopfronts either side stop short);
 - the ground row's windows (AG1's grammar) where neither is.
+
+A unit or entrance the model put on a wall a neighbor stands against, or on a facade too
+short for its door, goes to the nearest facade of its mass that has room (`Band.rehome`, in
+place of the ground windows there, `moved`), else flush on the nearest band facade of the
+building (`leftovers`).
 
 The wall round them is triangulated as a polygon per zone (`_pieces`: a lower zone under the
 industrial dado line or the base strip, then the wall), the openings that reach the
@@ -26,7 +32,9 @@ the roof of a mass the band takes whole).
 
 Doors are recorded (`doors`: id, kind, entrance or unit, walkway, position, outward normal,
 size, steps) for the access check and stage 4; every band opening is recorded (`opened`,
-in the brief edge's s) for the mounts check.
+in the brief edge's s) for the mounts check. After the bands: the hardware AG8's facade
+props hang on (`hardware`), downpipes and murals on blind and fire walls (`walls`) and the
+band's decals (`_decals`: cells of AG6's decal atlas, drawn by `build` as mesh decals).
 """
 
 from __future__ import annotations
@@ -1072,7 +1080,9 @@ def hardware(sb) -> None:
     br = sb.br
     for p in br["props"]:
         at = p.get("at")
-        if at is None or not p["on_wall"] or at["d"] > 0.5:
+        # (a scaffold stands its depth off the wall, about 0.8 m)
+        if at is None or not p["on_wall"] or \
+                at["d"] > (1.5 if p["kind"] == "scaffolding" else 0.5):
             continue
         kind = p["kind"]
         if kind not in ("wall_light", "overhead_cable", "scaffolding"):
