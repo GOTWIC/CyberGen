@@ -59,7 +59,7 @@ DECK_T = 600                 # deck slab
 GIRDER_T = 400               # box girder under it (the deck structure: 1.0 m in all)
 COLLAR = 250
 LANDING_TOL = 400            # a landing's deck within this of a floor line: a door row
-LANDING_THIN = 1000          # a mass too thin for windows still takes a landing door
+LANDING_THIN = 500           # a mass too thin for windows still takes a landing door
 DOOR_MIN = 900               # a landing door at least this wide
 LANDING_CORNER = 400         # and at least this far from a corner (a reveal and 6 cm)
 FRAME_JAMB = 600             # a portal frame's jambs, beside its mouth
@@ -272,7 +272,8 @@ def _into_portal(sb, s: dict) -> bool:
 
 def landing_records(sb) -> list[dict]:
     """Per skybridge of the brief: its landing door, else why none (`no_edge`: its end
-    meets none of the building's walls; `portal`: it lands in an open portal; `off_floor`:
+    meets none of the building's walls; `portal`: it lands in an open portal; `ground`: at
+    the ground floor, where the street front meets it (M13's slopes); `off_floor`:
     its deck is on no floor line of the mass it meets, M3's floor grids apart; `no_room`:
     the wall leaves no door's width)."""
     out = []
@@ -285,6 +286,8 @@ def landing_records(sb) -> list[dict]:
                 r["why"] = "no_edge"
             elif _into_portal(sb, s):
                 r["why"] = "portal"
+            elif sb.band_z is not None and s["z_m"] * 1000 < sb.band_z - LANDING_TOL:
+                r["why"] = "ground"           # (at the street front: AG3's band meets it)
             else:
                 z = int(round(s["z_m"] * 1000))
                 k = sb.br["edges"][at["edge"]]["mass"]
