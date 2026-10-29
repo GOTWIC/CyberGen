@@ -1252,8 +1252,13 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     job = {"mode": "import", "manifest": str(man_path), "build_dir": str(build),
            "result": str(out / "import_result.json"), "play": play,
            "fly_speed_m_s": float(fly_speed), "view_m": float(view_m)}
+    # (exp_fast_import) the engine's -fastexit: the process ends when the import script
+    # returns, everything saved; the editor's teardown of a city's objects takes minutes
+    # (Greyhook with stage 2: 5 to 6), the derived data cache writes each entry whole
+    # (a temp file, then a move). CITYGEN_UE_FAST=0 leaves it out.
+    extra = ["-fastexit"] if os.environ.get("CITYGEN_UE_FAST", "1") != "0" else None
     res = run_editor(root, up, UE_DIR / "import_city.py", job, out / "import_log.txt",
-                     timeout=timeout, estimate=True)
+                     timeout=timeout, estimate=True, extra=extra)
     res["manifest_s"] = manifest_s
     res["plugins_enabled"] = added
     if res.get("ok") and startup:
