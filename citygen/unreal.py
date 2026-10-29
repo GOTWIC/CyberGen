@@ -1147,6 +1147,9 @@ def _copy(proc, log_file, on_line, stop=None):
 
 
 PIPE_GRACE_S = 15.0
+# (exp_fast_import) the import's editor alone, over the project's settings (see import_city)
+FAST_INI = ("-ini:Engine:[/Script/Engine.RendererSettings]:r.GenerateMeshDistanceFields=False,"
+            "[SystemSettings]:r.MeshCardRepresentation=0")
 
 
 def _streamed(cmd: list[str], log: Path, on_line, timeout: float, env=None) -> int:
@@ -1255,8 +1258,13 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     # (exp_fast_import) the engine's -fastexit: the process ends when the import script
     # returns, everything saved; the editor's teardown of a city's objects takes minutes
     # (Greyhook with stage 2: 5 to 6), the derived data cache writes each entry whole
-    # (a temp file, then a move). CITYGEN_UE_FAST=0 leaves it out.
-    extra = ["-fastexit"] if os.environ.get("CITYGEN_UE_FAST", "1") != "0" else None
+    # (a temp file, then a move). And no distance field or Lumen card tasks in the import's
+    # editor (every mesh has none: resolution scale 0, no cards, so each task builds an empty
+    # one): with every pack imported at once their queue falls far behind, and a task that
+    # runs while the LOD chains add LODs to a mesh reads its freed source model (a crash in
+    # FDistanceFieldAsyncQueue::Build). Neither variable is in the mesh's cache key; the
+    # project's own settings are untouched. CITYGEN_UE_FAST=0 leaves both out.
+    extra = ["-fastexit", FAST_INI] if os.environ.get("CITYGEN_UE_FAST", "1") != "0" else None
     res = run_editor(root, up, UE_DIR / "import_city.py", job, out / "import_log.txt",
                      timeout=timeout, estimate=True, extra=extra)
     res["manifest_s"] = manifest_s
