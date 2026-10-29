@@ -29,6 +29,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -1295,7 +1296,8 @@ def _version_key(path: str) -> tuple:
 
 
 def find_blender(explicit: str | None = None) -> str | None:
-    """Blender: `explicit`, $BLENDER, the newest /Applications/Blender*.app, or `blender`."""
+    """Blender: `explicit`, $BLENDER, the newest /Applications/Blender*.app (a Mac) or
+    Program Files/Blender Foundation/Blender * (Windows), or `blender`."""
     for cand in (explicit, os.environ.get("BLENDER")):
         if cand:
             return cand if Path(cand).exists() else None
@@ -1304,6 +1306,12 @@ def find_blender(explicit: str | None = None) -> str | None:
         exe = Path(app) / "Contents" / "MacOS" / "Blender"
         if exe.exists():
             return str(exe)
+    if sys.platform == "win32":
+        base = Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "Blender Foundation"
+        for d in sorted(glob.glob(str(base / "Blender *")), key=_version_key, reverse=True):
+            exe = Path(d) / "blender.exe"
+            if exe.exists():
+                return str(exe)
     return shutil.which("blender")
 
 
