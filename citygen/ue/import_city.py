@@ -99,7 +99,6 @@ BAD_NAME_CHARS = "\"' ,/.:|&!~\n\r\t@#(){}[]=;^%$`"
 # the stage 2 packs being imported: glb path -> {asset name: the manifest's mesh record}
 PACK_PLAN = {}
 PACK_STEPS = []          # what the pack step did per pack (counts, for the result)
-PACK_TOTAL = [0]         # the packs to import in all (PACK_PLAN may hold a batch)
 TEXTURE_PLAN = {}        # texture file -> [(factory node setter, value)]
 TEXTURE_STEPS = []       # the texture files the texture step found in TEXTURE_PLAN
 
@@ -137,8 +136,8 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
             step = {"pack": source_datas[0].get_filename(), "nodes": len(nodes),
                     "matched": found, "skipped": 0}
             PACK_STEPS.append(step)
-            REPORT.update(len(PACK_STEPS), PACK_TOTAL[0] or len(PACK_PLAN),
-                          detail="packs imported, their meshes building")
+            REPORT.update(len(PACK_STEPS), len(PACK_PLAN), detail="packs imported, their "
+                          "meshes building")
             if found != len(plan):
                 # (a name this step cannot match: leave the pack as the generic pipeline
                 # made it; finish2 sets the settings and prune_meshes deletes the extras)
@@ -985,8 +984,6 @@ class Importer:
         self.texture_step = CgTextureStep() if self.fast else None
         # (fast: the actors made are saved and unloaded every `offload_n`, see offload)
         self.offload_n = int(os.environ.get("CITYGEN_UE_OFFLOAD", "2000")) if self.fast else 0
-        # (fast: stage 2's packs queued this many at a time; 0, the default, all at once)
-        self.packs_at_once = int(os.environ.get("CITYGEN_UE_PACKS", "0")) if self.fast else 0
         self.live, self.offloaded = [], []
         self.skip = set(self.s2["replaced"]) | {a["key"] for a in self.s2["actors"]} \
             if self.s2 else set()
@@ -1118,23 +1115,7 @@ class Importer:
     def import_packs(self, todo):
         """Every stage 2 pack in `todo` queued as one async Interchange import (with the pack
         step), then waited for: Interchange runs half the worker threads' worth at a time,
-        and each mesh's build goes to the asset compiling pool as its import ends. With
-        `packs_at_once` (CITYGEN_UE_PACKS) they are queued that many at a time, each batch
-        waited for before the next (fewer in flight, for a machine with less memory)."""
-        n = self.packs_at_once
-        PACK_TOTAL[0] = len(todo)
-        if n and len(todo) > n:
-            for i in range(0, len(todo), n):
-                self.import_packs_now(todo[i:i + n])
-            REPORT.note(f"stage 2 packs queued {n} at a time")
-        else:
-            self.import_packs_now(todo)
-        steps = PACK_STEPS
-        self.stats["stage2"]["pack_step"] = {
-            "packs": len(steps), "unmatched": sum(1 for x in steps if x.get("unmatched")),
-            "skipped": sum(x["skipped"] for x in steps)}
-
-    def import_packs_now(self, todo):
+        and each mesh's build goes to the asset compiling pool as its import ends."""
         tasks = []
         for pk, folder, entries, fresh in todo:
             glb = os.path.join(self.build, pk["glb"])
@@ -1154,6 +1135,10 @@ class Importer:
         AT.import_asset_tasks(tasks)
         unreal.InterchangeManager.get_interchange_manager_scripted() \
             .wait_until_all_tasks_done(False)
+        steps = PACK_STEPS
+        self.stats["stage2"]["pack_step"] = {
+            "packs": len(steps), "unmatched": sum(1 for x in steps if x.get("unmatched")),
+            "skipped": sum(x["skipped"] for x in steps)}
         PACK_PLAN.clear()
 
     def import_group(self, glb, folder, entries, pipeline=None, finish=None,

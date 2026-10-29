@@ -21,6 +21,40 @@ The import script alone (the editor's start and shutdown aside) is 3.3x faster i
 crashed in the engine after 12 minutes (item 9), so main's ran next and the experiment's
 again after it with the fix: main first in both pairs.
 
+## On main with #54 (2026-10-29 afternoon)
+
+The branch with main merged (#54: era materials on AG2's part instancers, no collision on
+building parts, Nanite usage flags on the masters, the city's sign pages kept by the prune,
+big prunes by their files), Greyhook's assets built with that main's assetgen (it kept every
+tile: nothing it makes changed), each a first import into a new project with a cache of its
+own as above, on a quieter Mac (1 min load 4.7 to 20, median 12; pair 2's median was 20 to 22):
+
+| Run | Whole command | Import script | Peak memory (the engine's count) |
+|---|---|---|---|
+| Experiment, pair 2 (before #54) | 14m15s | 13m34s | 42.4 GB |
+| Experiment on #54 | 7m01s | 6m40s | 35.0 GB |
+| `CITYGEN_UE_FAST=0` on #54 (main's path) | 20m21s | 18m54s | 33.4 GB |
+| Experiment on #54, packs queued 60 at a time (a trial, since taken out) | 7m21s | 7m04s | 35.0 GB |
+
+- **Textures:** 276 of 276 (the 5 sign pages kept: 271 before #54), the texture step matched
+  all 276 (`texture_step` in the result), all 9 sign instances naming their pages and all
+  1,129 instance texture parameters as the manifest names them.
+- **Pack step:** 603 packs, none unmatched, 299 unplaced meshes not made; nothing pruned.
+- **A second import** changed nothing (38,988 actors unchanged, every mesh, material, pack and
+  texture kept, no package saved, 46 s in the editor).
+- **`--check` passed:** 507 of 507 traces down, 35 of 36 roofs (the miss a balcony part, which
+  #54 left without collision; main's own #54 check of Greyhook had 35 of 36 too), 36 of 36
+  facades, the walk to its end, the flight.
+- **`CITYGEN_UE_FAST=0` is main's path:** the same importer digests as the fast import
+  (actors `bd62c47492c833dd`, assets `f07733e2dddc6540`, 38,988 and 33,278), neither
+  `-fastexit` nor the `-ini:` override on its command line, the 299 unplaced meshes made
+  and pruned, the distance field tasks abandoned at its exit; the fast import 2.9x
+  faster than it at the same load (2.8x for the import script).
+- **Memory:** imports in flight hardly matter: main's path (one pack at a time) peaked at
+  33.4 GB, the fast path (Interchange's half of the worker threads, 7 here) at 35.0 GB, and
+  packs queued 60 at a time at 35.0 GB. The peak is the city's meshes the import holds
+  (28k), so a knob for imports in flight would save little; it was tried and taken out.
+
 ## Conditions
 
 - The M4 Pro Mac (14 cores, 24 GB), shared with other sessions' work. **The absolute numbers
@@ -122,8 +156,12 @@ load and with what the editor holds in memory (less, with the actors offloaded).
    variable is in the static mesh cache key, so the meshes built stay valid in an editor
    that has them on (which builds the empty entries when it needs them).
 
-`CITYGEN_UE_FAST=0` turns all of it off (main's path); `CITYGEN_UE_OFFLOAD=N` sets the
-offload chunk (0: none).
+Knobs (environment variables, read by the importer):
+
+- `CITYGEN_UE_FAST=0`: all of it off, main's path exactly (one pack at a time, each mesh
+  built and then set, the editor's own shutdown).
+- `CITYGEN_UE_OFFLOAD=N`: the actors saved and unloaded every N made (default 2000; 0:
+  none).
 
 ## The same result
 
@@ -168,6 +206,49 @@ empty project (a cube mesh, a label, a folder, a transform and tags per actor):
   to the twelfth; each offload 1.9 to 2.6 s, loading all 12,000 again 1.4 s, every actor with
   its mesh after the reload.
 
+## On Windows
+
+Not run on Windows yet; from reading the branch, nothing in it is Mac-only:
+
+- **`-fastexit`** is the engine's own flag on every platform: on Windows it flushes the log
+  and ends the process (`TerminateProcess`) with the commandlet's exit code, on a Mac
+  `_Exit(0)`. `citygen unreal` judges an import by its result file, not the exit code.
+- **The `-ini:` override** is one argument with no spaces or quotes, passed as an argument
+  list (no shell), so Windows' command line carries it as it is; the engine parses `-ini:`
+  the same way on every platform (`FConfigFile::OverrideFromCommandline`).
+- **Paths:** the pack and texture plans are keyed by `os.path.normcase(os.path.realpath(...))`,
+  so separators, case and AG6's library (a directory junction on Windows) compare equal. A
+  pack the step still cannot match is imported as main does (`finish2` sets its settings);
+  the result's `stage2.pack_step.unmatched` and `stage2.textures.texture_step.matched` say
+  how many matched.
+- **The derived data cache:** a project made with `--new-project` uses the engine's default
+  cache (Zen, shared by the machine's projects), not the per-project store of these runs.
+  With `-fastexit` an entry the editor had not yet handed to the cache server is built again
+  by the next user; nothing saved is lost.
+- **Memory:** the engine's peak for Greyhook was 35 GB on #54 (42 GB in pair 2, under heavy
+  load) against main's 33.4 GB (38.5 GB in pairs 1 and 2), on this 24 GB Mac mostly in swap.
+  On Windows that is RAM plus page file; with less RAM the page file takes the rest, more
+  slowly. Main's path (`CITYGEN_UE_FAST=0`) needs about 1.5 GB less; there is no other knob.
+
+Steps in PowerShell, in the repo (`--no-hlod` times the import alone, as these runs did;
+without it the HLODs are built after the import, a few minutes more):
+
+```powershell
+git fetch origin
+git switch claude/exp-fast-import
+.venv\Scripts\python -m citygen build docs\progress\M1a2\peninsula_city\city_spec.json out\greyhook --blockout
+.venv\Scripts\python -m assetgen build out\greyhook
+.venv\Scripts\python -m citygen unreal out\greyhook "$HOME\Documents\Unreal Projects\GreyhookFast\GreyhookFast.uproject" --new-project
+```
+
+Main's path, into another new project, to compare:
+
+```powershell
+$env:CITYGEN_UE_FAST = "0"
+.venv\Scripts\python -m citygen unreal out\greyhook "$HOME\Documents\Unreal Projects\GreyhookMain\GreyhookMain.uproject" --new-project
+Remove-Item Env:CITYGEN_UE_FAST
+```
+
 ## What is left in the exporter
 
 - **The Nanite builds** are now most of the import (the packs' import and build: 364 s of
@@ -192,16 +273,15 @@ empty project (a cube mesh, a label, a folder, a transform and tags per actor):
   editor (`--check`'s start took 10 minutes in a new project); nothing the importer does
   changes that.
 
-## Found on the way: the prune deletes the city's sign pages (main too)
+## Found on the way: the prune deleted the city's sign pages (fixed on main)
 
-`prune_meshes` deletes every asset under `<root>/Assets` that no stage 2 entry names, except
-`Assets/Materials`. AG6's city texture pages live in `Assets/Textures`
-(`TEXTURE_FOLDER_CITY`), so every first import with AG6's signs force-deletes them after
-importing them (Greyhook: `T_city_ads_0`, `T_city_ads_1`, `T_city_logos`,
-`T_city_signs_tall_0`, `T_city_signs_wide_0`; the log's "deleting 5 stage 2 meshes"), and
-the force delete clears them from the sign material instances, which are saved so. Both
-importers do it (271 of 276 textures left in every project); a second import imports them
-again and deletes them again. Left as it is here so the experiment matches main.
+`prune_meshes` deleted every asset under `<root>/Assets` that no stage 2 entry named, except
+`Assets/Materials`, so every first import with AG6's signs force-deleted the city's texture
+pages (`Assets/Textures`: Greyhook's `T_city_ads_0`, `T_city_ads_1`, `T_city_logos`,
+`T_city_signs_tall_0`, `T_city_signs_wide_0`) right after importing them, and the sign
+material instances were saved without them (271 of 276 textures in pairs 1 and 2, both
+importers). #54 fixed it on main (the prune keeps `Assets/Textures`, and `materials2` gives an
+instance that lost a texture its textures again); this branch has it since the merge.
 
 ## For the assetgen coordinator (ideas that need assetgen changes)
 
