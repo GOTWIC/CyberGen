@@ -128,10 +128,21 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 ```
 
-`--blockout` needs Blender 5.2. `citygen unreal out/vesper_bay <Project>.uproject` imports
-the city into an Unreal 5.8 project. To make a new city, open Claude Code in this repo and
-ask for one (the `citygen` skill takes it from there). Editing, locking and the other
-commands: [`docs/citygen_milestones.md`](docs/citygen_milestones.md).
+`--blockout` needs Blender 5.2. To make a new city, open Claude Code in this repo and ask
+for one (the `citygen` skill takes it from there). Editing, locking and the other commands:
+[`docs/citygen_milestones.md`](docs/citygen_milestones.md).
+
+To see the city in Unreal Engine 5.8, import it into a project (on Windows:
+`.venv\Scripts\python` and Windows paths):
+
+```
+.venv/bin/python -m citygen unreal out/vesper_bay ~/CityTest/CityTest.uproject --new-project
+```
+
+Open the project and press Play: you fly over the city with a free camera (W, A, S, D to
+move, the mouse to look, E or Space up, Q or C down). `--play walk` walks it with the
+project's own character instead, and `--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
+alone). Controls, flags and streaming: [`docs/unreal_export.md`](docs/unreal_export.md).
 
 ---
 

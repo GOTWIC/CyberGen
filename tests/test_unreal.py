@@ -358,6 +358,51 @@ def test_prepare_project_and_engine(tmp_path):
     assert U.find_engine(str(tmp_path / "nowhere")) is None
 
 
+def test_startup_map(tmp_path):
+    """The imported city becomes the project's startup and default map; the rest of
+    DefaultEngine.ini stays as it was (a Windows one's line endings too)."""
+    up = tmp_path / "P" / "P.uproject"
+    (tmp_path / "P" / "Config").mkdir(parents=True)
+    ini = tmp_path / "P" / "Config" / "DefaultEngine.ini"
+    ini.write_bytes(b"[/Script/EngineSettings.GameMapsSettings]\r\n"
+                    b"EditorStartupMap=/Game/FirstPerson/Lvl_FirstPerson.Lvl_FirstPerson\r\n"
+                    b"bUseSplitscreen=True\r\n[/Script/Engine.RendererSettings]\r\n"
+                    b"r.Lumen=1\r\n")
+    level = "/Game/CityGen/VesperBay/Maps/VesperBay"
+    assert U.set_startup_map(up, level)
+    text = ini.read_bytes().decode()
+    assert text.count("\r\n") == text.count("\n") == 6
+    lines = text.split("\r\n")
+    assert lines[:4] == ["[/Script/EngineSettings.GameMapsSettings]",
+                         "GameDefaultMap=/Game/CityGen/VesperBay/Maps/VesperBay.VesperBay",
+                         "EditorStartupMap=/Game/CityGen/VesperBay/Maps/VesperBay.VesperBay",
+                         "bUseSplitscreen=True"]
+    assert lines[4:6] == ["[/Script/Engine.RendererSettings]", "r.Lumen=1"]
+    assert not U.set_startup_map(up, level)
+    ini.write_text("[/Script/Engine.RendererSettings]\nr.Lumen=1\n")
+    assert U.set_startup_map(up, level)
+    assert ini.read_text().endswith("[/Script/EngineSettings.GameMapsSettings]\n"
+                                    "EditorStartupMap=/Game/CityGen/VesperBay/Maps/VesperBay."
+                                    "VesperBay\nGameDefaultMap=/Game/CityGen/VesperBay/Maps/"
+                                    "VesperBay.VesperBay\n")
+
+
+def test_play_flags(tmp_path):
+    """`--play`, `--fly-speed`, `--view-range`, `--no-startup` and `--no-hlod` parse; a play mode
+    that is not one is refused before any editor runs."""
+    from citygen.cli import build_parser
+    a = build_parser().parse_args(["unreal", "B", "P.uproject"])
+    assert (a.play, a.fly_speed, a.view_range, a.no_startup, a.no_hlod) == \
+        ("fly", U.FLY_SPEED_M_S, U.VIEW_M, False, False)
+    a = build_parser().parse_args(["unreal", "B", "P.uproject", "--play", "walk",
+                                   "--fly-speed", "80", "--no-startup", "--no-hlod"])
+    assert (a.play, a.fly_speed, a.no_startup, a.no_hlod) == ("walk", 80.0, True, True)
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["unreal", "B", "--play", "swim"])
+    with pytest.raises(ValueError):
+        U.import_city(tmp_path, tmp_path / "P.uproject", play="swim")
+
+
 def test_names():
     assert U.pascal("Vesper Bay") == "VesperBay" and U.pascal("2077 City") == "City2077City"
     assert U.slug("Saltreach Free Port") == "saltreach_free_port"
@@ -613,6 +658,7 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     a = inst[f"{props_k}.prop.test.civic.v0"]
     assert a["xforms"] == xf and a["ids"] == ["a.prop.1", "a.prop.2"]
     assert a["category"] == next(i["category"] for i in man["instances"] if i["key"] == props_k)
+    assert "no_collision" not in a and inst[f"{plant_k}.plant.oak.v3"]["no_collision"]
     plants = next(p for p in s2["packs"] if p["folder"].endswith("PropsParts/oak"))
     (oak,) = plants["meshes"]
     assert oak["shape_preservation"] == "voxelize" and oak["collision"] == {"none": True}
@@ -632,6 +678,7 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'if inst["key"] in self.skip:' in src and "xf[4:7]" in src
     assert 'r.get("ids")' in src and "NaniteShapePreservation" in src
+    assert src.count('if r.get("no_collision"):') == 2
 
 
 @pytest.fixture(scope="module")
@@ -671,9 +718,14 @@ def test_stage2_from_assetgen(staged, manifest):
     assert set(blds) <= actor_keys
     ch = U.manifest_changes(man, m2)
     s2keys = actor_keys | {a["key"] for a in s2["instances"]}
-    assert ch["deleted"] == sorted(set(s2["replaced"]) - s2keys)
-    assert ch["updated"] == sorted(s2keys & (set(blockout) | protos))
-    assert ch["created"] == sorted(s2keys - set(blockout) - protos)
+    # AG8's exact props (cables, scaffolding, gates) take the key of M15's instanced actor
+    # they replace: a static mesh actor in its place is deleted and created
+    ka, kb = U.actor_kinds(man), U.actor_kinds(m2)
+    moved = {k for k in ka.keys() & kb.keys() if ka[k] != kb[k]}
+    assert moved and moved <= protos and all(kb[k] == "mesh" for k in moved)
+    assert ch["deleted"] == sorted((set(s2["replaced"]) - s2keys) | moved)
+    assert ch["updated"] == sorted((s2keys & (set(blockout) | protos)) - moved)
+    assert ch["created"] == sorted((s2keys - set(blockout) - protos) | moved)
     # AG8: every prop and plant prototype actor of M15 replaced by props, plants and signs
     assert protos <= set(s2["replaced"])
     assert all(len(a["cpd"]) == 23 for a in s2["actors"] if a["key"] in set(blds))
@@ -731,11 +783,18 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     assert first["ok"], first.get("error")
     assert first["actors"]["created"] == first["actor_count"] == \
         first["counts"]["objects"] + first["counts"]["instance_actors"] + 4
+    # Play flies by default, the level streams for it, the project opens on the city
+    assert first["play"]["mode"] == "fly" and first["streaming"]["set"]
+    assert first["startup_map"] == first["level"] and first["startup_map_changed"]
+    assert f"GameDefaultMap={first['level']}." in \
+        (proj.parent / "Config" / "DefaultEngine.ini").read_text()
     second = U.import_city(build, proj)
     assert second["ok"], second.get("error")
     assert second["actors"]["created"] == second["actors"]["updated"] == \
         second["actors"]["deleted"] == 0
     assert second["tiles_imported"] == 0 and second["dirty_packages"] == 0
+    assert second["streaming"]["changed"] == 0 and not second["play"]["fly_classes_saved"]
+    assert second["startup_map_changed"] is False
     assert (second["actor_digest"], second["asset_digest"]) == \
         (first["actor_digest"], first["asset_digest"])
     # the city with a district regenerated (`citygen build --district`): the import touches
@@ -761,6 +820,8 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
         fourth["actors"]["deleted"] == fourth["dirty_packages"] == 0
     chk = U.check_city(build2, proj)
     assert chk["ok"], chk
+    # walked with the template's character, then flew with the fly pawn
+    assert "FirstPerson" in chk["pawn"] and chk["checks"]["fly"]["ok"]
     # the project and the builds take most of a gigabyte: kept only when the test fails
     for d in (proj.parent, build, build2):
         shutil.rmtree(d, ignore_errors=True)

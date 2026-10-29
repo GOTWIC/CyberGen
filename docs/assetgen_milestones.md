@@ -527,6 +527,15 @@ replaced prototypes); not run in Unreal. What a check there should look at: the 
 per kind against the report, plant Nanite with `Voxelize` (AG0's finding), holo-ad LODs and
 translucency, the emissive neon at night, AC units and wall lights on their walls.
 
+**Unreal check** (after the merge, a session of its own): Greyhook and Vesper Bay imported
+with their props (25,837 and 46,354 actors, 785 and 1,818 s; again, nothing changed) and
+checked. The HISM counts per kind and species equal the report, no M15 prototype is left, every instance stands at its model
+position, plants are Nanite with `Voxelize` and read full from 600 m, holo-ads are
+translucent three-LOD chains, neon and lit faces emissive (a night shot). Two fixes: plants'
+instanced actors had collision (now `NoCollision`), and the check's traces down are tried
+again while a freshly streamed cell's collision comes in. Results:
+`docs/progress/AG8/unreal/`.
+
 **Open.** Textures are AG6's: bark, leaves (alpha cards would let leaf clumps be cards),
 painted metal, sign faces, billboard and holo-ad content; every slot now a flat color, neon
 and sign faces emissive. Plants and signs have no collision (trunk capsules later). Lawns,
