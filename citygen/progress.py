@@ -336,6 +336,10 @@ class _Null:
 
 
 class _NullStage:
+    """A Stage that shows nothing: every method a Stage has (callers such as the Unreal
+    import's estimate cannot tell them apart)."""
+
+    label = ""
     total = None
     done = 0
 
@@ -353,6 +357,15 @@ class _NullStage:
 
     def finish(self, ok=True):
         return 0.0
+
+    def elapsed(self):
+        return 0.0
+
+    def left_s(self):
+        return None
+
+    def text(self, width=None):
+        return ""
 
 
 _ACTIVE: list = [None]

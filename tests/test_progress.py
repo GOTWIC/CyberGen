@@ -158,6 +158,43 @@ def test_import_estimate():
     assert 0.5 < speed < 1.0
 
 
+def test_import_estimate_with_no_progress():
+    # a library call (no command, so no Progress): the estimate's stages are null stages
+    from citygen import unreal as U
+
+    p = PG.active()
+    e = U.ImportEstimate(p)
+    r = PG.Relay(p, U.STAGE_LABELS, on_begin=e.begin, on_end=e.end, on_other=e.plan)
+    r.open("start")
+    for op, f in (("plan", {"first": True, "objects": 10, "tiles": 2, "actors": 20,
+                            "packs": 1, "meshes2": 5, "textures": 0}),
+                  ("begin", {"label": "meshes2", "total": 5}), ("update", {"done": 2}),
+                  ("end", {})):
+        assert r.feed("LogPython: " + PG.marker(op, **f))
+    assert e.text().startswith("about ")
+    r.close()
+
+
+def test_copy_keeps_copying_when_progress_fails(capsys):
+    from citygen import unreal as U
+
+    text = b"".join(f"line {i}\n".encode() for i in range(5000))
+
+    class Proc:
+        stdout = io.BytesIO(text)
+
+    seen = []
+
+    def on_line(line):
+        seen.append(line)
+        raise AttributeError("boom")
+
+    log = io.BytesIO()
+    U._copy(Proc(), log, on_line)
+    assert log.getvalue() == text and len(seen) == 1
+    assert "no longer shown" in capsys.readouterr().err
+
+
 def test_runner_ticks_per_job():
     from citygen import build as B
 
