@@ -105,14 +105,15 @@ def _density(pos, uv, tri):
 # the packs read: (part, folder, files); AG8's in their own frames (the variants and plants
 # before an instance scales them), every one within reach of the street
 FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
-           ("streets", "streets", "t*.glb"), ("props", "props/variants", "*.glb"),
+           ("connections", "connections", "t*.glb"), ("streets", "streets", "t*.glb"), ("props", "props/variants", "*.glb"),
            ("props", "props/plants", "*.glb"), ("props", "props/tiles", "t*.glb"),
            ("signs", "props/signs", "t*.glb"))
 
 
 def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int) -> dict:
     """The check over every pack of a build's assets (tiles/, AG2's parts/ in their own
-    frames, streets/, and AG8's props/: variants, plants, exact props, signs)."""
+    frames, AG4's connections/, streets/, and AG8's props/: variants, plants, exact props,
+    signs)."""
     per: dict[str, dict] = {}
     parts: dict[str, list[float]] = {}
     tris = 0

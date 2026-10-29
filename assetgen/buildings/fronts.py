@@ -1320,7 +1320,8 @@ def mount_check(sb) -> dict:
     its brief edge, outside every opening cut there. A mount on an edge the shell tidied
     away (a spike of the ring) or over or under every wall of its edge (a shop sign over a
     low building under an M14 deck, a street's sign under a building on the deck) is counted
-    apart (`tidied`, `off`)."""
+    apart (`tidied`, `off`), and so is one in a skybridge's landing door (AG4: M6 does not
+    know where the bridges land; `in_landing`)."""
     br = sb.br
     items = []
     for sl in br["sign_slots"]:
@@ -1335,7 +1336,12 @@ def mount_check(sb) -> dict:
         at = pl.get("at")
         if at is not None and at["d"] <= 0.5 and pl["type"].endswith("facade_greenery"):
             items.append(("greenery", pl["id"], at, pl["position"][2] + 0.5))
-    bad, nowall, tidied, off = [], 0, 0, 0
+    bad, nowall, tidied, off, landing = [], 0, 0, 0, 0
+    doors: dict[int, list] = {}
+    for sk in br["skybridges"]:
+        ld = sb.landed.get(sk["id"])
+        if ld and sk.get("at") is not None:
+            doors.setdefault(sk["at"]["edge"], []).append(ld)
     span: dict[int, tuple[int, int]] = {}
     for fa, ms in sb.all_facades:
         lo, hi = span.get(fa.j, (ms["z0"], ms["z1"]))
@@ -1354,11 +1360,15 @@ def mount_check(sb) -> dict:
             nowall += 1
             bad.append(f"{kind} {iid} (no wall)")
             continue
+        if any(abs(s - ld["s"]) < ld["w"] // 2 + 300 and ld["z"] <= zz <= ld["z"] + ld["h"]
+               for ld in doors.get(at["edge"], ())):
+            landing += 1
+            continue
         if any(a + 1 < s < b - 1 and lo + 1 < zz < hi - 1
                for a, b, lo, hi in sb.opened.get(at["edge"], ())):
             bad.append(f"{kind} {iid}")
     return {"mounts": len(items), "on_glass": len(bad) - nowall, "no_wall": nowall,
-            "tidied": tidied, "off": off, "first": bad[:3]}
+            "tidied": tidied, "off": off, "in_landing": landing, "first": bad[:3]}
 
 
 def door_check(sb) -> dict:

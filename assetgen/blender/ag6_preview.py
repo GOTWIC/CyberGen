@@ -480,6 +480,10 @@ def main():
             p = f"{JOB['assets']}/streets/{tile}.glb"
             if os.path.isfile(p):
                 objs += import_glb(p, "streets")
+        for tile in v.get("connection_tiles", []):
+            p = f"{JOB['assets']}/connections/{tile}.glb"
+            if os.path.isfile(p):
+                objs += import_glb(p, "connections")
         for tile, inst in sorted(v.get("parts", {}).items()):
             p = f"{JOB['assets']}/parts/{tile}.glb"
             if os.path.isfile(p):

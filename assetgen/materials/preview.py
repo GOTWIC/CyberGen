@@ -1,8 +1,9 @@
 """`assetgen materials preview BUILD` and `assetgen materials board OUT` (AG6's shows):
 textured Blender renders.
 
-- **preview**: the blockout's `city.blend` with its building boxes and the street objects
-  AG7 replaces taken out; per view the shells of its tiles and the street pieces near it
+- **preview**: the blockout's `city.blend` with its building boxes, its skybridges, the
+  green roofs AG4 builds and the street objects AG7 replaces taken out; per view the shells
+  of its tiles with AG4's skybridges and their roof equipment, and the street pieces near it
   with AG6's materials (`assetgen/blender/ag6_materials.py`), the rest of the city from the
   far proxies; AG3's street fronts and decals with the shells, AG2's instanced parts on
   them; AG8's props and plants near a street view as instances of their variant
@@ -135,6 +136,8 @@ def run(args) -> dict:
     mats = json.loads((adir / "materials.json").read_text())
     signs = json.loads((adir / "signs.json").read_text())
     con = json.loads((adir / "unreal_contribution.streets.json").read_text())
+    cp = adir / "unreal_contribution.connections.json"
+    conn = json.loads(cp.read_text()) if cp.is_file() else {"entries": []}
     model, _, _ = load_model(bdir)
     od = Path(args.out) if args.out else adir / "previews_ag6"
     od.mkdir(parents=True, exist_ok=True)
@@ -152,9 +155,12 @@ def run(args) -> dict:
                       "eye": list(eye), "target": list(tgt), "w": args.width,
                       "h": int(args.width * 9 / 16), "shell_tiles": sorted(near)})
     stiles = sorted({e["tile"] for e in con["entries"]})
+    ctiles = sorted(man.get("connections") or {})
     for v in views:
         tgt = v["target"]
         v["parts"] = PV.instances(man, v["shell_tiles"])
+        # (AG4: the skybridges of the shells' tiles)
+        v["connection_tiles"] = sorted(set(v["shell_tiles"]) & set(ctiles))
         if v["ortho"]:
             v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
             v["signs"], v["lights"] = [], []
@@ -167,9 +173,10 @@ def run(args) -> dict:
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
            "files": _files(adir, mats["textures"]), "props": _props(man),
-           "removed": sorted({e["key"] for e in con["entries"]} |
+           "removed": sorted({e["key"] for e in con["entries"] + conn["entries"]} |
                              {r for e in con["entries"] for r in e.get("replaces", [])} |
-                             set((ag8 or {}).get("removed", []))),
+                             {g for v in (man.get("green_replaces") or {}).values() for g in v}
+                             | set((ag8 or {}).get("removed", []))),
            "ag8_families": (ag8 or {}).get("families", []),
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}

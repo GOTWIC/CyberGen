@@ -579,6 +579,42 @@ def test_stage2_layer(build, manifest, tmp_path):
                                           "deleted": []}
 
 
+def test_stage2_skybridge_links(build, manifest, tmp_path):
+    """AG4: a skybridge's entry (assetgen's `connections` part) is an actor at its pivot and
+    yaw that carries what it joins (`links`, the importer's `cg.link=` tags) in its hash,
+    in place of the blockout skybridge of its key."""
+    man, _, _ = manifest
+    objs = [o for t in man["tiles"] for o in t["objects"]]
+    sky = sorted(o["key"] for o in objs if o["category"] == "skybridge")
+    key = sky[0] if sky else "sb.test"
+    tile = next((t["name"] for t in man["tiles"] for o in t["objects"] if o["key"] == key),
+                man["tiles"][0]["name"])
+    entry = {"key": key, "kind": "skybridge", "hash": "s1", "replaces": [],
+             "glb": f"connections/{tile}.glb", "node": key, "asset": U.asset_name(key),
+             "pivot": [1.0, 2.0, 0.0], "yaw_deg": 30.0, "nanite": True, "triangles": 40,
+             "slots": ["bridge_deck"], "collision": {"complex": True}, "cpd": [],
+             "ids": [key], "links": ["building:a.bld", "building:b.bld", "walkway:w1"],
+             "tags": {"cg.type": "skybridge.enclosed", "cg.district": "", "cg.tile": tile}}
+    conn = {"version": 1, "stage": "assetgen", "part": "connections", "layer": 2,
+            "materials": {"bridge_deck": {"master": "facade", "color": [0.3, 0.3, 0.3],
+                                          "roughness": 0.8, "metallic": 0.0,
+                                          "tint_cpd": None}},
+            "entries": [entry]}
+    m2 = U.build_manifest(_with_contributions(build, tmp_path / "s", {"connections": conn}))[0]
+    s2 = m2["stage2"]
+    a = next(x for x in s2["actors"] if x["key"] == key)
+    assert a["links"] == entry["links"] and a["yaw_deg"] == 30.0 and a["pivot"] == [1.0, 2.0,
+                                                                                     0.0]
+    assert a["type"] == "skybridge.enclosed"
+    assert (key in s2["replaced"]) == bool(sky)
+    assert "connections.bridge_deck" in s2["materials"]
+    m3 = U.build_manifest(_with_contributions(build, tmp_path / "s3", {"connections": dict(
+        conn, entries=[dict(entry, links=entry["links"][:2])])}))[0]
+    assert U.manifest_changes(m2, m3) == {"created": [], "updated": [key], "deleted": []}
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert 'f"cg.link={x}"' in src and 'r.get("links", [])' in src
+
+
 def test_stage2_refuses(build, manifest, tmp_path):
     """A key in two contributions, a tint index no master reads, a contribution of another
     version or layer."""
@@ -889,6 +925,46 @@ def test_stage2_takes_assetgen_fronts(staged):
         for s in e["slots"]:
             mat = s2["materials"][f"buildings.{s}"]
             assert mat["master"] == "decal" and "Cell" in mat["scalars"]
+
+
+def test_stage2_takes_assetgen_roofs_and_skybridges(staged):
+    """AG4: roof equipment leaves the buildings' entries for one entry per tile
+    (`roofs.<tile>`): an instanced actor per mesh at the origin with one building id per
+    transform, its mesh a node of the tile's part pack; the green-roof objects a building
+    replaces are blockout objects; every skybridge an actor of its own with its links."""
+    m2, _, _ = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
+    man = json.loads((staged / "assets" / "manifest.json").read_text())
+    roofs = [e for e in con["entries"] if e["kind"] == "roof_equipment"]
+    assert roofs
+    for e in con["entries"]:
+        if e["kind"] == "building":
+            assert all(not p["kind"].startswith(("part.ac_unit", "part.water_tank",
+                                                 "part.antenna", "part.pad", "part.hut"))
+                       for p in e["parts"])
+    inst = {a["key"]: a for a in s2["instances"]}
+    n = 0
+    for e in roofs:
+        t = e["key"].split(".", 1)[1]
+        assert e["pivot"] == [0.0, 0.0, 0.0] and e["tags"]["cg.tile"] == t
+        for p in e["parts"]:
+            a = inst[f"{e['key']}.{p['kind']}"]
+            assert a["ids"] == p["ids"] and len(a["ids"]) == len(a["xforms"]) == p["count"]
+            assert set(a["ids"]) <= set(man["buildings"])
+            assert p["glb"] == f"parts/{t}.glb"
+            n += p["count"]
+    assert n == sum(1 for r in man["buildings"].values() for x in r["parts"] if x.get("roof")
+                    for _ in x["xforms"])
+    green = {g for e in con["entries"] for g in e.get("replaces", [])}
+    assert green <= set(s2["replaced"]) and s2["counts"]["replaces_missing"] == 0
+    cp = staged / "assets" / "unreal_contribution.connections.json"
+    conn = json.loads(cp.read_text())
+    actors = {a["key"]: a for a in s2["actors"]}
+    for e in conn["entries"]:
+        assert e["kind"] == "skybridge" and e["key"] in s2["replaced"]
+        assert actors[e["key"]]["links"] == e["links"]
+        assert actors[e["key"]]["mesh"].startswith("Assets/Connections/")
 
 
 def test_stage2_textured_props_and_signs(staged):

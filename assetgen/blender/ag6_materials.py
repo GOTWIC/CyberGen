@@ -148,7 +148,7 @@ def srgb_linear(c):
     return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
 
 
-LINEAR_PARTS = ("buildings", "props", "signs")      # (AG7 writes its colors as sRGB)
+LINEAR_PARTS = ("buildings", "connections", "props", "signs")  # (AG7 writes sRGB)
 
 
 def _lin(rec, part):

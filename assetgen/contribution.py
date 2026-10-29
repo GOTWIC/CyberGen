@@ -30,6 +30,16 @@ AG3 with AG6's library: a tile's decals (grime, leaks, rust, graffiti, posters, 
 moss on the street bands) are one mesh of quads in the tile's pack (`decals.<tile>`, at the
 tile's middle), its own entry keyed `decals.<tile>`: no Nanite (mesh decals), no collision,
 a slot per decal atlas cell (`decal.<cell>`, master `decal` with the cell's index).
+
+AG4: roof equipment (AC units, water tanks, antennas, pads, access huts, dunnage, vents,
+skylights: `roofparts.ROOF`, always instanced) leaves the buildings' entries for one entry
+per tile, keyed `roofs.<tile>`, whose parts gather every building's placements of each
+mesh in the tile (transforms in the city frame, pivot 0, one building id per transform);
+their slots take no tint, so the instances need no building's Custom Primitive Data. A
+building whose green roofs AG4 built replaces the blockout's green-roof objects that draw
+nothing else (`green_replaces`; an object also drawing a lawn or another building's
+unbuilt green roof stays). The skybridges are `unreal_contribution.connections.json`
+(`skybridges.py`).
 """
 
 from __future__ import annotations
@@ -61,14 +71,86 @@ def materials() -> dict:
     return out
 
 
+GREEN_MIN_M2 = 4.0      # (as `asset_checks.GREEN_MIN_M2`: a smaller green roof is not built)
+
+
+def green_replaces(model, records: dict) -> dict[str, list[str]]:
+    """Building id -> the blockout's green-roof objects (`{district}.green_roof.{tile}`) its
+    entry replaces: each object whose every green area is a green roof AG4 built (or one
+    too small to build), given to the smallest id among their buildings."""
+    from shapely.geometry import Polygon
+    from citygen import blockout as BO
+    from citygen import geom as G
+    with G.canonical():
+        P = BO._Plan(model)
+        BO._open_space(P)
+    built = {g for r in records.values() for g in r.get("green") or []}
+    ga = {g.id: g for g in model.green_areas}
+    out: dict[str, list[str]] = {}
+    for o in sorted(P.objects, key=lambda o: o["name"]):
+        if o["category"] != "green_roof":
+            continue
+        owners = []
+        for gid in o["props"]["citygen_ids"]:
+            g = ga.get(gid)
+            if g is None or g.kind != "green_roof" or g.building_id not in records:
+                owners = None
+                break
+            if gid not in built:
+                ring = [(p[0], p[1]) for p in g.polygon.exterior]
+                if len(ring) >= 3 and Polygon(ring, [[(p[0], p[1]) for p in h]
+                                                     for h in g.polygon.holes]).area \
+                        >= GREEN_MIN_M2:
+                    owners = None
+                    break
+            owners.append(g.building_id)
+        if owners:
+            out.setdefault(min(owners), []).append(o["name"])
+    return {k: sorted(v) for k, v in sorted(out.items())}
+
+
+def _roof_entries(man: dict) -> list[dict]:
+    """AG4: an entry per tile with every building's roof equipment as instanced parts."""
+    by: dict[str, dict] = {}
+    for key, r in sorted(man["buildings"].items()):
+        px, py, pz = r["pivot"]
+        for x in r.get("parts", []):
+            if not x.get("roof"):
+                continue
+            t = by.setdefault(r["tile"], {"glb": r["parts_glb"], "parts": {}})
+            p = t["parts"].setdefault(x["node"], {"type": x["type"], "triangles": x["triangles"],
+                                                  "xforms": [], "ids": []})
+            for a in x["xforms"]:
+                p["xforms"].append([round(px + a[0], 3), round(py + a[1], 3),
+                                    round(pz + a[2], 3), a[3]])
+                p["ids"].append(key)
+    out = []
+    for t, v in sorted(by.items()):
+        parts = [{"kind": n, "type": p["type"], "glb": v["glb"], "node": n,
+                  "asset": asset_name(n), "count": len(p["xforms"]),
+                  "triangles": p["triangles"], "xforms": p["xforms"], "ids": p["ids"]}
+                 for n, p in sorted(v["parts"].items())]
+        out.append({"key": f"roofs.{t}", "kind": "roof_equipment",
+                    "hash": man["tiles"][t]["hash"][:16], "replaces": [],
+                    "pivot": [0.0, 0.0, 0.0], "yaw_deg": 0.0, "nanite": True,
+                    "distance_field": False, "lumen_cards": False, "triangles": 0,
+                    "slots": [], "collision": {"complex": True}, "cpd": [], "parts": parts,
+                    "instances": sum(p["count"] for p in parts),
+                    "tags": {"cg.type": "roof_equipment", "cg.district": "", "cg.tile": t}})
+    return out
+
+
 def buildings(man: dict, lib: dict | None = None) -> dict:
     """The buildings' contribution; with the material library `lib` (AG6), textured
     materials, per-building material maps and AG6's Custom Primitive Data
     (`materials/contrib.py`)."""
     entries = []
+    green = man.get("green_replaces") or {}
     for key, r in sorted(man["buildings"].items()):
+        own = [x for x in r.get("parts", []) if not x.get("roof")]
         entries.append({
-            "key": key, "kind": "building", "hash": r["hash"][:16], "replaces": [],
+            "key": key, "kind": "building", "hash": r["hash"][:16],
+            "replaces": list(green.get(key, [])),
             "glb": r["glb"], "node": r["node"], "asset": asset_name(r["node"]),
             "pivot": r["pivot"], "yaw_deg": 0.0,
             "nanite": True, "distance_field": False, "lumen_cards": False,
@@ -83,8 +165,8 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
                        "node": x["node"], "asset": asset_name(x["node"]),
                        "count": x["count"], "triangles": x["triangles"],
                        "xforms": x["xforms"], "building": key}
-                      for x in r.get("parts", [])],
-            "instances": r.get("instances", 0),
+                      for x in own],
+            "instances": sum(x["count"] for x in own),
             "tags": {"cg.type": r["type"], "cg.district": r["district"] or "",
                      "cg.tile": r["tile"]},
         })
@@ -110,6 +192,7 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
             })
             if r.get("level"):
                 entries[-1]["level"] = r["level"]          # (M14: a front on a deck)
+    entries += _roof_entries(man)
     mats = materials()
     if lib is not None:
         from .materials.atlases import DECAL_CELLS

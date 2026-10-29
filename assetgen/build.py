@@ -14,13 +14,15 @@
    it), `proxies/<tile>.glb`, `parts/<tile>.glb` (AG2: one mesh per instanced part of the
    tile's buildings, at the origin, named by the hash of its parameters, so buildings whose
    parts coincide share it; the placements are in each building's record).
-4. Checks (`asset_checks`), `manifest.json`, `asset_report.json` and `.txt`,
-   `unreal_contribution.buildings.json`; each written only if its bytes change, tiles no
-   longer in the city removed.
-5. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
+4. AG4's skybridges (`skybridges.py`): every model skybridge a piece of its own in
+   `connections/<tile>.glb`, its record in the manifest's `skybridges`.
+5. Checks (`asset_checks`), `manifest.json`, `asset_report.json` and `.txt`,
+   `unreal_contribution.buildings.json` and `.connections.json`; each written only if its
+   bytes change, tiles no longer in the city removed.
+6. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
    bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
    `streets_report.json` and `.txt` (the report only when another of its files changed).
-6. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
+7. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
    stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
    families, exact props and signs (their faces showing those pages),
    `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
@@ -55,16 +57,18 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag3.5"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag4.0"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
-         "spec_sha256", "briefs_sha256", "buildings", "tiles")
+         "spec_sha256", "briefs_sha256", "buildings", "tiles", "skybridges", "connections",
+         "green_replaces")
 MAX_WORKERS = 4
 DECAL_OFF_MM = 10              # AG3: a decal quad stands this far off its wall (mesh decals)
 DECAL_UV = (0.004, 0.996)      # its atlas cell's own UVs, inset so it never reads a neighbor
 # the files a build delivers besides its packs (the report holds timings, so it is not one)
-DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json")
+DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json",
+             "unreal_contribution.connections.json")
 
 
 def tile_name(x: float, y: float) -> str:
@@ -141,10 +145,13 @@ def _bays_s11(brief: dict) -> float:
 
 
 def _part_rec(x: dict) -> dict:
-    return {"node": x["node"], "type": x["type"], "family": x["family"],
-            "count": len(x["at"]), "triangles": x["triangles"],
-            "xforms": [[C.m(a[0] / 1000.0), C.m(a[1] / 1000.0), C.m(a[2] / 1000.0),
-                        PT.yaw_deg(a[3], a[4])] for a in x["at"]]}
+    rec = {"node": x["node"], "type": x["type"], "family": x["family"],
+           "count": len(x["at"]), "triangles": x["triangles"],
+           "xforms": [[C.m(a[0] / 1000.0), C.m(a[1] / 1000.0), C.m(a[2] / 1000.0),
+                       PT.yaw_deg(a[3], a[4])] for a in x["at"]]}
+    if x["family"] in PT.INSTANCE_ALWAYS:
+        rec["roof"] = True            # (AG4: roof equipment, instanced per tile in Unreal)
+    return rec
 
 
 def _doors(sh: dict) -> list[dict]:
@@ -176,7 +183,9 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         ck[key] += ckf[key]
     ck["uv0"] = True
     inst = sh["parts"]
-    env = EN.check(brief, arrs, EN.part_points(inst))
+    pp = EN.part_points(inst)
+    env = EN.check(brief, arrs, pp)
+    clr = EN.clearances(brief, arrs, pp)
     tints = _tints(gm)
     lo = np.min(np.concatenate([a["pos"] for a in arrs.values()]), axis=0) if arrs else \
         np.zeros(3, dtype=np.int64)
@@ -207,7 +216,10 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "floor_m": float(brief["building"]["floor_grid"]["floor_height_m"]),
         "stats": st, "masses": sh["masses"],
         "checks": {"mesh": ck, "envelope": env, "mounts": sh["checks"]["mounts"],
-                   "doors": sh["checks"]["access"]},
+                   "doors": sh["checks"]["access"], "clearance": clr},
+        # AG4: every roof item's asset, green roofs, skybridge landings, portals
+        "roof_items": sh["roof_items"], "green": sh["green"], "landings": sh["landings"],
+        "portals": sh["portals"],
         "parts": [_part_rec(x) for x in inst],
         "instances": int(sum(len(x["at"]) for x in inst)),
         "part_triangles": int(sum(x["triangles"] for x in inst)),
@@ -494,9 +506,14 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     k = int(spec_doc["min_gene_distance"])
     tile_parts = {t: files[t].get("parts") for t in sorted(files)}
     acc = AC.access(model, records, briefs)
+    from . import skybridges as SK
+    sky = SK.build(model, out, log)                # AG4: every skybridge an asset of its own
+    wrote += sky["wrote"]
     checks = [AC.coverage(model, records), AC.envelope(records),
               AC.meshes(records, tile_parts), AC.unique(records, k),
-              AC.budget(records, tile_parts), acc, AC.mounts(records)]
+              AC.budget(records, tile_parts), acc, AC.mounts(records),
+              AC.clearance(records), AC.roofs(records, briefs),
+              AC.landings(records, sky["records"]), sky["check"]]
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,
@@ -504,7 +521,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
            "briefs_sha256": C.sha256_bytes((out / "briefs.json").read_bytes()),
            "tiles": {t: {"hash": tile_hash[t], "buildings": tiles[t], **files[t]}
                      for t in sorted(tiles)},
-           "buildings": {bid: records[bid] for bid in sorted(records)}}
+           "buildings": {bid: records[bid] for bid in sorted(records)},
+           "skybridges": sky["records"], "connections": sky["files"]}
+    from . import contribution as UC
+    man["green_replaces"] = UC.green_replaces(model, records)
     man = MF.merge(old, man, OWNED)
     text = MF.dumps(man)
     changed = MF.write_if_changed(out / MF.MANIFEST, text)
@@ -516,9 +536,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             if p.is_file():
                 p.unlink()
                 wrote += 1
-    from . import contribution as UC
     wrote += MF.write_if_changed(out / "unreal_contribution.buildings.json",
                                  MF.dumps(UC.buildings(man, lib)))
+    wrote += MF.write_if_changed(out / "unreal_contribution.connections.json",
+                                 MF.dumps(SK.contribution(man, lib)))
     secs = {"load": round(t1 - t0, 2), "briefs": round(t2 - t1, 2),
             "genomes": round(t3 - t2, 2), "tiles": round(t4 - t3, 2),
             "checks": round(t5 - t4, 2), "total": round(time.perf_counter() - t0, 2)}
@@ -624,7 +645,12 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
         for s, n in r["slots"].items():
             by_slot[s] = by_slot.get(s, 0) + n
         for s, v in r["stats"].items():
-            stats[s] = stats.get(s, 0) + v
+            if isinstance(v, dict):          # (AG4: counts by kind, e.g. roof_form_kinds)
+                d = stats.setdefault(s, {})
+                for kk, vv in v.items():
+                    d[kk] = d.get(kk, 0) + vv
+            else:
+                stats[s] = stats.get(s, 0) + v
     tri = sum(r["triangles"] for r in recs.values())
     ptri = sum(r["proxy"]["triangles"] for r in recs.values())
     pt = sorted(r["proxy"]["triangles"] for r in recs.values())
@@ -642,6 +668,10 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
             drawn += x["count"] * x["triangles"]
     meshes = sum(t["meshes"] for t in tparts)
     mesh_tri = sum(t["triangles"] for t in tparts)
+    sk = man.get("skybridges") or {}
+    kinds: dict[str, int] = {}
+    for r in sk.values():
+        kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
     return {
         "city": man["city"], "assetgen": man["assetgen"], "generator": man["generator"],
         "buildings": len(recs), "tiles": len(man["tiles"]),
@@ -659,8 +689,12 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
                               for k, v in sorted(by_part.items())}},
         "disk": {"tiles_bytes": disk_t, "proxies_bytes": disk_p, "parts_bytes": disk_q,
                  "bytes_per_triangle": round(disk_t / max(tri, 1), 1)},
-        "stats": {k: round(v, 2) if isinstance(v, float) else v
+        "stats": {k: round(v, 2) if isinstance(v, float) else
+                  (dict(sorted(v.items())) if isinstance(v, dict) else v)
                   for k, v in sorted(stats.items())},
+        "skybridges": {"count": len(sk), "by_kind": dict(sorted(kinds.items())),
+                       "triangles": sum(r["triangles"] for r in sk.values()),
+                       "bytes": sum(f["bytes"] for f in (man.get("connections") or {}).values())},
         "checks": {c["name"]: c for c in checks},
         "ok": all(c["ok"] for c in checks),
         "seconds": secs, "workers": workers, "tiles_made": made, "tiles_kept": kept,
@@ -681,7 +715,10 @@ def report_text(rep: dict) -> str:
              f"disk: tiles {rep['disk']['tiles_bytes'] / 1e6:.1f} MB "
              f"({rep['disk']['bytes_per_triangle']} B per triangle), proxies "
              f"{rep['disk']['proxies_bytes'] / 1e6:.1f} MB, parts "
-             f"{rep['disk']['parts_bytes'] / 1e6:.1f} MB", ""]
+             f"{rep['disk']['parts_bytes'] / 1e6:.1f} MB",
+             f"skybridges: {rep['skybridges']['count']} {rep['skybridges']['by_kind']}, "
+             f"{rep['skybridges']['triangles']:,} triangles, "
+             f"{rep['skybridges']['bytes'] / 1e6:.1f} MB", ""]
     for name, c in rep["checks"].items():
         extra = {k: v for k, v in c.items() if k not in ("name", "ok", "first")}
         lines.append(f"{'PASS' if c['ok'] else 'FAIL'} {name}: {extra}")

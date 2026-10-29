@@ -23,6 +23,12 @@ nearest ground walkway of its level, written into its record for stage 4) and
 glass: `fronts.mount_check`); the budgets count section 11's shopfronts, `T_UNIT` triangles
 per ground-floor unit, and `T_FRONT` per building with a street front (its band's zones,
 caps, pockets and doors).
+
+AG4: `asset_clearance` (nothing a building adds in a skybridge's, guideway's or sky tube's
+corridor, every portal open), `asset_roofs` (every roof item an asset, every green roof
+built, every portal cut and every sky station with its platforms), `asset_landings` (a
+landing door where a skybridge meets a floor line); the skybridges' own meshes are the
+skybridge stage's `asset_skybridges`.
 """
 
 from __future__ import annotations
@@ -402,12 +408,111 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             "first": first + [f"{i}: faces a neighbor or no walkway" for i in faced[:3]]}
 
 
+def clearance(records: dict) -> dict:
+    """AG4: nothing a building adds in the corridor of a skybridge, guideway or sky tube
+    passing near it, every portal open (`envelope.clearances` per building)."""
+    bad = [k for k in sorted(records) if not records[k]["checks"]["clearance"]["ok"]]
+    cor = sum(r["checks"]["clearance"]["corridors"] for r in records.values())
+    hits = sum(r["checks"]["clearance"]["hits"] for r in records.values())
+    ph = sum(r["checks"]["clearance"]["portal_hits"] for r in records.values())
+    return {"name": "asset_clearance", "ok": not bad, "corridors": cor, "hits": hits,
+            "portal_hits": ph, "failures": len(bad),
+            "first": [f"{k}: {records[k]['checks']['clearance']['first']}" for k in bad[:5]]}
+
+
+GREEN_MIN_M2 = 4.0      # a green roof under this (a sliver of a roof) is not built
+
+
+def roofs(records: dict, briefs: dict) -> dict:
+    """AG4: an asset for every roof item of every brief (an instanced roof part, a merged
+    one, or AG8's billboard), every green roof of `GREEN_MIN_M2` or more built, every
+    portal cut through its tower (or passing between its masses, `portals_passing`), a
+    platform in every sky station's."""
+    from shapely.geometry import Polygon
+    items = kinds = missing = 0
+    by: dict[str, int] = {}
+    green = green_built = green_small = 0
+    portals = cut = passes = closed = stations = platforms = 0
+    first = []
+    for k in sorted(records):
+        r, br = records[k], briefs.get(k) or {}
+        want = br.get("roof_items") or []
+        got = r.get("roof_items") or []
+        items += len(want)
+        if len(got) != len(want) or any(g.get("asset") is None for g in got):
+            missing += max(1, sum(1 for g in got if g.get("asset") is None))
+            if len(first) < 5:
+                first.append(f"{k}: roof item without an asset")
+        for g in got:
+            by[g["kind"]] = by.get(g["kind"], 0) + 1
+        done = set(r.get("green") or [])
+        for g in br.get("green_roofs") or []:
+            green += 1
+            if g["id"] in done:
+                green_built += 1
+                continue
+            pg = g.get("polygon") or {}
+            ext = pg.get("exterior") or []
+            a = Polygon(ext, pg.get("holes") or []).area if len(ext) >= 3 else 0.0
+            if a < GREEN_MIN_M2:
+                green_small += 1
+            elif len(first) < 5:
+                first.append(f"{k}: green roof {g['id']} not built")
+        for p in r.get("portals") or []:
+            portals += 1
+            cut += int(p["cut"])
+            # (a tube meeting no mass at its height, between a megabuilding's towers, has
+            # nothing to cut: open as it is)
+            passes += int(not p["cut"] and p.get("through", 1) == 0)
+            stations += int(p["station"])
+            platforms += int(p["station"] and p["platform"])
+            if (not p["cut"] and p.get("through", 1)) or (p["station"] and not p["platform"]):
+                closed += 1
+                if len(first) < 5:
+                    first.append(f"{k}: portal {p['line_id']} not open")
+    kinds = len(by)
+    green_missing = green - green_built - green_small
+    ok = missing == 0 and green_missing == 0 and closed == 0
+    return {"name": "asset_roofs", "ok": ok, "roof_items": items, "missing": missing,
+            "kinds": kinds, "by_kind": dict(sorted(by.items())), "green_roofs": green,
+            "green_built": green_built, "green_too_small": green_small, "portals": portals,
+            "portals_cut": cut, "portals_passing": passes, "portals_closed": closed,
+            "sky_stations": stations, "platforms": platforms, "first": first}
+
+
+def landings(records: dict, skybridges: dict | None = None) -> dict:
+    """AG4: a landing door in each building a skybridge meets (`connections.landings`), and
+    every skybridge an asset of its own (the skybridge stage's records). An end that lands
+    in an open portal needs none; one that meets no wall of the building, or whose deck is
+    on no floor line of the mass it meets (M3's floor grids apart), is counted apart, the
+    city's to change; a failure is a landing on a floor line that got no door."""
+    n = doors = 0
+    why: dict[str, int] = {}
+    first = []
+    for k in sorted(records):
+        for ld in records[k].get("landings") or []:
+            n += 1
+            if ld["door"]:
+                doors += 1
+                continue
+            w = ld.get("why", "no_room")
+            why[w] = why.get(w, 0) + 1
+            if w == "no_room" and len(first) < 5:
+                first.append(f"{k}: skybridge {ld['id']} has no landing door")
+    ok = why.get("no_room", 0) == 0
+    return {"name": "asset_landings", "ok": ok, "landings": n, "doors": doors,
+            "into_portal": why.get("portal", 0),
+            "no_edge": why.get("no_edge", 0), "off_floor": why.get("off_floor", 0),
+            "no_room": why.get("no_room", 0),
+            "skybridges": len(skybridges or {}), "first": first}
+
+
 def mounts(records: dict) -> dict:
     """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building).
     A mount on an edge of the footprint the shells tidy away (a spike or sliver of the lot's
-    ring: no wall stands there) or over or under every wall of its edge (M14's decks) is
-    counted apart, the city's to change."""
-    n = glass = nowall = tidied = off = 0
+    ring: no wall stands there), over or under every wall of its edge (M14's decks) or in a
+    skybridge's landing door (AG4) is counted apart, the city's to change."""
+    n = glass = nowall = tidied = off = landing = 0
     first = []
     for k in sorted(records):
         m = records[k]["checks"].get("mounts") or {}
@@ -416,8 +521,9 @@ def mounts(records: dict) -> dict:
         nowall += m.get("no_wall", 0)
         tidied += m.get("tidied", 0)
         off += m.get("off", 0)
+        landing += m.get("in_landing", 0)
         if (m.get("on_glass") or m.get("no_wall")) and len(first) < 5:
             first.append(f"{k}: {m.get('first')}")
     return {"name": "asset_mounts", "ok": glass == 0 and nowall == 0, "mounts": n,
             "on_glass": glass, "no_wall": nowall, "on_tidied_edge": tidied,
-            "off_its_walls": off, "first": first}
+            "off_its_walls": off, "in_landing": landing, "first": first}

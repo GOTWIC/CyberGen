@@ -37,6 +37,7 @@ from .meshbuf import Buf
 
 PARTS_VERSION = 1
 INSTANCE_MIN = 8             # placed fewer times in a building: merged into its shell
+INSTANCE_ALWAYS: frozenset = frozenset()   # (AG4: roof equipment, `roofparts`) never merged
 Q = 10                       # length step (mm)
 A = 5                        # angle step (degrees)
 OVERLAP = 10                 # frames reach this far into the jambs
@@ -672,3 +673,5 @@ def check_mesh(arrs: dict) -> dict:
 
 # AG3: the street-front families (shopfronts, doors, mounts...) join the kit
 from . import frontparts  # noqa: E402,F401
+# AG4: roof equipment and facade details
+from . import roofparts  # noqa: E402,F401

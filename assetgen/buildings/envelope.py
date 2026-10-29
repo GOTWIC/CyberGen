@@ -15,8 +15,14 @@ corner of its instanced parts inside a mass that spans its height, or an allowed
   rail "street" (on a street or avenue sidewalk, at most `STREET_MM` out and `STREET_Z`
   high);
 - roof equipment over a mass's roof; a crown mast or spire over the highest roof, at most
-  `mast_cap` tall;
-- on M13's slopes, a mass on the base reaches down by its plinth (`shell.plinth_mm`).
+  `mast_cap` tall; AG4's equipment (instanced, or merged penthouses and billboard frames in
+  their own slots, `roofparts.ROOF_SLOTS`) on a roof or inside the masses (the frames under
+  an item on a pitched roof stand in its attic);
+- AG4's roof forms in the top floor (their eaves as strips), finishes, copings and green
+  roofs on the roof under the parapet's allowance;
+- on M13's slopes, a mass on the base reaches down by its plinth (`shell.plinth_mm`);
+- AG4's court floors, planters and gardens in a court: inside a mass's outline (its court
+  is the building's), under its top.
 
 Masses that M3 put past their lot (straddle buildings) are the envelope as they are.
 Distances in IEEE doubles, element-wise in a fixed order (scope section 10).
@@ -27,6 +33,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..planar import dist_polyline, inside_poly
+from . import roofparts as RP
 from . import systems as SY
 from .shell import plinth_mm
 
@@ -38,6 +45,7 @@ DEEP_MM = 1810
 STREET_MM = 810
 STREET_Z = 1210
 TOL_MM = 2.0
+COLLAR_MM = 300.0            # AG4: a skybridge's collar zone at the facades it meets
 # merged parts keep their slots: how far each slot may reach (the rest: AG1's rule)
 SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "spandrel_panel": "flush", "shutter": "flush", "grille": "flush",
@@ -46,6 +54,8 @@ SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "fin": "strip", "perforated": "strip", "pod": "strip", "ac": "strip",
               "dish": "strip", "tile": "strip", "louver": "strip",
               "stanchion": "street", "rope": "street"}
+SLOT_REACH.update({"court_paving": "court", "planter": "court", "green_roof": "court",
+                   "coping": "flush", "coping_stone": "flush"})
 for _s in SY.SLOTS:
     if _s not in SLOT_REACH and (_s.startswith(("paint_", "neon_", "screen_", "poster_",
                                                 "mural_", "graffiti_", "riser_", "lit_",
@@ -76,7 +86,7 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     groups = []
     for name, a in arrs.items():
         pos = np.unique(a["pos"], axis=0).astype(np.float64)
-        groups.append((pos, "roof" if name in ("equipment", "mast") else
+        groups.append((pos, "roof" if name in RP.ROOF_SLOTS else
                        SLOT_REACH.get(name, "shell"), name))
     for pos, reach in parts or []:
         groups.append((np.asarray(pos, dtype=np.float64), reach, "part"))
@@ -84,16 +94,6 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     for pos, reach, name in groups:
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
         out["vertices"] += len(pos)
-        if reach == "roof":
-            ok = np.zeros(len(pos), dtype=bool)
-            for z0, z1, ext, holes in masses:
-                d = dist_polyline(x, y, ext + ext[:1])
-                on = (inside_poly(x, y, ext, []) | (d <= 1000.0)) & (z >= z1 - TOL_MM)
-                if name == "mast":
-                    on &= z <= z1 + cap
-                ok |= on
-            out["equipment_off_roof"] += int((~ok).sum())
-            continue
         inside = np.zeros(len(pos), dtype=bool)
         near = np.full(len(pos), np.inf)
         for z0, z1, ext, holes in masses:
@@ -107,6 +107,18 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
             on = d <= TOL_MM
             inside |= span & (ins | on)
             near = np.where(span, np.minimum(near, d), near)
+        if reach == "roof":
+            # on a mass's roof (within 1 m of its footprint), or inside the masses
+            ok = np.zeros(len(pos), dtype=bool)
+            for z0, z1, ext, holes in masses:
+                d = dist_polyline(x, y, ext + ext[:1])
+                on = (inside_poly(x, y, ext, []) | (d <= 1000.0)) & (z >= z1 - TOL_MM)
+                if name == "mast":
+                    on &= z <= z1 + cap
+                ok |= on
+            ok |= inside & (z <= top)
+            out["equipment_off_roof"] += int((~ok).sum())
+            continue
         over = ~inside
         high = z >= STRIP_MIN_MM
         allowed = (near <= OVERHANG_MM) & high
@@ -116,6 +128,10 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
             allowed |= (near <= DEEP_MM) & high
         if reach == "street":
             allowed |= (near <= STREET_MM) & (z <= STREET_Z)
+        if reach == "court":
+            for z0, z1, ext, holes in masses:
+                allowed |= inside_poly(x, y, ext, []) & (z >= z0 - TOL_MM) & \
+                    (z <= z1 + PARAPET_MM)
         bad = over & ~allowed
         out["outside"] += int(bad.sum())
         out["low_overhang"] += int((bad & (near <= DEEP_MM) & ~high).sum())
@@ -123,6 +139,20 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     out["ok"] = out["outside"] == 0 and out["too_high"] == 0 and \
         out["equipment_off_roof"] == 0
     return out
+
+
+def fits(brief: dict, family: str, p: dict, x: int, y: int, z: int, ux: float,
+         uy: float) -> bool:
+    """AG4: whether one part placed so stays inside the envelope, by its family's reach and
+    its slots' (it may be instanced or merged); the details and the roof's extras ask
+    before they place one."""
+    from . import parts as PT
+    _, arrs = PT.mesh(family, p)
+    placed = PT.place(arrs, x, y, z, ux, uy)
+    if not placed:
+        return True
+    pts = np.concatenate([np.unique(a["pos"], axis=0) for a in placed.values()])
+    return check(brief, placed, [(pts, PT.REACH[family])])["ok"]
 
 
 def part_points(inst: list[dict]) -> list:
@@ -144,4 +174,77 @@ def part_points(inst: list[dict]) -> list:
         pz = cz[None, :] + at[:, 2:3]
         pts = np.stack([px.reshape(-1), py.reshape(-1), pz.reshape(-1)], axis=1)
         out.append((pts, PT.REACH[x["family"]]))
+    return out
+
+
+def clearances(brief: dict, arrs: dict, parts: list | None = None) -> dict:
+    """AG4 (scope 9): nothing the asset adds to its masses (overhangs, roof forms, roof
+    equipment, masts) inside the corridor of a skybridge, a transit guideway and its
+    trains or a sky tube passing near it (the brief's `clearances`), and every portal open
+    (no point of the building inside its sky tube's section and 0.15 m round it)."""
+    pts = [np.unique(a["pos"], axis=0).astype(np.float64) for a in arrs.values()]
+    pts += [np.asarray(p, dtype=np.float64) for p, _ in (parts or [])]
+    out = {"corridors": len(brief.get("clearances") or []), "hits": 0, "portal_hits": 0,
+           "first": None}
+    if not pts:
+        out["ok"] = True
+        return out
+    P = np.concatenate(pts)
+    x, y, z = P[:, 0], P[:, 1], P[:, 2]
+    if brief.get("clearances"):
+        inside = np.zeros(len(P), dtype=bool)
+        for m in brief["masses"]:
+            ext = [(q[0] * 1000.0, q[1] * 1000.0) for q in m["footprint"]["exterior"]]
+            holes = [[(q[0] * 1000.0, q[1] * 1000.0) for q in h] for h in
+                     m["footprint"]["holes"]]
+            z0, z1 = m["z"][0] * 1000.0, m["z"][1] * 1000.0
+            d = dist_polyline(x, y, ext + ext[:1])
+            inside |= (z >= z0 - TOL_MM) & (z <= z1 + TOL_MM) & \
+                (inside_poly(x, y, ext, holes) | (d <= TOL_MM))
+        for c in brief["clearances"]:
+            h = c["half_m"] * 1000.0 - 20.0
+            ln = c["line"]
+            for p, q in zip(ln, ln[1:]):
+                ax, ay, bx, by = p[0] * 1000.0, p[1] * 1000.0, q[0] * 1000.0, q[1] * 1000.0
+                dx, dy = bx - ax, by - ay
+                L2 = dx * dx + dy * dy
+                if L2 == 0:
+                    continue
+                t = ((x - ax) * dx + (y - ay) * dy) / L2
+                tt = np.minimum(np.maximum(t, 0.0), 1.0)
+                ex, ey = ax + dx * tt - x, ay + dy * tt - y
+                d = np.sqrt(ex * ex + ey * ey)
+                zlo = (p[2] + (q[2] - p[2]) * tt) * 1000.0 + 20.0
+                zhi = (p[3] + (q[3] - p[3]) * tt) * 1000.0 - 20.0
+                hit = (t >= 0.0) & (t <= 1.0) & (d < h) & (z > zlo) & (z < zhi) & ~inside
+                if c["kind"] == "skybridge":
+                    # (the bridge's collar zone at each facade it meets: 0.3 m)
+                    L = L2 ** 0.5
+                    hit &= (t * L > COLLAR_MM) & ((1.0 - t) * L > COLLAR_MM)
+                k = int(hit.sum())
+                if k:
+                    out["hits"] += k
+                    if out["first"] is None:
+                        out["first"] = f"{c['kind']} {c['id']}"
+    for pr in brief.get("portals") or []:
+        R = pr["diameter_m"] * 500.0 + 150.0
+        for ln in pr.get("lines") or []:
+            for p, q in zip(ln, ln[1:]):
+                ax, ay, bx, by = p[0] * 1000.0, p[1] * 1000.0, q[0] * 1000.0, q[1] * 1000.0
+                dx, dy = bx - ax, by - ay
+                L2 = dx * dx + dy * dy
+                if L2 == 0:
+                    continue
+                t = ((x - ax) * dx + (y - ay) * dy) / L2
+                tt = np.minimum(np.maximum(t, 0.0), 1.0)
+                ex, ey = ax + dx * tt - x, ay + dy * tt - y
+                ax_z = (p[2] + (q[2] - p[2]) * tt) * 1000.0 - pr["diameter_m"] * 500.0
+                r2 = ex * ex + ey * ey + (z - ax_z) * (z - ax_z)
+                hit = (t >= 0.0) & (t <= 1.0) & (r2 < R * R)
+                k = int(hit.sum())
+                if k:
+                    out["portal_hits"] += k
+                    if out["first"] is None:
+                        out["first"] = f"portal {pr['line_id']}"
+    out["ok"] = out["hits"] == 0 and out["portal_hits"] == 0
     return out
