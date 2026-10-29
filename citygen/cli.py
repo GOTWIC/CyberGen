@@ -118,7 +118,10 @@ def cmd_build(args: argparse.Namespace) -> int:
     built = build_city(result, max_variants=args.variants)
     built = LK.finish(built, result, ov)
     entries = trace.stop() if args.trace else None
-    paths = write_outputs(built, args.out_dir, dpi=args.dpi)
+    from . import progress as PG
+
+    with PG.active().stage("previews and outputs"):
+        paths = write_outputs(built, args.out_dir, dpi=args.dpi)
     paths.append(E.write_state(args.out_dir, E.new_state(spec_data, built, ov)))
     if args.trace:
         import hashlib
@@ -332,6 +335,13 @@ def cmd_unreal(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _progress_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("-q", "--quiet", dest="quiet_progress", action="store_true",
+                   help="no progress on stderr (the stages, a bar with the time left, the "
+                        "times at the end; also $CYBERGEN_QUIET=1)")
+    p.set_defaults(progress=True)
+
+
 def _blockout_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--blender", help="Blender executable (default: $BLENDER, the newest "
                                      "/Applications/Blender*.app, or blender on PATH)")
@@ -518,6 +528,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--overrides", metavar="FILE.json",
                    help="pins and overrides (default: overrides.json beside the spec)")
     _blockout_args(b)
+    _progress_args(b)
     b.set_defaults(func=cmd_build)
 
     bo = sub.add_parser("blockout", help="Blender blockout of a built city: .blend, USD, "
@@ -525,6 +536,7 @@ def build_parser() -> argparse.ArgumentParser:
     bo.add_argument("model", help="city_model.json from `citygen build`")
     bo.add_argument("out_dir")
     _blockout_args(bo)
+    _progress_args(bo)
     bo.set_defaults(func=cmd_blockout)
 
     rr = sub.add_parser("rerender", help="render chosen blockout views again from city.blend "
@@ -637,6 +649,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="width of the rendered views in pixels (default 3840; 7680 for 8K)")
     ue.add_argument("--timeout", type=float, default=7200.0,
                     help="seconds per editor run (default 7200)")
+    _progress_args(ue)
     ue.set_defaults(func=cmd_unreal)
 
     model = sub.add_parser("model", help="city model tools")
@@ -672,7 +685,17 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
     except SystemExit as e:  # argparse exits 2 on usage errors, 0 on --help
         return int(e.code or 0)
-    return args.func(args)
+    if not getattr(args, "progress", False):
+        return args.func(args)
+    # the long commands: their stages on stderr (citygen.progress), the times at the end
+    from . import progress as PG
+
+    p = PG.Progress(quiet=True if args.quiet_progress else None)
+    with PG.use(p):
+        try:
+            return args.func(args)
+        finally:
+            p.summary()
 
 
 if __name__ == "__main__":
