@@ -23,6 +23,17 @@ from mathutils import Vector
 from mathutils.geometry import tessellate_polygon
 
 T0 = time.perf_counter()
+PROGRESS = "CYBERGEN_PROGRESS"     # progress lines `citygen blockout` draws (citygen.progress)
+_SAID = [0.0]
+
+
+def say(op, force=True, **fields):
+    """A progress line; an update at most once a second unless `force`."""
+    now = time.perf_counter()
+    if not force and now - _SAID[0] < 1.0:
+        return
+    _SAID[0] = now
+    print(PROGRESS + " " + json.dumps({"op": op, **fields}, separators=(",", ":")), flush=True)
 DOME_STEPS = [(1.0, 0.0), (0.92388, 0.382683), (0.707107, 0.707107), (0.382683, 0.92388)]
 
 
@@ -684,8 +695,13 @@ def render_view(scene, view, path, width=None, plan=None):
 
 
 def renders(scene, plan, out, res):
-    return [render_view(scene, v, os.path.join(out, f"render_{v[0]}.jpg"), plan=plan)
-            for v in views(plan, res)]
+    vs = views(plan, res)
+    say("begin", label="renders", total=len(vs))
+    files = []
+    for k, v in enumerate(vs):
+        files.append(render_view(scene, v, os.path.join(out, f"render_{v[0]}.jpg"), plan=plan))
+        say("update", done=k + 1)
+    return files
 
 
 # --- exports ------------------------------------------------------------------------------------
@@ -694,10 +710,11 @@ def export_tiles(plan, by_tile, out):
     tdir = os.path.join(out, "tiles")
     os.makedirs(tdir, exist_ok=True)
     files = []
-    for t in plan["tiles"]:
-        objs = by_tile.get(t["name"], [])
-        if not objs:
-            continue
+    todo = [t for t in plan["tiles"] if by_tile.get(t["name"])]
+    say("begin", label="gltf", total=len(todo))
+    for k, t in enumerate(todo):
+        say("update", force=False, done=k)
+        objs = by_tile[t["name"]]
         bpy.ops.object.select_all(action="DESELECT")
         for ob in objs:
             ob.select_set(True)
@@ -707,6 +724,7 @@ def export_tiles(plan, by_tile, out):
                                   export_extras=True, export_yup=True, export_cameras=False,
                                   export_lights=False, export_animations=False)
         files.append(path)
+    say("update", done=len(todo))
     bpy.ops.object.select_all(action="DESELECT")
     return files
 
@@ -727,7 +745,9 @@ def main():
     counts = {}
     groups = build_prototypes(plan, mats, cols)
     instances = 0
-    for o in plan["objects"]:
+    say("begin", label="objects", total=len(plan["objects"]))
+    for k, o in enumerate(plan["objects"]):
+        say("update", force=False, done=k)
         if o["parts"] and o["parts"][0]["k"] == "inst":
             # props and plants: instanced, in the .blend and the USD (point instancers), not
             # in the glTF tiles (props.csv carries them for engines)
@@ -739,16 +759,19 @@ def main():
             verts += nv
             faces += nf
         counts[o["category"]] = counts.get(o["category"], 0) + 1
+    say("update", done=len(plan["objects"]))
     timings["build_s"] = round(time.perf_counter() - t, 1)
     files = {}
     t = time.perf_counter()
     blend = os.path.join(out, "city.blend")
+    say("begin", label="save")
     bpy.ops.wm.save_as_mainfile(filepath=blend, compress=True)
     files["blend"] = blend
     timings["save_s"] = round(time.perf_counter() - t, 1)
     if opts["export"]:
         t = time.perf_counter()
         usd = os.path.join(out, "city.usdc")
+        say("begin", label="usd")
         bpy.ops.wm.usd_export(filepath=usd, export_materials=True, selected_objects_only=False,
                               export_cameras=False, export_lights=False, use_instancing=True)
         files["usd"] = usd
@@ -762,6 +785,7 @@ def main():
         files["renders"] = renders(scene, plan, out, opts["res"])
         timings["render_s"] = round(time.perf_counter() - t, 1)
     timings["total_s"] = round(time.perf_counter() - T0, 1)
+    say("end")
     sizes = {}
     for k, v in files.items():
         paths = v if isinstance(v, list) else [v]

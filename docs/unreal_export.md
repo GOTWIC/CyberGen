@@ -60,6 +60,15 @@ in the editor before importing. It uses the newest UE 5.x in the usual place
 (`C:\Program Files\Epic Games\UE_5.8` on Windows, `/Users/Shared/Epic Games/UE_5.8` on a
 Mac); `--engine` or `CITYGEN_UE_ROOT` names another.
 
+While it runs, `citygen unreal` shows on stderr where it is: one line per stage (the
+editor starting, materials and textures, the blockout meshes, stage 2's packs and meshes
+with how many were built and how many with Nanite, the level, the actors, saving, pruning,
+the editor shutting down, the HLOD build, and with `--check` its loading, shots, walk and
+flight), a bar with the count and the time left where a stage has a count, and on a first
+import an estimate of the time left in all (from this Mac's times, corrected as the stages
+go). In a terminal the line redraws in place; piped to a file it writes a few plain lines per
+stage. At the end it lists each stage's time. `--quiet` (or `CYBERGEN_QUIET=1`) turns it off.
+
 Then open the project: the editor opens on the city, and Play (Alt+P) puts you in it.
 
 - **Startup map.** Each import makes the city the project's `EditorStartupMap` and
@@ -100,6 +109,7 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 | `--new-project` | off | make the project from the First Person template if it is missing |
 | `--blockout-only` | off | leave out stage 2's buildings and streets |
 | `--check`, `--check-only`, `--shots DIR`, `--view ...` | | play and check the level, render views |
+| `--quiet` | off | no progress on stderr |
 
 ## Contract for every stage
 
@@ -637,4 +647,5 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |
 | AG3 | Street fronts: each building's ground band its own entry and node (`<id>.front`, kind `building.front`) with complex collision and `fallback_full` (the mesh record and its hash; the importer sets the Nanite fallback to every triangle), its building's id, CPD and materials; doors tagged on the front's actor (`cg.door=<id>@<walkway>`) and gathered into a fourth flat graph, `doors` (`doors_of`); a stage 2 entry's own `ids` and `level` reach its actor; the tiles' decal meshes as entries (`decals.<tile>`, no Nanite, no collision, `decal.<cell>` slots with their cell index); tests without Unreal (`test_stage2_takes_assetgen_fronts`; `test_stage2_from_assetgen` and `test_stage2_takes_assetgen_parts` read the new entries) | Not run (the coordinating session's call; what to look for: `docs/progress/AG3/README.md`) |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Not run (the coordinating session's call; what to look for: `docs/progress/AG6/README.md`) |
+| Progress output | `citygen unreal` (and `citygen build`, `citygen blockout`) report where they are on stderr through `citygen/progress.py` (stdlib; assetgen uses it too): the importer and the check print `CYBERGEN_PROGRESS {json}` lines (a stage per group of phases, counts at most once a second, a first `plan` line with the import's counts), which `run_editor` relays while it writes the editor's output to the log byte for byte; the HLOD stage counts the builder's own lines (`World contains N HLOD actors`, a `final decision` per actor); a first import's overall estimate from this Mac's per-item times (`FIRST_IMPORT_S`), corrected by the stages done; `--quiet`, `CYBERGEN_QUIET=1`. Nothing the import makes changes | Greyhook imported with stage 2 into a new project, and with the blockout alone and `--check` (below) |
 | AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Not run (the coordinating session's call; what to look for: leaves masked and two-sided up close and full at distance, sign faces showing their page cells upright, holo-ads textured, textured props) |

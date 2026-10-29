@@ -39,6 +39,7 @@ from . import geom as G
 from . import hydro as H
 from . import local as LC
 from . import megasites as MS
+from . import progress as PG
 from . import roads as RD
 from . import trace as T
 from . import waterways as W
@@ -317,23 +318,35 @@ class _Runner:
     def parallel(self) -> bool:
         return self.workers > 1
 
-    def map(self, fn, jobs: list) -> list:
+    def map(self, fn, jobs: list, tick=None) -> list:
+        """`tick()` after each job's result is back (progress: the workers never print)."""
+        tick = tick or (lambda: None)
+        out = []
         if not self.parallel or len(jobs) <= 1:
-            return [fn(*job, False) for job in jobs]
+            for job in jobs:
+                out.append(fn(*job, False))
+                tick()
+            return out
         if self.pool is None:
             self.pool = ProcessPoolExecutor(self.workers,
                                             mp_context=multiprocessing.get_context("spawn"))
-        return list(self.pool.map(fn, *zip(*[(*job, True) for job in jobs])))
+        for r in self.pool.map(fn, *zip(*[(*job, True) for job in jobs])):
+            out.append(r)
+            tick()
+        return out
 
-    def submit(self, fn, jobs: list):
+    def submit(self, fn, jobs: list, tick=None):
         """Start the jobs and return a function that waits for their results (in order); this
         process can work on something else meanwhile."""
+        tick = tick or (lambda: None)
         if not self.parallel or len(jobs) <= 1:
-            return lambda: [fn(*job, False) for job in jobs]
+            return lambda: self.map(fn, jobs, tick)
         if self.pool is None:
             self.pool = ProcessPoolExecutor(self.workers,
                                             mp_context=multiprocessing.get_context("spawn"))
         futs = [self.pool.submit(fn, *job, True) for job in jobs]
+        for f in futs:
+            f.add_done_callback(lambda _f: tick())
         return lambda: [f.result() for f in futs]
 
     def close(self) -> None:
@@ -359,24 +372,33 @@ def _good(b: Built) -> bool:
     return b.passed and _score(b)[1] <= GOOD_QUALITY
 
 
+def _variant_note(b: Built) -> str:
+    fails, quality, _ = _score(b)
+    return f"hydrology variant {b.variant}: " + (
+        f"{fails} check failures" if fails else f"passed, quality {quality}")
+
+
 def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = True,
                workers: int | None = None, local: bool = True,
                buildings: bool = True) -> Built:
     spec = result.filled
     explicit = {d.name for d in result.spec.districts if d.area_share is not None}
     run = _Runner(default_workers() if workers is None else workers)
+    P = PG.active()
     try:
         built: list[Built] = []
-        for start in range(0, max_variants, run.workers):
-            jobs = [(spec, explicit, i, T.on())
-                    for i in range(start, min(start + run.workers, max_variants))]
-            for b, entries in run.map(_variant_job, jobs):
-                T.extend(entries)
-                built.append(b)
-                if _good(b):
+        with P.stage("water and districts") as ps:
+            for start in range(0, max_variants, run.workers):
+                jobs = [(spec, explicit, i, T.on())
+                        for i in range(start, min(start + run.workers, max_variants))]
+                for b, entries in run.map(_variant_job, jobs):
+                    T.extend(entries)
+                    built.append(b)
+                    ps.note(_variant_note(b))
+                    if _good(b):
+                        break
+                if _good(built[-1]):
                     break
-            if _good(built[-1]):
-                break
         ranked = sorted(built, key=lambda b: (_score(b), b.variant))
         if not roads:
             return stable(ranked[0])
@@ -386,6 +408,7 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
         # order, so the result does not depend on the number of workers
         nxt = len(built)
         while sum(len(c.failures) for c in b.checks) and nxt < max_variants:
+            P.note(f"no road network passed: trying hydrology variants {nxt} and on")
             jobs = [(spec, explicit, i, T.on())
                     for i in range(nxt, min(nxt + run.workers, max_variants))]
             nxt += len(jobs)
@@ -393,6 +416,7 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
             for v, entries in run.map(_variant_job, jobs):
                 T.extend(entries)
                 built.append(v)
+                P.note(_variant_note(v))
                 if v.passed:
                     t = add_roads([v], explicit, run)
                     if not sum(len(c.failures) for c in t.checks):
@@ -417,10 +441,14 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
         salt = 0
         tries = []
         for attempt in range(CITY_RETRIES + 1):
+            P.note(f"city try {attempt + 1}: hydrology variant {b.variant}, road variant "
+                   f"{b.stats.get('road_variant')}, layout salt {salt}")
             add_local(b, explicit, run, check=not buildings)
             if buildings:
                 add_buildings(b, explicit, run)
             fails = sum(len(c.failures) for c in b.checks)
+            P.note(f"city try {attempt + 1}: " + (f"{fails} check failures" if fails else
+                                                  "every check passed"))
             T.stage(f"city_try{attempt}", [b.variant, b.stats.get("road_variant"), salt, fails])
             tries.append({"variant": b.variant, "road_variant": b.stats.get("road_variant"),
                           "layout_salt": salt, "failures": fails})
@@ -590,16 +618,20 @@ def add_roads(ranked: list[Built], explicit: set[str], run: _Runner | None = Non
         return None
     by_variant = {b.variant: b for b in cands}
     best: _RoadTry | None = None
-    for start in range(0, len(attempts), run.workers):
-        batch = attempts[start:start + run.workers]
-        for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):
-            T.extend(entries)
-            if best is None or t.fails < best.fails:
-                best = t
+    with PG.active().stage("roads", total=len(attempts)) as ps:
+        for start in range(0, len(attempts), run.workers):
+            batch = attempts[start:start + run.workers]
+            for t, entries in run.map(_road_job, [(b, explicit, k, T.on()) for b, k in batch]):
+                T.extend(entries)
+                ps.advance()
+                ps.note(f"road variant {t.variant}/{t.net.variant}: " +
+                        (f"{t.fails} check failures" if t.fails else "every check passed"))
+                if best is None or t.fails < best.fails:
+                    best = t
+                if best.fails == 0:
+                    break
             if best.fails == 0:
                 break
-        if best.fails == 0:
-            break
     if skip and best.fails:
         return None      # a retry only takes a road network that passes
     # a copy: a later retry starts again from the variant as it was
@@ -627,12 +659,17 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
     run = run or _Runner(1)
     spec = b.spec
     did = _district_ids(spec)
+    P = PG.active()
+    ps = P.begin("local streets, blocks and lots")
 
     def mapper(fn, jobs):
-        return run.map(_blocks_job, [(fn.__name__, j) for j in jobs])
+        ps.set_total((ps.total or 0) + len(jobs))
+        return run.map(_blocks_job, [(fn.__name__, j) for j in jobs], ps.advance)
 
     loc = LC.build_local(spec, b, did, mapper)
+    ps.finish()
     if b.roads.terrain is not None:
+        ps = P.begin("terrain grading")
         from . import terrain as TE
 
         nat, lv, tst = b.roads.terrain
@@ -650,12 +687,14 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
         loc.terrain = {"ground": gr.finished, "stats": {**tst, **gr.stats},
                        "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
         T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
+        ps.finish()
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
     b.notes = b.notes + loc.notes
     if not check:
         return b
-    checks, st = C.run_checks(spec, b.model, roads=True)
+    with P.stage("checks"):
+        checks, st = C.run_checks(spec, b.model, roads=True)
     T.stage("checks", [[c.id, c.passed] for c in checks])
     st["separation_budget"] = b.stats.get("separation_budget")
     st["road_variant"] = b.stats.get("road_variant")
@@ -696,12 +735,16 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     run = run or _Runner(1)
     spec = b.spec
     early: dict = {}
+    P = PG.active()
+    ps = P.begin("buildings")
 
     def mapper(fn_name, jobs):
-        return run.map(_buildings_job, [(fn_name, j) for j in jobs])
+        ps.set_total((ps.total or 0) + len(jobs))
+        return run.map(_buildings_job, [(fn_name, j) for j in jobs], ps.advance)
 
     def submit(fn_name, jobs):
-        return run.submit(_buildings_job, [(fn_name, j) for j in jobs])
+        ps.set_total((ps.total or 0) + len(jobs))
+        return run.submit(_buildings_job, [(fn_name, j) for j in jobs], ps.advance)
 
     def side():
         prev = G.CANONICAL[0]
@@ -714,6 +757,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     out = BO.build(spec, b, mapper, submit=submit, side=side)
     if "checks" not in early:
         side()
+    ps.finish()
     b.m3 = out
     m = with_rows(b.model, BO.rows(out))
     if b.local is not None and b.local.structures:
@@ -731,13 +775,16 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
                                           b.roads.terrain[0])})
     tr = None
     if spec.transit.lines:
-        tr = TR.build(spec, m, b.held_lines)
+        with P.stage("transit"):
+            tr = TR.build(spec, m, b.held_lines)
         m = with_rows(m, tr.rows)
     # M9: tunnel parts, metro tunnels, pedestrian underpasses (before the columns and props)
     from . import tunnels as TN
 
-    tn = TN.build(spec, m)
+    with P.stage("tunnels"):
+        tn = TN.build(spec, m)
     m = with_rows(m, tn.rows)
+    ps = P.begin("columns and stable ids")
     if tg is not None:
         m = with_rows(m, {"tunnels": list(m.tunnels) + TE.bore_rows(
             tg["bores"], [s.model_dump(mode="json") for s in m.road_segments],
@@ -761,15 +808,20 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     b.notes = [ID.text(n, mp) for n in b.notes]
     late_notes = [ID.text(n, mp) for n in out.notes + (tr.notes if tr is not None else []) +
                   tn.notes]
+    ps.finish()
+    ps = P.begin("props and plants")
     pr = DK.props(spec, m, PR.build)     # (M14: on every level)
     m = with_rows(m, pr.rows)
     if tg is not None:
         rows, dst = TE.dressing(m)
         m = with_rows(m, rows)
         tg["stats"].update(dst)
+    ps.finish()
     # M11: the gameplay layer on the finished city
-    gp = GP.build(spec, m)
+    with P.stage("gameplay"):
+        gp = GP.build(spec, m)
     m = with_rows(m, gp.rows)
+    ps = P.begin("checks")
     for key in sorted(gp.rows):
         T.stage(f"gameplay/{key}", gp.rows[key])
     b.model = m
@@ -802,6 +854,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st["gameplay"] = {**GC.stats(m), "generator": gp.info}
     if m.decks:
         st["decks"] = DC.stats(m)
+    ps.finish()
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
         st[key] = b.stats.get(key)
