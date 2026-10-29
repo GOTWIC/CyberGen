@@ -41,7 +41,7 @@ district.
 | | |
 |---|---|
 | ![Shopfront row in d03](greyhook/shopfronts_d03.jpg) | ![The same row at night](greyhook/shopfronts_d03_night.jpg) |
-| A shopfront row in d03: roller shutters, grilles, counters and awnings | The same row at night: lit interiors and neon |
+| A shopfront row in d03: roller shutters, grilles, counters and awnings | The same row at night: lit doorways, neon blade signs, shutters down |
 | ![Shopfronts in d02](greyhook/shopfronts_d02.jpg) | ![A shop street](greyhook/street_3.jpg) |
 | Shopfronts in d02 under their signs | A shop street: grilles, recessed doors, blade signs on their plates |
 | ![Under the viaduct](greyhook/street_1.jpg) | ![A plaza corner](greyhook/street_2.jpg) |
