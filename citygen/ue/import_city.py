@@ -88,6 +88,83 @@ CPD = {"wear": 3, "dirt": 4, "neon": 5, "lit": 6, "seed": 7, "room": 23, "floor"
 SAMPLER = {"color": "SAMPLERTYPE_COLOR", "normal": "SAMPLERTYPE_NORMAL",
            "mask": "SAMPLERTYPE_MASKS"}
 STAGE2_FOLDER = "Assets"             # citygen.unreal.STAGE2_FOLDER
+# what Unreal turns into "_" in an asset name (INVALID_OBJECTNAME_CHARACTERS): the packs' glTF
+# names have dots where the manifest's asset names have underscores
+BAD_NAME_CHARS = "\"' ,/.:|&!~\n\r\t@#(){}[]=;^%$`"
+# the stage 2 packs being imported: glb path -> {asset name: the manifest's mesh record}
+PACK_PLAN = {}
+PACK_STEPS = []          # what the pack step did per pack (counts, for the result)
+TEXTURE_PLAN = {}        # texture file -> [(factory node setter, value)]
+
+
+def asset_name(name):
+    return "".join("_" if ch in BAD_NAME_CHARS else ch for ch in name)
+
+
+def pack_key(path):
+    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+
+if hasattr(unreal, "InterchangePythonPipelineBase"):
+    @unreal.uclass()
+    class CgPackStep(unreal.InterchangePythonPipelineBase):
+        """After the generic pipeline: a pack's meshes the manifest has no entry for (the
+        family packs' variants this city does not place) are not made at all, and each mesh
+        is built once with its own Nanite settings (on or off, shape preservation, the full
+        fallback), not built and then built again by `finish2`."""
+
+        @unreal.ufunction(override=True)
+        def scripted_execute_pipeline(self, container, source_datas, content_base_path):
+            plan = PACK_PLAN.get(pack_key(source_datas[0].get_filename())) \
+                if source_datas else None
+            if plan is None:
+                return
+            nodes = []
+            for uid in container.get_nodes(unreal.InterchangeStaticMeshFactoryNode.static_class()):
+                node = container.get_factory_node(uid)
+                nodes.append((node, plan.get(asset_name(node.get_asset_name()))))
+            found = sum(1 for _, m in nodes if m is not None)
+            step = {"pack": source_datas[0].get_filename(), "nodes": len(nodes),
+                    "matched": found, "skipped": 0}
+            PACK_STEPS.append(step)
+            if found != len(plan):
+                # (a name this step cannot match: leave the pack as the generic pipeline
+                # made it; finish2 sets the settings and prune_meshes deletes the extras)
+                step["unmatched"] = True
+                return
+            for node, m in nodes:
+                if m is None:
+                    node.set_enabled(False)
+                    step["skipped"] += 1
+                    continue
+                node.set_custom_build_nanite(bool(m["nanite"]))
+                if m.get("shape_preservation"):
+                    sp = getattr(unreal.NaniteShapePreservation,
+                                 m["shape_preservation"].upper(), None)
+                    if sp is not None:
+                        node.set_custom_nanite_shape_preservation(int(sp.value))
+                if m.get("fallback_full"):
+                    node.set_custom_nanite_fallback_target(
+                        int(unreal.NaniteFallbackTarget.PERCENT_TRIANGLES.value))
+                    node.set_custom_nanite_fallback_percent_triangles(1.0)
+                    node.set_custom_nanite_fallback_relative_error(0.0)
+
+    @unreal.uclass()
+    class CgTextureStep(unreal.InterchangePythonPipelineBase):
+        """After the generic pipeline: a texture's color space, compression, texture group
+        and green channel set before its first build (TEXTURE_PLAN), not set one by one
+        after it (each set builds it again)."""
+
+        @unreal.ufunction(override=True)
+        def scripted_execute_pipeline(self, container, source_datas, content_base_path):
+            want = TEXTURE_PLAN.get(pack_key(source_datas[0].get_filename())) \
+                if source_datas else None
+            if want is None:
+                return
+            for uid in container.get_nodes(unreal.InterchangeTextureFactoryNode.static_class()):
+                node = container.get_factory_node(uid)
+                for fn, v in want:
+                    getattr(node, fn)(v)
 
 
 def log(msg):
@@ -772,7 +849,7 @@ class Importer:
                       "meshes": {"imported": 0, "kept": 0, "deleted": 0},
                       "tiles_imported": 0, "materials": {"created": 0, "updated": 0,
                                                          "kept": 0, "deleted": 0},
-                      "graphs": {"written": 0, "kept": 0}, "timings": {}}
+                      "graphs": {"written": 0, "kept": 0}, "timings": {}, "subtimings": {}}
         # the keys of the actors created, updated and deleted (a test compares them with the
         # objects whose hash changed between two manifests)
         self.keys = {"created": [], "updated": [], "deleted": []}
@@ -783,6 +860,15 @@ class Importer:
         self.s2 = man.get("stage2")
         self.mats2 = {}
         self.mi2, self.tex2 = {}, {}          # AG6: instances by asset, textures by name
+        # the fast first import (exp_fast_import): stage 2's packs queued at once, each mesh
+        # built once with its own settings; CITYGEN_UE_FAST=0 imports them one at a time
+        self.fast = os.environ.get("CITYGEN_UE_FAST", "1") != "0" and \
+            "CgPackStep" in globals() and hasattr(unreal.AssetImportTask(), "async_")
+        self.pack_step = CgPackStep() if self.fast else None
+        self.texture_step = CgTextureStep() if self.fast else None
+        # (fast: the actors made are saved and unloaded every `offload_n`, see offload)
+        self.offload_n = int(os.environ.get("CITYGEN_UE_OFFLOAD", "2000")) if self.fast else 0
+        self.live, self.offloaded = [], []
         self.skip = set(self.s2["replaced"]) | {a["key"] for a in self.s2["actors"]} \
             if self.s2 else set()
         if self.s2:
@@ -835,9 +921,10 @@ class Importer:
 
     # -- meshes --
 
-    def pipeline(self, nanite=True, bake=True):
+    def pipeline(self, nanite=True, bake=True, pack=False):
         """M15's import settings; stage 2's packs keep each mesh in its node's frame (`bake`
-        off: the actor stands at the node's pivot) and build Nanite only where asked."""
+        off: the actor stands at the node's pivot) and build Nanite only where asked (`pack`:
+        per mesh, by the pack step)."""
         gp = unreal.InterchangeGenericAssetsPipeline()
         gp.set_editor_property("asset_type_sub_folders", False)
         gp.set_editor_property("scene_name_sub_folder", False)
@@ -861,6 +948,8 @@ class Importer:
         msh.set_editor_property("max_lumen_mesh_cards", 0)
         stack = unreal.InterchangePipelineStackOverride()
         stack.add_pipeline(gp)
+        if pack and self.pack_step is not None:
+            stack.add_python_pipeline(self.pack_step)
         return stack
 
     def import_glb(self, glb, folder, pipeline=None):
@@ -892,15 +981,10 @@ class Importer:
         EAL.set_metadata_tag(sm, HASH_TAG, h)
         EAL.save_loaded_asset(sm, only_if_is_dirty=False)
 
-    def import_group(self, glb, folder, entries, pipeline=None, finish=None,
-                     version=MESH_VERSION, stats=None):
-        """entries: [(asset name, hash)] of one glb; imports the glb when any is missing or
-        stale; {asset name: static mesh}. (Stage 2 passes its own pipeline, finish(sm,
-        stored hash), mesh version and counters.)"""
+    def current(self, folder, entries):
+        """entries: [(asset name, stored hash)]; the meshes already there with that hash
+        ({name: static mesh}) and the entries missing or stale."""
         out, stale = {}, []
-        finish = finish or self.finish_mesh
-        stats = stats or self.stats
-        entries = [(name, f"{version}.{h}") for name, h in entries]
         for name, h in entries:
             path = f"{folder}/{name}"
             sm = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
@@ -908,6 +992,46 @@ class Importer:
                 out[name] = sm
             else:
                 stale.append((name, h))
+        return out, stale
+
+    def import_packs(self, todo):
+        """Every stage 2 pack in `todo` queued as one async Interchange import (with the pack
+        step), then waited for: Interchange runs half the worker threads' worth at a time,
+        and each mesh's build goes to the asset compiling pool as its import ends."""
+        tasks = []
+        for pk, folder, entries, fresh in todo:
+            glb = os.path.join(self.build, pk["glb"])
+            PACK_PLAN[pack_key(glb)] = {m["asset"]: m for m in pk["meshes"]}
+            task = unreal.AssetImportTask()
+            task.filename = glb
+            task.destination_path = folder
+            task.automated = True
+            task.replace_existing = True
+            task.save = False
+            task.set_editor_property("async_", True)
+            task.options = self.pipeline(nanite=any(m["nanite"] for m in pk["meshes"]),
+                                         bake=False, pack=True)
+            tasks.append(task)
+        if not tasks:
+            return
+        AT.import_asset_tasks(tasks)
+        unreal.InterchangeManager.get_interchange_manager_scripted() \
+            .wait_until_all_tasks_done(False)
+        steps = PACK_STEPS
+        self.stats["stage2"]["pack_step"] = {
+            "packs": len(steps), "unmatched": sum(1 for x in steps if x.get("unmatched")),
+            "skipped": sum(x["skipped"] for x in steps)}
+        PACK_PLAN.clear()
+
+    def import_group(self, glb, folder, entries, pipeline=None, finish=None,
+                     version=MESH_VERSION, stats=None):
+        """entries: [(asset name, hash)] of one glb; imports the glb when any is missing or
+        stale; {asset name: static mesh}. (Stage 2 passes its own pipeline, finish(sm,
+        stored hash), mesh version and counters.)"""
+        finish = finish or self.finish_mesh
+        stats = stats or self.stats
+        entries = [(name, f"{version}.{h}") for name, h in entries]
+        out, stale = self.current(folder, entries)
         if not stale:
             stats["meshes"]["kept"] += len(entries)
             return out
@@ -989,6 +1113,7 @@ class Importer:
                                                           "deleted": 0})
         TCS = unreal.TextureCompressionSettings
         TG = unreal.TextureGroup
+        todo = []
         for name, t in sorted(self.s2["textures"].items()):
             path = f"{t['folder']}/{t['asset']}"
             h = f"{TEXTURE_VERSION}.{t['hash']}"
@@ -998,28 +1123,47 @@ class Importer:
                     st["kept"] += 1
                     self.tex2[name] = tex
                     continue
-            task = unreal.AssetImportTask()
-            for k, v in (("filename", os.path.join(self.build, t["file"])),
-                         ("destination_path", t["folder"]), ("destination_name", t["asset"]),
-                         ("automated", True), ("replace_existing", True), ("save", False)):
-                task.set_editor_property(k, v)
-            AT.import_asset_tasks([task])
-            tex = unreal.load_asset(path)
-            if tex is None:
-                raise RuntimeError(f"texture {name}: import of {t['file']} failed")
             kind = t["kind"]
-            tex.set_editor_property("srgb", bool(t["srgb"]))
-            tex.set_editor_property("compression_settings",
-                                    TCS.TC_NORMALMAP if kind == "normal" else
-                                    (TCS.TC_MASKS if kind == "mask" else TCS.TC_DEFAULT))
+            want = [("srgb", bool(t["srgb"])),
+                    ("compression_settings", TCS.TC_NORMALMAP if kind == "normal" else
+                     (TCS.TC_MASKS if kind == "mask" else TCS.TC_DEFAULT))]
             if kind == "normal":
-                tex.set_editor_property("flip_green_channel", True)
-            tex.set_editor_property("lod_group", TG.TEXTUREGROUP_WORLD_NORMAL_MAP
-                                    if kind == "normal" else TG.TEXTUREGROUP_WORLD)
-            EAL.set_metadata_tag(tex, HASH_TAG, h)
-            EAL.save_loaded_asset(tex, only_if_is_dirty=False)
-            self.tex2[name] = tex
-            st["imported"] += 1
+                want.append(("flip_green_channel", True))
+            want.append(("lod_group", TG.TEXTUREGROUP_WORLD_NORMAL_MAP if kind == "normal"
+                         else TG.TEXTUREGROUP_WORLD))
+            todo.append((name, t, path, h, want))
+        setters = self.texture_setters() if self.fast and todo else None
+        tasks = []
+        for name, t, path, h, want in todo:
+            task = unreal.AssetImportTask()
+            f = os.path.join(self.build, t["file"])
+            for k, v in (("filename", f), ("destination_path", t["folder"]),
+                         ("destination_name", t["asset"]), ("automated", True),
+                         ("replace_existing", True), ("save", False)):
+                task.set_editor_property(k, v)
+            if setters is None:
+                AT.import_asset_tasks([task])
+                self.finish_texture(name, t, path, h, want, save=True)
+                continue
+            # (fast: every texture queued at once, each built once with its settings)
+            TEXTURE_PLAN[pack_key(f)] = [(setters[k], int(getattr(v, "value", v)))
+                                         if not isinstance(v, bool) else (setters[k], v)
+                                         for k, v in want]
+            task.set_editor_property("async_", True)
+            stack = unreal.InterchangePipelineStackOverride()
+            stack.add_pipeline(unreal.load_asset(
+                "/Interchange/Pipelines/DefaultTexturePipeline.DefaultTexturePipeline"))
+            stack.add_python_pipeline(self.texture_step)
+            task.options = stack
+            tasks.append(task)
+        if tasks:
+            AT.import_asset_tasks(tasks)
+            unreal.InterchangeManager.get_interchange_manager_scripted() \
+                .wait_until_all_tasks_done(False)
+            TEXTURE_PLAN.clear()
+            done = [self.finish_texture(name, t, path, h, want, save=False)
+                    for name, t, path, h, want in todo]
+            EAL.save_loaded_assets(done, False)
         # the city's pages it no longer has (the shared library's stay: other cities)
         folder = f"{self.root}/{STAGE2_FOLDER}/Textures"
         want = {f"{t['folder']}/{t['asset']}" for t in self.s2["textures"].values()}
@@ -1027,6 +1171,37 @@ class Importer:
             stale = [a for a in EAL.list_assets(folder, recursive=False)
                      if a.split(".")[0] not in want]
             st["deleted"] += delete_assets(stale)
+
+    def texture_setters(self):
+        """The texture factory node's setters by texture property (the pack step's for
+        textures: their Python names as Unreal makes them)."""
+        cls = unreal.InterchangeTextureFactoryNode
+        names = {n.replace("_", "").lower(): n for n in dir(cls) if n.startswith("set_custom")}
+        out = {}
+        for prop, fn in (("srgb", "setcustomsrgb"),
+                         ("compression_settings", "setcustomcompressionsettings"),
+                         ("flip_green_channel", "setcustombflipgreenchannel"),
+                         ("lod_group", "setcustomlodgroup")):
+            if fn not in names:
+                return None
+            out[prop] = names[fn]
+        return out
+
+    def finish_texture(self, name, t, path, h, want, save=True):
+        """A texture after its import: its settings (only those the texture step did not
+        set already: each set builds it again), the hash."""
+        tex = unreal.load_asset(path)
+        if tex is None:
+            raise RuntimeError(f"texture {name}: import of {t['file']} failed")
+        for k, v in want:
+            if tex.get_editor_property(k) != v:
+                tex.set_editor_property(k, v)
+        EAL.set_metadata_tag(tex, HASH_TAG, h)
+        if save:
+            EAL.save_loaded_asset(tex, only_if_is_dirty=False)
+        self.tex2[name] = tex
+        self.stats["stage2"]["textures"]["imported"] += 1
+        return tex
 
     def texture_defaults(self):
         """A texture of each kind for the masters' sample parameters (any the build has)."""
@@ -1153,6 +1328,12 @@ class Importer:
                      ("remove_fully_contained_shapes", True), ("max_convex_hulls_per_mesh", 1)):
             o.set_editor_property(k, v)
         so = unreal.GeometryScriptSetStaticMeshCollisionOptions()
+        if self.fast:
+            # (the flag set below, set first: the call cooks the body's collision again, and
+            # with the default flag it cooks the whole shell's triangles as well; cooked data
+            # is not saved with the asset)
+            bs.set_editor_property("collision_trace_flag",
+                                   unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX, NEVER)
         GS.set_static_mesh_collision_from_mesh(dm, sm, o, so)
         bs = sm.get_editor_property("body_setup")
         bs.set_editor_property("collision_trace_flag",
@@ -1162,20 +1343,48 @@ class Importer:
         else:
             st["boxes_only"] += 1
 
-    def finish2(self, sm, rec, part, h):
+    def nanite_as_asked(self, ns, rec):
+        """Whether a mesh's Nanite settings are already what its entry asks (the pack step
+        set them before the build): then finish2 builds it no second time."""
+        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]):
+            return False
+        shape = rec.get("shape_preservation")
+        if shape:
+            sp = getattr(getattr(unreal, "NaniteShapePreservation", None), shape.upper(), None)
+            if sp is not None and ns.get_editor_property("shape_preservation") != sp:
+                return False
+        if rec.get("fallback_full"):
+            tgt = getattr(getattr(unreal, "NaniteFallbackTarget", None), "PERCENT_TRIANGLES",
+                          None)
+            try:
+                if tgt is not None and ns.get_editor_property("fallback_target") != tgt:
+                    return False
+                if ns.get_editor_property("fallback_percent_triangles") != 1.0 or \
+                        ns.get_editor_property("fallback_relative_error") != 0.0:
+                    return False
+            except Exception:           # (a property this engine version lacks)
+                return False
+        return True
+
+    def finish2(self, sm, rec, part, h, save=True):
         """A stage 2 mesh: its slots' instances, collision (hulls, complex, or none: the
         actor turns it off), Nanite off where the entry says (sky tube glass, proxies), the
-        hash."""
+        hash (`save` False: saved with the others once they are all built)."""
+        t0 = time.perf_counter()
+        mats = sm.get_editor_property("static_materials")     # (waits for the build)
+        t1 = time.perf_counter()
         slots = []
-        for s in sm.get_editor_property("static_materials"):
+        for s in mats:
             mi = self.mat2(part, str(s.material_slot_name))
             if mi is not None:
                 s.set_editor_property("material_interface", mi)
             slots.append(s)
         sm.set_editor_property("static_materials", slots, NEVER)
         col = rec["collision"]
+        t2 = time.perf_counter()
         if "boxes" in col:
             self.collision2(sm, col)
+            self.add_sub("finish2.hulls", time.perf_counter() - t2)
         else:
             bs = sm.get_editor_property("body_setup")
             if bs is not None:
@@ -1185,7 +1394,7 @@ class Importer:
         ns = sm.get_editor_property("nanite_settings")
         shape = rec.get("shape_preservation")
         full = rec.get("fallback_full")
-        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape or full:
+        if not self.nanite_as_asked(ns, rec):
             ns.set_editor_property("enabled", bool(rec["nanite"]))
             if full:
                 # AG3's street fronts: complex collision is built from the fallback mesh, so
@@ -1207,38 +1416,76 @@ class Importer:
                 if sp is not None:
                     ns.set_editor_property("shape_preservation", sp)
             sm.set_editor_property("nanite_settings", ns)     # (builds the mesh again)
+            self.stats["stage2"]["nanite_rebuilt"] = \
+                self.stats["stage2"].get("nanite_rebuilt", 0) + 1
         EAL.set_metadata_tag(sm, HASH_TAG, h)
-        EAL.save_loaded_asset(sm, only_if_is_dirty=False)
+        t3 = time.perf_counter()
+        if save:
+            EAL.save_loaded_asset(sm, only_if_is_dirty=False)
+        self.add_sub("finish2.wait_build", t1 - t0)
+        self.add_sub("finish2.save", time.perf_counter() - t3)
+        self.add_sub("finish2.all", time.perf_counter() - t0)
+
+    def add_sub(self, k, dt):
+        sub = self.stats["subtimings"]
+        sub[k] = round(sub.get(k, 0.0) + dt, 3)
 
     def meshes2(self):
         """Stage 2's glTF packs (shells, proxies, street pieces, parts), each mesh in its
-        node's frame; then the LOD chains."""
+        node's frame; then the LOD chains. With `fast` every pack to import is queued at once
+        (Interchange runs several imports at a time and the meshes build on every core while
+        the next packs import), each mesh built once with its own settings (the pack step),
+        then finished and saved in one batch; else one pack at a time, each mesh saved once
+        built."""
         self.meshes_s2 = {}
         if not self.s2:
             return
         st = self.stats["stage2"]
-        n = len(self.s2["packs"])
-        for k, pk in enumerate(self.s2["packs"]):
+        sub = self.stats["subtimings"]
+        todo = []
+        for pk in self.s2["packs"]:
             if not pk["glb"]:
                 raise RuntimeError(f"{pk['folder']}: its glTF pack is missing (run assetgen "
                                    "build)")
             folder = f"{self.root}/{pk['folder']}"
-            recs = {m["asset"]: m for m in pk["meshes"]}
-            nanite = any(m["nanite"] for m in pk["meshes"])
-            part = pk["part"]
-
-            def finish(sm, h, recs=recs, part=part):
-                self.finish2(sm, recs[sm.get_name()], part, h)
-
-            got = self.import_group(
-                os.path.join(self.build, pk["glb"]), folder,
-                [(m["asset"], m["hash"]) for m in pk["meshes"]],
-                pipeline=self.pipeline(nanite=nanite, bake=False), finish=finish,
-                version=STAGE2_MESH_VERSION, stats=st)
+            entries = [(m["asset"], f"{STAGE2_MESH_VERSION}.{m['hash']}") for m in pk["meshes"]]
+            got, stale = self.current(folder, entries)
+            if stale:
+                todo.append((pk, folder, entries, {name for name, _ in stale}))
+                continue
+            st["meshes"]["kept"] += len(entries)
             for a, sm in got.items():
                 self.meshes_s2[f"{pk['folder']}/{a}"] = sm
+        t = time.time()
+        if self.fast:
+            self.import_packs(todo)
+        sub["meshes2.import"] = round(time.time() - t, 2)
+        t = time.time()
+        done = []
+        for k, (pk, folder, entries, fresh) in enumerate(todo):
+            glb = os.path.join(self.build, pk["glb"])
+            if not self.fast:
+                self.import_glb(glb, folder, self.pipeline(
+                    nanite=any(m["nanite"] for m in pk["meshes"]), bake=False))
+            st["packs_imported"] += 1
+            recs = {m["asset"]: m for m in pk["meshes"]}
+            for name, h in entries:
+                sm = unreal.load_asset(f"{folder}/{name}")
+                if sm is None:
+                    raise RuntimeError(f"{glb}: no static mesh {folder}/{name} after the import")
+                # (one imported again with its pack, the same content: hash and settings kept)
+                self.finish2(sm, recs[name], pk["part"], h, save=not self.fast)
+                st["meshes"]["imported" if name in fresh else "kept"] += 1
+                self.meshes_s2[f"{pk['folder']}/{name}"] = sm
+                done.append(sm)
             if k % 25 == 0:
-                log(f"stage 2 pack {k + 1}/{n} {pk['folder']}")
+                log(f"stage 2 pack {k + 1}/{len(todo)} {pk['folder']}")
+        sub["meshes2.finish"] = round(time.time() - t, 2)
+        if self.fast and done:
+            t = time.time()
+            EAL.save_loaded_assets(done, False)
+            sub["meshes2.save"] = round(time.time() - t, 2)
+        t = time.time()
         # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
         # class default object serves)
         sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem) or \
@@ -1263,6 +1510,7 @@ class Importer:
             self.meshes_s2[c["mesh"]] = sm
             st["meshes"]["imported"] += 1
             st["lod_chains"] += 1
+        sub["meshes2.lod_chains"] = round(time.time() - t, 2)
 
     # -- the level --
 
@@ -1323,6 +1571,7 @@ class Importer:
         spawned; returns it."""
         h = f"{version}.{h}"
         a = have.pop(key, None)
+        created = a is None
         if a is not None:
             if f"{HASH_TAG}={h}" in [str(t) for t in a.tags]:
                 self.stats["actors"]["unchanged"] += 1
@@ -1330,10 +1579,15 @@ class Importer:
             if a.get_class() != cls:
                 self.destroy(a, key)
                 a = None
+                created = True
         if a is None:
+            t0 = time.perf_counter()
             a = make()
+            t1 = time.perf_counter()
             a.set_actor_label(key)
             a.set_folder_path(folder)
+            self.add_sub("actors.spawn", t1 - t0)
+            self.add_sub("actors.label_folder", time.perf_counter() - t1)
             self.stats["actors"]["created"] += 1
             self.keys["created"].append(key)
         else:
@@ -1343,8 +1597,44 @@ class Importer:
             a.modify()
             self.stats["actors"]["updated"] += 1
             self.keys["updated"].append(key)
+        t0 = time.perf_counter()
         update(a, h)
+        self.add_sub("actors.update", time.perf_counter() - t0)
+        if self.offload_n and created:
+            self.live.append(key)
+            if len(self.live) >= self.offload_n:
+                self.offload()
         return a
+
+    def offload(self):
+        """Save the actors made since the last offload and unload them (World Partition keeps
+        them on disk; `reload` brings them all back after the last one is made). Every spawn
+        through the editor's placement path labels the new actor uniquely by collecting the
+        label of every actor in the world first, so a first import that keeps all its actors
+        loaded spends time growing with the square of their number; few loaded, it stays
+        linear."""
+        if not self.live:
+            return
+        t = time.perf_counter()
+        self.save()
+        want = set(self.live)
+        WPL = unreal.WorldPartitionBlueprintLibrary
+        guids = [d.guid for d in WPL.get_actor_descs() if str(d.label) in want]
+        if guids:
+            WPL.load_actors(guids)          # (the library's references, then let go of them)
+            WPL.unload_actors(guids)
+            self.offloaded += guids
+        self.live = []
+        self.add_sub("actors.offload", time.perf_counter() - t)
+
+    def reload(self):
+        if not self.offloaded:
+            return
+        t = time.perf_counter()
+        unreal.WorldPartitionBlueprintLibrary.load_actors(self.offloaded)
+        self.stats["offloaded"] = len(self.offloaded)
+        self.offloaded = []
+        self.add_sub("actors.reload", time.perf_counter() - t)
 
     def actors(self):
         have = self.existing()
@@ -1375,6 +1665,9 @@ class Importer:
         self.actors2(have)
         self.player_start(have)
         self.lighting(have)
+        self.offload_n = 0
+        self.live = []
+        self.reload()
         for key, a in sorted(have.items()):
             self.destroy(a, key)
 
