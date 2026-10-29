@@ -1,5 +1,5 @@
 {
-  "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation; (AG1, under ag1) the small city's asset manifest and the digest of its asset files, and the shells of a few Vesper Bay buildings as GLB. Made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86).",
+  "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation; (AG1, under ag1, with AG2's parts) the small city's asset manifest and the digest of its asset files (shells, proxies, part packs), and a few Vesper Bay buildings as GLB (shell and instanced parts). AG0 and AG1's made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86); AG2's on the Mac (the x86 check is deferred, docs/determinism_check.md).",
   "testport_briefs": "1556a3fa92de5ef134c5103b9e0a09b9201e57ddfbce800682226ee893a67d56",
   "triangulate": "b45c256a71c471e59d9c38b5e3be4c994ee36bf5da2d3fa23b2d81596dac1464",
   "buildings": {
@@ -31,19 +31,19 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "01fc47752f56a6c08febf09140c68fcc847fccb55508e4843f511cb2341f3de0",
-    "testport_files": "df752d327530c622bdd27d21e351dfe8de967315a93b9fa8ca99081294deed83",
+    "testport_manifest": "b6a44f6f9f832af76d1185798e7f2b28ff1e3b23524f8575aef5b8f9322caf52",
+    "testport_files": "3d4488d9460ccf3a97e0f86740d3bdb3084013e612bf121189fa69cd0b1a7bda",
     "buildings": {
       "vesper_bay": {
-        "d01.lm.e790n290.bld": "784ac1b43019000305ba7975794a150bec166966712c70f3752d68b06f5dfc45",
-        "d01.lot.e1021n512.bld": "81d0be8f91f21fb0aa467b7a01c0ecd27373f964ebb7cf9a39f0950ba6ce4cab",
-        "d01.lot.e111n225.bld": "868579f3b81c2474be9f9a1549c14919d701d3dbd59da08c6ada8cb612ede4e7",
-        "d01.lot.e1260n214.bld": "e1d0d1e9dd316e1006b2bcb0d2bdfd9ebe31eca76610ff995732945d04aee3e2",
-        "d02.lot.e123n1282.bld": "cdff171ec172aef428b076d4da39ef91528b2b8f295c243946638ca55761813e",
-        "d03.lot.e1000n1582.bld": "11a14abdbfd2e278cfb8decdddea9216bb86961e22c04ccfb4b9be50486f3ccf",
-        "d04.lot.e1000s1217.bld": "e33a6eb17515a8032481fe381601905a9283395c05d6bf08a6afa96dda6a389c",
-        "d04.lot.e1002s1191.bld": "c7a7577283abbb4db93651f862273c35867e3469aa277559bc7d910c1fb4d3c5",
-        "d06.lot.e125s1558.bld": "032b514e68e0bda9b45607b3d321271226b261ab126ecb88cd3a48bab06c1d08"
+        "d01.lm.e790n290.bld": "a2a47a05960a498c0d759165e7ffc331fcaaadb0efe4a4e97f375327da052a86",
+        "d01.lot.e1021n512.bld": "714646768ef643865ff405f28d62b5676ca244247bcbc2ff12273fda88e4d448",
+        "d01.lot.e111n225.bld": "b0fdd909300fcb6db15d6974ffa2167b7ec5351b65c2a8f0f85faf0338b6b4c7",
+        "d01.lot.e1260n214.bld": "8abb56857a3fc9dee37f9b99be0131817f3be31861631329f100d32d713d4538",
+        "d02.lot.e123n1282.bld": "ac36cfcfa91a9ebe501fb62cb6c4efd4c8a8bf432148693f1ba9ba5b438e609e",
+        "d03.lot.e1000n1582.bld": "737d517fbf5921ba6fa835e321bb7c60f2afa5dbf04077940c77e868c1db15e0",
+        "d04.lot.e1000s1217.bld": "422b87b9876da285f432ed8ab95f90a61dfa84dd0dc7e1190ca146bf3c3001c7",
+        "d04.lot.e1002s1191.bld": "24d615a549f22b725a152b1689cce2f6db9e60bb4166a1e7acabefa3e4284fa9",
+        "d06.lot.e125s1558.bld": "f3c55d0b6add060e305c7d645d390a8d702e98410500f1c1752c5b3cc031212c"
       }
     }
   }

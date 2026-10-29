@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1, AG7 and AG8 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0, AG1, AG2, AG7 and AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -154,39 +154,44 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1)
+[`docs/progress/AG2`](docs/progress/AG2)
 
 ### Cities
 
-Every building modelled: walls with window openings, storefronts, slab bands, parapets and
-cornices, in one of six facade styles chosen per district, owner and building (8K; open one
-for full size).
+Every building modelled: framed windows, mullions, spandrels, balconies, fins, louvers,
+shutters, capsule pods and structural frames on walls in one of nineteen facade styles
+chosen per district, owner and building, with chamfered and rounded corners, setback ledges,
+crowns, arcades and the wear of poor districts (8K; open one for full size).
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/AG1/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG1/nexus_city/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG2/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG2/nexus_city/city_full.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/AG1/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG1/archipelago_free_port/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG2/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG2/archipelago_free_port/city_full.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/AG1/peninsula_city/city_full.jpg" width="420"> | <img src="docs/progress/AG1/vesper_bay_pinned/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG2/peninsula_city/city_full.jpg" width="420"> | <img src="docs/progress/AG2/vesper_bay_pinned/city_full.jpg" width="420"> |
 
 | Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
 |---|---|
-| <img src="docs/progress/AG1/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG1/cragmouth/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG2/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG2/cragmouth/city_full.jpg" width="420"> |
 
 ### Up close
 
-| Corporate Core, every building at full detail (8K) | A street in Old Town (8K) |
-|---|---|
-| <img src="docs/progress/AG1/vesper_bay/detail/iso_d01.jpg" width="420"> | <img src="docs/progress/AG1/vesper_bay/detail/street_5.jpg" width="420"> |
+<img src="docs/progress/AG2/towers.jpg" width="840">
 
-<img src="docs/progress/AG1/vesper_bay/contact_sheet.jpg" width="840">
+The tallest building of every era, each in its own facade style (8K).
+
+<img src="docs/progress/AG2/vesper_bay/contact_sheet.jpg" width="840">
 
 64 Vesper Bay buildings drawn at random, each framed alone (8K).
+
+<img src="docs/progress/AG2/vesper_bay/detail/street_5.jpg" width="840">
+
+A street in Old Town at eye level: sash and lattice windows with sills and lintels, grilles, window AC units and patchwork walls (8K).
 
 ```bash
 .venv/bin/python -m assetgen spec validate cities/vesper_bay/asset_spec.json --build out/vesper_bay
@@ -197,11 +202,13 @@ for full size).
 
 The asset spec (art direction per era, district, owner and landmark) is written from the
 city prompt by a Claude Code session through the repo's `assetgen` skill. `assetgen build`
-writes `out/<city>/assets/`: a glTF pack per 256 m tile with every building's model, far
-proxies, a manifest keyed by building id and the entries the Unreal exporter reads, then the
-street packs (below); it rebuilds only what changed, so a regenerated district rebuilds only
-its own. On hilly cities buildings stand on plinths down to the ground. `assetgen preview`
-renders the city, its districts and street views in Blender.
+writes `out/<city>/assets/`: a glTF pack per 256 m tile with every building's model, a pack
+per tile of the facade parts its buildings repeat (windows, balconies, fins and the like,
+placed as instances), far proxies, a manifest keyed by building id and the entries the
+Unreal exporter reads, then the street packs (below); it rebuilds only what changed, so a
+regenerated district rebuilds only its own. On hilly cities buildings stand on plinths down
+to the ground. `assetgen preview` renders the city, its districts, street views and the
+tallest tower of each era in Blender.
 
 <img src="docs/progress/AG0/vesper_bay/preview_edges.png" width="840">
 
@@ -262,7 +269,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 |---|---|---|---|
 | AG0 | Groundwork | Art direction spec and skill, a brief of what every building is made from (facade edges by what they face), glTF writer, three test buildings in Unreal | Done |
 | AG1 | Building shells | A model for every building: walls with window openings, storefronts, slabs, parapets and cornices in six facade styles; far models for distant views | Done |
-| AG2 | Facades | Windows, balconies, fins and facade styles per era; massing details | Planned |
+| AG2 | Facades | Windows, balconies, fins, louvers and frames as instanced parts; nineteen facade styles; corner cuts, setbacks, crowns and arcades; wear by district | Done |
 | AG3 | Street fronts | Shopfronts, doors, lobbies, loading docks, awnings, sign boxes | Planned |
 | AG4 | Roofs and connections | Roof equipment, helipads, green roofs, skybridges, sky tube portals | Planned |
 | AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |

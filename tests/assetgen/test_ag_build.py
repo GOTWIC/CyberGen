@@ -82,7 +82,7 @@ def _tree(d):
     return {str(p.relative_to(d)): C.sha256_bytes(p.read_bytes())
             for p in sorted(d.rglob("*")) if p.is_file() and
             ((p.suffix == ".glb" and p.parent.parent == d and
-              p.parent.name in ("tiles", "proxies")) or
+              p.parent.name in ("tiles", "proxies", "parts")) or
              (p.parent == d and p.name in BD.DELIVERED))}
 
 
@@ -121,9 +121,10 @@ def test_regenerated_district_rebuilds_only_changed_tiles(tmp_path):
     assert rep["tiles_kept"] == len(kept) > 0
     assert rep["tiles_made"] < len(new["tiles"])
     for t in kept:
-        for sub in ("tiles", "proxies"):
-            assert (d / "assets" / sub / f"{t}.glb").read_bytes() == \
-                (base / "assets" / sub / f"{t}.glb").read_bytes()
+        for sub in ("tiles", "proxies", "parts"):
+            if (base / "assets" / sub / f"{t}.glb").is_file():
+                assert (d / "assets" / sub / f"{t}.glb").read_bytes() == \
+                    (base / "assets" / sub / f"{t}.glb").read_bytes()
     for bid, r in new["buildings"].items():
         if bid in old["buildings"] and old["buildings"][bid]["hash"] == r["hash"]:
             assert old["buildings"][bid]["cpd"] == r["cpd"]
@@ -143,6 +144,37 @@ def test_unreal_contribution_covers_every_building():
         assert e["proxy"]["node"] == f"{e['key']}.proxy"
         assert len(e["cpd"]) == 23
         assert set(e["slots"]) <= set(uc["materials"])
+
+
+def test_parts_packs_and_their_instances():
+    """AG2: every building's instanced parts are meshes of its tile's part pack, placed at
+    least eight times, their transforms and building in the contribution."""
+    from assetgen.buildings import parts as PT
+    base = small_assets()
+    man = _manifest(base)
+    uc = json.loads((base / "assets" / "unreal_contribution.buildings.json").read_text())
+    rep = small_assets_report()
+    assert rep["parts"]["instances"] > 0 and rep["parts"]["merged"] > 0
+    nodes: dict[str, bytes] = {}
+    n = 0
+    for e in uc["entries"]:
+        r = man["buildings"][e["key"]]
+        assert len({p["kind"] for p in e["parts"]}) == len(e["parts"])
+        assert e["instances"] == sum(p["count"] for p in e["parts"])
+        for p in e["parts"]:
+            assert p["glb"] == f"parts/{r['tile']}.glb" and p["building"] == e["key"]
+            assert p["count"] == len(p["xforms"]) >= PT.INSTANCE_MIN
+            assert all(len(x) == 4 for x in p["xforms"])
+            assert p["kind"] == p["node"] and p["node"].startswith(p["type"] + ".h")
+            if p["glb"] not in nodes:
+                nodes[p["glb"]] = (base / "assets" / p["glb"]).read_bytes()
+            assert p["node"].encode() in nodes[p["glb"]]
+            n += 1
+    assert n > 0
+    for t, info in man["tiles"].items():
+        if info.get("parts"):
+            data = (base / "assets" / "parts" / f"{t}.glb").read_bytes()
+            assert C.sha256_bytes(data) == info["parts"]["sha256"] and not info["parts"]["bad"]
 
 
 def test_manifest_keeps_other_sections(tmp_path):
@@ -167,7 +199,8 @@ def _vesper_bay():
 
 
 def test_vesper_bay_buildings_golden():
-    """A few Vesper Bay buildings, one per kind: their shells as GLB bytes."""
+    """A few Vesper Bay buildings, one per kind: their shells and instanced parts as GLB
+    bytes."""
     from assetgen import brief as B
     built, _, _ = _vesper_bay()
     want = golden()["ag1"]["buildings"]["vesper_bay"]

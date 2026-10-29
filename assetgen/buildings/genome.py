@@ -17,6 +17,14 @@ Mass groups: `base` (podiums, docks, halls), `body` (towers, tiers, slabs, singl
 `top` (crowns, roof tiers); each draws its own system genes, so a podium can differ from
 its tower. `effective` keeps the genes a building's masses actually use, the vector the
 uniqueness check compares.
+
+AG2 adds per group the window frame style, sills and lintels, balconies (style, pattern,
+depth) and the system's feature genes (fin angle and depth, sunshades, diagrid and
+exoskeleton modules, egg crates, timber patterns, screen blades, capsule pods), and per
+building the massing articulation (corner cut and size, setback ledge, podium canopy,
+arcade under a cantilevered first floor) and an irregularity rate that scales what grime
+and low wealth add (boarded and blocked windows, AC units, grilles, replaced frames,
+closed-in balconies, dishes).
 """
 
 from __future__ import annotations
@@ -25,23 +33,28 @@ import hashlib
 
 from . import systems as SY
 
-GENOME_VERSION = 1
+GENOME_VERSION = 2
 SALT = "ag1.genome"
 GROUPS = ("base", "body", "top")
 GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay_m", "wwr",
                "sill_m", "head_m", "reveal_m", "corner_m", "cornice_m", "parapet_m",
-               "band_m")
+               "band_m", "frame", "sills", "balcony", "balcony_pat", "balcony_m", "fin_m",
+               "member_m", "pod_m")
 BUILDING_GENES = ("ground", "crown", "corner", "finish", "base", "wall", "trim", "glass",
-                  "roof", "mech_every")
+                  "roof", "mech_every", "cut", "cut_m", "setback", "setback_at",
+                  "setback_m", "canopy", "canopy_m", "arcade", "arcade_m", "irreg")
 CONTINUOUS = ("bay_m", "wwr", "sill_m", "head_m", "reveal_m", "corner_m", "cornice_m",
               "parapet_m", "band_m", "open_p", "patch_w", "patch_h", "wear", "dirt_m",
-              "wall_v", "wall_w", "trim_v", "roof_v")
+              "wall_v", "wall_w", "trim_v", "roof_v", "balcony_m", "fin_m", "member_m",
+              "pod_m", "cut_m", "setback_at", "setback_m", "canopy_m", "arcade_m", "irreg")
 # what one unit of genome distance is for a continuous gene (a clearly visible change)
 SCALE = {"bay_m": 0.3, "wwr": 0.08, "sill_m": 0.15, "head_m": 0.15, "reveal_m": 0.05,
          "corner_m": 0.25, "cornice_m": 0.15, "parapet_m": 0.2, "band_m": 0.05,
          "open_p": 0.12, "patch_w": 0.35, "patch_h": 0.3,
          "wear": 0.25, "dirt_m": 2.0, "wall_v": 0.06, "wall_w": 0.04, "trim_v": 0.06,
-         "roof_v": 0.06}
+         "roof_v": 0.06, "balcony_m": 0.25, "fin_m": 0.12, "member_m": 0.12, "pod_m": 0.1,
+         "cut_m": 0.6, "setback_at": 0.1, "setback_m": 0.8, "canopy_m": 0.3,
+         "arcade_m": 0.5, "irreg": 0.3}
 LIT_BY_USE = {"residential": 0.35, "hotel": 0.45, "office": 0.6, "retail": 0.5,
               "civic": 0.4, "industrial": 0.15, "parking": 0.05}
 
@@ -78,25 +91,32 @@ def draw(key: str, purpose: str, lo: float, hi: float, step: float, salt: str = 
 
 
 def system_weights(spec: dict, btype: str, floors: int) -> dict[str, float]:
-    """The AG1 systems a building draws from, with weights: era, district additions and
-    owner bias, each mapped onto the six AG1 systems."""
+    """The systems a building draws from, with weights: era, district additions and owner
+    bias; curtain systems not on low types (`NO_CURTAIN`), and a system outside its floor
+    range (`systems.FLOORS`) gives its weight to its stand-in."""
     w: dict[str, float] = {}
 
     def add(src: dict | None, scale: float = 1.0):
         for name in sorted(src or {}):
-            s = SY.ag1_system(name)
+            s = SY.system(name)
             w[s] = w.get(s, 0.0) + scale * float(src[name])
     add((spec.get("era_style") or {}).get("systems"))
     add((spec.get("district") or {}).get("systems"))
     add((spec.get("owner") or {}).get("facade_bias"))
+    for name in sorted(SY.FLOORS):
+        lo, hi, alt = SY.FLOORS[name]
+        if name == "shanty_patchwork" and btype == "building.shanty_stack":
+            continue
+        if name in w and not lo <= floors <= hi:
+            w[alt] = w.get(alt, 0.0) + w.pop(name)
     if btype in SY.NO_CURTAIN:
-        w.pop("unitized_curtain_wall", None)
-    if btype != "building.shanty_stack" and floors > SY.SHANTY_MAX_FLOORS \
-            and "shanty_patchwork" in w:
-        w["precast_panel"] = w.get("precast_panel", 0.0) + w.pop("shanty_patchwork")
+        for name in SY.CURTAIN:
+            if name in w:
+                v = w.pop(name)
+                w["precast_panel"] = w.get("precast_panel", 0.0) + 0.5 * v
     if not any(v > 0 for v in w.values()):
         w = {"punched_concrete": 1.0}
-    return {k: w[k] for k in SY.AG1_SYSTEMS if w.get(k, 0.0) > 0}
+    return {k: w[k] for k in SY.ALL_SYSTEMS if w.get(k, 0.0) > 0}
 
 
 def _jitter(c: str, v: float, warm: float) -> str:
@@ -125,6 +145,9 @@ def make(brief: dict) -> dict:
     weights = system_weights(spec, btype, int(b["floors"]))
     names, ws = list(weights), [weights[k] for k in weights]
     fixed = SY.TYPE_SYSTEM.get(btype)
+    if isinstance(fixed, dict):
+        fixed = pick(fkey, "system.type", sorted(fixed), [fixed[k] for k in sorted(fixed)],
+                     salt)
     genes: dict = {}
     cont: dict = {}
     body = fixed or pick(fkey, "system.body", names, ws, salt)
@@ -174,6 +197,22 @@ def make(brief: dict) -> dict:
                               ("patch_h", (1.0, 2.2))):
                 cont[f"{g}.{gene}"] = draw(fkey, f"{g}.{gene}", rng[0], rng[1],
                                            SY.STEP[gene], salt)
+        # AG2: window frames, sills, balconies, the system's feature genes
+        genes[f"{g}.frame"] = pick(fkey, f"{g}.frame", T["frames"], None, salt)
+        genes[f"{g}.sills"] = pick(fkey, f"{g}.sills", T["sills"], None, salt)
+        balc = T["balconies"]
+        if b["use"] not in SY.BALCONY_USES or len(balc) == 1:
+            genes[f"{g}.balcony"] = "none"
+        else:
+            genes[f"{g}.balcony"] = pick(fkey, f"{g}.balcony", balc,
+                                         [1.2] + [1.0] * (len(balc) - 1), salt)
+        genes[f"{g}.balcony_pat"] = pick(fkey, f"{g}.balcony_pat",
+                                         ("every", "alternate", "columns", "ends"), None, salt)
+        for name, opts in sorted(SY.FEATURE_GENES.get(T.get("feature"), {}).items()):
+            genes[f"{g}.{name}"] = pick(fkey, f"{g}.{name}", opts, None, salt)
+        for gene, rng, step in (("balcony_m", (0.9, 1.5), 0.05), ("fin_m", (0.25, 0.55), 0.05),
+                                ("member_m", (0.3, 0.6), 0.05), ("pod_m", (0.3, 0.55), 0.05)):
+            cont[f"{g}.{gene}"] = draw(fkey, f"{g}.{gene}", rng[0], rng[1], step, salt)
     T = SY.SYSTEMS[body]
     genes["ground"] = pick(fkey, "ground", T["ground"], None, salt)
     genes["crown"] = pick(fkey, "crown", era_style.get("crowns") or ["flat"], None, salt)
@@ -181,6 +220,19 @@ def make(brief: dict) -> dict:
     genes["finish"] = pick(fkey, "finish", T.get("finishes") or (T["wall"],), None, salt)
     genes["mech_every"] = pick(fkey, "mech_every", (15, 18, 20, 22, 25), None, salt)
     genes["base"] = pick(fkey, "base", ("wall", "structure", "trim"), None, salt)
+    # AG2: an industrial wall's base band (a block or concrete dado under the cladding)
+    genes["dado"] = pick(fkey, "dado", ("none", "dado", "structure"), (0.15, 0.5, 0.35), salt)
+    cont["dado_m"] = draw(fkey, "dado_m", 1.2, 3.6, 0.3, salt)
+    # AG2: massing articulation (scope pipeline stage 3) by the era's weights
+    art = SY.ARTICULATION.get(spec.get("era") or "", SY.ARTICULATION_DEFAULT)
+    genes["cut"] = pick(fkey, "cut", ("none", "chamfer", "round"), art["cut"], salt)
+    genes["setback"] = "ledge" if u(fkey, "setback", salt) < art["setback"] else "none"
+    genes["canopy"] = "podium" if u(fkey, "canopy", salt) < art["canopy"] else "none"
+    genes["arcade"] = "arcade" if u(fkey, "arcade", salt) < art["arcade"] else "none"
+    for gene, rng, step in (("cut_m", (0.8, 3.0), 0.1), ("setback_at", (0.55, 0.8), 0.05),
+                            ("setback_m", (1.5, 4.0), 0.1), ("canopy_m", (1.0, 1.5), 0.1),
+                            ("arcade_m", (1.5, 3.0), 0.1)):
+        cont[gene] = draw(fkey, gene, rng[0], rng[1], step, salt)
     # colors: the era's palette (a landmark's own), an owner's brand colors over it
     pal = list((spec.get("landmark") or {}).get("palette") or era_style.get("palette") or
                ["#8c8a86"])
@@ -197,7 +249,8 @@ def make(brief: dict) -> dict:
     genes["wall"] = wall
     genes["trim"] = trim
     genes["glass"] = pick(fkey, "glass", SY.GLASS, None, salt)
-    genes["roof"] = pick(fkey, "roof", SY.ROOFS, None, salt)
+    genes["roof"] = pick(fkey, "roof", SY.ROOFS_INDUSTRIAL if body in SY.INDUSTRIAL else SY.ROOFS,
+                         None, salt)
     dist = spec.get("district") or {}
     wear0 = float(era_style.get("wear", 0.4)) * float(dist.get("wear", 1.0))
     grime = float((b.get("style") or {}).get("grime", 0.4))
@@ -209,6 +262,11 @@ def make(brief: dict) -> dict:
     cont["wall_w"] = draw(bid, "wall_w", -0.06, 0.06, SY.STEP["wall_w"], salt)
     cont["trim_v"] = draw(bid, "trim_v", -0.1, 0.1, SY.STEP["trim_v"], salt)
     cont["roof_v"] = draw(bid, "roof_v", -0.12, 0.12, SY.STEP["wall_v"], salt)
+    # irregularity (scope 5.1.2): what grime and low wealth add, with a building's own rate
+    wealth = (brief.get("district") or {}).get("wealth")
+    wealth = 0.5 if wealth is None else float(wealth)
+    cont["irreg"] = quant(min(max(grime * (1.15 - wealth) *
+                                  (0.6 + 0.8 * u(bid, "irreg.k", salt)), 0.0), 1.0), 0.05)
     neon = float((b.get("style") or {}).get("neon", 0.3))
     extra = {"neon": quant(neon, SY.STEP["neon"]),
              "lit": draw(bid, "lit", 0.7, 1.3, 0.01, salt) * LIT_BY_USE.get(b["use"], 0.4),
@@ -258,8 +316,31 @@ def effective(genome: dict, used: dict) -> dict:
             out[f"{g}.{feat}"] = v
             if v != "none" and feat in used.get("features", {}).get(g, ()):
                 out[f"{g}.{size}"] = cont[f"{g}.{size}"]
+        for gene in ("frame", "sills"):
+            if gene in used.get("parts", {}).get(g, ()):
+                out[f"{g}.{gene}"] = genes[f"{g}.{gene}"]
+        if "balcony" in used.get("parts", {}).get(g, ()):
+            for gene in ("balcony", "balcony_pat"):
+                out[f"{g}.{gene}"] = genes[f"{g}.{gene}"]
+            out[f"{g}.balcony_m"] = cont[f"{g}.balcony_m"]
+        feat = SY.SYSTEMS[s].get("feature")
+        if feat in used.get("parts", {}).get(g, ()):
+            for name in sorted(SY.FEATURE_GENES.get(feat, {})):
+                out[f"{g}.{name}"] = genes[f"{g}.{name}"]
+            for gene in {"fins": ("fin_m",), "diagrid": ("member_m",),
+                         "exo": ("member_m",), "capsules": ("pod_m",)}.get(feat, ()):
+                out[f"{g}.{gene}"] = cont[f"{g}.{gene}"]
     for gene in ("corner", "wall", "roof"):
         out[gene] = genes[gene]
+    for gene, size in (("cut", "cut_m"), ("setback", "setback_m"), ("canopy", "canopy_m"),
+                       ("arcade", "arcade_m")):
+        if gene in used.get("articulation", ()):
+            out[gene] = genes[gene]
+            out[size] = cont[size]
+    if used.get("crown"):
+        out["crown"] = genes["crown"]
+    if used.get("irregular"):
+        out["irreg"] = cont["irreg"]
     if used.get("trim"):
         out["trim"] = genes["trim"]
         out["trim_v"] = cont["trim_v"]
@@ -271,6 +352,9 @@ def effective(genome: dict, used: dict) -> dict:
         out["finish"] = genes["finish"]
     if used.get("base"):
         out["base"] = genes["base"]
+    if used.get("dado"):
+        out["dado"] = genes["dado"]
+        out["dado_m"] = cont["dado_m"]
     for gene in ("wear", "dirt_m", "wall_v", "wall_w", "roof_v"):
         out[gene] = cont[gene]
     return out

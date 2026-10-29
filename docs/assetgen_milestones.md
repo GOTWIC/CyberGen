@@ -11,7 +11,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 |---|---|---|---|
 | AG0 | Contract and spike: package `assetgen/`, asset spec and skill, a brief and hash per building, glTF writer, triangulator, assetgen's part of the Unreal exporter; three generated buildings in Unreal 5.8 to measure Nanite size, import time and Lumen cost | Done | [`docs/progress/AG0`](progress/AG0) |
 | AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the contribution for the first assets in Unreal | Done | [`docs/progress/AG1`](progress/AG1) |
-| AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth | Planned | |
+| AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth, thumbnail uniqueness and budgets per building class | Done | [`docs/progress/AG2`](progress/AG2) |
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Planned | |
 | AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
 | AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
@@ -149,6 +149,130 @@ already keep mounts off the glass); AG4 roof equipment (blocks now), skybridge l
 portals; AG5 per-type and landmark generators; AG6 reads the slots, tints, UVs and CPD
 layout as the material contract; citygen: footprints with zero-width spikes, self-crossing
 rings and pinched courts (`rings.tidy` cleans them).
+
+## AG2: facades
+
+**Built.** Facade parts, the remaining facade systems, massing articulation, irregularity,
+the thumbnail half of the uniqueness check and budgets per building class
+(`assetgen/buildings/`):
+- **parts** (`parts.py`): windows (frame by style, sill, lintel), mullion and transom caps,
+  spandrel panels, balconies (rail, solid, enclosed, glass), louver panels, fins and crown
+  fins, sunshade blades, shutters, grilles, boards, infills, screen blades, egg crates and
+  add-on boxes, structural members (columns, beams, diagonals cut level at their nodes),
+  capsule pods, window AC units, dishes, arcade columns, balconettes, podium canopies, masts
+  and spires. Each is made in its own frame from quantized parameters (whole centimeters,
+  5 degree steps), named `part.<type>.<style>.h<hash>` by its parameters (the `h` keeps
+  Blender from reading a trailing number as a copy suffix), and closed (the mesh check runs
+  on every part mesh). Within a building a part placed 8 times or more is instanced
+  (`INSTANCE_MIN`), else merged into the shell by slot (unless turning it to its facade and
+  rounding to the millimeter would fold a triangle: `survives`);
+- **systems** (`systems.py`): the thirteen remaining facade systems of 5.1.2 (spandrel
+  ribbon, fin wall, diagrid, exoskeleton, board-marked concrete, stucco with shutters,
+  timber infill, tiled eaves, standing seam, louvered industrial, capsule stack, the
+  perforated clean-tech skin, hangar cladding), so `FALLBACK` is empty and every era
+  draws its own systems; floor ranges per system (`FLOORS`, with a stand-in outside them),
+  frames, sills, balconies and the system's feature per entry; industrial systems a roof
+  palette of their own (galvanized and coated metal, white membrane, tar) and a dado (a
+  block or concrete base band 1.2 to 3.6 m high) on their ground walls;
+- **genome** (`genome.py`, `GENOME_VERSION` 2): per group frame, sills, balcony type and
+  pattern (residential and hotel uses only), the system's feature genes and part sizes; per
+  building corner cut, setback, canopy, arcade and their sizes by the era's weights
+  (`systems.ARTICULATION`), the dado, and `irreg`, quantized from grime, the district's
+  wealth and a building's own rate; `effective` keeps every gene a shell used (part
+  families, articulation, crown, irregularity);
+- **articulation** (`articulate.py`): chamfered and rounded corners (convex, 60 to 120
+  degrees, between free facades, on every mass with a vertex there), setback ledges on
+  towers of 14 floors and more, stepped and halo crowns, masts and spires, arcades with
+  the floors above cantilevered over them, podium canopies over the ground floor, the
+  mechanical louver bands of AG1;
+- **grammar** (`shell.py`): punched window widths from the genome's bay snapped to 5 cm,
+  so frames repeat across facades; door rows and balconies only where the facade has room
+  over a sidewalk, lot or park (`Facade.room`), once per bay; ribbons for spandrel ribbon
+  walls; caps, fins, members and timber on the bay lines; eaves and ribs as strips;
+  irregularity (boards, infills, replaced frames, AC units, grilles, dishes, add-on boxes,
+  shutters left open) by `irreg`; pockets at a convex corner keep clear of it;
+- **envelope** (`envelope.py`): parts by reach (flush up to 0.16 m out, strips as AG1's,
+  deep up to 1.81 m out at 3 m and higher; masts and spires within `mast_cap` over the
+  highest roof), instanced parts by the corners of their boxes;
+- **thumbnails** (`thumb.py`): each building drawn as the contact sheet frames it, 64 px,
+  by a small z-buffered rasterizer (shell triangles and the boxes of parts that stand out),
+  shaded by slot tint; over 16 x 16 blocks a difference hash (480 bits: the drawing's
+  structure) and each block's mean shade in four steps (1,024 bits: its tone);
+- **checks** (`asset_checks.py`): `asset_unique` also asks every pair of buildings outside
+  a family to differ by 8 bits of their thumbnails (a building filling under 10% of its
+  thumbnail, a long thin shed, is told apart by its genes alone); `asset_budget` per class
+  (low, mid, high, tower, mega by height and type): unique triangles at most k times section
+  11's estimate for the building's bays and roof plus a base, instances at most i per bay
+  plus a base, and the city's part meshes within 40% of its shell estimate;
+  `asset_meshes` covers the part packs;
+- **build** (`build.py`, `GEN_VERSION` ag2.7): a part pack per tile, `parts/<tile>.glb`,
+  one root node per part mesh; the building record's `parts`, `instances`,
+  `part_triangles`, `thumb`, `thumb_fill` and `class`; the report's parts line and
+  instances by part;
+- **previews** (`previews.py`, `blender/preview_assets.py`): parts as one geometry-node
+  instancer per pack picking each point's mesh from the pack's collection, with their
+  building's tints (`--no-parts` leaves them out; a node group per part mesh and the glTF
+  importer's per-mesh deletions made a whole city quadratic to load, so the importer's
+  temporary objects now go in one batch), proxies only where a view needs them, whole
+  cities at 16 samples, towers of each era (`--views towers`), contact sheets with every
+  building's parts;
+- **exporter** (`contribution.py`): each building entry's `parts` (kind, type, glb, node,
+  asset, count, triangles, xforms, building) and `instances` (`unreal_export.md`, "From
+  AG2");
+- tests `tests/assetgen/test_ag_facades.py` (new), `test_ag_shell.py`, `test_ag_build.py`;
+  goldens regenerated (below).
+
+**Samples** (every check passes in each; 4 workers on the shared Mac):
+
+| City | Buildings | Shell triangles | Part meshes (triangles) | Part instances | Merged | Unique triangles (of budget) | Drawn | Nearest thumbnails (bits) | Packs (shells + parts) | Build |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 26.2 M | 13,875 (0.8 M) | 1.3 M | 131,282 | 27.0 M (0.53) | 88.0 M | 24 | 1.54 GB + 67 MB | 396 s |
+| Saltreach Free Port | 3,135 | 16.0 M | 9,068 (0.5 M) | 0.9 M | 65,477 | 16.5 M (0.58) | 58.0 M | 20 | 0.94 GB + 41 MB | 43 s |
+| Delta Megacity | 5,417 | 27.2 M | 13,366 (0.7 M) | 1.3 M | 125,209 | 27.9 M (0.54) | 84.9 M | 21 | 1.59 GB + 57 MB | 93 s |
+| Nexus City | 6,519 | 26.4 M | 14,443 (0.8 M) | 1.1 M | 145,183 | 27.2 M (0.53) | 79.9 M | 13 | 1.55 GB + 63 MB | 155 s |
+| Greyhook | 2,671 | 13.9 M | 10,244 (0.6 M) | 0.8 M | 62,490 | 14.5 M (0.45) | 53.3 M | 30 | 0.82 GB + 49 MB | 57 s |
+| Vesper Bay Pinned | 6,658 | 26.5 M | 14,673 (0.9 M) | 1.2 M | 152,488 | 27.3 M (0.51) | 83.7 M | 25 | 1.56 GB + 72 MB | 88 s |
+| Vesper Bay Stacks | 6,686 | 25.8 M | 14,421 (0.8 M) | 1.1 M | 151,018 | 26.6 M (0.52) | 79.8 M | 17 | 1.52 GB + 70 MB | 96 s |
+| Cragmouth | 6,777 | 27.3 M | 13,165 (0.7 M) | 1.0 M | 159,127 | 28.0 M (0.52) | 73.9 M | 30 | 1.60 GB + 60 MB | 88 s |
+| Vesper Bay Decks (checks only) | 5,856 | 25.8 M | 13,834 (0.8 M) | 1.2 M | 132,424 | 26.6 M (0.51) | 84.1 M | 16 | 1.51 GB + 66 MB | 102 s |
+
+Build: the building stage of `assetgen build` with 4 workers on the M4 Pro, shared
+with other sessions' Unreal, Blender and test runs while these ran (load 10 to 50):
+43 to 155 s, Vesper Bay's 396 s under the heaviest load.
+
+**Goldens**: written again on the Mac (`tests/assetgen/goldens.py --builds`): AG2 changes
+every shell (punched widths, articulation, dado, merged parts) and adds the part packs, so
+the small city's manifest and files and the nine Vesper Bay buildings move; the briefs, the
+spike and the triangulation do not.
+
+**Found in the sample builds**: plain industrial sheds of one size drew the same thumbnail
+in Nexus City and Delta Megacity (3 to 7 bits apart; their metal walls and dark roofs left
+nothing for 4 px blocks to tell apart), hence the dado and the industrial roofs; then
+sheds whose roofs differed only in tone (a white membrane and galvanized metal, tar and
+dark grey) were still 5 to 7 bits apart, since a difference hash keeps only the signs of
+gradients, hence the tone bits (23 to 70 bits after); three long warehouses in Delta filling 5 to 8% of their thumbnails, hence the
+sliver line at 10% (under 0.4% of any city's buildings); a bay with paired windows placed
+its balcony twice (now once per bay, `test_no_part_is_placed_twice`); diagrid pockets at a
+convex corner met (now kept a reveal plus 6 cm from it); a terraced tower over 100 m on
+Vesper Bay Decks with paired windows (two openings a bay, about 56 shell triangles a bay)
+came to 1.03 of the tower class's budget at $k = 1.8$, hence $k = 2.0$ for towers, as for
+high and mega buildings.
+
+**Exporter**: no code change; the parts are in the contribution in the format of
+`unreal_export.md` ("From AG2"), and the exporter's stage 2 import (merged while AG2 was
+built) takes them: `tests/test_unreal.py::test_stage2_takes_assetgen_parts` (every listed
+part an instanced actor `<key>.<kind>` with the entry's pivot, Custom Primitive Data and
+transforms, its mesh a node of the tile's part pack, AG2's slots as materials); Vesper
+Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362
+instances of its contribution. Unreal check: the coordinating session's call.
+
+**For later milestones**: AG3 storefronts, doors, lobbies and docks (the ground band is
+still AG1's storefront glass and door gaps; the arcade and canopy leave room for them); AG4
+roof equipment (blocks), shed roof forms, skybridge landings and portals; AG5 per-type
+generators (shanty and industrial sheds share the generic grammar; the thumbnail check's
+slivers are long sheds), landmarks and stepped plinths on slopes; AG6 materials per slot
+(the slots and tints are the contract; parts carry their building's CPD); the determinism
+check (Mac = x86) waits for `docs/determinism_check.md`.
 
 ## AG7: street elements
 

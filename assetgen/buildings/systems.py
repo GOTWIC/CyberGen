@@ -1,14 +1,16 @@
-"""Facade systems, type rules and material slots (scope 5.1.2, 5.2).
+"""Facade systems, type rules, articulation tables and material slots (scope 5.1.2, 5.2).
 
-AG1 builds six of the v1 systems. Every other system an era or a spec names falls back to
-the nearest of the six (`FALLBACK`) until AG2 adds it, so every era draws only from what is
-built. Each system fixes which genes it reads and their ranges (`SYSTEMS`): window types,
-rhythms, the opening's proportions, reveal depth, slab bands, cornice and parapet, and its
-material slots.
+AG1 built six of the v1 systems; AG2 builds the rest, so every system an era or a spec
+names is its own (`FALLBACK` only maps a name this table does not know). Each system fixes
+which genes it reads and their ranges (`SYSTEMS`): window types, rhythms, the opening's
+proportions, reveal depth, slab bands, cornice and parapet, its material slots, and (AG2)
+its window frame styles, sills, balconies and its feature: the parts and articulation that
+make it what it is (mullion caps, ribbons and sunshades, fins, diagrids, exoskeletons, egg
+crates, shutters, timber frames, eaves, louver panels, capsule pods, screens, ribs).
 
 Material slots are shared by every building of a city (one material instance each in
 Unreal); per-building color comes from the genome as tints (glTF node extras, Custom
-Primitive Data in Unreal: `CPD_TINT`).
+Primitive Data in Unreal: `CPD_TINT`, the six channels the exporter reads).
 """
 
 from __future__ import annotations
@@ -17,39 +19,48 @@ from citygen import dmath as M
 
 AG1_SYSTEMS = ("unitized_curtain_wall", "punched_concrete", "precast_panel", "punched_brick",
                "corrugated", "shanty_patchwork")
+AG2_SYSTEMS = ("spandrel_ribbon", "fin_wall", "diagrid", "exoskeleton",
+               "board_marked_concrete", "stucco_shutters", "timber_infill", "tiled_eaves",
+               "standing_seam", "louvered_industrial", "capsule_stack", "perforated_skin",
+               "hangar_cladding")
+ALL_SYSTEMS = AG1_SYSTEMS + AG2_SYSTEMS
 
-# the rest of scope 5.1.2's systems, until AG2 builds them
-FALLBACK = {
-    "spandrel_ribbon": "unitized_curtain_wall",
-    "fin_wall": "unitized_curtain_wall",
-    "diagrid": "unitized_curtain_wall",
-    "exoskeleton": "unitized_curtain_wall",
-    "perforated_skin": "precast_panel",
-    "capsule_stack": "precast_panel",
-    "board_marked_concrete": "punched_concrete",
-    "stucco_shutters": "punched_concrete",
-    "timber_infill": "punched_brick",
-    "tiled_eaves": "punched_brick",
-    "standing_seam": "corrugated",
-    "louvered_industrial": "corrugated",
-    "hangar_cladding": "corrugated",
-}
+# a name no table here knows (an asset spec may name one) builds as the nearest system
+FALLBACK: dict[str, str] = {}
+
+CURTAIN = ("unitized_curtain_wall", "fin_wall", "diagrid", "exoskeleton", "spandrel_ribbon",
+           "perforated_skin")
+INDUSTRIAL = ("corrugated", "louvered_industrial", "hangar_cladding", "standing_seam")
+# systems that need a size of building: (fewest floors, most floors, the stand-in outside)
+FLOORS = {"diagrid": (10, 999, "fin_wall"), "exoskeleton": (6, 999, "fin_wall"),
+          "capsule_stack": (4, 40, "precast_panel"), "tiled_eaves": (1, 6, "punched_brick"),
+          "timber_infill": (2, 5, "stucco_shutters"), "shanty_patchwork": (1, 5,
+                                                                         "precast_panel")}
+
+
+def system(name: str) -> str:
+    return name if name in SYSTEMS else FALLBACK.get(name, "punched_concrete")
 
 
 def ag1_system(name: str) -> str:
-    return name if name in AG1_SYSTEMS else FALLBACK[name]
+    """Kept for AG1's callers: every system is built now."""
+    return system(name)
 
 
 # Ranges are [low, high] in meters (or ratios), drawn per building and quantized (`STEP`).
 # sill and head are heights above the floor line; wwr is the opening's share of its bay.
+# AG2: `frames` the window part styles (parts.gen_window), `sills` stone sills and lintels,
+# `balconies` the balcony styles (with "none"), `feature` the system's own parts.
+_GLASSY = {"cornices": ("none",), "parapets": ("none", "low"), "bands": ("none",),
+           "ground": ("lobby", "storefront"), "frames": ("unit",), "sills": ("none",),
+           "balconies": ("none",)}
 SYSTEMS: dict[str, dict] = {
     "unitized_curtain_wall": {
         "wall": "spandrel", "glass": "glass",
         "windows": ("full", "split", "banded"), "rhythms": ("even", "grouped"),
         "wwr": (0.9, 0.95), "sill": (0.1, 0.8), "head_gap": (0.25, 0.55),
         "reveal": (0.06, 0.12), "corner": (0.12, 0.4), "bay_scale": (0.8, 1.1),
-        "cornices": ("none",), "parapets": ("none", "low"), "bands": ("none",),
-        "ground": ("lobby", "storefront"),
+        **_GLASSY, "balconies": ("none", "glass"), "feature": "caps",
     },
     "punched_concrete": {
         "wall": "concrete", "finishes": ("concrete", "plaster"), "glass": "glass",
@@ -60,6 +71,8 @@ SYSTEMS: dict[str, dict] = {
         "cornices": ("none", "thin"), "parapets": ("low", "high"),
         "bands": ("none", "every", "alternate", "podium"),
         "ground": ("storefront", "raised", "lobby"),
+        "frames": ("casement", "fixed", "awning"), "sills": ("none", "stone"),
+        "balconies": ("none", "rail", "solid"), "feature": None,
     },
     "precast_panel": {
         "wall": "panel", "glass": "glass",
@@ -69,6 +82,8 @@ SYSTEMS: dict[str, dict] = {
         "cornices": ("none",), "parapets": ("low", "high"),
         "bands": ("none", "every", "podium"),
         "ground": ("storefront", "raised", "lobby"),
+        "frames": ("casement", "fixed", "awning"), "sills": ("none",),
+        "balconies": ("none", "solid", "rail", "glass"), "feature": None,
     },
     "punched_brick": {
         "wall": "brick", "glass": "glass",
@@ -78,6 +93,8 @@ SYSTEMS: dict[str, dict] = {
         "cornices": ("thin", "deep"), "parapets": ("low", "high"),
         "bands": ("none", "every", "podium"),
         "ground": ("storefront", "raised"),
+        "frames": ("sash", "casement"), "sills": ("stone",), "balconies": ("none",),
+        "feature": None,
     },
     "corrugated": {
         "wall": "cladding", "glass": "glass",
@@ -86,6 +103,8 @@ SYSTEMS: dict[str, dict] = {
         "reveal": (0.05, 0.08), "corner": (0.3, 0.8), "bay_scale": (1.0, 1.0),
         "cornices": ("none",), "parapets": ("none", "low"), "bands": ("none",),
         "ground": ("raised", "blank"),
+        "frames": ("industrial", "fixed"), "sills": ("none",), "balconies": ("none",),
+        "feature": None,
     },
     "shanty_patchwork": {
         "wall": "patch_sheet", "glass": "glass",
@@ -94,6 +113,125 @@ SYSTEMS: dict[str, dict] = {
         "reveal": (0.04, 0.06), "corner": (0.15, 0.35), "bay_scale": (0.6, 0.9),
         "cornices": ("none",), "parapets": ("none",), "bands": ("none",),
         "ground": ("raised", "storefront"),
+        "frames": ("fixed", "casement"), "sills": ("none",), "balconies": ("none",),
+        "feature": "addons",
+    },
+    # -- AG2 --------------------------------------------------------------------------
+    "spandrel_ribbon": {
+        "wall": "band_panel", "glass": "glass",
+        "windows": ("ribbon",), "rhythms": ("even",),
+        "wwr": (0.9, 0.96), "sill": (0.8, 1.05), "head_gap": (0.35, 0.6),
+        "reveal": (0.08, 0.14), "corner": (0.3, 0.8), "bay_scale": (0.8, 1.1),
+        **_GLASSY, "parapets": ("low", "high"), "frames": ("ribbon",),
+        "feature": "ribbon",
+    },
+    "fin_wall": {
+        "wall": "spandrel", "glass": "glass",
+        "windows": ("full", "split"), "rhythms": ("even", "grouped"),
+        "wwr": (0.86, 0.94), "sill": (0.1, 0.7), "head_gap": (0.3, 0.55),
+        "reveal": (0.06, 0.12), "corner": (0.2, 0.5), "bay_scale": (0.8, 1.1),
+        **_GLASSY, "feature": "fins",
+    },
+    "diagrid": {
+        "wall": "spandrel", "glass": "glass",
+        "windows": ("full",), "rhythms": ("even",),
+        "wwr": (0.9, 0.96), "sill": (0.1, 0.4), "head_gap": (0.3, 0.5),
+        "reveal": (0.35, 0.6), "corner": (0.4, 0.9), "bay_scale": (0.8, 1.0),
+        **_GLASSY, "feature": "diagrid",
+    },
+    "exoskeleton": {
+        "wall": "spandrel", "glass": "glass",
+        "windows": ("full", "split"), "rhythms": ("even",),
+        "wwr": (0.88, 0.95), "sill": (0.1, 0.5), "head_gap": (0.3, 0.55),
+        "reveal": (0.4, 0.65), "corner": (0.5, 1.0), "bay_scale": (0.9, 1.1),
+        **_GLASSY, "feature": "exo",
+    },
+    "board_marked_concrete": {
+        "wall": "board_concrete", "glass": "glass",
+        "windows": ("single", "wide", "tall", "slot"), "rhythms": ("even", "aba", "grouped"),
+        "wwr": (0.3, 0.55), "sill": (0.8, 1.0), "head_gap": (0.5, 0.9),
+        "reveal": (0.25, 0.45), "corner": (0.8, 1.6), "bay_scale": (1.0, 1.3),
+        "cornices": ("none",), "parapets": ("high",), "bands": ("none", "every"),
+        "ground": ("raised", "lobby", "storefront"),
+        "frames": ("fixed", "awning"), "sills": ("none",), "balconies": ("none", "solid"),
+        "feature": "eggcrate",
+    },
+    "stucco_shutters": {
+        "wall": "stucco", "glass": "glass",
+        "windows": ("single", "tall", "paired"), "rhythms": ("even", "aba"),
+        "wwr": (0.25, 0.4), "sill": (0.85, 1.0), "head_gap": (0.4, 0.6),
+        "reveal": (0.1, 0.18), "corner": (0.6, 1.2), "bay_scale": (0.95, 1.2),
+        "cornices": ("thin", "deep"), "parapets": ("low",), "bands": ("none", "podium"),
+        "ground": ("storefront", "raised"),
+        "frames": ("sash", "casement"), "sills": ("stone",),
+        "balconies": ("none", "balconette"), "feature": "shutters",
+    },
+    "timber_infill": {
+        "wall": "infill", "glass": "glass",
+        "windows": ("single", "paired", "square"), "rhythms": ("even", "aba"),
+        "wwr": (0.25, 0.4), "sill": (0.8, 1.0), "head_gap": (0.3, 0.5),
+        "reveal": (0.06, 0.1), "corner": (0.25, 0.45), "bay_scale": (0.8, 1.0),
+        "cornices": ("none", "thin"), "parapets": ("none", "low"), "bands": ("none",),
+        "ground": ("storefront", "raised"),
+        "frames": ("casement", "lattice"), "sills": ("none",), "balconies": ("none",),
+        "feature": "timber",
+    },
+    "tiled_eaves": {
+        "wall": "plaster", "glass": "glass",
+        "windows": ("single", "wide", "paired"), "rhythms": ("even", "aba"),
+        "wwr": (0.35, 0.6), "sill": (0.7, 0.95), "head_gap": (0.55, 0.8),
+        "reveal": (0.06, 0.1), "corner": (0.3, 0.6), "bay_scale": (0.9, 1.1),
+        "cornices": ("none",), "parapets": ("none", "low"), "bands": ("none",),
+        "ground": ("storefront",),
+        "frames": ("lattice", "casement"), "sills": ("none",), "balconies": ("none",),
+        "feature": "eaves",
+    },
+    "standing_seam": {
+        "wall": "seam", "glass": "glass",
+        "windows": ("strip", "single", "ribbon"), "rhythms": ("even", "grouped"),
+        "wwr": (0.4, 0.75), "sill": (0.9, 1.1), "head_gap": (0.4, 0.7),
+        "reveal": (0.05, 0.09), "corner": (0.2, 0.5), "bay_scale": (1.0, 1.3),
+        "cornices": ("none",), "parapets": ("none", "low"), "bands": ("every", "alternate"),
+        "ground": ("raised", "storefront", "blank"),
+        "frames": ("fixed", "industrial"), "sills": ("none",), "balconies": ("none",),
+        "feature": None,
+    },
+    "louvered_industrial": {
+        "wall": "cladding", "glass": "glass",
+        "windows": ("louver", "clerestory", "sparse"), "rhythms": ("even",),
+        "wwr": (0.5, 0.85), "sill": (1.2, 2.0), "head_gap": (0.4, 0.8),
+        "reveal": (0.05, 0.1), "corner": (0.3, 0.7), "bay_scale": (1.0, 1.0),
+        "cornices": ("none",), "parapets": ("none", "low"), "bands": ("none",),
+        "ground": ("raised", "blank"),
+        "frames": ("industrial",), "sills": ("none",), "balconies": ("none",),
+        "feature": "louvers",
+    },
+    "capsule_stack": {
+        "wall": "concrete", "glass": "glass",
+        "windows": ("pod",), "rhythms": ("even", "tight"),
+        "wwr": (0.85, 0.95), "sill": (0.05, 0.1), "head_gap": (0.05, 0.1),
+        "reveal": (0.15, 0.25), "corner": (0.3, 0.7), "bay_scale": (0.8, 0.95),
+        "cornices": ("none",), "parapets": ("low",), "bands": ("none",),
+        "ground": ("storefront", "lobby"),
+        "frames": ("fixed",), "sills": ("none",), "balconies": ("none",),
+        "feature": "capsules",
+    },
+    "perforated_skin": {
+        "wall": "panel", "glass": "glass",
+        "windows": ("full", "wide", "ribbon"), "rhythms": ("even",),
+        "wwr": (0.6, 0.85), "sill": (0.3, 0.8), "head_gap": (0.3, 0.5),
+        "reveal": (0.06, 0.12), "corner": (0.3, 0.8), "bay_scale": (0.8, 1.1),
+        **_GLASSY, "frames": ("unit", "fixed"), "feature": "screen",
+    },
+    "hangar_cladding": {
+        "wall": "hangar", "glass": "glass",
+        "windows": ("clerestory", "strip", "sparse"), "rhythms": ("even",),
+        "wwr": (0.4, 0.8), "sill": (1.0, 1.5), "head_gap": (0.5, 0.9),
+        "reveal": (0.05, 0.08), "corner": (0.6, 1.2), "bay_scale": (1.0, 1.0),
+        "cornices": ("none",), "parapets": ("none", "low"), "bands": ("none",),
+        "ground": ("raised", "blank"),
+        "frames": ("industrial", "fixed"), "sills": ("none",), "balconies": ("none",),
+        "feature": "ribs",
     },
 }
 
@@ -102,26 +240,65 @@ PATCH_SLOTS = ("patch_sheet", "patch_rust", "patch_tarp", "patch_panel", "patch_
 PATCH_MIXES = {"sheet": (4, 1, 1, 1, 1), "rust": (1, 4, 1, 1, 1), "tarp": (1, 1, 4, 1, 1),
                "panel": (1, 1, 1, 4, 1), "ply": (1, 1, 1, 1, 4), "mixed": (1, 1, 1, 1, 1)}
 
+# AG2 feature genes per system: discrete options the genome draws when the system has them
+FEATURE_GENES = {
+    "fins": {"fin_deg": (0, 0, 15, 30)},
+    "ribbon": {"shade": ("none", "blade")},
+    "diagrid": {"node_f": (2, 3, 4)},
+    "exo": {"brace": ("none", "x", "alternate"), "node_f": (2, 3, 4)},
+    "eggcrate": {"crate": ("none", "eggcrate")},
+    "timber": {"pattern": ("posts", "braced", "cross")},
+    "screen": {"blades": ("flat", "alternate", "wave")},
+    "capsules": {"pods": ("single", "paired")},
+}
+BALCONY_USES = ("residential", "hotel")
+
+# Massing articulation (scope pipeline stage 3) by era: weights of the corner cut (none,
+# chamfer, round), of a setback ledge on towers, a podium canopy, an arcade under a
+# cantilevered first floor, and the crown types AG2 builds (the rest are AG4's roofs).
+ARTICULATION = {
+    "corporate_glass": {"cut": (0.4, 0.25, 0.35), "setback": 0.5, "canopy": 0.6,
+                        "arcade": 0.15},
+    "clean_tech": {"cut": (0.4, 0.2, 0.4), "setback": 0.3, "canopy": 0.4, "arcade": 0.1},
+    "brutalist": {"cut": (0.8, 0.2, 0.0), "setback": 0.4, "canopy": 0.2, "arcade": 0.4},
+    "transit_modern": {"cut": (0.55, 0.15, 0.3), "setback": 0.2, "canopy": 0.6,
+                       "arcade": 0.1},
+    "mixed_modern": {"cut": (0.6, 0.25, 0.15), "setback": 0.35, "canopy": 0.3,
+                     "arcade": 0.15},
+    "neon_retro": {"cut": (0.75, 0.2, 0.05), "setback": 0.2, "canopy": 0.2, "arcade": 0.1},
+    "heritage": {"cut": (0.85, 0.15, 0.0), "setback": 0.1, "canopy": 0.0, "arcade": 0.25},
+    "industrial": {"cut": (1.0, 0.0, 0.0), "setback": 0.0, "canopy": 0.0, "arcade": 0.0},
+    "suburban_modern": {"cut": (0.9, 0.1, 0.0), "setback": 0.1, "canopy": 0.1,
+                        "arcade": 0.0},
+    "aerospace": {"cut": (0.7, 0.0, 0.3), "setback": 0.1, "canopy": 0.3, "arcade": 0.0},
+}
+ARTICULATION_DEFAULT = {"cut": (0.7, 0.2, 0.1), "setback": 0.25, "canopy": 0.3,
+                        "arcade": 0.1}
+AG2_CROWNS = ("flat", "parapet", "lantern", "stepped", "halo", "mast", "spire")
+
 # Discrete-gene value lists the genome draws from when a system leaves them open.
 CORNERS = ("plain", "heavy", "tight")
 GLASS = ("#1b2430", "#22303a", "#1e2b26", "#2b251e", "#2a3440", "#15191d", "#283238")
 ROOFS = ("#3d3d3d", "#4d4b47", "#5a5650", "#2f3133", "#6b6a66", "#544a40")
+# AG2: roofs of the industrial systems (galvanized and coated metal, white membrane, tar)
+ROOFS_INDUSTRIAL = ("#9ea3a7", "#c9ccc9", "#7a3e2c", "#4d5a66", "#3d3d3d", "#6b6a66", "#8a8f86")
 STEP = {"bay_m": 0.05, "wwr": 0.01, "sill_m": 0.05, "head_m": 0.05, "reveal_m": 0.01,
         "corner_m": 0.05, "cornice_m": 0.05, "parapet_m": 0.05, "band_m": 0.01,
         "open_p": 0.05, "patch_w": 0.1, "patch_h": 0.1,
         "wear": 0.05, "dirt_m": 0.5, "neon": 0.05, "lit": 0.05, "wall_v": 0.02,
         "wall_w": 0.02, "trim_v": 0.02, "mech_every": 1, "seed": 0.0001}
 
-# M3 types with a fixed system (else the era's draw).
+# M3 types whose system is fixed (one name) or drawn from their own weights (else the era's).
 TYPE_SYSTEM = {
     "building.shanty_stack": "shanty_patchwork",
-    "building.warehouse": "corrugated",
-    "building.shed": "corrugated",
-    "building.hangar": "corrugated",
+    "building.warehouse": {"corrugated": 0.5, "louvered_industrial": 0.25,
+                           "standing_seam": 0.25},
+    "building.shed": {"corrugated": 0.6, "standing_seam": 0.4},
+    "building.hangar": "hangar_cladding",
     "building.yard": "corrugated",
     "building.parking_structure": "punched_concrete",
-    "building.temple_hall": "punched_brick",
-    "building.pagoda": "punched_brick",
+    "building.temple_hall": {"punched_brick": 0.5, "tiled_eaves": 0.5},
+    "building.pagoda": "tiled_eaves",
     "building.gate_house": "punched_brick",
 }
 NO_CURTAIN = ("building.villa", "building.terraced", "building.shopfront_row",
@@ -164,6 +341,35 @@ SLOTS: dict[str, tuple] = {
     "roof": ("facade", "#4d4b47", 0.95, 0.0, "roof"),
     "equipment": ("metal", "#6f757b", 0.5, 0.7, None),
     "structure": ("facade", "#77736d", 0.9, 0.0, "trim"),
+    # AG2: walls of the new systems
+    "band_panel": ("metal", "#c9c7c1", 0.45, 0.5, "wall"),
+    "board_concrete": ("facade", "#8f8b84", 0.9, 0.0, "wall"),
+    "stucco": ("facade", "#d8cbb2", 0.9, 0.0, "wall"),
+    "infill": ("facade", "#e0d6c2", 0.9, 0.0, "wall"),
+    "seam": ("metal", "#6e767d", 0.45, 0.65, "wall"),
+    "hangar": ("metal", "#c4c9ce", 0.4, 0.6, "wall"),
+    "dado": ("facade", "#a39f97", 0.9, 0.0, None),
+    # AG2: parts
+    "frame": ("metal", "#5d6166", 0.45, 0.6, "trim"),
+    "sill": ("facade", "#c7c0b2", 0.8, 0.0, None),
+    "mullion": ("metal", "#9aa1a8", 0.35, 0.8, "trim"),
+    "spandrel_panel": ("facade", "#2a3440", 0.45, 0.3, "spandrel"),
+    "balcony": ("facade", "#a7a39b", 0.85, 0.0, "wall"),
+    "railing": ("metal", "#2e3236", 0.5, 0.7, None),
+    "glazing": ("metal", "#33414c", 0.08, 0.3, "glass"),
+    "fin": ("metal", "#b8bcc0", 0.4, 0.7, "trim"),
+    "member": ("metal", "#d6d8da", 0.5, 0.4, "trim"),
+    "timber": ("facade", "#4a3426", 0.85, 0.0, None),
+    "shutter": ("facade", "#5f7a63", 0.75, 0.0, "trim"),
+    "grille": ("metal", "#25282b", 0.6, 0.8, None),
+    "perforated": ("metal", "#d9dcde", 0.5, 0.6, "trim"),
+    "pod": ("facade", "#c9c6bf", 0.6, 0.1, "wall"),
+    "ac": ("metal", "#b5b8b4", 0.6, 0.3, None),
+    "dish": ("metal", "#dcdcd8", 0.5, 0.3, None),
+    "tile": ("facade", "#3b3f45", 0.8, 0.0, "roof"),
+    "canopy": ("metal", "#8a9096", 0.4, 0.7, "trim"),
+    "mast": ("metal", "#a8adb2", 0.4, 0.8, None),
+    "column": ("facade", "#8b8780", 0.85, 0.0, "trim"),
     "proxy": ("facade", "#8c8a86", 0.9, 0.0, "wall"),
     "proxy_roof": ("facade", "#4d4b47", 0.95, 0.0, "roof"),
 }

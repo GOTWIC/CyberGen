@@ -7,7 +7,13 @@ previews of a build's assets (scope 14.2), written to `BUILD/assets/previews/`:
 - `iso_<district>.jpg`: every district at full detail (its neighbors from proxies);
 - `street_<n>.jpg`: the blockout's street cameras with the shells around them;
 - `contact_<type>.jpg`: a contact sheet per building type (up to 12 buildings drawn by id
-  hash, each framed alone), and `contact_sheet.jpg`, 64 buildings drawn across the city.
+  hash, each framed alone), and `contact_sheet.jpg`, 64 buildings drawn across the city;
+- `tower_<era>.jpg` (AG2, `--views towers`): the tallest building of every era up close,
+  its neighbors at full detail.
+
+AG2's instanced parts are drawn as Blender instances (geometry nodes on a point cloud per
+part mesh and tile, the building's tints as instance attributes), the merged ones are in
+the shells.
 
 The cameras are the blockout's (`blockout_plan.json` when `--blockout` names a blockout
 directory, else planned here from the model); with a blockout the scene is its city.blend
@@ -65,20 +71,9 @@ def iso_frame(box, d, aspect):
 
 
 def front_dir(brief: dict) -> tuple[float, float, float]:
-    """A view direction onto a building's main front (its longest `front` edge, else its
-    longest window-bearing one), turned 30 degrees to show a corner, 35 degrees down."""
-    best = None
-    for e in brief["edges"]:
-        rank = 0 if e["class"] == "front" else (1 if e["class"] in ("street", "plaza", "park",
-                                                                    "canal", "open") else 2)
-        key = (rank, -e["length_m"])
-        if e["ring"] == 0 and (best is None or key < best[0]):
-            best = (key, e["normal_deg"])
-    if best is None:
-        return _norm(ISO_DIR)
-    a = math.radians(best[1] + 30.0)
-    c = math.cos(math.radians(35.0))
-    return _norm((-math.cos(a) * c, -math.sin(a) * c, -math.sin(math.radians(35.0))))
+    """The contact sheet's view onto a building's main front (`buildings.thumb.front_dir`)."""
+    from .buildings import thumb as TH
+    return TH.front_dir(brief)
 
 
 def _ortho(box, w, aspect, back, d=ISO_DIR):
@@ -102,6 +97,73 @@ def _tile_box(name: str) -> tuple[float, float, float, float]:
     return ix * BD.TILE_M, iy * BD.TILE_M, (ix + 1) * BD.TILE_M, (iy + 1) * BD.TILE_M
 
 
+def tower_views(man: dict, briefs: dict, width: int) -> list[dict]:
+    """The tallest building of every era (landmarks aside: theirs are AG5's), framed with
+    room round it, from its front; its own and its neighbors' tiles at full detail."""
+    best: dict[str, tuple] = {}
+    for bid, r in man["buildings"].items():
+        era = (briefs.get(bid) or {}).get("spec", {}).get("era")
+        if not era or r["type"].startswith("building.landmark") or \
+                not (r.get("genes") or {}).get("body.system"):
+            continue                # landmarks, and megasite structures without a facade
+        h = r["bounds"][1][2]
+        if era not in best or (h, bid) > best[era][:2]:
+            best[era] = (h, bid)
+    views = []
+    for era in sorted(best):
+        h, bid = best[era]
+        r = man["buildings"][bid]
+        px, py = r["pivot"][0], r["pivot"][1]
+        (x0, y0, _), (x1, y1, z1) = r["bounds"]
+        pad = max(8.0, 0.25 * max(x1 - x0, y1 - y0))
+        box = [px + x0 - pad, py + y0 - pad, 0.0, px + x1 + pad, py + y1 + pad, z1 * 1.04 + 4]
+        v = _ortho(box, width, 0.8 if z1 > 1.2 * max(x1 - x0, y1 - y0) else 1.4, 3000.0,
+                   front_dir(briefs[bid]))
+        near = []
+        for t in man["tiles"]:
+            tx0, ty0, tx1, ty1 = _tile_box(t)
+            dx = max(tx0 - px, 0.0, px - tx1)
+            dy = max(ty0 - py, 0.0, py - ty1)
+            if dx * dx + dy * dy <= 300.0 ** 2:
+                near.append(t)
+        views.append({"name": f"tower_{era}", **v, "shell_tiles": sorted(near),
+                      "key": bid, "height": round(z1, 1)})
+    return views
+
+
+def instances(man: dict, tiles: list[str], local: dict | None = None) -> dict:
+    """Per tile, its buildings' tints and every instanced part's placements in the world
+    (x, y, z, yaw in radians, the building's index in the tints); with `local` ({key:
+    index}), those buildings at their own origin instead (contact sheets)."""
+    out = {}
+    want = set(tiles)
+    chans = ("wall", "trim", "glass", "roof", "spandrel", "patch")
+    if local is not None:
+        order = sorted(local, key=lambda k: local[k])
+        out["sheet"] = {"tints": [[man["buildings"][k]["tints"][c] for c in chans]
+                                  for k in order], "parts": {}}
+    for bid in sorted(man["buildings"]):
+        r = man["buildings"][bid]
+        if local is None and r["tile"] not in want or local is not None and bid not in local:
+            continue
+        if not r.get("parts"):
+            continue
+        if local is None:
+            t = out.setdefault(r["tile"], {"tints": [], "parts": {}})
+            bi = len(t["tints"])
+            t["tints"].append([r["tints"][c] for c in chans])
+        else:
+            t = out["sheet"]
+            bi = local[bid]
+        px, py, pz = (0.0, 0.0, 0.0) if local is not None else r["pivot"]
+        for x in r["parts"]:
+            pl = t["parts"].setdefault(x["node"], [])
+            for a in x["xforms"]:
+                pl.append([round(px + a[0], 3), round(py + a[1], 3), round(pz + a[2], 3),
+                           round(math.radians(a[3]), 6), bi])
+    return out
+
+
 def plan_views(man: dict, cams: dict, width: int, which: set[str]) -> list[dict]:
     views = []
     boxes = [d["box"] for d in cams["districts"]]
@@ -113,9 +175,11 @@ def plan_views(man: dict, cams: dict, width: int, which: set[str]) -> list[dict]
             views.append({"name": "city", **_ortho(box, width, 1.6, 8000.0),
                           "shell_tiles": []})
         if "city_full" in which:
-            # every shell at once: AG1's 15 to 20 M triangles per city fit Blender
+            # every shell and part at once (AG2: 26 to 28 M unique triangles, about a
+            # million part instances); 16 samples, since EEVEE redraws the whole city each
+            # sample and the view is meant to be seen scaled down
             views.append({"name": "city_full", **_ortho(box, width, 1.6, 8000.0),
-                          "shell_tiles": sorted(man["tiles"])})
+                          "shell_tiles": sorted(man["tiles"]), "samples": 16})
     by_d: dict[str, set] = {}
     for r in man["buildings"].values():
         if r["district"]:
@@ -169,6 +233,23 @@ def sheet_jobs(bdir: Path, man: dict, out: Path, cell: int = CELL,
             sh, _, rec = BD.building_asset(br, GN.make(br))
             made.append((bid, sh, rec))
         mats = BD._materials(g, sorted({s for _, sh, _ in made for s in sh["arrays"]}))
+        # the sheet's instanced parts: one mesh each in a pack of their own
+        pdefs = {}
+        for _, sh, _ in made:
+            for x in sh["parts"]:
+                pdefs.setdefault(x["node"], (x["family"], x["params"]))
+        pglb = None
+        if pdefs:
+            from .buildings import parts as PT
+            gq = G.Gltf(generator="assetgen preview")
+            pm = {nd: PT.mesh(*pdefs[nd]) for nd in sorted(pdefs)}
+            qm = BD._materials(gq, sorted({s for _, a in pm.values() for s in a}))
+            for nd in sorted(pm):
+                gq.node(nd, mesh=gq.mesh(nd, pm[nd][0].primitives(pm[nd][1], qm)), root=True)
+            pglb = sd / f"{name}_parts.glb"
+            pglb.write_bytes(gq.to_glb())
+        sheet_man = {"buildings": {bid: rec for bid, sh, rec in made}}
+        sheet_inst = instances(sheet_man, [], {bid: k for k, (bid, _, _) in enumerate(made)})
         cells = []
         for k, (bid, sh, rec) in enumerate(made):
             mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["arrays"], mats))
@@ -182,7 +263,9 @@ def sheet_jobs(bdir: Path, man: dict, out: Path, cell: int = CELL,
                           "district": rec["district"]})
         path = sd / f"{name}.glb"
         path.write_bytes(g.to_glb())
-        jobs.append({"name": name, "glb": str(path), "cells": cells})
+        jobs.append({"name": name, "glb": str(path), "cells": cells,
+                     "parts_glb": str(pglb) if pglb else None,
+                     "instances": sheet_inst.get("sheet")})
     return jobs
 
 
@@ -222,7 +305,8 @@ def compose(out: Path, sheets: list[dict], man: dict, cell: int = CELL) -> list[
 
 def run(build_dir: str | Path, blockout: str | None = None, out: str | None = None,
         which: list[str] | None = None, width: int = 2400, blender: str | None = None,
-        only: list[str] | None = None, cell: int = CELL, log=print) -> dict:
+        only: list[str] | None = None, cell: int = CELL, log=print,
+        parts: bool = True) -> dict:
     bdir = Path(build_dir)
     adir = bdir / "assets"
     man = json.loads((adir / "manifest.json").read_text())
@@ -230,15 +314,24 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
     od.mkdir(parents=True, exist_ok=True)
     bo = Path(blockout) if blockout else (bdir / "blockout" if (bdir / "blockout").is_dir()
                                           else None)
-    which = set(which or ("city", "districts", "street", "sheets"))
+    which = set(which or ("city", "districts", "street", "sheets", "towers"))
     cams = cameras(bdir, bo)
     views = plan_views(man, cams, width, which)
+    if "towers" in which:
+        briefs = json.loads((adir / "briefs.json").read_text())["briefs"]
+        views += tower_views(man, briefs, width)
     if only:
         views = [v for v in views if v["name"] in only]
     sheets = sheet_jobs(bdir, man, od, cell, only) if "sheets" in which else []
+    need = sorted({t for v in views for t in v.get("shell_tiles", [])})
+    inst_path = od / "instances.json"
+    inst_path.write_text(json.dumps(instances(man, need)))
     lit = 0.03
     job = {"assets": str(adir), "out": str(od), "views": views, "sheets": sheets,
-           "proxy_tiles": sorted(man["tiles"]) if views else [],
+           "instances": str(inst_path), "parts_on": parts,
+           # proxies only where some view does not draw the tile at full detail
+           "proxy_tiles": sorted(set(man["tiles"]) - set.intersection(
+               *(set(v.get("shell_tiles", [])) for v in views))) if views else [],
            "blend": str(bo / "city.blend") if bo and (bo / "city.blend").is_file() else None,
            "slots": {k: [v[0], SY.srgb_linear(v[1]), v[2], v[3], v[4]]
                      for k, v in SY.SLOTS.items()}, "lit": lit, "samples": 32}
@@ -260,6 +353,8 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
         sys.stderr.write(proc.stdout[-4000:] + proc.stderr[-4000:])
         raise RuntimeError(f"Blender failed ({proc.returncode})")
     made = compose(od, sheets, man, cell) if sheets else []
+    if inst_path.is_file():
+        inst_path.unlink()
     rep = json.loads((od / "preview_report.json").read_text())
     rep["contact_sheets"] = [p.name for p in made]
     (od / "preview_report.json").write_text(json.dumps(rep, indent=1) + "\n")
@@ -269,7 +364,7 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
 def main(args) -> int:
     try:
         rep = run(args.build, args.blockout, args.out, args.views, args.width, args.blender,
-                  args.only, args.cell)
+                  args.only, args.cell, parts=not getattr(args, "no_parts", False))
     except (OSError, RuntimeError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

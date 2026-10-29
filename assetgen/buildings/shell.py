@@ -1,16 +1,27 @@
-"""The split grammar and the shell (scope 5.1.2, 14.2).
+"""The split grammar and the shell (scope 5.1.2, 14.2, 14.3).
 
 $$\\text{mass} \\to \\text{edges} \\to \\text{floor rows} \\to \\text{bays} \\to \\lbrace
 \\text{opening}, \\text{panel}, \\text{pier}, \\text{mount} \\rbrace$$
 
 Per mass: its floor rows (sill and head of every floor, the same on all its facades: a
 ground row by the ground gene, mechanical louver rows in towers, a glazed lantern at a
-tower's top, dark open bays in parking structures), then per facade (a mass edge, with the
-brief's regions) the bays by the genome's module and rhythm between corner piers wide
-enough for the reveals, an opening per bay by window type and the region's class (none on
-party and hidden walls, few on blind ones), storefronts per ground-floor unit, and a panel
-(a mount) wherever a sign slot, mounted prop, facade plant or skybridge end would fall on
-glass.
+tower's top, dark open bays in parking structures, door rows where balconies go), then per
+facade (a mass edge, with the brief's regions) the bays by the genome's module and rhythm
+between corner piers wide enough for the reveals, an opening per bay by window type and the
+region's class (none on party and hidden walls, few on blind ones), storefronts per
+ground-floor unit, and a panel (a mount) wherever a sign slot, mounted prop, facade plant or
+skybridge end would fall on glass.
+
+AG2: before the grammar the masses are articulated (`articulate`: corner cuts, setback
+ledges, stepped and screen crowns, arcades); every opening is filled with parts (`parts`:
+a window frame by style with sills and lintels, louver panels, capsule pods, balconies and
+door rows, spandrel panels, shutters, egg crates, screen blades, sunshades, and what grime
+and low wealth add: boards, infills, replaced frames, AC units, grilles, dishes, add-on
+boxes); every bay line gets the system's own parts (mullion caps, fins, exoskeleton and
+diagrid members, timber frames); eaves and ribs run as strips, podium canopies over the
+ground floor, masts and spires on the roof; industrial walls on the ground take a block or
+concrete dado. A part placed fewer than `parts.INSTANCE_MIN`
+times is merged into the shell; the others are the building's instances.
 
 Geometry, on integer millimeters in the building frame, every part closed (the mesh
 check):
@@ -19,8 +30,8 @@ check):
   a mass has the same rows), a reveal pocket per opening with the pane at its back, the
   roof and bottom caps on the ring's corners;
 - ring strips (`rings.strip`) extruded: slab bands at floor lines, cornices at the tops of
-  masses, parapets on roof edges no other mass covers; only above 3 m where they leave the
-  footprint, never on party, hidden or blind stretches;
+  masses, parapets on roof edges no other mass covers, eaves and ribs; only above 3 m where
+  they leave the footprint, never on party, hidden or blind stretches;
 - roof equipment blocks for the brief's roof items (AG4 replaces them);
 - on M13's slopes, a plinth under each mass that stands on the base, down into the lowest
   ground under the footprint (`plinth_mm`; AG5 steps it).
@@ -34,7 +45,9 @@ import math
 from citygen import dmath as M
 
 from ..triangulate import TriangulationError, triangulate
+from . import articulate as AR
 from . import genome as GN
+from . import parts as PT
 from . import rings as RG
 from . import systems as SY
 from .meshbuf import Buf
@@ -47,7 +60,14 @@ EDGE_CLEAR = 60              # an opening's pocket from the neighbor facade's pl
 MOUNT_PAD = 100
 THIN_MM = 2500               # masses thinner than this get no openings
 MAX_WIN_MM = 4000            # window height cap outside curtain walls
+DOOR_MIN_Z = 3200            # a balcony's floor line: its slab's underside 3 m up
+SNAP = 50                    # punched opening widths (mm), so frames repeat across facades
 SPREAD = {"irregular": (0.7, 0.6), "tight": (0.85, 0.3), "loose": (0.5, 1.0)}
+# window frame styles: (face width, depth) mm (parts.gen_window)
+FRAMES = {"unit": (50, 70), "fixed": (60, 70), "casement": (70, 80), "sash": (80, 90),
+          "awning": (60, 70), "industrial": (50, 60), "lattice": (60, 60), "ribbon": (50, 70)}
+ODD_FRAMES = ("fixed", "casement", "awning", "industrial")      # replaced windows
+WAVE = (-30, -15, 0, 15, 30, 15, 0, -15)                       # screen blades, by position
 
 
 def _u(bid: str, purpose: str) -> float:
@@ -66,9 +86,10 @@ def plinth_mm(brief: dict) -> int:
 
 
 class Facade:
-    """One mass edge: a -> b (mm), outward to the right; s along it in mm, 0..L."""
+    """One mass edge: a -> b (mm), outward to the right; s along it in mm, 0..L; `soff` the
+    s of its start along the brief edge it lies on (a cut or a setback moves it)."""
     __slots__ = ("a", "b", "L", "ux", "uy", "nx", "ny", "j", "u0", "rec", "c0", "c1",
-                 "regions")
+                 "regions", "soff")
 
     def __init__(self, a, b, u0: float):
         self.a, self.b = a, b
@@ -78,6 +99,7 @@ class Facade:
         self.ux, self.uy = dx / Lf, dy / Lf
         self.nx, self.ny = self.uy, -self.ux
         self.u0 = u0
+        self.soff = 0
 
     def P(self, s: int, z: int) -> tuple[int, int, int]:
         L2 = 2 * self.L
@@ -85,12 +107,32 @@ class Facade:
         return (a[0] + (2 * (b[0] - a[0]) * s + self.L) // L2,
                 a[1] + (2 * (b[1] - a[1]) * s + self.L) // L2, z)
 
-    def cls(self, s: int, z: int) -> str:
-        sm, zm = s / 1000.0, z / 1000.0
+    def reg(self, s: int, z: int) -> dict | None:
+        sm, zm = (s + self.soff) / 1000.0, z / 1000.0
         for r in self.regions:
             if r["s"][0] <= sm <= r["s"][1] and r["z"][0] <= zm <= r["z"][1]:
-                return r["class"]
+                return r
+        return None
+
+    def cls(self, s: int, z: int) -> str:
+        r = self.reg(s, z)
+        if r is not None:
+            return r["class"]
         return self.rec["class"] if self.rec else "open"
+
+    def room(self, s: int, z: int, street: int, other: int) -> int:
+        """How far out (mm) something may reach here at least 3 m up: over a street or an
+        avenue's sidewalk (2 m at least) `street`, over open ground, a park, a plaza, a
+        court or water `other`, never over an alley, a service road or a highway's lanes,
+        nor in front of a party, blind or hidden wall."""
+        r = self.reg(s, z)
+        cls = r["class"] if r is not None else (self.rec["class"] if self.rec else "open")
+        if cls in ("street", "front"):
+            rc = r.get("road_class") if r is not None else None
+            return street if rc in ("street", "avenue") else 0
+        if cls in ("open", "park", "plaza", "courtyard", "atrium", "canal", "upper"):
+            return other
+        return 0
 
 
 def _corner_clear(d_in, d_out, r: int) -> int:
@@ -108,6 +150,11 @@ TURN_COS = 0.9397            # cos 20 degrees: less turn than this is no corner
 
 def _turned(d_in, d_out) -> bool:
     return d_in[0] * d_out[0] + d_in[1] * d_out[1] < TURN_COS
+
+
+def _convex(d_in, d_out) -> bool:
+    """A real corner turning toward the solid (the solid lies left of every facade)."""
+    return _turned(d_in, d_out) and d_in[0] * d_out[1] - d_in[1] * d_out[0] > 0
 
 
 def _thickness(ring) -> int:
@@ -133,10 +180,15 @@ def _thickness(ring) -> int:
 # ---------------------------------------------------------------------------
 
 def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
-              tall_building: bool, parking: bool, cornice_h: int) -> list[tuple]:
-    """(lo, hi, kind, floor) of every window row of a mass, ascending."""
+              tall_building: bool, parking: bool, cornice_h: int,
+              doors: bool = False) -> list[tuple]:
+    """(lo, hi, kind, floor, sill, floor line) of every window row of a mass, ascending;
+    `sill` is where the opening would start without a door row (the spandrel panel's top
+    in a door row's bays without a balcony), else lo."""
     z0, z1 = ms["z0"], ms["z1"]
     n = ms["floors"]
+    f0 = ms.get("f0", 0)
+    n_all = ms.get("n0", n)
     if n <= 0 or g == "structure":
         return []
     genes, cont = gm["genes"], gm["cont"]
@@ -144,7 +196,7 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
     win = genes[f"{g}.window"]
     sill0 = int(round(cont[f"{g}.sill_m"] * 1000))
     gap0 = int(round(cont[f"{g}.head_m"] * 1000))
-    if win == "tall":
+    if win in ("tall", "slot"):
         sill0, gap0 = max(300, sill0 - 350), max(250, gap0 - 200)
     if win == "banded":
         sill0 += 300
@@ -156,26 +208,34 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
         kind, sill, head = "win", sill0, H - gap0
         if parking:
             kind, sill, head = "void", 1000, H - 300
-        elif f == 0 and z0 <= 50 and ground is not None:
+        elif f + f0 == 0 and z0 <= 50 and ground is not None:
             if ground == "blank":
-                continue
+                if n_all > 1 or H < 5000:
+                    continue
+                # a shed of one tall floor: a clerestory under its eaves
+                head = H - gap0
+                sill = head - (900 if win != "strip" else 1400)
             if ground == "storefront":
                 kind, sill, head = "shop", 300, H - max(500, H // 6)
             elif ground == "lobby":
                 kind, sill, head = "shop", 150, H - 400
-        elif win in ("clerestory", "strip") and sysname == "corrugated":
+        elif win in ("clerestory", "strip") and sysname in SY.INDUSTRIAL:
             hgt = 900 if win == "clerestory" else 1400
             head = H - gap0
             sill = head - hgt
         elif win in ("slit", "square") and sysname == "shanty_patchwork":
             sill = head - (500 if win == "slit" else 800)
-        if not parking and kind == "win" and g == "body" and n >= 24 and 0 < f < n - 2 and \
-                (f + 1) % mech == 0:
+        elif win == "louver":
+            kind = "louver"
+        elif win == "pod":
+            kind = "pod"
+        if not parking and kind == "win" and g == "body" and n_all >= 24 and \
+                0 < f + f0 < n_all - 2 and (f + f0 + 1) % mech == 0:
             kind = "louver"
         if is_top and f == n - 1 and tall_building and genes["crown"] == "lantern" and \
                 kind == "win":
             kind, sill, head = "lantern", 150, H - 150
-        if kind in ("win", "louver") and sysname != "unitized_curtain_wall" and \
+        if kind in ("win", "louver") and sysname not in SY.CURTAIN and \
                 head - sill > MAX_WIN_MM:
             sill = head - MAX_WIN_MM
         if f == n - 1 and cornice_h:
@@ -184,7 +244,10 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
         head = min(head, H - 100)
         if head - sill < 400:
             continue
-        rows.append((zf + sill, zf + head, kind, f))
+        full = zf + sill
+        if doors and kind == "win" and zf >= DOOR_MIN_Z and head - 150 >= 1800:
+            sill = 150
+        rows.append((zf + sill, zf + head, kind, f, full, zf))
     return rows
 
 
@@ -217,8 +280,13 @@ def bay_cuts(L: int, c0: int, c1: int, bay: int, rhythm: str, key: str) -> list[
 
 
 def bay_openings(b0: int, b1: int, j: int, n: int, win: str, rhythm: str, wwr: float,
-                 sysname: str, key: str, open_p: float = 0.55) -> list[tuple[int, int]]:
+                 sysname: str, key: str, open_p: float = 0.55,
+                 nominal: int = 0) -> list[tuple[int, int]]:
+    """The openings of bay j (b0 to b1). A punched window's width comes from the genome's
+    bay (`nominal`), fitted into the bay, so a building repeats one window size across its
+    facades (scope principle 5); curtain walls, ribbons and patchwork fill their bays."""
     wb = b1 - b0
+    nb = nominal or wb
     mid = (b0 + b1) // 2
     if win == "sparse" and j % 3 != 1:
         return []
@@ -232,7 +300,7 @@ def bay_openings(b0: int, b1: int, j: int, n: int, win: str, rhythm: str, wwr: f
         ow = min(int(wb * wwr * k * (0.75 + 0.4 * _u(fkey, f"w{j}"))), wb - 2 * PIER_MIN)
         off = int((wb - ow) * (_u(fkey, f"o{j}") - 0.5) * 0.6)
         return [(mid - ow // 2 + off, mid - ow // 2 + off + ow)]
-    if sysname == "unitized_curtain_wall":
+    if sysname in SY.CURTAIN and win in ("full", "split", "banded"):
         mull = max(60, int(wb * (1.0 - wwr)))
         if win == "split" and wb > 1800:
             half = (wb - 2 * mull) // 2
@@ -241,20 +309,26 @@ def bay_openings(b0: int, b1: int, j: int, n: int, win: str, rhythm: str, wwr: f
         return [(b0 + mull // 2, b1 - mull // 2)]
     if win in ("ribbon", "strip"):
         ow = wb - 200
+    elif win in ("louver", "pod"):
+        ow = wb - max(160, int(wb * (1.0 - wwr)))
+    elif win == "slot":
+        ow = int(nb * wwr * 0.55)
     elif win == "wide":
-        ow = int(wb * wwr * 1.4)
+        ow = int(nb * wwr * 1.4)
     elif win == "square":
-        ow = int(wb * wwr * 1.2)
+        ow = int(nb * wwr * 1.2)
     elif win == "paired":
-        tot = int(wb * min(wwr * 1.3, 0.85))
+        tot = min(int(nb * min(wwr * 1.3, 0.85)), int(wb * 0.85))
         gap = max(120, tot // 6)
-        each = (tot - gap) // 2
+        each = (tot - gap) // 2 // SNAP * SNAP
         if each < 350:
             return []
         return [(mid - gap // 2 - each, mid - gap // 2), (mid + gap // 2, mid + gap // 2 + each)]
     else:
-        ow = int(wb * wwr)
+        ow = int(nb * wwr)
     ow = min(ow, wb - 2 * PIER_MIN)
+    if win not in ("ribbon", "strip"):
+        ow = ow // SNAP * SNAP           # punched openings in 5 cm steps: their frames repeat
     if ow < 350:
         return []
     off = 0
@@ -294,7 +368,8 @@ class ShellBuilder:
         self.stats = {"bays": 0, "openings": 0, "mount_panels": 0, "storefronts": 0,
                       "strips": 0, "strips_refused": 0, "roof_items": 0, "masses": 0}
         self.used = {"groups": [], "features": {}, "ground": False, "finish": False,
-                     "base": False}
+                     "base": False, "parts": {}, "articulation": [], "crown": False,
+                     "irregular": False, "dado": False}
         self.mass_info: list[dict] = []
         b = brief["building"]
         self.parking = b["type"] == "building.parking_structure"
@@ -305,6 +380,14 @@ class ShellBuilder:
             if at is not None:
                 self.units_by_edge.setdefault(at["edge"], []).append(un)
         self.mounts = self._mounts()
+        # AG2
+        self.parts = PT.PartSet()
+        self.marks = AR.marks(brief, self.units_by_edge)
+        self.arcades: list[dict] = []
+        self.plinth = plinth_mm(brief)
+        self.irr = float(gm["cont"].get("irreg", 0.0))
+        self.res = b["use"] in SY.BALCONY_USES
+        self.inst: list[dict] = []
 
     # -- what must fall on a panel -------------------------------------------------------
 
@@ -351,16 +434,21 @@ class ShellBuilder:
             if any(len(t[0]) != len(RG.clean(r)) for t, r in zip(tidied, raw)):
                 self.stats["rings_tidied"] = self.stats.get("rings_tidied", 0) + 1
             keep = [0] + self._unpinched(tidied[0][0], [t[0] for t in tidied[1:]])
+            rings = [tidied[r][0] for r in keep]
             masses.append({"k": k, "role": m["role"], "shape": m["shape"],
                            "z0": int(round(m["z"][0] * 1000)), "z1": int(round(m["z"][1] * 1000)),
-                           "rings": [tidied[r][0] for r in keep],
+                           "rings": rings,
                            "eidx": [tidied[r][1] for r in keep], "rid": keep,
-                           "floors": int(m["floors"]["count"])})
+                           "deriv": [[False] * len(r) for r in rings],
+                           "floors": int(m["floors"]["count"]),
+                           "n0": int(m["floors"]["count"]), "f0": 0})
         self.masses = masses
         edge_of = {}
         for j, e in enumerate(br["edges"]):
             edge_of[(e["mass"], e["ring"], e["i"])] = j
         self.edge_of = edge_of
+        AR.articulate(self)
+        masses = self.masses
         groups = set()
         for ms in masses:
             if ms["z1"] - ms["z0"] < 50 or len(RG.clean(ms["rings"][0])) < 3:
@@ -369,6 +457,9 @@ class ShellBuilder:
             g = SY.role_group(ms["role"])
             if ms["shape"] == "ring":
                 self._wheel(ms)
+                continue
+            if ms.get("screen"):
+                self._screen(ms)
                 continue
             if g != "structure":
                 groups.add(g)
@@ -383,12 +474,15 @@ class ShellBuilder:
                         self.stats["plinths"] = self.stats.get("plinths", 0) + 1
         for it in br["roof_items"]:
             self._roof_item(it)
+        self._mast()
+        self._columns()
+        self._finish_parts()
         self.used["groups"] = [g for g in GN.GROUPS if g in groups]
         self.used["trim"] = self.stats["strips"] > 0
         self.used["glass"] = self.stats["openings"] > 0
         arrs = self.buf.arrays()
         return {"buf": self.buf, "arrays": arrs, "stats": self.stats, "used": self.used,
-                "masses": self.mass_info}
+                "masses": self.mass_info, "parts": self.inst}
 
     def _unpinched(self, ext, holes) -> list[int]:
         """The ring numbers (1 on) of the courts that touch neither the exterior nor another
@@ -461,7 +555,11 @@ class ShellBuilder:
             if br["units"] and ground not in ("storefront", "lobby"):
                 ground = "storefront"
             self.used["ground"] = True
-        rows = mass_rows(ms, g, gm, is_top, ground, self.tall, self.parking, cornice_h)
+        doors = sysname is not None and self.res and \
+            genes.get(f"{g}.balcony", "none") not in ("none", "balconette") and \
+            g in ("base", "body") and ms["floors"] >= 3
+        rows = mass_rows(ms, g, gm, is_top, ground, self.tall, self.parking, cornice_h,
+                         doors)
         reveal = int(round(cont[f"{g}.reveal_m"] * 1000)) if sysname else 0
         corner = int(round(cont[f"{g}.corner_m"] * 1000)) if sysname else 0
         corner = {"heavy": corner * 2, "tight": max(corner // 2, 100)}.get(genes["corner"],
@@ -482,9 +580,17 @@ class ShellBuilder:
                 fa = Facade(a, b, u_run)
                 u_run += fa.L / 1000.0
                 j = self.edge_of.get((k, ms["rid"][r], ms["eidx"][r][i]))
-                fa.j = j
                 fa.rec = br["edges"][j] if j is not None else None
-                fa.regions = fa.rec["regions"] if fa.rec else []
+                if ms["deriv"][r][i]:
+                    # a cut's or an offset's own edge: its neighbor's class, nothing mounted
+                    fa.j = None
+                    fa.regions = []
+                else:
+                    fa.j = j
+                    fa.regions = fa.rec["regions"] if fa.rec else []
+                    if fa.rec is not None:
+                        a0, ux, uy, _ = AR._edge_geom(br, j)
+                        fa.soff = int(round((a[0] - a0[0]) * ux + (a[1] - a0[1]) * uy))
                 prev = ring[(i - 1) % n]
                 pi = 2
                 while prev == a and pi <= n:
@@ -499,11 +605,14 @@ class ShellBuilder:
                 d_out = (fa.ux, fa.uy)
                 d_nx = _unit(b, nxt)
                 # the corner pier only at a real corner; where the ring runs on nearly
-                # straight (a front split in two), just the reveal's clearance
+                # straight (a front split in two), just the reveal's clearance; at a convex
+                # corner at least the reveal, so the pockets of the two facades never meet
                 fa.c0 = max(corner if _turned(d_in, d_out) else 0,
-                            _corner_clear(d_in, d_out, reveal))
+                            _corner_clear(d_in, d_out, reveal),
+                            reveal + EDGE_CLEAR if _convex(d_in, d_out) else 0)
                 fa.c1 = max(corner if _turned(d_out, d_nx) else 0,
-                            _corner_clear(d_out, d_nx, reveal))
+                            _corner_clear(d_out, d_nx, reveal),
+                            reveal + EDGE_CLEAR if _convex(d_out, d_nx) else 0)
                 ok = allow and not _blocked(fa, reveal + EDGE_CLEAR, all_edges)
                 info["openings"] += self._facade(ms, g, fa, rows, wall, sysname, reveal, bay,
                                                  ok)
@@ -519,6 +628,8 @@ class ShellBuilder:
             par = "none"
         if is_top and genes["crown"] == "parapet":
             par = "high"
+        if not is_top and par == "none" and any(any(r) for r in top_open):
+            par = "low"                # a ledge or a terrace on a lower mass: a railing
         if par != "none":
             hp = int(round(cont[f"{g}.parapet_m"] * 1000))
             if par == "low":
@@ -534,7 +645,8 @@ class ShellBuilder:
                             cornice_d, need_out=True):
                 feats.append("cornice")
         bands = genes.get(f"{g}.bands", "none")
-        if bands != "none" and ms["floors"] >= 2:
+        feature = SY.SYSTEMS[sysname].get("feature")
+        if (bands != "none" and ms["floors"] >= 2) or feature == "ribs":
             bd = int(round(cont[f"{g}.band_m"] * 1000))
             bh = int(2.5 * bd + 100)
             n = ms["floors"]
@@ -547,10 +659,14 @@ class ShellBuilder:
                 levels.append(ms["z0"] + (ms["z1"] - ms["z0"]) * f // n)
             if bands == "podium" and g == "base":
                 levels = [ms["z1"] - bh // 2 - 1] if not cornice_h else []
+            if feature == "ribs":
+                # hangar cladding: a rib every 3.5 m up the wall, whatever the floors
+                bd, bh = 120, 220
+                levels = list(range(ms["z0"] + 3500, ms["z1"] - 1499, 3500))
             done = False
             for zf in levels:
                 za, zb = zf - bh // 2, zf + bh // 2
-                if za < STRIP_MIN_Z or any(lo < zb + 20 and hi > za - 20 for lo, hi, _, _ in
+                if za < STRIP_MIN_Z or any(lo < zb + 20 and hi > za - 20 for lo, hi, *_ in
                                            rows):
                     continue
                 ok = self._edge_ok(ms, za, zb)
@@ -558,6 +674,10 @@ class ShellBuilder:
                     done = True
             if done:
                 feats.append("bands")
+                if feature == "ribs":
+                    self.used["parts"].setdefault(g, set()).add("ribs")
+        if feature == "eaves":
+            self._eaves(ms, g, rows)
 
     def _edge_ok(self, ms: dict, za: int, zb: int) -> list[list[bool]]:
         """Per ring edge: whether a strip may leave the footprint there between za and zb
@@ -675,31 +795,40 @@ class ShellBuilder:
                                               sysname, f"{key}|x", 1.0)]
             patch_cols = [x for a_, b_, _ in _merge_ok(pot, fa.c0, fa.c1, L) for x in (a_, b_)]
         units = self.units_by_edge.get(fa.j, []) if fa.j is not None else []
-        mounts = self.mounts.get(fa.j, []) if fa.j is not None else []
-        for lo, hi, kind, f in rows:
+        so = fa.soff
+        mounts = [(m0 - so, m1 - so, z0, z1) for m0, m1, z0, z1 in
+                  (self.mounts.get(fa.j, []) if fa.j is not None else [])]
+        balc = []
+        for lo, hi, kind, f, full, zf in rows:
             ops = []
+            balc.append(self._balcony_bays(fa, ms, g, cuts, lo, full, zf, mounts)
+                        if allow and full > lo + 200 else {})
             if allow:
                 zm = (lo + hi) // 2
                 if kind == "shop" and units:
                     for un in units:
-                        s = int(round(un["at"]["s"] * 1000))
+                        s = int(round(un["at"]["s"] * 1000)) - so
                         w = int(round(un["width_m"] * 1000))
                         a_, b_ = max(s - w // 2 + 250, fa.c0), min(s + w // 2 - 250, L - fa.c1)
                         if b_ - a_ >= 800 and fa.cls((a_ + b_) // 2, zm) not in NO_WINDOW:
-                            ops.append((a_, b_, "storefront"))
+                            ops.append((a_, b_, "storefront", -1))
                             self.stats["storefronts"] += 1
                 else:
                     back = {"win": "glass", "shop": "storefront", "louver": "louver",
-                            "void": "void", "lantern": "glass"}[kind]
-                    w_ = "full" if kind == "lantern" and sysname == "unitized_curtain_wall" \
+                            "void": "void", "lantern": "glass", "pod": "void"}[kind]
+                    w_ = "full" if kind == "lantern" and sysname in SY.CURTAIN \
                         else ("ribbon" if kind == "lantern" else win)
-                    if kind == "shop" and win in ("sparse", "clerestory", "strip") or \
+                    if kind == "shop" and win in ("sparse", "clerestory", "strip", "louver",
+                                                  "pod", "slot") or \
                             kind == "shop" and sysname == "shanty_patchwork":
+                        w_ = "single"
+                    if kind == "louver" and win in ("clerestory", "strip", "sparse", "slit",
+                                                    "patch", "square", "pod"):
                         w_ = "single"
                     for jb, (b0, b1) in enumerate(cuts):
                         self.stats["bays"] += 1
                         for a_, b_ in bay_openings(b0, b1, jb, len(cuts), w_, rhythm, wwr,
-                                                   sysname, f"{key}|{f}", open_p):
+                                                   sysname, f"{key}|{f}", open_p, bay):
                             c = fa.cls((a_ + b_) // 2, zm)
                             if c in NO_WINDOW:
                                 continue
@@ -708,7 +837,7 @@ class ShellBuilder:
                                     continue
                                 cw = (b_ - a_) * 3 // 10
                                 a_, b_ = (a_ + b_) // 2 - cw, (a_ + b_) // 2 + cw
-                            ops.append((a_, b_, back))
+                            ops.append((a_, b_, back, jb))
                 kept = []
                 for op in ops:
                     if any(op[0] < m1 and op[1] > m0 and lo < z1 and hi > z0
@@ -717,25 +846,47 @@ class ShellBuilder:
                         continue
                     kept.append(op)
                 ops = _merge_ok(kept, fa.c0, fa.c1, L)
+                if sysname == "spandrel_ribbon" and kind == "win":
+                    # a ribbon: the bays' openings one long opening, the mullions parts
+                    merged: list[tuple] = []
+                    for op in ops:
+                        if merged and op[0] - merged[-1][1] <= 260:
+                            merged[-1] = (merged[-1][0], op[1], op[2], -1)
+                        else:
+                            merged.append(op)
+                    ops = merged
             c = [0]
-            for a_, b_, _ in ops:
+            for a_, b_, *_ in ops:
                 c += [a_, b_]
             c.append(L)
             if patch_cols is not None:
                 # the facade's patch columns, except inside an opening or within 50 mm of a
                 # column this row has (two columns a millimeter apart could round to one point)
-                extra = [x for x in patch_cols if not any(a_ < x < b_ for a_, b_, _ in ops)
+                extra = [x for x in patch_cols if not any(a_ < x < b_ for a_, b_, *_ in ops)
                          and all(abs(x - y) >= 50 for y in c)]
                 c = sorted(set(c) | set(extra))
             cols.append(c)
-            ops_by_row.append({a_: (b_, back) for a_, b_, back in ops})
+            row_ops = {}
+            for k_, (a_, b_, back, jb) in enumerate(ops):
+                # the wall beside the opening, halved where a neighbor shares the pier
+                pl = a_ - (ops[k_ - 1][1] if k_ else 0)
+                pr = (ops[k_ + 1][0] if k_ + 1 < len(ops) else L) - b_
+                pl = pl // 2 if k_ else pl - fa.c0 // 2
+                pr = pr // 2 if k_ + 1 < len(ops) else pr - fa.c1 // 2
+                row_ops[a_] = (b_, back, jb, pl, pr)
+            ops_by_row.append(row_ops)
             n_open += len(ops)
         self.stats["openings"] += n_open
-        self._wall(ms, fa, rows, cols, ops_by_row, wall, reveal, key)
+        self._wall(ms, fa, rows, cols, ops_by_row, wall, reveal, key, g, sysname, cuts, balc)
+        if allow and sysname:
+            self._lines(fa, ms, g, sysname, cuts, rows, reveal, mounts)
+        if sysname and ms["z0"] <= 50 and not ms.get("arcade"):
+            self._canopy(fa, ms, mounts)
         return n_open
 
     def _wall(self, ms: dict, fa: Facade, rows: list, cols: list, ops_by_row: list,
-              wall: str, reveal: int, key: str) -> None:
+              wall: str, reveal: int, key: str, g: str = "body", sysname=None,
+              cuts=(), balc=()) -> None:
         buf = self.buf
         pl = buf.plane((fa.nx, fa.ny, 0.0), (fa.a[0], fa.a[1], 0), (fa.ux, fa.uy, 0.0),
                        (0.0, 0.0, 1.0), fa.u0, 0.0)
@@ -804,15 +955,31 @@ class ShellBuilder:
         prev, pz = [0, L], z0
         o = (int(round(-fa.nx * reveal)), int(round(-fa.ny * reveal)))
         base = self.gm["genes"]["base"]
-        plinth = base if rows and z0 <= 50 and base != "wall" and wall != "structure" else None
+        # an industrial wall on the ground: its dado line (the same on every facade of the
+        # mass, so the corners stay welded) where the first row starts 0.3 m above it
+        dado = 0
+        if sysname in SY.INDUSTRIAL and z0 <= 50 and self.gm["genes"]["dado"] != "none":
+            dz = int(round(self.gm["cont"]["dado_m"] * 1000))
+            if (rows[0][0] if rows else z1) >= z0 + dz + 300:
+                dado = dz
+                self.used["dado"] = True
+        plinth = base if rows and z0 <= 50 and base != "wall" and wall != "structure" and \
+            not dado else None
         if plinth:
             self.used["base"] = True        # the strip under the ground row in its finish
-        for (lo, hi, kind, f), c, ops in zip(rows, cols, ops_by_row):
+        if dado:
+            zipper(prev, pz, [0, L], z0 + dado, self.gm["genes"]["dado"])
+            prev, pz = [0, L], z0 + dado
+        for row, c, ops, bset in zip(rows, cols, ops_by_row, balc or [{}] * len(rows)):
+            lo, hi, kind, f = row[:4]
             zipper(prev, pz, c, lo, plinth if pz == z0 else None)
             for i in range(len(c) - 1):
                 a_, b_ = c[i], c[i + 1]
                 if a_ in ops and ops[a_][0] == b_:
                     self._pocket(fa, a_, b_, lo, hi, o, ops[a_][1], wall, key, f, i)
+                    if sysname:
+                        self._fill(fa, ms, g, sysname, row, a_, b_, ops[a_], reveal, wall,
+                                   key, i, cuts, bset)
                     continue
                 s = slot_at((a_ + b_) // 2, (lo + hi) // 2, c)
                 tri(s, (a_, lo), (b_, lo), (b_, hi))
@@ -853,6 +1020,519 @@ class ShellBuilder:
         win = int(_u(key, f"win{f}.{i}") * 256) & 255
         buf.quad(back, pane, Bl0, Br0, Br1, Bl1,
                  uv1=[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], win=win)
+
+    # -- AG2: what fills an opening -----------------------------------------------------
+
+    def _frame(self, fa: Facade, style: str, w: int, h: int, r: int, s: int, z: int,
+               sill=None, lintel=None) -> None:
+        fw, fd = FRAMES[style]
+        p = {"style": style, "w": PT.q(w), "h": PT.q(h), "r": r, "fw": fw, "fd": fd}
+        if sill:
+            p["sill"] = sill
+        if lintel:
+            p["lintel"] = lintel
+        self.parts.on(fa, "window", p, s, z)
+
+    def _balcony_bays(self, fa: Facade, ms: dict, g: str, cuts, lo: int, full: int, zf: int,
+                      mounts) -> dict:
+        """{bay: (b0, b1, depth)} of a door row's balconies: by the pattern gene, on bays
+        wide enough, as deep as the facade's room allows (`Facade.room`), off every mount."""
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        style = genes.get(f"{g}.balcony", "none")
+        if style in ("none", "balconette") or zf < DOOR_MIN_Z or not cuts:
+            return {}
+        pat = genes[f"{g}.balcony_pat"]
+        n = len(cuts)
+        want = int(round(cont[f"{g}.balcony_m"] * 1000))
+        out = {}
+        for jb, (b0, b1) in enumerate(cuts):
+            if pat == "alternate" and jb % 2:
+                continue
+            if pat == "columns" and (jb % 3 != 1 if n >= 3 else jb != n // 2):
+                continue
+            if pat == "ends" and jb not in (0, n - 1):
+                continue
+            if b1 - b0 - 160 < 900:
+                continue
+            d = PT.q(min(want, fa.room((b0 + b1) // 2, zf + 1000, 1200, 1500)))
+            if d < 600:
+                continue
+            if any(b0 < m1 and b1 > m0 and zf - 300 < z1 and zf + 1300 > z0
+                   for m0, m1, z0, z1 in mounts):
+                continue
+            out[jb] = (b0, b1, d)
+        return out
+
+    def _fill(self, fa: Facade, ms: dict, g: str, sysname: str, row: tuple, a_: int,
+              b_: int, op: tuple, reveal: int, wall: str, key: str, i: int, cuts,
+              bset: dict) -> None:
+        """The parts of one opening: its frame (or louver panel, pod, board, infill), door
+        row balcony or spandrel panel, the system's own (shutters, egg crate, screen blades,
+        ribbon units and sunshades, balconettes) and what grime and low wealth add."""
+        lo, hi, kind, f, full, zf = row
+        _, back, jb, pl, pr = op
+        w, h = b_ - a_, hi - lo
+        if w < 300 or h < 300 or kind == "void":
+            return
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        feat = SY.SYSTEMS[sysname].get("feature")
+        used = self.used["parts"].setdefault(g, set())
+        P = self.parts
+        mid = (a_ + b_) // 2
+        r = reveal
+        qw, qh = PT.q(w), PT.q(h)
+        if kind == "louver":
+            P.on(fa, "louver", {"w": qw, "h": qh, "r": r, "n": max(3, min(16, h // 220)),
+                                "bd": 140, "tilt": 30}, mid, lo)
+            if feat == "louvers":
+                used.add("louvers")
+            return
+        if kind == "pod":
+            if lo >= STRIP_MIN_Z:
+                # one capsule for the whole building (as a capsule tower's are), centered
+                # in its bay; a bay narrower than it takes a capsule of its own width
+                pw = min(PT.q(cont[f"{g}.bay_m"] * 800), qw)
+                ph = PT.q(min(h, 2800))
+                P.on(fa, "pod", {"w": pw, "h": ph, "r": r,
+                                 "d": PT.q(cont[f"{g}.pod_m"] * 1000),
+                                 "pr": PT.q(min(pw, ph) * 3 // 10)}, mid, lo)
+                used.add("capsules")
+            else:
+                self._frame(fa, "fixed", w, h, r, mid, lo)
+            return
+        if kind in ("shop", "lantern"):
+            self._frame(fa, "unit", w, h, r, mid, lo)
+            return
+        curtain = sysname in SY.CURTAIN
+        irr = self.irr
+        u1 = _u(key, f"irr{f}.{i}")
+        if not curtain and irr > 0:
+            if u1 < 0.10 * irr:
+                P.on(fa, "panel", {"style": "board", "w": qw, "h": qh}, mid, lo)
+                self.used["irregular"] = True
+                return
+            if u1 < 0.14 * irr:
+                P.on(fa, "panel", {"style": "infill", "w": qw, "h": qh, "r": r,
+                                   "slot": wall if not wall.startswith("patch") else
+                                   "patch_panel"}, mid, lo)
+                self.used["irregular"] = True
+                return
+            if feat == "addons" and lo - 150 >= STRIP_MIN_Z and u1 < 0.14 * irr + 0.10:
+                P.on(fa, "panel", {"style": "addon", "w": PT.q(w + 400),
+                                   "h": PT.q(min(h + 300, 2400)), "d": 500}, mid, lo - 150)
+                used.add("addons")
+                self.used["irregular"] = True
+                return
+        style = genes[f"{g}.frame"]
+        if irr > 0 and _u(key, f"odd{f}.{i}") < 0.12 * irr:
+            style = GN.pick(key, f"oddk{f}.{i}", [x for x in ODD_FRAMES if x != style], None,
+                            "ag2.shell")
+            self.used["irregular"] = True
+        door = full > lo + 200
+        sills = genes[f"{g}.sills"] == "stone"
+        if feat == "ribbon":
+            self._ribbon(fa, g, a_, b_, lo, hi, r, cuts)
+        else:
+            self._frame(fa, style, w, h, r, mid, lo,
+                        (50, 70, 60) if sills and not door else None,
+                        (25, 220, 90) if sysname == "punched_brick" else None)
+            used.add("frame")
+            if sills:
+                used.add("sills")
+        if door:
+            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2:
+                # the bay's balcony, once (by its first opening, where a bay has two)
+                b0, b1, d = bset[jb]
+                st = genes[f"{g}.balcony"]
+                p = {"style": st, "w": PT.q(b1 - b0 - 160), "d": d, "t": 200, "rh": 1050}
+                if irr > 0 and _u(key, f"encl{f}.{jb}") < 0.6 * irr:
+                    hf = (ms["z1"] - ms["z0"]) // max(ms["floors"], 1)
+                    p.update(style="enclosed", eh=PT.q(hf - 250))
+                    self.used["irregular"] = True
+                P.on(fa, "balcony", p, (b0 + b1) // 2, zf)
+                used.add("balcony")
+            elif jb not in bset:
+                P.on(fa, "spandrel", {"w": qw, "h": PT.q(full - lo), "r": r}, mid, lo)
+        if feat == "shutters" and h >= 900:
+            sw = PT.q(w // 2)
+            if pl >= sw + 80 and pr >= sw + 80:
+                P.on(fa, "shutter", {"w": sw, "h": qh}, a_ - 40 - sw // 2, lo)
+                P.on(fa, "shutter", {"w": sw, "h": qh}, b_ + 40 + sw // 2, lo)
+                used.add("shutters")
+        if feat == "eggcrate" and genes.get(f"{g}.crate") == "eggcrate" and \
+                lo - 150 >= STRIP_MIN_Z and pl >= 170 and pr >= 170:
+            P.on(fa, "panel", {"style": "eggcrate", "w": qw, "h": qh, "d": 400, "t": 150,
+                               "slot": wall}, mid, lo)
+            used.add("eggcrate")
+        if feat == "screen" and lo - 150 >= STRIP_MIN_Z:
+            nb = 3 if w >= 1800 else 2
+            pat = genes.get(f"{g}.blades", "flat")
+            for k in range(nb):
+                s = a_ + w * (2 * k + 1) // (2 * nb)
+                ang = 0 if pat == "flat" else ((15 if (k + f) % 2 else -15)
+                                               if pat == "alternate" else WAVE[(k + jb + f) % 8])
+                P.on(fa, "panel", {"style": "screen", "w": PT.q(min(w // nb, 600)),
+                                   "h": PT.q(h + 300), "t": 30, "off": 330}, s, lo - 150,
+                     extra_deg=ang)
+            used.add("screen")
+        if genes.get(f"{g}.balcony") == "balconette" and genes[f"{g}.window"] == "tall" and \
+                lo >= STRIP_MIN_Z:
+            P.on(fa, "balconette", {"w": qw, "rh": 900}, mid, lo)
+            used.add("balcony")
+        if curtain or irr <= 0:
+            return
+        use = self.br["building"]["use"]
+        if lo >= STRIP_MIN_Z and use in ("residential", "hotel", "office", "retail") and \
+                w >= 800 and jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr:
+            P.on(fa, "ac", {"w": 660, "h": 420, "do": 350, "di": min(250, max(r - 30, 20))},
+                 mid, full if door else lo)
+            self.used["irregular"] = True
+        if f + ms.get("f0", 0) <= 1 and lo < 6000 and jb not in bset and \
+                _u(key, f"gr{f}.{i}") < 0.9 * irr:
+            P.on(fa, "grille", {"w": qw, "h": qh}, mid, lo)
+            self.used["irregular"] = True
+        if self.res and lo >= STRIP_MIN_Z and pr >= 900 and _u(key, f"dish{f}.{i}") < 0.06 * irr:
+            P.on(fa, "dish", {"rd": 400}, b_ + 450, lo + h // 2 - 400)
+            self.used["irregular"] = True
+
+    def _ribbon(self, fa: Facade, g: str, a_: int, b_: int, lo: int, hi: int, r: int,
+                cuts) -> None:
+        """A ribbon window's units, one per bay it spans, and their sunshades."""
+        shade = self.gm["genes"].get(f"{g}.shade") == "blade" and hi + 140 >= STRIP_MIN_Z
+        for b0, b1 in cuts:
+            x0, x1 = max(b0, a_), min(b1, b_)
+            if x1 - x0 < 400:
+                continue
+            self._frame(fa, "ribbon", x1 - x0, hi - lo, r, (x0 + x1) // 2, lo)
+            if shade and fa.room((x0 + x1) // 2, hi + 140, 450, 450) >= 450:
+                self.parts.on(fa, "shade", {"L": PT.q(x1 - x0 - 60), "d": 450, "t": 60},
+                              (x0 + x1) // 2, hi + 200)
+        self.used["parts"].setdefault(g, set()).add("ribbon")
+
+    # -- AG2: the bay lines --------------------------------------------------------------
+
+    def _lines(self, fa: Facade, ms: dict, g: str, sysname: str, cuts, rows, reveal: int,
+               mounts) -> None:
+        """The system's parts on a facade's bay lines: mullion caps, fins, exoskeleton and
+        diagrid members, timber frames."""
+        feat = SY.SYSTEMS[sysname].get("feature")
+        if feat not in ("caps", "fins", "exo", "diagrid", "timber") or not cuts or not rows:
+            return
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        P = self.parts
+        used = self.used["parts"].setdefault(g, set())
+        lines = [cuts[0][0]] + [b1 for _, b1 in cuts]
+        zb = max(ms["z0"], rows[0][0] - 150)
+        zt = min(ms["z1"], rows[-1][1] + 150)
+
+        def free(s, half, za, zz):
+            return not any(s - half < m1 and s + half > m0 and za < z1 and zz > z0
+                           for m0, m1, z0, z1 in mounts)
+        if feat == "caps":
+            h = PT.q(zt - zb)
+            if h >= 1000:
+                for s in lines:
+                    if free(s, 60, zb, zb + h):
+                        P.on(fa, "cap", {"dir": "v", "w": 70, "p": 90, "h": h}, s, zb)
+                used.add("caps")
+        elif feat == "fins":
+            z0f = max(zb, STRIP_MIN_Z)
+            h = PT.q(zt - z0f)
+            if h >= 2000:
+                d = PT.q(cont[f"{g}.fin_m"] * 1000)
+                ang = int(genes.get(f"{g}.fin_deg", 0))
+                for s in lines:
+                    if free(s, d, z0f, z0f + h):
+                        P.on(fa, "fin", {"t": 100, "d": d, "h": h}, s, z0f, extra_deg=ang)
+                used.add("fins")
+        elif feat in ("exo", "diagrid"):
+            if self._members(fa, ms, g, feat, lines, reveal, mounts):
+                used.add(feat)
+        elif feat == "timber":
+            if self._timber(fa, ms, g, cuts, rows):
+                used.add("timber")
+
+    def _members(self, fa: Facade, ms: dict, g: str, feat: str, lines, reveal: int,
+                 mounts) -> bool:
+        """An exoskeleton (columns on every other bay line, beams every few floors, braces
+        by the brace gene) or a diagrid (diagonals over modules of two bays and a few
+        floors, edge columns, ring beams), in front of a deep-set curtain wall."""
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        P = self.parts
+        L = fa.L
+        w = PT.q(cont[f"{g}.member_m"] * 1000)
+        y0, y1 = -120, max(reveal - 40, 60)
+        e = w * 6 // 10 + 100              # a sheared diagonal's half width at its node
+        lo_s, hi_s = max(lines[0], e), min(lines[-1], L - e)
+        if hi_s - lo_s < 3000 or any(m0 < hi_s and m1 > lo_s for m0, m1, _, _ in mounts):
+            return False
+        z0, z1, n = ms["z0"], ms["z1"], max(ms["floors"], 1)
+        nf = int(genes.get(f"{g}.node_f", 3))
+        lev = [z0 + (z1 - z0) * f // n for f in range(0, n, nf)]
+        if z1 - lev[-1] < (z1 - z0) // n and len(lev) > 1:
+            lev.pop()
+        lev.append(z1)
+
+        def mem(dx, dz, ww, s, z):
+            P.on(fa, "member", {"dx": dx, "dz": dz, "w": ww, "y0": y0, "y1": y1}, s, z)
+        if feat == "exo":
+            cols = sorted({min(max(x, lo_s), hi_s) for x in lines[::2]} | {lo_s, hi_s})
+            cols = [x for k, x in enumerate(cols) if k == 0 or x - cols[k - 1] >= 1500]
+            brace = genes.get(f"{g}.brace", "none")
+            for x in cols:
+                mem(0, PT.q(z1 - z0), w, x, z0)
+            for j, z in enumerate(lev[1:], 1):
+                for k in range(len(cols) - 1):
+                    sa, sb = cols[k], cols[k + 1]
+                    mem(PT.q(sb - sa), 0, PT.q(w * 6 // 10), sa, z)
+                    if brace == "x" or (brace == "alternate" and (k + j) % 2 == 0):
+                        dz = PT.q(z - lev[j - 1])
+                        mem(PT.q(sb - sa), dz, PT.q(w // 2), sa, lev[j - 1])
+                        mem(-PT.q(sb - sa), dz, PT.q(w // 2), sb, lev[j - 1])
+            return True
+        bay = int(round(cont[f"{g}.bay_m"] * 1000))
+        m = max(1, int(round((hi_s - lo_s) / max(2 * bay, 2000))))
+        xs = [lo_s + (hi_s - lo_s) * k // m for k in range(m + 1)]
+        for x in (lo_s, hi_s):
+            mem(0, PT.q(z1 - z0), w, x, z0)
+        for j in range(len(lev) - 1):
+            dz = PT.q(lev[j + 1] - lev[j])
+            for k in range(m):
+                dx = PT.q(xs[k + 1] - xs[k])
+                mem(dx, dz, PT.q(w * 7 // 10), xs[k], lev[j])
+                mem(-dx, dz, PT.q(w * 7 // 10), xs[k + 1], lev[j])
+            if j > 0:
+                mem(PT.q(hi_s - lo_s), 0, PT.q(w // 2), lo_s, lev[j])
+        return True
+
+    def _timber(self, fa: Facade, ms: dict, g: str, cuts, rows) -> bool:
+        """A timber frame over the upper floors: posts on the bay lines, beams at the floor
+        lines and over the openings, crosses under the sills (`pattern`)."""
+        pat = self.gm["genes"].get(f"{g}.pattern", "posts")
+        P = self.parts
+        z0, z1, n = ms["z0"], ms["z1"], max(ms["floors"], 1)
+        lines = [cuts[0][0]] + [b1 for _, b1 in cuts]
+        made = False
+
+        def mem(dx, dz, ww, s, z):
+            P.on(fa, "member", {"dx": dx, "dz": dz, "w": ww, "y0": -40, "y1": 0,
+                                "slot": "timber"}, s, z)
+        for lo, hi, kind, f, full, zf in rows:
+            if f + ms.get("f0", 0) == 0 or kind != "win":
+                continue
+            zn = z0 + (z1 - z0) * (f + 1) // n
+            for s in lines:
+                mem(0, PT.q(zn - zf), 160, s, zf)
+            for jb, (b0, b1) in enumerate(cuts):
+                mem(PT.q(b1 - b0), 0, 180, b0, zf + 90)
+                mem(PT.q(b1 - b0), 0, 160, b0, hi + 90)
+                if lo - zf >= 700 and (pat == "cross" or
+                                       (pat == "braced" and jb in (0, len(cuts) - 1))):
+                    dz = PT.q(lo - 90 - zf - 180)
+                    mem(PT.q(b1 - b0), dz, 120, b0, zf + 180)
+                    mem(-PT.q(b1 - b0), dz, 120, b1, zf + 180)
+            made = True
+        return made
+
+    # -- AG2: canopies, eaves, crowns, arcade columns ------------------------------------
+
+    def _canopy(self, fa: Facade, ms: dict, mounts) -> None:
+        """A podium canopy over a ground floor's front, street or plaza edge (towers of six
+        floors or more), 3 m up at least, as deep as the room allows, where nothing hangs
+        near its height."""
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        if genes.get("canopy") != "podium" or self.br["building"]["floors"] < 6 or \
+                fa.j is None:
+            return
+        n = max(ms["floors"], 1)
+        zc = ms["z0"] + (ms["z1"] - ms["z0"]) // n if n >= 2 else ms["z1"]
+        if not 3300 <= zc - ms["z0"] <= 7000:
+            return
+        L = fa.L
+        s0, s1 = fa.c0 + 300, L - fa.c1 - 300
+        if s1 - s0 < 5000:
+            return
+        d = PT.q(min(cont["canopy_m"] * 1000, fa.room((s0 + s1) // 2, 1500, 1500, 2000)))
+        if d < 800:
+            return
+        so = fa.soff
+        for m0, m1, za, zb, kind in self.marks.get(fa.j, []):
+            if m0 - so < s1 and m1 - so > s0 and za < zc + 800 and zb > zc - 1700:
+                return
+        if any(m0 < s1 and m1 > s0 and z0 < zc + 800 and z1 > zc - 1700
+               for m0, m1, z0, z1 in mounts):
+            return
+        self.parts.on(fa, "canopy", {"L": PT.q(s1 - s0), "d": d, "t": 300}, (s0 + s1) // 2,
+                      zc - 150)
+        if "canopy" not in self.used["articulation"]:
+            self.used["articulation"].append("canopy")
+
+    def _eaves(self, ms: dict, g: str, rows) -> None:
+        """Tiled eaves: a pent roof round the mass at every floor line 3 m up or more,
+        between the rows' openings."""
+        n = ms["floors"]
+        made = False
+        for f in range(1, n):
+            zf = ms["z0"] + (ms["z1"] - ms["z0"]) * f // n
+            zt = zf - 60
+            zl, zbot = zt - 300, zt - 380
+            if zbot < STRIP_MIN_Z or any(lo < zt + 20 and hi > zbot - 20
+                                         for lo, hi, *_ in rows):
+                continue
+            ok = self._edge_ok(ms, zbot, zt)
+            for r, ring0 in enumerate(ms["rings"]):
+                n0 = len(ring0)
+                keep = [i for i in range(n0) if ring0[i] != ring0[(i + 1) % n0]]
+                ring = [ring0[i] for i in keep]
+                m = [ok[r][i] for i in keep]
+                if len(ring) < 3 or not all(m):
+                    continue
+                res = RG.strip(ring, 0, len(ring), 550, 0, 0)
+                if res is None:
+                    continue
+                if self._sloped(ring, res[0], res[1], zt, zl, zbot, "tile"):
+                    made = True
+        if made:
+            self.used["parts"].setdefault(g, set()).add("eaves")
+            self.stats["eaves"] = self.stats.get("eaves", 0) + 1
+
+    def _sloped(self, ring, outer, hole, zt: int, zl: int, zb: int, slot: str) -> bool:
+        """A closed sloped strip: flat underneath at zb, its top falling from zt on the
+        ring (the wall) to zl on the outer edge."""
+        holes = [hole] if hole is not None else []
+        try:
+            tris = triangulate(outer, holes, keep_straight=True)
+        except TriangulationError:
+            return False
+        if not tris:
+            return False
+        pts = list(outer) + [p for h in holes for p in h]
+        top = [zt if RG.inside(p, ring) == 0 else zl for p in pts]
+        buf = self.buf
+        buf.new_part()
+        PT.face(buf, slot, [(p[0], p[1], zb) for p in pts], (0.0, 0.0, -1.0),
+                [(t[0], t[2], t[1]) for t in tris])
+        for t in tris:
+            a, b, c = ((pts[k][0], pts[k][1], top[k]) for k in t)
+            nn = PT._cross(PT._sub(b, a), PT._sub(c, a))
+            ln = math.sqrt(nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2])
+            if ln == 0:
+                continue
+            PT.face(buf, slot, [a, b, c], (nn[0] / ln, nn[1] / ln, nn[2] / ln))
+        base = 0
+        for rg in [outer] + holes:
+            k = len(rg)
+            for i in range(k):
+                p, q = rg[i], rg[(i + 1) % k]
+                tp, tq = top[base + i], top[base + (i + 1) % k]
+                dx, dy = q[0] - p[0], q[1] - p[1]
+                L = math.sqrt(dx * dx + dy * dy)
+                if L == 0:
+                    continue
+                PT.face(buf, slot, [(p[0], p[1], zb), (q[0], q[1], zb), (q[0], q[1], tq),
+                                    (p[0], p[1], tp)], (dy / L, -dx / L, 0.0))
+            base += k
+        return True
+
+    def _screen(self, ms: dict) -> None:
+        """A halo crown: the top floor a screen of fins inside the mass round an open roof,
+        tied by a ring beam, a penthouse in the middle."""
+        ring = RG.clean(ms["rings"][0])
+        n = len(ring)
+        h = PT.q(ms["z1"] - ms["z0"] + 900)
+        for i in range(n):
+            a, b = ring[i], ring[(i + 1) % n]
+            fa = Facade(a, b, 0.0)
+            if fa.L < 2400:
+                continue
+            m = max(1, (fa.L - 1200) // 1100)
+            for k in range(m + 1):
+                self.parts.on(fa, "fin", {"t": 100, "d": 700, "h": h, "inward": True},
+                              600 + (fa.L - 1200) * k // m, ms["z0"])
+        res = RG.strip(ring, 0, n, 0, -700, 0)
+        if res is not None:
+            self.buf.new_part()
+            self._extrude(res[0], res[1], ms["z0"] + h - 300, ms["z0"] + h, "fin")
+        inner = RG.offset_ring(ring, [-4000] * n)
+        if inner is not None and RG.is_simple(inner) and len(inner) >= 3 and \
+                _thickness(inner) >= 3000:
+            self.buf.new_part()
+            self._extrude(inner, None, ms["z0"], ms["z1"] - 600, "structure")
+        self.mass_info.append({"mass": ms["k"], "group": "top", "system": None, "rows": 0,
+                               "openings": 0, "crown": "halo"})
+
+    def _mast(self) -> None:
+        """A mast or a spire on the highest roof (the crown gene), its middle clear of roof
+        items."""
+        crown = self.gm["genes"].get("crown")
+        if crown not in ("mast", "spire") or not self.tall or self.br["building"]["landmark"]:
+            return
+        cand = [ms for ms in self.masses if ms["shape"] == "prism" and not ms.get("screen")
+                and ms["z1"] - ms["z0"] >= 50]
+        if not cand:
+            return
+        top = max(cand, key=lambda ms: (ms["z1"], -ms["k"]))
+        ring = RG.clean(top["rings"][0])
+        c = _centroid(ring)
+        if len(ring) < 3 or RG.in_poly(c, top["rings"]) != 1 or _thickness(ring) < 8000:
+            return
+        for it in self.br["roof_items"]:
+            x, y = it["position"][0] * 1000, it["position"][1] * 1000
+            if (x - c[0]) ** 2 + (y - c[1]) ** 2 < 3000 ** 2:
+                return
+        H = int(round(float(self.br["building"]["height_m"]) * 1000))
+        if crown == "mast":
+            p = {"style": "mast", "h": PT.q(min(max(H // 10, 8000), 30000))}
+        else:
+            p = {"style": "spire", "h": PT.q(min(max(H * 18 // 100, 12000), 45000))}
+        self.parts.add("mast", p, c[0], c[1], top["z1"], 1.0, 0.0)
+        self.used["crown"] = True
+
+    def _columns(self) -> None:
+        """The columns of every arcade, on the facade line of the floors above."""
+        if not self.arcades:
+            return
+        bay = int(round(self.gm["cont"]["body.bay_m"] * 1000))
+        spacing = max(4000, 2 * bay)
+        for ar in self.arcades:
+            ring = ar["ring"]
+            n = len(ring)
+            for i in range(n):
+                if not ar["ok"][i]:
+                    continue
+                a, b = ring[i], ring[(i + 1) % n]
+                ux, uy, L = AR._unit(a, b)
+                e = 450
+                m = max(1, -(-(int(L) - 2 * e) // spacing))
+                for k in range(m + 1):
+                    s = e + (int(L) - 2 * e) * k // m
+                    self.parts.add("column", {"w": 500, "h": PT.q(ar["z1"])},
+                                   int(round(a[0] + ux * s)), int(round(a[1] + uy * s)),
+                                   ar["z0"], ux, uy)
+
+    def _finish_parts(self) -> None:
+        """Parts placed fewer than `parts.INSTANCE_MIN` times merged into the shell; the
+        others are the building's instances."""
+        inst = []
+        merged = 0
+        for k in sorted(self.parts.defs):
+            fam, p = self.parts.defs[k]
+            at = self.parts.at[k]
+            b, arrs = PT.mesh(fam, p)
+            if not arrs:
+                continue
+            if len(at) < PT.INSTANCE_MIN and all(PT.survives(arrs, a) for a in at):
+                for a in at:
+                    PT.merge_into(self.buf, b, arrs, a)
+                merged += len(at)
+                continue
+            inst.append({"family": fam, "params": p, "type": PT.type_of(fam, p),
+                         "node": PT.node_name(fam, p), "at": at,
+                         "triangles": int(sum(len(a["tri"]) for a in arrs.values()))})
+        self.inst = inst
+        self.stats["parts_merged"] = merged
+        self.stats["parts_instanced"] = sum(len(x["at"]) for x in inst)
+        self.stats["part_kinds"] = len(inst)
 
     def _caps(self, ms: dict, wall: str) -> None:
         rings = [RG.clean(r) for r in ms["rings"]]

@@ -865,6 +865,52 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
   (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
   generator change: the code hash is in every tile's hash.
 
+AG2 (facades) is in place (tests `tests/assetgen/test_ag_facades.py`):
+- **Parts** (`buildings/parts.py`): windows by frame style (with sills and lintels),
+  mullion caps, spandrel panels, balconies (solid, rail, glass, enclosed), louver panels,
+  fins, sunshades, shutters, grilles, boards, infills, screen blades, egg crates, add-on
+  boxes, structural members (columns, beams, diagonals), capsule pods, AC units, dishes,
+  arcade columns, balconettes, podium canopies, masts and spires; each in its own frame
+  (x along the facade, y into the wall, z up, mm) from parameters in whole centimeters and
+  5 degree steps, named `part.<family>.<style>.h<hash>` (a name may not end in digits:
+  Blender reads them as a copy number). A part placed 8 times or more in a building is an
+  instance, else merged into the shell (`merge_into`) unless a thin triangle would fold
+  when turned and rounded (`survives`); every family has a reach for the envelope check
+  (`REACH`: flush, strip, deep, roof). Per tile `parts/<tile>.glb` holds the tile's
+  instanced part meshes; the records and the contribution hold the transforms.
+- **Systems** (`systems.py`): all 19 of the presets' systems are built (`FALLBACK` empty;
+  `FLOORS` keeps some to a size of building; `TYPE_SYSTEM` may be weights), each with its
+  frame styles, sills, balconies and feature (`FEATURE_GENES`); new wall and part slots,
+  tints only from the six CPD channels the exporter reads.
+- **Articulation** (`buildings/articulate.py`, by era: `systems.ARTICULATION`): corner
+  chamfers and rounds, setback ledges, stepped and halo crowns, arcades under a
+  cantilevered first floor; the shell adds masts and spires, podium canopies, eaves and
+  ribs. Split masses keep the brief's mass index; cut and offset edges are `deriv`;
+  `Facade.soff` maps a facade's s onto its brief edge; `Facade.room` is how far a balcony
+  or canopy may reach (street or avenue sidewalk 1.2 to 1.5 m, open ground 1.5 to 2 m,
+  never over an alley, a service road or a highway).
+- **Grammar** (`shell.py`): punched windows take their width from the genome's bay (one
+  size across the facades, 5 cm steps); door rows where balconies go (spandrel panels in
+  the other bays); pockets at convex corners start a reveal plus 6 cm from the corner;
+  irregularity by `irreg` (grime times low wealth): boards, infills, replaced frames, AC
+  units, grilles, dishes, closed-in balconies, add-on boxes; a shed of one tall floor with
+  a blank ground gets a clerestory; industrial walls on the ground a block or concrete dado
+  (`dado`, `dado_m`) and industrial roofs a palette of their own (`ROOFS_INDUSTRIAL`), so
+  plain sheds differ in their thumbnails.
+- **Checks**: `asset_unique` also compares contact-sheet thumbnails (`buildings/thumb.py`:
+  a 64 px z-buffered rasterizer, a 1,504-bit hash of 16 x 16 blocks: a difference
+  hash and each block's tone in four steps, at least 8 bits apart; a
+  building filling under 10% of its thumbnail, a long thin shed, is told by genes alone), `asset_budget` per
+  building class (`asset_checks.CLASSES`) and per city (section 11's estimate plus 40% for
+  parts, 3 instances per bay), `asset_meshes` every part mesh, `asset_envelope` every
+  instanced part's box.
+- **Previews**: parts drawn by one geometry-node instancer per pack that picks each
+  point's mesh from the pack's collection (tints as point attributes, materials
+  `ag_<slot>.inst`; a node group per part mesh, or the glTF importer's per-mesh deletions,
+  are quadratic in Blender: the importer's temporary objects go in one batch); whole cities
+  at 16 samples; `--views towers` (the tallest building of each era up close);
+  `--no-parts`. Results: `docs/progress/AG2/`.
+
 AG8 (props, plants and signs) is in place, in `assetgen/props/` (tests
 `tests/assetgen/test_ag_props.py`):
 - **`assetgen props BUILD [--spec S] [--workers N] [--sheets DIR]`** (`build.py`; also the

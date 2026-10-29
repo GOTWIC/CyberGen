@@ -217,7 +217,7 @@ format:
   complex until AG3 adds the ground band.
 - **Proxy**: the building's far proxy, its masses as prisms (7 to 500 triangles), a Nanite
   fallback and HLOD input (AG9 sets up the HLOD layers); as a static mesh of its own.
-- **Parts**: empty until AG2 (hierarchical instanced meshes per building and kind).
+- **Parts**: AG2's instanced parts (next section); empty in AG1.
 - **Hash**: the asset hash (brief, generator version, material library); unchanged hash,
   unchanged packs, so a re-import may skip the key.
 
@@ -265,6 +265,46 @@ AG7; `citygen/unreal.py` `stage2`, `citygen/ue/import_city.py`):
   on the component (AG1's lists are empty; AG7's container stacks use it).
 - **Proxies**: imported as static meshes (Nanite off, no collision), not spawned: ready
   for HLOD (AG9).
+
+### From AG2: facade parts
+
+`assetgen build` (AG2) fills each building entry's `parts` with its instanced facade parts
+and writes their meshes beside the shells, one pack per tile: `parts/<tile>.glb`, a root
+node per part mesh at the origin, named by the hash of the part's type and parameters
+(`part.window.casement.h29779f5c63`), so every building of the tile whose part has the same
+parameters uses the same mesh. A part a building places fewer than 8 times is merged into
+its shell instead and not listed (as is one that would fold a thin triangle when turned to
+its facade and rounded to the millimeter).
+
+```json
+{"key": "d03.lot.e512n88.bld", "...": "...", "instances": 412,
+ "parts": [{"kind": "part.window.casement.h29779f5c63", "type": "part.window.casement",
+            "glb": "parts/t+02+00.glb", "node": "part.window.casement.h29779f5c63",
+            "asset": "part_window_casement_h29779f5c63", "count": 96, "triangles": 80,
+            "xforms": [[-6.12, 4.5, 3.35, 135.0], "..."], "building": "d03.lot.e512n88.bld"}]}
+```
+
+- **Kinds**: `kind` is the part's node name, unique within the entry (a building can have
+  several window sizes of one type); `type` the semantic type for tags and stage 3 and 4
+  (`part.window.<style>`, `part.cap.mullion`, `part.spandrel.panel`, `part.balcony.<style>`,
+  `part.louver.panel`, `part.fin.vertical`, `part.fin.crown`, `part.shade.blade`,
+  `part.shutter.open`, `part.grille.bars`, `part.panel.<board|infill|screen|eggcrate|addon>`,
+  `part.member.<column|beam|diagonal>`, `part.pod.capsule`, `part.ac.window`,
+  `part.dish.satellite`, `part.column.arcade`, `part.balconette.rail`,
+  `part.canopy.podium`, `part.mast.<mast|spire>`).
+- **Transforms**: `xforms` are `[x, y, z, yaw]` in the building frame (meters relative to
+  the entry's `pivot`, yaw in degrees counterclockwise about z), as AG7's container parts:
+  an HISM instance at `pivot + (x, y, z)` turned by yaw (Unreal: `(100 x, -100 y, 100 z)`,
+  yaw `-yaw`). A part's own frame: x along its facade, y into the wall, z up.
+- **Material and CPD**: the parts' slots are in the contribution's `materials` like the
+  shells' (tints only from the six channels of `cpd_layout`); the HISM carries the
+  building's 23 CPD floats, so a part takes its building's colors.
+- **Building ids**: `building` names the entry each instance belongs to (one HISM per
+  building and kind, keyed `<key>.<kind>`, its `Ids` the building's key).
+- **Collision**: none needed from the parts (the building's simple collision covers its
+  masses; AG3 adds the ground band); Nanite on, distance fields and Lumen cards off.
+- **Re-import**: a part's mesh is named by its parameters' hash and its pack changes only
+  when the tile's buildings change, so an unchanged building's HISMs change nothing.
 
 ## assetgen's street contribution (AG7)
 
@@ -446,3 +486,4 @@ AG8's Unreal check, `docs/progress/AG8/unreal/`).
 | AG8 | Props, plants and signs taken: `unreal_contribution.props.json` and `.signs.json` (above); `stage2` replaces M15's prop and plant prototype actors by key (entries keyed by them, or `replaces`, or `drop`), parts with per-instance ids, scales, collision, Nanite and `shape_preservation`; the importer skips the replaced prototypes, scales instances, sets voxel Nanite foliage, makes `M_CgHolo`; tests without Unreal (`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` now with every prototype replaced) | Greyhook and Vesper Bay imported with their props (25,837 and 46,354 actors, 785 and 1,818 s), imported again (nothing changed, 69 and 74 s) and checked (507 of 507 traces down, 36 of 36 roofs and facades, 134 and 253 m walked): the HISM counts per kind equal `props_report.txt`, no M15 prototype left, every instance at its model position, plants Nanite with `Voxelize`, holo-ads translucent 3-LOD chains, neon and lit faces emissive; shots of props by day and a neon street at night (`docs/progress/AG8/unreal/`) |
 | Play-ready (after AG1 and AG7) | Open into the city and play it: each import makes the city the project's `EditorStartupMap` and `GameDefaultMap` (`unreal.set_startup_map`, the rest of `Config/DefaultEngine.ini` as it was; `--no-startup`); `Core/BP_CityGenFlyPawn` (a SpectatorPawn, its built-in bindings, no collision, `--fly-speed` 50 m/s) and `Core/GM_CityGenFly`, the level's game mode override with `--play fly` (the default), none with `--play walk`; World Partition for flying: the main grid 256 m cells loaded `--view-range` (1500 m) around the player, the instanced HLOD layer in 512 m cells out to the city's diagonal (its merged parent layer cut off), set by the partitions' C++ property names; the HLODs built after the import (`unreal.build_hlods`, the WorldPartitionHLODsBuilder commandlet, only what changed; `--no-hlod`); every master `used_with_instanced_static_meshes` (without it the far view drew the default material, flat gray); `--check` walks with the project's own pawn whatever `--play` set, runs `ghost`, `fly` and `walk`, then flies with the fly pawn (its speed on the game's clock, through a building, the city loaded where it ends) and with `--shots` takes two views from it; an unchanged build imported again saves nothing; `unreal.manifest_changes` counts a key whose actor changes class (AG8's exact props over M15's instanced ones) as deleted and created, as the importer does | Vesper Bay (blockout only) and Greyhook (with stage 2) imported over their earlier imports, imported again, HLODs built (244 and 285), checked in both modes (507 of 507 traces down, 36 of 36 roofs and facades, 253 and 129 m walked, the console commands, 50 m/s flights) with shots from the fly pawn (`docs/progress/unreal_play/`) |
 | AG8 Unreal check | Plants' instanced actors without collision (a part's `collision: {"none": true}` now makes its HISM `NoCollision`; it reached only the mesh record before); the check tries a missed trace down again for up to 30 s (`TRACE_RETRY_S`) and counts those hits as late (the first play session after an import traced before the streamed cells' collision was in place: 346 of 507) (its streaming step's read of actors that had streamed out, which stopped Vesper Bay's first check, was fixed the same way by the play-ready exporter); `test_stage2_from_assetgen` expects the exact props' keys, whose actor changes class, as deleted and created (`manifest_changes` since the play-ready exporter) | as AG8's row |
+| AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | none (the coordinating session's call); Vesper Bay's manifest has 14,280 instanced actors for its buildings' parts, all 1,306,362 instances of its contribution |
