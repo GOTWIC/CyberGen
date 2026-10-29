@@ -99,7 +99,9 @@ BAD_NAME_CHARS = "\"' ,/.:|&!~\n\r\t@#(){}[]=;^%$`"
 # the stage 2 packs being imported: glb path -> {asset name: the manifest's mesh record}
 PACK_PLAN = {}
 PACK_STEPS = []          # what the pack step did per pack (counts, for the result)
+PACK_TOTAL = [0]         # the packs to import in all (PACK_PLAN may hold a batch)
 TEXTURE_PLAN = {}        # texture file -> [(factory node setter, value)]
+TEXTURE_STEPS = []       # the texture files the texture step found in TEXTURE_PLAN
 
 
 def asset_name(name):
@@ -107,7 +109,10 @@ def asset_name(name):
 
 
 def pack_key(path):
-    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+    """A file as both the importer and Interchange name it: links resolved (AG6's library is
+    a symlink on a Mac, a directory junction on Windows), case and separators as the OS
+    compares them."""
+    return os.path.normcase(os.path.realpath(path))
 
 
 if hasattr(unreal, "InterchangePythonPipelineBase"):
@@ -132,8 +137,8 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
             step = {"pack": source_datas[0].get_filename(), "nodes": len(nodes),
                     "matched": found, "skipped": 0}
             PACK_STEPS.append(step)
-            REPORT.update(len(PACK_STEPS), len(PACK_PLAN), detail="packs imported, their "
-                          "meshes building")
+            REPORT.update(len(PACK_STEPS), PACK_TOTAL[0] or len(PACK_PLAN),
+                          detail="packs imported, their meshes building")
             if found != len(plan):
                 # (a name this step cannot match: leave the pack as the generic pipeline
                 # made it; finish2 sets the settings and prune_meshes deletes the extras)
@@ -168,6 +173,7 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
                 if source_datas else None
             if want is None:
                 return
+            TEXTURE_STEPS.append(source_datas[0].get_filename())
             for uid in container.get_nodes(unreal.InterchangeTextureFactoryNode.static_class()):
                 node = container.get_factory_node(uid)
                 for fn, v in want:
@@ -979,6 +985,8 @@ class Importer:
         self.texture_step = CgTextureStep() if self.fast else None
         # (fast: the actors made are saved and unloaded every `offload_n`, see offload)
         self.offload_n = int(os.environ.get("CITYGEN_UE_OFFLOAD", "2000")) if self.fast else 0
+        # (fast: stage 2's packs queued this many at a time; 0, the default, all at once)
+        self.packs_at_once = int(os.environ.get("CITYGEN_UE_PACKS", "0")) if self.fast else 0
         self.live, self.offloaded = [], []
         self.skip = set(self.s2["replaced"]) | {a["key"] for a in self.s2["actors"]} \
             if self.s2 else set()
@@ -1110,7 +1118,23 @@ class Importer:
     def import_packs(self, todo):
         """Every stage 2 pack in `todo` queued as one async Interchange import (with the pack
         step), then waited for: Interchange runs half the worker threads' worth at a time,
-        and each mesh's build goes to the asset compiling pool as its import ends."""
+        and each mesh's build goes to the asset compiling pool as its import ends. With
+        `packs_at_once` (CITYGEN_UE_PACKS) they are queued that many at a time, each batch
+        waited for before the next (fewer in flight, for a machine with less memory)."""
+        n = self.packs_at_once
+        PACK_TOTAL[0] = len(todo)
+        if n and len(todo) > n:
+            for i in range(0, len(todo), n):
+                self.import_packs_now(todo[i:i + n])
+            REPORT.note(f"stage 2 packs queued {n} at a time")
+        else:
+            self.import_packs_now(todo)
+        steps = PACK_STEPS
+        self.stats["stage2"]["pack_step"] = {
+            "packs": len(steps), "unmatched": sum(1 for x in steps if x.get("unmatched")),
+            "skipped": sum(x["skipped"] for x in steps)}
+
+    def import_packs_now(self, todo):
         tasks = []
         for pk, folder, entries, fresh in todo:
             glb = os.path.join(self.build, pk["glb"])
@@ -1130,10 +1154,6 @@ class Importer:
         AT.import_asset_tasks(tasks)
         unreal.InterchangeManager.get_interchange_manager_scripted() \
             .wait_until_all_tasks_done(False)
-        steps = PACK_STEPS
-        self.stats["stage2"]["pack_step"] = {
-            "packs": len(steps), "unmatched": sum(1 for x in steps if x.get("unmatched")),
-            "skipped": sum(x["skipped"] for x in steps)}
         PACK_PLAN.clear()
 
     def import_group(self, glb, folder, entries, pipeline=None, finish=None,
@@ -1290,6 +1310,8 @@ class Importer:
             unreal.InterchangeManager.get_interchange_manager_scripted() \
                 .wait_until_all_tasks_done(False)
             TEXTURE_PLAN.clear()
+            # (a texture the step did not find gets its settings after its import)
+            st["texture_step"] = {"textures": len(tasks), "matched": len(TEXTURE_STEPS)}
             done = []
             for i, (name, t, path, h, want) in enumerate(todo):
                 done.append(self.finish_texture(name, t, path, h, want, save=False))
@@ -1326,7 +1348,7 @@ class Importer:
         if tex is None:
             raise RuntimeError(f"texture {name}: import of {t['file']} failed")
         for k, v in want:
-            if tex.get_editor_property(k) != v:
+            if not self.fast or tex.get_editor_property(k) != v:      # (main sets them all)
                 tex.set_editor_property(k, v)
         EAL.set_metadata_tag(tex, HASH_TAG, h)
         if save:
@@ -1526,7 +1548,9 @@ class Importer:
         ns = sm.get_editor_property("nanite_settings")
         shape = rec.get("shape_preservation")
         full = rec.get("fallback_full")
-        if not self.nanite_as_asked(ns, rec):
+        again = not self.nanite_as_asked(ns, rec) if self.fast else \
+            (bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape or full)
+        if again:                                  # (fast: the pack step set them already)
             ns.set_editor_property("enabled", bool(rec["nanite"]))
             if full:
                 # AG3's street fronts: complex collision is built from the fallback mesh, so
