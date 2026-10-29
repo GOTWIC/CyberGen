@@ -34,6 +34,11 @@ def log(*a):
     print(f"[ag6 board {time.time() - T0:6.1f}s]", *a, flush=True)
 
 
+def mark(what, name):
+    """`CGPROGRESS start|done <name>`: the driver's progress bar (`assetgen/blenderrun.py`)."""
+    print(f"CGPROGRESS {what} {name}", flush=True)
+
+
 def slab(name, x, z, w, h):
     """A slab facing -y (toward the camera): its front face's UV0 is meters (u along x, v up
     from its foot), stored as Blender's glTF import stores it (v flipped)."""
@@ -164,7 +169,9 @@ def board(b):
 def main():
     files = []
     for b in JOB["boards"]:
+        mark("start", b["name"])
         files += board(b)
+        mark("done", b["name"])
     with open(os.path.join(JOB["out"], "ag6_report.json"), "w") as f:
         json.dump({"files": files}, f, indent=1)
 
