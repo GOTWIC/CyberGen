@@ -41,6 +41,11 @@ def log(*a):
     print(f"[ag6 {time.time() - T0:6.1f}s]", *a, flush=True)
 
 
+def mark(what, name):
+    """`CGPROGRESS start|done <name>`: the driver's progress bar (`assetgen/blenderrun.py`)."""
+    print(f"CGPROGRESS {what} {name}", flush=True)
+
+
 MATS = {}
 
 
@@ -468,6 +473,7 @@ def main():
     log(f"AG8 variants: {len(protos)}")
     rep = {"files": [], "views": []}
     for v in JOB["views"]:
+        mark("start", v["name"])
         t = time.time()
         objs, hidden = [], []
         for tile in v.get("shell_tiles", []):
@@ -510,6 +516,7 @@ def main():
         remove(objs + sobjs + lobjs + [cam])
         for o in hidden:
             o.hide_render = False
+        mark("done", v["name"])
     with open(f"{JOB['out']}/ag6_report.json", "w") as f:
         json.dump(rep, f, indent=1)
     log("done")

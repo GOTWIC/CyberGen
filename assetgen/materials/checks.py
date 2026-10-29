@@ -110,9 +110,17 @@ FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
            ("signs", "props/signs", "t*.glb"))
 
 
-def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int) -> dict:
+def packs(assets: Path) -> int:
+    """How many packs the check reads (a progress bar's total)."""
+    return sum(len(list((assets / folder).glob(pat))) for _, folder, pat in FOLDERS
+               if (assets / folder).is_dir())
+
+
+def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int,
+                  step=None) -> dict:
     """The check over every pack of a build's assets (tiles/, AG2's parts/ in their own
-    frames, streets/, and AG8's props/: variants, plants, exact props, signs)."""
+    frames, streets/, and AG8's props/: variants, plants, exact props, signs); `step()` after
+    each pack (a progress bar's)."""
     per: dict[str, dict] = {}
     parts: dict[str, list[float]] = {}
     tris = 0
@@ -122,6 +130,8 @@ def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int) -> dic
         if not d.is_dir():
             continue
         for f in sorted(d.glob(pat)):
+            if step is not None:
+                step()
             for node, t, mat, pos, uv, tri in read_glb(f):
                 master, s = CT.set_for(mat, None, part)
                 if s is None or s not in lib["sets"]:
