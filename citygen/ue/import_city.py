@@ -127,6 +127,8 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
             step = {"pack": source_datas[0].get_filename(), "nodes": len(nodes),
                     "matched": found, "skipped": 0}
             PACK_STEPS.append(step)
+            REPORT.update(len(PACK_STEPS), len(PACK_PLAN), detail="packs imported, their "
+                          "meshes building")
             if found != len(plan):
                 # (a name this step cannot match: leave the pack as the generic pipeline
                 # made it; finish2 sets the settings and prune_meshes deletes the extras)
@@ -169,6 +171,58 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
 
 def log(msg):
     unreal.log(f"citygen: {msg} ({time.time() - T0:.1f} s)")
+
+
+# progress lines `citygen unreal` draws as a bar (citygen.progress.MARKER and its Relay ops)
+PROGRESS = "CYBERGEN_PROGRESS"
+# the importer's phases by the stage they show under
+STAGE_OF = {"core": "materials", "materials": "materials", "textures2": "materials",
+            "materials2": "materials", "meshes": "meshes", "meshes2": "meshes2",
+            "level": "level", "actors": "actors", "play": "settings", "streaming": "settings",
+            "graphs": "settings", "save": "save", "prune": "prune", "save_pruned": "prune",
+            "digests": "digests"}
+
+
+class Report:
+    """Progress for `citygen unreal`: a line per stage start and end, its count when known,
+    at most one update a second (the editor log keeps them too)."""
+
+    def __init__(self):
+        self.key = None
+        self.last = 0.0
+
+    def out(self, op, **fields):
+        print(PROGRESS + " " + json.dumps({"op": op, **fields}, separators=(",", ":")),
+              flush=True)
+
+    def begin(self, key, total=None):
+        if key == self.key:
+            return
+        self.key = key
+        self.last = time.time()
+        self.out("begin", label=key, total=total)
+
+    def update(self, done, total=None, detail=None, force=False):
+        now = time.time()
+        if force or now - self.last >= 1.0:
+            self.last = now
+            f = {"done": done}
+            if total is not None:
+                f["total"] = total
+            if detail:
+                f["detail"] = detail
+            self.out("update", **f)
+
+    def note(self, text):
+        self.out("note", text=text)
+
+    def end(self):
+        if self.key is not None:
+            self.out("end")
+        self.key = None
+
+
+REPORT = Report()
 
 
 def ue_loc(x, y, z):
@@ -855,6 +909,7 @@ class Importer:
         self.keys = {"created": [], "updated": [], "deleted": []}
         self.eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
         self.les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+        self.placed, self.to_place = 0, None
         self.mats = {}
         # stage 2 (assetgen): its materials by (part, slot), the blockout keys it replaces
         self.s2 = man.get("stage2")
@@ -880,6 +935,8 @@ class Importer:
                 "hulls": 0, "boxes_only": 0, "complex_fallback": 0, "lod_chains": 0}
 
     def timed(self, name, fn, *a):
+        if name != "meshes2" or self.s2:        # (no stage 2: no stage of its own)
+            REPORT.begin(STAGE_OF.get(name, name))
         t = time.time()
         r = fn(*a)
         self.stats["timings"][name] = round(time.time() - t, 2)
@@ -1067,6 +1124,7 @@ class Importer:
             entries = [(o["asset"], o["hash"]) for o in t["objects"]]
             self.tile_meshes[t["name"]] = self.import_group(
                 os.path.join(self.build, t["glb"]), folder, entries)
+            REPORT.update(k + 1, n, force=k + 1 == n)
             if k % 20 == 0:
                 log(f"tile {k + 1}/{n} {t['name']}")
         kinds = self.man["prototypes"]["kinds"]
@@ -1084,6 +1142,8 @@ class Importer:
                 continue
             stale = [a for a in EAL.list_assets(folder, recursive=True)
                      if a.split(".")[0] not in want]
+            if stale:
+                REPORT.note(f"deleting {len(stale)} blockout meshes no object uses")
             self.stats["meshes"]["deleted"] += delete_assets(stale)
         # stage 2's meshes no entry uses (its materials are pruned by materials2). A
         # blockout-only import leaves them as they are: its actors go, the assets stay for the
@@ -1097,6 +1157,8 @@ class Importer:
         mats = f"{folder}/Materials/"
         stale = [a for a in EAL.list_assets(folder, recursive=True)
                  if a.split(".")[0] not in want and not a.startswith(mats)]
+        if stale:
+            REPORT.note(f"deleting {len(stale)} stage 2 meshes no entry uses")
         self.stats["stage2"]["meshes"]["deleted"] += delete_assets(stale)
 
     # -- stage 2 (assetgen's layer: buildings, streets) --
@@ -1134,7 +1196,8 @@ class Importer:
             todo.append((name, t, path, h, want))
         setters = self.texture_setters() if self.fast and todo else None
         tasks = []
-        for name, t, path, h, want in todo:
+        REPORT.update(0, len(todo), detail="textures", force=True)
+        for i, (name, t, path, h, want) in enumerate(todo):
             task = unreal.AssetImportTask()
             f = os.path.join(self.build, t["file"])
             for k, v in (("filename", f), ("destination_path", t["folder"]),
@@ -1144,6 +1207,7 @@ class Importer:
             if setters is None:
                 AT.import_asset_tasks([task])
                 self.finish_texture(name, t, path, h, want, save=True)
+                REPORT.update(i + 1, len(todo), detail="textures")
                 continue
             # (fast: every texture queued at once, each built once with its settings)
             TEXTURE_PLAN[pack_key(f)] = [(setters[k], int(getattr(v, "value", v)))
@@ -1161,9 +1225,12 @@ class Importer:
             unreal.InterchangeManager.get_interchange_manager_scripted() \
                 .wait_until_all_tasks_done(False)
             TEXTURE_PLAN.clear()
-            done = [self.finish_texture(name, t, path, h, want, save=False)
-                    for name, t, path, h, want in todo]
+            done = []
+            for i, (name, t, path, h, want) in enumerate(todo):
+                done.append(self.finish_texture(name, t, path, h, want, save=False))
+                REPORT.update(i + 1, len(todo), detail="textures")
             EAL.save_loaded_assets(done, False)
+        REPORT.update(len(todo), len(todo), detail="textures", force=True)
         # the city's pages it no longer has (the shared library's stay: other cities)
         folder = f"{self.root}/{STAGE2_FOLDER}/Textures"
         want = {f"{t['folder']}/{t['asset']}" for t in self.s2["textures"].values()}
@@ -1442,6 +1509,8 @@ class Importer:
             return
         st = self.stats["stage2"]
         sub = self.stats["subtimings"]
+        # (counted in meshes, not packs: the packs differ a lot in size)
+        total = sum(len(pk["meshes"]) for pk in self.s2["packs"])
         todo = []
         for pk in self.s2["packs"]:
             if not pk["glb"]:
@@ -1458,10 +1527,13 @@ class Importer:
                 self.meshes_s2[f"{pk['folder']}/{a}"] = sm
         t = time.time()
         if self.fast:
-            self.import_packs(todo)
+            self.import_packs(todo)        # (its count: packs imported; then meshes finished)
         sub["meshes2.import"] = round(time.time() - t, 2)
         t = time.time()
         done = []
+        seen = total - sum(len(x[2]) for x in todo)       # (the packs kept)
+        built, nanite_built = 0, 0
+        REPORT.update(seen, total, force=True)
         for k, (pk, folder, entries, fresh) in enumerate(todo):
             glb = os.path.join(self.build, pk["glb"])
             if not self.fast:
@@ -1478,6 +1550,11 @@ class Importer:
                 st["meshes"]["imported" if name in fresh else "kept"] += 1
                 self.meshes_s2[f"{pk['folder']}/{name}"] = sm
                 done.append(sm)
+            built += len(entries)
+            nanite_built += sum(1 for m in pk["meshes"] if m["nanite"])
+            seen += len(entries)
+            REPORT.update(seen, total, detail=f"pack {k + 1} of {len(todo)}, {built} built, "
+                          f"{nanite_built} with Nanite", force=k + 1 == len(todo))
             if k % 25 == 0:
                 log(f"stage 2 pack {k + 1}/{len(todo)} {pk['folder']}")
         sub["meshes2.finish"] = round(time.time() - t, 2)
@@ -1566,9 +1643,20 @@ class Importer:
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
+    def actor_count(self):
+        """How many actors `actors` places (the blockout's not replaced, its instancers not
+        replaced, stage 2's, the player start and the lights)."""
+        n = sum(1 for t in self.man["tiles"] for o in t["objects"] if o["key"] not in self.skip)
+        n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
+        if self.s2:
+            n += len(self.s2["actors"]) + len(self.s2["instances"])
+        return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
+
     def place(self, have, key, h, cls, make, update, folder, version=ACTOR_VERSION):
         """The actor of `key`: unchanged when its hash matches, else updated in place, else
         spawned; returns it."""
+        self.placed += 1
+        REPORT.update(self.placed, self.to_place)
         h = f"{version}.{h}"
         a = have.pop(key, None)
         created = a is None
@@ -1630,6 +1718,7 @@ class Importer:
     def reload(self):
         if not self.offloaded:
             return
+        REPORT.note(f"loading the {len(self.offloaded)} actors saved meanwhile back")
         t = time.perf_counter()
         unreal.WorldPartitionBlueprintLibrary.load_actors(self.offloaded)
         self.stats["offloaded"] = len(self.offloaded)
@@ -1639,6 +1728,9 @@ class Importer:
     def actors(self):
         have = self.existing()
         log(f"{len(have)} actors of {self.city} in the level")
+        self.placed = 0
+        self.to_place = self.actor_count()
+        REPORT.update(0, self.to_place, force=True)
         sma = unreal.StaticMeshActor.static_class()
         origin = unreal.Vector(0.0, 0.0, 0.0)
         for t in self.man["tiles"]:
@@ -1665,6 +1757,7 @@ class Importer:
         self.actors2(have)
         self.player_start(have)
         self.lighting(have)
+        REPORT.update(self.placed, self.to_place, force=True)
         self.offload_n = 0
         self.live = []
         self.reload()
@@ -1970,6 +2063,13 @@ class Importer:
             unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
 
     def run(self):
+        REPORT.out("plan", first=not EAL.does_asset_exist(
+            f"{self.root}/Maps/{self.man['folder']}"),
+            objects=sum(len(t["objects"]) for t in self.man["tiles"]),
+            tiles=len(self.man["tiles"]), actors=self.actor_count(),
+            packs=len(self.s2["packs"]) if self.s2 else 0,
+            meshes2=sum(len(pk["meshes"]) for pk in self.s2["packs"]) if self.s2 else 0,
+            textures=len(self.s2.get("textures") or {}) if self.s2 else 0)
         base = self.timed("core", base_material)
         self.timed("materials", self.materials, base)
         self.timed("textures2", self.textures2)
@@ -1987,6 +2087,7 @@ class Importer:
         self.timed("prune", self.prune_meshes)
         self.timed("save_pruned", self.save)
         self.stats.update(self.timed("digests", self.digests))
+        REPORT.end()
         self.stats["keys"] = {k: sorted(v) for k, v in self.keys.items()}
         self.stats["level"] = self.level_path
         self.stats["content_root"] = self.root
