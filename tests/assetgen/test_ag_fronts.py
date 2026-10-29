@@ -179,6 +179,38 @@ def test_a_mount_on_a_tidied_crack_is_counted_apart():
     assert mc["mounts"] == 1 and mc["tidied"] == 1 and mc["no_wall"] == 0
 
 
+def test_a_front_its_building_whole_leaves_no_shell_mesh(tmp_path):
+    """An industrial gate house of one 3.5 m floor: its street front takes its whole height,
+    so its shell has no triangles. Its node in the tile pack carries no mesh (glTF has no
+    mesh without primitives; Unreal rejects one), its record names no shell node, and in
+    the contribution its front takes the place of its blockout actor."""
+    from assetgen import build as BD
+    from assetgen.presets import ERA_PRESETS
+    br = brief_of([mass([[5.0, 4.0], [-5.0, 4.0], [-5.0, -4.0], [5.0, -4.0]], 0.0, 3.5, 1)],
+                  btype="building.gate_house", era=ERA_PRESETS["industrial"],
+                  classes={(0, 0, 0): "park", (0, 0, 1): "open", (0, 0, 2): "open",
+                           (0, 0, 3): "open"})
+    br["building"].update(use="industrial",
+                          style={"era": "industrial", "grime": 0.8, "neon": 0.3})
+    br["building"]["floor_grid"]["floor_height_m"] = 3.5
+    br["spec"]["era"] = "industrial"
+    bid = br["id"]
+    res = BD.tile_job({"tile": "t+00+00", "out": str(tmp_path),
+                       "items": [(bid, br, GN.make(br))]})
+    rec = res["records"][bid]
+    assert rec["node"] is None and rec["front"]["triangles"] == rec["triangles"] > 0
+    data = (tmp_path / "tiles" / "t+00+00.glb").read_bytes()
+    doc = json.loads(data[20:20 + int.from_bytes(data[12:16], "little")])
+    assert all(m["primitives"] for m in doc["meshes"])
+    nodes = {n["name"]: n for n in doc["nodes"]}
+    assert "mesh" not in nodes[f"{bid}.shell"] and "mesh" in nodes[f"{bid}.front"]
+    con = UC.buildings({"buildings": {bid: dict(rec, hash="0" * 64)}, "tiles": {},
+                        "generator": BD.GEN_VERSION, "city": "Test", "model_sha256": ""})
+    e = {x["key"]: x for x in con["entries"]}
+    assert e[bid]["node"] is None and e[bid]["asset"] is None
+    assert e[f"{bid}.front"]["replaces"] == [bid]
+
+
 def test_decals_on_the_band():
     br = row()
     br["building"]["style"] = {"era": "heritage", "grime": 0.95, "neon": 0.6}

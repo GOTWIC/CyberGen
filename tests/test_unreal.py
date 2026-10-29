@@ -786,14 +786,19 @@ def test_stage2_from_assetgen(staged, manifest):
     assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
     assert set(blds) <= set(s2["replaced"])
     assert s2["counts"]["replaces_missing"] == 0
-    assert all(e["asset"] == U.asset_name(e["node"]) for e in con["entries"])
+    assert all(e["asset"] == (U.asset_name(e["node"]) if e["node"] else None)
+               for e in con["entries"])
     for p in s2["packs"]:
         assert p["glb"], p["folder"]
         nodes = {U.asset_name(n["name"]) for n in U.read_glb_json(staged / p["glb"])["nodes"]
                  if "mesh" in n}
         assert {m["asset"] for m in p["meshes"]} <= nodes, p["folder"]
     actor_keys = {a["key"] for a in s2["actors"]}
-    assert set(blds) <= actor_keys
+    # (a building with no shell mesh, its street front its whole height, is its front's
+    # actor alone)
+    shelled = {e["key"] for e in con["entries"] if e["kind"] == "building" and e["node"]}
+    assert shelled <= actor_keys and \
+        {f"{k}.front" for k in set(blds) - shelled} <= actor_keys
     ch = U.manifest_changes(man, m2)
     s2keys = actor_keys | {a["key"] for a in s2["instances"]}
     # AG8's exact props (cables, scaffolding, gates) take the key of M15's instanced actor
@@ -861,10 +866,15 @@ def test_stage2_takes_assetgen_fronts(staged):
     actors = {a["key"]: a for a in s2["actors"]}
     meshes = {f"{p['folder']}/{m['asset']}": m for p in s2["packs"] for m in p["meshes"]}
     ndoors = 0
+    shells = {e["key"]: e for e in con["entries"] if e["kind"] == "building"}
     for key, e in fronts.items():
         a = actors[key]
         b = key[:-len(".front")]
-        assert a["ids"] == [b] and a["pivot"] == actors[b]["pivot"] and a["cpd"] == e["cpd"]
+        # (a building with no shell mesh, its front its whole height, has no actor of its
+        # own: its front's stands at its pivot and takes its blockout actor's place)
+        pivot = actors[b]["pivot"] if shells[b]["node"] else shells[b]["pivot"]
+        assert a["ids"] == [b] and a["pivot"] == pivot and a["cpd"] == e["cpd"]
+        assert shells[b]["node"] or (b not in actors and b in s2["replaced"])
         assert a["type"] == "building.front" and a["category"] == "building"
         m = meshes[a["mesh"]]
         assert m["collision"] == {"complex": True} and m["nanite"] and m["fallback_full"]

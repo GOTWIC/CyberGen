@@ -330,6 +330,11 @@ a second node beside the shell in the tile's pack (`<id>.front`) and its own ent
 - **Where**: at its building's pivot, with its building's CPD and materials (its era's walls:
   `materials` as the building's); its building's id in `ids`, so the actor's `cg.id` is the
   building's; `level` 1 for a building on an M14 deck.
+- **A front its building's whole height** (a one-floor gate house): the shell has no
+  triangles, so its node carries no mesh (glTF has no mesh without primitives) and the
+  building's entry has `node` and `asset` null (no shell mesh, no shell actor; its proxy
+  and parts as usual); the front's `replaces` names the building's key, so the front's
+  actor takes the place of the building's blockout actor.
 - **Collision**: complex (its own triangles: doorways, steps, posts and recesses collide as
   drawn). The building's convex hulls now start at the band's top (`band_m`); a mass the
   band takes whole (a one-floor shop) has none. `fallback_full`: the Nanite fallback keeps
