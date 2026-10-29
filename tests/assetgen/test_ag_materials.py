@@ -183,7 +183,11 @@ def test_materials_stage_on_the_small_city():
     for name, t in con["textures"].items():
         assert (a / t["file"]).is_file(), name
     for e in con["entries"]:
-        r = man["buildings"][e["key"]]
+        if e["kind"] == "decals":
+            assert all(con["materials"][s]["master"] == "decal" for s in e["slots"])
+            continue
+        # (AG3: a street front takes its building's parameters)
+        r = man["buildings"][e["ids"][0] if e["kind"] == "building.front" else e["key"]]
         assert len(e["cpd"]) == SY.CPD_SIZE + 7 and e["cpd"][SY.CPD_SIZE:] == \
             r["material"]["cpd"]
         for slot, key in (e.get("materials") or {}).items():

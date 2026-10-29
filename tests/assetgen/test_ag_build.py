@@ -36,17 +36,19 @@ def test_every_building_has_a_shell_and_a_proxy():
     for bid, r in man["buildings"].items():
         assert r["triangles"] > 0 and r["proxy"]["triangles"] > 0, bid
         assert r["checks"]["mesh"]["open_edges"] == 0
-        assert r["collision"]["boxes"] or r["collision"]["convex"]
+        # (AG3: a building its street front takes whole collides as the front is drawn)
+        assert r["collision"]["boxes"] or r["collision"]["convex"] or r["front"]["triangles"]
     for t, info in man["tiles"].items():
         for sub in ("tiles", "proxies"):
             data = (base / "assets" / sub / f"{t}.glb").read_bytes()
             assert C.sha256_bytes(data) == info[sub]["sha256"]
 
 
-def test_checks_are_the_five():
+def test_checks_are_the_seven():
     rep = small_assets_report()
-    assert sorted(rep["checks"]) == ["asset_budget", "asset_coverage", "asset_envelope",
-                                     "asset_meshes", "asset_unique"]
+    assert sorted(rep["checks"]) == ["asset_access", "asset_budget", "asset_coverage",
+                                     "asset_envelope", "asset_meshes", "asset_mounts",
+                                     "asset_unique"]
     assert rep["checks"]["asset_unique"]["pairs"] > 0
 
 
@@ -136,9 +138,14 @@ def test_unreal_contribution_covers_every_building():
     man = _manifest(base)
     uc = json.loads((base / "assets" / "unreal_contribution.buildings.json").read_text())
     assert uc["stage"] == "assetgen" and uc["layer"] == 2 and uc["part"] == "buildings"
-    keys = [e["key"] for e in uc["entries"]]
-    assert keys == sorted(man["buildings"])
-    for e in uc["entries"]:
+    blds = [e for e in uc["entries"] if e["kind"] == "building"]
+    assert [e["key"] for e in blds] == sorted(man["buildings"])
+    # (AG3: a street front per building that has one, a decal mesh per tile)
+    fronts = {e["key"] for e in uc["entries"] if e["kind"] == "building.front"}
+    assert fronts == {f"{k}.front" for k, r in man["buildings"].items()
+                      if r["front"]["triangles"]}
+    assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals"}
+    for e in blds:
         r = man["buildings"][e["key"]]
         assert e["glb"] == r["glb"] and e["node"] == f"{e['key']}.shell"
         assert e["pivot"] == r["pivot"] and e["nanite"] and not e["distance_field"]
@@ -159,6 +166,8 @@ def test_parts_packs_and_their_instances():
     nodes: dict[str, bytes] = {}
     n = 0
     for e in uc["entries"]:
+        if e["kind"] != "building":
+            continue
         r = man["buildings"][e["key"]]
         assert len({p["kind"] for p in e["parts"]}) == len(e["parts"])
         assert e["instances"] == sum(p["count"] for p in e["parts"])

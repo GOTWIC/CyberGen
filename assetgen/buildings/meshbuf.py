@@ -6,6 +6,10 @@ Faces are welded on their plane by the generators themselves (a facade's grid sh
 vertices across bays, a cap's triangles share its ring), never across planes, as flat
 shading needs. UV0 is meters along the plane's axes (world-scale tiling, scope 5.2); UV1
 (0 to 1 over a pane) and COLOR_0 (window id in alpha) exist only on the glass slots.
+
+AG3: every triangle also carries the layer it belongs to (`layer`: 0 the shell, 1 the
+street front, the ground band that Unreal collides as drawn), so one buffer splits into the
+two meshes of a building (`split`); a part never spans two layers.
 """
 
 from __future__ import annotations
@@ -23,9 +27,14 @@ class Buf:
         self.planes: list[tuple] = []
         self.slots: dict[str, dict] = {}
         self.part = -1
+        self.layer = 0
+        self._parts = 0
 
     def new_part(self) -> int:
-        self.part += 1
+        """A new closed part (ids never reused, so a builder may go back to an earlier one
+        by setting `part`)."""
+        self.part = self._parts
+        self._parts += 1
         return self.part
 
     def plane(self, n, o, uax, vax, u0: float = 0.0, v0: float = 0.0) -> int:
@@ -38,7 +47,7 @@ class Buf:
         s = self.slots.get(name)
         if s is None:
             s = {"x": [], "y": [], "z": [], "pl": [], "tri": [], "part": [], "uv1": [],
-                 "win": []}
+                 "win": [], "layer": []}
             self.slots[name] = s
         return s
 
@@ -57,6 +66,7 @@ class Buf:
             s["win"].extend([win] * len(pts))
         s["tri"].extend(base + i for i in tris)
         s["part"].extend([self.part] * (len(tris) // 3))
+        s["layer"].extend([self.layer] * (len(tris) // 3))
 
     def quad(self, slot: str, plane: int, a, b, c, d, uv1=None, win: int = 0) -> None:
         self.add(slot, plane, (a, b, c, d), (0, 1, 2, 0, 2, 3), uv1, win)
@@ -82,7 +92,8 @@ class Buf:
                          "part": np.array(s["part"], dtype=np.int64),
                          "uv1": np.array(s["uv1"], dtype=np.float64).reshape(-1, 2)
                          if s["uv1"] else None,
-                         "win": np.array(s["win"], dtype=np.int64) if s["win"] else None}
+                         "win": np.array(s["win"], dtype=np.int64) if s["win"] else None,
+                         "layer": np.array(s["layer"], dtype=np.int64)}
         return out
 
     def primitives(self, arrs: dict, materials: dict[str, int]) -> list[Primitive]:
@@ -106,6 +117,33 @@ class Buf:
                                    indices=a["tri"].reshape(-1), normals=pl[:, 0:3],
                                    uv0=uv0, uv1=a["uv1"] if glass else None, colors=colors))
         return prims
+
+
+def split(arrs: dict) -> tuple[dict, dict]:
+    """(layer 0, layer 1) of a buffer's arrays: each slot's triangles of that layer with the
+    vertices they use, in their order (planes stay the buffer's, so `primitives` serves
+    both)."""
+    out: tuple[dict, dict] = ({}, {})
+    for name, a in arrs.items():
+        lay = a.get("layer")
+        for k in (0, 1):
+            sel = np.ones(len(a["tri"]), dtype=bool) if lay is None and k == 0 else \
+                (np.zeros(len(a["tri"]), dtype=bool) if lay is None else lay == k)
+            if not sel.any():
+                continue
+            if sel.all():
+                out[k][name] = a
+                continue
+            tri = a["tri"][sel]
+            used = np.unique(tri)
+            remap = np.full(len(a["pos"]), -1, dtype=np.int64)
+            remap[used] = np.arange(len(used), dtype=np.int64)
+            out[k][name] = {"pos": a["pos"][used], "pl": a["pl"][used], "tri": remap[tri],
+                            "part": a["part"][sel],
+                            "uv1": a["uv1"][used] if a["uv1"] is not None else None,
+                            "win": a["win"][used] if a["win"] is not None else None,
+                            "layer": lay[sel]}
+    return out
 
 
 def vertex_keys(pos: np.ndarray) -> np.ndarray:

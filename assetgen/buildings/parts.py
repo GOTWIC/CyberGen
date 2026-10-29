@@ -504,8 +504,17 @@ REACH = {"window": "flush", "cap": "flush", "spandrel": "flush", "balcony": "dee
          "canopy": "deep", "mast": "roof"}
 
 
+TYPE_KEY: dict[str, str] = {}      # families whose type names one parameter (AG3's: use)
+TYPE_SUB: dict[str, str] = {}      # and families with a fixed second word
+
+
 def type_of(family: str, p: dict) -> str:
-    """The part's semantic type (`part.window.casement`, scope principle 6)."""
+    """The part's semantic type (`part.window.casement`, `part.shopfront.bar`, scope
+    principle 6)."""
+    if family in TYPE_KEY:
+        return f"part.{family}.{p[TYPE_KEY[family]]}"
+    if family in TYPE_SUB:
+        return f"part.{family}.{TYPE_SUB[family]}"
     sub = p.get("style") or {"cap": "mullion" if p.get("dir") == "v" else "transom",
                              "fin": "crown" if p.get("inward") else "vertical",
                              "member": "column" if p.get("dx") == 0 else
@@ -631,7 +640,6 @@ def merge_into(buf: Buf, part: Buf, arrs: dict, at: tuple) -> None:
     moved = place(arrs, x, y, z, ux, uy)
     pl_map: dict[int, int] = {}
     piece: dict[int, int] = {}
-    top = buf.part
     for name in sorted(moved):
         a = moved[name]
         tri = a["tri"]
@@ -652,13 +660,15 @@ def merge_into(buf: Buf, part: Buf, arrs: dict, at: tuple) -> None:
                 va = (P[9] * ux - P[10] * uy, P[9] * uy + P[10] * ux, P[11])
                 pl_map[pid] = buf.plane(n, o, ua, va, P[12], P[13])
             if pc not in piece:
-                top += 1
-                piece[pc] = top
+                piece[pc] = buf.new_part()
             buf.part = piece[pc]
             buf.add(name, pl_map[pid], [tuple(pos[v]) for v in vs],
                     [loc[v] for v in T.reshape(-1).tolist()])
-    buf.part = top
 
 
 def check_mesh(arrs: dict) -> dict:
     return MB.check(arrs)
+
+
+# AG3: the street-front families (shopfronts, doors, mounts...) join the kit
+from . import frontparts  # noqa: E402,F401

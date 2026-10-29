@@ -4,7 +4,8 @@ textured Blender renders.
 - **preview**: the blockout's `city.blend` with its building boxes and the street objects
   AG7 replaces taken out; per view the shells of its tiles and the street pieces near it
   with AG6's materials (`assetgen/blender/ag6_materials.py`), the rest of the city from the
-  far proxies; AG8's props and plants near a street view as instances of their variant
+  far proxies; AG3's street fronts and decals with the shells, AG2's instanced parts on
+  them; AG8's props and plants near a street view as instances of their variant
   families and its signs (their faces showing the sign pages), with AG6's materials (where
   AG8 has not run, the sign slots as quads showing their atlas cells); by night
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
@@ -153,6 +154,7 @@ def run(args) -> dict:
     stiles = sorted({e["tile"] for e in con["entries"]})
     for v in views:
         tgt = v["target"]
+        v["parts"] = PV.instances(man, v["shell_tiles"])
         if v["ortho"]:
             v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
             v["signs"], v["lights"] = [], []

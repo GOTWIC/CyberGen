@@ -49,7 +49,8 @@ def _closed(arrs):
 
 
 def test_parts_are_closed_and_named_by_their_parameters():
-    assert set(SAMPLE) == set(PT.GEN) == set(PT.REACH)
+    from assetgen.buildings import frontparts as FP      # (AG3's: test_ag_fronts.py)
+    assert set(SAMPLE) | set(FP.FAMILIES) == set(PT.GEN) == set(PT.REACH)
     names = set()
     for fam, p in SAMPLE.items():
         _, arrs = PT.mesh(fam, p)
@@ -200,7 +201,9 @@ def test_industrial_dado_and_roofs():
         assert res["used"]["dado"] and dado in res["arrays"]
         assert GN.effective(gm, res["used"])["dado"] == dado
         z = res["arrays"][dado]["pos"][:, 2]
-        assert int(z.min()) == 0 and int(z.max()) == 2400
+        # (AG3: `structure` also closes the street band at its top, 7.5 m up)
+        assert int(z.min()) == 0 and (z == 2400).any() and \
+            int(z[z != 7500].max()) == 2400
         assert _closed(res["arrays"])
     br = _tower("precast_panel", 4, style={"dado": "dado"})
     gm, res = _built(br)
