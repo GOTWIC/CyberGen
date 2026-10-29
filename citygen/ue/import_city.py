@@ -77,6 +77,11 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # MESH_VERSION and ACTOR_VERSION)
 STAGE2_VERSION = "5"                 # AG6: textured masters; AG8: leaves, textured holo
 TEXTURE_VERSION = "1"
+# a prune of more assets than this deletes their package files itself, on an empty level: the
+# editor's delete makes a reachability pass over every loaded object per package (8435 meshes
+# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without)
+PRUNE_FILES = 500
+EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
@@ -92,6 +97,58 @@ STAGE2_FOLDER = "Assets"             # citygen.unreal.STAGE2_FOLDER
 
 def log(msg):
     unreal.log(f"citygen: {msg} ({time.time() - T0:.1f} s)")
+
+
+# progress lines `citygen unreal` draws as a bar (citygen.progress.MARKER and its Relay ops)
+PROGRESS = "CYBERGEN_PROGRESS"
+# the importer's phases by the stage they show under
+STAGE_OF = {"core": "materials", "materials": "materials", "textures2": "materials",
+            "materials2": "materials", "meshes": "meshes", "meshes2": "meshes2",
+            "level": "level", "actors": "actors", "play": "settings", "streaming": "settings",
+            "graphs": "settings", "save": "save", "prune": "prune", "save_pruned": "prune",
+            "digests": "digests"}
+
+
+class Report:
+    """Progress for `citygen unreal`: a line per stage start and end, its count when known,
+    at most one update a second (the editor log keeps them too)."""
+
+    def __init__(self):
+        self.key = None
+        self.last = 0.0
+
+    def out(self, op, **fields):
+        print(PROGRESS + " " + json.dumps({"op": op, **fields}, separators=(",", ":")),
+              flush=True)
+
+    def begin(self, key, total=None):
+        if key == self.key:
+            return
+        self.key = key
+        self.last = time.time()
+        self.out("begin", label=key, total=total)
+
+    def update(self, done, total=None, detail=None, force=False):
+        now = time.time()
+        if force or now - self.last >= 1.0:
+            self.last = now
+            f = {"done": done}
+            if total is not None:
+                f["total"] = total
+            if detail:
+                f["detail"] = detail
+            self.out("update", **f)
+
+    def note(self, text):
+        self.out("note", text=text)
+
+    def end(self):
+        if self.key is not None:
+            self.out("end")
+        self.key = None
+
+
+REPORT = Report()
 
 
 def ue_loc(x, y, z):
@@ -174,12 +231,26 @@ def fly_classes(speed_m_s):
     return mode_cls, saved
 
 
+def usage_flags(m):
+    """The usage flags a master needs: instanced static meshes (the props' and parts'
+    instances, and the instanced HLODs of the far view) and, opaque or masked on a surface,
+    Nanite (the blockout tiles and stage 2's packs). Without them a game draws the default
+    material, flat gray; so does play in the editor when nothing drew them in the editor
+    before (the editor sets them in memory only, and recompiles on every launch)."""
+    flags = ["used_with_instanced_static_meshes"]
+    if m.get_editor_property("material_domain") == unreal.MaterialDomain.MD_SURFACE and \
+            m.get_editor_property("blend_mode") in (unreal.BlendMode.BLEND_OPAQUE,
+                                                     unreal.BlendMode.BLEND_MASKED):
+        flags.append("used_with_nanite")
+    return flags
+
+
 def instanced(m):
-    """A master usable on instanced static meshes (the props' and parts' instances, and the
-    instanced HLODs of the far view): without the usage flag a game draws them with the
-    default material, flat gray. Saved only when it was missing."""
-    if not m.get_editor_property("used_with_instanced_static_meshes"):
-        m.set_editor_property("used_with_instanced_static_meshes", True)
+    """A master with its usage flags (`usage_flags`), saved only when one was missing."""
+    missing = [f for f in usage_flags(m) if not m.get_editor_property(f)]
+    for f in missing:
+        m.set_editor_property(f, True)
+    if missing:
         MEL.recompile_material(m)
         EAL.save_loaded_asset(m, only_if_is_dirty=False)
     return m
@@ -208,7 +279,8 @@ def base_material():
     MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     m.set_editor_property("two_sided", True)
-    m.set_editor_property("used_with_instanced_static_meshes", True)
+    for f in usage_flags(m):
+        m.set_editor_property(f, True)
     MEL.recompile_material(m)
     EAL.save_loaded_asset(m)
     return m
@@ -737,7 +809,8 @@ def stage2_master(master, defaults=None):
         MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
         MEL.connect_material_property(metal, "", MP.MP_METALLIC)
         m.set_editor_property("two_sided", master == "foliage")
-    m.set_editor_property("used_with_instanced_static_meshes", True)  # (HLODs, HISMs)
+    for f in usage_flags(m):
+        m.set_editor_property(f, True)        # (HLODs, HISMs, Nanite)
     MEL.recompile_material(m)
     EAL.set_metadata_tag(m, "cg.core2", STAGE2_VERSION)
     EAL.save_loaded_asset(m, only_if_is_dirty=False)
@@ -762,6 +835,41 @@ def delete_assets(paths):
     return len(paths) - sum(1 for p in left if EAL.does_asset_exist(p.split(".")[0]))
 
 
+def delete_files(paths):
+    """Delete the assets at `paths` by their package files (`PRUNE_FILES`): nothing names them
+    (their actors were destroyed, the level saved and unloaded), so their packages are
+    unloaded, their files deleted and the asset registry scans their folders again (a forced
+    scan drops what is gone); how many were deleted."""
+    if not paths:
+        return 0
+    names = sorted({p.split(".")[0] for p in paths})
+    loaded = [k for k in (unreal.find_package(n) for n in names) if k is not None]
+    if loaded:
+        unreal.EditorLoadingAndSavingUtils.unload_packages(loaded)
+    del loaded
+    unreal.SystemLibrary.collect_garbage()
+    content = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir())
+    for n in names:
+        base = os.path.join(content, n[len("/Game/"):])
+        for ext in (".uasset", ".uexp", ".ubulk"):
+            if os.path.exists(base + ext):
+                os.remove(base + ext)
+    folders = sorted({n.rsplit("/", 1)[0] for n in names})
+    unreal.AssetRegistryHelpers.get_asset_registry().scan_paths_synchronous(folders, True)
+    gone = sum(1 for n in names if not EAL.does_asset_exist(n))
+    log(f"deleted {gone} of {len(names)} assets by their files")
+    return gone
+
+
+def own_textures(mi, names):
+    """Whether the instance `mi` holds a texture of its own for every parameter in `names`
+    (one deleted under it leaves the parameter empty; reading it through
+    get_material_instance_texture_parameter_value would give the master's default)."""
+    have = {str(v.parameter_info.name): v.parameter_value
+            for v in mi.get_editor_property("texture_parameter_values")}
+    return all(have.get(n) is not None for n in names)
+
+
 class Importer:
     def __init__(self, man, build_dir):
         self.man = man
@@ -778,6 +886,7 @@ class Importer:
         self.keys = {"created": [], "updated": [], "deleted": []}
         self.eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
         self.les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+        self.placed, self.to_place = 0, None
         self.mats = {}
         # stage 2 (assetgen): its materials by (part, slot), the blockout keys it replaces
         self.s2 = man.get("stage2")
@@ -794,6 +903,8 @@ class Importer:
                 "hulls": 0, "boxes_only": 0, "complex_fallback": 0, "lod_chains": 0}
 
     def timed(self, name, fn, *a):
+        if name != "meshes2" or self.s2:        # (no stage 2: no stage of its own)
+            REPORT.begin(STAGE_OF.get(name, name))
         t = time.time()
         r = fn(*a)
         self.stats["timings"][name] = round(time.time() - t, 2)
@@ -943,6 +1054,7 @@ class Importer:
             entries = [(o["asset"], o["hash"]) for o in t["objects"]]
             self.tile_meshes[t["name"]] = self.import_group(
                 os.path.join(self.build, t["glb"]), folder, entries)
+            REPORT.update(k + 1, n, force=k + 1 == n)
             if k % 20 == 0:
                 log(f"tile {k + 1}/{n} {t['name']}")
         kinds = self.man["prototypes"]["kinds"]
@@ -955,25 +1067,38 @@ class Importer:
                 for t in self.man["tiles"] for o in t["objects"]}
         want |= {f"{self.root}/Props/{v['asset']}"
                  for v in self.man["prototypes"]["kinds"].values()}
+        stale = []
         for folder in (f"{self.root}/Meshes", f"{self.root}/Props"):
-            if not EAL.does_directory_exist(folder):
-                continue
-            stale = [a for a in EAL.list_assets(folder, recursive=True)
-                     if a.split(".")[0] not in want]
-            self.stats["meshes"]["deleted"] += delete_assets(stale)
+            if EAL.does_directory_exist(folder):
+                stale += [a for a in EAL.list_assets(folder, recursive=True)
+                          if a.split(".")[0] not in want]
+        if stale:
+            REPORT.note(f"deleting {len(stale)} blockout meshes no object uses")
         # stage 2's meshes no entry uses (its materials are pruned by materials2). A
         # blockout-only import leaves them as they are: its actors go, the assets stay for the
         # next import with stage 2 (deleting tens of thousands of meshes takes Unreal an hour)
         folder = f"{self.root}/{STAGE2_FOLDER}"
-        if not self.s2 or not EAL.does_directory_exist(folder):
-            return
-        want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
-                for m in p["meshes"]}
-        want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
-        mats = f"{folder}/Materials/"
-        stale = [a for a in EAL.list_assets(folder, recursive=True)
-                 if a.split(".")[0] not in want and not a.startswith(mats)]
-        self.stats["stage2"]["meshes"]["deleted"] += delete_assets(stale)
+        stale2 = []
+        if self.s2 and EAL.does_directory_exist(folder):
+            want = {f"{self.root}/{p['folder']}/{m['asset']}" for p in self.s2["packs"]
+                    for m in p["meshes"]}
+            want |= {f"{self.root}/{c['mesh']}" for c in self.s2["lod_chains"]}
+            # (the city's texture pages too: textures2 prunes them; they were deleted here
+            # after every import, under the sign instances that use them)
+            keep = (f"{folder}/Materials/", f"{folder}/Textures/")
+            stale2 = [a for a in EAL.list_assets(folder, recursive=True)
+                      if a.split(".")[0] not in want and not a.startswith(keep)]
+        if stale2:
+            REPORT.note(f"deleting {len(stale2)} stage 2 meshes no entry uses")
+        files = len(stale) + len(stale2) > PRUNE_FILES
+        if files:
+            self.les.load_level(EMPTY_LEVEL)
+        delete = delete_files if files else delete_assets
+        self.stats["meshes"]["deleted"] += delete(stale)
+        if stale2:
+            self.stats["stage2"]["meshes"]["deleted"] += delete(stale2)
+        if files:
+            self.level()            # (the digests read its actors)
 
     # -- stage 2 (assetgen's layer: buildings, streets) --
 
@@ -989,7 +1114,9 @@ class Importer:
                                                           "deleted": 0})
         TCS = unreal.TextureCompressionSettings
         TG = unreal.TextureGroup
-        for name, t in sorted(self.s2["textures"].items()):
+        ntex = len(self.s2["textures"])
+        for k, (name, t) in enumerate(sorted(self.s2["textures"].items())):
+            REPORT.update(k, ntex, detail="textures", force=k == 0)
             path = f"{t['folder']}/{t['asset']}"
             h = f"{TEXTURE_VERSION}.{t['hash']}"
             if EAL.does_asset_exist(path):
@@ -1020,6 +1147,7 @@ class Importer:
             EAL.save_loaded_asset(tex, only_if_is_dirty=False)
             self.tex2[name] = tex
             st["imported"] += 1
+        REPORT.update(ntex, ntex, detail="textures", force=True)
         # the city's pages it no longer has (the shared library's stay: other cities)
         folder = f"{self.root}/{STAGE2_FOLDER}/Textures"
         want = {f"{t['folder']}/{t['asset']}" for t in self.s2["textures"].values()}
@@ -1057,7 +1185,7 @@ class Importer:
             key = p.get("key", p["slot"])
             if EAL.does_asset_exist(path):
                 mi = unreal.load_asset(path)
-                if meta(mi, HASH_TAG) == h:
+                if meta(mi, HASH_TAG) == h and own_textures(mi, p.get("textures") or {}):
                     st["kept"] += 1
                     self.mats2[(p["part"], key)] = mi
                     self.mi2[p["asset"]] = mi
@@ -1218,6 +1346,10 @@ class Importer:
             return
         st = self.stats["stage2"]
         n = len(self.s2["packs"])
+        # (counted in meshes, not packs: the packs differ a lot in size)
+        total = sum(len(pk["meshes"]) for pk in self.s2["packs"])
+        seen, built, nanite_built = 0, 0, 0
+        REPORT.update(0, total, force=True)
         for k, pk in enumerate(self.s2["packs"]):
             if not pk["glb"]:
                 raise RuntimeError(f"{pk['folder']}: its glTF pack is missing (run assetgen "
@@ -1230,6 +1362,7 @@ class Importer:
             def finish(sm, h, recs=recs, part=part):
                 self.finish2(sm, recs[sm.get_name()], part, h)
 
+            before = st["packs_imported"]
             got = self.import_group(
                 os.path.join(self.build, pk["glb"]), folder,
                 [(m["asset"], m["hash"]) for m in pk["meshes"]],
@@ -1237,6 +1370,13 @@ class Importer:
                 version=STAGE2_MESH_VERSION, stats=st)
             for a, sm in got.items():
                 self.meshes_s2[f"{pk['folder']}/{a}"] = sm
+            if st["packs_imported"] > before:
+                # (a pack imported: every mesh in it built, those with Nanite too)
+                built += len(pk["meshes"])
+                nanite_built += sum(1 for m in pk["meshes"] if m["nanite"])
+            seen += len(pk["meshes"])
+            REPORT.update(seen, total, detail=f"pack {k + 1} of {n}, {built} built, "
+                          f"{nanite_built} with Nanite", force=k + 1 == n)
             if k % 25 == 0:
                 log(f"stage 2 pack {k + 1}/{n} {pk['folder']}")
         # (the subsystem is not made in a commandlet; its LOD functions keep no state, so its
@@ -1318,9 +1458,20 @@ class Importer:
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
+    def actor_count(self):
+        """How many actors `actors` places (the blockout's not replaced, its instancers not
+        replaced, stage 2's, the player start and the lights)."""
+        n = sum(1 for t in self.man["tiles"] for o in t["objects"] if o["key"] not in self.skip)
+        n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
+        if self.s2:
+            n += len(self.s2["actors"]) + len(self.s2["instances"])
+        return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
+
     def place(self, have, key, h, cls, make, update, folder, version=ACTOR_VERSION):
         """The actor of `key`: unchanged when its hash matches, else updated in place, else
         spawned; returns it."""
+        self.placed += 1
+        REPORT.update(self.placed, self.to_place)
         h = f"{version}.{h}"
         a = have.pop(key, None)
         if a is not None:
@@ -1349,6 +1500,9 @@ class Importer:
     def actors(self):
         have = self.existing()
         log(f"{len(have)} actors of {self.city} in the level")
+        self.placed = 0
+        self.to_place = self.actor_count()
+        REPORT.update(0, self.to_place, force=True)
         sma = unreal.StaticMeshActor.static_class()
         origin = unreal.Vector(0.0, 0.0, 0.0)
         for t in self.man["tiles"]:
@@ -1375,6 +1529,7 @@ class Importer:
         self.actors2(have)
         self.player_start(have)
         self.lighting(have)
+        REPORT.update(self.placed, self.to_place, force=True)
         for key, a in sorted(have.items()):
             self.destroy(a, key)
 
@@ -1443,6 +1598,11 @@ class Importer:
                     for xf in r["xforms"]], False, False)
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
+                for slot, asset in sorted((r.get("materials") or {}).items()):
+                    mi = self.mi2.get(asset)
+                    i = comp.get_material_index(unreal.Name(slot))
+                    if mi is not None and i >= 0:
+                        comp.set_material(i, mi)
                 if r.get("no_collision"):
                     comp.set_collision_profile_name("NoCollision")
                 a.set_actor_location_and_rotation(loc, rot, False, False)
@@ -1679,6 +1839,13 @@ class Importer:
             unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
 
     def run(self):
+        REPORT.out("plan", first=not EAL.does_asset_exist(
+            f"{self.root}/Maps/{self.man['folder']}"),
+            objects=sum(len(t["objects"]) for t in self.man["tiles"]),
+            tiles=len(self.man["tiles"]), actors=self.actor_count(),
+            packs=len(self.s2["packs"]) if self.s2 else 0,
+            meshes2=sum(len(pk["meshes"]) for pk in self.s2["packs"]) if self.s2 else 0,
+            textures=len(self.s2.get("textures") or {}) if self.s2 else 0)
         base = self.timed("core", base_material)
         self.timed("materials", self.materials, base)
         self.timed("textures2", self.textures2)
@@ -1696,6 +1863,7 @@ class Importer:
         self.timed("prune", self.prune_meshes)
         self.timed("save_pruned", self.save)
         self.stats.update(self.timed("digests", self.digests))
+        REPORT.end()
         self.stats["keys"] = {k: sorted(v) for k, v in self.keys.items()}
         self.stats["level"] = self.level_path
         self.stats["content_root"] = self.root
