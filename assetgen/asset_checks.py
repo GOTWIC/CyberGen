@@ -404,8 +404,8 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
 
 def mounts(records: dict) -> dict:
     """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building).
-    A mount on an edge of the footprint the shells tidy away (a spike or sliver of the lot's
-    ring: no wall stands there) or over or under every wall of its edge (M14's decks) is
+    A mount on a stretch of a footprint edge the shells tidy away (a spike or sliver of the
+    lot's ring: no wall stands there) or over or under every wall of its edge (M14's decks) is
     counted apart, the city's to change."""
     n = glass = nowall = tidied = off = 0
     first = []
