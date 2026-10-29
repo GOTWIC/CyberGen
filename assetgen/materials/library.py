@@ -230,7 +230,7 @@ BUILDING_SETS: dict[str, dict] = {
                 "params": {"color": "#5f7a63", "wear": 0.5, "board_m": 0.08, "along": "u"}},
     "sill_stone": {"gen": "stone", "tile_m": 2.0, "band": "street",
                    "params": {"color": "#c7c0b2", "wear": 0.4}},
-    "roof_tile": {"gen": "tiles", "tile_m": 2.0, "band": "upper",
+    "roof_tile": {"gen": "tiles", "tile_m": 2.0, "band": "street",   # (AG2's eaves, low)
                   "params": {"shape": "shingle", "size_m": (0.25, 0.2), "color": "#3b3f45",
                              "joint": "#22252a", "joint_m": 0.004, "tone": 0.25}},
     "pod": {"gen": "smooth_paint", "tile_m": 2.0, "band": "street",

@@ -303,11 +303,12 @@ pixel the same on every run:
   stickers, moss), the road atlas (16 cells: oil, cracks, patches, tar snakes, skid marks,
   manhole, drain, arrows, puddle, sand, dust), the window interiors and a 64 m macro map. A set
   covers 1 to 4 m at the spec's `texel_density_px_m` (512, decision 13.4) on the street band
-  and half that on roofs, so every map is a power of two. Made once per density in
+  and half that on flat roofs, so every map is a power of two. Made once per density in
   `~/.cache/cybergen/assetgen_library/d<density>` (or `$ASSETGEN_LIBRARY`) by up to 3 worker
   processes and kept while the generator's code hash is unchanged; `library.json` lists every
-  file with its decoded-pixel sha256. At 512 px/m: 655 MB of PNG, about 966 MB cooked with
-  mips and block compression, 80 s on the M4 with 3 workers (167 s while other builds ran).
+  file with its decoded-pixel sha256. At 512 px/m: 658 MB of PNG, about 969 MB cooked with
+  mips and block compression, 59 to 80 s on the M4 with 3 workers (167 s while other builds
+  ran).
   Not in git: each build links it as `BUILD/assets/library`.
 - **Window interiors** (`interiors.py`, the redesign PR #41 asked for): rooms drawn in
   one-point perspective (the back wall at `BACK` 0.5 of the window, floor, ceiling and side
@@ -345,7 +346,8 @@ pixel the same on every run:
   the entries' era `materials`; `unreal_contribution.materials.json` carries the sign pages
   and the decal material. `materials.json` is the same table for the Blender previews.
 - **Checks** (`checks.py`, in `materials_report.txt`): `texel_density` reads every pack's
-  UV0 against the set it shows: per slot, at least 99.5% of the textured area at 0.75 of the
+  UV0 (the shells, AG2's part packs in their own frames, the street pieces) against the set it
+  shows: per slot, at least 99.5% of the textured area at 0.75 of the
   band's density or better (buildings 100% in every sample; streets 99.5 to 99.9%, the rest
   tank cylinders, a few curb and barrier sides with plan UVs and the outer edge of tight
   curves, listed by slot); `texture_budget`: library under 2.5 GB cooked and 7 GB source, a
@@ -369,8 +371,10 @@ pixel the same on every run:
   pixels of seven maps of a 32 px/m library, the small city's material files);
   `golden_streets.json`'s contribution hashes and AG1's small-city contribution moved on
   purpose (textures, materials and CPD in the contributions); every pack is unchanged.
-- **For later**: vertex colors in the shells (grime under sills, edge wear) wait for AG2's
-  shell changes (AG3); UV1 and window ids on glass can go; parts mapped onto the trim sheets
+- **AG2** (merged before this): every slot of `systems.SLOTS` has its own catalog entry (a
+  test holds it); its part packs are in the density check; the roof tile set is on the street
+  band for its tiled eaves.
+- **For later**: vertex colors in the shells (grime under sills, edge wear), AG3's; UV1 and window ids on glass can go; parts mapped onto the trim sheets
   (AG3); decals placed from the decal atlas (AG3). AG8 landed first with its own sign meshes
   (stroke-built glyph geometry) and flat-colored props: one sign path should be chosen (AG8's
   meshes faced with AG6's sign pages through `signs.json`, or the pages dropped), and the

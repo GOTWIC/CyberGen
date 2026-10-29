@@ -101,12 +101,13 @@ def _density(pos, uv, tri):
 
 
 def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int) -> dict:
-    """The check over every pack of a build's assets (tiles/ and streets/)."""
+    """The check over every pack of a build's assets (tiles/, AG2's parts/ in their own
+    frames, and streets/)."""
     per: dict[str, dict] = {}
     parts: dict[str, list[float]] = {}
     tris = 0
     worst: dict[str, tuple] = {}
-    for part, folder in (("buildings", "tiles"), ("streets", "streets")):
+    for part, folder in (("buildings", "tiles"), ("buildings", "parts"), ("streets", "streets")):
         d = assets / folder
         if not d.is_dir():
             continue

@@ -269,7 +269,7 @@ and clinic signs in its districts' scripts, brand logos and ads.
 .venv/bin/python -m assetgen materials preview out/vesper_bay --night
 ```
 
-`assetgen build` makes the library the first time (about a minute and a half, 655 MB, kept in
+`assetgen build` makes the library the first time (about a minute, 658 MB, kept in
 `~/.cache/cybergen/assetgen_library`) and the city's sign pages, and gives every building and
 street piece its textured materials, which the Unreal exporter imports with the city.
 `assetgen materials preview` renders them in Blender, `assetgen materials board` a board of

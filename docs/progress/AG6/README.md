@@ -21,16 +21,16 @@ Unreal masters for the exporter.
 |---|---|
 | Sets | 113 (60 per era: six surfaces in ten eras; 22 shared building surfaces; 31 street surfaces) |
 | Atlases | 14 (ten trim sheets, decals, road, window interiors, macro) |
-| Density | 512 px/m on the street band, 256 px/m on roofs (decision 13.4); sets 1 to 4 m |
-| Size | 655 MB of PNG, about 966 MB cooked with mips and block compression |
-| Time | 80 s on the M4 with 3 workers (167 s while sample builds ran) |
+| Density | 512 px/m on the street band, 256 px/m on flat roofs (decision 13.4); sets 1 to 4 m |
+| Size | 658 MB of PNG, about 969 MB cooked with mips and block compression |
+| Time | 59 to 80 s on the M4 with 3 workers (167 s while sample builds ran) |
 | Where | `~/.cache/cybergen/assetgen_library/d512` (or `$ASSETGEN_LIBRARY`), linked from each build; not in git |
 
 Each **set** is three maps: base color with height in alpha, a tangent-space normal
 (OpenGL), and occlusion, roughness, metallic with the tint mask in alpha. Where the mask is
 1 a building's tint replaces the set's mean color there (its `ref`); where it is 0 (mortar,
 panel joints, sealant, rust) the set keeps its own color. A set covers 1 to 4 m at 512 px/m
-(roofs at 256 px/m), so its size is a power of two.
+(flat roofs at 256 px/m), so its size is a power of two.
 
 - **Per era** (ten eras): concrete (board marks, form joints and tie holes, smooth or worn
   by era), plaster or stucco (coarse or fine, patched, cracked), brick (English bond and
@@ -195,7 +195,7 @@ among them):
   everywhere; the street pieces below it are tank cylinders, a few curb, barrier and coping
   sides with plan-projected UVs and the outer edge of tight curves (AG7's UVs, listed in
   `materials_report.txt` with the worst piece per slot).
-- **Texture budget**: the library under 2.5 GB cooked (966 MB) and 7 GB of source (655 MB);
+- **Texture budget**: the library under 2.5 GB cooked (969 MB) and 7 GB of source (658 MB);
   a city's sign pages under 0.3 GB cooked (46 to 74 MB).
 - **Determinism**: decoded-pixel goldens for seven maps of a 32 px/m library and the small
   test city's material files (`tests/assetgen/data/golden_hashes.json`, `ag6`).
@@ -231,10 +231,10 @@ a project that has AG1's import, import it again, and look at:
 
 ## For later
 
-- **AG2 or AG3**: vertex colors baked into the shells (grime under sills, edge wear), which
-  waited for AG2's shell changes to merge; dropping UV1 and the window ids from the glass
-  slots (unused now) for leaner meshes; part UVs onto the trim sheets.
-- **AG3**: decals placed from the decal atlas (graffiti and posters on party walls, leaks).
+- **AG3**: vertex colors baked into the shells (grime under sills, edge wear); dropping UV1
+  and the window ids from the glass slots (unused now) for leaner meshes; part UVs onto the
+  trim sheets; decals placed from the decal atlas (graffiti and posters on party walls,
+  leaks).
 - **With AG8** (merged first, with its own sign meshes and flat-colored props): one sign path
   (AG8's sign meshes faced with these sign pages through `signs.json`, or the pages dropped),
   and the props and plants textured from the library (bark, leaves, painted metal).
