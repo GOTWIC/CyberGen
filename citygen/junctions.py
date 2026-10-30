@@ -350,6 +350,51 @@ def shared_pavement(legs: list[Leg], poly):
     return min(ps, key=lambda q: (q.distance(P), G.qbounds(q)))
 
 
+SHARED_M2 = 5.0     # M17: two primary roads' leftover overlap this big joins a junction
+
+
+def absorb_shared(net, junctions: list[dict]) -> None:
+    """M17: where two primary roads at one level still share pavement past their junctions
+    (a fork that runs on past the next junction of one of them), the overlap joins the
+    junction polygon it runs out of (the part that touches it); one that touches no junction
+    stays (the check `road_overlaps` reports it)."""
+    segs = [x for x in net.segments if x["road_class"] in ("highway", "avenue")]
+    if len(segs) < 2 or not junctions:
+        return
+    lines = [LineString(x["centerline"]) for x in segs]
+    rows = [G.qpoly(ln.buffer(x["width_m"] / 2, cap_style="flat", join_style="mitre",
+                              mitre_limit=2.0)) for x, ln in zip(segs, lines)]
+    jp = [j["polygon"] for j in junctions]
+    jtree = shapely.STRtree(jp)
+    a, b = ST._pairs(shapely.STRtree(rows).query(rows, predicate="intersects"))
+    for i, k in zip(a.tolist(), b.tolist()):
+        if k <= i:
+            continue
+        ov = G.inter(rows[i], rows[k])
+        if G.area1(ov) <= SHARED_M2:
+            continue
+        near = sorted(int(x) for x in jtree.query(ov.buffer(1.5)))
+        if not near:
+            continue
+        ov = G.diff(ov, G.union([jp[x] for x in near]))
+        for part in G.parts(ov):
+            if G.area1(part) <= SHARED_M2:
+                continue
+            p = part.representative_point()
+            za = _z_at(segs[i]["z_profile"], lines[i].project(p))
+            zb = _z_at(segs[k]["z_profile"], lines[k].project(p))
+            if abs(za - zb) >= 4.0:
+                continue
+            touch = [x for x in near if jp[x].distance(part) <= 0.05]
+            if not touch:
+                continue
+            x = min(touch, key=lambda x: (jp[x].distance(part), junctions[x]["id"]))
+            u = G.union([jp[x], G.qpoly(part.buffer(0.05, join_style="mitre"))])
+            ps = G.parts(u)
+            jp[x] = junctions[x]["polygon"] = u if len(ps) <= 1 else max(
+                ps, key=lambda q: (G.area1(q), G.qbounds(q)))
+
+
 def bend_polygon(legs: list[Leg], row: bool = False) -> Polygon:
     """M17: a bend's surface: both carriageways (rights of way with `row`) out to their cuts
     and where the two rights of way overlap."""
@@ -860,6 +905,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                     if c is not None and c != _pt(*end):
                         W.add("path", [end, c], 2.0)
     lanes = build_lanes(net, legs, cut)
+    absorb_shared(net, junctions)
     T.detail("junctions/polygons", [j["polygon"] for j in junctions])
     T.detail("junctions/lanes", [(r["id"], r["centerline"], r["successors"]) for r in lanes])
     return {"junctions": junctions, "crosswalks": crosswalks, "sidewalks": sidewalks,

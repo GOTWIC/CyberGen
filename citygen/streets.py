@@ -3411,8 +3411,8 @@ def _split_at(edges: list, k: int, q) -> None:
 
 
 def _chain(g: _Graph, e: int, at_end: bool) -> tuple[list[int], float]:
-    """The edges from a dead end back to its last junction (through bends), and their
-    length."""
+    """The edges from a dead end back to its last junction (through bends between local
+    roads: a primary road it goes on as stays), and their length."""
     out, L = [], 0.0
     pts = g.edges[e][0]
     q = pts[0] if at_end else pts[-1]
@@ -3420,7 +3420,7 @@ def _chain(g: _Graph, e: int, at_end: bool) -> tuple[list[int], float]:
         out.append(e)
         L += _plen(g.edges[e][0])
         nxt = [x for x in g.at.get(q, []) if x[0] not in out]
-        if len(g.at.get(q, [])) != 2 or len(nxt) != 1:
+        if len(g.at.get(q, [])) != 2 or len(nxt) != 1 or g.edges[nxt[0][0]][1] < g.B.n_primary:
             return out, L
         e, f_end = nxt[0]
         pts = g.edges[e][0]
@@ -3525,7 +3525,7 @@ def _overlaps(B: Builder, g: _Graph) -> set:
     rows = np.array([g.row(e) for e in range(len(g.edges))], dtype=object)
     prim = np.array([li < B.n_primary for _, li in g.edges], dtype=bool)
     a, b = _pairs(shapely.STRtree(rows).query(rows, predicate="intersects"))
-    keep = a < b
+    keep = (a < b) & ~(prim[a] & prim[b])
     a, b = a[keep], b[keep]
     # (a first pass in floating point, a meter short of the limit, round discs about the
     # nodes they share; the exact one on the pairs left that an earlier round did not
@@ -3559,16 +3559,6 @@ def _overlaps(B: Builder, g: _Graph) -> set:
             continue
         if not both and any(ov.distance(Point(q)) < 1.0
                             for q in (g.nodes_of(i) | g.nodes_of(j)) & dead):
-            continue
-        if li < B.n_primary and lj < B.n_primary:
-            # two primary roads: one laid again inside the other's right of way (most of
-            # its own) goes, unless that would cut off its far end
-            k = min((i, j), key=lambda k: (G.area1(g.row(k)), k))
-            far = [q for q in g.nodes_of(k) if q not in both]
-            if B.lines[g.edges[k][1]].primary is not None and "pinned" in                     B.lines[g.edges[k][1]].primary["attrs"]:
-                continue
-            if G.area1(ov) >= 0.6 * G.area1(g.row(k)) and all(len(g.at[q]) > 1 for q in far):
-                drop.add(k)
             continue
         cand = [k for k in (i, j) if g.edges[k][1] >= B.n_primary and
                 not _held(B, g.edges[k][0])]
@@ -3733,6 +3723,15 @@ def clean_graph(B: Builder, edges):
     edges = out
     edges, n_dead = settle_dead_ends(B, edges)
     notes += n_dead
+    n_ped3 = pedestrianize_islands(B, edges)   # (M17: a cut-back may leave a lane island)
+    if n_ped3:
+        notes.append(f"{n_ped3} more lanes became pedestrian")
+        edges = _merge_and_trim(B, edges)
+        for pts, li in edges:
+            if B.lines[li].cls in PEDESTRIAN:
+                for q in (pts[0], pts[-1]):
+                    if B.dead_ends.get(q, ("", 0.0))[0] == "cul_de_sac":
+                        B.dead_ends[q] = ("path_end", 0.0)
     # keep the component that holds the primary network
     parent: dict = {}
 
