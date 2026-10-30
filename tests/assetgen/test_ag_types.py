@@ -169,11 +169,16 @@ def test_a_building_on_a_slope_stands_on_a_stepped_plinth():
     _check(sh, br)
     st = sh["stats"]
     assert st.get("plinth_facades", 0) >= 3 and st.get("retaining_skirts", 0) >= 1
+    low = -min(v for r in br["terrain"]["grade"] for v in r)
+    assert low >= AC.SLOPE_MIN_M
     rec = {"type": br["building"]["type"], "plinth_m": SH.plinth_mm(br) / 1000.0,
-           "stats": st}
-    assert AC.slopes({"a": rec})["ok"]
+           "grade_low_m": low, "stats": st}
+    r = AC.slopes({"a": rec})
+    assert r["ok"] and r["falling"] == 1
     flat = dict(rec, stats={})
     assert not AC.slopes({"a": flat})["ok"]
+    # (a plinth whose walls' ground stays within 0.3 m of the base needs no step)
+    assert AC.slopes({"a": dict(flat, grade_low_m=0.2)})["ok"]
 
 
 def _inside(col, x, y, z):

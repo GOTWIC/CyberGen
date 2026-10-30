@@ -315,6 +315,29 @@ tubes pass through towers in portals, with platforms where a station stands. In 
 each skybridge replaces its blockout piece and the roof equipment is instanced per tile.
 More: [`docs/progress/AG4`](docs/progress/AG4).
 
+<img src="docs/progress/AG5/landmarks_8k.jpg" width="840">
+
+Landmarks as hero buildings (8K): the megatower over Vesper Bay's Corporate Core, Nexus
+City's spires, an arcology and Greyhook's wheel.
+
+Every landmark is a hero building, built by kind: the megatower's three arms with light seams
+up their tips, sky gardens on the setbacks, a halo crown and a needle; spires with collars, a
+needle and a beacon; the arcology's planted terraces and glazed atrium roof; the wheel with
+its twin rims, spokes, gondolas and lattice legs. Each has weathering of its own (grime
+washed down under the setbacks, leaks under the sills, worn corners). The other building
+types are built their own way: shanty stacks with lean-to roofs, tarps and fire escapes,
+megablocks with antenna farms, sheds open on steel columns, hangars with sliding doors,
+temples and pagodas with colonnades and eaves, control towers with their cabs, vaulted
+terminals and stations, parking ramps, and twin towers as one design. Pitched roofs get
+dormers, and penthouses follow the era.
+
+<img src="docs/progress/AG5/cragmouth/slopes_8k.jpg" width="840">
+
+Cragmouth's Old Quarter on its hill (8K). On slopes, every building stands on a stepped
+stone plinth, with doors and shopfronts brought down or up to the street and retaining
+walls where the hill stands against a wall. `assetgen review` writes an art-direction sheet
+for a round of changes to the asset spec. More: [`docs/progress/AG5`](docs/progress/AG5).
+
 <img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
 
 Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).

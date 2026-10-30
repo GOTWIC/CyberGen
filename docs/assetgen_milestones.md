@@ -14,7 +14,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth, thumbnail uniqueness and budgets per building class | Done | [`docs/progress/AG2`](progress/AG2) |
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Done | [`docs/progress/AG3`](progress/AG3) |
 | AG4 | Roofs and connections: roof forms and finishes, roof equipment for every roof item, helipads, green roofs, facade details, skybridges with landing doors, sky tube portals and stations | Done | [`docs/progress/AG4`](progress/AG4) |
-| AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
+| AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Done | [`docs/progress/AG5`](progress/AG5) |
 | AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Done | [`docs/progress/AG6`](progress/AG6) |
 | AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
 | AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Done | [`docs/progress/AG8`](progress/AG8) |
@@ -603,6 +603,154 @@ that also draw a lawn stay in Unreal under AG4's beds (their plates sit under th
 border, so nothing flickers). Shell vertex colors and trim-sheet UVs stay open from AG3. The whole-city previews
 draw AG8's props only near a perspective camera (AG6's preview), so parks read bare
 there. Mac = x86 waits for the deferred determinism check.
+
+## AG5: types, landmarks and slopes
+
+**Built.** Generators per M3 type, heroes for the landmarks, buildings on M13's slopes, the
+complex families' check and the art-direction loop, in the shell builder's passes
+(`assetgen/buildings/types.py`, `heroes.py`, `slopes.py`, the part kit's AG5 families in
+`typeparts.py`) and `assetgen/review.py`:
+- **type generators** (`types.GENERATORS`; `pre` after the massing articulation, `mass` in
+  the mass loop in place of the grammar, `post` after the masses): shanty stacks (lean-to
+  sheet roofs over their top storeys, tarps on poles, water barrels, rough fire escapes and
+  ladders up the stacks, stilt balconies), megablocks (antenna farms on the towers, service
+  risers up their back walls, a neon band along the podium), warehouses and yards (canopies
+  over loading doors, ridge monitors), sheds (open sides: the roof on steel columns two
+  bays apart, walls only where a neighbour stands; doors recorded as open sides), hangars
+  (a sliding door across the apron facade, its facade kept blank), labs (fume stacks),
+  villas (a chimney through the attic, a pergola on a lower roof), terraced rows (planters
+  and rails on every terrace), temple halls (a colonnade of lacquered columns on stone
+  bases round the hall, the hall set back behind it, eaves over every tier, stairs cut
+  into the platform, a finial), pagodas (eaves over every tier, a finial), gate houses
+  (a canopy roof all round, a beacon), terminals and stations (a vaulted roof, canopies),
+  control towers (the cab: a glazed band leaning out, mullions, a roof with a radome and
+  antennas; a lit slot up the shaft), parking structures (ramps as sloped decks), straddle
+  buildings (transfer girders under the span, lamps); the rest of M3's types stay the
+  general grammar's. Everything a type adds goes through `types.put`: only where the
+  envelope allows it (`envelope.fits`) and off every skybridge, guideway and sky tube
+  corridor; counted (`stats.type_features`, by kind), the record's `generator` names it;
+- **AG4's leftovers**: the mechanical penthouse by era (`roofs.PENTHOUSE_STYLE`: deco,
+  screen, block, shed, louver); dormers on gable, hip and mansard roofs of the eras that
+  pitch them (`types.dormers`: gabled or shed dormers one per 4.2 m on the long slopes,
+  small gabled ones on a mansard's steep slope where the attic leaves room); shanty fire
+  escapes (the shanty generator); collision that leaves the landing doors open
+  (`collision.py`: a mass a skybridge lands on is cut into storeys at the door's floor and
+  head, the door's storey notched the door's width and `VESTIBULE_MM` 2.5 m deep); a sky
+  station whose tube passes beside its tower, not through it (M5 leaves Delta Megacity two),
+  gets its platform there (`connections._beside`: the station's footprint on the tower's
+  side of the tube and a deck across to the wall, `STATION_LINK` 6 m at most, cantilevered
+  or resting on a roof up to 3 m under it, its floor under the tube's lowest point over the
+  station; the envelope check lets the `platform` slot reach the station);
+- **heroes** (`heroes.py`; every landmark and M3's megasite wheel): the general shell of
+  the landmark's masses with its era system by kind (`systems.LANDMARK_SYSTEM`), its
+  palette from the spec's landmark entry (walls the darkest colour, trim the lightest, the
+  accent its most saturated) and per kind: the megatower's light seams up every arm tip,
+  aviation lights on the tiers, sky gardens on the setbacks, a halo crown and a needle;
+  the spire's seams at the octagon's corners, collars, a needle with rings and a beacon;
+  the arcology's planted terraces with glass rails on every step, a glazed space frame
+  over its atrium and a mast with dishes; the wheel built whole (twin rims tied by beams,
+  rim lights, spokes to a hub and axle, 24 to 32 gondolas, lattice legs, a crossbeam).
+  Every hero has a U2 mask (scope 13.2): 512 px, R grime (from the ground and washed down
+  under every setback), G leaks (under its windows' sills), B wear (its corners and roof
+  edges), integer-hash noise from AG6's library, in the hero UV (UV1 on every non-glass
+  slot: u the UV0's u over its longest perimeter, v the height over the building's),
+  written as `assets/textures/hero/<id>.png`; budget class `hero`;
+- **slopes** (`slopes.py`; the brief's new `terrain`: the ground along every edge of a
+  mass on the base, every metre, 0.3 m out): each facade's plinth in steps of about 4 m at
+  their lowest ground (0.15 m risers), mitred at the corners, from 0.3 m under the step up
+  to the base; doors and shopfronts at grade (lowered to the ground where it falls 0.3 m
+  or more, into the plinth whole where they would end under the base, the band putting
+  windows in their place; raised onto the ground where it rises 0.2 m or more, their head
+  up to the band's top under what is mounted over them; narrowed to the stretch that can
+  be raised where the hill climbs across a wide shopfront); lower-storey windows where a
+  step is 2.7 m or more under the base; retaining skirts where the hill stands against a
+  wall; the band's ground-row windows the hill would bury left out;
+- **complex families**: twin towers one design to the last step (no member step on the
+  continuous genes); clusters, campuses, bridged pairs and megasites share their discrete
+  genes as before;
+- **checks**: `asset_types` (every building by its type's generator, every hero with its
+  mask; types the generators do not list counted apart), `asset_families` (the members of
+  a family share the discrete genes of every group whose system they share; twins every
+  gene), `asset_slopes` (every building whose plinth is 0.3 m or more stands on a stepped
+  plinth; what the fronts did at grade counted);
+- **art direction**: `assetgen review BUILD --spec S [--prev P]` writes `review.md` and
+  `review.json` (the failed checks of every stage, numbers per district: eras, facade
+  systems, type generators, wear; spec changes since the previous round; the previews to
+  open; what to change in the spec for what one sees), `assetgen spec diff A B`; the
+  skill's step 6 runs the rounds.
+
+GEN_VERSION "ag5.0", GENOME_VERSION 5; briefs unchanged on flat ground (a hilly city's
+briefs gain `terrain`, BRIEF_VERSION stays 2).
+
+**Exporter** (`docs/unreal_export.md`, "From AG5"): a hero's building entry carries `hero`
+(kind, accent) and a `materials` map of its own (`<slot or era material>#<id>`: its U2 mask
+`city.hero.<id>` as `HeroMask`, `HeroMaskOn` 1 on every slot of a textured opaque master;
+its accent on its light slots, with or without AG6's library), its shell and front UV1 in
+the hero UV; a building on M13's slopes carries `plinth_m`. `citygen/unreal.py` takes an
+entry's `hero` and `plinth_m` onto its actor (in its hash; `stage2.counts.heroes`);
+`citygen/ue/import_city.py` tags them (`cg.hero=<kind>`, `cg.plinth=<m>`) and gives the
+textured masters `HeroMask` (sampled on UV1) and `HeroMaskOn` (0 by default) after their
+surface (`HERO_CODE`: grime darkens, leaks stain, wear lightens), `STAGE2_VERSION` 6. The
+buildings' hulls are notched at the landing doors (no exporter change: convex pieces as
+before). Tested without Unreal by `test_stage2_heroes_and_plinths`; the Blender preview
+draws the same (`ag6_materials._hero` on `UVMap.001`). Unreal check: the coordinating
+session's call (`docs/progress/AG5/README.md` lists what to look at).
+
+**Samples** (4 workers, 3 where the shared Mac was short of memory; every check passes in
+each: the fourteen building checks, AG7's streets, AG8's props, AG6's materials):
+
+| City | Buildings | Shell triangles | Type generators (buildings; features) | Heroes | Families (twin towers) | Dormers | Landing doors | Sky platforms beside a tower | On a plinth (stepped facades / skirts; doors lowered / raised / narrowed; buried) | Build |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 34.52 M | 17 (2,598; 8,170) | megatower | 8 (1) | 331 | 513 of 516 | 0 | flat | 2m29s |
+| Greyhook | 2,671 | 19.05 M | 14 (1,426; 4,227) | wheel | 7 (0) | 401 | 338 of 340 | 0 | flat | 1m19s |
+| Cragmouth | 6,777 | 37.23 M | 10 (2,520; 11,882) | megatower | 4 (0) | 157 | 533 of 558 | 0 | 4,724 (33,923 / 30,123; 5,589 / 4,502 / 634; 2,196) | 4m31s |
+| Delta Megacity | 5,417 | 35.21 M | 10 (2,099; 10,155) | megatower | 7 (1) | 154 | 647 of 652 | 2 | flat | 3m02s |
+| Nexus City | 6,519 | 35.35 M | 19 (2,757; 11,107) | megatower, spire x3, wheel | 12 (1) | 340 | 468 of 474 | 0 | flat | 3m09s |
+| Vesper Bay Decks (checks only) | 5,856 | 34.78 M | 17 (2,546; 9,373) | megatower | 8 (1) | 280 | 531 of 532 | 0 | flat | 4m20s |
+
+On a plinth: buildings whose ground falls 0.3 m or more round their base (every one on a
+stepped plinth); buried: doors and shopfronts the hill covers where it climbs past a whole
+ground storey (left in place, counted). Build: the whole `assetgen build`.
+
+**Art direction**: two rounds on Vesper Bay as the art director's stand-in
+(`docs/progress/AG5/review/`: each round's `assetgen review` sheet, notes, before and
+after). Round 1 found the Corporate Core's gold and red brand-coloured towers (an owner's
+first two brand colours can paint whole walls), the spaceport's amber parking decks,
+The Stacks without the capsule stacks the spec asks for, and Old Town's roofs nearly all
+flat; round 2's spec moved the owners' accents to third place (trim only), weighted the
+heritage era's pitched roofs two in four and raised The Stacks' capsule weight and wear.
+The core and Scholar Isle now read as quiet glass and Old Town's pitched crowns went from
+963 to 1,409; The Stacks' capsules did not come (capsule stacks are built only up to 40
+floors, `systems.FLOORS`, and its towers are taller). The round 2 spec is now
+`cities/vesper_bay/asset_spec.json`.
+
+**Goldens**: written again on the Mac (`tests/assetgen/goldens.py --builds DIR --sections ag1
+ag6 vesper`): every shell moves (the type generators, heroes, dormers, penthouse styles,
+the collision notches at landing doors), so the small city's asset digest and the Vesper Bay
+buildings move; the buildings' contribution and `materials.json` (AG5's slots, hero
+materials) move AG6's digest. Briefs on flat ground are unchanged (the samples' brief
+goldens hold); a hilly city's briefs gain `terrain`. AG7's streets and AG8's props goldens
+are unchanged.
+
+**Found on the way** (the city's, stage 1's to look at):
+- M3's arcology leaves its top tier with no area and its crown 56 m over the last tier (the
+  sample with an arcology made for the renders, Vesper Bay with The Stacks' landmark an
+  arcology); AG5 leaves out a hero's unsupported masses and moves their roof items onto the
+  roof under them (`hero_masses_unsupported`, `roof_items_moved`).
+- M5 places two of Delta Megacity's sky stations (Corporate Core, Midtown) where the tube
+  passes 1 to 3 m beside the tower at the station's height, on a track that climbs 1.5 m
+  along the platform; AG4 built a platform only in a cut portal, so those stations had none
+  (AG4's `asset_roofs` failed on them; Delta was not one of AG4's samples).
+- M3 puts some temple halls' main entrance at a corner of the hall; behind AG5's colonnade
+  the door comes onto the entrance's own wall, 2 m from the corner.
+
+**Open.** For AG9: capsule stacks over 40 floors (The Stacks' towers); a hero glass darker
+than AG6's interior-mapped glass (the megatower reads grey-blue, not the brief's
+near-black); openings the hill buries where it climbs past a whole ground storey
+(Cragmouth: 2,196 doors and shopfronts, left in place and counted:
+`openings_buried`); an entrance on the uphill side of such a storey wants the floor above
+(AG3's band is the ground floor only). The whole-city 8K renders stay AG4's (AG5 changes
+read at street and district scale). Mac = x86 waits for the deferred determinism check.
 
 ## AG6: materials and textures
 

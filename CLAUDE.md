@@ -1044,6 +1044,8 @@ AG5 (types, landmarks and slopes) is in place (tests `tests/assetgen/test_ag_typ
   edge): stepped plinths, lower-storey windows, retaining skirts, doors and shopfronts at
   grade (lowered, raised or narrowed).
 - **Collision**: hulls notched at skybridge landing doors (`collision.VESTIBULE_MM`).
+- **Sky stations beside a tower** (the tube meets no mass there): a platform deck to the
+  wall or onto a roof under it (`connections._beside`).
 - **Checks**: `asset_types`, `asset_families` (twin towers one design), `asset_slopes`.
 - **Art direction**: `assetgen review BUILD --spec S [--prev P]` (`review.md`), `assetgen
   spec diff A B`; rounds in the skill. Results: `docs/progress/AG5/`.
