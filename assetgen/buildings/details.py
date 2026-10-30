@@ -24,6 +24,7 @@ overhead cables between buildings, ivy). Nothing here draws what either draws.
 
 from __future__ import annotations
 
+from . import decks as DK
 from . import fronts as FR
 from . import genome as GN
 from . import parts as PT
@@ -213,11 +214,16 @@ def ducts(sb) -> None:
         if best is None:
             continue
         _, fa, ms = best
+        # (0.6 m over the roof; AG10: under an M14 deck, stopped under its soffit)
+        top = ms["z1"] + 600
+        ceil = DK.ceiling_mm(sb.br)
+        if ceil is not None:
+            top = min(top, ceil - int(DK.CEIL_GAP_M * 1000))
         for t in (0.5, 0.3, 0.7, 0.15, 0.85):
             s = int(fa.c0 + (fa.L - fa.c0 - fa.c1) * t)
             if _free(sb, fa, s - 300, s + 300, 3000, ms["z1"]) and \
                     _on(sb, fa, "duct", {"w": 400, "dd": 300,
-                                         "h": PT.q(ms["z1"] - 3200 + 600)}, s, 3200):
+                                         "h": PT.q(top - 3200)}, s, 3200):
                 made += 1
                 break
     if made:

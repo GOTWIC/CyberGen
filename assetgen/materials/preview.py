@@ -147,8 +147,10 @@ def run(args, progress=None) -> dict:
     bo = Path(args.blockout) if args.blockout else bdir
     cams = PV.cameras(bdir, bo)
     which = set(args.views or ["districts", "street"])
-    kinds = {"city", "city_full", "districts", "street"}
+    kinds = {"city", "city_full", "districts", "street", "deck"}
     views = PV.plan_views(man, cams, args.width, which & kinds)
+    if "deck" in which and cams.get("deck"):
+        views.append(deck_view(man, cams["deck"], args.width))
     named = [v for v in (args.views or []) if v not in kinds]
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
@@ -166,7 +168,7 @@ def run(args, progress=None) -> dict:
             v["parts"] = PV.instances(man, v["shell_tiles"])
             # (AG4: the skybridges of the shells' tiles)
             v["connection_tiles"] = sorted(set(v["shell_tiles"]) & set(ctiles))
-            if v["ortho"]:
+            if v["ortho"] or v.get("section"):
                 v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
                 v["signs"], v["lights"] = [], []
             else:
@@ -187,6 +189,24 @@ def run(args, progress=None) -> dict:
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
     return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))
+
+
+DECK_R = 420.0          # the deck section's tiles: within this of its plane's middle
+
+
+def deck_view(man: dict, cut: dict, width: int) -> dict:
+    """AG10: the section across the biggest M14 deck (the blockout's `deck` view), looking
+    level along its plane's normal from the blockout's eye; the camera's near clip on the
+    plane cuts everything on its side (Blender hides what lies wholly there)."""
+    ox, oy = cut["origin"]
+    nx, ny = cut["n"]
+    ex, ey, ez = cut["eye"]
+    d = (ex - ox) * nx + (ey - oy) * ny
+    tiles = sorted(t for t in man["tiles"] if _tile_near(t, (ox, oy), DECK_R))
+    return {"name": "deck", "ortho": False, "lens": cut["lens_mm"], "eye": [ex, ey, ez],
+            "target": [ex - nx * d, ey - ny * d, ez], "w": width, "h": int(width * 9 / 16),
+            "shell_tiles": tiles, "section": {"origin": [ox, oy], "n": [nx, ny],
+                                              "clip": round(d, 3)}}
 
 
 def _tile_near(name: str, p, r) -> bool:

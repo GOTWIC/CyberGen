@@ -495,6 +495,26 @@ def camera(sc, v):
     return cam
 
 
+def section(sc, cam, v):
+    """AG10: a section along a vertical plane (`v["section"]`: a point on it and its normal
+    toward the camera): the camera's near clip on the plane, and every mesh lying wholly on
+    the camera's side hidden (so it casts no shadow into the cut). Returns what it hid."""
+    s = v["section"]
+    cam.data.clip_start = max(float(s["clip"]), 0.3)
+    ox, oy = s["origin"]
+    nx, ny = s["n"]
+    hid = []
+    for o in sc.objects:
+        if o.type != "MESH" or o.hide_render:
+            continue
+        dn = [((o.matrix_world @ Vector(c)).x - ox) * nx +
+              ((o.matrix_world @ Vector(c)).y - oy) * ny for c in o.bound_box]
+        if min(dn) > 0.05:
+            o.hide_render = True
+            hid.append(o)
+    return hid
+
+
 def main():
     _defer_gltf_tmp()
     sc, sun = start()
@@ -541,6 +561,8 @@ def main():
                 o.hide_render = True
         sobjs = signs(v.get("signs", [])) + ag8(v, protos)
         cam = camera(sc, v)
+        if v.get("section"):
+            hidden += section(sc, cam, v)
         try:
             sc.eevee.taa_render_samples = v.get("samples") or JOB.get("samples", 32)
         except AttributeError:
