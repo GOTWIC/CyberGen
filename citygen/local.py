@@ -19,6 +19,8 @@ from . import trace as T
 
 PATH_KINDS = ("park", "plaza", "pocket_park", "market", "garden", "promenade", "beach")
 PATH_REACH_M = 30.0
+ISLAND_SEAM_M = 40.0   # M17: a regeneration links a cut-off walkway group within this far of
+#                        the district (its seam) where it can, so nothing far from it moves
 
 
 @dataclass
@@ -81,19 +83,34 @@ def open_paths(W: JN.WalkGraph, opens: list[dict]) -> int:
     return n
 
 
-def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list) -> int:
+def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list,
+                      frame=None) -> int:
     """Walkway groups cut off on their landmass (streets reached only past a highway) join
     the main group by the shortest link up to 150 m: a pedestrian overpass where it crosses
-    a highway or avenue, else a path."""
+    a highway or avenue, else a path. Under a regeneration's frame (M17) the old city's links
+    away from the district (`ISLAND_SEAM_M` past it) come back first as they were, and a
+    group still cut off is linked at its nearest point within that seam where it has one."""
+    n = 0
+    band = None
+    if frame is not None:
+        band = G.qpoly(frame.zone.buffer(ISLAND_SEAM_M, join_style="mitre"))
+        shapely.prepare(band)
+        ends = {p for e in W.edges for p in (e["pts"][0], e["pts"][-1])}
+        for w in frame.islands:
+            line = [(p[0], p[1]) for p in w.line]
+            if set(w.attrs) <= {"joins", "beside"} and line[0] in ends and \
+                    line[-1] in ends and not band.intersects(LineString(line)):
+                W.add(w.kind, line, w.width_m, z=w.line[0][2], **w.attrs)
+                n += 1
     roots = JN.walk_components([(e["pts"][0], e["pts"][-1]) for e in W.edges])
     if not roots:
-        return 0
+        return n
     big = [LineString(s["centerline"]) for s in segments
            if s["road_class"] in ("highway", "avenue")]
     big_u = shapely.union_all(big) if big else None
     pts = sorted(roots)
     arr = shapely.points(np.array(pts, dtype=np.float64))
-    n = 0
+    in_band = shapely.contains(band, arr).tolist() if band is not None else None
     for lm in landmasses:
         inside = np.nonzero(shapely.contains(G.qpoly(lm.buffer(-1.0, join_style="mitre")),
                                              arr))[0].tolist()
@@ -104,18 +121,19 @@ def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list) -> int:
             continue
         main = max(sorted(groups), key=lambda r: len(groups[r]))
         tree = shapely.STRtree(arr[groups[main]])
+        near = [i for i in groups[main] if in_band[i]] if in_band is not None else []
+        near_tree = shapely.STRtree(arr[near]) if near else None
         for r in sorted(groups):
             if r == main:
                 continue
             best = None
-            for i in groups[r]:
-                # every equally near point, the lowest wins (the tree's own pick among
-                # ties follows its std::sort order, which differs between C++ libraries)
-                ks = tree.query_nearest(arr[i], all_matches=True).tolist()
-                j = min((groups[main][int(k)] for k in ks), key=lambda j: pts[j])
-                d = STR._dist(pts[i], pts[j])
-                if best is None or (round(d, 6), pts[i]) < (round(best[0], 6), best[1]):
-                    best = (d, pts[i], pts[j])
+            own = [i for i in groups[r] if in_band[i]] if near_tree is not None else []
+            if own:
+                best = _nearest(pts, arr, own, near, near_tree)
+                if best[0] > 150.0:
+                    best = None
+            if best is None:
+                best = _nearest(pts, arr, groups[r], groups[main], tree)
             if best is None or best[0] > 150.0:
                 if _path_along_roads(W, [pts[i] for i in groups[r]],
                                      [pts[i] for i in groups[main]], segments):
@@ -127,6 +145,21 @@ def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list) -> int:
                   z=6.5 if over else 0.0, joins="walkway island")
             n += 1
     return n
+
+
+def _nearest(pts: list, arr, own: list, other: list, tree):
+    """The nearest pair from points `own` to points `other` (indices into pts; `tree` over
+    arr[other]): (distance, own point, other point), or None."""
+    best = None
+    for i in own:
+        # every equally near point, the lowest wins (the tree's own pick among ties follows
+        # its std::sort order, which differs between C++ libraries)
+        ks = tree.query_nearest(arr[i], all_matches=True).tolist()
+        j = min((other[int(k)] for k in ks), key=lambda j: pts[j])
+        d = STR._dist(pts[i], pts[j])
+        if best is None or (round(d, 6), pts[i]) < (round(best[0], 6), best[1]):
+            best = (d, pts[i], pts[j])
+    return best
 
 
 def _path_along_roads(W: JN.WalkGraph, island: list, main: list, segments: list) -> bool:
@@ -245,7 +278,8 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                                 "kind": o["kind"], "polygon": P(poly), "name": o["name"],
                                 "district_id": d, "attrs": attrs})
     n_paths = open_paths(jx["walk"], blk["open"])
-    n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, gnet.segments)
+    n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, gnet.segments,
+                                getattr(b, "frame", None))
     walk = JN.walkways(jx["walk"])
     if dplan.decks:
         walk = _deck_walks(dplan, net, jx, dko, walk)

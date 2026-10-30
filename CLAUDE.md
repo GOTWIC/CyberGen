@@ -774,7 +774,11 @@ M17 (road network repair, from the first run-through) is in place:
   height, 5 m of headroom) after the building checks. Heights over the ground on a terrain
   city; M10's regeneration runs them through `check_all`; a held road is never extended, cut
   or dropped (`_held`), a new street meets an old road only at its nodes (a facing join onto a
-  held road's end at an old node is one).
+  held road's end at an old node is one). Under a regeneration's frame
+  `local.join_walk_islands` lays the old city's walkway-island links away from the district
+  again as they were (`Frame.islands`) and links a group the new streets cut off at its
+  nearest point within `ISLAND_SEAM_M` 40 m of the district (else as before), so a
+  regeneration moves no walkway far from it; a fresh build is unchanged.
 Sample builds, the run-through's measures before and after: `docs/progress/M17/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

@@ -504,6 +504,10 @@ class Frame:
         self.pin_buildings = list(pin_buildings)
         self.zone = G.qpoly(polygon.buffer(2.0, join_style="mitre"))
         self.core = G.qpoly(polygon.buffer(-1.0, join_style="mitre"))
+        # M17: the old city's walkway-island links on the ground (`local.join_walk_islands`
+        # lays those away from the district again as they were)
+        self.islands = [w for w in model.walkways
+                        if w.attrs.get("joins") == "walkway island" and not w.level]
         # M13: the old city's bored stretches of primary road (no new street meets them)
         self.bores = [LineString([(p[0], p[1]) for p in t.line]) for t in model.tunnels
                       if t.kind == "bored" and len(t.line) >= 2]

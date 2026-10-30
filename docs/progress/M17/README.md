@@ -155,13 +155,6 @@ it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` 
 
 ## Open items
 
-- `tests/test_edit.py::test_regeneration_of_the_first_district_keeps_the_ones_after_it`:
-  regenerating Testport's Core (its first district) keeps every road outside it (1,287 of
-  1,287 held), but adds one 6.5 m walkway-island link (`wk.e881n688`) 321 m from Core and so
-  changes four walkways' neighbor lists there. The old city reached that walkway group through
-  Core's old streets; the new Core does not, and `local.join_walk_islands`, which links islands
-  over the whole landmass, joins the group where it is nearest. Making that join local under
-  a regeneration's frame (or keeping the far groups' old links) is left open.
 - `tests/assetgen/data/golden_props.json` was not rewritten: its pack bytes differ on Windows
   (known), so it wants `tests/assetgen/props_goldens.py --builds DIR` on the Mac.
 - Vesper Bay Stacks' traced crosstown ends 23 m up on M12's stack (tagged `traced_end`; M12's
@@ -204,6 +197,17 @@ it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` 
 - **Tests**: `test_check_segment_length_and_duplicates` drops the twin's `split_of` too (M17's
   Testport makes the longest avenue chain one M7 joined, and the twin joined its group); the
   committed sample reports are read from here; the city model schema has the `bend` shape.
+
+- **Walkway islands in a regeneration**: regenerating Testport's Core (its first district)
+  kept every road outside it, but added a 6.5 m walkway-island link 321 m from Core
+  (`tests/test_edit.py::test_regeneration_of_the_first_district_keeps_the_ones_after_it`).
+  The new Core and the streets north-east of it formed a walkway group cut off from the rest,
+  which the old Core's streets had joined, and `local.join_walk_islands` linked it where it
+  came nearest, far from Core. Under a regeneration's frame it now lays the old city's island
+  links away from the district again as they were (`Frame.islands`) and links a group the new
+  streets cut off at its nearest point within `ISLAND_SEAM_M` (40 m) of the district (here a
+  20.6 m path at Core's edge), else as before; nothing more than 250 m from Core moves. A
+  fresh build takes the old path (Testport and Delta byte for byte the same).
 
 ## Two changes to the assetgen tests and check
 
