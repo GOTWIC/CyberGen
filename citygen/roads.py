@@ -74,6 +74,7 @@ RAMP_GRADE = 0.06
 WATERFRONT_SETBACK_M = 50.0
 EDGE_KEEP_M = 40.0          # roads stay this far from the map edge, exits aside
 JUNCTION_SKIP_M = {"highway": 60.0, "avenue": 25.0}  # junction area (see checks)
+FORK_DEG = 45.0        # M17: primary roads leaving a node closer than this part as a fork
 OPTIONAL_ROLES = ("waterfront", "boundary", "chord", "crossing", "ring_road", "axis_boulevard")
 DANGLE_M = 120.0
 SPACING_M = {
@@ -2411,22 +2412,35 @@ def _drop_dangles(pieces, keep: set, ctx: Ctx):
 
 
 def _drop_lenses(pieces):
-    """Two avenue pieces between the same two nodes (a lens under 200 m): keep the shorter."""
+    """Two avenue pieces between the same two nodes (a lens under 200 m): keep the shorter.
+    M17: two primary pieces between the same two nodes whose rights of way overlap all the
+    way (the one within half their two widths of the other everywhere) are one road laid
+    twice: the lesser goes (an avenue beside a highway, else the longer)."""
+    rank = {"highway": 2, "avenue": 1}
     seen: dict = {}
     drop = set()
     for k, (ln, r) in enumerate(pieces):
         a, b = G.qpoint(ln.coords[0]), G.qpoint(ln.coords[-1])
-        if a == b or r.cls != "avenue":
+        if a == b or "pinned" in (r.role,):
             continue
         key = (min(a, b), max(a, b))
-        if key in seen:
-            j = seen[key]
-            if max(ln.length, pieces[j][0].length) < 200.0:
-                worse = k if ln.length > pieces[j][0].length else j
-                drop.add(worse)
-                seen[key] = j if worse == k else k
-        else:
-            seen[key] = k
+        for j in seen.get(key, []):
+            if j in drop:
+                continue
+            lj, rj = pieces[j]
+            half = (CLASSES[r.cls]["width"] + CLASSES[rj.cls]["width"]) / 2
+            if r.cls == rj.cls == "avenue" and max(ln.length, lj.length) < 200.0:
+                worse = k if ln.length > lj.length else j
+            elif ln.hausdorff_distance(lj) <= half:
+                worse = min((k, j), key=lambda x: (rank[pieces[x][1].cls],
+                                                   -pieces[x][0].length, x))
+            else:
+                continue
+            drop.add(worse)
+            if worse == k:
+                break
+        if k not in drop:
+            seen.setdefault(key, []).append(k)
     return [p for k, p in enumerate(pieces) if k not in drop]
 
 
@@ -2682,10 +2696,22 @@ def _merge_forks(pieces):
                     s = 0.0
                     while s + 10.0 <= b.length and A.distance(b.interpolate(s + 10.0)) < 25.0:
                         s += 10.0
-                    if s < 150.0 or s > b.length - 40.0:
-                        continue
-                    # the junction a little before they part, so the branch leaves at an angle
-                    q = G.qpoint(nearest_points(A, b.interpolate(s - 50.0))[0])
+                    if 150.0 <= s <= b.length - 40.0:
+                        # the junction a little before they part, so the branch leaves at an
+                        # angle
+                        q = G.qpoint(nearest_points(A, b.interpolate(s - 50.0))[0])
+                    else:
+                        # M17: rights of way that overlap farther out than a junction's at
+                        # FORK_DEG (a fork or a crossing at a smaller angle): the branch leaves
+                        # square from where they part
+                        half = (CLASSES[ra.cls]["width"] + CLASSES[rb.cls]["width"]) / 2
+                        s = 0.0
+                        while s + 5.0 <= b.length and A.distance(b.interpolate(s + 5.0)) < half:
+                            s += 5.0
+                        if s < half / M.sin(M.radians(FORK_DEG)) or s > b.length - 40.0:
+                            continue
+                        s += 5.0
+                        q = G.qpoint(nearest_points(A, b.interpolate(s))[0])
                     t = A.project(Point(q))
                     if t < 40.0 or t > A.length - 40.0:
                         continue

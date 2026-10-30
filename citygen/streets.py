@@ -3244,6 +3244,7 @@ class _Graph:
         self.lines = [LineString(p) for p, _ in edges]
         self.tree = shapely.STRtree(self.lines)
         self.dead = [q for q in sorted(self.at) if len(self.at[q]) == 1]
+        self.pad = max((B.lines[li].width / 2 for _, li in edges), default=0.0)
 
     def row(self, e: int):
         pts, li = self.edges[e]
@@ -3255,7 +3256,12 @@ class _Graph:
         return self._cache[key]
 
     def near(self, geom) -> list[int]:
-        return sorted(int(x) for x in self.tree.query(geom))
+        """Edges whose rights of way may touch geom (centerlines within the widest half
+        width of its box)."""
+        x0, y0, x1, y1 = geom.bounds
+        d = self.pad
+        return sorted(int(x) for x in self.tree.query(shapely.box(x0 - d, y0 - d, x1 + d,
+                                                                    y1 + d)))
 
     def ends(self) -> list[tuple]:
         """(point, edge, at its end) of every dead end, by point."""
@@ -3519,7 +3525,7 @@ def _overlaps(B: Builder, g: _Graph) -> set:
     rows = np.array([g.row(e) for e in range(len(g.edges))], dtype=object)
     prim = np.array([li < B.n_primary for _, li in g.edges], dtype=bool)
     a, b = _pairs(shapely.STRtree(rows).query(rows, predicate="intersects"))
-    keep = (a < b) & ~(prim[a] & prim[b])
+    keep = a < b
     a, b = a[keep], b[keep]
     # (a first pass in floating point, a meter short of the limit, round discs about the
     # nodes they share; the exact one on the pairs left that an earlier round did not
@@ -3554,6 +3560,16 @@ def _overlaps(B: Builder, g: _Graph) -> set:
         if not both and any(ov.distance(Point(q)) < 1.0
                             for q in (g.nodes_of(i) | g.nodes_of(j)) & dead):
             continue
+        if li < B.n_primary and lj < B.n_primary:
+            # two primary roads: one laid again inside the other's right of way (most of
+            # its own) goes, unless that would cut off its far end
+            k = min((i, j), key=lambda k: (G.area1(g.row(k)), k))
+            far = [q for q in g.nodes_of(k) if q not in both]
+            if B.lines[g.edges[k][1]].primary is not None and "pinned" in                     B.lines[g.edges[k][1]].primary["attrs"]:
+                continue
+            if G.area1(ov) >= 0.6 * G.area1(g.row(k)) and all(len(g.at[q]) > 1 for q in far):
+                drop.add(k)
+            continue
         cand = [k for k in (i, j) if g.edges[k][1] >= B.n_primary and
                 not _held(B, g.edges[k][0])]
         new = [k for k in cand if B._renewed(B.lines[g.edges[k][1]])]
@@ -3577,7 +3593,7 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
     n_run = n_cut = n_trim = n_dup = 0
     tags: dict = {}
     cache: dict = {}
-    for _ in range(12):
+    for rnd in range(12):
         g = _Graph(B, edges, cache)
         drop = _overlaps(B, g)
         if drop:
@@ -3604,6 +3620,8 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
             n_run += 1
         if touched:
             edges = _merge_and_trim(B, edges)
+            if rnd < 6:
+                edges, _ = fix_angles(B, edges)   # (a road run on may meet others too sharply)
             continue
         tags = {}
         cut: set = set()

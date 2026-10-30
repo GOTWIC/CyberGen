@@ -106,6 +106,7 @@ class Leg:
             self.r = CORNER_R[self.cls]
         self.cut = 0.0
         self.cut_row = 0.0
+        self.capped = False     # M17: its cut is short of where it parts from a neighbor
 
 
 def _corner(P, a: Leg, b: Leg, ha: float, hb: float, r: float):
@@ -194,6 +195,10 @@ def cutbacks(legs: list[Leg], cap: bool = True) -> None:
         if c is not None:
             a.cut = max(a.cut, c[0])
             b.cut = max(b.cut, c[1])
+            if c[4] is None:
+                # (M17: a corner too sharp for its fillet, or a fork: their rights of way
+                # share pavement out past the curb corner)
+                a.capped = b.capped = True
         rr = max(r - max(a.sw, b.sw), ROW_CORNER_MIN_M)
         c2 = _corner(P, a, b, a.row, b.row, rr)
         if c2 is not None:
@@ -228,6 +233,8 @@ def share_cuts(legs: dict) -> None:
                     a = b = avail / 2
                 need = [a, b]
             for x, c in zip(xs, need):
+                if attr == "cut" and getattr(x, attr) > min(c, avail) + 0.01:
+                    x.capped = True
                 setattr(x, attr, min(c, avail))
 
 
@@ -258,6 +265,8 @@ def overlap_cuts(legs: list[Leg]) -> None:
                 far = float(shapely.line_locate_point(lines[k], pts).max())
                 legs[k].cut = max(legs[k].cut, G.q(far + 0.5))
                 legs[k].cut_row = max(legs[k].cut_row, legs[k].cut)
+                if far >= reach[k] - 1.0:
+                    legs[k].capped = True    # (they overlap on past its reach)
 
 
 def run_along(lg: Leg, c: float) -> float:
@@ -280,6 +289,8 @@ def run_along(lg: Leg, c: float) -> float:
 
 def junction_polygon(legs: list[Leg], row: bool = False) -> Polygon:
     n = len(legs)
+    if n == 2:
+        return bend_polygon(legs, row)
     P = legs[0].p
     ring = []
     for i in range(n):
@@ -313,6 +324,42 @@ def junction_polygon(legs: list[Leg], row: bool = False) -> Polygon:
                         for lg in legs if _bends(lg, lg.cut_row if row else lg.cut))
             if G.area1(G.diff(s, poly)) > 0.5]
     return G.union([poly] + bent) if bent else poly
+
+
+def shared_pavement(legs: list[Leg], poly):
+    """M17: where two legs' rights of way overlap farther out than their cuts reach (a
+    crossing or a fork at a small angle, a junction close to the next one), the overlap is
+    pavement both share: the junction polygon takes it."""
+    if not any(lg.capped for lg in legs):
+        return poly
+    rows = [strip(lg, lg.L, lg.row) for lg in legs]
+    extra = []
+    for i in range(len(legs)):
+        for j in range(i + 1, len(legs)):
+            if legs[i].capped or legs[j].capped:
+                ov = G.inter(rows[i], rows[j])
+                if G.area1(ov) > 0.5:
+                    extra.append(ov)
+    if not extra:
+        return poly
+    u = G.union([poly] + extra)
+    ps = G.parts(u)
+    if len(ps) <= 1:
+        return u
+    P = Point(legs[0].p)
+    return min(ps, key=lambda q: (q.distance(P), G.qbounds(q)))
+
+
+def bend_polygon(legs: list[Leg], row: bool = False) -> Polygon:
+    """M17: a bend's surface: both carriageways (rights of way with `row`) out to their cuts
+    and where the two rights of way overlap."""
+    a, b = legs
+    parts = [strip(x, x.cut_row if row else x.cut, x.row if row else x.h) for x in (a, b)]
+    parts.append(G.inter(strip(a, a.cut_row if row else a.cut, a.row),
+                         strip(b, b.cut_row if row else b.cut, b.row)))
+    u = G.union(parts)
+    ps = G.parts(u)
+    return u if len(ps) <= 1 else max(ps, key=lambda q: (G.area1(q), G.qbounds(q)))
 
 
 def _bends(lg: Leg, c: float) -> bool:
@@ -724,7 +771,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
             continue
         kind, shape, sig = classify(lg, node_arch[nid])
         jid = f"jn{len(junctions) + 1:05d}"
-        poly = junction_polygon(lg)
+        poly = shared_pavement(lg, junction_polygon(lg))
         row_poly = junction_polygon(lg, row=True)
         has_avenue = any(x.cls == "avenue" for x in lg)
         xw_ids = []

@@ -69,6 +69,12 @@ def _rows(m: CityModel) -> tuple[list, list]:
     return lines, list(rows)
 
 
+def _inter(a, b):
+    """Intersection on the 1 cm grid (GEOS's floating overlay can take two corridors that only
+    share an edge on a 45 degree line for one inside the other)."""
+    return G.polygonal(shapely.intersection(a, b, grid_size=G.GRID_M))
+
+
 def _water(m: CityModel):
     polys = [G.from_model_poly(p) for s in m.seas for p in s.polygons]
     polys += [G.from_model_poly(x.polygon) for x in list(m.rivers) + list(m.channels) +
@@ -143,13 +149,13 @@ def road_overlaps(m: CityModel) -> list[tuple]:
     for i, j in sorted(zip(a_idx.tolist(), b_idx.tolist())):
         if j <= i:
             continue
-        ov = rows[i].intersection(rows[j])
+        ov = _inter(rows[i], rows[j])
         if ov.area <= OVERLAP_M2:
             continue
         if jtree is not None:
             near = [jpolys[k] for k in sorted(int(x) for x in jtree.query(ov))]
             if near:
-                ov = ov.difference(shapely.union_all(near))
+                ov = shapely.difference(ov, shapely.union_all(near), grid_size=G.GRID_M)
         if ov.area <= OVERLAP_M2:
             continue
         p = ov.representative_point()
@@ -225,7 +231,7 @@ def check_bridge_clash(spec: CitySpec, m: CityModel):
         a, b = parts[i], parts[j]
         if j <= i or a[0] == b[0] or (a[0], b[0]) in seen or a[6] & b[6]:
             continue
-        ov = a[3].intersection(b[3])
+        ov = _inter(a[3], b[3])
         if ov.area <= BRIDGE_M2:
             continue
         p = ov.representative_point()
@@ -258,7 +264,7 @@ def check_building_clash(spec: CitySpec, m: CityModel):
     a_idx, b_idx = tree.query(rows, predicate="intersects")
     for i, k in sorted(zip(a_idx.tolist(), b_idx.tolist())):
         b, mk, fp, z0, z1 = masses[k]
-        ov = rows[i].intersection(fp)
+        ov = _inter(rows[i], fp)
         if ov.area <= MASS_M2:
             continue
         z = surface_z(segs[i], lines[i], ov.representative_point())
