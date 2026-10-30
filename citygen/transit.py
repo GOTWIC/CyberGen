@@ -3412,7 +3412,7 @@ def sidewalks_clear(sw, pt, size: float) -> bool:
 SPAN_MOVE = 0.15         # a support moves at most this share of its span to free ground
 TRUSS_OVER = 1.15        # a span this much over the mode's is a truss (a cable span over the
 #                          longest, only across a navigable channel)
-MAIN_SPAN_M = {"elevated_rail": 240.0, "monorail": 200.0, "maglev": 300.0, "sky_tube": 600.0}
+MAIN_SPAN_M = {"elevated_rail": 300.0, "monorail": 250.0, "maglev": 300.0, "sky_tube": 600.0}
 FRAME_REACH_M = 30.0     # a portal frame's columns stand at most this far either side
 CANT_REACH_M = 15.0      # a cantilever bent's column at most this far from the line
 CANT_SHORT_M = 4.0       # ... and is taken before a frame when this near
@@ -3652,14 +3652,15 @@ class Keep:
         out[ip] = True
         return out
 
-    def pier_ok(self, P: np.ndarray) -> np.ndarray:
-        """In the water clear of every navigable channel (`pier_reach`)."""
+    def pier_ok(self, P: np.ndarray, size: float) -> np.ndarray:
+        """Piers of this size at P clear of every navigable channel: their middle within
+        `pier_reach` of the shore of each water their footprint is in."""
         out = np.ones(len(P), bool)
         if self.wtree is None or self.shore is None or not len(P):
             return out
         pts = shapely.points(P)
         _, dist = self.shore.query_nearest(pts, return_distance=True, all_matches=False)
-        ip, iw = self.wtree.query(pts, predicate="intersects")
+        ip, iw = self.wtree.query(_squares(P, max(size, 0.02)), predicate="intersects")
         for j, k in zip(ip.tolist(), iw.tolist()):
             if dist[j] > self.wet_reach[k] + 1e-9:
                 out[j] = False
@@ -3668,7 +3669,7 @@ class Keep:
     def in_channel(self, P: np.ndarray) -> np.ndarray:
         """Points over a navigable channel (where no pier may stand)."""
         w = self.wet(P, 0.0)
-        return w & ~self.pier_ok(P)
+        return w & ~self.pier_ok(P, 0.0)
 
     def over_channel(self, T_: _Track, g0: float, g1: float) -> bool:
         """Whether the track crosses what no support may stand in between g0 and g1: a
@@ -4224,7 +4225,8 @@ class Builder:
         ok_col = keep.free(P, size, top, ln, cands) & ~wet
         ok_pier = np.zeros(len(cands), bool)
         if wet.any():
-            ok_pier = keep.free(P, size * PIER_SCALE, top, ln, cands) & wet & keep.pier_ok(P)
+            ok_pier = keep.free(P, size * PIER_SCALE, top, ln, cands) & wet & \
+                keep.pier_ok(P, size * PIER_SCALE)
         for j, s in enumerate(cands):
             if top[j] <= GROUND_TOP_M:
                 continue
@@ -4271,7 +4273,7 @@ class Builder:
             P = np.round(P, 2)
             tops = [top - CAP_M] * len(ds)
             wet = keep.wet(P, size)
-            ok = keep.free(P, size, tops, ln, [s] * len(ds)) & (~wet | keep.pier_ok(P))
+            ok = keep.free(P, size, tops, ln, [s] * len(ds)) & (~wet | keep.pier_ok(P, size))
             for j in np.nonzero(ok)[0].tolist():
                 if wet[j] or keep.sidewalk_ok(P[j], size):
                     legs[side] = (ds[j], (float(P[j][0]), float(P[j][1])), bool(wet[j]))

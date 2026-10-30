@@ -7,7 +7,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 and M19 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG3, AG6, AG7 and AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
@@ -93,7 +93,11 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 
 | Transit, Delta Megacity | Transit, Nexus City | Transit, Vesper Bay |
 |---|---|---|
-| <img src="docs/progress/M13/delta_megacity/preview_transit.png" width="280"> | <img src="docs/progress/M13/nexus_city/preview_transit.png" width="280"> | <img src="docs/progress/M13/vesper_bay/preview_transit.png" width="280"> |
+| <img src="docs/progress/M19/delta_megacity/preview_transit.png" width="280"> | <img src="docs/progress/M19/nexus_city/preview_transit.png" width="280"> | <img src="docs/progress/M19/vesper_bay/preview_transit.png" width="280"> |
+
+| Sky tubes on cable-stayed masts (8K) | A monorail on portal frames over a raised road (8K) |
+|---|---|
+| <img src="docs/progress/M19/delta_megacity/render_sky_tube_masts.jpg" width="420"> | <img src="docs/progress/M19/delta_megacity/render_monorail_frames.jpg" width="420"> |
 
 | Street level beside a viaduct (Delta Megacity) | Street level in the Corporate Core (Vesper Bay) |
 |---|---|
@@ -122,7 +126,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | Planned |
 | M17 | Road network repair | No stray dead ends, overlapping roads or bridges; roads clear of buildings | Planned |
 | M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps, crosswalks and signals only where they are needed | Planned |
-| M19 | Transit structures | Lines clear of buildings, supports under the track at even spans, more room over the streets | Planned |
+| M19 | Transit structures | Lines clear of buildings, supports under the track at even spans (columns, portal frames, piers, sky tube masts), more room over the streets | ✅ Done |
 | M20 | Props, plants and signs | Nothing floating or growing through a road; many more large neon billboards and holo-boards on the sides and tops of buildings | Planned |
 | M21 | Cyberpunk massing | Twisted, tapered, leaning, stacked and cantilevered towers; smooth curves | Planned |
 

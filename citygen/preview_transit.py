@@ -143,9 +143,9 @@ def render_transit(b, out, dpi: int = 150) -> None:
                       for k, v in st.get("support_forms", {}).items())
     fig.text(0.04, 1.0 - 0.48 / fh,
              f"{len(m.transit_lines)} lines, {st.get('km', 0):g} km; stations {stations}; "
-             f"supports: {forms or st.get('supports', 0)}; {st.get('portals', 0)} tower "
-             f"portals, {st.get('buildings_removed', 0)} buildings removed for the lines; "
-             f"{'checks PASS' if b.passed else 'checks FAIL'}",
-             color=MUTED, fontsize=8.5, va="top")
+             f"{st.get('portals', 0)} tower portals, {st.get('buildings_removed', 0)} "
+             f"buildings removed for the lines; {'checks PASS' if b.passed else 'checks FAIL'}"
+             f"\nsupports: {forms or st.get('supports', 0)}",
+             color=MUTED, fontsize=8.5, va="top", linespacing=1.5)
     fig.savefig(out, dpi=dpi, facecolor=BG)
     plt.close(fig)
