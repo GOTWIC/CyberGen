@@ -99,6 +99,7 @@ All checks pass on every sample (86; 91 on Vesper Bay Decks). Full-city tries, M
   both is needed (seen on the test city, not on the samples).
 - **Supports in a regenerated district** (`citygen build --district`) are planned again along
   the whole line; outside the district they come back where they were when nothing near them
-  changed, but a seam can shift a few supports next to it.
+  changed, but a seam can shift a few supports next to it. Regenerating Delta's Midtown (the
+  Skyline Loop's host tower stands in it) passes all 86 checks.
 - AG14 draws the frames, masts, piers, trusses and cable spans as assets; AG7 draws beams as
   plain boxes and masts and piers as columns until then.
