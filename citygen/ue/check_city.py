@@ -45,6 +45,7 @@ FLY_MODE = "/Game/CityGen/Core/GM_CityGenFly"     # the importer's (import_city.
 FLY_S = 8.0         # the flight's straight run
 FLY_Z_M = 40.0      # its height over the player start: through the buildings in its way
 TRACE_RETRY_S = 30.0  # how long a trace down that missed is tried again after settling
+WARM_S = 3.0        # after a view's warm-up render, for its Nanite pages to stream in
 
 
 def log(msg):
@@ -70,6 +71,22 @@ def wait(seconds):
     t = time.time()
     while time.time() - t < seconds:
         yield
+
+
+def frame_times(ts):
+    """Wall-clock seconds per frame (`ts`: the time at each frame) as the median, the 95th
+    percentile and the longest, so a slow play session shows in the result."""
+    dt = sorted(b - a for a, b in zip(ts, ts[1:]))
+    if not dt:
+        return {"frames": 0}
+    return {"frames": len(dt), "median_s": round(dt[len(dt) // 2], 3),
+            "p95_s": round(dt[(len(dt) * 19) // 20], 3), "max_s": round(dt[-1], 3)}
+
+
+def frame_line(ts):
+    f = frame_times(ts)
+    return (f", frames {f['median_s']:.3f} s (median), {f['p95_s']:.3f} s (95%), "
+            f"{f['max_s']:.2f} s at most" if f["frames"] else "")
 
 
 def tags_of(a):
@@ -560,7 +577,9 @@ def walk(world, pawn, man):
     lift0 = start.z - path[0][2] * 100.0      # the player's height over the path at the start
     travelled, last = 0.0, start
     mark, mark_t, side_until, side, blockers, stops = start, time.time(), 0.0, 1.0, {}, []
+    ticks = []
     while k < len(path) and time.time() - t < WALK_S:
+        ticks.append(time.time())
         loc = pawn.get_actor_location()
         tx, ty = path[k][0] * 100.0, -path[k][1] * 100.0
         dx, dy = tx - loc.x, ty - loc.y
@@ -591,6 +610,7 @@ def walk(world, pawn, man):
         travelled += math.hypot(loc.x - last.x, loc.y - last.y)
         last = loc
         yield
+    ticks.append(time.time())     # (the last frame's end: a long one shows)
     length = sum(math.dist(path[j][:2], path[j + 1][:2]) for j in range(len(path) - 1))
     reached = k >= len(path)
     share = on_ground / max(frames, 1)
@@ -600,13 +620,14 @@ def walk(world, pawn, man):
                              "reached": reached, "travelled_m": round(travelled / 100.0, 1),
                              "on_ground": round(share, 3), "max_drop_m": round(z_drop, 2),
                              "seconds": round(time.time() - t, 1), "stopped_by": blockers,
-                             "stops": stops, "skipped_low_walkways": skipped}
+                             "stops": stops, "skipped_low_walkways": skipped,
+                             "frame_time": frame_times(ticks)}
     stops = (", stepped round " + ", ".join(f"{v} x {k_}" for k_, v in sorted(
         blockers.items()))) if blockers else ""
     RES["lines"].append(f"walk: {travelled / 100.0:.0f} m along a {length:.0f} m sidewalk "
                         f"path in {time.time() - t:.0f} s, {100 * share:.0f}% of frames on "
                         f"the ground, {'reached its end' if reached else 'did not reach its end'}"
-                        + stops)
+                        + stops + frame_line(ticks))
 
 
 def cheats(world, pawn):
@@ -647,9 +668,12 @@ def fly(world, pawn, man, slug):
     yield from wait(1.0)
     a = pawn.get_actor_location()
     t, g = time.time(), unreal.GameplayStatics.get_time_seconds(world)
+    ticks = []
     while time.time() - t < FLY_S:
+        ticks.append(time.time())
         pawn.add_movement_input(unreal.Vector(dx, -dy, 0.0), 1.0, False)
         yield
+    ticks.append(time.time())
     secs = unreal.GameplayStatics.get_time_seconds(world) - g
     e = pawn.get_actor_location()
     dist = math.hypot(e.x - a.x, e.y - a.y) / 100.0
@@ -666,11 +690,12 @@ def fly(world, pawn, man, slug):
     RES["checks"]["fly"] = {"ok": ok, "pawn": RES["fly_pawn"], "speed_m_s": round(speed, 1),
                             "flew_m": round(dist, 1), "seconds": round(secs, 1),
                             "through": through, "loaded_at_end": len(here),
-                            "end_tile_loaded": tile in tiles}
+                            "end_tile_loaded": tile in tiles,
+                            "frame_time": frame_times(ticks)}
     RES["lines"].append(
         f"fly: {RES['fly_pawn']} at {speed:g} m/s flew {dist:.0f} m in {secs:.1f} s"
         + (f" through {through}" if through else "") + f", {len(here)} actors loaded where it "
-        "ended")
+        "ended" + frame_line(ticks))
     if JOB.get("shots"):
         yield from fly_shots(world, pawn, man, slug)
 
@@ -749,7 +774,17 @@ def shots(man):
         if os.path.exists(path):
             os.remove(path)
         unreal.AutomationLibrary.finish_loading_before_screenshot()   # shaders, streaming
-        yield from wait(2.0)
+        # a small render from the camera first: Nanite streams the pages a view needs from
+        # what that view drew, so a first render of a new view shows coarse clusters (big
+        # flat triangles over the walls) where its pages had not come in yet
+        warm = os.path.join(out, f"warm_{name}.png")
+        unreal.AutomationLibrary.take_high_res_screenshot(960, 540, warm, cam)
+        t = time.time()
+        while not os.path.exists(warm) and time.time() - t < 120:
+            yield
+        yield from wait(WARM_S)
+        if os.path.exists(warm):
+            os.remove(warm)
         unreal.AutomationLibrary.take_high_res_screenshot(w, w * 9 // 16, path, cam)
         t = time.time()
         while not os.path.exists(path) and time.time() - t < 300:

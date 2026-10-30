@@ -79,8 +79,10 @@ STAGE2_VERSION = "5"                 # AG6: textured masters; AG8: leaves, textu
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
-# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without)
-PRUNE_FILES = 500
+# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without; a first
+# import's unused family variants, 200 to 300, 76 to 313 s), and loading the city again after
+# it takes 15 to 30 s
+PRUNE_FILES = 50
 EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"

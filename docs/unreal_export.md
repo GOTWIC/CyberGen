@@ -97,7 +97,9 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 - **`--check`** plays the level twice in the editor, without saving it: walking with the
   project's character whatever `--play` set (streaming, collision, a walk along a sidewalk),
   then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
-  With `--shots DIR` it renders views of the city and two from the fly pawn.
+  The walk and the flight report how long their frames took (median, 95%, longest). With
+  `--shots DIR` it renders views of the city (each once small first, so its Nanite pages
+  have streamed in) and two from the fly pawn.
 
 | Flag | Default | |
 |---|---|---|
