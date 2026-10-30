@@ -138,9 +138,26 @@ see Checks.)
 streets, props, materials). Drawn simply for now (`shell._simple_mass`, until AG15 draws the
 forms whole): the bands of twisted, tapered and leaning shafts and the masses off the ground
 curved all round (round towers and drums, ovals): the plate extruded, a spandrel and a ribbon
-of glass a floor; 594 masses in Vesper Bay. Rounded corners, blocks, links, cores, pods and
+of glass a floor; 594 masses in Vesper Bay, 1,186 in Delta. Rounded corners, blocks, links, cores, pods and
 frames take the full facade grammar, their curves as short facade edges.
 
 Images: `vesper_bay/` and `delta_megacity/` (`preview_massing.png`; 8K renders
 `render_iso_city.jpg` and the corporate cores `render_iso_d01.jpg`, `render_iso_d03.jpg`;
 `render_street_up.jpg`, looking up a Vesper Bay Corporate Core street). WIP: `wip/`.
+
+## District regeneration
+
+`citygen build cities/vesper_bay/city_spec.json OUT --district "Corporate Core"` on the M21
+build keeps the neighbor rule (179 towers, 19 forms, no pair; the old towers outside the
+district are held). It fails one check, as on main with the same four seeds: `complexes`, the
+district's twin towers not built (their two lots left empty; the held transit lines remove 139
+buildings in the regenerated district). An open item from before M21.
+
+## Open
+
+- AG15 draws the forms whole (bands as one lofted surface, curved walls with their windows,
+  diagonal braces of the exoskeletons from `form.params`); AG14 the arcs smooth.
+- Megabuildings and perimeter blocks are not towers for the rule (their towers take cut or
+  rounded corners on some, by variety).
+- The rule measures footprint centroids; a leaning tower's top can stand up to 20 m from it.
+- Mac = x86 for M21 waits for the deferred determinism check (`docs/determinism_check.md`).
