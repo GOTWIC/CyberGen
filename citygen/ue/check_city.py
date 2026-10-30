@@ -36,7 +36,8 @@ import unreal
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 T0 = time.time()
 RES = {"ok": False, "lines": [], "checks": {}}
-LOAD_WAIT_S = 60.0
+LOAD_WAIT_S = 180.0  # the longest wait for a spot to stream in
+COUNT_EVERY_S = 2.0  # how often that wait lists the city's actors in the play world
 WALK_M = 120.0
 WALK_S = 60.0
 MAX_GRADE = 0.3     # steepest leg the walk takes (a road's is at most 12%)
@@ -45,6 +46,7 @@ FLY_MODE = "/Game/CityGen/Core/GM_CityGenFly"     # the importer's (import_city.
 FLY_S = 8.0         # the flight's straight run
 FLY_Z_M = 40.0      # its height over the player start: through the buildings in its way
 TRACE_RETRY_S = 30.0  # how long a trace down that missed is tried again after settling
+WARM_S = 3.0        # after a view's warm-up render, for its Nanite pages to stream in
 
 
 def log(msg):
@@ -70,6 +72,22 @@ def wait(seconds):
     t = time.time()
     while time.time() - t < seconds:
         yield
+
+
+def frame_times(ts):
+    """Wall-clock seconds per frame (`ts`: the time at each frame) as the median, the 95th
+    percentile and the longest, so a slow play session shows in the result."""
+    dt = sorted(b - a for a, b in zip(ts, ts[1:]))
+    if not dt:
+        return {"frames": 0}
+    return {"frames": len(dt), "median_s": round(dt[len(dt) // 2], 3),
+            "p95_s": round(dt[(len(dt) * 19) // 20], 3), "max_s": round(dt[-1], 3)}
+
+
+def frame_line(ts):
+    f = frame_times(ts)
+    return (f", frames {f['median_s']:.3f} s (median), {f['p95_s']:.3f} s (95%), "
+            f"{f['max_s']:.2f} s at most" if f["frames"] else "")
 
 
 def tags_of(a):
@@ -335,14 +353,19 @@ def streamed(world, at=None, radius_m=150.0):
 
 def settle(world, slug, timeout=LOAD_WAIT_S, at=None):
     """Wait until World Partition has finished streaming (around `at` when given) and the
-    number of city actors in the game world stops changing."""
-    t, last, stable = time.time(), -1, 0
+    number of city actors in the game world stops changing. The actors are listed once the
+    streaming query says done and then every COUNT_EVERY_S, not every frame: a list of 45,000
+    takes the game thread seconds, and listed every frame Vesper Bay's play ran at 6.5 s a
+    frame, too few frames for the cells around a teleport to stream in before the wait ended."""
+    t, last, stable, due = time.time(), -1, 0, 0.0
     while time.time() - t < timeout:
-        n = len(city_actors(world, slug))
-        stable = stable + 1 if n == last else 0
-        last = n
-        if n > 0 and stable >= 30 and streamed(world, at) is not False:
-            break
+        if time.time() >= due and streamed(world, at) is not False:
+            n = len(city_actors(world, slug))
+            stable = stable + 1 if n == last else 0
+            last = n
+            if n > 0 and stable >= 2:
+                break
+            due = time.time() + COUNT_EVERY_S
         yield
     return last
 
@@ -451,7 +474,11 @@ def collision(world, pawn, man, slug):
                 down["by_category"][c] = down["by_category"].get(c, 0) + 1
             todo, first = left, False
         here = ue(x0, y0, 0.0)
-        blds = [a for a in city_actors(world, slug) if tag(a, "cg.category") == "building"]
+        # (the buildings' shells: not their part instancers, which have no collision, nor
+        # their street fronts, AG3's ground bands)
+        blds = [a for a in city_actors(world, slug) if tag(a, "cg.category") == "building"
+                and not tag(a, "cg.type").startswith("part.")
+                and tag(a, "cg.type") != "building.front"]
         blds.sort(key=lambda a: (a.get_actor_bounds(False)[0] - here).length())
         for a in blds[:12]:
             o, e = a.get_actor_bounds(False)
@@ -560,7 +587,9 @@ def walk(world, pawn, man):
     lift0 = start.z - path[0][2] * 100.0      # the player's height over the path at the start
     travelled, last = 0.0, start
     mark, mark_t, side_until, side, blockers, stops = start, time.time(), 0.0, 1.0, {}, []
+    ticks = []
     while k < len(path) and time.time() - t < WALK_S:
+        ticks.append(time.time())
         loc = pawn.get_actor_location()
         tx, ty = path[k][0] * 100.0, -path[k][1] * 100.0
         dx, dy = tx - loc.x, ty - loc.y
@@ -591,6 +620,7 @@ def walk(world, pawn, man):
         travelled += math.hypot(loc.x - last.x, loc.y - last.y)
         last = loc
         yield
+    ticks.append(time.time())     # (the last frame's end: a long one shows)
     length = sum(math.dist(path[j][:2], path[j + 1][:2]) for j in range(len(path) - 1))
     reached = k >= len(path)
     share = on_ground / max(frames, 1)
@@ -600,13 +630,14 @@ def walk(world, pawn, man):
                              "reached": reached, "travelled_m": round(travelled / 100.0, 1),
                              "on_ground": round(share, 3), "max_drop_m": round(z_drop, 2),
                              "seconds": round(time.time() - t, 1), "stopped_by": blockers,
-                             "stops": stops, "skipped_low_walkways": skipped}
+                             "stops": stops, "skipped_low_walkways": skipped,
+                             "frame_time": frame_times(ticks)}
     stops = (", stepped round " + ", ".join(f"{v} x {k_}" for k_, v in sorted(
         blockers.items()))) if blockers else ""
     RES["lines"].append(f"walk: {travelled / 100.0:.0f} m along a {length:.0f} m sidewalk "
                         f"path in {time.time() - t:.0f} s, {100 * share:.0f}% of frames on "
                         f"the ground, {'reached its end' if reached else 'did not reach its end'}"
-                        + stops)
+                        + stops + frame_line(ticks))
 
 
 def cheats(world, pawn):
@@ -647,9 +678,12 @@ def fly(world, pawn, man, slug):
     yield from wait(1.0)
     a = pawn.get_actor_location()
     t, g = time.time(), unreal.GameplayStatics.get_time_seconds(world)
+    ticks = []
     while time.time() - t < FLY_S:
+        ticks.append(time.time())
         pawn.add_movement_input(unreal.Vector(dx, -dy, 0.0), 1.0, False)
         yield
+    ticks.append(time.time())
     secs = unreal.GameplayStatics.get_time_seconds(world) - g
     e = pawn.get_actor_location()
     dist = math.hypot(e.x - a.x, e.y - a.y) / 100.0
@@ -666,11 +700,12 @@ def fly(world, pawn, man, slug):
     RES["checks"]["fly"] = {"ok": ok, "pawn": RES["fly_pawn"], "speed_m_s": round(speed, 1),
                             "flew_m": round(dist, 1), "seconds": round(secs, 1),
                             "through": through, "loaded_at_end": len(here),
-                            "end_tile_loaded": tile in tiles}
+                            "end_tile_loaded": tile in tiles,
+                            "frame_time": frame_times(ticks)}
     RES["lines"].append(
         f"fly: {RES['fly_pawn']} at {speed:g} m/s flew {dist:.0f} m in {secs:.1f} s"
         + (f" through {through}" if through else "") + f", {len(here)} actors loaded where it "
-        "ended")
+        "ended" + frame_line(ticks))
     if JOB.get("shots"):
         yield from fly_shots(world, pawn, man, slug)
 
@@ -749,7 +784,17 @@ def shots(man):
         if os.path.exists(path):
             os.remove(path)
         unreal.AutomationLibrary.finish_loading_before_screenshot()   # shaders, streaming
-        yield from wait(2.0)
+        # a small render from the camera first: Nanite streams the pages a view needs from
+        # what that view drew, so a first render of a new view shows coarse clusters (big
+        # flat triangles over the walls) where its pages had not come in yet
+        warm = os.path.join(out, f"warm_{name}.png")
+        unreal.AutomationLibrary.take_high_res_screenshot(960, 540, warm, cam)
+        t = time.time()
+        while not os.path.exists(warm) and time.time() - t < 120:
+            yield
+        yield from wait(WARM_S)
+        if os.path.exists(warm):
+            os.remove(warm)
         unreal.AutomationLibrary.take_high_res_screenshot(w, w * 9 // 16, path, cam)
         t = time.time()
         while not os.path.exists(path) and time.time() - t < 300:

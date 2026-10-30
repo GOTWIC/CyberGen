@@ -414,8 +414,11 @@ its manifest is AG3's.
 `citygen/unreal.py` (`fallback_full` in the mesh record and its hash, an entry's own `ids`
 and `level` on its actor, door tags, `doors_of` and the `doors` flat graph) and
 `citygen/ue/import_city.py` (the Nanite fallback at every triangle, `cg.door=` tags);
-`tests/test_unreal.py::test_stage2_takes_assetgen_fronts`. Unreal check: the coordinating
-session's call.
+`tests/test_unreal.py::test_stage2_takes_assetgen_fronts`. Unreal check: with AG4's
+(`docs/progress/AG4/unreal/`): fronts flush with their shells, doorways walkable into the
+recess to the door, the hull from the band line, every door tagged and in the doors data
+asset, decals on the walls; a one-floor building its front takes whole has an empty shell
+node, which the exporter now leaves out (its entry's `triangles` counts the front's).
 
 **Open.** Shell vertex colors for grime and edge wear are not written (the masters draw grime
 from the ground by the building's dirt height, CPD, and read no vertex colors; COLOR_0 on
@@ -589,8 +592,11 @@ digest again (the buildings' contribution is in both).
 
 **Exporter**: as above; `tests/test_unreal.py` (`test_stage2_skybridge_links`,
 `test_stage2_takes_assetgen_roofs_and_skybridges`, and `test_stage2_from_assetgen` knowing
-the roof equipment entries, which have no node). Unreal check: the coordinating session's
-call (`docs/progress/AG4/README.md` lists what it should look at).
+the roof equipment entries, which have no node). Unreal check (`docs/progress/AG4/unreal/`):
+skybridges at their pivots with their links, floors walkable, reaching both facades; roof
+equipment counts right, `NoCollision`, nothing floating; replaced green roofs gone. Open
+from it: the hulls close the landing doors, and the sky station platforms lie inside their
+tower's hull.
 
 **Open.** For AG5: one mechanical penthouse family (variants by era), no dormers on the
 pitched roofs, the plinths on slopes still one block (the landings at a ground floor and

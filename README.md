@@ -338,13 +338,15 @@ stone plinth, with doors and shopfronts brought down or up to the street and ret
 walls where the hill stands against a wall. `assetgen review` writes an art-direction sheet
 for a round of changes to the asset spec. More: [`docs/progress/AG5`](docs/progress/AG5).
 
-<img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
+<img src="docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg" width="840">
 
-Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).
+A shopping street in Greyhook in Unreal 5.8: street fronts, signs, props, roads and
+textured buildings, all from stage 2 (8K).
 
 `citygen unreal out/<city> <Project>.uproject` brings the buildings and streets into Unreal
 over the blockout, each replacing its blockout piece, with tinted materials and collision;
-`--blockout-only` leaves them out. More views: [`docs/progress/AG1/unreal`](docs/progress/AG1/unreal).
+`--blockout-only` leaves them out. More views: [`docs/progress/AG4/unreal`](docs/progress/AG4/unreal),
+[`docs/progress/AG1/unreal`](docs/progress/AG1/unreal).
 
 ### Milestones
 
