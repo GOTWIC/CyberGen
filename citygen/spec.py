@@ -371,6 +371,32 @@ class Tunnels(_Model):
                          "frontage streets on both sides (share of the spots that fit).")
 
 
+Grade = Annotated[float, Field(gt=0.0, le=0.1)]
+
+
+class Grades(_Model):
+    """M18: grades of the raised roads (steeper and shorter than M7's 5%, leaving less dead
+    space under them)."""
+    run: Grade = Field(0.06, description="Design grade of a viaduct run's ends down to the "
+                                         "ground.")
+    run_max: Grade = Field(0.07, description="Steepest a viaduct run may be.")
+    ramp: Grade = Field(0.07, description="Design grade of ramps, loops, flyovers and stack "
+                                          "ramps.")
+    ramp_max: Grade = Field(0.08, description="Steepest a ramp, loop, flyover or stack ramp "
+                                              "may be (and any raised road).")
+    approach: Grade = Field(0.065, description="Bridge approaches (no vertical curves).")
+    curve_m: Annotated[float, Field(ge=10.0, le=80.0)] = Field(
+        30.0, description="Vertical curves of the runs and ramps.")
+
+    @model_validator(mode="after")
+    def _order(self) -> Grades:
+        if self.run > self.run_max or self.ramp > self.ramp_max:
+            raise ValueError("a design grade is steeper than its maximum")
+        if max(self.run_max, self.approach) > self.ramp_max:
+            raise ValueError("ramp_max must be the steepest grade")
+        return self
+
+
 class Highways(_Model):
     pattern: HighwayPattern = "ring_plus_spine"
     exits: list[Direction] | None = Field(None, description="Off-map exits. Default: land edges.")
@@ -380,6 +406,7 @@ class Highways(_Model):
     crossings: Literal["stack", "turbine"] = Field(
         "stack", description="Interchange where two highways cross with room for it: a "
                              "four-level stack or a turbine (each the other's fallback).")
+    grades: Grades = Field(default_factory=Grades)
 
 
 class TransitLine(_Model):
@@ -533,6 +560,22 @@ class Decks(_Model):
                           "the district's).")
 
 
+class JunctionControl(_Model):
+    """M18: crossings by need in a district."""
+    signals: Literal["auto", "fewer", "none"] = Field(
+        "auto", description="'auto': signals where two primary roads meet, and where a street "
+                            "meets one (or at a street crossing in the corporate core, transit "
+                            "hub and midtown) with no signalized junction within 120 m along "
+                            "either road (200 m in the old town and entertainment market); "
+                            "'fewer': twice that spacing and no street crossing signalized; "
+                            "'none': no signals.")
+    crosswalks: Literal["auto", "fewer", "none"] = Field(
+        "auto", description="'auto': crosswalks on the approaches of signalized junctions and "
+                            "across avenues where none is within the signal spacing; 'fewer': "
+                            "at signalized junctions only; 'none': unmarked crossings "
+                            "everywhere.")
+
+
 class District(_Model):
     name: Name
     archetype: Archetype
@@ -573,6 +616,8 @@ class District(_Model):
                           "dangerous, a corporation in corporate districts, else the police.")
     decks: Decks | None = Field(None, description="M14: a layered district: an upper deck "
                                                    "city over the ground streets.")
+    junctions: JunctionControl | None = Field(
+        None, description="M18: signals and crosswalks by need (default 'auto' for both).")
 
 
 # ---------------------------------------------------------------------------

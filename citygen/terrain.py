@@ -44,6 +44,8 @@ SITE_BAND_M = 60.0      # a megasite likewise
 
 # road grade lines (M13)
 STEP_M = 10.0           # stations along a road for the grade fit
+LEVEL_GRADE = 0.02      # M18: a primary road's grade line over a junction and 10 m past it
+LEVEL_SLOPE_MAX = 0.04  # ... where the natural ground at the junction is no steeper than this
 MAX_GRADE = {"highway": 0.06, "avenue": 0.08, "street": 0.12, "alley": 0.15,
              "service": 0.12, "pedestrian": 0.15, "footbridge": 0.15}
 EMBANK_SLOPE = 1.5      # embankments 1:1.5 (run per rise)
@@ -672,14 +674,23 @@ def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = Non
     district regeneration): segment id -> the grade line it keeps, [(s, z)]; their vertices
     are fixed at it and the rest is fitted to them. `level`: (segment id, node id) -> the
     junction's run along that leg's centerline (out to the edge of its polygon, past its curb
-    and sidewalk corners: `junctions.cutbacks`, `run_along`), at most 0.45 of the leg; at a
-    junction of local roads the grade line holds the node's height over it, so its roads
-    meet at one height at the corners (a primary road keeps its grade through its
-    junctions: levelled, its fills and cuts would pass CUT_MAX_M and FILL_MAX_M)."""
+    and sidewalk corners: `junctions.cutbacks`, `run_along`, and M18's LEVEL_OUT_M beyond),
+    at most 0.45 of the leg; over it a local road's grade line holds the node's height, so
+    its roads meet at one height at the corners, and (M18) a primary road's is at most
+    LEVEL_GRADE steep (held level, its fills and cuts would pass CUT_MAX_M and FILL_MAX_M on
+    a long hill); the junction carries the surface between (`junctions.surfaces`)."""
     held = held or {}
-    primary = {n for s in segments if s["road_class"] in PRIMARY or _ramp(s)
-               for n in (s["start"], s["end"])}
-    level = {k: v for k, v in (level or {}).items() if k[1] not in primary}
+    level = dict(level or {})
+    # (M18: a primary road holds a junction's run only where the natural ground there is
+    # gentle; on a steeper hill it keeps its grade through, and the junction its surface)
+    seg_of = {s["id"]: s for s in segments}
+    npos = {n["id"]: tuple(n["position"][:2]) for n in nodes}
+    for k in sorted(level):
+        s = seg_of.get(k[0])
+        if s is not None and (s["road_class"] in PRIMARY or _ramp(s)) and k[1] in npos and \
+                float(nat.slope_many(np.array([npos[k[1]][0]]),
+                                     np.array([npos[k[1]][1]]))[0]) > LEVEL_SLOPE_MAX:
+            del level[k]
     node_pos = {n["id"]: tuple(n["position"][:2]) for n in nodes}
     cross = crossings(segments)
     vid: dict = {}
@@ -724,11 +735,14 @@ def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = Non
         zp = _zp(s.get("z_profile") or [])
         ch = chains[s["id"]]
         r0, r1 = _level_runs(s, ch[-1][0], level)
+        lg = LEVEL_GRADE if s["road_class"] in PRIMARY or _ramp(s) else 0.0
         for (s0, a), (s1, b) in zip(ch, ch[1:]):
             dz = abs(z_on(zp, s1) - z_on(zp, s0)) if zp else 0.0
             cap = int(math.floor(max(0.0, g * (s1 - s0) - dz) * 100.0))
             if s1 <= r0 or s0 >= r1:
-                cap = 0     # inside a junction: level
+                # inside a junction and LEVEL_OUT_M past it: level (M18: a primary road at
+                # most LEVEL_GRADE)
+                cap = min(cap, int(math.floor(max(0.0, lg * (s1 - s0) - dz) * 100.0)))
             adj[a].append((b, cap))
             adj[b].append((a, cap))
     tgt = [int(round(nat.at(x, y) * 100.0)) for x, y in pos]

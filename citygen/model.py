@@ -263,6 +263,13 @@ class Junction(Entity):
     corner_radius_m: float
     crosswalk_ids: list[str] = Field(default_factory=list)
     level: int = _level()
+    edge_z: list[float] | None = Field(
+        None, exclude_if=lambda v: v is None,
+        description="M18: the surface where it is not flat at its node's height: the height of "
+                    "every exterior vertex of the polygon, in order, over the node's ground "
+                    "(`RoadNode.ground_m`; 0 on a flat city), from the legs' heights where they "
+                    "leave the polygon (every vertex on a leg's cut line at the leg's height) "
+                    "and the curb lines between; the surface meets every leg with no step.")
 
 
 class Crosswalk(Entity):
@@ -320,7 +327,7 @@ class Walkway(Entity):
 class Structure(Entity):
     TYPE_PREFIX: ClassVar[str] = "structure"
     kind: Literal["deck", "ramp", "column", "pylon", "tube", "canopy", "portal", "trench",
-                  "vent", "retaining_wall", "stair", "elevator"]
+                  "vent", "retaining_wall", "stair", "elevator", "embankment"]
     footprint: Polygon | None = None
     line: list[Point3] = Field(default_factory=list)
     z0_m: float

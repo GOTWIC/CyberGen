@@ -8,8 +8,9 @@
   walkways are at z 0 there; the piece also writes the walkways' corrected lines).
 - **Crosswalks**: zebra or ladder paint by the district's era, tactile paving at both
   curbs, on the dropped curb.
-- **Junctions**: the carriageway polygon at its node's height (blended toward each leg's
-  height at its cut-back where they differ), the sidewalk corners between neighboring legs
+- **Junctions**: the carriageway polygon at its node's height, or (M18) through the model's
+  surface where it carries one (`edge_z`; else blended toward each leg's height at its
+  cut-back where they differ), the sidewalk corners between neighboring legs
   (the curb return from the junction polygon, the property-line fillet rebuilt as M2 builds
   it), their curb faces, and a deck slab under a raised junction.
 """
@@ -477,8 +478,27 @@ def make_junction(inp: dict) -> Out:
     legs.sort(key=lambda r: (r["ang"], r["id"]))
     lz = [r for r in legs if "z" in r]
     flat = all(abs(r["z"] - zn) < 0.002 for r in lz)
+    # M18: the model's surface where it carries one (`edge_z`, over the node's ground): every
+    # vertex at its height, so the legs meet it with no step (AG14 draws the rest from it)
+    ez = j.get("edge_z")
+    if ez and len(ez) == len(j["polygon"]["exterior"]):
+        vz = {(p[0], p[1]): inp["node_ground"] + z + ROAD_DZ
+              for p, z in zip(j["polygon"]["exterior"], ez)}
+        vpts = list(vz.items())
+    else:
+        vz = None
 
     def zfun(x, y):
+        if vz is not None:
+            z = vz.get((x, y))
+            if z is not None:
+                return z
+            acc = wt = 0.0
+            for (px, py), pz in vpts:
+                w = 1.0 / ((x - px) ** 2 + (y - py) ** 2 + 1.0)
+                acc += pz * w
+                wt += w
+            return acc / wt
         if flat:
             return zn
         w0 = 1.0 / ((x - P[0]) ** 2 + (y - P[1]) ** 2 + 4.0)

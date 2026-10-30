@@ -28,25 +28,94 @@ def _prof(s) -> list[tuple[float, float]]:
     return [(z.s, z.z) for z in s.z_profile]
 
 
-def check_grades(m: CityModel) -> Check:
-    c = Check("road_grades", f"Every road at most {EL.MAX_GRADE:.0%} steep along its z "
-                             "profile (viaducts, ramps, bridge approaches, streets ramping up "
-                             "to a raised junction; footbridge stairs aside)")
+def grade_kind(s) -> str | None:
+    """M18: which grade limit a road's z profile keeps: `ramp` (ramps, loops, flyovers and
+    stack ramps), `run` (viaducts), `approach` (other raised highways and avenues: bridge
+    approaches), `deck_ramp` (M14), `local` (streets ramping to a raised junction), or None
+    (footbridge stairs)."""
+    if s.road_class == "footbridge":
+        return None
+    if s.attrs.get("role") == "deck_ramp":
+        return "deck_ramp"
+    if s.attrs.get("role") == "ramp":
+        return "ramp"
+    if s.attrs.get("elevated"):
+        return "run"
+    if s.road_class in ("highway", "avenue"):
+        return "approach"
+    return "local"
+
+
+def grade_caps(spec) -> dict:
+    """M18: the steepest grade of each kind (`highways.grades`; approaches as steep as a run
+    where a junction on them is levelled, local streets as steep as a ramp)."""
     from .decks import RAMP_GRADE
 
+    gr = spec.highways.grades
+    return {"ramp": gr.ramp_max, "run": gr.run_max, "approach": gr.run_max,
+            "deck_ramp": RAMP_GRADE, "local": gr.ramp_max}
+
+
+def steepest(p) -> tuple[float, float, float]:
+    """(grade, s0, s1) of the steepest piece of a z profile (both s and z are on the 1 cm
+    grid: a step of 1 cm in z is rounding)."""
+    best = (0.0, 0.0, 0.0)
+    for (s0, z0), (s1, z1) in zip(p, p[1:]):
+        if s1 - s0 > 1e-6:
+            g = (abs(z1 - z0) - 0.01) / (s1 - s0)
+            if g > best[0]:
+                best = (g, s0, s1)
+    return best
+
+
+def check_grades(spec, m: CityModel) -> Check:
+    cap = spec.highways.grades.ramp_max
+    c = Check("road_grades", f"Every road at most {cap:.0%} steep along its z profile "
+                             "(viaducts, ramps, bridge approaches, streets ramping up to a "
+                             "raised junction; footbridge stairs aside, M14's deck ramps as "
+                             "steep as a street)")
+    caps = grade_caps(spec)
     for s in m.road_segments:
-        if s.road_class == "footbridge":
+        k = grade_kind(s)
+        if k is None:
             continue
-        p = _prof(s)
-        # (M14: a deck's street ramp may be as steep as a street)
-        cap = RAMP_GRADE if s.attrs.get("role") == "deck_ramp" else EL.MAX_GRADE
-        for (s0, z0), (s1, z1) in zip(p, p[1:]):
-            # (both s and z are on the 1 cm grid: a step of 1 cm in z is rounding)
-            if s1 - s0 > 1e-6 and (abs(z1 - z0) - 0.01) / (s1 - s0) > cap + 1e-4:
-                _limit(c, f"{s.id} ({s.road_class}): {abs(z1 - z0) / (s1 - s0):.1%} at "
-                          f"s {s0:.0f} to {s1:.0f} m")
-                break
+        lim = caps["deck_ramp"] if k == "deck_ramp" else cap
+        g, s0, s1 = steepest(_prof(s))
+        if g > lim + 1e-4:
+            _limit(c, f"{s.id} ({s.road_class}): {g + 0.01 / max(s1 - s0, 1e-6):.1%} at "
+                      f"s {s0:.0f} to {s1:.0f} m")
     return c
+
+
+def check_ramp_grades(spec, m: CityModel) -> Check:
+    gr = spec.highways.grades
+    c = Check("ramp_grades", f"M18: ramps, loops, flyovers and stack ramps at most "
+                             f"{gr.ramp_max:.0%} steep, viaduct runs and bridge approaches "
+                             f"{gr.run_max:.0%} (`highways.grades`)")
+    caps = grade_caps(spec)
+    for s in m.road_segments:
+        k = grade_kind(s)
+        if k not in ("ramp", "run", "approach"):
+            continue
+        g, s0, s1 = steepest(_prof(s))
+        if g > caps[k] + 1e-4:
+            _limit(c, f"{s.id} ({k}): {g:.1%} at s {s0:.0f} to {s1:.0f} m, over "
+                      f"{caps[k]:.0%}")
+    return c
+
+
+def grade_stats(m: CityModel) -> dict:
+    """M18: per kind of raised road, how many and their steepest grades (the steepest, and
+    the median of each road's steepest)."""
+    by: dict = {}
+    for s in m.road_segments:
+        k = grade_kind(s)
+        p = _prof(s)
+        if k is None or not any(z > 0.05 for _, z in p):
+            continue
+        by.setdefault(k, []).append(steepest(p)[0])
+    return {k: {"n": len(v), "max": round(max(v), 4), "median": round(float(np.median(v)), 4)}
+            for k, v in sorted(by.items())}
 
 
 def check_continuity(m: CityModel) -> Check:
@@ -129,7 +198,7 @@ def check_supports(m: CityModel) -> Check:
                                f"{EL.SUPPORT_MAX_GAP_M:.0f} m apart, none in a lane, a road "
                                "or junction under the deck, a building, the water or a "
                                "transit structure")
-    cols = [s for s in m.structures if (s.attrs or {}).get("road_id")]
+    cols = [s for s in m.structures if (s.attrs or {}).get("road_id") and s.kind == "column"]
     raised = EL.raised_segments(m)
     if not raised:
         return c
@@ -338,10 +407,11 @@ def check_stack_levels(m: CityModel) -> Check:
     return c
 
 
-def run(m: CityModel, supports: bool) -> list[Check]:
+def run(spec, m: CityModel, supports: bool) -> list[Check]:
     with G.canonical():
-        out = [check_grades(m), check_continuity(m), check_clearance(m), check_ramps(m),
-               check_stack_ramps(m), check_stack_levels(m)]
+        out = [check_grades(spec, m), check_ramp_grades(spec, m), check_continuity(m),
+               check_clearance(m), check_ramps(m), check_stack_ramps(m),
+               check_stack_levels(m)]
         if supports:
             out.append(check_supports(m))
     return out
@@ -359,7 +429,8 @@ def stats(m: CityModel) -> dict:
     over = sum(len(s.attrs.get("overpass_at", [])) for s in el)
     raised = [s for s in m.road_segments if not s.attrs.get("elevated") and
               s.attrs.get("role") != "ramp" and any(z.z > 0.5 for z in s.z_profile)]
-    cols = [s for s in m.structures if (s.attrs or {}).get("road_id")]
+    cols = [s for s in m.structures if (s.attrs or {}).get("road_id") and s.kind == "column"]
+    emb = [s for s in m.structures if s.kind == "embankment"]
     under = [s for s in m.road_segments if s.attrs.get("role") == "underpass"]
     fly = [s for s in ramps if s.attrs.get("flyover")]
     sysr = [s for s in ramps if s.attrs.get("template") in SYSTEM]
@@ -382,4 +453,8 @@ def stats(m: CityModel) -> dict:
                                  2),
         "underpass_streets": len(under),
         "road_columns": len(cols),
+        "embankments": len(emb),
+        "embankment_km": round(sum(s.attrs.get("s1_m", 0.0) - s.attrs.get("s0_m", 0.0)
+                                   for s in emb) / 1000.0, 2),
+        "grades": grade_stats(m),
     }

@@ -102,7 +102,7 @@ def _draw_roads(ax, m, lw_scale: float = 1.0, box=None) -> None:
 def _columns(ax, m, size: float = 2.0, box=None) -> None:
     pts = []
     for s in m.structures:
-        if not (s.attrs or {}).get("road_id") or s.footprint is None:
+        if not (s.attrs or {}).get("road_id") or s.footprint is None or s.kind != "column":
             continue
         c = G.from_model_poly(s.footprint).centroid
         if box is None or (box[0] <= c.x <= box[2] and box[1] <= c.y <= box[3]):

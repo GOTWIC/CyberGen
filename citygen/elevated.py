@@ -16,8 +16,9 @@ Runs inside the road builder, after `roads.assemble`, so M2 lays its streets aro
    A run that is too short for its ramps (both ends at the ground) goes back to the ground.
 3. **Profiles.** Deck top at level 1 (9 m), raised over bridge decks, over other raised roads
    it crosses without a node (level 2 where that takes it over 16 m), down to the ground at
-   its ends at a 5% design grade (6% at most) with 40 m vertical curves and a 20 m flat
-   landing. A run that leaves the map stays up.
+   its ends at the run grade (M18: 6% design, 7% at most) with 30 m vertical curves and a
+   20 m flat landing; ramps, loops, flyovers and stack ramps at 7% (8% at most), bridge
+   approaches at 6.5% (`highways.grades`). A run that leaves the map stays up.
 4. **Ramps.** One lane, 7 m wide, one-way (right-hand traffic), 1 m beside the deck: a 60 m
    taper on the deck from the diverge or merge point, then parallel to the highway down to
    the terminal on the avenue (a signalized junction in M2). A ramp is built only where it
@@ -40,6 +41,7 @@ from __future__ import annotations
 
 import bisect
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -52,10 +54,16 @@ from . import geom as G
 LEVEL_Z = {1: 9.0, 2: 18.0, 3: 27.0}   # deck tops (3: a stack's upper flyovers, M12)
 DECK_M = 1.8                    # viaduct structure depth (scope: 1.5 to 2 m)
 CLEAR_M = 5.5                   # under any road deck
-GRADE = 0.05                    # design grade of runs and ramps
-MAX_GRADE = 0.06                # scope maximum for roads
+# M18: the grades are the spec's `highways.grades` (`grades` sets them for one road stage);
+# these are its defaults (M7 to M17: 5% design and 6% at most everywhere, 40 m curves)
+RUN_GRADE = 0.06                # design grade of a viaduct run's ends down to the ground
+RUN_MAX_GRADE = 0.07            # and their maximum
+GRADE = 0.07                    # design grade of ramps, loops, flyovers and stack ramps
+MAX_GRADE = 0.08                # and their maximum (the steepest any road may be)
+SEARCH_GRADE = 0.05             # a ramp's search runs as long, and a loop is as big, as one at
+#                                 this grade (M7's): steeper, it descends sooner within it
 FLAT_M = 20.0                   # flat landing at a ground end
-CURVE_M = 40.0                  # vertical curves (moving average of this length)
+CURVE_M = 30.0                  # vertical curves (moving average of this length)
 STEP_M = 5.0                    # profile sampling
 TAPER_M = 60.0                  # ramp taper on the deck
 RAMP_W = 7.0
@@ -101,9 +109,25 @@ UNDER_END_M = 15.0              # an avenue ending under a stack's deck stops th
 #                                 its edge
 
 
-def ramp_run(dz: float) -> float:
-    """Length a ramp or run end needs to change height by dz: landing, grade, curve."""
-    return FLAT_M + dz / GRADE + CURVE_M / 2.0
+def ramp_run(dz: float, g: float | None = None) -> float:
+    """Length a ramp (or, with g = RUN_GRADE, a run end) needs to change height by dz:
+    landing, grade, curve."""
+    return FLAT_M + dz / (GRADE if g is None else g) + CURVE_M / 2.0
+
+
+@contextmanager
+def grades(gr):
+    """M18: the spec's `highways.grades` (a `spec.Grades`, or None for the defaults) as the
+    module's grades while a road stage runs; the previous ones after it."""
+    global RUN_GRADE, RUN_MAX_GRADE, GRADE, MAX_GRADE, CURVE_M, APPROACH_GRADE
+    old = (RUN_GRADE, RUN_MAX_GRADE, GRADE, MAX_GRADE, CURVE_M, APPROACH_GRADE)
+    if gr is not None:
+        RUN_GRADE, RUN_MAX_GRADE, GRADE, MAX_GRADE, CURVE_M, APPROACH_GRADE = (
+            gr.run, gr.run_max, gr.ramp, gr.ramp_max, gr.curve_m, gr.approach)
+    try:
+        yield
+    finally:
+        RUN_GRADE, RUN_MAX_GRADE, GRADE, MAX_GRADE, CURVE_M, APPROACH_GRADE = old
 
 
 def under_m(z: float) -> float:
@@ -219,9 +243,10 @@ def compress(prof, tol: float = 0.005) -> list[tuple[float, float]]:
     return out
 
 
-def smooth(samples: list[float], width: float = CURVE_M, step: float = STEP_M) -> list[float]:
-    """Moving average over `width` (vertical curves); values beyond the ends repeat the end."""
-    k = int(round(width / step / 2.0))
+def smooth(samples: list[float], width: float | None = None, step: float = STEP_M) -> list[float]:
+    """Moving average over `width` (vertical curves, CURVE_M by default); values beyond the
+    ends repeat the end."""
+    k = int(round((CURVE_M if width is None else width) / step / 2.0))
     n = len(samples)
     out = []
     for i in range(n):
@@ -425,7 +450,7 @@ class Elev:
         if not hw or share <= 0:
             return
         corridors = self.chains(hw)
-        lmin = 2.0 * ramp_run(LEVEL_Z[1]) + PLATEAU_M + 120.0
+        lmin = 2.0 * ramp_run(LEVEL_Z[1], RUN_GRADE) + PLATEAU_M + 120.0
         target = share * total
         self.prim = [(LineString(s["centerline"]), s) for s in self.net.segments]
         self.prim_tree = shapely.STRtree([ln for ln, _ in self.prim])
@@ -451,7 +476,7 @@ class Elev:
                         break
                     L = run.s_nodes[j + 1] - run.s_nodes[i]
                     ramps = (0 if off[i] else 1) + (0 if off[j + 1] else 1)
-                    if L < ramps * ramp_run(LEVEL_Z[1]) + PLATEAU_M + 120.0:
+                    if L < ramps * ramp_run(LEVEL_Z[1], RUN_GRADE) + PLATEAU_M + 120.0:
                         continue
                     if L > max(target, lmin) * 1.5:
                         break
@@ -646,8 +671,8 @@ class Elev:
     def settle(self) -> None:
         """Split runs at nodes that cannot stay under or beside the deck, add the branch runs
         of ground highways, drop what is too short; until nothing changes."""
-        full = ramp_run(LEVEL_Z[1])
-        clear_at = ramp_run(CLEAR_M + DECK_M + 0.3)
+        full = ramp_run(LEVEL_Z[1], RUN_GRADE)
+        clear_at = ramp_run(CLEAR_M + DECK_M + 0.3, RUN_GRADE)
         for _ in range(30):
             changed = False
             # branch runs follow their main runs
@@ -795,7 +820,7 @@ class Elev:
                 room = math.inf
                 for e, d in ((0, s_here), (1, r.L - s_here)):
                     if not loop and ends[e] == "ground":
-                        room = min(room, GRADE * max(0.0, d - FLAT_M - CURVE_M / 2.0))
+                        room = min(room, RUN_GRADE * max(0.0, d - FLAT_M - CURVE_M / 2.0))
                 if room >= z_o + CLEAR_M + DECK_M or oid is None:
                     need.append((s_here, z_o + CLEAR_M + DECK_M))
                 else:
@@ -807,15 +832,15 @@ class Elev:
                     if loop:
                         continue
                     if ends[e] == "ground":
-                        z = min(z, GRADE * max(0.0, d - FLAT_M))
+                        z = min(z, RUN_GRADE * max(0.0, d - FLAT_M))
                     elif end_val[e] is not None:
                         gap = end_val[e] - plateau
-                        step = min(abs(gap), GRADE * max(0.0, d - FLAT_M))
+                        step = min(abs(gap), RUN_GRADE * max(0.0, d - FLAT_M))
                         z = end_val[e] - math.copysign(step, gap) if gap else z
                 raw.append(z)
             for sn, zn in need:
                 for i, s in enumerate(ss):
-                    raw[i] = max(raw[i], zn - GRADE * max(0.0, abs(s - sn) - CURVE_M / 2.0))
+                    raw[i] = max(raw[i], zn - RUN_GRADE * max(0.0, abs(s - sn) - CURVE_M / 2.0))
             sm = smooth(raw)
             z = [max(a_, b_) for a_, b_ in zip(sm, bridges)]
             for e, i in ((0, 0), (1, -1)):
@@ -887,16 +912,19 @@ class Elev:
                 return None
         return None
 
-    def _ramp(self, r: Run, T, sT: float, sigma: int, kind: str, hw_w: float):
+    def _ramp(self, r: Run, T, sT: float, sigma: int, kind: str, hw_w: float, clear=None):
         """The shortest ramp between terminal T and the run on side sigma: its polyline (in
         driving direction), profile and the run station of its deck end; or (None, reason).
         The ramp follows the deck through the taper (sloped where the run itself rises),
-        then falls to the terminal at the design grade."""
+        then falls to the terminal at the design grade. `clear(pts, prof)` (M18): why a
+        ramp does not fit; a longer one is tried then (the steeper ramps are shorter, and
+        the shortest may run into a loop the longer did not)."""
         dirn = 1 if sigma == -1 else -1      # right-hand traffic
         o = hw_w / 2.0 + RAMP_GAP + RAMP_W / 2.0
         top = max(z for _, z in r.prof)
         lo_span = TAPER_M + 10.0 + FLAT_M + CURVE_M
-        hi_span = ramp_run(top) + TAPER_M + 10.0
+        # (M18: the steeper ramps are tried as long as M7's, past nodes and the water)
+        hi_span = ramp_run(top, SEARCH_GRADE) + TAPER_M + 10.0
         why = "no room"
         span = lo_span
         while span <= hi_span + 0.01:
@@ -954,6 +982,10 @@ class Elev:
                 pts = pts[::-1]
                 prof = [(G.q(Lr - qd), zz) for qd, zz in reversed(prof)]
                 prof[0] = (0.0, prof[0][1])
+            if clear is not None:
+                why = clear(pts, prof)
+                if why is not None:
+                    continue
             return (pts, prof, s_far), None
         return None, why
 
@@ -1035,7 +1067,7 @@ class Elev:
         z_d = r.z(s_far)
         if z_d < 2.0:
             return None, "loop: deck too low"
-        R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(z_d) - LOOP_LEAD_M) /
+        R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(z_d, SEARCH_GRADE) - LOOP_LEAD_M) /
                                             (1.5 * math.pi) / 5.0))
         # the tightest loop: its start moves along the deck (5 m at a time) until the circle
         # clears the run and the avenue it comes back to
@@ -1157,7 +1189,7 @@ class Elev:
         skew = abs(u[0] * v[1] - u[1] * v[0])
         o = hw_w / 2.0 + RAMP_GAP + RAMP_W / 2.0
         top = r.z(sN)
-        R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(top) - LOOP_LEAD_M) /
+        R = max(LOOP_MIN_R, 5.0 * math.ceil((ramp_run(top, SEARCH_GRADE) - LOOP_LEAD_M) /
                                             (1.5 * math.pi) / 5.0))
         y_e = o + 2.0 * R + 20.0
         Te = G.qpoint((C[0] - v[0] * y_e / skew, C[1] - v[1] * y_e / skew))
@@ -1238,7 +1270,7 @@ class Elev:
         deck square, comes down beside the stem and turns into it at a terminal T_f (corner
         K2). An on flyover is its mirror (built the same way, then reversed). Its deck clears
         every road and ramp it passes over (`_fly_needs`), at the design grade with vertical
-        curves, at most 6%; its own columns find room within `FLY_SPAN_M` (`_fly_span`).
+        curves, at most MAX_GRADE; its own columns find room within `FLY_SPAN_M` (`_fly_span`).
         Returns (ramp, None) or (None, reason)."""
         sN = r.s_nodes[k]
         C, u = _at(r.pts, r.cum, sN)
@@ -1450,7 +1482,7 @@ class Elev:
 
     def _fly_profile(self, r: Run, s_div: float, c: int, qs, need) -> list | None:
         """A flyover's profile (in the off direction): on the deck along the taper, then over
-        every need with a 40 m crest at the design grade, down to the landing; None where it
+        every need with a CURVE_M crest at the design grade, down to the landing; None where it
         cannot (a need on the taper, too steep, too high)."""
         L = qs[-1]
         hump = [(q, z) for q, z in zip(qs, need) if z > 0.0]
@@ -1611,10 +1643,12 @@ class Elev:
             T, sT, leg = terminals[sigma]
             side = []
             for kind in ("off", "on"):
-                res, why = self._ramp(r, T, sT, sigma, kind, hw_w)
+                res, why = self._ramp(
+                    r, T, sT, sigma, kind, hw_w,
+                    clear=lambda pts, prof, T=T: self._ramp_clear(pts, r, legs, T, hw_w,
+                                                                  full=(pts, prof)))
                 if res is not None:
                     pts, prof, s_far = res
-                    why = self._ramp_clear(pts, r, legs, T, hw_w, full=(pts, prof))
                 if why is not None:
                     why = why.split(" rs")[0]
                     self.failed[why] = self.failed.get(why, 0) + 1
@@ -1809,7 +1843,7 @@ class Elev:
         node that would bring a run down."""
         self.stack_plan = {}
         taken: set = set()
-        full = STACK_LIFT_M + ramp_run(LEVEL_Z[1])
+        full = STACK_LIFT_M + ramp_run(LEVEL_Z[1], RUN_GRADE)
         for n, p1, p2 in self.stack_sites():
             best = None
             for lift, gnd in ((p1, p2), (p2, p1)):
@@ -2115,8 +2149,8 @@ class Elev:
     def _sys_profile(self, L: float, hump, zh, zt, cap: float) -> list | None:
         """A directional ramp's profile: on its source road along the first taper (zh, from
         the start), on its target along the last (zt, from the end), a steady grade between
-        them raised over every need with a 40 m crest (level between crests, no dip below
-        both ends), at most 6% and `cap`; None where it cannot."""
+        them raised over every need with a CURVE_M crest (level between crests, no dip below
+        both ends), at most MAX_GRADE and `cap`; None where it cannot."""
         hq = [q for q, _ in hump]
         left, right = [], []
         for _, z in hump:
@@ -2667,7 +2701,7 @@ def rebuild(E: Elev) -> None:
     net.segments = segs
 
 
-APPROACH_GRADE = 0.055          # bridge approaches (no vertical curves)
+APPROACH_GRADE = 0.065          # bridge approaches (no vertical curves; M18, 5.5% before)
 BRIDGE_DECK_M = 1.5             # a bridge's structure depth (M1b)
 
 
@@ -2907,7 +2941,10 @@ def elevate(spec, ctx, net) -> dict:
 
 SUPPORT_STEP_M = 32.0           # scope: columns every 25 to 40 m
 SUPPORT_MAX_GAP_M = 60.0        # a span over a road under the deck
-SUPPORT_MIN_UNDER_M = 1.0       # a deck lower than this rests on its embankment
+EMBANKMENT_M = 4.5              # M18: a raised road lower than this stands on retained fill
+#                                 (structure `embankment`), not on columns over open ground
+SUPPORT_MIN_UNDER_M = EMBANKMENT_M - DECK_M    # a deck lower than this rests on its embankment
+EMBANK_STEP_M = 2.0             # sampling of a raised road for its embankments
 COLUMN_M = {"highway": 2.5, "avenue": 2.2}
 COLUMN_DEFAULT_M = 1.8
 
@@ -2956,6 +2993,66 @@ def raised_segments(m) -> list:
             continue      # (M14: a deck's streets are on its slab, its ramps solid)
         if any(under_m(z.z) >= SUPPORT_MIN_UNDER_M for z in s.z_profile):
             out.append(s)
+    return out
+
+
+def road_embankments(m) -> list[dict]:
+    """M18: retained fill under every raised road over land where its surface is less than
+    EMBANKMENT_M up (the low end of a ramp, a bridge approach or a viaduct, a street ramping
+    up to a raised junction), so nothing stands or grows in the dead space under a low
+    deck: one structure per such stretch of a road (`<road>.emb<k>`), its footprint the
+    road's width over the stretch less the water, its line the centerline at the road's
+    height, z0 the ground. Tunnels, a deck's streets and ramps (M14) and footbridges have
+    none; the road's columns stand where it is higher (`road_supports`)."""
+    land = G.union([G.from_model_poly(p) for lnd in m.land for p in lnd.polygons])
+    wet = G.union(_water_polys(m))
+    dry = G.diff(land, wet) if not wet.is_empty else land
+    shapely.prepare(dry)
+    out = []
+    for s in m.road_segments:
+        if s.road_class == "footbridge" or s.tunnel or "deck" in s.attrs:
+            continue
+        prof = [(z.s, z.z) for z in s.z_profile]
+        if not any(z > 0.05 for _, z in prof):
+            continue
+        pts = [tuple(p) for p in s.centerline]
+        cum = _cum(pts)
+        L = cum[-1]
+        n = max(int(math.ceil(L / EMBANK_STEP_M)), 1)
+        ss = sorted({G.q(L * k / n) for k in range(n + 1)} | {G.q(x) for x, _ in prof})
+        xy = np.array([_at(pts, cum, x)[0] for x in ss], dtype=np.float64)
+        on = shapely.contains_xy(dry, xy[:, 0], xy[:, 1])
+        runs, cur = [], None
+        for x, ok in zip(ss, on.tolist()):
+            z = _z_at(prof, x)
+            if ok and 0.05 < z <= EMBANKMENT_M + 1e-9:
+                cur = [x, x] if cur is None else [cur[0], x]
+            elif cur is not None:
+                runs.append(cur)
+                cur = None
+        if cur is not None:
+            runs.append(cur)
+        k = 0
+        for a, b in runs:
+            if b - a < EMBANK_STEP_M:
+                continue
+            sub = _sub(pts, cum, a, b)
+            if len(sub) < 2:
+                continue
+            band = G.qpoly(LineString(sub).buffer(s.width_m / 2.0, cap_style="flat",
+                                                  join_style="mitre", mitre_limit=2.0))
+            parts = G.parts(G.inter(band, dry))
+            if not parts:
+                continue
+            foot = max(parts, key=lambda p: (G.area1(p), G.qbounds(p)))
+            sc = _cum(sub)
+            line = [(x, y, G.q(_z_at(prof, a + d))) for (x, y), d in zip(sub, sc)]
+            k += 1
+            out.append({"id": f"{s.id}.emb{k}", "type": "structure", "kind": "embankment",
+                        "footprint": G.to_model_poly(foot), "line": line, "z0_m": 0.0,
+                        "z1_m": max(p[2] for p in line), "supports": [s.id],
+                        "attrs": {"road_id": s.id, "road_class": s.road_class,
+                                  "s0_m": G.q(a), "s1_m": G.q(b), "width_m": s.width_m}})
     return out
 
 

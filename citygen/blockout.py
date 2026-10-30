@@ -59,6 +59,7 @@ Z_OPEN = 0.1
 CURB_M = 0.15
 DECK_M = 1.2           # bridge and elevated deck thickness
 EMBANKMENT_M = 3.0     # a raised street no higher than this is drawn as a solid embankment
+#                        (M18: the model's embankments fill under the low stretches of others)
 PIER_STEP_M = 40.0
 
 ROAD_COLORS = {"highway": "#2c3038", "avenue": "#353a44", "street": "#3b404b",
@@ -337,15 +338,112 @@ def _land_and_water(P: _Plan) -> None:
 
 # --- streets -----------------------------------------------------------------------------
 
+def _trimmed(s, ends: dict) -> tuple[list, list, float, float]:
+    """M18: a road's centerline (deduplicated) and z at its vertices, cut back to where it
+    leaves each junction drawn from its surface (`edge_z`: the road ends on it, so a leg that
+    slopes inside the polygon does not show through it), whole elsewhere; and how far it is
+    cut back at its start and end."""
+    from . import junctions as JN
+
+    pts = _dedupe([(x, y) for x, y in s.centerline])
+    L = sum(_dist(a, b) for a, b in zip(pts, pts[1:]))
+    a = b = 0.0
+    if s.start in ends:
+        a = JN.leg_exit(pts, ends[s.start])[0]
+    if s.end in ends:
+        b = JN.leg_exit(pts[::-1], ends[s.end])[0]
+    if not (a or b):
+        return pts, _z_along(pts, s.z_profile), 0.0, 0.0
+    if L - a - b < 0.5:
+        return [], [], a, b
+    from . import streets as ST
+
+    sub = _dedupe(ST._substring(pts, a, L - b))
+    return sub, [_z_on(s.z_profile, a + d) for d in _cum2(sub)], a, b
+
+
+def _fill(s, st, a: float, b: float) -> dict | None:
+    """M18: an embankment of the model under its road, within the road's drawn stretch
+    (from a, to b short of its end), from just under the road surface down into the
+    ground."""
+    from . import streets as ST
+
+    pts = _dedupe([(x, y) for x, y in s.centerline])
+    L = sum(_dist(p, q_) for p, q_ in zip(pts, pts[1:]))
+    s0 = max(st.attrs.get("s0_m", 0.0), a)
+    s1 = min(st.attrs.get("s1_m", L), L - b)
+    if s1 - s0 < 0.5:
+        return None
+    sub = _dedupe(ST._substring(pts, s0, s1))
+    zs = [_z_on(s.z_profile, s0 + d) for d in _cum2(sub)]
+    r = ribbon(sub, s.width_m, [z + Z_ROAD - 0.01 for z in zs])
+    if r is None:
+        return None
+    return {"k": "ribbon", "m": "embankment", "l": r[0], "rr": r[1], "t": q(max(zs) + 0.3)}
+
+
+def _z_on(profile, s: float) -> float:
+    if not profile:
+        return 0.0
+    if s <= profile[0].s:
+        return profile[0].z
+    for p0, p1 in zip(profile, profile[1:]):
+        if p0.s <= s <= p1.s:
+            return p0.z if p1.s - p0.s <= 1e-9 else p0.z + (p1.z - p0.z) * (s - p0.s) / (
+                p1.s - p0.s)
+    return profile[-1].z
+
+
+def _junction_part(j, node, terrain: bool) -> dict:
+    """M18: a junction's surface: flat at its node's height, or (`edge_z`) a face through
+    every vertex at its height, holes at the height of the vertices around them (on a terrain
+    city over sea level, as the ground grid is drawn)."""
+    ext, holes = _poly_rings(j.polygon)
+    nz = node.position[2] if node is not None else 0.0
+    ez = j.edge_z if j.edge_z and len(j.edge_z) == len(j.polygon.exterior) else None
+    if ez is None and not terrain:
+        return {"k": "flat", "m": "junction", "z": q(Z_JUNCTION + nz), "r": ext, "h": holes}
+    base = (node.ground_m or 0.0) if (terrain and node is not None) else 0.0
+    pts = [tuple(p) for p in j.polygon.exterior]
+    ez = ez or [nz] * len(pts)
+    zx = {p: z for p, z in zip(pts, ez)}
+
+    def zat(x, y):
+        if (x, y) in zx:
+            return zx[(x, y)]
+        acc = wt = 0.0
+        for (px, py), z in zip(pts, ez):
+            w = 1.0 / ((px - x) ** 2 + (py - y) ** 2 + 1.0)
+            acc += w * z
+            wt += w
+        return acc / wt
+    part = {"k": "drape", "m": "junction",
+            "r": [[x, y, q(base + Z_JUNCTION + zat(x, y))] for x, y in ext],
+            "h": [[[x, y, q(base + Z_JUNCTION + zat(x, y))] for x, y in h] for h in holes]}
+    if terrain:
+        part["abs"] = True
+    return part
+
+
 def _streets(P: _Plan) -> None:
     m = P.m
     seg_district = {}
+    terrain = m.terrain is not None
+    # (M18: the junctions drawn from their surfaces, which their roads end on)
+    ends = {j.node_id: [tuple(p) for p in j.polygon.exterior] for j in m.junctions
+            if j.edge_z}
+    embank: dict = {}
+    for st in m.structures:
+        if st.kind == "embankment" and len(st.line) >= 2:
+            embank.setdefault((st.attrs or {}).get("road_id"), []).append(st)
     for s in m.road_segments:
         did = s.district_ids[0] if s.district_ids else None
         seg_district[s.id] = did
-        pts = [(x, y) for x, y in s.centerline]
-        zs = _z_along(_dedupe(pts), s.z_profile)
-        raised = max(zs) > 0.5 if zs else False
+        pts, zs, cut0, cut1 = _trimmed(s, ends)
+        if not pts:
+            continue
+        zfull = _z_along(_dedupe([(x, y) for x, y in s.centerline]), s.z_profile)
+        raised = max(zfull) > 0.5
         r = ribbon(pts, s.width_m, [z + Z_ROAD for z in zs])
         if r is None:
             continue
@@ -377,17 +475,20 @@ def _streets(P: _Plan) -> None:
         if raised or s.bridge:
             # a deck with its own object: thickness, and piers down to the water (M7: the
             # columns over land are model structures); a low raised street (a ramp up to a
-            # raised junction, an approach's foot) is a solid embankment
+            # raised junction, an approach's foot) is a solid embankment, and (M18) the
+            # model's embankments fill under the low stretches of the others
             elev = bool(s.attrs.get("elevated")) or s.attrs.get("role") == "ramp"
-            low = not elev and not s.bridge and max(zs) <= EMBANKMENT_M
+            low = not elev and not s.bridge and max(zfull) <= EMBANKMENT_M
             cat = "elevated" if elev else ("embankment" if low else "bridge")
-            t_deck = q(max(zs) + 0.3) if low else DECK_M
+            t_deck = q(max(zfull) + 0.3) if low else DECK_M
             part = {"k": "ribbon", "m": "embankment" if low else "bridge_deck", "l": r[0],
                     "rr": r[1], "t": t_deck}
             road = {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
                     "t": 0.0}
             t = tile_key(*mid)
-            parts = [part, road] + ([] if low else _piers(_dedupe(pts), zs, P.wet_at))
+            fills = [] if low else [f for f in (_fill(s, st, cut0, cut1) for st in sorted(
+                embank.get(s.id, []), key=lambda st: st.id)) if f is not None]
+            parts = [part, road] + fills + ([] if low else _piers(_dedupe(pts), zs, P.wet_at))
             P.add(f"{s.id}.deck", P.collection(did, "Elevated" if elev else "Waterfront"), t,
                   cat, parts,
                   {"citygen_id": s.id, "citygen_type": s.type, "road_class": s.road_class,
@@ -398,13 +499,14 @@ def _streets(P: _Plan) -> None:
                {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1], "t": 0.0},
                s.id)
     nz = {n.id: n.position[2] for n in m.road_nodes}
+    node = {n.id: n for n in m.road_nodes}
     for j in m.junctions:
-        ext, holes = _poly_rings(j.polygon)
+        ext, _ = _poly_rings(j.polygon)
         cx, cy = _center(ext)
-        # (M7: a junction on a viaduct or an approach sits at its node's height)
+        # (M7: a junction on a viaduct or an approach sits at its node's height; M18: one
+        # not flat there is drawn through its surface, `edge_z`)
         P.join(P.district_at(cx, cy), "deck_junction" if j.level else "junction", cx, cy,
-               {"k": "flat", "m": "junction", "z": q(Z_JUNCTION + nz.get(j.node_id, 0.0)),
-                "r": ext, "h": holes}, j.id)
+               _junction_part(j, node.get(j.node_id), terrain), j.id)
     # (M14: a deck's crosswalks and sidewalks at its top)
     jtop = {j.id: nz.get(j.node_id, 0.0) for j in m.junctions if j.level}
     stop = {s.id: s.z_profile[0].z for s in m.road_segments if "deck" in s.attrs}
@@ -573,6 +675,8 @@ def _sites(P: _Plan) -> None:
             continue    # M9: drawn with their tunnel (`_tunnels`)
         if s.kind == "retaining_wall":
             continue    # M13: drawn with the ground (`_terrain`)
+        if s.kind == "embankment":
+            continue    # M18: drawn with its road (`_streets`)
         if a.get("deck"):
             continue    # M14: drawn with their deck (`_decks`)
         if s.kind == "vent":

@@ -16,7 +16,6 @@ from shapely.ops import unary_union
 
 from . import geom as G
 from . import relations as R
-from .elevated import APPROACH_GRADE
 from .model import CityModel
 from .spec import BoundaryKind, CitySpec
 
@@ -539,7 +538,7 @@ def bridge_water_class(g: _Geo, line: LineString) -> str | None:
     return None
 
 
-def check_bridges(m: CityModel, g: _Geo) -> Check:
+def check_bridges(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
     c = Check("bridge_clearance", "Every bridge has the clearance of the water it crosses (sea "
                                   "channel and port approach 25 m+, river 10 to 15 m, canal 3 "
                                   "to 4 m), every road over water is a bridge, no junction on "
@@ -557,7 +556,7 @@ def check_bridges(m: CityModel, g: _Geo) -> Check:
         if not lo - 1e-6 <= b.clearance_m <= hi + 1e-6:
             c.failures.append(f"bridge {b.id}: clearance {b.clearance_m:g} m over {cls} water "
                               f"(needs {lo:g} to {hi:g} m)")
-        want = (b.clearance_m + 1.5) / APPROACH_GRADE
+        want = (b.clearance_m + 1.5) / spec.highways.grades.approach
         if b.ramp_length_m is not None and abs(b.ramp_length_m - want) > 0.05:
             c.failures.append(f"bridge {b.id}: ramp {b.ramp_length_m} m, expected {want:.2f} m")
         for sid in b.segment_ids:
@@ -901,7 +900,7 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
             check_road_graph(spec, m, g),
             check_districts_served(m, g),
             check_named_bridges(spec, m, g),
-            check_bridges(m, g),
+            check_bridges(spec, m, g),
             check_road_avoidance(m, g),
             check_curve_radius(m, g),
             check_segment_length(m, g),
@@ -909,7 +908,7 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         ]
         from . import elevated_checks as EC
 
-        checks += EC.run(m, supports=bool(m.buildings))
+        checks += EC.run(spec, m, supports=bool(m.buildings))
         from . import tunnel_checks as TNC
 
         checks += TNC.run(spec, m)
@@ -959,9 +958,11 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
 
             st["terrain"] = TGC.stats(m)
     if m.lots or m.blocks or m.junctions:
+        from . import network_checks as NC
         from . import street_checks as SC
 
         st["local"] = SC.stats(spec, m)
+        st["junction_levels"] = NC.junction_stats(m)
     if m.buildings:
         from . import building_checks as BC
 
