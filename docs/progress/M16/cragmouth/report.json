@@ -336,6 +336,20 @@
       "notes": []
     },
     {
+      "id": "road_dead_ends",
+      "title": "Every dead end is deliberate and says so (`dead_end`): at the map edge, a water end, a park, plaza or megasite gate, a path's end, a cul-de-sac with its turning bulb, a deck street's end, a traced road's end",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_overlaps",
+      "title": "Two roads at one level (within 4 m) overlap only inside a junction: rights of way overlapping by more than 25 m2 outside every junction polygon",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "building_footprints",
       "title": "Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it",
       "passed": true,
@@ -429,6 +443,20 @@
       ]
     },
     {
+      "id": "bridge_clash",
+      "title": "Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_building_clash",
+      "title": "No road, sidewalk, ramp or deck street right of way over a building mass at the road's own height (the mass under it, or 5 m over it, clears)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "transit_routes",
       "title": "Every transit line of the spec is built along its whole route (every leg found)",
       "passed": true,
@@ -513,7 +541,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "30773 things on the ground"
+        "30572 things on the ground"
       ]
     },
     {
@@ -536,12 +564,12 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "Low Harbor: 99% lit",
-        "Lantern Steps: 95% lit",
-        "Crown Heights: 98% lit",
+        "Low Harbor: 98% lit",
+        "Lantern Steps: 94% lit",
+        "Crown Heights: 97% lit",
         "Old Quarter: 94% lit",
         "Ridgeback: 97% lit",
-        "Hollow: 98% lit"
+        "Hollow: 97% lit"
       ]
     },
     {
@@ -564,7 +592,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "327 doors"
+        "334 doors"
       ]
     },
     {
@@ -654,7 +682,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "67 road columns under 20 raised segments"
+        "64 road columns under 20 raised segments"
       ]
     }
   ],
@@ -667,12 +695,32 @@
     "landmasses": 2,
     "landmasses_with_districts": 2,
     "unassigned_land_km2": 0.0,
-    "open_land_km2": 0.986,
+    "open_land_km2": 1.041,
     "open_land": [
       {
         "name": null,
         "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
         "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
       },
       {
         "name": null,
@@ -692,26 +740,6 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
         "area_km2": 0.003
       },
       {
@@ -722,7 +750,7 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.002
+        "area_km2": 0.011
       },
       {
         "name": null,
@@ -733,66 +761,6 @@
         "name": null,
         "kind": "green",
         "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
       },
       {
         "name": null,
@@ -812,17 +780,67 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.003
+        "area_km2": 0.005
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.004
+        "area_km2": 0.005
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.003
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
       },
       {
         "name": null,
@@ -833,11 +851,6 @@
         "name": null,
         "kind": "green",
         "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
       },
       {
         "name": null,
@@ -847,7 +860,142 @@
       {
         "name": null,
         "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
         "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
       },
       {
         "name": null,
@@ -862,32 +1010,12 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.003
+        "area_km2": 0.001
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
+        "area_km2": 0.001
       },
       {
         "name": null,
@@ -902,12 +1030,12 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.003
+        "area_km2": 0.004
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.003
+        "area_km2": 0.005
       },
       {
         "name": null,
@@ -917,12 +1045,17 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.004
+        "area_km2": 0.003
       },
       {
         "name": null,
         "kind": "green",
         "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
       },
       {
         "name": null,
@@ -947,22 +1080,7 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.001
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
+        "area_km2": 0.004
       },
       {
         "name": null,
@@ -977,7 +1095,7 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.006
+        "area_km2": 0.002
       },
       {
         "name": null,
@@ -987,17 +1105,22 @@
       {
         "name": null,
         "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
+      },
+      {
+        "name": null,
+        "kind": "green",
         "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
       },
       {
         "name": null,
@@ -1012,242 +1135,12 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.001
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.001
-      },
-      {
-        "name": null,
-        "kind": "green",
         "area_km2": 0.002
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.007
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.007
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.008
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.008
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.013
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.012
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.007
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.015
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.011
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.013
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.01
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.012
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.018
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.013
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.012
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.015
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.008
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.01
+        "area_km2": 0.025
       },
       {
         "name": null,
@@ -1258,176 +1151,6 @@
         "name": null,
         "kind": "green",
         "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.007
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.011
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.01
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.007
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.01
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.008
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.011
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.011
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.005
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.004
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.011
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.006
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.011
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.009
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.003
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.008
       },
       {
         "name": null,
@@ -1442,7 +1165,37 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.006
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
       },
       {
         "name": null,
@@ -1452,12 +1205,27 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.004
+        "area_km2": 0.006
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.014
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
       },
       {
         "name": null,
@@ -1472,7 +1240,22 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.012
+        "area_km2": 0.013
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
       },
       {
         "name": null,
@@ -1487,22 +1270,22 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.005
+        "area_km2": 0.006
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.009
+        "area_km2": 0.006
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.009
+        "area_km2": 0.004
       },
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.008
+        "area_km2": 0.012
       },
       {
         "name": null,
@@ -1513,6 +1296,61 @@
         "name": null,
         "kind": "green",
         "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.012
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.002
       },
       {
         "name": null,
@@ -1527,7 +1365,87 @@
       {
         "name": null,
         "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
         "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
       },
       {
         "name": null,
@@ -1548,6 +1466,186 @@
         "name": null,
         "kind": "green",
         "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.011
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.01
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.009
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.008
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.003
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.007
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.006
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.005
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.004
       },
       {
         "name": null,
@@ -1572,32 +1670,7 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.001
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.001
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.0
-      },
-      {
-        "name": null,
-        "kind": "green",
         "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.001
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.001
       },
       {
         "name": null,
@@ -1632,7 +1705,7 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.002
+        "area_km2": 0.001
       },
       {
         "name": null,
@@ -1642,7 +1715,12 @@
       {
         "name": null,
         "kind": "green",
-        "area_km2": 0.0
+        "area_km2": 0.001
+      },
+      {
+        "name": null,
+        "kind": "green",
+        "area_km2": 0.001
       },
       {
         "name": null,
@@ -1658,11 +1736,6 @@
         "name": null,
         "kind": "green",
         "area_km2": 0.002
-      },
-      {
-        "name": null,
-        "kind": "green",
-        "area_km2": 0.0
       },
       {
         "name": null,
@@ -1765,16 +1838,16 @@
       }
     ],
     "road_km": {
-      "alley": 28.7,
+      "alley": 30.55,
       "avenue": 23.54,
       "footbridge": 0.07,
       "highway": 8.93,
-      "pedestrian": 8.21,
-      "service": 9.9,
-      "street": 101.92
+      "pedestrian": 7.56,
+      "service": 12.24,
+      "street": 95.42
     },
-    "road_nodes": 2288,
-    "road_segments": 3226,
+    "road_nodes": 1927,
+    "road_segments": 2970,
     "road_components": 1,
     "bridges": 6,
     "bridges_by_class": {
@@ -1811,19 +1884,19 @@
       "max_stack_m": 0.0,
       "overpasses": 0,
       "max_deck_m": 0.0,
-      "raised_other_km": 5.74,
+      "raised_other_km": 6.02,
       "underpass_streets": 0,
-      "road_columns": 67
+      "road_columns": 64
     },
     "tunnels": {
       "by_kind": {
         "bored": {
-          "count": 9,
-          "km": 0.79
+          "count": 8,
+          "km": 0.7
         },
         "metro": {
-          "count": 6,
-          "km": 4.16
+          "count": 7,
+          "km": 3.93
         },
         "pedestrian": {
           "count": 5,
@@ -1832,7 +1905,7 @@
       },
       "vents": 0,
       "deepest_road_m": 0.0,
-      "deepest_metro_m": -51.37,
+      "deepest_metro_m": -52.84,
       "over_tunnel_roads": 0,
       "over_tunnel_streets": 0
     },
@@ -1889,199 +1962,210 @@
         }
       ],
       "max_m": 95.11,
-      "max_cut_m": 18.68,
-      "max_fill_m": 18.67,
-      "walls": 1805,
-      "wall_km": 132.72,
-      "bores": 9,
-      "viaducts": 1,
-      "graph_vertices": 23702,
+      "max_cut_m": 18.7,
+      "max_fill_m": 18.7,
+      "walls": 1780,
+      "wall_km": 131.83,
+      "bores": 8,
+      "viaducts": 2,
+      "graph_vertices": 22894,
       "crossings": 0,
-      "slope_greens": 201,
-      "retaining_walls": 1805,
-      "highest_wall_m": 21.14,
-      "bored_tunnels": 9,
-      "highest_plinth_m": 12.88,
-      "parked_off_steep": 723,
-      "seats_off_steep": 165,
-      "trees_off_cliffs": 1,
-      "under_viaducts": 57
+      "slope_greens": 210,
+      "retaining_walls": 1780,
+      "highest_wall_m": 21.06,
+      "bored_tunnels": 8,
+      "highest_plinth_m": 14.01,
+      "parked_off_steep": 682,
+      "seats_off_steep": 149,
+      "trees_off_cliffs": 0,
+      "under_viaducts": 56
     },
     "local": {
-      "junctions": 1839,
-      "junctions_signalized": 405,
+      "junctions": 1824,
+      "junctions_signalized": 400,
       "junctions_by_type": {
-        "street_street T": 878,
-        "street_street X": 278,
-        "avenue_avenue T": 209,
-        "alley_alley T": 166,
-        "avenue_avenue X": 94,
-        "street T": 58,
+        "street_street T": 768,
+        "street_street X": 267,
+        "avenue_avenue T": 181,
+        "alley_alley T": 160,
+        "avenue_avenue X": 126,
+        "street T": 57,
+        "street_alley bend": 41,
+        "pedestrian T": 32,
+        "alley_alley X": 30,
         "street_alley T": 25,
-        "pedestrian T": 23,
-        "alley_alley X": 19,
-        "street_service T": 17,
+        "street_service T": 19,
+        "street cul_de_sac": 18,
         "highway_highway T": 15,
-        "street_street multi": 12,
+        "alley T": 12,
         "highway_highway X": 11,
-        "alley T": 10,
         "street_alley X": 10,
-        "avenue_avenue multi": 7,
-        "service_service T": 4,
-        "alley_alley multi": 2,
-        "pedestrian X": 1
+        "avenue_avenue multi": 8,
+        "street_street multi": 7,
+        "alley cul_de_sac": 6,
+        "service cul_de_sac": 5,
+        "service_service T": 5,
+        "street_service bend": 5,
+        "street bend": 4,
+        "avenue_service bend": 3,
+        "alley_alley bend": 2,
+        "avenue_street bend": 2,
+        "pedestrian X": 2,
+        "pedestrian bend": 1,
+        "street_alley multi": 1,
+        "street_street bend": 1
       },
-      "crosswalks": 1406,
-      "sidewalks": 4555,
-      "sidewalk_km": 163.79,
-      "lanes": 6888,
-      "lane_connectors": 14036,
-      "one_way_segments": 142,
-      "walkways": 17702,
+      "crosswalks": 1422,
+      "sidewalks": 4088,
+      "sidewalk_km": 151.04,
+      "lanes": 6326,
+      "lane_connectors": 13143,
+      "one_way_segments": 172,
+      "walkways": 16852,
       "walkway_km": {
-        "alley": 38.6,
-        "crossing": 88.42,
-        "crosswalk": 45.1,
+        "alley": 42.8,
+        "crossing": 85.46,
+        "crosswalk": 47.28,
         "elevator": 0.0,
         "footbridge": 0.07,
-        "path": 70.56,
-        "pedestrian_street": 0.91,
-        "promenade": 7.31,
-        "sidewalk": 209.43,
-        "skybridge": 3.26,
-        "stairs": 0.2,
+        "path": 69.89,
+        "pedestrian_street": 1.51,
+        "promenade": 6.05,
+        "sidewalk": 195.06,
+        "skybridge": 3.0,
+        "stairs": 0.27,
         "underpass": 0.15
       },
       "footbridges": 3,
-      "blocks": 1129,
-      "lots": 6775,
-      "merged_lot_groups": 2,
+      "blocks": 1110,
+      "lots": 7058,
+      "merged_lot_groups": 3,
       "lot_area_m2_by_archetype": {
         "corporate_core": {
-          "count": 157,
-          "min": 1006.9,
-          "p10": 1467.9,
-          "median": 2563.5,
-          "p90": 3851.0,
-          "max": 6375.4,
-          "median_frontage_m": 52.9
+          "count": 142,
+          "min": 1105.5,
+          "p10": 1402.8,
+          "median": 2466.4,
+          "p90": 3870.1,
+          "max": 5813.5,
+          "median_frontage_m": 56.6
         },
         "entertainment_market": {
-          "count": 2222,
-          "min": 57.9,
-          "p10": 117.4,
-          "median": 239.7,
-          "p90": 459.4,
-          "max": 755.8,
-          "median_frontage_m": 16.1
+          "count": 2348,
+          "min": 56.7,
+          "p10": 107.5,
+          "median": 221.9,
+          "p90": 446.6,
+          "max": 743.5,
+          "median_frontage_m": 15.6
         },
         "industrial_port": {
-          "count": 58,
-          "min": 2104.5,
-          "p10": 2780.2,
-          "median": 7026.2,
-          "p90": 15450.0,
-          "max": 35376.3,
-          "median_frontage_m": 125.3
+          "count": 61,
+          "min": 2132.5,
+          "p10": 3158.2,
+          "median": 5929.6,
+          "p90": 14232.4,
+          "max": 26984.1,
+          "median_frontage_m": 135.7
         },
         "megablock_residential": {
-          "count": 58,
-          "min": 2140.3,
-          "p10": 2685.6,
-          "median": 4868.1,
-          "p90": 9776.5,
-          "max": 13218.0,
-          "median_frontage_m": 95.6
+          "count": 60,
+          "min": 2235.0,
+          "p10": 2657.4,
+          "median": 3954.8,
+          "p90": 8116.0,
+          "max": 14410.9,
+          "median_frontage_m": 81.4
         },
         "midtown_mixed": {
-          "count": 682,
-          "min": 282.2,
-          "p10": 486.7,
-          "median": 906.5,
-          "p90": 1667.9,
-          "max": 4209.4,
-          "median_frontage_m": 31.2
+          "count": 724,
+          "min": 285.1,
+          "p10": 472.6,
+          "median": 858.3,
+          "p90": 1675.2,
+          "max": 3130.6,
+          "median_frontage_m": 29.4
         },
         "old_town": {
-          "count": 3598,
-          "min": 37.3,
-          "p10": 79.2,
-          "median": 159.7,
-          "p90": 315.2,
-          "max": 721.4,
-          "median_frontage_m": 13.5
+          "count": 3723,
+          "min": 36.6,
+          "p10": 77.2,
+          "median": 162.0,
+          "p90": 318.0,
+          "max": 966.4,
+          "median_frontage_m": 13.2
         }
       },
       "block_size_m_by_district": {
         "Low Harbor": {
-          "count": 15,
-          "min": 51.9,
-          "p10": 96.0,
-          "median": 150.6,
-          "p90": 291.7,
-          "max": 311.2
+          "count": 20,
+          "min": 49.7,
+          "p10": 80.9,
+          "median": 159.0,
+          "p90": 220.4,
+          "max": 264.8
         },
         "Lantern Steps": {
-          "count": 331,
-          "min": 10.6,
-          "p10": 20.8,
-          "median": 39.0,
-          "p90": 61.9,
-          "max": 106.0
+          "count": 337,
+          "min": 10.5,
+          "p10": 23.6,
+          "median": 38.5,
+          "p90": 59.8,
+          "max": 116.4
         },
         "Crown Heights": {
-          "count": 58,
-          "min": 43.2,
-          "p10": 62.8,
-          "median": 107.2,
-          "p90": 152.8,
-          "max": 197.2
+          "count": 61,
+          "min": 36.3,
+          "p10": 68.3,
+          "median": 106.2,
+          "p90": 143.2,
+          "max": 231.4
         },
         "Old Quarter": {
-          "count": 554,
-          "min": 9.2,
-          "p10": 17.1,
-          "median": 30.7,
-          "p90": 47.7,
+          "count": 515,
+          "min": 8.7,
+          "p10": 18.4,
+          "median": 32.1,
+          "p90": 51.1,
           "max": 133.4
         },
         "Ridgeback": {
-          "count": 61,
-          "min": 46.7,
-          "p10": 72.6,
-          "median": 113.4,
-          "p90": 191.8,
-          "max": 242.8
+          "count": 78,
+          "min": 48.4,
+          "p10": 65.1,
+          "median": 105.9,
+          "p90": 158.0,
+          "max": 264.9
         },
         "Hollow": {
-          "count": 110,
-          "min": 22.1,
-          "p10": 51.6,
-          "median": 76.9,
-          "p90": 101.0,
-          "max": 203.1
+          "count": 99,
+          "min": 19.2,
+          "p10": 43.7,
+          "median": 82.5,
+          "p90": 117.6,
+          "max": 211.3
         }
       },
       "open_spaces_by_kind": {
-        "courtyard": 15,
-        "green": 254,
-        "park": 37,
-        "plaza": 224,
-        "pocket_park": 28
+        "courtyard": 20,
+        "green": 242,
+        "park": 32,
+        "plaza": 195,
+        "pocket_park": 43
       },
       "open_share_by_district": {
-        "Low Harbor": 0.0411,
-        "Lantern Steps": 0.0621,
-        "Crown Heights": 0.1141,
-        "Old Quarter": 0.0624,
-        "Ridgeback": 0.0955,
-        "Hollow": 0.1624
+        "Low Harbor": 0.0597,
+        "Lantern Steps": 0.0623,
+        "Crown Heights": 0.1163,
+        "Old Quarter": 0.062,
+        "Ridgeback": 0.0945,
+        "Hollow": 0.1623
       },
-      "open_share": 0.0952,
+      "open_share": 0.0974,
       "places": 0,
       "generator": {
-        "one_way_loops": 29,
-        "open_paths": 795,
+        "one_way_loops": 34,
+        "open_paths": 708,
         "walkway_links": 0,
         "angles": {
           "d01": 42.5,
@@ -2094,22 +2178,22 @@
       }
     },
     "buildings": {
-      "count": 6777,
-      "floor_area_km2": 20.246,
+      "count": 7058,
+      "floor_area_km2": 19.78,
       "by_type": {
-        "shopfront_row": 3383,
-        "shanty_stack": 2219,
-        "perimeter": 405,
-        "podium_tower": 318,
-        "terraced": 192,
-        "courtyard_block": 106,
-        "megabuilding": 39,
-        "warehouse": 35,
-        "tower": 27,
-        "slab": 15,
-        "yard": 13,
-        "shed": 12,
-        "parking_structure": 6,
+        "shopfront_row": 3536,
+        "shanty_stack": 2334,
+        "perimeter": 450,
+        "podium_tower": 296,
+        "terraced": 180,
+        "courtyard_block": 110,
+        "megabuilding": 44,
+        "warehouse": 37,
+        "tower": 24,
+        "shed": 15,
+        "yard": 11,
+        "slab": 10,
+        "parking_structure": 4,
         "pavilion": 2,
         "straddle_building": 2,
         "gate_house": 1,
@@ -2117,122 +2201,123 @@
         "office": 1
       },
       "by_use": {
-        "retail": 3383,
-        "residential": 2383,
-        "mixed": 682,
-        "office": 149,
-        "entertainment": 111,
-        "industrial": 61,
-        "parking": 6,
+        "retail": 3536,
+        "residential": 2504,
+        "mixed": 724,
+        "office": 133,
+        "entertainment": 91,
+        "industrial": 64,
+        "parking": 4,
         "civic": 2
       },
       "by_district": {
         "Low Harbor": {
-          "count": 58,
-          "min": 9.1,
-          "median": 12.6,
-          "p90": 16.0,
+          "count": 61,
+          "min": 8.5,
+          "median": 11.2,
+          "p90": 15.7,
           "max": 16.0,
           "archetype": "industrial_port",
-          "floor_area_km2": 0.154,
-          "coverage": 0.308,
-          "far": 0.31
+          "floor_area_km2": 0.146,
+          "coverage": 0.301,
+          "far": 0.3
         },
         "Lantern Steps": {
-          "count": 2222,
+          "count": 2348,
           "min": 10.5,
-          "median": 21.0,
+          "median": 23.6,
           "p90": 31.5,
-          "max": 45.5,
+          "max": 49.0,
           "archetype": "entertainment_market",
-          "floor_area_km2": 2.813,
-          "coverage": 0.968,
-          "far": 4.74
+          "floor_area_km2": 2.918,
+          "coverage": 0.965,
+          "far": 4.9
         },
         "Crown Heights": {
-          "count": 154,
-          "min": 15.0,
-          "median": 128.0,
-          "p90": 200.0,
+          "count": 136,
+          "min": 12.0,
+          "median": 136.0,
+          "p90": 228.0,
           "max": 480.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 6.038,
-          "coverage": 0.811,
-          "far": 14.52
+          "floor_area_km2": 5.415,
+          "coverage": 0.839,
+          "far": 14.71
         },
         "Old Quarter": {
-          "count": 3597,
+          "count": 3723,
           "min": 6.0,
-          "median": 15.0,
-          "p90": 20.6,
-          "max": 26.6,
+          "median": 17.6,
+          "p90": 21.0,
+          "max": 27.0,
           "archetype": "old_town",
-          "floor_area_km2": 2.098,
+          "floor_area_km2": 2.358,
           "coverage": 0.955,
-          "far": 3.23
+          "far": 3.46
         },
         "Ridgeback": {
-          "count": 58,
+          "count": 60,
           "min": 124.8,
           "median": 150.4,
           "p90": 166.4,
-          "max": 188.8,
+          "max": 192.0,
           "archetype": "megablock_residential",
-          "floor_area_km2": 4.039,
-          "coverage": 0.766,
-          "far": 12.64
+          "floor_area_km2": 4.042,
+          "coverage": 0.764,
+          "far": 12.99
         },
         "Hollow": {
-          "count": 682,
+          "count": 724,
           "min": 31.5,
-          "median": 42.0,
-          "p90": 66.5,
-          "max": 140.0,
+          "median": 38.5,
+          "p90": 63.0,
+          "max": 129.5,
           "archetype": "midtown_mixed",
-          "floor_area_km2": 5.094,
-          "coverage": 0.709,
-          "far": 7.41
+          "floor_area_km2": 4.891,
+          "coverage": 0.685,
+          "far": 6.92
         }
       },
-      "properties": 6771,
+      "properties": 7050,
       "complexes": {
         "bridged_pair": 1,
         "landmark": 1,
         "megasite": 2,
-        "straddle_building": 1
+        "straddle_building": 1,
+        "tower_cluster": 1
       },
-      "skybridges": 279,
+      "skybridges": 242,
       "skybridges_by_kind": {
-        "cable": 51,
-        "catwalk": 99,
+        "cable": 37,
+        "catwalk": 80,
         "enclosed": 75,
-        "open_deck": 54
+        "open_deck": 50
       },
-      "skybridge_km": 3.26,
-      "units": 21094,
+      "skybridge_km": 3.0,
+      "units": 19909,
       "units_by_use": {
-        "food": 5595,
-        "bar": 3038,
-        "convenience": 2204,
-        "cyberware": 2091,
-        "club": 1902,
-        "arcade": 1646,
-        "pawn": 1361,
-        "laundromat": 1333,
-        "lobby": 976,
-        "clinic": 948
+        "food": 5181,
+        "bar": 2897,
+        "convenience": 2048,
+        "cyberware": 2029,
+        "club": 1807,
+        "arcade": 1630,
+        "pawn": 1252,
+        "laundromat": 1233,
+        "lobby": 949,
+        "clinic": 883
       },
       "roof_items": {
-        "ac_unit": 13974,
-        "billboard": 1640,
-        "water_tank": 1229,
-        "antenna": 1109,
-        "mechanical": 556,
-        "av_pad": 34,
-        "helipad": 11
+        "ac_unit": 14549,
+        "billboard": 1649,
+        "water_tank": 1291,
+        "antenna": 1182,
+        "mechanical": 595,
+        "av_pad": 23,
+        "helipad": 12
       },
-      "green_roofs": 338,
-      "green_roof_m2": 248573,
+      "green_roofs": 325,
+      "green_roof_m2": 212675,
       "landmarks": [
         {
           "name": "Crown Spire",
@@ -2266,119 +2351,120 @@
           }
         }
       },
-      "site_elements": 280,
-      "structures": 1909,
+      "site_elements": 303,
+      "structures": 1885,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2415
+        "walkways_added": 2105
       }
     },
     "transit": {
       "by_mode": {
         "metro": {
           "lines": 1,
-          "km": 5.0,
-          "stations": 7
+          "km": 4.89,
+          "stations": 8
         }
       },
       "stations": {
-        "underground": 7
+        "underground": 8
       },
       "supports": 0,
       "portals": 0,
       "buildings_removed": 0,
-      "km": 5.0,
+      "km": 4.89,
       "generator": {
         "lines": 1,
-        "stations": 7,
+        "stations": 8,
         "removed_buildings": 0,
         "removed_skybridges": 0,
         "portals": 0,
-        "structures": 21,
-        "walkways_added": 21
+        "structures": 24,
+        "walkways_added": 24
       }
     },
     "props": {
-      "props": 61406,
-      "plants": 26159,
-      "trees": 10063,
-      "instances": 87565,
+      "props": 58519,
+      "plants": 25308,
+      "trees": 9998,
+      "instances": 83827,
       "props_by_kind": {
-        "sign": 16934,
-        "awning": 13826,
-        "ac_unit": 9390,
-        "street_light": 3626,
-        "parked_vehicle": 2602,
-        "overhead_cable": 2403,
+        "sign": 16012,
+        "awning": 13030,
+        "ac_unit": 8668,
+        "street_light": 3450,
+        "parked_vehicle": 2630,
+        "overhead_cable": 2404,
         "barrier": 2217,
-        "trash": 2203,
-        "traffic_signal": 2085,
+        "trash": 2001,
+        "traffic_signal": 1995,
         "railing": 1678,
-        "bollard": 1168,
-        "wall_light": 898,
-        "trash_can": 792,
-        "hydrant": 778,
-        "bench": 345,
-        "dumpster": 278,
-        "bus_stop": 62,
-        "scaffolding": 59,
+        "bollard": 1250,
+        "wall_light": 804,
+        "hydrant": 759,
+        "trash_can": 751,
+        "bench": 368,
+        "dumpster": 318,
+        "bus_stop": 60,
+        "scaffolding": 51,
         "boat": 47,
-        "planter": 9,
-        "kiosk": 3,
-        "vending_machine": 3
+        "planter": 13,
+        "kiosk": 9,
+        "food_stall": 2,
+        "vending_machine": 2
       },
       "plants_by_kind": {
-        "shrub": 9550,
-        "park_tree": 6348,
-        "facade_greenery": 5971,
-        "street_tree": 1629,
-        "median_tree": 878,
-        "conifer": 672,
-        "roof_tree": 564,
-        "palm": 536,
-        "overgrowth": 11
+        "shrub": 9295,
+        "park_tree": 6635,
+        "facade_greenery": 5579,
+        "street_tree": 1438,
+        "median_tree": 825,
+        "conifer": 640,
+        "palm": 460,
+        "roof_tree": 406,
+        "overgrowth": 30
       },
-      "lawn_m2": 53906,
-      "hedge_km": 3.03,
+      "lawn_m2": 48887,
+      "hedge_km": 3.67,
       "generator": {
-        "traffic_signals": 2089,
-        "bus_stops": 127,
-        "street_lights": 3341,
-        "narrow_lights": 1189,
-        "hydrants": 780,
-        "crosswalk_cans": 455,
-        "bollards": 1168,
+        "traffic_signals": 2003,
+        "bus_stops": 120,
+        "street_lights": 3181,
+        "narrow_lights": 1077,
+        "hydrants": 760,
+        "crosswalk_cans": 408,
+        "bollards": 1250,
         "station_props": 0,
-        "street_trees": 1632,
-        "plaza_props": 138,
-        "park_benches": 574,
-        "parked_vehicles": 3325,
-        "alley_clutter": 2488,
-        "median_trees": 1350,
-        "promenade_trees": 70,
-        "park_trees": 13880,
-        "roof_plants": 3280,
-        "facade_greenery": 5971,
-        "overgrowth": 11,
-        "quay_props": 1814,
+        "street_trees": 1447,
+        "plaza_props": 136,
+        "park_benches": 628,
+        "parked_vehicles": 3312,
+        "alley_clutter": 2324,
+        "median_trees": 1251,
+        "promenade_trees": 39,
+        "park_trees": 14297,
+        "roof_plants": 2698,
+        "facade_greenery": 5579,
+        "overgrowth": 30,
+        "quay_props": 1792,
         "highway_barriers": 2217,
-        "overhead_cables": 2403,
-        "unit_dressing": 40150,
-        "scaffolding": 59,
+        "overhead_cables": 2404,
+        "unit_dressing": 37710,
+        "scaffolding": 51,
         "market_gates": 0,
-        "props": 62317,
-        "plants": 26194
+        "props": 59373,
+        "plants": 25341
       }
     },
     "gameplay": {
       "pois": 269,
       "pois_by_kind": {
-        "vendor.pawn": 40,
-        "bar.bar": 38,
+        "vendor.pawn": 35,
+        "bar.bar": 34,
         "vendor.food": 34,
-        "bar.arcade": 28,
-        "vendor.convenience": 25,
-        "apartment.studio": 23,
+        "bar.arcade": 32,
+        "vendor.convenience": 30,
+        "apartment.studio": 22,
         "clinic.ripperdoc": 22,
         "bar.club": 17,
         "clinic.clinic": 16,
@@ -2386,7 +2472,8 @@
         "fixer.fixer": 8,
         "hideout.squat": 4,
         "hideout.back_room": 3,
-        "hideout.warehouse": 2
+        "hideout.warehouse": 2,
+        "apartment.capsule": 1
       },
       "factions": 6,
       "factions_by_kind": {
@@ -2397,31 +2484,31 @@
       "territories": 13,
       "contested": 4,
       "parking": {
-        "street": 559,
-        "garage": 13
+        "street": 557,
+        "garage": 20
       },
-      "parking_capacity": 15117,
+      "parking_capacity": 17345,
       "taxi_stands": 34,
       "fast_travel": 11,
       "sign_slots": {
-        "shop_sign.blade": 11802,
-        "shop_sign.facade": 5132,
-        "billboard.roof": 1640,
-        "neon.facade": 740,
-        "billboard.facade": 337,
-        "holo_ad.roof": 43
+        "shop_sign.blade": 11153,
+        "shop_sign.facade": 4859,
+        "billboard.roof": 1649,
+        "neon.facade": 812,
+        "billboard.facade": 352,
+        "holo_ad.roof": 38
       },
-      "density_rows": 3226,
+      "density_rows": 2970,
       "peak_traffic_vph": 9690.0,
       "peak_crowd_per_100m": 168.0,
       "generator": {
         "factions": 6,
         "zones": 19,
         "pois": 269,
-        "parking": 572,
+        "parking": 577,
         "travel_points": 45,
-        "densities": 3226,
-        "sign_slots": 19694
+        "densities": 2970,
+        "sign_slots": 18863
       }
     },
     "water": {
@@ -2486,12 +2573,12 @@
       ],
       "banks": {
         "canal_wall": {
-          "count": 5,
-          "km": 0.31
+          "count": 8,
+          "km": 0.54
         },
         "natural_bank": {
-          "count": 13,
-          "km": 5.34
+          "count": 15,
+          "km": 5.1
         },
         "quay": {
           "count": 6,
@@ -2512,47 +2599,43 @@
       },
       "cover": {
         "bare_dirt": {
-          "pieces": 2318,
-          "km2": 0.036
+          "pieces": 2416,
+          "km2": 0.038
         },
         "gravel": {
-          "pieces": 60,
-          "km2": 0.338
-        },
-        "marsh": {
-          "pieces": 1,
-          "km2": 0.0
+          "pieces": 63,
+          "km2": 0.327
         },
         "meadow": {
-          "pieces": 149,
-          "km2": 0.734
+          "pieces": 142,
+          "km2": 0.749
         },
         "mown_lawn": {
-          "pieces": 122,
-          "km2": 0.383
+          "pieces": 121,
+          "km2": 0.428
         },
         "overgrown_paving": {
-          "pieces": 556,
+          "pieces": 614,
           "km2": 0.079
         },
         "park_lawn": {
           "pieces": 54,
-          "km2": 0.177
+          "km2": 0.161
         },
         "paving": {
-          "pieces": 1889,
-          "km2": 0.508
+          "pieces": 1940,
+          "km2": 0.533
         },
         "planted_bed": {
-          "pieces": 22,
-          "km2": 0.003
+          "pieces": 30,
+          "km2": 0.005
         },
         "wasteland": {
-          "pieces": 2,
+          "pieces": 1,
           "km2": 0.0
         }
       },
-      "desire_lines": 291
+      "desire_lines": 278
     },
     "separation_budget": {
       "target": 0.6,
@@ -2561,25 +2644,35 @@
       "planned": 0.3049
     },
     "road_variant": 1,
+    "layout_salt": 1,
     "city_tries": [
       {
         "variant": 1,
         "road_variant": 1,
         "layout_salt": 0,
+        "failures": 2
+      },
+      {
+        "variant": 1,
+        "road_variant": 1,
+        "layout_salt": 1,
         "failures": 0
       }
     ]
   },
   "notes": [
+    "road variant 1/1 left 2 check failures in the full city; built again on the same roads with the local layout drawn again (salt 1)",
     "megasite 'Low Harbor Freight Terminal' (freight_terminal) shrunk to 0.18 km2 (asked 0.40) to fit 'Low Harbor'",
-    "76 local roads cut back at junctions sharper than the district minimum",
-    "4 local roads running alongside another road removed",
-    "48 lanes reached only over pedestrian streets became pedestrian",
+    "84 local roads cut back at junctions sharper than the district minimum",
+    "3 local roads running alongside another road removed",
+    "55 lanes reached only over pedestrian streets became pedestrian",
     "3 local roads crossing another without a junction removed",
-    "62 local segments (4.03 km) not connected to the network were dropped",
-    "complex straddle_building d02.mg.w1167s320: built on lots d02.lot.w1192s286, d02.lot.w1197s310 (the merged group did not fit)",
-    "lot too small or narrow for a building",
-    "metro Hill Line: lowered to -51.37 m under foundation",
+    "81 dead ends run on to the road ahead or the dead end facing them",
+    "191 dead-end pieces cut back to their last junction",
+    "4 dead ends cut back clear of the road they ran into",
+    "24 local roads laid along another road removed",
+    "51 local segments (4.72 km) not connected to the network were dropped",
+    "metro Hill Line: lowered to -52.84 m under foundation",
     "5 pedestrian underpasses under the highways"
   ]
 }

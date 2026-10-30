@@ -771,7 +771,8 @@ city, `citygen/water.py` and `citygen/cover.py`, checks in `water_checks.py`, pr
   degrees within 60 m, 1 under a deck), moisture (0 from 60 m off the water), slope (M13) and
   `desire_lines` (walkway paths across a lawn worn by the nearest street's crowds, and
   shortcuts across a lawn between walkway ends where the way round is 1.35 times longer).
-- **Checks** (three, on a city with M16's data: 89 on a flat sample, 94 on the deck sample):
+- **Checks** (three, on a city with M16's data: 93 on a flat sample with M17's, 98 on the
+  deck sample):
   `water_beds` (every body's data, no bed under M9's, tunnels under the water with 1.5 m of
   backfill under the bed as it is, bridge foundations in the water on bed no deeper than their
   footing), `water_banks` (the banks cover every edge once; quays, embankments, widths,

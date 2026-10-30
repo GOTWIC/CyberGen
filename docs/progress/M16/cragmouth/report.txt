@@ -52,6 +52,8 @@ checks:
   [pass] street_duplicates: No near-duplicate local roads: right-of-way edges closer than 4 m over more than 50 m (30 m around shared points aside)
   [pass] open_space_share: Open space share of each district's net land (open space over open space plus lots) within the archetype target (a traced district aside)
   [pass] places_built: Every named place of the spec is built in its district
+  [pass] road_dead_ends: Every dead end is deliberate and says so (`dead_end`): at the map edge, a water end, a park, plaza or megasite gate, a path's end, a cul-de-sac with its turning bulb, a deck street's end, a traced road's end
+  [pass] road_overlaps: Two roads at one level (within 4 m) overlap only inside a junction: rights of way overlapping by more than 25 m2 outside every junction polygon
   [pass] building_footprints: Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it
   [pass] building_clear_zones: No ground mass of a building or site element on a road, junction, sidewalk, crosswalk, water, open space or another megasite's reserve or flight cone
   [pass] building_overlaps: No two buildings, site elements or skybridge decks overlap (plan and height)
@@ -66,6 +68,8 @@ checks:
   [pass] megasite_heights: Nothing inside a spaceport flight cone above its height limit, and nothing near one above the transitional surface (limit + 1 m per 1 m away)
   [pass] megasite_access: Every megasite reaches a road (within 40 m) and its buildings and paths join the walkway graph
          note: transit links of megasites: see transit_hubs
+  [pass] bridge_clash: Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck
+  [pass] road_building_clash: No road, sidewalk, ramp or deck street right of way over a building mass at the road's own height (the mass under it, or 5 m over it, clears)
   [pass] transit_routes: Every transit line of the spec is built along its whole route (every leg found)
   [pass] transit_stops: Every stop of a line is served by one of its stations (in the district, within 150 m of the site, place or island), and a line to an exit reaches it
   [pass] transit_curves: Track curve radius at least the mode minimum (elevated rail 150 m, monorail 100, maglev 500, sky tube 300; measured through points 30 m apart)
@@ -79,20 +83,20 @@ checks:
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 30773 things on the ground
+         note: 30572 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
-         note: Low Harbor: 99% lit
-         note: Lantern Steps: 95% lit
-         note: Crown Heights: 98% lit
+         note: Low Harbor: 98% lit
+         note: Lantern Steps: 94% lit
+         note: Crown Heights: 97% lit
          note: Old Quarter: 94% lit
          note: Ridgeback: 97% lit
-         note: Hollow: 98% lit
+         note: Hollow: 97% lit
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
-         note: 327 doors
+         note: 334 doors
   [pass] poi_reachable_car: Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door
   [pass] poi_places: Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones
   [pass] territories: Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other
@@ -107,7 +111,7 @@ checks:
   [pass] water_banks: The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes
   [pass] ground_cover: The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
-         note: 67 road columns under 20 raised segments
+         note: 64 road columns under 20 raised segments
 
 stats:
   map 10.2 km2, land 7.261 km2 (districts 7.261 km2, unassigned 0.0 km2)
@@ -116,65 +120,65 @@ stats:
   rivers 2.29 km; channels none
   separation channels 0; boundary between districts on water 30%, 2.56 km on water, 5.94 km on land
   district perimeter facing water 40%; boundary curvature (arc / chord over 400 m) 1.0796, land boundaries 1.0416
-  open land 0.986 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.005 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.003 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.005 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.007 km2; green 'None' 0.002 km2; green 'None' 0.005 km2; green 'None' 0.002 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.003 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.007 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.002 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.007 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.008 km2; green 'None' 0.006 km2; green 'None' 0.008 km2; green 'None' 0.009 km2; green 'None' 0.013 km2; green 'None' 0.003 km2; green 'None' 0.012 km2; green 'None' 0.007 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.009 km2; green 'None' 0.015 km2; green 'None' 0.011 km2; green 'None' 0.013 km2; green 'None' 0.01 km2; green 'None' 0.009 km2; green 'None' 0.012 km2; green 'None' 0.018 km2; green 'None' 0.013 km2; green 'None' 0.006 km2; green 'None' 0.012 km2; green 'None' 0.009 km2; green 'None' 0.004 km2; green 'None' 0.015 km2; green 'None' 0.008 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.01 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.007 km2; green 'None' 0.004 km2; green 'None' 0.011 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.01 km2; green 'None' 0.007 km2; green 'None' 0.003 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.01 km2; green 'None' 0.005 km2; green 'None' 0.009 km2; green 'None' 0.003 km2; green 'None' 0.009 km2; green 'None' 0.004 km2; green 'None' 0.008 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.011 km2; green 'None' 0.006 km2; green 'None' 0.011 km2; green 'None' 0.003 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.011 km2; green 'None' 0.006 km2; green 'None' 0.011 km2; green 'None' 0.009 km2; green 'None' 0.003 km2; green 'None' 0.008 km2; green 'None' 0.009 km2; green 'None' 0.017 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.014 km2; green 'None' 0.007 km2; green 'None' 0.006 km2; green 'None' 0.012 km2; green 'None' 0.01 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.009 km2; green 'None' 0.009 km2; green 'None' 0.008 km2; green 'None' 0.008 km2; green 'None' 0.007 km2; green 'None' 0.007 km2; green 'None' 0.004 km2; green 'None' 0.007 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.0 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.0 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.0 km2; green 'None' 0.001 km2; green 'None' 0.001 km2
+  open land 1.041 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.011 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.002 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.002 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.003 km2; green 'None' 0.005 km2; green 'None' 0.007 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.004 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.006 km2; green 'None' 0.003 km2; green 'None' 0.001 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.001 km2; green 'None' 0.005 km2; green 'None' 0.007 km2; green 'None' 0.001 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.004 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.006 km2; green 'None' 0.002 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.025 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.009 km2; green 'None' 0.017 km2; green 'None' 0.009 km2; green 'None' 0.011 km2; green 'None' 0.009 km2; green 'None' 0.003 km2; green 'None' 0.009 km2; green 'None' 0.007 km2; green 'None' 0.009 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.009 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.006 km2; green 'None' 0.007 km2; green 'None' 0.006 km2; green 'None' 0.013 km2; green 'None' 0.01 km2; green 'None' 0.006 km2; green 'None' 0.011 km2; green 'None' 0.01 km2; green 'None' 0.005 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.012 km2; green 'None' 0.008 km2; green 'None' 0.007 km2; green 'None' 0.008 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.012 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.002 km2; green 'None' 0.007 km2; green 'None' 0.004 km2; green 'None' 0.011 km2; green 'None' 0.003 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.005 km2; green 'None' 0.011 km2; green 'None' 0.009 km2; green 'None' 0.01 km2; green 'None' 0.009 km2; green 'None' 0.007 km2; green 'None' 0.01 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.009 km2; green 'None' 0.006 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.007 km2; green 'None' 0.007 km2; green 'None' 0.007 km2; green 'None' 0.005 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.008 km2; green 'None' 0.003 km2; green 'None' 0.003 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.008 km2; green 'None' 0.004 km2; green 'None' 0.011 km2; green 'None' 0.011 km2; green 'None' 0.01 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.009 km2; green 'None' 0.009 km2; green 'None' 0.008 km2; green 'None' 0.008 km2; green 'None' 0.008 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.008 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.007 km2; green 'None' 0.007 km2; green 'None' 0.006 km2; green 'None' 0.006 km2; green 'None' 0.005 km2; green 'None' 0.005 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.004 km2; green 'None' 0.003 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.001 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.002 km2; green 'None' 0.001 km2; green 'None' 0.001 km2
   inner waterways 6 (2.43 km: basin 0.98, canal 1.14, creek 0.31), quays 5.04 km
-  roads alley 28.7 km, avenue 23.54 km, footbridge 0.07 km, highway 8.93 km, pedestrian 8.21 km, service 9.9 km, street 101.92 km; 3226 segments, 2288 nodes, 1 component(s); exits east_exit, north_exit, west_exit
+  roads alley 30.55 km, avenue 23.54 km, footbridge 0.07 km, highway 8.93 km, pedestrian 7.56 km, service 12.24 km, street 95.42 km; 2970 segments, 1927 nodes, 1 component(s); exits east_exit, north_exit, west_exit
   bridges 6 (sea 0, river 2, canal 4; 0.13 km of span), pedestrian 3; named: none
   landmasses with districts connected by road 2 of 2; highway planned elevated 0%; megasite reserves 2; road variant 1
-  local roads street 101.92 km, alley 28.7 km, service 9.9 km, pedestrian 8.21 km, footbridge 0.07 km; 142 one-way segments, 3 footbridges
-  junctions 1839 (405 signalized), crosswalks 1406, sidewalks 163.79 km, lanes 6888 + 14036 connectors, walkways 17702 (alley 38.6 km, crossing 88.42 km, crosswalk 45.1 km, elevator 0.0 km, footbridge 0.07 km, path 70.56 km, pedestrian_street 0.91 km, promenade 7.31 km, sidewalk 209.43 km, skybridge 3.26 km, stairs 0.2 km, underpass 0.15 km)
-  junctions by type: street_street T 878, street_street X 278, avenue_avenue T 209, alley_alley T 166, avenue_avenue X 94, street T 58, street_alley T 25, pedestrian T 23, alley_alley X 19, street_service T 17, highway_highway T 15, street_street multi 12
-  blocks 1129, lots 6775 (2 merged groups), open space 9.5% of net land (courtyard 15, green 254, park 37, plaza 224, pocket_park 28), named places 0
+  local roads street 95.42 km, alley 30.55 km, service 12.24 km, pedestrian 7.56 km, footbridge 0.07 km; 172 one-way segments, 3 footbridges
+  junctions 1824 (400 signalized), crosswalks 1422, sidewalks 151.04 km, lanes 6326 + 13143 connectors, walkways 16852 (alley 42.8 km, crossing 85.46 km, crosswalk 47.28 km, elevator 0.0 km, footbridge 0.07 km, path 69.89 km, pedestrian_street 1.51 km, promenade 6.05 km, sidewalk 195.06 km, skybridge 3.0 km, stairs 0.27 km, underpass 0.15 km)
+  junctions by type: street_street T 768, street_street X 267, avenue_avenue T 181, alley_alley T 160, avenue_avenue X 126, street T 57, street_alley bend 41, pedestrian T 32, alley_alley X 30, street_alley T 25, street_service T 19, street cul_de_sac 18
+  blocks 1110, lots 7058 (3 merged groups), open space 9.7% of net land (courtyard 20, green 242, park 32, plaza 195, pocket_park 43), named places 0
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
-  corporate_core                 157     1007   1468     2564    3851     6375    52.9
-  entertainment_market          2222       58    117      240     459      756    16.1
-  industrial_port                 58     2104   2780     7026   15450    35376   125.3
-  megablock_residential           58     2140   2686     4868    9776    13218    95.6
-  midtown_mixed                  682      282    487      906    1668     4209    31.2
-  old_town                      3598       37     79      160     315      721    13.5
+  corporate_core                 142     1106   1403     2466    3870     5814    56.6
+  entertainment_market          2348       57    108      222     447      744    15.6
+  industrial_port                 61     2132   3158     5930   14232    26984   135.7
+  megablock_residential           60     2235   2657     3955    8116    14411    81.4
+  midtown_mixed                  724      285    473      858    1675     3131    29.4
+  old_town                      3723       37     77      162     318      966    13.2
 
   blocks and open space by district  blocks  median block m  open share
-  Low Harbor                            15            151       4.1%
-  Lantern Steps                        331             39       6.2%
-  Crown Heights                         58            107      11.4%
-  Old Quarter                          554             31       6.2%
-  Ridgeback                             61            113       9.6%
-  Hollow                               110             77      16.2%
+  Low Harbor                            20            159       6.0%
+  Lantern Steps                        337             38       6.2%
+  Crown Heights                         61            106      11.6%
+  Old Quarter                          515             32       6.2%
+  Ridgeback                             78            106       9.4%
+  Hollow                                99             82      16.2%
 
-  buildings 6777 (20.246 km2 floor area), properties 6771, tallest 480 m; complexes bridged_pair 1, landmark 1, megasite 2, straddle_building 1
-  by type: shopfront_row 3383, shanty_stack 2219, perimeter 405, podium_tower 318, terraced 192, courtyard_block 106, megabuilding 39, warehouse 35, tower 27, slab 15, yard 13, shed 12, parking_structure 6, pavilion 2, straddle_building 2, gate_house 1, landmark.megatower 1, office 1
-  skybridges 279 (3.26 km: cable 51, catwalk 99, enclosed 75, open_deck 54), ground-floor units 21094 (food 5595, bar 3038, convenience 2204, cyberware 2091, club 1902, arcade 1646, pawn 1361, laundromat 1333, lobby 976, clinic 948)
-  roof items: ac_unit 13974, billboard 1640, water_tank 1229, antenna 1109, mechanical 556, av_pad 34, helipad 11; green roofs 338 (248573 m2)
+  buildings 7058 (19.78 km2 floor area), properties 7050, tallest 480 m; complexes bridged_pair 1, landmark 1, megasite 2, straddle_building 1, tower_cluster 1
+  by type: shopfront_row 3536, shanty_stack 2334, perimeter 450, podium_tower 296, terraced 180, courtyard_block 110, megabuilding 44, warehouse 37, tower 24, shed 15, yard 11, slab 10, parking_structure 4, pavilion 2, straddle_building 2, gate_house 1, landmark.megatower 1, office 1
+  skybridges 242 (3.0 km: cable 37, catwalk 80, enclosed 75, open_deck 50), ground-floor units 19909 (food 5181, bar 2897, convenience 2048, cyberware 2029, club 1807, arcade 1630, pawn 1252, laundromat 1233, lobby 949, clinic 883)
+  roof items: ac_unit 14549, billboard 1649, water_tank 1291, antenna 1182, mechanical 595, av_pad 23, helipad 12; green roofs 325 (212675 m2)
   landmarks: Crown Spire (megatower, 480 m)
   megasites: Low Harbor Freight Terminal (freight_terminal: berth 1, container_stack 147, gantry_crane 1, gate_house 1, office 1, rail_track 2, truck_gate 1, warehouse 2); Hollow Central Park (central_park: fountain 1, lawn 12, pavilion 2, plaza 1, pond 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
-  Low Harbor                        58      12.6    16.0    16.0       31%   0.3      0.154
-  Lantern Steps                   2222      21.0    31.5    45.5       97%   4.7      2.813
-  Crown Heights                    154     128.0   200.0   480.0       81%  14.5      6.038
-  Old Quarter                     3597      15.0    20.6    26.6       96%   3.2      2.098
-  Ridgeback                         58     150.4   166.4   188.8       77%  12.6      4.039
-  Hollow                           682      42.0    66.5   140.0       71%   7.4      5.094
+  Low Harbor                        61      11.2    15.7    16.0       30%   0.3      0.146
+  Lantern Steps                   2348      23.6    31.5    49.0       96%   4.9      2.918
+  Crown Heights                    136     136.0   228.0   480.0       84%  14.7      5.415
+  Old Quarter                     3723      17.6    21.0    27.0       96%   3.5      2.358
+  Ridgeback                         60     150.4   166.4   192.0       76%  13.0      4.042
+  Hollow                           724      38.5    63.0   129.5       68%   6.9      4.891
 
-  props 61406, plants 26159 (10063 trees), 87565 instances; lawns 53906 m2, hedges 3.03 km
-  props: sign 16934, awning 13826, ac_unit 9390, street_light 3626, parked_vehicle 2602, overhead_cable 2403, barrier 2217, trash 2203, traffic_signal 2085, railing 1678, bollard 1168, wall_light 898, trash_can 792, hydrant 778, bench 345, dumpster 278, bus_stop 62, scaffolding 59, boat 47, planter 9, kiosk 3, vending_machine 3
-  plants: shrub 9550, park_tree 6348, facade_greenery 5971, street_tree 1629, median_tree 878, conifer 672, roof_tree 564, palm 536, overgrowth 11
+  props 58519, plants 25308 (9998 trees), 83827 instances; lawns 48887 m2, hedges 3.67 km
+  props: sign 16012, awning 13030, ac_unit 8668, street_light 3450, parked_vehicle 2630, overhead_cable 2404, barrier 2217, trash 2001, traffic_signal 1995, railing 1678, bollard 1250, wall_light 804, hydrant 759, trash_can 751, bench 368, dumpster 318, bus_stop 60, scaffolding 51, boat 47, planter 13, kiosk 9, food_stall 2, vending_machine 2
+  plants: shrub 9295, park_tree 6635, facade_greenery 5579, street_tree 1438, median_tree 825, conifer 640, palm 460, roof_tree 406, overgrowth 30
 
-  tunnels bored 9 (0.79 km), metro 6 (4.16 km), pedestrian 5 (0.15 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -51.37 m
+  tunnels bored 8 (0.7 km), metro 7 (3.93 km), pedestrian 5 (0.15 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -52.84 m
 
-  terrain: ground up to 95.11 m; cuts to 18.68 m, fills to 18.67 m; 1805 retaining walls (highest 21.14 m), 9 bored tunnels, 1 terrain viaducts; 201 hillside greens, highest plinth 12.88 m
+  terrain: ground up to 95.11 m; cuts to 18.7 m, fills to 18.7 m; 1780 retaining walls (highest 21.06 m), 8 bored tunnels, 2 terrain viaducts; 210 hillside greens, highest plinth 14.01 m
 
   water: 8 bodies (sea 12 m tidal, rv.cragwater 3.07 m downstream, d01.ww.e1171s718 12 m still, d01.ww.e987s600 12 m still, d01.ww.e814s468 12 m still, d02.ww.w1009s495 3 m tidal, ...); sea open 2.65 km2, sheltered 0.206 km2
-  banks: canal wall 5 (0.31 km), natural bank 13 (5.34 km), quay 6 (5.05 km), riprap 5 (1.92 km), road embankment 2 (0.08 km)
-  ground cover: bare dirt 0.036 km2, gravel 0.338 km2, marsh 0.0 km2, meadow 0.734 km2, mown lawn 0.383 km2, overgrown paving 0.079 km2, park lawn 0.177 km2, paving 0.508 km2, planted bed 0.003 km2, wasteland 0.0 km2; 291 desire lines
+  banks: canal wall 8 (0.54 km), natural bank 15 (5.1 km), quay 6 (5.05 km), riprap 5 (1.92 km), road embankment 2 (0.08 km)
+  ground cover: bare dirt 0.038 km2, gravel 0.327 km2, meadow 0.749 km2, mown lawn 0.428 km2, overgrown paving 0.079 km2, park lawn 0.161 km2, paving 0.533 km2, planted bed 0.005 km2, wasteland 0.0 km2; 278 desire lines
 
   gameplay: 269 points of interest, 6 factions (gang 4, corporate 1, police 1), 13 territories (4 contested), 34 taxi stands, 11 fast-travel points
-  pois: vendor.pawn 40, bar.bar 38, vendor.food 34, bar.arcade 28, vendor.convenience 25, apartment.studio 23, clinic.ripperdoc 22, bar.club 17, clinic.clinic 16, apartment.apartment 9, fixer.fixer 8, hideout.squat 4, hideout.back_room 3, hideout.warehouse 2
-  parking: street 559, garage 13 (15117 spaces); sign slots: shop_sign.blade 11802, shop_sign.facade 5132, billboard.roof 1640, neon.facade 740, billboard.facade 337, holo_ad.roof 43
+  pois: vendor.pawn 35, bar.bar 34, vendor.food 34, bar.arcade 32, vendor.convenience 30, apartment.studio 22, clinic.ripperdoc 22, bar.club 17, clinic.clinic 16, apartment.apartment 9, fixer.fixer 8, hideout.squat 4, hideout.back_room 3, hideout.warehouse 2, apartment.capsule 1
+  parking: street 557, garage 20 (17345 spaces); sign slots: shop_sign.blade 11153, shop_sign.facade 4859, billboard.roof 1649, neon.facade 812, billboard.facade 352, holo_ad.roof 38
 
-  transit 5.0 km, supports 0, portals 0, buildings removed 0; stations underground 7
-  by mode: metro 1 lines 5.0 km 7 stations
+  transit 4.89 km, supports 0, portals 0, buildings removed 0; stations underground 8
+  by mode: metro 1 lines 4.89 km 8 stations
 
   district                     archetype              landmass  km2    share  target  error
   Low Harbor                   industrial_port        lm.e479n280  0.908  0.125  0.125   +0.0%  (spec)
@@ -185,13 +189,16 @@ stats:
   Hollow                       midtown_mixed          lm.e479n280  1.363  0.188  0.188   +0.1%  (spec)
 
 notes:
+  - road variant 1/1 left 2 check failures in the full city; built again on the same roads with the local layout drawn again (salt 1)
   - megasite 'Low Harbor Freight Terminal' (freight_terminal) shrunk to 0.18 km2 (asked 0.40) to fit 'Low Harbor'
-  - 76 local roads cut back at junctions sharper than the district minimum
-  - 4 local roads running alongside another road removed
-  - 48 lanes reached only over pedestrian streets became pedestrian
+  - 84 local roads cut back at junctions sharper than the district minimum
+  - 3 local roads running alongside another road removed
+  - 55 lanes reached only over pedestrian streets became pedestrian
   - 3 local roads crossing another without a junction removed
-  - 62 local segments (4.03 km) not connected to the network were dropped
-  - complex straddle_building d02.mg.w1167s320: built on lots d02.lot.w1192s286, d02.lot.w1197s310 (the merged group did not fit)
-  - lot too small or narrow for a building
-  - metro Hill Line: lowered to -51.37 m under foundation
+  - 81 dead ends run on to the road ahead or the dead end facing them
+  - 191 dead-end pieces cut back to their last junction
+  - 4 dead ends cut back clear of the road they ran into
+  - 24 local roads laid along another road removed
+  - 51 local segments (4.72 km) not connected to the network were dropped
+  - metro Hill Line: lowered to -52.84 m under foundation
   - 5 pedestrian underpasses under the highways
