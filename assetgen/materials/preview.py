@@ -12,7 +12,9 @@ textured Blender renders.
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
-  part, skybridge and street piece at once), or cameras of one's own (`--eye`, `--target`).
+  part, skybridge and street piece at once), the section across the biggest M14 deck
+  (`deck`, AG10: the blockout's deck camera, its near clip on the cut), or cameras of one's
+  own (`--eye`, `--target`).
 - **board**: a material board per era (its wall sets, roof, trims, metals, a window with
   its rooms) and one of the street sets, each a slab of the material under a low sun.
 
@@ -147,8 +149,12 @@ def run(args, progress=None) -> dict:
     bo = Path(args.blockout) if args.blockout else bdir
     cams = PV.cameras(bdir, bo)
     which = set(args.views or ["districts", "street"])
-    kinds = {"city", "city_full", "districts", "street"}
+    kinds = {"city", "city_full", "districts", "street", "deck"}
     views = PV.plan_views(man, cams, args.width, which & kinds)
+    if "deck" in which and cams.get("deck"):
+        from ..streets.ctx import Ground
+        ox, oy = cams["deck"]["origin"]
+        views.append(deck_view(man, cams["deck"], args.width, Ground(model).at(ox, oy)))
     named = [v for v in (args.views or []) if v not in kinds]
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
@@ -166,7 +172,7 @@ def run(args, progress=None) -> dict:
             v["parts"] = PV.instances(man, v["shell_tiles"])
             # (AG4: the skybridges of the shells' tiles)
             v["connection_tiles"] = sorted(set(v["shell_tiles"]) & set(ctiles))
-            if v["ortho"]:
+            if v["ortho"] or v.get("section"):
                 v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
                 v["signs"], v["lights"] = [], []
             else:
@@ -187,6 +193,34 @@ def run(args, progress=None) -> dict:
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
     return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))
+
+
+DECK_R = 420.0          # the deck section's tiles: within this of its plane's middle
+DECK_LENS = 35.0        # its lens (the blockout's 22 mm shows mostly sky and nothing)
+DECK_ASPECT = 2.4       # and its frame's width over its height (a section is wide and low)
+DECK_FOOT_M = 3.0       # the ground this far over the frame's bottom
+
+
+def deck_view(man: dict, cut: dict, width: int, ground: float = 0.0) -> dict:
+    """AG10: the section across the biggest M14 deck (the blockout's `deck` view), looking
+    level along its plane's normal from the blockout's eye; the camera's near clip on the
+    plane cuts everything on its side (Blender hides what lies wholly there), its frame
+    shifted up so the ground at the cut (`ground`) sits `DECK_FOOT_M` over its bottom."""
+    ox, oy = cut["origin"]
+    nx, ny = cut["n"]
+    ex, ey, ez = cut["eye"]
+    ez += ground                               # (the blockout's eye is over flat ground)
+    d = (ex - ox) * nx + (ey - oy) * ny
+    lens = DECK_LENS
+    w_at = 2.0 * d * 18.0 / lens               # (the frame's width at the cut: 36 mm sensor)
+    bottom = ez - w_at / (2.0 * DECK_ASPECT)   # (half its height under the eye)
+    shift = (ground - DECK_FOOT_M - bottom) / w_at
+    tiles = sorted(t for t in man["tiles"] if _tile_near(t, (ox, oy), DECK_R))
+    return {"name": "deck", "ortho": False, "lens": lens, "eye": [ex, ey, ez],
+            "target": [ex - nx * d, ey - ny * d, ez], "w": width, "h": int(width / DECK_ASPECT),
+            "shell_tiles": tiles, "section": {"origin": [ox, oy], "n": [nx, ny],
+                                              "clip": round(d, 3),
+                                              "shift_y": round(shift, 4)}}
 
 
 def _tile_near(name: str, p, r) -> bool:

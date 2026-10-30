@@ -49,6 +49,7 @@ from . import manifest as MF
 from .progress import Progress
 from . import spec as S
 from .buildings import collision as CO
+from .buildings import decks as DKB
 from .buildings import envelope as EN
 from .buildings import genome as GN
 from .buildings import meshbuf as MB
@@ -58,7 +59,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag5.0"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag5.1"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -208,7 +209,9 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "triangles": int(sum(len(a["tri"]) for a in arrs.values())),
         "slots": {k: int(len(a["tri"])) for k, a in arrs.items()},
         "proxy": {"triangles": int(px["triangles"])},
-        "collision": CO.build(brief, sh["band_m"], sh.get("landing_doors")),
+        "collision": CO.build(brief, sh["band_m"], sh.get("landing_doors"),
+                              {mi["mass"]: mi["under_m"] for mi in sh["masses"]
+                               if mi.get("under_m") is not None}),
         "front": {"triangles": int(sum(len(a["tri"]) for a in sh["front"].values())),
                   "slots": {k: int(len(a["tri"])) for k, a in sh["front"].items()},
                   "band_m": sh["band_m"]},
@@ -244,6 +247,10 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
             rec["grade_low_m"] = C.m(-min(rows))
     if brief["building"]["floor_grid"].get("level"):
         rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
+    if brief.get("deck"):
+        # AG10: on, under, beside or in an M14 deck's slab: nothing of it where it may not be
+        rec["deck"] = {"id": brief["deck"]["id"], "role": brief["deck"]["role"]}
+        rec["checks"]["deck"] = DKB.check(brief, arrs, pp)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
     rec["class"] = AC.budget_class(rec)
     return sh, px, rec
@@ -576,6 +583,8 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                   AC.clearance(records), AC.roofs(records, briefs),
                   AC.landings(records, sky["records"]), sky["check"],
                   AC.types(records), AC.families(records), AC.slopes(records)]
+        if getattr(model, "decks", None):
+            checks.append(AC.decks(model, records))     # (AG10: M14's decks)
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,

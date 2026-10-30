@@ -210,6 +210,19 @@ def test_collision_leaves_a_landing_door_open():
     assert _inside(CO.build(br, None), -4.5, -7.0, 10.5)  # (no door: closed)
 
 
+def test_collision_lets_a_walk_under_an_open_shed():
+    br = brief_of([mass(rect(-12.0, -9.0, 12.0, 9.0), 0.0, 9.0, 1)], btype="building.shed",
+                  bid="d01.lot.shed.bld")
+    br["building"]["attrs"] = {"open_sides": True}
+    sh = SH.build(br, GN.make(br))
+    under = {mi["mass"]: mi["under_m"] for mi in sh["masses"] if mi.get("under_m") is not None}
+    assert list(under) == [0] and 3.0 < under[0] < 8.4     # (under its eave's 0.6 m slab)
+    col = CO.build(br, sh["band_m"], None, under)
+    assert not _inside(col, 0.0, 0.0, 1.7) and not _inside(col, -11.5, 8.5, 1.7)
+    assert _inside(col, 0.0, 0.0, under[0] + 0.3)          # (the roof still collides)
+    assert _inside(CO.build(br, sh["band_m"]), 0.0, 0.0, 1.7)  # (closed without it)
+
+
 def test_a_sky_station_beside_its_tower_gets_a_platform():
     br = _tower("glass_curtain", 20, w=30.0, d=20.0, fh=3.4)
     # (the tube runs 7 m south of the tower and climbs 1 m along the station)

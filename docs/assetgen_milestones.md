@@ -19,7 +19,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
 | AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Done | [`docs/progress/AG8`](progress/AG8) |
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
-| AG10 | Layered districts: buildings and streets on M14's decks | Planned (after M14) | |
+| AG10 | Layered districts: M14's slabs per tile with soffits, fascias, rails, lights and colonnades, their columns, stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs meeting the soffit; `asset_decks` and `street_decks` | Done | [`docs/progress/AG10`](progress/AG10) |
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
 
 ## AG0: contract and spike
@@ -685,8 +685,9 @@ complex families' check and the art-direction loop, in the shell builder's passe
   open; what to change in the spec for what one sees), `assetgen spec diff A B`; the
   skill's step 6 runs the rounds.
 
-GEN_VERSION "ag5.0", GENOME_VERSION 5; briefs unchanged on flat ground (a hilly city's
-briefs gain `terrain`, BRIEF_VERSION stays 2).
+GEN_VERSION "ag5.0" (ag5.1 since the Unreal check's open shed fix), GENOME_VERSION 5;
+briefs unchanged on flat ground (a hilly city's briefs gain `terrain`, BRIEF_VERSION stays
+2).
 
 **Exporter** (`docs/unreal_export.md`, "From AG5"): a hero's building entry carries `hero`
 (kind, accent) and a `materials` map of its own (`<slot or era material>#<id>`: its U2 mask
@@ -699,8 +700,18 @@ textured masters `HeroMask` (sampled on UV1) and `HeroMaskOn` (0 by default) aft
 surface (`HERO_CODE`: grime darkens, leaks stain, wear lightens), `STAGE2_VERSION` 6. The
 buildings' hulls are notched at the landing doors (no exporter change: convex pieces as
 before). Tested without Unreal by `test_stage2_heroes_and_plinths`; the Blender preview
-draws the same (`ag6_materials._hero` on `UVMap.001`). Unreal check: the coordinating
-session's call (`docs/progress/AG5/README.md` lists what to look at).
+draws the same (`ag6_materials._hero` on `UVMap.001`). Unreal check
+(`docs/progress/AG5/unreal/`): Cragmouth and Greyhook imported and imported again; the
+megatower and the wheel tagged `cg.hero=` with the mask on UV1 and `HeroMaskOn` 1, the
+masters at `STAGE2_VERSION` 6, no other building with it on; Cragmouth's plinths meet the
+terrain (732 of 976 corners at the wall, 210 buried uphill, 30 floating over a lower street);
+landing doors open 2.5 m in (332 of 340 in Greyhook); open sheds' hulls blocked the walk
+under the roof, fixed there (an open shed collides from its roof's underside, GEN_VERSION
+ag5.1). Open from it: Cragmouth's 63,700 Nanite meshes overrun Unreal's root pages on the
+Mac, so it cannot be played as exported; doors on slopes behind M13's retaining walls
+(Greyhook's doors 1,989 of 2,000 at grade, Cragmouth's 325 of 710); the sky platforms beside
+a tower have no collision; station platforms inside their tower's hull and garage mouths as
+in AG4.
 
 **Samples** (4 workers, 3 where the shared Mac was short of memory; every check passes in
 each: the fourteen building checks, AG7's streets, AG8's props, AG6's materials):
@@ -1208,6 +1219,136 @@ species (and wind) later. The sign packs are the largest files; quantized positi
 (`KHR_mesh_quantization`) would halve them. The Unreal check of the textured props: leaves
 masked and two-sided, Nanite `Voxelize` still full at distance, sign faces showing their
 page cells, holo-ads textured. Mac = x86 waits for the deferred determinism check.
+
+## AG10: layered districts
+
+**Built.** Stage 2's side of citygen's M14: the decks, the buildings on and under them, and
+the deck's streets (scope 14.11; AG9's dependency waived, AG9 waits):
+- **Deck pieces** (`assetgen/streets/decks.py`, in AG7's street stage, one piece per M14
+  id in place of its blockout object, `citygen/blockout.py` `_decks` now among the keys
+  `ctx._blockout_keys` reads):
+  - **Slab** (`<deck>.slab.<tile>`, the blockout object's own key): the deck's polygon in
+    the tile (holes under 2 m2 filled), paved top and soffit; a coffered soffit in the
+    planned eras, a ribbed one elsewhere (0.3 by 0.45 m ribs every 3 m on the deck's long
+    axis), stopping at the fascia and round the undercity buildings.
+  - **Edges**: on the slab's real edges (never a tile's), a fascia with a 0.15 m upstand
+    and a 0.45 m drip edge, grime streaks down it and a stained band on the soffit inside
+    it. A rail on the upstand: posts every 1.6 m with top, mid and bottom rails, glass
+    panels in the wealthy eras. No rail where a building on the deck stands at the edge,
+    a ramp or its junction meets it, or a stair or elevator lands.
+  - **Soffit lights**: two rows every 8 m over every ground street under the slab, and one
+    over each ground junction.
+  - **Colonnade**: where the edge passes over a park or plaza, a 0.8 by 0.9 m edge beam
+    and slim columns every 7.5 m, off the park's paths, M14's columns, props, plants and
+    buildings.
+  - **Collar**: a steel collar round a building the slab is cut round (a ground building
+    within 0.5 m of it reaching over its soffit; the slab cut back 0.1 m from it).
+  - **Columns**: a square pier cap, a round shaft, a flared capital and a drop panel (the
+    shaft alone inside an undercity building), a grime band at the foot.
+  - **Stairs**: two flights of steps on a sloped soffit with stringers and handrails, the
+    half landing on two posts, a top landing across to the slab's edge.
+  - **Elevators**: a glazed shaft on a steel frame with bands (a concrete core in the plain
+    eras), a cab door at the ground and at the deck facing the street, the shaft's head
+    over the deck, a bridge across to the slab's edge.
+- **The deck's streets** (`roads.deck_kind`: `slab`, `ramp`): they lie on the slab. Before,
+  they were drawn as viaducts, with a box girder 5 cm under the soffit, barriers and
+  underside lights. A ramp (`deck_ramp`) is a solid ramp: barriers at the carriageway, a
+  2 m walkway at curb height on each side (M14's walkways beside it, their lines put on it
+  in `graphs.walkways`), parapets, walls down to the ground and across its raised ends. A
+  deck's junction gets a slab of its own only where it reaches past the deck (at a ramp's
+  top).
+- **Ground** (M13): the slab is measured from the ground the deck stands on, flat where it
+  is level (within 5 cm on a 4 m grid). Elsewhere it is in 8 m cells over the finished
+  ground, or over the base of a building on or under the deck where one stands, so it
+  meets them (`decks.Ref`). Columns, stairs and elevators run from the ground at their
+  point to the slab there.
+- **Buildings** (`assetgen/buildings/decks.py`): the brief's `deck` record (AG10, only on a
+  building on, under, beside or in a slab): the deck, the role (`on`, `under`, `near`
+  within 2 m and over its soffit, `through` for one it is cut round), top and soffit over
+  the building's pivot, and the slab's plan within 3 m of its box. With it:
+  - **Undercity** (`under`): a roof within 1.2 m of the soffit is closed up to it by a
+    louvered plenum band (its top meets the soffit); a parapet otherwise stops 0.3 m under
+    it; no roof form. The roof's equipment, the types' roof features, masts, kitchen ducts
+    and shanty barrels keep under it (`roofs.Clear` takes the soffit as a ceiling). A
+    covered street's grime from the ground up and fronts and windows lit (`genome`: wear,
+    dirt height, lit ratio).
+  - **On a deck**: nothing under the deck's top (the band and doors on the slab already,
+    AG3).
+- **Checks**, on a city with decks only:
+  - `street_decks`: every slab object, column, stair and elevator replaced by a piece with
+    a mesh; the lowest thing over a ground street clears M14's 5.5 m; every stair and
+    elevator runs from the ground to the deck's top and lands on the slab's edge.
+  - `asset_decks`: no vertex of a building's shell, front or parts' boxes where its role
+    forbids, within the slab's plan (on: under the top; under: over the soffit; near or
+    through: inside the slab). Doors of buildings on a deck on its walkways; no roof item
+    or green roof under a slab.
+  - `street_coverage` counts the decks.
+- **Previews**: `assetgen materials preview --views deck`, the section across the biggest
+  deck from the blockout's deck camera: level, 35 mm, a 2.4 to 1 frame shifted up so the
+  ground at the cut sits 3 m over its bottom, the near clip on the cut
+  (`ag6_preview.section`), the eye lifted by the ground there on a terrain city; custom
+  views for the street under the slab (by day and night), the undercity, a light well and
+  the deck's own street.
+
+**Samples** (3 workers on the shared Mac, an Unreal import running beside):
+
+| City | Decks | Slab pieces | Columns | Stairs, elevators | Deck triangles | Lights, ribs, colonnade columns | On, under, cut round | Plenums | Doors on the deck | Build |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay Decks | 1 (Highcrest, 21.9 ha, level) | 8 | 570 | 2, 2 | 95,576 | 1,144, 1,807, 133 | 158, 164, 0 | 86 | 579 of 579 | 3m04s (every tile), 7 s streets |
+| Cragmouth with decks (test) | 2 (Ridgeback 12.2 ha on its slope, Hollow 5.0 ha, level) | 14 | 495 | 4, 4 | 128,571 | 545, 194, 19 | 38, 40, 9 | 30 | 255 of 255 | 3m30s (every tile), 9 s streets |
+
+Every check passes in both, `asset_decks` and `street_decks` included; the lowest thing
+over a ground street (a light under the ribs) is 7.2 m up. A building whose brief has no
+deck record makes the same bytes, so only the deck tiles' packs change (8 of 136 in
+Vesper Bay Decks).
+
+**Found on the way**:
+- The slab's lights at first followed only the junctions: a polygon-only intersection
+  (`geom.inter`) dropped the street lines (now `geom.line_inter`, a test counts them).
+- Undercity shanty stacks put water barrels and kitchen ducts through the soffit (their
+  own placements, not through `roofs.Clear`).
+- On Cragmouth with decks, two shop doors that AG3 moves off a party wall onto a wall at
+  the map's edge failed `asset_access` as walled off. Their way to the alley runs along
+  their own wall and round its corner. The check now lets a path graze its own building
+  (2 cm, `GRAZE_M`); it fails one that crosses it.
+- Ridgeback's finished ground falls from 44 to 25 m under its slab. M14 levels a deck's
+  district, but the streets' grade lines down the ridge stay on the slope, and the deck's
+  streets follow them. Hence the draped slab (no ribs there).
+
+**Exporter**: no code change. Slabs keep their blockout keys, so the manifest's `decks`
+still name them. Every deck piece replaces its blockout object and takes its level from
+it: the slab, the deck's streets and ramps on level 1 (`cg.level=1`); the columns, stairs
+and elevators on the ground. Recorded in `unreal_export.md` ("From AG10"); test
+`test_stage2_takes_assetgen_decks`. Not run in Unreal (the coordinating session's call).
+
+**Tests**: `tests/assetgen/test_ag_decks.py` (6, on the small test city with a deck over
+Core, `agtools.deck_build`): the pieces and what they replace, every street check, the
+slab's parts and the deck's streets on it, spans and ground, the buildings on their side of
+the slab, a city without decks untouched. Goldens: `ag1` (`testport_manifest`,
+`testport_files`) and `ag6` (`testport_materials`) written again on this Mac, on purpose: one
+door in the small test city (`d04.lot.e877n1165.bld`) keeps its model walkway now that its
+path may graze its own wall (`GRAZE_M`), so the manifest and
+`unreal_contribution.buildings.json` name another walkway; every pack is byte for byte as
+before (the small city's 445 files built on main and on AG10: only that door, the reports'
+timings and the street stage's code hash differ). The street, props, briefs and sample
+goldens are unchanged.
+
+**Asks of citygen**: level all the ground under a deck's slab, the streets' grade lines
+included (Ridgeback); a column grid that keeps out of undercity buildings or says it stands
+in one; the colonnade's columns in the model (AG10 places its own off the paths); the blockout's
+`deck` camera over the ground at the cut on a terrain city (its eye is 12 m over sea level,
+inside Ridgeback's hill; AG10's section adds the ground itself).
+
+**Open.**
+- One deck level per district (as M14).
+- No ribs on a deck whose ground is not level.
+- The elevator's head over the deck is the model's 3 m: a cab's overrun, not a machine
+  room storey.
+- Undercity buildings one floor high stay 4.3 m clear of the soffit (a clean roof, no
+  plenum).
+- The Unreal check of the deck city (slab collision, `cg.level` on every deck actor, the
+  undercity lit under the slab) is the coordinating session's call.
+- Mac = x86 waits for the deferred determinism check.
 
 ## Order
 

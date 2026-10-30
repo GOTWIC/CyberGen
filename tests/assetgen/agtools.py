@@ -92,6 +92,24 @@ def small_regen() -> Path:
     return _CACHE["regen"]
 
 
+def deck_build() -> Path:
+    """The small test city with a deck over Core (M14, as `tests/test_decks.py`) built with
+    the citygen CLI, with its briefs: DIR (the build directory itself)."""
+    if "decks" not in _CACHE:
+        from assetgen.cli import main as ag
+        from citygen.cli import main as cg
+        d = temp_dir("ag_decks")
+        data = copy.deepcopy(SMALL)
+        for x in data["districts"]:
+            if x["name"] == "Core":
+                x["decks"] = {}
+        spec = write(d, data, "spec.json")
+        assert cg(["build", str(spec), str(d / "base")]) == 0
+        assert ag(["brief", str(d / "base"), "--no-preview"]) == 0
+        _CACHE["decks"] = d / "base"
+    return _CACHE["decks"]
+
+
 def small_assets() -> Path:
     """The small test city with its assets built (`assetgen build`, two workers):
     DIR/base/assets."""

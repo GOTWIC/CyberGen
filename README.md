@@ -166,7 +166,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10)
 
 ### Cities
 
@@ -338,6 +338,23 @@ stone plinth, with doors and shopfronts brought down or up to the street and ret
 walls where the hill stands against a wall. `assetgen review` writes an art-direction sheet
 for a round of changes to the asset spec. More: [`docs/progress/AG5`](docs/progress/AG5).
 
+<img src="docs/progress/AG10/vesper_bay_decks/8k/deck_section.jpg" width="840">
+
+A section across the deck over Vesper Bay Decks' Highcrest (8K): the deck's street on the
+slab, the undercity and a ground street under it.
+
+| | |
+|---|---|
+| <img src="docs/progress/AG10/vesper_bay_decks/8k/under_slab.jpg" width="420"> | <img src="docs/progress/AG10/vesper_bay_decks/8k/under_slab_night.jpg" width="420"> |
+| A ground street under the slab (8K) | By night |
+
+A district with a deck gets the slab itself: a coffered or ribbed soffit with lights over
+the streets below, an edge fascia with grime streaks and a rail, colonnades where it
+passes over a park, columns with capitals, and light wells with switchback stairs and glass
+elevators. The deck's streets lie on the slab and climb to it on solid ramps; the
+undercity's roofs close up to the soffit, its fronts lit and grimy as a covered street.
+More: [`docs/progress/AG10`](docs/progress/AG10).
+
 <img src="docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg" width="840">
 
 A shopping street in Greyhook in Unreal 5.8: street fronts, signs, props, roads and
@@ -362,7 +379,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |
 | AG8 | Props, plants and signs | Street furniture and parked cars in variants per district style, trees by species, shrubs and ivy, shop signs with their text, neon, billboards, holo-ads | Done |
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
-| AG10 | Layered districts | Buildings and streets on stacked decks | Planned |
+| AG10 | Layered districts | Deck slabs with coffered or ribbed soffits, edge fascias, rails, lights over the streets below and colonnades over parks; columns, light-well stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs that meet the slab | Done |
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 | AG12 | Water | Real water: surfaces that flow and foam, beds, banks and beaches, swimming | Planned |
 | AG13 | Ground cover and grass | Textured ground with worn paths, grass and small plants that sway in the wind | Planned |

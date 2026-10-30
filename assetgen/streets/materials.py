@@ -44,6 +44,10 @@ SLOTS: dict[str, tuple[str, str, float, float]] = {
     "concrete.barrier": ("opaque", "#a19e96", 0.85, 0.0),
     "concrete.column": ("opaque", "#76746f", 0.88, 0.0),
     "concrete.dark": ("opaque", "#55534f", 0.9, 0.0),
+    # M14's decks (AG10): the soffit, the edge fascia, grime streaks and stains
+    "concrete.soffit": ("opaque", "#6b6965", 0.92, 0.0),
+    "concrete.fascia": ("opaque", "#8f8d87", 0.85, 0.0),
+    "stain": ("opaque", "#3b3833", 0.95, 0.0),
     "stone.quay": ("opaque", "#6f6a62", 0.9, 0.0),
     "stone.coping": ("opaque", "#9c978d", 0.8, 0.0),
     "stone.arch": ("opaque", "#8b8273", 0.9, 0.0),

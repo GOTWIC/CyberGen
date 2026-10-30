@@ -48,6 +48,7 @@ from citygen import dmath as M
 from ..triangulate import TriangulationError, triangulate
 from . import articulate as AR
 from . import connections as CN
+from . import decks as DK
 from . import details as DT
 from . import heroes as HE
 from . import fronts as FR
@@ -844,10 +845,26 @@ class ShellBuilder:
             par = "low"                # a ledge or a terrace on a lower mass: a railing
         if ms.get("roof"):
             par = "none"               # (AG4: eaves instead)
+        ceil = DK.ceiling_mm(self.br)
+        if ceil is not None and 50 < ceil - ms["z1"] <= DK.PLENUM_MAX_M * 1000 and \
+                any(any(r) for r in top_open):
+            # AG10: a roof just under an M14 deck's soffit, closed up to it by a louvered
+            # plenum band (its top meets the soffit)
+            if self._strips(ms, top_open, 0, -200, ms["z1"], ceil - 5, "louver", 200,
+                            need_out=False):
+                feats.append("plenum")
+                self.stats["plenums"] = self.stats.get("plenums", 0) + 1
+            par = "none"
         if par != "none":
             hp = int(round(cont[f"{g}.parapet_m"] * 1000))
             if par == "low":
                 hp = max(300, hp // 2)
+            if ceil is not None:
+                # (AG10: under a deck, the parapet keeps CEIL_GAP_M under its soffit)
+                hp = min(hp, ceil - ms["z1"] - int(DK.CEIL_GAP_M * 1000))
+                if hp < 200:
+                    par = "none"
+        if par != "none":
             t = max(200, reveal + 80)
             # AG4: a coping on the parapet's top (metal flashing, or stone)
             cop = RF.coping_slot(self)

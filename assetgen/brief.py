@@ -726,9 +726,13 @@ def build_briefs(model: CityModel, spec: S.AssetSpec | None = None,
     from .streets.ctx import Ground
     ground = Ground(model)
     cors = corridors(model, ground)
+    from .buildings import decks as BD
+    from .streets import decks as SD
+    decks = BD.records(model, ground)         # AG10: M14's slabs near each building
+    SD.reset()
     for k, b in enumerate(model.buildings):
         briefs[b.id] = _brief(city, k, b, edges_by_b[k], faced, props.get(k, []), look,
-                              sdata, overrides, cors, ground)
+                              sdata, overrides, cors, ground, decks.get(b.id))
     t_end = time.perf_counter()
     stats = _stats(briefs, city)
     stats["seconds"] = {"cover": round(t_cover - t0, 2), "facing": round(t_face - t_cover, 2),
@@ -928,7 +932,7 @@ def _portal_rec(city: "City", k: int, b, p, look: "_Lookups", ground) -> dict:
 
 def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, look: _Lookups,
            sdata: dict, overrides: dict | None, cors: list | None = None,
-           ground=None) -> dict:
+           ground=None, slab: dict | None = None) -> dict:
     ox, oy = city.origins[k]
     if ground is None:
         from .streets.ctx import Ground
@@ -1059,6 +1063,10 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
     terr = terrain_of(rec, ground, getattr(b, "base_m", None))
     if terr is not None:
         rec["terrain"] = terr
+    if slab is not None:
+        # AG10: the M14 slab it stands on, under, beside or in
+        from .buildings.decks import framed
+        rec["deck"] = framed(slab, ox, oy)
     return json.loads(C.dumps(rec))
 
 

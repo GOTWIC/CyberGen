@@ -198,6 +198,50 @@
       "title": "Clearance",
       "type": "object"
     },
+    "Deck": {
+      "additionalProperties": false,
+      "description": "AG10: the M14 deck slab a building stands on, under, beside or in: its top and\nsoffit over the building's pivot, and the slab's plan within 3 m of the building's box\n(its frame).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "on",
+            "under",
+            "near",
+            "through"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "top_m": {
+          "title": "Top M",
+          "type": "number"
+        },
+        "underside_m": {
+          "title": "Underside M",
+          "type": "number"
+        },
+        "slab": {
+          "items": {
+            "$ref": "#/$defs/Polygon"
+          },
+          "title": "Slab",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "top_m",
+        "underside_m",
+        "slab"
+      ],
+      "title": "Deck",
+      "type": "object"
+    },
     "District": {
       "additionalProperties": false,
       "properties": {
@@ -1956,6 +2000,18 @@
       ],
       "default": null,
       "description": "AG5: the ground along the base's edges (M13's slopes only)."
+    },
+    "deck": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Deck"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "AG10: an M14 deck's slab it stands on, under, beside or in (decks only)."
     }
   },
   "required": [

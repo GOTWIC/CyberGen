@@ -1143,6 +1143,35 @@ def test_check_frame_times_and_warm_shots():
     assert _ue_script("import_city.py", "PRUNE_FILES")["PRUNE_FILES"] <= 100
 
 
+def test_check_shots_stay_under_nanites_root_pages():
+    """The AG5 Unreal check: Cragmouth's shots loaded all 75,155 of its actors and the editor
+    stopped on Nanite's root pages (49,152, its 2 GB pool on the Mac; Cragmouth has 63,700
+    Nanite meshes); past `SHOT_MESHES` distinct meshes the shots load the actors nearest the
+    city's middle up to that many meshes (actors with shared or no-Nanite meshes always), one
+    set for every view (an actor unloaded between views kept its meshes' root pages), and
+    never an HLOD actor."""
+    ns = _ue_script("check_city.py", "view_load", "mesh_of", "SHOT_MESHES")
+    vl = ns["view_load"]
+    assert 30000 <= ns["SHOT_MESHES"] <= 45000
+    rows = [("p0", "actor", 900.0, 0.0, None), ("h0", "hlod", 0.0, 0.0, None)] + \
+        [(f"m{k}", "actor", float(k), 0.0, f"mesh{k // 2}") for k in range(10)]
+    assert set(vl(rows, (0.0, 0.0), cap=5)) == {"p0"} | {f"m{k}" for k in range(10)}
+    assert vl(rows, (6.2, 0.0), cap=2) == ["m6", "m7", "m5", "m4", "p0"]
+    assert vl(rows, (100.0, 0.0), cap=1) == ["m9", "m8", "p0"]
+    src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    shots = src[src.index("def shots("):src.index("# --- the tick loop")]
+    assert shots.count("load_actors(") == 1 and "unload_actors" not in shots
+    man = {"tiles": [{"name": "t+00+00", "objects": [{"key": "city.sea.t+00+00",
+                                                      "asset": "city_sea_t+00+00"}]}],
+           "stage2": {"actors": [{"key": "a.bld", "mesh": "Assets/Buildings/t/a_bld"},
+                                 {"key": "a.holo", "mesh": "Assets/Signs/t/a_holo"}],
+                      "instances": [{"key": "a.bld.part.x", "mesh": "Assets/BuildingsParts/t/x"}],
+                      "lod_chains": [{"mesh": "Assets/Signs/t/a_holo"}]}}
+    assert ns["mesh_of"](man) == {"city.sea.t+00+00": "Meshes/t+00+00/city_sea_t+00+00",
+                                  "a.bld": "Assets/Buildings/t/a_bld", "a.holo": None,
+                                  "a.bld.part.x": "Assets/BuildingsParts/t/x"}
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()
@@ -1260,3 +1289,51 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     assert again["actor_digest"] == second["actor_digest"]
     for d in (proj.parent, build):
         shutil.rmtree(d, ignore_errors=True)
+
+
+def test_stage2_takes_assetgen_decks(tmp_path):
+    """AG10: M14's deck pieces over the blockout of a city with a deck. Every slab object
+    (`<deck>.slab.<tile>`, an entry of that key), joined column object, stair and elevator
+    the blockout draws is replaced; the slab's actors stand on the deck's level
+    (`cg.level=1`), the columns, stairs and elevators on the ground; the deck's streets keep
+    level 1 from the joined deck objects they replace; the manifest's `decks` still name the
+    slab actors by key; the walkways beside a ramp are put on it in `graphs.walkways`."""
+    from assetgen.streets import build as SB
+
+    data = copy.deepcopy(SMALL)
+    for x in data["districts"]:
+        if x["name"] == "Core":
+            x["decks"] = {}
+    res = validate_spec(data)
+    assert res.ok, res.issues
+    m = build_city(res).model
+    build = _blockout_files(m, tmp_path / "build")
+    (build / "city_model.json").write_text(m.to_json() + "\n", encoding="utf-8")
+    rep = SB.build(m, "x" * 64, build / "assets", None, workers=1)
+    assert rep["ok"], [c for c in rep["checks"] if not c["ok"]]
+    man = U.build_manifest(build)[0]
+    s2 = man["stage2"]
+    objs = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    deck_objs = {k for k, o in objs.items() if o["category"] in (
+        "deck_slab", "deck_column", "deck_stair", "deck_elevator", "deck_road",
+        "deck_junction", "deck_sidewalk", "deck_ramp")}
+    assert deck_objs and deck_objs <= set(s2["replaced"])
+    assert s2["counts"]["replaces_missing"] == 0
+    actors = {a["key"]: a for a in s2["actors"]}
+    slabs = [k for k, o in objs.items() if o["category"] == "deck_slab"]
+    assert slabs and all(actors[k]["level"] == 1 for k in slabs)
+    assert {k for d in man["decks"] for k in d["keys"]} == set(slabs)
+    con = json.loads((build / "assets" / "unreal_contribution.streets.json").read_text())
+    for e in con["entries"]:
+        a = actors.get(e["key"])
+        if a is None:
+            continue
+        if e["kind"] in ("street.deck.column", "street.deck.stair", "street.deck.elevator"):
+            assert "level" not in a
+        if e["key"].startswith("l1."):
+            assert a["level"] == 1          # (a deck's street, its joined object's level)
+    ramps = [s.id for s in m.road_segments if s.attrs.get("role") == "deck_ramp"]
+    walks = con["graphs"]["walkways"]
+    for w in m.walkways:
+        if w.attrs.get("ramp") in ramps:
+            assert max(p[2] for p in walks[w.id]) >= m.decks[0].top_m

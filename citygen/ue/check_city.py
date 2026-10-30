@@ -7,8 +7,9 @@ with $CITYGEN_UE_JOB naming a job file ({"manifest", "build_dir", "result", "sho
 "width"}) that `citygen unreal --check` writes. On the imported level (citygen/ue/
 import_city.py) it:
 
-1. with `shots`, renders views of the city in the editor world (all actors loaded): the
-   isometric view from the blockout's iso direction and its street views;
+1. with `shots`, renders views of the city in the editor world (all actors loaded, or for
+   a city with more meshes than `SHOT_MESHES`, those nearest its middle): the isometric
+   view from the blockout's iso direction and its street views;
 2. plays the level in the editor with the project's own game mode and pawn (whatever the
    level's Play is set to, `--play`) and checks:
    - streaming: the World Partition cells around the player load, those far away do not,
@@ -47,6 +48,9 @@ FLY_S = 8.0         # the flight's straight run
 FLY_Z_M = 40.0      # its height over the player start: through the buildings in its way
 TRACE_RETRY_S = 30.0  # how long a trace down that missed is tried again after settling
 WARM_S = 3.0        # after a view's warm-up render, for its Nanite pages to stream in
+SHOT_MESHES = 42000  # distinct meshes a shot loads at most: every Nanite mesh in memory
+                    # takes a root page, and they run out at 49,152 (the 2 GB pool on the
+                    # Mac), which Cragmouth's 63,700 overrun (the editor stops on a fatal error)
 
 
 def log(msg):
@@ -750,16 +754,63 @@ def fly_shots(world, pawn, man, slug):
 
 # --- shots ------------------------------------------------------------------------------------
 
+def view_load(rows, target, cap=SHOT_MESHES):
+    """The actor descs a view loads, from (guid, kind, x, y, mesh) rows (kind `hlod` for the
+    HLOD actors, never loaded; x and y the middle of its bounds; mesh the actor's mesh, None
+    for one whose meshes are shared or have no Nanite): every other row when their distinct
+    meshes fit in `cap`, else the rows nearest the target (plan x, y) up to `cap` meshes."""
+    rows = [r for r in rows if r[1] != "hlod"]
+    if len({r[4] for r in rows if r[4] is not None}) <= cap:
+        return [r[0] for r in rows]
+    tx, ty = target
+    out, seen = [], set()
+    for r in sorted(rows, key=lambda r: ((r[2] - tx) ** 2 + (r[3] - ty) ** 2, str(r[0]))):
+        if r[4] is not None and r[4] not in seen:
+            if len(seen) >= cap:
+                continue
+            seen.add(r[4])
+        out.append(r[0])
+    return out
+
+
+def mesh_of(man):
+    """Each actor key's mesh from the manifest: a blockout object's own, a stage 2 actor's or
+    part instancer's; None for a prop or plant instancer (shared prototypes) and the LOD
+    chains (no Nanite)."""
+    s2 = man.get("stage2") or {}
+    lod = {c["mesh"] for c in s2.get("lod_chains", [])}
+    out = {}
+    for t in man.get("tiles", []):
+        for o in t.get("objects", []):
+            out[o["key"]] = f"Meshes/{t['name']}/{o['asset']}"
+    for r in s2.get("actors", []) + s2.get("instances", []):
+        out[r["key"]] = None if r.get("mesh") in lod else r.get("mesh")
+    return out
+
+
+def desc_rows(WPL, meshes):
+    rows = []
+    for d in WPL.get_actor_descs():
+        hlod = "HLOD" in str(getattr(d, "native_class", ""))
+        bd = getattr(d, "bounds", None)
+        x = y = 0.0
+        if bd is not None:
+            x = (bd.min.x + bd.max.x) / 200.0
+            y = -(bd.min.y + bd.max.y) / 200.0
+        rows.append((d.guid, "hlod" if hlod else "actor", x, y,
+                     meshes.get(str(getattr(d, "label", "")))))
+    return rows
+
+
 def shots(man):
-    """Renders of the city in the editor world, every actor loaded: the isometric view and
-    the blockout's street views."""
+    """Renders of the city in the editor world, every actor loaded (or, past `SHOT_MESHES`
+    meshes, those nearest the city's middle): the isometric view and the blockout's street
+    views."""
     out = JOB["shots"]
     os.makedirs(out, exist_ok=True)
     WPL = unreal.WorldPartitionBlueprintLibrary
-    guids = [d.guid for d in WPL.get_actor_descs()]
-    WPL.load_actors(guids)
-    log(f"loaded {len(guids)} actors for the shots")
-    yield from wait(5.0)
+    rows = desc_rows(WPL, mesh_of(man))
+    n_mesh = len({r[4] for r in rows if r[1] != "hlod" and r[4] is not None})
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     b = man["bounds"]
     cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
@@ -773,6 +824,14 @@ def shots(man):
                       2.0 * math.degrees(math.atan(18.0 / v.get("lens_mm", 28)))))
     files = []
     w = int(JOB.get("width") or 3840)
+    # one set for every view: an actor unloaded between views keeps its meshes' root pages
+    # (Cragmouth stopped at its fourth view, each of 42,000 meshes)
+    loaded = view_load(rows, (cx, cy))
+    WPL.load_actors(loaded)
+    log(f"loaded {len(loaded)} actors for the shots" + (
+        f" ({SHOT_MESHES} of {n_mesh} meshes, the nearest to the city's middle)"
+        if n_mesh > SHOT_MESHES else ""))
+    yield from wait(5.0)
     say("begin", label="check_shots", total=len(views))
     for k, (name, eye, target, fov) in enumerate(views):
         cam = eas.spawn_actor_from_class(unreal.CameraActor, ue(*eye), transient=True)

@@ -291,6 +291,17 @@ class Terrain(_M):
     grade: list[list[float] | None]
 
 
+class Deck(_M):
+    """AG10: the M14 deck slab a building stands on, under, beside or in: its top and
+    soffit over the building's pivot, and the slab's plan within 3 m of the building's box
+    (its frame)."""
+    id: str
+    role: Literal["on", "under", "near", "through"]
+    top_m: float
+    underside_m: float
+    slab: list[Polygon]
+
+
 class Brief(_M):
     brief_version: Literal[2]
     id: str
@@ -317,6 +328,8 @@ class Brief(_M):
     clearances: list[Clearance] = Field(default_factory=list)
     terrain: Terrain | None = Field(None, description="AG5: the ground along the base's "
                                                       "edges (M13's slopes only).")
+    deck: Deck | None = Field(None, description="AG10: an M14 deck's slab it stands on, "
+                                                "under, beside or in (decks only).")
 
 
 def json_schema() -> dict:

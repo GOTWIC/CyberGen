@@ -213,7 +213,7 @@ def miter(ring, d):
 class Clear:
     """The brief's clearance corridors (AG4) in millimeters: `hits` tests a box."""
 
-    def __init__(self, brief: dict, kinds=("skybridge", "guideway", "sky_tube")):
+    def __init__(self, brief: dict, kinds=("skybridge", "guideway", "sky_tube", "deck")):
         self.segs = []
         for c in brief.get("clearances") or []:
             if c["kind"] not in kinds:
@@ -222,6 +222,11 @@ class Clear:
             ln = [[v * 1000.0 for v in p] for p in c["line"]]
             for p, q in zip(ln, ln[1:]):
                 self.segs.append((p, q, h, c["kind"], c["id"]))
+        if "deck" in kinds:
+            from .decks import clear_seg
+            seg = clear_seg(brief)
+            if seg is not None:
+                self.segs.append(seg)        # (AG10: under an M14 deck, its soffit)
 
     def lowest(self, x0, y0, x1, y1, z0) -> float | None:
         """The lowest corridor floor over the plan box (x0..x1, y0..y1) that reaches above z0
@@ -345,6 +350,8 @@ def plan(sb) -> None:
     sb.roof_forms = []
     if br["building"]["landmark"] or br["portals"]:
         return
+    if (br.get("deck") or {}).get("role") == "under":
+        return                  # (AG10: under an M14 deck's soffit, a flat roof)
     form = form_of(sb)
     if form is None:
         return
