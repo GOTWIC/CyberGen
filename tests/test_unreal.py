@@ -615,6 +615,32 @@ def test_stage2_skybridge_links(build, manifest, tmp_path):
     assert 'f"cg.link={x}"' in src and 'r.get("links", [])' in src
 
 
+def test_stage2_empty_shell(build, manifest, tmp_path):
+    """The AG3 and AG4 Unreal check: a one-floor building its street front takes whole has
+    an empty shell node in its pack, while its entry's `triangles` counts the front's too.
+    Its key makes no mesh (Unreal refuses an empty one, "Bad MeshDescription", and the HLOD
+    build then fails) and no actor, but still takes the blockout building's place; a shell
+    with triangles is as before."""
+    man = manifest[0]
+    fake, blds = _fake(man, json.loads((build / "graphs.json").read_text()))[:2]
+    tile = fake["buildings"]["entries"][0]["glb"]
+    full = U._Mesh()
+    full.poly([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)], "brick")
+    out = _with_contributions(build, tmp_path / "e", fake)
+    (out / "assets" / "tiles").mkdir(parents=True, exist_ok=True)
+    U.write_glb({f"{blds[0]}.shell": U._Mesh(), f"{blds[1]}.shell": full}, {},
+                out / "assets" / tile)
+    assert U.glb_triangles(out / "assets" / tile) == {f"{blds[0]}.shell": 0,
+                                                     f"{blds[1]}.shell": 1}
+    s2 = U.build_manifest(out)[0]["stage2"]
+    keys = {a["key"] for a in s2["actors"]}
+    assert blds[0] not in keys and blds[1] in keys
+    assert blds[0] in s2["replaced"] and blds[1] in s2["replaced"]
+    meshes = {m["asset"] for p in s2["packs"] for m in p["meshes"]}
+    assert U.asset_name(f"{blds[0]}.shell") not in meshes
+    assert U.asset_name(f"{blds[1]}.shell") in meshes
+
+
 def test_stage2_refuses(build, manifest, tmp_path):
     """A key in two contributions, a tint index no master reads, a contribution of another
     version or layer."""
@@ -850,7 +876,13 @@ def test_stage2_from_assetgen(staged, manifest):
                  if "mesh" in n}
         assert {m["asset"] for m in p["meshes"]} <= nodes, p["folder"]
     actor_keys = {a["key"] for a in s2["actors"]}
-    assert set(blds) <= actor_keys
+    # (a one-floor building its street front takes whole has an empty shell node: no actor
+    # of its own, its front in its place; Testport's harbor freight terminal)
+    es = {e["key"]: e for e in con["entries"]}
+    empty = {k for k in blds
+             if U.glb_triangles(staged / "assets" / es[k]["glb"])[es[k]["node"]] == 0}
+    assert set(blds) - empty <= actor_keys and not empty & actor_keys
+    assert all(f"{k}.front" in actor_keys for k in empty)
     ch = U.manifest_changes(man, m2)
     s2keys = actor_keys | {a["key"] for a in s2["instances"]}
     # AG8's exact props (cables, scaffolding, gates) take the key of M15's instanced actor
@@ -929,7 +961,9 @@ def test_stage2_takes_assetgen_fronts(staged):
     for key, e in fronts.items():
         a = actors[key]
         b = key[:-len(".front")]
-        assert a["ids"] == [b] and a["pivot"] == actors[b]["pivot"] and a["cpd"] == e["cpd"]
+        # (its building's pivot; a building the front takes whole has no shell actor)
+        assert a["ids"] == [b] and a["cpd"] == e["cpd"]
+        assert b not in actors or a["pivot"] == actors[b]["pivot"]
         assert a["type"] == "building.front" and a["category"] == "building"
         m = meshes[a["mesh"]]
         assert m["collision"] == {"complex": True} and m["nanite"] and m["fallback_full"]
@@ -1026,6 +1060,49 @@ def test_stage2_textured_props_and_signs(staged):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'elif master == "leaves":' in src and "MP_OPACITY_MASK" in src
     assert 'tparam(m, "SignTex", "color"' in src and "HOLO_CODE" in src
+
+
+def _ue_script(name, *defs):
+    """The top-level functions and constants `defs` of an Unreal-side script, run here
+    without the `unreal` module (they use only the standard library)."""
+    import ast
+    tree = ast.parse((Path(U.__file__).parent / "ue" / name).read_text())
+    body = [n for n in tree.body
+            if (isinstance(n, ast.FunctionDef) and n.name in defs) or
+            (isinstance(n, ast.Assign) and any(getattr(t, "id", None) in defs
+                                               for t in n.targets))]
+    ns = {}
+    exec(compile(ast.Module(body=body, type_ignores=[]), name, "exec"), ns)
+    return ns
+
+
+def test_check_frame_times_and_warm_shots():
+    """The AG3 and AG4 Unreal check: the check's walk and flight report how long their frames
+    took (Vesper Bay's play ran at 12 to 14 s a frame before #54's fixes), its waits for
+    streaming do not list every actor every frame, roofs are traced on shells, and each
+    editor shot is rendered once small from its camera first, so Nanite has streamed the
+    view's pages in (a first render of a new view drew coarse clusters as big flat triangles
+    over the walls); a first import's few hundred unused variants are pruned by their
+    files."""
+    ns = _ue_script("check_city.py", "frame_times", "frame_line", "WARM_S", "LOAD_WAIT_S",
+                    "COUNT_EVERY_S")
+    ft = ns["frame_times"]([0.0, 0.1, 0.2, 0.35, 1.35])
+    assert ft == {"frames": 4, "median_s": 0.15, "p95_s": 1.0, "max_s": 1.0}
+    assert ns["frame_times"]([5.0]) == {"frames": 0} and ns["frame_line"]([]) == ""
+    assert "0.150 s (median)" in ns["frame_line"]([0.0, 0.1, 0.2, 0.35, 1.35])
+    assert ns["WARM_S"] >= 2.0
+    # the wait for a spot to stream in lists the city's actors every COUNT_EVERY_S once the
+    # streaming query says done, not every frame (Vesper Bay: 6.5 s frames, its far spots
+    # never streamed in, 169 of 507 traces down)
+    assert ns["COUNT_EVERY_S"] >= 1.0 and ns["LOAD_WAIT_S"] >= 120.0
+    src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    settle = src[src.index("def settle("):src.index("def teleport(")]
+    assert "time.time() >= due and streamed(world, at) is not False" in settle
+    # roofs and facades are traced on shells, not on part instancers (no collision) or fronts
+    assert 'not tag(a, "cg.type").startswith("part.")' in src
+    assert src.count('"frame_time": frame_times(ticks)') == 2
+    assert "take_high_res_screenshot(960, 540, warm, cam)" in src
+    assert _ue_script("import_city.py", "PRUNE_FILES")["PRUNE_FILES"] <= 100
 
 
 # --- in Unreal (where it is installed) ------------------------------------------------------
