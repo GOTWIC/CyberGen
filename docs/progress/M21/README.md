@@ -94,6 +94,18 @@ Every sample city has no such pair now (Delta: 867 before city-wide, Vesper Bay 
 M3's checks see every new mass (footprints, overlaps, clear zones, heights, flight cones,
 skybridge landings, roof items); M13 seats and M14 decks as before.
 
+Three fixes the new forms called for elsewhere:
+
+- **Skybridges** keep stage 2's corridor margins (0.2 m beside, 0.3 m over) clear of every
+  mass: a block of a stacked tower and a pod 0.3 m over two bridges failed assetgen's
+  `asset_clearance` on Vesper Bay. A bridge through a traced building (placed after the
+  bridges, which did not see it) is taken out: the pinned and stack demos' first try.
+- **A cluster tower** stood beside its podium piece where the piece was cut in two (the
+  largest piece was taken): now the piece under it.
+- **Sky tube portals** stay under a tower's shaft (`transit.Bld.body`): with masts more
+  common, a Delta station portal went through a lean tower's mast over its roof, which
+  assetgen could not cut (`asset_roofs`). Clearances still see the mast.
+
 ## Builds
 
 Every sample builds with every check passing (88 checks, 93 on the deck demo), in the tries it

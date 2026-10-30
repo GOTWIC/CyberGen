@@ -764,8 +764,13 @@ neighbor rule in `buildout.select_forms`):
 - **Checks** (two more): `building_forms` (arcs within 2.1 cm of their footprint, twist at
   most 3 degrees a floor, every mass above the building's floor resting on or fixed to
   another of its masses: it found M3's megabuilding decks hanging past a mid setback, now
-  placed only where both towers reach them, `_deck_held`), `tower_neighbors` (towers of
-  different owners within 150 m, by footprint centroid, never share a form and a band).
+  placed only where both towers reach them, `_deck_held`, and a cluster's tower beside its
+  podium piece, now the piece under it), `tower_neighbors` (towers of different owners
+  within 150 m, by footprint centroid, never share a form and a band). Skybridges keep stage
+  2's corridor margins clear of every mass (0.2 m beside, 0.3 m over: `CORRIDOR_SIDE_M`,
+  `CORRIDOR_TOP_M`) and a bridge through a traced or pinned building (placed after the
+  bridges) is taken out (`buildout.bridges_clear_of`); a sky tube portal stays under a
+  tower's shaft, not its mast or spire (`transit.Bld.body`, `THIN_ROLES`).
 - **Blockout:** a mass with arcs drawn smooth along them (`set_sharp_from_angle`, 25
   degrees); accents for mast, halo, strut, frame, link. **Exporter:** a building's form in
   the manifest (`form`) and tagged `cg.form=`. **assetgen:** the brief carries arcs, plates
