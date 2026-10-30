@@ -363,8 +363,10 @@ def plan(sb) -> None:
         H = ms["z1"] - ms["z0"]
         if n >= 2:
             zb = ms["z0"] + (ms["z1"] - ms["z0"]) * (n - 1) // n
-        elif ms["z0"] > 50 and H <= ROOF_STOREY:
-            zb = ms["z0"]            # a one-floor storey on another mass: all roof
+        elif ms["z0"] > 50 and (H <= ROOF_STOREY or
+                                (n == 1 and getattr(sb, "form_override", None) == "pagoda")):
+            zb = ms["z0"]            # a one-floor storey on another mass: all roof (AG5: a
+                                     # temple's top tier at any height)
         else:
             if H < SHED_WALL + MIN_ATTIC:
                 continue
