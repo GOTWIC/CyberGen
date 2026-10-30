@@ -1346,8 +1346,16 @@ inside Ridgeback's hill; AG10's section adds the ground itself).
   room storey.
 - Undercity buildings one floor high stay 4.3 m clear of the soffit (a clean roof, no
   plenum).
-- The Unreal check of the deck city (slab collision, `cg.level` on every deck actor, the
-  undercity lit under the slab) is the coordinating session's call.
+- The Unreal check of the deck city (`docs/progress/AG10/unreal/`, after the merge): the
+  slabs keep their keys and `cg.level=1`, the columns, stairs and elevators stand on the
+  ground, the deck's streets and ramps at level 1, the data assets' `Levels` as
+  `graphs.json`; every deck grid point lands on the deck, its walkways, ramps and stairs
+  walkable. Fixed there: the deck's slab, stairs and elevators keep every triangle in their
+  Nanite fallback (`streets.build.FULL_FALLBACK`, `fallback_full`): complex collision is
+  built from it and had lost the rail (a capsule stopped at 33 of 143 edge points, 78
+  after), and the Mac editor, which renders without Nanite, drew no soffit lights. Open from
+  it: Vesper Bay Decks overruns Nanite's root pages in play on the Mac (50,008 meshes), and
+  the undercity's one-storey rows leave empty shell nodes in the packs.
 - Mac = x86 waits for the deferred determinism check.
 
 ## Order
