@@ -3224,6 +3224,8 @@ PRIMARY_GATE_M = 30.0      # ... a primary road's (a promenade and a quay betwee
 OVERLAP_M2 = 10.0          # rights of way of two roads (no node shared) overlapping more
 #                            than this: the lesser road goes
 POKE_M2 = 1.0              # a dead end's right of way reaching into another road's
+SPLIT_SEARCH_M = 500.0     # a road dropped keeps a way round between its ends this near
+SETTLE_ROUNDS = 24         # rounds of the repair at most (each acts only where the last changed)
 DEAD_END_KINDS = ("map_edge", "water_end", "park_gate", "plaza_gate", "site_gate", "path_end",
                   "cul_de_sac", "deck_end", "traced_end")
 SITE_GATE = {"central_park": "park_gate", "grand_plaza": "plaza_gate"}
@@ -3311,12 +3313,13 @@ def _link_clear(B: Builder, g: _Graph, e: int, p, q, at_q: set, ln: Line) -> boo
     return True
 
 
-def _run_on(B: Builder, g: _Graph, e: int, at_end: bool):
+def _run_on(B: Builder, g: _Graph, e: int, at_end: bool, link: Line | None = None):
     """Where edge e's dead end runs on to: (point, edge to split there or None, edges at the
-    point) when the road straight ahead (within DEAD_END_REACH_M) takes a junction there, or a node of it within
-    MIN_JUNCTION_GAP_M, or a dead end facing it; else None."""
+    point) when the road straight ahead (within DEAD_END_REACH_M) takes a junction there, or
+    a node of it within MIN_JUNCTION_GAP_M, or a dead end facing it; else None. `link`: the
+    street a primary road's dead end runs on as (its class, width and district)."""
     pts, li = g.edges[e]
-    ln = B.lines[li]
+    ln = link if link is not None else B.lines[li]
     seq, p, d0 = _end_dir(pts, at_end)
     other = seq[0]
     amin = min_angle(B.arch[ln.district]) if ln.district else GRID_ANGLE_DEG
@@ -3354,9 +3357,8 @@ def _run_on(B: Builder, g: _Graph, e: int, at_end: bool):
             face = (q, f)
     if face is not None:
         q, f = face
-        if B.frame is not None and (renewed != B._renewed(B.lines[g.edges[f][1]]) or
-                                    _held(B, g.edges[f][0])):
-            return None
+        if B.frame is not None and renewed != B._renewed(B.lines[g.edges[f][1]]) and                 q not in B.frame.nodes:
+            return None     # (M10: a new street meets an old road only at an old node)
         if _link_clear(B, g, e, p, q, {f}, ln):
             return q, None, {f}
         return None
@@ -3397,8 +3399,9 @@ def _run_on(B: Builder, g: _Graph, e: int, at_end: bool):
     if any(_turn_deg(mine, v) < want + 1.0 for v in others):
         return None
     if B.frame is not None:
-        # M10: a held road keeps its pieces; a new street meets an old road at a node of it
-        if q not in (tpts[0], tpts[-1]) and (_held(B, tpts) or renewed != B._renewed(t)):
+        # M10: a held road keeps its pieces (split only at a node it had); a new street meets an
+        # old road at a node of it
+        if q not in (tpts[0], tpts[-1]) and (_held(B, tpts) or renewed != B._renewed(t)) and                 q not in B.frame.nodes:
             return None
         if renewed and not B._renewed(t) and q not in B.frame.nodes:
             return None
@@ -3527,7 +3530,7 @@ def _reach(B: Builder, g: _Graph, i: int, j: int, q) -> float:
 
 def _splits(B: Builder, g: _Graph, k: int, gone: set) -> bool:
     """Whether dropping vehicle edge k (and the edges `gone`) parts its two ends on the
-    vehicle network."""
+    vehicle network (a way round within SPLIT_SEARCH_M of them)."""
     if B.lines[g.edges[k][1]].cls not in VEHICLE:
         return False
     a, b = g.edges[k][0][0], g.edges[k][0][-1]
@@ -3536,6 +3539,8 @@ def _splits(B: Builder, g: _Graph, k: int, gone: set) -> bool:
         q = todo.pop()
         if q == b:
             return False
+        if _dist(q, a) > SPLIT_SEARCH_M:
+            continue      # (a way round farther than this does not count: a local decision)
         for f, f_end in g.at.get(q, []):
             if f == k or f in gone or B.lines[g.edges[f][1]].cls not in VEHICLE:
                 continue
@@ -3615,7 +3620,7 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
     n_run = n_cut = n_trim = n_dup = 0
     tags: dict = {}
     cache: dict = {}
-    for rnd in range(12):
+    for _ in range(SETTLE_ROUNDS):
         g = _Graph(B, edges, cache)
         drop = _overlaps(B, g)
         if drop:
@@ -3623,18 +3628,42 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
             edges = _merge_and_trim(B, [x for k, x in enumerate(edges) if k not in drop])
             continue
         touched: set = set()
-        ends = [x for x in g.ends() if g.edges[x[1]][1] >= B.n_primary]
-        for p, e, at_end in ends:
-            if e in touched or _held(B, g.edges[e][0]):
-                continue
-            r = _run_on(B, g, e, at_end)
+        for p, e, at_end in g.ends():
+            # a dead end that already lies on another road is noded there (on a held road
+            # only at a node it had: M10)
+            on = [k for k in g.near(Point(p)) if k != e and k not in touched and
+                  p not in g.nodes_of(k) and g.lines[k].distance(Point(p)) < 0.02]
+            if on and e not in touched:
+                k = on[0]
+                if B.frame is None or not _held(B, g.edges[k][0]) or p in B.frame.nodes:
+                    _split_at(edges, k, p)
+                    touched |= {e, k}
+                    n_run += 1
+                    continue
+            li = g.edges[e][1]
+            link = None
+            if li < B.n_primary:
+                # an M1b road that stops short of the road ahead runs on to it as a street
+                # (not a traced road, nor one leaving the map)
+                if "pinned" in B.lines[li].primary["attrs"] or                         B.canvas.exterior.distance(Point(p)) < 1.0:
+                    continue
+                nd = _district_at(B, p)
+                sec = cross_section("street", B.arch.get(nd) if nd else None)
+                link = Line([p], "street", sec["total_width_m"], "end_link", nd, section=sec)
+            if e in touched or (link is None and _held(B, g.edges[e][0])):
+                continue      # (a held road is not run on; a link leaves it as it is)
+            r = _run_on(B, g, e, at_end, link)
             if r is None:
                 continue
             q, k, at_q = r
             if at_q & touched:
                 continue
             pts, li = edges[e]
-            edges[e] = (_dedupe(list(pts) + [q] if at_end else [q] + list(pts)), li)
+            if link is not None:
+                link.pts = [p, q]
+                edges.append(([p, q], B.add(link)))
+            else:
+                edges[e] = (_dedupe(list(pts) + [q] if at_end else [q] + list(pts)), li)
             touched.add(e)
             touched |= at_q
             if k is not None:
@@ -3643,8 +3672,7 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
         if touched:
             edges = _merge_and_trim(B, edges)
             # (a road run on may meet others too sharply, or run alongside one)
-            if rnd < 6:
-                edges, _ = fix_angles(B, edges)
+            edges, _ = fix_angles(B, edges)
             edges, _ = fix_duplicates(B, edges)
             continue
         tags = {}

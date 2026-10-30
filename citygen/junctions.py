@@ -35,7 +35,9 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import shapely
+import shapely.ops
 from shapely.geometry import LineString, Point, Polygon
 
 from . import decks as DK
@@ -354,22 +356,33 @@ SHARED_M2 = 5.0     # M17: two primary roads' leftover overlap this big joins a 
 
 
 def absorb_shared(net, junctions: list[dict]) -> None:
-    """M17: where two primary roads at one level still share pavement past their junctions
-    (a fork that runs on past the next junction of one of them), the overlap joins the
-    junction polygon it runs out of (the part that touches it); one that touches no junction
+    """M17: where two roads at one level still share pavement past their junction polygon
+    (a fork that runs on past the next junction of one of them, two legs of a hairpin), the
+    overlap joins the junction polygon it runs out of (the part that touches it): any two
+    primary roads, and any two roads at a node they share. One that touches no junction
     stays (the check `road_overlaps` reports it)."""
-    segs = [x for x in net.segments if x["road_class"] in ("highway", "avenue")]
+    segs = net.segments
     if len(segs) < 2 or not junctions:
         return
     lines = [LineString(x["centerline"]) for x in segs]
-    rows = [G.qpoly(ln.buffer(x["width_m"] / 2, cap_style="flat", join_style="mitre",
-                              mitre_limit=2.0)) for x, ln in zip(segs, lines)]
+    rows = np.array([G.qpoly(ln.buffer(x["width_m"] / 2, cap_style="flat", join_style="mitre",
+                                       mitre_limit=2.0)) for x, ln in zip(segs, lines)],
+                    dtype=object)
+    prim = np.array([x["road_class"] in ("highway", "avenue") for x in segs], dtype=bool)
     jp = [j["polygon"] for j in junctions]
+    at_node = {j["node_id"]: k for k, j in enumerate(junctions)}
     jtree = shapely.STRtree(jp)
     a, b = ST._pairs(shapely.STRtree(rows).query(rows, predicate="intersects"))
-    for i, k in zip(a.tolist(), b.tolist()):
-        if k <= i:
-            continue
+    shared = [sorted({segs[i]["start"], segs[i]["end"]} & {segs[k]["start"], segs[k]["end"]})
+              for i, k in zip(a.tolist(), b.tolist())]
+    keep = (a < b) & (prim[a] & prim[b] | np.array([bool(x) for x in shared], dtype=bool))
+    # (a first pass in floating point: past the junction polygon at the node they share)
+    jn = np.array([jp[at_node[x[0]]] if x and x[0] in at_node else Polygon() for x in shared],
+                  dtype=object)
+    ov = shapely.intersection(rows[a], rows[b])
+    keep &= shapely.area(shapely.difference(ov, jn)) > SHARED_M2
+    for i, k, sh in zip(a[keep].tolist(), b[keep].tolist(),
+                        [x for x, y in zip(shared, keep) if y]):
         ov = G.inter(rows[i], rows[k])
         if G.area1(ov) <= SHARED_M2:
             continue
@@ -386,10 +399,16 @@ def absorb_shared(net, junctions: list[dict]) -> None:
             if abs(za - zb) >= 4.0:
                 continue
             touch = [x for x in near if jp[x].distance(part) <= 0.05]
+            if not touch and sh and sh[0] in at_node:
+                touch = [at_node[sh[0]]]     # (the junction of the node they share)
             if not touch:
                 continue
             x = min(touch, key=lambda x: (jp[x].distance(part), junctions[x]["id"]))
-            u = G.union([jp[x], G.qpoly(part.buffer(0.05, join_style="mitre"))])
+            # (bridged to it where a sliver starts a few meters out)
+            q = shapely.ops.nearest_points(jp[x], part)[0]
+            hull = shapely.convex_hull(shapely.MultiPoint(
+                list(shapely.get_coordinates(part)) + [(q.x, q.y)]))
+            u = G.union([jp[x], G.qpoly(hull.buffer(0.05, join_style="mitre"))])
             ps = G.parts(u)
             jp[x] = junctions[x]["polygon"] = u if len(ps) <= 1 else max(
                 ps, key=lambda q: (G.area1(q), G.qbounds(q)))

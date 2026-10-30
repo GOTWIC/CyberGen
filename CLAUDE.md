@@ -730,16 +730,21 @@ M17 (road network repair, from the first run-through) is in place:
   for paths, turning at most 35 degrees, at the district's junction angle; on land, off closed
   ground, crossing nothing but under a deck high enough: `under_deck(..., cls)`, a path under
   4.5 m, `PATH_UNDER_CLEAR_M`, which `node_lines` also lets pass under), or joins a dead end
-  facing it (30 m); else it stays as what it is, `RoadNode.attrs.dead_end` (`DEAD_END_KINDS`:
-  `map_edge`, `water_end`, `park_gate`, `plaza_gate`, `site_gate` within `GATE_M` 8 m past its
-  half width, 30 m for a primary road; `path_end` on a path; `cul_de_sac` with a turning bulb
+  facing it (30 m); an M1b road's dead end runs on the same way as a short street
+  (`end_link`); else it stays as what it is, `RoadNode.attrs.dead_end` (`DEAD_END_KINDS`:
+  `map_edge`, `water_end`, `park_gate`, `plaza_gate` within `GATE_M` 8 m past its half width,
+  30 m for a primary road; `site_gate` within `SITE_GATE_M` 40 m of a megasite reserve, the
+  road `megasite_access` asks for; `path_end` on a path; `cul_de_sac` with a turning bulb
   that fits, `attrs.turning_head_m`, street 12, service 10, alley 8 m, a primary road's half
-  width and 4 m; `deck_end` on M14's deck spokes), else its street goes back to its last
-  junction (a vehicle road under `CUL_DE_SAC_MIN_M` 40 m from it, or with no room for a bulb).
+  width and 4 m; `deck_end` on M14's deck spokes; `traced_end` on a traced road, as drawn),
+  else its street goes back to its last junction (a vehicle road under `CUL_DE_SAC_MIN_M`
+  40 m from it, or with no room for a bulb). A run-on meets the roads at its junction at the
+  district angle there, legs measured 10 m out as `fix_angles` and `junction_angles` do.
   A dead end reaching into another road's right of way is cut back clear of it (`_poke`; a
   primary road's dead end cuts the local road it reaches into, `_poked`); a local road laid
   along another (rights of way overlapping by `OVERLAP_M2` away from the nodes they share,
-  `_reach`) goes (`_overlaps`); `fix_angles` runs again after the run-ons, and
+  `_reach`) goes (`_overlaps`, never one whose loss parts the vehicle network, `_splits`);
+  `fix_angles` and `fix_duplicates` run again after each round of run-ons, and
   `pedestrianize_islands` after the repair (a cut-back can leave a lane island). A cut-back
   never takes a primary road (`_chain` stops at one); M1b is as it was (the sweep showed
   that changing its forks and lenses moves every city's road search). `junctions.build`
@@ -751,8 +756,10 @@ M17 (road network repair, from the first run-through) is in place:
   meet at an angle is a `bend` junction (`Junction.shape`, `bend_polygon`); where rights of way
   still overlap past the cuts (a fork, a crossing at a small angle, a corner with no room for
   its fillet), the junction polygon takes the shared pavement (`shared_pavement`); two
-  primary roads still sharing pavement past it (a fork that runs on past the next junction
-  of one of them) give the overlap to the junction it touches (`absorb_shared`).
+  primary roads, or two roads at a node they share (a hairpin), still sharing pavement past
+  it give the overlap to the junction it touches or their node's (`absorb_shared`). M13's
+  grading still holds a junction's height at most 0.45 of a leg out (`Local.cuts`; M18
+  levels junctions).
 - **Checks** (`network_checks.py`, 4 more): `road_dead_ends` (every dead end tagged, the tag
   true of where it is, a cul-de-sac with its bulb) and `road_overlaps` (rights of way of two
   roads within 4 m in height overlapping more than 25 m2 outside every junction polygon, the
@@ -762,7 +769,8 @@ M17 (road network repair, from the first run-through) is in place:
   upper deck) and `road_building_clash` (no road right of way over a building mass at its own
   height, 5 m of headroom) after the building checks. Heights over the ground on a terrain
   city; M10's regeneration runs them through `check_all`; a held road is never extended, cut
-  or dropped (`_held`), a new street meets an old road only at its nodes.
+  or dropped (`_held`), a new street meets an old road only at its nodes (a facing join onto a
+  held road's end at an old node is one).
 Sample builds, the run-through's measures before and after: `docs/progress/M17/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
