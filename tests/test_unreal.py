@@ -1289,3 +1289,51 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     assert again["actor_digest"] == second["actor_digest"]
     for d in (proj.parent, build):
         shutil.rmtree(d, ignore_errors=True)
+
+
+def test_stage2_takes_assetgen_decks(tmp_path):
+    """AG10: M14's deck pieces over the blockout of a city with a deck. Every slab object
+    (`<deck>.slab.<tile>`, an entry of that key), joined column object, stair and elevator
+    the blockout draws is replaced; the slab's actors stand on the deck's level
+    (`cg.level=1`), the columns, stairs and elevators on the ground; the deck's streets keep
+    level 1 from the joined deck objects they replace; the manifest's `decks` still name the
+    slab actors by key; the walkways beside a ramp are put on it in `graphs.walkways`."""
+    from assetgen.streets import build as SB
+
+    data = copy.deepcopy(SMALL)
+    for x in data["districts"]:
+        if x["name"] == "Core":
+            x["decks"] = {}
+    res = validate_spec(data)
+    assert res.ok, res.issues
+    m = build_city(res).model
+    build = _blockout_files(m, tmp_path / "build")
+    (build / "city_model.json").write_text(m.to_json() + "\n", encoding="utf-8")
+    rep = SB.build(m, "x" * 64, build / "assets", None, workers=1)
+    assert rep["ok"], [c for c in rep["checks"] if not c["ok"]]
+    man = U.build_manifest(build)[0]
+    s2 = man["stage2"]
+    objs = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    deck_objs = {k for k, o in objs.items() if o["category"] in (
+        "deck_slab", "deck_column", "deck_stair", "deck_elevator", "deck_road",
+        "deck_junction", "deck_sidewalk", "deck_ramp")}
+    assert deck_objs and deck_objs <= set(s2["replaced"])
+    assert s2["counts"]["replaces_missing"] == 0
+    actors = {a["key"]: a for a in s2["actors"]}
+    slabs = [k for k, o in objs.items() if o["category"] == "deck_slab"]
+    assert slabs and all(actors[k]["level"] == 1 for k in slabs)
+    assert {k for d in man["decks"] for k in d["keys"]} == set(slabs)
+    con = json.loads((build / "assets" / "unreal_contribution.streets.json").read_text())
+    for e in con["entries"]:
+        a = actors.get(e["key"])
+        if a is None:
+            continue
+        if e["kind"] in ("street.deck.column", "street.deck.stair", "street.deck.elevator"):
+            assert "level" not in a
+        if e["key"].startswith("l1."):
+            assert a["level"] == 1          # (a deck's street, its joined object's level)
+    ramps = [s.id for s in m.road_segments if s.attrs.get("role") == "deck_ramp"]
+    walks = con["graphs"]["walkways"]
+    for w in m.walkways:
+        if w.attrs.get("ramp") in ramps:
+            assert max(p[2] for p in walks[w.id]) >= m.decks[0].top_m

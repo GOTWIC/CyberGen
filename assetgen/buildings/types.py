@@ -47,6 +47,7 @@ from citygen import dmath as M
 
 from ..triangulate import area2
 from . import articulate as AR
+from . import decks as DK
 from . import genome as GN
 from . import parts as PT
 from . import rings as RG
@@ -355,6 +356,9 @@ def shanty_post(sb) -> None:
             spots = _free_roof(sb, ms, 900, 900, u[0], u[1], 300, 800, taken)
             if spots:
                 x, y = spots[int(_u(key, f"barrel.at{ms['k']}") * len(spots)) % len(spots)]
+                ceil = DK.ceiling_mm(sb.br)
+                if ceil is not None and ms["z1"] + 1100 > ceil - DK.CEIL_GAP_M * 1000:
+                    continue        # (AG10: no room under an M14 deck's soffit)
                 RF._place(sb, "water_tank", {"r": 400, "h": 1000, "style": "panel"}, x, y,
                           ms["z1"], u[0], u[1])
                 taken.append(RF._bbox(x, y, u[0], u[1], 1400, 1400))

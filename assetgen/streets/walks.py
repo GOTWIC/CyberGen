@@ -284,8 +284,36 @@ def gather_junction(cx: Ctx, j) -> Piece:
     inputs = {"junction": dump(j), "node": list(node.position) if node else [*cxy, 0.0],
               "node_ground": getattr(node, "ground_m", None) or 0.0,
               "legs": legs, "style": cx.style(did), "origin": list(cxy)}
+    if j.level:
+        # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
+        # ramp's top) a slab of its own carries it
+        inputs["off_deck"] = _off_deck(cx, j)
     return Piece(j.id, "street.junction", "junction", cx.tile_for(j.id, ext),
                  cx.keys.get(j.id, []), inputs)
+
+
+def _off_deck(cx: Ctx, j) -> list:
+    """The parts of a deck's junction outside its deck's slab (over 0.5 m2), as rings."""
+    from citygen import geom as G
+
+    from .decks import _rings, deck_of
+    dk = None
+    for s in cx.seg_at_node.get(j.node_id, ()):
+        did = s.attrs.get("deck")
+        if did:
+            dk = next((d for d in cx.m.decks if d.id == did), None)
+            break
+    if dk is None:
+        return []
+    D = deck_of(cx, dk)
+    with G.canonical():
+        rest = G.diff(G.from_model_poly(j.polygon), D.poly)
+        out = []
+        for p in G.parts(rest):
+            if G.area1(p) >= 0.5:
+                e, hs = _rings(p)
+                out.append([[list(q) for q in e], [[list(q) for q in h] for h in hs]])
+    return out
 
 
 def _valid_parts(ring, holes) -> list:
@@ -471,7 +499,11 @@ def make_junction(inp: dict) -> Out:
         ok = any([mesh.poly(slot, r, hs, zfun=zfun) for r, hs in _valid_parts(ring, holes)])
     if not ok:
         return Out(empty="untriangulable polygon")
-    if zn - inp["node_ground"] - ROAD_DZ > 0.5:
+    if j.get("level"):
+        for r_, hs_ in inp.get("off_deck", ()):
+            mesh.prism("concrete.deck", ccw(r_), zn - ROAD_DZ - 1.2, zn - ROAD_DZ - 0.01,
+                       top=False, bottom=True, holes=[ccw(h)[::-1] for h in hs_])
+    elif zn - inp["node_ground"] - ROAD_DZ > 0.5:
         D = max(DECK_D.get(r["cls"], 1.2) for r in legs) if legs else 1.2
         mesh.prism("concrete.deck", ring, zn - ROAD_DZ - D, zn - ROAD_DZ - 0.01, top=False,
                    bottom=True)

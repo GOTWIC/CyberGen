@@ -41,15 +41,15 @@ CITY_TRIANGLE_BUDGET = 20_000_000
 # collections whose every entity is a street element (scope 5.3), and those covered through
 # other pieces
 COVERED = ("road_segments", "junctions", "crosswalks", "sidewalks", "bridges", "structures",
-           "tunnels", "quays", "waterways", "site_elements")
+           "tunnels", "quays", "waterways", "site_elements", "decks")
 
 
 def _import_makers():
-    from . import roads, sites, structures, transit, walks, water  # noqa: F401
+    from . import decks, roads, sites, structures, transit, walks, water  # noqa: F401
 
 
 def gather(cx: Ctx) -> list[PC.Piece]:
-    from . import roads, sites, structures, transit, walks, water
+    from . import decks, roads, sites, structures, transit, walks, water
     m = cx.m
     out: list[PC.Piece] = []
     for s in m.road_segments:
@@ -63,6 +63,8 @@ def gather(cx: Ctx) -> list[PC.Piece]:
     for b in m.bridges:
         out.append(structures.gather_bridge(cx, b))
     for st in m.structures:
+        if decks.is_deck_structure(st):
+            continue                    # (M14: with their deck, below)
         mk = transit.maker_for(st)
         if mk == "column":
             out.append(structures.gather_column(cx, st))
@@ -82,6 +84,7 @@ def gather(cx: Ctx) -> list[PC.Piece]:
         out.append(water.gather_canal(cx, w))
     for e in m.site_elements:
         out.append(sites.gather_site(cx, e))
+    out += decks.gather(cx)             # AG10: slabs, columns, stairs and elevators of M14
     return out
 
 

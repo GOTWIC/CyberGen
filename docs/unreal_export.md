@@ -481,6 +481,42 @@ the exporter:
   (`HERO_CODE`: grime darkens, leaks stain, wear lightens); `STAGE2_VERSION` 6 rebuilds
   them. Tested without Unreal by `test_stage2_heroes_and_plinths`.
 
+### From AG10: layered districts
+
+`assetgen build` (AG10) gives M14's decks their assets. On a city without decks no entry,
+key or byte of any contribution changes. On a city with decks:
+
+- **Deck pieces** in `unreal_contribution.streets.json` (kinds `street.deck.slab`,
+  `street.deck.column`, `street.deck.stair`, `street.deck.elevator`; meshes in the street
+  packs, complex collision, Nanite):
+  - **Slabs**: one entry per deck and tile keyed by the blockout's own slab object
+    (`<deck>.slab.<tile>`, its `replaces` that key). So the slab actor keeps its key and
+    the manifest's `decks` still name it.
+  - **Columns**: one entry per column by its id, replacing the joined
+    `<district>.deck_column.<tile>`.
+  - **Stairs and elevators**: one entry each by id, replacing the blockout object of that
+    name.
+  - **The rest of the deck**: the deck's streets, junctions and sidewalks lie on the slab
+    (no viaduct girder or parapet under them) and replace the joined `deck_road`,
+    `deck_junction` and `deck_sidewalk` objects as before. A ramp's entry (`<segment>`)
+    replaces `<segment>.ramp`, now a solid ramp with a walkway on each side.
+- **Levels**: an entry takes the level of the blockout actor it takes the place of (as
+  every stage 2 entry does), so the slabs, the deck's streets and ramps keep `cg.level=1`
+  and the columns, stairs and elevators stand on the ground. Buildings on a deck carry
+  `level` 1 in their entries (AG3).
+- **Graphs**: `graphs.walkways` adds the walkways beside each ramp, put on the ramp's
+  walkway decks (z over the ground, as the model's).
+- **Buildings**: no new field. The undercity buildings' tops meet the soffit, and the
+  buildings on a deck stand on its top (the shells, `asset_decks`); their entries are as
+  before.
+
+**What the exporter does with them**: no code change. `stage2` drops every deck object a
+deck entry names, and each deck actor's level comes from the replaced object's category
+(`DECK_LEVEL`). Tested without Unreal by `test_stage2_takes_assetgen_decks`: the small city
+with a deck, its street stage over its blockout, every deck object replaced, the slab
+actors on level 1 and the manifest's `decks` naming them, the columns, stairs and
+elevators on the ground, the ramp walkways on their ramp.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -767,3 +803,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG3 and AG4 Unreal check | A shell node with no triangles in its pack (a one-floor building its street front takes whole; the entry's `triangles` counts the front's too) makes no mesh and no actor but still takes the blockout building's place (`glb_triangles`; the empty mesh Unreal refused, "Bad MeshDescription", failed Vesper Bay's HLOD build); the check's streaming wait lists the city's actors once the streaming query says done and then every 2 s, for up to 180 s (`settle`, `COUNT_EVERY_S`, `LOAD_WAIT_S`; listed every frame, 45,000 of them took Vesper Bay's game thread 6.5 s a frame and the far spots never streamed in: the 157 and 169 of 507 traces of the AG2 and AG6 check); roofs and facades traced on shells, not part instancers or fronts; each editor shot rendered once small first (a first render of a new view drew coarse Nanite clusters as flat triangles over the walls); the walk's and flight's frame times in the result; `PRUNE_FILES` 50 (a first import's unused variants by their files); tests `test_stage2_empty_shell`, `test_check_frame_times_and_warm_shots` | Greyhook (40,049 actors, 1,142 s, HLODs 192 s) and Vesper Bay (67,904 actors, 3,524 s; HLODs 167 s) imported into a new project, imported again (Vesper Bay: the empty shell's actor gone, then nothing changed), read back, traced and checked: 507 of 507 traces down in both, 36 of 36 roofs and facades in Vesper Bay, 130 and 253 m walked; Vesper Bay with #54's fixes walks at 0.019 s a frame (median; 0.079 s at 95%), no usage flag warning, its part and roof instancers `NoCollision`, free memory down to 11%; holo-ads show their page by night (`docs/progress/AG4/unreal/`) |
 | AG5 | Heroes, types and slopes: a hero's entry carries `hero` (kind, accent) and its own materials (`<slot>#<id>`: the U2 mask `city.hero.<id>` as `HeroMask` with `HeroMaskOn` 1 on the textured opaque masters, its accent on its lights), its shell's UV1 the hero UV; an entry's `hero` and `plinth_m` reach its actor (in its hash), tagged `cg.hero=` and `cg.plinth=`, `stage2.counts.heroes`; the textured masters sample `HeroMask` on UV1 (`STAGE2_VERSION` 6); the buildings' hulls notched at skybridge landing doors; test without Unreal (`test_stage2_heroes_and_plinths`) | In the AG5 Unreal check (below; `docs/progress/AG5/unreal/`): Cragmouth and Greyhook imported and imported again (nothing changed); the megatower and the wheel tagged `cg.hero=`, two UV channels, `HeroMask` (`T_city_hero_<id>`) with `HeroMaskOn` 1 on 14 of 20 and 4 of 5 slots, every master at 6, no other building with it on; 119 Cragmouth buildings tagged `cg.plinth=`, their plinths at the terrain at 732 of 976 corners, buried uphill at 210, floating over a lower street at 30; landing doors open 2.5 m in (332 of 340 in Greyhook) |
 | AG5 Unreal check | The check's shots stay under Nanite's root pages: they load every actor but the HLODs, or for a city with more than 42,000 meshes (the manifest's mesh of each actor key, `mesh_of`) the actors nearest its middle up to 42,000 meshes, one set for every view (`SHOT_MESHES`, `view_load`; all 75,155 of Cragmouth's actors stopped the editor on "Cannot allocate more root pages 49152/49152", and loaded per view it stopped at the fourth: an actor unloaded between views keeps its meshes'); in assetgen, an open shed collides only from its roof's underside (its hull blocked the walk under the roof; `GEN_VERSION` ag5.1, no exporter change); test `test_check_shots_stay_under_nanites_root_pages` | Greyhook checked with shots (31,379 of 40,099 actors streamed in at the start, 507 of 507 traces down, 36 of 36 roofs and facades, 130 m walked, 378 m flown; open sheds walked under at 40 of 40 sides); Cragmouth's four check views rendered, but play stops on the root pages before its first frame (its 63,700 Nanite meshes; with the HLODs off and a 700 m loading range as well), an open item for the exporter; slopes traced in the editor (doors behind M13's retaining walls, 325 of 710 within 0.2 m of the ground outside against Greyhook's 1,989 of 2,000), `docs/progress/AG5/unreal/` |
+| AG10 | Layered districts: no code change. M14's decks as street pieces in `unreal_contribution.streets.json` (kinds `street.deck.slab`, `.column`, `.stair`, `.elevator`): a slab entry per deck and tile keyed by the blockout's own slab object (`<deck>.slab.<tile>`, so the manifest's `decks` still name it), a column, stair and elevator entry each by id, replacing the joined `deck_column` objects and the flights and shafts; the deck's streets on the slab and its ramps solid with a walkway each side (`graphs.walkways`); an entry's level that of the actor it replaces (`DECK_LEVEL`), so slabs, deck streets and ramps keep `cg.level=1`; test without Unreal (`test_stage2_takes_assetgen_decks`) | Not run (the coordinating session's call; what to look for: `docs/progress/AG10/README.md`) |

@@ -153,6 +153,8 @@ STREET: dict[str, tuple[str, str | None]] = {
     "concrete.barrier": ("concrete", "concrete_formed"),
     "concrete.column": ("concrete", "concrete_formed"),
     "concrete.dark": ("concrete", "concrete_smooth"),
+    "concrete.soffit": ("concrete", "concrete_formed"),
+    "concrete.fascia": ("concrete", "concrete_smooth"), "stain": ("concrete", "concrete_smooth"),
     "stone.quay": ("concrete", "stone_blocks"), "stone.coping": ("concrete", "stone_dressed"),
     "stone.arch": ("concrete", "stone_blocks"), "tile.tunnel": ("concrete", "tile_glazed"),
     "steel": ("metal", "steel_mill"), "steel.painted": ("metal", "steel_painted"),

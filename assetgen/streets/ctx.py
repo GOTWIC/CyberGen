@@ -132,10 +132,15 @@ class Ctx:
         for w in m.sidewalks:
             self.walks_on[w.segment_id].append(w)
         self.walkways_of: dict[str, list] = defaultdict(list)
+        self.ramp_walks: dict[str, list] = defaultdict(list)
         for w in m.walkways:
             sw = w.attrs.get("sidewalk")
             if w.kind == "sidewalk" and sw:
                 self.walkways_of[sw].append(w)
+            if w.attrs.get("ramp"):
+                self.ramp_walks[w.attrs["ramp"]].append(w)      # (M14: beside a deck's ramp)
+        for v in self.ramp_walks.values():
+            v.sort(key=lambda w: w.id)
         self.doors_on: dict[str, list] = defaultdict(list)
         for b in m.buildings:
             for e in b.entrances:
@@ -248,6 +253,8 @@ def _blockout_keys(m: CityModel) -> tuple[dict[str, list[str]], dict[str, str]]:
         BO._open_space(P)
         BO._sites(P)
         BO._tunnels(P)
+        if getattr(m, "decks", None):
+            BO._decks(P)            # M14: slabs per tile, joined columns, stairs, elevators
         if getattr(m, "terrain", None) is not None and hasattr(BO, "_terrain"):
             BO._terrain(P)          # M13: the retaining walls (one object each since M15)
     keys: dict[str, list[str]] = defaultdict(list)

@@ -1050,6 +1050,41 @@ AG5 (types, landmarks and slopes) is in place (tests `tests/assetgen/test_ag_typ
 - **Art direction**: `assetgen review BUILD --spec S [--prev P]` (`review.md`), `assetgen
   spec diff A B`; rounds in the skill. Results: `docs/progress/AG5/`.
 
+AG10 (layered districts) is in place (tests `tests/assetgen/test_ag_decks.py`, the small city
+with a deck over Core, `agtools.deck_build`):
+- **Deck pieces** (`assetgen/streets/decks.py`, in AG7's stage; `ctx._blockout_keys` runs the
+  blockout's `_decks`): the slab per deck and tile keyed by the blockout's own object
+  (`<deck>.slab.<tile>`; holes under 2 m2 filled, `slab_of`), with a coffered (planned eras)
+  or ribbed soffit stopping round the undercity buildings, a fascia with upstand and drip
+  edge on its real edges only, grime streaks and a stained soffit band, a rail (glass in the
+  wealthy eras; none at a building on the deck, a ramp or its junction, a stair or
+  elevator landing), soffit lights in two rows every 8 m over the ground streets, a
+  colonnade (edge beam, columns every 7.5 m off the paths) over parks and plazas, a collar
+  round a building it is cut round (`through`); columns (pier cap, shaft, capital, drop
+  panel; the shaft alone in an undercity building), switchback stairs and elevators (doors
+  at both levels, a landing or bridge to the slab's edge), each replacing its blockout
+  object. On M13's terrain the slab is measured from the ground the deck stands on
+  (`decks.Ref`: flat where level, else 8 m cells over the ground or the bases of the
+  buildings on and under it).
+- **Deck streets** (`roads.deck_kind`: `slab`, `ramp`): on the slab, no girder; a ramp solid
+  with a walkway and parapet on each side (its walkways in `graphs.walkways`); a deck
+  junction's own slab only past the deck (`walks._off_deck`).
+- **Buildings** (`assetgen/buildings/decks.py`): the brief's `deck` record (role `on`,
+  `under`, `near`, `through`; top, soffit and the slab's plan near it; only on such
+  buildings, so other briefs and packs keep their bytes). Under a slab: a roof within
+  1.2 m closed up to it by a louvered plenum band, parapets 0.3 m under it, no roof form,
+  roof equipment, type features, masts, ducts and barrels kept under it (`roofs.Clear`'s
+  ceiling), grime and lit ratio raised (`genome`).
+- **Checks**, on a city with decks only: `street_decks` (pieces, 5.5 m over the ground
+  streets, stairs and elevators reach both levels) and `asset_decks` (nothing of a building
+  inside the slab where its role forbids, deck doors on deck walkways, no roof items under
+  a slab). `asset_access` lets a door's path graze its own wall (`GRAZE_M`).
+- **Previews**: `assetgen materials preview --views deck` (the section across the biggest
+  deck, its near clip on the cut).
+- **Exporter**: no code change (each deck piece takes its level from the blockout object
+  it replaces); `docs/unreal_export.md`, "From AG10"; `test_stage2_takes_assetgen_decks`.
+  Results: `docs/progress/AG10/`.
+
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
 and `props` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one

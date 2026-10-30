@@ -293,6 +293,9 @@ def _walk_index(model):
     return out
 
 
+GRAZE_M = 0.02          # a path this near its own building's wall does not cross it
+
+
 def access(model, records: dict, briefs: dict | None = None) -> dict:
     """A door at every entrance and every unit's entrance (the shells' `doors` checks), each
     open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
@@ -335,11 +338,20 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             if fids[i] != bid:
                 return False
             # its own building only near the door (an arcade, a recess; AG5: a colonnade's
-            # depth more behind one)
+            # depth more behind one); a path that only grazes its own wall (along it, round
+            # its corner: AG10, a door on a wall at the map's edge) is not walled off
             far = seg.difference(Point(x, y).buffer(OWN_M + under, 8))
-            if not far.is_empty and far.intersects(feet[own[bid]]):
+            if not far.is_empty and far.intersects(inner(bid)):
                 return False
         return True
+
+    shrunk: dict = {}
+
+    def inner(bid):
+        if bid not in shrunk:
+            with G.canonical():
+                shrunk[bid] = feet[own[bid]].buffer(-GRAZE_M, join_style="mitre")
+        return shrunk[bid]
 
     for bid in sorted(records):
         r = records[bid]
@@ -644,3 +656,42 @@ def slopes(records: dict) -> dict:
                 first.append(f"{k}: the ground {r['grade_low_m']} m under its base, no step")
     return {"name": "asset_slopes", "ok": flat == 0, "buildings": n, "falling": stepped,
             "unstepped": flat, **tot, "first": first}
+
+
+def decks(model, records: dict) -> dict:
+    """AG10 (a city with M14 decks only): nothing of a building where its deck's slab is
+    (`buildings/decks.check`: on a deck, nothing under its top; under one, nothing over its
+    soffit; beside or in one, nothing inside it); every building on a deck stands on it
+    (its masses from the deck's top), its doors on the deck's walkways; every undercity
+    building's roof under the soffit without roof equipment or green roofs."""
+    up = {w.id for w in model.walkways if w.level}
+    by_role: dict[str, int] = {}
+    bad, first = 0, []
+    doors = on_deck = 0
+    plenums = under_items = 0
+    for k in sorted(records):
+        r = records[k]
+        d = r.get("deck")
+        if not d:
+            continue
+        by_role[d["role"]] = by_role.get(d["role"], 0) + 1
+        c = r["checks"].get("deck") or {}
+        if not c.get("ok", True):
+            bad += 1
+            if len(first) < 5:
+                first.append(f"{k} ({d['role']}): {c['inside']} vertices in the slab, "
+                             f"first at {c.get('first')}")
+        if d["role"] == "on":
+            for dr in r.get("doors") or []:
+                doors += 1
+                on_deck += dr.get("walkway_id") in up
+        elif d["role"] == "under":
+            plenums += r["stats"].get("plenums", 0)
+            under_items += len(r.get("roof_items") or []) + len(r.get("green") or [])
+    if under_items:
+        bad += 1
+        first.append(f"{under_items} roof items or green roofs under a deck")
+    return {"name": "asset_decks", "ok": bad == 0, "decks": len(model.decks),
+            "buildings": by_role, "failures": bad, "doors_on_decks": doors,
+            "doors_to_deck_walkways": on_deck, "plenums": plenums,
+            "under_roof_items": under_items, "first": first}

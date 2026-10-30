@@ -324,6 +324,15 @@ def make(brief: dict) -> dict:
              "lit": draw(bid, "lit", 0.7, 1.3, 0.01, salt) * LIT_BY_USE.get(b["use"], 0.4),
              "seed": quant(u(bid, "seed", salt), SY.STEP["seed"])}
     extra["lit"] = quant(min(extra["lit"], 1.0), SY.STEP["lit"])
+    if (brief.get("deck") or {}).get("role") == "under":
+        # AG10: under an M14 deck, a covered street's grime from the ground up to the soffit,
+        # its fronts and windows lit day and night
+        cont["wear"] = draw(bid, "wear.deck", min(max(cont["wear"], 0.7), 0.95), 1.0,
+                            SY.STEP["wear"], salt)
+        h = float(b["height_m"])
+        cont["dirt_m"] = draw(bid, "dirt_m.deck", 0.8 * h, h + 1.0, SY.STEP["dirt_m"], salt)
+        extra["lit"] = quant(max(extra["lit"], draw(bid, "lit.deck", 0.75, 1.0, 0.01, salt)),
+                             SY.STEP["lit"])
     for name, val in sorted((ov.get("style") or {}).items()):
         if name in genes:
             genes[name] = val
