@@ -1,7 +1,8 @@
 # First run-through (2026-10-29)
 
 Swagnik's first walk and flight through a whole city in Unreal: Delta Megacity built from
-scratch (`citygen build --blockout`, `assetgen build`) and imported with its stage 2 assets.
+scratch (`citygen build --blockout`, `assetgen build`) and imported with its stage 2 assets
+(AG1 to AG3 and AG6 to AG8: AG2's 1.2 million part instances included; AG4 came after).
 The issues probably show in every city. Each one below has what the code does today, what
 Delta's `city_model.json` measures, and the milestone that fixes it (citygen scope section
 12, assetgen scope section 14).
@@ -23,7 +24,7 @@ Delta's `city_model.json` measures, and the milestone that fixes it (citygen sco
 |---|---|---|
 | Overlapping bridges | None of Delta's 32 bridges (15 road, 17 pedestrian) overlaps another in plan in the model, so the overlap is in the meshes (likely a bridge drawn twice, by its bridge piece and its road's deck) | M17 (check), AG14 |
 | Floating railings by the river | The model stands quay railings on the quay deck (`deck_z_m` 1.5 m); AG7 paves the quay at the ground, so they float 1.5 m | M20, AG14 |
-| AC units floating over roofs | The model's roof items sit on their masses' roofs (6 of 16,114 do not), so the gap is in AG4's roof meshes (roof forms, finishes or equipment bases) | AG14 |
+| AC units floating over roofs | The model's roof items sit on their masses' roofs (6 of 16,114 do not). The run-through's build predates AG4, so its roof equipment was AG1's placeholder blocks; look again with AG4's equipment, seated on its roof forms | AG14 |
 | Sky tubes and trains through buildings and platforms | Only sky tubes pass through masses (22 tube pieces, all through towers with a declared M5 portal); in the run-through they read as tubes through buildings | M19, AG14 |
 | Supports not under the line | `transit._column_spots` moves a support to the median or the curbs of the road under it. The monorail puts its one column at a curb: 53 of its 94 columns stand more than 2 m off the beam (up to 13.5 m); sky tube pylons up to 13 m off | M19 |
 | Uneven support spacing, long gaps over water | Supports every 25 to 69 m (median), skipped wherever no spot within 12 m is free, never in water: gaps up to 971 m (sky tube), 531 m (monorail), 270 m (maglev). Sky tubes should have 6 to 8 times fewer pylons, evenly spaced | M19 |
