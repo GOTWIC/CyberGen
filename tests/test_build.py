@@ -73,11 +73,11 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M17/<city>/report.json is committed, passes and matches a fresh
+    """docs/progress/M16/<city>/report.json is committed, passes and matches a fresh
     build."""
     for path in CITIES:
         slug = path.parent.name
-        folder = ROOT / "docs" / "progress" / "M17" / slug
+        folder = ROOT / "docs" / "progress" / "M16" / slug
         committed = folder / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
@@ -153,7 +153,9 @@ def test_small_city_passes(small_built):
                    "ground_grades", "cut_fill", "retaining_walls", "building_seats",
                    "water_levels",
                    # M17
-                   "road_dead_ends", "road_overlaps", "bridge_clash", "road_building_clash"}
+                   "road_dead_ends", "road_overlaps", "bridge_clash", "road_building_clash",
+                   # M16
+                   "water_beds", "water_banks", "ground_cover"}
 
 
 def test_check_geometry_invalid(small_built):

@@ -73,7 +73,8 @@ def test_rich_city_passes(rich):
     failed = [f for c in rich.checks for f in c.failures]
     assert not failed, failed
     assert M3_CHECKS <= {c.id for c in rich.checks}
-    assert len(rich.checks) == 79  # 44 to M3, 6 M6, 5 M7, 4 M9, 9 M11, 2 M12, 5 M13, 4 M17
+    assert len(rich.checks) == 82  # 44 to M3, 6 M6, 5 M7, 4 M9, 9 M11, 2 M12, 5 M13, 4 M17,
+    #                                3 M16
     # (no transit)
 
 

@@ -257,7 +257,15 @@ def check_cover(m) -> Check:
 
 
 def run(spec, m) -> list:
-    return [check_beds(m), check_banks(m), check_cover(m)]
+    out = []
+    for fn, cid in ((check_beds, "water_beds"), (check_banks, "water_banks"),
+                    (check_cover, "ground_cover")):
+        try:
+            out.append(fn(m))
+        except shapely.errors.GEOSException as e:
+            # (invalid geometry, which `geometry_valid` reports: nothing to measure on)
+            out.append(Check(cid, "M16 (not measured)", [f"invalid geometry: {e}"]))
+    return out
 
 
 def stats(m) -> dict:
