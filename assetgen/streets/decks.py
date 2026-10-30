@@ -547,10 +547,10 @@ def _ground_streets(cx: Ctx, D: _Deck) -> tuple[list, list]:
         if not ln.intersects(D.poly):
             continue
         with G.canonical():
-            part = G.inter(ln, inner)
-        for g in getattr(part, "geoms", [part]):
-            if g.is_empty or g.geom_type != "LineString" or g.length < 4.0:
-                continue
+            part = G.line_inter(ln, inner)
+        gs = [g for g in getattr(part, "geoms", [part]) if not g.is_empty and
+              g.geom_type == "LineString" and g.length >= 4.0]
+        for g in sorted(gs, key=lambda g: g.coords[0]):
             h = s.width_m / 2.0 - s.cross_section.sidewalk_m[0]
             lines.append([[[C.m2(x), C.m2(y)] for x, y in g.coords], C.m2(max(h, 1.5)), s.id])
     lines.sort(key=lambda r: (r[2], r[0][0]))

@@ -472,6 +472,42 @@ the exporter:
   (`HERO_CODE`: grime darkens, leaks stain, wear lightens); `STAGE2_VERSION` 6 rebuilds
   them. Tested without Unreal by `test_stage2_heroes_and_plinths`.
 
+### From AG10: layered districts
+
+`assetgen build` (AG10) gives M14's decks their assets. On a city without decks no entry,
+key or byte of any contribution changes. On a city with decks:
+
+- **Deck pieces** in `unreal_contribution.streets.json` (kinds `street.deck.slab`,
+  `street.deck.column`, `street.deck.stair`, `street.deck.elevator`; meshes in the street
+  packs, complex collision, Nanite):
+  - **Slabs**: one entry per deck and tile keyed by the blockout's own slab object
+    (`<deck>.slab.<tile>`, its `replaces` that key). So the slab actor keeps its key and
+    the manifest's `decks` still name it.
+  - **Columns**: one entry per column by its id, replacing the joined
+    `<district>.deck_column.<tile>`.
+  - **Stairs and elevators**: one entry each by id, replacing the blockout object of that
+    name.
+  - **The rest of the deck**: the deck's streets, junctions and sidewalks lie on the slab
+    (no viaduct girder or parapet under them) and replace the joined `deck_road`,
+    `deck_junction` and `deck_sidewalk` objects as before. A ramp's entry (`<segment>`)
+    replaces `<segment>.ramp`, now a solid ramp with a walkway on each side.
+- **Levels**: an entry takes the level of the blockout actor it takes the place of (as
+  every stage 2 entry does), so the slabs, the deck's streets and ramps keep `cg.level=1`
+  and the columns, stairs and elevators stand on the ground. Buildings on a deck carry
+  `level` 1 in their entries (AG3).
+- **Graphs**: `graphs.walkways` adds the walkways beside each ramp, put on the ramp's
+  walkway decks (z over the ground, as the model's).
+- **Buildings**: no new field. The undercity buildings' tops meet the soffit, and the
+  buildings on a deck stand on its top (the shells, `asset_decks`); their entries are as
+  before.
+
+**What the exporter does with them**: no code change. `stage2` drops every deck object a
+deck entry names, and each deck actor's level comes from the replaced object's category
+(`DECK_LEVEL`). Tested without Unreal by `test_stage2_takes_assetgen_decks`: the small city
+with a deck, its street stage over its blockout, every deck object replaced, the slab
+actors on level 1 and the manifest's `decks` naming them, the columns, stairs and
+elevators on the ground, the ramp walkways on their ramp.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its

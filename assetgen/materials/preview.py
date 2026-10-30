@@ -12,7 +12,9 @@ textured Blender renders.
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
-  part, skybridge and street piece at once), or cameras of one's own (`--eye`, `--target`).
+  part, skybridge and street piece at once), the section across the biggest M14 deck
+  (`deck`, AG10: the blockout's deck camera, its near clip on the cut), or cameras of one's
+  own (`--eye`, `--target`).
 - **board**: a material board per era (its wall sets, roof, trims, metals, a window with
   its rooms) and one of the street sets, each a slab of the material under a low sun.
 
@@ -192,6 +194,7 @@ def run(args, progress=None) -> dict:
 
 
 DECK_R = 420.0          # the deck section's tiles: within this of its plane's middle
+DECK_SHIFT = 0.18       # its frame shifted up (a share of its width): the ground near the bottom
 
 
 def deck_view(man: dict, cut: dict, width: int) -> dict:
@@ -206,7 +209,7 @@ def deck_view(man: dict, cut: dict, width: int) -> dict:
     return {"name": "deck", "ortho": False, "lens": cut["lens_mm"], "eye": [ex, ey, ez],
             "target": [ex - nx * d, ey - ny * d, ez], "w": width, "h": int(width * 9 / 16),
             "shell_tiles": tiles, "section": {"origin": [ox, oy], "n": [nx, ny],
-                                              "clip": round(d, 3)}}
+                                              "clip": round(d, 3), "shift_y": DECK_SHIFT}}
 
 
 def _tile_near(name: str, p, r) -> bool:

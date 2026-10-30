@@ -293,6 +293,9 @@ def _walk_index(model):
     return out
 
 
+GRAZE_M = 0.02          # a path this near its own building's wall does not cross it
+
+
 def access(model, records: dict, briefs: dict | None = None) -> dict:
     """A door at every entrance and every unit's entrance (the shells' `doors` checks), each
     open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
@@ -335,11 +338,20 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             if fids[i] != bid:
                 return False
             # its own building only near the door (an arcade, a recess; AG5: a colonnade's
-            # depth more behind one)
+            # depth more behind one); a path that only grazes its own wall (along it, round
+            # its corner: AG10, a door on a wall at the map's edge) is not walled off
             far = seg.difference(Point(x, y).buffer(OWN_M + under, 8))
-            if not far.is_empty and far.intersects(feet[own[bid]]):
+            if not far.is_empty and far.intersects(inner(bid)):
                 return False
         return True
+
+    shrunk: dict = {}
+
+    def inner(bid):
+        if bid not in shrunk:
+            with G.canonical():
+                shrunk[bid] = feet[own[bid]].buffer(-GRAZE_M, join_style="mitre")
+        return shrunk[bid]
 
     for bid in sorted(records):
         r = records[bid]
