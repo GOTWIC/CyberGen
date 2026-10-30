@@ -32,6 +32,7 @@ import shapely
 from shapely.geometry import LineString, Point, Polygon
 
 from . import dmath as M
+from . import forms as FM
 from . import geom as G
 from . import massing as MS
 from . import streets as ST
@@ -281,6 +282,9 @@ class Ctx:
     axis: object = None      # boulevards (see `boulevards`)
     lots: list = field(default_factory=list)          # (id, polygon) of the district's lots
     probe: bool = False      # M2 trying a merged group: masses only, no ground floor or roof
+    variety: float = 0.5     # M21: how far the district's towers depart from boxes
+    placed: list = field(default_factory=list)   # M21: (centroid, property, form, band) of
+    #                                              the complex towers built so far
 
     @property
     def prog(self) -> Program:
@@ -467,7 +471,8 @@ class Bld:
         self.use = use
         self.fh = fh
         self.fr = fr
-        self.masses: list = []    # (poly, z0, z1, role, shape)
+        self.masses: list = []    # (poly, z0, z1, role, shape, meta): meta M21's arcs, turn,
+        #                           scale and shift (or None)
         self.roofs: list = []     # (poly, z, role) flat roofs for items and gardens
         self.attrs: dict = {}
         self.name = None
@@ -475,22 +480,30 @@ class Bld:
         self.front_v = None       # local v of the street front (frontage line + setback)
         self.front_u = None       # local u range of the main frontage (plus a margin)
         self.front_line = None    # (line points, setback) of the main frontage
+        self.form = None          # M21: the form record (`forms.tower`)
+        self.key = None           # M21: salt of the building's form generators
+        self.force = None         # M21: the form the neighbor rule asks for
+        self.probe_forms = False  # M21: find every form that fits (the neighbor rule's list)
+        self.forms_ok: list = []
+        self.alt_h: list = []     # M21: heights in the bands beside its own (`band_heights`)
+        self.depart = True        # M21: a slab may curve or step (not in a complex)
+        self.avoid: set = set()   # M21: forms taken near it (tried last)
 
     def add(self, poly, z0: float, z1: float, role: str = "body", shape: str = "prism",
-            roof: bool = True):
+            roof: bool = True, meta: dict | None = None):
         if poly is None or poly.is_empty or z1 <= z0:
             return
         poly = G.parts(poly)[0] if poly.geom_type != "Polygon" else poly
-        self.masses.append((poly, q(z0), q(z1), role, shape))
+        self.masses.append((poly, q(z0), q(z1), role, shape, meta))
         if roof and shape == "prism":
             self.roofs.append((poly, q(z1), role))
 
     @property
     def height(self) -> float:
-        return max(z1 for _, _, z1, _, _ in self.masses)
+        return max(m[2] for m in self.masses)
 
     def ground(self):
-        key = tuple((id(p), z0) for p, z0, _, _, _ in self.masses)
+        key = tuple((id(m[0]), m[1]) for m in self.masses)
         if getattr(self, "_gkey", None) == key:
             return self._ground
         self._gkey = key
@@ -498,7 +511,7 @@ class Bld:
         return self._ground
 
     def _ground_calc(self):
-        polys = [p for p, z0, _, _, _ in self.masses if z0 <= 0.0]
+        polys = [m[0] for m in self.masses if m[1] <= 0.0]
         if not polys:
             return Polygon()
         ps = polys if len(polys) == 1 else G.parts(G.union(polys))
@@ -548,10 +561,66 @@ def podium_tower(b: Bld, region, H: float, cx: Ctx, rng, podium_floors: int | No
             b.kind = "megabuilding"
             megabuilding(b, region, H, cx, rng)
             return
-        b.add(region, 0.0, H, "body")
         b.kind = "tower" if H >= 40.0 else b.kind
+        if b.kind != "tower":
+            b.add(region, 0.0, H, "body")
+            return
+        _forms(b, H, cx, FM.POLY_FORMS,
+               lambda f, r: FM.tower_poly(b, f, region, 0.0, H, r))
         return
-    tower_body(b, t, P, H, cx, rng)
+    tower_shaft(b, t, P, H, cx, region)
+
+
+def _form_rng(b: Bld, cx: Ctx, i: int):
+    return ST._rng(cx.seed, 313, *(b.key or (0,)), i)
+
+
+def _forms(b: Bld, H: float, cx: Ctx, allowed, build) -> None:
+    """The building's form: the first of its district's drawn order that fits (the form the
+    neighbor rule asks for first, when it asks); with `probe_forms`, also every other form
+    that fits (`forms_ok`, for the rule)."""
+    names = FM.order(cx.variety, _form_rng(b, cx, 0), allowed)
+    if b.force is not None and b.force in names:
+        names = [b.force] + [f for f in names if f != b.force]
+    elif b.avoid:
+        names = [f for f in names if f not in b.avoid] + [f for f in names if f in b.avoid]
+    ok = []
+    chosen = None
+    for f in names:
+        r = _form_rng(b, cx, 1 + FM.FORM_INDEX[f])
+        if chosen is None:
+            if build(f, r):
+                chosen = (f, b.form)
+                ok.append(f)
+                if not b.probe_forms:
+                    break
+            continue
+        n_m, n_r = len(b.masses), len(b.roofs)
+        if build(f, r):
+            ok.append(f)
+        del b.masses[n_m:]
+        del b.roofs[n_r:]
+        b.form = chosen[1]
+    b.forms_ok = ok
+
+
+def tower_shaft(b: Bld, t, P: float, H: float, cx: Ctx, region, allowed=None,
+                crown: str | None = None) -> None:
+    """M21: the tower's shaft and crown on plate t (a rectangle in the building's frame)
+    from P to H, in a form of its district's variety (a complex's tower in one whose
+    facades still face its partners)."""
+    if allowed is None:
+        allowed = FM.FORMS if b.depart else FM.COMPLEX_FORMS
+    inner = MS.inset(region, 4.0)
+    if inner.is_empty:
+        inner = region
+    MS.prep(inner)
+    room = MS.inset(region, 1.0)
+    room = MS.prep(room if not room.is_empty else region)
+    plate = MS.Plate.of_rect(b.fr, t)
+    hi = cx.height[1]
+    _forms(b, H, cx, allowed, lambda f, r: FM.tower(b, f, plate, P, H, cx.variety, inner,
+                                                    room, r, hi, crown))
 
 
 def tower_rect(b: Bld, region, cx: Ctx, rng, setback: float):
@@ -574,38 +643,30 @@ def tower_rect(b: Bld, region, cx: Ctx, rng, setback: float):
     return found[0] if found else None
 
 
-def tower_body(b: Bld, t, z0: float, H: float, cx: Ctx, rng, crown: float | None = None,
+def taken_near(cx: Ctx, c, pid: str, H: float) -> set:
+    """M21: the forms of the complex towers built so far near c (another property's, in the
+    band of a tower H tall): what a complex's tower tries last."""
+    band = tower_band(H)
+    R = TOWER_NEAR_M + 1.0
+    return {f for p, o, f, bd in cx.placed if bd == band and o != pid and
+            (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 <= R * R}
+
+
+def placed(cx: Ctx, b: Bld, pid: str) -> None:
+    """M21: a complex's tower recorded for the ones built after it."""
+    if not cx.probe and b.form is not None and b.masses:
+        cx.placed.append((G.centroid(b.ground()), pid, b.form["kind"], tower_band(b.height)))
+
+
+def tower_body(b: Bld, t, z0: float, H: float, cx: Ctx, rng, region, crown: float | None = None,
                spire: bool | None = None):
-    """Tower shaft on `t` from z0 to H: setback crown tiers and a spire on some."""
-    fh = b.fh
-    lo, hi = cx.height
-    u = float(rng.random())
+    """A complex's tower shaft on `t` from z0 to H (M21: in a form of `forms.COMPLEX_FORMS`,
+    whose facades still face its partners): crown tiers on some (chance `crown`), a spire
+    when asked."""
     crown = (0.45 if cx.archetype in ("corporate_core", "transit_hub") else 0.25) \
         if crown is None else crown
-    spire = (H > 0.75 * hi and H > 120.0 and float(rng.random()) < 0.5) if spire is None \
-        else spire
-    top = H
-    sp_h = 0.0
-    if spire:
-        sp_h = q(min(H * 0.12, 40.0))
-        top = H - sp_h
-        top = z0 + max(2, int((top - z0) / fh)) * fh
-        sp_h = H - top
-    if u < crown and top - z0 > 10 * fh:
-        n_cr = max(2, int((top - z0) / fh * MS.uniform(rng, 0.08, 0.16)))
-        zc = top - n_cr * fh
-        b.add(t, z0, zc, "tower")
-        c = _tier(b.fr, t, MS.uniform(rng, 2.5, 4.5))
-        if c is not None:
-            b.add(c, zc, top, "crown")
-        else:
-            b.add(t, zc, top, "tower")
-    else:
-        b.add(t, z0, top, "tower")
-    if sp_h > 2.0:
-        cu, cv = b.fr.local(*G.centroid(t))
-        s = b.fr.rect(cu - 1.5, cv - 1.5, cu + 1.5, cv + 1.5)
-        b.add(s, top, top + sp_h, "spire", roof=False)
+    c = "spire" if spire else "tiers" if float(rng.random()) < crown else "flat"
+    tower_shaft(b, t, z0, H, cx, region, FM.COMPLEX_FORMS, crown=c)
 
 
 def slab(b: Bld, region, H: float, cx: Ctx, rng):
@@ -615,6 +676,9 @@ def slab(b: Bld, region, H: float, cx: Ctx, rng):
     depth = min(D, MS.uniform(rng, 14.0, 22.0))
     bar = MS.front_rect(region, b.fr, depth, min_w=8.0, min_d=8.0, v_front=b.front_v,
                         u_lim=b.front_u)
+    if bar is not None and b.depart and not cx.probe and \
+            FM.slab_form(b, bar, region, H, cx.variety, _form_rng(b, cx, 40)):
+        return     # M21: a curved or stepped slab
     if bar is None:
         bar = front_poly(b, region, depth)
     if bar is None:
@@ -712,7 +776,7 @@ def megabuilding(b: Bld, region, H: float, cx: Ctx, rng):
         f = 1.0 if i == main else steps[(i - (i > main)) % len(steps)]
         n = max(npod + 10, int(H * f / fh + 1e-9))
         Hi = min(H, n * fh)
-        _mega_tower(b, fr, t, P, Hi, rng)
+        _mega_tower(b, fr, t, P, Hi, rng, cx.variety)
         tops.append(Hi)
     _mega_decks(b, fr, region, towers, tops, P)
     b.attrs["towers"] = len(towers)
@@ -773,8 +837,9 @@ def _mega_layout(fr, region, g: float, band: float, sv1: float, front_row: bool,
     return fr, podium, court, towers
 
 
-def _mega_tower(b: Bld, fr, t, P: float, Hi: float, rng) -> None:
-    """A tower on the podium with a mid setback (one or two sides) and a crown tier."""
+def _mega_tower(b: Bld, fr, t, P: float, Hi: float, rng, v: float = 0.0) -> None:
+    """A tower on the podium with a mid setback (one or two sides) and a crown tier (M21:
+    with cut or rounded corners on some, by the district's variety)."""
     fh = b.fh
     rise = Hi - P
     zm = P + max(4, int(rise * MS.uniform(rng, 0.42, 0.66) / fh)) * fh
@@ -788,11 +853,24 @@ def _mega_tower(b: Bld, fr, t, P: float, Hi: float, rng) -> None:
         else t
     if zm >= zc - fh:
         zm = zc
-    b.add(t, P, zm, "tower")
+    soft = float(rng.random()) < 0.9 * v
+    rnd = float(rng.random()) < 0.5
+    d_c = MS.uniform(rng, 2.5, 4.0)
+
+    def put(rect, z0, z1, role):
+        if not soft:
+            b.add(rect, z0, z1, role)
+            return
+        p = MS.Plate.of_rect(fr, rect)
+        s = min(p.hw, p.hd)
+        p = p.rounded(0.3 * s) if rnd else MS.Plate(p.fr, p.hw, p.hd, c=min(0.25 * s, 4.0))
+        FM.put(b, p, z0, z1, role)
+
+    put(t, P, zm, "tower")
     if zm < zc:
-        b.add(upper, zm, zc, "tower")
-    c = _tier(fr, upper, MS.uniform(rng, 2.5, 4.0))
-    b.add(c if c is not None else upper, zc, Hi, "crown")
+        put(upper, zm, zc, "tower")
+    c = _tier(fr, upper, d_c)
+    put(c if c is not None else upper, zc, Hi, "crown")
 
 
 def _mega_decks(b: Bld, fr, region, towers, tops, P: float) -> None:
@@ -824,11 +902,22 @@ def _mega_decks(b: Bld, fr, region, towers, tops, P: float) -> None:
             levels = (0.38, 0.72) if top - P > 24 * fh else (0.5,)
             for f in levels:
                 z = P + max(3, int((top - P) * f / fh)) * fh
-                if z + 2.0 < top - fh:
+                # (M21: only where both towers' walls reach the deck, not past a setback)
+                if z + 2.0 < top - fh and _deck_held(b, deck, towers[i][0], z) and \
+                        _deck_held(b, deck, towers[j][0], z):
                     b.add(deck, z, z + 2.0, "deck", roof=False)
                     n += 1
     if n:
         b.attrs["decks"] = n
+
+
+def _deck_held(b: Bld, deck, t, z: float) -> bool:
+    """A mass of the tower on t spans the deck's height (z to z + 2 m) and meets it."""
+    for m in b.masses:
+        if m[3] in ("tower", "crown") and m[1] <= z + 1e-6 and m[2] >= z + 2.0 - 1e-6 and \
+                G.area1(G.inter(m[0], t)) > 1.0 and G.area1(G.inter(deck, m[0])) > 0.01:
+            return True
+    return False
 
 
 def terraced(b: Bld, region, H: float, cx: Ctx, rng):
@@ -1005,7 +1094,7 @@ def villa(b: Bld, region, H: float, cx: Ctx, rng):
     if float(rng.random()) < 0.5 and H > 2 * b.fh:
         t = _tier(b.fr, r, 3.0)
         if t is not None:
-            b.masses[-1] = (r, 0.0, q(H - b.fh), "body", "prism")
+            b.masses[-1] = (r, 0.0, q(H - b.fh), "body", "prism", None)
             b.roofs[-1] = (r, q(H - b.fh), "body")
             b.add(t, H - b.fh, H, "tier")
 
@@ -1132,7 +1221,43 @@ def front_poly(b: Bld, region, depth: float):
     return ps[0] if ps and G.area1(ps[0]) >= 40.0 else None
 
 
-def lot_building(cx: Ctx, lot: dict, k: int, notes: list) -> Bld | None:
+TOWER_MIN_M = 40.0                # M21: a tower for the neighbor rule
+TOWER_BANDS_M = (40.0, 56.0, 78.0, 110.0, 154.0, 215.0, 300.0)   # its height bands
+TOWER_NEAR_M = 150.0              # towers this close never share a form and height band
+TOWER_KINDS = ("podium_tower", "tower")
+
+
+def tower_band(h: float) -> int:
+    """Height band of a tower (index into TOWER_BANDS_M, -1 under the first)."""
+    k = -1
+    for i, e in enumerate(TOWER_BANDS_M):
+        if h >= e - 1e-6:
+            k = i
+    return k
+
+
+def band_heights(H: float, fh: float, lo: float, hi: float, cap: float) -> list[float]:
+    """Heights on the floor grid in the bands beside H's, within [lo, hi] and under the cap
+    (the highest of the band below first, then the lowest of the band above): where a tower
+    can go when every form it fits is taken in its own band."""
+    k = tower_band(H)
+    out = []
+    if k >= 0:      # (from the first band: under 40 m, no longer a tower)
+        n = int(math.ceil(TOWER_BANDS_M[k] / fh - 1e-9)) - 1
+        h = q(n * fh)
+        if h >= lo - 1e-6 and h < TOWER_BANDS_M[k] - 1e-6 and tower_band(h) == k - 1:
+            out.append(h)
+    if 0 <= k < len(TOWER_BANDS_M) - 1:
+        n = int(math.ceil(TOWER_BANDS_M[k + 1] / fh - 1e-9))
+        h = q(n * fh)
+        if h <= min(hi, cap) + 1e-6 and tower_band(h) == k + 1:
+            out.append(h)
+    return out
+
+
+def lot_building(cx: Ctx, lot: dict, k: int, notes: list, force=None) -> Bld | None:
+    """The lot's building; `force` (form, height or None) is what the neighbor rule asks
+    of a tower (M21)."""
     rng = cx.rng(1, k)
     fronts = lot["frontage"]
     if not fronts:
@@ -1151,6 +1276,8 @@ def lot_building(cx: Ctx, lot: dict, k: int, notes: list) -> Bld | None:
     kind = choose_kind(cx, region, lot["area_m2"], front_cls, rng)
     p = G.centroid(region)
     H, fh = heights_for(cx, kind, p, lot["area_m2"], front_cls, rng, region)
+    if force is not None and force[1] is not None:
+        H = q(force[1])
     for info, rim in cx.rings:
         ip = G.inter(region, rim) if region.intersects(rim) else Polygon()
         if not ip.is_empty:
@@ -1160,10 +1287,16 @@ def lot_building(cx: Ctx, lot: dict, k: int, notes: list) -> Bld | None:
                 return None
     use = USE_OF.get(kind) or prog.use
     b = Bld(kind, use, fh, fr)
+    b.key = (1, k)
+    b.force = force[0] if force is not None else None
+    b.probe_forms = H >= TOWER_MIN_M and kind == "podium_tower" and not cx.probe
     set_front(b, main_front(fronts), prog)
     fill(b, kind, region, H, cx, rng, fronts, front_cls)
     if not b.masses:
         return None
+    if b.probe_forms:
+        b.alt_h = band_heights(H, fh, cx.height[0], cx.height[1],
+                               height_cap(cx.cones, region))
     street = [f for f in fronts if f["road_class"] != "highway"]
     if kind in REFIT_KINDS and street and not any(
             r["road_class"] != "highway" for r in facades(b.ground(), fronts, prog)):
@@ -1175,6 +1308,7 @@ def lot_building(cx: Ctx, lot: dict, k: int, notes: list) -> Bld | None:
             top = b.height
             b.masses.clear()
             b.roofs.clear()
+            b.form = None
             b.add(body, 0.0, top, "body")
     if kind == "yard":
         b.attrs["yard"] = True
@@ -1421,6 +1555,9 @@ def green_roofs(b: Bld, cx: Ctx, rng) -> list[dict]:
     """Podium roofs and low flat roofs as green roofs or roof plazas."""
     out = []
     chance = cx.prog.green * cx.greenery
+    for p, z, rl in b.roofs:
+        if rl == "garden":     # M21: a sky garden cut through a tower
+            out.append({"polygon": p, "z_m": z, "use": "sky_garden"})
     pods = [(p, z) for p, z, rl in b.roofs if rl == "podium"]
     for p, z in pods[:1]:
         above = [m[0] for m in b.masses if m[1] >= z - 1e-9 and m[3] != "podium"]
@@ -1454,19 +1591,40 @@ def style(cx: Ctx, rng) -> dict:
     return {"grime": q(g), "neon": q(n), "era": era}
 
 
+def form_record(b: Bld) -> dict | None:
+    """M21: the building's form record, with whether it is a tower for the neighbor rule
+    and its height band (towers without a form of their own are boxes, landmarks their
+    kind)."""
+    H = b.height
+    tower = (b.kind in TOWER_KINDS or b.landmark) and H >= TOWER_MIN_M - 1e-6
+    f = dict(b.form) if b.form is not None else None
+    if f is None and not tower:
+        return None
+    if f is None:
+        top = max(b.masses, key=lambda m: (m[2], -m[1]))
+        f = {"kind": b.kind.split(".", 1)[1] if b.landmark else "box", "crown": "flat",
+             "pivot": G.centroid(top[0]), "masses": [], "params": {}}
+    elif b.landmark:
+        f["kind"] = b.kind.split(".", 1)[1]
+    f["tower"] = bool(tower)
+    f["band"] = tower_band(H) if tower else -1
+    return f
+
+
 def finish(b: Bld, cx: Ctx, fronts: list, rng, shops: bool | None = None) -> dict:
     """Ground floor, rooftop and style of a finished building (record without ids)."""
     units, ents = ground_floor(b, cx, fronts, rng, shops)
     items = rooftop(b, cx, rng)
     greens = green_roofs(b, cx, rng)
     H = b.height
-    body_top = max((z1 for _, _, z1, role, _ in b.masses if role != "spire"), default=H)
+    body_top = max((m[2] for m in b.masses if m[3] not in FM.ACCESSORY), default=H)
     return {"kind": b.kind, "use": b.use, "fh": b.fh, "floors": max(1, int(body_top / b.fh +
                                                                            0.5)),
             "height": q(H), "masses": b.masses, "footprint": b.ground(), "entrances": ents,
             "units": units, "roof_items": items, "greens": greens, "style": style(cx, rng),
             "attrs": dict(b.attrs), "frame": (b.fr.ox, b.fr.oy, b.fr.angle),
-            "name": b.name, "landmark": b.landmark}
+            "name": b.name, "landmark": b.landmark, "form": form_record(b),
+            "forms_ok": list(b.forms_ok), "alt_h": list(b.alt_h)}
 
 
 # ---------------------------------------------------------------------------
@@ -1486,6 +1644,7 @@ def phase_a(job: dict) -> dict:
 
     with G.canonical():
         cx = _prepare(job["ctx"])
+        cx.placed = []      # (M21: this job's own, whatever process runs it)
         out = {"buildings": [], "properties": [], "structures": [], "elements": [],
                "forced": []}
         used: set = set()
@@ -1509,12 +1668,13 @@ def phase_b(job: dict) -> dict:
     with G.canonical():
         cx = _prepare(job["ctx"])
         used = set(job["used"])
+        force = job.get("force", {})
         notes: list = []
         out = {"buildings": [], "properties": [], "elements": [], "notes": notes}
         for k, lot in job["lots"]:
             if lot["id"] in used:
                 continue
-            b = lot_building(cx, lot, k, notes)
+            b = lot_building(cx, lot, k, notes, force.get(lot["id"]))
             if b is None:
                 continue
             rec = finish(b, cx, lot["frontage"], cx.rng(2, k))
@@ -1547,6 +1707,14 @@ def _rows_and_sky(out: dict, did: str) -> dict:
                    "landmark": r.get("landmark", False)} for r in out["buildings"]]
     res["trace"] = [[x["id"], x["kind"], x["height"], [(m[0], m[1], m[2]) for m in x["masses"]]]
                     for x in out["buildings"]]
+    # M21: the towers, for the neighbor rule (`buildout.select_forms`)
+    res["towers"] = [{"id": r["id"], "lot_id": r.get("lot_id"),
+                      "property_id": r.get("property_id"), "height": r["height"],
+                      "c": G.centroid(r["footprint"]), "form": r["form"]["kind"],
+                      "band": r["form"]["band"], "ok": list(r.get("forms_ok", [])),
+                      "alt_h": list(r.get("alt_h", []))}
+                     for r in out["buildings"]
+                     if r.get("form") and r["form"]["tower"] and not r["footprint"].is_empty]
     return res
 
 
@@ -1571,12 +1739,35 @@ def phase_c(job: dict) -> dict:
 
 def _mass_rows(masses) -> list:
     P = G.to_model_poly
-    return [{"footprint": P(p), "z0_m": z0, "z1_m": z1, "role": role, "shape": shape}
-            for p, z0, z1, role, shape in masses]
+    out = []
+    for m in masses:
+        p, z0, z1, role, shape = m[:5]
+        row = {"footprint": P(p), "z0_m": z0, "z1_m": z1, "role": role, "shape": shape}
+        meta = m[5] if len(m) > 5 else None
+        if meta:
+            if meta.get("arcs"):
+                row["arcs"] = meta["arcs"]
+            if meta.get("turn"):
+                row["turn_deg"] = meta["turn"]
+            if meta.get("scale", 1.0) != 1.0:
+                row["scale"] = meta["scale"]
+            if tuple(meta.get("shift", (0.0, 0.0))) != (0.0, 0.0):
+                row["shift_m"] = tuple(meta["shift"])
+        out.append(row)
+    return out
+
+
+def _form_row(f: dict | None) -> dict | None:
+    if f is None:
+        return None
+    px, py = f["pivot"]
+    return {"kind": f["kind"], "crown": f.get("crown", "flat"), "tower": f.get("tower", False),
+            "band": f.get("band", -1), "pivot": (G.q(px), G.q(py)),
+            "masses": list(f.get("masses", [])), "params": dict(f.get("params", {}))}
 
 
 def building_row(r: dict) -> dict:
-    return {
+    row = {
         "id": r["id"], "type": f"building.{r['kind']}", "name": r.get("name"),
         "lot_id": r.get("lot_id"), "property_id": r.get("property_id"),
         "district_id": r.get("district_id"), "megasite_id": r.get("megasite_id"),
@@ -1586,6 +1777,10 @@ def building_row(r: dict) -> dict:
         "masses": _mass_rows(r["masses"]), "entrances": r["entrances"], "units": r["units"],
         "roof_items": r["roof_items"], "landmark": bool(r.get("landmark")),
         "style": r["style"], "attrs": {k: v for k, v in r["attrs"].items() if v is not None}}
+    form = _form_row(r.get("form"))
+    if form is not None:
+        row["form"] = form
+    return row
 
 
 def to_rows(out: dict, did: str | None) -> dict:

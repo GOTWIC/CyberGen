@@ -360,7 +360,7 @@ def plan(sb) -> None:
     for ms in sb.masses:
         g = SY.role_group(ms["role"])
         if ms["shape"] != "prism" or len(ms["rings"]) != 1 or g == "structure" or \
-                ms.get("screen") or ms["floors"] < 1:
+                ms.get("screen") or ms.get("simple") or ms["floors"] < 1:
             continue
         ring = RG.clean(ms["rings"][0])
         if len(ring) < 3 or area2(ring) <= 0:

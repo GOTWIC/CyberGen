@@ -28,6 +28,7 @@ from shapely.geometry import LineString, Point, Polygon
 
 from . import buildings as BL
 from . import dmath as M
+from . import forms as FM
 from . import geom as G
 from . import massing as MS
 from . import streets as ST
@@ -228,11 +229,13 @@ def observation_tower(cx, b: BL.Bld, region, H: float, rng) -> bool:
         x, y = b.fr.world(cu, cv)
         pod = MS.circle(x, y, 15.0)
         if region.covers(pod):
-            b.add(MS.circle(x, y, 13.0), 0.0, 8.0, "base")
-            b.add(MS.circle(x, y, 6.5), 8.0, q(H * 0.78), "shaft", shape="cylinder",
-                  roof=False)
-            b.add(pod, q(H * 0.78), q(H * 0.86), "pod", shape="cylinder")
-            b.add(MS.circle(x, y, 1.2), q(H * 0.86), H, "spire", shape="cylinder", roof=False)
+            # (M21: true circles, their arcs in the model)
+            def disc(r):
+                return MS.Plate(MS.Frame(x, y, 0.0), r, r, r)
+            FM.put(b, disc(13.0), 0.0, 8.0, "base")
+            FM.put(b, disc(6.5), 8.0, q(H * 0.78), "shaft", shape="cylinder", roof=False)
+            FM.put(b, disc(15.0), q(H * 0.78), q(H * 0.86), "pod", shape="cylinder")
+            FM.put(b, disc(1.2), q(H * 0.86), H, "spire", shape="cylinder", roof=False)
             return True
     return False
 
@@ -397,6 +400,7 @@ def landmarks(cx, lots, used: set, out: dict) -> None:
             capH = min(H, BL.height_cap(cx.cones, region))
             b = BL.Bld(f"landmark.{kind}", LANDMARK_USE.get(kind, "mixed"), 4.0,
                        MS.lot_frame(region, front))
+            b.key, b.depart = (40, i), False
             b.landmark = True
             b.name = lm["name"]
             if not gen(cx, b, region, capH, cx.rng(40, i)):
@@ -600,10 +604,13 @@ def _shared_podium(cx, gid, members, out, idx, n: int, steps, kind: str) -> bool
             return False
         Hi = BL.floors_in(H0 * steps[i], fh, lo, hi, cap) * fh
         b = BL.Bld("podium_tower", prog.use, fh, fr)
+        b.key, b.depart = (51, idx, 0 if kind == "twin_towers" else i), False
         b.add(ps[0], 0.0, P, "podium")
+        b.avoid = BL.taken_near(cx, G.centroid(ps[0]), pid, Hi)
         trng = cx.rng(51, idx, 0 if kind == "twin_towers" else i)
-        BL.tower_body(b, t, P, Hi, cx, trng, crown=0.6 if crown_u < 0.6 else 0.0,
+        BL.tower_body(b, t, P, Hi, cx, trng, ps[0], crown=0.6 if crown_u < 0.6 else 0.0,
                       spire=kind == "twin_towers" or i == 0)
+        BL.placed(cx, b, pid)
         bid = f"{gid}.bld{i + 1}"
         rec = emit(cx, out, b, fronts, cx.rng(52, idx, i), bid, [lt["id"] for lt in lots],
                    pid, lots=lots)
@@ -661,6 +668,8 @@ def megabuilding_campus(cx, gid, members, out, idx) -> bool:
                              cap) * prog.fh
             kind = "podium_tower"
         b = BL.Bld(kind, prog.use, prog.fh, fr)
+        b.key, b.depart = (55, idx, i), False
+        b.avoid = BL.taken_near(cx, G.centroid(region), pid, H)
         BL.set_front(b, BL.main_front(fronts), prog)
         if i == 0 or not recs:
             BL.fill(b, kind, region, H, cx, rng, fronts, front_cls)
@@ -668,6 +677,7 @@ def megabuilding_campus(cx, gid, members, out, idx) -> bool:
             BL.fill(b, kind, region, H, cx, rng, fronts, front_cls)
         if not b.masses:
             continue
+        BL.placed(cx, b, pid)
         if i == 0:
             main_fr = b.fr
         bid = f"{gid}.bld{len(bids) + 1}"
@@ -679,6 +689,7 @@ def megabuilding_campus(cx, gid, members, out, idx) -> bool:
             bridgeable(cx, recs[0], recs[j], min(recs[0]["height"], recs[j]["height"]) * 0.33,
                        "open_deck", 8.0) for j in range(1, len(recs))):
         _drop(out, bids)
+        cx.placed[:] = [p for p in cx.placed if p[1] != pid]
         return False
     prop(out, pid, "megabuilding_campus", bids, [lt["id"] for lt in lots],
          BL.owner(cx, 800 + idx))
@@ -727,7 +738,7 @@ def _satellite(cx, b, region, H, main, main_fr, rng) -> bool:
         if t is not None:
             P = 3 * fh
             b.add(region, 0.0, P, "podium")
-            BL.tower_body(b, t, P, H, cx, rng, crown=0.0, spire=False)
+            BL.tower_body(b, t, P, H, cx, rng, region, crown=0.0, spire=False)
             return True
     return False
 
@@ -822,6 +833,7 @@ def bridged_pair(cx, gid, members, out, idx) -> bool:
                                         f["road_class"], rng, 0.4, 1.0), prog.fh, lo, hi,
                          BL.height_cap(cx.cones, region)) * prog.fh
         b = BL.Bld("slab", prog.use, prog.fh, fr)
+        b.depart = False
         BL.set_front(b, f, prog)
         if recs:
             # the second slab opposite the first: along the street where the first one is

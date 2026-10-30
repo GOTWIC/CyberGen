@@ -32,7 +32,8 @@ PERP_COS = 0.97          # within about 14 degrees of perpendicular
 DECK_M = 1.0             # structure depth under the deck level
 ROAD_CLEAR_M = 5.5
 EXCLUDE_ROLES = ("spire", "deck", "dock", "ramp", "platform", "leg_frame", "wheel", "shack",
-                 "mechanical", "antenna", "span", "plinth", "obelisk", "shaft")
+                 "mechanical", "antenna", "span", "plinth", "obelisk", "shaft", "band", "mast",
+                 "halo", "strut", "frame", "column", "pod")
 WIDTH_M = {"enclosed": 5.0, "open_deck": 7.0, "stack": 6.0, "catwalk": 1.6, "cable": 1.2}
 LEVEL_M = {"enclosed": 4.0, "open_deck": 3.0, "stack": 4.0, "catwalk": 2.5, "cable": 2.5}
 

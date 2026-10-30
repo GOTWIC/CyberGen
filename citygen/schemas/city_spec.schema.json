@@ -610,6 +610,21 @@
           "default": null,
           "title": "Greenery"
         },
+        "variety": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: how far the district's towers depart from boxes (0: boxes and mild forms, rounded or cut corners, setbacks; 1: twisted, leaning, stacked, split, cantilevered, framed and podded towers, the twist and lean at their most); default by archetype.",
+          "title": "Variety"
+        },
         "wealth": {
           "anyOf": [
             {

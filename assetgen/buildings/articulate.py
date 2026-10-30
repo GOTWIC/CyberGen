@@ -167,7 +167,8 @@ def corners(sb) -> None:
         return
     c = int(round(cont["cut_m"] * 1000))
     masses = [ms for ms in sb.masses if ms["shape"] == "prism" and len(ms["rings"]) == 1 and
-              SY.role_group(ms["role"]) != "structure" and len(ms["rings"][0]) >= 4]
+              SY.role_group(ms["role"]) != "structure" and len(ms["rings"][0]) >= 4 and
+              not ms.get("simple")]
     if not masses:
         return
     at: dict[tuple, list] = {}
@@ -364,7 +365,7 @@ def splits(sb) -> None:
     for ms in sb.masses:
         g = SY.role_group(ms["role"])
         n = ms["floors"]
-        if ms["shape"] != "prism" or len(ms["rings"]) != 1 or g != "body" or n < 1:
+        if ms["shape"] != "prism" or len(ms["rings"]) != 1 or g != "body" or n < 1 or                 ms.get("simple"):
             out.append(ms)
             continue
         parts = [ms]

@@ -166,7 +166,7 @@ def contexts(spec, m) -> list[dict]:
             cones=[c for c in cones if G.dist(c[0], poly) < 3000.0],
             complexes=tuple(c.kind for c in (sd.complexes or [])), landmarks=lms,
             roads=roads, junctions=junctions, water=wat, opens=opens_by.get(d.id, []),
-            block_opens=bopen_by.get(d.id, {}))
+            block_opens=bopen_by.get(d.id, {}), variety=float(sd.variety))
         lots = sorted(lots_by.get(d.id, []), key=lambda lt: lt.id)
         jobs.append({"ctx": cx, "lots": [_lot_dict(lt) for lt in lots]})
         for dk in m.decks:
@@ -333,6 +333,12 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     lap("phase_b")
     secs["phase_b_cpu"] = round(sum(r.get("seconds", 0.0) for r in rb), 2)
     secs["phase_b_max"] = round(max((r.get("seconds", 0.0) for r in rb), default=0.0), 2)
+    # M21: towers within 150 m never share a form and a height band
+    changes = select_forms([t for r in ra for t in r.get("towers", [])],
+                           [t for r in rb for t in r.get("towers", [])])
+    n_re = rebuild(mapper, chunks, rb, changes)
+    lap("forms")
+    secs["forms_rebuilt"] = n_re
     out = Out()
     sky = [list(r["sky"]) for r in ra]
     trace = [list(r["trace"]) for r in ra]
@@ -391,6 +397,89 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     T.stage("walkways_m3", [[w["id"], w["kind"], w["neighbors"]] for w in out.walkways])
     out.notes = JN_dedupe(out.notes)
     return out
+
+
+NEAR_PAD_M = 1.0    # M21: the selection keeps this margin over the neighbor check's distance
+
+
+def select_forms(fixed: list, movable: list) -> dict:
+    """M21: the form of each lot tower (and, where every form it fits is taken in its own
+    height band, its height) so that no two towers of different properties within
+    `TOWER_NEAR_M` share a form and a height band. The towers of complexes and landmarks
+    stand as built; then the lot towers, tallest first, each take the first form of their
+    own list (their own drawn form first) that no tower already placed near them has in
+    their band, else the same in a band beside their own (`band_heights`). Returns
+    {lot id: (form, height or None)} for the towers that change; a tower with no free form
+    keeps its own (the check reports it)."""
+    R = BL.TOWER_NEAR_M + NEAR_PAD_M
+    grid: dict = {}
+
+    def cell(c):
+        return int(math.floor(c[0] / R)), int(math.floor(c[1] / R))
+
+    def taken(t, band) -> set:
+        i, j = cell(t["c"])
+        out = set()
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                for c, pid, f, bd in grid.get((i + di, j + dj), ()):
+                    dx, dy = c[0] - t["c"][0], c[1] - t["c"][1]
+                    if bd == band and pid != t["property_id"] and dx * dx + dy * dy <= R * R:
+                        out.add(f)
+        return out
+
+    def place(t, f, band):
+        grid.setdefault(cell(t["c"]), []).append((t["c"], t["property_id"], f, band))
+
+    for t in sorted(fixed, key=lambda t: t["id"]):
+        place(t, t["form"], t["band"])
+    changes = {}
+    for t in sorted(movable, key=lambda t: (-t["height"], t["id"])):
+        ok = t["ok"] or [t["form"]]
+        pick = None
+        for h in [None] + list(t["alt_h"]):
+            band = t["band"] if h is None else BL.tower_band(h)
+            used = taken(t, band) if band >= 0 else set()
+            f = next((f for f in ok if f not in used), None)
+            if f is not None:
+                pick = (f, h, band)
+                break
+        f, h, band = pick if pick is not None else (t["form"], None, t["band"])
+        if f != t["form"] or h is not None:
+            changes[t["lot_id"]] = (f, h)
+        place(t, f, band)
+    return changes
+
+
+def rebuild(mapper, chunks: list, rb: list, changes: dict) -> int:
+    """M21: the lots whose tower the neighbor rule changed built again (in their chunks,
+    with the form and height asked), their rows replacing the old ones."""
+    jobs, where = [], []
+    for ci, ch in enumerate(chunks):
+        lots = [(k, lot) for k, lot in ch["lots"] if lot["id"] in changes]
+        if lots:
+            jobs.append({"ctx": ch["ctx"], "lots": lots, "used": [],
+                         "force": {lot["id"]: changes[lot["id"]] for _, lot in lots}})
+            where.append(ci)
+    if not jobs:
+        return 0
+    n = 0
+    for ci, r in zip(where, _run(mapper, "phase_b", jobs)):
+        old = rb[ci]
+        ids = {x.id for x in r["buildings"]}
+        n += len(ids)
+        for key in ("buildings", "properties"):
+            new = {x.id: x for x in r[key]}
+            old[key] = sorted([x for x in old[key] if x.id not in new] + list(new.values()),
+                              key=lambda x: x.id)
+        old["green_areas"] = sorted([g for g in old["green_areas"] if g.building_id not in ids]
+                                    + list(r["green_areas"]), key=lambda g: g.id)
+        for key, kf in (("sky", lambda x: x["id"]), ("trace", lambda x: x[0]),
+                        ("towers", lambda x: x["id"])):
+            new = {kf(x): x for x in r[key]}
+            old[key] = [new.get(kf(x), x) for x in old[key]
+                        if kf(x) not in ids or kf(x) in new]
+    return n
 
 
 PIN_FLOOR_M = 4.0               # floor height of a traced building
