@@ -185,6 +185,8 @@ def _convex(d_in, d_out) -> bool:
     return _turned(d_in, d_out) and d_in[0] * d_out[1] - d_in[1] * d_out[0] > 0
 
 
+BALCONY_UNDER = 300    # M21: how far a balcony's slab reaches under its floor (and margin)
+BALCONY_REACH = 1800   # a deep part's reach from a mass (`envelope.DEEP_MM`, under it)
 SIMPLE_SILL = 1000     # M21: a simply drawn floor's spandrel up to its sill
 SIMPLE_HEAD = 400      # and over its head
 
@@ -1431,7 +1433,8 @@ class ShellBuilder:
             if sills:
                 used.add("sills")
         if door:
-            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2:
+            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2 and                     not (zf - BALCONY_UNDER < ms["z0"] and
+                         self._hangs(fa, (bset[jb][0] + bset[jb][1]) // 2, bset[jb][2], zf)):
                 # the bay's balcony, once (by its first opening, where a bay has two)
                 b0, b1, d = bset[jb]
                 st = genes[f"{g}.balcony"]
@@ -1727,6 +1730,31 @@ class ShellBuilder:
                 PT.face(buf, slot, [(p[0], p[1], zb), (q[0], q[1], zb), (q[0], q[1], tq),
                                     (p[0], p[1], tp)], (dy / L, -dx / L, 0.0))
             base += k
+        return True
+
+    def _hangs(self, fa: Facade, s: int, d: int, zf: int) -> bool:
+        """M21: whether a balcony on a mass's first floor would hang in the air: no mass of
+        the building spans its slab's underside within a deep part's reach of its middle (a
+        cantilevered or stacked block's first floor; over a podium it stands as before)."""
+        x0, y0, _ = fa.P(s, 0)
+        x, y = x0 + fa.nx * d, y0 + fa.ny * d
+        zb = zf - BALCONY_UNDER // 2
+        for o in self.masses:
+            if o["shape"] != "prism" or not (o["z0"] - 2 <= zb <= o["z1"] + 2):
+                continue
+            ring = o["rings"][0]
+            if RG.in_poly((int(round(x)), int(round(y))), [ring]) >= 0:
+                return False
+            n = len(ring)
+            for i in range(n):
+                a, b = ring[i], ring[(i + 1) % n]
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                L2 = dx * dx + dy * dy
+                t = 0.0 if L2 == 0 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy)
+                                                     / L2))
+                ex, ey = a[0] + dx * t - x, a[1] + dy * t - y
+                if ex * ex + ey * ey <= BALCONY_REACH * BALCONY_REACH:
+                    return False
         return True
 
     def _simple_mass(self, ms: dict, g: str) -> None:

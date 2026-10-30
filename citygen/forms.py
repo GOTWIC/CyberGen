@@ -774,6 +774,32 @@ def tower(b, form: str, plate, P: float, H: float, v: float, inner, room, rng,
     return True
 
 
+NEAT_DEG = 40.0     # a tier cut from an odd plate: no corner sharper than this
+NEAT_EDGE_M = 1.0   # and no edge shorter
+
+
+def neat(p) -> bool:
+    """Whether a tier cut or inset from an odd plate is fit to build on (stage 2's facade
+    grammar breaks on a sliver of an edge or a needle of a corner): plain arithmetic on its
+    grid ring."""
+    pts = list(G.oriented(p).exterior.coords)[:-1]
+    n = len(pts)
+    if n < 3 or p.interiors:
+        return False
+    cos_lim = float(M.cos(M.radians(NEAT_DEG)))
+    for i in range(n):
+        a, b_, c = pts[i - 1], pts[i], pts[(i + 1) % n]
+        ux, uy = a[0] - b_[0], a[1] - b_[1]
+        vx, vy = c[0] - b_[0], c[1] - b_[1]
+        lu = math.sqrt(ux * ux + uy * uy)
+        lv = math.sqrt(vx * vx + vy * vy)
+        if lv < NEAT_EDGE_M:
+            return False
+        if lu > 0 and lv > 0 and (ux * vx + uy * vy) / (lu * lv) > cos_lim:
+            return False
+    return True
+
+
 def tower_poly(b, form: str, poly, P: float, H: float, rng, crown: str | None = None) -> bool:
     """A tower on an odd plate (the region itself, no rectangle fits): box, setback (insets),
     taper (an inset per band), terrace (tiers cut back from one side) or wedge (the upper
@@ -790,7 +816,7 @@ def tower_poly(b, form: str, poly, P: float, H: float, rng, crown: str | None = 
         for i, fz in enumerate((0.5, 0.78, 1.0)):
             za = q(H) if i == 2 else q(P + int((H - P) * fz / fh) * fh)
             p = MS.inset(poly, 3.0 * i) if i else poly
-            if p.is_empty or G.area1(p) < 60.0:
+            if p.is_empty or G.area1(p) < 60.0 or (i and not neat(p)):
                 _rollback(b, n_m, n_r)
                 return False
             b.add(p, z, za, "body" if i == 0 else "tier")
@@ -828,7 +854,7 @@ def tower_poly(b, form: str, poly, P: float, H: float, rng, crown: str | None = 
             if za <= z:
                 continue
             ps = G.parts(G.inter(poly, MS.halfplane(f, u_max=lim))) if lim < hi else [poly]
-            if not ps or G.area1(ps[0]) < 60.0:
+            if not ps or G.area1(ps[0]) < 60.0 or (lim < hi and not neat(ps[0])):
                 _rollback(b, n_m, n_r)
                 return False
             b.add(ps[0], z, za, "body" if z <= P else "tier")
@@ -843,7 +869,7 @@ def tower_poly(b, form: str, poly, P: float, H: float, rng, crown: str | None = 
                 za = q(H)
             d = 6.0 * k / max(n - 1, 1)
             p = MS.inset(poly, d) if d > 0 else poly
-            if p.is_empty or G.area1(p) < 60.0:
+            if p.is_empty or G.area1(p) < 60.0 or (d > 0 and not neat(p)):
                 _rollback(b, n_m, n_r)
                 return False
             b.add(p, z, za, "body")
