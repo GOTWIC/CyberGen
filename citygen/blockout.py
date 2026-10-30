@@ -95,7 +95,8 @@ MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
 MATERIALS.update({f"bld_{k}": v for k, v in ARCHETYPE_COLORS.items()})
 MATERIALS.update({f"site_{k}": v for k, v in {**ELEMENT_COLORS, **FLAT_COLORS}.items()})
 # M16: beds, banks by kind, ground cover by kind
-MATERIALS.update({"bed": "#5a4a36"})
+MATERIALS.update({"bed_shallow": "#8f8264", "bed_mid": "#5f5846",
+                  "bed_deep": "#3b3832"})
 MATERIALS.update({f"bank_{k}": v for k, v in BANK_COLOR.items()})
 MATERIALS.update({f"cover_{k}": v for k, v in COVER_COLOR.items()})
 
@@ -507,6 +508,7 @@ def _open_space(P: _Plan) -> None:
 # --- water beds, banks and ground cover (M16) ------------------------------------------------
 
 BED_CELL_M = 8.0         # the bed's heightfield (flat cities)
+BED_BANDS = (("bed_shallow", 2.0), ("bed_mid", 6.0), ("bed_deep", 1e9))   # by depth
 BED_EDGE_M = 0.5         # its points on land, under the surface
 SEA_UNDER_M = 0.05       # the sea sheet under the inland water's surface (no z-fighting)
 BANK_T_M = 0.3
@@ -561,7 +563,9 @@ def _banks(P: _Plan) -> None:
 
 def _beds(P: _Plan) -> None:
     """The beds of a flat city: a heightfield per tile, `BED_CELL_M` cells, each point at the
-    surface less the water's depth there; cells whose middle is on land left open."""
+    surface less the water's depth there, in three parts by the depth of the cell (shallow
+    under 2 m, middle, deep over 6 m: a material each); cells whose middle is on land left
+    open."""
     m = P.m
     if P.beds is None or P.surf is None or P.wet.is_empty:
         return
@@ -592,12 +596,18 @@ def _beds(P: _Plan) -> None:
             wet = shapely.contains_xy(P.wet, CX, CY).ravel()
             if not wet.any():
                 continue
-            skip = np.nonzero(~wet)[0].tolist()
+            depth = (P.surf - (Z[:-1, :-1] + Z[1:, :-1] + Z[:-1, 1:] + Z[1:, 1:]) / 4.0).ravel()
+            zs = [q(float(v)) for v in Z.ravel()]
+            parts, lo = [], -1e9
+            for mat, hi in BED_BANDS:
+                cell = wet & (depth >= lo) & (depth < hi)
+                lo = hi
+                if cell.any():
+                    parts.append({"k": "grid", "m": mat, "abs": True, "x0": q(bx0),
+                                  "y0": q(by0), "c": c, "nx": nx, "ny": ny, "z": zs,
+                                  "skip": np.nonzero(~cell)[0].tolist()})
             t = (ix, iy)
-            P.add(f"city.bed.{tile_name(*t)}", [P.city, "Water", "Beds"], t, "bed",
-                  [{"k": "grid", "m": "bed", "abs": True, "x0": q(bx0), "y0": q(by0), "c": c,
-                    "nx": nx, "ny": ny, "z": [q(float(v)) for v in Z.ravel()],
-                    "skip": skip}],
+            P.add(f"city.bed.{tile_name(*t)}", [P.city, "Water", "Beds"], t, "bed", parts,
                   {"citygen_type": "bed"})
 
 
@@ -1577,11 +1587,12 @@ def _run(cmd: list[str], marker: str, timeout: float,
 def rerender(blockout_dir: str | Path, to_dir: str | Path, views: list[str],
              width: int = README_WIDTH, blender: str | None = None,
              samples: int = 16, eye=None, target=None, lens: float = 35.0,
-             name: str = "custom") -> list[str]:
+             name: str = "custom", hide: list[str] | None = None) -> list[str]:
     """Render chosen views of a blockout (`top`, `iso_city`, `iso_<district>`, `street_<n>`)
     again from its city.blend, `width` pixels wide, as to_dir/render_<view>.jpg (same cameras
     as the build), plus, with `eye` and `target` (plan coordinates, meters), a perspective
-    view of one's own as render_<name>.jpg. Returns the files written."""
+    view of one's own as render_<name>.jpg; `hide`: object name prefixes left out (M16:
+    `city.water.`, `city.sea.` drain the water). Returns the files written."""
     exe = find_blender(blender)
     if exe is None:
         raise RuntimeError("no Blender (set BLENDER or --blender)")
@@ -1591,6 +1602,8 @@ def rerender(blockout_dir: str | Path, to_dir: str | Path, views: list[str],
     if eye is not None and target is not None:
         cmd += ["--eye", *map(str, eye), "--target", *map(str, target), "--lens", str(lens),
                 "--name", name]
+    for h in hide or []:
+        cmd += ["--hide", h]
     done, log = _run(cmd, "CITYGEN_RERENDER_DONE", timeout=BUDGET_S)
     if done is None:
         raise RuntimeError("Blender rerender failed:\n" + log[-2000:])

@@ -12,7 +12,8 @@ what covers it, for stage 2's ground cover and grass (AG13). Runs on the finishe
 - **Kind** (`model.COVER_KINDS`): by what it is (a park's lawn, a plaza's paving, a villa's
   garden, a shanty yard's bare dirt, a warehouse's gravel, a marsh, a beach's sand, a narrow
   setback's planted bed) and how it is kept (paving overgrown, lawns gone to meadow, meadows
-  to wasteland as the maintenance falls; wet ground by the water a marsh).
+  to wasteland as the maintenance falls; wet ground by the water a marsh); land outside every
+  district is wild meadow (or marsh), whatever its maintenance.
 - **Attributes**: maintenance (the district's wealth and danger, what the piece is), wear
   (its desire lines, the crowds of the street beside it), shade (a 4 m raster: the share of
   8 directions in which a building within 60 m rises above 45 degrees; 1 under a deck),
@@ -215,7 +216,8 @@ def pieces(cx: Ctx) -> list[tuple]:
         for p in G.parts(left):
             if G.area(p) < MIN_PIECE_M2 * 20 or width_of(p) < SLIVER_M:
                 continue
-            kind = "gravel" if arch in ROUGH_ARCHETYPES else "wasteland"
+            # (land outside every district is wild, not neglected: meadow)
+            kind = "meadow" if did is None else                 "gravel" if arch in ROUGH_ARCHETYPES else "wasteland"
             out.append((did, Src(None, "rest", kind, p), p))
     return out
 
@@ -456,8 +458,10 @@ def _maintenance(cx: Ctx, did, what: str, kind: str) -> float:
 
 
 def _kind(base: str, what: str, maint: float, moist: float, width: float, area: float,
-          arch) -> str:
+          arch, wild: bool = False) -> str:
     k = base
+    if wild:
+        return "marsh" if moist >= 0.9 else "meadow"
     if what == "lot" and width < 2.5 and maint >= 0.55 and k in ("paving", "mown_lawn"):
         return "planted_bed"
     if what == "open" and k == "park_lawn" and area < 250.0:
@@ -500,7 +504,8 @@ def build(m) -> Out:
             arch = cx.dist[did].archetype if did in cx.dist else None
             maint = _maintenance(cx, did, src.what, src.kind)
             A = G.area(p)
-            kind = _kind(src.kind, src.what, maint, moist, width_of(p), A, arch)
+            kind = _kind(src.kind, src.what, maint, moist, width_of(p), A, arch,
+                         wild=did is None and src.what == "rest")
             if src.kind == "marsh":
                 moist = 1.0
             s_mean, s_max = fields.slope(pts)

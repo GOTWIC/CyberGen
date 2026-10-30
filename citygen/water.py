@@ -767,10 +767,9 @@ class Beds:
         if t is None:
             return D
         pts_ = shapely.points(np.stack([xs, ys], axis=1))
-        k = t.query_nearest(pts_, all_matches=False)[1]
         bks = self.bank_by[wid]
         lines = np.array([LineString(bk.line) for bk in bks], dtype=object)
-        d = shapely.distance(lines[k], pts_)
+        k, d = self._nearest(t, lines, pts_)
         w = np.array([bk.width_m for bk in bks])[k]
         toe = np.minimum(np.array([bk.toe_m for bk in bks])[k], D)
         if bed.profile == "flat":
@@ -780,6 +779,23 @@ class Beds:
         u = np.minimum(1.0, np.maximum(0.0, d - w) / span)
         ramp = u * (2.0 - u) if bed.profile == "channel" else u
         return np.where(d < w, 0.0, toe + (D - toe) * ramp)
+
+
+    @staticmethod
+    def _nearest(tree, lines, pts_):
+        """(index, distance) of the nearest bank line to each point: distances rounded to
+        1e-6 m, ties to the first bank (GEOS's own pick among equidistant lines, common by a
+        joint between two banks, follows its sort, which differs between machines)."""
+        _, d0 = tree.query_nearest(pts_, all_matches=False, return_distance=True)
+        pi, li = tree.query(pts_, predicate="dwithin", distance=d0 + 1e-3)
+        dd = np.round(shapely.distance(lines[li], pts_[pi]), G.DIST_DIGITS)
+        order = np.lexsort((li, dd, pi))
+        first = np.r_[True, pi[order][1:] != pi[order][:-1]]
+        k = np.zeros(len(pts_), dtype=np.int64)
+        d = np.zeros(len(pts_))
+        k[pi[order][first]] = li[order][first]
+        d[pi[order][first]] = dd[order][first]
+        return k, d
 
 
 def _project_many(pts, cum, xs, ys, chunk: int = 4000) -> np.ndarray:
