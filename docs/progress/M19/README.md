@@ -84,7 +84,7 @@ All checks pass on every sample (86; 91 on Vesper Bay Decks). Full-city tries, M
 | Saltreach Free Port (archipelago) | 1 | 1 | monorail 39, maglev 56 |
 | Vesper Bay Pinned | 2 | 2 | |
 | Vesper Bay Stacks | 1 | 1 | |
-| Vesper Bay Decks | 2 | 3 (see below) | elevated rail on cable spans across the deck city |
+| Vesper Bay Decks | 2 | 2 | elevated rail on cable spans across the deck city |
 | Cragmouth (a metro only) | 1 | 1 (its model gains only its line's empty `attrs.spans`) | |
 
 ## Open items
