@@ -47,7 +47,6 @@ from citygen import dmath as M
 
 from ..triangulate import area2
 from . import articulate as AR
-from . import fronts as FR
 from . import genome as GN
 from . import parts as PT
 from . import rings as RG

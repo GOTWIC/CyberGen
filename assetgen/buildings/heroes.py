@@ -44,11 +44,13 @@ from . import roofs as RF
 from . import systems as SY
 from . import typeparts as TP
 from .roofparts import bar
+from .details import _mounted
 from .types import _count, _wall_free, facades, frame_of, put, put_on
 
 HERO_KINDS = ("megatower", "spire", "arcology", "ferris_wheel")
 MASK_PX = 512
 SEAM_W = 500
+SEAM_STEP = 6000         # a light seam is tried in runs this tall
 
 
 def _u(key: str, purpose: str) -> float:
@@ -97,6 +99,36 @@ def pre(sb) -> None:
     if not is_hero(sb.br):
         return
     sb.hero = {"kind": kind_of(sb.br), "accent": accent(sb.br, sb.gm)}
+    if sb.hero["kind"] != "ferris_wheel":
+        _unsupported(sb)
+
+
+def _unsupported(sb) -> None:
+    """A landmark's masses that stand on nothing (M3 can leave a top tier with no area and
+    a crown over it): left out, lowest first, so its crown mast stands on its real top
+    (`hero_masses_unsupported`)."""
+    from shapely.geometry import Polygon
+    polys = {}
+    for ms in sb.masses:
+        ring = RG.clean(ms["rings"][0])
+        pg = Polygon(ring) if len(ring) >= 3 else None
+        polys[id(ms)] = pg if pg is not None and pg.is_valid and pg.area > 1e6 else None
+    kept: list = []
+    gone = set()
+    for ms in sorted(sb.masses, key=lambda m: (m["z0"], m["k"])):
+        pg = polys[id(ms)]
+        if ms["z0"] <= 50:
+            kept.append(ms)
+            continue
+        if pg is not None and any(polys[id(o)] is not None and abs(o["z1"] - ms["z0"]) <= 50
+                                  and polys[id(o)].intersection(pg).area > 1e6
+                                  for o in kept):
+            kept.append(ms)
+            continue
+        gone.add(id(ms))
+    if gone:
+        sb.masses = [ms for ms in sb.masses if id(ms) not in gone]
+        sb.stats["hero_masses_unsupported"] = len(gone)
 
 
 def mass(sb, ms) -> bool:
@@ -157,12 +189,24 @@ def _seams(sb) -> None:
                 continue                     # (a real convex corner only; a spire's octagon)
             s = max(min(fa.c0 // 2, 600), SEAM_W // 2 + 60)
             z0 = ms["z0"] + (600 if ms["z0"] > 50 else 4500)
-            h = PT.q(ms["z1"] - z0 - 600)
-            if h < 3000 or not _wall_free(sb, fa, s - SEAM_W // 2 - 40, s + SEAM_W // 2 + 40,
-                                          z0, z0 + h):
-                continue
-            if put_on(sb, fa, "seam", {"w": SEAM_W, "h": h, "d": 140}, s, z0, "light_seam"):
-                n += 1
+            z1 = z0 + PT.q(ms["z1"] - z0 - 600)
+            # (in runs of SEAM_STEP that stay off what is mounted on the corner: a sign or
+            # billboard breaks the seam; over glass it runs on the mullion line)
+            runs, za = [], z0
+            while za < z1:
+                zb = min(za + SEAM_STEP, z1)
+                if fa.j is not None and not _mounted(sb, fa, s - SEAM_W // 2 - 40,
+                                                     s + SEAM_W // 2 + 40, za, zb):
+                    if runs and runs[-1][1] == za:
+                        runs[-1][1] = zb
+                    else:
+                        runs.append([za, zb])
+                za = zb
+            for ra, rb in runs:
+                h = PT.q(rb - ra)
+                if h >= 3000 and put_on(sb, fa, "seam", {"w": SEAM_W, "h": h, "d": 140}, s,
+                                        ra, "light_seam"):
+                    n += 1
     sb.stats["hero_seams"] = sb.stats.get("hero_seams", 0) + n
 
 

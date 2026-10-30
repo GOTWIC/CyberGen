@@ -110,6 +110,8 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "wheel_steel": ("metal", "steel_painted"), "gondola": ("metal", "aluminum"),
     "hero_frame": ("metal", "metal_dark"), "hero_light": ("neon", None),
     "halo_frame": ("metal", "metal_dark"), "halo_light": ("neon", None),
+    "terrace_planter": ("facade", "concrete_formed"), "terrace_green": ("foliage", "grass"),
+    "terrace_soil": ("facade", "ballast"),
     "escape_rust": ("metal", "metal_rusty"), "atrium_glass": ("glass", None),
     "atrium_frame": ("metal", "aluminum"),
 }

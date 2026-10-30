@@ -89,8 +89,14 @@ def _top(counts: dict, n: int = 3) -> str:
                      sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:n])
 
 
-def numbers(man: dict, rep: dict) -> dict:
-    """The key numbers of a build, per city and per district."""
+def _counts(counts: dict, n: int = 4) -> str:
+    return ", ".join(f"{k} {v}" for k, v in
+                     sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:n])
+
+
+def numbers(man: dict, rep: dict, names: dict | None = None) -> dict:
+    """The key numbers of a build, per city and per district (`names`: district id ->
+    name)."""
     recs = man["buildings"]
     city = {"buildings": rep.get("buildings"),
             "triangles_m": round(rep["triangles"]["unique"] / 1e6, 2),
@@ -100,7 +106,8 @@ def numbers(man: dict, rep: dict) -> dict:
             "on_slopes": sum(1 for r in recs.values() if r.get("plinth_m", 0) >= 0.3)}
     by: dict[str, dict] = {}
     for r in recs.values():
-        d = by.setdefault(r.get("district") or "-", {"n": 0, "era": {}, "system": {},
+        dn = (names or {}).get(r.get("district"), r.get("district")) or "-"
+        d = by.setdefault(dn, {"n": 0, "era": {}, "system": {},
                                                      "generator": {}, "wear": 0.0})
         d["n"] += 1
         era = (r.get("material") or {}).get("era") or "-"
@@ -112,7 +119,7 @@ def numbers(man: dict, rep: dict) -> dict:
             d["generator"][g] = d["generator"].get(g, 0) + 1
         d["wear"] += float(r["cpd"][3]) if len(r["cpd"]) > 3 else 0.0
     districts = {k: {"buildings": v["n"], "eras": _top(v["era"], 2),
-                     "systems": _top(v["system"]), "generators": _top(v["generator"]),
+                     "systems": _top(v["system"]), "generators": _counts(v["generator"]),
                      "wear": round(v["wear"] / max(v["n"], 1), 2)}
                  for k, v in sorted(by.items())}
     return {"city": city, "districts": districts}
@@ -154,7 +161,12 @@ def review(build: str | Path, spec_path: str | Path | None = None,
     adir = bdir / "assets" if (bdir / "assets").is_dir() else bdir
     man = json.loads((adir / "manifest.json").read_text(encoding="utf-8"))
     rep = json.loads((adir / "asset_report.json").read_text(encoding="utf-8"))
-    nums = numbers(man, rep)
+    names = {}
+    mp = adir.parent / "city_model.json"
+    if mp.is_file():
+        names = {d["id"]: d["name"] for d in
+                 json.loads(mp.read_text(encoding="utf-8")).get("districts", [])}
+    nums = numbers(man, rep, names)
     prev_rec = None
     if prev is not None:
         pd = Path(prev)
@@ -203,7 +215,8 @@ def _markdown(rec: dict, prev: dict | None, previews: list) -> str:
     for k, v in rec["numbers"]["city"].items():
         L.append(f"| {k} | {_fmt(v)} | {_fmt(pc.get(k))} |")
     L += ["", "## Districts", "",
-          "| District | Buildings | Eras | Facade systems (body) | Type generators | Wear |",
+          "| District | Buildings | Eras | Facade systems (body) | Type generators (buildings) "
+          "| Wear |",
           "|---|---|---|---|---|---|"]
     pd = prev["numbers"]["districts"] if prev else {}
     for name, d in rec["numbers"]["districts"].items():

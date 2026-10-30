@@ -227,10 +227,11 @@ def gen_halo(p: dict, b) -> None:
 
 def gen_garden(p: dict, b) -> None:
     w, d, h = p["w"], p["d"], p["h"]
-    box(b, "planter", -w // 2, w // 2, -d // 2, d // 2, 0, h)
-    box(b, "soil", -w // 2 + 80, w // 2 - 80, -d // 2 + 80, d // 2 - 80, h, h + 40)
-    box(b, "green_roof", -w // 2 + 120, w // 2 - 120, -d // 2 + 120, d // 2 - 120, h + 40,
-        h + 40 + p.get("g", 400))
+    # (slots of its own on the roof rule: AG4's court planters keep theirs)
+    box(b, "terrace_planter", -w // 2, w // 2, -d // 2, d // 2, 0, h)
+    box(b, "terrace_soil", -w // 2 + 80, w // 2 - 80, -d // 2 + 80, d // 2 - 80, h, h + 40)
+    box(b, "terrace_green", -w // 2 + 120, w // 2 - 120, -d // 2 + 120, d // 2 - 120,
+        h + 40, h + 40 + p.get("g", 400))
 
 
 def gen_terrace_rail(p: dict, b) -> None:
@@ -440,9 +441,10 @@ def gen_needle(p: dict, b) -> None:
     box(b, "lamp_red", -120, 120, -120, 120, z, z + 600)
 
 
-GEN = {"eave": gen_eave, "needle": gen_needle, "pillar": gen_pillar, "stairs": gen_stairs, "ladder": gen_ladder,
-       "hangar_door": gen_hangar_door, "truss": gen_truss, "finial": gen_finial,
-       "beacon": gen_beacon, "seam": gen_seam, "halo": gen_halo, "garden": gen_garden,
+GEN = {"eave": gen_eave, "needle": gen_needle, "pillar": gen_pillar, "stairs": gen_stairs,
+       "ladder": gen_ladder, "hangar_door": gen_hangar_door, "truss": gen_truss,
+       "finial": gen_finial, "beacon": gen_beacon, "seam": gen_seam, "halo": gen_halo,
+       "garden": gen_garden,
        "terrace_rail": gen_terrace_rail, "gondola": gen_gondola, "lattice": gen_lattice,
        "dormer": gen_dormer, "tarp": gen_tarp, "shack_roof": gen_shack_roof,
        "stack": gen_stack, "monitor": gen_monitor, "pergola": gen_pergola,
@@ -460,7 +462,8 @@ REACH = {"eave": "deep", "needle": "roof", "pillar": "flush", "stairs": "flush",
          "chimney": "roof", "cab": "deep", "radar": "roof", "neon_strip": "flush",
          "girder": "flush"}
 SUB = {"pillar": "style", "dormer": "style", "terrace_rail": "style"}
-FIXED = {"eave": "tier", "needle": "spire", "stairs": "flight", "ladder": "rungs", "hangar_door": "sliding",
+FIXED = {"eave": "tier", "needle": "spire", "stairs": "flight", "ladder": "rungs",
+         "hangar_door": "sliding",
          "truss": "warren", "finial": "pagoda", "beacon": "aviation", "seam": "light",
          "halo": "crown", "garden": "box", "gondola": "capsule", "lattice": "tower",
          "tarp": "poles", "shack_roof": "lean_to", "stack": "fume", "monitor": "ridge",
@@ -469,7 +472,7 @@ FIXED = {"eave": "tier", "needle": "spire", "stairs": "flight", "ladder": "rungs
 # slots of these parts, merged into a shell, that stand on a roof (the envelope's roof
 # rule: on a roof, or inside the masses)
 ROOF_SLOTS = ("tarp", "pergola", "chimney", "radome", "halo_frame", "halo_light", "finial",
-              "lacquer")
+              "lacquer", "terrace_planter", "terrace_soil", "terrace_green")
 
 
 def register() -> None:
