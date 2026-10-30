@@ -267,7 +267,8 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
         out.junctions.append({
             "id": j["id"], "type": f"junction.{a['type']}", "node_id": j["node_id"],
             "polygon": P(j["polygon"]) if not j["polygon"].is_empty else None,
-            "shape": a["shape"] if a["shape"] in ("T", "X", "multi", "cul_de_sac") else "multi",
+            "shape": a["shape"] if a["shape"] in ("T", "X", "multi", "cul_de_sac", "bend")
+            else "multi",
             "legs": a["legs"], "signalized": j["signalized"],
             "corner_radius_m": a["corner_radius_m"], "crosswalk_ids": j["crosswalk_ids"],
             "attrs": {"classes": a["classes"], "archetype": a["archetype"]}})

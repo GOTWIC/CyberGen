@@ -955,6 +955,8 @@ class Builder:
         self.closed = G.union([G.qpoly(self.reserves.buffer(CLOSED_PAD_M, join_style="mitre")),
                                self.cones, self.open_land, self.pinned])
         shapely.prepare(self.closed)
+        self.canvas = G.canvas_for(spec.size_km)
+        self.dead_ends: dict = {}      # M17: dead end point -> (kind, turning bulb radius)
         self.lines: list[Line] = []
         self.index = SegIndex()
         self.net = StreetNet()
@@ -1371,6 +1373,7 @@ def district_angle(B: Builder, name: str) -> float:
 
 UNDERPASS_STEP_M = 200.0       # M7: a street under a viaduct about this often
 UNDERPASS_CLEAR_M = 7.8        # deck top over it: 5.5 m clear, 1.8 m deck, a margin
+PATH_UNDER_CLEAR_M = 4.5       # M17: a pedestrian path under a deck this high (2.5 m clear)
 
 
 def _z_on(prof, s: float) -> float:
@@ -1385,11 +1388,13 @@ def _z_on(prof, s: float) -> float:
     return pts[-1][1]
 
 
-def under_deck(ln: "Line", p) -> bool:
-    """A primary road whose deck at p (on it) clears a street passing under it."""
+def under_deck(ln: "Line", p, cls: str = "street") -> bool:
+    """A primary road whose deck at p (on it) clears a road of class cls passing under it
+    (M17: a pedestrian path under a lower deck)."""
     if ln.primary is None:
         return False
-    return _z_on(ln.primary["z_profile"], _project(ln.pts, p)[0]) >= UNDERPASS_CLEAR_M - 0.5
+    clear = PATH_UNDER_CLEAR_M if cls in PEDESTRIAN else UNDERPASS_CLEAR_M
+    return _z_on(ln.primary["z_profile"], _project(ln.pts, p)[0]) >= clear - 0.5
 
 
 TUNNEL_SIDE_M = 3.0            # M9: a tunnel road's right of way past each carriageway edge
@@ -2800,7 +2805,7 @@ def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
             # a local road crossing a primary road where no junction was allowed: it stops
             # on both sides instead (cut below), no node; under a viaduct it passes under
             loc, prim = (lj, li) if li < B.n_primary else (li, lj)
-            if under_deck(B.lines[prim], p) or over_tunnel(B.lines[prim], p):
+            if under_deck(B.lines[prim], p, B.lines[loc].cls) or over_tunnel(B.lines[prim], p):
                 continue
             cuts.setdefault(loc, []).append((p, B.lines[prim].width / 2 + 3.0))
             crossings += 1
@@ -3202,6 +3207,466 @@ def drop_unnoded_crossings(B: Builder, edges) -> tuple[list, int]:
     return edges, n
 
 
+# ---------------------------------------------------------------------------
+# M17: dead ends and overlaps
+# ---------------------------------------------------------------------------
+
+DEAD_END_REACH_M = 60.0    # a dead end runs on to the road straight ahead this close
+DEAD_END_TURN_DEG = 35.0   # ... or to a node of that road, turning this much at most
+FACING_M = 30.0            # two dead ends facing each other this close are joined
+PATH_JUNCTION_GAP_M = 8.0  # a path's dead end meets a road this far from its junctions
+CUL_DE_SAC_MIN_M = 40.0    # a dead-end vehicle road shorter than this to its junction goes
+TURN_HEAD_M = {"street": 12.0, "service": 10.0, "alley": 8.0}   # turning bulb radius
+GATE_M = 8.0               # a dead end this close (past its half width) to water, open land
+#                            or a megasite reserve ends there
+PRIMARY_GATE_M = 30.0      # ... a primary road's (a promenade and a quay between it and the
+#                            water, a reserve's service ring between it and the site)
+OVERLAP_M2 = 10.0          # rights of way of two roads (no node shared) overlapping more
+#                            than this: the lesser road goes
+POKE_M2 = 1.0              # a dead end's right of way reaching into another road's
+DEAD_END_KINDS = ("map_edge", "water_end", "park_gate", "plaza_gate", "site_gate", "path_end",
+                  "cul_de_sac", "deck_end")
+SITE_GATE = {"central_park": "park_gate", "grand_plaza": "plaza_gate"}
+
+
+class _Graph:
+    """The noded edges with the edges at each end point, their lines and rights of way."""
+
+    def __init__(self, B: Builder, edges, cache: dict | None = None):
+        self.B = B
+        self.edges = list(edges)      # (as the round found them)
+        self._cache = {} if cache is None else cache    # (rights of way, kept across rounds)
+        self.clear = self._cache.setdefault("clear", set())   # (pairs found clear)
+        self.at: dict = {}
+        for e, (pts, li) in enumerate(edges):
+            self.at.setdefault(pts[0], []).append((e, False))
+            self.at.setdefault(pts[-1], []).append((e, True))
+        self.lines = [LineString(p) for p, _ in edges]
+        self.tree = shapely.STRtree(self.lines)
+        self.dead = [q for q in sorted(self.at) if len(self.at[q]) == 1]
+
+    def row(self, e: int):
+        pts, li = self.edges[e]
+        key = (tuple(pts), self.B.lines[li].width)
+        if key not in self._cache:
+            self._cache[key] = G.qpoly(self.lines[e].buffer(
+                self.B.lines[li].width / 2, cap_style="flat", join_style="mitre",
+                mitre_limit=2.0))
+        return self._cache[key]
+
+    def near(self, geom) -> list[int]:
+        return sorted(int(x) for x in self.tree.query(geom))
+
+    def ends(self) -> list[tuple]:
+        """(point, edge, at its end) of every dead end, by point."""
+        return [(p, *self.at[p][0]) for p in self.dead]
+
+    def nodes_of(self, e: int) -> set:
+        pts = self.edges[e][0]
+        return {pts[0], pts[-1]}
+
+
+def _end_dir(pts, at_end: bool):
+    """The polyline ending at its dead end, the end point and the direction it leaves in."""
+    seq = pts if at_end else pts[::-1]
+    p = seq[-1]
+    back, _ = _along(seq[::-1], min(8.0, _plen(seq) / 2))
+    return seq, p, _unit(p[0] - back[0], p[1] - back[1])
+
+
+def _passes_under(B: Builder, g: _Graph, j: int, link: LineString, cls: str) -> bool:
+    """Whether a link crosses edge j where j is a deck high enough for class cls under it."""
+    tl = g.edges[j][1]
+    if tl >= B.n_primary:
+        return False
+    x = link.intersection(g.lines[j])
+    pts = _points_of(x) if not x.is_empty else []
+    return bool(pts) and x.geom_type in ("Point", "MultiPoint") and all(
+        under_deck(B.lines[tl], _pt(*q), cls) for q in pts)
+
+
+def _link_clear(B: Builder, g: _Graph, e: int, p, q, at_q: set, ln: Line) -> bool:
+    """A link p-q from edge e's dead end: on land, off closed ground, crossing no road but at
+    q (or under a deck high enough), its right of way into no other road's (but those
+    meeting at q)."""
+    link = LineString([p, q])
+    if B.wet.intersects(link) and link.intersection(B.wet).length > 0.5:
+        return False
+    if B.closed.intersects(link) and link.intersection(B.closed).length > 0.5:
+        return False
+    row = G.qpoly(link.buffer(ln.width / 2, cap_style="flat"))
+    for j in g.near(row):
+        if j == e or j in at_q:
+            continue
+        if (g.lines[j].intersects(link) or G.area1(G.inter(row, g.row(j))) > POKE_M2) and                 not _passes_under(B, g, j, link, ln.cls):
+            return False
+    return True
+
+
+def _run_on(B: Builder, g: _Graph, e: int, at_end: bool):
+    """Where edge e's dead end runs on to: (point, edge to split there or None, edges at the
+    point) when the road straight ahead (within DEAD_END_REACH_M) takes a junction there, or a node of it within
+    MIN_JUNCTION_GAP_M, or a dead end facing it; else None."""
+    pts, li = g.edges[e]
+    ln = B.lines[li]
+    seq, p, d0 = _end_dir(pts, at_end)
+    other = seq[0]
+    amin = min_angle(B.arch[ln.district]) if ln.district else GRID_ANGLE_DEG
+    renewed = B._renewed(ln)
+    tip = (p[0] + d0[0] * DEAD_END_REACH_M, p[1] + d0[1] * DEAD_END_REACH_M)
+    ray = LineString([p, tip])
+    hit = None
+    for k in g.near(ray):
+        if k == e:
+            continue
+        kp, kl = g.edges[k]
+        for i in range(len(kp) - 1):
+            r = _cross_exact(p, tip, kp[i], kp[i + 1])
+            if r is None or r[0] == p or (hit is not None and (r[1], k) >= (hit[1], hit[2])):
+                continue
+            if kl < B.n_primary and under_deck(B.lines[kl], r[0], ln.cls):
+                continue      # (a deck it passes under: the road beyond)
+            hit = (r[0], r[1], k)
+    # a dead end facing this one, nearer than the road ahead
+    face = None
+    for q in g.dead:
+        if q in (p, other) or _dist(p, q) > FACING_M:
+            continue
+        f, f_end = g.at[q][0]
+        fl = B.lines[g.edges[f][1]]
+        if f == e or fl.cls not in LOCAL or (fl.cls in PEDESTRIAN) != (ln.cls in PEDESTRIAN):
+            continue
+        u = _unit(q[0] - p[0], q[1] - p[1])
+        _, _, d1 = _end_dir(g.edges[f][0], f_end)
+        if _turn_deg(d0, u) > 20.0 or _turn_deg(d1, (-u[0], -u[1])) > DEAD_END_TURN_DEG:
+            continue
+        if hit is not None and _dist(p, hit[0]) < _dist(p, q):
+            continue
+        if face is None or (_dist(p, q), q) < (_dist(p, face[0]), face[0]):
+            face = (q, f)
+    if face is not None:
+        q, f = face
+        if B.frame is not None and (renewed != B._renewed(B.lines[g.edges[f][1]]) or
+                                    _held(B, g.edges[f][0])):
+            return None
+        if _link_clear(B, g, e, p, q, {f}, ln):
+            return q, None, {f}
+        return None
+    if hit is None:
+        return None
+    q, _, k = hit
+    tpts, tl = g.edges[k]
+    t = B.lines[tl]
+    if t.no_junction or (ln.cls not in PEDESTRIAN and t.cls == "footbridge"):
+        return None
+    gap = PATH_JUNCTION_GAP_M if ln.cls in PEDESTRIAN or t.cls in PEDESTRIAN else         MIN_JUNCTION_GAP_M
+    near = [x for x in (tpts[0], tpts[-1]) if _dist(x, q) < gap]
+    if near:
+        # the junction of the road ahead that is close takes the dead end instead
+        n = min(near, key=lambda x: (_dist(x, q), x))
+        if n == other:
+            return None
+        u = _unit(n[0] - p[0], n[1] - p[1])
+        if _turn_deg(d0, u) > DEAD_END_TURN_DEG or (tl < B.n_primary and n in t.nodes) or (
+                len(g.at[n]) == 1 and (ln.cls in PEDESTRIAN) != (t.cls in PEDESTRIAN)):
+            return None     # (a street goes on as a path only where the two meet a third)
+        for f, f_end in g.at[n]:
+            v, _ = _along(g.edges[f][0] if not f_end else g.edges[f][0][::-1], 10.0)
+            if _turn_deg((-u[0], -u[1]), _unit(v[0] - n[0], v[1] - n[1])) < amin - 1.0:
+                return None
+        q = n
+        at_q = {f for f, _ in g.at[n]}
+    else:
+        if tl < B.n_primary and not B._legal(t, q, _project(t.pts, q)[0], renewed):
+            return None
+        if _angle_between(_unit(q[0] - p[0], q[1] - p[1]), B._tangent(tpts, q)) < amin - 1.0:
+            return None
+        at_q = {k}
+    if B.frame is not None:
+        # M10: a held road keeps its pieces; a new street meets an old road at a node of it
+        if q not in (tpts[0], tpts[-1]) and (_held(B, tpts) or renewed != B._renewed(t)):
+            return None
+        if renewed and not B._renewed(t) and q not in B.frame.nodes:
+            return None
+    if _dist(p, q) < 0.5 or not _link_clear(B, g, e, p, q, at_q, ln):
+        return None
+    return q, (k if q not in (tpts[0], tpts[-1]) else None), at_q
+
+
+def _split_at(edges: list, k: int, q) -> None:
+    """Edge k split at grid point q on it (the second piece appended)."""
+    pts, li = edges[k]
+    i = _project(pts, q)[3]
+    a, b = _dedupe(list(pts[:i + 1]) + [q]), _dedupe([q] + list(pts[i + 1:]))
+    if len(a) < 2 or len(b) < 2:
+        return
+    edges[k] = (a, li)
+    edges.append((b, li))
+
+
+def _chain(g: _Graph, e: int, at_end: bool) -> tuple[list[int], float]:
+    """The edges from a dead end back to its last junction (through bends), and their
+    length."""
+    out, L = [], 0.0
+    pts = g.edges[e][0]
+    q = pts[0] if at_end else pts[-1]
+    while True:
+        out.append(e)
+        L += _plen(g.edges[e][0])
+        nxt = [x for x in g.at.get(q, []) if x[0] not in out]
+        if len(g.at.get(q, [])) != 2 or len(nxt) != 1:
+            return out, L
+        e, f_end = nxt[0]
+        pts = g.edges[e][0]
+        q = pts[0] if f_end else pts[-1]
+
+
+def _dead_kind(B: Builder, g: _Graph, e: int, at_end: bool, p) -> tuple[str | None, float]:
+    """What a dead end that stays is (`DEAD_END_KINDS`) and its turning bulb's radius (0 for
+    none), or (None, 0) when it goes."""
+    pts, li = g.edges[e]
+    ln = B.lines[li]
+    if B.canvas.exterior.distance(Point(p)) < 1.0:
+        return "map_edge", 0.0
+    prim = li < B.n_primary
+    zone = _disc(Point(p), ln.width / 2 + (PRIMARY_GATE_M if prim else GATE_M))
+    head = G.q(ln.width / 2 + 4.0) if prim else TURN_HEAD_M.get(ln.cls, 0.0)
+    if ln.role == "cul_de_sac":
+        return "cul_de_sac", 12.0     # (a curvilinear district's: laid with its bulb)
+    if B.wet.intersects(zone):
+        return "water_end", head if head and _bulb_fits(B, g, e, p, head) else 0.0
+    for s in B.sites:
+        if s.polygon.intersects(zone):
+            return SITE_GATE.get(s.kind, "site_gate"), 0.0
+    if B.open_land.intersects(zone):
+        return "park_gate", 0.0
+    if ln.cls in PEDESTRIAN:
+        return "path_end", 0.0
+    if prim:
+        # (an M1b road that ends with nothing at its end: a bulb where it fits, else the
+        # check `road_dead_ends` reports it)
+        return "cul_de_sac", head if _bulb_fits(B, g, e, p, head) else 0.0
+    _, L = _chain(g, e, at_end)
+    if L >= CUL_DE_SAC_MIN_M and head and _bulb_fits(B, g, e, p, head):
+        return "cul_de_sac", head
+    return None, 0.0
+
+
+def _bulb_fits(B: Builder, g: _Graph, e: int, p, r: float) -> bool:
+    disc = G.qpoly(_disc(Point(p), r))
+    if B.wet.intersects(disc) or (B.closed.intersects(disc) and
+                                  G.area1(G.inter(disc, B.closed)) > POKE_M2):
+        return False
+    for j in g.near(disc):
+        if j != e and G.area1(G.inter(disc, g.row(j))) > POKE_M2:
+            return False
+    return True
+
+
+def _poke(B: Builder, g: _Graph, e: int, at_end: bool) -> float:
+    """How far edge e must be cut back from its dead end so its right of way reaches into
+    no road that does not meet it (0 when it does not)."""
+    pts, li = g.edges[e]
+    seq, p, _ = _end_dir(pts, at_end)
+    mine = g.nodes_of(e)
+    row = g.row(e)
+    worst = 0.0
+    line = LineString(seq[::-1])
+    for j in g.near(row):
+        if j == e or g.nodes_of(j) & mine:
+            continue
+        ov = G.inter(row, g.row(j))
+        if G.area1(ov) <= POKE_M2:
+            continue
+        s = shapely.line_locate_point(line, shapely.points(shapely.get_coordinates(ov)))
+        worst = max(worst, float(s.max()) + 1.0)
+    return G.q(worst)
+
+
+def _poked(B: Builder, g: _Graph, e: int, p) -> dict:
+    """Local edges (not held, no node shared) that primary edge e's dead end p reaches into:
+    edge -> the stretch (from, to along it) within its right of way, 1 m past."""
+    out = {}
+    mine = g.nodes_of(e)
+    zone = G.inter(g.row(e), G.qpoly(_disc(Point(p), B.lines[g.edges[e][1]].width)))
+    for j in g.near(zone):
+        pts, lj = g.edges[j]
+        if j == e or lj < B.n_primary or g.nodes_of(j) & mine or _held(B, pts):
+            continue
+        ov = G.inter(zone, g.row(j))
+        if G.area1(ov) <= POKE_M2:
+            continue
+        s = shapely.line_locate_point(g.lines[j], shapely.points(shapely.get_coordinates(ov)))
+        out[j] = (G.q(max(float(s.min()) - 1.0, 0.0)),
+                  G.q(min(float(s.max()) + 1.0, _plen(pts))))
+    return out
+
+
+def _reach(B: Builder, g: _Graph, i: int, j: int, q) -> float:
+    """How far from a node they share two roads' rights of way may overlap (their junction's
+    reach: both widths and 5 m; at a bend, where nothing else meets them, half that)."""
+    w = B.lines[g.edges[i][1]].width + B.lines[g.edges[j][1]].width
+    return w / 2 + 5.0 if len(g.at.get(q, [])) == 2 else w + 5.0
+
+
+def _overlaps(B: Builder, g: _Graph) -> set:
+    """Local edges whose right of way overlaps another road's by more than OVERLAP_M2 (away
+    from the nodes they share, as far as their two widths and 5 m: the junction's; neither
+    with a dead end in it, which `_poke` cuts back): the lesser of each pair (a street laid
+    again along another, two streets between the same junctions, a short parallel run)."""
+    drop: set = set()
+    dead = set(g.dead)
+    rows = np.array([g.row(e) for e in range(len(g.edges))], dtype=object)
+    prim = np.array([li < B.n_primary for _, li in g.edges], dtype=bool)
+    a, b = _pairs(shapely.STRtree(rows).query(rows, predicate="intersects"))
+    keep = (a < b) & ~(prim[a] & prim[b])
+    a, b = a[keep], b[keep]
+    # (a first pass in floating point, a meter short of the limit, round discs about the
+    # nodes they share; the exact one on the pairs left that an earlier round did not
+    # find clear)
+    ov = shapely.intersection(rows[a], rows[b])
+    keep = shapely.area(ov) > OVERLAP_M2 - 1.0
+    a, b, ov = a[keep], b[keep], ov[keep]
+    shared = [sorted(g.nodes_of(i) & g.nodes_of(j)) for i, j in zip(a.tolist(), b.tolist())]
+    for k in (0, 1):
+        pts = shapely.points([x[k] if len(x) > k else (0.0, 0.0) for x in shared] or
+                             np.empty((0, 2)))
+        r = np.array([_reach(B, g, i, j, x[k]) if len(x) > k else 0.0
+                      for i, j, x in zip(a.tolist(), b.tolist(), shared)])
+        has = np.array([len(x) > k for x in shared], dtype=bool)
+        ov = np.where(has, shapely.difference(ov, shapely.buffer(pts, r + 0.5)), ov)
+    keep = shapely.area(ov) > OVERLAP_M2 - 1.0
+    for i, j in zip(a[keep].tolist(), b[keep].tolist()):
+        if i in drop or j in drop:
+            continue
+        li, lj = g.edges[i][1], g.edges[j][1]
+        key = (tuple(g.edges[i][0]), tuple(g.edges[j][0]))
+        if key in g.clear:
+            continue
+        ov = G.inter(g.row(i), g.row(j))
+        both = sorted(g.nodes_of(i) & g.nodes_of(j))
+        if both:
+            ov = G.diff(ov, G.union([G.qpoly(_disc(Point(q), _reach(B, g, i, j, q)))
+                                     for q in both]))
+        if G.area1(ov) <= OVERLAP_M2:
+            g.clear.add(key)
+            continue
+        if not both and any(ov.distance(Point(q)) < 1.0
+                            for q in (g.nodes_of(i) | g.nodes_of(j)) & dead):
+            continue
+        cand = [k for k in (i, j) if g.edges[k][1] >= B.n_primary and
+                not _held(B, g.edges[k][0])]
+        new = [k for k in cand if B._renewed(B.lines[g.edges[k][1]])]
+        if new and len(new) < len(cand):
+            cand = new    # M10: the new street goes, not the held one
+        if not cand:
+            continue
+        drop.add(min(cand, key=lambda k: (RANK[B.lines[g.edges[k][1]].cls],
+                                          _plen(g.edges[k][0]), k)))
+    return drop
+
+
+def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
+    """M17: every dead end of a local road runs on to the road straight ahead, joins a dead
+    end facing it, or stays as what it is (`DEAD_END_KINDS`: a map edge, a water end, a gate
+    to a park, plaza or megasite, a path's end, a cul-de-sac with room for its turning
+    bulb), else its street is cut back to its last junction; a dead end's right of way
+    reaching into another road's is cut back clear of it, and a local road laid along
+    another (rights of way overlapping, no node shared) goes. Sets `B.dead_ends` (point ->
+    (kind, bulb radius))."""
+    n_run = n_cut = n_trim = n_dup = 0
+    tags: dict = {}
+    cache: dict = {}
+    for _ in range(12):
+        g = _Graph(B, edges, cache)
+        drop = _overlaps(B, g)
+        if drop:
+            n_dup += len(drop)
+            edges = _merge_and_trim(B, [x for k, x in enumerate(edges) if k not in drop])
+            continue
+        touched: set = set()
+        ends = [x for x in g.ends() if g.edges[x[1]][1] >= B.n_primary]
+        for p, e, at_end in ends:
+            if e in touched or _held(B, g.edges[e][0]):
+                continue
+            r = _run_on(B, g, e, at_end)
+            if r is None:
+                continue
+            q, k, at_q = r
+            if at_q & touched:
+                continue
+            pts, li = edges[e]
+            edges[e] = (_dedupe(list(pts) + [q] if at_end else [q] + list(pts)), li)
+            touched.add(e)
+            touched |= at_q
+            if k is not None:
+                _split_at(edges, k, q)
+            n_run += 1
+        if touched:
+            edges = _merge_and_trim(B, edges)
+            continue
+        tags = {}
+        cut: set = set()
+        trims: dict = {}
+        gaps: dict = {}
+        for p, e, at_end in g.ends():
+            if e in cut:
+                continue
+            held = _held(B, g.edges[e][0])
+            kind, head = _dead_kind(B, g, e, at_end, p)
+            if kind is None and not held:
+                chain, _ = _chain(g, e, at_end)
+                if not any(_held(B, g.edges[c][0]) for c in chain):
+                    cut.update(chain)
+                    continue
+            tags[p] = (kind or "cul_de_sac", head)
+            if g.edges[e][1] >= B.n_primary and not held and kind != "map_edge":
+                d = _poke(B, g, e, at_end)
+                if d > 0.0:
+                    trims[e] = (at_end, d)
+            elif g.edges[e][1] < B.n_primary:
+                # a primary road ending in a local road's right of way: the local road
+                # stops on both sides of it
+                for j, span in _poked(B, g, e, p).items():
+                    gaps.setdefault(j, []).append(span)
+        if not cut and not trims and not gaps:
+            break
+        out = []
+        for k, (pts, li) in enumerate(edges):
+            if k in cut:
+                n_cut += 1
+                continue
+            if k in gaps:
+                L = _plen(pts)
+                a = min(x[0] for x in gaps[k])
+                b = max(x[1] for x in gaps[k])
+                out += [(x, li) for x in (_substring(pts, 0.0, a), _substring(pts, b, L))
+                        if len(x) >= 2 and _plen(x) >= 2.0]
+                n_trim += 1
+                continue
+            if k in trims:
+                at_end, d = trims[k]
+                L = _plen(pts)
+                if L - d < 12.0:
+                    n_cut += 1
+                    continue
+                pts = _trimmed(pts, not at_end, d)
+                n_trim += 1
+            out.append((pts, li))
+        edges = _merge_and_trim(B, out)
+    B.dead_ends = tags
+    notes = []
+    if n_run:
+        notes.append(f"{n_run} dead ends run on to the road ahead or the dead end facing them")
+    if n_cut:
+        notes.append(f"{n_cut} dead-end pieces cut back to their last junction")
+    if n_trim:
+        notes.append(f"{n_trim} dead ends cut back clear of the road they ran into")
+    if n_dup:
+        notes.append(f"{n_dup} local roads laid along another road removed")
+    return edges, notes
+
+
 def clean_graph(B: Builder, edges):
     notes = []
     if B.frame is not None:
@@ -3248,6 +3713,8 @@ def clean_graph(B: Builder, edges):
         else:
             out.append((pts, li))
     edges = out
+    edges, n_dead = settle_dead_ends(B, edges)
+    notes += n_dead
     # keep the component that holds the primary network
     parent: dict = {}
 
@@ -3482,6 +3949,14 @@ def build_output(B: Builder, edges) -> None:
         attrs = {"kind": kind, "degree": deg[c], "primary_degree": prim_deg.get(c, 0)}
         if old and old["attrs"].get("exit"):
             attrs["exit"] = old["attrs"]["exit"]
+        if deg[c] == 1:
+            # M17: what a dead end is (a primary road's exit or map edge too)
+            de, head = B.dead_ends.get(c, ("map_edge", 0.0) if kind in ("exit", "edge")
+                                       else (None, 0.0))
+            if de is not None:
+                attrs["dead_end"] = de
+            if head:
+                attrs["turning_head_m"] = head
         z = old["position"][2] if old else 0.0
         net.nodes.append({"id": node_id[c], "position": (c[0], c[1], z),
                           "level": old.get("level", 0) if old else 0, "attrs": attrs})

@@ -48,6 +48,7 @@ CORNER_R = {"highway": 15.0, "avenue": 12.0, "service": 6.0, "alley": 3.0, "pede
             "footbridge": 1.0}
 ROW_CORNER_MIN_M = 1.0
 CORNER_RUN_MAX_M = 60.0      # longest corner (fillet or sharp) along a leg
+CUT_SHARE = 0.9              # M17: the cut-backs at a road's two ends take at most this of it
 CROSSWALK_W = 4.0
 CROSSWALK_SETBACK_M = 1.5
 SIGNAL_STREET_ARCH = ("corporate_core", "transit_hub", "midtown_mixed")
@@ -170,8 +171,19 @@ def legs_at(net, arch_of) -> dict[str, list[Leg]]:
     return out
 
 
-def cutbacks(legs: list[Leg]) -> None:
+def cutbacks(legs: list[Leg], cap: bool = True) -> None:
+    """Each leg's cut-back at a node; `cap` limits it to 0.45 of the leg (else `share_cuts`
+    shares each road between its two junctions)."""
     n = len(legs)
+    if n == 2:
+        # M17: a bend between two roads (an avenue that ends in a street, a street that goes
+        # on as a promenade) cuts back where their rights of way overlap
+        overlap_cuts(legs)
+        if any(lg.cut > 0.0 for lg in legs):
+            for lg in legs:
+                lg.cut = min(lg.cut + 1.0, 0.45 * lg.L) if cap else lg.cut + 1.0
+                lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L) if cap else lg.cut_row + 0.5
+        return
     if n < 3:
         return
     P = legs[0].p
@@ -187,9 +199,65 @@ def cutbacks(legs: list[Leg]) -> None:
         if c2 is not None:
             a.cut_row = max(a.cut_row, c2[0])
             b.cut_row = max(b.cut_row, c2[1])
+    overlap_cuts(legs)
     for lg in legs:
-        lg.cut = min(lg.cut + 1.0, 0.45 * lg.L)
-        lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L)
+        lg.cut = min(lg.cut + 1.0, 0.45 * lg.L) if cap else lg.cut + 1.0
+        lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L) if cap else lg.cut_row + 0.5
+
+
+def share_cuts(legs: dict) -> None:
+    """M17: the two junctions of a road share CUT_SHARE of it by need (one that needs less
+    than half leaves the rest to the other), so a junction next to a small one reaches past
+    its overlaps on a short road."""
+    by_seg: dict = {}
+    for nid in sorted(legs):
+        for x in legs[nid]:
+            by_seg.setdefault(x.seg["id"], []).append(x)
+    for sid in sorted(by_seg):
+        xs = by_seg[sid]
+        avail = CUT_SHARE * xs[0].L
+        for attr in ("cut", "cut_row"):
+            need = [getattr(x, attr) for x in xs]
+            if len(xs) == 2 and need[0] + need[1] > avail:
+                a, b = need
+                if a <= avail / 2:
+                    b = avail - a
+                elif b <= avail / 2:
+                    a = avail - b
+                else:
+                    a = b = avail / 2
+                need = [a, b]
+            for x, c in zip(xs, need):
+                setattr(x, attr, min(c, avail))
+
+
+def strip(lg: Leg, s: float, h: float):
+    """A leg's band of half width h from the node to s along its centerline (flat ends)."""
+    pts = ST._substring(lg.pts, 0.0, min(s, lg.L))
+    if len(pts) < 2 or h <= 0.0:
+        return Polygon()
+    return G.qpoly(LineString(pts).buffer(h, cap_style="flat", join_style="mitre",
+                                          mitre_limit=2.0))
+
+
+def overlap_cuts(legs: list[Leg]) -> None:
+    """M17: each leg's cut reaches past every stretch where its right of way overlaps
+    another leg's (an acute corner, a leg that bends inside the junction, a gore where a
+    ramp leaves), as far as 0.45 of the leg, so two roads overlap only inside the junction
+    polygon (`junction_polygon` adds a bent leg's carriageway out to its cut)."""
+    reach = [CUT_SHARE * lg.L for lg in legs]
+    rows = [strip(lg, r, lg.row) for lg, r in zip(legs, reach)]
+    lines = [LineString(lg.pts) for lg in legs]
+    for i in range(len(legs)):
+        for j in range(i + 1, len(legs)):
+            ov = G.inter(rows[i], rows[j])
+            if ov.is_empty or G.area1(ov) < 0.5:
+                continue
+            pts = shapely.points(shapely.get_coordinates(ov))
+            for k in (i, j):
+                far = float(shapely.line_locate_point(lines[k], pts).max())
+                legs[k].cut = max(legs[k].cut, G.q(far + 0.5))
+                legs[k].cut_row = max(legs[k].cut_row, legs[k].cut)
 
 
 def run_along(lg: Leg, c: float) -> float:
@@ -238,7 +306,26 @@ def junction_polygon(legs: list[Leg], row: bool = False) -> Polygon:
     pts = ST._dedupe(ring)
     if len(pts) < 3:
         return Polygon()
-    return G.qpoly(shapely.make_valid(Polygon(pts)))
+    poly = G.qpoly(shapely.make_valid(Polygon(pts)))
+    # M17: a leg that bends inside the junction keeps its band out to the cut (the ring
+    # runs straight along its direction at the node)
+    bent = [s for s in (strip(lg, lg.cut_row if row else lg.cut, lg.row if row else lg.h)
+                        for lg in legs if _bends(lg, lg.cut_row if row else lg.cut))
+            if G.area1(G.diff(s, poly)) > 0.5]
+    return G.union([poly] + bent) if bent else poly
+
+
+def _bends(lg: Leg, c: float) -> bool:
+    """Whether a leg's centerline leaves its direction at the node by over 5 cm within c."""
+    P, d = lg.p, lg.d
+    acc = 0.0
+    for a, b in zip(lg.pts, lg.pts[1:]):
+        if abs((b[0] - P[0]) * d[1] - (b[1] - P[1]) * d[0]) > 0.05:
+            return True
+        acc += ST._dist(a, b)
+        if acc >= c:
+            return False
+    return False
 
 
 def classify(legs: list[Leg], arch: str | None) -> tuple[str, str, bool]:
@@ -581,6 +668,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
     n_oneway = one_way_loops(net, district_arch, seed)
     T.detail("junctions/one_way", sorted(s["id"] for s in net.segments if s.get("one_way")))
     pos = {n["id"]: tuple(n["position"][:2]) for n in net.nodes}
+    heads = {n["id"]: n["attrs"].get("turning_head_m", 0.0) for n in net.nodes}
 
     def arch_of(s):
         d = s["attrs"].get("district")
@@ -603,10 +691,12 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
     nlev = {n["id"]: DK.walk_level(n) for n in net.nodes}
     corner_of: dict = {}   # (node, seg id, side) -> walk node
     for nid in sorted(legs):
+        cutbacks(legs[nid], cap=False)
+    share_cuts(legs)
+    for nid in sorted(legs):
         lg = legs[nid]
         P = pos[nid]
         W = Ws.setdefault(nlev.get(nid, 0), WalkGraph())
-        cutbacks(lg)
         for x in lg:
             cut[(x.seg["id"], nid)] = x.cut
             cut_row[(x.seg["id"], nid)] = x.cut_row
@@ -616,8 +706,9 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
             q = W.node(P)
             corner_of[(nid, x.seg["id"], "L")] = q
             corner_of[(nid, x.seg["id"], "R")] = q
-            if x.seg["attrs"].get("role") == "cul_de_sac":
-                r = 12.0
+            r = heads.get(nid, 0.0)
+            if r:
+                # (M17: a cul-de-sac or a quay end with room for its turning bulb)
                 ring = [(P[0] + r * M.cos(a), P[1] + r * M.sin(a))
                         for a in [k * 2 * M.PI / 24 for k in range(24)]]
                 turnarounds.append((nid, G.qpoly(Polygon(ring))))
@@ -629,7 +720,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
             q = W.node(c)
             corner_of[(nid, a.seg["id"], "L" if a.at_start else "R")] = q
             corner_of[(nid, b.seg["id"], "R" if b.at_start else "L")] = q
-        if n < 3:
+        if n < 3 and not (n == 2 and any(x.cut > 0.0 for x in lg)):
             continue
         kind, shape, sig = classify(lg, node_arch[nid])
         jid = f"jn{len(junctions) + 1:05d}"
@@ -671,11 +762,12 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                                     "classes": sorted({x.cls for x in lg},
                                                       key=lambda c: (-ST.RANK[c], c))}})
     for nid, poly in turnarounds:
+        cls = ST.street_class(legs[nid][0].seg)
         junctions.append({"id": f"jn{len(junctions) + 1:05d}", "node_id": nid, "polygon": poly,
                           "signalized": False, "crosswalk_ids": [], "row_polygon": poly,
-                          "attrs": {"type": "street", "shape": "cul_de_sac", "legs": 1,
-                                    "corner_radius_m": 12.0,
-                                    "archetype": node_arch[nid], "classes": ["street"]}})
+                          "attrs": {"type": cls, "shape": "cul_de_sac", "legs": 1,
+                                    "corner_radius_m": heads[nid],
+                                    "archetype": node_arch[nid], "classes": [cls]}})
     # sidewalks and centerline walkways
     for s in net.segments:
         if s["attrs"].get("role") == "deck_ramp":
