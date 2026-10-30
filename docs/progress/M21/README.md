@@ -96,4 +96,35 @@ skybridge landings, roof items); M13 seats and M14 decks as before.
 
 ## Builds
 
-See the tables in this folder's builds section below (tries, checks) and the images.
+Every sample builds with every check passing (88 checks, 93 on the deck demo), in the tries it
+took on main before M21:
+
+| City | Tries before | Tries after | Towers | Tower forms before | after | Same form and band pairs within 150 m, before | after |
+|---|---|---|---|---|---|---|---|
+| Vesper Bay | 1 | 1 | 191 | 2 | 19 | 472 | 0 |
+| Delta Megacity | 1 | 1 | 396 | 2 | 19 | 867 | 0 |
+| Nexus City | 1 | 1 | 276 | 3 | 20 | 575 | 0 |
+| Saltreach Free Port | 1 | 1 | 217 | 1 | 18 | 609 | 0 |
+| Greyhook | 1 | 1 | 113 | 2 | 15 | 149 | 0 |
+| Vesper Bay Pinned | 2 | 2 | 41 | 1 | 13 | 21 | 0 |
+| Vesper Bay Stacks | 1 | 1 | 46 | 1 | 13 | 35 | 0 |
+| Vesper Bay Decks | 2 | 2 | 183 | 2 | 19 | 328 | 0 |
+| Cragmouth | 1 | 1 | 227 | 2 | 19 | 320 | 0 |
+
+(Forms before: box and the landmarks' kinds. Towers: podium towers, towers and landmarks 40 m
+and taller; the traced towers of the pinned and stack demos stand as drawn and are left out.)
+
+(A first try of the pinned and stack demos found a skybridge through a traced building, which
+the bridges did not see, and a cluster tower standing beside its podium piece; both are fixed,
+see Checks.)
+
+`assetgen build` on Vesper Bay and Delta: every check of every stage passes (buildings,
+streets, props, materials). Drawn simply for now (`shell._simple_mass`, until AG15 draws the
+forms whole): the bands of twisted, tapered and leaning shafts and the masses off the ground
+curved all round (round towers and drums, ovals): the plate extruded, a spandrel and a ribbon
+of glass a floor; 594 masses in Vesper Bay. Rounded corners, blocks, links, cores, pods and
+frames take the full facade grammar, their curves as short facade edges.
+
+Images: `vesper_bay/` and `delta_megacity/` (`preview_massing.png`; 8K renders
+`render_iso_city.jpg` and the corporate cores `render_iso_d01.jpg`, `render_iso_d03.jpg`;
+`render_street_up.jpg`, looking up a Vesper Bay Corporate Core street). WIP: `wip/`.
