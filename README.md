@@ -309,13 +309,15 @@ tubes pass through towers in portals, with platforms where a station stands. In 
 each skybridge replaces its blockout piece and the roof equipment is instanced per tile.
 More: [`docs/progress/AG4`](docs/progress/AG4).
 
-<img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
+<img src="docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg" width="840">
 
-Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).
+A shopping street in Greyhook in Unreal 5.8: street fronts, signs, props, roads and
+textured buildings, all from stage 2 (8K).
 
 `citygen unreal out/<city> <Project>.uproject` brings the buildings and streets into Unreal
 over the blockout, each replacing its blockout piece, with tinted materials and collision;
-`--blockout-only` leaves them out. More views: [`docs/progress/AG1/unreal`](docs/progress/AG1/unreal).
+`--blockout-only` leaves them out. More views: [`docs/progress/AG4/unreal`](docs/progress/AG4/unreal),
+[`docs/progress/AG1/unreal`](docs/progress/AG1/unreal).
 
 ### Milestones
 
