@@ -235,6 +235,11 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     pl = SH.plinth_mm(brief)
     if pl > 0:
         rec["plinth_m"] = C.m(pl / 1000.0)        # (M13: its plinth's depth under the base)
+        rows = [v for r in (brief.get("terrain") or {}).get("grade") or [] if r for v in r]
+        if rows and min(rows) < 0:
+            # (and how far the ground along its walls falls under the base: what its steps
+            # meet)
+            rec["grade_low_m"] = C.m(-min(rows))
     if brief["building"]["floor_grid"].get("level"):
         rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)

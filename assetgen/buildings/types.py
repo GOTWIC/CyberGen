@@ -581,8 +581,14 @@ def shed_mass(sb, ms) -> bool:
             s = 300 + (L - 600) * m / k
             x = int(round(a[0] + ux * s - uy * (r + 100)))
             y = int(round(a[1] + uy * s + ux * (r + 100)))
-            if put(sb, "pillar", {"r": r, "h": PT.q(top - slab - ms["z0"]),
-                                  "style": "steel"}, x, y, ms["z0"], ux, uy, "open_column"):
+            z0 = ms["z0"]
+            g = sb.slope.at(x, y) if getattr(sb, "slope", None) is not None else None
+            if g is not None and g < -50:
+                # (on M13's slopes: down to the ground at its foot, 0.3 m into it)
+                z0 = min(z0, int(g) - 300)
+                sb.stats["columns_to_grade"] = sb.stats.get("columns_to_grade", 0) + 1
+            if put(sb, "pillar", {"r": r, "h": PT.q(top - slab - z0),
+                                  "style": "steel"}, x, y, z0, ux, uy, "open_column"):
                 cols += 1
     if ms.get("roof"):
         RF.build_form(sb, ms, "hangar")

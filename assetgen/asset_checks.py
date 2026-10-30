@@ -612,28 +612,33 @@ def families(records: dict) -> dict:
             "kinds": dict(sorted(kinds.items())), "differ": bad, "first": first}
 
 
-SLOPE_MIN_M = 0.3      # a plinth this deep or more must be stepped
+SLOPE_MIN_M = 0.3      # ground this far under the base along the walls needs steps
 
 
 def slopes(records: dict) -> dict:
-    """AG5: every building on M13's slopes (a plinth `SLOPE_MIN_M` deep or more under its
-    base) stands on a stepped plinth; what its street front did at grade is counted."""
+    """AG5: every building on M13's slopes whose ground falls `SLOPE_MIN_M` or more under
+    its base along its walls (`grade_low_m`) stands on a stepped plinth, an open shed on
+    columns down to the ground; what the street fronts did at grade is counted (over
+    every building with a plinth, `plinth_m`)."""
     keys = ("plinth_facades", "plinth_windows", "retaining_skirts", "openings_lowered",
             "openings_in_plinth", "openings_raised", "openings_narrowed", "openings_buried",
-            "windows_buried")
-    n, flat, first = 0, 0, []
+            "windows_buried", "columns_to_grade")
+    n, stepped, flat, first = 0, 0, 0, []
     tot = {k: 0 for k in keys}
     for k in sorted(records):
         r = records[k]
-        if r.get("plinth_m", 0.0) < SLOPE_MIN_M:
+        if not r.get("plinth_m"):
             continue
         n += 1
         st = r["stats"]
         for key in keys:
             tot[key] += int(st.get(key, 0))
-        if not st.get("plinth_facades"):
+        if r.get("grade_low_m", 0.0) < SLOPE_MIN_M:
+            continue
+        stepped += 1
+        if not st.get("plinth_facades") and not st.get("columns_to_grade"):
             flat += 1
             if len(first) < 5:
-                first.append(f"{k}: a {r['plinth_m']} m plinth with no step")
-    return {"name": "asset_slopes", "ok": flat == 0, "buildings": n, "unstepped": flat,
-            **tot, "first": first}
+                first.append(f"{k}: the ground {r['grade_low_m']} m under its base, no step")
+    return {"name": "asset_slopes", "ok": flat == 0, "buildings": n, "falling": stepped,
+            "unstepped": flat, **tot, "first": first}
