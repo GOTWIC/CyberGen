@@ -510,12 +510,18 @@ def station(sb) -> None:
         lines = [[(q[0], q[1]) for q in ln] for ln in p["lines"] if len(ln) >= 2]
         if not lines:
             continue
-        axis = int(round((p["lines"][0][0][2] - p["diameter_m"] / 2.0) * 1000))
+        pf = p["platform"]
+        # (M21: the floor under the tube's lowest point over the platform, as `_beside`: a
+        # station's track may climb, and a level floor from its first point met the tube)
+        foot = Polygon(pf["exterior"], pf["holes"])
+        zs = [z for ln in p["lines"] for a, b in zip(ln, ln[1:])
+              if LineString([a[:2], b[:2]]).intersects(foot) for z in (a[2], b[2])]
+        zs = zs or [p["lines"][0][0][2]]
+        axis = int(round((min(zs) - p["diameter_m"] / 2.0) * 1000))
         floor = axis - TUBE_FLOOR
         z0 = rec["z"][0]
         if floor - z0 < 300:
             continue
-        pf = p["platform"]
         # (inside the tower: the outlines of the masses across the platform's floor)
         outl = [_poly_m([ms["outline"]]) for ms in sb.masses
                 if ms.get("portal") and ms["z0"] <= floor < ms["z1"] + 50]

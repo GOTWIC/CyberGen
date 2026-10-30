@@ -776,7 +776,10 @@ neighbor rule in `buildout.select_forms`):
   the manifest (`form`) and tagged `cg.form=`. **assetgen:** the brief carries arcs, plates
   and the form; `shell._simple_mass` draws bands and masses curved all round simply (the
   plate extruded, a spandrel and a ribbon of glass a floor) until AG15; skybridges never land
-  on bands, frames, pods, columns, halos or masts.
+  on bands, frames, pods, columns, halos or masts; a sky station's platform floor is under the
+  tube's lowest point over it (`connections.station`, as `_beside`: a rerouted Delta line put
+  a station on a 7.5% grade, and the level floor from the tube's first point met the tube);
+  `GEN_VERSION` m21.1.
 Sample builds: `docs/progress/M21/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

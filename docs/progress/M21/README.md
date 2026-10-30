@@ -104,7 +104,11 @@ Three fixes the new forms called for elsewhere:
   largest piece was taken): now the piece under it.
 - **Sky tube portals** stay under a tower's shaft (`transit.Bld.body`): with masts more
   common, a Delta station portal went through a lean tower's mast over its roof, which
-  assetgen could not cut (`asset_roofs`). Clearances still see the mast.
+  assetgen could not cut (`asset_roofs`). Clearances still see the mast. The line then ran
+  through a Midtown box tower with a station on a 7.5% grade, where assetgen laid the
+  platform level from the tube's first point, into the tube (`asset_clearance`): AG4's
+  `connections.station` now takes the floor under the tube's lowest point over the platform,
+  as its `_beside` already did (`GEN_VERSION` m21.1).
 
 ## Builds
 
