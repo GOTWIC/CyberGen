@@ -62,6 +62,10 @@ GREEN_BASE = 80                 # a green roof's gravel border and the bed's foo
 MIN_ATTIC = 1200                # a form needs at least this rise
 SHED_WALL = 4000                # a one-floor shed keeps this much wall under its roof form
 ROOF_STOREY = 4600              # a one-floor storey on another mass this low is all roof
+# AG5: the mechanical penthouse's style by era (`roofparts.gen_penthouse`)
+PENTHOUSE_STYLE = {"heritage": "deco", "neon_retro": "deco", "corporate_glass": "screen",
+                   "clean_tech": "screen", "transit_modern": "screen", "brutalist": "block",
+                   "industrial": "shed", "aerospace": "shed"}
 PITCHED_FLOORS = 12             # pitched forms on buildings up to this many floors
 FLATTEST = 0.14                 # a gable or hip flattened to its attic: at least 8 degrees
 LEG_MIN = 150                   # an item stands on dunnage where the roof is this far under it
@@ -313,6 +317,9 @@ def form_of(sb) -> str | None:
     genes = sb.gm["genes"]
     crown = genes.get("crown", "flat")
     era = sb.gm.get("era")
+    fo = getattr(sb, "form_override", None)
+    if fo:
+        return fo                       # (AG5: a type's own: a temple's pagoda, a vault)
     shed = b["type"] in SY.SHED_TYPES and genes["body.system"] in SY.INDUSTRIAL
     if shed:
         f = genes.get("roof_form", "flat")
@@ -356,8 +363,10 @@ def plan(sb) -> None:
         H = ms["z1"] - ms["z0"]
         if n >= 2:
             zb = ms["z0"] + (ms["z1"] - ms["z0"]) * (n - 1) // n
-        elif ms["z0"] > 50 and H <= ROOF_STOREY:
-            zb = ms["z0"]            # a one-floor storey on another mass: all roof
+        elif ms["z0"] > 50 and (H <= ROOF_STOREY or
+                                (n == 1 and getattr(sb, "form_override", None) == "pagoda")):
+            zb = ms["z0"]            # a one-floor storey on another mass: all roof (AG5: a
+                                     # temple's top tier at any height)
         else:
             if H < SHED_WALL + MIN_ATTIC:
                 continue
@@ -925,8 +934,17 @@ def items(sb) -> None:
         if rf and rf["kind"] != "flat":
             for k in rf["items"]:
                 form_of_item[k] = rf
+    have = {ms["k"] for ms in sb.masses}
     for k, it in enumerate(br["roof_items"]):
         x, y, z = (int(round(v * 1000)) for v in it["position"])
+        if it.get("mass") is not None and it["mass"] not in have:
+            # (AG5: on a mass the shell left out, a hero's unsupported crown: on the roof
+            # under it)
+            tops = [ms["z1"] for ms in sb.masses if len(RG.clean(ms["rings"][0])) >= 3 and
+                    RG.inside((x, y), RG.clean(ms["rings"][0])) == 1]
+            if tops:
+                z = max(tops)
+                sb.stats["roof_items_moved"] = sb.stats.get("roof_items_moved", 0) + 1
         sa, sc, sz = (max(int(round(v * 1000)), 100) for v in it["size"])
         a = M.radians(float(it["yaw_deg"]))
         ux, uy = float(M.cos(a)), float(M.sin(a))
@@ -977,7 +995,8 @@ def items(sb) -> None:
                 if top < h + up:
                     h, stacks = max(2500, min(sz, top)), False
                 sb.stats["roof_items_lowered"] = sb.stats.get("roof_items_lowered", 0) + 1
-            p = {"w": PT.q(sa), "d": PT.q(sc), "h": PT.q(h)}
+            p = {"w": PT.q(sa), "d": PT.q(sc), "h": PT.q(h),
+                 "style": PENTHOUSE_STYLE.get(sb.gm.get("era"), "louver")}
             if not stacks:
                 p["stacks"] = 0
             rec["asset"] = _place(sb, "penthouse", p, x, y, z, ux, uy)

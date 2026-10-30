@@ -341,7 +341,19 @@ TYPE_SYSTEM = {
     "building.temple_hall": {"punched_brick": 0.5, "tiled_eaves": 0.5},
     "building.pagoda": "tiled_eaves",
     "building.gate_house": "punched_brick",
+    # AG5: a terminal's and a station's glass halls
+    "building.terminal": {"unitized_curtain_wall": 0.5, "fin_wall": 0.3, "hangar_cladding": 0.2},
+    "building.station": {"unitized_curtain_wall": 0.4, "fin_wall": 0.3, "punched_concrete": 0.3},
 }
+# AG5: a hero's facade system by its landmark kind (weights), drawn from its id
+LANDMARK_SYSTEM = {
+    "megatower": {"unitized_curtain_wall": 0.5, "fin_wall": 0.3, "diagrid": 0.2},
+    "spire": {"fin_wall": 0.45, "unitized_curtain_wall": 0.35, "diagrid": 0.2},
+    "arcology": {"exoskeleton": 0.4, "precast_panel": 0.35, "capsule_stack": 0.25},
+}
+# AG5: the families of complexes whose buildings are one design (twin towers: the same
+# genes to the last step; the others step their continuous genes off the family's)
+TWINS = ("twin_towers",)
 NO_CURTAIN = ("building.villa", "building.terraced", "building.shopfront_row",
               "building.courtyard_block", "building.perimeter")
 SHANTY_MAX_FLOORS = 5          # patchwork only on low buildings outside shanty stacks
@@ -485,6 +497,33 @@ SLOTS: dict[str, tuple] = {
     "bridge_roof": ("metal", "#6f757b", 0.5, 0.6, None),
     "bridge_steel": ("metal", "#3f4a55", 0.55, 0.7, None),
     "bridge_rail": ("metal", "#2e3236", 0.5, 0.7, None),
+    # AG5: slopes (stepped plinths, retaining skirts), the type generators and the heroes
+    "plinth": ("facade", "#8f8b84", 0.9, 0.0, None),
+    "retaining": ("facade", "#9a968e", 0.9, 0.0, None),
+    "eave_tile": ("facade", "#3b3f45", 0.8, 0.0, "roof"),
+    "eave_soffit": ("facade", "#7a3326", 0.8, 0.0, None),
+    "lacquer": ("facade", "#8e1c16", 0.55, 0.0, None),
+    "stone": ("facade", "#a49d91", 0.85, 0.0, None),
+    "finial": ("metal", "#b8a26a", 0.35, 0.9, None),
+    "hangar_door": ("metal", "#9aa1a8", 0.5, 0.6, "wall"),
+    "dormer": ("facade", "#b9ad9c", 0.85, 0.0, "wall"),
+    "tarp": ("facade", "#2f5f8a", 0.8, 0.0, "patch"),
+    "shanty_roof": ("metal", "#7a5a40", 0.8, 0.4, "roof"),
+    "pergola": ("facade", "#6b5038", 0.8, 0.0, None),
+    "chimney": ("facade", "#7a4a35", 0.9, 0.0, None),
+    "radome": ("facade", "#e8e8e2", 0.5, 0.0, None),
+    "wheel_steel": ("metal", "#e8e8e2", 0.45, 0.6, "trim"),
+    "gondola": ("metal", "#d8dadc", 0.4, 0.5, "trim"),
+    "hero_frame": ("metal", "#2b2f33", 0.4, 0.8, "trim"),
+    "hero_light": ("neon", "#ff2a6d", 0.5, 0.0, None),
+    "halo_frame": ("metal", "#2b2f33", 0.4, 0.8, "trim"),
+    "halo_light": ("neon", "#ff2a6d", 0.5, 0.0, None),
+    "terrace_planter": ("facade", "#8a8883", 0.85, 0.0, None),
+    "terrace_green": ("foliage", "#4f7a3a", 0.95, 0.0, None),
+    "terrace_soil": ("facade", "#4a3b2e", 0.95, 0.0, None),
+    "escape_rust": ("metal", "#5a3424", 0.8, 0.5, None),
+    "atrium_glass": ("glass", "#2a3a48", 0.06, 0.0, None),
+    "atrium_frame": ("metal", "#d6d8da", 0.4, 0.6, "trim"),
 }
 # AG3: a shopfront's paint (frame, fascia, riser, door) per unit, from its era's list
 PAINTS = {"paint_red": "#7e1f1c", "paint_green": "#1f4a36", "paint_blue": "#1d3557",

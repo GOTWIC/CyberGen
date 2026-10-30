@@ -68,6 +68,8 @@ MOUNT_REACH = {"ac_unit": 0.3, "wall_light": 0.2, "sign": 0.7, "awning": None,
 FACADE_PROPS = ("ac_unit", "awning", "wall_light", "sign", "overhead_cable")
 DISTRICT_KEYS = ("grime", "neon", "greenery", "wealth", "danger")
 NO_FLOOR_ROLES = ("spire", "mast", "void")
+GRADE_STEP_M = 1.0     # AG5: the ground along a mass edge on the base, sampled this often
+GRADE_OUT_M = 0.3      # and this far outside it
 
 
 def load_model(path: str | Path) -> tuple[CityModel, str, Path]:
@@ -1054,7 +1056,44 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
     if getattr(b, "level", 0):
         # M14: a building on a deck: its level and the deck top its ground floor stands on
         rec["building"]["floor_grid"].update(level=b.level, deck_m=C.m(deck))
+    terr = terrain_of(rec, ground, getattr(b, "base_m", None))
+    if terr is not None:
+        rec["terrain"] = terr
     return json.loads(C.dumps(rec))
+
+
+def terrain_of(rec: dict, ground, base) -> dict | None:
+    """AG5: on M13's slopes, the ground along every edge of a mass on the base: from its
+    start to its end every `GRADE_STEP_M` (and at its end), `GRADE_OUT_M` outside it, in
+    meters over the base (the ground floor at the main entrance), to the centimeter; None
+    on flat ground or for a building with no base (a flat city's briefs say nothing of
+    terrain)."""
+    if base is None or getattr(ground, "flat", True):
+        return None
+    ox, oy = rec["origin"]
+    grade = []
+    for e in rec["edges"]:
+        m_ = rec["masses"][e["mass"]]
+        if m_["z"][0] > 0.05:
+            grade.append(None)
+            continue
+        ax, ay = e["a"]
+        bx, by = e["b"]
+        L = math.hypot(bx - ax, by - ay)
+        if L <= 0:
+            grade.append(None)
+            continue
+        ux, uy = (bx - ax) / L, (by - ay) / L
+        nx, ny = uy, -ux                       # outward (the solid lies left of the edge)
+        n = max(1, int(math.ceil(L / GRADE_STEP_M)))
+        row = []
+        for k in range(n + 1):
+            s = min(k * GRADE_STEP_M, L)
+            x = ox + ax + ux * s + nx * GRADE_OUT_M
+            y = oy + ay + uy * s + ny * GRADE_OUT_M
+            row.append(C.m2(ground.at(x, y) - base))
+        grade.append(row)
+    return {"step_m": GRADE_STEP_M, "out_m": GRADE_OUT_M, "grade": grade}
 
 
 def _opt(v):

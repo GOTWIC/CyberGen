@@ -32,7 +32,7 @@ SAMPLE = {
     "dunnage": [{"w": 2000, "d": 1600, "leg": 900}],
     "roof_vent": [{"style": s} for s in ("stack", "mushroom", "box")],
     "skylight": [{"w": 3000, "d": 2000, "style": s} for s in ("dome", "flat")],
-    "penthouse": [{"w": 6000, "d": 5000, "h": 3500}],
+    "penthouse": [{"w": 6000, "d": 5000, "h": 3500, "style": s} for s in RP.PENTHOUSE_STYLES],
     "billboard_frame": [{"w": 8000, "h": 4000, "back": 1500}],
     "escape": [{"w": 3000, "d": 1200, "zs": [3400, 6800, 10200], "ladder": 2000}],
     "duct": [{"w": 600, "dd": 400, "h": 9000}],

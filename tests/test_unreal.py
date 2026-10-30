@@ -745,6 +745,44 @@ def test_stage2_textures(build, manifest, tmp_path):
         U.build_manifest(_with_contributions(build, tmp_path / "t5", bad))
 
 
+def test_stage2_heroes_and_plinths(build, manifest, tmp_path):
+    """AG5: a hero's entry carries its kind (`cg.hero=` on its actor) and materials of its
+    own reading its U2 mask (a city texture, `HeroMask` on UV1 in the textured masters); a
+    new mask moves its materials, not its actor; a building on a slope carries its
+    plinth's depth (`cg.plinth=`)."""
+    man = manifest[0]
+    fake, blds = _fake(man, json.loads((build / "graphs.json").read_text()))[:2]
+    b = fake["buildings"]
+    hero = f"city.hero.{blds[0]}"
+    b["textures"] = {hero: {"file": f"textures/hero/{blds[0]}.png", "pixels_sha256": "e" * 64,
+                            "size": [512, 512], "srgb": False, "kind": "mask"}}
+    b["materials"][f"brick#{blds[0]}"] = dict(
+        b["materials"]["brick"], slot="brick", textures={"HeroMask": hero},
+        scalars={"HeroMaskOn": 1.0})
+    b["entries"][0]["materials"] = {"brick": f"brick#{blds[0]}"}
+    b["entries"][0]["hero"] = {"kind": "megatower", "accent": "#39ff8a"}
+    b["entries"][1]["plinth_m"] = 2.35
+    m2 = U.build_manifest(_with_contributions(build, tmp_path / "h1", fake))[0]
+    s2 = m2["stage2"]
+    a = {x["key"]: x for x in s2["actors"]}
+    assert a[blds[0]]["hero"] == "megatower" and "hero" not in a[blds[1]]
+    assert a[blds[1]]["plinth_m"] == 2.35 and "plinth_m" not in a[blds[0]]
+    assert s2["counts"]["heroes"] == 1
+    assert s2["textures"][hero]["folder"] == m2["content_root"] + "/Assets/Textures"
+    mat = s2["materials"][f"buildings.brick#{blds[0]}"]
+    assert mat["slot"] == "brick" and mat["scalars"] == {"HeroMaskOn": 1.0}
+    assert mat["textures"]["HeroMask"] == {"texture": hero, "hash": "e" * 16}
+    assert a[blds[0]]["materials"] == {"brick": "MI_" + U.asset_name(f"buildings.brick#{blds[0]}")}
+    f2 = copy.deepcopy(fake)
+    f2["buildings"]["textures"][hero]["pixels_sha256"] = "f" * 64
+    m3 = U.build_manifest(_with_contributions(build, tmp_path / "h2", f2))[0]
+    assert U.manifest_changes(m2, m3) == {"created": [], "updated": [], "deleted": []}
+    assert m3["stage2"]["materials"][f"buildings.brick#{blds[0]}"] != mat
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert '"HeroMask", "mask"' in src and "coordinate_index=1" in src
+    assert 'f"cg.hero={r[\'hero\']}"' in src and 'f"cg.plinth={r[\'plinth_m\']}"' in src
+
+
 def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     """AG8 over M15's prototype actors: an entry keyed by a prototype actor's key replaces
     it with its variants (transforms with a scale, an id per instance; plants as Nanite

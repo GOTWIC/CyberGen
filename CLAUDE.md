@@ -1026,6 +1026,30 @@ AG4 (roofs and connections) is in place (tests `tests/assetgen/test_ag_roofs.py`
   (`docs/unreal_export.md`, "From AG4"). `assetgen materials preview --views city_full`.
   Results: `docs/progress/AG4/`.
 
+AG5 (types, landmarks and slopes) is in place (tests `tests/assetgen/test_ag_types.py`):
+- **Types** (`assetgen/buildings/types.py`, parts `typeparts.py`): a generator per M3 type
+  where the general grammar falls short (`types.GENERATORS`: shanty stacks, megablocks,
+  warehouses, sheds open on columns, yards, hangar doors, labs, villas, terraced rows,
+  temple halls, pagodas, gate houses, vaulted terminals and stations, control tower cabs,
+  parking ramps, straddle girders), at three points of the shell builder (`pre`, `mass`,
+  `post`); every part through `types.put` (`envelope.fits`, off the corridors). Dormers on
+  gable, hip and mansard roofs by era; the mechanical penthouse by era
+  (`roofs.PENTHOUSE_STYLE`).
+- **Heroes** (`buildings/heroes.py`): every landmark (megatower, spire, arcology) and the
+  wheel built by kind (light seams, halos, needles, terraces, atrium frames, rims, spokes,
+  gondolas, lattice legs), the landmark's palette and accent; a U2 mask per hero (grime,
+  leaks, wear, 512 px, `assets/textures/hero/<id>.png`) on UV1 in the hero UV, read by
+  per-hero materials (`contribution.heroes`, `HeroMask`); budget class `hero`.
+- **Slopes** (`buildings/slopes.py`; briefs carry `terrain`, the ground along every base
+  edge): stepped plinths, lower-storey windows, retaining skirts, doors and shopfronts at
+  grade (lowered, raised or narrowed).
+- **Collision**: hulls notched at skybridge landing doors (`collision.VESTIBULE_MM`).
+- **Sky stations beside a tower** (the tube meets no mass there): a platform deck to the
+  wall or onto a roof under it (`connections._beside`).
+- **Checks**: `asset_types`, `asset_families` (twin towers one design), `asset_slopes`.
+- **Art direction**: `assetgen review BUILD --spec S [--prev P]` (`review.md`), `assetgen
+  spec diff A B`; rounds in the skill. Results: `docs/progress/AG5/`.
+
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
 and `props` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one

@@ -289,6 +289,25 @@ def cmd_streets_seam(args: argparse.Namespace) -> int:
         else EXIT_INVALID
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    from . import review as RV
+    rec = RV.review(args.build, args.spec, args.prev)
+    print(f"round {rec['round']} of at most {rec['max_rounds']}: "
+          f"{'checks pass' if rec['passed'] else str(len(rec['failed'])) + ' checks fail'}, "
+          f"{len(rec['spec_changes'])} spec changes, {len(rec['previews'])} previews; "
+          "review.md written")
+    return EXIT_OK
+
+
+def cmd_spec_diff(args: argparse.Namespace) -> int:
+    from . import review as RV
+    a = json.loads(Path(args.a).read_text(encoding="utf-8"))
+    b = json.loads(Path(args.b).read_text(encoding="utf-8"))
+    for line in RV.spec_diff(a, b):
+        print(line)
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="assetgen",
                                 description="Offline building, street and texture assets.")
@@ -306,6 +325,17 @@ def build_parser() -> argparse.ArgumentParser:
     sc = ssub.add_parser("schema", help="print or write the asset spec JSON Schema")
     sc.add_argument("out", nargs="?")
     sc.set_defaults(func=cmd_spec_schema)
+    sd = ssub.add_parser("diff", help="the parameter changes between two asset specs")
+    sd.add_argument("a")
+    sd.add_argument("b")
+    sd.set_defaults(func=cmd_spec_diff)
+
+    rv = sub.add_parser("review", help="AG5: an art-direction round's sheet (review.md): "
+                                       "checks, numbers per district, spec changes, previews")
+    rv.add_argument("build", help="a citygen build directory with its assets")
+    rv.add_argument("--spec", help="the asset spec of this round")
+    rv.add_argument("--prev", help="the previous round's build directory")
+    rv.set_defaults(func=cmd_review)
 
     br = sub.add_parser("brief", help="the brief of every building (briefs.json)")
     bsub = br.add_subparsers(dest="command", required=True)

@@ -40,6 +40,10 @@ building whose green roofs AG4 built replaces the blockout's green-roof objects 
 nothing else (`green_replaces`; an object also drawing a lawn or another building's
 unbuilt green roof stays). The skybridges are `unreal_contribution.connections.json`
 (`skybridges.py`).
+
+AG5: a hero (a landmark or the wheel) carries `hero` (kind, accent) and materials of its
+own (`heroes`: its U2 mask on UV1, its accent on its lights); a building on M13's slopes
+carries `plinth_m`, how far its stepped plinth reaches under its pivot.
 """
 
 from __future__ import annotations
@@ -172,6 +176,10 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
             "tags": {"cg.type": r["type"], "cg.district": r["district"] or "",
                      "cg.tile": r["tile"]},
         })
+        if r.get("plinth_m"):
+            # (AG5: on M13's slopes its plinth reaches this far under the pivot, stepped to
+            # the ground)
+            entries[-1]["plinth_m"] = r["plinth_m"]
         fr = r.get("front") or {}
         if fr.get("node") and fr.get("triangles", 0) > 0:
             entries.append({
@@ -219,4 +227,57 @@ def buildings(man: dict, lib: dict | None = None) -> dict:
            "masters": ["facade", "glass", "metal", "neon", "foliage"],
            "materials": mats, "cpd_layout": SY.CPD_LAYOUT, "entries": entries}
     from .materials import contrib as MC
-    return MC.buildings(con, man, lib)
+    return heroes(MC.buildings(con, man, lib), man, lib is not None)
+
+
+HERO_MASTERS = ("facade", "metal", "concrete")
+
+
+def heroes(con: dict, man: dict, textured: bool) -> dict:
+    """AG5: a hero's own materials (in place; returned). Its light slots take its accent
+    colour (`heroes.hero_materials`); with AG6's library, every slot of a textured opaque
+    master (`HERO_MASTERS`) reads its U2 mask (texture `city.hero.<id>`, parameter
+    `HeroMask` on UV1, `HeroMaskOn` 1), so grime, leaks and wear are its own. Each such
+    material is the slot's (or its era's) with `#<id>` added to its key."""
+    from .buildings import heroes as HE
+    mats = con["materials"]
+    tex = dict(con.get("textures") or {})
+    for e in con["entries"]:
+        if e.get("kind") not in ("building", "building.front"):
+            continue
+        bid = e["ids"][0] if e["kind"] == "building.front" else e["key"]
+        h = (man["buildings"].get(bid) or {}).get("hero")
+        if not h:
+            continue
+        mp = dict(e.get("materials") or {})
+        light = HE.hero_materials(h)
+        mask = textured and h.get("mask")
+        if mask:
+            tname = f"city.hero.{bid}"
+            tex[tname] = {"file": h["mask"], "pixels_sha256": h["mask_sha256"],
+                          "size": [h["mask_px"], h["mask_px"]], "srgb": False, "kind": "mask"}
+        for slot in e["slots"]:
+            base = mp.get(slot, slot)
+            rec = mats.get(base)
+            if rec is None:
+                continue
+            if slot in light:
+                new = {**rec, "slot": rec.get("slot", slot),
+                       "color": SY.srgb_linear(light[slot])}
+            elif mask and rec["master"] in HERO_MASTERS and rec.get("textures"):
+                new = {**rec, "slot": rec.get("slot", slot),
+                       "textures": {**rec["textures"], "HeroMask": tname},
+                       "scalars": {**rec.get("scalars", {}), "HeroMaskOn": 1.0}}
+            else:
+                continue
+            key = f"{base}#{bid}"
+            mats[key] = new
+            mp[slot] = key
+        if mp:
+            e["materials"] = dict(sorted(mp.items()))
+        if e["kind"] == "building":
+            e["hero"] = {"kind": h["kind"], "accent": h["accent"]}
+    con["materials"] = dict(sorted(mats.items()))
+    if tex:
+        con["textures"] = dict(sorted(tex.items()))
+    return con
