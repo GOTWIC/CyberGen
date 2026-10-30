@@ -110,6 +110,8 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "wheel_steel": ("metal", "steel_painted"), "gondola": ("metal", "aluminum"),
     "hero_frame": ("metal", "metal_dark"), "hero_light": ("neon", None),
     "halo_frame": ("metal", "metal_dark"), "halo_light": ("neon", None),
+    "escape_rust": ("metal", "metal_rusty"), "atrium_glass": ("glass", None),
+    "atrium_frame": ("metal", "aluminum"),
 }
 for _s in SY.SLOTS:
     if _s.startswith("paint_"):

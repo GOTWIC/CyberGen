@@ -414,17 +414,18 @@ def gen_escape(p: dict, b) -> None:
     w, d, zs = p["w"], p["d"], p["zs"]
     hw = w // 2
     y0, y1 = -d, -60
+    slot = p.get("slot", "escape")       # (AG5: a shanty's rusty one)
     for z in zs:
-        box(b, "escape", -hw, hw, y0, y1, z - 60, z)
+        box(b, slot, -hw, hw, y0, y1, z - 60, z)
         n = max(2, w // 1200)
         for j in range(n + 1):
             x = -hw + (w - 40) * j // n
-            box(b, "escape", x, x + 40, y0, y0 + 40, z, z + 960)
-        box(b, "escape", -hw, hw, y0, y0 + 40, z + 960, z + 1000)
-        box(b, "escape", -hw, -hw + 40, y0 + 40, y1, z + 960, z + 1000)
-        box(b, "escape", hw - 40, hw, y0 + 40, y1, z + 960, z + 1000)
+            box(b, slot, x, x + 40, y0, y0 + 40, z, z + 960)
+        box(b, slot, -hw, hw, y0, y0 + 40, z + 960, z + 1000)
+        box(b, slot, -hw, -hw + 40, y0 + 40, y1, z + 960, z + 1000)
+        box(b, slot, hw - 40, hw, y0 + 40, y1, z + 960, z + 1000)
         for x in (-hw + 200, hw - 200):
-            bar(b, "escape", (x, -30, z - 800), (x, y0 + 120, z - 80), 50)
+            bar(b, slot, (x, -30, z - 800), (x, y0 + 120, z - 80), 50)
     run = 0
     for k in range(len(zs) - 1):
         za, zb = zs[k], zs[k + 1]
@@ -436,21 +437,21 @@ def gen_escape(p: dict, b) -> None:
             xa, xb = hw - 300, hw - 300 - run
         ya, yb = y0 + 80, y0 + d // 2
         for yy in (ya, yb):
-            bar(b, "escape", (xa, yy, za), (xb, yy, zb), 40, 120)
+            bar(b, slot, (xa, yy, za), (xb, yy, zb), 40, 120)
         n = max(4, dz // 230)
         for i in range(1, n):
             x = xa + (xb - xa) * i // n
             z = za + dz * i // n
             lo, hi = sorted((x - 110, x + 110))
-            box(b, "escape", lo, hi, ya + 25, yb - 25, z - 30, z)
+            box(b, slot, lo, hi, ya + 25, yb - 25, z - 30, z)
     lad = p.get("ladder", 0)
     if lad > 400:
         x = hw - 500
         for dx in (-220, 220):
-            box(b, "escape", x + dx - 20, x + dx + 20, y0 + 60, y0 + 100, -lad, -60)
+            box(b, slot, x + dx - 20, x + dx + 20, y0 + 60, y0 + 100, -lad, -60)
         z = -lad + 150
         while z < -160:
-            box(b, "escape", x - 200, x + 200, y0 + 65, y0 + 95, z, z + 25)
+            box(b, slot, x - 200, x + 200, y0 + 65, y0 + 95, z, z + 25)
             z += 300
 
 

@@ -39,7 +39,7 @@ import hashlib
 
 from . import systems as SY
 
-GENOME_VERSION = 4
+GENOME_VERSION = 5
 SALT = "ag1.genome"
 GROUPS = ("base", "body", "top")
 GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay_m", "wwr",
@@ -151,10 +151,14 @@ def make(brief: dict) -> dict:
     fam = prop.get("id") if prop and prop.get("complex") not in (None, "single") and \
         len(prop.get("building_ids") or []) > 1 else None
     fkey = fam or bid             # discrete genes and colors: the family's
+    twins = bool(fam) and prop.get("complex") in SY.TWINS
     btype = b["type"]
     weights = system_weights(spec, btype, int(b["floors"]))
     names, ws = list(weights), [weights[k] for k in weights]
     fixed = SY.TYPE_SYSTEM.get(btype)
+    if btype.startswith("building.landmark."):
+        # AG5: a hero's system by its kind
+        fixed = SY.LANDMARK_SYSTEM.get(btype.rsplit(".", 1)[1], fixed)
     if isinstance(fixed, dict):
         fixed = pick(fkey, "system.type", sorted(fixed), [fixed[k] for k in sorted(fixed)],
                      salt)
@@ -196,7 +200,9 @@ def make(brief: dict) -> dict:
                                 ("parapet_m", (0.5, 1.2), SY.STEP["parapet_m"]),
                                 ("band_m", (0.06, 0.14), SY.STEP["band_m"])):
             base = draw(fkey, f"{g}.{gene}", rng[0], rng[1], step, salt)
-            if fam:
+            if fam and twins:
+                pass                # (AG5: twin towers are one design to the last step)
+            elif fam:
                 # a family member steps one or two quantization steps off the family's value
                 k = pick(bid, f"{g}.{gene}.step", (-2, -1, 0, 1, 2), None, salt)
                 base = quant(min(max(base + k * step, rng[0]), rng[1]), step)
@@ -281,9 +287,20 @@ def make(brief: dict) -> dict:
     if brand and u(fkey, "trim.brand", salt) < 0.7:
         trim = pick(fkey, "trim.brand.pick", brand, None, salt)
     dark = min(pal, key=lambda c: (sum(int(c[1 + 2 * k:3 + 2 * k], 16) for k in range(3)), c))
+    lpal = list((spec.get("landmark") or {}).get("palette") or [])
+    if lpal and b.get("landmark"):
+        # AG5: a hero in its own palette: the darkest its walls and glass, the lightest its
+        # trim (the most saturated is its accent, `heroes.accent`)
+        def lum(c):
+            return sum(int(c[1 + 2 * k:3 + 2 * k], 16) for k in range(3))
+        wall = min(lpal, key=lambda c: (lum(c), c))
+        trim = max(lpal, key=lambda c: (lum(c), c))
+        dark = wall
     genes["wall"] = wall
     genes["trim"] = trim
     genes["glass"] = pick(fkey, "glass", SY.GLASS, None, salt)
+    if lpal and b.get("landmark"):
+        genes["glass"] = wall
     genes["roof"] = pick(fkey, "roof", SY.ROOFS_INDUSTRIAL if body in SY.INDUSTRIAL else SY.ROOFS,
                          None, salt)
     dist = spec.get("district") or {}

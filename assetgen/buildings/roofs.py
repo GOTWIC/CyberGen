@@ -313,6 +313,9 @@ def form_of(sb) -> str | None:
     genes = sb.gm["genes"]
     crown = genes.get("crown", "flat")
     era = sb.gm.get("era")
+    fo = getattr(sb, "form_override", None)
+    if fo:
+        return fo                       # (AG5: a type's own: a temple's pagoda, a vault)
     shed = b["type"] in SY.SHED_TYPES and genes["body.system"] in SY.INDUSTRIAL
     if shed:
         f = genes.get("roof_form", "flat")

@@ -46,6 +46,7 @@ STREET_MM = 810
 STREET_Z = 1210
 TOL_MM = 2.0
 COLLAR_MM = 300.0            # AG4: a skybridge's collar zone at the facades it meets
+WHEEL_TOL_MM = 250.0         # AG5: a wheel's members past the box of its masses by their section
 # merged parts keep their slots: how far each slot may reach (the rest: AG1's rule)
 SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "spandrel_panel": "flush", "shutter": "flush", "grille": "flush",
@@ -63,7 +64,8 @@ SLOT_REACH.update({"court_paving": "court", "planter": "court", "green_roof": "c
 SLOT_REACH.update({"retaining": "flush", "eave_tile": "deep", "eave_soffit": "deep",
                    "stone": "flush", "hangar_door": "flush", "hero_frame": "flush",
                    "hero_light": "flush", "shanty_roof": "strip", "wheel_steel": "wheel",
-                   "gondola": "wheel"})
+                   "gondola": "wheel", "escape_rust": "deep", "atrium_glass": "court",
+                   "atrium_frame": "court"})
 for _s in SY.SLOTS:
     if _s not in SLOT_REACH and (_s.startswith(("paint_", "neon_", "screen_", "poster_",
                                                 "mural_", "graffiti_", "riser_", "lit_",
@@ -140,6 +142,18 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
             for z0, z1, ext, holes in masses:
                 allowed |= inside_poly(x, y, ext, []) & (z >= z0 - TOL_MM) & \
                     (z <= z1 + PARAPET_MM)
+        if reach == "wheel" and masses:
+            # (AG5: a wheel's rim, axle and legs are one open-air structure: inside the
+            # box of its masses)
+            t = WHEEL_TOL_MM
+            bx0 = min(min(p[0] for p in e) for _, _, e, _ in masses) - t
+            bx1 = max(max(p[0] for p in e) for _, _, e, _ in masses) + t
+            by0 = min(min(p[1] for p in e) for _, _, e, _ in masses) - t
+            by1 = max(max(p[1] for p in e) for _, _, e, _ in masses) + t
+            bz0 = min(z0 for z0, _, _, _ in masses) - t
+            bz1 = max(z1 for _, z1, _, _ in masses) + t
+            allowed |= (x >= bx0) & (x <= bx1) & (y >= by0) & (y <= by1) & (z >= bz0) & \
+                (z <= bz1)
         bad = over & ~allowed
         out["outside"] += int(bad.sum())
         out["low_overhang"] += int((bad & (near <= DEEP_MM) & ~high).sum())

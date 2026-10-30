@@ -341,7 +341,19 @@ TYPE_SYSTEM = {
     "building.temple_hall": {"punched_brick": 0.5, "tiled_eaves": 0.5},
     "building.pagoda": "tiled_eaves",
     "building.gate_house": "punched_brick",
+    # AG5: a terminal's and a station's glass halls
+    "building.terminal": {"unitized_curtain_wall": 0.5, "fin_wall": 0.3, "hangar_cladding": 0.2},
+    "building.station": {"unitized_curtain_wall": 0.4, "fin_wall": 0.3, "punched_concrete": 0.3},
 }
+# AG5: a hero's facade system by its landmark kind (weights), drawn from its id
+LANDMARK_SYSTEM = {
+    "megatower": {"unitized_curtain_wall": 0.5, "fin_wall": 0.3, "diagrid": 0.2},
+    "spire": {"fin_wall": 0.45, "unitized_curtain_wall": 0.35, "diagrid": 0.2},
+    "arcology": {"exoskeleton": 0.4, "precast_panel": 0.35, "capsule_stack": 0.25},
+}
+# AG5: the families of complexes whose buildings are one design (twin towers: the same
+# genes to the last step; the others step their continuous genes off the family's)
+TWINS = ("twin_towers",)
 NO_CURTAIN = ("building.villa", "building.terraced", "building.shopfront_row",
               "building.courtyard_block", "building.perimeter")
 SHANTY_MAX_FLOORS = 5          # patchwork only on low buildings outside shanty stacks
@@ -506,6 +518,9 @@ SLOTS: dict[str, tuple] = {
     "hero_light": ("neon", "#ff2a6d", 0.5, 0.0, None),
     "halo_frame": ("metal", "#2b2f33", 0.4, 0.8, "trim"),
     "halo_light": ("neon", "#ff2a6d", 0.5, 0.0, None),
+    "escape_rust": ("metal", "#5a3424", 0.8, 0.5, None),
+    "atrium_glass": ("glass", "#2a3a48", 0.06, 0.0, None),
+    "atrium_frame": ("metal", "#d6d8da", 0.4, 0.6, "trim"),
 }
 # AG3: a shopfront's paint (frame, fascia, riser, door) per unit, from its era's list
 PAINTS = {"paint_red": "#7e1f1c", "paint_green": "#1f4a36", "paint_blue": "#1d3557",

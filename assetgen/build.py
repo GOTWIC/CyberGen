@@ -58,7 +58,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag4.0"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag5.0"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -225,6 +225,10 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "instances": int(sum(len(x["at"]) for x in inst)),
         "part_triangles": int(sum(x["triangles"] for x in inst)),
     }
+    # AG5: the type's generator (or a landmark's hero), a hero's accent and UV extents
+    rec["generator"] = sh["generator"]
+    if sh.get("hero"):
+        rec["hero"] = dict(sh["hero"])
     if brief["building"]["floor_grid"].get("level"):
         rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)

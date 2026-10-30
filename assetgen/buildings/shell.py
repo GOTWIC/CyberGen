@@ -49,6 +49,7 @@ from ..triangulate import TriangulationError, triangulate
 from . import articulate as AR
 from . import connections as CN
 from . import details as DT
+from . import heroes as HE
 from . import fronts as FR
 from . import genome as GN
 from . import parts as PT
@@ -56,6 +57,7 @@ from . import rings as RG
 from . import roofs as RF
 from . import slopes as SL
 from . import systems as SY
+from . import types as TY
 from .meshbuf import Buf
 
 NO_WINDOW = ("party", "hidden", "firewall")
@@ -447,6 +449,8 @@ class ShellBuilder:
         self.landed: dict[str, dict] = {}
         self.portal_recs: list[dict] = []
         self.roof_forms: list[dict] = []
+        self.generator = TY.generator_of(b["type"])
+        self.hero = None
         self.roof_items: list[dict] = []
         self.green_done: list[str] = []
 
@@ -533,6 +537,8 @@ class ShellBuilder:
                     kept.setdefault(j, []).append((min(s), max(s)))
         self.kept = kept
         AR.articulate(self)
+        HE.pre(self)                            # AG5: a landmark's hero, a type's own steps
+        TY.pre(self)
         CN.portals(self)
         RF.plan(self)
         masses = self.masses
@@ -546,6 +552,8 @@ class ShellBuilder:
                 continue
             self.stats["masses"] += 1
             g = SY.role_group(ms["role"])
+            if HE.mass(self, ms) or TY.mass(self, ms):
+                continue                        # (AG5: a mass the type or hero builds)
             if ms["shape"] == "ring":
                 self._wheel(ms)
                 continue
@@ -574,6 +582,8 @@ class ShellBuilder:
         RF.extras(self)
         self._mast()
         self._columns()
+        TY.post(self)                           # AG5: what the type adds, the hero's
+        HE.post(self)
         # AG3: doors for what no band could take, the mounts' hardware, blind and fire walls
         FR.leftovers(self)
         FR.hardware(self)
@@ -593,7 +603,17 @@ class ShellBuilder:
                 # AG4: every roof item's asset, the green roofs built, skybridge landings,
                 # portals and sky stations
                 "roof_items": self.roof_items, "green": list(self.green_done),
-                "landings": CN.landing_records(self), "portals": self.portal_recs}
+                "landings": CN.landing_records(self), "portals": self.portal_recs,
+                # AG5: the generator, a hero's kind, accent, UV extents and its U2 mask
+                "generator": self.generator, "hero": self._hero_rec(),
+                "mask": HE.bake(self)}
+
+    def _hero_rec(self) -> dict | None:
+        h = getattr(self, "hero", None)
+        if h is None:
+            return None
+        P, H = HE.uv_scale(self)
+        return {"kind": h["kind"], "accent": h["accent"], "perimeter_m": P, "height_m": H}
 
     def _unpinched(self, ext, holes) -> list[int]:
         """The ring numbers (1 on) of the courts that touch neither the exterior nor another
@@ -1705,6 +1725,10 @@ class ShellBuilder:
             p = {"style": "mast", "h": PT.q(min(max(H // 10, 8000), 30000))}
         else:
             p = {"style": "spire", "h": PT.q(min(max(H * 18 // 100, 12000), 45000))}
+        if self.clear.segs and self.clear.hits(c[0] - 1200, c[1] - 1200, c[0] + 1200,
+                                               c[1] + 1200, top["z1"], top["z1"] + p["h"]):
+            self.stats["masts_off_corridors"] = self.stats.get("masts_off_corridors", 0) + 1
+            return               # (AG5: a sky tube or a guideway passes over the roof)
         self.parts.add("mast", p, c[0], c[1], top["z1"], 1.0, 0.0)
         self.used["crown"] = True
 

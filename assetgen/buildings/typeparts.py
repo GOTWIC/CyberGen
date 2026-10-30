@@ -15,8 +15,8 @@ from quantized parameters, closed, named by its parameters.
 | beacon | an aviation light on a little base |
 | seam | an emissive light seam up a hero's edge |
 | halo | a hero's crown halo: a ring on posts, lit under its rim |
-| planter | a planter box with soil and planting (sky gardens, terraces) |
-| balustrade | a glass or rail balustrade along a terrace edge |
+| garden | a planter box with soil and planting (sky gardens, terraces; AG4's `planter` is a deck's) |
+| terrace_rail | a glass or rail balustrade along a terrace edge (AG4's `balustrade` is a deck's) |
 | gondola | a ferris wheel's capsule: an octagonal cabin with a glazed band on its hanger |
 | lattice | a tapering four-chord lattice tower (a wheel's legs, masts) |
 | dormer | a gabled or shed dormer on a pitched roof, its window and cheeks |
@@ -225,7 +225,7 @@ def gen_halo(p: dict, b) -> None:
             (int(rm * c), int(rm * s), post + t // 2), 300)
 
 
-def gen_planter(p: dict, b) -> None:
+def gen_garden(p: dict, b) -> None:
     w, d, h = p["w"], p["d"], p["h"]
     box(b, "planter", -w // 2, w // 2, -d // 2, d // 2, 0, h)
     box(b, "soil", -w // 2 + 80, w // 2 - 80, -d // 2 + 80, d // 2 - 80, h, h + 40)
@@ -233,7 +233,7 @@ def gen_planter(p: dict, b) -> None:
         h + 40 + p.get("g", 400))
 
 
-def gen_balustrade(p: dict, b) -> None:
+def gen_terrace_rail(p: dict, b) -> None:
     """Along x from 0 to L at the terrace edge (y 0 the edge, the terrace +y), h tall."""
     L, h, st = p["L"], p["h"], p["style"]
     if st == "glass":
@@ -421,13 +421,29 @@ def gen_girder(p: dict, b) -> None:
     while x < L - 1000:
         box(b, "steel", x - 60, x + 60, -w - 40, -w, -h + 60, -60)
         x += 3000
-    box(b, "lamp_white", 200, L - 200, -w - 30, -w, -h, -h + 60)
+    box(b, "lamp_white", 200, L - 200, -w + 20, -20, -h - 40, -h)
 
 
-GEN = {"eave": gen_eave, "pillar": gen_pillar, "stairs": gen_stairs, "ladder": gen_ladder,
+def gen_needle(p: dict, b) -> None:
+    """A hero's needle spire h tall from a base r wide: four tapering lengths, a ring at
+    each joint, an aviation beacon on top."""
+    h, r = p["h"], p["r"]
+    z = 0
+    rs = [r, r * 7 // 10, r * 45 // 100, r * 25 // 100]
+    fr = (35, 30, 20, 15)
+    for k, (rr, f) in enumerate(zip(rs, fr)):
+        dz = (h - 600) * f // 100
+        prism(b, "hero_frame", ngon(0, 0, max(rr, 80), 8, 0.5), [], z, z + dz, "z")
+        if k:
+            annulus(b, "hero_light", max(rr, 80) + 20, max(rr, 80) + 160, z, z + 200, 16)
+        z += dz
+    box(b, "lamp_red", -120, 120, -120, 120, z, z + 600)
+
+
+GEN = {"eave": gen_eave, "needle": gen_needle, "pillar": gen_pillar, "stairs": gen_stairs, "ladder": gen_ladder,
        "hangar_door": gen_hangar_door, "truss": gen_truss, "finial": gen_finial,
-       "beacon": gen_beacon, "seam": gen_seam, "halo": gen_halo, "planter": gen_planter,
-       "balustrade": gen_balustrade, "gondola": gen_gondola, "lattice": gen_lattice,
+       "beacon": gen_beacon, "seam": gen_seam, "halo": gen_halo, "garden": gen_garden,
+       "terrace_rail": gen_terrace_rail, "gondola": gen_gondola, "lattice": gen_lattice,
        "dormer": gen_dormer, "tarp": gen_tarp, "shack_roof": gen_shack_roof,
        "stack": gen_stack, "monitor": gen_monitor, "pergola": gen_pergola,
        "chimney": gen_chimney, "cab": gen_cab, "radar": gen_radar,
@@ -436,17 +452,17 @@ GEN = {"eave": gen_eave, "pillar": gen_pillar, "stairs": gen_stairs, "ladder": g
 # `envelope.SLOT_REACH`): "type" is what a type or hero generator builds inside its masses
 # or within a deep allowance (eaves, cab roofs), "roof" on a roof, "wheel" inside the
 # wheel's box (its rim, axle and legs are one open-air structure)
-REACH = {"eave": "deep", "pillar": "flush", "stairs": "flush", "ladder": "flush",
+REACH = {"eave": "deep", "needle": "roof", "pillar": "flush", "stairs": "flush", "ladder": "flush",
          "hangar_door": "flush", "truss": "flush", "finial": "roof", "beacon": "roof",
-         "seam": "flush", "halo": "roof", "planter": "roof", "balustrade": "deep",
+         "seam": "flush", "halo": "roof", "garden": "roof", "terrace_rail": "deep",
          "gondola": "wheel", "lattice": "wheel", "dormer": "roof", "tarp": "roof",
          "shack_roof": "strip", "stack": "roof", "monitor": "roof", "pergola": "roof",
          "chimney": "roof", "cab": "deep", "radar": "roof", "neon_strip": "flush",
          "girder": "flush"}
-SUB = {"pillar": "style", "dormer": "style", "balustrade": "style"}
-FIXED = {"eave": "tier", "stairs": "flight", "ladder": "rungs", "hangar_door": "sliding",
+SUB = {"pillar": "style", "dormer": "style", "terrace_rail": "style"}
+FIXED = {"eave": "tier", "needle": "spire", "stairs": "flight", "ladder": "rungs", "hangar_door": "sliding",
          "truss": "warren", "finial": "pagoda", "beacon": "aviation", "seam": "light",
-         "halo": "crown", "planter": "box", "gondola": "capsule", "lattice": "tower",
+         "halo": "crown", "garden": "box", "gondola": "capsule", "lattice": "tower",
          "tarp": "poles", "shack_roof": "lean_to", "stack": "fume", "monitor": "ridge",
          "pergola": "terrace", "chimney": "stack", "cab": "glazed", "radar": "dome",
          "neon_strip": "band", "girder": "transfer"}
