@@ -1,0 +1,41 @@
+== dead ends
+dead ends by class: {'highway': 3, 'street': 71, 'service': 6, 'alley': 19, 'pedestrian': 41}
+of them, another road within 60 m straight ahead: {'street': 9, 'service': 1, 'alley': 4, 'pedestrian': 31}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 32 Counter({'pedestrian': 17, 'road': 15})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1536 with a leg not at the node's height at the junction edge: 76 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 46
+   ('Corporate Core', True, True) 42
+   ('Industrial Port', False, False) 69
+   ('Industrial Port', False, True) 2
+   ('Industrial Port', True, True) 16
+   ('Midtown', False, False) 91
+   ('Midtown', True, True) 49
+   ('Old Town', False, False) 1107
+   ('Old Town', False, True) 1
+   ('Old Town', True, True) 19
+   ('Research Campus', False, False) 25
+   ('Research Campus', True, True) 10
+   ('Transit Nexus', False, False) 39
+   ('Transit Nexus', False, True) 1
+   ('Transit Nexus', True, True) 19
+crosswalk widths: Counter({3.0: 245, 4.0: 205, 5.0: 97})
+junctions with crosswalks: 159 of them within 40 m of another: 0
+== signs
+Counter({('shop_sign', 'blade'): 7333, ('shop_sign', 'facade'): 5510, ('billboard', 'roof'): 1041, ('neon', 'facade'): 464, ('billboard', 'facade'): 249, ('holo_ad', 'roof'): 47})
+== transit supports
+  tl.maglev_line maglev: length 3046 m, supports 57, gap median 45 max 147 m, off the line max 4.5 m (>2 m: 2)
+  tl.skyline_loop sky_tube: length 2473 m, supports 16, gap median 126 max 360 m, off the line max 13.0 m (>2 m: 3)
+  tl.delta_loop sky_tube: length 4973 m, supports 42, gap median 60 max 975 m, off the line max 9.5 m (>2 m: 2)
+  tl.waterfront_monorail monorail: length 2258 m, supports 68, gap median 25 max 213 m, off the line max 15.0 m (>2 m: 26)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 1

@@ -25,6 +25,7 @@ from .. import canon as C
 from . import materials as MT
 from .ctx import Ctx, bbox_center, dump
 from .kit import Mesh, ccw
+from .kit import check as mesh_check
 from .path import Path, Profile, dist, first_exit, unit
 from .pieces import Out, Piece, maker
 from .roads import DECK_D, PEDESTRIAN, RANK, ROAD_DZ, Road, raised, street_class, \
@@ -664,8 +665,18 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
     for parts, row in drawn:
         drew = False
         for r in parts:
+            sl = mesh._slot(pave)
+            mark = (len(sl.pos), len(sl.idx), sl.auto)
+            before = mesh_check({pave: sl})["winding"]
             if not mesh.poly(pave, r, zfun=lambda x, y: zfun(x, y) + 0.15):
                 why["triangulation"] = why.get("triangulation", 0) + 1
+                continue
+            if mesh_check({pave: sl})["winding"] > before:
+                # (M18: a pad that folds over one drawn before it, on a polygon whose
+                # corners crowd each other: left out)
+                del sl.pos[mark[0]:], sl.nrm[mark[0]:], sl.uv[mark[0]:], sl.idx[mark[1]:]
+                sl.auto = mark[2]
+                why["fold"] = why.get("fold", 0) + 1
                 continue
             drew = True
             for k in range(len(r)):

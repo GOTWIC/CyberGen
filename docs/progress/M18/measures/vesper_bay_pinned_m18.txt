@@ -1,0 +1,45 @@
+== dead ends
+dead ends by class: {'highway': 8, 'street': 77, 'service': 16, 'alley': 28, 'pedestrian': 32}
+of them, another road within 60 m straight ahead: {'street': 10, 'service': 3, 'alley': 1, 'pedestrian': 26}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 12 Counter({'road': 9, 'pedestrian': 2, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1764 with a leg not at the node's height at the junction edge: 30 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 2
+   ('Corporate Core', False, True) 2
+   ('Corporate Core', True, True) 10
+   ('Highcrest', False, False) 157
+   ('Highcrest', True, True) 15
+   ('Launch Key', False, False) 3
+   ('Launch Key', False, True) 2
+   ('Launch Key', True, True) 3
+   ('Neon Strand', False, False) 484
+   ('Neon Strand', True, True) 10
+   ('Old Town', False, False) 824
+   ('Old Town', True, True) 13
+   ('Scholar Isle', False, False) 18
+   ('Scholar Isle', True, True) 10
+   ('The Stacks', False, False) 131
+   ('The Stacks', False, True) 2
+   ('The Stacks', True, True) 27
+   ('Vess Docks', False, False) 35
+   ('Vess Docks', False, True) 3
+   ('Vess Docks', True, True) 12
+crosswalk widths: Counter({4.0: 230, 3.0: 71, 5.0: 40})
+junctions with crosswalks: 110 of them within 40 m of another: 6
+== signs
+Counter({('shop_sign', 'blade'): 9969, ('shop_sign', 'facade'): 3287, ('billboard', 'roof'): 1581, ('neon', 'facade'): 719, ('billboard', 'facade'): 312, ('holo_ad', 'roof'): 46})
+== transit supports
+  tl.halo_line elevated_rail: length 5709 m, supports 128, gap median 32 max 987 m, off the line max 12.0 m (>2 m: 31)
+  tl.launch_express maglev: length 1006 m, supports 3, gap median 469 max 894 m, off the line max 0.0 m (>2 m: 0)
+  tl.crown_line sky_tube: length 2869 m, supports 22, gap median 60 max 612 m, off the line max 9.2 m (>2 m: 1)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 0
