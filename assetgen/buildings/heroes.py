@@ -61,6 +61,11 @@ def is_hero(brief: dict) -> bool:
     return bool(b["landmark"]) or b["type"] == "building.ferris_wheel"
 
 
+def is_hero_type(btype: str) -> bool:
+    """A landmark's type, or the wheel's (a record's view of `is_hero`)."""
+    return btype.startswith("building.landmark.") or btype == "building.ferris_wheel"
+
+
 def kind_of(brief: dict) -> str:
     t = brief["building"]["type"]
     if t == "building.ferris_wheel":
@@ -472,12 +477,15 @@ def bake(sb) -> np.ndarray | None:
     gx, gy = N.grid(n)
     v = (np.float32(1.0) - gy).astype(np.float32)            # v up (rows from the top)
     z_m = v * np.float32(H)
-    # grime: from the ground up 12 m, and a band under every setback
+    # grime: from the ground up 12 m, and streaks washed down 16 m under every setback
     grime = N.smooth(12.0, 0.0, z_m) * np.float32(0.75)
     tops = sorted({ms["z1"] / 1000.0 for ms in sb.masses if ms["z1"] / 1000.0 < H - 1.0})
+    col = np.arange(n, dtype=np.int64)
+    cv = N.unit(N.hash2(col // 3, np.zeros(n, dtype=np.int64), seed + 5)).astype(np.float32)
+    cv = (np.float32(0.25) + np.float32(0.75) * cv * cv)[None, :]
     for t in tops:
         d = (np.float32(t) - z_m).astype(np.float32)
-        band = N.smooth(-0.2, 0.0, d) * N.smooth(4.0, 0.0, d)
+        band = N.smooth(-0.2, 0.0, d) * N.smooth(16.0, 0.0, d) * cv
         grime = np.maximum(grime, (band * np.float32(0.6)).astype(np.float32))
     grime = np.clip(grime + (N.fbm(n, 8, seed, 4) - np.float32(0.5)) * np.float32(0.3), 0, 1)
     # leaks: streaks down from the sills of its windows (their u and the row's sill)

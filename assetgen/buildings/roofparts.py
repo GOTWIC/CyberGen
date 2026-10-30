@@ -292,8 +292,82 @@ def gen_pad(p: dict, b) -> None:
 STACK_UP = 1200      # a penthouse's exhaust stacks rise this (and a 0.1 m cap) over it
 
 
+PENTHOUSE_STYLES = ("louver", "deco", "screen", "block", "shed")
+
+
 def gen_penthouse(p: dict, b) -> None:
     w, d, h = p["w"], p["d"], p["h"]
+    hw, hd = w // 2, d // 2
+    st = p.get("style", "louver")
+    if st != "louver":
+        _penthouse_style(st, w, d, h, b)
+    else:
+        _penthouse_louver(w, d, h, b)
+    if not p.get("stacks", 1):
+        return               # (under a corridor with no room for them: no exhaust stacks)
+    for x in ((-hw // 2, hw // 2) if w >= 3000 else (0,)):
+        cyl(b, "equip_steel", x, hd // 3, 200, h - 300, h + STACK_UP, 10)
+        cyl(b, "equip_steel", x, hd // 3, 260, h + STACK_UP, h + STACK_UP + 100, 10)
+
+
+def _penthouse_style(st: str, w: int, d: int, h: int, b) -> None:
+    """AG5: the penthouse by era (`roofs.PENTHOUSE_STYLE`): `deco` a stepped block with
+    pilasters, `screen` a core in a fin screen, `block` a board-formed box under a heavy cap
+    with louver slits, `shed` a sheet shed under a monopitch."""
+    hw, hd = w // 2, d // 2
+    if st == "deco":
+        h1 = h * 70 // 100
+        box(b, "penthouse", -hw, hw, -hd, hd, 0, h1)
+        ins = min(500, hw // 4, hd // 4)
+        box(b, "penthouse", -hw + ins, hw - ins, -hd + ins, hd - ins, h1, h - 200)
+        box(b, "penthouse", -hw + ins - 100, hw - ins + 100, -hd + ins - 100, hd - ins + 100,
+            h - 200, h)
+        n = max(2, w // 1500)
+        for i in range(n + 1):
+            x = -hw + 150 + (w - 300) * i // n
+            for y0, y1 in ((-hd - 80, -hd), (hd, hd + 80)):
+                box(b, "penthouse", x - 150, x + 150, y0, y1, 0, h1 + 200)
+        if w >= 2500:
+            for y0, y1 in ((-hd - 40, -hd), (hd, hd + 40)):
+                box(b, "equip_dark", -hw + 700, hw - 700, y0, y1, h1 * 40 // 100,
+                    h1 - 400)
+    elif st == "screen":
+        ins = 300
+        box(b, "penthouse", -hw + ins, hw - ins, -hd + ins, hd - ins, 0, h - 200)
+        box(b, "equip_steel", -hw, hw, -hd, hd, h - 200, h)
+        for y0, y1 in ((-hd, -hd + 120), (hd - 120, hd)):
+            n = max(2, w // 450)
+            for i in range(n + 1):
+                x = -hw + 40 + (w - 80) * i // n
+                box(b, "equip_steel", x - 40, x + 40, y0, y1, 0, h - 200)
+        for x0, x1 in ((-hw, -hw + 120), (hw - 120, hw)):
+            n = max(2, d // 450)
+            for i in range(1, n):
+                y = -hd + 40 + (d - 80) * i // n
+                box(b, "equip_steel", x0, x1, y - 40, y + 40, 0, h - 200)
+    elif st == "block":
+        ins = min(300, hw // 4, hd // 4)
+        box(b, "penthouse", -hw + ins, hw - ins, -hd + ins, hd - ins, 0, h - 500)
+        box(b, "penthouse", -hw, hw, -hd, hd, h - 500, h)
+        for y0, y1 in ((-hd + ins - 40, -hd + ins), (hd - ins, hd - ins + 40)):
+            for z in (h * 30 // 100, h * 55 // 100):
+                if z + 300 < h - 600:
+                    box(b, "equip_dark", -hw + ins + 400, hw - ins - 400, y0, y1, z, z + 300)
+    else:                            # shed
+        hl = h - 600
+        box(b, "penthouse", -hw + 100, hw - 100, -hd + 100, hd - 100, 0, hl)
+        y1 = hd - 100
+        top = hl + (y1 + hd) * (h - 120 - hl) // d
+        if top > hl + 20:
+            prism(b, "penthouse", [(-hd + 100, hl), (y1, hl), (y1, top)], [],
+                  -hw + 100, hw - 100, "x")
+        prism(b, "equip_steel", [(-hd, hl), (hd, h - 120), (hd, h), (-hd, hl + 120)], [],
+              -hw, hw, "x")
+        if w >= 2200 and hl >= 2400:
+            box(b, "equip_dark", -900, 900, -hd + 60, -hd + 100, 0, min(2400, hl - 200))
+
+
+def _penthouse_louver(w: int, d: int, h: int, b) -> None:
     hw, hd = w // 2, d // 2
     # (merged into its building's shell: its walls in the building's wall tint)
     box(b, "penthouse", -hw, hw, -hd, hd, 0, h - 300)
@@ -308,11 +382,6 @@ def gen_penthouse(p: dict, b) -> None:
     if d >= 1600:
         box(b, "equip_dark", -hw - 40, -hw, -500, 500, 0, 2200)
         box(b, "equip_steel", -hw - 900, -hw, -700, 700, 2300, 2400)
-    if not p.get("stacks", 1):
-        return               # (under a corridor with no room for them: no exhaust stacks)
-    for x in ((-hw // 2, hw // 2) if w >= 3000 else (0,)):
-        cyl(b, "equip_steel", x, hd // 3, 200, h - 300, h + STACK_UP, 10)
-        cyl(b, "equip_steel", x, hd // 3, 260, h + STACK_UP, h + STACK_UP + 100, 10)
 
 
 def gen_hut(p: dict, b) -> None:
@@ -528,8 +597,8 @@ REACH = {**{k: "roof" for k in ROOF}, **{k: "roof" for k in MERGED_ROOF},
          "escape": "deep", "duct": "strip", "wall_vent": "flush", "conduit": "flush",
          "camera": "strip", "landing": "flush"}
 SUB = {"ac_unit": "style", "water_tank": "style", "antenna": "style", "pad": "kind",
-       "roof_vent": "style", "skylight": "style"}
-FIXED = {"hut": "access", "dunnage": "frame", "penthouse": "mechanical",
+       "roof_vent": "style", "skylight": "style", "penthouse": "style"}
+FIXED = {"hut": "access", "dunnage": "frame",
          "billboard_frame": "empty", "escape": "fire", "duct": "exhaust", "wall_vent": "grille",
          "conduit": "cables", "landing": "skybridge"}
 # instanced whatever their count (the exporter's roof equipment kinds, per tile)

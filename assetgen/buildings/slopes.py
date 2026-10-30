@@ -185,22 +185,60 @@ def adjust(band, fa, taken: list) -> list:
             continue
         hi_g = ground_over(gs, op.a, op.b, max)
         if hi_g >= UP:
-            zr = int((hi_g + SILL_UP + 9) // 10) * 10
-            need = RAISED_MIN
-            # (its head may rise to the band's top, under anything mounted over it)
-            cap = band.zb - 150
-            for m0, m1, za, _ in mounts:
-                if m0 < op.b and m1 > op.a and za > zr + 1000:
-                    cap = min(cap, za - 50)
-            hi = max(op.hi, min(cap, zr + need + 400))
-            if hi - zr >= need:
-                op.lo, op.hi = zr, hi
+            fit = _raise(band, gs, mounts, op.a, op.b, op.hi)
+            if fit is None:
+                # (the hill rises across it: the stretch of it that can be raised, at least
+                # NARROW_MIN wide, nearest its middle)
+                fit = _narrowed(band, gs, mounts, op)
+                if fit is not None:
+                    sb.stats["openings_narrowed"] = sb.stats.get("openings_narrowed", 0) + 1
+            if fit is not None:
+                op.a, op.b, op.lo, op.hi = fit
                 op.info["raised"] = True
                 sb.stats["openings_raised"] = sb.stats.get("openings_raised", 0) + 1
             else:
                 sb.stats["openings_buried"] = sb.stats.get("openings_buried", 0) + 1
         keep.append(op)
     return keep
+
+
+NARROW_MIN = {"shop": 2400, "door": 1100}
+NARROW_STEP = 250
+
+
+def _raise(band, gs, mounts, a: int, b: int, hi0: int):
+    """(a, b, lo, hi) of an opening over a..b raised onto the ground, or None when its head
+    cannot rise RAISED_MIN over its sill (the band's top, what is mounted over it)."""
+    hi_g = ground_over(gs, a, b, max)
+    zr = int((hi_g + SILL_UP + 9) // 10) * 10
+    # (its head may rise to the band's top, under anything mounted over it)
+    cap = band.zb - 150
+    for m0, m1, za, _ in mounts:
+        if m0 < b and m1 > a and za > zr + 1000:
+            cap = min(cap, za - 50)
+    hi = max(hi0, min(cap, zr + RAISED_MIN + 400))
+    if hi - zr < RAISED_MIN:
+        return None
+    return a, b, zr, hi
+
+
+def _narrowed(band, gs, mounts, op):
+    w_min = NARROW_MIN.get(op.kind, 1100)
+    W = op.b - op.a
+    mid = (op.a + op.b) // 2
+    w = W - NARROW_STEP
+    while w >= w_min:
+        best = None
+        for a in range(op.a, op.b - w + 1, NARROW_STEP):
+            fit = _raise(band, gs, mounts, a, a + w, op.hi)
+            if fit is not None:
+                d = abs(a + w // 2 - mid)
+                if best is None or d < best[0]:
+                    best = (d, fit)
+        if best is not None:
+            return best[1]
+        w -= NARROW_STEP
+    return None
 
 
 def windows_clear(band, fa, ops: list) -> list:

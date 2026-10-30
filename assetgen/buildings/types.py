@@ -206,9 +206,107 @@ def mass(sb, ms) -> bool:
 
 
 def post(sb) -> None:
+    dormers(sb)
     fn = POST.get(getattr(sb, "generator", "general"))
     if fn is not None:
         fn(sb)
+
+
+# ---------------------------------------------------------------------------
+# Dormers (AG4's open item: the pitched roofs had none)
+# ---------------------------------------------------------------------------
+
+DORMER_ERAS = {"heritage": 0.75, "suburban_modern": 0.5, "neon_retro": 0.3}
+DORMER_H = 1800          # a dormer's face, base to eaves
+DORMER_BAY = 4200        # one per this along a slope
+DORMER_SET = 450         # its face set back from the wall line below
+DORMER_END = 900         # kept this from a gable end or a hip's slope
+
+
+def dormers(sb) -> None:
+    """Dormers along the long slopes of a gable or hip roof, on the eras that pitch their
+    roofs, one per DORMER_BAY, each a face DORMER_SET in from the wall under it and cheeks
+    back into the roof until its own roof meets the slope."""
+    share = DORMER_ERAS.get(sb.gm.get("era"), 0.0)
+    if not share or _u(sb.bid, "dormers") >= share or getattr(sb, "hero", None):
+        return
+    for ms in sb.roof_forms:
+        rf = ms.get("roof") or {}
+        if rf.get("kind") == "mansard" and rf.get("tan") and rf.get("B"):
+            _mansard_dormers(sb, ms, rf)
+            continue
+        if rf.get("kind") not in ("gable", "hip") or "ridge" not in rf or not rf.get("tan"):
+            continue
+        c, u, v = rf["frame"]
+        x0, x1, y0, y1 = rf["box"]
+        rx0, rx1, ym, zr = rf["ridge"]
+        tanp, zf = rf["tan"], rf["zf"]
+        _, _, _, W, D, _ = RF._rect_frame(rf["ring"], rf["rect"], rf["eave"])
+        w = 1400 if _u(f"{sb.bid}|{ms['k']}", "dw") < 0.5 else 1800
+        st = "gable" if _u(f"{sb.bid}|{ms['k']}", "dst") < 0.65 else "shed"
+        rise = w * 45 // 100 if st == "gable" else 400
+        slot = RF.slope_slot(sb)
+        for side in (-1, 1):
+            yf = side * (D / 2.0 - DORMER_SET)        # the face, in the roof's frame
+            run = abs(yf - (y0 if side < 0 else y1))  # from the eave line in
+            zs = zf + int(run * tanp)
+            if zs + DORMER_H + rise > zr - 300:
+                continue
+            d = int((DORMER_H + rise) / tanp) + 300
+            if run + d > abs(ym - (y0 if side < 0 else y1)) - 600:
+                continue
+            sh = run + d if rf["kind"] == "hip" else 0     # a hip's ends close in at 45 degrees
+            xa = x0 + sh + DORMER_END + w / 2.0
+            xb = x1 - sh - DORMER_END - w / 2.0
+            if xb < xa:
+                continue
+            n = int((xb - xa) // DORMER_BAY) + 1
+            ux, uy = (u[0], u[1]) if side < 0 else (-u[0], -u[1])
+            for i in range(n):
+                xc = (xa + xb) / 2.0 if n == 1 else xa + (xb - xa) * i / (n - 1)
+                px = c[0] + u[0] * xc + v[0] * yf
+                py = c[1] + u[1] * xc + v[1] * yf
+                put(sb, "dormer", {"w": w, "h": DORMER_H, "d": PT.q(d), "style": st,
+                                   "slot": slot},
+                    int(round(px)), int(round(py)), zs - 150, ux, uy, "dormer")
+
+
+MANSARD_SET = 100        # a mansard dormer's face this in from the wall line
+MANSARD_W = 1200
+
+
+def _mansard_dormers(sb, ms, rf) -> None:
+    """Small gabled dormers on a mansard's steep slopes, along every edge with an eave (a
+    wall open to the street, not a party wall), as tall as the attic leaves over the slope
+    where it crosses the wall line."""
+    ring, e, tanp = rf["ring"], rf["eave"], rf["tan"]
+    zf, zt = rf["zf"], rf["zt"]
+    n = len(ring)
+    w = MANSARD_W
+    rise = w * 35 // 100
+    slot = RF.slope_slot(sb)
+    for i in range(n):
+        if e[i] <= 0:
+            continue
+        a, b = ring[i], ring[(i + 1) % n]
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+        zs = zf + int((e[i] + MANSARD_SET) * tanp)
+        hd = min(DORMER_H, zt - zs - rise - 150)
+        if hd < 1000:
+            continue
+        d = min(int((hd + rise) / tanp) + 300, 2500)
+        end = e[i] + MANSARD_SET + d + 300 + w / 2.0
+        if L - 2 * end < 0:
+            continue
+        k = int((L - 2 * end) // DORMER_BAY) + 1
+        for j in range(k):
+            s_ = L / 2.0 if k == 1 else end + (L - 2 * end) * j / (k - 1)
+            px = a[0] + ux * s_ - uy * MANSARD_SET
+            py = a[1] + uy * s_ + ux * MANSARD_SET
+            put(sb, "dormer", {"w": w, "h": PT.q(hd), "d": PT.q(d), "style": "gable",
+                               "slot": slot},
+                int(round(px)), int(round(py)), zs - 150, ux, uy, "dormer")
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +554,12 @@ def shed_mass(sb, ms) -> bool:
     n = len(ring)
     walls = 0
     cols = 0
+    # (its columns from the genome: two bays apart, their size from the corner pier)
+    bay = int(round(float(sb.gm["cont"]["body.bay_m"]) * 2000))
+    r = 100 + 50 * int(float(sb.gm["cont"]["body.corner_m"]) * 4)
+    sb.used.setdefault("open", [])
+    if "body" not in sb.used["open"]:
+        sb.used["open"].append("body")
     for i in range(n):
         a, b = ring[i], ring[(i + 1) % n]
         ux, uy, L = AR._unit(a, b)
@@ -470,12 +574,12 @@ def shed_mass(sb, ms) -> bool:
             if sb._extrude(q, None, ms["z0"], top - slab, "hangar"):
                 walls += 1
             continue
-        k = max(1, int(L // 6000))
+        k = max(1, int(L // bay))
         for m in range(k + 1):
             s = 300 + (L - 600) * m / k
-            x = int(round(a[0] + ux * s - uy * 250))
-            y = int(round(a[1] + uy * s + ux * 250))
-            if put(sb, "pillar", {"r": 150, "h": PT.q(top - slab - ms["z0"]),
+            x = int(round(a[0] + ux * s - uy * (r + 100)))
+            y = int(round(a[1] + uy * s + ux * (r + 100)))
+            if put(sb, "pillar", {"r": r, "h": PT.q(top - slab - ms["z0"]),
                                   "style": "steel"}, x, y, ms["z0"], ux, uy, "open_column"):
                 cols += 1
     if ms.get("roof"):

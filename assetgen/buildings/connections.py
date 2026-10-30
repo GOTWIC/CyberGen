@@ -245,7 +245,8 @@ def landing_ops(sb, fa, row: tuple, ops: list) -> list:
         ops = [op for op in ops if op[1] < a_ - 200 or op[0] > b_ + 200]
         ops.append((a_, b_, "storefront", -2))
         sb.landed[ld["id"]] = {"s": ld["s"], "z": zf, "w": b_ - a_, "h": hi - lo,
-                               "door": True}
+                               "door": True, "edge": fa.j, "s0": a_ + fa.soff,
+                               "s1": b_ + fa.soff, "hi": hi}
     return ops
 
 

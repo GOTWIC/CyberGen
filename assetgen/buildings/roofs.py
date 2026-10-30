@@ -62,6 +62,10 @@ GREEN_BASE = 80                 # a green roof's gravel border and the bed's foo
 MIN_ATTIC = 1200                # a form needs at least this rise
 SHED_WALL = 4000                # a one-floor shed keeps this much wall under its roof form
 ROOF_STOREY = 4600              # a one-floor storey on another mass this low is all roof
+# AG5: the mechanical penthouse's style by era (`roofparts.gen_penthouse`)
+PENTHOUSE_STYLE = {"heritage": "deco", "neon_retro": "deco", "corporate_glass": "screen",
+                   "clean_tech": "screen", "transit_modern": "screen", "brutalist": "block",
+                   "industrial": "shed", "aerospace": "shed"}
 PITCHED_FLOORS = 12             # pitched forms on buildings up to this many floors
 FLATTEST = 0.14                 # a gable or hip flattened to its attic: at least 8 degrees
 LEG_MIN = 150                   # an item stands on dunnage where the roof is this far under it
@@ -980,7 +984,8 @@ def items(sb) -> None:
                 if top < h + up:
                     h, stacks = max(2500, min(sz, top)), False
                 sb.stats["roof_items_lowered"] = sb.stats.get("roof_items_lowered", 0) + 1
-            p = {"w": PT.q(sa), "d": PT.q(sc), "h": PT.q(h)}
+            p = {"w": PT.q(sa), "d": PT.q(sc), "h": PT.q(h),
+                 "style": PENTHOUSE_STYLE.get(sb.gm.get("era"), "louver")}
             if not stacks:
                 p["stacks"] = 0
             rec["asset"] = _place(sb, "penthouse", p, x, y, z, ux, uy)

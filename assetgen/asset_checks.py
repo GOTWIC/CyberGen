@@ -29,6 +29,13 @@ corridor, every portal open), `asset_roofs` (every roof item an asset, every gre
 built, every portal cut and every sky station with its platforms), `asset_landings` (a
 landing door where a skybridge meets a floor line); the skybridges' own meshes are the
 skybridge stage's `asset_skybridges`.
+
+AG5: `asset_types` (every building built by its type's generator, `types.generator_of`,
+every landmark and wheel a hero with its U2 mask), `asset_families` (the members of a
+complex family share its design: the discrete genes of every group whose system they share,
+and twin towers every gene) and `asset_slopes` (every building on M13's slopes stands on a
+stepped plinth; openings lowered, raised, narrowed or left buried, lower storeys and
+retaining skirts counted). Heroes have a budget class of their own (`hero`).
 """
 
 from __future__ import annotations
@@ -53,14 +60,18 @@ CLASSES = {
     "high": {"k": 2.0, "base": 10000, "i": 7.0, "ibase": 200},
     "tower": {"k": 2.0, "base": 20000, "i": 6.0, "ibase": 400},
     "mega": {"k": 2.0, "base": 20000, "i": 6.0, "ibase": 400},
+    "hero": {"k": 4.0, "base": 250000, "i": 10.0, "ibase": 4000},
 }
 MEGA = ("building.megabuilding", "building.straddle_building")
 
 
 def budget_class(rec: dict) -> str:
-    """A building's budget class: mega (megabuildings, straddle buildings, landmarks), else by
-    height: tower (100 m or more), high (40 m), mid (12 m), low."""
+    """A building's budget class: hero (AG5: landmarks and the wheel, built by `heroes`),
+    mega (megabuildings, straddle buildings), else by height: tower (100 m or more), high
+    (40 m), mid (12 m), low."""
     t = rec["type"]
+    if rec.get("hero"):
+        return "hero"
     if t in MEGA or t.startswith("building.landmark"):
         return "mega"
     h = rec["bounds"][1][2]
@@ -528,3 +539,101 @@ def mounts(records: dict) -> dict:
     return {"name": "asset_mounts", "ok": glass == 0 and nowall == 0, "mounts": n,
             "on_glass": glass, "no_wall": nowall, "on_tidied_edge": tidied,
             "off_its_walls": off, "in_landing": landing, "first": first}
+
+
+# ---------------------------------------------------------------------------
+# AG5: types, families, slopes
+# ---------------------------------------------------------------------------
+
+def types(records: dict) -> dict:
+    """Every building built by its type's generator (`types.generator_of`); every landmark
+    and wheel a hero with its mask. Types the general grammar builds are counted apart, and
+    so is a type the generators do not list (built by the general one)."""
+    from .buildings import heroes as HE
+    from .buildings import types as TY
+    by: dict[str, dict] = {}
+    bad, first, unlisted = 0, [], {}
+    for k in sorted(records):
+        r = records[k]
+        t = r["type"]
+        want = TY.generator_of(t)
+        got = r.get("generator")
+        b = by.setdefault(want, {"buildings": 0, "features": 0})
+        b["buildings"] += 1
+        b["features"] += int(r["stats"].get("type_features", 0)) + \
+            int(r["stats"].get("hero_features", 0))
+        if want == "general" and t not in TY.GENERATORS and not t.startswith("building.landmark"):
+            unlisted[t] = unlisted.get(t, 0) + 1
+        miss = got != want
+        if HE.is_hero_type(t) and not (r.get("hero") and r["hero"].get("mask")):
+            miss = True
+        if miss:
+            bad += 1
+            if len(first) < 5:
+                first.append(f"{k}: {t} built by {got}, not {want}"
+                             if got != want else f"{k}: {t} has no hero mask")
+    return {"name": "asset_types", "ok": bad == 0, "buildings": len(records),
+            "generators": {g: by[g] for g in sorted(by)},
+            "heroes": sum(1 for r in records.values() if r.get("hero")),
+            "unlisted_types": dict(sorted(unlisted.items())), "wrong": bad, "first": first}
+
+
+def families(records: dict) -> dict:
+    """The members of a complex family share its design: the discrete genes of every group
+    whose system two members share, and twin towers every gene they both use."""
+    from .buildings import systems as SY
+    fams: dict[str, list] = {}
+    for k in sorted(records):
+        f = records[k].get("family")
+        if f:
+            fams.setdefault(f, []).append(k)
+    kinds: dict[str, int] = {}
+    bad, first = 0, []
+    for f in sorted(fams):
+        ks = fams[f]
+        cx = records[ks[0]].get("complex") or "complex"
+        kinds[cx] = kinds.get(cx, 0) + 1
+        twins = cx in SY.TWINS
+        g0 = records[ks[0]]["genes"]
+        for k in ks[1:]:
+            g1 = records[k]["genes"]
+            for gene in sorted(set(g0) & set(g1)):
+                grp = gene.split(".", 1)[0]
+                if grp not in GN.GROUPS or g0.get(f"{grp}.system") != g1.get(f"{grp}.system"):
+                    continue         # (a building's own genes: its wear, its ground floor)
+                discrete = isinstance(g0[gene], str)
+                if (discrete or twins) and g0[gene] != g1[gene]:
+                    bad += 1
+                    if len(first) < 5:
+                        first.append(f"{f}: {ks[0]} and {k} differ in {gene}")
+                    break
+    return {"name": "asset_families", "ok": bad == 0, "families": len(fams),
+            "members": sum(len(v) for v in fams.values()),
+            "kinds": dict(sorted(kinds.items())), "differ": bad, "first": first}
+
+
+SLOPE_MIN_M = 0.3      # a plinth this deep or more must be stepped
+
+
+def slopes(records: dict) -> dict:
+    """AG5: every building on M13's slopes (a plinth `SLOPE_MIN_M` deep or more under its
+    base) stands on a stepped plinth; what its street front did at grade is counted."""
+    keys = ("plinth_facades", "plinth_windows", "retaining_skirts", "openings_lowered",
+            "openings_in_plinth", "openings_raised", "openings_narrowed", "openings_buried",
+            "windows_buried")
+    n, flat, first = 0, 0, []
+    tot = {k: 0 for k in keys}
+    for k in sorted(records):
+        r = records[k]
+        if r.get("plinth_m", 0.0) < SLOPE_MIN_M:
+            continue
+        n += 1
+        st = r["stats"]
+        for key in keys:
+            tot[key] += int(st.get(key, 0))
+        if not st.get("plinth_facades"):
+            flat += 1
+            if len(first) < 5:
+                first.append(f"{k}: a {r['plinth_m']} m plinth with no step")
+    return {"name": "asset_slopes", "ok": flat == 0, "buildings": n, "unstepped": flat,
+            **tot, "first": first}

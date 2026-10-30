@@ -206,7 +206,7 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "triangles": int(sum(len(a["tri"]) for a in arrs.values())),
         "slots": {k: int(len(a["tri"])) for k, a in arrs.items()},
         "proxy": {"triangles": int(px["triangles"])},
-        "collision": CO.build(brief, sh["band_m"]),
+        "collision": CO.build(brief, sh["band_m"], sh.get("landing_doors")),
         "front": {"triangles": int(sum(len(a["tri"]) for a in sh["front"].values())),
                   "slots": {k: int(len(a["tri"])) for k, a in sh["front"].items()},
                   "band_m": sh["band_m"]},
@@ -229,6 +229,12 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     rec["generator"] = sh["generator"]
     if sh.get("hero"):
         rec["hero"] = dict(sh["hero"])
+    cx = (brief.get("property") or {}).get("complex")
+    if gm["family"] and cx:
+        rec["complex"] = cx
+    pl = SH.plinth_mm(brief)
+    if pl > 0:
+        rec["plinth_m"] = C.m(pl / 1000.0)        # (M13: its plinth's depth under the base)
     if brief["building"]["floor_grid"].get("level"):
         rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
@@ -358,16 +364,22 @@ def tile_job(job: dict) -> dict:
             gq.node(node, mesh=mesh, root=True,
                     extras={"cg": {"part": PT.type_of(*pdefs[node]), "kind": "part"}})
         parts_glb = gq.to_glb()
+    wrote = 0
     for bid, brief, sh, px, rec in made:
         piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
                int(round(_base_m(brief) * 1000)))
         ex = _node_extras(bid, rec)
-        mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["shell"], mats),
+        hero = None
+        if rec.get("hero") and sh.get("mask") is not None:
+            # AG5: the hero's U2 mask, a texture of its own, on UV1 in the hero UV
+            hero = (rec["hero"]["perimeter_m"], rec["hero"]["height_m"])
+            wrote += _hero_mask(out, bid, sh["mask"], rec["hero"])
+        mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["shell"], mats, hero),
                       extras={"kind": "shell"})
         kids = [g.node(f"{bid}.shell", mesh=mesh, extras=ex)]
         if sh["front"]:
             # AG3: the street front, its own mesh (Unreal collides it as drawn)
-            fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats),
+            fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats, hero),
                         extras={"kind": "front"})
             kids.append(g.node(f"{bid}.front", mesh=fm, extras=ex))
             rec["front"]["node"] = f"{bid}.front"
@@ -385,7 +397,6 @@ def tile_job(job: dict) -> dict:
     decals = _decal_mesh(g, job["tile"], made)
     shells = g.to_glb()
     proxies = gp.to_glb()
-    wrote = 0
     wrote += MF.write_if_changed(out / "tiles" / f"{job['tile']}.glb", shells)
     wrote += MF.write_if_changed(out / "proxies" / f"{job['tile']}.glb", proxies)
     ppath = out / "parts" / f"{job['tile']}.glb"
@@ -409,6 +420,26 @@ def tile_job(job: dict) -> dict:
                                                for a in arrs.values())),
                           "bad": part_checks["bad"]}
     return {"tile": job["tile"], "records": records, "wrote": wrote, "files": files}
+
+
+HERO_DIR = "textures/hero"       # AG5: the heroes' U2 masks, under BUILD/assets
+
+
+def _hero_mask(out: Path, bid: str, a: np.ndarray, hero: dict) -> int:
+    """Write a hero's mask PNG where its pixels changed; its file and pixel hash go into the
+    hero's record. Returns the files written (0 or 1)."""
+    from .materials import pbr as PB
+    rel = f"{HERO_DIR}/{bid}.png"
+    path = out / rel
+    sha = PB.pixels_sha256(a)
+    hero.update(mask=rel, mask_sha256=sha, mask_px=int(a.shape[0]))
+    if path.is_file():
+        from PIL import Image
+        with Image.open(path) as im:
+            if PB.pixels_sha256(np.asarray(im)) == sha:
+                return 0
+    PB.save_png(path, a)
+    return 1
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +521,9 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             all(bid in old_b for bid in tiles[t]) and \
             _file_ok(out / "tiles" / f"{t}.glb", ot.get("tiles")) and \
             _file_ok(out / "proxies" / f"{t}.glb", ot.get("proxies")) and \
-            (ot.get("parts") is None or _file_ok(out / "parts" / f"{t}.glb", ot.get("parts")))
+            (ot.get("parts") is None or _file_ok(out / "parts" / f"{t}.glb", ot.get("parts"))) \
+            and all((out / old_b[bid]["hero"]["mask"]).is_file() for bid in tiles[t]
+                    if (old_b.get(bid) or {}).get("hero", {}).get("mask"))
         (keep if fresh else todo).append(t)
     t3 = time.perf_counter()
     records: dict[str, dict] = {}
@@ -534,7 +567,8 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                   AC.meshes(records, tile_parts), AC.unique(records, k),
                   AC.budget(records, tile_parts), acc, AC.mounts(records),
                   AC.clearance(records), AC.roofs(records, briefs),
-                  AC.landings(records, sky["records"]), sky["check"]]
+                  AC.landings(records, sky["records"]), sky["check"],
+                  AC.types(records), AC.families(records), AC.slopes(records)]
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,

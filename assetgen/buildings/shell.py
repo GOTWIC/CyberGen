@@ -604,6 +604,10 @@ class ShellBuilder:
                 # portals and sky stations
                 "roof_items": self.roof_items, "green": list(self.green_done),
                 "landings": CN.landing_records(self), "portals": self.portal_recs,
+                # AG5: the landing doors (brief edge, s range, floor and head, mm), which
+                # the collision leaves open
+                "landing_doors": [{k: ld[k] for k in ("edge", "s0", "s1", "z", "hi")}
+                                  for _, ld in sorted(self.landed.items()) if "edge" in ld],
                 # AG5: the generator, a hero's kind, accent, UV extents and its U2 mask
                 "generator": self.generator, "hero": self._hero_rec(),
                 "mask": HE.bake(self)}

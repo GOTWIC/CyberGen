@@ -351,6 +351,10 @@ def effective(genome: dict, used: dict) -> dict:
     and which features it built), as {gene: value}; the vector of the uniqueness check."""
     genes, cont = genome["genes"], genome["cont"]
     out: dict = {}
+    for g in used.get("open", []):
+        # (AG5: an open shed's columns: their bay and section)
+        out[f"{g}.bay_m"] = cont[f"{g}.bay_m"]
+        out[f"{g}.corner_m"] = cont[f"{g}.corner_m"]
     for g in used.get("groups", []):
         s = genes[f"{g}.system"]
         out[f"{g}.system"] = s

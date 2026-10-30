@@ -694,6 +694,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                                       for slot, m in sorted(e["materials"].items())}
                 if "none" in collision:
                     a["no_collision"] = True
+                if e.get("hero"):
+                    a["hero"] = e["hero"]["kind"]          # (AG5: a landmark's or the wheel's)
+                if e.get("plinth_m"):
+                    # (AG5: its stepped plinth reaches this far under the pivot, M13's slopes)
+                    a["plinth_m"] = float(e["plinth_m"])
                 if e.get("doors"):
                     # (AG3: the doors of a street front, tagged on its actor for stage 4)
                     a["doors"] = [f"{d['id']}@{d.get('walkway_id') or ''}" for d in e["doors"]]
@@ -758,7 +763,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                        "replaced": len(replaced), "replaces_missing": missing,
                        "packs": len(out_packs),
                        "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
-                       "materials": len(mats), "textures": len(textures)}}
+                       "materials": len(mats), "textures": len(textures),
+                       "heroes": sum(1 for a in actors if a.get("hero"))}}
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
