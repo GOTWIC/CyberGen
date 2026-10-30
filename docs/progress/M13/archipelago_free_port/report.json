@@ -561,7 +561,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "14922 things on the ground"
+        "14925 things on the ground"
       ]
     },
     {
@@ -876,7 +876,7 @@
       "lanes": 2718,
       "lane_connectors": 5355,
       "one_way_segments": 76,
-      "walkways": 8980,
+      "walkways": 8989,
       "walkway_km": {
         "alley": 14.77,
         "crossing": 39.03,
@@ -884,11 +884,11 @@
         "elevated": 0.76,
         "elevator": 0.0,
         "footbridge": 0.1,
-        "path": 46.12,
+        "path": 46.18,
         "pedestrian_street": 4.75,
         "promenade": 13.01,
         "sidewalk": 103.36,
-        "skybridge": 1.66,
+        "skybridge": 1.69,
         "stairs": 0.22
       },
       "footbridges": 5,
@@ -1016,7 +1016,7 @@
     },
     "buildings": {
       "count": 3186,
-      "floor_area_km2": 12.569,
+      "floor_area_km2": 12.637,
       "by_type": {
         "shopfront_row": 1299,
         "shanty_stack": 979,
@@ -1054,9 +1054,9 @@
           "p90": 180.0,
           "max": 292.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 9.821,
+          "floor_area_km2": 9.889,
           "coverage": 0.764,
-          "far": 11.5
+          "far": 11.58
         },
         "Kettle Island": {
           "count": 47,
@@ -1109,14 +1109,14 @@
         "megasite": 3,
         "twin_towers": 1
       },
-      "skybridges": 144,
+      "skybridges": 145,
       "skybridges_by_kind": {
         "cable": 36,
         "catwalk": 61,
-        "enclosed": 46,
+        "enclosed": 47,
         "stack": 1
       },
-      "skybridge_km": 1.66,
+      "skybridge_km": 1.69,
       "units": 9618,
       "units_by_use": {
         "food": 3109,
@@ -1131,16 +1131,16 @@
         "club": 205
       },
       "roof_items": {
-        "ac_unit": 6666,
-        "antenna": 642,
+        "ac_unit": 6655,
+        "antenna": 641,
         "water_tank": 565,
         "billboard": 478,
-        "mechanical": 170,
-        "av_pad": 38,
+        "mechanical": 168,
+        "av_pad": 39,
         "helipad": 22
       },
-      "green_roofs": 377,
-      "green_roof_m2": 236863,
+      "green_roofs": 379,
+      "green_roof_m2": 240534,
       "landmarks": [],
       "megasites": {
         "Crown Island Skyport": {
@@ -1177,7 +1177,7 @@
       "structures": 523,
       "tallest_m": 292.0,
       "generator": {
-        "walkways_added": 1295
+        "walkways_added": 1304
       }
     },
     "transit": {
@@ -1211,10 +1211,10 @@
       }
     },
     "props": {
-      "props": 30081,
-      "plants": 13457,
+      "props": 30084,
+      "plants": 13510,
       "trees": 3829,
-      "instances": 43538,
+      "instances": 43594,
       "props_by_kind": {
         "sign": 6848,
         "awning": 5995,
@@ -1228,9 +1228,9 @@
         "traffic_signal": 685,
         "wall_light": 610,
         "hydrant": 476,
-        "trash_can": 427,
+        "trash_can": 428,
         "trash": 342,
-        "bench": 331,
+        "bench": 333,
         "dumpster": 170,
         "bus_stop": 89,
         "boat": 34,
@@ -1240,13 +1240,13 @@
         "kiosk": 8
       },
       "plants_by_kind": {
-        "shrub": 3912,
+        "shrub": 3956,
         "facade_greenery": 3228,
         "overgrowth": 1941,
         "street_tree": 1931,
         "park_tree": 892,
         "palm": 610,
-        "roof_tree": 547,
+        "roof_tree": 556,
         "conifer": 363,
         "median_tree": 33
       },
@@ -1263,13 +1263,13 @@
         "station_props": 9,
         "street_trees": 1931,
         "plaza_props": 114,
-        "park_benches": 329,
+        "park_benches": 332,
         "parked_vehicles": 1185,
         "alley_clutter": 512,
         "median_trees": 487,
         "promenade_trees": 156,
         "park_trees": 2451,
-        "roof_plants": 3263,
+        "roof_plants": 3316,
         "facade_greenery": 3228,
         "overgrowth": 1941,
         "quay_props": 2685,
@@ -1278,8 +1278,8 @@
         "unit_dressing": 17048,
         "scaffolding": 29,
         "market_gates": 0,
-        "props": 30081,
-        "plants": 13457
+        "props": 30084,
+        "plants": 13510
       }
     },
     "gameplay": {
@@ -1320,7 +1320,7 @@
         "shop_sign.facade": 2884,
         "billboard.roof": 478,
         "neon.facade": 204,
-        "billboard.facade": 63,
+        "billboard.facade": 65,
         "holo_ad.roof": 44
       },
       "density_rows": 1527,
@@ -1333,7 +1333,7 @@
         "parking": 259,
         "travel_points": 19,
         "densities": 1527,
-        "sign_slots": 7637
+        "sign_slots": 7639
       }
     },
     "separation_budget": {

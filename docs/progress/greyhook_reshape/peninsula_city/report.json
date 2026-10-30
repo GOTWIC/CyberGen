@@ -462,7 +462,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "117 towers, 17 forms, 0 pairs within 150 m of one form and band"
+        "115 towers, 17 forms, 0 pairs within 150 m of one form and band"
       ]
     },
     {
@@ -1060,18 +1060,18 @@
     },
     "buildings": {
       "count": 2617,
-      "floor_area_km2": 16.058,
+      "floor_area_km2": 16.082,
       "by_type": {
         "shopfront_row": 884,
         "villa": 736,
         "shanty_stack": 417,
-        "podium_tower": 208,
+        "podium_tower": 210,
         "megabuilding": 105,
         "slab": 90,
         "warehouse": 29,
         "parking_structure": 27,
-        "tower": 26,
         "terraced": 25,
+        "tower": 24,
         "perimeter": 22,
         "hangar": 16,
         "shed": 14,
@@ -1114,9 +1114,9 @@
           "p90": 59.5,
           "max": 112.0,
           "archetype": "transit_hub",
-          "floor_area_km2": 2.436,
+          "floor_area_km2": 2.459,
           "coverage": 0.658,
-          "far": 5.27
+          "far": 5.32
         },
         "The Stacks": {
           "count": 134,
@@ -1191,15 +1191,15 @@
         "clinic": 190
       },
       "roof_items": {
-        "ac_unit": 6139,
+        "ac_unit": 6138,
         "water_tank": 652,
-        "billboard": 571,
+        "billboard": 572,
         "mechanical": 274,
-        "antenna": 69,
-        "av_pad": 8
+        "antenna": 67,
+        "av_pad": 10
       },
       "green_roofs": 415,
-      "green_roof_m2": 215037,
+      "green_roof_m2": 215605,
       "landmarks": [
         {
           "name": "Lantern Wheel",
@@ -1289,9 +1289,9 @@
     },
     "props": {
       "props": 27814,
-      "plants": 14203,
+      "plants": 14220,
       "trees": 5539,
-      "instances": 42017,
+      "instances": 42034,
       "props_by_kind": {
         "sign": 7007,
         "awning": 4904,
@@ -1318,14 +1318,14 @@
         "vending_machine": 10
       },
       "plants_by_kind": {
-        "shrub": 6665,
+        "shrub": 6675,
         "park_tree": 2336,
         "palm": 1285,
         "street_tree": 1245,
         "facade_greenery": 852,
         "overgrowth": 693,
         "conifer": 524,
-        "roof_tree": 454,
+        "roof_tree": 461,
         "median_tree": 149
       },
       "lawn_m2": 49753,
@@ -1347,7 +1347,7 @@
         "median_trees": 1264,
         "promenade_trees": 170,
         "park_trees": 7071,
-        "roof_plants": 2908,
+        "roof_plants": 2925,
         "facade_greenery": 852,
         "overgrowth": 693,
         "quay_props": 1099,
@@ -1357,7 +1357,7 @@
         "scaffolding": 12,
         "market_gates": 0,
         "props": 27814,
-        "plants": 14203
+        "plants": 14220
       }
     },
     "gameplay": {
@@ -1397,10 +1397,10 @@
       "sign_slots": {
         "shop_sign.blade": 5249,
         "shop_sign.facade": 1758,
-        "billboard.roof": 571,
+        "billboard.roof": 572,
         "neon.facade": 257,
-        "billboard.facade": 162,
-        "holo_ad.roof": 35
+        "billboard.facade": 163,
+        "holo_ad.roof": 36
       },
       "density_rows": 1249,
       "peak_traffic_vph": 9690.0,
@@ -1412,7 +1412,7 @@
         "parking": 408,
         "travel_points": 24,
         "densities": 1249,
-        "sign_slots": 8032
+        "sign_slots": 8035
       }
     },
     "separation_budget": {

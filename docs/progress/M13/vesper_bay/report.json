@@ -460,7 +460,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "180 towers, 19 forms, 0 pairs within 150 m of one form and band"
+        "180 towers, 18 forms, 0 pairs within 150 m of one form and band"
       ]
     },
     {
@@ -938,7 +938,7 @@
       "lanes": 5490,
       "lane_connectors": 10768,
       "one_way_segments": 96,
-      "walkways": 14556,
+      "walkways": 14570,
       "walkway_km": {
         "alley": 31.5,
         "crossing": 75.42,
@@ -946,11 +946,11 @@
         "elevated": 1.92,
         "elevator": 0.0,
         "footbridge": 0.22,
-        "path": 72.08,
+        "path": 72.18,
         "pedestrian_street": 2.43,
         "promenade": 6.57,
         "sidewalk": 190.31,
-        "skybridge": 3.15,
+        "skybridge": 3.23,
         "stairs": 0.77,
         "underpass": 0.06
       },
@@ -1137,7 +1137,7 @@
     },
     "buildings": {
       "count": 5809,
-      "floor_area_km2": 20.84,
+      "floor_area_km2": 20.878,
       "by_type": {
         "shopfront_row": 2814,
         "shanty_stack": 1762,
@@ -1182,9 +1182,9 @@
           "p90": 204.0,
           "max": 480.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 6.901,
+          "floor_area_km2": 6.938,
           "coverage": 0.739,
-          "far": 11.02
+          "far": 11.08
         },
         "The Stacks": {
           "count": 104,
@@ -1274,15 +1274,15 @@
         "tower_cluster": 1,
         "twin_towers": 1
       },
-      "skybridges": 233,
+      "skybridges": 235,
       "skybridges_by_kind": {
         "cable": 32,
         "catwalk": 74,
-        "enclosed": 54,
+        "enclosed": 56,
         "open_deck": 72,
         "stack": 1
       },
-      "skybridge_km": 3.15,
+      "skybridge_km": 3.23,
       "units": 15968,
       "units_by_use": {
         "food": 4307,
@@ -1297,11 +1297,11 @@
         "lobby": 441
       },
       "roof_items": {
-        "ac_unit": 11904,
+        "ac_unit": 11902,
         "billboard": 1221,
         "water_tank": 1086,
         "antenna": 869,
-        "mechanical": 216,
+        "mechanical": 214,
         "av_pad": 23,
         "helipad": 13
       },
@@ -1357,7 +1357,7 @@
       "structures": 660,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2125
+        "walkways_added": 2139
       }
     },
     "transit": {
@@ -1403,9 +1403,9 @@
       }
     },
     "props": {
-      "props": 48172,
-      "plants": 26065,
-      "trees": 6309,
+      "props": 48173,
+      "plants": 26064,
+      "trees": 6308,
       "instances": 74237,
       "props_by_kind": {
         "sign": 12629,
@@ -1421,7 +1421,7 @@
         "parked_vehicle": 1117,
         "hydrant": 804,
         "wall_light": 746,
-        "trash_can": 741,
+        "trash_can": 742,
         "bench": 526,
         "dumpster": 279,
         "bus_stop": 96,
@@ -1438,7 +1438,7 @@
         "facade_greenery": 5130,
         "overgrowth": 4352,
         "park_tree": 2201,
-        "street_tree": 2028,
+        "street_tree": 2027,
         "roof_tree": 937,
         "conifer": 927,
         "palm": 736,
@@ -1448,14 +1448,14 @@
       "hedge_km": 10.81,
       "generator": {
         "traffic_signals": 1341,
-        "bus_stops": 190,
+        "bus_stops": 191,
         "street_lights": 3435,
         "narrow_lights": 927,
         "hydrants": 804,
         "crosswalk_cans": 302,
         "bollards": 1417,
         "station_props": 17,
-        "street_trees": 2028,
+        "street_trees": 2027,
         "plaza_props": 126,
         "park_benches": 708,
         "parked_vehicles": 1117,
@@ -1472,8 +1472,8 @@
         "unit_dressing": 30109,
         "scaffolding": 49,
         "market_gates": 1,
-        "props": 48172,
-        "plants": 26065
+        "props": 48173,
+        "plants": 26064
       }
     },
     "gameplay": {

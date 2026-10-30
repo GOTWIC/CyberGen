@@ -461,7 +461,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "261 towers, 20 forms, 0 pairs within 150 m of one form and band"
+        "259 towers, 20 forms, 0 pairs within 150 m of one form and band"
       ]
     },
     {
@@ -565,7 +565,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "29245 things on the ground"
+        "29244 things on the ground"
       ]
     },
     {
@@ -974,11 +974,11 @@
         "elevated": 1.13,
         "elevator": 0.0,
         "footbridge": 0.61,
-        "path": 66.81,
+        "path": 66.7,
         "pedestrian_street": 3.79,
         "promenade": 16.32,
         "sidewalk": 201.36,
-        "skybridge": 2.84,
+        "skybridge": 2.82,
         "stairs": 0.49,
         "underpass": 0.06
       },
@@ -1182,17 +1182,17 @@
     },
     "buildings": {
       "count": 6553,
-      "floor_area_km2": 18.658,
+      "floor_area_km2": 18.717,
       "by_type": {
         "shopfront_row": 2833,
         "shanty_stack": 1891,
         "villa": 558,
         "perimeter": 437,
-        "podium_tower": 279,
+        "podium_tower": 281,
         "terraced": 191,
         "courtyard_block": 104,
         "slab": 57,
-        "tower": 54,
+        "tower": 52,
         "warehouse": 38,
         "lab": 25,
         "parking_structure": 19,
@@ -1236,15 +1236,15 @@
           "p90": 200.0,
           "max": 437.3,
           "archetype": "corporate_core",
-          "floor_area_km2": 6.684,
+          "floor_area_km2": 6.737,
           "coverage": 0.691,
-          "far": 10.4
+          "far": 10.49
         },
         "Transit Nexus": {
           "count": 95,
           "min": 18.0,
           "median": 38.5,
-          "p90": 73.5,
+          "p90": 70.0,
           "max": 105.0,
           "archetype": "transit_hub",
           "floor_area_km2": 0.983,
@@ -1291,9 +1291,9 @@
           "p90": 66.5,
           "max": 115.5,
           "archetype": "midtown_mixed",
-          "floor_area_km2": 4.777,
+          "floor_area_km2": 4.783,
           "coverage": 0.673,
-          "far": 7.41
+          "far": 7.42
         },
         "Old Town": {
           "count": 3408,
@@ -1339,15 +1339,15 @@
         "tower_cluster": 2,
         "twin_towers": 1
       },
-      "skybridges": 228,
+      "skybridges": 227,
       "skybridges_by_kind": {
         "cable": 36,
         "catwalk": 101,
-        "enclosed": 80,
+        "enclosed": 79,
         "open_deck": 10,
         "stack": 1
       },
-      "skybridge_km": 2.84,
+      "skybridge_km": 2.82,
       "units": 19192,
       "units_by_use": {
         "food": 5328,
@@ -1362,16 +1362,16 @@
         "lobby": 921
       },
       "roof_items": {
-        "ac_unit": 13251,
+        "ac_unit": 13247,
         "billboard": 1321,
         "water_tank": 1204,
-        "antenna": 985,
+        "antenna": 987,
         "mechanical": 561,
-        "av_pad": 41,
+        "av_pad": 40,
         "helipad": 7
       },
       "green_roofs": 652,
-      "green_roof_m2": 317922,
+      "green_roof_m2": 317879,
       "landmarks": [
         {
           "name": "Nexus Spire",
@@ -1476,7 +1476,7 @@
       "structures": 498,
       "tallest_m": 437.31,
       "generator": {
-        "walkways_added": 2145
+        "walkways_added": 2151
       }
     },
     "transit": {
@@ -1515,17 +1515,17 @@
         "lines": 4,
         "stations": 15,
         "removed_buildings": 42,
-        "removed_skybridges": 7,
+        "removed_skybridges": 8,
         "portals": 8,
         "structures": 207,
         "walkways_added": 59
       }
     },
     "props": {
-      "props": 58386,
-      "plants": 24232,
+      "props": 58385,
+      "plants": 24231,
       "trees": 7844,
-      "instances": 82618,
+      "instances": 82616,
       "props_by_kind": {
         "sign": 15146,
         "awning": 12432,
@@ -1541,7 +1541,7 @@
         "wall_light": 912,
         "trash_can": 828,
         "hydrant": 822,
-        "bench": 622,
+        "bench": 621,
         "dumpster": 141,
         "bus_stop": 89,
         "boat": 64,
@@ -1552,7 +1552,7 @@
         "food_stall": 3
       },
       "plants_by_kind": {
-        "shrub": 7967,
+        "shrub": 7966,
         "facade_greenery": 5599,
         "park_tree": 3081,
         "street_tree": 2467,
@@ -1575,13 +1575,13 @@
         "station_props": 7,
         "street_trees": 2417,
         "plaza_props": 166,
-        "park_benches": 745,
+        "park_benches": 744,
         "parked_vehicles": 3033,
         "alley_clutter": 1131,
         "median_trees": 1307,
         "promenade_trees": 135,
         "park_trees": 8261,
-        "roof_plants": 4317,
+        "roof_plants": 4316,
         "facade_greenery": 5599,
         "overgrowth": 2196,
         "quay_props": 2679,
@@ -1590,8 +1590,8 @@
         "unit_dressing": 35810,
         "scaffolding": 54,
         "market_gates": 0,
-        "props": 58386,
-        "plants": 24232
+        "props": 58385,
+        "plants": 24231
       }
     },
     "gameplay": {
@@ -1632,8 +1632,8 @@
         "shop_sign.blade": 10180,
         "shop_sign.facade": 4966,
         "billboard.roof": 1321,
-        "neon.facade": 693,
-        "billboard.facade": 306,
+        "neon.facade": 694,
+        "billboard.facade": 310,
         "holo_ad.roof": 42
       },
       "density_rows": 2740,
@@ -1646,7 +1646,7 @@
         "parking": 576,
         "travel_points": 42,
         "densities": 2740,
-        "sign_slots": 17508
+        "sign_slots": 17513
       }
     },
     "separation_budget": {
