@@ -456,8 +456,8 @@ def test_z_at_interpolates():
 
 
 class _B:
-    def __init__(self, top, portal_ok=True, bottom=0.0):
-        self.top, self.portal_ok, self.bottom = top, portal_ok, bottom
+    def __init__(self, top, portal_ok=True, bottom=0.0, id="b1"):
+        self.top, self.portal_ok, self.bottom, self.id = top, portal_ok, bottom, id
 
 
 def test_sky_pass():
@@ -469,6 +469,10 @@ def test_sky_pass():
     assert TR.sky_pass(_B(200.0), 92.5, alt, False) == "block"
     assert TR.sky_pass(_B(200.0, portal_ok=False), 92.5, alt, True) == "block"
     assert TR.sky_pass(_B(105.0, portal_ok=False), 92.5, alt, True) == "climb"
+    # M19: only the towers of its sky stations (its hosts) take a portal
+    assert TR.sky_pass(_B(200.0), 92.5, alt, frozenset({"b1"})) == "portal"
+    assert TR.sky_pass(_B(200.0, id="b2"), 92.5, alt, frozenset({"b1"})) == "block"
+    assert TR.sky_pass(_B(200.0), 92.5, alt, frozenset()) == "block"
 
 
 # --- determinism ---------------------------------------------------------------------
@@ -521,3 +525,120 @@ def test_transit_stage_ignores_ulp_noise(monkeypatch, lines, no_transit):
     b = json.dumps(noisy_out.rows["transit_lines"], sort_keys=True, default=str)
     assert a == b
     assert len(m3.transit_lines) == len(clean.rows["transit_lines"])
+
+
+# --- M19: transit structures ----------------------------------------------------------
+
+def test_clearances():
+    """M19: the floor over the roads (8 m under the deck and its frames' cap beams), 6.5 m
+    over a raised road (a meter more for a frame across a ramp), the navigable channel."""
+    assert TR.floor_z("elevated_rail") == pytest.approx(8.0 + 1.6 + 1.6)
+    assert TR.floor_z("sky_tube") == pytest.approx(8.0 + 3.5)
+    assert TR.over_deck("monorail", 9.0) == pytest.approx(9.0 + 6.5 + 1.8 + 1.6 + 1.0)
+    assert TR.over_deck("sky_tube", 9.0) == pytest.approx(9.0 + 6.5 + 3.5)
+    assert TR.self_clear_m("elevated_rail") == pytest.approx(6.5 + 1.6)
+    # a river 120 m wide: a 40 m channel down its middle, piers within 40 m of its banks
+    assert TR.pier_reach(120.0, "river") == pytest.approx(40.0)
+    # a narrow canal: its channel is half its width
+    assert TR.pier_reach(12.0, "canal") == pytest.approx(3.0)
+    assert TR.presets.TRANSIT_MODES["sky_tube"].support_spacing_m == (420, 600)
+
+
+def _supports(m, t):
+    return [s for s in m.structures if s.attrs.get("line_id") == t.id and
+            s.kind in ("column", "pylon", "beam")]
+
+
+def test_supports_under_the_line(lines):
+    """M19: a lone column stands under its line, a frame's or a cantilever's cap beam
+    reaches under it at the deck's underside, its columns at the beam's ends; the spans
+    stay within the mode's longest (the check)."""
+    m = lines.model
+    beams = {s.id: s for s in m.structures if s.kind == "beam"}
+    for t in m.transit_lines:
+        if t.mode == "metro":
+            continue
+        line = shapely.LineString([p[:2] for p in t.path])
+        sup = _supports(m, t)
+        assert sup, t.name
+        for s in sup:
+            if s.kind == "beam":
+                g = shapely.LineString([p[:2] for p in s.line])
+                assert g.distance(line) < 0.5, s.id
+            elif s.attrs.get("frame"):
+                b = beams[s.attrs["frame"]]
+                c = G.from_model_poly(s.footprint).centroid
+                assert min(shapely.Point(p[:2]).distance(c) for p in b.line) < 0.5, s.id
+            else:
+                c = G.from_model_poly(s.footprint).centroid
+                assert line.distance(c) <= 0.5, s.id
+    assert {c.id: c for c in lines.checks}["transit_supports"].passed
+
+
+def test_sky_tube_masts_and_hosts(lines):
+    """M19: a sky tube's pylons are cable-stayed masts over the tube; a tower it passes
+    through hosts one of its sky stations."""
+    m = lines.model
+    t = _line(json.loads(m.to_json()), "sky_tube")
+    masts = [s for s in m.structures if s.attrs.get("line_id") == t["id"] and
+             s.attrs.get("form") == "mast"]
+    for s in masts:
+        assert s.attrs["mast_top_m"] > s.z1_m + 20.0
+        assert len(s.attrs["stays"]) == 2
+    hosted = {s.building_id for s in m.stations if t["id"] in s.line_ids}
+    assert set(t["attrs"]["portals"]) <= hosted
+
+
+def test_check_supports_fails_off_the_line(lines):
+    def fn(d):
+        t = _line(d, "elevated_rail")
+        s = next(s for s in d["structures"] if s["attrs"].get("line_id") == t["id"] and
+                 s["kind"] == "column" and not s["attrs"].get("frame"))
+        s["footprint"]["exterior"] = [[x + 6.0, y] for x, y in s["footprint"]["exterior"]]
+    c = _rerun(_mutate(lines.model, fn))["transit_supports"]
+    assert not c.passed and any("off its line" in f or "lane" in f or "building" in f or
+                                "sidewalk" in f for f in c.failures)
+
+
+def test_check_supports_fails_long_span(lines):
+    def fn(d):
+        # every support of the green line between 100 and 400 m along it goes
+        t = next(t for t in d["transit_lines"] if t["name"] == "Green Line")
+        gone = {s["id"] for s in d["structures"] if s["attrs"].get("line_id") == t["id"] and
+                100.0 < s["attrs"].get("s_m", -1.0) < 400.0}
+        d["structures"] = [s for s in d["structures"] if s["id"] not in gone and
+                           s["attrs"].get("frame") not in gone]
+    c = _rerun(_mutate(lines.model, fn))["transit_supports"]
+    assert not c.passed and any("without a support" in f for f in c.failures)
+
+
+def test_check_clearance_fails_portal_without_station(lines):
+    def fn(d):
+        t = _line(d, "sky_tube")
+        hosts = {s["building_id"] for s in d["stations"] if s.get("building_id")}
+        b = max((b for b in d["buildings"] if b["id"] not in hosts),
+                key=lambda b: (b["height_m"], b["id"]))
+        b["portals"] = [{"line_id": t["id"], "z0_m": 80.0, "z1_m": 100.0, "station": False}]
+    c = _rerun(_mutate(lines.model, fn))["transit_clearance"]
+    assert not c.passed and any("without a sky station" in f for f in c.failures)
+
+
+def test_check_clearance_fails_side(lines):
+    """A tall building 5 m beside the elevated deck (less than 6 m) fails."""
+    def fn(d):
+        t = _line(d, "elevated_rail")
+        (x0, y0, z0), (x1, y1, _) = t["path"][len(t["path"]) // 2:len(t["path"]) // 2 + 2]
+        L = math.hypot(x1 - x0, y1 - y0)
+        nx, ny = -(y1 - y0) / L, (x1 - x0) / L
+        cx, cy = x0 + nx * (4.5 + 5.0 + 2.0), y0 + ny * (4.5 + 5.0 + 2.0)
+        b = copy.deepcopy(d["buildings"][0])
+        b["id"] = "test.tower"
+        ring = [[cx - 2.0, cy - 2.0], [cx + 2.0, cy - 2.0], [cx + 2.0, cy + 2.0],
+                [cx - 2.0, cy + 2.0]]
+        b["masses"] = [{**b["masses"][0], "footprint": {"exterior": ring, "holes": []},
+                        "z0_m": 0.0, "z1_m": z0 + 10.0}]
+        b["roof_items"], b["portals"] = [], []
+        d["buildings"].append(b)
+    c = _rerun(_mutate(lines.model, fn))["transit_clearance"]
+    assert not c.passed and any("test.tower" in f for f in c.failures)
+

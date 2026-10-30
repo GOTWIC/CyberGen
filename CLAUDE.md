@@ -723,6 +723,49 @@ The stage 1 fixes (three open items of M13 to M15) are in place:
 Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. Outputs:
 `docs/progress/stage1_fixes/`.
 
+M19 (transit structures, from the first run-through) is in place, in `citygen/transit.py`
+(checks in `transit_checks.py`):
+- **Portals only at stations:** a sky tube through towers picks each stop's host tower
+  before its route (`_hosts`: a portal-sized tower in the stop's zone that a straight tube
+  through its middle leaves with `HOST_RAY_M` clear on both sides, nearest the line's way);
+  the stop moves into it (`tower_id`, its clear headings in `Line.heads`) and only hosts are
+  portals in the costs (`Line.hosts`; `sky_pass` takes the set), so every other tower is
+  climbed or gone round. A tube that can neither is routed again taking the removable
+  towers in its way out (`Line.cut`, `TOWER_CUT_W`; Vesper Bay's Crown Loop, whose two stops
+  are walls of 130 to 216 m towers). A tower hosts one station (`Builder.hosted`); a pylon
+  station slides along its line until its elevator core is clear of other lines
+  (`_core_spot`, round a loop's seam).
+- **Clearances:** `SIDE_PAD_M` 6 m (2 before) from buildings in plan, or their clearance
+  in height; roof items a line passes too close over go (`_roof_hits`); the profile never
+  under `floor_z` (8 m over the roads under the deck and its cap beams), `over_deck` (6.5 m
+  over a raised road, plus a cap beam and a meter so a frame may straddle it), 6.5 m between
+  a line and the lines before it (`_line_crossings`, over or under, `track_rec` with the
+  platforms' width), the same under a road deck passed under. Default altitudes up
+  (elevated rail 14 to 20 m, monorail 16 to 26; allowed 8 to 26 and 10 to 32).
+- **Supports** (`Builder.supports_of`, `Keep` the vectorized keep-outs): evenly spaced
+  between fixed points (an open line's ends, each platform's ends) and carriers (portal
+  towers, ground stretches, a nexus platform, a sky station's elevator core) at the mode's
+  span (`support_spacing_m` is now (span, longest): rail 30/45, monorail 25/40, maglev 50/80,
+  sky tube 420/600), each moved at most `SPAN_MOVE` (15%) to free ground: a column under
+  the line (`form` column, `mast` for sky tubes), a pier in the water within `pier_reach` of
+  the shore (the navigable channel down the middle, `CHANNEL_M` wide at most; the open sea
+  has none), else a portal frame (`leg<n>a/b` columns either side within `FRAME_REACH_M`, a
+  `beam` structure `cap<n>` under the deck, `attrs.frame`) or a cantilever bent (one column
+  within `CANT_REACH_M`, its arm past the deck); then any gap over the longest span filled
+  wherever a support stands. Before the stations, a dry run (`_support_room`, `_Dry`) takes
+  out the low removable buildings that alone keep a support off a gap. A gap still longer
+  is a cable-stayed main span over a navigable channel (`MAIN_SPAN_M`: rail 240, monorail
+  200, maglev 300), else a note; the line's `attrs.spans` lists its truss, cable and gap
+  spans; sky tube masts carry `mast_top_m` and their `stays`.
+- **Checks:** `transit_supports` (lone columns within 0.5 m of the line, frames' beams under
+  it at the deck's underside, piers clear of the channel, spans within the longest, an end
+  overhanging half of it at most), `transit_clearance` (3D along the line: masses and roof
+  items, a portal only with a station in it, other lines' tracks and structures, the roads,
+  raised decks, beams over roads), `transit_altitude` knows the new needs.
+- **Blockout and stage 2:** beams in `transit_support`, masts (two legs, stays) and pier
+  footings (`_mast`, `_pier_cap`); AG7 draws a beam plainly (`transit_beam`), AG14 the rest.
+  New structure kind `beam` in the model.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.

@@ -593,11 +593,15 @@ def _sites(P: _Plan) -> None:
             parts.append({"k": "prism", "m": mat, "z0": q(s.z0_m),
                           "z1": q(max(s.z1_m, s.z0_m + 0.3)), "r": ext, "h": holes,
                           "s": "prism"})
+            if transit and (a.get("form") == "pier" or a.get("pier")):
+                parts.append(_pier_cap(ext))
+            if transit and a.get("mast_top_m") and len(a.get("stays") or []) == 2:
+                parts += _mast(ext, s.z1_m, a["mast_top_m"], a["stays"])
         elif len(s.line) >= 2:
             w = a.get("width_m", 4.0)
             t = a.get("deck_m", max(s.z1_m - s.z0_m, 0.5))
-            mat = "transit_tube" if s.kind == "tube" else "transit_deck" if transit else \
-                "bld_deck"
+            mat = "transit_tube" if s.kind == "tube" else "transit_support" if \
+                s.kind == "beam" else "transit_deck" if transit else "bld_deck"
             r = ribbon([(p[0], p[1]) for p in s.line], w, [p[2] for p in s.line])
             if r is not None:
                 parts.append({"k": "ribbon", "m": mat, "l": r[0], "rr": r[1], "t": q(t)})
@@ -610,6 +614,48 @@ def _sites(P: _Plan) -> None:
               tile_key(cx, cy), f"structure_{s.kind}", parts,
               {"citygen_id": s.id, "citygen_type": s.type, "line_id": a.get("line_id", ""),
                "station_id": a.get("station", "")})
+
+
+PIER_CAP = (1.8, -2.0, 1.2)     # M19: a pier's footing: times its width, from, to (m)
+MAST_LEG_M = 1.6                # a sky tube mast's two legs, square, beside the tube
+STAY_W = 0.3
+DECK_M_SKY = 7.0                # the tube's diameter (transit.DECK_M)
+
+
+def _pier_cap(ext: list) -> dict:
+    """M19: the footing of a transit pier in the water, wider than its column."""
+    cx, cy = _center(ext)
+    h = max(max(abs(p[0] - cx) for p in ext), max(abs(p[1] - cy) for p in ext)) * PIER_CAP[0]
+    ring = [[q(cx - h), q(cy - h)], [q(cx + h), q(cy - h)], [q(cx + h), q(cy + h)],
+            [q(cx - h), q(cy + h)]]
+    return {"k": "prism", "m": "transit_support", "z0": PIER_CAP[1], "z1": PIER_CAP[2],
+            "r": ring, "h": [], "s": "prism"}
+
+
+def _mast(ext: list, z0: float, top: float, stays: list) -> list[dict]:
+    """M19: a sky tube's cable-stayed mast over its pylon: two legs either side of the tube
+    from the pylon's top (the tube's underside) to the mast top, and their stays fanned to
+    the tube's top along the line (`stays`: where they land, behind and ahead)."""
+    cx, cy = _center(ext)
+    (bx, by, _), (ax, ay, _) = stays
+    dx, dy = ax - bx, ay - by
+    L = math.hypot(dx, dy) or 1.0
+    nx, ny = -dy / L, dx / L
+    off = DECK_M_SKY / 2.0 + MAST_LEG_M
+    h = MAST_LEG_M / 2.0
+    out = []
+    for side in (1.0, -1.0):
+        lx, ly = cx + nx * side * off, cy + ny * side * off
+        out.append({"k": "prism", "m": "transit_support", "z0": q(z0), "z1": q(top),
+                    "r": [[q(lx - h), q(ly - h)], [q(lx + h), q(ly - h)],
+                          [q(lx + h), q(ly + h)], [q(lx - h), q(ly + h)]], "h": [],
+                    "s": "prism"})
+        for sx, sy, sz in stays:
+            r = ribbon([(lx, ly), (sx, sy)], STAY_W, [top, sz])
+            if r is not None:
+                out.append({"k": "ribbon", "m": "transit_support", "l": r[0], "rr": r[1],
+                            "t": STAY_W})
+    return out
 
 
 # --- decks (M14) ---------------------------------------------------------------------------

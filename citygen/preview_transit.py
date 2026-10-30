@@ -71,6 +71,16 @@ def render_transit(b, out, dpi: int = 150) -> None:
     if sup:
         c = np.array([[P(s.footprint).centroid.x, P(s.footprint).centroid.y] for s in sup])
         ax.scatter(c[:, 0], c[:, 1], s=1.2, c="#9aa0aa", zorder=3, linewidths=0)
+        # M19: piers in the water and the sky tubes' masts stand out
+        big = [s for s in sup if (s.attrs or {}).get("form") in ("pier", "mast")]
+        if big:
+            c = np.array([[P(s.footprint).centroid.x, P(s.footprint).centroid.y] for s in big])
+            ax.scatter(c[:, 0], c[:, 1], s=9, marker="s", c="#c8ccd4", zorder=3.1,
+                       linewidths=0)
+    beams = [np.asarray([p[:2] for p in s.line]) for s in m.structures
+             if s.kind == "beam" and len(s.line) >= 2]
+    if beams:
+        ax.add_collection(LineCollection(beams, colors="#9aa0aa", linewidths=0.7, zorder=3))
     handles = []
     for t in sorted(m.transit_lines, key=lambda t: (t.mode == "metro", t.id)):
         ls, lw = MODE_STYLE.get(t.mode, ("-", 2.0))
@@ -126,13 +136,15 @@ def render_transit(b, out, dpi: int = 150) -> None:
     ax.legend(handles=handles, loc="lower left", fontsize=6.5, frameon=True, facecolor=BG,
               edgecolor=MUTED, labelcolor=INK, framealpha=0.85)
     st = b.stats.get("transit", {})
-    fig.text(0.04, 1.0 - 0.15 / fh, f"{b.spec.name}: transit (M5, M8b loops)", color=INK, fontsize=13,
-             fontweight="bold", va="top")
+    fig.text(0.04, 1.0 - 0.15 / fh, f"{b.spec.name}: transit (M5, M8b loops, M19 structures)",
+             color=INK, fontsize=13, fontweight="bold", va="top")
     stations = ", ".join(f"{k} {v}" for k, v in st.get("stations", {}).items())
+    forms = ", ".join(f"{v} {k}{'s' if v != 1 else ''}"
+                      for k, v in st.get("support_forms", {}).items())
     fig.text(0.04, 1.0 - 0.48 / fh,
              f"{len(m.transit_lines)} lines, {st.get('km', 0):g} km; stations {stations}; "
-             f"{st.get('supports', 0)} supports, {st.get('portals', 0)} tower portals, "
-             f"{st.get('buildings_removed', 0)} buildings removed for the lines; "
+             f"supports: {forms or st.get('supports', 0)}; {st.get('portals', 0)} tower "
+             f"portals, {st.get('buildings_removed', 0)} buildings removed for the lines; "
              f"{'checks PASS' if b.passed else 'checks FAIL'}",
              color=MUTED, fontsize=8.5, va="top")
     fig.savefig(out, dpi=dpi, facecolor=BG)

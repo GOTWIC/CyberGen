@@ -4074,6 +4074,7 @@
           "type": "object"
         },
         "kind": {
+          "description": "M19: `beam` is a transit portal frame's cap beam or a cantilever bent's arm (its line on the columns' tops, attrs.frame names it on its columns).",
           "enum": [
             "deck",
             "ramp",
@@ -4086,7 +4087,8 @@
             "vent",
             "retaining_wall",
             "stair",
-            "elevator"
+            "elevator",
+            "beam"
           ],
           "title": "Kind",
           "type": "string"

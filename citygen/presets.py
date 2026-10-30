@@ -147,6 +147,8 @@ class ModePreset:
     default_altitude_m: tuple[float, float]
     max_grade: float | None
     min_curve_radius_m: float | None
+    # M19: (span, longest span) between supports; the sky tube's span is the middle of 360 to
+    # 480 m, its longest the cable-stayed masts' 600 m
     support_spacing_m: tuple[float, float] | None
     station_spacing_m: tuple[float, float]
     palette: tuple[str, ...] = field(default=())
@@ -156,13 +158,13 @@ TRANSIT_MODES: dict[str, ModePreset] = {
     # Metro is underground; altitude is the track depth (negative), carried as data only.
     "metro": ModePreset((-60, 0), (-20, -12), None, None, None, (600, 1000),
                         ("#2f7bff", "#5aa0ff", "#1d4fbf")),
-    "elevated_rail": ModePreset((8, 20), (10, 16), 0.04, 150, (25, 40), (500, 900),
+    "elevated_rail": ModePreset((8, 26), (14, 20), 0.04, 150, (30, 45), (500, 900),
                                 ("#ffb020", "#ffcf6a", "#c98600")),
-    "monorail": ModePreset((10, 30), (12, 22), 0.06, 100, (20, 30), (400, 800),
+    "monorail": ModePreset((10, 32), (16, 26), 0.06, 100, (25, 40), (400, 800),
                            ("#3ddc84", "#8ff0b8", "#1f9c57")),
-    "maglev": ModePreset((15, 60), (25, 45), 0.10, 500, (30, 60), (1200, 2500),
+    "maglev": ModePreset((15, 60), (25, 45), 0.10, 500, (50, 80), (1200, 2500),
                          ("#ff2bd6", "#ff7ae6", "#b0009a")),
-    "sky_tube": ModePreset((40, 150), (70, 120), 0.08, 300, (40, 80), (800, 1600),
+    "sky_tube": ModePreset((40, 150), (70, 120), 0.08, 300, (420, 600), (800, 1600),
                            ("#22e5ff", "#8ff3ff", "#0aa6bd")),
 }
 

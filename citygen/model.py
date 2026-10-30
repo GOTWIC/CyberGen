@@ -319,7 +319,10 @@ class Walkway(Entity):
 class Structure(Entity):
     TYPE_PREFIX: ClassVar[str] = "structure"
     kind: Literal["deck", "ramp", "column", "pylon", "tube", "canopy", "portal", "trench",
-                  "vent", "retaining_wall", "stair", "elevator"]
+                  "vent", "retaining_wall", "stair", "elevator", "beam"] = Field(
+        description="M19: `beam` is a transit portal frame's cap beam or a cantilever "
+                    "bent's arm (its line on the columns' tops, attrs.frame names it on its "
+                    "columns).")
     footprint: Polygon | None = None
     line: list[Point3] = Field(default_factory=list)
     z0_m: float

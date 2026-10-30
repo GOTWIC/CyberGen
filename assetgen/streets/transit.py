@@ -6,7 +6,8 @@
 - **Sky tubes**: a glass tube (translucent, non-Nanite) with a LOD chain of 24, 12 and 6
   sides, and, Nanite, the floor inside and steel ribs every 10 m.
 - **Columns and pylons** of a line: the model's footprint as the shaft and a cap across the
-  guideway (a cradle under a sky tube).
+  guideway (a cradle under a sky tube); M19's cap beams of its portal frames and the arms
+  of its cantilever bents as plain beams (AG14 draws the frames, masts and piers).
 - **Stations' structures** (stations themselves are buildings, the building line's):
   platforms, skywalks (glazed, roofed), canopies on posts, covered walkways, elevator cores,
   underground concourses.
@@ -171,6 +172,25 @@ def make_transit_column(inp: dict) -> Out:
     return Out(mesh=mesh)
 
 
+@maker("transit_beam", 1)
+def make_transit_beam(inp: dict) -> Out:
+    """M19: a portal frame's cap beam (or a cantilever bent's arm) along its line, its top
+    the line (the deck's underside), `deck_m` deep and `width_m` wide; drawn plain until
+    AG14 draws the frames."""
+    st = inp["st"]
+    a = st.get("attrs", {})
+    try:
+        ln = Line3(st["line"], inp.get("ground"))
+    except ValueError:
+        return Out(empty="degenerate line")
+    w = a.get("width_m", 1.6)
+    dm = a.get("deck_m", max(st["z1_m"] - st["z0_m"], 0.5))
+    mesh = Mesh(inp["origin"])
+    mesh.sweep("concrete.column", ln.frames(0.0, ln.L, 6.0), box_prof(-w / 2.0, w / 2.0, -dm,
+                                                                      0.0))
+    return Out(mesh=mesh)
+
+
 @maker("station_part", 1)
 def make_station_part(inp: dict) -> Out:
     st = inp["st"]
@@ -270,6 +290,8 @@ def maker_for(st) -> str | None:
         return "column"
     if st.kind in ("column", "pylon") and a.get("line_id"):
         return "transit_column"
+    if st.kind == "beam":
+        return "transit_beam"
     if st.kind == "deck" and a.get("line_id") and not a.get("station"):
         return "guideway"
     if st.kind == "tube":

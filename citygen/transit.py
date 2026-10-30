@@ -50,6 +50,7 @@ predicates, sorted tree hits and plain arithmetic (dmath angles), like the road 
 
 from __future__ import annotations
 
+import bisect
 import heapq
 import math
 from dataclasses import dataclass, field
@@ -72,12 +73,17 @@ INF = math.inf
 # structure width (m) and the clearance kept to buildings beside it
 WIDTH_M = {"metro": 10.0, "elevated_rail": 9.0, "monorail": 3.5, "maglev": 7.0,
            "sky_tube": 7.0}
-SIDE_PAD_M = 2.0
+SIDE_PAD_M = 6.0            # M19: from buildings, other lines' structures and platforms in
+#                             plan (or the clearance in height); 2 m before
 DECK_M = {"metro": 0.0, "elevated_rail": 1.6, "monorail": 1.8, "maglev": 2.0, "sky_tube": 7.0}
 SKY_CLEAR_M = 10.0          # sky lines clear buildings by this much (scope 5.3)
-ROAD_CLEAR_M = 5.5          # under any deck over a road (scope 5.2)
+ROAD_CLEAR_M = 8.0          # M19: under a transit structure over a road or sidewalk (5.5 m)
+DECK_CLEAR_M = 6.5          # M19: over a raised road's deck or another line's structure, and
+#                             under a road deck passed under (the train itself)
 ROAD_DECK_M = 2.0           # depth under a road deck (viaducts 1.8 m, bridges 1.5 m)
-UNDER_PAD_M = 1.0           # a track passing under a road deck stays this far below it
+UNDER_PAD_M = DECK_CLEAR_M  # a track passing under a road deck stays this far below it
+CAP_M = 1.6                 # M19: a portal frame's cap beam (or a cantilever's arm) under the
+#                             deck, its width COLUMN_M
 PORTAL_HEADROOM_M = 8.0     # a portal tower rises at least this far above the tube's top
 PORTAL_TIGHT_M = 3.0        # ... or this far, where the line could not climb over it
 STATION_LEN_M = {"metro": 120.0, "elevated_rail": 110.0, "monorail": 60.0, "maglev": 160.0,
@@ -88,6 +94,7 @@ COLUMN_M = {"elevated_rail": 1.6, "monorail": 1.2, "maglev": 2.2, "sky_tube": 3.
 METRO_CONCOURSE_Z = -8.0
 METRO_RUN_M = 12.0          # a metro stair runs this far along the concourse from its kiosk
 STATION_TOWER_M = 200.0     # a sky station uses a portal tower within this of its stop
+CORE_SHIFT = 12             # M19: track vertices a sky station on a pylon may move, its core clear
 
 # raster costs per meter, by what a cell is (lower is preferred)
 COSTS = {
@@ -116,6 +123,7 @@ ROAD_W = {
 RAISED_W = 6.0
 RAISED_MIN_M = 4.0    # a road deck higher than this counts as raised for the road graph
 CLIMB_W = 6.0         # raster: over a building the line climbs to clear (within its altitude)
+TOWER_CUT_W = 40.0    # M19: a tower a sky tube that cannot go round takes out (`Line.cut`)
 RESTOP_TRIES = 6      # avenue nodes a missed road-line stop tries
 EXIT_RUN_M = 400.0    # a line that leaves the map is fitted as if it ran on this far
 RESTOP_BUDGET = 4     # routes the stop retry may try in all, per line
@@ -292,11 +300,18 @@ def deck_crossings(decks, tree, arr, pad: float) -> list[list[tuple[int, float]]
     return out
 
 
+def over_deck(mode: str, z: float) -> float:
+    """M19: the lowest track z over a road deck at z: DECK_CLEAR_M under the structure, and
+    under a portal frame's cap beam for the lines on columns (one may straddle the road; a
+    meter more, as a beam across a ramp meets it higher up)."""
+    return z + DECK_CLEAR_M + below(mode) + (0.0 if mode == "sky_tube" else CAP_M + 1.0)
+
+
 def passes_under(mode: str, zs: list[float], z0: float) -> bool:
     """A crossing of road decks at heights zs that the track passes under: over it would
     take the track above its mode's altitude, under it keeps the track at its base."""
     lo_alt, hi_alt = presets.TRANSIT_MODES[mode].altitude_m
-    over = max(zs) + ROAD_CLEAR_M + below(mode)
+    over = over_deck(mode, max(zs))
     under = road_underside(min(zs)) - above(mode) - UNDER_PAD_M
     return over > hi_alt and under >= max(lo_alt, z0 - 0.01) - 1e-9
 
@@ -385,9 +400,9 @@ def context(spec, m) -> Ctx:
                           G.area(poly) >= 600.0))
     # M14: a deck's slab, with the clear height over its streets: a track passes over it
     # (`_profile_pass`; the routes do not see it)
-    from .decks import CLEAR_M as DECK_CLEAR_M
+    from .decks import CLEAR_M as SLAB_CLEAR_M
 
-    c.slabs = [(G.from_model_poly(dk.polygon), dk.top_m + DECK_CLEAR_M) for dk in m.decks]
+    c.slabs = [(G.from_model_poly(dk.polygon), dk.top_m + SLAB_CLEAR_M) for dk in m.decks]
     c.btree = shapely.STRtree([x.poly for x in c.blds]) if c.blds else None
     for s in m.megasites:
         if s.flight_cone is not None and s.height_limit_m is not None:
@@ -569,7 +584,8 @@ def _loop_points(c: Ctx, ln: Line, pads: dict | None = None) -> list | None:
     cands, every = [], []
     for s in ring:
         every.append([])
-        if s.kind == "district" and s.z is None and s.district_id in dist:
+        if s.kind == "district" and s.z is None and s.tower_id is None and \
+                s.district_id in dist:
             # in each sector seen from the center, the junction nearest the ring
             by: dict = {}
             for p, _ in _district_cands(c, dist[s.district_id], ln.mode, True):
@@ -870,7 +886,7 @@ def _dubins_track(c: Ctx, ln: Line, cost, r_min: float):
             zi = G.qpoly(z.buffer(-APEX_PAD_M, join_style="mitre"))
             z = zi if not zi.is_empty else z
             shapely.prepare(z)
-        heads.append(every)
+        heads.append(ln.heads.get(k, every))
         if s.kind == "exit":
             # off the map at its nearest edge (into the map, for a line that starts there)
             q4 = RING_HEADINGS // 4
@@ -909,6 +925,7 @@ def _pose_descent(c: Ctx, stops, cands, heads, cost, rho: float, cmin: float, mo
     n = len(stops)
     seg_cache: dict = {}
     len_cache: dict = {}
+    bx0, by0, bx1, by1 = c.m.bounds
 
     def pose(p, h):
         return (p[0], p[1], h)
@@ -934,6 +951,10 @@ def _pose_descent(c: Ctx, stops, cands, heads, cost, rho: float, cmin: float, mo
                                              (b[0], b[1], _heading(b[2])), rho)
             pts = dubins_points((a[0], a[1], _heading(a[2])), r[1], r[2], rho)
             cv = cost[_cells(c, pts)]
+            # (M19: off the map is blocked too; the raster's edge cells stand in for it)
+            P = np.array(pts, dtype=np.float64)
+            off = (P[:, 0] < bx0 - 1.0) | (P[:, 0] > bx1 + 1.0) | (P[:, 1] < by0 - 1.0) |                 (P[:, 1] > by1 + 1.0)
+            cv = np.where(off, INF, cv)
             ok = np.isfinite(cv)
             mid = np.where(ok[:-1] & ok[1:], (cv[:-1] + cv[1:]) / 2.0, 0.0)
             dx, dy = np.diff([p[0] for p in pts]), np.diff([p[1] for p in pts])
@@ -1069,15 +1090,16 @@ def base_z(mode: str, alt) -> float:
     return q(lo + 0.3 * (hi - lo))
 
 
-def sky_pass(b, z: float, alt: tuple, through: bool) -> str:
+def sky_pass(b, z: float, alt: tuple, through) -> str:
     """How a sky tube at base altitude z gets past a building in its corridor: "clear" (10 m
     over the roof), "portal" (through a tower, the track at least 8 m of headroom under its
     roof), "climb" (over it, within the altitude range) or "block". Where both a portal and
-    a climb work, the one closer to z."""
+    a climb work, the one closer to z. `through`: the towers the line may pass through (M19:
+    those of its sky stations, `_hosts`), or True for any tower."""
     r = DECK_M["sky_tube"] / 2.0
     if b.top <= z - SKY_CLEAR_M or b.bottom >= z + 6.0:
         return "clear"
-    portal = through and b.portal_ok and b.top >= alt[0] + r + PORTAL_HEADROOM_M
+    portal = (through is True or (bool(through) and b.id in through)) and b.portal_ok and         b.top >= alt[0] + r + PORTAL_HEADROOM_M
     climb = b.top <= alt[1] - SKY_CLEAR_M
     if portal and climb:
         return "climb" if b.top + SKY_CLEAR_M - z <= z - (b.top - r - PORTAL_HEADROOM_M) \
@@ -1085,11 +1107,12 @@ def sky_pass(b, z: float, alt: tuple, through: bool) -> str:
     return "portal" if portal else "climb" if climb else "block"
 
 
-def costs(c: Ctx, mode: str, z: float, through: bool, extra_block=None, hi: float = 0.0,
-          lo: float = 0.0, tall_scale: float = 1.0) -> tuple:
+def costs(c: Ctx, mode: str, z: float, through, extra_block=None, hi: float = 0.0,
+          lo: float = 0.0, tall_scale: float = 1.0, cut: bool = False) -> tuple:
     """(cost per meter of each cell, portal cell mask). A building the line cannot clear at
     z but could by climbing (up to its altitude limit hi) costs CLIMB_W; one it can neither
-    clear nor take out (nor pass through, sky tubes) is forbidden."""
+    clear nor take out (nor pass through, sky tubes) is forbidden. With `cut` (M19, a sky
+    tube that cannot go round), a tower it may take out costs TOWER_CUT_W."""
     k = COSTS[mode]
     n = c.nx * c.ny
     cost = np.full(n, k["land"])
@@ -1100,7 +1123,7 @@ def costs(c: Ctx, mode: str, z: float, through: bool, extra_block=None, hi: floa
     cost = np.where(c.cls["highway"], k["highway"], cost)
     cost = np.where(c.cls["avenue"], k["avenue"], cost)
     if mode != "metro":
-        cost = np.where(c.cls["raised"] & (c.road_z > z - below(mode) - ROAD_CLEAR_M),
+        cost = np.where(c.cls["raised"] & (over_deck(mode, c.road_z) > z),
                         k["raised"] * 3.0, cost)
     portal = np.zeros(n, bool)
     if mode == "metro" or c.btree is None:
@@ -1119,6 +1142,8 @@ def costs(c: Ctx, mode: str, z: float, through: bool, extra_block=None, hi: floa
             how = sky_pass(b, z, (lo, hi), through)
             if how == "portal":
                 portal[p_] = True
+            elif how == "block" and cut and b.removable:
+                cost[p_] = max(cost[p_], TOWER_CUT_W)
             else:
                 cost[p_] = max(cost[p_], CLIMB_W) if how == "climb" else INF
             continue
@@ -1540,6 +1565,11 @@ class Line:
     corners: dict = field(default_factory=dict)  # stop index -> guide corner (fast lines)
     keep_free: bool = False                      # legs may run back along the line
     held: bool = False                           # M10: the old track kept (regeneration)
+    hosts: frozenset = frozenset()               # M19: the towers it may pass through (its
+    #                                              sky stations'), `_hosts`
+    heads: dict = field(default_factory=dict)    # M19: stop index -> headings through its host
+    cut: bool = False                            # M19: a sky tube that takes out the towers
+    #                                              it can neither pass nor go round
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -1766,6 +1796,109 @@ def snap_cell(c: Ctx, cost, p) -> int:
     return k
 
 
+HOST_RAY_M = 240.0   # M19: a host tower is passed straight through, this far clear each way
+
+
+def _hosts(c: Ctx, ln: Line) -> None:
+    """M19: a sky tube passes through a tower only at a sky station inside it. For a line
+    through towers, each stop's station tower (its host) is chosen before the route: a tower
+    inside the stop's zone, tall and wide enough for a portal at the base altitude, that a
+    straight tube through its middle leaves, in some heading, with HOST_RAY_M clear of every
+    building it cannot pass on both sides (an edge tower of a dense core, not one in its
+    middle); the nearest to the line's way (the chord between the neighboring stops, a
+    loop's ring), then to the stop. The stop moves into it (`tower_id`, like a nexus tower)
+    with those headings (`heads`), and only the hosts are portals in the line's costs
+    (`hosts`): every other tower is climbed over or gone round. A stop without such a tower
+    gets none (its station stands on a pylon)."""
+    stops = ln.stops
+    if ln.mode != "sky_tube" or not ln.through:
+        ln.hosts = frozenset()
+        return
+    hosts = {s.tower_id for s in stops if s.tower_id}
+    base = costs(c, ln.mode, ln.z0, frozenset(), None, ln.alt[1], ln.alt[0], ln.tall_scale)[0]
+    half = WIDTH_M[ln.mode] / 2.0 + SIDE_PAD_M + 0.75 * CELL_M
+    # the cells each building blocks (a host's own are passable unless another blocks them)
+    blk = np.array([sky_pass(b, ln.z0, ln.alt, frozenset()) == "block" for b in c.blds], bool)
+    ip, ib = c.btree.query(c.pts, predicate="dwithin", distance=half) if c.btree is not None \
+        else (np.zeros(0, int), np.zeros(0, int))
+    count = np.bincount(ip[blk[ib]], minlength=c.nx * c.ny) if len(ip) else \
+        np.zeros(c.nx * c.ny, int)
+    blocked = ~np.isfinite(base) & (count == 0)       # cones, skybridges of complexes
+    others = count > 0
+    ring = _ring_of(stops) if ln.loop else stops
+    ox = math.fsum(s.p[0] for s in ring) / len(ring)
+    oy = math.fsum(s.p[1] for s in ring) / len(ring)
+    R = math.fsum(_d(s.p, (ox, oy)) for s in ring) / len(ring)
+    steps = np.arange(-HOST_RAY_M, HOST_RAY_M + 0.01, CELL_M / 2.0).tolist()
+    again = ln.loop and len(ring) < len(stops)    # a loop's last stop is its first again
+    for k, s in enumerate(stops):
+        if s.tower_id or s.kind == "exit" or (again and k == len(stops) - 1):
+            continue
+        zone = _zone(s)
+        if zone is None or c.btree is None:
+            continue
+        shapely.prepare(zone)
+        if ln.loop:
+            def way(p):
+                return abs(_d(p, (ox, oy)) - R)
+
+            def along(p):
+                # the ring's tangent there
+                return M._atan2_s(p[1] - oy, p[0] - ox) + M.PI / 2.0
+        else:
+            nb = [stops[j].p for j in (k - 1, k + 1) if 0 <= j < len(stops)]
+            guide = LineString(nb) if len(nb) == 2 and nb[0] != nb[1] else Point(nb[0])
+
+            def way(p, guide=guide):
+                return guide.distance(Point(p))
+
+            def along(p, nb=nb):
+                a, b = (nb[0], nb[-1]) if len(nb) == 2 else (p, nb[0])
+                return M._atan2_s(b[1] - a[1], b[0] - a[0])
+        best = None
+        for i in sorted(c.btree.query(zone, predicate="intersects").tolist()):
+            b = c.blds[i]
+            if b.id in hosts or not zone.covers(b.poly) or \
+                    sky_pass(b, ln.z0, ln.alt, True) != "portal":
+                continue
+            ctr = _rep(b.poly)
+            x0, y0, x1, y1 = b.poly.bounds
+            near = np.nonzero((c.xs > x0 - half) & (c.xs < x1 + half) & (c.ys > y0 - half) &
+                              (c.ys < y1 + half))[0]
+            own = set(near[shapely.dwithin(b.poly, c.pts[near], half)].tolist()) \
+                if blk[i] else set()
+            clean = []
+            for h in range(RING_HEADINGS // 2):
+                t = _heading(h)
+                ux, uy = float(M.cos(t)), float(M.sin(t))
+                ray = [(ctr[0] + ux * d, ctr[1] + uy * d) for d in steps]
+                if not any(blocked[kk] or (others[kk] and (kk not in own or count[kk] > 1))
+                           for kk in _cells(c, ray).tolist()):
+                    clean += [h, h + RING_HEADINGS // 2]
+            if not clean:
+                continue
+            # (its straight pass along the line's way first: a host passed at an angle to it
+            # takes the line far round)
+            t0 = along(ctr)
+            dev = min(min(x, M.PI - x) for x in ((_heading(h) - t0) % M.PI for h in clean))
+            key = (int(dev // (M.PI / 8.0 + 1e-9)), round(way(ctr), 1), round(_d(ctr, s.p), 1),
+                   b.id)
+            if best is None or key < best[0]:
+                best = (key, b, ctr, sorted(clean))
+        if best is None:
+            ln.notes.append(f"{ln.name}: no tower at {s.name} to host its sky station "
+                            f"(it stands on a pylon)")
+            continue
+        _, b, ctr, clean = best
+        hosts.add(b.id)
+        s.tower_id, s.p = b.id, ctr
+        ln.heads[k] = clean
+        if again and k == 0:
+            stops[-1].tower_id, stops[-1].p = b.id, ctr
+            ln.heads[len(stops) - 1] = clean
+    ln.hosts = frozenset(hosts)
+
+
 def route_line(c: Ctx, ln: Line) -> None:
     """The track: the stops in districts between two others moved toward the line's way
     first (a loop's to the junctions that keep it one simple ring, `_loop_points`); where
@@ -1774,6 +1907,7 @@ def route_line(c: Ctx, ln: Line) -> None:
     mode = ln.mode
     stops = ln.stops
     dist = {d.id: d for d in c.m.districts}
+    _hosts(c, ln)
     home = [s.p for s in stops]
     r_min = presets.TRANSIT_MODES[mode].min_curve_radius_m or 0.0
     fast_cost = None
@@ -1781,12 +1915,12 @@ def route_line(c: Ctx, ln: Line) -> None:
         st = stops[k]
         # (a loop's stops move below: the chord between its neighbors crosses the loop)
         if not ln.loop and st.kind == "district" and st.z is None and \
-                st.district_id in dist:
+                st.tower_id is None and st.district_id in dist:
             chord = LineString([stops[k - 1].p, stops[k + 1].p])
             if chord.length > 1.0 and r_min >= FAST_R:
                 if fast_cost is None:
-                    fast_cost = costs(c, mode, ln.z0, ln.through, None, ln.alt[1],
-                                      ln.alt[0], ln.tall_scale)[0]
+                    fast_cost = costs(c, mode, ln.z0, ln.hosts, None, ln.alt[1],
+                                      ln.alt[0], ln.tall_scale, cut=ln.cut)[0]
                 st.p, corner = _fast_point(c, dist[st.district_id], mode, stops[k - 1].p,
                                            stops[k + 1].p, fast_cost)
                 if corner is not None:
@@ -1797,8 +1931,8 @@ def route_line(c: Ctx, ln: Line) -> None:
         for k, nb in ((0, 1), (len(stops) - 1, len(stops) - 2)):
             if _site_end(stops[k]):
                 if fast_cost is None:
-                    fast_cost = costs(c, mode, ln.z0, ln.through, None, ln.alt[1],
-                                      ln.alt[0], ln.tall_scale)[0]
+                    fast_cost = costs(c, mode, ln.z0, ln.hosts, None, ln.alt[1],
+                                      ln.alt[0], ln.tall_scale, cut=ln.cut)[0]
                 stops[k].p = _site_point(c, stops[k], stops[nb].p, fast_cost)
     if ln.loop:
         ring = _loop_points(c, ln)
@@ -1807,8 +1941,8 @@ def route_line(c: Ctx, ln: Line) -> None:
                 s.p = p
         if mode not in ROAD_MODES and r_min > 0:
             # M8c: a flying loop as one ring of Dubins paths, when one is clear
-            cost = costs(c, mode, ln.z0, ln.through, None, ln.alt[1], ln.alt[0],
-                         ln.tall_scale)[0]
+            cost = costs(c, mode, ln.z0, ln.hosts, None, ln.alt[1], ln.alt[0],
+                         ln.tall_scale, cut=ln.cut)[0]
             dub = _dubins_track(c, ln, cost, r_min)
             if dub is not None:
                 track, passes, rho = dub
@@ -1868,7 +2002,8 @@ def _dubins_line(c: Ctx, ln: Line, flaws, r_min: float) -> None:
     first = _line_score(c, ln, flaws, r_min)
     if first == ((0, 0), 0, 0):
         return
-    cost = costs(c, ln.mode, ln.z0, ln.through, None, ln.alt[1], ln.alt[0], ln.tall_scale)[0]
+    cost = costs(c, ln.mode, ln.z0, ln.hosts, None, ln.alt[1], ln.alt[0], ln.tall_scale,
+                 cut=ln.cut)[0]
     dub = _dubins_track(c, ln, cost, r_min)
     if dub is None:
         return
@@ -1969,8 +2104,8 @@ def _off_roads_line(c: Ctx, ln: Line, flaws, notes: list, conflicts: list) -> No
                    if s.kind in ("megasite", "place", "island") and s.tower_id is None]
             if not mid:
                 break
-            cost = costs(c, ln.mode, ln.z0, ln.through, None, ln.alt[1], ln.alt[0],
-                         ln.tall_scale)[0]
+            cost = costs(c, ln.mode, ln.z0, ln.hosts, None, ln.alt[1], ln.alt[0],
+                         ln.tall_scale, cut=ln.cut)[0]
         for on in ((False,) if not move else (True, False)):
             for s, p in zip(ln.stops, home):
                 s.p = p
@@ -2273,8 +2408,8 @@ def _route(c: Ctx, ln: Line) -> None:
     block = None
     dense, rmin, ok = [], INF, True
     for attempt in range(ATTEMPTS):
-        cost, portal = costs(c, mode, ln.z0, ln.through, block, ln.alt[1], ln.alt[0],
-                             ln.tall_scale)
+        cost, portal = costs(c, mode, ln.z0, ln.hosts, block, ln.alt[1], ln.alt[0],
+                             ln.tall_scale, cut=ln.cut)
         if graph is None:
             # a stop in a forbidden area (a flight cone, a tower the line cannot pass) moves
             # to the nearest passable cell; its station goes there
@@ -2686,9 +2821,9 @@ SELF_GAP_M = 100.0   # parts of one line this far apart along it must not meet
 
 
 def self_clear_m(mode: str) -> float:
-    """Height between two parts of one line where one passes over the other: 5.5 m under the
-    upper structure, over the lower one."""
-    return ROAD_CLEAR_M + below(mode) + above(mode)
+    """Height between two parts of one line where one passes over the other: 6.5 m under the
+    upper structure, over the lower one (M19; 5.5 m before)."""
+    return DECK_CLEAR_M + below(mode) + above(mode)
 
 
 def self_meets(pts, loop: bool, reach: float, zs=None, clear: float = 0.0) -> list[tuple]:
@@ -2839,10 +2974,13 @@ def _corridor(c: Ctx, ln: Line, pts, check_only: bool = False) -> list:
         climbable = b.top <= ln.alt[1] - (SKY_CLEAR_M if mode == "sky_tube" else
                                           below(mode) + 2.0)
         if mode == "sky_tube":
-            how = sky_pass(b, z, ln.alt, ln.through)
+            how = sky_pass(b, z, ln.alt, ln.hosts)
             if how == "portal" and not check_only:
                 ln.portals[b.id] = (q(z - DECK_M[mode] / 2 - 1.0),
                                     q(z + DECK_M[mode] / 2 + 1.0))
+            elif how == "block" and ln.cut and b.removable:
+                if not check_only:
+                    ln.removed.append(b.id)
             elif how == "block":
                 out.append(b)
             continue
@@ -2916,16 +3054,97 @@ def clearance_conflicts(c: Ctx, ln: Line, gone: set) -> list[str]:
     return sorted(out)
 
 
-def profile(c: Ctx, ln: Line, gone: set) -> None:
+def floor_z(mode: str) -> float:
+    """M19: the lowest track z: ROAD_CLEAR_M over a road or sidewalk under the structure
+    (and under a portal frame's cap beam, for the lines on columns)."""
+    if mode == "metro":
+        return -INF
+    return ROAD_CLEAR_M + below(mode) + (0.0 if mode == "sky_tube" else CAP_M)
+
+
+def track_rec(ln: Line) -> dict:
+    """M19: a profiled line as the lines after it see it: its track with its platforms' width
+    all along (`_line_crossings`)."""
+    return {"id": ln.id, "mode": ln.mode, "line": LineString(ln.pts), "pts": ln.pts,
+            "zs": ln.zs, "cum": _cum(ln.pts),
+            "half": WIDTH_M[ln.mode] / 2.0 + PLATFORM_M[ln.mode]}
+
+
+def _z_along(o: dict, s: float) -> float:
+    cum, zs = o["cum"], o["zs"]
+    i = min(max(bisect.bisect_right(cum, s) - 1, 0), len(cum) - 2)
+    L = cum[i + 1] - cum[i]
+    f = 0.0 if L <= 0 else min(max((s - cum[i]) / L, 0.0), 1.0)
+    return zs[i] + (zs[i + 1] - zs[i]) * f
+
+
+def _z_range(o: dict, s0: float, s1: float) -> tuple[float, float]:
+    """The lowest and highest z of a track between s0 and s1 along it."""
+    cum, zs = o["cum"], o["zs"]
+    s0, s1 = max(s0, 0.0), min(s1, cum[-1])
+    a = _z_along(o, s0)
+    b = _z_along(o, s1)
+    inner = zs[bisect.bisect_right(cum, s0):bisect.bisect_left(cum, s1)]
+    return min([a, b, *inner]), max([a, b, *inner])
+
+
+def _xing_z(o: dict, so: float) -> tuple[float, float]:
+    """(M19) Another line's z range near where a track passes it: over its stations' half
+    length and 10 m more each way (a platform is level at its middle's height while the
+    track under it climbs, and the two lines sample each other at different points)."""
+    w = STATION_LEN_M[o["mode"]] / 2.0 + 10.0
+    return _z_range(o, so - w, so + w)
+
+
+def _line_crossings(ln: Line, arr, others: list) -> list:
+    """M19: where the track passes a line profiled before it (within both structures' half
+    widths, the other's platforms, and SIDE_PAD_M in plan): one run per crossing, each
+    [(point index, z over it, z under it)] with DECK_CLEAR_M between the structures (the
+    lower one's top, the upper one's underside)."""
+    out = []
+    mode = ln.mode
+    for o in others:
+        if o["mode"] == "metro" or o["id"] == ln.id:
+            continue
+        reach = WIDTH_M[mode] / 2.0 + o["half"] + SIDE_PAD_M
+        idx = np.nonzero(shapely.dwithin(o["line"], arr, reach))[0].tolist()
+        run: list = []
+        for i in idx:
+            lo, hi = _xing_z(o, o["line"].project(arr[i]))
+            rec = (i, hi + above(o["mode"]) + DECK_CLEAR_M + below(mode),
+                   lo - below(o["mode"]) - DECK_CLEAR_M - above(mode))
+            if run and i > run[-1][0] + 1:
+                out.append(run)
+                run = []
+            run.append(rec)
+        if run:
+            out.append(run)
+    return out
+
+
+def _xing_under(run, z0: float, low, floor: float) -> bool:
+    """Whether a crossing of another line is passed under (else over): under where the base
+    altitude is under it or nearer under than over, the track's lower envelope (water)
+    leaves room and the floor stays clear."""
+    over = max(r[1] for r in run)
+    under = min(r[2] for r in run)
+    if z0 >= over - 0.01 or under < floor or any(low[i] > u for i, _, u in run):
+        return False
+    return z0 <= under + 0.01 or z0 - under < over - z0
+
+
+def profile(c: Ctx, ln: Line, gone: set, others: list = ()) -> None:
     """z at every vertex: the base altitude, raised over navigable water, road decks, the
-    buildings left under the line and nexus platforms, then smoothed to the maximum grade."""
+    buildings left under the line, nexus platforms and (M19) the lines before it, never
+    under the floor (`floor_z`), then smoothed to the maximum grade."""
     mode = ln.mode
     n = len(ln.pts)
     if mode == "metro":
         ln.zs = [ln.z0] * n
         return
     deck = below(mode)
-    need = [ln.z0] * n
+    floor = floor_z(mode)
+    need = [max(ln.z0, floor)] * n
     arr = shapely.points(np.array(ln.pts, dtype=np.float64))
     for poly, clr, nav in c.water:
         if not nav:
@@ -2936,11 +3155,14 @@ def profile(c: Ctx, ln: Line, gone: set) -> None:
     closed = ln.loop and n > 2 and ln.pts[0] == ln.pts[-1]
     low = _envelope(ln.pts, need, g, closed)  # what the water already needs, at the grade
     runs = deck_crossings(c.decks, c.dtree, arr, WIDTH_M[mode] / 2.0)
+    xings = _line_crossings(ln, arr, others)
+    unders = {k for k, run in enumerate(xings) if _xing_under(run, ln.z0, low, floor)}
     need0 = list(need)
     over_runs: set = set()
-    for _attempt in range(4):
+    for _attempt in range(6):
         need = list(need0)
-        zs = _profile_pass(c, ln, gone, arr, need, runs, over_runs, low)
+        zs = _profile_pass(c, ln, gone, arr, need, runs, over_runs, low,
+                           [(run, k in unders) for k, run in enumerate(xings)])
         # a deck the track was to pass under but other needs lift it into: over it instead
         late = set()
         for k, run in enumerate(runs):
@@ -2949,9 +3171,12 @@ def profile(c: Ctx, ln: Line, gone: set) -> None:
             if any(zs[i] > road_underside(z) - above(mode) - UNDER_PAD_M + 0.01
                    for i, z in run) and _under_choice(mode, run, ln.z0, low):
                 late.add(k)
-        if not late:
+        # (M19: likewise a line it was to pass under)
+        lift = {k for k in unders if any(zs[i] > u + 0.01 for i, _, u in xings[k])}
+        if not late and not lift:
             break
         over_runs |= late
+        unders -= lift
     ln.zs = zs
 
 
@@ -2961,7 +3186,7 @@ def _under_choice(mode: str, run, z0: float, low) -> bool:
 
 
 def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs: set,
-                  low) -> list[float]:
+                  low, xings=()) -> list[float]:
     mode = ln.mode
     n = len(ln.pts)
     deck = below(mode)
@@ -2971,8 +3196,16 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
             # M7: a high road deck (an approach viaduct) the track passes under
             unders += [(i, road_underside(z) - above(mode) - UNDER_PAD_M) for i, z in run]
         else:
+            # (M19: a portal frame's cap beam under it too, so that one may straddle it)
             for i, z in run:
-                need[i] = max(need[i], z + ROAD_CLEAR_M + deck)
+                need[i] = max(need[i], over_deck(mode, z))
+    # M19: the lines before it, over or under each crossing
+    for run, under in xings:
+        for i, over_z, under_z in run:
+            if under:
+                unders.append((i, under_z))
+            else:
+                need[i] = max(need[i], over_z)
     if c.btree is not None:
         half = WIDTH_M[mode] / 2.0 + SIDE_PAD_M
         ip, ib = c.btree.query(arr, predicate="dwithin", distance=half)
@@ -3008,7 +3241,7 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
         if under >= ln.z0 or over <= ln.z0:
             continue    # the track passes under or over it at its base altitude
         for i in idx:
-            if over - ln.z0 <= ln.z0 - under:
+            if over - ln.z0 <= ln.z0 - under or under < floor_z(mode):
                 need[i] = max(need[i], over)
             else:
                 cap[i] = min(cap[i], under)
@@ -3172,6 +3405,338 @@ def sidewalks_clear(sw, pt, size: float) -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# Supports (M19)
+# ---------------------------------------------------------------------------
+
+SPAN_MOVE = 0.15         # a support moves at most this share of its span to free ground
+TRUSS_OVER = 1.15        # a span this much over the mode's is a truss (a cable span over the
+#                          longest, only across a navigable channel)
+MAIN_SPAN_M = {"elevated_rail": 240.0, "monorail": 200.0, "maglev": 300.0, "sky_tube": 600.0}
+FRAME_REACH_M = 30.0     # a portal frame's columns stand at most this far either side
+CANT_REACH_M = 15.0      # a cantilever bent's column at most this far from the line
+CANT_SHORT_M = 4.0       # ... and is taken before a frame when this near
+LEG_STEP_M = 0.5         # the spots tried across the line
+PIER_SCALE = 1.6         # a pier's footprint over its column's
+GROUND_TOP_M = 1.0       # a track whose underside is this low runs on the ground
+# the navigable channel down the middle of the water, at most half its width and this wide
+# (the open sea has none: a pier may stand anywhere in it)
+CHANNEL_M = {"river": 40.0, "delta_branch": 40.0, "sea_channel": 120.0, "separation": 12.0,
+             "canal": 8.0, "creek": 8.0, "inlet": 30.0, "basin": 30.0, "marina": 30.0}
+MAST_RATIO = 0.12        # a sky tube's mast rises this share of its longer span over the tube
+MAST_MIN_M = 20.0
+STAY_SHARE = 0.4         # its stays reach this share of each span along the tube
+
+
+def pier_reach(width: float, kind: str) -> float:
+    """How far from the shore a pier may stand in water of this width and kind: up to its
+    navigable channel (CHANNEL_M, at most half the width, down the middle)."""
+    return max(0.0, width / 2.0 - min(width / 4.0, CHANNEL_M.get(kind, 40.0) / 2.0))
+
+
+def _squares(P: np.ndarray, size: float):
+    """Axis-aligned squares of this size centered on the points P."""
+    h = size / 2.0
+    return shapely.box(P[:, 0] - h, P[:, 1] - h, P[:, 0] + h, P[:, 1] + h)
+
+
+def _runs(idx: list) -> list[tuple[int, int]]:
+    """Runs of consecutive indices: [(first, last)]."""
+    out = []
+    for i in idx:
+        if out and i == out[-1][1] + 1:
+            out[-1] = (out[-1][0], i)
+        else:
+            out.append((i, i))
+    return out
+
+
+class _Track:
+    """A line's track by arc length: points, heights and the normal at any s."""
+
+    def __init__(self, ln: Line):
+        self.mode = ln.mode
+        self.pts, self.zs = ln.pts, ln.zs
+        self.cum = _cum(ln.pts)
+        self.L = self.cum[-1]
+        self.closed = ln.loop and len(ln.pts) > 2 and ln.pts[0] == ln.pts[-1]
+        self.line = LineString(ln.pts)
+
+    def _i(self, s: float) -> tuple[int, float]:
+        cum = self.cum
+        s = min(max(s, 0.0), self.L)
+        i = min(max(bisect.bisect_right(cum, s) - 1, 0), len(cum) - 2)
+        L = cum[i + 1] - cum[i]
+        return i, (0.0 if L <= 0 else min(max((s - cum[i]) / L, 0.0), 1.0))
+
+    def xy(self, s: float) -> tuple[float, float]:
+        i, f = self._i(s)
+        a, b = self.pts[i], self.pts[i + 1]
+        return (G.q(a[0] + (b[0] - a[0]) * f), G.q(a[1] + (b[1] - a[1]) * f))
+
+    def z(self, s: float) -> float:
+        i, f = self._i(s)
+        return self.zs[i] + (self.zs[i + 1] - self.zs[i]) * f
+
+    def normal(self, s: float) -> tuple[float, float]:
+        i, _ = self._i(s)
+        a, b = self.pts[i], self.pts[i + 1]
+        L = _d(a, b) or 1.0
+        return (-(b[1] - a[1]) / L, (b[0] - a[0]) / L)
+
+
+def _support_room(c: Ctx, lines: list, gone: set, lanes, sw, ground: list) -> None:
+    """M19: the supports planned once before the stations (`Builder.supports_of` on a dry
+    builder): where a gap would stay longer than the longest span, a low building under the
+    track that alone keeps a column off it every span along the gap is taken out (its lot
+    stays, marked as the line's corridor), as M5 takes out what a line cannot clear."""
+    keep = Keep(c, gone, lanes, sw, [track_rec(ln) for ln in lines if ln.mode != "metro"],
+                ground)
+    dry = _Dry(c)
+    for ln in lines:
+        if ln.mode == "metro" or len(ln.pts) < 2 or c.btree is None:
+            continue
+        notes = list(ln.notes)
+        _, spans = dry.supports_of(ln, keep)
+        ln.notes = notes
+        span = presets.TRANSIT_MODES[ln.mode].support_spacing_m[0]
+        T_ = _Track(ln)
+        size = COLUMN_M[ln.mode]
+        for a, b, kind in spans:
+            if kind != "gap":
+                continue
+            b = b + T_.L if T_.closed and b < a else b
+            x = a + span / 2.0
+            while x < b:
+                y = x % T_.L if T_.closed else x
+                p = T_.xy(y)
+                top = T_.z(y) - below(ln.mode)
+                for i in sorted(c.btree.query(Point(p), predicate="dwithin",
+                                              distance=size).tolist()):
+                    o = c.blds[i]
+                    if o.id not in gone and o.removable and o.id not in ln.portals and                             o.top <= top - 2.0:
+                        gone.add(o.id)
+                        ln.removed.append(o.id)
+                x += span
+
+
+class Keep:
+    """M19: where a support may stand (vectorized over candidate points): off buildings
+    (but the ones taken out), road decks, lanes, tunnel boxes, ground structures (canopies,
+    elevator cores, other supports), deck slabs, the water (but a pier clear of the
+    navigable channel) and the sidewalks' clear paths, and SIDE_PAD_M clear of every other
+    line's structure (and of its own line's parts farther than SELF_GAP_M along it) that
+    passes lower than its top plus DECK_CLEAR_M."""
+
+    def __init__(self, c: Ctx, gone: set, lanes, sw, tracks: list, ground: list):
+        self.c = c
+        self.sw = sw
+        self.ok_bld = np.array([b.id not in gone for b in c.blds], bool)
+        self.lanes = lanes
+        self.lane_w = np.array(lanes[2], dtype=np.float64) if lanes[1] else np.zeros(0)
+        self.tracks = tracks
+        boxes = [LineString([p_[:2] for p_ in t.line]).buffer(t.width_m / 2.0 + 1.0,
+                                                             cap_style="flat")
+                 for t in c.m.tunnels if t.kind in ("immersed_tube", "cut_and_cover")]
+        self.boxes = shapely.STRtree(boxes) if boxes else None
+        self.ground = ground
+        self.gtree = shapely.STRtree(ground) if ground else None
+        slabs = [p for p, _ in c.slabs]
+        self.slabs = shapely.STRtree(slabs) if slabs else None
+        self.deck_lines = [d[0] for d in c.decks]
+        self.deck_hw = np.array([d[1] for d in c.decks], dtype=np.float64)
+        # water: every body with how far from its shore a pier may stand (`pier_reach`)
+        wet = []
+        for e in c.m.seas:
+            for p in e.polygons:
+                wet.append((G.from_model_poly(p), INF))
+        for e in c.m.rivers:
+            w = sorted(e.width_m)[len(e.width_m) // 2] if e.width_m else 60.0
+            wet.append((G.from_model_poly(e.polygon), pier_reach(w, "river")))
+        for e in c.m.channels:
+            w = sorted(e.width_m)[len(e.width_m) // 2] if e.width_m else 60.0
+            wet.append((G.from_model_poly(e.polygon), pier_reach(w, e.kind)))
+        for e in c.m.waterways:
+            poly = G.from_model_poly(e.polygon)
+            per = poly.length
+            w = 2.0 * G.area(poly) / per if per > 0 else 0.0
+            wet.append((poly, INF if e.ornamental else pier_reach(w, e.kind)))
+        self.wet_polys = [w[0] for w in wet]
+        self.wet_reach = [w[1] for w in wet]
+        self.wtree = shapely.STRtree(self.wet_polys) if wet else None
+        shore = []
+        if wet:
+            x0, y0, x1, y1 = c.m.bounds
+            edge = shapely.box(x0, y0, x1, y1).boundary.buffer(1.0)
+            bd = G.union(self.wet_polys).boundary
+            for g in getattr(bd, "geoms", [bd]):
+                cs = list(g.coords)
+                for a, b in zip(cs, cs[1:]):
+                    seg = LineString([a, b])
+                    if not edge.covers(seg):
+                        shore.append(seg)
+        self.shore = shapely.STRtree(shore) if shore else None
+        self.placed: dict = {}
+
+    # -- tests ------------------------------------------------------------------------------
+
+    def free(self, P: np.ndarray, size: float, tops, ln: Line, s_at) -> np.ndarray:
+        """Which of the points P a support of this size (up to `tops`) may stand on, but
+        for the water and the sidewalks (`wet`, `sidewalk_ok`)."""
+        c = self.c
+        n = len(P)
+        ok = np.ones(n, bool)
+        if n == 0:
+            return ok
+        pts = shapely.points(P)
+        if c.btree is not None:
+            ip, ib = c.btree.query(pts, predicate="dwithin", distance=size)
+            ok[ip[self.ok_bld[ib]]] = False
+        if self.deck_lines and c.dtree is not None:
+            ip, il = c.dtree.query(pts, predicate="dwithin",
+                                   distance=float(self.deck_hw.max()) + size / 2.0 + 0.5)
+            if len(ip):
+                d = shapely.distance(pts[ip], np.array(self.deck_lines, dtype=object)[il])
+                ok[ip[d < self.deck_hw[il] + size / 2.0 + 0.5]] = False
+        ltree, llines, _ = self.lanes
+        if llines:
+            ip, il = ltree.query(pts, predicate="dwithin", distance=4.0 + size)
+            if len(ip):
+                d = shapely.distance(pts[ip], np.array(llines, dtype=object)[il])
+                ok[ip[d < self.lane_w[il] / 2.0 + size / 2.0]] = False
+        sq = _squares(P, size)
+        for tree in (self.boxes, self.gtree, self.slabs):
+            if tree is not None:
+                ip, _ = tree.query(sq, predicate="intersects")
+                ok[ip] = False
+        # other supports
+        for j in range(n):
+            if ok[j] and self._near_placed(P[j], size):
+                ok[j] = False
+        # other lines' structures (and its own far along it) lower than its top
+        tops = np.asarray(tops, dtype=np.float64)
+        for o in self.tracks:
+            reach = o["half"] + SIDE_PAD_M + size / 2.0
+            d = shapely.distance(o["line"], pts)
+            for j in np.nonzero(ok & (d < reach))[0].tolist():
+                so = o["line"].project(pts[j])
+                if o["id"] == ln.id:
+                    gap = abs(so - s_at[j])
+                    if ln.loop:
+                        gap = min(gap, o["cum"][-1] - gap)
+                    if gap <= SELF_GAP_M:
+                        continue
+                if _xing_z(o, so)[0] - below(o["mode"]) < tops[j] + DECK_CLEAR_M:
+                    ok[j] = False
+        return ok
+
+    def _near_placed(self, p, size: float) -> bool:
+        kx, ky = int(p[0] // 10.0), int(p[1] // 10.0)
+        for i in range(kx - 1, kx + 2):
+            for j in range(ky - 1, ky + 2):
+                for x, y, h in self.placed.get((i, j), ()):
+                    if abs(x - p[0]) < h + size / 2.0 + 1.0 and abs(y - p[1]) < h + size / 2.0 + 1.0:
+                        return True
+        return False
+
+    def add(self, p, size: float) -> None:
+        self.placed.setdefault((int(p[0] // 10.0), int(p[1] // 10.0)), []).append(
+            (float(p[0]), float(p[1]), size / 2.0))
+
+    def wet(self, P: np.ndarray, size: float) -> np.ndarray:
+        """Which supports of this size at P stand in the water (their footprint in it)."""
+        out = np.zeros(len(P), bool)
+        if self.wtree is None or not len(P):
+            return out
+        ip, _ = self.wtree.query(_squares(P, max(size, 0.02)), predicate="intersects")
+        out[ip] = True
+        return out
+
+    def pier_ok(self, P: np.ndarray) -> np.ndarray:
+        """In the water clear of every navigable channel (`pier_reach`)."""
+        out = np.ones(len(P), bool)
+        if self.wtree is None or self.shore is None or not len(P):
+            return out
+        pts = shapely.points(P)
+        _, dist = self.shore.query_nearest(pts, return_distance=True, all_matches=False)
+        ip, iw = self.wtree.query(pts, predicate="intersects")
+        for j, k in zip(ip.tolist(), iw.tolist()):
+            if dist[j] > self.wet_reach[k] + 1e-9:
+                out[j] = False
+        return out
+
+    def in_channel(self, P: np.ndarray) -> np.ndarray:
+        """Points over a navigable channel (where no pier may stand)."""
+        w = self.wet(P, 0.0)
+        return w & ~self.pier_ok(P)
+
+    def over_channel(self, T_: _Track, g0: float, g1: float) -> bool:
+        """Whether the track crosses what no support may stand in between g0 and g1: a
+        navigable channel or a raised road (where a main span bridges an interchange)."""
+        L = T_.L
+        xs = np.arange(g0, g1, 5.0).tolist()
+        if not xs:
+            return False
+        P = np.array([T_.xy(x % L if T_.closed else min(max(x, 0.0), L)) for x in xs],
+                     dtype=np.float64)
+        if self.in_channel(P).any():
+            return True
+        c = self.c
+        if c.dtree is None:
+            return False
+        pts = shapely.points(P)
+        ip, il = c.dtree.query(pts, predicate="dwithin", distance=float(self.deck_hw.max()))
+        if not len(ip):
+            return False
+        d = shapely.distance(pts[ip], np.array(self.deck_lines, dtype=object)[il])
+        return bool((d <= self.deck_hw[il]).any())
+
+    def sidewalk_ok(self, p, size: float) -> bool:
+        return sidewalks_clear(self.sw, Point(float(p[0]), float(p[1])), size)
+
+    def beam_ok(self, line: list, top: float, ln: Line, s: float) -> bool:
+        """A cap beam (or arm) from line[0] to line[1], CAP_M deep under `top`: over no
+        building that reaches it, no raised road deck, and DECK_CLEAR_M from every other
+        line's structure."""
+        c = self.c
+        g = LineString(line)
+        if g.length < 0.5:
+            return False
+        bot = top - CAP_M
+        w = COLUMN_M[ln.mode] / 2.0
+        if c.btree is not None:
+            for i in c.btree.query(g, predicate="dwithin", distance=w + 0.5).tolist():
+                b = c.blds[i]
+                if self.ok_bld[i] and b.top > bot - 0.5 and b.bottom < top + 0.5:
+                    return False
+        if c.dtree is not None:
+            # a raised road under it: DECK_CLEAR_M under its bottom (a frame straddles it)
+            for i in c.dtree.query(g, predicate="dwithin", distance=float(self.deck_hw.max())
+                                   + w).tolist():
+                dl = self.deck_lines[i]
+                if dl.distance(g) >= self.deck_hw[i] + w:
+                    continue
+                p0, _ = shapely.ops.nearest_points(dl, g)
+                if _z_at(c.decks[i][2], dl.project(p0)) + DECK_CLEAR_M > bot + 0.01:
+                    return False
+        for o in self.tracks:
+            reach = o["half"] + SIDE_PAD_M + w
+            if o["line"].distance(g) >= reach:
+                continue
+            if o["id"] == ln.id:
+                # its own line: only far along it (a loop over itself)
+                near = [o["line"].project(Point(p)) for p in line]
+                if all(min(abs(x - s), o["cum"][-1] - abs(x - s)) <= SELF_GAP_M
+                       if ln.loop else abs(x - s) <= SELF_GAP_M for x in near):
+                    continue
+            p0, _ = shapely.ops.nearest_points(o["line"], g)
+            zlo, zhi = _xing_z(o, o["line"].project(p0))
+            lo, hi = zlo - below(o["mode"]), zhi + above(o["mode"])
+            if not (lo >= top + DECK_CLEAR_M or hi + DECK_CLEAR_M <= bot):
+                return False
+        return True
+
+
 class Builder:
     def __init__(self, c: Ctx, walks: list):
         self.c = c
@@ -3188,6 +3753,10 @@ class Builder:
         self.stations: list = []
         self.nst = 0
         self.sw = sidewalk_index(c.m)
+        self.hosted: set = set()     # M19: towers that host a sky station already
+        self.platforms: dict = {}    # M19: line id -> [(from, to along it, kind, core at)]
+        self.tracks: list = []       # M19: every line's track (`track_rec`)
+        self.nsup: dict = {}         # M19: supports numbered per line
 
     def foot(self, p) -> tuple[tuple, float]:
         lm = _landmass_index(self.lms, [p])[0]
@@ -3223,6 +3792,8 @@ class Builder:
             tower = None
             if mode == "sky_tube":
                 tower, idx = self._tower_for(ln, stop, idx, bld)
+                if tower is None:
+                    idx = self._core_spot(ln, stop, idx, cum)
             self.nst += 1
             sid = f"st{self.nst:03d}"
             half = STATION_LEN_M[mode] / 2.0
@@ -3256,6 +3827,13 @@ class Builder:
                 self._elevated(sid, ln, seg, foot, z, bld, gone, acc,
                                pylon=(mode == "sky_tube"))
                 zpos = z
+                # (M19: its ends are fixed points of the line's supports, a sky station's
+                # elevator core a support at its first)
+                core = None
+                if mode == "sky_tube":
+                    core = q(a) if self._core_end(ln, seg) == seg[0] else q(b)
+                self.platforms.setdefault(ln.id, []).append(
+                    (q(a), q(b), "pylon" if mode == "sky_tube" else "elevated", core))
             self.stations.append({
                 "id": sid, "type": "station", "name": name, "kind": kind,
                 "line_ids": [ln.id], "position": [pts[idx][0], pts[idx][1], q(zpos)],
@@ -3276,7 +3854,11 @@ class Builder:
             cands = [stop.tower_id]
         else:
             p = ln.pts[idx]
+            # (M19: a stop's host is its own station's, and a tower hosts one station)
+            mine = {s.tower_id for s in ln.stops if s.tower_id} | self.hosted
             for bid in sorted(ln.portals):
+                if bid in mine:
+                    continue
                 b = bld[bid]
                 d = round(b.poly.distance(Point(p)), 2)
                 if d <= STATION_TOWER_M:
@@ -3288,6 +3870,7 @@ class Builder:
             inside = [i for i, p in enumerate(ln.pts) if b.poly.contains(Point(p)) and
                       (zone is None or zone.covers(Point(p)))]
             if inside:
+                self.hosted.add(bid)
                 return b, inside[len(inside) // 2]
         return None, idx
 
@@ -3332,7 +3915,7 @@ class Builder:
         acc.append(k)
         self.struct(f"{sid}.pf", "deck", z - 1.0, z, footprint=foot,
                     attrs={"station": sid, "role": "platform", "mode": mode})
-        ends = [seg[0], seg[-1]] if not pylon else [seg[0]]
+        ends = [seg[0], seg[-1]] if not pylon else [self._core_end(ln, seg)]
         for e, tag in zip(ends, ("a", "b")):
             f, d = self.foot(e)
             if pylon or d < 1.0:
@@ -3358,6 +3941,39 @@ class Builder:
             acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
                                  {"station": sid}))
         self._skywalk(sid, seg, foot, z, bld, gone, acc)
+
+    def _core_near(self, ln: Line, e) -> bool:
+        """Whether another line passes an elevator core at e closer than SIDE_PAD_M."""
+        return any(o["id"] != ln.id and o["line"].distance(Point(e)) <
+                   o["half"] + SIDE_PAD_M + 5.0 for o in self.tracks)
+
+    def _core_end(self, ln: Line, seg) -> tuple:
+        """M19: the platform end a sky station's elevator core stands at: its first, unless
+        another line passes it closer than SIDE_PAD_M (the last then, if that one is clear)."""
+        if self._core_near(ln, seg[0]) and not self._core_near(ln, seg[-1]):
+            return seg[-1]
+        return seg[0]
+
+    def _core_spot(self, ln: Line, stop, idx: int, cum) -> int:
+        """M19: a sky station on a pylon moves along its line (at most CORE_SHIFT vertices,
+        still serving its stop) until an end of its platform is clear of the other lines for
+        its elevator core (two lines stopping at one place cross there)."""
+        half = STATION_LEN_M[ln.mode] / 2.0
+        zone = _zone(stop) if stop is not None else None
+        n = len(ln.pts)
+        closed = ln.loop and n > 2 and ln.pts[0] == ln.pts[-1]
+        for k in range(CORE_SHIFT + 1):
+            for j in ((idx,) if k == 0 else (idx + k, idx - k)):
+                if closed:
+                    j = j % (n - 1)     # (round a loop's seam)
+                if not 0 <= j < n or (zone is not None and
+                                      not zone.covers(Point(ln.pts[j]))):
+                    continue
+                a = min(max(cum[j] - half, 0.0), max(cum[-1] - 2 * half, 0.0))
+                b = min(a + 2 * half, cum[-1])
+                if not all(self._core_near(ln, _at(ln.pts, cum, x)[1]) for x in (a, b)):
+                    return j
+        return idx
 
     def _skywalk(self, sid, seg, foot, z, bld, gone, acc) -> None:
         """An elevated walkway from a platform end to the nearest building with a floor at
@@ -3412,10 +4028,11 @@ class Builder:
 
     # -- line structures --------------------------------------------------------------------
 
-    def line_structures(self, ln: Line, gone: set, segs, lanes) -> int:
+    def line_structures(self, ln: Line) -> None:
+        """The deck or tube of a line, in 400 m pieces along its top line."""
         mode = ln.mode
         if mode == "metro":
-            return 0
+            return
         pts, zs = ln.pts, ln.zs
         cum = _cum(pts)
         piece = 400.0
@@ -3435,103 +4052,304 @@ class Builder:
                             attrs={"line_id": ln.id, "mode": mode, "width_m": WIDTH_M[mode],
                                    "deck_m": DECK_M[mode], "color": ln.color})
             s = e
-        lo, hi = presets.TRANSIT_MODES[mode].support_spacing_m
-        step = (lo + hi) / 2.0
-        n = 0
-        s = step / 2.0
-        while s < cum[-1]:
-            placed = self._support(ln, cum, s, gone, segs, lanes, n)
-            n += placed
-            s += step
-        return n
 
-    def _support(self, ln, cum, s, gone, segs, lanes, n0) -> int:
-        c = self.c
+    # -- supports (M19) ---------------------------------------------------------------------
+
+    def supports_of(self, ln: Line, keep: "Keep") -> tuple[int, list]:
+        """M19: the supports of a line, evenly spaced between its fixed points: a support at
+        each end of an open line and of each platform, none where a tower carries the tube
+        (a portal) or the track runs on the ground; between them as many spans as the mode's
+        span makes, each support moved at most SPAN_MOVE of its span to free ground (a
+        column under the line, else a portal frame or a cantilever bent, a pier in the
+        water clear of the navigable channel), then any gap still over the longest span
+        filled wherever a support stands. A gap that stays longer is a main span over a
+        navigable channel or a raised road (cable-stayed, up to MAIN_SPAN_M), else a note.
+        Returns (the
+        supports placed, the spans that are not plain girders: [s0, s1, truss or cable])."""
+        mode = ln.mode
+        if mode == "metro" or len(ln.pts) < 2:
+            return 0, []
+        span, longest = presets.TRANSIT_MODES[mode].support_spacing_m
+        T_ = _Track(ln)
+        L = T_.L
+        carriers = self._carriers(ln, T_)
+        fixed = [0.0, L] if not T_.closed else []
+        for a, b, kind, core in self.platforms.get(ln.id, []):
+            fixed += [a, b] if kind == "elevated" else [x for x in (a, b) if x != core]
+        fixed = sorted({q(min(max(x, 0.0), L)) for x in fixed
+                        if not any(c0 - 0.01 <= x <= c1 + 0.01 for c0, c1 in carriers)})
+        # anchors: the carriers' ends and the fixed points, in order along the line
+        marks = sorted([(c0, c1, "carrier") for c0, c1 in carriers] +
+                       [(x, x, "fixed") for x in fixed])
+        ideal: list[tuple[float, float]] = []      # (s, how far it may move)
+        for x in fixed:
+            ideal.append((x, SPAN_MOVE * span))
+        pairs = list(zip(marks, marks[1:]))
+        if T_.closed and marks:
+            pairs.append((marks[-1], (marks[0][0] + L, marks[0][1] + L, marks[0][2])))
+        elif T_.closed:
+            pairs.append(((0.0, 0.0, "fixed"), (L, L, "fixed")))
+            ideal.append((0.0, SPAN_MOVE * span))
+        for (a0, a1, _), (b0, b1, _) in pairs:
+            G_ = b0 - a1
+            if G_ <= 0.01:
+                continue
+            n = max(1, int(round(G_ / span)), int(math.ceil(G_ / (0.85 * longest))))
+            for j in range(1, n):
+                ideal.append((a1 + G_ * j / n, SPAN_MOVE * G_ / n))
+        placed: list[float] = []
+        for x, move in sorted(ideal):
+            got = self._place(ln, T_, keep, x % L if T_.closed else x, move, carriers)
+            if got is not None:
+                placed.append(got)
+        # gaps over the longest span: filled where a support stands
+        for g0, g1 in self._gaps(T_, placed, carriers, longest):
+            left = g0
+            while g1 - left > longest + 0.01:
+                got = None
+                x = min(left + 0.98 * longest, g1 - 1.0)
+                step = max(1.0, longest / 40.0)
+                while x > left + 0.25 * longest and got is None:
+                    if T_.closed or 0.0 <= x <= L:
+                        got = self._place(ln, T_, keep, x % L if T_.closed else x, 0.0,
+                                          carriers)
+                    x -= step
+                if got is None:
+                    break
+                placed.append(got)
+                left = got if not T_.closed or got >= left - 1.0 else got + L
+        spans: list = []
+        for g0, g1 in self._gaps(T_, placed, carriers, longest):
+            G_ = g1 - g0
+            a_ = q(min(max(g0, 0.0), L) % L if T_.closed else min(max(g0, 0.0), L))
+            b_ = q(g1 % L if T_.closed else min(max(g1, 0.0), L))
+            if G_ > longest + 0.01:
+                if G_ <= MAIN_SPAN_M[mode] + 0.01 and keep.over_channel(T_, g0, g1):
+                    spans.append([a_, b_, "cable"])
+                else:
+                    ln.notes.append(f"{ln.name}: {G_:.0f} m without a support from {a_:g} m "
+                                    f"along it")
+                    spans.append([a_, b_, "gap"])
+            elif G_ > TRUSS_OVER * span:
+                spans.append([a_, b_, "truss"])
+        if mode == "sky_tube":
+            self._masts(ln, T_, sorted(placed), carriers)
+        return len(placed), sorted(spans)
+
+    def _gaps(self, T_, placed: list, carriers: list, longest: float) -> list:
+        """The unsupported stretches between successive supports and carriers (a carrier
+        carries its own stretch); an open line's ends as if supported half the longest span
+        past them (an end overhangs at most that)."""
+        L = T_.L
+        anchors = sorted(placed + [c0 for c0, _ in carriers] + [c1 for _, c1 in carriers])
+        if not T_.closed:
+            anchors = [-longest / 2.0] + anchors + [L + longest / 2.0]
+        if not anchors:
+            return [(0.0, L)]
+        pairs = list(zip(anchors, anchors[1:]))
+        if T_.closed:
+            pairs.append((anchors[-1], anchors[0] + L))
+        return [(a, b) for a, b in pairs if b - a > 0.01 and
+                not any(c0 - 0.01 <= a and b <= c1 + 0.01 for c0, c1 in carriers)]
+
+    def _carriers(self, ln: Line, T_) -> list[tuple[float, float]]:
+        """Stretches of the track carried by something else: inside a portal tower (and its
+        sky station), on the ground (underside at most GROUND_TOP_M up), on a sky
+        station's elevator core."""
+        out = []
+        bld = {b.id: b for b in self.c.blds}
+        arr = shapely.points(np.array(ln.pts, dtype=np.float64))
+        for bid in sorted(ln.portals):
+            b = bld.get(bid)
+            if b is None:
+                continue
+            ins = np.nonzero(shapely.covers(b.poly, arr))[0].tolist()
+            for i0, i1 in _runs(ins):
+                out.append((T_.cum[i0], T_.cum[i1]))
+        low = [i for i, z in enumerate(ln.zs) if z - below(ln.mode) <= GROUND_TOP_M]
+        for i0, i1 in _runs(low):
+            out.append((T_.cum[i0], T_.cum[i1]))
+        # a transit nexus's platform (a megasite element) right under the track
+        for e in self.c.m.site_elements:
+            if e.kind != "platform" or e.footprint is None or not e.masses:
+                continue
+            fp = G.from_model_poly(e.footprint)
+            top = max(ms.z1_m for ms in e.masses)
+            ins = [i for i in np.nonzero(shapely.covers(fp, arr))[0].tolist()
+                   if abs(ln.zs[i] - below(ln.mode) - top) <= 3.0 or
+                   abs(ln.zs[i] - top) <= 3.0]
+            for i0, i1 in _runs(ins):
+                out.append((T_.cum[i0], T_.cum[i1]))
+        for _a, _b, kind, core in self.platforms.get(ln.id, []):
+            if core is not None:
+                out.append((max(core - 5.0, 0.0), min(core + 5.0, T_.L)))
+        out.sort()
+        merged: list = []
+        for c0, c1 in out:
+            if merged and c0 <= merged[-1][1] + 0.01:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], c1))
+            else:
+                merged.append((c0, c1))
+        return [(q(c0), q(c1)) for c0, c1 in merged]
+
+    def _place(self, ln: Line, T_, keep: "Keep", x: float, move: float,
+               carriers: list) -> float | None:
+        """A support near x along the line (within `move`): a column under the line at
+        the nearest free point (a pier in the water clear of the channel), else a portal
+        frame or a cantilever bent at the nearest point where one stands. Returns where it
+        stands along the line, None where nothing does."""
         mode = ln.mode
         size = COLUMN_M[mode]
-        for off in (0.0, 6.0, -6.0, 12.0, -12.0):
-            i, p = _at(ln.pts, cum, s + off)
-            f = 0.0 if cum[min(i + 1, len(cum) - 1)] == cum[i] else \
-                (s + off - cum[i]) / (cum[min(i + 1, len(cum) - 1)] - cum[i])
-            z = ln.zs[i] + (ln.zs[min(i + 1, len(ln.zs) - 1)] - ln.zs[i]) * min(max(f, 0), 1)
-            top = z - below(mode)
-            if top <= 1.0:
-                return 0
-            spots = self._column_spots(p, segs, mode)
-            if spots and all(self._free(q_, size, gone, lanes, segs) for q_ in spots):
-                for j, q_ in enumerate(spots):
-                    sq = G.qpoly(Point(q_).buffer(size / 2.0, cap_style="square"))
-                    self.struct(f"{ln.id}.col{n0 + 1:04d}{'ab'[j] if len(spots) > 1 else ''}",
-                                "pylon" if mode in ("sky_tube", "maglev") else "column",
-                                0.0, top, footprint=sq,
-                                attrs={"line_id": ln.id, "mode": mode})
-                return 1
-        return 0
+        step = max(0.5, min(3.0, move / 12.0)) if move > 0 else 1.0
+        offs = [0.0]
+        k = 1
+        while k * step <= move + 1e-9:
+            offs += [k * step, -k * step]
+            k += 1
+        cands = []
+        for o in offs:
+            s = x + o
+            if not T_.closed and (s < 0.0 or s > T_.L):
+                continue
+            s = s % T_.L if T_.closed else s
+            if any(c0 - 0.01 <= s <= c1 + 0.01 for c0, c1 in carriers):
+                continue
+            cands.append(q(s))
+        if not cands:
+            return None
+        top = [T_.z(s) - below(mode) for s in cands]
+        P = np.array([T_.xy(s) for s in cands], dtype=np.float64)
+        # a column under the line (or a pier)
+        wet = keep.wet(P, size)
+        ok_col = keep.free(P, size, top, ln, cands) & ~wet
+        ok_pier = np.zeros(len(cands), bool)
+        if wet.any():
+            ok_pier = keep.free(P, size * PIER_SCALE, top, ln, cands) & wet & keep.pier_ok(P)
+        for j, s in enumerate(cands):
+            if top[j] <= GROUND_TOP_M:
+                continue
+            if ok_col[j] and keep.sidewalk_ok(P[j], size):
+                self._column(ln, T_, s, P[j], top[j], "column", size)
+                keep.add(P[j], size)
+                return s
+            if ok_pier[j]:
+                self._column(ln, T_, s, P[j], top[j], "pier", size * PIER_SCALE)
+                keep.add(P[j], size * PIER_SCALE)
+                return s
+        # a portal frame or a cantilever bent, across the line
+        for j, s in enumerate(cands):
+            if top[j] <= GROUND_TOP_M + CAP_M:
+                continue
+            got = self._frame(ln, T_, keep, s, top[j])
+            if got:
+                return s
+        return None
 
-    def _column_spots(self, p, segs, mode) -> list[tuple]:
-        """Where a support at p stands: in the median of the road under it, just inside both
-        curbs of a road without one (a bent; only where 1.8 m of the sidewalk stays clear
-        behind it), or at p off the roads."""
-        tree, lines, recs = segs
-        pt = Point(p)
+    def _column(self, ln: Line, T_, s: float, p, top: float, form: str, size: float) -> None:
+        self.nsup[ln.id] = self.nsup.get(ln.id, 0) + 1
+        n = self.nsup[ln.id]
+        sq = G.qpoly(Point(G.q(p[0]), G.q(p[1])).buffer(size / 2.0, cap_style="square"))
+        self.struct(f"{ln.id}.col{n:04d}", "pylon" if ln.mode in ("sky_tube", "maglev")
+                    else "column", 0.0, top, footprint=sq,
+                    attrs={"line_id": ln.id, "mode": ln.mode,
+                           "form": "mast" if ln.mode == "sky_tube" and form == "column"
+                           else form, "s_m": q(s)})
+
+    def _frame(self, ln: Line, T_, keep: "Keep", s: float, top: float) -> bool:
+        """A portal frame across the line at s (a column each side, the nearest free spot
+        within FRAME_REACH_M, a cap beam between their tops under the deck) or a cantilever
+        bent (one column within CANT_REACH_M, its arm reaching past the far side of the
+        deck): a cantilever first where its column stands within CANT_SHORT_M."""
+        mode = ln.mode
         size = COLUMN_M[mode]
-        hits = sorted(tree.query(pt, predicate="dwithin", distance=30.0).tolist())
-        on = []
-        for h in hits:
-            s = recs[h]
-            d = lines[h].distance(pt)
-            if d <= max(s.width_m, s.cross_section.total_width_m) / 2.0:
-                on.append((round(d, 3), s.id, h))
-        if not on:
-            return [p]
-        _, _, h = min(on)
-        s, line = recs[h], lines[h]
-        cs = s.cross_section
-        if cs.median_m >= size + 0.5:
-            return [G.qpoint(line.interpolate(line.project(pt)))]
-        out = []
-        for w in self.sw[2].get(s.id, []):
-            sw_line = LineString(w.line)
-            q_, n = _sidewalk_frame(sw_line, line, pt)
-            o = w.width_m / 2.0 - w.curb_m - size / 2.0
-            spot = (G.q(q_[0] + n[0] * o), G.q(q_[1] + n[1] * o))
-            if clear_of_sidewalk(w, o, size):
-                out.append(spot)
-        if len(out) < (1 if mode == "monorail" else 2):
-            return []
-        return out[:1] if mode == "monorail" else out
+        x, y = T_.xy(s)
+        nx, ny = T_.normal(s)
+        ds = np.arange(size / 2.0 + 0.5, FRAME_REACH_M + 0.01, LEG_STEP_M).tolist()
+        legs = {}
+        for side in (1.0, -1.0):
+            P = np.array([(x + nx * side * d, y + ny * side * d) for d in ds], dtype=np.float64)
+            P = np.round(P, 2)
+            tops = [top - CAP_M] * len(ds)
+            wet = keep.wet(P, size)
+            ok = keep.free(P, size, tops, ln, [s] * len(ds)) & (~wet | keep.pier_ok(P))
+            for j in np.nonzero(ok)[0].tolist():
+                if wet[j] or keep.sidewalk_ok(P[j], size):
+                    legs[side] = (ds[j], (float(P[j][0]), float(P[j][1])), bool(wet[j]))
+                    break
+        reach = WIDTH_M[mode] / 2.0 + 0.3
 
-    def _free(self, p, size, gone, lanes, segs) -> bool:
-        """Off the water, buildings, road decks, lanes and sidewalk clear paths."""
-        c = self.c
-        pt = Point(p)
-        sq = pt.buffer(size / 2.0, cap_style="square")
-        for poly, _, nav in c.water:
-            if poly.intersects(sq):
-                return False
-        if c.dtree is not None:
-            for i in c.dtree.query(pt, predicate="dwithin", distance=40.0).tolist():
-                if c.decks[i][0].distance(pt) < c.decks[i][1] + size / 2.0 + 0.5:
-                    return False
-        if not sidewalks_clear(self.sw, pt, size):
-            return False
-        if c.btree is not None:
-            for i in c.btree.query(pt, predicate="dwithin", distance=size).tolist():
-                if c.blds[i].id not in gone:
-                    return False
-        ltree, llines, lw = lanes
-        for i in ltree.query(pt, predicate="dwithin", distance=4.0 + size).tolist():
-            if llines[i].distance(pt) < lw[i] / 2.0 + size / 2.0:
-                return False
-        # M9: no footing on a road tunnel's box or open approach
-        if not hasattr(c, "_tunnels"):
-            boxes = [LineString([p_[:2] for p_ in t.line]).buffer(t.width_m / 2.0 + 1.0,
-                                                                 cap_style="flat")
-                     for t in c.m.tunnels if t.kind in ("immersed_tube", "cut_and_cover")]
-            c._tunnels = (shapely.STRtree(boxes), boxes) if boxes else None
-        if c._tunnels is not None and len(c._tunnels[0].query(sq, predicate="intersects")):
-            return False
-        return True
+        def arm(side):
+            d, p, _ = legs[side]
+            far = (G.q(x - nx * side * reach), G.q(y - ny * side * reach))
+            return [p, far]
+        opts = []
+        for side in sorted(legs, reverse=True):
+            if legs[side][0] <= CANT_SHORT_M:
+                opts.append(("cantilever", [side], arm(side)))
+        if len(legs) == 2:
+            opts.append(("frame", [1.0, -1.0], [legs[1.0][1], legs[-1.0][1]]))
+        for side in sorted(legs, reverse=True):
+            if CANT_SHORT_M < legs[side][0] <= CANT_REACH_M:
+                opts.append(("cantilever", [side], arm(side)))
+        for form, sides, line in opts:
+            if not keep.beam_ok(line, top, ln, s):
+                continue
+            self.nsup[ln.id] = self.nsup.get(ln.id, 0) + 1
+            n = self.nsup[ln.id]
+            cap = f"{ln.id}.cap{n:04d}"
+            for tag, side in zip("ab", sides):
+                _, p, in_water = legs[side]
+                sq = G.qpoly(Point(G.q(p[0]), G.q(p[1])).buffer(size / 2.0, cap_style="square"))
+                at = {"line_id": ln.id, "mode": mode, "form": form, "frame": cap, "s_m": q(s)}
+                if in_water:
+                    at["pier"] = True
+                self.struct(f"{ln.id}.leg{n:04d}{tag}", "pylon" if mode in ("sky_tube", "maglev")
+                            else "column", 0.0, top - CAP_M, footprint=sq, attrs=at)
+                keep.add(p, size)
+            self.struct(cap, "beam", top - CAP_M, top,
+                        line=[(G.q(p_[0]), G.q(p_[1]), top) for p_ in line],
+                        attrs={"line_id": ln.id, "mode": mode, "form": form, "frame": cap,
+                               "width_m": size, "deck_m": CAP_M, "s_m": q(s)})
+            return True
+        return False
+
+    def _masts(self, ln: Line, T_, placed: list, carriers: list) -> None:
+        """M19: a sky tube's pylons are cable-stayed masts: a mast MAST_RATIO of its longer
+        span over the tube's top, stays fanned to STAY_SHARE of each span (never past a
+        carrier)."""
+        recs = [r for r in self.structures if r["attrs"].get("line_id") == ln.id and
+                r["attrs"].get("form") == "mast"]
+        if not recs:
+            return
+        L = T_.L
+        anchors = sorted(placed + [c0 for c0, _ in carriers] + [c1 for _, c1 in carriers])
+        for r in recs:
+            s = r["attrs"]["s_m"]
+            k = bisect.bisect_left(anchors, s - 0.01)
+            prev = anchors[k - 1] if k > 0 else (anchors[-1] - L if T_.closed else 0.0)
+            nxt = anchors[k + 1] if k + 1 < len(anchors) else \
+                (anchors[0] + L if T_.closed else L)
+            back, ahead = max(s - prev, 0.0), max(nxt - s, 0.0)
+            z_top = T_.z(s) + above(ln.mode)
+            r["attrs"]["mast_top_m"] = q(z_top + max(MAST_MIN_M, MAST_RATIO * max(back, ahead)))
+            stays = []
+            for d in (-STAY_SHARE * back, STAY_SHARE * ahead):
+                t = s + d
+                if not T_.closed:
+                    t = min(max(t, 0.0), L)
+                px, py = T_.xy(t % L if T_.closed else t)
+                stays.append([px, py, q(T_.z(t % L if T_.closed else t) + above(ln.mode))])
+            r["attrs"]["stays"] = stays
+
+
+class _Dry(Builder):
+    """(M19) A builder without stations or walkways, for `_support_room`."""
+
+    def __init__(self, c: Ctx):
+        self.c = c
+        self.structures: list = []
+        self.platforms: dict = {}
+        self.nsup: dict = {}
 
 
 # ---------------------------------------------------------------------------
@@ -3575,6 +4393,46 @@ def _skybridge_hits(c: Ctx, lines: list) -> list[str]:
     return sorted(out)
 
 
+def _roof_hits(c: Ctx, lines: list, gone: set) -> dict:
+    """M19: the roof items a line passes within SIDE_PAD_M of in plan without clearing them
+    (a sky tube's axis SKY_CLEAR_M over them, an elevated deck's underside 2 m): building id
+    -> their indices."""
+    out: dict = {}
+    if c.btree is None:
+        return out
+    model = {b.id: b for b in c.m.buildings}
+    for ln in lines:
+        if ln.mode == "metro" or len(ln.pts) < 2:
+            continue
+        tr = LineString(ln.pts)
+        arr = shapely.points(np.array(ln.pts, dtype=np.float64))
+        reach = WIDTH_M[ln.mode] / 2.0 + SIDE_PAD_M
+        for i in sorted(c.btree.query(tr, predicate="dwithin", distance=reach + 30.0).tolist()):
+            b = c.blds[i]
+            if b.id in gone or not model[b.id].roof_items:
+                continue
+            for k, it in enumerate(model[b.id].roof_items):
+                r = math.hypot(it.size[0], it.size[1]) / 2.0
+                near = np.nonzero(shapely.dwithin(Point(it.position[0], it.position[1]), arr,
+                                                  reach + r))[0].tolist()
+                if not near:
+                    continue
+                z = min(ln.zs[j] for j in near)
+                top = it.position[2] + it.size[2]
+                clear = top + SKY_CLEAR_M <= z if ln.mode == "sky_tube" else                     top + 2.0 <= z - below(ln.mode)
+                if not clear and it.position[2] < z + 6.0:
+                    out.setdefault(b.id, set()).add(k)
+    return out
+
+
+def _blocked(c: Ctx, ln: Line) -> tuple:
+    """How blocked a routed line is, lower better: a leg without a route, the stops it
+    misses, the buildings in its corridor it cannot pass."""
+    return (1 if "route" in ln.conflicts else 0,
+            sum(1 for s in ln.stops if not _served(ln.pts, s)),
+            len(_corridor(c, ln, ln.pts, check_only=True)))
+
+
 def build(spec, m, fixed: dict | None = None) -> Out:
     """`fixed` (M10, a district regeneration): line name -> the old line's row; such a line
     keeps its track and heights, and the buildings now in its way go."""
@@ -3614,8 +4472,23 @@ def _build(spec, m, fixed: dict) -> Out:
             r = fx["attrs"].get("min_radius_m")
             ln.min_radius = INF if r is None else r
             ln.held = True
+            if ln.through and tl.mode == "sky_tube":
+                # (M19: the towers of its stations, as the old build chose them)
+                ln.hosts = frozenset(fx["attrs"].get("portals", []))
         else:
             route_line(c, ln)
+            if tl.mode == "sky_tube" and any(_blocked(c, ln)):
+                # M19: a tube that can neither pass a tower (not at a station) nor go round
+                # it: routed again, taking the towers it may out of its way
+                alt_ln = Line(ln.id, ln.name, ln.mode, ln.color, ln.loop, ln.alt, ln.z0,
+                              ln.through, cut=True)
+                alt_ln.stops = [st for st in (resolve_stop(c, name, tl.mode)
+                                              for name in tl.route) if st is not None]
+                route_line(c, alt_ln)
+                if _blocked(c, alt_ln) < _blocked(c, ln):
+                    ln = alt_ln
+                    ln.notes.append(f"{ln.name}: takes out the towers it can neither pass "
+                                    f"nor go round")
         T.stage(f"transit/{ln.id}/route", [ln.pts, round(ln.min_radius, 2)
                                            if ln.min_radius != INF else None])
         lines.append(ln)
@@ -3624,6 +4497,8 @@ def _build(spec, m, fixed: dict) -> Out:
     gone = set()
     for ln in lines:
         gone |= set(ln.removed)
+    # M19: a line's heights see the lines before it (a held line keeps its own)
+    others = [track_rec(ln) for ln in lines if ln.held]
     for ln in lines:
         if ln.held:
             # M10: the old track and heights; a portal that no longer fits goes, and what is
@@ -3637,14 +4512,22 @@ def _build(spec, m, fixed: dict) -> Out:
             ln.conflicts = [x for x in ln.conflicts if x == "route"]
             notes += ln.notes
             continue
-        profile(c, ln, gone)
+        profile(c, ln, gone, others)
         for _ in range(40):
             if not _fit_portals(c, ln):
                 break
-            profile(c, ln, gone)
+            profile(c, ln, gone, others)
         ln.conflicts = [x for x in ln.conflicts if x == "route"] + clearance_conflicts(
             c, ln, gone)
         notes += ln.notes
+        others.append(track_rec(ln))
+    lane_lines = [LineString([p[:2] for p in x.centerline]) for x in m.lanes]
+    lanes = (shapely.STRtree(lane_lines), lane_lines, [x.width_m for x in m.lanes])
+    sw = sidewalk_index(m)
+    # M19: the low buildings that alone keep a line's supports off it go
+    _support_room(c, lines, gone, lanes, sw,
+                  [G.from_model_poly(x.footprint) for x in m.structures
+                   if x.footprint is not None and x.z0_m < 0.5])
     T.stage("transit/profiles", [[ln.id, ln.zs] for ln in lines])
     sky_gone = set(_skybridge_hits(c, lines)) | {s.id for s in m.skybridges
                                                   if set(s.building_ids) & gone}
@@ -3663,15 +4546,25 @@ def _build(spec, m, fixed: dict) -> Out:
                  b.entrances[0] if b.entrances else None)
         if e is not None:
             ent[b.id] = (e.position[0], e.position[1])
-    seg_recs = [s for s in m.road_segments if not s.bridge]
-    seg_lines = [LineString(s.centerline) for s in seg_recs]
-    segs = (shapely.STRtree(seg_lines), seg_lines, seg_recs)
-    lane_lines = [LineString([p[:2] for p in x.centerline]) for x in m.lanes]
-    lanes = (shapely.STRtree(lane_lines), lane_lines, [x.width_m for x in m.lanes])
-    tl_rows, supports = [], {}
+    B.tracks = [track_rec(ln) for ln in lines if ln.mode != "metro"]
+    tl_rows, supports, spans = [], {}, {}
+    st_ids_of = {ln.id: B.stations_of(ln, bld, ent, gone) for ln in lines}
     for ln in lines:
-        st_ids = B.stations_of(ln, bld, ent, gone)
-        supports[ln.id] = B.line_structures(ln, gone, segs, lanes)
+        B.line_structures(ln)
+    # M19: the supports, once every station stands (they keep off its feet)
+    ground = [G.from_model_poly(x.footprint) for x in m.structures
+              if x.footprint is not None and x.z0_m < 0.5]
+    ground += [G.from_model_poly(r["footprint"]) for r in B.structures
+               if r.get("footprint") is not None and r["z0_m"] < 0.5]
+    ground += [LineString([p[:2] for p in line3]).buffer(width / 2.0 + 0.3)
+               for kind, line3, width, _ in B.new
+               if kind in ("stairs", "elevator", "escalator") and line3]
+    keep = Keep(c, gone, lanes, B.sw, B.tracks, ground)
+    for ln in lines:
+        supports[ln.id], spans[ln.id] = B.supports_of(ln, keep)
+    notes += [x for ln in lines for x in ln.notes if x not in notes]
+    for ln in lines:
+        st_ids = st_ids_of[ln.id]
         L = _plen(ln.pts)
         grades = [abs(ln.zs[k + 1] - ln.zs[k]) / max(_d(ln.pts[k], ln.pts[k + 1]), 1e-9)
                   for k in range(len(ln.pts) - 1)]
@@ -3686,7 +4579,8 @@ def _build(spec, m, fixed: dict) -> Out:
                       "stop_vertices": ln.stop_at,
                       "removed_buildings": sorted(set(ln.removed)),
                       "portals": sorted(ln.portals), "conflicts": sorted(set(ln.conflicts)),
-                      "through_towers": ln.through, "supports": supports[ln.id]}})
+                      "through_towers": ln.through, "supports": supports[ln.id],
+                      "spans": spans[ln.id]}})
     # ground walkways split at the station feet, then the new walkways
     walks = _split(walks, B.gi, B.glines, B.splits)
     k = wk_max(walks)
@@ -3710,13 +4604,19 @@ def _build(spec, m, fixed: dict) -> Out:
         for bid, (z0, z1) in sorted(ln.portals.items()):
             portals.setdefault(bid, []).append({"line_id": ln.id, "z0_m": z0, "z1_m": z1,
                                                 "station": ln.id in station_at.get(bid, ())})
+    roof = _roof_hits(c, lines, gone)
     buildings = []
     for b in m.buildings:
         if b.id in gone:
             continue
-        if b.id in portals:
+        if b.id in portals or b.id in roof:
             d = b.model_dump(mode="json")
-            d["portals"] = list(d.get("portals") or []) + portals[b.id]
+            if b.id in portals:
+                d["portals"] = list(d.get("portals") or []) + portals[b.id]
+            if b.id in roof:
+                # M19: the roof items a line passes too close over go
+                d["roof_items"] = [it for k, it in enumerate(d["roof_items"])
+                                   if k not in roof[b.id]]
             buildings.append(d)
         else:
             buildings.append(b)
