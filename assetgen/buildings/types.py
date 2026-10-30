@@ -597,7 +597,8 @@ def shed_mass(sb, ms) -> bool:
     if ms.get("roof"):
         RF.build_form(sb, ms, "hangar")
     sb.mass_info.append({"mass": ms["k"], "group": "body", "system": None, "rows": 0,
-                         "openings": 0, "open": True})
+                         "openings": 0, "open": True,
+                         "under_m": round((top - slab) / 1000.0, 3)})
     # its doors are open sides: a record at every entrance, for the access check
     for k, en in enumerate(sb.br["entrances"]):
         at = en.get("at")

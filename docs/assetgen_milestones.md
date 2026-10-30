@@ -685,8 +685,9 @@ complex families' check and the art-direction loop, in the shell builder's passe
   open; what to change in the spec for what one sees), `assetgen spec diff A B`; the
   skill's step 6 runs the rounds.
 
-GEN_VERSION "ag5.0", GENOME_VERSION 5; briefs unchanged on flat ground (a hilly city's
-briefs gain `terrain`, BRIEF_VERSION stays 2).
+GEN_VERSION "ag5.0" (ag5.1 since the Unreal check's open shed fix), GENOME_VERSION 5;
+briefs unchanged on flat ground (a hilly city's briefs gain `terrain`, BRIEF_VERSION stays
+2).
 
 **Exporter** (`docs/unreal_export.md`, "From AG5"): a hero's building entry carries `hero`
 (kind, accent) and a `materials` map of its own (`<slot or era material>#<id>`: its U2 mask
@@ -699,8 +700,18 @@ textured masters `HeroMask` (sampled on UV1) and `HeroMaskOn` (0 by default) aft
 surface (`HERO_CODE`: grime darkens, leaks stain, wear lightens), `STAGE2_VERSION` 6. The
 buildings' hulls are notched at the landing doors (no exporter change: convex pieces as
 before). Tested without Unreal by `test_stage2_heroes_and_plinths`; the Blender preview
-draws the same (`ag6_materials._hero` on `UVMap.001`). Unreal check: the coordinating
-session's call (`docs/progress/AG5/README.md` lists what to look at).
+draws the same (`ag6_materials._hero` on `UVMap.001`). Unreal check
+(`docs/progress/AG5/unreal/`): Cragmouth and Greyhook imported and imported again; the
+megatower and the wheel tagged `cg.hero=` with the mask on UV1 and `HeroMaskOn` 1, the
+masters at `STAGE2_VERSION` 6, no other building with it on; Cragmouth's plinths meet the
+terrain (732 of 976 corners at the wall, 210 buried uphill, 30 floating over a lower street);
+landing doors open 2.5 m in (332 of 340 in Greyhook); open sheds' hulls blocked the walk
+under the roof, fixed there (an open shed collides from its roof's underside, GEN_VERSION
+ag5.1). Open from it: Cragmouth's 63,700 Nanite meshes overrun Unreal's root pages on the
+Mac, so it cannot be played as exported; doors on slopes behind M13's retaining walls
+(Greyhook's doors 1,989 of 2,000 at grade, Cragmouth's 325 of 710); the sky platforms beside
+a tower have no collision; station platforms inside their tower's hull and garage mouths as
+in AG4.
 
 **Samples** (4 workers, 3 where the shared Mac was short of memory; every check passes in
 each: the fourteen building checks, AG7's streets, AG8's props, AG6's materials):
