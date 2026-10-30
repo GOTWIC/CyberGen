@@ -599,7 +599,9 @@ def _shared_podium(cx, gid, members, out, idx, n: int, steps, kind: str) -> bool
     recs = []
     for i, (t, c) in enumerate(rects):
         part = G.inter(region, MS.halfplane(fr, u_min=edges[i], u_max=edges[i + 1]))
-        ps = G.parts(part)
+        # (M21: the piece of the podium under its tower, not just the largest piece: a tower
+        # stood in the air over a podium cut in two)
+        ps = sorted(G.parts(part), key=lambda p: -G.area1(G.inter(p, t)))
         if not ps:
             return False
         Hi = BL.floors_in(H0 * steps[i], fh, lo, hi, cap) * fh

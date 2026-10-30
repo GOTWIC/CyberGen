@@ -216,6 +216,12 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
     frame = ST.Frame(old, district, dd.id, poly, {d.name: d.archetype for d in cur.districts},
                      pins=pins, keep_out=G.union(ground) if ground else None,
                      pin_buildings=pin_b, old_entry=d_old)
+    # M21: the old towers outside the district stay as they are; the new ones keep their
+    # forms apart from them (`buildout.select_forms`)
+    from . import building_checks as BC
+    frame.old_towers = [{"id": t.id, "property_id": t.property_id, "height": h, "c": c,
+                         "form": f, "band": band}
+                        for t, h, band, f, c in BC.towers(old) if t.district_id != dd.id]
     held = {ln.name: ln.model_dump(mode="json") for ln in old.transit_lines}
     O = old.model_dump(mode="json")
     new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,

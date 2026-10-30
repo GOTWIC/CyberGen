@@ -334,7 +334,9 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     secs["phase_b_cpu"] = round(sum(r.get("seconds", 0.0) for r in rb), 2)
     secs["phase_b_max"] = round(max((r.get("seconds", 0.0) for r in rb), default=0.0), 2)
     # M21: towers within 150 m never share a form and a height band
-    changes = select_forms([t for r in ra for t in r.get("towers", [])],
+    # (a district regeneration: the old towers outside it as they are, `edit.py`)
+    held = list(getattr(getattr(b, "frame", None), "old_towers", None) or [])
+    changes = select_forms([t for r in ra for t in r.get("towers", [])] + held,
                            [t for r in rb for t in r.get("towers", [])])
     n_re = rebuild(mapper, chunks, rb, changes)
     lap("forms")
@@ -387,8 +389,10 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     out.notes += site.notes
     lap("megasites")
     T.stage("megasites_m3", [[x["id"], len(x["member_ids"])] for x in out.megasites])
+    n_b = len(out.buildings)
     pinned_buildings(spec, b, out)
     frame_pins(b, out)
+    bridges_clear_of(out, out.buildings[n_b:])
     walks = [w.model_dump(mode="python") for w in m.walkways]
     out.landmasses = list(b.hydro.landmasses)
     out.walkways = link_entrances(out, walks)
@@ -551,6 +555,33 @@ def pinned_buildings(spec, b, out: Out) -> None:
             out.buildings.append(COLLECTIONS["buildings"].model_validate(row))
     out.notes.append(f"{sum(len(p.buildings) for p, _ in pins.values())} traced buildings "
                      "placed as drawn")
+
+
+def bridges_clear_of(out: Out, blds: list) -> None:
+    """The skybridges through a traced or pinned building (placed after the skybridges, which
+    do not see them) taken out."""
+    if not blds or not out.skybridges:
+        return
+    from .skybridges import DECK_M, deck_poly
+
+    masses = [(G.from_model_poly(ms.footprint), ms.z0_m, ms.z1_m) for x in blds
+              for ms in x.masses]
+    keep = []
+    for s in out.skybridges:
+        (ax, ay), (bx_, by) = s["line"][0], s["line"][-1]
+        L = math.sqrt((bx_ - ax) ** 2 + (by - ay) ** 2)
+        if L <= 0.6:
+            keep.append(s)
+            continue
+        na, da = ((bx_ - ax) / L, (by - ay) / L), (-(by - ay) / L, (bx_ - ax) / L)
+        deck = deck_poly((ax, ay), (bx_, by), na, da, s["width_m"])
+        z0, z1 = s["z_m"] - DECK_M, s["z_m"] + s["levels"] * s["level_height_m"]
+        if any(a < z1 - 0.01 and b_ > z0 + 0.01 and not G.apart(deck, p) and
+               G.area1(G.inter(deck, p)) > 1.0 for p, a, b_ in masses):
+            out.notes.append(f"skybridge {s['id']} through a traced building taken out")
+            continue
+        keep.append(s)
+    out.skybridges = keep
 
 
 def frame_pins(b, out: Out) -> None:

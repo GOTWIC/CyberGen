@@ -211,12 +211,12 @@ def crown_in(S: Shaft, crown: str, plate, z0: float, z1: float, turn: float = 0.
 
 
 def crown_up(S: Shaft, crown: str, plate, top: float, turn: float = 0.0,
-             shift=(0.0, 0.0)) -> None:
+             shift=(0.0, 0.0)) -> str:
     """The crown above the roof at `top`, up to the building's top: a halo on struts, a
-    mast or a spire on the plate's middle."""
+    mast or a spire on the plate's middle; the crown it built."""
     b, H = S.b, S.H
     if H - top < 1.0:
-        return
+        return "flat"
     cx, cy = plate.fr.ox, plate.fr.oy
     if crown == "halo":
         z0 = q(top + 3.0)
@@ -234,15 +234,15 @@ def crown_up(S: Shaft, crown: str, plate, top: float, turn: float = 0.0,
                            (1.0 - plate.hw, 0.0), (0.0, 1.0 - plate.hd)):
                 c = plate.fr.moved(du, dv)
                 put(b, None, top, z0, "strut", roof=False, poly=c.rect(-0.5, -0.5, 0.5, 0.5))
-            return
+            return "halo"
         crown = "mast"
     if crown == "mast":
         m = MS.Plate(MS.Frame(cx, cy, plate.fr.angle), 1.3, 1.3, 1.3)
         put(b, m, top, H, "mast", roof=False)
-        return
-    if crown == "spire" or H - top >= 1.0:
-        f = MS.Frame(cx, cy, plate.fr.angle)
-        put(b, None, top, H, "spire", roof=False, poly=f.rect(-1.5, -1.5, 1.5, 1.5))
+        return "mast"
+    f = MS.Frame(cx, cy, plate.fr.angle)
+    put(b, None, top, H, "spire", roof=False, poly=f.rect(-1.5, -1.5, 1.5, 1.5))
+    return "spire"
 
 
 # ---------------------------------------------------------------------------
@@ -763,7 +763,7 @@ def tower(b, form: str, plate, P: float, H: float, v: float, inner, room, rng,
     elif crown in ("tiers", "sloped", "cut"):
         crown = "flat"
     if crown in ACCESSORY:
-        crown_up(S, crown, tp, top, turn, sh)
+        crown = crown_up(S, crown, tp, top, turn, sh)
     if not b.masses[n_m:]:
         _rollback(b, n_m, n_r)
         return False

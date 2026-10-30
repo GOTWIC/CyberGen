@@ -164,7 +164,7 @@ def test_checks_catch_broken_forms(city):
     near["height_m"] = a["height_m"]
     near["form"]["band"] = a["form"]["band"]
     # a mass lifted off what holds it, and an arc moved off its footprint
-    lifted = next(b for b in data["buildings"] if len(b["masses"]) >= 2 and
+    lifted = next(b for b in data["buildings"] if len(b["masses"]) == 2 and
                   b["masses"][1]["z0_m"] > 1.0 and not b.get("level"))
     lifted["masses"][1]["z0_m"] += 3.0
     lifted["masses"][1]["z1_m"] += 3.0
