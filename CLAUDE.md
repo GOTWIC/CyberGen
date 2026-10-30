@@ -842,7 +842,10 @@ M18 (junctions and ramps, from the first run-through) is in place:
 - **Found on the new layouts:** M9's pedestrian underpasses keep their passage off column
   footings (`tunnels._underpasses`: a transit column in a highway's median); AG7's junction
   piece leaves out a sidewalk corner pad that would fold over an earlier one
-  (`walks._corners`).
+  (`walks._corners`); AG3's `Band.rehome` drops the ground windows a moved door takes the
+  place of (it looked for kind `window`, the windows are `win`, so a rehomed door never
+  found room among them: the small test city's new layout left a villa's entrance with no
+  door; `GEN_VERSION` ag5.2).
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

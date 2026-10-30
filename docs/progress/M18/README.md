@@ -114,6 +114,12 @@ covers them.
   embankments; a sidewalk corner pad that would fold over one drawn before it is left out
   (Nexus City's new layout has a junction whose corners crowd each other; `street_meshes`
   failed there with or without `edge_z`). AG7's street stage passes on all nine builds.
+- **AG3**: a door `Band.rehome` moves to another facade now takes the place of the ground
+  windows there, as documented (it filtered kind `window`; the windows are `win`): the
+  small test city's new layout put a villa's entrance on a 0.3 m wall between two chamfers,
+  and no door found room (`asset_access` failed). On the small city it also moves 64 doors
+  off neighbors' walls and 115 off flush spots. `GEN_VERSION` ag5.2; assetgen goldens
+  written again.
 - **Found on the new layouts**: an M9 underpass passage through a transit column's footing
   (Vesper Bay's first layout); the passage now keeps off column footings.
 

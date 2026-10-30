@@ -385,13 +385,13 @@ class Band:
                 own = [_quad(fa, o.a, o.b, o.depth) for o in ops
                        if o.depth > 0 and o.lo <= self.z0]
                 keep, self.boxes = self.boxes, [b for b in self.boxes if b not in own]
-                taken = [o for o in ops if o.kind != "window"]
+                taken = [o for o in ops if o.kind != "win"]
                 op = self._door(fa, k, en, t, taken, self._mounts(fa), True)
                 self.boxes = keep
                 if op is None or fa.cls((op.a + op.b) // 2, self.z0 + 1200) in INNER:
                     continue                   # (nor slid along the facade into one)
                 op.info["moved"] = True
-                ops[:] = sorted([o for o in ops if o.kind != "window" or not (
+                ops[:] = sorted([o for o in ops if o.kind != "win" or not (
                     o.a < op.b + GAP_MIN and o.b > op.a - GAP_MIN)] + [op], key=lambda o: o.a)
                 if op.depth > 0 and op.lo <= self.z0:
                     self.boxes.append(_quad(fa, op.a, op.b, op.depth))
