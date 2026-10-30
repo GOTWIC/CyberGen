@@ -35,6 +35,7 @@ from __future__ import annotations
 import math
 
 import shapely
+import shapely.ops
 from shapely.geometry import LineString, Point, Polygon, box
 
 from citygen import dmath as M
@@ -311,7 +312,6 @@ class _Deck:
         self.id = dk.id
         self.top, self.slab = float(dk.top_m), float(dk.slab_m)
         self.style = cx.style(dk.district_id)
-        self.filled = 0
         era = self.style["era"]
         self.soffit = "coffered" if era in COFFERED else "ribbed"
         self.rail = "glass" if era in GLASS_RAIL else "bars"
@@ -757,7 +757,8 @@ def _link_piece(cx: Ctx, D: _Deck, st, mk: str) -> Piece:
 # Make: the slab
 # ---------------------------------------------------------------------------
 
-def _hs(x0, y0, x1, y1, n):
+def _split(x0, y0, x1, y1, n):
+    """n + 1 points evenly from (x0, y0) to (x1, y1)."""
     return [(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n) for k in range(n + 1)]
 
 
@@ -903,7 +904,7 @@ def _edge(mesh: Mesh, inp: dict, R: Ref, top: float, sd: float, a, b, ma, mb, ki
     if L < 0.005:
         return
     n = 1 if R.level is not None else max(1, int(math.ceil(L / DRAPE_M)))
-    ps = _hs(a[0], a[1], b[0], b[1], n)
+    ps = _split(a[0], a[1], b[0], b[1], n)
     qs = [(x + (ma[0] + (mb[0] - ma[0]) * k / n) * t, y + (ma[1] + (mb[1] - ma[1]) * k / n) * t)
           for k, (x, y) in enumerate(ps)]
     for k in range(n):

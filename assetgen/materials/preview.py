@@ -152,7 +152,9 @@ def run(args, progress=None) -> dict:
     kinds = {"city", "city_full", "districts", "street", "deck"}
     views = PV.plan_views(man, cams, args.width, which & kinds)
     if "deck" in which and cams.get("deck"):
-        views.append(deck_view(man, cams["deck"], args.width))
+        from ..streets.ctx import Ground
+        ox, oy = cams["deck"]["origin"]
+        views.append(deck_view(man, cams["deck"], args.width, Ground(model).at(ox, oy)))
     named = [v for v in (args.views or []) if v not in kinds]
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
@@ -194,22 +196,31 @@ def run(args, progress=None) -> dict:
 
 
 DECK_R = 420.0          # the deck section's tiles: within this of its plane's middle
-DECK_SHIFT = 0.18       # its frame shifted up (a share of its width): the ground near the bottom
+DECK_LENS = 35.0        # its lens (the blockout's 22 mm shows mostly sky and nothing)
+DECK_ASPECT = 2.4       # and its frame's width over its height (a section is wide and low)
+DECK_FOOT_M = 3.0       # the ground this far over the frame's bottom
 
 
-def deck_view(man: dict, cut: dict, width: int) -> dict:
+def deck_view(man: dict, cut: dict, width: int, ground: float = 0.0) -> dict:
     """AG10: the section across the biggest M14 deck (the blockout's `deck` view), looking
     level along its plane's normal from the blockout's eye; the camera's near clip on the
-    plane cuts everything on its side (Blender hides what lies wholly there)."""
+    plane cuts everything on its side (Blender hides what lies wholly there), its frame
+    shifted up so the ground at the cut (`ground`) sits `DECK_FOOT_M` over its bottom."""
     ox, oy = cut["origin"]
     nx, ny = cut["n"]
     ex, ey, ez = cut["eye"]
+    ez += ground                               # (the blockout's eye is over flat ground)
     d = (ex - ox) * nx + (ey - oy) * ny
+    lens = DECK_LENS
+    w_at = 2.0 * d * 18.0 / lens               # (the frame's width at the cut: 36 mm sensor)
+    bottom = ez - w_at / (2.0 * DECK_ASPECT)   # (half its height under the eye)
+    shift = (ground - DECK_FOOT_M - bottom) / w_at
     tiles = sorted(t for t in man["tiles"] if _tile_near(t, (ox, oy), DECK_R))
-    return {"name": "deck", "ortho": False, "lens": cut["lens_mm"], "eye": [ex, ey, ez],
-            "target": [ex - nx * d, ey - ny * d, ez], "w": width, "h": int(width * 9 / 16),
+    return {"name": "deck", "ortho": False, "lens": lens, "eye": [ex, ey, ez],
+            "target": [ex - nx * d, ey - ny * d, ez], "w": width, "h": int(width / DECK_ASPECT),
             "shell_tiles": tiles, "section": {"origin": [ox, oy], "n": [nx, ny],
-                                              "clip": round(d, 3), "shift_y": DECK_SHIFT}}
+                                              "clip": round(d, 3),
+                                              "shift_y": round(shift, 4)}}
 
 
 def _tile_near(name: str, p, r) -> bool:

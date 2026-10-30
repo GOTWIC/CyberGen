@@ -1,0 +1,63 @@
+assetgen streets: Cragmouth: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 2757 blockout objects replaced
+  [ok] street_decks: 2 decks: 14 slab pieces, 495 columns, 8 stairs and elevators; lowest over a ground street 7.225 m (at least 5.5)
+  [ok] street_budgets: 1422677 triangles in the city (budget 20000000), at most 33080 in a tile (t-05+02, budget 2500000)
+
+coverage:
+  road_segments: 3307 of 3310 (+3 declared)
+  junctions: 1900 of 1900
+  crosswalks: 1392 of 1392
+  sidewalks: 4631 of 4631
+  bridges: 12 of 12
+  structures: 2266 of 2266
+  tunnels: 12 of 12
+  quays: 6 of 6
+  waterways: 5 of 6 (+1 declared)
+  site_elements: 298 of 298
+  decks: 2 of 2
+  transit_lines: 1 of 1
+  megasites: 2 of 2
+  stations: 7 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 13847, tiles 129, triangles 1422677, disk 96.9 MB
+triangles by kind:
+  street.sidewalk: 475446 (4631 pieces)
+  street.road: 273763 (3310 pieces)
+  street.junction: 218429 (1900 pieces)
+  street.structure.retaining_wall: 193308 (1660 pieces)
+  street.deck.slab: 96775 (14 pieces)
+  street.crosswalk: 43636 (1392 pieces)
+  street.quay: 37879 (6 pieces)
+  street.tunnel.metro: 35240 (6 pieces)
+  street.deck.column: 27108 (495 pieces)
+  street.site.rail_track: 4740 (2 pieces)
+  street.deck.stair: 4352 (4 pieces)
+  street.bridge: 2719 (12 pieces)
+  street.canal_wall.canal: 2188 (2 pieces)
+  street.underpass_stair: 1160 (10 pieces)
+  street.site.berth: 1074 (1 pieces)
+  street.column: 966 (71 pieces)
+  street.transit.canopy: 728 (14 pieces)
+  street.transit.deck: 580 (7 pieces)
+  street.site.container_stack: 556 (278 pieces)
+  street.canal_wall.basin: 384 (3 pieces)
+  street.deck.elevator: 336 (4 pieces)
+  street.tunnel.pedestrian: 320 (5 pieces)
+  street.tunnel.bored: 288 (1 pieces)
+  street.site.gantry_crane: 206 (1 pieces)
+  street.site.lawn: 178 (12 pieces)
+  street.site.pond: 94 (1 pieces)
+  street.site.truck_gate: 84 (1 pieces)
+  street.site.fountain: 58 (1 pieces)
+  street.structure.canopy: 52 (1 pieces)
+  street.site.plaza: 30 (1 pieces)
+  street.canal_wall.creek: 0 (1 pieces)
+no mesh: inside its junctions 3, natural banks 1
+corner pads: 5101 made, 16 skipped (no sidewalk 8, same edge 8)
+bridges: footbridge.steel 1, footbridge.stone 2, girder 9
+instances: part.container.c0 1113, part.container.c1 1050, part.container.c2 1132, part.container.c3 1106, part.container.c4 1058, part.container.c5 1098
+files: 129 tiles made, 0 kept, 11 written, 118 same bytes, 0 removed
+seconds: context 1.45, gather 2.33, make 4.15, write 0.31, total 8.87, workers 3
