@@ -5,8 +5,10 @@ one of its districts regenerated), with briefs; the goldens.
 which the citygen tests import by name.)
 """
 
+import atexit
 import copy
 import json
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -28,6 +30,8 @@ def small_build() -> Path:
         from assetgen.cli import main as ag
         from citygen.cli import main as cg
         d = Path(tempfile.mkdtemp(prefix="ag_small_"))
+        # (about 1.4 GB once its assets are built: removed when the test process ends)
+        atexit.register(shutil.rmtree, d, True)
         spec = write(d, copy.deepcopy(SMALL), "spec.json")
         assert cg(["build", str(spec), str(d / "base")]) == 0
         assert ag(["brief", str(d / "base"), "--no-preview"]) == 0

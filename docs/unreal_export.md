@@ -431,6 +431,45 @@ front and parts), and three things the exporter takes:
 - the connections part like any other: its folder `Assets/Connections/<tile>/`, its
   materials `connections.<slot>`.
 
+### From AG5: heroes, types and slopes
+
+`assetgen build` (AG5) adds the type generators, the landmark heroes, buildings on M13's
+slopes and complex families to the shells (no new entry, no new part). Three things reach
+the exporter:
+
+- **Heroes** (every landmark and M3's megasite wheel): the building entry carries
+  `hero` (`kind`: megatower, spire, arcology, ferris_wheel; `accent`) and a `materials`
+  map of its own. Every slot of a textured opaque master (`facade`, `metal`, `concrete`)
+  takes the material `<slot or era material>#<id>`, the slot's record with the hero's U2
+  mask: texture `city.hero.<id>` (`textures/hero/<id>.png`, 512 px, kind `mask`, not sRGB:
+  R grime, G leaks, B wear) as `HeroMask`, and `HeroMaskOn` 1. The hero's shell and front
+  carry TEXCOORD_1 on every non-glass slot in the hero UV (u the UV0's u over its longest
+  perimeter, v the height over the building's), where the mask is baked. Its light slots
+  (`hero_light`, `halo_light`) take its accent colour (`<slot>#<id>` again, with or without
+  the library):
+
+  ```json
+  {"key": "d01.lm.e152n1064.bld", "kind": "building", "hero": {"kind": "megatower",
+   "accent": "#39ff8a"}, "materials": {"wall": "wall@corporate_glass#d01.lm.e152n1064.bld",
+   "hero_light": "hero_light#d01.lm.e152n1064.bld"}, "...": "..."}
+  ```
+- **Plinths**: a building on M13's slopes carries `plinth_m`, how far its stepped plinth
+  reaches under its pivot (its base, `floor_grid.base_m`) to meet the ground; the plinth is
+  in the shell and the street front, stepped to the terrain along every wall (retaining
+  skirts where the hill stands against it).
+- **Collision**: a mass a skybridge lands on is cut into storeys at each landing door's
+  floor and head, and in the door's storey its hull has a notch the door's width and 2.5 m
+  deep, so a walk across the bridge steps through the door (`collision.VESTIBULE_MM`).
+
+**What the exporter does with them** (`citygen/unreal.py`, `citygen/ue/import_city.py`):
+- an entry's `hero` and `plinth_m` reach its actor (in its hash), tagged `cg.hero=<kind>`
+  and `cg.plinth=<m>`; `stage2.counts.heroes`;
+- the hero's materials and mask texture as any other (the mask among the city's textures,
+  `Assets/Textures`); the textured masters (`facade`, `metal`, `concrete`, `foliage`,
+  `road`) gain `HeroMask` (sampled on UV1) and `HeroMaskOn` (default 0) after their surface
+  (`HERO_CODE`: grime darkens, leaks stain, wear lightens); `STAGE2_VERSION` 6 rebuilds
+  them. Tested without Unreal by `test_stage2_heroes_and_plinths`.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -711,3 +750,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Greyhook rebuilt with it and imported over its AG6 import (16,054 sign, prop and plant actors updated, no shell or street actor; 4,329 new sign meshes, 8,150 renamed away; 39 new library textures), imported again (nothing changed, no HLOD rebuilt) and checked with shots: leaf cards masked up close, crowns full at 250 and 600 m, sign faces upright on their page cells, bark, painted cars and banded bollards; the holo-ads' faces on their page instances, blown out to white by day (a night shot is open); the prune of the renamed meshes stalled until the AG2 and AG6 Unreal check's fix (`docs/progress/AG6/unreal/`) |
 | AG2 and AG6 Unreal check | A building entry's `materials` reach its part instancers (the era walls on AG2's panels, concrete and plaster parts, per slot on the HISM); AG2's building parts get no collision (`collision: {"none": true}`, their instancers `NoCollision`: the building's simple collision covers its masses, and a body per instance, 1.3 million in Vesper Bay, stalled play; containers keep complex collision); every opaque or masked surface master is made with `used_with_nanite` as well as `used_with_instanced_static_meshes` (`usage_flags`; without it, instanced Nanite meshes drew the default material in play and recompiled at each launch, 272 warnings in Vesper Bay); `prune_meshes` keeps `Assets/Materials/` and `Assets/Textures/` (it deleted the city's sign pages after every import, under the instances that use them), and an instance whose texture parameters are empty is rebuilt (`own_textures`); a prune of more than 500 assets (`PRUNE_FILES`) deletes their package files itself on an empty level (`/Engine/Maps/Entry`): the stale packages unloaded, their files deleted, their folders scanned again by the asset registry, the city loaded again for the digests (`delete_files`; the editor's delete took over 90 minutes for the 8,435 meshes AG8 on AG6 renamed, 5 s now) | Greyhook imported again with these (10,617 part instancers updated to `NoCollision`, the 8,435 stale meshes deleted by their files in 5 s; then nothing changed, no HLOD rebuilt) and checked: 507 of 507 traces down, 35 of 36 roofs, 36 of 36 facades, 129 m walked, no usage flag warning in the log; Vesper Bay not imported again with them (its check before them failed: play at 12 to 14 s a frame, 157 of 507 traces down), an open item with the commands in `docs/progress/AG6/unreal/README.md` |
 | AG4 | Roofs and connections: roof equipment one entry per tile (`roofs.<tile>`, parts only, an instanced actor per mesh with a building id per instance, no collision as the AG2 and AG6 check's building parts); buildings' `replaces` the blockout green-roof objects their shells build; skybridges a part of their own (`unreal_contribution.connections.json`, `connections/<tile>.glb`, an entry per skybridge by id with complex collision); a stage 2 entry's `links` carried to its actor (in its hash) and tagged `cg.link=<link>` by the importer; tests without Unreal (`test_stage2_skybridge_links`, `test_stage2_takes_assetgen_roofs_and_skybridges`) | Not run (the coordinating session's call; what to look for: `docs/progress/AG4/README.md`) |
+| AG5 | Heroes, types and slopes: a hero's entry carries `hero` (kind, accent) and its own materials (`<slot>#<id>`: the U2 mask `city.hero.<id>` as `HeroMask` with `HeroMaskOn` 1 on the textured opaque masters, its accent on its lights), its shell's UV1 the hero UV; an entry's `hero` and `plinth_m` reach its actor (in its hash), tagged `cg.hero=` and `cg.plinth=`, `stage2.counts.heroes`; the textured masters sample `HeroMask` on UV1 (`STAGE2_VERSION` 6); the buildings' hulls notched at skybridge landing doors; test without Unreal (`test_stage2_heroes_and_plinths`) | Not run (the coordinating session's call; what to look for: `docs/progress/AG5/README.md`) |

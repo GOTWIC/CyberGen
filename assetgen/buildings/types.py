@@ -206,6 +206,9 @@ def mass(sb, ms) -> bool:
 
 
 def post(sb) -> None:
+    fo = getattr(sb, "form_override", None)
+    if fo and any((ms.get("roof") or {}).get("kind") == fo for ms in sb.roof_forms):
+        _count(sb, f"roof_{fo}")          # (a type's own roof form, as AG4 built it)
     dormers(sb)
     fn = POST.get(getattr(sb, "generator", "general"))
     if fn is not None:
