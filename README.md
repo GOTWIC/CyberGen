@@ -119,6 +119,12 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | ✅ Done |
 | M14 | Layered districts | Deck cities over the streets: upper streets, lots and buildings, ramps, stairs, elevators, light wells | ✅ Done |
 | M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | ✅ Done |
+| M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | Planned |
+| M17 | Road network repair | No stray dead ends, overlapping roads or bridges; roads clear of buildings | Planned |
+| M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps, crosswalks and signals only where they are needed | Planned |
+| M19 | Transit structures | Lines clear of buildings, supports under the track at even spans, more room over the streets | Planned |
+| M20 | Props, plants and signs | Nothing floating or growing through a road; many more large neon billboards and holo-boards on the sides and tops of buildings | Planned |
+| M21 | Cyberpunk massing | Twisted, tapered, leaning, stacked and cantilevered towers; smooth curves | Planned |
 
 ### Run it
 
@@ -333,6 +339,10 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Buildings and streets on stacked decks | Planned |
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
+| AG12 | Water | Real water: surfaces that flow and foam, beds, banks and beaches, swimming | Planned |
+| AG13 | Ground cover and grass | Textured ground with worn paths, grass and small plants that sway in the wind | Planned |
+| AG14 | Fit and finish | Smooth junctions and curved walls, everything resting on what it stands on, nothing through anything else | Planned |
+| AG15 | Cyberpunk facades and night | Window patterns beyond grids, mixed materials, every building lit its own way at night, lit streets | Planned |
 
 ---
 
