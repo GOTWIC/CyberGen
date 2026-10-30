@@ -1078,17 +1078,28 @@ def _ue_script(name, *defs):
 
 def test_check_frame_times_and_warm_shots():
     """The AG3 and AG4 Unreal check: the check's walk and flight report how long their frames
-    took (Vesper Bay's play ran at 12 to 14 s a frame before #54's fixes), and each editor
-    shot is rendered once small from its camera first, so Nanite has streamed the view's
-    pages in (a first render of a new view drew coarse clusters as big flat triangles over
-    the walls); a first import's few hundred unused variants are pruned by their files."""
-    ns = _ue_script("check_city.py", "frame_times", "frame_line", "WARM_S")
+    took (Vesper Bay's play ran at 12 to 14 s a frame before #54's fixes), its waits for
+    streaming do not list every actor every frame, roofs are traced on shells, and each
+    editor shot is rendered once small from its camera first, so Nanite has streamed the
+    view's pages in (a first render of a new view drew coarse clusters as big flat triangles
+    over the walls); a first import's few hundred unused variants are pruned by their
+    files."""
+    ns = _ue_script("check_city.py", "frame_times", "frame_line", "WARM_S", "LOAD_WAIT_S",
+                    "COUNT_EVERY_S")
     ft = ns["frame_times"]([0.0, 0.1, 0.2, 0.35, 1.35])
     assert ft == {"frames": 4, "median_s": 0.15, "p95_s": 1.0, "max_s": 1.0}
     assert ns["frame_times"]([5.0]) == {"frames": 0} and ns["frame_line"]([]) == ""
     assert "0.150 s (median)" in ns["frame_line"]([0.0, 0.1, 0.2, 0.35, 1.35])
     assert ns["WARM_S"] >= 2.0
+    # the wait for a spot to stream in lists the city's actors every COUNT_EVERY_S once the
+    # streaming query says done, not every frame (Vesper Bay: 6.5 s frames, its far spots
+    # never streamed in, 169 of 507 traces down)
+    assert ns["COUNT_EVERY_S"] >= 1.0 and ns["LOAD_WAIT_S"] >= 120.0
     src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    settle = src[src.index("def settle("):src.index("def teleport(")]
+    assert "time.time() >= due and streamed(world, at) is not False" in settle
+    # roofs and facades are traced on shells, not on part instancers (no collision) or fronts
+    assert 'not tag(a, "cg.type").startswith("part.")' in src
     assert src.count('"frame_time": frame_times(ticks)') == 2
     assert "take_high_res_screenshot(960, 540, warm, cam)" in src
     assert _ue_script("import_city.py", "PRUNE_FILES")["PRUNE_FILES"] <= 100

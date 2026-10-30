@@ -36,7 +36,8 @@ import unreal
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 T0 = time.time()
 RES = {"ok": False, "lines": [], "checks": {}}
-LOAD_WAIT_S = 60.0
+LOAD_WAIT_S = 180.0  # the longest wait for a spot to stream in
+COUNT_EVERY_S = 2.0  # how often that wait lists the city's actors in the play world
 WALK_M = 120.0
 WALK_S = 60.0
 MAX_GRADE = 0.3     # steepest leg the walk takes (a road's is at most 12%)
@@ -352,14 +353,19 @@ def streamed(world, at=None, radius_m=150.0):
 
 def settle(world, slug, timeout=LOAD_WAIT_S, at=None):
     """Wait until World Partition has finished streaming (around `at` when given) and the
-    number of city actors in the game world stops changing."""
-    t, last, stable = time.time(), -1, 0
+    number of city actors in the game world stops changing. The actors are listed once the
+    streaming query says done and then every COUNT_EVERY_S, not every frame: a list of 45,000
+    takes the game thread seconds, and listed every frame Vesper Bay's play ran at 6.5 s a
+    frame, too few frames for the cells around a teleport to stream in before the wait ended."""
+    t, last, stable, due = time.time(), -1, 0, 0.0
     while time.time() - t < timeout:
-        n = len(city_actors(world, slug))
-        stable = stable + 1 if n == last else 0
-        last = n
-        if n > 0 and stable >= 30 and streamed(world, at) is not False:
-            break
+        if time.time() >= due and streamed(world, at) is not False:
+            n = len(city_actors(world, slug))
+            stable = stable + 1 if n == last else 0
+            last = n
+            if n > 0 and stable >= 2:
+                break
+            due = time.time() + COUNT_EVERY_S
         yield
     return last
 
@@ -468,7 +474,11 @@ def collision(world, pawn, man, slug):
                 down["by_category"][c] = down["by_category"].get(c, 0) + 1
             todo, first = left, False
         here = ue(x0, y0, 0.0)
-        blds = [a for a in city_actors(world, slug) if tag(a, "cg.category") == "building"]
+        # (the buildings' shells: not their part instancers, which have no collision, nor
+        # their street fronts, AG3's ground bands)
+        blds = [a for a in city_actors(world, slug) if tag(a, "cg.category") == "building"
+                and not tag(a, "cg.type").startswith("part.")
+                and tag(a, "cg.type") != "building.front"]
         blds.sort(key=lambda a: (a.get_actor_bounds(False)[0] - here).length())
         for a in blds[:12]:
             o, e = a.get_actor_bounds(False)
