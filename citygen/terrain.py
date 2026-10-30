@@ -46,6 +46,7 @@ SITE_BAND_M = 60.0      # a megasite likewise
 STEP_M = 10.0           # stations along a road for the grade fit
 LEVEL_GRADE = 0.02      # M18: a primary road's grade line over a junction and 10 m past it
 LEVEL_SLOPE_MAX = 0.04  # ... where the natural ground at the junction is no steeper than this
+LEVEL_DEV_MAX = 4.0     # ... and its grade line, without the runs, within this of that ground
 MAX_GRADE = {"highway": 0.06, "avenue": 0.08, "street": 0.12, "alley": 0.15,
              "service": 0.12, "pedestrian": 0.15, "footbridge": 0.15}
 EMBANK_SLOPE = 1.5      # embankments 1:1.5 (run per rise)
@@ -682,91 +683,128 @@ def grade(spec, segments, nodes, nat: Field, water=None, held: dict | None = Non
     held = held or {}
     level = dict(level or {})
     # (M18: a primary road holds a junction's run only where the natural ground there is
-    # gentle; on a steeper hill it keeps its grade through, and the junction its surface)
+    # gentle; on a steeper hill it keeps its grade through, and the junction its surface; a
+    # local road at a junction with a primary road takes its height from it, as in M13)
     seg_of = {s["id"]: s for s in segments}
     npos = {n["id"]: tuple(n["position"][:2]) for n in nodes}
+    prim = {n for s in segments if s["road_class"] in PRIMARY or _ramp(s)
+            for n in (s["start"], s["end"])}
     for k in sorted(level):
         s = seg_of.get(k[0])
-        if s is not None and (s["road_class"] in PRIMARY or _ramp(s)) and k[1] in npos and \
-                float(nat.slope_many(np.array([npos[k[1]][0]]),
-                                     np.array([npos[k[1]][1]]))[0]) > LEVEL_SLOPE_MAX:
+        if s is None or k[1] not in npos:
+            continue
+        if not (s["road_class"] in PRIMARY or _ramp(s)):
+            if k[1] in prim:
+                del level[k]
+        elif float(nat.slope_many(np.array([npos[k[1]][0]]),
+                                  np.array([npos[k[1]][1]]))[0]) > LEVEL_SLOPE_MAX:
             del level[k]
     node_pos = {n["id"]: tuple(n["position"][:2]) for n in nodes}
     cross = crossings(segments)
-    vid: dict = {}
-    pos: list[tuple[float, float]] = []
 
-    def vertex(key, xy):
-        if key not in vid:
-            vid[key] = len(pos)
-            pos.append(xy)
-        return vid[key]
+    def solve(level):
+        """The grade lines with these level runs: (elevation per vertex, vertex ids,
+        chains)."""
+        vid: dict = {}
+        pos: list[tuple[float, float]] = []
 
-    chains = {}
-    for s in segments:
-        line = [tuple(p) for p in s["centerline"]]
-        cum = _cum(line)
-        L = cum[-1]
-        n = max(1, int(math.ceil(L / STEP_M)))
-        stations = {round(L * k / n, 2): None for k in range(n + 1)}
-        for sx, key in cross.get(s["id"], []):
-            stations[sx] = key
-        for sx in _level_runs(s, round(L, 2), level):
-            stations.setdefault(sx, None)
-        ss = sorted(stations)
-        ch = []
-        for k, sv in enumerate(ss):
-            if k == 0:
-                v = vertex(("n", s["start"]), node_pos[s["start"]])
-            elif k == len(ss) - 1:
-                v = vertex(("n", s["end"]), node_pos[s["end"]])
-            elif stations[sv] is not None:
-                v = vertex(stations[sv], point_at(line, cum, sv))
-            else:
-                v = vertex(("s", s["id"], k), point_at(line, cum, sv))
-            ch.append((sv, v))
-        ss[-1] = L
-        chains[s["id"]] = ch
-    adj: list[list[tuple[int, int]]] = [[] for _ in pos]
-    for s in segments:
-        g = MAX_GRADE.get(s["road_class"], 0.12)
-        if _ramp(s):
-            g = MAX_GRADE["highway"]
-        zp = _zp(s.get("z_profile") or [])
-        ch = chains[s["id"]]
-        r0, r1 = _level_runs(s, ch[-1][0], level)
-        lg = LEVEL_GRADE if s["road_class"] in PRIMARY or _ramp(s) else 0.0
-        for (s0, a), (s1, b) in zip(ch, ch[1:]):
-            dz = abs(z_on(zp, s1) - z_on(zp, s0)) if zp else 0.0
-            cap = int(math.floor(max(0.0, g * (s1 - s0) - dz) * 100.0))
-            if s1 <= r0 or s0 >= r1:
-                # inside a junction and LEVEL_OUT_M past it: level (M18: a primary road at
-                # most LEVEL_GRADE)
-                cap = min(cap, int(math.floor(max(0.0, lg * (s1 - s0) - dz) * 100.0)))
-            adj[a].append((b, cap))
-            adj[b].append((a, cap))
-    tgt = [int(round(nat.at(x, y) * 100.0)) for x, y in pos]
-    for sid, prof in sorted(held.items()):
-        for sv, v in chains[sid]:
-            tgt[v] = int(round(z_on(prof, sv) * 100.0))
-    frozen = frozenset(v for sid in held for _, v in chains[sid])
-    hi = _lipschitz(len(pos), adj, tgt, frozen)
-    lo = _lipschitz(len(pos), adj, [-v for v in tgt], frozen)
-    if frozen:
-        # the held vertices bound the rest both ways (a held vertex takes no bound from its
-        # neighbors, so without this the envelopes would break the grade beside it)
-        big = 1 << 60
-        up = _lipschitz(len(pos), adj, [t if v in frozen else big for v, t in enumerate(tgt)])
-        dn = _lipschitz(len(pos), adj, [-t if v in frozen else big for v, t in enumerate(tgt)])
-        hi = [max(h, -d) for h, d in zip(hi, dn)]
-        lo = [max(lw, -u) for lw, u in zip(lo, up)]
-    e = [(h - lw) // 2 for h, lw in zip(hi, lo)]
-    elev = [v / 100.0 for v in e]
+        def vertex(key, xy):
+            if key not in vid:
+                vid[key] = len(pos)
+                pos.append(xy)
+            return vid[key]
+
+        chains = {}
+        for s in segments:
+            line = [tuple(p) for p in s["centerline"]]
+            cum = _cum(line)
+            L = cum[-1]
+            n = max(1, int(math.ceil(L / STEP_M)))
+            stations = {round(L * k / n, 2): None for k in range(n + 1)}
+            for sx, key in cross.get(s["id"], []):
+                stations[sx] = key
+            for sx in _level_runs(s, round(L, 2), level):
+                stations.setdefault(sx, None)
+            ss = sorted(stations)
+            ch = []
+            for k, sv in enumerate(ss):
+                if k == 0:
+                    v = vertex(("n", s["start"]), node_pos[s["start"]])
+                elif k == len(ss) - 1:
+                    v = vertex(("n", s["end"]), node_pos[s["end"]])
+                elif stations[sv] is not None:
+                    v = vertex(stations[sv], point_at(line, cum, sv))
+                else:
+                    v = vertex(("s", s["id"], k), point_at(line, cum, sv))
+                ch.append((sv, v))
+            ss[-1] = L
+            chains[s["id"]] = ch
+        # (M18: directed, a cm the ground may rise from one vertex to the next: the road's total,
+        # grade line plus z, within the class's grade, or the z profile's own where it climbs
+        # more; `rev` the same edges the other way, for the lower envelope)
+        adj: list[list[tuple[int, int]]] = [[] for _ in pos]
+        rev: list[list[tuple[int, int]]] = [[] for _ in pos]
+        for s in segments:
+            g = MAX_GRADE.get(s["road_class"], 0.12)
+            if _ramp(s):
+                g = MAX_GRADE["highway"]
+            zp = _zp(s.get("z_profile") or [])
+            ch = chains[s["id"]]
+            r0, r1 = _level_runs(s, ch[-1][0], level)
+            lg = LEVEL_GRADE if s["road_class"] in PRIMARY or _ramp(s) else 0.0
+            for (s0, a), (s1, b) in zip(ch, ch[1:]):
+                ds = s1 - s0
+                dz = (z_on(zp, s1) - z_on(zp, s0)) if zp else 0.0
+                gt = max(g * ds, abs(dz))
+                ab = int(math.floor(max(0.0, gt - dz) * 100.0))
+                ba = int(math.floor(max(0.0, gt + dz) * 100.0))
+                if s1 <= r0 or s0 >= r1:
+                    # inside a junction and LEVEL_OUT_M past it: level (M18: a primary road at
+                    # most LEVEL_GRADE)
+                    lv = int(math.floor(max(0.0, lg * ds - abs(dz)) * 100.0))
+                    ab, ba = min(ab, lv), min(ba, lv)
+                adj[a].append((b, ab))
+                adj[b].append((a, ba))
+                rev[b].append((a, ab))
+                rev[a].append((b, ba))
+        tgt = [int(round(nat.at(x, y) * 100.0)) for x, y in pos]
+        for sid, prof in sorted(held.items()):
+            for sv, v in chains[sid]:
+                tgt[v] = int(round(z_on(prof, sv) * 100.0))
+        frozen = frozenset(v for sid in held for _, v in chains[sid])
+        hi = _lipschitz(len(pos), adj, tgt, frozen)
+        lo = _lipschitz(len(pos), rev, [-v for v in tgt], frozen)
+        if frozen:
+            # the held vertices bound the rest both ways (a held vertex takes no bound from its
+            # neighbors, so without this the envelopes would break the grade beside it)
+            big = 1 << 60
+            up = _lipschitz(len(pos), adj,
+                            [t if v in frozen else big for v, t in enumerate(tgt)])
+            dn = _lipschitz(len(pos), rev,
+                            [-t if v in frozen else big for v, t in enumerate(tgt)])
+            hi = [max(h, -d) for h, d in zip(hi, dn)]
+            lo = [max(lw, -u) for lw, u in zip(lo, up)]
+        e = [(h - lw) // 2 for h, lw in zip(hi, lo)]
+        elev = [v / 100.0 for v in e]
+        return elev, vid, chains
+
+    # (M18: a primary road's run only where the grade lines without them stay near the
+    # natural ground at its junction: there the run's flat costs no cut or fill the limits
+    # feel, where the road is high over a valley or deep in a hill they would)
+    pkeys = {k for k in level if seg_of[k[0]]["road_class"] in PRIMARY or
+             _ramp(seg_of[k[0]])}
+    if pkeys:
+        elev, vid, chains = solve({k: v for k, v in level.items() if k not in pkeys})
+        for k in sorted(pkeys):
+            x, y = npos[k[1]]
+            if abs(elev[vid[("n", k[1])]] - nat.at(x, y)) > LEVEL_DEV_MAX:
+                del level[k]
+    elev, vid, chains = solve(level)
     ground = {sid: (list(held[sid]) if sid in held else [(sv, elev[v]) for sv, v in ch])
               for sid, ch in chains.items()}
     node_ground = {k[1]: elev[v] for k, v in vid.items() if k[0] == "n"}
     fin, walls, bores, viaducts, st = finish(spec, segments, ground, nat, water)
-    st["graph_vertices"] = len(pos)
+    st["graph_vertices"] = len(elev)
     st["crossings"] = sum(len(v) for v in cross.values()) // 2
     return Graded(ground, node_ground, fin, walls, bores, viaducts, st)
 

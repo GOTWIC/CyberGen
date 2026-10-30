@@ -89,6 +89,29 @@ def test_levelled_profile():
     new, ra, rb = JN._levelled([{"s": 0.0, "z": 0.0}, {"s": 40.0, "z": 2.0}], 40.0, 20.0,
                                20.0, 0.08)
     assert ra + rb == pytest.approx(40.0 - 2.0 / 0.08, abs=0.02)
+    # an end not held keeps its node's height: the hold at the other end shrinks instead
+    new, ra, rb = JN._levelled([{"s": 0.0, "z": 2.0}, {"s": 50.0, "z": 0.0}], 50.0, 40.0,
+                               0.0, 0.08)
+    assert JN._z_at(new, 0.0) == 2.0 and JN._z_at(new, 50.0) == 0.0
+    assert ra == pytest.approx(50.0 - 2.0 / 0.08, abs=0.02)
+
+
+def test_stranded_highway_goes_one_way():
+    """A two-way highway whose far node only has ramps leaving it (a trumpet's stem past its
+    flyover's landing): no lane can enter it there, so it carries the other way only."""
+    def seg(sid, a, b, pts, one_way=False):
+        return {"id": sid, "start": a, "end": b, "road_class": "highway", "one_way": one_way,
+                "centerline": pts, "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 100.0, "z": 1.0}],
+                "attrs": {}}
+    net = type("Net", (), {"segments": [
+        seg("stem", "a", "b", [(0.0, 0.0), (100.0, 0.0)]),
+        seg("r1", "b", "c", [(100.0, 0.0), (200.0, 50.0)], True),
+        seg("r2", "b", "d", [(100.0, 0.0), (200.0, -50.0)], True),
+        seg("tail", "e", "a", [(-100.0, 0.0), (0.0, 0.0)]),
+        seg("r3", "f", "a", [(0.0, -100.0), (0.0, 0.0)], True)]})
+    assert JN.one_way_stranded(net) == ["stem"]
+    stem = net.segments[0]
+    assert stem["one_way"] and (stem["start"], stem["end"]) == ("a", "b")
 
 
 def test_surface_meets_each_leg():

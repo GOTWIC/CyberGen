@@ -292,14 +292,17 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     out.nodes, out.segments, out.bridges = net.nodes, net.segments, net.bridges
     # (each junction's run along each leg's centerline out to its polygon's edge, which is
     # square to the leg's direction: longer than the cut where the leg bends inside it; M18:
-    # and LEVEL_OUT_M beyond, primary roads too)
+    # primary roads too, `terrain.grade` says where)
     for nid in sorted(jx["legs"]):
         lg = jx["legs"][nid]
         if len(lg) < 2 or (len(lg) == 2 and not any(x.cut > 0.0 for x in lg)):
             continue      # (no junction there)
         for x in lg:
-            r = min(max(JN.run_along(x, max(x.cut, x.cut_row)),
-                        jx["exits"].get((x.seg["id"], x.at_start), 0.0)) + JN.LEVEL_OUT_M,
+            # (M18: a primary road LEVEL_OUT_M past it too; a local road's run stays M13's:
+            # longer, the grade lines of a hillside's short streets go flat and its fills pass
+            # FILL_MAX_M, as Cragmouth showed)
+            r = min(JN.run_along(x, max(x.cut, x.cut_row)) +
+                    (JN.LEVEL_OUT_M if x.cls in ("highway", "avenue") else 0.0),
                     0.45 * x.L)
             k = (x.seg["id"], nid)
             if r > out.cuts.get(k, 0.0):

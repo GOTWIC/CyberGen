@@ -124,6 +124,24 @@ def _interchanges(m) -> list[tuple[str, str, list]]:
         -len(x[2]), x[0]))
 
 
+EMBANK = "#8a7a62"       # M18: retained fill under the low raised roads
+
+
+def _embankments(ax, m, box=None) -> None:
+    """M18: the embankments' footprints (under the roads, drawn over by them)."""
+    polys = []
+    for s in m.structures:
+        if s.kind != "embankment" or s.footprint is None:
+            continue
+        ring = np.asarray(s.footprint.exterior)
+        if box is None or (box[0] <= ring[:, 0].max() and ring[:, 0].min() <= box[2] and
+                           box[1] <= ring[:, 1].max() and ring[:, 1].min() <= box[3]):
+            polys.append(ring)
+    if polys:
+        ax.add_collection(PolyCollection(polys, facecolors=EMBANK, edgecolors=EMBANK,
+                                         linewidths=0.6, zorder=2.9))
+
+
 def render_elevated(b, out, dpi: int = 140) -> None:
     m = b.model
     x0, y0, x1, y1 = m.bounds
@@ -145,7 +163,8 @@ def render_elevated(b, out, dpi: int = 140) -> None:
                 f"{st['max_flyover_m']} m, " if st.get("flyovers") else "")
              + (f"{st['stack_ramps']} stack and turbine ramps up to {st['max_stack_m']} m, "
                 if st.get("stack_ramps") else "") +
-             f"{st.get('road_columns', 0)} columns; deck up to {st.get('max_deck_m', 0)} m; "
+             f"{st.get('road_columns', 0)} columns, {st.get('embankments', 0)} embankments; "
+             f"deck up to {st.get('max_deck_m', 0)} m; "
              f"{'checks PASS' if b.passed else 'checks FAIL'}", color=MUTED, fontsize=9,
              va="top")
     mh = map_w * H / W
@@ -156,6 +175,7 @@ def render_elevated(b, out, dpi: int = 140) -> None:
     ax.set_aspect("equal")
     ax.axis("off")
     _ground(ax, m)
+    _embankments(ax, m)
     _draw_roads(ax, m)
     _columns(ax, m, 1.2)
     ics = _interchanges(m)
@@ -174,7 +194,8 @@ def render_elevated(b, out, dpi: int = 140) -> None:
                Line2D([], [], color="#7ee0c3", lw=1.6, label="underpass street"),
                Line2D([], [], color="#e8e8f0", marker="o", lw=0, ms=4, mfc="none",
                       label="road under the deck"),
-               Line2D([], [], color="#e8e8f0", marker=".", lw=0, label="column")]
+               Line2D([], [], color="#e8e8f0", marker=".", lw=0, label="column"),
+               Line2D([], [], color=EMBANK, lw=4.0, label="embankment (raised road under 4.5 m)")]
     ax.legend(handles=handles, loc="lower left", fontsize=7.5, frameon=False, labelcolor=INK)
     sm = plt.cm.ScalarMappable(norm=Normalize(0.0, ZMAX), cmap=CMAP)
     cax = fig.add_axes([map_w / (map_w + side_w) + 0.05, 0.45, 0.2, 0.012])
@@ -199,6 +220,7 @@ def render_elevated(b, out, dpi: int = 140) -> None:
                 box[0] - 50 < b_.footprint.exterior[0][0] < box[2] + 50 and
                 box[1] - 50 < b_.footprint.exterior[0][1] < box[3] + 50]
         ax2.add_collection(PolyCollection(foot, facecolors=FOOT, edgecolors="none", zorder=1))
+        _embankments(ax2, m, box)
         _draw_roads(ax2, m, 3.0, box)
         _columns(ax2, m, 6.0, box)
         for s in rs:

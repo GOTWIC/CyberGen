@@ -451,9 +451,9 @@ def _bends(lg: Leg, c: float) -> bool:
 
 def classify(legs: list[Leg], arch: str | None) -> tuple[str, str, bool]:
     """(kind, shape, signal candidate). M18's candidates (`plan_signals` spaces them): two
-    primary roads meeting (`always`), a street meeting a primary road, a four-way street
-    crossing in SIGNAL_STREET_ARCH; never an interchange of highways alone (M7), nor an
-    alley or a service road meeting a road."""
+    primary roads meeting (always signalized), a street meeting a primary road, a four-way
+    street crossing in SIGNAL_STREET_ARCH; never an interchange of highways alone (M7), nor
+    an alley or a service road meeting a road."""
     veh = sorted([lg.cls for lg in legs if lg.cls in ST.VEHICLE],
                  key=lambda c: -ST.RANK[c])
     n = len(legs)
@@ -468,11 +468,6 @@ def classify(legs: list[Leg], arch: str | None) -> tuple[str, str, bool]:
     cand = n_p >= 3 or (n_p >= 1 and n_s >= 1) or \
         (n_p == 0 and n_s >= 4 and arch in SIGNAL_STREET_ARCH)
     return kind, shape, cand
-
-
-def _always(legs: list[Leg]) -> bool:
-    """Two primary roads meet (three primary legs or more): signals whatever is near."""
-    return sum(lg.cls in ST.PRIMARY for lg in legs) >= 3
 
 
 def spacing(arch: str | None, signals: str = "auto") -> float:
@@ -766,12 +761,12 @@ def _levelled(prof: list[dict], L: float, ra: float, rb: float, g: float,
     """A profile held at za (default: its start's height) over [0, ra] and at zb (its end's)
     over [L - rb, L] (0: not held), rejoining itself at grade g: the profile clamped between
     the cones of slope g from the held stretches (the median of the three keeps it within g
-    where it was). The holds shrink alike where their heights leave them no room (an end
-    given its height keeps its cone even then). Returns (profile, ra, rb)."""
-    fa, fb = bool(ra) or za is not None, bool(rb) or zb is not None
+    where it was). An end not held keeps its height too (a cone from it with no hold: the
+    hold at the other end cannot lift it off its node), and the holds shrink alike where the
+    two heights leave them no room. Returns (profile, ra, rb)."""
     za = _z_at(prof, 0.0) if za is None else za
     zb = _z_at(prof, L) if zb is None else zb
-    room = max(L - abs(za - zb) / g, 0.0) if fa and fb else L
+    room = max(L - abs(za - zb) / g, 0.0)
     if ra + rb > room:
         f = room / (ra + rb)
         ra, rb = ra * f, rb * f
@@ -781,13 +776,9 @@ def _levelled(prof: list[dict], L: float, ra: float, rb: float, g: float,
     out = []
     for s in ss:
         z = _z_at(prof, s)
-        lo, hi = -math.inf, math.inf
-        if fa:
-            d = max(0.0, s - ra)
-            lo, hi = max(lo, za - g * d), min(hi, za + g * d)
-        if fb:
-            d = max(0.0, L - s - rb)
-            lo, hi = max(lo, zb - g * d), min(hi, zb + g * d)
+        da, db = max(0.0, s - ra), max(0.0, L - s - rb)
+        lo = max(za - g * da, zb - g * db)
+        hi = min(za + g * da, zb + g * db)
         out.append((s, min(max(z, lo), hi)))
     from .elevated import compress
 
@@ -795,6 +786,12 @@ def _levelled(prof: list[dict], L: float, ra: float, rb: float, g: float,
 
 
 RAISE_MAX_M = 2.5       # M18: a junction raised at most this much to hold its legs level
+
+
+def _steepest(prof: list[dict]) -> float:
+    """The steepest grade of a z profile (both on the 1 cm grid: 1 cm of rounding)."""
+    return max(((abs(b["z"] - a["z"]) - 0.01) / (b["s"] - a["s"])
+                for a, b in zip(prof, prof[1:]) if b["s"] > a["s"]), default=0.0)
 
 
 def _changed(a: list[dict], b: list[dict]) -> bool:
@@ -850,6 +847,11 @@ def level_legs(net, legs: dict, gr, held=None, exits: dict | None = None) -> dic
         L = G.q(ST._plen([tuple(p) for p in s["centerline"]]))
         g = catch_grade(s, gr)
         best = None
+        if _steepest(prof) > g + 1e-4:
+            # (steeper than its catch-up grade somewhere already: the cones from its two
+            # ends could not both hold it)
+            runs[(s["id"], True)], runs[(s["id"], False)] = 0.0, 0.0
+            continue
         for xa, xb in dict.fromkeys(((ra, rb), (ra, 0.0), (0.0, rb))):
             if not (xa or xb):
                 continue
@@ -896,8 +898,7 @@ def level_legs(net, legs: dict, gr, held=None, exits: dict | None = None) -> dic
             near, far = (0.0, L) if x.at_start else (L, 0.0)
             if not fits(s, prof, s["z_profile"]) or abs(_z_at(prof, near) - top) > 0.01 or \
                     abs(_z_at(prof, far) - _z_at(s["z_profile"], far)) > 0.01 or \
-                    any((abs(b["z"] - a["z"]) - 0.01) / (b["s"] - a["s"]) > g + 1e-4
-                        for a, b in zip(prof, prof[1:]) if b["s"] > a["s"]):
+                    _steepest(prof) > g + 1e-4:
                 new = None
                 break
             new[k] = (prof, ra if x.at_start else rb)

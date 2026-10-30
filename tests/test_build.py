@@ -153,7 +153,9 @@ def test_small_city_passes(small_built):
                    "ground_grades", "cut_fill", "retaining_walls", "building_seats",
                    "water_levels",
                    # M17
-                   "road_dead_ends", "road_overlaps", "bridge_clash", "road_building_clash"}
+                   "road_dead_ends", "road_overlaps", "bridge_clash", "road_building_clash",
+                   # M18
+                   "ramp_grades", "junction_levels", "crossing_spacing"}
 
 
 def test_check_geometry_invalid(small_built):
