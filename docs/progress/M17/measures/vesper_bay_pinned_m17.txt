@@ -1,0 +1,44 @@
+== dead ends
+dead ends by class: {'highway': 8, 'street': 75, 'service': 14, 'alley': 27, 'pedestrian': 38}
+of them, another road within 60 m straight ahead: {'street': 9, 'service': 2, 'alley': 3, 'pedestrian': 31}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 12 Counter({'road': 9, 'pedestrian': 2, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1714 with a leg not at the node's height at the junction edge: 49 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 3
+   ('Corporate Core', True, True) 10
+   ('Highcrest', False, False) 146
+   ('Highcrest', True, True) 26
+   ('Launch Key', False, False) 3
+   ('Launch Key', False, True) 2
+   ('Launch Key', True, True) 2
+   ('Neon Strand', False, False) 421
+   ('Neon Strand', False, True) 1
+   ('Neon Strand', True, True) 72
+   ('Old Town', False, False) 705
+   ('Old Town', False, True) 1
+   ('Old Town', True, True) 95
+   ('Scholar Isle', False, False) 12
+   ('Scholar Isle', True, True) 11
+   ('The Stacks', False, False) 103
+   ('The Stacks', True, True) 57
+   ('Vess Docks', False, False) 23
+   ('Vess Docks', True, True) 20
+crosswalk widths: Counter({4.0: 976})
+junctions with crosswalks: 297 of them within 40 m of another: 175
+== signs
+Counter({('shop_sign', 'blade'): 10110, ('shop_sign', 'facade'): 3202, ('billboard', 'roof'): 1538, ('neon', 'facade'): 703, ('billboard', 'facade'): 305, ('holo_ad', 'roof'): 46})
+== transit supports
+  tl.halo_line elevated_rail: length 5937 m, supports 141, gap median 33 max 337 m, off the line max 12.9 m (>2 m: 47)
+  tl.launch_express maglev: length 946 m, supports 3, gap median 449 max 849 m, off the line max 9.2 m (>2 m: 1)
+  tl.crown_line sky_tube: length 2869 m, supports 22, gap median 60 max 612 m, off the line max 9.2 m (>2 m: 1)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 38

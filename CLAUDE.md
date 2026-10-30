@@ -760,7 +760,7 @@ M17 (road network repair, from the first run-through) is in place:
   it give the overlap to the junction it touches or their node's (`absorb_shared`). M13's
   grading still holds a junction's height at most 0.45 of a leg out (`Local.cuts`; M18
   levels junctions).
-- **Checks** (`network_checks.py`, 4 more): `road_dead_ends` (every dead end tagged, the tag
+- **Checks** (`network_checks.py`, 4 more, 90 in all, 95 on the deck sample): `road_dead_ends` (every dead end tagged, the tag
   true of where it is, a cul-de-sac with its bulb) and `road_overlaps` (rights of way of two
   roads within 4 m in height overlapping more than 25 m2 outside every junction polygon, the
   run-through's measure on the 1 cm grid: GEOS's floating overlay takes two corridors meeting

@@ -96,3 +96,71 @@ is its grade line plus its z profile, a building's masses stand on its base.
   wheel is measured under its rim, which is a circle, not the mass's lowest point.
 
 ## Before and after
+
+Builds on this Windows PC at each city's own seed, before (main at M15 plus the stage 1 fixes)
+and with M17 (`builds/M17/before`, `builds/M17/final`; the run-through's measure in
+`measures/`, the cities' reports, previews and 8K renders here). Dead ends and overlaps are
+the run-through's measure (`measure_runthrough.py`, which leaves out highway exits); tags from
+the model's `RoadNode.attrs.dead_end`.
+
+| City | Dead ends | With a road within 60 m ahead | Overlapping pairs | Full-city tries | Checks |
+|---|---|---|---|---|---|
+| Delta Megacity | 308 to 139 | 206 to 46 | 149 to 0 | 1 to 1 | 90 of 90 |
+| Saltreach Free Port | 175 to 68 | 154 to 51 | 85 to 1 (a GEOS float pair; 0 on the 1 cm grid) | 1 to 1 | 90 of 90 |
+| Nexus City | 405 to 156 | 306 to 74 | 194 to 0 | 1 to 1 | 90 of 90 |
+| Greyhook | 165 to 80 | 83 to 16 | 73 to 0 | 1 to 2 | 90 of 90 |
+| Vesper Bay | 380 to 152 | 246 to 38 | 130 to 0 | 1 to 1 | 90 of 90 |
+| Vesper Bay Pinned | 395 to 162 | 255 to 45 | 114 to 0 | 2 to 2 | 90 of 90 |
+| Vesper Bay Stacks | 412 to 138 | 257 to 29 | 110 to 0 | 1 to 2 | 90 of 90 |
+| Vesper Bay Decks | 357 to 158 | 248 to 68 | 134 to 0 | 2 to 6 | 95 of 95 |
+| Cragmouth | 406 to 116 | 279 to 43 | 147 to 0 | 1 to 2 | 90 of 90 |
+
+![Delta Megacity's dead ends and overlaps before and with M17](delta_dead_ends_overlaps.png)
+
+**Delta Megacity** (the run-through's city): 308 dead ends, 69 of them local streets running
+off the map and 239 inside it, none tagged, 206 with another road within 60 m straight ahead;
+now 139, every one tagged: 71 at the map edge (`map_edge`; with the 9 highway exits, 80), 23
+`water_end`, 20 `path_end`, 20 `cul_de_sac` with their bulbs, 5 `site_gate`. The 46 the
+measure still sees with a road ahead (31 paths, 11 streets, 4 alleys) are ones the run-on
+turned down (the road ahead takes no junction there, or the link would cross water, a park, a
+lot, a building or another road, or meet the roads at less than the district's junction
+angle); all of them tagged. 149 overlapping pairs (highway and
+avenue, avenue and street, street and street along each other) to 0. Bridges apart and roads
+clear of buildings before and after.
+
+Tags on the other cities (model nodes of degree 1, highway exits in `map_edge`): Saltreach 28
+water end, 17 path end, 17 cul-de-sac, 5 site gate, 1 map edge; Nexus 54 map edge, 35 water
+end, 31 path end, 27 cul-de-sac, 13 site gate, 2 park gate; Greyhook 31, 13, 3, 20, 17; Vesper
+Bay 93, 14, 18, 34, 7; Pinned 77, 17, 27, 40, 10; Stacks 87, 11, 12, 31, 7 and its traced
+crosstown's `traced_end`; Decks 78, 16, 25, 35, 8 and 12 `deck_end`; Cragmouth 66, 16, 12, 29,
+5 and a park gate (map edge, water end, path end, cul-de-sac, site gate).
+
+The run-through measure's other residue is its own: Saltreach's one pair is GEOS's floating
+overlay (0 on the 1 cm grid, the check's measure), Nexus City has one bridge pair over each
+other in plan 7 m apart in height (M7's clearance, which `bridge_clash` accepts), and Greyhook's
+five road and mass overlaps are the ferris wheel's box over the streets under its rim (the rim
+clears them; `road_building_clash` measures the rim).
+
+**Sweep** (`citygen sweep --suite m8a --extra 0`, each spec at its own seed, `sweep/`): 9 of 10
+before and 9 of 10 with M17; `test_minimal` fails `placement` in both. Greyhook takes a second
+layout salt (one try more); Vesper Bay Pinned passes on its second salt, as before.
+
+**Regeneration**: Vesper Bay's Old Town regenerates with every check passing (one reseed);
+`tests/test_edit.py` keeps every held road and junction outside the district (366 of 366).
+
+**Tries**: three cities take a try more (Greyhook, Vesper Bay Stacks, Cragmouth), Vesper Bay
+Decks four more (each of its first road network's four layout salts fails one or two checks;
+it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` by 0.1 m
+(18.1 m of fill), `retaining_walls` and two small `road_overlaps`, and passes on the second.
+
+## Open items
+
+- `tests/test_edit.py::test_regeneration_of_the_first_district_keeps_the_ones_after_it`: a
+  regeneration of the first district changes a few walkways far from it (an extra walkway link
+  between walkway islands, which the build links over the whole city); roads and junctions
+  outside the district are kept.
+- `tests/assetgen/data/golden_props.json` was not rewritten: its pack bytes differ on Windows
+  (known), so it wants `tests/assetgen/props_goldens.py --builds DIR` on the Mac.
+- Vesper Bay Stacks' traced crosstown ends 23 m up on M12's stack (tagged `traced_end`; M12's
+  as drawn).
+- Mac = x86 for the new goldens waits for the deferred determinism check.

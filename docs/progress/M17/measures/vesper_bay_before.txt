@@ -1,0 +1,49 @@
+== dead ends
+dead ends by class: {'highway': 2, 'avenue': 1, 'street': 197, 'service': 16, 'alley': 114, 'pedestrian': 50}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 108, 'service': 6, 'alley': 92, 'pedestrian': 39}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 130
+[(('avenue', 'street'), 68), (('street', 'street'), 17), (('highway', 'highway'), 12), (('highway', 'avenue'), 11), (('avenue', 'avenue'), 11), (('avenue', 'alley'), 3), (('street', 'alley'), 2), (('street', 'pedestrian'), 2)]
+   ('rs.e127n384', 'rs.e153n253', 'highway', 'highway', 301, 163, 179)
+   ('rs.e127n384', 'rs.e120n484', 'highway', 'highway', 299, 104, 590)
+   ('rs.e224n3', 'rs.e309s91', 'highway', 'avenue', 26, 308, -89)
+   ('rs.e224n3', 'rs.e330n106', 'highway', 'highway', 630, 192, 100)
+   ('rs.e224n3', 'rs.e163n126', 'highway', 'highway', 293, 170, 106)
+   ('rs.e163n126', 'rs.e330n106', 'highway', 'highway', 150, 170, 106)
+   ('rs.e399n996', 'rs.e271n802', 'highway', 'highway', 303, 260, 790)
+   ('rs.e318s607', 'rs.e318s607.2', 'highway', 'avenue', 44, 365, -681)
+== bridges
+bridges: 16 Counter({'road': 9, 'pedestrian': 6, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1651 with a leg not at the node's height at the junction edge: 53 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 36
+   ('Corporate Core', True, True) 63
+   ('Highcrest', False, False) 145
+   ('Highcrest', True, True) 23
+   ('Launch Key', False, False) 1
+   ('Launch Key', True, True) 3
+   ('Neon Strand', False, False) 341
+   ('Neon Strand', True, True) 82
+   ('Old Town', False, False) 663
+   ('Old Town', True, True) 94
+   ('Scholar Isle', False, False) 17
+   ('Scholar Isle', True, True) 7
+   ('The Stacks', False, False) 94
+   ('The Stacks', True, True) 29
+   ('Vess Docks', False, False) 27
+   ('Vess Docks', True, True) 26
+crosswalk widths: Counter({4.0: 1102})
+junctions with crosswalks: 327 of them within 40 m of another: 166
+== signs
+Counter({('shop_sign', 'blade'): 9838, ('shop_sign', 'facade'): 3365, ('billboard', 'roof'): 1286, ('neon', 'facade'): 659, ('billboard', 'facade'): 250, ('holo_ad', 'roof'): 50})
+== transit supports
+  tl.halo_line elevated_rail: length 7548 m, supports 199, gap median 32 max 381 m, off the line max 14.3 m (>2 m: 19)
+  tl.launch_express maglev: length 3508 m, supports 44, gap median 45 max 1088 m, off the line max 14.9 m (>2 m: 13)
+  tl.crown_loop sky_tube: length 2281 m, supports 13, gap median 76 max 639 m, off the line max 3.2 m (>2 m: 1)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 100
