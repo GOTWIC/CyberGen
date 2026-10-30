@@ -73,6 +73,21 @@ def test_deck_streets_pass_every_check():
     assert rep["coverage"]["decks"]["assets"] == rep["coverage"]["decks"]["entities"] == 1
 
 
+def test_deck_pieces_keep_a_full_fallback():
+    """AG10's Unreal check: the slab's complex collision came from a Nanite fallback without
+    its rail, so the deck's slab, stairs and elevators keep every triangle in it; other
+    street pieces as before."""
+    _streets()
+    base = _deck_city()[0]
+    con = json.loads((base / "assets" / "unreal_contribution.streets.json").read_text())
+    kinds = {}
+    for e in con["entries"]:
+        kinds.setdefault(e["kind"], set()).add(bool(e.get("fallback_full")))
+    for k in ("street.deck.slab", "street.deck.stair", "street.deck.elevator"):
+        assert kinds.get(k) == {True}, k
+    assert kinds["street.deck.column"] == {False} and kinds["street.road"] == {False}
+
+
 def test_the_slab_and_its_parts():
     man = _manifest()
     _, model, _ = _deck_city()
