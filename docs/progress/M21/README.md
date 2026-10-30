@@ -151,10 +151,12 @@ the bridges did not see, and a cluster tower standing beside its podium piece; b
 see Checks.)
 
 `assetgen build` on Vesper Bay and Delta: every check of every stage passes (buildings,
-streets, props, materials). Drawn simply for now (`shell._simple_mass`, until AG15 draws the
+streets, props, materials) but one in each, which main with M17 fails the same way (see
+Open: a sky station portal over a megabuilding's podium in Vesper Bay, a perimeter block's
+door in Delta); before M17 both passed every check. Drawn simply for now (`shell._simple_mass`, until AG15 draws the
 forms whole): the bands of twisted, tapered and leaning shafts and the masses off the ground
 curved all round (round towers and drums, ovals): the plate extruded, a spandrel and a ribbon
-of glass a floor; 594 masses in Vesper Bay, 1,186 in Delta. Rounded corners, blocks, links, cores, pods and
+of glass a floor; 695 masses in Vesper Bay, 1,293 in Delta. Rounded corners, blocks, links, cores, pods and
 frames take the full facade grammar, their curves as short facade edges.
 
 Images: `vesper_bay/` and `delta_megacity/` (`preview_massing.png`; 8K renders
