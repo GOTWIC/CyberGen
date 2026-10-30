@@ -739,19 +739,20 @@ M17 (road network repair, from the first run-through) is in place:
   A dead end reaching into another road's right of way is cut back clear of it (`_poke`; a
   primary road's dead end cuts the local road it reaches into, `_poked`); a local road laid
   along another (rights of way overlapping by `OVERLAP_M2` away from the nodes they share,
-  `_reach`) goes (`_overlaps`; also a primary piece inside another primary's right of way);
-  `fix_angles` runs again after the run-ons. `junctions.build` draws the bulbs from the tag.
+  `_reach`) goes (`_overlaps`); `fix_angles` runs again after the run-ons, and
+  `pedestrianize_islands` after the repair (a cut-back can leave a lane island). A cut-back
+  never takes a primary road (`_chain` stops at one); M1b is as it was (the sweep showed
+  that changing its forks and lenses moves every city's road search). `junctions.build`
+  draws the bulbs from the tag.
 - **Junctions** (`junctions.py`): each leg's cut reaches past where its right of way overlaps
   another leg's (`overlap_cuts`: an acute corner, a leg that bends in the junction, a gore);
   a road's two junctions share `CUT_SHARE` 0.9 of it by need (`share_cuts`, the old cap was
   0.45 a side); a leg that bends gets its band to the cut; a degree-2 node where two roads
   meet at an angle is a `bend` junction (`Junction.shape`, `bend_polygon`); where rights of way
   still overlap past the cuts (a fork, a crossing at a small angle, a corner with no room for
-  its fillet), the junction polygon takes the shared pavement (`shared_pavement`).
-- **M1b** (`roads.py`): `_drop_lenses` drops the lesser of two primary pieces between the
-  same nodes whose rights of way overlap all the way (a waterfront avenue laid along a
-  highway); `_merge_forks` also parts a fork whose rights of way overlap farther than a
-  junction's at `FORK_DEG` 45 degrees (the branch leaves square where they part).
+  its fillet), the junction polygon takes the shared pavement (`shared_pavement`); two
+  primary roads still sharing pavement past it (a fork that runs on past the next junction
+  of one of them) give the overlap to the junction it touches (`absorb_shared`).
 - **Checks** (`network_checks.py`, 4 more): `road_dead_ends` (every dead end tagged, the tag
   true of where it is, a cul-de-sac with its bulb) and `road_overlaps` (rights of way of two
   roads within 4 m in height overlapping more than 25 m2 outside every junction polygon, the
