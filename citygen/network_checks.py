@@ -89,7 +89,7 @@ def check_dead_ends(spec: CitySpec, m: CityModel):
     c = _check("road_dead_ends", "Every dead end is deliberate and says so (`dead_end`): at "
                                  "the map edge, a water end, a park, plaza or megasite gate, a "
                                  "path's end, a cul-de-sac with its turning bulb, a deck "
-                                 "street's end")
+                                 "street's end, a traced road's end")
     deg: dict = {}
     seg_at: dict = {}
     for s in m.road_segments:
@@ -121,7 +121,8 @@ def check_dead_ends(spec: CitySpec, m: CityModel):
             if water is None or water.distance(p) > reach:
                 c.failures.append(f"{where}: a water end away from the water")
         elif kind in ("park_gate", "plaza_gate", "site_gate"):
-            near = otree.query(p, predicate="dwithin", distance=reach) if otree else []
+            far = max(reach, ST.SITE_GATE_M + GATE_REACH_M) if kind != "park_gate" else reach
+            near = otree.query(p, predicate="dwithin", distance=far) if otree else []
             if not len(near):
                 c.failures.append(f"{where}: a {kind.replace('_', ' ')} with no open space, "
                                   "plaza or megasite at it")
@@ -134,6 +135,9 @@ def check_dead_ends(spec: CitySpec, m: CityModel):
         elif kind == "deck_end":
             if "deck" not in s.attrs:
                 c.failures.append(f"{where}: a deck street's end off a deck")
+        elif kind == "traced_end":
+            if s.attrs.get("role") != "pinned":
+                c.failures.append(f"{where}: a traced road's end on a road not traced")
     return c
 
 
@@ -222,9 +226,9 @@ def _bridge_parts(m: CityModel) -> list[tuple]:
 
 
 def check_bridge_clash(spec: CitySpec, m: CityModel):
-    c = _check("bridge_clash", "Road, pedestrian and transit bridges keep their decks and "
-                               "approaches apart in plan, or the lower one's clearance under the "
-                               "upper deck")
+    c = _check("bridge_clash", "Road and pedestrian bridges keep their decks and approaches "
+                               "apart from each other and from transit bridges in plan, or the "
+                               "lower one's clearance under the upper deck")
     parts = _bridge_parts(m)
     if len(parts) < 2:
         return c
@@ -233,8 +237,8 @@ def check_bridge_clash(spec: CitySpec, m: CityModel):
     seen = set()
     for i, j in sorted(zip(a_idx.tolist(), b_idx.tolist())):
         a, b = parts[i], parts[j]
-        if j <= i or a[0] == b[0] or (a[0], b[0]) in seen or a[6] & b[6]:
-            continue
+        if j <= i or a[0] == b[0] or (a[0], b[0]) in seen or a[6] & b[6] or                 a[2] == b[2] == "transit":
+            continue      # (transit against transit: M19's transit_clearance)
         ov = _inter(a[3], b[3])
         if ov.area <= BRIDGE_M2:
             continue

@@ -3225,8 +3225,10 @@ OVERLAP_M2 = 10.0          # rights of way of two roads (no node shared) overlap
 #                            than this: the lesser road goes
 POKE_M2 = 1.0              # a dead end's right of way reaching into another road's
 DEAD_END_KINDS = ("map_edge", "water_end", "park_gate", "plaza_gate", "site_gate", "path_end",
-                  "cul_de_sac", "deck_end")
+                  "cul_de_sac", "deck_end", "traced_end")
 SITE_GATE = {"central_park": "park_gate", "grand_plaza": "plaza_gate"}
+SITE_GATE_M = 40.0         # a dead end this close to a megasite reserve is its gate (the road
+#                            `megasite_access` asks for within 40 m)
 
 
 class _Graph:
@@ -3376,18 +3378,24 @@ def _run_on(B: Builder, g: _Graph, e: int, at_end: bool):
         if _turn_deg(d0, u) > DEAD_END_TURN_DEG or (tl < B.n_primary and n in t.nodes) or (
                 len(g.at[n]) == 1 and (ln.cls in PEDESTRIAN) != (t.cls in PEDESTRIAN)):
             return None     # (a street goes on as a path only where the two meet a third)
-        for f, f_end in g.at[n]:
-            v, _ = _along(g.edges[f][0] if not f_end else g.edges[f][0][::-1], 10.0)
-            if _turn_deg((-u[0], -u[1]), _unit(v[0] - n[0], v[1] - n[1])) < amin - 1.0:
-                return None
+        others = [_leg_dir(g.edges[f][0], not f_end) for f, f_end in g.at[n]]
         q = n
         at_q = {f for f, _ in g.at[n]}
     else:
         if tl < B.n_primary and not B._legal(t, q, _project(t.pts, q)[0], renewed):
             return None
-        if _angle_between(_unit(q[0] - p[0], q[1] - p[1]), B._tangent(tpts, q)) < amin - 1.0:
-            return None
+        sq = _project(tpts, q)[0]
+        Lt = _plen(tpts)
+        others = [_leg_dir(x, True) for x in (_substring(tpts, sq, Lt),
+                                               _substring(tpts, 0.0, sq)[::-1]) if len(x) >= 2]
         at_q = {k}
+    # (the new leg leaves q along the link, then the dead end's road, measured 10 m out as
+    # `fix_angles` and the check `junction_angles` measure it)
+    nd = _district_at(B, q)
+    want = max(amin, min_angle(B.arch[nd]) if nd else GRID_ANGLE_DEG)   # (as fix_angles)
+    mine = _leg_dir(_dedupe([q] + list(seq[::-1])), True)
+    if any(_turn_deg(mine, v) < want + 1.0 for v in others):
+        return None
     if B.frame is not None:
         # M10: a held road keeps its pieces; a new street meets an old road at a node of it
         if q not in (tpts[0], tpts[-1]) and (_held(B, tpts) or renewed != B._renewed(t)):
@@ -3442,12 +3450,14 @@ def _dead_kind(B: Builder, g: _Graph, e: int, at_end: bool, p) -> tuple[str | No
     if B.wet.intersects(zone):
         return "water_end", head if head and _bulb_fits(B, g, e, p, head) else 0.0
     for s in B.sites:
-        if s.polygon.intersects(zone):
+        if s.polygon.distance(Point(p)) <= SITE_GATE_M:
             return SITE_GATE.get(s.kind, "site_gate"), 0.0
     if B.open_land.intersects(zone):
         return "park_gate", 0.0
     if ln.cls in PEDESTRIAN:
         return "path_end", 0.0
+    if prim and ln.primary is not None and "pinned" in ln.primary["attrs"]:
+        return "traced_end", 0.0      # (a traced road ends where it was drawn)
     if prim:
         # (an M1b road that ends with nothing at its end: a bulb where it fits, else the
         # check `road_dead_ends` reports it)
@@ -3515,6 +3525,28 @@ def _reach(B: Builder, g: _Graph, i: int, j: int, q) -> float:
     return w / 2 + 5.0 if len(g.at.get(q, [])) == 2 else w + 5.0
 
 
+def _splits(B: Builder, g: _Graph, k: int, gone: set) -> bool:
+    """Whether dropping vehicle edge k (and the edges `gone`) parts its two ends on the
+    vehicle network."""
+    if B.lines[g.edges[k][1]].cls not in VEHICLE:
+        return False
+    a, b = g.edges[k][0][0], g.edges[k][0][-1]
+    seen, todo = {a}, [a]
+    while todo:
+        q = todo.pop()
+        if q == b:
+            return False
+        for f, f_end in g.at.get(q, []):
+            if f == k or f in gone or B.lines[g.edges[f][1]].cls not in VEHICLE:
+                continue
+            pts = g.edges[f][0]
+            r = pts[0] if f_end else pts[-1]
+            if r not in seen:
+                seen.add(r)
+                todo.append(r)
+    return True
+
+
 def _overlaps(B: Builder, g: _Graph) -> set:
     """Local edges whose right of way overlaps another road's by more than OVERLAP_M2 (away
     from the nodes they share, as far as their two widths and 5 m: the junction's; neither
@@ -3561,7 +3593,7 @@ def _overlaps(B: Builder, g: _Graph) -> set:
                             for q in (g.nodes_of(i) | g.nodes_of(j)) & dead):
             continue
         cand = [k for k in (i, j) if g.edges[k][1] >= B.n_primary and
-                not _held(B, g.edges[k][0])]
+                not _held(B, g.edges[k][0]) and not _splits(B, g, k, drop)]
         new = [k for k in cand if B._renewed(B.lines[g.edges[k][1]])]
         if new and len(new) < len(cand):
             cand = new    # M10: the new street goes, not the held one
@@ -3610,8 +3642,10 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
             n_run += 1
         if touched:
             edges = _merge_and_trim(B, edges)
+            # (a road run on may meet others too sharply, or run alongside one)
             if rnd < 6:
-                edges, _ = fix_angles(B, edges)   # (a road run on may meet others too sharply)
+                edges, _ = fix_angles(B, edges)
+            edges, _ = fix_duplicates(B, edges)
             continue
         tags = {}
         cut: set = set()

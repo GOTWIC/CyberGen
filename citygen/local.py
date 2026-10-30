@@ -258,7 +258,8 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     # square to the leg's direction: longer than the cut where the leg bends inside it)
     for nid in sorted(jx["legs"]):
         for x in jx["legs"][nid]:
-            r = JN.run_along(x, max(x.cut, x.cut_row))
+            # (at most 0.45 of the leg, as before M17's longer cuts: M18 levels junctions)
+            r = min(JN.run_along(x, max(x.cut, x.cut_row)), 0.45 * x.L)
             k = (x.seg["id"], nid)
             if r > out.cuts.get(k, 0.0):
                 out.cuts[k] = r
