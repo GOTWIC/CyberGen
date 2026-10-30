@@ -88,6 +88,13 @@ def gather(cx: Ctx) -> list[PC.Piece]:
     return out
 
 
+# AG10's Unreal check: complex collision is built from the Nanite fallback, which kept
+# about 8% of a slab's triangles and none of its rail (a walk stepped off the deck's edge at
+# 140 of 143 points), so the deck's slab, stairs and elevators keep every triangle in it, as
+# AG3's street fronts do (`fallback_full`)
+FULL_FALLBACK = ("street.deck.slab", "street.deck.stair", "street.deck.elevator")
+
+
 def code_hash() -> str:
     """sha256 of the code that makes the packs (this package, the mesh writer and the
     triangulator), so a changed generator remakes its tiles even where no version was
@@ -375,6 +382,8 @@ def contribution(manifest: dict, lib: dict | None = None) -> dict:
                  "slots": r.get("slots", []), "collision": {"complex": True},
                  "tile": tile}
             slots |= set(r.get("slots", []))
+            if r["kind"] in FULL_FALLBACK:
+                e["fallback_full"] = True
             if r.get("parts"):
                 e["parts"] = [{"kind": p["kind"], "glb": "streets/parts.glb",
                                "node": p["kind"], "asset": p["kind"].replace(".", "_"),

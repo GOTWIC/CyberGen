@@ -1333,12 +1333,20 @@ class Importer:
         ns = sm.get_editor_property("nanite_settings")
         shape = rec.get("shape_preservation")
         full = rec.get("fallback_full")
-        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape or full:
+        tgt = getattr(unreal, "NaniteFallbackTarget", None)
+        auto = getattr(tgt, "AUTO", None)
+        # (a mesh imported again keeps its Nanite settings: one whose entry no longer asks
+        # for every triangle in its fallback goes back to the automatic one)
+        stale = not full and auto is not None and \
+            ns.get_editor_property("fallback_target") != auto
+        if bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape or full \
+                or stale:
             ns.set_editor_property("enabled", bool(rec["nanite"]))
+            if stale:
+                ns.set_editor_property("fallback_target", auto)
             if full:
                 # AG3's street fronts: complex collision is built from the fallback mesh, so
                 # the fallback keeps every triangle (doorways, steps and posts as drawn)
-                tgt = getattr(unreal, "NaniteFallbackTarget", None)
                 for k, v in (("fallback_target", getattr(tgt, "PERCENT_TRIANGLES", None)),
                              ("fallback_percent_triangles", 1.0),
                              ("fallback_relative_error", 0.0)):

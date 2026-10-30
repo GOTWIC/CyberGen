@@ -1172,6 +1172,18 @@ def test_check_shots_stay_under_nanites_root_pages():
                                   "a.bld.part.x": "Assets/BuildingsParts/t/x"}
 
 
+def test_import_resets_a_stale_fallback():
+    """The AG10 Unreal check: a mesh imported again keeps its Nanite settings, so one whose
+    entry no longer asks for every triangle in its fallback (`fallback_full`) is put back on
+    the automatic fallback (the deck slabs kept a full one after their entries dropped it)."""
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    body = src[src.index('full = rec.get("fallback_full")'):]
+    body = body[:body.index("EAL.set_metadata_tag(sm, HASH_TAG, h)")]
+    assert "stale = not full and auto is not None" in body
+    assert 'ns.set_editor_property("fallback_target", auto)' in body
+    assert "or shape or full \\\n                or stale:" in body
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()
@@ -1330,6 +1342,11 @@ def test_stage2_takes_assetgen_decks(tmp_path):
             continue
         if e["kind"] in ("street.deck.column", "street.deck.stair", "street.deck.elevator"):
             assert "level" not in a
+        if e["kind"] in ("street.deck.slab", "street.deck.stair", "street.deck.elevator"):
+            # (AG10's Unreal check: their complex collision keeps the rail and the steps)
+            pk = next(p for p in s2["packs"] if p["glb"].endswith(e["glb"]) and p["use"] == "mesh")
+            ms = {x["asset"]: x for x in pk["meshes"]}
+            assert ms[e["asset"]].get("fallback_full") is True
         if e["key"].startswith("l1."):
             assert a["level"] == 1          # (a deck's street, its joined object's level)
     ramps = [s.id for s in m.road_segments if s.attrs.get("role") == "deck_ramp"]
