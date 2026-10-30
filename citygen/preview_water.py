@@ -133,7 +133,7 @@ def render_water(b, out, dpi: int = 140) -> None:
     ax.axis("off")
     dmax = max([e.depth_m for e in [*m.seas, *m.rivers, *m.channels, *m.waterways]
                 if e.depth_m is not None] or [1.0])
-    norm = Normalize(0.0, dmax)
+    norm = Normalize(-0.25 * dmax, dmax)     # (shallow water a light blue, not white)
     img = _depth_image(m, beds, x0, y0, x1, y1, SAMPLE_M)
     ax.imshow(img, extent=(x0, x1, y0, y1), origin="lower", cmap=CMAP, norm=norm,
               interpolation="nearest", zorder=1.5)
@@ -163,6 +163,8 @@ def render_water(b, out, dpi: int = 140) -> None:
     # the window
     cx, cy = _window(m)
     r = 300.0
+    cx = min(max(cx, x0 + r), x1 - r)
+    cy = min(max(cy, y0 + r), y1 - r)
     ax2 = fig.add_axes([side_x + 0.01, 0.42, side_w / (map_w + side_w) - 0.02, 0.5])
     ax2.set_facecolor(SEA)
     ax2.set_xlim(cx - r, cx + r)
@@ -197,7 +199,8 @@ def render_water(b, out, dpi: int = 140) -> None:
     if wide is not None:
         pts = [tuple(p) for p in wide.centerline]
         cum = WA._cum(pts)
-        k = max(range(len(pts)), key=lambda i: (wide.width_m[i], -i))
+        n = len(pts)
+        k = max(range(n // 4, max(n // 4 + 1, 3 * n // 4)), key=lambda i: (wide.width_m[i], -i))
         x, y, tx, ty = WA._point_at(pts, cum, cum[k])
         hw = wide.width_m[k] * 0.75
         ts = np.linspace(-hw, hw, 241)
@@ -211,9 +214,9 @@ def render_water(b, out, dpi: int = 140) -> None:
                          color="#1d5a85", zorder=1)
         ax3.plot(ts, np.where(inside, surf - d, np.nan), color="#c8a46a", lw=1.5, zorder=2)
         ax3.axhline(0.0 if m.terrain is None else surf, color=MUTED, lw=0.6, ls=":")
-        ax3.set_title(f"{wide.name or wide.id}: cross-section at its widest "
-                      f"({wide.width_m[k]:.0f} m), flow {wide.flow.speed_m_s:g} m/s "
-                      f"toward {wide.flow.toward}", color=INK, fontsize=8)
+        ax3.set_title(f"{wide.name or wide.id}: cross-section ({wide.width_m[k]:.0f} m "
+                      f"wide), flow {wide.flow.speed_m_s:g} m/s toward "
+                      f"{wide.flow.toward or 'the map edge'}", color=INK, fontsize=8)
         ax3.set_xlabel("m across", color=MUTED, fontsize=7)
         ax3.set_ylabel("m (ground 0)" if m.terrain is None else "m over the water",
                        color=MUTED, fontsize=7)

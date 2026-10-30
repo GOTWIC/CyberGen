@@ -127,6 +127,8 @@ def render_ground(b, out, dpi: int = 140) -> None:
     sw = side_w / (map_w + side_w)
     cx, cy = _window(m)
     r = 250.0
+    cx = min(max(cx, x0 + r), x1 - r)
+    cy = min(max(cy, y0 + r), y1 - r)
     ax2 = fig.add_axes([side_x + 0.01, 0.42, sw - 0.02, 0.5])
     _setup(ax2, (cx - r, cx + r), (cy - r, cy + r))
     _base(ax2, m)
