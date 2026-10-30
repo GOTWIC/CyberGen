@@ -306,8 +306,9 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     city's to change (scope 4.5), not as a failure: against a neighbor (its facade a party or
     blind wall: the brief's classes, `facing_neighbor`), or with no ground walkway ahead of it
     within `AHEAD_M` (open ground, a canal, a road without a sidewalk on its side, its walkway
-    behind the building: `unreachable`). A failure is a missing door, or a door with a
-    walkway just ahead that another building walls off."""
+    behind the building, or ahead only inside another building, a park path citygen runs
+    through it: `unreachable`). A failure is a missing door, or a door with a walkway just
+    ahead that another building walls off."""
     import shapely
     from shapely.geometry import LineString, Point
     walks = _walk_index(model)
@@ -324,6 +325,11 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     doors = flush = moved = 0
     first = []
     faced = []
+
+    def inside(bid, f) -> bool:
+        return ftree is not None and any(
+            fids[i] != bid and flev[i] == level.get(bid, 0)
+            for i in ftree.query(f, predicate="within").tolist())
 
     def leg_clear(bid, ax, ay, bx, by, x, y, under=0.0) -> bool:
         if (bx - ax) ** 2 + (by - ay) ** 2 < 0.0025 or ftree is None:
@@ -397,7 +403,8 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                 for k in tree.query(q.buffer(AHEAD_M)).tolist():
                     f = geoms[k].interpolate(geoms[k].project(q))
                     if (f.x - x) * nx + (f.y - y) * ny > 0.0 and \
-                            (f.x - qx) ** 2 + (f.y - qy) ** 2 <= AHEAD_M * AHEAD_M:
+                            (f.x - qx) ** 2 + (f.y - qy) ** 2 <= AHEAD_M * AHEAD_M and \
+                            not inside(bid, f):
                         ahead = True
                         break
                 if not ahead:
