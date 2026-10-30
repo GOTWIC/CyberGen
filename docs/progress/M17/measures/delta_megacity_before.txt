@@ -1,0 +1,46 @@
+== dead ends
+dead ends by class: {'highway': 3, 'avenue': 2, 'street': 152, 'service': 5, 'alley': 81, 'pedestrian': 65}
+of them, another road within 60 m straight ahead: {'avenue': 2, 'street': 83, 'service': 3, 'alley': 63, 'pedestrian': 55}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 149
+[(('avenue', 'street'), 47), (('street', 'street'), 44), (('highway', 'avenue'), 32), (('avenue', 'avenue'), 16), (('avenue', 'pedestrian'), 3), (('street', 'pedestrian'), 3), (('street', 'alley'), 2), (('street', 'service'), 1)]
+   ('rs.w1531n611', 'rs.w1504n597', 'highway', 'avenue', 230, -1506, 606)
+   ('rs.w1433n606', 'rs.w1357n613', 'highway', 'avenue', 60, -1375, 610)
+   ('rs.w1433n606', 'rs.w1504n597', 'highway', 'avenue', 193, -1493, 602)
+   ('rs.w1311n582', 'rs.w1357n613', 'highway', 'avenue', 223, -1357, 604)
+   ('rs.w1188n556', 'rs.w1113n560', 'highway', 'avenue', 64, -1128, 560)
+   ('rs.w905n430', 'rs.w1113n560', 'highway', 'avenue', 274, -1110, 552)
+   ('rs.w290n46', 'rs.w141s217', 'highway', 'avenue', 30, 6, -56)
+   ('rs.w290n46', 'rs.e106s187', 'highway', 'avenue', 30, 6, -56)
+== bridges
+bridges: 32 Counter({'pedestrian': 17, 'road': 15})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1580 with a leg not at the node's height at the junction edge: 78 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 36
+   ('Corporate Core', True, True) 64
+   ('Industrial Port', False, False) 66
+   ('Industrial Port', True, True) 22
+   ('Midtown', False, False) 41
+   ('Midtown', True, True) 106
+   ('Old Town', False, False) 1020
+   ('Old Town', True, True) 117
+   ('Research Campus', False, False) 20
+   ('Research Campus', True, True) 16
+   ('Transit Nexus', False, False) 39
+   ('Transit Nexus', True, True) 33
+crosswalk widths: Counter({4.0: 1261})
+junctions with crosswalks: 358 of them within 40 m of another: 116
+== signs
+Counter({('shop_sign', 'blade'): 7572, ('shop_sign', 'facade'): 5636, ('billboard', 'roof'): 1016, ('neon', 'facade'): 444, ('billboard', 'facade'): 252, ('holo_ad', 'roof'): 63})
+== transit supports
+  tl.maglev_line maglev: length 2701 m, supports 43, gap median 45 max 270 m, off the line max 3.1 m (>2 m: 3)
+  tl.skyline_loop sky_tube: length 2750 m, supports 19, gap median 69 max 388 m, off the line max 13.1 m (>2 m: 4)
+  tl.delta_loop sky_tube: length 4969 m, supports 39, gap median 60 max 971 m, off the line max 9.9 m (>2 m: 2)
+  tl.waterfront_monorail monorail: length 4311 m, supports 94, gap median 25 max 531 m, off the line max 13.5 m (>2 m: 53)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 114

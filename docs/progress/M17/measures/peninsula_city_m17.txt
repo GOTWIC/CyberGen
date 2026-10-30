@@ -1,0 +1,43 @@
+== dead ends
+dead ends by class: {'highway': 1, 'avenue': 2, 'street': 42, 'service': 7, 'pedestrian': 28}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 8, 'service': 1, 'pedestrian': 6}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 5 Counter({'road': 2, 'pedestrian': 2, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 5
+Counter({'alley': 3, 'street': 2})
+   ('rs.w1044n4', 'street', 'd04.lm.w1070s44.bld', 44.2, 0.0, 4.0)
+   ('rs.w1088s95', 'street', 'd04.lm.w1070s44.bld', 44.5, 0.0, 4.0)
+   ('rs.w1072s125', 'alley', 'd04.lm.w1070s44.bld', 20.1, 0.0, 4.0)
+   ('rs.w1078s69', 'alley', 'd04.lm.w1070s44.bld', 18.1, 0.0, 4.0)
+   ('rs.w1067s13', 'alley', 'd04.lm.w1070s44.bld', 18.0, 0.0, 4.0)
+== junction levels
+junctions: 794 with a leg not at the node's height at the junction edge: 18 with a leg's end not at the node's z: 0
+== junction control
+   ('Eastside Docks', False, False) 27
+   ('Eastside Docks', True, True) 20
+   ('Hook Spaceport', False, False) 8
+   ('Hook Spaceport', False, True) 2
+   ('Hook Spaceport', True, True) 15
+   ('Lantern Strip', False, False) 301
+   ('Lantern Strip', True, True) 61
+   ('Neckgate', False, False) 21
+   ('Neckgate', False, True) 3
+   ('Neckgate', True, True) 76
+   ('The Stacks', False, False) 91
+   ('The Stacks', True, True) 37
+   ('Wallgate Heights', False, False) 112
+   ('Wallgate Heights', True, True) 20
+crosswalk widths: Counter({4.0: 730})
+junctions with crosswalks: 234 of them within 40 m of another: 62
+== signs
+Counter({('shop_sign', 'blade'): 5253, ('shop_sign', 'facade'): 1762, ('billboard', 'roof'): 576, ('neon', 'facade'): 258, ('billboard', 'facade'): 181, ('holo_ad', 'roof'): 36})
+== transit supports
+  tl.spine_tube sky_tube: length 1510 m, supports 7, gap median 177 max 607 m, off the line max 1.8 m (>2 m: 0)
+  tl.east_shore_line elevated_rail: length 2711 m, supports 88, gap median 32 max 71 m, off the line max 13.7 m (>2 m: 37)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 26

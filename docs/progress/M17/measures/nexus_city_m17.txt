@@ -1,0 +1,51 @@
+== dead ends
+dead ends by class: {'highway': 3, 'avenue': 1, 'street': 63, 'service': 5, 'alley': 15, 'pedestrian': 69}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 8, 'service': 1, 'alley': 3, 'pedestrian': 61}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 30 Counter({'pedestrian': 18, 'road': 11, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 1
+   ('br.w1194s441', 'br.w1061s724', 'road', 'road', 905)
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1680 with a leg not at the node's height at the junction edge: 85 with a leg's end not at the node's z: 0
+== junction control
+   ('Aurora Spaceport', False, False) 5
+   ('Aurora Spaceport', False, True) 1
+   ('Aurora Spaceport', True, True) 6
+   ('Corporate Core', False, False) 46
+   ('Corporate Core', False, True) 2
+   ('Corporate Core', True, True) 40
+   ('Harbor Industrial', False, False) 20
+   ('Harbor Industrial', False, True) 1
+   ('Harbor Industrial', True, True) 11
+   ('Midtown', False, False) 70
+   ('Midtown', False, True) 1
+   ('Midtown', True, True) 81
+   ('Neon Market', False, False) 317
+   ('Neon Market', False, True) 2
+   ('Neon Market', True, True) 60
+   ('Northridge', False, False) 107
+   ('Northridge', True, True) 28
+   ('Old Town', False, False) 719
+   ('Old Town', False, True) 3
+   ('Old Town', True, True) 79
+   ('Silver Island', False, False) 13
+   ('Silver Island', True, True) 7
+   ('Transit Nexus', False, False) 25
+   ('Transit Nexus', False, True) 4
+   ('Transit Nexus', True, True) 32
+crosswalk widths: Counter({4.0: 1165})
+junctions with crosswalks: 358 of them within 40 m of another: 162
+== signs
+Counter({('shop_sign', 'blade'): 9819, ('shop_sign', 'facade'): 4743, ('billboard', 'roof'): 1239, ('neon', 'facade'): 680, ('billboard', 'facade'): 342, ('holo_ad', 'roof'): 47})
+== transit supports
+  tl.magenta_line maglev: length 1952 m, supports 34, gap median 45 max 180 m, off the line max 14.5 m (>2 m: 7)
+  tl.harbor_line elevated_rail: length 4481 m, supports 103, gap median 32 max 857 m, off the line max 12.0 m (>2 m: 45)
+  tl.spire_line sky_tube: length 1143 m, supports 7, gap median 93 max 489 m, off the line max 13.7 m (>2 m: 1)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 58
