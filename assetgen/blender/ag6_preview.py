@@ -179,11 +179,47 @@ def glare(sc, on):
         log(f"no glare: {e}")
 
 
-def import_glb(path, part):
+GLTF_TMP = []
+
+
+def _defer_gltf_tmp():
+    """The glTF importer's temporary object per mesh deleted in one batch per import, not
+    one by one (each deletion scans the whole file: quadratic over a whole city's packs;
+    as `preview_assets._defer_gltf_tmp`)."""
+    try:
+        from io_scene_gltf2.blender.imp import mesh as GM
+    except ImportError:
+        return
+
+    def create_mesh(gltf, mesh_idx, skin_idx):
+        pymesh = gltf.data.meshes[mesh_idx]
+        GM.import_user_extensions('gather_import_mesh_before_hook', gltf, pymesh)
+        mesh = bpy.data.meshes.new(pymesh.name or 'Mesh_%d' % mesh_idx)
+        tmp_ob = bpy.data.objects.new('##gltf-import:tmp-object##', mesh)
+        GLTF_TMP.append(tmp_ob)
+        GM.do_primitives(gltf, mesh_idx, skin_idx, mesh, tmp_ob)
+        GM.set_extras(mesh, pymesh.extras, exclude=['targetNames'])
+        GM.import_user_extensions('gather_import_mesh_after_hook', gltf, pymesh, mesh)
+        return mesh
+
+    if all(hasattr(GM, n) for n in ("create_mesh", "do_primitives", "set_extras",
+                                    "import_user_extensions")):
+        GM.create_mesh = create_mesh
+
+
+def import_glb(path, part, shared=False):
+    """A pack's objects with AG6's materials. `shared`: meshes that other objects draw too
+    (AG2's parts and AG8's families through geometry nodes, AG8's signs as copies), whose
+    materials go on the mesh; every other object's go on the object (a slot linked to the
+    mesh walks every object of the file on each assignment, quadratic over a whole city)."""
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=path, import_shading="FLAT")
+    if GLTF_TMP:
+        bpy.data.batch_remove(GLTF_TMP)
+        GLTF_TMP.clear()
     new = [o for o in bpy.data.objects if o not in before]
     props = JOB["props"]
+    old_mats = set()
     for o in new:
         o["ag6"] = part
         if o.type != "MESH":
@@ -209,10 +245,12 @@ def import_glb(path, part):
                     key = slot
             m = mat_for("buildings" if part == "parts" else part, key, part == "parts")
             if m is not None:
-                old = ms.material
-                o.material_slots[i].material = m
-                if old.users == 0:
-                    bpy.data.materials.remove(old)
+                old_mats.add(ms.material)
+                if not shared:
+                    ms.link = "OBJECT"
+                ms.material = m
+    # (in one batch: one by one is quadratic)
+    bpy.data.batch_remove([m for m in old_mats if m.users == 0])
     return new
 
 
@@ -273,7 +311,7 @@ def load_parts(glb, inst):
     """AG2's part pack of a tile: its meshes hidden in a collection of their own (in the
     order of their node names), their placements one instancer with the building's tints
     on every point."""
-    objs = import_glb(glb, "parts")
+    objs = import_glb(glb, "parts", shared=True)
     protos = {}
     for o in objs:
         if o.type == "MESH":
@@ -402,7 +440,7 @@ def ag8(v, protos):
         objs += import_glb(path, "props")
     meshes = {}
     for path in sorted({s["glb"] for s in a8.get("signs", [])}):
-        for o in import_glb(path, "signs"):
+        for o in import_glb(path, "signs", shared=True):
             o.hide_render = True
             meshes.setdefault(SUFFIX.sub("", o.name), o)    # (a sign shared by two tiles)
             objs.append(o)
@@ -455,6 +493,7 @@ def camera(sc, v):
 
 
 def main():
+    _defer_gltf_tmp()
     sc, sun = start()
     proxies = {}
     for t in JOB["proxy_tiles"]:
@@ -466,7 +505,7 @@ def main():
     log(f"proxies: {len(proxies)}")
     protos = {}
     for p in JOB.get("ag8_families", []):
-        for o in import_glb(p, "props"):
+        for o in import_glb(p, "props", shared=True):
             o.hide_render = True
             o.hide_viewport = True
             protos[SUFFIX.sub("", o.name)] = o
@@ -486,6 +525,10 @@ def main():
             p = f"{JOB['assets']}/streets/{tile}.glb"
             if os.path.isfile(p):
                 objs += import_glb(p, "streets")
+        for tile in v.get("connection_tiles", []):
+            p = f"{JOB['assets']}/connections/{tile}.glb"
+            if os.path.isfile(p):
+                objs += import_glb(p, "connections")
         for tile, inst in sorted(v.get("parts", {}).items()):
             p = f"{JOB['assets']}/parts/{tile}.glb"
             if os.path.isfile(p):
@@ -495,6 +538,10 @@ def main():
                 o.hide_render = True
         sobjs = signs(v.get("signs", [])) + ag8(v, protos)
         cam = camera(sc, v)
+        try:
+            sc.eevee.taa_render_samples = v.get("samples") or JOB.get("samples", 32)
+        except AttributeError:
+            pass
         sc.render.resolution_x, sc.render.resolution_y = v["w"], v["h"]
         sc.render.resolution_percentage = 100
         lobjs = []

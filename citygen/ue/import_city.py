@@ -1566,9 +1566,11 @@ class Importer:
                     c.set_collision_profile_name("NoCollision")
                 # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's)
                 doors = [unreal.Name(f"cg.door={d}") for d in r.get("doors", [])]
+                # (AG4: what a skybridge joins, `cg.link=building:<id>` or `walkway:<id>`)
+                links = [unreal.Name(f"cg.link={x}") for x in r.get("links", [])]
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage] + \
-                    doors
+                    doors + links
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)

@@ -49,8 +49,11 @@ def _closed(arrs):
 
 
 def test_parts_are_closed_and_named_by_their_parameters():
+    from assetgen.buildings import connections as CN     # (AG4's: test_ag_roofs.py)
     from assetgen.buildings import frontparts as FP      # (AG3's: test_ag_fronts.py)
-    assert set(SAMPLE) | set(FP.FAMILIES) == set(PT.GEN) == set(PT.REACH)
+    from assetgen.buildings import roofparts as RP
+    ag4 = set(RP.ROOF) | set(RP.MERGED_ROOF) | set(RP.FACADE) | set(CN.FAMILIES)
+    assert set(SAMPLE) | set(FP.FAMILIES) | ag4 == set(PT.GEN) == set(PT.REACH)
     names = set()
     for fam, p in SAMPLE.items():
         _, arrs = PT.mesh(fam, p)
@@ -99,7 +102,8 @@ def test_every_system_builds_a_closed_shell_inside_its_envelope():
         placed = res["stats"]["parts_merged"] + res["stats"]["parts_instanced"]
         assert placed > 0, s
         for x in res["parts"]:
-            assert len(x["at"]) >= PT.INSTANCE_MIN
+            # (AG4's roof equipment is always instanced)
+            assert len(x["at"]) >= PT.INSTANCE_MIN or x["family"] in PT.INSTANCE_ALWAYS
 
 
 def test_no_part_is_placed_twice():

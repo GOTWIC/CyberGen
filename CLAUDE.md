@@ -999,6 +999,30 @@ AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontpar
   beside AG8's props. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
   grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.
 
+AG4 (roofs and connections) is in place (tests `tests/assetgen/test_ag_roofs.py`):
+- **Roofs** (`buildings/roofs.py`): roof forms in the top floor, never over the model's mass
+  (hip, gable, pagoda, mansard by crown and era; sheds' sawtooth, gable, barrel by gene;
+  `plan` before the masses), finishes and copings on flat roofs, green roofs (bed, border,
+  path), an asset for every roof item (`items`; equipment lowered under a corridor over it),
+  access huts, vents, skylights, the billboard frame crown.
+- **Parts** (`buildings/roofparts.py`): roof equipment (`ROOF`) always instanced
+  (`parts.INSTANCE_ALWAYS`) on untinted slots; penthouses, billboard frames, fire escapes,
+  ducts, vents, conduits, cameras, landing doors. Facade details in `buildings/details.py`
+  (each placed only where `envelope.fits`; the line with AG3 and AG8 in its docstring).
+- **Connections** (`buildings/connections.py`): skybridges by kind (`skybridge`), landing
+  doors in the facade grammar, portals cut through towers by the tube's corridor with sky
+  station platforms and mouth frames, decks, courts. The brief's `clearances` (skybridge,
+  guideway, sky tube corridors) and portal tube lines (`BRIEF_VERSION` 2).
+- **Skybridge stage** (`assetgen/skybridges.py`): `connections/<tile>.glb`, the manifest's
+  `skybridges`, `unreal_contribution.connections.json` (an entry per skybridge by id,
+  `links`). Roof equipment is one entry per tile (`roofs.<tile>`) in the buildings'
+  contribution; buildings replace the blockout green roof objects they build
+  (`contribution.green_replaces`).
+- **Checks**: `asset_clearance`, `asset_roofs`, `asset_landings`, `asset_skybridges`; mounts
+  in a landing door counted apart. Exporter: `links` as `cg.link=` tags
+  (`docs/unreal_export.md`, "From AG4"). `assetgen materials preview --views city_full`.
+  Results: `docs/progress/AG4/`.
+
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
 and `props` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one

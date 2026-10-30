@@ -1,8 +1,9 @@
 """`assetgen materials preview BUILD` and `assetgen materials board OUT` (AG6's shows):
 textured Blender renders.
 
-- **preview**: the blockout's `city.blend` with its building boxes and the street objects
-  AG7 replaces taken out; per view the shells of its tiles and the street pieces near it
+- **preview**: the blockout's `city.blend` with its building boxes, its skybridges, the
+  green roofs AG4 builds and the street objects AG7 replaces taken out; per view the shells
+  of its tiles with AG4's skybridges and their roof equipment, and the street pieces near it
   with AG6's materials (`assetgen/blender/ag6_materials.py`), the rest of the city from the
   far proxies; AG3's street fronts and decals with the shells, AG2's instanced parts on
   them; AG8's props and plants near a street view as instances of their variant
@@ -10,7 +11,8 @@ textured Blender renders.
   AG8 has not run, the sign slots as quads showing their atlas cells); by night
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
-  street cameras (`street_<n>`), the city, or cameras of one's own (`--eye`, `--target`).
+  street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
+  part, skybridge and street piece at once), or cameras of one's own (`--eye`, `--target`).
 - **board**: a material board per era (its wall sets, roof, trims, metals, a window with
   its rooms) and one of the street sets, each a slab of the material under a low sun.
 
@@ -137,14 +139,17 @@ def run(args, progress=None) -> dict:
         mats = json.loads((adir / "materials.json").read_text())
         signs = json.loads((adir / "signs.json").read_text())
         con = json.loads((adir / "unreal_contribution.streets.json").read_text())
+        cp = adir / "unreal_contribution.connections.json"
+        conn = json.loads(cp.read_text()) if cp.is_file() else {"entries": []}
         model, _, _ = load_model(bdir)
     od = Path(args.out) if args.out else adir / "previews_ag6"
     od.mkdir(parents=True, exist_ok=True)
     bo = Path(args.blockout) if args.blockout else bdir
     cams = PV.cameras(bdir, bo)
     which = set(args.views or ["districts", "street"])
-    views = PV.plan_views(man, cams, args.width, which & {"city", "districts", "street"})
-    named = [v for v in (args.views or []) if v not in ("city", "districts", "street")]
+    kinds = {"city", "city_full", "districts", "street"}
+    views = PV.plan_views(man, cams, args.width, which & kinds)
+    named = [v for v in (args.views or []) if v not in kinds]
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
         views = [v for v in allv if v["name"] in named]
@@ -154,10 +159,13 @@ def run(args, progress=None) -> dict:
                       "eye": list(eye), "target": list(tgt), "w": args.width,
                       "h": int(args.width * 9 / 16), "shell_tiles": sorted(near)})
     stiles = sorted({e["tile"] for e in con["entries"]})
+    ctiles = sorted(man.get("connections") or {})
     with P.stage("views", total=len(views)) as st:
         for v in views:
             tgt = v["target"]
             v["parts"] = PV.instances(man, v["shell_tiles"])
+            # (AG4: the skybridges of the shells' tiles)
+            v["connection_tiles"] = sorted(set(v["shell_tiles"]) & set(ctiles))
             if v["ortho"]:
                 v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
                 v["signs"], v["lights"] = [], []
@@ -171,9 +179,10 @@ def run(args, progress=None) -> dict:
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
            "files": _files(adir, mats["textures"]), "props": _props(man),
-           "removed": sorted({e["key"] for e in con["entries"]} |
+           "removed": sorted({e["key"] for e in con["entries"] + conn["entries"]} |
                              {r for e in con["entries"] for r in e.get("replaces", [])} |
-                             set((ag8 or {}).get("removed", []))),
+                             {g for v in (man.get("green_replaces") or {}).values() for g in v}
+                             | set((ag8 or {}).get("removed", []))),
            "ag8_families": (ag8 or {}).get("families", []),
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
@@ -202,10 +211,13 @@ def _blender(job: dict, script: str, blender: str | None, od: Path, progress=Non
         json.dump(job, f)
         jp = f.name
     sp = Path(__file__).resolve().parent.parent / "blender" / script
-    with P.stage("blender", total=total) as st:
-        code, sout, serr = run_blender(
-            [exe, "-b", "--factory-startup", "-P", str(sp), "--", jp], st, keep="[ag6",
-            log=(lambda m: print(m, flush=True)) if progress is None else None)
+    try:
+        with P.stage("blender", total=total) as st:
+            code, sout, serr = run_blender(
+                [exe, "-b", "--factory-startup", "-P", str(sp), "--", jp], st, keep="[ag6",
+                log=(lambda m: print(m, flush=True)) if progress is None else None)
+    finally:
+        Path(jp).unlink(missing_ok=True)        # (a whole city's job is ~90 MB)
     rep_p = od / "ag6_report.json"
     if code != 0 or not rep_p.is_file():
         sys.stderr.write(sout[-4000:] + serr[-4000:])

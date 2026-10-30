@@ -697,6 +697,9 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 if e.get("doors"):
                     # (AG3: the doors of a street front, tagged on its actor for stage 4)
                     a["doors"] = [f"{d['id']}@{d.get('walkway_id') or ''}" for d in e["doors"]]
+                if e.get("links"):
+                    # (AG4: what a skybridge joins, `building:<id>`, `walkway:<id>`, stage 4's)
+                    a["links"] = list(e["links"])
                 a["hash"] = content_hash([a, h])
                 actors.append(a)
                 made = True

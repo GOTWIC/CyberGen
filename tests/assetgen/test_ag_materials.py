@@ -186,6 +186,9 @@ def test_materials_stage_on_the_small_city():
         if e["kind"] == "decals":
             assert all(con["materials"][s]["master"] == "decal" for s in e["slots"])
             continue
+        if e["kind"] == "roof_equipment":
+            assert e["cpd"] == []           # (AG4: untinted, per tile)
+            continue
         # (AG3: a street front takes its building's parameters)
         r = man["buildings"][e["ids"][0] if e["kind"] == "building.front" else e["key"]]
         assert len(e["cpd"]) == SY.CPD_SIZE + 7 and e["cpd"][SY.CPD_SIZE:] == \

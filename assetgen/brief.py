@@ -42,7 +42,7 @@ from . import canon as C
 from . import planar as PL
 from . import spec as S
 
-BRIEF_VERSION = 1
+BRIEF_VERSION = 2      # 2: AG4 (clearances, portal tube lines, skybridges in the building frame)
 PARTY_M = 0.5          # another building this close: a party wall
 BLIND_M = 3.0          # this close: a blind wall (and a neighbor in the brief)
 HIDE_M = 0.05          # another mass of the same building this close outside: hidden
@@ -721,9 +721,12 @@ def build_briefs(model: CityModel, spec: S.AssetSpec | None = None,
     t_props = time.perf_counter()
     briefs = {}
     look = _Lookups(model)
+    from .streets.ctx import Ground
+    ground = Ground(model)
+    cors = corridors(model, ground)
     for k, b in enumerate(model.buildings):
         briefs[b.id] = _brief(city, k, b, edges_by_b[k], faced, props.get(k, []), look,
-                              sdata, overrides)
+                              sdata, overrides, cors, ground)
     t_end = time.perf_counter()
     stats = _stats(briefs, city)
     stats["seconds"] = {"cover": round(t_cover - t0, 2), "facing": round(t_face - t_cover, 2),
@@ -750,11 +753,184 @@ class _Lookups:
         self.plants = group(model.plants, lambda p: p.attrs.get("building"))
         self.green = group(model.green_areas, lambda g: g.building_id
                            if g.kind == "green_roof" else None)
+        # AG4: the sky tubes of every line (their top lines, in pieces), sky stations by
+        # their tower
+        self.tubes: dict[str, list] = {}
+        for st in model.structures:
+            a = st.attrs or {}
+            if st.kind == "tube" and a.get("line_id") and len(st.line) >= 2:
+                self.tubes.setdefault(a["line_id"], []).append(st)
+        self.sky_stations = group([s for s in model.stations if s.kind == "sky"],
+                                  lambda s: s.building_id)
+
+
+# AG4: what a building's asset must keep out of (scope 9): skybridges, transit guideways and
+# sky tubes passing near it, as corridors (a line with a floor and a top at every point, a
+# half width); a building's tops are tested up to its height and this much over it (roof
+# equipment, masts)
+CLEAR_MARGIN_M = 4.0          # corridors within this of the footprint's box (plan)
+CLEAR_OVER_M = 16.0
+TUBE_D_M = 7.0                # citygen's sky tube (transit.DECK_M): its line is the top
+SKYBRIDGE_DECK_M = 1.0        # what a skybridge's deck structure reaches under z_m
+SKYBRIDGE_H = {"open_deck": 1.4, "catwalk": 1.4, "cable": 1.4}     # rail heights (else levels)
+# a train's envelope over the rail (elevated rail, maglev) or round the beam (monorail), and
+# under it the deck (citygen's transit.DECK_M) and the pad
+TRAIN_UP_M = {"elevated_rail": 5.0, "maglev": 4.5, "monorail": 3.8}
+DECK_DOWN_M = {"elevated_rail": 1.6, "maglev": 2.0, "monorail": 1.8}
+GUIDE_HALF_M = {"elevated_rail": 4.5, "maglev": 3.5, "monorail": 1.75}
+
+
+def corridors(model: CityModel, ground) -> list[dict]:
+    """Every clearance corridor of the city in world coordinates: kind, id, mode, half
+    width and its line [(x, y, z_lo, z_hi)] (z over the finished ground where it stands,
+    as the model measures transit; skybridges from their base)."""
+    out = []
+    for s in sorted(model.skybridges, key=lambda s: s.id):
+        base = float(getattr(s, "base_m", None) or 0.0)
+        h = SKYBRIDGE_H.get(s.kind) or s.levels * s.level_height_m
+        out.append({"kind": "skybridge", "id": s.id, "mode": s.kind,
+                    "half_m": s.width_m / 2.0 + 0.2, "base": base,
+                    "line": [(p[0], p[1], s.z_m - SKYBRIDGE_DECK_M, s.z_m + h + 0.3)
+                             for p in s.line], "abs": True})
+    for st in sorted(model.structures, key=lambda s: s.id):
+        a = st.attrs or {}
+        if not a.get("line_id") or a.get("station") or len(st.line) < 2:
+            continue
+        mode = a.get("mode")
+        if st.kind == "tube":
+            # the tube: a square corridor round its axis (the line is its top), 1 m clear
+            d = float(a.get("deck_m", TUBE_D_M))
+            out.append({"kind": "sky_tube", "id": st.id, "mode": "sky_tube",
+                        "half_m": d / 2.0 + 1.0, "line_id": a["line_id"],
+                        "line": [(p[0], p[1], p[2] - d - 1.0, p[2] + 1.0) for p in st.line]})
+        elif st.kind == "deck" and mode in TRAIN_UP_M:
+            out.append({"kind": "guideway", "id": st.id, "mode": mode,
+                        "half_m": GUIDE_HALF_M[mode] + 0.5, "line_id": a["line_id"],
+                        "line": [(p[0], p[1], p[2] - DECK_DOWN_M[mode] - 0.3,
+                                  p[2] + TRAIN_UP_M[mode]) for p in st.line]})
+    for c in out:
+        if c.get("abs"):
+            continue
+        # (M13: transit z over the ground where it stands)
+        c["line"] = [(x, y, z0 + ground.at(x, y), z1 + ground.at(x, y))
+                     for x, y, z0, z1 in c["line"]]
+    for c in out:
+        xs = [p[0] for p in c["line"]]
+        ys = [p[1] for p in c["line"]]
+        c["box"] = (min(xs) - c["half_m"], min(ys) - c["half_m"], max(xs) + c["half_m"],
+                    max(ys) + c["half_m"])
+    return out
+
+
+def clearances_of(city: "City", k: int, cors: list[dict], ground) -> list[dict]:
+    """The corridors a building's asset keeps out of (AG4), in its frame: the stretches of
+    each corridor near its footprint's box, z from its base (M13: the building's base_m)."""
+    b = city.m.buildings[k]
+    ox, oy = city.origins[k]
+    ms = city.by_b[k]
+    x0 = min(mm.box[0] for mm in ms) - CLEAR_MARGIN_M
+    y0 = min(mm.box[1] for mm in ms) - CLEAR_MARGIN_M
+    x1 = max(mm.box[2] for mm in ms) + CLEAR_MARGIN_M
+    y1 = max(mm.box[3] for mm in ms) + CLEAR_MARGIN_M
+    base = float(getattr(b, "base_m", None) or 0.0)
+    top = float(b.height_m) + max(CLEAR_OVER_M, 0.2 * float(b.height_m) + 1.5)
+    out = []
+    for c in cors:
+        bx = c["box"]
+        if bx[0] > x1 or bx[2] < x0 or bx[1] > y1 or bx[3] < y0:
+            continue
+        h = c["half_m"]
+        ln = c["line"]
+        keep = set()
+        for i in range(len(ln) - 1):
+            p, q = ln[i], ln[i + 1]
+            if min(p[0], q[0]) - h > x1 or max(p[0], q[0]) + h < x0 or \
+                    min(p[1], q[1]) - h > y1 or max(p[1], q[1]) + h < y0:
+                continue
+            keep.update((i, i + 1))
+        if not keep:
+            continue
+        # the corridor's z in the building frame: from the building's base (a skybridge's
+        # from its own base, the first building's)
+        off = (c.get("base", 0.0) - base) if c.get("abs") else -base
+        pts = [ln[i] for i in sorted(keep)]
+        if min(p[2] for p in pts) + off > top or max(p[3] for p in pts) + off < 0.0:
+            continue
+        # runs of consecutive kept points (a corridor may pass by twice)
+        runs, cur = [], []
+        for i in sorted(keep):
+            if cur and i != cur[-1] + 1:
+                runs.append(cur)
+                cur = []
+            cur.append(i)
+        runs.append(cur)
+        for r in runs:
+            if len(r) < 2:
+                continue
+            out.append({"kind": c["kind"], "id": c["id"], "mode": c["mode"],
+                        "half_m": C.m(h),
+                        "line": [[C.m(ln[i][0] - ox), C.m(ln[i][1] - oy),
+                                  C.m(ln[i][2] + off), C.m(ln[i][3] + off)] for i in r]})
+    return sorted(out, key=lambda c: (c["kind"], c["id"], c["line"][0]))
+
+
+def _portal_rec(city: "City", k: int, b, p, look: "_Lookups", ground) -> dict:
+    """A sky tube portal (M5) with what AG4 cuts it from: the tube's top line near the
+    tower (building frame, z from its base) and its diameter, and the sky station it hosts
+    (its platform footprint, track height), if any."""
+    ox, oy = city.origins[k]
+    base = float(getattr(b, "base_m", None) or 0.0)
+    ms = city.by_b[k]
+    x0 = min(mm.box[0] for mm in ms) - 12.0
+    y0 = min(mm.box[1] for mm in ms) - 12.0
+    x1 = max(mm.box[2] for mm in ms) + 12.0
+    y1 = max(mm.box[3] for mm in ms) + 12.0
+    lines, diam = [], TUBE_D_M
+    for st in sorted(look.tubes.get(p.line_id, []), key=lambda s: s.id):
+        pts = [tuple(q) for q in st.line]
+        near = [i for i in range(len(pts) - 1)
+                if not (min(pts[i][0], pts[i + 1][0]) > x1 or
+                        max(pts[i][0], pts[i + 1][0]) < x0 or
+                        min(pts[i][1], pts[i + 1][1]) > y1 or
+                        max(pts[i][1], pts[i + 1][1]) < y0)]
+        if not near:
+            continue
+        diam = float((st.attrs or {}).get("deck_m", TUBE_D_M))
+        # each run of the tube piece near the tower its own polyline (a loop's seam may lie
+        # in the tower, so pieces are never joined end to end)
+        runs: list[list[int]] = []
+        for i in sorted({j for i in near for j in (i, i + 1)}):
+            if runs and i == runs[-1][-1] + 1:
+                runs[-1].append(i)
+            else:
+                runs.append([i])
+        for r in runs:
+            if len(r) >= 2:
+                lines.append([[C.m(pts[i][0] - ox), C.m(pts[i][1] - oy),
+                               C.m(pts[i][2] + ground.at(pts[i][0], pts[i][1]) - base)]
+                              for i in r])
+    rec = {"line_id": p.line_id, "z": [C.m(p.z0_m), C.m(p.z1_m)], "station": p.station,
+           "lines": lines, "diameter_m": C.m(diam)}
+    if p.station:
+        for s in sorted(look.sky_stations.get(b.id, []), key=lambda s: s.id):
+            if p.line_id not in s.line_ids:
+                continue
+            tz = float((s.attrs or {}).get("track_z_m", s.position[2]))
+            rec["station_id"] = s.id
+            rec["station_name"] = s.name
+            rec["track_z_m"] = C.m(tz + ground.at(s.position[0], s.position[1]) - base)
+            rec["platform"] = _poly(s.footprint, ox, oy) if s.footprint else None
+            break
+    return rec
 
 
 def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, look: _Lookups,
-           sdata: dict, overrides: dict | None) -> dict:
+           sdata: dict, overrides: dict | None, cors: list | None = None,
+           ground=None) -> dict:
     ox, oy = city.origins[k]
+    if ground is None:
+        from .streets.ctx import Ground
+        ground = Ground(city.m)
     fh = b.floor_height_m
     deck = float(b.attrs.get("deck_top_m", 0.0)) if getattr(b, "level", 0) else 0.0
     masses = []
@@ -805,10 +981,13 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
     sky = []
     for s, j in sorted(look.sky.get(b.id, []), key=lambda t: t[0].id):
         end = s.line[0] if j == 0 else s.line[-1]
-        sky.append({"id": s.id, "kind": s.kind, "z_m": C.m(s.z_m), "width_m": C.m(s.width_m),
+        # (its deck in the building frame: M13 measures it from the bridge's own base)
+        sz = s.z_m + float(getattr(s, "base_m", None) or 0.0) - \
+            float(getattr(b, "base_m", None) or 0.0)
+        sky.append({"id": s.id, "kind": s.kind, "z_m": C.m(sz), "width_m": C.m(s.width_m),
                     "levels": s.levels, "level_height_m": C.m(s.level_height_m),
                     "other": s.building_ids[1 - j], "end": C.pt(end, ox, oy),
-                    "at": loc(end[0], end[1], s.z_m + 0.5)})
+                    "at": loc(end[0], end[1], sz + 0.5)})
     slots = [{"id": s.id, "kind": s.kind, "mount": s.mount, "position": C.pt3(s.position, ox, oy),
               "yaw_deg": C.deg(s.yaw_deg), "width_m": C.m(s.width_m),
               "height_m": C.m(s.height_m), "content": s.content, "prop_id": s.prop_id,
@@ -865,12 +1044,12 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
                                     "plinth_m": _opt(getattr(b, "plinth_m", None))}},
         "masses": masses, "edges": edge_recs, "neighbors": nb,
         "units": units, "entrances": ents, "roof_items": roof,
-        "portals": [{"line_id": p.line_id, "z": [C.m(p.z0_m), C.m(p.z1_m)],
-                     "station": p.station} for p in b.portals],
+        "portals": [_portal_rec(city, k, b, p, look, ground) for p in b.portals],
         "skybridges": sky, "sign_slots": slots, "props": props, "plants": plants,
         "green_roofs": green, "pois": pois, "lot": lot_rec, "property": prop_rec,
         "district": dist_rec, "spec": spec_rec,
         "override": (overrides or {}).get(b.id),
+        "clearances": clearances_of(city, k, cors or [], ground),
     }
     if getattr(b, "level", 0):
         # M14: a building on a deck: its level and the deck top its ground floor stands on

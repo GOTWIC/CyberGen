@@ -368,8 +368,8 @@ def build_parser() -> argparse.ArgumentParser:
     mp.add_argument("build", help="a citygen build directory with BUILD/assets")
     mp.add_argument("--out", help="output directory (default BUILD/assets/previews_ag6)")
     mp.add_argument("--blockout", help="the blockout directory (default BUILD)")
-    mp.add_argument("--views", nargs="*", help="districts, street, city (default districts "
-                                                  "and street) or view names")
+    mp.add_argument("--views", nargs="*", help="districts, street, city, city_full (default "
+                                                  "districts and street) or view names")
     mp.add_argument("--night", action="store_true", help="also every view by night")
     mp.add_argument("--only-night", action="store_true", help="only by night")
     mp.add_argument("--width", type=int, default=1920)

@@ -32,7 +32,8 @@ check):
 - ring strips (`rings.strip`) extruded: slab bands at floor lines, cornices at the tops of
   masses, parapets on roof edges no other mass covers, eaves and ribs; only above 3 m where
   they leave the footprint, never on party, hidden or blind stretches;
-- roof equipment blocks for the brief's roof items (AG4 replaces them);
+- AG4: roof forms in the attic, finishes, copings, green roofs, an asset for every
+  roof item, access huts, vents and skylights (`roofs`);
 - on M13's slopes, a plinth under each mass that stands on the base, down into the lowest
   ground under the footprint (`plinth_mm`; AG5 steps it).
 """
@@ -46,10 +47,13 @@ from citygen import dmath as M
 
 from ..triangulate import TriangulationError, triangulate
 from . import articulate as AR
+from . import connections as CN
+from . import details as DT
 from . import fronts as FR
 from . import genome as GN
 from . import parts as PT
 from . import rings as RG
+from . import roofs as RF
 from . import systems as SY
 from .meshbuf import Buf
 
@@ -60,6 +64,7 @@ GAP_MIN = 60                 # between openings
 EDGE_CLEAR = 60              # an opening's pocket from the neighbor facade's plane
 MOUNT_PAD = 100
 THIN_MM = 2500               # masses thinner than this get no openings
+SILL_MIN = 100               # a window row's sill strip over the street front's band
 MAX_WIN_MM = 4000            # window height cap outside curtain walls
 DOOR_MIN_Z = 3200            # a balcony's floor line: its slab's underside 3 m up
 SNAP = 50                    # punched opening widths (mm), so frames repeat across facades
@@ -185,13 +190,19 @@ def _thickness(ring) -> int:
     return int(best if best is not None else 0)
 
 
+def _depth(ring, fa) -> int:
+    """How far the footprint reaches in behind a facade: the most any vertex lies inside
+    its line (a notch elsewhere in the ring does not make the wall thin)."""
+    return int(max(-((p[0] - fa.a[0]) * fa.nx + (p[1] - fa.a[1]) * fa.ny) for p in ring))
+
+
 # ---------------------------------------------------------------------------
 # Rows
 # ---------------------------------------------------------------------------
 
 def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
               tall_building: bool, parking: bool, cornice_h: int,
-              doors: bool = False) -> list[tuple]:
+              doors: bool = False, door_floors=frozenset()) -> list[tuple]:
     """(lo, hi, kind, floor, sill, floor line) of every window row of a mass, ascending;
     `sill` is where the opening would start without a door row (the spandrel panel's top
     in a door row's bays without a balcony), else lo."""
@@ -240,8 +251,8 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
         elif win == "pod":
             kind = "pod"
         if not parking and kind == "win" and g == "body" and n_all >= 24 and \
-                0 < f + f0 < n_all - 2 and (f + f0 + 1) % mech == 0:
-            kind = "louver"
+                0 < f + f0 < n_all - 2 and (f + f0 + 1) % mech == 0 and f not in door_floors:
+            kind = "louver"          # (a mechanical floor, unless a skybridge lands on it)
         if is_top and f == n - 1 and tall_building and genes["crown"] == "lantern" and \
                 kind == "win":
             kind, sill, head = "lantern", 150, H - 150
@@ -257,6 +268,8 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
         full = zf + sill
         if doors and kind == "win" and zf >= DOOR_MIN_Z and head - 150 >= 1800:
             sill = 150
+        elif f in door_floors and kind == "win" and head - 150 >= 1800:
+            sill = 150             # (AG4: a skybridge lands on this floor)
         rows.append((zf + sill, zf + head, kind, f, full, zf))
     return rows
 
@@ -413,6 +426,16 @@ class ShellBuilder:
         self.irr = float(gm["cont"].get("irreg", 0.0))
         self.res = b["use"] in SY.BALCONY_USES
         self.inst: list[dict] = []
+        # AG4: what the asset keeps out of, roof forms, the roof items' assets, green roofs
+        self.clear = RF.Clear(brief)
+        self.bridges = RF.Clear(brief, ("skybridge",))
+        self.tubes = CN.tube_axes(brief)
+        self.landings = CN.landings_of(self)
+        self.landed: dict[str, dict] = {}
+        self.portal_recs: list[dict] = []
+        self.roof_forms: list[dict] = []
+        self.roof_items: list[dict] = []
+        self.green_done: list[str] = []
 
     # -- what must fall on a panel -------------------------------------------------------
 
@@ -451,8 +474,10 @@ class ShellBuilder:
         for p in br["plants"]:
             add(p["at"], p["position"][2], 1500, int(max(p["height_m"], 1.0) * 1000))
         for s in br["skybridges"]:
-            h = int(max(s["levels"], 1) * s["level_height_m"] * 1000)
-            add(s["at"], s["z_m"] + h / 2000.0, int(s["width_m"] * 1000) + 600, h + 400)
+            # (AG4: the bridge's corridor and a margin: its deck structure 1 m under the
+            # landing, 0.5 m beside it, so no sill, shutter or shade enters it)
+            h = int(max(s["levels"], 1) * s["level_height_m"] * 1000) + 1600
+            add(s["at"], s["z_m"] + (h - 2400) / 2000.0, int(s["width_m"] * 1000) + 1000, h)
         return out
 
     # -- build ---------------------------------------------------------------------------
@@ -495,9 +520,15 @@ class ShellBuilder:
                     kept.setdefault(j, []).append((min(s), max(s)))
         self.kept = kept
         AR.articulate(self)
+        CN.portals(self)
+        RF.plan(self)
         masses = self.masses
         groups = set()
         for ms in masses:
+            if ms.get("roof") and ms["roof"]["zb"] <= ms["z0"] + 50:
+                # (AG4: a roof storey, all roof)
+                RF.build_form(self, ms, self._wall_slot(ms, SY.role_group(ms["role"])))
+                continue
             if ms["z1"] - ms["z0"] < 50 or len(RG.clean(ms["rings"][0])) < 3:
                 continue
             self.stats["masses"] += 1
@@ -521,14 +552,20 @@ class ShellBuilder:
                     if self._extrude(ms["rings"][0], None, -depth, 0, "structure"):
                         self.stats["plinths"] = self.stats.get("plinths", 0) + 1
                     self.buf.layer = 0
-        for it in br["roof_items"]:
-            self._roof_item(it)
+        # AG4: sky stations and portal mouths; an asset for every roof item, green roofs,
+        # the access hut, vents, skylights
+        CN.station(self)
+        CN.mouth_frames(self)
+        RF.items(self)
+        RF.green_roofs(self)
+        RF.extras(self)
         self._mast()
         self._columns()
         # AG3: doors for what no band could take, the mounts' hardware, blind and fire walls
         FR.leftovers(self)
         FR.hardware(self)
         FR.walls(self)
+        DT.details(self)          # AG4: downpipes, fire escapes, ducts, vents, cables, cameras
         self.checks = {"mounts": FR.mount_check(self), "access": FR.door_check(self)}
         self._finish_parts()
         self.used["groups"] = [g for g in GN.GROUPS if g in groups]
@@ -539,7 +576,11 @@ class ShellBuilder:
                 "masses": self.mass_info, "parts": self.inst, "doors": self.doors,
                 "decals": self.decals,
                 "band_m": None if self.band_z is None else self.band_z / 1000.0,
-                "checks": self.checks}
+                "checks": self.checks,
+                # AG4: every roof item's asset, the green roofs built, skybridge landings,
+                # portals and sky stations
+                "roof_items": self.roof_items, "green": list(self.green_done),
+                "landings": CN.landing_records(self), "portals": self.portal_recs}
 
     def _unpinched(self, ext, holes) -> list[int]:
         """The ring numbers (1 on) of the courts that touch neither the exterior nor another
@@ -556,6 +597,33 @@ class ShellBuilder:
             else:
                 keep.append(j + 1)
         return keep
+
+    def _j(self, ms: dict, r: int, i: int):
+        """The brief edge of a mass's ring edge (AG4: a portal's pieces carry theirs)."""
+        if "ej" in ms:
+            return ms["ej"][r][i]
+        return self.edge_of.get((ms["k"], ms["rid"][r], ms["eidx"][r][i]))
+
+    def _bridge_free(self, fa: Facade, s0: int, s1: int, z0: int, z1: int, depth: int
+                     ) -> bool:
+        """AG4: whether a part of a facade (s0..s1, z0..z1, `depth` out) keeps out of every
+        skybridge's corridor."""
+        if not self.bridges.segs:
+            return True
+        a, b = fa.P(s0, 0), fa.P(s1, 0)
+        ox, oy = fa.nx * depth, fa.ny * depth
+        xs = (a[0], b[0], a[0] + ox, b[0] + ox)
+        ys = (a[1], b[1], a[1] + oy, b[1] + oy)
+        return not self.bridges.hits(min(xs), min(ys), max(xs), max(ys), z0, z1)
+
+    def _wall_slot(self, ms: dict, g: str) -> str:
+        """The slot of a mass's walls (as `_mass` picks it)."""
+        if g == "structure":
+            return "structure"
+        sysname = self.gm["genes"][f"{g}.system"]
+        if sysname == "punched_concrete":
+            return self.gm["genes"]["finish"]
+        return SY.SYSTEMS[sysname]["wall"]
 
     def _covered_above(self, ms: dict, a, b) -> bool:
         """Whether another mass of the building stands on this mass's edge a-b (just above
@@ -598,7 +666,8 @@ class ShellBuilder:
                          for o in self.masses)
         feats = self.used["features"].setdefault(g, [])
         # cornice and bands decided first: they bound the rows
-        cornice = genes.get(f"{g}.cornice", "none") if sysname else "none"
+        cornice = genes.get(f"{g}.cornice", "none") if sysname and not ms.get("roof") \
+            else "none"
         cornice_d = int(round(cont.get(f"{g}.cornice_m", 0.3) * 1000)) if cornice != "none" \
             else 0
         if cornice == "thin":
@@ -616,7 +685,7 @@ class ShellBuilder:
             genes.get(f"{g}.balcony", "none") not in ("none", "balconette") and \
             g in ("base", "body") and ms["floors"] >= 3
         rows = mass_rows(ms, g, gm, is_top, ground, self.tall, self.parking, cornice_h,
-                         doors)
+                         doors, CN.door_floors(self, ms))
         # AG3: a mass on the ground has its street front (`fronts`) up to its first floor
         # line; the rows above it are the shell's
         band = FR.band_top(ms) if ms["z0"] <= self.ground + 50 and ms["shape"] == "prism" \
@@ -627,6 +696,11 @@ class ShellBuilder:
             # shed's clerestory)
             ground_row = next((r for r in rows if r[5] < band and r[0] < band - 400), None)
             rows = [r for r in rows if r[5] >= band or r[0] >= band]
+            # (AG4: a row of a floor under the band that starts on its top, e.g. a shed's tall
+            # window whose wall a roof form lowered, keeps a sill strip over it)
+            rows = [(max(r[0], band + SILL_MIN), r[1], r[2], r[3], max(r[4], band + SILL_MIN),
+                     r[5]) if r[5] < band and r[0] < band + SILL_MIN else r for r in rows]
+            rows = [r for r in rows if r[1] - r[0] >= 400]
             ms["band"] = band
             self.band_z = band if self.band_z is None else min(self.band_z, band)
         reveal = int(round(cont[f"{g}.reveal_m"] * 1000)) if sysname else 0
@@ -650,7 +724,7 @@ class ShellBuilder:
                     continue
                 fa = Facade(a, b, u_run)
                 u_run += fa.L / 1000.0
-                j = self.edge_of.get((k, ms["rid"][r], ms["eidx"][r][i]))
+                j = self._j(ms, r, i)
                 fa.rec = br["edges"][j] if j is not None else None
                 if ms["deriv"][r][i]:
                     # a cut's or an offset's own edge: its neighbor's class, nothing mounted
@@ -685,11 +759,16 @@ class ShellBuilder:
                             _corner_clear(d_out, d_nx, reveal),
                             reveal + EDGE_CLEAR if _convex(d_out, d_nx) else 0)
                 ok = allow and not _blocked(fa, reveal + EDGE_CLEAR, all_edges)
+                fwall = wall
+                if ms.get("portal") and ms["deriv"][r][i] and fa.j is None:
+                    # (AG4: a portal's corridor wall: a metal lining, glazed at a station)
+                    fwall = "portal_lining"
+                    ok = ok and bool(ms.get("station"))
                 fa.d_in, fa.d_nx, fa.reveal = d_in, d_nx, max(reveal, 60)
                 facades.append((fa, r, i, ok))
                 self.all_facades.append((fa, ms))
                 if band is None or band < ms["z1"]:
-                    info["openings"] += self._facade(ms, g, fa, rows, wall, sysname, reveal,
+                    info["openings"] += self._facade(ms, g, fa, rows, fwall, sysname, reveal,
                                                      bay, ok)
         if band is not None:
             self.buf.layer = 1
@@ -704,12 +783,19 @@ class ShellBuilder:
             self.buf.layer = 0
             self.buf.part = up_part
         self._caps(ms, wall, band)
+        if ms.get("roof"):
+            RF.build_form(self, ms, wall)       # AG4: the roof form in the attic
         self.mass_info.append(info)
         if sysname is None:
+            if ms["role"] == "deck":
+                CN.deck(self, ms)               # AG4: paving, balustrades, planters
             return
+        CN.courts(self, ms)                     # AG4: court floors and galleries
         # strips: parapet on open roof edges, cornice, slab bands
         top_open = [[not self._covered_above(ms, ring[i], ring[(i + 1) % len(ring)])
                      for i in range(len(ring))] for ring in rings]
+        if ms.get("portal_floor"):
+            top_open = [[False] * len(ring) for ring in rings]     # (AG4: a portal's floor)
         par = genes.get(f"{g}.parapet", "none")
         if is_top and genes["crown"] == "flat" and g != "base":
             par = "none"
@@ -717,14 +803,22 @@ class ShellBuilder:
             par = "high"
         if not is_top and par == "none" and any(any(r) for r in top_open):
             par = "low"                # a ledge or a terrace on a lower mass: a railing
+        if ms.get("roof"):
+            par = "none"               # (AG4: eaves instead)
         if par != "none":
             hp = int(round(cont[f"{g}.parapet_m"] * 1000))
             if par == "low":
                 hp = max(300, hp // 2)
             t = max(200, reveal + 80)
-            if self._strips(ms, top_open, 0, -t, ms["z1"], ms["z1"] + hp, "trim", t,
+            # AG4: a coping on the parapet's top (metal flashing, or stone)
+            cop = RF.coping_slot(self)
+            hz = hp - 50 if cop else hp
+            if self._strips(ms, top_open, 0, -t, ms["z1"], ms["z1"] + hz, "trim", t,
                             need_out=False):
                 feats.append("parapet")
+                if cop and self._strips(ms, top_open, 30, -(t + 30), ms["z1"] + hz,
+                                        ms["z1"] + hp, cop, t + 30, need_out=False):
+                    self.stats["copings"] = self.stats.get("copings", 0) + 1
         if cornice_h:
             ok = self._edge_ok(ms, ms["z1"] - cornice_h, ms["z1"])
             mask = [[o and q for o, q in zip(r1, r2)] for r1, r2 in zip(top_open, ok)]
@@ -765,6 +859,7 @@ class ShellBuilder:
                     self.used["parts"].setdefault(g, set()).add("ribs")
         if feature == "eaves":
             self._eaves(ms, g, rows)
+        RF.finish(self, ms, top_open)        # AG4: a flat roof's finish
 
     def _edge_ok(self, ms: dict, za: int, zb: int) -> list[list[bool]]:
         """Per ring edge: whether a strip may leave the footprint there between za and zb
@@ -774,7 +869,7 @@ class ShellBuilder:
         for r, ring in enumerate(ms["rings"]):
             row = []
             for i in range(len(ring)):
-                j = self.edge_of.get((k, ms["rid"][r], ms["eidx"][r][i]))
+                j = self._j(ms, r, i)
                 ok = j is not None
                 if ok:
                     for reg in self.br["edges"][j]["regions"]:
@@ -934,6 +1029,8 @@ class ShellBuilder:
                         self.stats["mount_panels"] += 1
                         continue
                     kept.append(op)
+                # AG4: a skybridge's landing door where its deck is this row's floor
+                kept = CN.landing_ops(self, fa, (lo, hi, kind, f, full, zf), kept)
                 ops = _merge_ok(kept, fa.c0, fa.c1, L)
                 if sysname == "spandrel_ribbon" and kind == "win":
                     # a ribbon: the bays' openings one long opening, the mullions parts
@@ -944,6 +1041,10 @@ class ShellBuilder:
                         else:
                             merged.append(op)
                     ops = merged
+            elif sysname and fa.j in self.landings and \
+                    _depth(ms["rings"][0], fa) >= CN.LANDING_THIN:
+                # AG4: a skybridge landing on a mass too thin for windows: its door alone
+                ops = CN.landing_ops(self, fa, (lo, hi, kind, f, full, zf), [])
             c = [0]
             for a_, b_, *_ in ops:
                 c += [a_, b_]
@@ -1154,6 +1255,8 @@ class ShellBuilder:
             if any(b0 < m1 and b1 > m0 and zf - 300 < z1 and zf + 1300 > z0
                    for m0, m1, z0, z1 in mounts):
                 continue
+            if not self._bridge_free(fa, b0, b1, zf - 300, zf + 1300, d):
+                continue                       # (AG4: off every skybridge's corridor)
             out[jb] = (b0, b1, d)
         return out
 
@@ -1166,6 +1269,9 @@ class ShellBuilder:
         lo, hi, kind, f, full, zf = row
         _, back, jb, pl, pr = op
         w, h = b_ - a_, hi - lo
+        if jb == -2:
+            CN.landing_door(self, fa, a_, b_, lo, hi, reveal)      # (AG4)
+            return
         if w < 300 or h < 300 or kind == "void":
             return
         genes, cont = self.gm["genes"], self.gm["cont"]
@@ -1211,7 +1317,8 @@ class ShellBuilder:
                                    "patch_panel"}, mid, lo)
                 self.used["irregular"] = True
                 return
-            if feat == "addons" and lo - 150 >= STRIP_MIN_Z and u1 < 0.14 * irr + 0.10:
+            if feat == "addons" and lo - 150 >= STRIP_MIN_Z and u1 < 0.14 * irr + 0.10 and \
+                    self._bridge_free(fa, a_ - 200, b_ + 200, lo - 150, hi + 150, 500):
                 P.on(fa, "panel", {"style": "addon", "w": PT.q(w + 400),
                                    "h": PT.q(min(h + 300, 2400)), "d": 500}, mid, lo - 150)
                 used.add("addons")
@@ -1277,7 +1384,8 @@ class ShellBuilder:
             return
         use = self.br["building"]["use"]
         if lo >= STRIP_MIN_Z and use in ("residential", "hotel", "office", "retail") and \
-                w >= 800 and jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr:
+                w >= 800 and jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr and \
+                self._bridge_free(fa, a_, b_, lo - 100, lo + 600, 400):
             P.on(fa, "ac", {"w": 660, "h": 420, "do": 350, "di": min(250, max(r - 30, 20))},
                  mid, full if door else lo)
             self.used["irregular"] = True
@@ -1618,7 +1726,32 @@ class ShellBuilder:
             b, arrs = PT.mesh(fam, p)
             if not arrs:
                 continue
-            if len(at) < PT.INSTANCE_MIN and all(PT.survives(arrs, a) for a in at):
+            if (self.bridges.segs or self.tubes) and PT.REACH.get(fam) in ("strip", "deep"):
+                # AG4: no part that stands out of a wall enters a skybridge's corridor or
+                # comes near a sky tube passing through a portal
+                lo, hi = PT.bounds(arrs)
+                keep = []
+                for a in at:
+                    xs, ys = [], []
+                    for cx in (lo[0], hi[0]):
+                        for cy in (lo[1], hi[1]):
+                            xs.append(a[0] + cx * a[3] - cy * a[4])
+                            ys.append(a[1] + cx * a[4] + cy * a[3])
+                    box_ = (min(xs), min(ys), max(xs), max(ys), a[2] + lo[2], a[2] + hi[2])
+                    if self.bridges.hits(*box_):
+                        self.stats["parts_off_bridges"] = \
+                            self.stats.get("parts_off_bridges", 0) + 1
+                        continue
+                    if self.tubes and CN.in_tube(self.tubes, *box_):
+                        self.stats["parts_off_portals"] = \
+                            self.stats.get("parts_off_portals", 0) + 1
+                        continue
+                    keep.append(a)
+                at = keep
+                if not at:
+                    continue
+            if len(at) < PT.INSTANCE_MIN and fam not in PT.INSTANCE_ALWAYS and \
+                    all(PT.survives(arrs, a) for a in at):
                 zlo = PT.bounds(arrs)[0][2]
                 for a in at:
                     # (AG3) a part reaching down into the street band is the front's
@@ -1655,29 +1788,14 @@ class ShellBuilder:
         top = buf.plane((0.0, 0.0, 1.0), (0, 0, z1), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
         bot = buf.plane((0.0, 0.0, -1.0), (0, 0, z0), (1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
         roof = "roof" if wall != "structure" else "structure"
+        if ms.get("portal_floor"):
+            roof = "portal_floor"           # (AG4: under a sky tube portal)
+        under = "portal_lining" if ms.get("portal_top") else "structure"
         buf.add(roof, top, [(p[0], p[1], z1) for p in pts], [i for t in tris for i in t])
-        buf.add("structure", bot, [(p[0], p[1], z0) for p in pts],
+        buf.add(under, bot, [(p[0], p[1], z0) for p in pts],
                 [i for t in tris for i in (t[0], t[2], t[1])])
 
-    # -- roof items and wheels -----------------------------------------------------------
-
-    def _roof_item(self, it: dict) -> None:
-        x, y, z = (int(round(v * 1000)) for v in it["position"])
-        sa, sc, sz = (max(int(round(v * 1000)), 100) for v in it["size"])
-        a = M.radians(float(it["yaw_deg"]))
-        ux, uy = float(M.cos(a)), float(M.sin(a))
-        vx, vy = -uy, ux
-        ha, hc = sa / 2.0, sc / 2.0
-        ring = [(int(round(x - ux * ha - vx * hc)), int(round(y - uy * ha - vy * hc))),
-                (int(round(x + ux * ha - vx * hc)), int(round(y + uy * ha - vy * hc))),
-                (int(round(x + ux * ha + vx * hc)), int(round(y + uy * ha + vy * hc))),
-                (int(round(x - ux * ha + vx * hc)), int(round(y - uy * ha + vy * hc)))]
-        ring = RG.clean(ring)
-        if len(ring) < 3 or not RG.is_simple(ring):
-            return
-        self.buf.new_part()
-        if self._extrude(ring, None, z, z + sz, "equipment"):
-            self.stats["roof_items"] += 1
+    # -- wheels -------------------------------------------------------------------------
 
     def _wheel(self, ms: dict) -> None:
         """A vertical wheel (as the blockout draws it): rim and spokes as closed beams in the

@@ -3,8 +3,9 @@
     blender -b --factory-startup -P assetgen/blender/preview_assets.py -- JOB.json
 
 `assetgen preview` writes the job. With a blockout (`citygen blockout`'s city.blend) the
-scene starts from it, its building boxes removed (ground, water, streets, props, plants and
-skybridges stay); else from a plain ground. Every far proxy is loaded once; each view then
+scene starts from it, its building boxes removed, and AG4's skybridges and green roofs in
+place of the blockout's (ground, water, streets, props and plants stay); else from a plain
+ground. Every far proxy is loaded once; each view then
 loads the full shells of the tiles it needs and hides those buildings' proxies:
 
 - `city`: the whole city from proxies, isometric (the blockout's iso_city camera);
@@ -51,9 +52,10 @@ def start_scene():
     if JOB.get("blend"):
         bpy.ops.wm.open_mainfile(filepath=JOB["blend"])
         gone = 0
+        removed = set(JOB.get("removed") or ())
         for o in list(bpy.data.objects):
             t = str(o.get("citygen_type", ""))
-            if t.startswith("building."):
+            if t.startswith("building.") or o.name in removed:
                 bpy.data.objects.remove(o, do_unlink=True)
                 gone += 1
         for m in list(bpy.data.meshes):
@@ -514,6 +516,8 @@ def main():
             shells += import_glb(f"{JOB['assets']}/tiles/{tile}.glb", "shell")
             if tile in insts:
                 shells += load_parts(f"{JOB['assets']}/parts/{tile}.glb", insts[tile], "parts")
+        for tile in v.get("connection_tiles", []):
+            shells += import_glb(f"{JOB['assets']}/connections/{tile}.glb", "connection")
         for o in shells:
             if o.type == "EMPTY" and o.name in proxies:
                 proxies[o.name].hide_render = True

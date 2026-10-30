@@ -72,6 +72,32 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "riser_tile": ("facade", "tile_glazed"), "riser_stone": ("facade", "stone_dressed"),
     "riser_dark": ("facade", "stone_dressed"), "lit_menu": ("neon", None),
     "lit_white": ("neon", None),
+    # AG4: roofs, roof equipment, green roofs, facade details, portals, stations, courts,
+    # decks and skybridges (all on the shared library's sets)
+    "roof_gravel": ("facade", "ballast"), "roof_paver": ("facade", "paving_concrete_slab"),
+    "roof_deck": ("facade", "paving_timber"), "roof_walkway": ("facade",
+                                                                 "paving_concrete_tile"),
+    "roof_metal": ("metal", "seam"), "coping": ("metal", "aluminum"),
+    "coping_stone": ("facade", "sill_stone"), "soffit": ("facade", "trim_paint"),
+    "skylight": ("metal", None), "green_roof": ("foliage", "grass"),
+    "soil": ("facade", "ballast"), "equip_dark": ("metal", "metal_dark"),
+    "equip_rust": ("metal", "metal_rusty"), "equip_steel": ("metal", "metal_galvanized"),
+    "tank_timber": ("facade", "timber"), "tank_steel": ("metal", "tank_metal"),
+    "tank_panel": ("facade", "plastic"), "tank_roof": ("metal", "metal_dark"),
+    "antenna": ("metal", "metal_galvanized"), "lamp_red": ("neon", None),
+    "lamp_green": ("neon", None), "lamp_amber": ("neon", None), "lamp_white": ("neon", None),
+    "pad_deck": ("facade", "pad_concrete"), "pad_paint_white": ("facade", "road_paint"),
+    "pad_paint_yellow": ("facade", "road_paint"), "roof_wall": ("facade", "structure"),
+    "penthouse": ("facade", "structure"),
+    "escape": ("metal", "metal_dark"), "duct": ("metal", "metal_galvanized"),
+    "cable": ("facade", "rubber"), "camera": ("facade", "plastic"),
+    "camera_lens": ("metal", None), "portal_lining": ("metal", "panel_corporate_glass"),
+    "portal_floor": ("facade", "paving_granite"), "platform": ("facade", "paving_granite"),
+    "platform_edge": ("facade", "tactile"), "court_paving": ("facade", "paving_tile"),
+    "planter": ("facade", "concrete_formed"), "bridge_deck": ("facade", "concrete_formed"),
+    "bridge_floor": ("facade", "paving_granite"), "bridge_glass": ("glass", None),
+    "bridge_frame": ("metal", "aluminum"), "bridge_roof": ("metal", "seam"),
+    "bridge_steel": ("metal", "steel_painted"), "bridge_rail": ("metal", "metal_dark"),
 }
 for _s in SY.SLOTS:
     if _s.startswith("paint_"):
@@ -195,7 +221,8 @@ def prop_set(slot: str) -> tuple[str, str | None]:
 
 
 def set_for(slot: str, era: str | None, part: str = "buildings") -> tuple[str, str | None]:
-    """(master, library set) of a slot (for an era-varied slot, in that era)."""
+    """(master, library set) of a slot (for an era-varied slot, in that era); AG4's
+    `connections` (skybridges) read the building table."""
     if part == "streets":
         return STREET.get(slot, ("concrete", "concrete_smooth"))
     if part in ("props", "signs"):

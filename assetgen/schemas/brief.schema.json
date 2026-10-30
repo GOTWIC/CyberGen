@@ -139,6 +139,65 @@
       "title": "BuildingRec",
       "type": "object"
     },
+    "Clearance": {
+      "additionalProperties": false,
+      "description": "AG4: a corridor the asset keeps out of (a skybridge, a transit guideway and its\ntrains, a sky tube), near the building: a line of (x, y, z floor, z top) in the building\nframe and a half width.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "skybridge",
+            "guideway",
+            "sky_tube"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "half_m": {
+          "title": "Half M",
+          "type": "number"
+        },
+        "line": {
+          "items": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Line",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "mode",
+        "half_m",
+        "line"
+      ],
+      "title": "Clearance",
+      "type": "object"
+    },
     "District": {
       "additionalProperties": false,
       "properties": {
@@ -988,12 +1047,91 @@
         "station": {
           "title": "Station",
           "type": "boolean"
+        },
+        "lines": {
+          "description": "AG4: the sky tube's top line near the tower, a polyline per tube piece (building frame, z from its base).",
+          "items": {
+            "items": {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "diameter_m": {
+          "title": "Diameter M",
+          "type": "number"
+        },
+        "station_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Id"
+        },
+        "station_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Name"
+        },
+        "track_z_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The sky station's track (the tube's axis), building frame.",
+          "title": "Track Z M"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The sky station's platform footprint (M5), building frame."
         }
       },
       "required": [
         "line_id",
         "z",
-        "station"
+        "station",
+        "lines",
+        "diameter_m"
       ],
       "title": "Portal",
       "type": "object"
@@ -1601,7 +1739,7 @@
   "additionalProperties": false,
   "properties": {
     "brief_version": {
-      "const": 1,
+      "const": 2,
       "title": "Brief Version",
       "type": "integer"
     },
@@ -1761,6 +1899,13 @@
         }
       ],
       "title": "Override"
+    },
+    "clearances": {
+      "items": {
+        "$ref": "#/$defs/Clearance"
+      },
+      "title": "Clearances",
+      "type": "array"
     }
   },
   "required": [

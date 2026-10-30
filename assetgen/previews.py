@@ -331,8 +331,14 @@ def run(build_dir: str | Path, blockout: str | None = None, out: str | None = No
     inst_path = od / "instances.json"
     inst_path.write_text(json.dumps(instances(man, need)))
     lit = 0.03
+    # AG4: the skybridges of the tiles each view draws in full, in place of the blockout's
+    conn = set(man.get("connections") or {})
+    for v in views:
+        v["connection_tiles"] = sorted(set(v.get("shell_tiles", [])) & conn)
+    removed = sorted(set(man.get("skybridges") or {}) |
+                     {g for x in (man.get("green_replaces") or {}).values() for g in x})
     job = {"assets": str(adir), "out": str(od), "views": views, "sheets": sheets,
-           "instances": str(inst_path), "parts_on": parts,
+           "instances": str(inst_path), "parts_on": parts, "removed": removed,
            # proxies only where some view does not draw the tile at full detail
            "proxy_tiles": sorted(set(man["tiles"]) - set.intersection(
                *(set(v.get("shell_tiles", [])) for v in views))) if views else [],

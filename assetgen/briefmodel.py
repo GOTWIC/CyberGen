@@ -117,6 +117,27 @@ class Portal(_M):
     line_id: str
     z: tuple[float, float]
     station: bool
+    lines: list[list[P3]] = Field(description="AG4: the sky tube's top line near the tower, "
+                                               "a polyline per tube piece (building frame, z "
+                                               "from its base).")
+    diameter_m: float
+    station_id: str | None = None
+    station_name: str | None = None
+    track_z_m: float | None = Field(None, description="The sky station's track (the tube's "
+                                                      "axis), building frame.")
+    platform: Polygon | None = Field(None, description="The sky station's platform "
+                                                       "footprint (M5), building frame.")
+
+
+class Clearance(_M):
+    """AG4: a corridor the asset keeps out of (a skybridge, a transit guideway and its
+    trains, a sky tube), near the building: a line of (x, y, z floor, z top) in the building
+    frame and a half width."""
+    kind: Literal["skybridge", "guideway", "sky_tube"]
+    id: str
+    mode: str
+    half_m: float
+    line: list[tuple[float, float, float, float]]
 
 
 class SkybridgeEnd(_M):
@@ -262,7 +283,7 @@ class SpecSection(_M):
 
 
 class Brief(_M):
-    brief_version: Literal[1]
+    brief_version: Literal[2]
     id: str
     origin: P2
     building: BuildingRec
@@ -284,6 +305,7 @@ class Brief(_M):
     district: District | None
     spec: SpecSection
     override: dict[str, Any] | None
+    clearances: list[Clearance] = Field(default_factory=list)
 
 
 def json_schema() -> dict:

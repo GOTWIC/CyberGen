@@ -275,6 +275,47 @@ ARTICULATION = {
 ARTICULATION_DEFAULT = {"cut": (0.7, 0.2, 0.1), "setback": 0.25, "canopy": 0.3,
                         "arcade": 0.1}
 AG2_CROWNS = ("flat", "parapet", "lantern", "stepped", "halo", "mast", "spire")
+# AG4's crowns: pitched (hip, gable, mansard), pagoda_roof, sawtooth, dome (a barrel vault),
+# billboard_frame (an empty frame on the roof); `roofs.py`
+AG4_CROWNS = ("pitched", "pagoda_roof", "sawtooth", "dome", "billboard_frame")
+
+# AG4: roofs. Sheds and halls take a roof form of their own (gene `roof_form`, weights by
+# type: sawtooth, gable, barrel, flat); the era's share of gables among its pitched roofs;
+# the finish of its flat roofs (gravel, pavers, membrane); stone copings; pitch ranges
+# (degrees) and eaves (m); the styles of roof equipment.
+SHED_TYPES = ("building.shed", "building.warehouse", "building.hangar", "building.yard")
+SHED_FORMS = {"building.shed": (("sawtooth", "gable", "barrel", "flat"), (0.3, 0.4, 0.1, 0.2)),
+              "building.warehouse": (("sawtooth", "gable", "barrel", "flat"),
+                                     (0.35, 0.35, 0.05, 0.25)),
+              "building.hangar": (("barrel", "gable", "flat"), (0.6, 0.25, 0.15)),
+              "building.yard": (("gable", "flat"), (0.4, 0.6))}
+GABLE_SHARE = {"heritage": 0.55, "suburban_modern": 0.45}
+ROOF_FINISHES = {
+    "heritage": (0.2, 0.5, 0.1, 0.2), "neon_retro": (0.1, 0.35, 0.1, 0.45),
+    "corporate_glass": (0.0, 0.3, 0.5, 0.2), "brutalist": (0.0, 0.6, 0.15, 0.25),
+    "industrial": (0.0, 0.25, 0.0, 0.75), "clean_tech": (0.0, 0.25, 0.45, 0.3),
+    "suburban_modern": (0.3, 0.35, 0.2, 0.15), "transit_modern": (0.0, 0.4, 0.25, 0.35),
+    "mixed_modern": (0.05, 0.4, 0.25, 0.3), "aerospace": (0.0, 0.2, 0.1, 0.7),
+}
+ROOF_FINISH_NAMES = ("tile", "gravel", "pavers", "membrane")
+STONE_COPING = ("heritage", "brutalist", "suburban_modern")
+PITCH = {"heritage": (32.0, 45.0), "suburban_modern": (24.0, 36.0), "*": (18.0, 30.0)}
+SHED_PITCH = (10.0, 18.0)
+EAVE = {"heritage": (0.35, 0.55), "suburban_modern": (0.3, 0.5), "*": (0.2, 0.4)}
+EQUIP_STYLES = {
+    "ac": {"heritage": (("old", "fans"), (0.6, 0.4)), "neon_retro": (("old", "fans", "box"),
+                                                                    (0.4, 0.4, 0.2)),
+           "corporate_glass": (("box", "fans"), (0.8, 0.2)), "clean_tech": (("box",), None),
+           "aerospace": (("box", "fans"), (0.6, 0.4)),
+           "transit_modern": (("box", "fans"), (0.6, 0.4)),
+           "*": (("fans", "box", "old"), (0.5, 0.3, 0.2))},
+    "tank": {"heritage": (("timber", "steel"), (0.75, 0.25)),
+             "neon_retro": (("timber", "steel", "panel"), (0.5, 0.3, 0.2)),
+             "industrial": (("steel", "panel"), (0.7, 0.3)),
+             "brutalist": (("steel", "panel"), (0.5, 0.5)),
+             "suburban_modern": (("panel", "steel"), (0.6, 0.4)),
+             "*": (("panel", "steel"), (0.6, 0.4))},
+}
 
 # Discrete-gene value lists the genome draws from when a system leaves them open.
 CORNERS = ("plain", "heavy", "tight")
@@ -395,6 +436,55 @@ SLOTS: dict[str, tuple] = {
     "riser_dark": ("facade", "#26292c", 0.5, 0.1, None),
     "lit_menu": ("neon", "#ffe7b8", 0.5, 0.0, None),
     "lit_white": ("neon", "#e8f4ff", 0.5, 0.0, None),
+    # AG4: roof finishes and forms, roof equipment, green roofs, facade details, portals,
+    # sky stations, courts and decks
+    "roof_gravel": ("facade", "#6a6762", 0.95, 0.0, None),
+    "roof_paver": ("facade", "#8f8c86", 0.85, 0.0, None),
+    "roof_deck": ("facade", "#6b5038", 0.8, 0.0, None),
+    "roof_walkway": ("facade", "#7f7c76", 0.85, 0.0, None),
+    "roof_metal": ("metal", "#7a8086", 0.45, 0.6, "roof"),
+    "coping": ("metal", "#9aa0a6", 0.4, 0.7, None),
+    "coping_stone": ("facade", "#c7c0b2", 0.8, 0.0, None),
+    "soffit": ("facade", "#bdb6aa", 0.8, 0.0, "trim"),
+    "skylight": ("metal", "#2a3a48", 0.1, 0.4, None),
+    "green_roof": ("foliage", "#4f7a3a", 0.95, 0.0, None),
+    "soil": ("facade", "#4a3b2e", 0.95, 0.0, None),
+    "equip_dark": ("metal", "#2b2f33", 0.6, 0.6, None),
+    "equip_rust": ("metal", "#6e3a22", 0.8, 0.4, None),
+    "equip_steel": ("metal", "#55595e", 0.5, 0.8, None),
+    "tank_timber": ("facade", "#6b4a32", 0.85, 0.0, None),
+    "tank_steel": ("metal", "#b9bcba", 0.5, 0.6, None),
+    "tank_panel": ("facade", "#c9c6bc", 0.6, 0.1, None),
+    "tank_roof": ("metal", "#3b3f45", 0.6, 0.5, None),
+    "antenna": ("metal", "#c9ccce", 0.45, 0.8, None),
+    "lamp_red": ("neon", "#ff2a1a", 0.5, 0.0, None),
+    "lamp_green": ("neon", "#3dff6a", 0.5, 0.0, None),
+    "lamp_amber": ("neon", "#ffb000", 0.5, 0.0, None),
+    "lamp_white": ("neon", "#f2f6ff", 0.5, 0.0, None),
+    "pad_deck": ("facade", "#5a5d61", 0.85, 0.0, None),
+    "pad_paint_white": ("facade", "#e8e8e2", 0.6, 0.0, None),
+    "pad_paint_yellow": ("facade", "#d9b21f", 0.6, 0.0, None),
+    "roof_wall": ("facade", "#9a968e", 0.85, 0.0, None),
+    "penthouse": ("facade", "#9a968e", 0.85, 0.0, "wall"),
+    "escape": ("metal", "#1f2326", 0.6, 0.7, None),
+    "duct": ("metal", "#9ea3a7", 0.5, 0.6, None),
+    "cable": ("facade", "#141414", 0.7, 0.0, None),
+    "camera": ("facade", "#d8dadc", 0.4, 0.0, None),
+    "camera_lens": ("metal", "#0b0d10", 0.1, 0.5, None),
+    "portal_lining": ("metal", "#aeb4ba", 0.35, 0.7, None),
+    "portal_floor": ("facade", "#8d8c88", 0.7, 0.0, None),
+    "platform": ("facade", "#a7a6a1", 0.65, 0.0, None),
+    "platform_edge": ("facade", "#c9a227", 0.6, 0.0, None),
+    "court_paving": ("facade", "#9b968d", 0.75, 0.0, None),
+    "planter": ("facade", "#8a8883", 0.85, 0.0, None),
+    # AG4: skybridges (pieces of their own, untinted: they carry no building's CPD)
+    "bridge_deck": ("facade", "#85827c", 0.85, 0.0, None),
+    "bridge_floor": ("facade", "#a7a6a1", 0.65, 0.0, None),
+    "bridge_glass": ("glass", "#2a3a48", 0.06, 0.0, None),
+    "bridge_frame": ("metal", "#a8adb2", 0.35, 0.8, None),
+    "bridge_roof": ("metal", "#6f757b", 0.5, 0.6, None),
+    "bridge_steel": ("metal", "#3f4a55", 0.55, 0.7, None),
+    "bridge_rail": ("metal", "#2e3236", 0.5, 0.7, None),
 }
 # AG3: a shopfront's paint (frame, fascia, riser, door) per unit, from its era's list
 PAINTS = {"paint_red": "#7e1f1c", "paint_green": "#1f4a36", "paint_blue": "#1d3557",
