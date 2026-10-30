@@ -758,8 +758,10 @@ neighbor rule in `buildout.select_forms`):
   salts by `FORM_INDEX`) and, in phase b, every form that fits (`forms_ok`) and the heights
   in the bands beside its own (`band_heights`; under 40 m from the first band). Then the
   parent (`select_forms`, tallest first, the complexes' and landmarks' towers and in a
-  regeneration the old towers outside the district fixed, `Frame.old_towers`) gives each the
-  first form no tower of another property within 151 m has in its band, else a band beside;
+  regeneration the old towers outside the district fixed, `Frame.old_towers`, and a new tower
+  on an old one's lot given its old form and height, so the city outside comes back as it
+  was) gives each the first form no tower of another property within 151 m has in its band,
+  else a band beside;
   the lots that change are built again in their chunks (`rebuild`, `force`).
 - **Checks** (two more): `building_forms` (arcs within 2.1 cm of their footprint, twist at
   most 3 degrees a floor, every mass above the building's floor resting on or fixed to

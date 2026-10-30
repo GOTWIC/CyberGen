@@ -136,6 +136,8 @@ def test_small_city_passes(small_built):
                    "building_heights", "building_entrances", "ground_floor_units",
                    "roof_items", "complexes", "skybridges", "landmarks", "megasite_contents",
                    "megasite_heights", "megasite_access",
+                   # M21
+                   "building_forms", "tower_neighbors",
                    # M6 (no transit lines in the small city, so no M5 checks)
                    "props_keepout", "props_overlap", "tree_clearance", "street_lighting",
                    "park_planting", "boats_afloat",

@@ -337,7 +337,7 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
     # (a district regeneration: the old towers outside it as they are, `edit.py`)
     held = list(getattr(getattr(b, "frame", None), "old_towers", None) or [])
     changes = select_forms([t for r in ra for t in r.get("towers", [])] + held,
-                           [t for r in rb for t in r.get("towers", [])])
+                           [t for r in rb for t in r.get("towers", [])], held)
     n_re = rebuild(mapper, chunks, rb, changes)
     lap("forms")
     secs["forms_rebuilt"] = n_re
@@ -406,7 +406,10 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
 NEAR_PAD_M = 1.0    # M21: the selection keeps this margin over the neighbor check's distance
 
 
-def select_forms(fixed: list, movable: list) -> dict:
+TWIN_M = 0.5        # M21: a regeneration's new tower and the old one on the same lot
+
+
+def select_forms(fixed: list, movable: list, hold: list | None = None) -> dict:
     """M21: the form of each lot tower (and, where every form it fits is taken in its own
     height band, its height) so that no two towers of different properties within
     `TOWER_NEAR_M` share a form and a height band. The towers of complexes and landmarks
@@ -414,9 +417,25 @@ def select_forms(fixed: list, movable: list) -> dict:
     own list (their own drawn form first) that no tower already placed near them has in
     their band, else the same in a band beside their own (`band_heights`). Returns
     {lot id: (form, height or None)} for the towers that change; a tower with no free form
-    keeps its own (the check reports it)."""
+    keeps its own (the check reports it). In a district regeneration (`hold`, the old towers
+    outside it), a new tower on an old one's lot takes the old one's form and height, so the
+    city outside the district comes back as it was."""
     R = BL.TOWER_NEAR_M + NEAR_PAD_M
     grid: dict = {}
+    olds: dict = {}
+    for o in hold or []:
+        olds.setdefault((int(math.floor(o["c"][0])), int(math.floor(o["c"][1]))), []).append(o)
+
+    def twin(t):
+        i, j = int(math.floor(t["c"][0])), int(math.floor(t["c"][1]))
+        best = None
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                for o in olds.get((i + di, j + dj), ()):
+                    d = math.sqrt((o["c"][0] - t["c"][0]) ** 2 + (o["c"][1] - t["c"][1]) ** 2)
+                    if d <= TWIN_M and (best is None or (d, o["id"]) < best[0]):
+                        best = ((d, o["id"]), o)
+        return best[1] if best is not None else None
 
     def cell(c):
         return int(math.floor(c[0] / R)), int(math.floor(c[1] / R))
@@ -439,6 +458,13 @@ def select_forms(fixed: list, movable: list) -> dict:
         place(t, t["form"], t["band"])
     changes = {}
     for t in sorted(movable, key=lambda t: (-t["height"], t["id"])):
+        o = twin(t) if olds else None
+        if o is not None:
+            h = None if abs(o["height"] - t["height"]) < 0.01 else o["height"]
+            if o["form"] != t["form"] or h is not None:
+                changes[t["lot_id"]] = (o["form"], h)
+            place(t, o["form"], o["band"])
+            continue
         ok = t["ok"] or [t["form"]]
         pick = None
         for h in [None] + list(t["alt_h"]):

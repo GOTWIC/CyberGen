@@ -216,12 +216,21 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
     frame = ST.Frame(old, district, dd.id, poly, {d.name: d.archetype for d in cur.districts},
                      pins=pins, keep_out=G.union(ground) if ground else None,
                      pin_buildings=pin_b, old_entry=d_old)
-    # M21: the old towers outside the district stay as they are; the new ones keep their
-    # forms apart from them (`buildout.select_forms`)
-    from . import building_checks as BC
-    frame.old_towers = [{"id": t.id, "property_id": t.property_id, "height": h, "c": c,
-                         "form": f, "band": band}
-                        for t, h, band, f, c in BC.towers(old) if t.district_id != dd.id]
+    # M21: the old towers outside the district stay as they are: the new build gives each
+    # its old form and height, and the district's new ones keep their forms apart from them
+    # (`buildout.select_forms`)
+    from . import buildings as BL
+    frame.old_towers = []
+    for t in old.buildings:
+        kind = t.type.split(".", 1)[1] if "." in t.type else t.type
+        if t.district_id == dd.id or t.megasite_id or t.footprint is None or                 not (kind in BL.TOWER_KINDS or t.landmark) or t.attrs.get("pinned"):
+            continue
+        h = t.height_m - (float(t.attrs.get("deck_top_m", 0.0)) if t.level else 0.0)
+        frame.old_towers.append({
+            "id": t.id, "property_id": t.property_id, "height": h,
+            "c": G.centroid(G.from_model_poly(t.footprint)),
+            "form": t.form.kind if t.form is not None else "box",
+            "band": BL.tower_band(h) if h >= BL.TOWER_MIN_M - 1e-6 else -1})
     held = {ln.name: ln.model_dump(mode="json") for ln in old.transit_lines}
     O = old.model_dump(mode="json")
     new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,
