@@ -164,3 +164,25 @@ it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` 
 - Vesper Bay Stacks' traced crosstown ends 23 m up on M12's stack (tagged `traced_end`; M12's
   as drawn).
 - Mac = x86 for the new goldens waits for the deferred determinism check.
+- **Park paths through lots** (found by assetgen's `asset_access` on M17's Testport, since
+  M2): `local.open_paths` draws a straight 3 m path from a park's, plaza's or promenade's
+  middle to every walkway node within 30 m of it, across whatever lies between. In M17's
+  builds 342 to 801 such paths per city cross a lot and 287 to 711 run through a building;
+  before M17 the counts were about the same (Delta 538 and 498, Vesper Bay 442 and 372). On
+  Testport one villa's main entrance faces such a path behind its neighbor, and
+  `asset_access` failed the door. Kept out of M17: keeping the paths off lots (tried: 431
+  of Testport's 726 paths go, 0 then cross a lot) leaves 121 of its 293 open spaces with no
+  path at all, parks the lots enclose, which need an access of their own. For M17
+  `asset_access` counts a door whose only walkway ahead lies inside another building as
+  unreachable, the city's to change, as its rule for a city-made problem says.
+- **About 3% of building entrances** link to their walkway by a straight line through another
+  building (Delta 199 of 6,724 with M17, 211 before); assetgen relinks them, as before.
+
+## Two changes to the assetgen tests and check
+
+- `tests/assetgen/agtools._alive` (main's new temp-dir sweep) called `os.kill(pid, 0)`, which
+  on Windows sends Ctrl+C to process group `pid` or raises WinError 87, so any test run that met
+  another run's `ag_small_<pid>_*` dir broke its assetgen tests; it now asks `OpenProcess`
+  and `GetExitCodeProcess` on Windows.
+- `assetgen/asset_checks.access`: as above, a walkway that is ahead of a door only inside
+  another building does not make the door a failure.
