@@ -1,0 +1,42 @@
+== dead ends
+dead ends by class: {'highway': 3, 'avenue': 1, 'street': 176, 'service': 14, 'alley': 172, 'pedestrian': 40}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 97, 'service': 8, 'alley': 138, 'pedestrian': 35}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 147
+[(('avenue', 'street'), 79), (('street', 'street'), 25), (('highway', 'avenue'), 18), (('avenue', 'avenue'), 10), (('street', 'pedestrian'), 4), (('highway', 'highway'), 3), (('avenue', 'pedestrian'), 3), (('avenue', 'service'), 2)]
+   ('rs.w809n205', 'rs.w819n280', 'highway', 'avenue', 725, -821, 269)
+   ('rs.w593n849.2', 'rs.w593n849', 'highway', 'avenue', 1274, -591, 847)
+   ('rs.w593n849.2', 'rs.w517n902', 'highway', 'highway', 1459, -588, 841)
+   ('rs.w591n909', 'rs.w593n849', 'highway', 'avenue', 36, -590, 883)
+   ('rs.w517n902', 'rs.w593n849', 'highway', 'avenue', 1019, -591, 843)
+   ('rs.w517n902', 'rs.w447n982', 'highway', 'avenue', 411, -428, 978)
+   ('rs.w517n902', 'rs.w405n991', 'highway', 'avenue', 35, -422, 981)
+   ('rs.w376s128', 'rs.w94s248', 'highway', 'avenue', 224, -98, -255)
+== bridges
+bridges: 9 Counter({'road': 6, 'pedestrian': 3})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1839 with a leg not at the node's height at the junction edge: 31 with a leg's end not at the node's z: 0
+== junction control
+   ('Crown Heights', False, False) 28
+   ('Crown Heights', True, True) 66
+   ('Hollow', False, False) 62
+   ('Hollow', True, True) 100
+   ('Lantern Steps', False, False) 445
+   ('Lantern Steps', True, True) 92
+   ('Low Harbor', False, False) 30
+   ('Low Harbor', True, True) 15
+   ('Old Quarter', False, False) 804
+   ('Old Quarter', True, True) 86
+   ('Ridgeback', False, False) 65
+   ('Ridgeback', True, True) 46
+crosswalk widths: Counter({4.0: 1406})
+junctions with crosswalks: 405 of them within 40 m of another: 182
+== signs
+Counter({('shop_sign', 'blade'): 11802, ('shop_sign', 'facade'): 5132, ('billboard', 'roof'): 1640, ('neon', 'facade'): 740, ('billboard', 'facade'): 337, ('holo_ad', 'roof'): 43})
+== transit supports
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 46

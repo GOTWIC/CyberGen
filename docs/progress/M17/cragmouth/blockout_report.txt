@@ -1,0 +1,18 @@
+citygen blockout: Cragmouth
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 12684 objects in the .blend, 12684 in the plan
+  [pass] blend_buildings: 7058 building objects, 7058 buildings with masses in the model
+  [pass] blend_instances: 83827 prop and plant instances evaluated in the .blend, 83827 in the plan
+  [pass] gltf_tiles: 168 tile files for 168 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 12 of 12 renders
+  [pass] blender_budget: Blender 267.2 s (budget 600 s)
+
+plan: 12684 objects, 92790 parts, 168 tiles, 7058 buildings (sha256 506a7750dee8b316)
+blender 5.2.3 LTS: 2453458 vertices, 1477878 faces, 83827 instances, 74 materials, 106 collections
+files (MB): {"blend": 30.2, "usd": 109.7, "gltf_tiles": 153.4, "renders": 4.5}
+timings (s): {"build_s": 9.8, "save_s": 1.0, "usd_s": 38.8, "gltf_s": 93.7, "render_s": 123.1, "total_s": 267.2}
+total (s): {"plan_s": 16.4, "exports_s": 6.3, "total_s": 296.2}
