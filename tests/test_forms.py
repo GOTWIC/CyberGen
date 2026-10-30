@@ -106,8 +106,12 @@ def test_variety_sets_the_forms_drawn():
 def test_band_heights_leave_the_band():
     for H in (60.0, 100.0, 150.0, 200.0):
         k = BL.tower_band(H)
-        for h in BL.band_heights(H, 4.0, 40.0, 320.0, math.inf):
-            assert abs(BL.tower_band(h) - k) == 1 and abs(h / 4.0 - round(h / 4.0)) < 1e-9
+        hs = BL.band_heights(H, 4.0, 40.0, 320.0, math.inf)
+        steps = [abs(BL.tower_band(h) - k) for h in hs]
+        assert hs and all(s >= 1 for s in steps) and steps == sorted(steps)
+        assert all(40.0 <= h <= 320.0 and abs(h / 4.0 - round(h / 4.0)) < 1e-9 for h in hs)
+    # the first band may go under 40 m (no longer a tower) where the range allows
+    assert BL.tower_band(BL.band_heights(48.0, 4.0, 20.0, 120.0, math.inf)[0]) == -1
 
 
 def _t(i, x, h, form, ok, prop=None, alt=()):

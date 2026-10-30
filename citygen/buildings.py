@@ -1237,21 +1237,28 @@ def tower_band(h: float) -> int:
 
 
 def band_heights(H: float, fh: float, lo: float, hi: float, cap: float) -> list[float]:
-    """Heights on the floor grid in the bands beside H's, within [lo, hi] and under the cap
-    (the highest of the band below first, then the lowest of the band above): where a tower
-    can go when every form it fits is taken in its own band."""
+    """Heights on the floor grid in the other bands, within [lo, hi] and under the cap,
+    nearest band first (below before above; under 40 m, no longer a tower, below the first
+    band): the highest of a band below, the lowest of a band above. Where a tower can go when
+    every form it fits is taken in its own band."""
     k = tower_band(H)
+    if k < 0:
+        return []
+    top = min(hi, cap)
     out = []
-    if k >= 0:      # (from the first band: under 40 m, no longer a tower)
-        n = int(math.ceil(TOWER_BANDS_M[k] / fh - 1e-9)) - 1
-        h = q(n * fh)
-        if h >= lo - 1e-6 and h < TOWER_BANDS_M[k] - 1e-6 and tower_band(h) == k - 1:
-            out.append(h)
-    if 0 <= k < len(TOWER_BANDS_M) - 1:
-        n = int(math.ceil(TOWER_BANDS_M[k + 1] / fh - 1e-9))
-        h = q(n * fh)
-        if h <= min(hi, cap) + 1e-6 and tower_band(h) == k + 1:
-            out.append(h)
+    for step in range(1, len(TOWER_BANDS_M) + 1):
+        b = k - step
+        if b >= -1:
+            n = int(math.ceil(TOWER_BANDS_M[b + 1] / fh - 1e-9)) - 1
+            h = q(n * fh)
+            if lo - 1e-6 <= h <= top + 1e-6 and tower_band(h) == b:
+                out.append(h)
+        b = k + step
+        if b < len(TOWER_BANDS_M):
+            n = int(math.ceil(TOWER_BANDS_M[b] / fh - 1e-9))
+            h = q(n * fh)
+            if lo - 1e-6 <= h <= top + 1e-6 and tower_band(h) == b:
+                out.append(h)
     return out
 
 

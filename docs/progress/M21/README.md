@@ -113,6 +113,14 @@ Three fixes the new forms called for elsewhere:
   its `finish` from the body's system, and its punched concrete podium read that finish
   without the patch genes its own group never drew (`KeyError`, the merged Vesper Bay): the
   podium keeps concrete in that case (`shell._finish`), every other building as before.
+- **Balconies under a floating block** (AG2): a cantilevered or stacked block's first-floor
+  balconies hung 0.2 m under it in the air (`asset_envelope`); a balcony whose slab no mass of
+  the building spans within a deep part's reach is left out (`shell._hangs`), so balconies
+  over a podium stand as before.
+- **Odd-lot tiers** (citygen): a setback, taper, terrace or wedge tier inset or cut from an
+  odd plate must have no corner under 40 degrees and no edge under 1 m (`forms.neat`; a
+  35 degree tier gave AG1's facade grammar bad edges on Delta), else the tower takes another
+  form.
 
 ## Builds
 
@@ -161,6 +169,15 @@ district's twin towers not built (their two lots left empty; the held transit li
 buildings in the regenerated district). An open item from before M21.
 
 ## Open
+
+- On the merged code `assetgen build` fails two checks that main with M17 fails the same way
+  without M21 (checked on main's own builds of both cities): Vesper Bay `asset_roofs`
+  (`d02.lot.e799n917.bld`: a sky station portal of the Crown Loop over a megabuilding's
+  podium, 26 m from its tower at the tube's height, so there is nothing to cut and too far for
+  a platform beside it; transit portals by the union of a building's masses) and Delta
+  `asset_access` (`d02.lot.e1475n1713.bld` door `u0`, no walkway open to it, a perimeter
+  block). Main with M17 also crashed on Vesper Bay (`KeyError: 'base.patch'`, fixed here) and
+  failed Delta `asset_clearance` (a sloped sky station, fixed here).
 
 - AG15 draws the forms whole (bands as one lofted surface, curved walls with their windows,
   diagonal braces of the exoskeletons from `form.params`); AG14 the arcs smooth.

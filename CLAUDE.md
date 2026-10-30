@@ -840,8 +840,9 @@ neighbor rule in `buildout.select_forms`):
   tube's lowest point over it (`connections.station`, as `_beside`: a rerouted Delta line put
   a station on a 7.5% grade, and the level floor from the tube's first point met the tube);
   a punched concrete wall under a patchwork body keeps its own wall where the patchwork
-  finish has no patch genes in its group (`shell._finish`; it raised `KeyError`);
-  `GEN_VERSION` m21.1.
+  finish has no patch genes in its group (`shell._finish`; it raised `KeyError`); no
+  balcony hangs under a floating block (`shell._hangs`); `GEN_VERSION` m21.1. Odd-lot tiers
+  are kept neat (`forms.neat`: no corner under 40 degrees, no edge under 1 m).
 Sample builds: `docs/progress/M21/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
