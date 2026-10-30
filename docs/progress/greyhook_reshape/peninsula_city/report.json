@@ -158,7 +158,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "3 crossings without a node"
+        "4 crossings without a node"
       ]
     },
     {
@@ -343,6 +343,20 @@
       "notes": []
     },
     {
+      "id": "road_dead_ends",
+      "title": "Every dead end is deliberate and says so (`dead_end`): at the map edge, a water end, a park, plaza or megasite gate, a path's end, a cul-de-sac with its turning bulb, a deck street's end, a traced road's end",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_overlaps",
+      "title": "Two roads at one level (within 4 m) overlap only inside a junction: rights of way overlapping by more than 25 m2 outside every junction polygon",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "building_footprints",
       "title": "Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it",
       "passed": true,
@@ -436,6 +450,36 @@
       ]
     },
     {
+      "id": "building_forms",
+      "title": "Building forms (M21): every arc lies on its footprint within 2 cm, a twisted shaft turns at most 3 degrees a floor, the form names its own masses, and every mass above the building's floor rests on or is fixed to another of its masses",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tower_neighbors",
+      "title": "No two towers of different owners within 150 m share a form and a height band (M21), and every tower's form record names its band",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "117 towers, 17 forms, 0 pairs within 150 m of one form and band"
+      ]
+    },
+    {
+      "id": "bridge_clash",
+      "title": "Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "road_building_clash",
+      "title": "No road, sidewalk, ramp or deck street right of way over a building mass at the road's own height (the mass under it, or 5 m over it, clears)",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "transit_routes",
       "title": "Every transit line of the spec is built along its whole route (every leg found)",
       "passed": true,
@@ -490,7 +534,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "93 columns and pylons"
+        "95 columns and pylons"
       ]
     },
     {
@@ -520,7 +564,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "20481 things on the ground"
+        "20624 things on the ground"
       ]
     },
     {
@@ -546,7 +590,7 @@
         "Wallgate Heights: 99% lit",
         "Neckgate: 96% lit",
         "The Stacks: 97% lit",
-        "Lantern Strip: 92% lit",
+        "Lantern Strip: 90% lit",
         "Eastside Docks: 98% lit",
         "Hook Spaceport: 98% lit"
       ]
@@ -571,7 +615,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "224 doors"
+        "217 doors"
       ]
     },
     {
@@ -638,7 +682,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "98 road columns under 17 raised segments"
+        "101 road columns under 17 raised segments"
       ]
     }
   ],
@@ -753,16 +797,16 @@
       }
     ],
     "road_km": {
-      "alley": 5.35,
+      "alley": 5.89,
       "avenue": 24.56,
-      "footbridge": 0.07,
+      "footbridge": 0.05,
       "highway": 3.37,
-      "pedestrian": 11.79,
-      "service": 10.66,
-      "street": 51.06
+      "pedestrian": 20.48,
+      "service": 11.74,
+      "street": 45.38
     },
-    "road_nodes": 926,
-    "road_segments": 1261,
+    "road_nodes": 864,
+    "road_segments": 1249,
     "road_components": 1,
     "bridges": 3,
     "bridges_by_class": {
@@ -774,7 +818,7 @@
     "named_bridges": [
       "Wallgate Bridge"
     ],
-    "pedestrian_bridges": 3,
+    "pedestrian_bridges": 2,
     "landmasses_connected": [
       2,
       2
@@ -801,15 +845,15 @@
       "max_stack_m": 0.0,
       "overpasses": 1,
       "max_deck_m": 9.0,
-      "raised_other_km": 2.92,
-      "underpass_streets": 2,
-      "road_columns": 98
+      "raised_other_km": 2.66,
+      "underpass_streets": 0,
+      "road_columns": 101
     },
     "tunnels": {
       "by_kind": {
         "metro": {
           "count": 5,
-          "km": 2.47
+          "km": 2.48
         }
       },
       "vents": 0,
@@ -819,179 +863,191 @@
       "over_tunnel_streets": 0
     },
     "local": {
-      "junctions": 745,
-      "junctions_signalized": 246,
+      "junctions": 794,
+      "junctions_signalized": 229,
       "junctions_by_type": {
-        "street_street T": 314,
-        "avenue_avenue T": 206,
-        "street T": 70,
-        "street_street X": 47,
-        "avenue_avenue X": 29,
-        "alley_alley T": 23,
-        "pedestrian T": 15,
-        "street_service T": 10,
+        "street_street T": 285,
+        "avenue_avenue T": 191,
+        "street T": 76,
+        "street_street X": 55,
+        "pedestrian T": 46,
+        "avenue_avenue X": 33,
+        "alley_alley T": 24,
+        "street cul_de_sac": 16,
         "highway_highway T": 8,
-        "street_alley T": 6,
-        "street_street multi": 5,
+        "street_alley bend": 7,
+        "street bend": 5,
+        "street_service T": 5,
+        "street_service bend": 5,
+        "alley_alley X": 4,
+        "service cul_de_sac": 4,
+        "service_service T": 4,
+        "street_alley T": 4,
+        "alley T": 3,
+        "avenue_street bend": 3,
         "highway_highway X": 3,
-        "service_service T": 3,
-        "street_alley X": 2,
-        "alley T": 1,
-        "alley_alley X": 1,
+        "street_alley X": 3,
+        "avenue_service bend": 2,
+        "pedestrian X": 2,
+        "alley X": 1,
+        "avenue cul_de_sac": 1,
         "highway_avenue T": 1,
-        "pedestrian X": 1
+        "pedestrian bend": 1,
+        "street X": 1,
+        "street_street multi": 1
       },
-      "crosswalks": 773,
-      "sidewalks": 1952,
-      "sidewalk_km": 107.48,
-      "lanes": 2807,
-      "lane_connectors": 5127,
-      "one_way_segments": 39,
-      "walkways": 7285,
+      "crosswalks": 730,
+      "sidewalks": 1788,
+      "sidewalk_km": 95.73,
+      "lanes": 2610,
+      "lane_connectors": 4804,
+      "one_way_segments": 50,
+      "walkways": 7334,
       "walkway_km": {
-        "alley": 16.01,
-        "crossing": 31.96,
-        "crosswalk": 28.0,
-        "elevated": 0.91,
+        "alley": 17.63,
+        "crossing": 32.15,
+        "crosswalk": 27.56,
+        "elevated": 0.81,
         "elevator": 0.0,
-        "footbridge": 0.07,
-        "path": 54.47,
-        "pedestrian_street": 0.53,
-        "promenade": 11.26,
-        "sidewalk": 131.64,
-        "skybridge": 2.76,
-        "stairs": 0.32
+        "footbridge": 0.05,
+        "path": 59.86,
+        "pedestrian_street": 6.98,
+        "promenade": 13.51,
+        "sidewalk": 119.95,
+        "skybridge": 2.9,
+        "stairs": 0.31
       },
-      "footbridges": 3,
-      "blocks": 411,
-      "lots": 2682,
+      "footbridges": 2,
+      "blocks": 439,
+      "lots": 2637,
       "merged_lot_groups": 5,
       "lot_area_m2_by_archetype": {
         "entertainment_market": {
           "count": 1376,
-          "min": 62.7,
-          "p10": 115.0,
-          "median": 232.0,
-          "p90": 436.8,
-          "max": 703.1,
-          "median_frontage_m": 16.0
+          "min": 57.2,
+          "p10": 113.7,
+          "median": 229.7,
+          "p90": 446.2,
+          "max": 756.2,
+          "median_frontage_m": 16.1
         },
         "industrial_port": {
-          "count": 55,
-          "min": 2064.3,
-          "p10": 2652.8,
-          "median": 6163.1,
-          "p90": 15256.1,
-          "max": 27164.9,
-          "median_frontage_m": 109.4
+          "count": 44,
+          "min": 2829.8,
+          "p10": 3959.2,
+          "median": 8447.8,
+          "p90": 15804.5,
+          "max": 22008.1,
+          "median_frontage_m": 154.7
         },
         "megablock_residential": {
-          "count": 140,
-          "min": 2019.3,
-          "p10": 2783.5,
-          "median": 5216.1,
-          "p90": 10467.6,
-          "max": 16566.3,
-          "median_frontage_m": 93.6
+          "count": 136,
+          "min": 2048.7,
+          "p10": 2950.8,
+          "median": 5564.9,
+          "p90": 10181.4,
+          "max": 16460.5,
+          "median_frontage_m": 109.8
         },
         "residential_heights": {
-          "count": 817,
-          "min": 283.6,
-          "p10": 467.6,
-          "median": 800.7,
-          "p90": 1343.0,
-          "max": 2598.2,
-          "median_frontage_m": 25.6
+          "count": 787,
+          "min": 281.4,
+          "p10": 461.1,
+          "median": 811.0,
+          "p90": 1414.3,
+          "max": 3099.8,
+          "median_frontage_m": 27.2
         },
         "spaceport": {
           "count": 27,
-          "min": 2734.5,
-          "p10": 4817.7,
-          "median": 9143.7,
-          "p90": 16381.2,
-          "max": 25090.0,
-          "median_frontage_m": 110.6
+          "min": 2506.0,
+          "p10": 4456.2,
+          "median": 9277.0,
+          "p90": 19468.0,
+          "max": 24219.8,
+          "median_frontage_m": 122.2
         },
         "transit_hub": {
           "count": 267,
-          "min": 477.4,
-          "p10": 769.6,
-          "median": 1475.9,
-          "p90": 3199.7,
-          "max": 5244.6,
-          "median_frontage_m": 44.2
+          "min": 445.0,
+          "p10": 790.7,
+          "median": 1485.4,
+          "p90": 2919.4,
+          "max": 4845.2,
+          "median_frontage_m": 45.5
         }
       },
       "block_size_m_by_district": {
         "Wallgate Heights": {
-          "count": 83,
-          "min": 27.9,
-          "p10": 64.7,
-          "median": 90.4,
-          "p90": 130.0,
+          "count": 84,
+          "min": 32.6,
+          "p10": 67.7,
+          "median": 92.2,
+          "p90": 123.7,
           "max": 270.0
         },
         "Neckgate": {
-          "count": 48,
-          "min": 26.8,
-          "p10": 56.7,
-          "median": 85.5,
-          "p90": 114.2,
-          "max": 235.1
+          "count": 49,
+          "min": 31.9,
+          "p10": 49.3,
+          "median": 84.0,
+          "p90": 151.2,
+          "max": 224.7
         },
         "The Stacks": {
-          "count": 60,
-          "min": 58.5,
-          "p10": 73.8,
-          "median": 108.3,
-          "p90": 181.6,
-          "max": 220.3
+          "count": 74,
+          "min": 56.3,
+          "p10": 64.6,
+          "median": 95.4,
+          "p90": 163.5,
+          "max": 242.5
         },
         "Lantern Strip": {
-          "count": 201,
-          "min": 10.8,
-          "p10": 21.9,
-          "median": 38.0,
-          "p90": 62.3,
-          "max": 89.8
+          "count": 204,
+          "min": 15.2,
+          "p10": 24.0,
+          "median": 39.4,
+          "p90": 60.5,
+          "max": 92.1
         },
         "Eastside Docks": {
-          "count": 8,
-          "min": 87.7,
-          "p10": 91.5,
-          "median": 230.8,
-          "p90": 328.3,
-          "max": 372.3
+          "count": 16,
+          "min": 53.2,
+          "p10": 63.9,
+          "median": 165.1,
+          "p90": 232.6,
+          "max": 264.1
         },
         "Hook Spaceport": {
-          "count": 11,
-          "min": 91.4,
-          "p10": 105.0,
-          "median": 193.1,
-          "p90": 200.1,
-          "max": 214.5
+          "count": 12,
+          "min": 87.6,
+          "p10": 114.5,
+          "median": 142.8,
+          "p90": 236.9,
+          "max": 242.4
         }
       },
       "open_spaces_by_kind": {
-        "green": 16,
-        "park": 228,
-        "plaza": 142,
+        "courtyard": 5,
+        "green": 11,
+        "park": 231,
+        "plaza": 139,
         "pocket_park": 3
       },
       "open_share_by_district": {
-        "Wallgate Heights": 0.1761,
-        "Neckgate": 0.101,
-        "The Stacks": 0.0983,
-        "Lantern Strip": 0.0626,
-        "Eastside Docks": 0.0441,
-        "Hook Spaceport": 0.1631
+        "Wallgate Heights": 0.176,
+        "Neckgate": 0.0992,
+        "The Stacks": 0.1003,
+        "Lantern Strip": 0.0621,
+        "Eastside Docks": 0.0432,
+        "Hook Spaceport": 0.1608
       },
-      "open_share": 0.1136,
+      "open_share": 0.1137,
       "places": 1,
       "generator": {
-        "one_way_loops": 7,
-        "open_paths": 658,
-        "walkway_links": 0,
+        "one_way_loops": 10,
+        "open_paths": 601,
+        "walkway_links": 1,
         "angles": {
           "d01": 7.5,
           "d02": 2.5,
@@ -1003,24 +1059,24 @@
       }
     },
     "buildings": {
-      "count": 2671,
-      "floor_area_km2": 16.851,
+      "count": 2617,
+      "floor_area_km2": 16.058,
       "by_type": {
-        "shopfront_row": 870,
-        "villa": 775,
-        "shanty_stack": 434,
-        "podium_tower": 240,
-        "megabuilding": 102,
-        "slab": 77,
-        "perimeter": 33,
+        "shopfront_row": 884,
+        "villa": 736,
+        "shanty_stack": 417,
+        "podium_tower": 208,
+        "megabuilding": 105,
+        "slab": 90,
         "warehouse": 29,
-        "terraced": 22,
-        "parking_structure": 21,
-        "tower": 17,
-        "hangar": 15,
-        "yard": 12,
-        "shed": 10,
-        "courtyard_block": 6,
+        "parking_structure": 27,
+        "tower": 26,
+        "terraced": 25,
+        "perimeter": 22,
+        "hangar": 16,
+        "shed": 14,
+        "courtyard_block": 7,
+        "yard": 3,
         "straddle_building": 2,
         "control_tower": 1,
         "landmark.ferris_wheel": 1,
@@ -1030,84 +1086,84 @@
         "terminal": 1
       },
       "by_use": {
-        "residential": 1389,
-        "retail": 870,
-        "mixed": 245,
-        "entertainment": 64,
-        "industrial": 51,
+        "residential": 1336,
+        "retail": 884,
+        "mixed": 230,
+        "entertainment": 63,
+        "industrial": 46,
         "transport": 29,
-        "parking": 21,
+        "parking": 27,
         "station": 2
       },
       "by_district": {
         "Wallgate Heights": {
-          "count": 815,
+          "count": 785,
           "min": 10.2,
           "median": 20.4,
           "p90": 23.8,
-          "max": 37.4,
+          "max": 34.0,
           "archetype": "residential_heights",
-          "floor_area_km2": 1.311,
-          "coverage": 0.335,
-          "far": 1.87
+          "floor_area_km2": 1.364,
+          "coverage": 0.354,
+          "far": 1.96
         },
         "Neckgate": {
-          "count": 265,
+          "count": 256,
           "min": 12.0,
-          "median": 35.0,
-          "p90": 66.5,
+          "median": 42.0,
+          "p90": 59.5,
           "max": 112.0,
           "archetype": "transit_hub",
-          "floor_area_km2": 2.775,
-          "coverage": 0.716,
-          "far": 5.86
+          "floor_area_km2": 2.436,
+          "coverage": 0.658,
+          "far": 5.27
         },
         "The Stacks": {
-          "count": 140,
-          "min": 131.2,
-          "median": 156.8,
+          "count": 134,
+          "min": 124.8,
+          "median": 160.0,
           "p90": 185.6,
-          "max": 227.2,
+          "max": 236.8,
           "archetype": "megablock_residential",
-          "floor_area_km2": 10.623,
-          "coverage": 0.764,
-          "far": 12.55
+          "floor_area_km2": 10.075,
+          "coverage": 0.752,
+          "far": 12.17
         },
         "Lantern Strip": {
-          "count": 1367,
+          "count": 1363,
           "min": 10.5,
           "median": 21.0,
-          "p90": 28.0,
+          "p90": 30.6,
           "max": 120.0,
           "archetype": "entertainment_market",
-          "floor_area_km2": 1.541,
-          "coverage": 0.961,
-          "far": 4.35
+          "floor_area_km2": 1.551,
+          "coverage": 0.96,
+          "far": 4.34
         },
         "Eastside Docks": {
-          "count": 49,
+          "count": 44,
           "min": 10.0,
-          "median": 11.9,
+          "median": 12.5,
           "p90": 16.0,
           "max": 16.0,
           "archetype": "industrial_port",
-          "floor_area_km2": 0.106,
-          "coverage": 0.256,
-          "far": 0.26
+          "floor_area_km2": 0.133,
+          "coverage": 0.333,
+          "far": 0.33
         },
         "Hook Spaceport": {
           "count": 27,
           "min": 11.0,
-          "median": 24.4,
-          "p90": 32.0,
+          "median": 20.1,
+          "p90": 28.0,
           "max": 36.0,
           "archetype": "spaceport",
-          "floor_area_km2": 0.213,
-          "coverage": 0.278,
-          "far": 0.73
+          "floor_area_km2": 0.217,
+          "coverage": 0.302,
+          "far": 0.75
         }
       },
-      "properties": 2659,
+      "properties": 2605,
       "complexes": {
         "landmark": 1,
         "megabuilding_campus": 3,
@@ -1115,35 +1171,35 @@
         "straddle_building": 1,
         "tower_cluster": 1
       },
-      "skybridges": 170,
+      "skybridges": 155,
       "skybridges_by_kind": {
-        "enclosed": 43,
-        "open_deck": 127
+        "enclosed": 35,
+        "open_deck": 120
       },
-      "skybridge_km": 2.76,
-      "units": 8570,
+      "skybridge_km": 2.9,
+      "units": 8427,
       "units_by_use": {
-        "food": 2020,
-        "bar": 1225,
-        "convenience": 1079,
-        "club": 1058,
-        "cyberware": 882,
-        "arcade": 736,
-        "pawn": 633,
-        "lobby": 451,
-        "laundromat": 291,
-        "clinic": 195
+        "food": 2063,
+        "bar": 1221,
+        "club": 1052,
+        "convenience": 1044,
+        "cyberware": 876,
+        "arcade": 667,
+        "pawn": 596,
+        "lobby": 419,
+        "laundromat": 299,
+        "clinic": 190
       },
       "roof_items": {
-        "ac_unit": 6176,
-        "water_tank": 672,
-        "billboard": 547,
-        "mechanical": 308,
-        "antenna": 75,
-        "av_pad": 11
+        "ac_unit": 6139,
+        "water_tank": 652,
+        "billboard": 571,
+        "mechanical": 274,
+        "antenna": 69,
+        "av_pad": 8
       },
-      "green_roofs": 430,
-      "green_roof_m2": 266171,
+      "green_roofs": 415,
+      "green_roof_m2": 215037,
       "landmarks": [
         {
           "name": "Lantern Wheel",
@@ -1187,139 +1243,139 @@
           }
         }
       },
-      "site_elements": 211,
-      "structures": 247,
-      "tallest_m": 227.2,
+      "site_elements": 119,
+      "structures": 245,
+      "tallest_m": 236.8,
       "generator": {
-        "walkways_added": 1291
+        "walkways_added": 1215
       }
     },
     "transit": {
       "by_mode": {
         "elevated_rail": {
           "lines": 1,
-          "km": 3.23,
-          "stations": 6
+          "km": 2.71,
+          "stations": 5
         },
         "metro": {
           "lines": 1,
-          "km": 3.07,
+          "km": 3.08,
           "stations": 5
         },
         "sky_tube": {
           "lines": 1,
-          "km": 1.5,
+          "km": 1.51,
           "stations": 3
         }
       },
       "stations": {
-        "elevated": 6,
+        "elevated": 5,
         "sky": 3,
         "underground": 5
       },
-      "supports": 93,
-      "portals": 14,
-      "buildings_removed": 10,
-      "km": 7.81,
+      "supports": 95,
+      "portals": 13,
+      "buildings_removed": 15,
+      "km": 7.3,
       "generator": {
         "lines": 3,
-        "stations": 14,
-        "removed_buildings": 10,
-        "removed_skybridges": 2,
-        "portals": 14,
-        "structures": 148,
-        "walkways_added": 52
+        "stations": 13,
+        "removed_buildings": 15,
+        "removed_skybridges": 7,
+        "portals": 13,
+        "structures": 143,
+        "walkways_added": 49
       }
     },
     "props": {
-      "props": 27800,
-      "plants": 15109,
-      "trees": 5493,
-      "instances": 42909,
+      "props": 27814,
+      "plants": 14203,
+      "trees": 5539,
+      "instances": 42017,
       "props_by_kind": {
-        "sign": 7119,
-        "awning": 4939,
-        "ac_unit": 3586,
-        "street_light": 3102,
-        "trash": 2044,
-        "traffic_signal": 1141,
-        "bollard": 1048,
+        "sign": 7007,
+        "awning": 4904,
+        "ac_unit": 3543,
+        "street_light": 2789,
+        "bollard": 1951,
+        "trash": 1940,
+        "traffic_signal": 1081,
         "railing": 1017,
-        "hydrant": 693,
-        "trash_can": 631,
+        "trash_can": 581,
+        "hydrant": 563,
         "barrier": 557,
-        "parked_vehicle": 541,
-        "bench": 463,
-        "overhead_cable": 457,
-        "dumpster": 285,
+        "parked_vehicle": 508,
+        "overhead_cable": 482,
+        "bench": 424,
+        "dumpster": 289,
         "bus_stop": 62,
-        "boat": 29,
-        "wall_light": 27,
-        "planter": 17,
-        "food_stall": 14,
-        "scaffolding": 14,
-        "vending_machine": 8,
-        "kiosk": 6
+        "boat": 30,
+        "wall_light": 29,
+        "planter": 15,
+        "scaffolding": 12,
+        "food_stall": 10,
+        "kiosk": 10,
+        "vending_machine": 10
       },
       "plants_by_kind": {
-        "shrub": 7290,
-        "park_tree": 2375,
-        "street_tree": 1289,
-        "palm": 1228,
-        "facade_greenery": 883,
-        "overgrowth": 828,
-        "roof_tree": 615,
-        "conifer": 456,
-        "median_tree": 145
+        "shrub": 6665,
+        "park_tree": 2336,
+        "palm": 1285,
+        "street_tree": 1245,
+        "facade_greenery": 852,
+        "overgrowth": 693,
+        "conifer": 524,
+        "roof_tree": 454,
+        "median_tree": 149
       },
-      "lawn_m2": 50563,
-      "hedge_km": 2.36,
+      "lawn_m2": 49753,
+      "hedge_km": 2.86,
       "generator": {
-        "traffic_signals": 1141,
-        "bus_stops": 126,
-        "street_lights": 2895,
-        "narrow_lights": 234,
-        "hydrants": 693,
-        "crosswalk_cans": 255,
-        "bollards": 1048,
+        "traffic_signals": 1081,
+        "bus_stops": 124,
+        "street_lights": 2514,
+        "narrow_lights": 304,
+        "hydrants": 563,
+        "crosswalk_cans": 245,
+        "bollards": 1951,
         "station_props": 6,
-        "street_trees": 1289,
-        "plaza_props": 78,
-        "park_benches": 684,
-        "parked_vehicles": 541,
-        "alley_clutter": 2329,
-        "median_trees": 1267,
-        "promenade_trees": 106,
-        "park_trees": 6988,
-        "roof_plants": 3748,
-        "facade_greenery": 883,
-        "overgrowth": 828,
-        "quay_props": 1098,
+        "street_trees": 1245,
+        "plaza_props": 80,
+        "park_benches": 605,
+        "parked_vehicles": 508,
+        "alley_clutter": 2229,
+        "median_trees": 1264,
+        "promenade_trees": 170,
+        "park_trees": 7071,
+        "roof_plants": 2908,
+        "facade_greenery": 852,
+        "overgrowth": 693,
+        "quay_props": 1099,
         "highway_barriers": 557,
-        "overhead_cables": 457,
-        "unit_dressing": 15644,
-        "scaffolding": 14,
+        "overhead_cables": 482,
+        "unit_dressing": 15454,
+        "scaffolding": 12,
         "market_gates": 0,
-        "props": 27800,
-        "plants": 15109
+        "props": 27814,
+        "plants": 14203
       }
     },
     "gameplay": {
-      "pois": 143,
+      "pois": 136,
       "pois_by_kind": {
-        "vendor.food": 26,
-        "bar.arcade": 18,
-        "apartment.studio": 15,
-        "clinic.ripperdoc": 15,
-        "bar.bar": 14,
-        "vendor.convenience": 14,
-        "vendor.pawn": 10,
-        "bar.club": 8,
+        "vendor.food": 21,
+        "bar.arcade": 17,
+        "clinic.ripperdoc": 17,
+        "bar.bar": 16,
+        "vendor.convenience": 15,
+        "apartment.studio": 14,
+        "vendor.pawn": 9,
         "apartment.penthouse": 7,
-        "clinic.clinic": 5,
+        "bar.club": 7,
         "fixer.fixer": 5,
-        "apartment.apartment": 2,
+        "apartment.apartment": 3,
         "hideout.back_room": 2,
+        "clinic.clinic": 1,
         "hideout.squat": 1,
         "hideout.warehouse": 1
       },
@@ -1332,31 +1388,31 @@
       "territories": 9,
       "contested": 1,
       "parking": {
-        "street": 400,
-        "garage": 55
+        "street": 351,
+        "garage": 57
       },
-      "parking_capacity": 26084,
-      "taxi_stands": 18,
+      "parking_capacity": 24197,
+      "taxi_stands": 16,
       "fast_travel": 8,
       "sign_slots": {
-        "shop_sign.blade": 5386,
-        "shop_sign.facade": 1733,
-        "billboard.roof": 547,
-        "neon.facade": 311,
-        "billboard.facade": 177,
-        "holo_ad.roof": 29
+        "shop_sign.blade": 5249,
+        "shop_sign.facade": 1758,
+        "billboard.roof": 571,
+        "neon.facade": 257,
+        "billboard.facade": 162,
+        "holo_ad.roof": 35
       },
-      "density_rows": 1261,
+      "density_rows": 1249,
       "peak_traffic_vph": 9690.0,
       "peak_crowd_per_100m": 168.0,
       "generator": {
         "factions": 6,
         "zones": 15,
-        "pois": 143,
-        "parking": 455,
-        "travel_points": 26,
-        "densities": 1261,
-        "sign_slots": 8183
+        "pois": 136,
+        "parking": 408,
+        "travel_points": 24,
+        "densities": 1249,
+        "sign_slots": 8032
       }
     },
     "separation_budget": {
@@ -1366,26 +1422,40 @@
       "planned": 0.6274
     },
     "road_variant": 0,
+    "layout_salt": 1,
     "city_tries": [
       {
         "variant": 0,
         "road_variant": 0,
         "layout_salt": 0,
+        "failures": 1
+      },
+      {
+        "variant": 0,
+        "road_variant": 0,
+        "layout_salt": 1,
         "failures": 0
       }
     ]
   },
   "notes": [
+    "road variant 0/0 left 1 check failures in the full city; built again on the same roads with the local layout drawn again (salt 1)",
     "megasite 'Neck Arena' (stadium) shrunk to 0.02 km2 (asked 0.06) to fit 'Neckgate'",
     "megasite 'Hook Spaceport' (spaceport) shrunk to 0.36 km2 (asked 0.50) to fit 'Hook Spaceport'",
     "ramps not built: 2 too near another node",
     "2 underpass streets under the viaducts or over the tunnels (not built: 1 deck too low, 2 near a ramp)",
-    "17 local roads cut back at junctions sharper than the district minimum",
-    "2 local roads running alongside another road removed",
-    "15 lanes reached only over pedestrian streets became pedestrian",
-    "2 local roads crossing another without a junction removed",
-    "8 local segments (5.61 km) not connected to the network were dropped",
-    "lot under a wheel rim left open (2 times)",
+    "18 local roads cut back at junctions sharper than the district minimum",
+    "4 local roads running alongside another road removed",
+    "11 lanes reached only over pedestrian streets became pedestrian",
+    "28 more lanes became pedestrian",
+    "1 local roads crossing another without a junction removed",
+    "39 dead ends run on to the road ahead or the dead end facing them",
+    "46 dead-end pieces cut back to their last junction",
+    "5 dead ends cut back clear of the road they ran into",
+    "10 local roads laid along another road removed",
+    "2 local segments (0.14 km) not connected to the network were dropped",
+    "megabuilding_campus: no skybridge fits between d03.mg.e137n158.bld.e166n158 and d03.mg.e137n158.bld.e98n158",
+    "lot under a wheel rim left open (3 times)",
     "metro Strip Line: lowered to -26 m under foundation"
   ]
 }

@@ -75,12 +75,12 @@ landmarks' towers as built): each takes the first form no tower already placed w
 has in its band, else the same in a band beside its own; the lots that change are built again
 in their chunks. In a district regeneration the old towers outside the district are held.
 
-| Corporate core | Towers | Forms before | Forms after | Same form and band pairs within 150 m, before | after |
+| Corporate core (on M17's roads) | Towers | Forms before | Forms after | Same form and band pairs within 150 m, before | after |
 |---|---|---|---|---|---|
-| Vesper Bay | 170 | 1 (box) and the megatower | 18 and the megatower | 464 | 0 |
-| Delta Megacity | 219 | 1 (box) and the megatower | 18 and the megatower | 565 | 0 |
+| Vesper Bay | 156 | 1 (box) and the megatower | 18 and the megatower | 345 | 0 |
+| Delta Megacity | 230 | 1 (box) and the megatower | 18 and the megatower | 641 | 0 |
 
-Every sample city has no such pair now (Delta: 867 before city-wide, Vesper Bay 472).
+City-wide: Vesper Bay 353 pairs to 0, Delta 934 to 0; every sample has none now.
 
 ## Checks
 
@@ -109,26 +109,33 @@ Three fixes the new forms called for elsewhere:
   platform level from the tube's first point, into the tube (`asset_clearance`): AG4's
   `connections.station` now takes the floor under the tube's lowest point over the platform,
   as its `_beside` already did (`GEN_VERSION` m21.1).
+- **A patchwork finish on a concrete podium** (AG2): a building whose body is patchwork takes
+  its `finish` from the body's system, and its punched concrete podium read that finish
+  without the patch genes its own group never drew (`KeyError`, the merged Vesper Bay): the
+  podium keeps concrete in that case (`shell._finish`), every other building as before.
 
 ## Builds
 
-Every sample builds with every check passing (88 checks, 93 on the deck demo), in the tries it
-took on main before M21:
+Every sample builds with every check passing (92 checks, 97 on the deck demo), on main's
+code with M17 merged; tries before are main's with M17:
 
-| City | Tries before | Tries after | Towers | Tower forms before | after | Same form and band pairs within 150 m, before | after |
-|---|---|---|---|---|---|---|---|
-| Vesper Bay | 1 | 1 | 191 | 2 | 19 | 472 | 0 |
-| Delta Megacity | 1 | 1 | 396 | 2 | 19 | 867 | 0 |
-| Nexus City | 1 | 1 | 276 | 3 | 20 | 575 | 0 |
-| Saltreach Free Port | 1 | 1 | 217 | 1 | 18 | 609 | 0 |
-| Greyhook | 1 | 1 | 113 | 2 | 15 | 149 | 0 |
-| Vesper Bay Pinned | 2 | 2 | 41 | 1 | 13 | 21 | 0 |
-| Vesper Bay Stacks | 1 | 1 | 46 | 1 | 13 | 35 | 0 |
-| Vesper Bay Decks | 2 | 2 | 183 | 2 | 19 | 328 | 0 |
-| Cragmouth | 1 | 1 | 227 | 2 | 19 | 320 | 0 |
+| City | Tries before | Tries after | Towers | Tower forms | Same form and band pairs within 150 m |
+|---|---|---|---|---|---|
+| Vesper Bay | 1 | 1 | 180 | 19 | 0 |
+| Delta Megacity | 1 | 1 | 418 | 19 | 0 |
+| Nexus City | 1 | 2 | 261 | 20 | 0 |
+| Saltreach Free Port | 1 | 1 | 230 | 18 | 0 |
+| Greyhook | 2 | 2 | 117 | 17 | 0 |
+| Vesper Bay Pinned | 2 | 2 | 34 | 12 | 0 |
+| Vesper Bay Stacks | 2 | 2 | 31 | 13 | 0 |
+| Vesper Bay Decks | 6 | 4 | 186 | 19 | 0 |
+| Cragmouth | 2 | 2 | 227 | 19 | 0 |
 
-(Forms before: box and the landmarks' kinds. Towers: podium towers, towers and landmarks 40 m
-and taller; the traced towers of the pinned and stack demos stand as drawn and are left out.)
+Nexus City's first try misses `transit_altitude` by 0.43 m: its Spire Line sky tube climbs
+over a tower's new mast to 150.43 m (its range ends at 150 m); the next layout passes. Before
+M17 (same M21 code otherwise) every sample took the tries it took on main.
+(Towers: podium towers, towers and landmarks 40 m and taller; the traced towers of the pinned
+and stack demos stand as drawn and are left out. Before M21 every tower was a box.)
 
 (A first try of the pinned and stack demos found a skybridge through a traced building, which
 the bridges did not see, and a cluster tower standing beside its podium piece; both are fixed,

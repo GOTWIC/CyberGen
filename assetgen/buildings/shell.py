@@ -189,6 +189,16 @@ SIMPLE_SILL = 1000     # M21: a simply drawn floor's spandrel up to its sill
 SIMPLE_HEAD = 400      # and over its head
 
 
+def _finish(gm: dict, g: str) -> str:
+    """A punched concrete wall's finish: the building's (its body system's), but its own
+    system's wall where that finish is a patchwork whose patch genes the group never drew
+    (a concrete podium under a patchwork body, M21's first crash of it)."""
+    f = gm["genes"]["finish"]
+    if f == "patch_sheet" and f"{g}.patch" not in gm["genes"]:
+        return SY.SYSTEMS["punched_concrete"]["wall"]
+    return f
+
+
 def _simple(m: dict, ground: int) -> bool:
     """M21: whether a brief mass is drawn simply: a band of a twisted, tapered or leaning
     shaft, or a mass off the ground curved all round (its arcs run its whole exterior)."""
@@ -684,7 +694,7 @@ class ShellBuilder:
             return "structure"
         sysname = self.gm["genes"][f"{g}.system"]
         if sysname == "punched_concrete":
-            return self.gm["genes"]["finish"]
+            return _finish(self.gm, g)
         return SY.SYSTEMS[sysname]["wall"]
 
     def _covered_above(self, ms: dict, a, b) -> bool:
@@ -719,7 +729,7 @@ class ShellBuilder:
             T = SY.SYSTEMS[sysname]
             wall = T["wall"]
             if sysname == "punched_concrete":
-                wall = genes["finish"]
+                wall = _finish(self.gm, g)
                 self.used["finish"] = True
         rings = ms["rings"]
         thick = _thickness(RG.clean(rings[0]))

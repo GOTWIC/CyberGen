@@ -839,6 +839,8 @@ neighbor rule in `buildout.select_forms`):
   on bands, frames, pods, columns, halos or masts; a sky station's platform floor is under the
   tube's lowest point over it (`connections.station`, as `_beside`: a rerouted Delta line put
   a station on a 7.5% grade, and the level floor from the tube's first point met the tube);
+  a punched concrete wall under a patchwork body keeps its own wall where the patchwork
+  finish has no patch genes in its group (`shell._finish`; it raised `KeyError`);
   `GEN_VERSION` m21.1.
 Sample builds: `docs/progress/M21/`.
 
