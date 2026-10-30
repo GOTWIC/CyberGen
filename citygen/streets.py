@@ -934,6 +934,11 @@ class Builder:
         ww_polys = [w.polygon for w in waterways.items]
         self.wet = G.union([h.water] + ww_polys)
         shapely.prepare(self.wet)
+        # M17: the water the model keeps (sea, water bodies and their rings, waterways), not
+        # a sliver of the map between the land and its edge: what a `water_end` is beside
+        bodies = G.union([h.sea, h.rings] + [b.polygon for b in h.bodies])
+        self.water = G.union([G.inter(h.water, bodies)] + ww_polys)
+        shapely.prepare(self.water)
         self.reserves = G.union([s.polygon for s in sites]) if sites else Polygon()
         cones = [s.flight_cone for s in sites if s.flight_cone is not None]
         self.cones = G.union(cones) if cones else Polygon()
@@ -3231,6 +3236,8 @@ DEAD_END_KINDS = ("map_edge", "water_end", "park_gate", "plaza_gate", "site_gate
 SITE_GATE = {"central_park": "park_gate", "grand_plaza": "plaza_gate"}
 SITE_GATE_M = 40.0         # a dead end this close to a megasite reserve is its gate (the road
 #                            `megasite_access` asks for within 40 m)
+ON_ROAD_M = 0.1            # a dead end this close to another road's centerline lies on it (an
+#                            M1b road ending on another, off it by the grid's rounding)
 
 
 class _Graph:
@@ -3450,7 +3457,7 @@ def _dead_kind(B: Builder, g: _Graph, e: int, at_end: bool, p) -> tuple[str | No
     head = G.q(ln.width / 2 + 4.0) if prim else TURN_HEAD_M.get(ln.cls, 0.0)
     if ln.role == "cul_de_sac":
         return "cul_de_sac", 12.0     # (a curvilinear district's: laid with its bulb)
-    if B.wet.intersects(zone):
+    if B.water.intersects(zone):
         return "water_end", head if head and _bulb_fits(B, g, e, p, head) else 0.0
     for s in B.sites:
         if s.polygon.distance(Point(p)) <= SITE_GATE_M:
@@ -3632,7 +3639,7 @@ def settle_dead_ends(B: Builder, edges) -> tuple[list, list[str]]:
             # a dead end that already lies on another road is noded there (on a held road
             # only at a node it had: M10)
             on = [k for k in g.near(Point(p)) if k != e and k not in touched and
-                  p not in g.nodes_of(k) and g.lines[k].distance(Point(p)) < 0.02]
+                  p not in g.nodes_of(k) and g.lines[k].distance(Point(p)) < ON_ROAD_M]
             if on and e not in touched:
                 k = on[0]
                 if B.frame is None or not _held(B, g.edges[k][0]) or p in B.frame.nodes:

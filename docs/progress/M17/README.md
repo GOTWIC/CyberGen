@@ -164,6 +164,11 @@ it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` 
 - Vesper Bay Stacks' traced crosstown ends 23 m up on M12's stack (tagged `traced_end`; M12's
   as drawn).
 - Mac = x86 for the new goldens waits for the deferred determinism check.
+- `tests/test_progress.py::test_streamed_does_not_wait_for_a_child_holding_the_pipe` fails on
+  Windows, not from M17: its log ends `done
+` (a child's print there), the test asks
+  for `done
+`.
 - **Park paths through lots** (found by assetgen's `asset_access` on M17's Testport, since
   M2): `local.open_paths` draws a straight 3 m path from a park's, plaza's or promenade's
   middle to every walkway node within 30 m of it, across whatever lies between. In M17's
@@ -177,6 +182,25 @@ it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` 
   unreachable, the city's to change, as its rule for a city-made problem says.
 - **About 3% of building entrances** link to their walkway by a straight line through another
   building (Delta 199 of 6,724 with M17, 211 before); assetgen relinks them, as before.
+
+## Found by the test suite
+
+- **Water ends by the map edge**: where the land stops a few centimeters short of the map
+  edge, the street builder's `wet` (the map less the land) has a hairline strip there, and the
+  promenade generator lays a waterfront promenade along it 5 m in (since M2). M17's repair
+  tagged the ends of such promenades `water_end`, which `road_dead_ends` rightly failed (the
+  test cities Budget Bay and Testgrid). A `water_end` is now tested against the water the
+  model keeps (`Builder.water`: sea, water bodies and their rings, waterways), so those ends
+  are `path_end`.
+- **An M1b road ending on another**: Testport with grid highways has an axis boulevard ending
+  0.04 m off a boundary avenue's centerline, never noded, so it overlapped the avenue by
+  571 m2 and stayed a dead end with no bulb. A dead end within `ON_ROAD_M` (0.1 m) of another
+  road is now noded onto it (it was 0.02 m).
+- Neither changes a sample: the nine samples' city models (and Testport's) are byte for byte
+  the same with both, so their goldens, reports and renders stand.
+- **Tests**: `test_check_segment_length_and_duplicates` drops the twin's `split_of` too (M17's
+  Testport makes the longest avenue chain one M7 joined, and the twin joined its group); the
+  committed sample reports are read from here; the city model schema has the `bend` shape.
 
 ## Two changes to the assetgen tests and check
 

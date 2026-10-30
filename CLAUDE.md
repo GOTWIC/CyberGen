@@ -740,6 +740,10 @@ M17 (road network repair, from the first run-through) is in place:
   else its street goes back to its last junction (a vehicle road under `CUL_DE_SAC_MIN_M`
   40 m from it, or with no room for a bulb). A run-on meets the roads at its junction at the
   district angle there, legs measured 10 m out as `fix_angles` and `junction_angles` do.
+  A `water_end` is beside the water the model keeps (`Builder.water`: sea, water bodies,
+  waterways; not `wet`'s sliver between the land and the map edge, which grows edge
+  promenades); a dead end within `ON_ROAD_M` 0.1 m of another road is noded onto it (an M1b
+  road ending on another, off it by the grid's rounding).
   A dead end reaching into another road's right of way is cut back clear of it (`_poke`; a
   primary road's dead end cuts the local road it reaches into, `_poked`); a local road laid
   along another (rights of way overlapping by `OVERLAP_M2` away from the nodes they share,
@@ -1046,8 +1050,9 @@ AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontpar
   on the band (`_decals`; one mesh per tile, `decals.<tile>`, mesh decals in Unreal).
   AG8 keeps every object it draws; AG3 gives the wall its fascia, panel, pier or plate.
 - **Checks**: `asset_access` (a door per entrance and unit, open to a walkway; facing a
-  neighbor or with no walkway ahead reported, not failed) and `asset_mounts` (never on
-  glass); budget allowances per unit and per front.
+  neighbor, with no walkway ahead, or ahead only inside another building (M17: a park path
+  citygen runs through it) reported, not failed) and `asset_mounts` (never on glass); budget
+  allowances per unit and per front.
 - **Previews**: AG6's `assetgen materials preview` now draws fronts, decals and AG2's parts
   beside AG8's props. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
   grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.
