@@ -185,7 +185,13 @@ def apply(model: CityModel, ov: dict, old: CityModel | None = None,
             notes += _edit(d, e)
         except OverrideError as err:
             notes.append(f"override edits[{k}] skipped: {err}")
-    return CityModel.model_validate(d), notes
+    out = CityModel.model_validate(d)
+    if out.banks or out.ground_cover:
+        # M16: the banks and the ground cover follow the edited buildings, plazas and lots
+        from .build import water_ground
+
+        out, _ = water_ground(out)
+    return out, notes
 
 
 def _where(d: dict, i: str) -> tuple[str, int]:

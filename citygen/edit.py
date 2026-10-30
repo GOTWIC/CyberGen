@@ -224,7 +224,17 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
     if ov:
         model, notes = OV.apply(model, ov, old=old, district=dd.id)
         info["notes"] += notes
+    if new.model.banks or new.model.ground_cover:
+        # M16: the banks and the ground cover of the spliced city (each depends only on its
+        # own district and the roads at it, so outside the district and its seam they come
+        # back as they were: `regen_locality`); the splice leaves them out
+        model, _ = B.water_ground(model)
     checks, stats = B.check_all(spec, model)
+    if model.banks or model.ground_cover:
+        from . import water_checks as WC
+
+        with G.canonical():
+            checks.append(WC.check_locality(old, model, dd.id, poly))
     out = copy.copy(new)
     out.model, out.checks = model, checks
     stats["regenerated"] = {k: v for k, v in info.items() if k != "notes"}
@@ -361,6 +371,7 @@ class _Owner:
 
 
 KEEP_BLOCK_M2 = 1.0   # a neighbor block a seam junction moves less than this stays
+M16 = ("banks", "ground_cover")
 
 # collections that follow the ground: those on the district's ground, or on a block one of
 # its seam junctions cuts, come from the new build
@@ -453,8 +464,10 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
     ground = _Ground([zone] + near)
     own_o = _Owner(O, did, zone, frame, seam_nodes, ground)
     own_n = _Owner(N, did, zone, frame, seam_nodes, ground)
-    io = {c: {e["id"]: e for e in O.get(c, [])} for c in COLLECTIONS}
-    inn = {c: {e["id"]: e for e in N.get(c, [])} for c in COLLECTIONS}
+    # (M16's rows stay out of the splice and its closure: they are made again on the
+    # spliced city)
+    io = {c: {e["id"]: e for e in O.get(c, [])} if c not in M16 else {} for c in COLLECTIONS}
+    inn = {c: {e["id"]: e for e in N.get(c, [])} if c not in M16 else {} for c in COLLECTIONS}
     coll_of = {}
     for c in COLLECTIONS:
         for i in io[c]:
