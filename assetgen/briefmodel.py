@@ -282,6 +282,15 @@ class SpecSection(_M):
     landmark: dict[str, Any] | None
 
 
+class Terrain(_M):
+    """AG5: on M13's slopes, the ground along each edge of a mass on the base (None for the
+    others), from its start every `step_m` and at its end, `out_m` outside it, in meters
+    over the building's base."""
+    step_m: float
+    out_m: float
+    grade: list[list[float] | None]
+
+
 class Brief(_M):
     brief_version: Literal[2]
     id: str
@@ -306,6 +315,8 @@ class Brief(_M):
     spec: SpecSection
     override: dict[str, Any] | None
     clearances: list[Clearance] = Field(default_factory=list)
+    terrain: Terrain | None = Field(None, description="AG5: the ground along the base's "
+                                                      "edges (M13's slopes only).")
 
 
 def json_schema() -> dict:

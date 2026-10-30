@@ -59,6 +59,11 @@ SLOT_REACH.update({"court_paving": "court", "planter": "court", "green_roof": "c
                    # AG4's facade details and portal frames, merged, reach as their family
                    "escape": "deep", "duct": "strip", "cable": "flush", "camera": "strip",
                    "camera_lens": "strip", "portal_lining": "strip", "lamp_white": "strip"})
+# AG5: plinths and skirts on slopes, eaves, columns, doors, lights, a wheel's structure
+SLOT_REACH.update({"retaining": "flush", "eave_tile": "deep", "eave_soffit": "deep",
+                   "stone": "flush", "hangar_door": "flush", "hero_frame": "flush",
+                   "hero_light": "flush", "shanty_roof": "strip", "wheel_steel": "wheel",
+                   "gondola": "wheel"})
 for _s in SY.SLOTS:
     if _s not in SLOT_REACH and (_s.startswith(("paint_", "neon_", "screen_", "poster_",
                                                 "mural_", "graffiti_", "riser_", "lit_",
