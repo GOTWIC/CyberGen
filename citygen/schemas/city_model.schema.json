@@ -1416,7 +1416,7 @@
     },
     "Junction": {
       "additionalProperties": false,
-      "description": "Intersection area of a node where three or more roads meet (curb lines with corner\nfillets), or a cul-de-sac turning bulb. `type` is `junction.<class pair>`, e.g.\n`junction.avenue_street`.",
+      "description": "Intersection area of a node where three or more roads meet (curb lines with corner\nfillets), a cul-de-sac turning bulb, or (M17) a bend where two roads meet at an angle\nand their rights of way overlap. `type` is `junction.<class pair>`, e.g.\n`junction.avenue_street`.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -1454,7 +1454,8 @@
             "T",
             "X",
             "multi",
-            "cul_de_sac"
+            "cul_de_sac",
+            "bend"
           ],
           "title": "Shape",
           "type": "string"
