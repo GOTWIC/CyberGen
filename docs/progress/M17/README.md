@@ -155,10 +155,13 @@ it builds on road variant 1, salt 1). Cragmouth's first layout fails `cut_fill` 
 
 ## Open items
 
-- `tests/test_edit.py::test_regeneration_of_the_first_district_keeps_the_ones_after_it`: a
-  regeneration of the first district changes a few walkways far from it (an extra walkway link
-  between walkway islands, which the build links over the whole city); roads and junctions
-  outside the district are kept.
+- `tests/test_edit.py::test_regeneration_of_the_first_district_keeps_the_ones_after_it`:
+  regenerating Testport's Core (its first district) keeps every road outside it (1,287 of
+  1,287 held), but adds one 6.5 m walkway-island link (`wk.e881n688`) 321 m from Core and so
+  changes four walkways' neighbor lists there. The old city reached that walkway group through
+  Core's old streets; the new Core does not, and `local.join_walk_islands`, which links islands
+  over the whole landmass, joins the group where it is nearest. Making that join local under
+  a regeneration's frame (or keeping the far groups' old links) is left open.
 - `tests/assetgen/data/golden_props.json` was not rewritten: its pack bytes differ on Windows
   (known), so it wants `tests/assetgen/props_goldens.py --builds DIR` on the Mac.
 - Vesper Bay Stacks' traced crosstown ends 23 m up on M12's stack (tagged `traced_end`; M12's
