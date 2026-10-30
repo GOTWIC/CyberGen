@@ -723,6 +723,47 @@ The stage 1 fixes (three open items of M13 to M15) are in place:
 Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. Outputs:
 `docs/progress/stage1_fixes/`.
 
+M17 (road network repair, from the first run-through) is in place:
+- **Dead ends** (`streets.settle_dead_ends`, at the end of `clean_graph`, on the noded
+  edges, in rounds): a local road's dead end runs on to the road straight ahead
+  (`DEAD_END_REACH_M` 60, a junction there or at a node of it within `MIN_JUNCTION_GAP_M`, 8 m
+  for paths, turning at most 35 degrees, at the district's junction angle; on land, off closed
+  ground, crossing nothing but under a deck high enough: `under_deck(..., cls)`, a path under
+  4.5 m, `PATH_UNDER_CLEAR_M`, which `node_lines` also lets pass under), or joins a dead end
+  facing it (30 m); else it stays as what it is, `RoadNode.attrs.dead_end` (`DEAD_END_KINDS`:
+  `map_edge`, `water_end`, `park_gate`, `plaza_gate`, `site_gate` within `GATE_M` 8 m past its
+  half width, 30 m for a primary road; `path_end` on a path; `cul_de_sac` with a turning bulb
+  that fits, `attrs.turning_head_m`, street 12, service 10, alley 8 m, a primary road's half
+  width and 4 m; `deck_end` on M14's deck spokes), else its street goes back to its last
+  junction (a vehicle road under `CUL_DE_SAC_MIN_M` 40 m from it, or with no room for a bulb).
+  A dead end reaching into another road's right of way is cut back clear of it (`_poke`; a
+  primary road's dead end cuts the local road it reaches into, `_poked`); a local road laid
+  along another (rights of way overlapping by `OVERLAP_M2` away from the nodes they share,
+  `_reach`) goes (`_overlaps`; also a primary piece inside another primary's right of way);
+  `fix_angles` runs again after the run-ons. `junctions.build` draws the bulbs from the tag.
+- **Junctions** (`junctions.py`): each leg's cut reaches past where its right of way overlaps
+  another leg's (`overlap_cuts`: an acute corner, a leg that bends in the junction, a gore);
+  a road's two junctions share `CUT_SHARE` 0.9 of it by need (`share_cuts`, the old cap was
+  0.45 a side); a leg that bends gets its band to the cut; a degree-2 node where two roads
+  meet at an angle is a `bend` junction (`Junction.shape`, `bend_polygon`); where rights of way
+  still overlap past the cuts (a fork, a crossing at a small angle, a corner with no room for
+  its fillet), the junction polygon takes the shared pavement (`shared_pavement`).
+- **M1b** (`roads.py`): `_drop_lenses` drops the lesser of two primary pieces between the
+  same nodes whose rights of way overlap all the way (a waterfront avenue laid along a
+  highway); `_merge_forks` also parts a fork whose rights of way overlap farther than a
+  junction's at `FORK_DEG` 45 degrees (the branch leaves square where they part).
+- **Checks** (`network_checks.py`, 4 more): `road_dead_ends` (every dead end tagged, the tag
+  true of where it is, a cul-de-sac with its bulb) and `road_overlaps` (rights of way of two
+  roads within 4 m in height overlapping more than 25 m2 outside every junction polygon, the
+  run-through's measure on the 1 cm grid: GEOS's floating overlay takes two corridors meeting
+  end to end on a 45 degree line for overlapping) with the street checks; `bridge_clash`
+  (road, pedestrian and transit bridges apart in plan or by the lower one's clearance plus the
+  upper deck) and `road_building_clash` (no road right of way over a building mass at its own
+  height, 5 m of headroom) after the building checks. Heights over the ground on a terrain
+  city; M10's regeneration runs them through `check_all`; a held road is never extended, cut
+  or dropped (`_held`), a new street meets an old road only at its nodes.
+Sample builds, the run-through's measures before and after: `docs/progress/M17/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.

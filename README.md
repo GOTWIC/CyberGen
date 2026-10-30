@@ -7,7 +7,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 done |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 and M17 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG3, AG6, AG7 and AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
@@ -120,7 +120,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M14 | Layered districts | Deck cities over the streets: upper streets, lots and buildings, ramps, stairs, elevators, light wells | ✅ Done |
 | M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | ✅ Done |
 | M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | Planned |
-| M17 | Road network repair | No stray dead ends, overlapping roads or bridges; roads clear of buildings | Planned |
+| M17 | Road network repair | Every dead end on purpose (a cul-de-sac with its turning circle, a quay, a park gate, a path's end), no overlapping roads or bridges, roads clear of buildings | ✅ Done |
 | M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps, crosswalks and signals only where they are needed | Planned |
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans, more room over the streets | Planned |
 | M20 | Props, plants and signs | Nothing floating or growing through a road; many more large neon billboards and holo-boards on the sides and tops of buildings | Planned |

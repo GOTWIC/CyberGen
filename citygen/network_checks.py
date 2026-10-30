@@ -27,10 +27,13 @@ LEVEL_M = 4.0           # two road surfaces within this in height are at one lev
 GATE_REACH_M = 1.0      # a gate or water end within its half width, GATE_M and this of it
 BRIDGE_M2 = 2.0         # bridge decks overlapping in plan by more than this ...
 CLEAR_UNDER_M = {"road": 5.5, "pedestrian": 2.5, "transit": 5.5}   # ... keep this clear
-DECK_M = {"road": 1.8, "pedestrian": 0.8}                          # under the upper deck
+DECK_M = {"road": 1.5, "pedestrian": 0.8}     # under the upper deck (M1b's road deck: M7
+#                                               keeps crossing road decks 7 m apart)
+CLEAR_TOL_M = 0.15
 MASS_M2 = 2.0           # a road's right of way over a building mass by more than this ...
 HEADROOM_M = 5.0        # ... clashes unless the mass is this far above the road surface or
 #                         below it
+PATH_HEADROOM_M = 2.5   # ... over a pedestrian path
 
 
 class _Check:  # same shape as checks.Check (imported lazily there)
@@ -177,8 +180,9 @@ def check_overlaps(spec: CitySpec, m: CityModel):
 
 
 def _bridge_parts(m: CityModel) -> list[tuple]:
-    """(id, kind, plan polygon, line, z at a point) of every bridge's segments (road and
-    pedestrian, approaches included) and every transit deck or tube over water."""
+    """(bridge or line id, part id, kind, plan polygon, z at a point, deck depth, end nodes,
+    centerline) of every bridge's segments (road and pedestrian, approaches included) and
+    every transit deck or tube over water."""
     out = []
     segs = {s.id: s for s in m.road_segments}
     for b in m.bridges:
@@ -190,7 +194,7 @@ def _bridge_parts(m: CityModel) -> list[tuple]:
             line = LineString(s.centerline)
             poly = line.buffer(s.width_m / 2, cap_style="flat")
             out.append((b.id, sid, kind, poly, (lambda p, s=s, ln=line: surface_z(s, ln, p)),
-                        DECK_M[kind], {s.start, s.end}))
+                        DECK_M[kind], {s.start, s.end}, line))
     water = _water(m)
     if water is None:
         return out
@@ -213,7 +217,7 @@ def _bridge_parts(m: CityModel) -> list[tuple]:
                 acc += d
             return zs[-1]
         out.append((st.attrs["line_id"], st.id, "transit", poly, z_of,
-                    st.attrs.get("deck_m", 2.0), set()))
+                    st.attrs.get("deck_m", 2.0), set(), line))
     return out
 
 
@@ -234,11 +238,13 @@ def check_bridge_clash(spec: CitySpec, m: CityModel):
         ov = _inter(a[3], b[3])
         if ov.area <= BRIDGE_M2:
             continue
-        p = ov.representative_point()
+        # (where the two cross, else in the overlap)
+        pts = [q for q in shapely.get_parts(a[7].intersection(b[7])) if q.geom_type == "Point"]
+        p = pts[0] if pts else ov.representative_point()
         za, zb = a[4](p), b[4](p)
         lo, hi = (a, b) if za <= zb else (b, a)
         need = CLEAR_UNDER_M[lo[2]] + hi[5]
-        if abs(za - zb) < need - 0.05:
+        if abs(za - zb) < need - CLEAR_TOL_M:
             seen.add((a[0], b[0]))
             c.failures.append(f"bridges {a[0]} ({a[2]}, {a[1]}) and {b[0]} ({b[2]}, {b[1]}) "
                               f"overlap by {ov.area:.0f} m2 at ({p.x:.0f}, {p.y:.0f}), "
@@ -259,20 +265,33 @@ def check_building_clash(spec: CitySpec, m: CityModel):
         base = b.base_m or 0.0
         for k, ms in enumerate(b.masses):
             masses.append((b, k, G.from_model_poly(ms.footprint), base + ms.z0_m,
-                           base + ms.z1_m))
+                           base + ms.z1_m, ms.shape))
     tree = shapely.STRtree([x[2] for x in masses])
     a_idx, b_idx = tree.query(rows, predicate="intersects")
     for i, k in sorted(zip(a_idx.tolist(), b_idx.tolist())):
-        b, mk, fp, z0, z1 = masses[k]
+        b, mk, fp, z0, z1, shape = masses[k]
         ov = _inter(rows[i], fp)
         if ov.area <= MASS_M2:
             continue
         z = surface_z(segs[i], lines[i], ov.representative_point())
-        if z0 < z + HEADROOM_M and z1 > z + 0.5:
+        if shape == "ring":
+            z0 = _rim_low(fp, ov, z0, z1)
+        head = PATH_HEADROOM_M if segs[i].road_class in ST.PEDESTRIAN else HEADROOM_M
+        if z0 < z + head and z1 > z + 0.5:
             c.failures.append(f"segment {segs[i].id} ({segs[i].road_class}) runs through "
                               f"building {b.id} (mass {mk}, {z0:.1f} to {z1:.1f} m) over "
                               f"{ov.area:.0f} m2 at {z:.1f} m")
     return c
+
+
+def _rim_low(fp, ov, z0: float, z1: float) -> float:
+    """A vertical wheel's (`Mass.shape` ring) lowest rim height over the part ov of its plan:
+    the rim is a circle from z0 to z1 over the footprint's long middle line."""
+    r = (z1 - z0) / 2.0
+    c = fp.centroid
+    d = min(Point(q).distance(c) for q in list(shapely.get_coordinates(ov)) +
+            [(ov.centroid.x, ov.centroid.y)])
+    return z0 + r - (max(r * r - d * d, 0.0)) ** 0.5
 
 
 def run_streets(spec: CitySpec, m: CityModel) -> list:

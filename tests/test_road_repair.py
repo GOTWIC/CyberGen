@@ -125,7 +125,7 @@ def test_check_bridge_clash_fails():
         return _model(nodes, segs, bridges=br)
 
     bad = NC.check_bridge_clash(_spec(), crossing(10.0))
-    assert len(bad.failures) == 1 and "0.0 m apart in height (needs 7.3 m)" in \
+    assert len(bad.failures) == 1 and "0.0 m apart in height (needs 7 m)" in \
         bad.failures[0]
     assert NC.check_bridge_clash(_spec(), crossing(20.0)).passed
 

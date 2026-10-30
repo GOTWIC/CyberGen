@@ -2673,7 +2673,9 @@ def _cut_tight(pieces):
 def _merge_forks(pieces):
     """Two primary roads that leave a node together and run side by side (within 25 m for
     150 m or more: a duplicate) become one there: the lesser one (class, then an optional
-    role, then the shorter) starts where they part, from a junction on the other."""
+    role, then the shorter) starts where they part, from a junction on the other. M17: so do
+    two whose rights of way overlap farther out than a junction's at FORK_DEG (the branch
+    leaves square from where they part)."""
     rank = {"highway": 2, "avenue": 1}
     for _ in range(20):
         ends: dict = {}
