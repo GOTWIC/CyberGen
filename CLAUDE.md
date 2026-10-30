@@ -780,8 +780,10 @@ city, `citygen/water.py` and `citygen/cover.py`, checks in `water_checks.py`, pr
 - **With M10:** `banks` and `ground_cover` are in `ids.KEEP` (named by their stage), in
   `ids.REFS` and `ids.ORDER`; the splice leaves them out (and out of its closure) and
   `edit._regenerate_once` runs `water_ground` on the spliced city, then
-  `water_checks.check_locality` against the old one (nothing outside the district and
-  `SEAM_M`, 60 m, changed); `overrides.apply` runs it again after its edits.
+  `water_checks.check_locality` against the old one (outside the district and `SEAM_M`, 60 m,
+  an M16 row changes only within 60 m of a changed input, `water_checks.INPUTS`: the splice's
+  own seam, a crowd density or a walkway, can reach farther); `overrides.apply` runs it again
+  after its edits.
 - **Blockout:** water and the sea at -1.5 on a flat city (the sea sheet 5 cm lower), a bed
   heightfield per tile (`city.bed.<tile>`, 8 m cells; on a terrain city the ground grid carries
   M16's beds), banks as bands from the line down to the toe joined per district, kind and tile

@@ -217,13 +217,22 @@ def test_regeneration_keeps_water_and_ground_outside_the_district():
     failed = [(c.id, c.failures[:2]) for c in r.checks if not c.passed]
     assert not failed, failed
     did = next(d.id for d in b.model.districts if d.name == "Old Quarter")
-    # the district's own cover is new, the rest far from it as it was
+    # the district's own cover is new, nearly all of the rest far from it as it was (what
+    # changes there follows a change under it that the splice made, a crowd density say)
     old = {g.id: g for g in b.model.ground_cover}
     new = {g.id: g for g in r.model.ground_cover}
     poly = G.from_model_poly(next(d for d in b.model.districts if d.id == did).polygon)
     far = [i for i, g in old.items() if g.district_id != did and
-           G.from_model_poly(g.polygon).distance(poly) > WC.SEAM_M and new.get(i) != g]
-    assert not far, far[:5]
+           G.from_model_poly(g.polygon).distance(poly) > WC.SEAM_M]
+    kept = [i for i in far if new.get(i) == old[i]]
+    assert far and len(kept) >= 0.95 * len(far)
+    # a change with nothing under it changed fails the check (the piece farthest away)
+    g = old[max(kept, key=lambda i: (G.from_model_poly(old[i].polygon).distance(poly), i))]
+    moved = r.model.model_copy(update={"ground_cover": [
+        x.model_copy(update={"wear": round(1.0 - x.wear, 2)}) if x.id == g.id else x
+        for x in r.model.ground_cover]})
+    with G.canonical():
+        assert not WC.check_locality(b.model, moved, did, poly).passed
 
 
 def test_cover_pieces_keep_to_their_district():

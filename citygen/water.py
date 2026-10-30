@@ -148,7 +148,6 @@ def body_depth(b: Body, flat: bool) -> tuple[float, str, float, list]:
                  for s, w in zip(cum, ws)]
         return G.q(max(a["z"] for a in along)), "channel", G.q(_median(ws) / 2.0), along
     if b.kind in ("creek", "inlet"):
-        line = list(b.ent.centerline) or []
         return G.q(min(1.0 if b.kind == "creek" else D, D)), "channel", \
             G.q(max(2.0, _width_of(b) / 2.0)), []
     if b.kind == "ornamental":
@@ -451,7 +450,8 @@ def _classify(near: _Near, b: Body, did, x, y) -> tuple:
                 near.archetype.get(did) in RIPRAP_ARCHETYPES or
                 near.near_items(("s", did), pt, 0.0)):
             kind = "riprap"
-        elif b.kind == "sea" and hard >= BEACH_CLEAR_M and                 near.near_items(("g", did), pt, OPEN_NEAR_M):
+        elif (b.kind == "sea" and hard >= BEACH_CLEAR_M and
+              near.near_items(("g", did), pt, OPEN_NEAR_M)):
             kind = "beach"
         else:
             kind = "natural_bank"

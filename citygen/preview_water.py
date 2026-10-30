@@ -16,7 +16,6 @@ import numpy as np  # noqa: E402
 from matplotlib.collections import LineCollection, PathCollection, PolyCollection  # noqa: E402
 from matplotlib.colors import Normalize  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
-from matplotlib.patches import Patch  # noqa: E402
 from shapely.geometry import LineString  # noqa: E402
 
 from . import geom as G  # noqa: E402

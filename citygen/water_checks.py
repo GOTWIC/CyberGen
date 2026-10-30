@@ -13,15 +13,16 @@ ground cover):
 - `ground_cover`: the pieces tile the open land once: no two overlap, none lies under a
   building, a road or the water, and every part of the open land not covered is a curb
   corner narrower than `cover.SLIVER_M`.
-- `regen_locality` (a district regeneration only, `edit.py`): the water bodies' data, the
-  banks and the ground cover outside the district and its seam (`SEAM_M`) are as they were.
+- `regen_locality` (a district regeneration only, `edit.py`): outside the district and its
+  seam (`SEAM_M`) the water bodies' data, the banks and the ground cover change only where
+  what they are made from (`INPUTS`: a crowd density, a walkway the splice changed) changed
+  within `SEAM_M` of them.
 """
 
 from __future__ import annotations
 
 import math
 
-import numpy as np
 import shapely
 from shapely.geometry import LineString, Point
 
@@ -293,43 +294,89 @@ def stats(m) -> dict:
 
 # --- regeneration locality ---------------------------------------------------------------------
 
+# what M16's rows are made from: a row may change where one of these changed near it
+INPUTS = ("land", "districts", "road_segments", "junctions", "walkways", "quays", "lots",
+          "open_spaces", "megasites", "site_elements", "buildings", "structures", "decks",
+          "densities")
+
+
+def _geom(e: dict):
+    """The geometry of a model row (dict), or None."""
+    from . import ids as ID
+
+    for key in ("polygon", "footprint", "polygons"):
+        v = e.get(key)
+        if isinstance(v, dict):
+            return G.from_model_poly(v)
+        if isinstance(v, list) and v and isinstance(v[0], dict):
+            return G.union([G.from_model_poly(x) for x in v])
+    pts = ID._pts(e)
+    if not pts:
+        return None
+    pts = [(p[0], p[1]) for p in pts]
+    return LineString(pts) if len(pts) > 1 else shapely.geometry.Point(pts[0])
+
+
 def check_locality(old, new, did: str, poly) -> Check:
-    """`regen_locality`: what M16 made outside the district and its seam is as it was."""
-    c = Check("regen_locality", "A district regeneration leaves the water bodies' data, the "
+    """`regen_locality`: what M16 made outside the district and its seam changed only where
+    what it is made from changed near it (the splice's own seam: a crowd density, a walkway)."""
+    c = Check("regen_locality", "A district regeneration changes the water bodies' data, the "
                                 "banks and the ground cover outside the district and "
-                                f"{SEAM_M:g} m around it as they were")
+                                f"{SEAM_M:g} m around it only where what they are made from "
+                                "changed within that distance")
     zone = poly.buffer(SEAM_M)
     shapely.prepare(zone)
+    O, N = old.model_dump(mode="json"), new.model_dump(mode="json")
+    segs = {s["id"]: s for side in (O, N) for s in side.get("road_segments", [])}
+    moved = []
+    for coll in INPUTS:
+        a = {e["id"]: e for e in O.get(coll, [])}
+        b = {e["id"]: e for e in N.get(coll, [])}
+        for i in sorted(set(a) | set(b)):
+            if a.get(i) == b.get(i):
+                continue
+            for e in (a.get(i), b.get(i)):
+                if e is None:
+                    continue
+                if coll == "densities":
+                    e = segs.get(e["segment_id"], {})
+                g = _geom(e)
+                if g is not None and not g.is_empty:
+                    moved.append(g.buffer(SEAM_M))
+    tree = shapely.STRtree(moved) if moved else None
 
-    def outside(e) -> bool:
+    def explained(e) -> bool:
         if getattr(e, "district_id", None) == did:
-            return False
+            return True
         geo = getattr(e, "polygon", None)
-        g = G.from_model_poly(geo) if geo is not None and not isinstance(geo, list) else \
-            LineString(e.line)
-        return not zone.intersects(g)
+        g = G.from_model_poly(geo) if geo is not None else LineString(e.line)
+        if zone.intersects(g):
+            return True
+        return tree is not None and len(tree.query(g, predicate="intersects")) > 0
 
     for coll in ("banks", "ground_cover"):
         o = {e.id: e for e in getattr(old, coll)}
         n = {e.id: e for e in getattr(new, coll)}
-        moved = 0
+        bad = 0
         for i in sorted(set(o) | set(n)):
             a, b = o.get(i), n.get(i)
             if a is not None and b is not None and a == b:
                 continue
-            if all(outside(e) for e in (a, b) if e is not None):
-                moved += 1
-                if moved <= 3:
-                    _limit(c, f"{coll}: {i} changed outside the district")
-        if moved > 3:
-            _limit(c, f"{coll}: {moved} changed outside the district")
+            if not all(explained(e) for e in (a, b) if e is not None):
+                bad += 1
+                if bad <= 3:
+                    _limit(c, f"{coll}: {i} changed outside the district with nothing under "
+                              "it changed")
+        if bad > 3:
+            _limit(c, f"{coll}: {bad} changed outside the district with nothing under them "
+                      "changed")
     for coll in ("seas", "rivers", "channels", "waterways"):
         o = {e.id: e for e in getattr(old, coll)}
         for e in getattr(new, coll):
             a = o.get(e.id)
             if a is None or getattr(e, "district_id", None) == did:
                 continue
-            if (a.depth_m, a.bed, a.flow) != (e.depth_m, e.bed, e.flow) or \
-                    getattr(a, "exposure", None) != getattr(e, "exposure", None):
+            if ((a.depth_m, a.bed, a.flow) != (e.depth_m, e.bed, e.flow) or
+                    getattr(a, "exposure", None) != getattr(e, "exposure", None)):
                 _limit(c, f"{coll}: {e.id}'s depth, bed, flow or exposure changed")
     return c

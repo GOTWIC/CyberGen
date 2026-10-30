@@ -13,7 +13,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.collections import LineCollection, PathCollection  # noqa: E402
-from matplotlib.colors import Normalize  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
 from . import geom as G  # noqa: E402

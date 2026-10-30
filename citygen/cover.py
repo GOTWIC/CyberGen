@@ -34,7 +34,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import shapely
-from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry import LineString, Point
 
 from . import dmath as M
 from . import geom as G
@@ -217,7 +217,8 @@ def pieces(cx: Ctx) -> list[tuple]:
             if G.area(p) < MIN_PIECE_M2 * 20 or width_of(p) < SLIVER_M:
                 continue
             # (land outside every district is wild, not neglected: meadow)
-            kind = "meadow" if did is None else                 "gravel" if arch in ROUGH_ARCHETYPES else "wasteland"
+            kind = ("meadow" if did is None else
+                    "gravel" if arch in ROUGH_ARCHETYPES else "wasteland")
             out.append((did, Src(None, "rest", kind, p), p))
     return out
 
