@@ -226,6 +226,9 @@ Curbs 0.15 m. Corner radii by class. One-way flags for narrow streets. Every roa
   approach ramps, so major bridges are few and named; canals get many low footbridges.
 - Quays and promenades along waterways, with stairs down to the water and boat moorings.
 - Street-level pools, fountains, reflecting basins in plazas.
+- M16 (planned): each water body's depth, bed profile and flow, the sea's exposure, and a
+  bank kind for every water edge (quay, canal wall, embankment, natural bank, beach, marsh
+  edge, riprap), for stage 2's water (AG12).
 
 ### 5.5 Open space and buildings
 Open space: parks (lawns, path network, tree clusters), plazas (paving, fountain, seating),
@@ -346,6 +349,9 @@ labeled sub-areas with their own features and appear on the 2D map.
 - Keep-outs: trunks off roads, the sidewalk clear path, quays and junction sight lines; crowns
   at least 1 m from facades and at least 1 m below any deck overhead; no trees over metro
   entrances, stairs or bus stops.
+- M16 (planned): a ground cover kind for every piece of open land (lawn, meadow, marsh,
+  wasteland, dirt, gravel, sand, planted bed, overgrown paving) with its maintenance, wear
+  (desire lines), shade, moisture and slope, for stage 2's ground cover and grass (AG13).
 
 ## 6. City model (canonical output data)
 
@@ -448,11 +454,11 @@ viaducts with simple end ramps from M5.
 
 ### After v1
 
-Stage 1 of CyberGen (layoutgen) ends with M15. The later stages are assetgen (unique 3D
-models and textures for every building and street element), atmosgen (lighting, sky and
-atmospherics in Unreal), lifegen (generated traffic, trains, crowds and animation) and
-storygen (story, characters, cutscenes); stages 1 and 2 are reusable generators, not tied to
-one city.
+Stage 1 of CyberGen (layoutgen) ended with M15; M16 adds the water and ground data stage 2's
+water and grass need (planned). The later stages are assetgen (unique 3D models and textures
+for every building and street element), atmosgen (lighting, sky and atmospherics in Unreal),
+lifegen (generated traffic, trains, crowds and animation) and storygen (story, characters,
+cutscenes); stages 1 and 2 are reusable generators, not tied to one city.
 
 | M | Deliverable | Done when | Status |
 |---|---|---|---|
@@ -467,6 +473,7 @@ one city.
 | M13 | Terrain: a height field per city (spec: hills, ridges, cliffs, flat districts), water bodies at their own levels, roads that follow the ground within their grade (cuts, fills, retaining walls, tunnels from M9 through hills), lots and building bases on slopes (terraces, stepped podiums), terrain-aware props and plants, a ground mesh in the blockout | hilly sample cities pass the full suite with every grade and clearance check measured from the ground; Mac = x86 | done (Cragmouth; grade lines on a road graph, retaining walls, bored tunnels, terrain viaducts, seated buildings, draped blockout) |
 | M14 | Layered districts: districts stacked on several street levels (an upper deck city over a lower one, Night City style): deck slabs on columns, upper streets, lots and buildings on decks, ramps, stairs and elevators between levels, light wells, a level on every street, lot, walkway and prop, per-level lane and walkway graphs, per-level previews | a layered sample district passes the full suite on every level; walkways connect all levels; Mac = x86 | done (Vesper Bay Decks: a deck over Highcrest, five deck checks; Mac = x86 waits for the deferred determinism check) |
 | M15 | Unreal export tool, the last milestone of stage 1 (layoutgen): `citygen unreal <build_dir> <uproject>` imports a built city into an Unreal 5.8 project through editor Python (headless) and the Unreal MCP plugin: a World Partition level from the 256 m tiles, static meshes with collision and per-category materials, props and plants as instanced meshes, citygen ids and types as actor tags, the lane, walkway and transit graphs as data assets for stage 4, a player start; re-importing a build updates it by id (the stable ids of M10). It grows as later stages come online (stage 2 assets replacing the blockout meshes, stage 3 lighting, stage 4 traffic and crowds) | every sample city imports, streams and can be walked (collision) on the Mac; a second import of the same build changes nothing; a regenerated city updates in place | done (headless editor Python, the MCP plugin as the interactive route; every sample imported and checked in play-in-editor; the same build twice writes nothing; a district regenerated with M10 updates only the actors of what changed; docs/progress/M15) |
+| M16 | Water and ground detail, for stage 2's real water (AG12) and ground cover (AG13). **Water:** each water body gets `depth_m` and a bed profile (canals flat between their walls, rivers deepest along the centerline, the sea shelving away from the coast; consistent with the bed depths M9's tunnels assume), a flow direction and speed (toward `flows_into` or the mouth, by kind and width; still water for basins and ornamental pools) and, for the sea, an exposure (open water or a sheltered harbor, which sets wave height later); every water edge is split into typed bank segments (quay, canal wall, road embankment, natural bank, beach, marsh edge, riprap) with their heights and widths. **Ground cover:** every piece of open land that is not a building, road, sidewalk or water gets a cover kind (mown lawn, park lawn, meadow, marsh, wasteland and scrub, bare dirt, gravel, sand, planted bed, overgrown paving) with attributes: maintenance (district wealth and archetype), wear (desire lines where the walkway graph and M11's crowds cut across a lawn), shade (buildings, M14's decks), moisture (nearness to water) and slope (M13). **Checks:** every piece of open land covered once, none under a building, road or water; banks cover every water edge; beds clear of tunnels and bridge foundations; M10's regeneration locality. **Blockout:** beds and banks, cover kinds in colors of their own, `preview_water.png`, `preview_ground.png`. **Unreal:** a swim volume per water body (the player swims in a canal instead of falling through it), a material per cover kind | every sample's water and open land carry the new data, its checks pass, the previews show it; a city without water or open land builds as before; Mac = x86 | planned |
 
 ## 13. Running it with cloud sessions
 - Push this repo to a private GitHub repository (cloud sessions start from it).

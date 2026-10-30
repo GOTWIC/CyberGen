@@ -4,7 +4,7 @@ Stage 2 (assetgen) of CyberGen's five stages. A built citygen city in; a 3D mode
 for every building, plus the street elements, props, plants and texture library the city
 needs, out, and into Unreal through the shared exporter (`docs/unreal_export.md`), which
 every assetgen milestone updates for what it adds. Like citygen it is city-agnostic, offline and
-deterministic. Its milestones carry the prefix AG (AG0 to AG11, section 14), so their
+deterministic. Its milestones carry the prefix AG (AG0 to AG13, section 14), so their
 folders in `docs/progress/` never clash with stage 1's M folders or a later stage's; their
 full record is `docs/assetgen_milestones.md`. The decisions that need Swagnik before AG1
 starts are in section 13.
@@ -349,6 +349,21 @@ brackets and transformers), billboards (frame, lamps, a content texture), holo-a
 (emissive translucent planes, non-Nanite), neon bands. Text comes from M11 names and unit
 uses; fonts and scripts per asset spec.
 
+### 5.6 Water and ground cover
+
+Today both are the blockout's flat sheets with a color: blue for the sea and the water
+bodies, green for lawns, parks and verges. AG12 and AG13 (14.13, 14.14) replace them, from
+M16's data (citygen scope, section 12):
+
+- **Water** (AG12): per water body and tile a surface mesh carrying its flow and a foam
+  mask, a bed at its depth (mud, sand, stone) and its banks (natural slopes, beaches,
+  riprap) meeting AG7's quays and canal walls; drawn in Unreal with Single Layer Water.
+- **Ground cover** (AG13): every piece of open land textured by its cover kind (lawn,
+  meadow, marsh, wasteland, dirt, gravel, sand, planted bed, overgrown paving), blended by
+  its wear, shade and edges; grass and small plants (lawn, meadow, reeds, weeds, clover,
+  flowers, ferns) scattered on it by density, swaying in the wind. AG8's ground plants
+  (sedum, scrub) join it.
+
 ## 6. Asset outputs (canonical)
 
 ```
@@ -599,6 +614,8 @@ below as its answer so that AG1 can start; any of them can still change.
 | 13.6 | Interior mapping only (the spike's glass master does it) | |
 | 13.7 | The asset spec written by a session from the prompt through the `assetgen` skill; no mood boards | `.claude/skills/assetgen/SKILL.md` |
 | 13.8 | Pure Python generators, Blender for previews only | |
+| 13.9 | Open: before AG13 starts (grass in Unreal) | |
+| 13.10 | Open: before AG12 starts (sea waves) | |
 
 1. **Local AI models.**
    - (a) None: everything procedural, deterministic, no ML dependency. *Recommended for the
@@ -638,6 +655,23 @@ below as its answer so that AG1 can start; any of them can still change.
    or district (mood boards) that the skill reads, as citygen reads concept maps?
 8. **Geometry route.** Confirm pure Python generators with Blender for previews (section 8)
    over geometry nodes or Unreal PCG.
+9. **Grass in Unreal** (AG13).
+   - (a) Baked per tile: assetgen scatters the clumps, the exporter places them as instanced
+     meshes per tile that fade out at 60 to 100 m. Deterministic, testable, the same in the
+     Blender previews, streamed with the tile by World Partition; heavy at city scale (Delta
+     Megacity's open land at one clump per 0.25 m2 is several million instances), so a
+     per-tile cap. *Recommended* first.
+   - (b) Generated around the player at run time by Unreal's PCG (GPU runtime generation from
+     the ground pieces and AG13's density textures): light on disk and memory, but more engine
+     machinery, seeded rather than baked, and nothing to match in the Blender previews. If
+     (a) misses its budgets.
+10. **Sea waves** (AG12).
+   - (a) In the water master: waves by world position offset on a finer sea surface, keyed
+     by id like every other piece, no physics. *Recommended*.
+   - (b) Unreal's Water plugin ocean: better waves, buoyancy and an underwater view built in,
+     but built around Landscape (the cities' ground is heightfield meshes), with a water
+     zone and render mesh of its own, less mature, and harder to key by id. Only if stage 4's
+     boats need its buoyancy.
 
 ## 14. Milestones
 
@@ -662,9 +696,11 @@ docker image; Windows joins in AG9.
 | AG6 | Materials and textures | AG1; decisions 13.1, 13.3 | AG2 to AG5, AG7, AG8 |
 | AG7 | Street elements | AG0; M13 for grades | AG1 to AG6 |
 | AG8 | Props, plants and signs | AG0; decision 13.3 | AG1 to AG6 |
-| AG9 | Scale and release | AG5 to AG8; decision 13.5 | |
+| AG9 | Scale and release | AG5 to AG8, AG12, AG13; decision 13.5 | |
 | AG10 | Layered districts | AG9; M14 | AG11 |
 | AG11 | Interiors (only if decision 13.6 asks) | AG9 | AG10 |
+| AG12 | Water (14.13) | M16; AG6, AG7; decision 13.10 | AG4, AG5, AG13 |
+| AG13 | Ground cover and grass (14.14) | M16; AG6, AG8; decision 13.9 | AG4, AG5, AG12 |
 
 ### 14.1 AG0: Contract and spike
 
@@ -813,7 +849,8 @@ docker image; Windows joins in AG9.
 - **Unreal:** HLOD layers, distance field and Lumen card settings at city scale, import time
   and disk per city within section 11.
 - **Done when:** the sweep runs without a crash; the Mac, x86 Linux and Windows agree;
-  budgets are met; the README's stage 2 section shows every sample city.
+  budgets are met (AG12's water and AG13's grass included); the README's stage 2 section
+  shows every sample city.
 - **Shows:** whole-city renders of every sample at 8K, in Blender and in Unreal.
 
 ### 14.11 AG10 and AG11: after v1
@@ -832,7 +869,9 @@ docker image; Windows joins in AG9.
  AG0 ─┬─> AG1 ─> AG2 ─> AG3 ─> AG4 ─> AG5 ──┐
       │     └──> AG6 ───────────────────────┤
       ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11 (if asked)
-      └─> AG8 ──────────────────────────────┘
+      └─> AG8 ──────────────────────────────┤
+ M16 ─┬─> AG12 (water) ─────────────────────┤
+      └─> AG13 (ground cover, grass) ───────┘
 ```
 
 - **The building line** (AG1 to AG5) runs one session at a time: each builds on the last
@@ -849,10 +888,57 @@ docker image; Windows joins in AG9.
   which change what the level holds or how it imports).
 - **The core** is AG0 to AG3: every building has a model of its own that reads as its own
   from the street.
+- **Water and grass** (AG12, AG13) come after stage 1's M16 and before AG9, so the release
+  has real water and ground; they share no generator code with each other or with the
+  building line, so each can run beside AG4 and AG5 as a separate session.
 - **Stage 1 milestones assetgen waits on:** M15 and the exporter's move to its own package
   before AG0's Unreal part, M13 for AG5's slopes and AG7's grades (until then flat ground at
   z 0), M14 for AG10. The asks of section 4.5 go to citygen sessions; each milestone derives
   what it needs in the brief meanwhile.
+
+### 14.13 AG12: Water
+
+- **Adds:** per water body and 256 m tile, keyed by the body's id: a surface mesh at its
+  level (M13's profile along a river), finer on the sea, carrying the flow direction and
+  speed (M16) and a foam mask along walls, banks and bridge piers; a bed at M16's depth
+  and profile (mud, sand or stone by kind); banks by M16's bank kind (natural slopes,
+  beaches, riprap stones as instanced parts, marsh edges) meeting AG7's quays and canal
+  walls without a gap; for AG6: water normal and foam maps, caustics, bed sets, and a
+  catalog entry per water kind (sea, river, canal, ornamental basin, marsh water: color,
+  clarity, flow speed, foam).
+- **Unreal:** an `M_CgWater` master in the Single Layer Water shading model (color deepening
+  with depth, flow-mapped ripples, depth foam; the sea's waves by decision 13.10); the
+  surfaces as non-Nanite meshes with LOD chains (Nanite does not take the shading model);
+  the pieces replacing the blockout's `sea` and `water` objects by key; an underwater
+  post-process volume per body beside M16's swim volume.
+- **Blender:** a water shader in the previews that matches the master.
+- **Done when:** every water body of the samples has its surface, bed and banks; each
+  surface at its level, each bed at its depth below it, no gap between bank, bed and wall
+  (a check); budgets met; a regenerated district rewrites only its tiles' water; Mac = x86.
+- **Shows:** a canal and a river bank up close by day and by night; the harbor from above.
+- **Later stages:** wind, rain and fog on the water and the underwater look (stage 3);
+  boats moving with buoyancy and wakes, ferries (stage 4).
+
+### 14.14 AG13: Ground cover and grass
+
+- **Adds:** for AG6, tileable sets for lawn, meadow, dirt, mud, gravel, sand, moss and
+  rubble; per tile, the ground pieces of every piece of open land (M16's cover kinds),
+  their sets blended by M16's wear (paths and desire lines), shade and edges; grass and
+  small plants as generated clump meshes per cover kind (short lawn, long meadow, reeds
+  and cattails, weeds, clover, flowers in the district's palette, ferns under trees), a
+  few variants each, scattered deterministically by density (none on paths, desire lines
+  or under decks, sparse in deep shade, thicker near water); AG8's ground plants (sedum,
+  scrub) folded in.
+- **Unreal:** the ground pieces replacing the blockout's lawns, parks, greens and verges by
+  key; the grass as decision 13.9 settles it (instanced per tile fading out at 60 to 100 m,
+  no collision, or generated around the player at run time); an `M_CgGrass` master that
+  sways in the wind, reading a `Wind` value in `MPC_CityGen` that stage 3 drives later.
+- **Blender:** the grass through the geometry-nodes instancing AG8 uses.
+- **Done when:** every piece of open land of the samples has its ground and cover; no grass
+  through paving, a building or water (a check); instance and triangle budgets met per tile
+  and city; a regenerated district rewrites only its tiles; Mac = x86.
+- **Shows:** a park and a wasteland lot at street level; a lawn edge with a worn path.
+- **Later stages:** wind and seasons (stage 3); people on the lawns (stage 4).
 
 ## 15. Running it
 
