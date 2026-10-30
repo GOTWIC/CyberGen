@@ -73,12 +73,11 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M13/<city>/report.json (Greyhook's in docs/progress/greyhook_reshape) is
-    committed, passes and matches a fresh build."""
+    """docs/progress/M19/<city>/report.json (M19 changed every sample's transit) is committed,
+    passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        folder = ROOT / "docs" / "progress" / (
-            "greyhook_reshape" if slug == "peninsula_city" else "M13") / slug
+        folder = ROOT / "docs" / "progress" / "M19" / slug
         committed = folder / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
