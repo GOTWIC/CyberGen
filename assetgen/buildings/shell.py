@@ -49,12 +49,15 @@ from ..triangulate import TriangulationError, triangulate
 from . import articulate as AR
 from . import connections as CN
 from . import details as DT
+from . import heroes as HE
 from . import fronts as FR
 from . import genome as GN
 from . import parts as PT
 from . import rings as RG
 from . import roofs as RF
+from . import slopes as SL
 from . import systems as SY
+from . import types as TY
 from .meshbuf import Buf
 
 NO_WINDOW = ("party", "hidden", "firewall")
@@ -90,11 +93,18 @@ def ground_mm(brief: dict) -> int:
 def plinth_mm(brief: dict) -> int:
     """How far a building on M13's slopes reaches under its base: from its base (mass z 0,
     the ground floor at the main entrance) down to the lowest ground under its footprint
-    and 0.5 m into it, as the blockout's plinth; 0 on flat ground (scope 14.6: AG5 steps it)."""
+    and 0.5 m into it, as the blockout's plinth (AG5: or the ground just outside its walls,
+    where lower); 0 on flat ground."""
     fg = brief["building"]["floor_grid"]
     base, low = fg.get("base_m"), fg.get("plinth_m")
     if base is None or low is None or base - low < 0.3:
         return 0
+    t = brief.get("terrain")
+    if t:
+        # (AG5: the ground just outside the walls, where the stepped plinth meets it)
+        rows = [v for r in t["grade"] if r for v in r]
+        if rows:
+            low = min(low, base + min(rows))
     return int(round((base - low + 0.5) * 1000))
 
 
@@ -102,7 +112,7 @@ class Facade:
     """One mass edge: a -> b (mm), outward to the right; s along it in mm, 0..L; `soff` the
     s of its start along the brief edge it lies on (a cut or a setback moves it)."""
     __slots__ = ("a", "b", "L", "ux", "uy", "nx", "ny", "j", "u0", "rec", "c0", "c1",
-                 "regions", "soff", "d_in", "d_nx", "reveal", "podium")
+                 "regions", "soff", "d_in", "d_nx", "reveal", "podium", "grade", "band_ops")
 
     def __init__(self, a, b, u0: float):
         self.a, self.b = a, b
@@ -115,6 +125,8 @@ class Facade:
         self.soff = 0
         self.podium = False
         self.reveal = 0
+        self.grade = None
+        self.band_ops = []
 
     def P(self, s: int, z: int) -> tuple[int, int, int]:
         L2 = 2 * self.L
@@ -423,6 +435,9 @@ class ShellBuilder:
         self.marks = AR.marks(brief, self.units_by_edge)
         self.arcades: list[dict] = []
         self.plinth = plinth_mm(brief)
+        # AG5: the ground along the base on M13's slopes, the openings moved to grade
+        self.slope = SL.of(brief) if self.plinth else None
+        self.lowered: dict[int, list] = {}
         self.irr = float(gm["cont"].get("irreg", 0.0))
         self.res = b["use"] in SY.BALCONY_USES
         self.inst: list[dict] = []
@@ -434,6 +449,8 @@ class ShellBuilder:
         self.landed: dict[str, dict] = {}
         self.portal_recs: list[dict] = []
         self.roof_forms: list[dict] = []
+        self.generator = TY.generator_of(b["type"])
+        self.hero = None
         self.roof_items: list[dict] = []
         self.green_done: list[str] = []
 
@@ -520,6 +537,8 @@ class ShellBuilder:
                     kept.setdefault(j, []).append((min(s), max(s)))
         self.kept = kept
         AR.articulate(self)
+        HE.pre(self)                            # AG5: a landmark's hero, a type's own steps
+        TY.pre(self)
         CN.portals(self)
         RF.plan(self)
         masses = self.masses
@@ -533,6 +552,8 @@ class ShellBuilder:
                 continue
             self.stats["masses"] += 1
             g = SY.role_group(ms["role"])
+            if HE.mass(self, ms) or TY.mass(self, ms):
+                continue                        # (AG5: a mass the type or hero builds)
             if ms["shape"] == "ring":
                 self._wheel(ms)
                 continue
@@ -546,7 +567,7 @@ class ShellBuilder:
         if depth:
             for ms in masses:
                 if ms["z0"] <= 50 and ms["z1"] - ms["z0"] >= 50 and ms["shape"] != "ring" and \
-                        len(RG.clean(ms["rings"][0])) >= 3:
+                        len(RG.clean(ms["rings"][0])) >= 3 and not ms.get("stepped"):
                     self.buf.layer = 1
                     self.buf.new_part()
                     if self._extrude(ms["rings"][0], None, -depth, 0, "structure"):
@@ -561,6 +582,8 @@ class ShellBuilder:
         RF.extras(self)
         self._mast()
         self._columns()
+        TY.post(self)                           # AG5: what the type adds, the hero's
+        HE.post(self)
         # AG3: doors for what no band could take, the mounts' hardware, blind and fire walls
         FR.leftovers(self)
         FR.hardware(self)
@@ -580,7 +603,21 @@ class ShellBuilder:
                 # AG4: every roof item's asset, the green roofs built, skybridge landings,
                 # portals and sky stations
                 "roof_items": self.roof_items, "green": list(self.green_done),
-                "landings": CN.landing_records(self), "portals": self.portal_recs}
+                "landings": CN.landing_records(self), "portals": self.portal_recs,
+                # AG5: the landing doors (brief edge, s range, floor and head, mm), which
+                # the collision leaves open
+                "landing_doors": [{k: ld[k] for k in ("edge", "s0", "s1", "z", "hi")}
+                                  for _, ld in sorted(self.landed.items()) if "edge" in ld],
+                # AG5: the generator, a hero's kind, accent, UV extents and its U2 mask
+                "generator": self.generator, "hero": self._hero_rec(),
+                "mask": HE.bake(self)}
+
+    def _hero_rec(self) -> dict | None:
+        h = getattr(self, "hero", None)
+        if h is None:
+            return None
+        P, H = HE.uv_scale(self)
+        return {"kind": h["kind"], "accent": h["accent"], "perimeter_m": P, "height_m": H}
 
     def _unpinched(self, ext, holes) -> list[int]:
         """The ring numbers (1 on) of the courts that touch neither the exterior nor another
@@ -781,6 +818,8 @@ class ShellBuilder:
                 self.band_facades.append((fa, ms))
             FR.caps(fb, roof=band >= ms["z1"])
             self.buf.layer = 0
+            if self.slope is not None and ms["z0"] <= 50:
+                SL.plinth(self, ms, fb)         # AG5: the stepped plinth, openings at grade
             self.buf.part = up_part
         self._caps(ms, wall, band)
         if ms.get("roof"):
@@ -1690,6 +1729,10 @@ class ShellBuilder:
             p = {"style": "mast", "h": PT.q(min(max(H // 10, 8000), 30000))}
         else:
             p = {"style": "spire", "h": PT.q(min(max(H * 18 // 100, 12000), 45000))}
+        if self.clear.segs and self.clear.hits(c[0] - 1200, c[1] - 1200, c[0] + 1200,
+                                               c[1] + 1200, top["z1"], top["z1"] + p["h"]):
+            self.stats["masts_off_corridors"] = self.stats.get("masts_off_corridors", 0) + 1
+            return               # (AG5: a sky tube or a guideway passes over the roof)
         self.parts.add("mast", p, c[0], c[1], top["z1"], 1.0, 0.0)
         self.used["crown"] = True
 

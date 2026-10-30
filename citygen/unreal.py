@@ -285,6 +285,21 @@ def read_glb_json(path: Path) -> dict:
     return json.loads(data[20:20 + n])
 
 
+def glb_triangles(path: Path) -> dict[str, int]:
+    """Each named node's triangles in a glTF binary, read from its JSON chunk alone."""
+    with open(path, "rb") as f:
+        n = struct.unpack("<I", f.read(20)[12:16])[0]
+        js = json.loads(f.read(n))
+    acc, meshes = js.get("accessors", []), js.get("meshes", [])
+    out = {}
+    for nd in js.get("nodes", []):
+        prims = meshes[nd["mesh"]]["primitives"] if "mesh" in nd else []
+        out[nd.get("name", "")] = sum(
+            acc[p["indices"] if "indices" in p else p["attributes"]["POSITION"]]["count"] // 3
+            for p in prims)
+    return out
+
+
 # --- graphs -----------------------------------------------------------------------------------
 
 def _flat(elems: list[dict]) -> dict:
@@ -547,6 +562,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
     mats, packs, actors, insts, chains, textures = {}, {}, [], [], [], {}
     replaced, missing, files = set(), 0, []
     sha_of: dict[str, str] = {}
+    tris_of: dict[str, dict[str, int]] = {}
 
     def pack(part, glb, use):
         stem = Path(glb).stem
@@ -565,6 +581,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             p = build / ASSETS_DIR / glb
             sha_of[glb] = hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
         return sha_of[glb]
+
+    def node_tris(glb, node):
+        # (a node's own triangles in its pack: an entry's `triangles` may count more, AG3's
+        # shell entries count their street front's too)
+        if glb not in tris_of:
+            p = build / ASSETS_DIR / glb
+            tris_of[glb] = glb_triangles(p) if p.is_file() else {}
+        return tris_of[glb].get(node, 1)
 
     def mesh(pk, node, h, collision, nanite, shape=None, fallback=False):
         a = asset_name(node)
@@ -651,6 +675,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 collision = {"complex": True}
             nanite = bool(e.get("nanite", True))
             path = h = None
+            empty = False
             if e.get("lods"):
                 # a non-Nanite LOD chain: each LOD node imported, the chain made as `asset`
                 pk = pack(part, e["glb"], "mesh")
@@ -662,8 +687,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 h = content_hash([e["hash"], lods, collision])
                 chains.append({"mesh": path, "hash": h, "lods": lods, "collision": collision})
             elif e.get("node") and e.get("triangles", 0) > 0:
-                path, h = mesh(pack(part, e["glb"], "mesh"), e["node"], e["hash"], collision,
-                               nanite, fallback=bool(e.get("fallback_full")))
+                if node_tris(e["glb"], e["node"]) > 0:
+                    path, h = mesh(pack(part, e["glb"], "mesh"), e["node"], e["hash"],
+                                   collision, nanite, fallback=bool(e.get("fallback_full")))
+                else:
+                    # (AG3: a one-floor building its street front takes whole has an empty
+                    # shell node: no mesh, which Unreal refuses ("Bad MeshDescription", and
+                    # the HLOD build fails on it), but it still takes the blockout's place)
+                    empty = True
             if e.get("proxy"):
                 px = e["proxy"]
                 mesh(pack(part, px["glb"], "proxy"), px["node"], e["hash"], {"none": True},
@@ -694,6 +725,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                                       for slot, m in sorted(e["materials"].items())}
                 if "none" in collision:
                     a["no_collision"] = True
+                if e.get("hero"):
+                    a["hero"] = e["hero"]["kind"]          # (AG5: a landmark's or the wheel's)
+                if e.get("plinth_m"):
+                    # (AG5: its stepped plinth reaches this far under the pivot, M13's slopes)
+                    a["plinth_m"] = float(e["plinth_m"])
                 if e.get("doors"):
                     # (AG3: the doors of a street front, tagged on its actor for stage 4)
                     a["doors"] = [f"{d['id']}@{d.get('walkway_id') or ''}" for d in e["doors"]]
@@ -727,7 +763,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
                 made = True
-            if not made:
+            if not made and not empty:
                 continue
             if bo:
                 replaced.add(k)
@@ -758,7 +794,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                        "replaced": len(replaced), "replaces_missing": missing,
                        "packs": len(out_packs),
                        "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
-                       "materials": len(mats), "textures": len(textures)}}
+                       "materials": len(mats), "textures": len(textures),
+                       "heroes": sum(1 for a in actors if a.get("hero"))}}
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,

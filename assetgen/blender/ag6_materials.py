@@ -226,6 +226,8 @@ def textured(mat, rec, files, part):
         col = t.mix(t.m("MULTIPLY", s, 0.6), col, (0.03, 0.03, 0.028, 1.0))
     if rec["master"] == "road" and sc.get("Stains", 0.0) > 0 and "RoadAtlas" in tx:
         col, rough = _stains(t, uv, col, rough, files[tx["RoadAtlas"]])
+    if sc.get("HeroMaskOn", 0.0) > 0 and "HeroMask" in tx:
+        col = _hero(t, col, files[tx["HeroMask"]])
     t.link(col, bsdf.inputs["Base Color"])
     t.link(t.clamp(rough, 0.02, 1.0), bsdf.inputs["Roughness"])
     t.link(metal, bsdf.inputs["Metallic"])
@@ -234,6 +236,18 @@ def textured(mat, rec, files, part):
     nm.inputs["Strength"].default_value = 1.0
     t.link(nm.outputs["Normal"], bsdf.inputs["Normal"])
     return mat
+
+
+def _hero(t, col, path):
+    """AG5: a hero's U2 mask on UV1 (`UVMap.001`): grime darkens, leaks stain, wear
+    lightens (the Unreal masters' `HERO_CODE`)."""
+    uv1 = t.new("ShaderNodeUVMap", uv_map="UVMap.001").outputs["UV"]
+    m, _ = t.tex(path, uv1, False)
+    g, lk, w = t.xyz(m)
+    col = t.mix(t.m("MULTIPLY", g, 0.55), col, (0.045, 0.04, 0.032, 1.0))
+    col = t.mix(t.m("MULTIPLY", lk, 0.7), col, t.v("MULTIPLY", col, (0.62, 0.58, 0.52)))
+    return t.mix(t.m("MULTIPLY", w, 0.35), col,
+                 t.v("ADD", t.v("SCALE", col, scale=1.18), (0.02, 0.02, 0.02)))
 
 
 ROAD_STAINS = (0, 1, 2, 3, 4, 5, 6, 7, 13, 15)      # cells of the road atlas a road lays

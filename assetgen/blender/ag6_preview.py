@@ -243,6 +243,9 @@ def import_glb(path, part, shared=False):
                 key = f"{slot}@{era}"
                 if key not in JOB["materials"]["buildings"]:
                     key = slot
+            if part == "buildings" and pr is not None and \
+                    f"{key}#{base}" in JOB["materials"]["buildings"]:
+                key = f"{key}#{base}"          # (AG5: a hero's own, its mask on UV1)
             m = mat_for("buildings" if part == "parts" else part, key, part == "parts")
             if m is not None:
                 old_mats.add(ms.material)

@@ -98,6 +98,22 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "bridge_floor": ("facade", "paving_granite"), "bridge_glass": ("glass", None),
     "bridge_frame": ("metal", "aluminum"), "bridge_roof": ("metal", "seam"),
     "bridge_steel": ("metal", "steel_painted"), "bridge_rail": ("metal", "metal_dark"),
+    # AG5: stepped plinths and retaining skirts on slopes, the type generators' and the
+    # heroes' parts
+    "plinth": ("facade", "board_concrete"), "retaining": ("facade", "concrete_formed"),
+    "eave_tile": ("facade", "roof_tile"), "eave_soffit": ("facade", "timber"),
+    "lacquer": ("metal", "metal_painted"), "stone": ("facade", "stone_dressed"),
+    "finial": ("metal", "aluminum"), "hangar_door": ("metal", "hangar"),
+    "dormer": ("facade", "plaster_heritage"), "tarp": ("facade", "patch_tarp"),
+    "shanty_roof": ("metal", "metal_rusty"), "pergola": ("facade", "timber"),
+    "chimney": ("facade", "brick_heritage"), "radome": ("facade", "plastic"),
+    "wheel_steel": ("metal", "steel_painted"), "gondola": ("metal", "aluminum"),
+    "hero_frame": ("metal", "metal_dark"), "hero_light": ("neon", None),
+    "halo_frame": ("metal", "metal_dark"), "halo_light": ("neon", None),
+    "terrace_planter": ("facade", "concrete_formed"), "terrace_green": ("foliage", "grass"),
+    "terrace_soil": ("facade", "ballast"),
+    "escape_rust": ("metal", "metal_rusty"), "atrium_glass": ("glass", None),
+    "atrium_frame": ("metal", "aluminum"),
 }
 for _s in SY.SLOTS:
     if _s.startswith("paint_"):

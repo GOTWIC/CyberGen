@@ -75,12 +75,15 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "5"                 # AG6: textured masters; AG8: leaves, textured holo
+STAGE2_VERSION = "6"                 # AG6: textured masters; AG8: leaves, textured holo;
+                                     # AG5: the heroes' masks (HeroMask on UV1)
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
-# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without)
-PRUNE_FILES = 500
+# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without; a first
+# import's unused family variants, 200 to 300, 76 to 313 s), and loading the city again after
+# it takes 15 to 30 s
+PRUNE_FILES = 50
 EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
@@ -355,6 +358,16 @@ c = lerp(c, float3(0.03, 0.03, 0.028), s * 0.6);
 if (Stains > 0.5) { c = lerp(c, Stain.rgb, Stain.a * Gate.z); }
 return c;
 """
+# AG5: a hero's U2 mask on UV1 (grime, leaks, wear), where its instance sets HeroMaskOn
+HERO_CODE = """
+float3 c = C;
+if (On > 0.5) {
+  c = lerp(c, float3(0.045, 0.04, 0.032), Mask.r * 0.55);
+  c = lerp(c, c * float3(0.62, 0.58, 0.52), Mask.g * 0.7);
+  c = lerp(c, c * 1.18 + 0.02, Mask.b * 0.35);
+}
+return c;
+"""
 UV_CODE = "return UV / max(TileM, 0.01) + float2(Seed * 37.3, Seed * 71.9);"
 MACRO_UV_CODE = "return float2(WP.x, -WP.y) / 6400.0;"
 STREAK_UV_CODE = """
@@ -567,6 +580,13 @@ def textured_surface(m, master, defaults):
         link(a, out, sur, b)
     for name, node in params.items():
         link(node, "", sur, name)
+    # AG5: a hero's mask over the surface (its own instance: HeroMask, HeroMaskOn 1)
+    uv1 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2400, 2900, coordinate_index=1)
+    hmask = tparam(m, "HeroMask", "mask", -1800, 2900, uv1, defaults)
+    hon = sparam(m, "HeroMaskOn", -1500, 2900, 0.0)
+    hero = custom(m, -700, 0, HERO_CODE, ["C", "Mask", "On"], cmot(F3), "CgHero")
+    for a, out, b in ((sur, "", "C"), (hmask, "RGBA", "Mask"), (hon, "", "On")):
+        link(a, out, hero, b)
     rough = sparam(m, "Roughness", -1500, 2650, 0.85)
     metal = sparam(m, "Metallic", -1500, 2730, 0.0)
     rc = custom(m, -1000, 400, ROUGH_CODE, ["Orm", "Macro", "Textured", "Rough", "Stains",
@@ -586,7 +606,7 @@ def textured_surface(m, master, defaults):
     link(flat, "", nl, "A")
     link(nrm, "RGB", nl, "B")
     link(params["Textured"], "", nl, "Alpha")
-    MEL.connect_material_property(sur, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(hero, "", MP.MP_BASE_COLOR)
     MEL.connect_material_property(rc, "", MP.MP_ROUGHNESS)
     MEL.connect_material_property(mc, "", MP.MP_METALLIC)
     MEL.connect_material_property(nl, "", MP.MP_NORMAL)
@@ -1568,9 +1588,13 @@ class Importer:
                 doors = [unreal.Name(f"cg.door={d}") for d in r.get("doors", [])]
                 # (AG4: what a skybridge joins, `cg.link=building:<id>` or `walkway:<id>`)
                 links = [unreal.Name(f"cg.link={x}") for x in r.get("links", [])]
+                # (AG5: a landmark's or the wheel's hero, `cg.hero=<kind>`; a building on a
+                # slope, `cg.plinth=<m>` its stepped plinth under the pivot)
+                more = ([unreal.Name(f"cg.hero={r['hero']}")] if r.get("hero") else []) + \
+                    ([unreal.Name(f"cg.plinth={r['plinth_m']}")] if r.get("plinth_m") else [])
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage] + \
-                    doors + links
+                    doors + links + more
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)

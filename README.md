@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15 and M17 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG3, AG6, AG7 and AG8 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -166,7 +166,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7)
 
 ### Cities
 
@@ -315,13 +315,38 @@ tubes pass through towers in portals, with platforms where a station stands. In 
 each skybridge replaces its blockout piece and the roof equipment is instanced per tile.
 More: [`docs/progress/AG4`](docs/progress/AG4).
 
-<img src="docs/progress/AG1/unreal/cragmouth/unreal_district_old_quarter_8k.jpg" width="840">
+<img src="docs/progress/AG5/landmarks_8k.jpg" width="840">
 
-Cragmouth's Old Quarter in Unreal 5.8, every building and street from stage 2 (8K).
+Landmarks as hero buildings (8K): the megatower over Vesper Bay's Corporate Core, Nexus
+City's spires, an arcology and Greyhook's wheel.
+
+Every landmark is a hero building, built by kind: the megatower's three arms with light seams
+up their tips, sky gardens on the setbacks, a halo crown and a needle; spires with collars, a
+needle and a beacon; the arcology's planted terraces and glazed atrium roof; the wheel with
+its twin rims, spokes, gondolas and lattice legs. Each has weathering of its own (grime
+washed down under the setbacks, leaks under the sills, worn corners). The other building
+types are built their own way: shanty stacks with lean-to roofs, tarps and fire escapes,
+megablocks with antenna farms, sheds open on steel columns, hangars with sliding doors,
+temples and pagodas with colonnades and eaves, control towers with their cabs, vaulted
+terminals and stations, parking ramps, and twin towers as one design. Pitched roofs get
+dormers, and penthouses follow the era.
+
+<img src="docs/progress/AG5/cragmouth/slopes_8k.jpg" width="840">
+
+Cragmouth's Old Quarter on its hill (8K). On slopes, every building stands on a stepped
+stone plinth, with doors and shopfronts brought down or up to the street and retaining
+walls where the hill stands against a wall. `assetgen review` writes an art-direction sheet
+for a round of changes to the asset spec. More: [`docs/progress/AG5`](docs/progress/AG5).
+
+<img src="docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg" width="840">
+
+A shopping street in Greyhook in Unreal 5.8: street fronts, signs, props, roads and
+textured buildings, all from stage 2 (8K).
 
 `citygen unreal out/<city> <Project>.uproject` brings the buildings and streets into Unreal
 over the blockout, each replacing its blockout piece, with tinted materials and collision;
-`--blockout-only` leaves them out. More views: [`docs/progress/AG1/unreal`](docs/progress/AG1/unreal).
+`--blockout-only` leaves them out. More views: [`docs/progress/AG4/unreal`](docs/progress/AG4/unreal),
+[`docs/progress/AG1/unreal`](docs/progress/AG1/unreal).
 
 ### Milestones
 
@@ -332,7 +357,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG2 | Facades | Windows, balconies, fins, louvers and frames as instanced parts; nineteen facade styles; corner cuts, setbacks, crowns and arcades; wear by district | Done |
 | AG3 | Street fronts | A shopfront for every shop by its use, doors at every entrance, lobbies, loading docks, garages, shutters and grilles, mounts for signs and awnings, fire walls, grime and graffiti; walkable doorways in Unreal | Done |
 | AG4 | Roofs and connections | Pitched, sawtooth and vaulted roofs, roof finishes, AC units, water tanks, antennas, helipads and penthouses on every roof, green roofs, fire escapes, ducts and cameras, skybridges with landing doors, sky tube portals through towers and sky stations | Done |
-| AG5 | Building types and landmarks | Megabuildings, shanties, industrial and civic types, landmarks, buildings on slopes | Planned |
+| AG5 | Building types and landmarks | Shanty stacks, megablocks, sheds, hangars, temples, pagodas, control towers, terminals and the other building types each built their own way; twin towers and campuses as one design; the megatower, spires, arcology and wheel as hero landmarks with their own weathering; stepped plinths and doors at grade on slopes; art-direction rounds | Done |
 | AG6 | Materials and textures | Texture library per era, trim sheets, decals, window interiors, signs in each district's scripts, textured materials in Blender and Unreal | Done |
 | AG7 | Street elements | Roads with markings, sidewalks and junctions, bridges, viaducts and interchanges, tunnels, quays, transit structures, megasite elements, per 256 m tile | Done |
 | AG8 | Props, plants and signs | Street furniture and parked cars in variants per district style, trees by species, shrubs and ivy, shop signs with their text, neon, billboards, holo-ads | Done |

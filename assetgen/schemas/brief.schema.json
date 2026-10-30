@@ -1626,6 +1626,44 @@
       "title": "SpecSection",
       "type": "object"
     },
+    "Terrain": {
+      "additionalProperties": false,
+      "description": "AG5: on M13's slopes, the ground along each edge of a mass on the base (None for the\nothers), from its start every `step_m` and at its end, `out_m` outside it, in meters\nover the building's base.",
+      "properties": {
+        "step_m": {
+          "title": "Step M",
+          "type": "number"
+        },
+        "out_m": {
+          "title": "Out M",
+          "type": "number"
+        },
+        "grade": {
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Grade",
+          "type": "array"
+        }
+      },
+      "required": [
+        "step_m",
+        "out_m",
+        "grade"
+      ],
+      "title": "Terrain",
+      "type": "object"
+    },
     "Unit": {
       "additionalProperties": false,
       "properties": {
@@ -1906,6 +1944,18 @@
       },
       "title": "Clearances",
       "type": "array"
+    },
+    "terrain": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Terrain"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "AG5: the ground along the base's edges (M13's slopes only)."
     }
   },
   "required": [
