@@ -13,9 +13,10 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M16 (M16, water and ground
-detail, planned), built in `docs/progress/M*`; later stages give their milestones a prefix of
-their own (set in their scope doc) so their progress folders never clash with stage 1's.
+high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M16, water and
+ground detail; M17 to M21, the fixes from the first run-through, `docs/run_through_1.md`),
+built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
+their scope doc) so their progress folders never clash with stage 1's.
 
 **Unreal exporter.** One exporter takes every stage's output into Unreal Engine 5.8. It is
 not a stage and has no milestones of its own: stage 1 introduces it (M15, `citygen unreal`,
@@ -744,8 +745,9 @@ Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. 
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG13, section 14; AG12
-water and AG13 ground cover and grass planned, after citygen's M16), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
+AG12 water and AG13 ground cover and grass after citygen's M16, AG14 fit and finish and AG15
+cyberpunk facades and night from the first run-through), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).

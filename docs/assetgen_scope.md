@@ -4,7 +4,7 @@ Stage 2 (assetgen) of CyberGen's five stages. A built citygen city in; a 3D mode
 for every building, plus the street elements, props, plants and texture library the city
 needs, out, and into Unreal through the shared exporter (`docs/unreal_export.md`), which
 every assetgen milestone updates for what it adds. Like citygen it is city-agnostic, offline and
-deterministic. Its milestones carry the prefix AG (AG0 to AG13, section 14), so their
+deterministic. Its milestones carry the prefix AG (AG0 to AG15, section 14), so their
 folders in `docs/progress/` never clash with stage 1's M folders or a later stage's; their
 full record is `docs/assetgen_milestones.md`. The decisions that need Swagnik before AG1
 starts are in section 13.
@@ -696,11 +696,13 @@ docker image; Windows joins in AG9.
 | AG6 | Materials and textures | AG1; decisions 13.1, 13.3 | AG2 to AG5, AG7, AG8 |
 | AG7 | Street elements | AG0; M13 for grades | AG1 to AG6 |
 | AG8 | Props, plants and signs | AG0; decision 13.3 | AG1 to AG6 |
-| AG9 | Scale and release | AG5 to AG8, AG12, AG13; decision 13.5 | |
+| AG9 | Scale and release | AG5 to AG8, AG12 to AG15; decision 13.5 | |
 | AG10 | Layered districts | AG9; M14 | AG11 |
 | AG11 | Interiors (only if decision 13.6 asks) | AG9 | AG10 |
 | AG12 | Water (14.13) | M16; AG6, AG7; decision 13.10 | AG4, AG5, AG13 |
 | AG13 | Ground cover and grass (14.14) | M16; AG6, AG8; decision 13.9 | AG4, AG5, AG12 |
+| AG14 | Fit and finish (14.15) | AG4, AG7, AG8; M17 to M21 | AG12, AG13 |
+| AG15 | Cyberpunk facades and night (14.16) | AG14, AG6; M20, M21 | AG12, AG13 |
 
 ### 14.1 AG0: Contract and spike
 
@@ -849,7 +851,7 @@ docker image; Windows joins in AG9.
 - **Unreal:** HLOD layers, distance field and Lumen card settings at city scale, import time
   and disk per city within section 11.
 - **Done when:** the sweep runs without a crash; the Mac, x86 Linux and Windows agree;
-  budgets are met (AG12's water and AG13's grass included); the README's stage 2 section
+  budgets are met (AG12's water, AG13's grass and AG15's lights included); the README's stage 2 section
   shows every sample city.
 - **Shows:** whole-city renders of every sample at 8K, in Blender and in Unreal.
 
@@ -870,6 +872,7 @@ docker image; Windows joins in AG9.
       │     └──> AG6 ───────────────────────┤
       ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11 (if asked)
       └─> AG8 ──────────────────────────────┤
+ M17 to M21 ─> AG14 (fit) ─> AG15 (night) ──┤
  M16 ─┬─> AG12 (water) ─────────────────────┤
       └─> AG13 (ground cover, grass) ───────┘
 ```
@@ -891,6 +894,9 @@ docker image; Windows joins in AG9.
 - **Water and grass** (AG12, AG13) come after stage 1's M16 and before AG9, so the release
   has real water and ground; they share no generator code with each other or with the
   building line, so each can run beside AG4 and AG5 as a separate session.
+- **The first run-through's fixes** (AG14, AG15; `docs/run_through_1.md`) come first: AG14
+  after stage 1's M17 to M21 (it draws what they add), AG15 after AG14 (both change the
+  shell), before AG5, AG12 and AG13.
 - **Stage 1 milestones assetgen waits on:** M15 and the exporter's move to its own package
   before AG0's Unreal part, M13 for AG5's slopes and AG7's grades (until then flat ground at
   z 0), M14 for AG10. The asks of section 4.5 go to citygen sessions; each milestone derives
@@ -939,6 +945,56 @@ docker image; Windows joins in AG9.
   and city; a regenerated district rewrites only its tiles; Mac = x86.
 - **Shows:** a park and a wasteland lot at street level; a lawn edge with a worn path.
 - **Later stages:** wind and seasons (stage 3); people on the lawns (stage 4).
+
+### 14.15 AG14: Fit and finish
+
+From the first run-through (`docs/run_through_1.md`): the stage 2 side of M17 to M21, and
+checks on the generated meshes.
+
+- **Adds:** junction pieces drawn from M18's `edge_z`, meeting every leg at its cut edge
+  (now an inverse-distance blend that misses a leg's height there, a step at every sloped
+  leg); quays, their railings and props at one height (M20); roof equipment seated on the
+  roof surface under it (dunnage on a pitched form; no AC unit floating over a roof); curved
+  walls tessellated from M21's arcs by chord sag (2 cm at most) with smooth normals across
+  the curve, bays and windows following it; M19's cap beams, masts and piers; M18's
+  embankments; crosswalk widths from the model. Two checks on the meshes: `asset_grounded`
+  (every part, prop, plant, roof item and street piece rests on a surface under it within
+  2 cm) and `asset_clash` (street pieces against building meshes and their parts: no road,
+  ramp or embankment into a building; bridge pieces against each other; transit structures
+  against buildings except through a cut portal). The run-through's model checks found no
+  road in a building mass and no overlapping bridges on Delta, so those came from the meshes
+  (a part or front over the road, a piece reaching past its corridor, a bridge drawn twice):
+  the clash check finds them, the fix follows.
+- **Unreal:** nothing new; the pieces replace their blockout objects as before.
+- **Done when:** both checks pass on every sample; a sloped junction, a quay and a round tower
+  read clean up close; budgets met; Mac = x86.
+- **Shows:** a junction at a bridge approach, a quay with its railing, a round tower up close.
+
+### 14.16 AG15: Cyberpunk facades and night
+
+- **Adds:** facades that are not rows of rectangles: ribbon and slit glazing, diagonal and
+  diagrid glazing, honeycomb and hexagonal panels, punched windows of mixed sizes, staggered
+  and stepped bays, angled and folded glass, fritted and colored glass, perforated metal and
+  mesh screens, LED-strip mullions and fins, pod and capsule windows, media facades; two or
+  three finishes per building, colored glass, emissive strips; genomes that reach further
+  in the corporate core and midtown, and `asset_unique` by neighbors (towers within 150 m
+  differ in system, window pattern and palette, by day and in night thumbnails). **Night:**
+  every building lit its own way: the lit share of its windows by use and hour band
+  (offices in bands of floors, homes scattered, hotels warm, vacant towers dark), mixed
+  color temperatures, crown and edge lighting, vertical LED strips, logo signs; assets for
+  M20's new sign kinds, emissive, with real lights where they wash a facade.
+- **Unreal:** the night patterns in the facade master (Custom Primitive Data per building:
+  lit share, color, pattern seed, schedule) driven by `MPC_CityGen`'s Night and hour; street
+  lights that light the ground: a downward spot light under each lamp head, outside the lamp
+  mesh's shadow, the 128 to 256 lamps nearest the player lit (shadowless past the closest
+  few) and light-pool decals under the rest (the run-through's streets were black at night);
+  emissive windows and signs tuned against the night exposure.
+- **Blender:** night previews with the patterns.
+- **Done when:** the uniqueness check passes with the neighbor rule; no two neighboring
+  towers of a sample's corporate core look or light alike (reviewed with Swagnik); streets
+  under their lamps read lit at night in Unreal; budgets met; Mac = x86.
+- **Shows:** the corporate core by day and by night; a street at night under its lamps.
+- **Later stages:** the full night (fog, rain, reflections, light shafts) is stage 3's.
 
 ## 15. Running it
 
