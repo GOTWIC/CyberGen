@@ -88,8 +88,7 @@ def deck_build() -> Path:
     if "decks" not in _CACHE:
         from assetgen.cli import main as ag
         from citygen.cli import main as cg
-        d = Path(tempfile.mkdtemp(prefix="ag_decks_"))
-        atexit.register(shutil.rmtree, d, True)
+        d = temp_dir("ag_decks")
         data = copy.deepcopy(SMALL)
         for x in data["districts"]:
             if x["name"] == "Core":
