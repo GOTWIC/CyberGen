@@ -785,6 +785,7 @@ def temple_pre(sb) -> None:
             continue
         sb.colonnade.append({"ring": list(ring), "z0": ms["z0"], "z1": ms["z1"], "ms": ms})
         ms["outer_ring"] = list(ring)
+        ms["colonnade_mm"] = COLONNADE
         ms["rings"], ms["eidx"], ms["deriv"] = [res[0]], [res[1]], [res[2]]
         sb.used["articulation"].append("colonnade")
     _platform_stairs(sb)

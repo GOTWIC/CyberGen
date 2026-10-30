@@ -168,6 +168,8 @@ def _doors(sh: dict) -> list[dict]:
                     "height_m": C.m(d["h"] / 1000.0), "depth_m": C.m(d["depth"] / 1000.0),
                     "steps": d["steps"], "flush": d["flush"], "moved": bool(d.get("moved")),
                     "class": d["class"]})
+        if d.get("under"):
+            out[-1]["under_m"] = C.m(d["under"] / 1000.0)     # (AG5: behind a colonnade)
     return sorted(out, key=lambda d: d["id"])
 
 

@@ -275,6 +275,9 @@ class Band:
                     units.append((k, un, s))
         ents = []
         if fa.j is not None:
+            # (AG5: behind a temple's colonnade the hall's walls are its depth shorter; an
+            # entrance at the old corner comes onto the wall's end)
+            col = int(self.ms.get("colonnade_mm", 0))
             for k, en in enumerate(br["entrances"]):
                 at = en.get("at")
                 if at is None or at["edge"] != fa.j or k in sb.done_ents:
@@ -282,6 +285,8 @@ class Band:
                 s = int(round(at["s"] * 1000)) - so
                 if -500 <= s <= L + 500:
                     ents.append((k, en, s))
+                elif col and -500 - col <= s <= L + 500 + col and L > 4000:
+                    ents.append((k, en, min(max(s, 2000), L - 2000)))
         # a main entrance not well inside a unit keeps room for its own door: the shopfronts
         # either side of it stop short (a lobby between the shops)
         spans = [(su - wu // 2 + PIER_U, su + wu // 2 - PIER_U) for _, un, su in units
@@ -883,6 +888,8 @@ class Band:
                "edge": fa.j,
                "s": int(s + fa.soff), "class": fa.cls(min(max(s, 0), fa.L),
                                                      op.lo + 1200)}
+        if self.ms.get("colonnade_mm"):
+            rec["under"] = int(self.ms["colonnade_mm"])    # (AG5: behind a colonnade)
         sb.doors.append(rec)
 
 

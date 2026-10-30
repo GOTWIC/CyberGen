@@ -325,7 +325,7 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     first = []
     faced = []
 
-    def leg_clear(bid, ax, ay, bx, by, x, y) -> bool:
+    def leg_clear(bid, ax, ay, bx, by, x, y, under=0.0) -> bool:
         if (bx - ax) ** 2 + (by - ay) ** 2 < 0.0025 or ftree is None:
             return True
         seg = LineString([(ax, ay), (bx, by)])
@@ -334,8 +334,9 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                 continue                       # (M14: under or on a deck, not in the way)
             if fids[i] != bid:
                 return False
-            # its own building only near the door (an arcade, a recess)
-            far = seg.difference(Point(x, y).buffer(OWN_M, 8))
+            # its own building only near the door (an arcade, a recess; AG5: a colonnade's
+            # depth more behind one)
+            far = seg.difference(Point(x, y).buffer(OWN_M + under, 8))
             if not far.is_empty and far.intersects(feet[own[bid]]):
                 return False
         return True
@@ -365,10 +366,11 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                 if d.get("entrance") is not None else None
             # (out of the doorway STEP_M, else further out past a corner of its own that
             # juts beside it, then straight to the walkway)
+            under = float(d.get("under_m", 0.0))
             for step in STEPS_M:
                 qx, qy = x + nx * step, y + ny * step
                 q = Point(qx, qy)
-                if not leg_clear(bid, ox, oy, qx, qy, x, y):
+                if not leg_clear(bid, ox, oy, qx, qy, x, y, under):
                     break
                 for k in sorted(tree.query(q.buffer(REACH_M)).tolist(), key=lambda k: ids[k]):
                     line = geoms[k]
@@ -379,7 +381,7 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                     key = (0 if ids[k] == model_w else 1, round(dist, 3), ids[k])
                     if best is not None and key >= best[0]:
                         continue
-                    if leg_clear(bid, qx, qy, f.x, f.y, x, y):
+                    if leg_clear(bid, qx, qy, f.x, f.y, x, y, under):
                         best = (key, ids[k])
                 if best is not None:
                     break
