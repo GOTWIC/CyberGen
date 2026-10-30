@@ -953,7 +953,8 @@ def _pose_descent(c: Ctx, stops, cands, heads, cost, rho: float, cmin: float, mo
             cv = cost[_cells(c, pts)]
             # (M19: off the map is blocked too; the raster's edge cells stand in for it)
             P = np.array(pts, dtype=np.float64)
-            off = (P[:, 0] < bx0 - 1.0) | (P[:, 0] > bx1 + 1.0) | (P[:, 1] < by0 - 1.0) |                 (P[:, 1] > by1 + 1.0)
+            off = (P[:, 0] < bx0 - 1.0) | (P[:, 0] > bx1 + 1.0) | (P[:, 1] < by0 - 1.0) | \
+                (P[:, 1] > by1 + 1.0)
             cv = np.where(off, INF, cv)
             ok = np.isfinite(cv)
             mid = np.where(ok[:-1] & ok[1:], (cv[:-1] + cv[1:]) / 2.0, 0.0)
@@ -1099,7 +1100,8 @@ def sky_pass(b, z: float, alt: tuple, through) -> str:
     r = DECK_M["sky_tube"] / 2.0
     if b.top <= z - SKY_CLEAR_M or b.bottom >= z + 6.0:
         return "clear"
-    portal = (through is True or (bool(through) and b.id in through)) and b.portal_ok and         b.top >= alt[0] + r + PORTAL_HEADROOM_M
+    portal = (through is True or (bool(through) and b.id in through)) and b.portal_ok and \
+        b.top >= alt[0] + r + PORTAL_HEADROOM_M
     climb = b.top <= alt[1] - SKY_CLEAR_M
     if portal and climb:
         return "climb" if b.top + SKY_CLEAR_M - z <= z - (b.top - r - PORTAL_HEADROOM_M) \
@@ -3514,7 +3516,8 @@ def _support_room(c: Ctx, lines: list, gone: set, lanes, sw, ground: list) -> No
                 for i in sorted(c.btree.query(Point(p), predicate="dwithin",
                                               distance=size).tolist()):
                     o = c.blds[i]
-                    if o.id not in gone and o.removable and o.id not in ln.portals and                             o.top <= top - 2.0:
+                    if o.id not in gone and o.removable and o.id not in ln.portals and \
+                            o.top <= top - 2.0:
                         gone.add(o.id)
                         ln.removed.append(o.id)
                 x += span
@@ -3635,7 +3638,8 @@ class Keep:
         for i in range(kx - 1, kx + 2):
             for j in range(ky - 1, ky + 2):
                 for x, y, h in self.placed.get((i, j), ()):
-                    if abs(x - p[0]) < h + size / 2.0 + 1.0 and abs(y - p[1]) < h + size / 2.0 + 1.0:
+                    r = h + size / 2.0 + 1.0
+                    if abs(x - p[0]) < r and abs(y - p[1]) < r:
                         return True
         return False
 
@@ -4421,7 +4425,8 @@ def _roof_hits(c: Ctx, lines: list, gone: set) -> dict:
                     continue
                 z = min(ln.zs[j] for j in near)
                 top = it.position[2] + it.size[2]
-                clear = top + SKY_CLEAR_M <= z if ln.mode == "sky_tube" else                     top + 2.0 <= z - below(ln.mode)
+                clear = top + SKY_CLEAR_M <= z if ln.mode == "sky_tube" else \
+                    top + 2.0 <= z - below(ln.mode)
                 if not clear and it.position[2] < z + 6.0:
                     out.setdefault(b.id, set()).add(k)
     return out
