@@ -65,7 +65,7 @@ SLOT_REACH.update({"retaining": "flush", "eave_tile": "deep", "eave_soffit": "de
                    "stone": "flush", "hangar_door": "flush", "hero_frame": "flush",
                    "hero_light": "flush", "shanty_roof": "strip", "wheel_steel": "wheel",
                    "gondola": "wheel", "escape_rust": "deep", "atrium_glass": "court",
-                   "atrium_frame": "court"})
+                   "atrium_frame": "court", "platform": "station"})
 for _s in SY.SLOTS:
     if _s not in SLOT_REACH and (_s.startswith(("paint_", "neon_", "screen_", "poster_",
                                                 "mural_", "graffiti_", "riser_", "lit_",
@@ -154,6 +154,20 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
             bz1 = max(z1 for _, z1, _, _ in masses) + t
             allowed |= (x >= bx0) & (x <= bx1) & (y >= by0) & (y <= by1) & (z >= bz0) & \
                 (z <= bz1)
+        if reach == "station":
+            # (AG5: a sky station beside its tower: its platform within the station's
+            # footprint and the deck across to the wall, down to a roof it rests on)
+            from .connections import STATION_LINK, STATION_REST
+            for pr in brief.get("portals") or []:
+                pf = pr.get("platform")
+                if not pr.get("station") or not pf:
+                    continue
+                ext = [(q[0] * 1000.0, q[1] * 1000.0) for q in pf["exterior"]]
+                holes = [[(q[0] * 1000.0, q[1] * 1000.0) for q in h] for h in pf["holes"]]
+                d = dist_polyline(x, y, ext + ext[:1])
+                allowed |= (inside_poly(x, y, ext, holes) | (d <= STATION_LINK + TOL_MM)) & \
+                    (z >= pr["z"][0] * 1000.0 - STATION_REST - TOL_MM) & \
+                    (z <= pr["z"][1] * 1000.0 + TOL_MM)
         bad = over & ~allowed
         out["outside"] += int(bad.sum())
         out["low_overhang"] += int((bad & (near <= DEEP_MM) & ~high).sum())

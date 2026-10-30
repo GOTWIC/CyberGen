@@ -67,6 +67,9 @@ FRAME_DEPTH = 340            # and how far it stands out of the facade, with its
 PORTAL_CLEAR = 1000          # the corridor round a sky tube's section
 PLATFORM_GAP = 2750          # a sky station's platform edge from the tube's axis
 TUBE_FLOOR = 2520            # the tube's floor (AG7) under its axis
+STATION_LINK = 6000          # AG5: a station beside its tower: its deck across to the wall
+STATION_REST = 3000          # or onto a roof this far under its floor
+STATION_SLAB = 600           # its slab's depth where it hangs
 GALLERY = 1200               # a court gallery's depth
 SLIVER = 1500                # a portal storey's piece thinner than this is left out
 
@@ -498,7 +501,11 @@ def station(sb) -> None:
     from shapely.geometry import LineString, Polygon
     from citygen import geom as G
     for p, rec in zip(sb.br["portals"], sb.portal_recs):
-        if not p.get("station") or not p.get("platform") or not rec.get("cut"):
+        if not p.get("station") or not p.get("platform"):
+            continue
+        if not rec.get("cut"):
+            if not rec.get("through"):
+                _beside(sb, p, rec)             # (AG5: the tube passes beside the tower)
             continue
         lines = [[(q[0], q[1]) for q in ln] for ln in p["lines"] if len(ln) >= 2]
         if not lines:
@@ -533,6 +540,67 @@ def station(sb) -> None:
             rec["platform"] = True
             rec["floor_m"] = round(floor / 1000.0, 3)
             sb.stats["sky_platforms"] = sb.stats.get("sky_platforms", 0) + made
+
+
+def _beside(sb, p: dict, rec: dict) -> None:
+    """AG5: a sky station whose tube passes beside its tower (it meets no mass at its
+    height, `through` 0, so there is no portal to cut): its platform on the tower's side
+    of the tube, a deck from the station's footprint to the tower's wall (`STATION_LINK` at
+    most), cantilevered off it or resting on a roof under it (`STATION_REST`)."""
+    from shapely.geometry import LineString, Polygon
+    from citygen import geom as G
+    lines = [[(q[0], q[1]) for q in ln] for ln in p["lines"] if len(ln) >= 2]
+    if not lines:
+        return
+    pf = p["platform"]
+    # (the floor under the tube's lowest point over the station: its track may climb)
+    foot = Polygon(pf["exterior"], pf["holes"])
+    zs = [z for ln in p["lines"] for a, b in zip(ln, ln[1:])
+          if LineString([a[:2], b[:2]]).intersects(foot) for z in (a[2], b[2])]
+    zs = zs or [q[2] for ln in p["lines"] for q in ln]
+    floor = int(round((min(zs) - p["diameter_m"] / 2.0) * 1000)) - TUBE_FLOOR
+    at = [_poly_m(ms["rings"]) for ms in sb.masses
+          if ms["shape"] == "prism" and ms["z0"] <= floor < ms["z1"]]
+    roofs = [(ms["z1"], _poly_m(ms["rings"])) for ms in sb.masses
+             if ms["shape"] == "prism" and floor - STATION_REST <= ms["z1"] <= floor]
+    with G.canonical():
+        tube = G.union([G.qpoly(LineString(ln).buffer(PLATFORM_GAP / 1000.0,
+                                                       cap_style="flat")) for ln in lines])
+        plat = G.diff(G.inter(G.qpoly(Polygon(pf["exterior"], pf["holes"])), _corridor(p)),
+                      tube)
+        walls = G.union([G.qpoly(a) for a in at]) if at else None
+        decks = []
+        for pc in G.to_model_polys(plat):
+            piece = G.qpoly(Polygon(pc["exterior"], pc["holes"]))
+            z0 = floor - STATION_SLAB
+            rest = [z for z, rp in roofs if G.area1(G.inter(piece, G.qpoly(rp))) > 1.0]
+            d = piece.distance(walls) if walls is not None else math.inf
+            if d <= STATION_LINK / 1000.0:
+                if d > 0.01:
+                    # (the deck across the gap: the hull of the piece and the wall near it)
+                    near = G.inter(walls, G.qpoly(piece.buffer(d + 1.0, join_style="mitre")))
+                    piece = G.union([piece, G.qpoly(G.union([piece, near]).convex_hull)])
+            elif not rest:
+                continue
+            if rest:
+                z0 = min(z0, max(rest))
+            if walls is not None:
+                piece = G.diff(piece, walls)
+            decks.append((z0, G.diff(piece, tube)))
+    made = 0
+    for z0, deck in decks:
+        for pc in G.to_model_polys(deck):
+            ring = RF._ccw(RG.mm_ring(pc["exterior"]))
+            if len(ring) < 3 or not RG.is_simple(ring) or abs(area2(ring)) < 2 * 4_000_000:
+                continue
+            if RF.slab(sb.buf, ring, [], z0, floor, "platform", "platform"):
+                made += 1
+    if made:
+        rec["platform"] = True
+        rec["beside"] = True
+        rec["floor_m"] = round(floor / 1000.0, 3)
+        sb.stats["sky_platforms"] = sb.stats.get("sky_platforms", 0) + made
+        sb.stats["sky_platforms_beside"] = sb.stats.get("sky_platforms_beside", 0) + made
 
 
 def mouth_frames(sb) -> None:

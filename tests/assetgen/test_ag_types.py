@@ -1,8 +1,9 @@
 """AG5's types, landmarks and slopes on small made-up briefs: every type part closed and
 named by its parameters; the listed types built by their own generators inside the envelope;
 heroes with their U2 mask and hero UV; a building on a slope on a stepped plinth with
-retaining skirts; a skybridge's landing door left open in the collision; the new checks;
-the review sheet and the spec diff; a hero's materials in the contribution."""
+retaining skirts; a skybridge's landing door left open in the collision; a sky station beside
+its tower with a platform; the new checks; the review sheet and the spec diff; a hero's
+materials in the contribution."""
 
 import copy
 import json
@@ -23,7 +24,7 @@ from assetgen.buildings import shell as SH
 from assetgen.buildings import typeparts as TP
 from assetgen.buildings import types as TY
 
-from test_ag_facades import _closed
+from test_ag_facades import _closed, _tower
 from test_ag_shell import brief_of, mass, rect
 
 SAMPLE = {
@@ -202,6 +203,28 @@ def test_collision_leaves_a_landing_door_open():
     assert _inside(col, -4.5, -4.0, 10.5) is True        # past the vestibule
     assert _inside(col, -4.5, -7.0, 8.0) and _inside(col, -4.5, -7.0, 13.0)
     assert _inside(CO.build(br, None), -4.5, -7.0, 10.5)  # (no door: closed)
+
+
+def test_a_sky_station_beside_its_tower_gets_a_platform():
+    br = _tower("glass_curtain", 20, w=30.0, d=20.0, fh=3.4)
+    # (the tube runs 7 m south of the tower and climbs 1 m along the station)
+    br["portals"] = [{"line_id": "tl.sky", "z": [32.0, 42.0], "station": True,
+                      "station_id": "st.sky", "station_name": "Sky", "track_z_m": 36.5,
+                      "lines": [[[-40.0, -17.0, 40.0], [40.0, -17.0, 41.0]]],
+                      "diameter_m": 7.0,
+                      "platform": {"exterior": [[-14.0, -24.0], [14.0, -24.0], [14.0, -12.0],
+                                                [-14.0, -12.0]], "holes": []}}]
+    gm = GN.make(br)
+    res = SH.build(br, gm)
+    rec = res["portals"][0]
+    assert not rec["cut"] and rec["through"] == 0
+    assert rec["platform"] and rec["beside"] and rec["floor_m"] == 33.98      # (under the lowest axis)
+    pos = res["arrays"]["platform"]["pos"]
+    assert pos[:, 1].min() >= -14_300 and pos[:, 1].max() == -10_000   # (to the wall only)
+    assert EN.check(br, res["arrays"], EN.part_points(res["parts"]))["ok"]
+    assert EN.clearances(br, res["arrays"], EN.part_points(res["parts"]))["portal_hits"] == 0
+    c = AC.roofs({"b": {"roof_items": [], "green": [], "portals": res["portals"]}}, {"b": br})
+    assert c["ok"] and c["portals_passing"] == 1 and c["platforms"] == 1
 
 
 def _rec(t, gen, genes=None, fam=None, cx=None, hero=None):
