@@ -917,13 +917,15 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
 
         checks += TGC.run(spec, m)
     if m.lots or m.blocks or m.junctions:
+        from . import network_checks as NC
         from . import street_checks as SC
 
-        checks += SC.run(spec, m, g)
+        checks += SC.run(spec, m, g) + NC.run_streets(spec, m)
     if m.buildings:
         from . import building_checks as BC
+        from . import network_checks as NC
 
-        checks += BC.run(spec, m, g)
+        checks += BC.run(spec, m, g) + NC.run_finished(spec, m)
     if m.transit_lines:
         from . import transit_checks as TC
 

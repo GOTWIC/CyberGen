@@ -331,12 +331,13 @@ class RoadSegment(Entity):
 
 class Junction(Entity):
     """Intersection area of a node where three or more roads meet (curb lines with corner
-    fillets), or a cul-de-sac turning bulb. `type` is `junction.<class pair>`, e.g.
+    fillets), a cul-de-sac turning bulb, or (M17) a bend where two roads meet at an angle
+    and their rights of way overlap. `type` is `junction.<class pair>`, e.g.
     `junction.avenue_street`."""
     TYPE_PREFIX: ClassVar[str] = "junction"
     node_id: str
     polygon: Polygon
-    shape: Literal["T", "X", "multi", "cul_de_sac"]
+    shape: Literal["T", "X", "multi", "cul_de_sac", "bend"]
     legs: int
     signalized: bool = False
     corner_radius_m: float

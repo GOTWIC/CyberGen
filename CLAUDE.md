@@ -13,8 +13,8 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M17 to M21, the
-fixes from the first run-through, `docs/run_through_1.md`),
+high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M21, the
+rest of the fixes from the first run-through, `docs/run_through_1.md`),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
 
@@ -795,6 +795,64 @@ city, `citygen/water.py` and `citygen/cover.py`, checks in `water_checks.py`, pr
 A city without water or open land builds as before. Every sample has new goldens. Sample
 builds: `docs/progress/M16/`.
 
+M17 (road network repair, from the first run-through) is in place:
+- **Dead ends** (`streets.settle_dead_ends`, at the end of `clean_graph`, on the noded
+  edges, in rounds): a local road's dead end runs on to the road straight ahead
+  (`DEAD_END_REACH_M` 60, a junction there or at a node of it within `MIN_JUNCTION_GAP_M`, 8 m
+  for paths, turning at most 35 degrees, at the district's junction angle; on land, off closed
+  ground, crossing nothing but under a deck high enough: `under_deck(..., cls)`, a path under
+  4.5 m, `PATH_UNDER_CLEAR_M`, which `node_lines` also lets pass under), or joins a dead end
+  facing it (30 m); an M1b road's dead end runs on the same way as a short street
+  (`end_link`); else it stays as what it is, `RoadNode.attrs.dead_end` (`DEAD_END_KINDS`:
+  `map_edge`, `water_end`, `park_gate`, `plaza_gate` within `GATE_M` 8 m past its half width,
+  30 m for a primary road; `site_gate` within `SITE_GATE_M` 40 m of a megasite reserve, the
+  road `megasite_access` asks for; `path_end` on a path; `cul_de_sac` with a turning bulb
+  that fits, `attrs.turning_head_m`, street 12, service 10, alley 8 m, a primary road's half
+  width and 4 m; `deck_end` on M14's deck spokes; `traced_end` on a traced road, as drawn),
+  else its street goes back to its last junction (a vehicle road under `CUL_DE_SAC_MIN_M`
+  40 m from it, or with no room for a bulb). A run-on meets the roads at its junction at the
+  district angle there, legs measured 10 m out as `fix_angles` and `junction_angles` do.
+  A `water_end` is beside the water the model keeps (`Builder.water`: sea, water bodies,
+  waterways; not `wet`'s sliver between the land and the map edge, which grows edge
+  promenades); a dead end within `ON_ROAD_M` 0.1 m of another road is noded onto it (an M1b
+  road ending on another, off it by the grid's rounding).
+  A dead end reaching into another road's right of way is cut back clear of it (`_poke`; a
+  primary road's dead end cuts the local road it reaches into, `_poked`); a local road laid
+  along another (rights of way overlapping by `OVERLAP_M2` away from the nodes they share,
+  `_reach`) goes (`_overlaps`, never one whose loss parts the vehicle network, `_splits`);
+  `fix_angles` and `fix_duplicates` run again after each round of run-ons, and
+  `pedestrianize_islands` after the repair (a cut-back can leave a lane island). A cut-back
+  never takes a primary road (`_chain` stops at one); M1b is as it was (the sweep showed
+  that changing its forks and lenses moves every city's road search). `junctions.build`
+  draws the bulbs from the tag.
+- **Junctions** (`junctions.py`): each leg's cut reaches past where its right of way overlaps
+  another leg's (`overlap_cuts`: an acute corner, a leg that bends in the junction, a gore);
+  a road's two junctions share `CUT_SHARE` 0.9 of it by need (`share_cuts`, the old cap was
+  0.45 a side); a leg that bends gets its band to the cut; a degree-2 node where two roads
+  meet at an angle is a `bend` junction (`Junction.shape`, `bend_polygon`); where rights of way
+  still overlap past the cuts (a fork, a crossing at a small angle, a corner with no room for
+  its fillet), the junction polygon takes the shared pavement (`shared_pavement`); two
+  primary roads, or two roads at a node they share (a hairpin), still sharing pavement past
+  it give the overlap to the junction it touches or their node's (`absorb_shared`). M13's
+  grading still holds a junction's height at most 0.45 of a leg out (`Local.cuts`; M18
+  levels junctions).
+- **Checks** (`network_checks.py`, 4 more, 90 in all, 95 on the deck sample): `road_dead_ends` (every dead end tagged, the tag
+  true of where it is, a cul-de-sac with its bulb) and `road_overlaps` (rights of way of two
+  roads within 4 m in height overlapping more than 25 m2 outside every junction polygon, the
+  run-through's measure on the 1 cm grid: GEOS's floating overlay takes two corridors meeting
+  end to end on a 45 degree line for overlapping) with the street checks; `bridge_clash`
+  (road, pedestrian and transit bridges apart in plan or by the lower one's clearance plus the
+  upper deck) and `road_building_clash` (no road right of way over a building mass at its own
+  height, 5 m of headroom) after the building checks. Heights over the ground on a terrain
+  city; M10's regeneration runs them through `check_all`; a held road is never extended, cut
+  or dropped (`_held`), a new street meets an old road only at its nodes (a facing join onto a
+  held road's end at an old node is one). Under a regeneration's frame
+  `local.join_walk_islands` lays the old city's walkway-island links away from the district
+  again as they were (`Frame.islands`) and links a group the new streets cut off at its
+  nearest point within `ISLAND_SEAM_M` 40 m of the district (else as before), so a
+  regeneration moves no walkway far from it; a fresh build is unchanged.
+Sample builds, the run-through's measures before and after: `docs/progress/M17/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
@@ -1068,8 +1126,9 @@ AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontpar
   on the band (`_decals`; one mesh per tile, `decals.<tile>`, mesh decals in Unreal).
   AG8 keeps every object it draws; AG3 gives the wall its fascia, panel, pier or plate.
 - **Checks**: `asset_access` (a door per entrance and unit, open to a walkway; facing a
-  neighbor or with no walkway ahead reported, not failed) and `asset_mounts` (never on
-  glass); budget allowances per unit and per front.
+  neighbor, with no walkway ahead, or ahead only inside another building (M17: a park path
+  citygen runs through it) reported, not failed) and `asset_mounts` (never on glass); budget
+  allowances per unit and per front.
 - **Previews**: AG6's `assetgen materials preview` now draws fronts, decals and AG2's parts
   beside AG8's props. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
   grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.

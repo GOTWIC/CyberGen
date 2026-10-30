@@ -726,6 +726,7 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     from . import gameplay as GP
     from . import gameplay_checks as GC
     from . import ids as ID
+    from . import network_checks as NC
     from . import street_checks as SC
     from . import prop_checks as PC
     from . import props as PR
@@ -840,8 +841,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     late = {c.id: c for c in TNC.run(spec, m) + TGC.run(spec, m)}
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
-        TC.run(spec, m) + DK.per_level(m, lambda v: PC.run(spec, v)) + GC.run(spec, m) + \
-        DC.run(spec, m)
+        NC.run_finished(spec, m) + TC.run(spec, m) + \
+        DK.per_level(m, lambda v: PC.run(spec, v)) + GC.run(spec, m) + DC.run(spec, m)
     if m.banks or m.ground_cover:
         from . import water_checks as WC
 

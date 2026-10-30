@@ -329,6 +329,7 @@ def test_check_segment_length_and_duplicates(small_built):
     twin = json.loads(m.road_segments[k].model_dump_json())
     twin["id"] = "rs9999"
     twin["attrs"].pop("m1b_segment", None)
+    twin["attrs"].pop("split_of", None)    # (a road of its own, not a piece of the chain)
     twin["centerline"] = [(x + 8.0, y + 8.0) for x, y in LineString(chain).coords]
     dup = _mutate(m, lambda d: d["road_segments"].append(twin))
     assert LineString(chain).length > C.ROAD_DUP_LEN_M + 150

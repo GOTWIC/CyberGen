@@ -1,0 +1,52 @@
+== dead ends
+dead ends by class: {'highway': 3, 'avenue': 1, 'street': 182, 'service': 6, 'alley': 117, 'pedestrian': 96}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 114, 'service': 2, 'alley': 102, 'pedestrian': 87}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 194
+[(('avenue', 'street'), 77), (('street', 'street'), 50), (('highway', 'avenue'), 22), (('pedestrian', 'pedestrian'), 11), (('avenue', 'avenue'), 10), (('street', 'alley'), 6), (('street', 'pedestrian'), 5), (('avenue', 'pedestrian'), 4)]
+   ('rs.w336s348', 'rs.w244s512', 'highway', 'highway', 305, -289, -236)
+   ('rs.w348s339', 'rs.w275s189', 'highway', 'highway', 298, -278, -183)
+   ('rs.w126s870', 'rs.w119s899', 'highway', 'street', 32, -114, -920)
+   ('rs.e33n446', 'rs.e59n383', 'highway', 'avenue', 132, 54, 393)
+   ('rs.e33n446', 'rs.e40n508', 'highway', 'avenue', 207, 36, 503)
+   ('rs.e83n227', 'rs.e153n137', 'highway', 'avenue', 115, 141, 141)
+   ('rs.e36n350', 'rs.e59n383', 'highway', 'avenue', 132, 55, 372)
+   ('rs.e226s950', 'rs.e230s1005', 'highway', 'highway', 200, 227, -956)
+== bridges
+bridges: 30 Counter({'pedestrian': 18, 'road': 11, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 1
+   ('br.w1194s441', 'br.w1061s724', 'road', 'road', 905)
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1736 with a leg not at the node's height at the junction edge: 84 with a leg's end not at the node's z: 0
+== junction control
+   ('Aurora Spaceport', False, False) 4
+   ('Aurora Spaceport', True, True) 6
+   ('Corporate Core', False, False) 48
+   ('Corporate Core', True, True) 51
+   ('Harbor Industrial', False, False) 13
+   ('Harbor Industrial', True, True) 13
+   ('Midtown', False, False) 75
+   ('Midtown', True, True) 92
+   ('Neon Market', False, False) 327
+   ('Neon Market', True, True) 61
+   ('Northridge', False, False) 120
+   ('Northridge', True, True) 29
+   ('Old Town', False, False) 742
+   ('Old Town', True, True) 77
+   ('Silver Island', False, False) 8
+   ('Silver Island', True, True) 7
+   ('Transit Nexus', False, False) 27
+   ('Transit Nexus', True, True) 36
+crosswalk widths: Counter({4.0: 1255})
+junctions with crosswalks: 372 of them within 40 m of another: 172
+== signs
+Counter({('shop_sign', 'blade'): 9989, ('shop_sign', 'facade'): 5121, ('billboard', 'roof'): 1302, ('neon', 'facade'): 637, ('billboard', 'facade'): 366, ('holo_ad', 'roof'): 41})
+== transit supports
+  tl.magenta_line maglev: length 1966 m, supports 35, gap median 45 max 262 m, off the line max 17.9 m (>2 m: 13)
+  tl.harbor_line elevated_rail: length 3074 m, supports 62, gap median 32 max 721 m, off the line max 13.1 m (>2 m: 20)
+  tl.spire_line sky_tube: length 1127 m, supports 5, gap median 264 max 451 m, off the line max 12.2 m (>2 m: 2)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 61
