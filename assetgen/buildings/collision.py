@@ -13,6 +13,10 @@ AG5: a skybridge's landing door is left open (AG4's open item: the hulls closed 
 it opens on is cut into storeys at each door's floor and head; in the door's storey its
 footprint has a notch the door's width and `VESTIBULE_MM` deep at the door, so a walk across
 the bridge steps through the door onto the solid below it.
+
+An open shed's mass (its roof on columns, `types.shed_mass`) collides only from its roof's
+underside up (`open_under`, from the shell's `under_m`), so a walk passes under the roof
+between the columns, which are parts and have none.
 """
 
 from __future__ import annotations
@@ -109,7 +113,8 @@ def _bands(z0: float, z1: float, doors: list) -> list[tuple[float, float, list]]
     return out
 
 
-def build(brief: dict, band_m: float | None = None, doors: list | None = None) -> dict:
+def build(brief: dict, band_m: float | None = None, doors: list | None = None,
+          open_under: dict | None = None) -> dict:
     boxes, convex = [], []
     depth = plinth_mm(brief) / 1000.0
     ground = ground_mm(brief) / 1000.0
@@ -126,6 +131,10 @@ def build(brief: dict, band_m: float | None = None, doors: list | None = None) -
             z0 = band_m
         elif z0 <= 0.05 and depth:
             z0 = -depth                        # down its plinth on a slope
+        if open_under and k in open_under:
+            z0 = max(z0, open_under[k])        # (an open shed: its roof only)
+            if z1 - z0 < 0.05:
+                continue
         ext = RG.tidy(RG.mm_ring(m["footprint"]["exterior"]))[0]
         holes = [RG.tidy(RG.mm_ring(h))[0] for h in m["footprint"]["holes"]]
         if len(ext) < 3:

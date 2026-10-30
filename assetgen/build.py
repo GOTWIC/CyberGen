@@ -58,7 +58,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag5.0"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag5.1"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -208,7 +208,9 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "triangles": int(sum(len(a["tri"]) for a in arrs.values())),
         "slots": {k: int(len(a["tri"])) for k, a in arrs.items()},
         "proxy": {"triangles": int(px["triangles"])},
-        "collision": CO.build(brief, sh["band_m"], sh.get("landing_doors")),
+        "collision": CO.build(brief, sh["band_m"], sh.get("landing_doors"),
+                              {mi["mass"]: mi["under_m"] for mi in sh["masses"]
+                               if mi.get("under_m") is not None}),
         "front": {"triangles": int(sum(len(a["tri"]) for a in sh["front"].values())),
                   "slots": {k: int(len(a["tri"])) for k, a in sh["front"].items()},
                   "band_m": sh["band_m"]},

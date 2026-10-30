@@ -1143,6 +1143,35 @@ def test_check_frame_times_and_warm_shots():
     assert _ue_script("import_city.py", "PRUNE_FILES")["PRUNE_FILES"] <= 100
 
 
+def test_check_shots_stay_under_nanites_root_pages():
+    """The AG5 Unreal check: Cragmouth's shots loaded all 75,155 of its actors and the editor
+    stopped on Nanite's root pages (49,152, its 2 GB pool on the Mac; Cragmouth has 63,700
+    Nanite meshes); past `SHOT_MESHES` distinct meshes the shots load the actors nearest the
+    city's middle up to that many meshes (actors with shared or no-Nanite meshes always), one
+    set for every view (an actor unloaded between views kept its meshes' root pages), and
+    never an HLOD actor."""
+    ns = _ue_script("check_city.py", "view_load", "mesh_of", "SHOT_MESHES")
+    vl = ns["view_load"]
+    assert 30000 <= ns["SHOT_MESHES"] <= 45000
+    rows = [("p0", "actor", 900.0, 0.0, None), ("h0", "hlod", 0.0, 0.0, None)] + \
+        [(f"m{k}", "actor", float(k), 0.0, f"mesh{k // 2}") for k in range(10)]
+    assert set(vl(rows, (0.0, 0.0), cap=5)) == {"p0"} | {f"m{k}" for k in range(10)}
+    assert vl(rows, (6.2, 0.0), cap=2) == ["m6", "m7", "m5", "m4", "p0"]
+    assert vl(rows, (100.0, 0.0), cap=1) == ["m9", "m8", "p0"]
+    src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    shots = src[src.index("def shots("):src.index("# --- the tick loop")]
+    assert shots.count("load_actors(") == 1 and "unload_actors" not in shots
+    man = {"tiles": [{"name": "t+00+00", "objects": [{"key": "city.sea.t+00+00",
+                                                      "asset": "city_sea_t+00+00"}]}],
+           "stage2": {"actors": [{"key": "a.bld", "mesh": "Assets/Buildings/t/a_bld"},
+                                 {"key": "a.holo", "mesh": "Assets/Signs/t/a_holo"}],
+                      "instances": [{"key": "a.bld.part.x", "mesh": "Assets/BuildingsParts/t/x"}],
+                      "lod_chains": [{"mesh": "Assets/Signs/t/a_holo"}]}}
+    assert ns["mesh_of"](man) == {"city.sea.t+00+00": "Meshes/t+00+00/city_sea_t+00+00",
+                                  "a.bld": "Assets/Buildings/t/a_bld", "a.holo": None,
+                                  "a.bld.part.x": "Assets/BuildingsParts/t/x"}
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()
