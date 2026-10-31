@@ -66,9 +66,9 @@ def ground_material(slot: str, lib: dict | None, mask: str | None) -> dict:
            "scalars": {"MaskX0": x0, "MaskY0": y0, "MaskSize": K.TILE_M, "WearK": wk,
                        "MossK": mk, "EdgeK": ek, "WetK": xk, "Tinted": 1.0 if tint else 0.0,
                        "Textured": 0.0},
-           "vectors": {"BaseColor": _lin(COLOR.get(base, "#6a6a6a")),
-                       "WornColor": _lin(COLOR.get(worn, "#6a5038")),
-                       "ShadeColor": _lin(COLOR.get(shade, "#4d6a2a"))}}
+           "vectors": {"BaseFlat": _lin(COLOR.get(base, "#6a6a6a")),
+                       "WornFlat": _lin(COLOR.get(worn, "#6a5038")),
+                       "ShadeFlat": _lin(COLOR.get(shade, "#4d6a2a"))}}
     if lib is not None and all(s in lib["sets"] for s in (base, worn, shade)):
         for pre, s in (("", base), ("Worn", worn), ("Shade", shade)):
             for kind, name in (("base", "Base"), ("normal", "Normal"), ("orm", "Orm")):

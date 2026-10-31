@@ -748,8 +748,22 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb), pcol,
                               p.get("nanite", True), p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
-                     "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [],
-                     "xforms": p["xforms"], **base}
+                     "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [], **base}
+                if p.get("xforms_file"):
+                    # (AG13's grass: its transforms in a file of its tile's, by its node,
+                    # so millions of clumps stay out of the manifest; the file's sha256 in
+                    # the hash)
+                    a.update(xforms_file=f"{ASSETS_DIR}/{p['xforms_file']}",
+                             xforms_key=p["node"], count=int(p["count"]),
+                             xforms_sha=file_sha(p["xforms_file"]))
+                else:
+                    a["xforms"] = p["xforms"]
+                if p.get("cull_m"):
+                    a["cull_m"] = [float(v) for v in p["cull_m"]]     # (AG13: the grass fades)
+                if p.get("shadow") is False:
+                    a["no_shadow"] = True
+                if p.get("cull_m"):
+                    a["no_hlod"] = True          # (faded out near the player: no HLOD)
                 if p.get("ids"):
                     a["ids"] = p["ids"]          # (one citygen id per transform)
                 if pcol.get("none"):
@@ -790,7 +804,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             "replaced": sorted(replaced),
             "counts": {"entries": len(owner), "actors": len(actors),
                        "instance_actors": len(insts),
-                       "instances": sum(len(a["xforms"]) for a in insts),
+                       "instances": sum(a["count"] if "count" in a else len(a["xforms"])
+                                        for a in insts),
                        "replaced": len(replaced), "replaces_missing": missing,
                        "packs": len(out_packs),
                        "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),

@@ -221,13 +221,13 @@ def _disc(key, r):
 
 def lawn(c: Clump, k: int) -> None:
     r, h = K.CLUMPS["lawn"][1], K.CLUMPS["lawn"][2]
-    n = 22 + int(8 * u("lawn", k, "n"))
+    n = 32 + int(10 * u("lawn", k, "n"))
     for i in range(n):
         key = ("lawn", k, i)
         x, y = _disc(key, r)
         hh = h * (0.6 + 0.6 * u(*key, "h"))
         dry = 1.0 if u(*key, "d") < 0.12 else 0.0
-        blade(c, "grass.lawn", x, y, hh, 0.0045 + 0.002 * u(*key, "w"),
+        blade(c, "grass.lawn", x, y, hh, 0.0055 + 0.0025 * u(*key, "w"),
               2.0 * M.PI * u(*key, "l"), hh * (0.15 + 0.3 * u(*key, "b")), key, 2, dry)
 
 
@@ -278,14 +278,14 @@ def flowers(c: Clump, k: int, colors: list[str]) -> None:
 
 def meadow(c: Clump, k: int, dry_share: float, kind: str = "meadow") -> None:
     r, h = K.CLUMPS[kind][1], K.CLUMPS[kind][2]
-    n = 26 + int(8 * u(kind, k, "n"))
+    n = 40 + int(12 * u(kind, k, "n"))
     for i in range(n):
         key = (kind, k, i)
         x, y = _disc(key, r)
         hh = h * (0.45 + 0.75 * u(*key, "h"))
         straw = u(*key, "d") < dry_share
         blade(c, "grass.straw" if straw else "grass.meadow", x, y, hh,
-              0.006 + 0.003 * u(*key, "w"), 2.0 * M.PI * u(*key, "l"),
+              0.007 + 0.004 * u(*key, "w"), 2.0 * M.PI * u(*key, "l"),
               hh * (0.25 + 0.45 * u(*key, "b")), key, 3, 0.4 if straw else 0.1 * u(*key, "dd"))
     for i in range(3 + int(3 * u(kind, k, "s"))):
         key = (kind, k, "s", i)
@@ -355,8 +355,8 @@ def weeds(c: Clump, k: int) -> None:
     for i in range(n):
         key = ("weeds", k, i)
         a = a0 + 2.0 * M.PI * (i + 0.3 * u(*key, "j")) / n
-        L = r * (0.6 + 0.5 * u(*key, "l"))
-        leaf(c, "grass.weed", (0.0, 0.0, 0.005), a, L, L * 0.32, 0.03 + 0.03 * u(*key, "r"),
+        L = r * (0.8 + 0.5 * u(*key, "l"))
+        leaf(c, "grass.weed", (0.0, 0.0, 0.005), a, L, L * 0.38, 0.03 + 0.04 * u(*key, "r"),
              key, 0.3 * u(*key, "d"), droop=0.004)
     for i in range(1 + int(2 * u("weeds", k, "s"))):
         key = ("weeds", k, "s", i)
@@ -431,7 +431,7 @@ def ag8(c: Clump, species: str, k: int, scale: float) -> None:
         s["idx"] += [b + i for i in sl.idx]
 
 
-AG8_SCALE = {"scrub": 0.4, "sedum": 0.34}
+AG8_SCALE = {"scrub": 0.5, "sedum": 0.34}
 
 
 def make(kind: str, k: int, colors: list[str] | None = None) -> Clump:

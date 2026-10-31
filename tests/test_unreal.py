@@ -1030,6 +1030,44 @@ def test_stage2_takes_assetgen_fronts(staged):
             assert mat["master"] == "decal" and "Cell" in mat["scalars"]
 
 
+def test_stage2_takes_assetgen_ground(staged):
+    """AG13's ground and grass: an actor per tile's ground (Nanite, its slots `ground`
+    materials reading the tile's mask), every blockout ground cover object and median lawn
+    replaced (by its tile's entry or a drop), the grass as instanced actors per clump variant
+    whose transforms stay in their tile's file (its sha256 in the hash), culled at 60 to
+    100 m, no shadow, no collision, out of the HLODs; the importer's masters and `Wind`."""
+    m2, _, _ = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    con = json.loads((staged / "assets" / "unreal_contribution.ground.json").read_text())
+    actors = {a["key"]: a for a in s2["actors"]}
+    ground = [e for e in con["entries"] if e["kind"] == "ground.cover"]
+    assert ground
+    for e in ground:
+        a = actors[e["key"]]
+        for s in e["slots"]:
+            mat = s2["materials"][f"ground.{s}"]
+            assert mat["master"] == "ground"
+            assert mat["textures"]["Mask"]["texture"] == f"city.ground.{e['tile']}"
+    bo = {o["key"] for t in m2["tiles"] for o in t["objects"]}
+    cover = {k for k in bo if ".cover_" in k or ".lawn." in k}
+    assert cover and cover <= set(s2["replaced"])
+    grass = [a for a in s2["instances"] if a["entry"].startswith("grass.")]
+    assert grass
+    for a in grass:
+        assert "xforms" not in a and a["xforms_file"].startswith("assets/ground/grass/")
+        assert a["cull_m"] == [60.0, 100.0] and a["no_shadow"] and a["no_hlod"]
+        assert a["no_collision"] and a["xforms_sha"]
+        doc = json.loads((staged / a["xforms_file"]).read_text())
+        assert len(doc["nodes"][a["xforms_key"]]) == a["count"]
+    pm = {f"{pk['folder']}/{m['asset']}": m for pk in s2["packs"] for m in pk["meshes"]}
+    assert all(not pm[a["mesh"]]["nanite"] for a in grass)
+    assert {"ground", "grass"} <= set(s2["masters"])
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert "set_cull_distances" in src and "def ground_master" in src
+    assert "def grass_master" in src and '("Wind", 0.35)' in src
+    assert 'self.xforms_file(r)' in src
+
+
 def test_stage2_takes_assetgen_roofs_and_skybridges(staged):
     """AG4: roof equipment leaves the buildings' entries for one entry per tile
     (`roofs.<tile>`): an instanced actor per mesh at the origin with one building id per

@@ -119,6 +119,42 @@ def _ag8(adir: Path, views: list) -> dict | None:
     return {"families": fams, "removed": removed}
 
 
+GRASS_R = 140.0         # AG13: clumps this near the eye (Unreal fades them out at 60 to 100 m)
+
+
+def _ground(adir: Path, views: list) -> dict | None:
+    """AG13's ground for the views (its contribution): per view the ground tiles (a street
+    view's within STREET_R of its eye, else its shell tiles) and the clumps within GRASS_R of
+    a perspective view's eye, by variant node (AG8's points, so the same instancer draws
+    them); the clump pack, the blockout keys it replaces, its materials and textures."""
+    cp = adir / "unreal_contribution.ground.json"
+    if not cp.is_file():
+        return None
+    con = json.loads(cp.read_text(encoding="utf-8"))
+    gtiles = sorted({e["tile"] for e in con["entries"] if e.get("glb")})
+    grass = {e["tile"]: e for e in con["entries"] if e.get("parts")}
+    for v in views:
+        if v["ortho"] or v.get("section"):
+            v["ground_tiles"] = sorted(set(v["shell_tiles"]) & set(gtiles))
+            continue
+        v["ground_tiles"] = [t for t in gtiles if _tile_near(t, v["eye"], STREET_R)]
+        pts = v.setdefault("ag8", {}).setdefault("points", {})
+        for t, e in sorted(grass.items()):
+            if not _tile_near(t, v["eye"], GRASS_R):
+                continue
+            doc = json.loads((adir / e["parts"][0]["xforms_file"]).read_text(encoding="utf-8"))
+            px, py, pz = doc["pivot"]
+            for node, xf in doc["nodes"].items():
+                for q in xf:
+                    x, y = q[0] + px, q[1] + py
+                    if _near((x, y), v["eye"], GRASS_R):
+                        pts.setdefault(node, []).append([x, y, q[2] + pz, q[3]] + list(q[4:7]))
+        v["ag8"]["points"] = dict(sorted(pts.items()))
+    removed = sorted({k for e in con["entries"] for k in [e["key"]] + list(e.get("replaces", []))})
+    return {"clumps": str((adir / "ground" / "clumps.glb").resolve()), "removed": removed,
+            "materials": con.get("materials", {}), "textures": con.get("textures", {})}
+
+
 def _lights(model, center, r) -> list[list[float]]:
     """Street lights near a view: the lamp (8 m high, M6's prototype) over each pole."""
     out = []
@@ -181,6 +217,10 @@ def run(args, progress=None) -> dict:
                 v["lights"] = _lights(model, v["eye"], LIGHT_R)
             st.advance()
         ag8 = _ag8(adir, views)
+        gr = _ground(adir, views)
+    if gr is not None:
+        mats["parts"]["ground"] = gr["materials"]
+        mats["textures"] = {**mats.get("textures", {}), **gr["textures"]}
     modes = ["night"] if args.only_night else (["day", "night"] if args.night else ["day"])
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
@@ -188,8 +228,10 @@ def run(args, progress=None) -> dict:
            "removed": sorted({e["key"] for e in con["entries"] + conn["entries"]} |
                              {r for e in con["entries"] for r in e.get("replaces", [])} |
                              {g for v in (man.get("green_replaces") or {}).values() for g in v}
-                             | set((ag8 or {}).get("removed", []))),
+                             | set((ag8 or {}).get("removed", []))
+                             | set((gr or {}).get("removed", []))),
            "ag8_families": (ag8 or {}).get("families", []),
+           "ground": {"clumps": gr["clumps"]} if gr is not None else {},
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
     return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))

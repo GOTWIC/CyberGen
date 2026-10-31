@@ -77,7 +77,7 @@ CLUMPS: dict[str, tuple[int, float, float]] = {
     "lawn": (4, 0.17, 0.12), "clover": (4, 0.16, 0.08), "flowers": (3, 0.15, 0.32),
     "meadow": (4, 0.24, 0.55), "meadow_dry": (4, 0.24, 0.5), "reeds": (4, 0.2, 1.4),
     "cattails": (4, 0.2, 1.6), "weeds": (4, 0.16, 0.35), "fern": (4, 0.24, 0.45),
-    "scrub": (4, 0.3, 0.5), "sedum": (4, 0.2, 0.1)}
+    "scrub": (4, 0.36, 0.5), "sedum": (4, 0.2, 0.1)}
 MAX_FOOT_M = max(v[1] for v in CLUMPS.values()) * MAX_SCALE_UP * 1.15
 
 # per cover kind: clumps per m2 and the clump mix
@@ -86,7 +86,7 @@ GRASS: dict[str, tuple[float, dict[str, float]]] = {
     "park_lawn": (1.0, {"lawn": 0.72, "clover": 0.12, "flowers": 0.1, "weeds": 0.06}),
     "meadow": (0.9, {"meadow": 0.7, "flowers": 0.14, "weeds": 0.1, "fern": 0.06}),
     "marsh": (1.0, {"reeds": 0.45, "cattails": 0.2, "meadow": 0.3, "fern": 0.05}),
-    "wasteland": (0.6, {"weeds": 0.4, "meadow_dry": 0.3, "scrub": 0.22, "flowers": 0.08}),
+    "wasteland": (0.85, {"weeds": 0.4, "meadow_dry": 0.32, "scrub": 0.2, "flowers": 0.08}),
     "bare_dirt": (0.08, {"weeds": 0.75, "scrub": 0.25}),
     "gravel": (0.05, {"weeds": 0.65, "sedum": 0.35}),
     "sand": (0.04, {"meadow_dry": 1.0}),

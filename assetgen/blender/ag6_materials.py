@@ -13,7 +13,11 @@ compute (`citygen/ue/import_city.py`, `stage2_master`), so the previews show the
   per cell by hash, its blinds, lit at night by the building's lit ratio;
 - `neon`, `emissive`: emission; `sign`: an atlas page as emission; `translucent`;
 - `leaves` (AG8's leaf cards): the leaf clump tile, tinted, cut by its leaf cover; `holo`
-  (AG8's holo-ads): the holo ad page glowing, see-through by its brightness.
+  (AG8's holo-ads): the holo ad page glowing, see-through by its brightness;
+- `ground` (AG13): three sets (base, worn, shade) blended per pixel by the tile's mask on
+  world x, y (wear and edges bare the worn set, broken up by the base set's height; shade
+  and wet grow the shade set; wet darkens); `grass` (AG13's clumps): the slot's color toward
+  its dry color by the vertex colors, darker at the root, two-sided.
 
 A building's parameters come from the object's custom properties (`cg_wall`... tints from
 the glTF node extras, the rest set by the preview script: `cg_room`, `cg_floorh`, `cg_row`,
@@ -148,7 +152,7 @@ def srgb_linear(c):
     return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
 
 
-LINEAR_PARTS = ("buildings", "connections", "props", "signs")  # (AG7 writes sRGB)
+LINEAR_PARTS = ("buildings", "connections", "props", "signs", "ground")  # (AG7: sRGB)
 
 
 def _lin(rec, part):
@@ -422,6 +426,100 @@ def leaves(mat, rec, files, part):
     return mat
 
 
+def _smooth(t, e0, e1, x):
+    """smoothstep(e0, e1, x) with sockets or numbers."""
+    n = t.new("ShaderNodeMapRange", interpolation_type="SMOOTHSTEP", clamp=True)
+    t._in(n.inputs["Value"], x)
+    t._in(n.inputs["From Min"], e0)
+    t._in(n.inputs["From Max"], e1)
+    return n.outputs["Result"]
+
+
+def ground(mat, rec, files, part):
+    """AG13's ground, node for node `ground_master` (citygen/ue/import_city.py): its mask's
+    row 0 is the tile's south edge, sampled on world x, y."""
+    t = T(mat)
+    bsdf = t.n["Principled BSDF"]
+    sc = rec.get("scalars", {})
+    vec = rec.get("vectors", {})
+    tx = rec["textures"]
+    uv = t.new("ShaderNodeUVMap", uv_map="UVMap").outputs["UV"]
+    sets = {}
+    for pre in ("", "Worn", "Shade"):
+        tuv = t.v("SCALE", uv, scale=1.0 / sc.get(f"{pre}TileM", 2.0))
+        b, h = t.tex(files[tx[f"{pre}BaseTex"]], tuv, True)
+        n, _ = t.tex(files[tx[f"{pre}NormalTex"]], tuv, False)
+        o, om = t.tex(files[tx[f"{pre}OrmTex"]], tuv, False)
+        sets[pre] = (b, h, n, o, om)
+    geo = t.new("ShaderNodeNewGeometry")
+    wx, wy, _ = t.xyz(geo.outputs["Position"])
+    S = sc.get("MaskSize", 256.0)
+    muv = t.comb(t.m("DIVIDE", t.m("SUBTRACT", wx, sc.get("MaskX0", 0.0)), S),
+                 t.m("DIVIDE", t.m("SUBTRACT", sc.get("MaskY0", 0.0) + S, wy), S))
+    mk, ma = t.tex(files[tx["Mask"]], muv, False, "Linear")
+    mr, mg, mb = t.xyz(mk)
+    h = sets[""][1]
+    wear = t.clamp(t.m("ADD", t.m("MULTIPLY", mr, sc.get("WearK", 1.0) * 1.25),
+                       t.m("MULTIPLY", mb, sc.get("EdgeK", 0.5) * 0.45)))
+    lo = t.m("ADD", t.m("MULTIPLY", h, 0.6), 0.1)
+    ww = _smooth(t, lo, t.m("ADD", lo, 0.25), wear)
+    wet = t.m("MULTIPLY", ma, sc.get("WetK", 0.6))
+    ws = t.m("MULTIPLY", t.m("MULTIPLY", t.clamp(t.m("MULTIPLY", t.m("SUBTRACT", mg, 0.45), 1.8)),
+                             sc.get("MossK", 0.5)),
+             t.m("MULTIPLY", t.m("ADD", 0.5, t.m("MULTIPLY", wet, 0.5)), t.m("SUBTRACT", 1.0, ww)))
+    b, _, bn, bo, bom = sets[""]
+    bao, brough, _ = t.xyz(bo)
+    if sc.get("Tinted", 0.0) > 0:
+        ref = vec.get("RefColor", [0.3, 0.3, 0.3])
+        ratio = t.v("DIVIDE", tuple(rec["color"]), tuple(max(c, 0.02) for c in ref))
+        b = t.mix(bom, b, t.v("MULTIPLY", b, ratio))
+    b = t.v("SCALE", b, scale=t.m("ADD", 0.4, t.m("MULTIPLY", bao, 0.6)))
+    w, _, wn, wo, _ = sets["Worn"]
+    wao, wrough, _ = t.xyz(wo)
+    w = t.v("SCALE", w, scale=t.m("ADD", 0.4, t.m("MULTIPLY", wao, 0.6)))
+    s, _, sn, so, _ = sets["Shade"]
+    sao, srough, _ = t.xyz(so)
+    s = t.v("SCALE", s, scale=t.m("ADD", 0.4, t.m("MULTIPLY", sao, 0.6)))
+    col = t.mix(ws, t.mix(ww, b, w), s)
+    mac, _ = t.tex(files[tx["Macro"]], t.comb(t.m("DIVIDE", wx, 64.0),
+                                              t.m("DIVIDE", wy, 64.0)), False)
+    col = t.v("SCALE", col, scale=t.m("ADD", 0.86, t.m("MULTIPLY", t.xyz(mac)[0], 0.28)))
+    col = t.v("SCALE", col, scale=t.m("SUBTRACT", 1.0, t.m("MULTIPLY", wet, 0.28)))
+    col = t.v("SCALE", col, scale=t.m("SUBTRACT", 1.0, t.m("MULTIPLY",
+                                                          t.clamp(t.m("SUBTRACT", mg, 0.5)), 0.25)))
+    rough = t.m("MULTIPLY", t.m("ADD", t.m("MULTIPLY", t.m("ADD", t.m("MULTIPLY", brough,
+                                                                     t.m("SUBTRACT", 1.0, ww)),
+                                                              t.m("MULTIPLY", wrough, ww)),
+                                                       t.m("SUBTRACT", 1.0, ws)),
+                                         t.m("MULTIPLY", srough, ws)),
+                t.m("SUBTRACT", 1.0, t.m("MULTIPLY", wet, 0.35)))
+    nrm = t.mix(ws, t.mix(ww, bn, wn), sn)
+    t.link(col, bsdf.inputs["Base Color"])
+    t.link(t.clamp(rough, 0.05, 1.0), bsdf.inputs["Roughness"])
+    nm = t.new("ShaderNodeNormalMap", space="TANGENT", uv_map="UVMap")
+    t.link(nrm, nm.inputs["Color"])
+    t.link(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    return mat
+
+
+def grass(mat, rec, part):
+    """AG13's clumps, as `grass_master`: the slot's color toward its dry color by the vertex
+    colors (R height share, G tone, B dryness), two-sided; no sway (a still frame)."""
+    t = T(mat)
+    bsdf = t.n["Principled BSDF"]
+    vc = t.new("ShaderNodeAttribute", attribute_type="GEOMETRY", attribute_name="Color")
+    r, g, b = t.xyz(vc.outputs["Vector"])
+    base = (*rec["color"][:3], 1.0)
+    dry = (*rec.get("vectors", {}).get("DryColor", rec["color"])[:3], 1.0)
+    col = t.mix(b, base, dry)
+    k = t.m("MULTIPLY", t.m("ADD", 0.55, t.m("MULTIPLY", r, 0.45)),
+            t.m("ADD", 0.9, t.m("MULTIPLY", g, 0.2)))
+    t.link(t.v("SCALE", col, scale=k), bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = rec.get("roughness", 0.8)
+    mat.use_backface_culling = False
+    return mat
+
+
 def holo(mat, rec, files, part):
     """A holo-ad screen: its color, AG6's holo ad page where it has one, glowing and
     see-through by its brightness."""
@@ -549,6 +647,11 @@ def make(name, rec, files, part):
         return leaves(mat, rec, files, part)
     if master == "holo":
         return holo(mat, rec, files, part)
+    if master == "ground" and rec.get("scalars", {}).get("Textured", 0.0) > 0 and \
+            "Mask" in (rec.get("textures") or {}):
+        return ground(mat, rec, files, part)
+    if master == "grass":
+        return grass(mat, rec, part)
     if master == "sign" and "SignTex" in (rec.get("textures") or {}):
         return sign(mat, files[rec["textures"]["SignTex"]],
                     rec.get("scalars", {}).get("SignStrength", 4.0))
