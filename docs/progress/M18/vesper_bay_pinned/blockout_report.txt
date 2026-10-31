@@ -3,16 +3,16 @@ result: PASS
 
   [pass] blender_build: built
   [pass] blend_opens: city.blend reopened in a fresh Blender
-  [pass] blend_objects: 11013 objects in the .blend, 11013 in the plan
+  [pass] blend_objects: 11023 objects in the .blend, 11023 in the plan
   [pass] blend_buildings: 6729 building objects, 6729 buildings with masses in the model
-  [pass] blend_instances: 73250 prop and plant instances evaluated in the .blend, 73250 in the plan
+  [pass] blend_instances: 73471 prop and plant instances evaluated in the .blend, 73471 in the plan
   [pass] gltf_tiles: 196 tile files for 196 tiles with objects
   [pass] usd_export: city.usdc
   [pass] renders: 15 of 15 renders
-  [pass] blender_budget: Blender 236.1 s (budget 600 s)
+  [pass] blender_budget: Blender 217.8 s (budget 600 s)
 
-plan: 11013 objects, 47687 parts, 196 tiles, 6729 buildings (sha256 3f5cb671025e4697)
-blender 5.2.3 LTS: 870331 vertices, 348047 faces, 73250 instances, 82 materials, 124 collections
-files (MB): {"blend": 14.2, "usd": 36.1, "gltf_tiles": 50.3, "renders": 4.7}
-timings (s): {"build_s": 4.0, "save_s": 0.9, "usd_s": 25.9, "gltf_s": 86.1, "render_s": 118.8, "total_s": 236.1}
-total (s): {"plan_s": 4.4, "exports_s": 4.9, "total_s": 252.5}
+plan: 11023 objects, 47943 parts, 196 tiles, 6729 buildings (sha256 d5f2f12f80a77249)
+blender 5.2.3 LTS: 910728 vertices, 360264 faces, 73471 instances, 82 materials, 124 collections
+files (MB): {"blend": 14.6, "usd": 37.4, "gltf_tiles": 51.6, "renders": 4.7}
+timings (s): {"build_s": 3.9, "save_s": 0.9, "usd_s": 24.6, "gltf_s": 84.0, "render_s": 104.2, "total_s": 217.8}
+total (s): {"plan_s": 4.3, "exports_s": 4.8, "total_s": 232.3}
