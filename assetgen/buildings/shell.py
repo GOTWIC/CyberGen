@@ -185,6 +185,38 @@ def _convex(d_in, d_out) -> bool:
     return _turned(d_in, d_out) and d_in[0] * d_out[1] - d_in[1] * d_out[0] > 0
 
 
+BALCONY_UNDER = 300    # M21: how far a balcony's slab reaches under its floor (and margin)
+BALCONY_REACH = 1800   # a deep part's reach from a mass (`envelope.DEEP_MM`, under it)
+SIMPLE_SILL = 1000     # M21: a simply drawn floor's spandrel up to its sill
+SIMPLE_HEAD = 400      # and over its head
+
+
+def _finish(gm: dict, g: str) -> str:
+    """A punched concrete wall's finish: the building's (its body system's), but its own
+    system's wall where that finish is a patchwork whose patch genes the group never drew
+    (a concrete podium under a patchwork body, M21's first crash of it)."""
+    f = gm["genes"]["finish"]
+    if f == "patch_sheet" and f"{g}.patch" not in gm["genes"]:
+        return SY.SYSTEMS["punched_concrete"]["wall"]
+    return f
+
+
+def _simple(m: dict, ground: int) -> bool:
+    """M21: whether a brief mass is drawn simply: a band of a twisted, tapered or leaning
+    shaft, or a mass off the ground curved all round (its arcs run its whole exterior)."""
+    if m["shape"] != "prism":
+        return False
+    if m["role"] == "band":
+        return True
+    arcs = m.get("arcs")
+    if not arcs or int(round(m["z"][0] * 1000)) <= ground + 50:
+        return False
+    ext = m["footprint"]["exterior"]
+    per = sum(math.dist(ext[i], ext[(i + 1) % len(ext)]) for i in range(len(ext)))
+    on = sum(a["radius_m"] * math.radians(a["sweep_deg"]) for a in arcs)
+    return per > 0 and on >= 0.97 * per
+
+
 def _thickness(ring) -> int:
     """The footprint's least width: over its edges, the most any vertex lies inside the
     edge's line (exact for convex rings, a fair measure otherwise)."""
@@ -517,7 +549,8 @@ class ShellBuilder:
                            "eidx": [tidied[r][1] for r in keep], "rid": keep,
                            "deriv": [[False] * len(r) for r in rings],
                            "floors": int(m["floors"]["count"]),
-                           "n0": int(m["floors"]["count"]), "f0": 0})
+                           "n0": int(m["floors"]["count"]), "f0": 0,
+                           "simple": _simple(m, self.ground)})
         self.masses = masses
         edge_of = {}
         for j, e in enumerate(br["edges"]):
@@ -561,6 +594,9 @@ class ShellBuilder:
             if ms.get("screen"):
                 self._screen(ms)
                 continue
+            if ms.get("simple"):
+                self._simple_mass(ms, g)       # M21: a band or a curved shaft, drawn simply
+                continue
             if g != "structure":
                 groups.add(g)
             self._mass(ms, g)
@@ -594,7 +630,7 @@ class ShellBuilder:
         self._finish_parts()
         self.used["groups"] = [g for g in GN.GROUPS if g in groups]
         self.used["trim"] = self.stats["strips"] > 0
-        self.used["glass"] = self.stats["openings"] > 0
+        self.used["glass"] = self.stats["openings"] > 0 or self.stats.get("simple_glass", 0) > 0
         arrs = self.buf.arrays()
         return {"buf": self.buf, "arrays": arrs, "stats": self.stats, "used": self.used,
                 "masses": self.mass_info, "parts": self.inst, "doors": self.doors,
@@ -660,7 +696,7 @@ class ShellBuilder:
             return "structure"
         sysname = self.gm["genes"][f"{g}.system"]
         if sysname == "punched_concrete":
-            return self.gm["genes"]["finish"]
+            return _finish(self.gm, g)
         return SY.SYSTEMS[sysname]["wall"]
 
     def _covered_above(self, ms: dict, a, b) -> bool:
@@ -695,7 +731,7 @@ class ShellBuilder:
             T = SY.SYSTEMS[sysname]
             wall = T["wall"]
             if sysname == "punched_concrete":
-                wall = genes["finish"]
+                wall = _finish(self.gm, g)
                 self.used["finish"] = True
         rings = ms["rings"]
         thick = _thickness(RG.clean(rings[0]))
@@ -1397,7 +1433,8 @@ class ShellBuilder:
             if sills:
                 used.add("sills")
         if door:
-            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2:
+            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2 and                     not (zf - BALCONY_UNDER < ms["z0"] and
+                         self._hangs(fa, (bset[jb][0] + bset[jb][1]) // 2, bset[jb][2], zf)):
                 # the bay's balcony, once (by its first opening, where a bay has two)
                 b0, b1, d = bset[jb]
                 st = genes[f"{g}.balcony"]
@@ -1694,6 +1731,77 @@ class ShellBuilder:
                                     (p[0], p[1], tp)], (dy / L, -dx / L, 0.0))
             base += k
         return True
+
+    def _hangs(self, fa: Facade, s: int, d: int, zf: int) -> bool:
+        """M21: whether a balcony on a mass's first floor would hang in the air: no mass of
+        the building spans its slab's underside within a deep part's reach of its middle (a
+        cantilevered or stacked block's first floor; over a podium it stands as before)."""
+        x0, y0, _ = fa.P(s, 0)
+        x, y = x0 + fa.nx * d, y0 + fa.ny * d
+        zb = zf - BALCONY_UNDER // 2
+        for o in self.masses:
+            if o["shape"] != "prism" or not (o["z0"] - 2 <= zb <= o["z1"] + 2):
+                continue
+            ring = o["rings"][0]
+            if RG.in_poly((int(round(x)), int(round(y))), [ring]) >= 0:
+                return False
+            n = len(ring)
+            for i in range(n):
+                a, b = ring[i], ring[(i + 1) % n]
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                L2 = dx * dx + dy * dy
+                t = 0.0 if L2 == 0 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy)
+                                                     / L2))
+                ex, ey = a[0] + dx * t - x, a[1] + dy * t - y
+                if ex * ex + ey * ey <= BALCONY_REACH * BALCONY_REACH:
+                    return False
+        return True
+
+    def _simple_mass(self, ms: dict, g: str) -> None:
+        """M21: a band of a twisted, tapered or leaning shaft, or a shaft curved all round,
+        drawn simply until AG15 draws the form whole: its plate extruded, a spandrel and a
+        ribbon of glass a floor (structure in the structure group)."""
+        ring = RG.clean(ms["rings"][0])
+        holes = [RG.clean(h) for h in ms["rings"][1:]]
+        if len(ring) < 3:
+            return
+        z0, z1 = ms["z0"], ms["z1"]
+        n = max(1, ms["floors"])
+        fh = (z1 - z0) // n
+        self.buf.new_part()
+        try:
+            tris = triangulate(ring, holes, keep_straight=True)
+        except TriangulationError:
+            return
+        slot = "structure" if g == "structure" else "spandrel"
+        buf = self.buf
+        pts = list(ring) + [p for h in holes for p in h]
+        top = buf.plane((0.0, 0.0, 1.0), (0, 0, z1), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
+        bot = buf.plane((0.0, 0.0, -1.0), (0, 0, z0), (1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
+        buf.add("roof" if g != "structure" else slot, top, [(p[0], p[1], z1) for p in pts],
+                [i for t in tris for i in t])
+        buf.add(slot, bot, [(p[0], p[1], z0) for p in pts],
+                [i for t in tris for i in (t[0], t[2], t[1])])
+        cuts = [z0]
+        if g != "structure" and fh >= 2400:
+            for f in range(n):
+                zf = z0 + f * fh
+                cuts += [zf + SIMPLE_SILL, zf + fh - SIMPLE_HEAD]
+        cuts.append(z1)
+        for rg in [ring] + holes:
+            m = len(rg)
+            for i in range(m):
+                p, q = rg[i], rg[(i + 1) % m]
+                if p == q:
+                    continue
+                for j in range(len(cuts) - 1):
+                    s = slot if j % 2 == 0 else "glass"
+                    self._vquad(s, p, q, cuts[j], cuts[j + 1])
+        self.stats["simple_masses"] = self.stats.get("simple_masses", 0) + 1
+        if len(cuts) > 2:
+            self.stats["simple_glass"] = self.stats.get("simple_glass", 0) + 1
+        self.mass_info.append({"mass": ms["k"], "group": g, "system": None, "rows": n,
+                               "openings": 0, "simple": True})
 
     def _screen(self, ms: dict) -> None:
         """A halo crown: the top floor a screen of fins inside the mass round an open roof,

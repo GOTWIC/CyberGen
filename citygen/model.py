@@ -552,17 +552,43 @@ class Property(Entity):
     name: str | None = None
 
 
+class Arc(_Model):
+    """M21: a stretch of a footprint ring on a circle. The ring's vertices between the two
+    angles lie on it (the polygon cut so that no chord sags more than 2 cm from the curve),
+    so stage 2 can draw the wall as the curve itself."""
+    center: Point2
+    radius_m: float
+    start_deg: float = Field(description="Where it starts, degrees counterclockwise from east.")
+    sweep_deg: float = Field(description="How far it runs counterclockwise (360: the circle).")
+
+
 class Mass(_Model):
     """An extruded footprint from z0 to z1. `shape` tells the blockout builder how to read it:
     prism (the footprint extruded), cylinder (footprint is a circle), dome and cone (rise
     from the footprint to a point or cap), ring (a vertical wheel whose diameter is z1 - z0,
-    its footprint the thin plan of the rim)."""
+    its footprint the thin plan of the rim).
+
+    M21: a building's form (`Building.form`) is built of such masses; a band of a twisted,
+    tapered or leaning shaft is its form's base plate turned by `turn_deg` and scaled by
+    `scale` about the form's pivot, then moved by `shift_m` (the footprint is exact either
+    way). `arcs` are the curved stretches of the footprint."""
     footprint: Polygon
     z0_m: float
     z1_m: float
     role: str = Field("body", description="podium, tower, tier, crown, spire, mechanical, "
-                                          "body, void, deck, span, leg, dock, ramp, roof, ...")
+                                          "body, void, deck, span, leg, dock, ramp, roof, "
+                                          "band, block, link, core, column, frame, pod, "
+                                          "halo, strut, mast, ...")
     shape: Literal["prism", "cylinder", "dome", "cone", "ring"] = "prism"
+    arcs: list[Arc] = Field(default_factory=list, exclude_if=lambda v: not v,
+                            description="M21: the footprint's curved stretches.")
+    turn_deg: float = Field(0.0, exclude_if=lambda v: v == 0.0,
+                            description="M21: the plate's turn from its form's base plate.")
+    scale: float = Field(1.0, exclude_if=lambda v: v == 1.0,
+                         description="M21: the plate's size against its form's base plate.")
+    shift_m: Point2 = Field((0.0, 0.0), exclude_if=lambda v: tuple(v) == (0.0, 0.0),
+                            description="M21: how far the plate is moved from its form's "
+                                        "base plate (after turning and scaling).")
 
 
 class Unit(_Model):
@@ -600,6 +626,25 @@ class Portal(_Model):
     station: bool = False
 
 
+class Form(_Model):
+    """M21: how a building departs from a box. `kind` is the shaft's form: for towers box,
+    chamfer, rounded, setback, round, oval, taper, twist, lean, stack, cantilever, split,
+    garden, gate, exo or pods; for slabs curved, bent, stepped or lifted; landmarks their
+    kind. `crown` is how the top ends (flat, tiers, sloped, cut, halo, mast, spire). The
+    masses of the shaft (`masses`, bottom up) carry their turn, scale and shift from the base
+    plate, which is centered on `pivot`; `params` holds the form's numbers (twist per floor,
+    taper, lean, ...)."""
+    kind: str
+    crown: str = "flat"
+    tower: bool = Field(False, description="A tower (40 m and taller), which the neighbor "
+                                           "rule counts.")
+    band: int = Field(-1, description="Height band of a tower (`buildings.TOWER_BANDS_M`), "
+                                      "-1 otherwise.")
+    pivot: Point2 | None = None
+    masses: list[int] = Field(default_factory=list)
+    params: dict[str, float | str] = Field(default_factory=dict)
+
+
 class Building(Entity):
     """`type` is `building.<archetype>` (podium_tower, slab, courtyard_block, megabuilding,
     terraced, shopfront_row, shanty_stack, warehouse, shed, parking_structure, lab, station,
@@ -621,6 +666,8 @@ class Building(Entity):
     plinth_m: float | None = Field(None, exclude_if=lambda v: v is None, description="M13: the lowest ground under the "
                                    "footprint; a stepped plinth fills from it up to base_m.")
     masses: Annotated[list[Mass], Field(min_length=1)]
+    form: Form | None = Field(None, exclude_if=lambda v: v is None,
+                              description="M21: the building's form and its parameters.")
     entrances: list[Entrance] = Field(default_factory=list)
     units: list[Unit] = Field(default_factory=list)
     roof_items: list[RoofItem] = Field(default_factory=list)

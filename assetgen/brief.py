@@ -947,6 +947,15 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
             "footprint": {"exterior": [C.pt(p, ox, oy) for p in mass.rings[0]],
                           "holes": [[C.pt(p, ox, oy) for p in h] for h in mass.rings[1:]]},
             "floors": floors_of(mm, fh, deck)})
+        # M21: a mass's arcs and its plate's turn, scale and shift (only where it has them,
+        # so other briefs keep their bytes)
+        if mm.arcs:
+            masses[-1]["arcs"] = [{"center": C.pt(a.center, ox, oy), "radius_m": C.m(a.radius_m),
+                                   "start_deg": round(a.start_deg, 4),
+                                   "sweep_deg": round(a.sweep_deg, 4)} for a in mm.arcs]
+        if mm.turn_deg or mm.scale != 1.0 or tuple(mm.shift_m) != (0.0, 0.0):
+            masses[-1]["plate"] = {"turn_deg": C.deg(mm.turn_deg), "scale": mm.scale,
+                                   "shift_m": [C.m(mm.shift_m[0]), C.m(mm.shift_m[1])]}
     edge_recs = [_edge_record(e, ox, oy, faced, k) for e in edges]
     for rec, e in zip(edge_recs, edges):
         rec["mass"] = e.mass.k
@@ -1060,6 +1069,13 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
     if getattr(b, "level", 0):
         # M14: a building on a deck: its level and the deck top its ground floor stands on
         rec["building"]["floor_grid"].update(level=b.level, deck_m=C.m(deck))
+    f = getattr(b, "form", None)
+    if f is not None:
+        # M21: the building's form (its shaft's masses, pivot in the building frame)
+        rec["building"]["form"] = {
+            "kind": f.kind, "crown": f.crown, "tower": f.tower, "band": f.band,
+            "pivot": C.pt(f.pivot, ox, oy) if f.pivot is not None else None,
+            "masses": list(f.masses), "params": dict(f.params)}
     terr = terrain_of(rec, ground, getattr(b, "base_m", None))
     if terr is not None:
         rec["terrain"] = terr

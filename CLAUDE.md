@@ -13,7 +13,7 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M21, the
+high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M20, the
 rest of the fixes from the first run-through, `docs/run_through_1.md`),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
@@ -853,6 +853,70 @@ M17 (road network repair, from the first run-through) is in place:
   nearest point within `ISLAND_SEAM_M` 40 m of the district (else as before), so a
   regeneration moves no walkway far from it; a fresh build is unchanged.
 Sample builds, the run-through's measures before and after: `docs/progress/M17/`.
+
+M21 (cyberpunk massing) is in place, in `citygen/forms.py` (with `massing.Plate`, and the
+neighbor rule in `buildout.select_forms`):
+- **Model:** a form is prism masses, so every check and consumer reads it as it is. A tower's
+  shaft stands on its podium on a base plate (`massing.Plate`: a rectangle with sharp, cut
+  or rounded corners, a circle, a four-centre oval); a band of a twisted, tapered or leaning
+  shaft (role `band`) is that plate turned by `Mass.turn_deg` and scaled by `Mass.scale`
+  about the form's pivot, then moved by `Mass.shift_m`. `Building.form` names the form
+  (`kind`), its `crown`, whether it is a `tower` (podium towers, towers and landmarks 40 m
+  and taller) and its height `band` (`buildings.TOWER_BANDS_M`: 40, 56, 78, 110, 154, 215,
+  300 m), the `pivot`, the shaft's `masses` (bottom up) and its `params` (twist per floor,
+  taper, lean, chamfer, ...). New fields are left out of the JSON at their defaults.
+- **True arcs:** `Mass.arcs` (center and radius to the millimeter, start and sweep in
+  degrees); the footprint is cut by `massing.arc_steps` (a step of 2 sqrt(2 SAG / r), plain
+  arithmetic) so no chord sags over 1 cm, 2 cm at most once on the grid (`MS.circle`,
+  `ellipse`, `sector`; no more 12, 20 or 32-gons, megasite tanks and pads included).
+- **Forms** (`forms.SHAFTS`): box, chamfer, rounded, setback, round (in drums), oval, taper
+  (bands of 2 or 3 floors), twist (a band a floor, two over 48 floors, at most 3 degrees a
+  floor, 180 in all), lean, stack (3 to 5 turned and offset blocks, each over 35% on the one
+  under it), cantilever (blocks reaching out over the podium), split (two shafts, a slot and
+  links), garden (sky gardens: a core and corner columns, a green area `sky_garden`), gate (a
+  void through the upper floors), exo (columns standing off the facade, belts), pods (capsule
+  pods on a core); towers on odd plates (no rectangle fits) box, setback, taper, terrace or
+  wedge (`tower_poly`). Crowns: flat, tiers, sloped, cut, halo (a ring on struts), mast,
+  spire. Complexes' towers take box, chamfer, rounded or setback (`COMPLEX_FORMS`: their
+  skybridges need facing facades), and a complex avoids the forms of the complex towers built
+  before it near it (`Ctx.placed`). Slabs: curved (`MS.sector`) or stepped
+  (`forms.slab_form`); megabuilding towers with cut or rounded corners on some.
+- **Variety:** spec `District.variety` (presets: corporate core 0.9, midtown 0.75, transit
+  hub 0.6, entertainment 0.55, research 0.5, megablock 0.35, spaceport 0.3, residential 0.2,
+  old town 0.15, industrial 0.1) sets the draw weights (`forms.weights`: box and the mild
+  forms where low, bold forms from their `BOLD_MIN`) and how far twist, taper and lean go.
+- **Neighbor rule:** a lot tower draws its order of forms from its own generator (`_forms`,
+  salts by `FORM_INDEX`) and, in phase b, every form that fits (`forms_ok`) and the heights
+  in the bands beside its own (`band_heights`; under 40 m from the first band). Then the
+  parent (`select_forms`, tallest first, the complexes' and landmarks' towers and in a
+  regeneration the old towers outside the district fixed, `Frame.old_towers`, and a new tower
+  on an old one's lot given its old form and height, so the city outside comes back as it
+  was) gives each the first form no tower of another property within 151 m has in its band,
+  else a band beside;
+  the lots that change are built again in their chunks (`rebuild`, `force`).
+- **Checks** (two more): `building_forms` (arcs within 2.1 cm of their footprint, twist at
+  most 3 degrees a floor, every mass above the building's floor resting on or fixed to
+  another of its masses: it found M3's megabuilding decks hanging past a mid setback, now
+  placed only where both towers reach them, `_deck_held`, and a cluster's tower beside its
+  podium piece, now the piece under it), `tower_neighbors` (towers of different owners
+  within 150 m, by footprint centroid, never share a form and a band). Skybridges keep stage
+  2's corridor margins clear of every mass (0.2 m beside, 0.3 m over: `CORRIDOR_SIDE_M`,
+  `CORRIDOR_TOP_M`) and a bridge through a traced or pinned building (placed after the
+  bridges) is taken out (`buildout.bridges_clear_of`); a sky tube portal stays under a
+  tower's shaft, not its mast or spire (`transit.Bld.body`, `THIN_ROLES`).
+- **Blockout:** a mass with arcs drawn smooth along them (`set_sharp_from_angle`, 25
+  degrees); accents for mast, halo, strut, frame, link. **Exporter:** a building's form in
+  the manifest (`form`) and tagged `cg.form=`. **assetgen:** the brief carries arcs, plates
+  and the form; `shell._simple_mass` draws bands and masses curved all round simply (the
+  plate extruded, a spandrel and a ribbon of glass a floor) until AG15; skybridges never land
+  on bands, frames, pods, columns, halos or masts; a sky station's platform floor is under the
+  tube's lowest point over it (`connections.station`, as `_beside`: a rerouted Delta line put
+  a station on a 7.5% grade, and the level floor from the tube's first point met the tube);
+  a punched concrete wall under a patchwork body keeps its own wall where the patchwork
+  finish has no patch genes in its group (`shell._finish`; it raised `KeyError`); no
+  balcony hangs under a floating block (`shell._hangs`); `GEN_VERSION` m21.1. Odd-lot tiers
+  are kept neat (`forms.neat`: no corner under 40 degrees, no edge under 1 m).
+Sample builds: `docs/progress/M21/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

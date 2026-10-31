@@ -1,5 +1,45 @@
 {
   "$defs": {
+    "Arc": {
+      "additionalProperties": false,
+      "description": "M21: a curved stretch of the footprint (in the building frame).",
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "radius_m": {
+          "title": "Radius M",
+          "type": "number"
+        },
+        "start_deg": {
+          "title": "Start Deg",
+          "type": "number"
+        },
+        "sweep_deg": {
+          "title": "Sweep Deg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "center",
+        "radius_m",
+        "start_deg",
+        "sweep_deg"
+      ],
+      "title": "Arc",
+      "type": "object"
+    },
     "At": {
       "additionalProperties": false,
       "properties": {
@@ -119,6 +159,18 @@
         },
         "floor_grid": {
           "$ref": "#/$defs/FloorGrid"
+        },
+        "form": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Form"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: the building's form (absent: none)."
         }
       },
       "required": [
@@ -584,6 +636,72 @@
       "title": "Floors",
       "type": "object"
     },
+    "Form": {
+      "additionalProperties": false,
+      "description": "M21: how the building departs from a box (citygen's `Building.form`).",
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "crown": {
+          "title": "Crown",
+          "type": "string"
+        },
+        "tower": {
+          "title": "Tower",
+          "type": "boolean"
+        },
+        "band": {
+          "title": "Band",
+          "type": "integer"
+        },
+        "pivot": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pivot"
+        },
+        "masses": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Masses",
+          "type": "array"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "crown",
+        "tower",
+        "band",
+        "pivot",
+        "masses",
+        "params"
+      ],
+      "title": "Form",
+      "type": "object"
+    },
     "Frontage": {
       "additionalProperties": false,
       "properties": {
@@ -724,6 +842,34 @@
         },
         "floors": {
           "$ref": "#/$defs/Floors"
+        },
+        "arcs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Arc"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: its curved stretches (absent: none).",
+          "title": "Arcs"
+        },
+        "plate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Plate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: a band of a twisted, tapered or leaning shaft (absent: none)."
         }
       },
       "required": [
@@ -944,6 +1090,41 @@
         "at"
       ],
       "title": "Plant",
+      "type": "object"
+    },
+    "Plate": {
+      "additionalProperties": false,
+      "description": "M21: a band's plate against its form's base plate (turned and scaled about the form's\npivot, then moved).",
+      "properties": {
+        "turn_deg": {
+          "title": "Turn Deg",
+          "type": "number"
+        },
+        "scale": {
+          "title": "Scale",
+          "type": "number"
+        },
+        "shift_m": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Shift M",
+          "type": "array"
+        }
+      },
+      "required": [
+        "turn_deg",
+        "scale",
+        "shift_m"
+      ],
+      "title": "Plate",
       "type": "object"
     },
     "Poi": {

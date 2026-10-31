@@ -100,7 +100,7 @@ MATERIALS.update({"bed_shallow": "#8f8264", "bed_mid": "#5f5846",
 MATERIALS.update({f"bank_{k}": v for k, v in BANK_COLOR.items()})
 MATERIALS.update({f"cover_{k}": v for k, v in COVER_COLOR.items()})
 
-ACCENT_ROLES = {"crown", "spire", "mechanical"}
+ACCENT_ROLES = {"crown", "spire", "mechanical", "mast", "halo", "strut", "frame", "link"}
 DECK_ROLES = {"deck", "span"}
 SKYBRIDGE_H = {"enclosed": None, "stack": None, "open_deck": 0.6, "catwalk": 0.4, "cable": 0.3}
 
@@ -706,8 +706,11 @@ def _terrain_beds(P: _Plan, X, Y, Z):
 
 def _mass_part(ms, mat: str) -> dict:
     ext, holes = _poly_rings(ms.footprint)
-    return {"k": "prism", "m": mat, "z0": q(ms.z0_m), "z1": q(ms.z1_m), "r": ext,
-            "h": holes, "s": ms.shape}
+    out = {"k": "prism", "m": mat, "z0": q(ms.z0_m), "z1": q(ms.z1_m), "r": ext,
+           "h": holes, "s": ms.shape}
+    if ms.arcs:
+        out["a"] = 1      # (M21: drawn smooth along its arcs)
+    return out
 
 
 def _buildings(P: _Plan) -> None:
@@ -747,7 +750,8 @@ def _buildings(P: _Plan) -> None:
                "height_m": q(b.height_m), "floors": b.floors, "district": did or "",
                "archetype": arch, "name": b.name or "", "property_id": b.property_id or "",
                "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or "",
-               **({"level": b.level} if b.level else {})})   # (M14: on a deck)
+               **({"level": b.level} if b.level else {}),    # (M14: on a deck)
+               **({"form": b.form.kind} if b.form is not None else {})})   # (M21)
     for s in m.skybridges:
         (ax, ay), (bx, by) = s.line[0], s.line[-1]
         hh = SKYBRIDGE_H.get(s.kind) or s.levels * s.level_height_m
