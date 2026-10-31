@@ -3432,7 +3432,9 @@ def sidewalks_clear(sw, pt, size: float) -> bool:
 SPAN_MOVE = 0.15         # a support moves at most this share of its span to free ground
 TRUSS_OVER = 1.15        # a span this much over the mode's is a truss (a cable span over the
 #                          longest, only across a navigable channel)
-MAIN_SPAN_M = {"elevated_rail": 300.0, "monorail": 250.0, "maglev": 300.0, "sky_tube": 600.0}
+# (elevated rail 400 m: a rail cable-stayed span reaches 430 m, Kap Shui Mun; after M18's roads
+# Vesper Bay's Halo Line runs 326 m down the Vess River where it and a delta branch cross)
+MAIN_SPAN_M = {"elevated_rail": 400.0, "monorail": 250.0, "maglev": 300.0, "sky_tube": 600.0}
 FRAME_REACH_M = 30.0     # a portal frame's columns stand at most this far either side
 CANT_REACH_M = 15.0      # a cantilever bent's column at most this far from the line
 CANT_SHORT_M = 4.0       # ... and is taken before a frame when this near

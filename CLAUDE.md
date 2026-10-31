@@ -969,7 +969,7 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   wherever a support stands. Before the stations, a dry run (`_support_room`, `_Dry`) takes
   out the low removable buildings that alone keep a support off a gap. A gap still longer
   is a cable-stayed main span over a navigable channel or a raised road (`MAIN_SPAN_M`:
-  rail 300, monorail 250, maglev 300), else a note; the line's `attrs.spans` lists its truss, cable and gap
+  rail 400, monorail 250, maglev 300), else a note; the line's `attrs.spans` lists its truss, cable and gap
   spans; sky tube masts carry `mast_top_m` and their `stays`.
 - **Checks:** `transit_supports` (lone columns within 0.5 m of the line, frames' beams under
   it at the deck's underside, piers clear of the channel, spans within the longest, an end

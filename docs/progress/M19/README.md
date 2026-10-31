@@ -31,7 +31,7 @@ and each other. Spec: `docs/citygen_scope.md`, section 12, M19.
 - **Sky tube masts.** Every sky tube pylon is a cable-stayed mast: two legs either side of the
   tube rising 12% of its longer span over it, stays fanned to 40% of each span.
 - **Main spans.** Where nothing may stand, a navigable channel or a raised road (an
-  interchange), a span may pass the longest, cable-stayed, up to 300 m (elevated rail), 250
+  interchange), a span may pass the longest, cable-stayed, up to 400 m (elevated rail), 250
   (monorail), 300 (maglev). Each line lists its truss and cable spans (`attrs.spans`).
 - **Portals only at stations.** A sky tube through towers picks each stop's host tower
   before its route: a portal-sized tower in the stop's zone that a straight tube leaves with
