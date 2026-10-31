@@ -373,8 +373,8 @@ More: [`docs/progress/AG10`](docs/progress/AG10).
 
 <img src="docs/progress/AG13/vesper_bay/8k/park.jpg" width="840">
 
-A park on Vesper Bay's Scholar Isle at street level (8K): its lawn worn along the path
-people take across it, grass, clover and flowers in the district's colors, trees.
+A park on Vesper Bay's Scholar Isle at street level (8K): lawn grass, clover and flowers in
+the district's colors under the trees.
 
 | | |
 |---|---|
