@@ -972,7 +972,8 @@ def moss(n: int, tile_m: float, p: dict) -> Surface:
     c = rgb(p.get("color", "#4d6a2a"))
     d, cid = N.cells(n, count(tile_m, 0.05), s + 1, 0.9)
     soft = N.fbm(n, count(tile_m, 0.08), s + 4, 3)
-    cush = N.smooth(0.85, 0.05, d) * N.smooth(0.15, 0.5, soft + F(0.1))         + F(0.35) * N.smooth(0.3, 0.7, soft)
+    cush = N.smooth(0.85, 0.05, d) * N.smooth(0.15, 0.5, soft + F(0.1)) \
+        + F(0.35) * N.smooth(0.3, 0.7, soft)
     fine = N.fbm(n, max(8, count(tile_m, 0.004)), s + 2, 2)
     g = grain(n, s + 3, 0)
     shade = F(0.7) + F(0.5) * cush + F(0.3) * (fine - F(0.5)) + F(0.06) * (cid - F(0.5))

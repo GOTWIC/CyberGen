@@ -763,13 +763,14 @@ MASK_UV_CODE = "return float2((WP.x / 100.0 - X0) / Size, (-WP.y / 100.0 - Y0) /
 # instance.
 GRASS_C_CODE = """
 float3 c = lerp(Base, Dry, VC.b);
-return c * (0.55 + 0.45 * VC.r) * (0.9 + 0.2 * VC.g);
+return c * (0.7 + 0.3 * VC.r) * (0.9 + 0.2 * VC.g);
 """
 GRASS_WPO_CODE = """
 float k = VC.r * VC.r * Wind * Slot;
 float ph = Rand * 6.2832 + WP.x * 0.0021 - WP.y * 0.0017;
 float s = sin(T * 1.7 + ph) * 0.65 + sin(T * 3.3 + ph * 1.7) * 0.25 + 0.35;
-return float3(0.92, 0.38, 0.0) * s * k * 14.0 + float3(-0.38, 0.92, 0.0) * sin(T * 2.3 + ph * 2.1) * k * 4.0;
+float3 along = float3(0.92, 0.38, 0.0) * s * k * 14.0;
+return along + float3(-0.38, 0.92, 0.0) * sin(T * 2.3 + ph * 2.1) * k * 4.0;
 """
 
 

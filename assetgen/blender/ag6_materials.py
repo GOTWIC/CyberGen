@@ -512,7 +512,7 @@ def grass(mat, rec, part):
     base = (*rec["color"][:3], 1.0)
     dry = (*rec.get("vectors", {}).get("DryColor", rec["color"])[:3], 1.0)
     col = t.mix(b, base, dry)
-    k = t.m("MULTIPLY", t.m("ADD", 0.55, t.m("MULTIPLY", r, 0.45)),
+    k = t.m("MULTIPLY", t.m("ADD", 0.7, t.m("MULTIPLY", r, 0.3)),
             t.m("ADD", 0.9, t.m("MULTIPLY", g, 0.2)))
     t.link(t.v("SCALE", col, scale=k), bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = rec.get("roughness", 0.8)

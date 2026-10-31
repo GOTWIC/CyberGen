@@ -32,11 +32,11 @@ from . import kinds as K
 
 # slot -> (color, dry color)
 SLOTS: dict[str, tuple[str, str]] = {
-    "grass.lawn": ("#4f7c31", "#9a9452"), "grass.meadow": ("#6c8c38", "#b5a25e"),
+    "grass.lawn": ("#5f923a", "#a39c5a"), "grass.meadow": ("#6c8c38", "#b5a25e"),
     "grass.straw": ("#b3a060", "#cdbd84"), "grass.seed": ("#cbbd8a", "#d8cc9e"),
     "grass.reed": ("#6a8450", "#a89a62"), "grass.plume": ("#9a8468", "#c2ae8a"),
     "grass.cattail": ("#56371f", "#6e4a2a"), "grass.weed": ("#5b7b33", "#8f8a4a"),
-    "grass.clover": ("#4d8838", "#7f9a48"), "grass.clover_flower": ("#efece2", "#e6dfc8"),
+    "grass.clover": ("#5b9a42", "#86a04c"), "grass.clover_flower": ("#efece2", "#e6dfc8"),
     "grass.fern": ("#3e7a2d", "#8a8a3e"), "grass.stem": ("#4c6a2b", "#857f48"),
     "grass.eye": ("#e6b622", "#d0a62a"), "grass.scrub": ("#5e6c32", "#8a7a46"),
     "grass.scrub_dry": ("#8a7a46", "#a08e5a"), "grass.sedum": ("#7a8a36", "#8f8a46"),
@@ -271,7 +271,7 @@ def flowers(c: Clump, k: int, colors: list[str]) -> None:
                  0.05, 0.016, 0.01, (*key, "lf", j), droop=0.01)
         col = colors[(k + i) % len(colors)] if u(*key, "c") < 0.75 else colors[k % len(colors)]
         petals = 5 + int(2 * u(*key, "p"))
-        hr = 0.016 + 0.012 * u(*key, "hr")
+        hr = 0.022 + 0.016 * u(*key, "hr")
         head(c, FLOWER_PREFIX + "c" + col.lstrip("#"), tip, hr, petals, key)
         head(c, "grass.eye", (tip[0], tip[1], tip[2] + 0.002), hr * 0.3, 4, (*key, "e"), 0.0)
 
