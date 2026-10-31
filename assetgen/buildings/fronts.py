@@ -1125,7 +1125,8 @@ def hardware(sb) -> None:
         sl = min(max(s - fa.soff, w), fa.L - w)
         if _open_at(sb, at["edge"], s - w // 2, s + w // 2, z - h, z + h):
             continue
-        sb.parts.on(fa, "mount", {"style": "plate", "w": w, "h": h}, sl, z - h // 2)
+        sb.parts.on(fa, "mount", {"style": "plate", "w": w, "h": h}, sl,
+                    _on_mass(ms, z - h // 2, h))
         sb.stats["mount_plates"] = sb.stats.get("mount_plates", 0) + 1
     for pl in br["plants"]:
         at = pl.get("at")
@@ -1145,8 +1146,15 @@ def hardware(sb) -> None:
         sl = min(max(s - fa.soff, w // 2 + 50), fa.L - w // 2 - 50)
         if _open_at(sb, at["edge"], s - w // 2, s + w // 2, z, z + h):
             continue
-        sb.parts.on(fa, "mount", {"style": "trellis", "w": w, "h": h}, sl, z)
+        sb.parts.on(fa, "mount", {"style": "trellis", "w": w, "h": h}, sl, _on_mass(ms, z, h))
         sb.stats["trellises"] = sb.stats.get("trellises", 0) + 1
+
+
+def _on_mass(ms, z0: int, h: int) -> int:
+    """A mount h tall from z0, moved up or down onto its facade's mass (`_facade_at` takes
+    a facade within 0.5 m of the prop's height: a wall light just under a belt that
+    stands off the tower under it would hang its plate in the air)."""
+    return min(max(z0, ms["z0"]), ms["z1"] - h)
 
 
 def _ties(sb, p, at) -> None:
@@ -1167,7 +1175,8 @@ def _ties(sb, p, at) -> None:
             for ds in (0, 400, -400, 800, -800):
                 if not _open_at(sb, at["edge"], s + ds - 150, s + ds + 150, z - 150, z + 150):
                     sl = min(max(s + ds - fa.soff, 200), fa.L - 200)
-                    sb.parts.on(fa, "mount", {"style": "tie", "w": 200, "h": 200}, sl, z - 100)
+                    sb.parts.on(fa, "mount", {"style": "tie", "w": 200, "h": 200}, sl,
+                                _on_mass(ms, z - 100, 200))
                     sb.stats["scaffold_ties"] = sb.stats.get("scaffold_ties", 0) + 1
                     break
 
