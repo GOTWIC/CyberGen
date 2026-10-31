@@ -614,7 +614,7 @@ below as its answer so that AG1 can start; any of them can still change.
 | 13.6 | Interior mapping only (the spike's glass master does it) | |
 | 13.7 | The asset spec written by a session from the prompt through the `assetgen` skill; no mood boards | `.claude/skills/assetgen/SKILL.md` |
 | 13.8 | Pure Python generators, Blender for previews only | |
-| 13.9 | Open: before AG13 starts (grass in Unreal) | |
+| 13.9 | (a): grass baked per tile by assetgen and placed by the exporter as instanced meshes per tile, fading out between 60 and 100 m, at most 40,000 clumps a tile and 3 million a city (taken by AG13, 2026-10-31) | `assetgen/ground/kinds.py` (`TILE_INSTANCES`, `CITY_INSTANCES`, `FADE_M`) |
 | 13.10 | Open: before AG12 starts (sea waves) | |
 
 1. **Local AI models.**
@@ -660,7 +660,9 @@ below as its answer so that AG1 can start; any of them can still change.
      meshes per tile that fade out at 60 to 100 m. Deterministic, testable, the same in the
      Blender previews, streamed with the tile by World Partition; heavy at city scale (Delta
      Megacity's open land at one clump per 0.25 m2 is several million instances), so a
-     per-tile cap. *Recommended* first.
+     per-tile cap. *Recommended* first. **Taken** (AG13): clumps of 0.3 to 1 m across at
+     0.05 to 1.8 per m2 by cover kind (not one per 0.25 m2), at most 40,000 a tile (the
+     kept ones scaled up where the cap thins them); the samples have 1.0 to 2.3 million.
    - (b) Generated around the player at run time by Unreal's PCG (GPU runtime generation from
      the ground pieces and AG13's density textures): light on disk and memory, but more engine
      machinery, seeded rather than baked, and nothing to match in the Blender previews. If
@@ -945,6 +947,14 @@ docker image; Windows joins in AG9.
   and city; a regenerated district rewrites only its tiles; Mac = x86.
 - **Shows:** a park and a wasteland lot at street level; a lawn edge with a worn path.
 - **Later stages:** wind and seasons (stage 3); people on the lawns (stage 4).
+- **As built** (`docs/assetgen_milestones.md`, AG13): a ninth set, `ground_wild` (the
+  meadow's dry form, for wasteland); paving takes AG7's paving sets by what it paves (no new
+  paving set); the blend is a mask texture per tile (512 px, wear, shade, edge, moisture),
+  so the ground's materials are per surface and tile; M6's median lawns (verges) are
+  replaced too; AG8's ground plants are folded in as two of the clump kinds (its scrub and
+  sedum generators at ground cover scale), while M6's own scrub and sedum placements stay
+  AG8's instances (they are seen from far, the grass fades at 100 m); the grass's
+  transforms live in a file per tile, not in the contribution.
 
 ### 14.15 AG14: Fit and finish
 

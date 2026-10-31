@@ -207,13 +207,14 @@ def _defer_gltf_tmp():
         GM.create_mesh = create_mesh
 
 
-def import_glb(path, part, shared=False):
+def import_glb(path, part, shared=False, shading="FLAT"):
     """A pack's objects with AG6's materials. `shared`: meshes that other objects draw too
     (AG2's parts and AG8's families through geometry nodes, AG8's signs as copies), whose
     materials go on the mesh; every other object's go on the object (a slot linked to the
-    mesh walks every object of the file on each assignment, quadratic over a whole city)."""
+    mesh walks every object of the file on each assignment, quadratic over a whole city).
+    `shading`: the importer's (AG13's ground and grass keep their own normals)."""
     before = set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=path, import_shading="FLAT")
+    bpy.ops.import_scene.gltf(filepath=path, import_shading=shading)
     if GLTF_TMP:
         bpy.data.batch_remove(GLTF_TMP)
         GLTF_TMP.clear()
@@ -534,6 +535,14 @@ def main():
             o.hide_viewport = True
             protos[SUFFIX.sub("", o.name)] = o
     log(f"AG8 variants: {len(protos)}")
+    gj = JOB.get("ground") or {}
+    if gj.get("clumps"):
+        # AG13's clumps: prototypes beside AG8's, their placements with AG8's per view
+        for o in import_glb(gj["clumps"], "ground", shared=True, shading="NORMALS"):
+            o.hide_render = True
+            o.hide_viewport = True
+            protos[SUFFIX.sub("", o.name)] = o
+        log(f"AG13 clump variants: {len(protos)} with AG8's")
     rep = {"files": [], "views": []}
     for v in JOB["views"]:
         mark("start", v["name"])
@@ -549,6 +558,10 @@ def main():
             p = f"{JOB['assets']}/streets/{tile}.glb"
             if os.path.isfile(p):
                 objs += import_glb(p, "streets")
+        for tile in v.get("ground_tiles", []):
+            p = f"{JOB['assets']}/ground/tiles/{tile}.glb"
+            if os.path.isfile(p):
+                objs += import_glb(p, "ground", shading="NORMALS")     # (AG13)
         for tile in v.get("connection_tiles", []):
             p = f"{JOB['assets']}/connections/{tile}.glb"
             if os.path.isfile(p):

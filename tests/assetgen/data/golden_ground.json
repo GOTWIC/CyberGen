@@ -1,0 +1,7 @@
+{
+ "about": "sha256 goldens of assetgen's ground stage (AG13): the small test city's ground packs, mask pixels, grass files and Unreal contribution (tests/conftest.py SMALL, built by the citygen CLI), as `assetgen.ground.build.outputs_digest` measures them (`all` hashes them together). Written on the Windows PC; Mac = x86 waits for the deferred determinism check.",
+ "small_city": {
+  "all": "5fddd45243e1a022429f36369069d1a12059f2c7e2857f89a0afed58669de446",
+  "files": 230
+ }
+}

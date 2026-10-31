@@ -941,8 +941,8 @@ Sample builds: `docs/progress/M21/`.
 ## Asset generator (assetgen)
 
 `docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
-AG12 water and AG13 ground cover and grass after citygen's M16, AG14 fit and finish and AG15
-cyberpunk facades and night from the first run-through), its log
+AG12 water after citygen's M16 (AG13, ground cover and grass, is in place), AG14 fit and finish
+and AG15 cyberpunk facades and night from the first run-through), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -1280,6 +1280,56 @@ with a deck over Core, `agtools.deck_build`):
 - **Exporter**: no code change (each deck piece takes its level from the blockout object
   it replaces); `docs/unreal_export.md`, "From AG10"; `test_stage2_takes_assetgen_decks`.
   Results: `docs/progress/AG10/`.
+
+AG13 (ground cover and grass) is in place, in `assetgen/ground/` (tests
+`tests/assetgen/test_ag_ground.py`, golden `tests/assetgen/data/golden_ground.json` by
+`tests/assetgen/ground_goldens.py`):
+- **`assetgen ground BUILD [--spec S] [--workers N] [--force]`** (`build.py`; also the stage
+  of `assetgen build` after AG8's props and before AG6's materials, `--no-ground` skips it):
+  per 256 m tile (`gather.py`: a job holding every input of its tile, its hash the tile's)
+  M16's ground cover pieces meeting it, M6's median lawns (verges: grass on AG7's lawn island
+  top, a lawn strip on a highway median clear of the barrier, nothing where AG7 tops the
+  island with concrete), M14's decks, trees, the water within 60 m, M16's shade raster and
+  M13's ground grid; a tile made again only when its job's hash or the code changes.
+- **Surfaces** (`kinds.py`): per cover kind three AG6 sets, base, worn and shade
+  (`materials/library.GROUND_SETS`: `ground_lawn`, `_meadow`, `_wild`, `_dirt`, `_mud`,
+  `_gravel`, `_sand`, `_moss`, `_rubble`; generators at the end of `surfaces.py`); paving
+  and overgrown paving on AG7's paving sets by what they pave. The mask per tile
+  (`tile.py`, `ground/masks/<tile>.png`, 512 px, row 0 the south edge): R wear (desire lines,
+  the piece's wear), G shade (M16's raster bilinear, tree crowns, 1 under a deck), B edge,
+  A moisture; the ground master blends the sets by it.
+- **Ground mesh**: each piece clipped to its tile on the 1 cm grid, triangulated exactly on
+  its millimeters (`triangulate.py`), 0.1 m over the ground (on M13's terrain cut by its 4 m
+  cells, vertices and normals on the ground grid), a primitive per surface and tile
+  (`ground.<surface>.<tile>`), UV0 the plan position; `ground/tiles/<tile>.glb`.
+- **Grass** (`clumps.py`, `tile.py`): clump kinds lawn, clover, flowers (a family per
+  district palette: its era's palette pushed to petal colors), meadow, meadow_dry, reeds,
+  cattails, weeds, fern and AG8's scrub and sedum (`props.trees` at ground cover scale), 3
+  or 4 variants each, at most 400 triangles, COLOR_0 (height share, tone, dryness) for the
+  grass master, in `ground/clumps.glb`. A candidate per mask pixel (0.5 m) in a grass-bearing
+  piece, jittered and kept by splitmix64 hashes of its world cell with probability
+  density x wear x shade x moisture x slope x the tile's cap (`kinds.GRASS`, 0.04 to 1.8 per
+  m2; `TILE_INSTANCES` 40,000, the kept clumps scaled up by the cap's inverse square root,
+  at most 1.5; a tile over the cap by chance drops the clumps kept by the least margin);
+  the mix leans to ferns in deep shade and under crowns, reeds on wet ground, weeds where
+  neglected; a clump stands only where its footprint lies in grass-bearing land clear of
+  desire lines, decks and trunks. Transforms per tile in `ground/grass/<tile>.json`.
+- **Checks** (`checks.py`, `ground_report.json/.txt`): `ground_coverage` (every piece drawn
+  whole, every blockout cover object and median lawn replaced), `ground_grass_clear` (no
+  footprint on a road, building, water, paving, deck or desire line, every clump on grass;
+  on the model's own geometry), `ground_meshes`, `ground_budgets` (clumps per tile and city,
+  3 million; triangles per clump, of all clumps, of the ground per tile and city;
+  instanced triangles per tile). `ground/preview.png`: the city from above and the busiest
+  tile up close (`preview.py`).
+- **Exporter**: `unreal_contribution.ground.json` (`docs/unreal_export.md`, AG13): a ground
+  actor per tile replacing the blockout's `<district>.cover_<kind>.<tile>` and
+  `<district>.lawn.<tile>` objects (a `drop` where its tile draws none), the grass as
+  instanced parts whose transforms stay in their tile's file (`xforms_file`), not Nanite,
+  no collision, no shadow, culled at 60 to 100 m (`cull_m`), out of the HLODs; masters
+  `M_CgGround` and `M_CgGrass` (sway by world position offset, `MPC_CityGen`'s new `Wind`).
+- **Previews**: `assetgen materials preview` draws the ground tiles with AG6's materials
+  (`ag6_materials.ground`, `grass`) and the clumps within 140 m of a street view's eye
+  through AG8's geometry-nodes instancer. Results: `docs/progress/AG13/`.
 
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
 and `props` print a line per stage, a bar (n of N, time left) where the count is known and
