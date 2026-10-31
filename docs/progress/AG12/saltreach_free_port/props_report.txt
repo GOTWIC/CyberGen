@@ -46,5 +46,5 @@ instances by species:
   elm: 149
 signs: billboard.facade 65, billboard.roof 478, holo_ad.roof 44, neon.neon 204, shop_sign.channel 75, shop_sign.led 2616, shop_sign.lightbox 2415, shop_sign.neon 1742
 scripts: hangul 800, hanzi 3683, kana 74, latin 3082
-files: 34 families made, 59 tiles made, 0 kept, 0 written, 0 removed
-seconds: gather 0.64, families 2.58, tiles 3.9, write 0.33, total 7.5, workers 3
+files: 0 families made, 0 tiles made, 59 kept, 0 written, 0 removed
+seconds: gather 0.58, families 0.07, tiles 0.11, write 0.3, total 1.11, workers 2

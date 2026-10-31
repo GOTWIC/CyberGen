@@ -47,5 +47,5 @@ instances by species:
   date_palm: 177
 signs: billboard.facade 208, billboard.roof 1013, holo_ad.roof 49, neon.neon 468, shop_sign.channel 78, shop_sign.led 4815, shop_sign.lightbox 4364, shop_sign.neon 3633
 scripts: hangul 1504, hanzi 6628, kana 467, latin 6029
-files: 35 families made, 98 tiles made, 0 kept, 0 written, 0 removed
-seconds: gather 1.15, families 2.73, tiles 6.89, write 0.55, total 11.42, workers 3
+files: 0 families made, 0 tiles made, 98 kept, 0 written, 0 removed
+seconds: gather 1.02, families 0.09, tiles 0.22, write 0.52, total 1.93, workers 2

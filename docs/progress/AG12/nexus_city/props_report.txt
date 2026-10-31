@@ -48,5 +48,5 @@ instances by species:
   ficus: 74
 signs: billboard.facade 310, billboard.roof 1321, holo_ad.roof 42, neon.neon 694, shop_sign.channel 33, shop_sign.led 5382, shop_sign.lightbox 5289, shop_sign.neon 4442
 scripts: hangul 2560, hanzi 5282, kana 2149, latin 7522
-files: 36 families made, 104 tiles made, 0 kept, 0 written, 0 removed
-seconds: gather 1.45, families 3.01, tiles 8.51, write 0.63, total 13.71, workers 3
+files: 0 families made, 0 tiles made, 104 kept, 0 written, 0 removed
+seconds: gather 1.15, families 0.1, tiles 0.27, write 0.63, total 2.25, workers 2

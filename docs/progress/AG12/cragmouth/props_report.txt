@@ -48,5 +48,5 @@ instances by species:
   scrub: 30
 signs: billboard.facade 331, billboard.roof 1627, holo_ad.roof 38, neon.neon 813, shop_sign.channel 33, shop_sign.led 6098, shop_sign.lightbox 4468, shop_sign.neon 5408
 scripts: cyrillic 97, hangul 1269, hanzi 6844, kana 1699, latin 8907
-files: 36 families made, 110 tiles made, 0 kept, 0 written, 0 removed
-seconds: gather 1.61, families 3.52, tiles 10.52, write 2.35, total 18.13, workers 3
+files: 0 families made, 0 tiles made, 110 kept, 0 written, 0 removed
+seconds: gather 1.38, families 0.1, tiles 0.28, write 0.63, total 2.49, workers 2
