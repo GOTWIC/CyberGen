@@ -565,20 +565,28 @@ def _passes(m: CityModel):
     """Who a walkway may pass into: its own building (a door or lobby path), the buildings of
     its skybridge, its megasite, its station's host tower."""
     host = {s.id: s.building_id for s in m.stations if s.building_id}
+    # (a station at a megasite, a transit nexus: its walkways enter the site's buildings)
+    at_site: dict = {}
+    for ms in m.megasites:
+        poly = G.from_model_poly(ms.polygon)
+        for s in m.stations:
+            if poly.covers(Point(s.position[:2])):
+                at_site.setdefault(s.id, set()).add(ms.id)
+    sky = {s.id: s.building_ids for s in m.skybridges}
 
     def own_of(w):
         a = w.attrs or {}
         ids = set()
         if a.get("building"):
             ids.add(a["building"])
-        if a.get("skybridge"):
-            sb = next((s for s in m.skybridges if s.id == a["skybridge"]), None)
-            if sb is not None:
-                ids.update(sb.building_ids)
+        if a.get("skybridge") in sky:
+            ids.update(sky[a["skybridge"]])
         if a.get("station") in host:
             ids.add(host[a["station"]])
-        site = a.get("megasite")
-        return lambda b: b.id in ids or (site is not None and b.megasite_id == site)
+        sites = set(at_site.get(a.get("station"), ()))
+        if a.get("megasite"):
+            sites.add(a["megasite"])
+        return lambda b: b.id in ids or (b.megasite_id is not None and b.megasite_id in sites)
 
     return own_of
 

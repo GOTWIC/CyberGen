@@ -771,10 +771,10 @@ def link_entrances(out: Out, walks: list) -> list:
     lvs = {lv: _Level([pos_of[i] for i in per[lv]], lines, walks, gi, land_of)
            for lv in levels if per[lv]}
     relinked = unlinked = moved = 0
+    masses = _Masses(out.buildings)
     if ents:
         pts = shapely.points(np.array([e.position for _, e in ents], dtype=np.float64))
         ent_land = _landmass_index(out.landmasses, [e.position for _, e in ents])
-        masses = _Masses(out.buildings)
         for k, (rec, e) in enumerate(ents):
             lv = lvs[rec.level if rec.level in lvs else 0]
             best = lv.nearest(pts[k], ent_land[k])
@@ -851,6 +851,12 @@ def link_entrances(out: Out, walks: list) -> list:
     for (sid, p), lm in zip(out.site_links, link_land):
         best = lvs[0].nearest(Point(p), lm)
         foot = _foot(lines, walks, gi, best, p)
+        if not masses.clear(p, foot, 0):
+            # (park paths fix: a gate's path reaches a walkway with no building between)
+            alt = lvs[0].reachable(Point(p), lm, lambda i, p=p: masses.clear(
+                p, _foot(lines, walks, gi, i, p), 0))
+            if alt is not None:
+                best, foot = alt, _foot(lines, walks, gi, alt, p)
         splits.setdefault(best, []).append(foot)
         if foot != tuple(p):
             new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True},

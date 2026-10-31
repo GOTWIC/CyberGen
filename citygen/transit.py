@@ -63,7 +63,8 @@ from . import dmath as M
 from . import geom as G
 from . import presets
 from . import trace as T
-from .buildout import _foot, _ground, _landmass_index, _nearest_on, _neighbors, _split, wk_max
+from .buildout import (RELINK_M, _foot, _ground, _landmass_index, _Masses, _nearest_on,
+                       _neighbors, _split, wk_max)
 from .roads import _arc_line, _fillet_radii
 
 CELL_M = 15.0
@@ -3195,12 +3196,24 @@ class Builder:
         self.stations: list = []
         self.nst = 0
         self.sw = sidewalk_index(c.m)
+        self.masses = _Masses(c.m.buildings)
 
     def foot(self, p) -> tuple[tuple, float]:
         lm = _landmass_index(self.lms, [p])[0]
         best = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of,
                            Point(p), lm)
         f = _foot(self.glines, self.walks, self.gi, best, p)
+        if not self.masses.clear(p, f, 0):
+            # (park paths fix: the nearest ground walkway it reaches with no building between)
+            ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
+                                                   distance=RELINK_M)]
+            ks = [h for h in ks if lm < 0 or self.land_of[h] == lm]
+            for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
+                                               self.walks[self.gi[h]]["id"])):
+                f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                if self.masses.clear(p, f2, 0):
+                    best, f = h, f2
+                    break
         self.splits.setdefault(best, []).append(f)
         return f, _d(f, p)
 
