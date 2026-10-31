@@ -13,8 +13,10 @@ textured Blender renders.
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
   part, skybridge and street piece at once), the section across the biggest M14 deck
-  (`deck`, AG10: the blockout's deck camera, its near clip on the cut), or cameras of one's
-  own (`--eye`, `--target`).
+  (`deck`, AG10: the blockout's deck camera, its near clip on the cut), AG12's water shows
+  (`water`: a canal and a river bank up close, the harbor from above), or cameras of one's
+  own (`--eye`, `--target`). AG12's water (surfaces, beds, banks, riprap stones) comes into
+  every view near it, in place of the blockout's water.
 - **board**: a material board per era (its wall sets, roof, trims, metals, a window with
   its rooms) and one of the street sets, each a slab of the material under a low sun.
 
@@ -149,16 +151,19 @@ def run(args, progress=None) -> dict:
     bo = Path(args.blockout) if args.blockout else bdir
     cams = PV.cameras(bdir, bo)
     which = set(args.views or ["districts", "street"])
-    kinds = {"city", "city_full", "districts", "street", "deck"}
+    kinds = {"city", "city_full", "districts", "street", "deck", "water"}
     views = PV.plan_views(man, cams, args.width, which & kinds)
     if "deck" in which and cams.get("deck"):
         from ..streets.ctx import Ground
         ox, oy = cams["deck"]["origin"]
         views.append(deck_view(man, cams["deck"], args.width, Ground(model).at(ox, oy)))
+    if "water" in which:
+        views += water_views(model, man, args.width)
     named = [v for v in (args.views or []) if v not in kinds]
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
-        views = [v for v in allv if v["name"] in named]
+        views = [v for v in allv if v["name"] in named] + \
+            [v for v in water_views(model, man, args.width) if v["name"] in named]
     for k, (eye, tgt) in enumerate(zip(args.eye, args.target), 1):
         near = [t for t in man["tiles"] if _tile_near(t, tgt, PV.STREET_R)]
         views.append({"name": f"custom_{k}", "ortho": False, "lens": args.lens,
@@ -181,6 +186,7 @@ def run(args, progress=None) -> dict:
                 v["lights"] = _lights(model, v["eye"], LIGHT_R)
             st.advance()
         ag8 = _ag8(adir, views)
+        wat = _water(adir, views)
     modes = ["night"] if args.only_night else (["day", "night"] if args.night else ["day"])
     job = {"assets": str(adir), "out": str(od), "views": views, "modes": modes,
            "blend": str(bo / "city.blend"), "materials": mats["parts"],
@@ -188,11 +194,155 @@ def run(args, progress=None) -> dict:
            "removed": sorted({e["key"] for e in con["entries"] + conn["entries"]} |
                              {r for e in con["entries"] for r in e.get("replaces", [])} |
                              {g for v in (man.get("green_replaces") or {}).values() for g in v}
-                             | set((ag8 or {}).get("removed", []))),
+                             | set((ag8 or {}).get("removed", []))
+                             | set((wat or {}).get("removed", []))),
+           "water_parts": (wat or {}).get("parts"),
            "ag8_families": (ag8 or {}).get("families", []),
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
            "era_slots": sorted(CT.ERA_SLOTS)}
     return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))
+
+
+WATER_R = 700.0          # AG12: the water tiles of a view within this of its eye or target
+STONES_R = 320.0         # ... and its riprap stones within this of its eye
+
+
+def water_views(model, man: dict, width: int) -> list[dict]:
+    """AG12's shows (`--views water`): `water_canal`, along the longest quayed canal from
+    over its water; `water_bank`, a river's longest natural or riprap bank from the land
+    beside it; `water_harbor`, the biggest harbor basin (else the sea's harbor water) from
+    above."""
+    from citygen import geom as G
+    from ..streets.ctx import Ground
+    gd = Ground(model)
+    h = int(width * 9 / 16)
+    out = []
+
+    def tiles(p):
+        return sorted(t for t in man["tiles"] if _tile_near(t, p, 600.0))
+
+    def level(wid, x, y):
+        return gd.water_level(wid, 0.0) if not gd.flat else gd.surface.get(wid, -1.5)
+    ww = {w.id: w for w in model.waterways}
+    quays = [q for q in model.quays if ww.get(q.waterway_id) is not None and
+             ww[q.waterway_id].kind == "canal" and len(ww[q.waterway_id].centerline) >= 2]
+    if quays:
+        q = max(quays, key=lambda q: (_plen(q.line), q.id))
+        w = ww[q.waterway_id]
+        cl = [tuple(p) for p in w.centerline]
+        s = _straight(cl, 60.0)
+        a = _at(cl, s)
+        tx, ty = _dir(cl, s, 60.0)
+        z = level(w.id, *a)
+        out.append({"name": "water_canal", "ortho": False, "lens": 24.0,
+                    "eye": [a[0], a[1], z + 2.6],
+                    "target": [a[0] + tx * 60.0, a[1] + ty * 60.0, z + 0.6],
+                    "w": width, "h": h, "shell_tiles": tiles(a)})
+    rivers = {e.id for e in [*model.rivers, *model.channels]}
+    bks = [k for k in model.banks if k.water_id in rivers and
+           k.kind in ("natural_bank", "riprap") and _plen(k.line) > 80.0]
+    if bks:
+        k = max(bks, key=lambda k: (_plen(k.line), k.id))
+        pts = [tuple(p) for p in k.line]
+        s = _straight(pts, 50.0)
+        x, y = _at(pts, s)
+        tx, ty = _dir(pts, s, 50.0)
+        lx, ly = -ty, tx                          # (the water's side, left of the line)
+        z = level(k.water_id, x, y)
+        g = gd.at(x, y)
+        eye = [x - lx * 4.0, y - ly * 4.0, g + 2.4]
+        tgt = [x + lx * (k.width_m + 10.0) + tx * 45.0, y + ly * (k.width_m + 10.0) + ty * 45.0,
+               z]
+        out.append({"name": "water_bank", "ortho": False, "lens": 28.0, "eye": eye,
+                    "target": tgt, "w": width, "h": h, "shell_tiles": tiles((x, y))})
+    basins = [w for w in model.waterways if w.kind in ("basin", "marina")]
+    c = None
+    if basins:
+        b = max(basins, key=lambda w: (G.area(G.from_model_poly(w.polygon)), w.id))
+        p = G.from_model_poly(b.polygon).centroid
+        c = (p.x, p.y)
+    elif model.seas and model.seas[0].exposure:
+        zs = [e for e in model.seas[0].exposure if e.kind == "harbor"] or \
+            [e for e in model.seas[0].exposure if e.kind == "sheltered"]
+        if zs:
+            e = max(zs, key=lambda e: G.area(G.from_model_poly(e.polygon)))
+            p = G.from_model_poly(e.polygon).centroid
+            c = (p.x, p.y)
+    if c is not None:
+        out.append({"name": "water_harbor", "ortho": False, "lens": 35.0,
+                    "eye": [c[0] - 160.0, c[1] - 420.0, 330.0], "target": [c[0], c[1], 0.0],
+                    "w": width, "h": h, "shell_tiles": tiles(c), "far": True})
+    return out
+
+
+def _dir(pts, s: float, d: float) -> tuple[float, float]:
+    """The unit direction from the point at s to the point at s + d along a polyline."""
+    (x0, y0), (x1, y1) = _at(pts, s), _at(pts, min(s + d, _plen(pts)))
+    n = max(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5, 1e-6)
+    return (x1 - x0) / n, (y1 - y0) / n
+
+
+def _straight(pts, d: float) -> float:
+    """Where along a polyline the straightest stretch of length d starts (every 5 m: the
+    smallest turn between its first and last 5 m, ties to the first)."""
+    L = _plen(pts)
+    best, out = None, 0.0
+    s = 0.0
+    while s + d <= L or s == 0.0:
+        a = _dir(pts, s, 5.0)
+        b = _dir(pts, max(0.0, min(s + d, L) - 5.0), 5.0)
+        turn = 1.0 - (a[0] * b[0] + a[1] * b[1])
+        if best is None or turn < best - 1e-9:
+            best, out = turn, s
+        s += 5.0
+        if s + d > L:
+            break
+    return out
+
+
+def _plen(pts) -> float:
+    return sum(((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:]))
+
+
+def _at(pts, s: float) -> tuple[float, float]:
+    acc = 0.0
+    for a, b in zip(pts, pts[1:]):
+        d = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+        if acc + d >= s and d > 0:
+            f = (s - acc) / d
+            return a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+        acc += d
+    return tuple(pts[-1])
+
+
+def _water(adir: Path, views: list) -> dict | None:
+    """AG12's water for the views (its contribution): the parts pack, the blockout keys it
+    replaces and drops, per view the water tiles near it and the riprap stones near its eye
+    (world transforms)."""
+    wp = adir / "unreal_contribution.water.json"
+    if not wp.is_file():
+        return None
+    cw = json.loads(wp.read_text(encoding="utf-8"))
+    removed = sorted({k for e in cw["entries"] for k in [e["key"]] + list(e.get("replaces", []))})
+    wtiles = sorted({e["tile"] for e in cw["entries"] if e.get("tile")})
+    for v in views:
+        r = WATER_R * (2.0 if v.get("far") else 1.0)
+        v["water_tiles"] = [t for t in wtiles if _tile_near(t, v["eye"], r) or
+                            _tile_near(t, v["target"], r)]
+        if v["ortho"]:
+            v["water_tiles"] = sorted(set(v["water_tiles"]) | (set(v["shell_tiles"]) &
+                                                               set(wtiles)))
+        pts: dict[str, list] = {}
+        for e in cw["entries"]:
+            px, py, pz = e.get("pivot", [0.0, 0.0, 0.0])
+            for q in e.get("parts", []):
+                for xf in q["xforms"]:
+                    x, y = xf[0] + px, xf[1] + py
+                    if not v["ortho"] and _near((x, y), v["eye"], STONES_R):
+                        pts.setdefault(q["node"], []).append(
+                            [x, y, xf[2] + pz, xf[3]] + list(xf[4:7]))
+        v["water_points"] = dict(sorted(pts.items()))
+    return {"parts": str((adir / "water" / "parts.glb").resolve()), "removed": removed}
 
 
 DECK_R = 420.0          # the deck section's tiles: within this of its plane's middle

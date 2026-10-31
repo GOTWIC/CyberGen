@@ -23,6 +23,7 @@ meshes read back) against the model (M16's beds, banks and levels, M13's levels)
 
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -367,7 +368,6 @@ class _Locator:
 
 
 def _streets(assets: Path) -> dict | None:
-    import json
     f = assets / "streets" / "manifest.json"
     if not f.is_file():
         return None

@@ -118,6 +118,7 @@ def make_tile(tile: str, pieces: list[dict]) -> dict:
         slots |= {m.slot for m in out.bed} | {m.slot for lod in out.lods for m in lod}
         if out.mesh is not None and out.mesh.triangles:
             slots |= set(out.mesh.slots)
+        slots |= {m.slot for m in out.nm}
     g = Gltf(generator=f"assetgen {__version__} water")
     mats = MT.gltf_materials(g, slots)
     recs = {}
@@ -149,16 +150,34 @@ def make_tile(tile: str, pieces: list[dict]) -> dict:
             rec["triangles"] = rec.get("bed", {}).get("triangles", 0) + (
                 lods[0]["triangles"] if lods else 0)
         else:
-            if out.mesh is not None and out.mesh.triangles:
-                mi = g.mesh(pd["id"], out.mesh.finish(mats))
-                g.node(pd["id"], mi, translation=trans, root=True, extras={"kind": pd["kind"]})
-                lo, hi = out.mesh.bounds_mm()
-                rec.update(triangles=out.mesh.triangles, slots=sorted(out.mesh.slots),
-                           bounds=[[C.m(o[0] + lo[0] / 1000.0), C.m(o[1] + lo[1] / 1000.0),
-                                    C.m(lo[2] / 1000.0)],
-                                   [C.m(o[0] + hi[0] / 1000.0), C.m(o[1] + hi[1] / 1000.0),
-                                    C.m(hi[2] / 1000.0)]],
-                           checks={k: v for k, v in kit_check(out.mesh.slots).items() if v})
+            prims, tris, bad = [], 0, {}
+            kit = out.mesh is not None and out.mesh.triangles
+            if kit:
+                prims += out.mesh.finish(mats)
+                tris += out.mesh.triangles
+                bad.update({k: v for k, v in kit_check(out.mesh.slots).items() if v})
+            nms = [m for m in out.nm if m.triangles]
+            if nms:
+                prims += [_prim(m, mats) for m in nms]
+                tris += sum(m.triangles for m in nms)
+                for k, v in check_nmesh(nms).items():
+                    bad[k] = bad.get(k, 0) + v
+            if prims:
+                g.node(pd["id"], g.mesh(pd["id"], prims), translation=trans, root=True,
+                       extras={"kind": pd["kind"]})
+                b = _bounds(nms, o) or [[0, 0, 0], [0, 0, 0]]
+                if kit:
+                    lo, hi = out.mesh.bounds_mm()
+                    kb = [[C.m(o[0] + lo[0] / 1000.0), C.m(o[1] + lo[1] / 1000.0),
+                           C.m(lo[2] / 1000.0)],
+                          [C.m(o[0] + hi[0] / 1000.0), C.m(o[1] + hi[1] / 1000.0),
+                           C.m(hi[2] / 1000.0)]]
+                    b = kb if not nms else [[min(u, v) for u, v in zip(b[0], kb[0])],
+                                            [max(u, v) for u, v in zip(b[1], kb[1])]]
+                rec.update(triangles=tris,
+                           slots=sorted(({m.slot for m in nms}) |
+                                        (set(out.mesh.slots) if kit else set())),
+                           bounds=b, checks=bad)
             else:
                 rec["triangles"] = 0
         if out.empty:
@@ -178,7 +197,6 @@ def _make_job(args):
 
 
 def parts_glb() -> tuple[bytes, dict]:
-    from ..streets import materials as SMT  # noqa: F401  (the slot colors' helper)
     g = Gltf(generator=f"assetgen {__version__} water parts")
     meshes = [(f"part.riprap.r{k}", MK.stone_part(k)) for k in range(MK.RIPRAP_VARIANTS)]
     slots = set()

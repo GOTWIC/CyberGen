@@ -595,6 +595,100 @@ them (`SetLodFromStaticMesh`, `SetLodScreenSizes`), its actor without collision;
 instead of graphs.json's (on a terrain city the ground under them, graphs.json's z there,
 is added); the new keys in the re-import digests.
 
+## assetgen's water contribution (AG12)
+
+`assetgen water BUILD` (and `assetgen build`, after the streets) writes
+`BUILD/assets/unreal_contribution.water.json` beside its packs (`BUILD/assets/water/<tile>.glb`,
+one per 256 m tile; `water/parts.glb`, the riprap stones), in AG0's format with `"part":
+"water"`, layer 2:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "water", "layer": 2,
+ "masters": ["bed", "concrete", "water"],
+ "materials": {"water.sea": {"master": "water", "textures": {"NormalTex":
+                "atlas.water.normal", "FoamTex": "atlas.water.foam"},
+                "scalars": {"Clarity": 6.0, "FlowScale": 1.0, "FoamAmount": 1.0,
+                            "WaveHeight": 0.55, "WaveLength": 26.0, "RippleTileM": 8.0},
+                "vectors": {"Scatter": [0.02, 0.07, 0.08], "Absorb": [0.45, 0.11, 0.08],
+                            "Shallow": ["..."], "Deep": ["..."]}, "...": "..."},
+               "bed.sand": {"master": "bed", "textures": {"BaseTex": "set.bed_sand.base",
+                            "Caustics": "atlas.water.caustics", "...": "..."}}, "...": {}},
+ "entries": [
+  {"key": "sea.water.t-03+01", "kind": "water.surface.sea", "replaces": ["city.sea.t-03+01"],
+   "glb": "water/t-03+01.glb", "node": "sea.water.t-03+01.lod0", "nanite": false,
+   "collision": {"none": true}, "ids": ["sea"], "pivot": [-640.0, 384.0, 0.0],
+   "lods": [{"node": "sea.water.t-03+01.lod0", "screen_size": 1.0, "triangles": 33012},
+            {"node": "...lod1", "screen_size": 0.4}, {"node": "...lod2", "screen_size": 0.15},
+            {"node": "...lod3", "screen_size": 0.05}], "...": "..."},
+  {"key": "sea.bed.t-03+01", "kind": "water.bed", "replaces": ["city.bed.t-03+01"],
+   "nanite": true, "collision": {"complex": true}, "...": "..."},
+  {"key": "sea.bank.w568n284", "kind": "water.bank.riprap",
+   "replaces": ["d02.bank_riprap.t-03+01"], "nanite": true, "collision": {"complex": true},
+   "parts": [{"kind": "part.riprap.r3", "glb": "water/parts.glb", "node": "part.riprap.r3",
+              "collision": {"none": true},
+              "xforms": [[-2.4, 1.1, -1.62, 213.4, 0.92, 0.81, 0.69], "..."]}], "...": "..."},
+  {"key": "water.blockout", "kind": "water.drop", "drop": true,
+   "replaces": ["city.sea.t+05+05", "d04.bank_quay.t+03-05", "..."]}],
+ "underwater": {"sea": {"water": "sea", "tint": [0.35, 0.62, 0.7], "fog": 0.06}, "...": {}}}
+```
+
+- **Keys**: per water body and tile, the surface `<body>.water.<tile>` and the bed
+  `<body>.bed.<tile>` (a body's own water: its polygon less the bodies before it in M16's
+  order, so no two overlap); per bank AG12 draws (natural, beach, marsh edge, riprap, road
+  embankment, and canal walls along rivers and the sea) its id. `replaces`: a surface the
+  tile's `city.sea.<tile>` (the sea) or `city.water.<tile>` (inland water), a bed the
+  tile's `city.bed.<tile>`, a bank its joined `<district>.bank_<kind>.<tile>`. The drop
+  entry (`water.blockout`) takes away the blockout's water objects no piece replaces: sea
+  sheets of tiles with no sea (they lie under the land, and under inland water 5 cm under
+  its surface they would show through the water), and the `bank_quay` and the waterways'
+  `bank_canal_wall` bands, which AG7's quay and canal wall pieces draw.
+- **Surfaces**: non-Nanite (Nanite does not take Single Layer Water), no collision (M16's
+  swim volumes are the water), a LOD chain on coarser lattices (the sea 2, 4, 8 and 16 m,
+  inland water 4, 8 and 16 m; screen sizes 1.0, 0.4, 0.15, 0.05). Vertex data the master
+  reads: UV0 the plan in meters (x east, y north), UV1 the current in m/s (x east, y
+  north: Unreal's y is citygen's -y, the master turns it over), COLOR_0 R the foam mask
+  (walls, waterlines, bridge piers), G the depth over 12 m, B the sea's wave weight (M16's
+  exposure, open 1, sheltered 0.5, harbor 0.15, nothing at the waterline). The packs keep
+  their vertex colors and full-precision UVs, with no lightmap UVs over UV1 (the importer's
+  water pipeline).
+- **Beds**: Nanite, complex collision (the floor under a swimmer), UV0 the plan in meters
+  (a steep step's triangles on vertices of their own, UV0 on the vertical plane they face),
+  UV1.x the depth (the caustics' strength). On a terrain city the bed lies 0.1 m over M13's
+  ground grid, which carries M16's beds under the water too.
+- **Banks**: Nanite, complex collision; riprap stones as an instanced actor per bank and
+  stone kind (six meshes in `water/parts.glb`; x, y, z, yaw, sx, sy, sz relative to the
+  pivot), no collision.
+- **Underwater**: per body its water kind's post-process tint and fog density; the
+  exporter puts a post-process volume beside each of M16's swim boxes of that body.
+
+**What the exporter does with water** (in this milestone): the third layer-2 part read
+like the streets' (AG12 writes its colors as sRGB: `SRGB_PARTS`), its packs imported with
+the water pipeline (vertex colors replaced, full-precision UVs, no lightmap UVs), the
+surfaces' LOD chains made from their LOD nodes as the sky tube glass's; the masters:
+- `M_CgWater` (`water_master`): the Single Layer Water shading model (its output node's
+  scattering and absorption coefficients from the water kind's `Scatter` and `Absorb`, so
+  the color deepens with the depth the shading model measures behind the surface; phase
+  0.1), ripple normals from the water atlas sampled twice along the current (UV1, a flow
+  map's two phases blended by their distance from the phase's middle, scaled by
+  `FlowScale`, tiled every `RippleTileM`), foam from the vertex mask and the shallows (the
+  vertex depth under 0.6 m) over the atlas's foam lace, drawn over the water by Opacity
+  (white, rough), and the sea's waves by world position offset: four Gerstner waves on
+  absolute world position (`WaveHeight`, `WaveLength`, the vertex's wave weight), faded out
+  between 150 and 350 m from the camera, so a coarser LOD's edges never meet a finer one's
+  moving, their slope added to the normal. Decision 13.10 (a): no Water plugin; an engine
+  whose Python lacks the shading model's output node gets opaque reflective water instead
+  (logged).
+- `M_CgBed`: the textured surface (`textured_surface`, the bed's set by M16's material:
+  mud, silt, sand, gravel, stone) with caustics as emission: the water atlas's two
+  networks scrolled across each other on the world plan (`CausticTileM`), only under the
+  water (UV1.x over 0.08 m), fading to nothing at 9 m and by night (`MPC_CityGen.Night`).
+- An unbound-off `PostProcessVolume` per swim box of a body (`underwater.<water>.<tile>.<k>`,
+  in `CityGen/underwater`, the swim box's size): the water kind's scene color tint,
+  saturation 0.75, a vignette and the focal distance of its fog; tags as the swim volumes'
+  (`cg.type=underwater`). `actor_hashes`, `actor_kinds` (`underwater`) and
+  `manifest_changes` take them, `stage2.counts.underwater_volumes`.
+`STAGE2_VERSION` 7 rebuilds the masters.
+
 ## assetgen's props and signs contributions (AG8)
 
 `assetgen props BUILD` (and `assetgen build`, last) writes two layer-2 contributions beside

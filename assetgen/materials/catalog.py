@@ -25,6 +25,12 @@ AG8's props, plants and signs (`PROP`, `prop_set`): their slots tinted by the sl
 color as the streets', the leaf cards on `leaves` (the leaf clump tile, cut where it has no
 leaf), sign faces on `sign` with the city's sign page (`page.<page>`), holo-ad screens on
 `holo` with the holo ad page.
+
+AG12's water (`WATER_SLOT`, `WATER`): a surface per water kind on `water` (Single Layer
+Water in Unreal: the kind's scattering and absorption, so a clear sea deepens slowly and a
+marsh goes murky within a meter; its flow speed, foam and the sea's waves; ripples and foam
+from the water atlas), the beds on `bed` (their set, M16's material, with the water atlas's
+caustics), the banks, walls and riprap stones on `concrete` with their sets.
 """
 
 from __future__ import annotations
@@ -210,9 +216,49 @@ PROP_PREFIX: dict[str, tuple[str, str | None]] = {
     "screen": ("emissive", None), "neon": ("neon", None), "lit": ("emissive", None),
     "holo": ("holo", None), "page": ("sign", None), "holopage": ("holo", None),
 }
-TEXTURED = ("facade", "concrete", "metal", "road", "foliage", "leaves")
+# AG12's water slots (`assetgen/water/materials.py`) to (master, set or None); the
+# surfaces' `water.<kind>` on `water` with the kind's `WATER` parameters
+WATER_SLOT: dict[str, tuple[str, str | None]] = {
+    "bed.silt": ("bed", "bed_silt"), "bed.mud": ("bed", "bed_mud"),
+    "bed.sand": ("bed", "bed_sand"), "bed.gravel": ("bed", "bed_gravel"),
+    "bed.stone": ("bed", "bed_stone"),
+    "bank.natural_bank": ("concrete", "bank_soil"), "bank.beach": ("concrete", "bed_sand"),
+    "bank.marsh_edge": ("concrete", "bed_mud"), "bank.riprap": ("concrete", "bank_rubble"),
+    "bank.road_embankment": ("concrete", "stone_blocks"),
+    "wall.stone": ("concrete", "stone_blocks"), "wall.coping": ("concrete", "stone_dressed"),
+    "stone.riprap": ("concrete", "bank_rock"),
+}
+# per water kind: `scatter` and `absorb` (linear RGB; Single Layer Water's coefficients per
+# meter: the water's own color, and how fast each channel fades, red first), `shallow` and
+# `deep` (linear RGB: the color over a shallow and a deep bed, the previews'), `clarity_m`
+# (how far one sees into it), `flow` (the ripples' speed over M16's current), `foam` (the
+# vertex foam's strength), `waves_m` and `wave_length_m` (the open sea's swell; M16's
+# exposure weighs it per vertex), `ripple_m` (the ripple normals' tile)
+WATER: dict[str, dict] = {
+    "sea": {"scatter": [0.02, 0.07, 0.08], "absorb": [0.45, 0.11, 0.08],
+            "shallow": [0.16, 0.36, 0.36], "deep": [0.008, 0.045, 0.065], "clarity_m": 6.0,
+            "flow": 1.0, "foam": 1.0, "waves_m": 0.55, "wave_length_m": 26.0,
+            "ripple_m": 8.0},
+    "river": {"scatter": [0.035, 0.06, 0.045], "absorb": [0.65, 0.3, 0.3],
+              "shallow": [0.2, 0.28, 0.2], "deep": [0.02, 0.04, 0.03], "clarity_m": 2.5,
+              "flow": 1.0, "foam": 0.7, "waves_m": 0.0, "wave_length_m": 26.0,
+              "ripple_m": 6.0},
+    "canal": {"scatter": [0.03, 0.055, 0.045], "absorb": [0.75, 0.35, 0.35],
+              "shallow": [0.17, 0.25, 0.2], "deep": [0.02, 0.04, 0.035], "clarity_m": 2.0,
+              "flow": 1.0, "foam": 0.5, "waves_m": 0.0, "wave_length_m": 26.0,
+              "ripple_m": 5.0},
+    "ornamental": {"scatter": [0.04, 0.11, 0.13], "absorb": [0.28, 0.07, 0.05],
+                   "shallow": [0.3, 0.55, 0.55], "deep": [0.04, 0.12, 0.15],
+                   "clarity_m": 10.0, "flow": 0.3, "foam": 0.2, "waves_m": 0.0,
+                   "wave_length_m": 26.0, "ripple_m": 4.0},
+    "marsh": {"scatter": [0.05, 0.05, 0.02], "absorb": [1.1, 0.7, 0.9],
+              "shallow": [0.18, 0.18, 0.08], "deep": [0.03, 0.035, 0.015], "clarity_m": 0.8,
+              "flow": 0.6, "foam": 0.3, "waves_m": 0.0, "wave_length_m": 26.0,
+              "ripple_m": 5.0},
+}
+TEXTURED = ("facade", "concrete", "metal", "road", "foliage", "leaves", "bed")
 MASTERS = ("facade", "glass", "metal", "concrete", "road", "neon", "sign", "decal",
-           "opaque", "emissive", "translucent", "foliage", "leaves", "holo")
+           "opaque", "emissive", "translucent", "foliage", "leaves", "holo", "water", "bed")
 
 
 def _master_of_building(slot: str) -> tuple[str, str | None]:
@@ -243,6 +289,10 @@ def set_for(slot: str, era: str | None, part: str = "buildings") -> tuple[str, s
     `connections` (skybridges) read the building table."""
     if part == "streets":
         return STREET.get(slot, ("concrete", "concrete_smooth"))
+    if part == "water":
+        if slot.startswith("water."):
+            return "water", None
+        return WATER_SLOT.get(slot, ("concrete", "concrete_smooth"))
     if part in ("props", "signs"):
         return prop_set(slot)
     master, s = _master_of_building(slot)
@@ -270,6 +320,16 @@ def material(slot: str, era: str | None, lib: dict, part: str = "buildings") -> 
     scalars and vectors (the contribution's and the Blender preview's)."""
     master, s = set_for(slot, era, part)
     rec: dict = {"master": master, "textures": {}, "scalars": {}, "vectors": {}}
+    if master == "water":
+        w = WATER[slot.split(".", 1)[1]]
+        rec["textures"] = {"NormalTex": atlas_tex("water", "normal"),
+                           "FoamTex": atlas_tex("water", "foam")}
+        rec["scalars"] = {"Clarity": w["clarity_m"], "FlowScale": w["flow"],
+                          "FoamAmount": w["foam"], "WaveHeight": w["waves_m"],
+                          "WaveLength": w["wave_length_m"], "RippleTileM": w["ripple_m"]}
+        rec["vectors"] = {k.capitalize(): list(w[k]) for k in ("scatter", "absorb",
+                                                                "shallow", "deep")}
+        return rec
     if master == "decal":
         from .atlases import DECAL_CELLS
         rec["textures"] = {"BaseTex": atlas_tex("decals", "base"),
@@ -288,8 +348,11 @@ def material(slot: str, era: str | None, lib: dict, part: str = "buildings") -> 
         rec["set"] = s
     else:
         rec["scalars"]["Textured"] = 0.0
-    if master in ("facade", "metal", "concrete", "road", "foliage", "glass"):
+    if master in ("facade", "metal", "concrete", "road", "foliage", "glass", "bed"):
         rec["textures"]["Macro"] = atlas_tex("macro", "macro")
+    if master == "bed":
+        rec["textures"]["Caustics"] = atlas_tex("water", "caustics")   # (AG12)
+        rec["scalars"]["CausticTileM"] = 3.0
     if master in ("facade", "metal"):
         rec["textures"]["Decals"] = atlas_tex("decals", "base")
         rec["scalars"]["Streaks"] = 1.0 if part == "buildings" else 0.0

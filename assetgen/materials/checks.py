@@ -12,7 +12,8 @@ building's base that is not a roof, every street piece) needs the spec's
 `texel_density_px_m` (512), the others `texel_density_upper_px_m` (256). A triangle meets it
 at three quarters of that or more (UV0 runs along a road's center line, so the outer edge
 of a curve, a bevel or a cylinder stretches it), and the check passes when at least 99.5 %
-of each part's textured area (buildings, streets, AG8's props and signs) meets it; it lists
+of each part's textured area (buildings, streets, AG8's props and signs, AG12's water: its
+beds, under the water, at the upper density) meets it; it lists
 the slots and pieces below it. The packs are read back (every triangle of every pack;
 positions and UV0 only). A leaf card shows a whole leaf tile, so its density is the tile's
 pixels over the card's side.
@@ -108,7 +109,8 @@ FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
            ("connections", "connections", "t*.glb"), ("streets", "streets", "t*.glb"),
            ("props", "props/variants", "*.glb"),
            ("props", "props/plants", "*.glb"), ("props", "props/tiles", "t*.glb"),
-           ("signs", "props/signs", "t*.glb"))
+           ("signs", "props/signs", "t*.glb"),
+           ("water", "water", "t*.glb"), ("water", "water", "parts.glb"))
 
 
 def packs(assets: Path) -> int:
@@ -143,6 +145,8 @@ def texel_density(assets: Path, lib: dict, street_px: int, upper_px: int,
                 rho = rho * px_uv
                 if part == "buildings":
                     near = (zc < STREET_BAND_M) & (nz < 0.7)
+                elif part == "water" and st.get("band") == "upper":
+                    near = np.zeros(len(tri), dtype=bool)     # (AG12: beds, under water)
                 else:
                     near = np.ones(len(tri), dtype=bool)
                 need = np.where(near, street_px, upper_px)

@@ -123,7 +123,8 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
                                      MF.dumps(con)))
     doc = {"version": 1, "city": model.name, "library": con["library"],
            "parts": {}, "textures": {}}
-    for part in ("buildings", "connections", "streets", "props", "signs", "materials"):
+    for part in ("buildings", "connections", "streets", "water", "props", "signs",
+                 "materials"):
         p = out / f"unreal_contribution.{part}.json"
         if not p.is_file():
             continue

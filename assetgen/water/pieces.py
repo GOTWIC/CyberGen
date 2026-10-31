@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -52,7 +52,6 @@ class Piece:
     tile: str
     replaces: list[str]
     inputs: dict
-    covers: list[str] = field(default_factory=list)
 
     def digest(self) -> str:
         from .makers import VERSIONS
@@ -171,7 +170,7 @@ def gather(cx: WCtx) -> tuple[list[Piece], list[str]]:
     """The body and bank pieces of a city, and the blockout water objects none takes."""
     out: list[Piece] = []
     m = cx.m
-    if not cx.bodies or not m.banks and all(b.ent.depth_m is None for b in cx.bodies):
+    if not cx.bodies:
         return out, []
     taken: set[str] = set()
     with G.canonical():

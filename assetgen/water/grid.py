@@ -31,6 +31,11 @@ def mesh(region, box, cell: float) -> tuple[np.ndarray, np.ndarray]:
     if region is None or region.is_empty:
         return np.zeros((0, 2), dtype=np.int64), np.zeros((0, 3), dtype=np.int64)
     x0, y0, x1, y1 = box
+    # (on the millimeter grid first: the clipped pieces are then valid as they are rounded,
+    # with no sliver that rounds to a fold)
+    region = shapely.set_precision(region, 0.001)
+    if region.is_empty:
+        return np.zeros((0, 2), dtype=np.int64), np.zeros((0, 3), dtype=np.int64)
     gx = _lattice(x0, x1, cell)
     gy = _lattice(y0, y1, cell)
     nx, ny = len(gx) - 1, len(gy) - 1
@@ -63,7 +68,7 @@ def mesh(region, box, cell: float) -> tuple[np.ndarray, np.ndarray]:
             tris.append((a, b, c))
             tris.append((a, c, d))
         if edge.any():
-            for g in shapely.intersection(cells[edge], face).tolist():
+            for g in shapely.intersection(cells[edge], face, grid_size=0.001).tolist():
                 for p in _polys(g):
                     _piece(p, vid, tris)
     if not tris:
@@ -93,7 +98,13 @@ def _ring_mm(coords) -> list[tuple[int, int]]:
     return out
 
 
-def _piece(p, vid, tris) -> None:
+SPLIT_DEPTH = 4
+
+
+def _piece(p, vid, tris, depth: int = 0) -> None:
+    """A clipped cell piece, triangulated exactly; a piece the ear clipper cannot take whole
+    (a hole touching its outline at a point, a pinched spike: the same directed edge twice)
+    is split in halves, across its longer side, and each half taken again."""
     outer = _ring_mm(p.exterior.coords)
     holes = [_ring_mm(r.coords) for r in p.interiors]
     holes = [h for h in holes if len(h) >= 3]
@@ -102,14 +113,32 @@ def _piece(p, vid, tris) -> None:
     try:
         t = triangulate(outer, holes, keep_straight=True)
     except TriangulationError:
-        return
+        t = None
     allp = outer + [q for h in holes for q in h]
-    ids = [vid(q) for q in allp]
-    for a, b, c in t:
+    keep, seen, bad = [], set(), t is None
+    for a, b, c in t or ():
         pa, pb, pc = allp[a], allp[b], allp[c]
         if (pb[0] - pa[0]) * (pc[1] - pa[1]) - (pb[1] - pa[1]) * (pc[0] - pa[0]) <= 0:
             continue
-        tris.append((ids[a], ids[b], ids[c]))
+        for e in ((pa, pb), (pb, pc), (pc, pa)):
+            if e in seen:
+                bad = True
+            seen.add(e)
+        keep.append((pa, pb, pc))
+    if bad and depth < SPLIT_DEPTH:
+        x0, y0, x1, y1 = p.bounds
+        if x1 - x0 >= y1 - y0:
+            xm = round((x0 + x1) / 2.0, 3)
+            halves = [(x0, y0, xm, y1), (xm, y0, x1, y1)]
+        else:
+            ym = round((y0 + y1) / 2.0, 3)
+            halves = [(x0, y0, x1, ym), (x0, ym, x1, y1)]
+        for h in halves:
+            for q in _polys(shapely.intersection(p, shapely.box(*h), grid_size=0.001)):
+                _piece(q, vid, tris, depth + 1)
+        return
+    for pa, pb, pc in keep:
+        tris.append((vid(pa), vid(pb), vid(pc)))
 
 
 def normals(pos_mm: np.ndarray, tri: np.ndarray) -> np.ndarray:

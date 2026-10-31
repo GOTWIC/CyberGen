@@ -39,9 +39,9 @@ from citygen import water as WA
 SURFACE_GAP_M = 0.05        # the bed stays this far under the surface
 WALLS = ("quay", "canal_wall")
 WALL_FOAM_M = 2.5           # foam fades over this from a wall's face
-FOAM_M = {"natural_bank": 2.0, "riprap": 2.5, "road_embankment": 2.0, "beach": 7.0,
+FOAM_M = {"natural_bank": 1.5, "riprap": 2.5, "road_embankment": 2.0, "beach": 7.0,
           "marsh_edge": 3.0}
-FOAM_K = {"natural_bank": 0.8, "riprap": 1.0, "road_embankment": 0.9, "beach": 1.0,
+FOAM_K = {"natural_bank": 0.55, "riprap": 1.0, "road_embankment": 0.9, "beach": 1.0,
           "marsh_edge": 0.35}
 PIER_FOAM_M = 2.0
 WAVE_RAMP_M = 20.0          # waves grow from nothing at the waterline over this

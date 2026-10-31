@@ -848,6 +848,13 @@ def report_text(rep: dict) -> str:
                      f"{st['triangles']:,} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if st['ok'] else 'FAIL ' + ', '.join(st['failed'])}"
                      f" ({st['tiles_made']} tiles made, {st['seconds']} s; streets_report.txt)")
+    wa = rep.get("water")
+    if wa:
+        lines.append(f"water: {wa['bodies']} bodies, {wa['pieces']} pieces in {wa['tiles']} "
+                     f"tiles, {wa['triangles']:,} triangles, {wa['stones']:,} stones, "
+                     f"{wa['disk_bytes'] / 1e6:.1f} MB; "
+                     f"{'all checks pass' if wa['ok'] else 'FAIL ' + ', '.join(wa['failed'])}"
+                     f" ({wa['tiles_made']} tiles made, {wa['seconds']} s; water_report.txt)")
     pr = rep.get("props")
     if pr is not None:
         lines.append(f"props: {pr['variants']} variants, {pr['instances']:,} instances, "

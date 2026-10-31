@@ -512,7 +512,7 @@ STAGE2_FOLDER = "Assets"                    # under the city's content root
 # the Custom Primitive Data indices a stage 2 material may take its tint from (the masters
 # read a color at each: AG1's wall, trim, glass, roof, spandrel and patch tints)
 TINT_CPD = (0, 8, 11, 14, 17, 20)
-SRGB_PARTS = ("streets",)                   # AG7 writes its slot colors as sRGB (0 to 1)
+SRGB_PARTS = ("streets", "water")          # AG7 and AG12 write their slot colors as sRGB
 EMISSIVE2 = {"neon": 8.0, "emissive": 4.0, "holo": 3.0}  # a master's instances' emissive
 # AG6: textures imported once per project (the shared library, `set.` and `atlas.`) or per
 # city (its sign pages, `city.`), by pixel hash
@@ -561,6 +561,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
     owner: dict[str, str] = {}
     mats, packs, actors, insts, chains, textures = {}, {}, [], [], [], {}
     replaced, missing, files = set(), 0, []
+    under: dict[str, dict] = {}
     sha_of: dict[str, str] = {}
     tris_of: dict[str, dict[str, int]] = {}
 
@@ -609,6 +610,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
         part = c.get("part") or c.get("stage") or "stage2"
         files.append({"file": rel, "part": part, "stage": c.get("stage"), "sha256": sha,
                       "entries": len(c["entries"])})
+        under.update(c.get("underwater") or {})        # (AG12: per water body)
         for name, t in sorted((c.get("textures") or {}).items()):
             if t.get("kind") not in TEXTURE_KINDS:
                 raise ValueError(f"{rel}: texture {name}: kind {t.get('kind')} is not one of "
@@ -782,7 +784,19 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             if t["texture"] not in textures:
                 raise ValueError(f"material {k}: no texture {t['texture']}")
     masters = sorted({m["master"] for m in mats.values()})
+    # AG12: an underwater post-process volume beside each of M16's swim boxes of a body
+    uw = []
+    for s in man.get("swim", []):
+        u = under.get(s["water_id"])
+        if u is None:
+            continue
+        rec = {"key": "underwater." + s["key"].split(".", 1)[1], "water_id": s["water_id"],
+               "tile": s["tile"], "box": s["box"], "z": s["z"], "water": u["water"],
+               "tint": u["tint"], "fog": u["fog"]}
+        rec["hash"] = content_hash(rec)
+        uw.append(rec)
     return {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
+            "underwater": uw,
             "textures": dict(sorted(textures.items())),
             "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
             "actors": sorted(actors, key=lambda a: a["key"]),
@@ -795,7 +809,8 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                        "packs": len(out_packs),
                        "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
                        "materials": len(mats), "textures": len(textures),
-                       "heroes": sum(1 for a in actors if a.get("hero"))}}
+                       "heroes": sum(1 for a in actors if a.get("hero")),
+                       "underwater_volumes": len(uw)}}
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
@@ -913,6 +928,7 @@ def actor_hashes(man: dict) -> dict[str, str]:
         for k in s2["replaced"]:
             out.pop(k, None)
         out.update({a["key"]: a["hash"] for a in s2["actors"] + s2["instances"]})
+        out.update({u["key"]: u["hash"] for u in s2.get("underwater", [])})
     out["player_start"] = content_hash(man["player_start"])
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
     return out
@@ -930,6 +946,7 @@ def actor_kinds(man: dict) -> dict[str, str]:
             out.pop(k, None)
         out.update({a["key"]: "mesh" for a in s2["actors"]})
         out.update({i["key"]: "instances" for i in s2["instances"]})
+        out.update({u["key"]: "underwater" for u in s2.get("underwater", [])})
     return out
 
 

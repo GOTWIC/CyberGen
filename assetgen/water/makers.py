@@ -79,7 +79,8 @@ class NMesh:
 class Out:
     bed: list = field(default_factory=list)          # [NMesh]
     lods: list = field(default_factory=list)         # [[NMesh]] (surface LODs)
-    mesh: Mesh | None = None                         # (a bank)
+    mesh: Mesh | None = None                         # (a bank's wall)
+    nm: list = field(default_factory=list)           # (a bank's slope: [NMesh])
     parts: list = field(default_factory=list)
     notes: dict = field(default_factory=dict)
     empty: str | None = None
@@ -114,6 +115,23 @@ def _drop_flat(pos: np.ndarray, tri: np.ndarray) -> np.ndarray:
     a, b, c = pos[tri[:, 0]], pos[tri[:, 1]], pos[tri[:, 2]]
     o = (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
     return tri[o > 0]
+
+
+STEEP_NZ = 0.6          # a bed triangle facing up less than this is a step
+
+
+def _steep(slot, pos, nrm, uv1, tri, cr, org) -> NMesh:
+    """Steep bed triangles on vertices of their own, UV0 projected on the vertical plane each
+    faces most (meters: along it and up)."""
+    n = len(tri)
+    v = tri.ravel()
+    p = pos[v]
+    wx = (p[:, 0] + org[0]) / 1000.0
+    wy = (p[:, 1] + org[1]) / 1000.0
+    wz = p[:, 2] / 1000.0
+    xface = np.repeat(np.abs(cr[:, 0]) >= np.abs(cr[:, 1]), 3)
+    uv0 = np.stack([np.where(xface, wy, wx), wz], axis=1)
+    return NMesh(slot, p, np.arange(3 * n, dtype=np.int64), nrm[v], uv0, uv1[v], None)
 
 
 def _sub(slot, pos, nrm, uv0, uv1, col, tri) -> NMesh:
@@ -167,9 +185,21 @@ def make_body(inp: dict) -> Out:
                     continue
                 kk = np.array([x == kind for x in fd.kind])[k]
                 slot_of = np.where(kk & (d < toe_d + 0.5), slot, slot_of)
+        # (a steep triangle, a step where the nearest bank changes or beside a wall, takes its
+        # UV0 from the vertical plane it faces most, on vertices of its own: from above its
+        # texels would stretch down the step)
+        a, b, c = pos[tri[:, 0]], pos[tri[:, 1]], pos[tri[:, 2]]
+        cr = np.cross((b - a).astype(np.float64), (c - a).astype(np.float64))
+        L = np.sqrt((cr * cr).sum(axis=1))
+        steep = cr[:, 2] < STEEP_NZ * np.maximum(L, 1e-9)
         for slot in sorted(set(slot_of.tolist())):
-            sel = tri[slot_of == slot]
-            out.bed.append(_sub(slot, pos, nrm, uv0, uv1, None, sel))
+            sel = tri[(slot_of == slot) & ~steep]
+            if len(sel):
+                out.bed.append(_sub(slot, pos, nrm, uv0, uv1, None, sel))
+            st = tri[(slot_of == slot) & steep]
+            if len(st):
+                out.bed.append(_steep(slot, pos, nrm, uv1, st, cr[(slot_of == slot) & steep],
+                                      org))
         out.notes["bed"] = {"cell_m": cell, "min_z": C.m(float(z.min())),
                             "max_depth": C.m(float(depth.max()))}
     skirt = _skirts(inp, fd, org, lift)
@@ -238,15 +268,15 @@ def _skirts(inp, fd, org, lift):
             # the outward side: away from the body's own water
             left_in = region.covers(shapely.Point(mx - ty * 0.2, my + tx * 0.2))
             nx, ny = (ty, -tx) if left_in else (-ty, tx)
-            q = [(ax, ay, top[i]), (bx, by, top[i + 1]), (bx, by, bot[i + 1]),
-                 (ax, ay, bot[i])]
+            q = [(ax, ay, top[i], s), (bx, by, top[i + 1], s + L), (bx, by, bot[i + 1], s + L),
+                 (ax, ay, bot[i], s)]
             if not left_in:
                 q = q[::-1]                    # (counterclockwise seen from outside)
             base = len(P)
-            for x, y, z in q:
+            for x, y, z, u in q:
                 P.append((C.mm(x) - org[0], C.mm(y) - org[1], C.mm(z)))
                 Nn.append((nx, ny, 0.0))
-                U.append((s, z))
+                U.append((u, z))
             I += [base, base + 1, base + 2, base, base + 2, base + 3]
             s += L
     if not I:
@@ -290,11 +320,11 @@ def make_bank(inp: dict) -> Out:
     kind = k["kind"]
     if kind == "canal_wall":
         _wall(mesh, P, k, lv, ground, out)
+        out.mesh = mesh
     else:
-        _slope(mesh, P, k, lv, ground, out)
+        _slope(k, inp, ground, out)
         if kind == "riprap":
             out.parts = _stones(P, k, lv, ground, inp["origin"])
-    out.mesh = mesh
     return out
 
 
@@ -327,6 +357,12 @@ def strip(k: dict):
     line = [(C.m2(x), C.m2(y)) for s, x, y, nx, ny, mk in st]
     wl = [_wl(x, y, nx, ny, mk, w) for s, x, y, nx, ny, mk in st]
     p = shapely.make_valid(shapely.Polygon(line + wl[::-1]))
+    # (where the waterline folds over at a bend the ring crosses itself: its loops are the
+    # strip too, and the holes they leave are filled)
+    parts = [shapely.Polygon(q.exterior) for q in GR._polys(p) if q.area > 1e-6]
+    if not parts:
+        return None
+    p = shapely.union_all(parts, grid_size=0.001)
     return p if not p.is_empty else None
 
 
@@ -344,24 +380,55 @@ def _bed_region(region, banks):
     return shapely.normalize(out)
 
 
-def _slope(mesh: Mesh, P: Path, k: dict, lv, ground, out: Out) -> None:
+BANK_CELL_M = 2.0
+
+
+def _slope(k: dict, inp: dict, ground, out: Out) -> None:
+    """A sloped bank: its dry strip (the polygon the bed leaves out) on a 2 m lattice, each
+    point at the ground at the line's nearest point, falling to the level at `width` from
+    the line (the bed's slope: they meet along the waterline, where the strip's vertices are
+    at the level); UV0 the plan in meters (the slopes are gentle: 1 in 1.5 at the most)."""
+    poly = strip(k)
+    if poly is None:
+        out.empty = "degenerate strip"
+        return
+    ps = [p for p in GR._polys(poly) if p.area > 1e-6]
+    if not ps:
+        out.empty = "degenerate strip"
+        return
+    poly = ps[0] if len(ps) == 1 else shapely.MultiPolygon(ps)
+    x0, y0, x1, y1 = poly.bounds
+    vmm, tri = GR.mesh(poly, (x0, y0, x1, y1), BANK_CELL_M)
+    if not len(tri):
+        out.empty = "degenerate strip"
+        return
     w = max(float(k["w"]), 0.05)
-    slot = f"bank.{k['kind']}"
-    sag = 0.08 if k["kind"] == "natural_bank" else 0.0
-    rows, uvs, edge = [], [], []
+    xs, ys = vmm[:, 0] / 1000.0, vmm[:, 1] / 1000.0
+    line = shapely.LineString(k["line"])
+    pts = shapely.points(np.stack([xs, ys], axis=1))
+    d = np.round(shapely.distance(line, pts), 6)
+    s = shapely.line_locate_point(line, pts)
+    top = np.array([ground(v) for v in s.tolist()])
+    fd = F.Field({"body": {"depth_m": 0.0, "profile": "flat", "reach_m": 1.0},
+                  "level": inp["level"]})
+    lvl = fd.level(xs, ys)
+    z = top - (top - lvl) * np.clip(d / w, 0.0, 1.0)
+    # (the waterline's own vertices at the level, where the bed's edge runs)
     _, st = _stations(k)
-    for s, x, y, nx, ny, mk in st:
-        zt = ground(s)
-        xw, yw = _wl(x, y, nx, ny, mk, w)
-        zw = lv(xw, yw)
-        xm, ym = x + nx * w / 2.0, y + ny * w / 2.0
-        zm = (zt + zw) / 2.0 - sag * max(zt - zw, 0.0)
-        rows.append([(x, y, zt), (xm, ym, zm), (xw, yw, zw)])
-        uvs.append([(s, 0.0), (s, w / 2.0), (s, w)])
-        edge.append((xw, yw, zw))
-    mesh.grid(slot, rows, uvs, expect=(0.0, 0.0, 1.0))
-    step = max(1, len(edge) // 40)
-    out.notes["edge"] = [[C.m(x), C.m(y), C.m(z)] for x, y, z in edge[::step]]
+    wl = {(C.mm(a), C.mm(b)) for sx, x, y, nx, ny, mk in st for a, b in [_wl(x, y, nx, ny, mk, w)]}
+    on = np.array([(int(a), int(b)) in wl for a, b in vmm.tolist()], dtype=bool)
+    z = np.where(on, lvl, z)
+    org = _origin_mm(inp)
+    pos = _pos(vmm, z, org)
+    tri = _drop_flat(pos, tri)
+    nm = NMesh(f"bank.{k['kind']}", pos, tri.ravel().astype(np.int64), GR.normals(pos, tri),
+               np.stack([xs, ys], axis=1))
+    out.nm = [nm]
+    edge = [(x, y) for sx, x, y, nx, ny, mk in st]
+    step = max(1, len(st) // 40)
+    out.notes["edge"] = [[C.m(a), C.m(b), C.m(float(fd.level(np.array([a]), np.array([b]))[0]))]
+                         for sx, x, y, nx, ny, mk in st[::step] for a, b in [_wl(x, y, nx, ny,
+                                                                               mk, w)]]
 
 
 def _wall(mesh: Mesh, P: Path, k: dict, lv, ground, out: Out) -> None:

@@ -35,7 +35,8 @@ LIB_VERSION = "ag6.2"
 DENSITY = 512           # px/m within reach of the street (decision 13.4)
 UPPER = 256             # px/m above it
 MAX_WORKERS = 3
-CODE = ("noise.py", "surfaces.py", "pbr.py", "library.py", "atlases.py", "interiors.py")
+CODE = ("noise.py", "surfaces.py", "pbr.py", "library.py", "atlases.py", "interiors.py",
+        "water_surfaces.py")
 
 
 def default_root() -> Path:
@@ -359,9 +360,32 @@ PROP_SETS: dict[str, dict] = {
 }
 
 
+# AG12's water beds (under the water: the upper band's density) and banks
+WATER_SETS: dict[str, dict] = {
+    "bed_mud": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
+                "params": {"kind": "mud", "color": "#4a4033", "shells": 0.3}},
+    "bed_silt": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
+                 "params": {"kind": "silt", "color": "#5d5546", "bump": 6.0}},
+    "bed_sand": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
+                 "params": {"kind": "sand", "color": "#9c8b68", "pebbles": 0.04,
+                            "shells": 0.5, "rough": 0.85}},
+    "bed_gravel": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
+                   "params": {"kind": "silt", "color": "#6f6a5f", "pebbles": 0.75}},
+    "bed_stone": {"gen": "rubble", "tile_m": 4.0, "band": "upper",
+                  "params": {"color": "#5f5d58", "stone_m": 0.3, "joint": "#3a362e",
+                             "wet": 0.5}},
+    "bank_soil": {"gen": "soil", "tile_m": 2.0, "band": "street",
+                  "params": {"color": "#5d5440", "grass": "#4f6a35"}},
+    "bank_rubble": {"gen": "rubble", "tile_m": 2.0, "band": "street",
+                    "params": {"color": "#6d6a63", "stone_m": 0.22}},
+    "bank_rock": {"gen": "stone", "tile_m": 1.0, "band": "street",
+                  "params": {"color": "#77736b", "wear": 0.8, "rough": 0.85}},
+}
+
+
 def sets() -> dict[str, dict]:
     out = _era_sets()
-    for d in (BUILDING_SETS, STREET_SETS, PROP_SETS):
+    for d in (BUILDING_SETS, STREET_SETS, PROP_SETS, WATER_SETS):
         for k, v in d.items():
             if k in out:
                 raise ValueError(f"set {k} twice")
