@@ -95,7 +95,8 @@ def test_new_checks_pass(small, small2):
                 "lot_block_sizes", "lot_slivers", "sidewalk_clear_path", "crosswalks",
                 "junction_placement", "junction_angles", "street_duplicates",
                 "open_space_share", "places_built"} <= ids
-        assert len(b.checks) == 75  # 31 to M2, 13 M3, 6 M6, 5 M7, 4 M9, 9 M11, 2 M12, 5 M13
+        assert len(b.checks) == 84  # 31 to M2, 13 M3, 6 M6, 5 M7, 4 M9, 9 M11, 2 M12, 5 M13,
+        #                              4 M17, 2 M21, 3 M16
 
 
 # --- street patterns by archetype ------------------------------------------------------
@@ -172,7 +173,8 @@ def test_footbridge_spacing():
 
 def test_junction_geometry(small):
     m = small.model
-    assert m.junctions and all(j.legs >= 3 or j.shape == "cul_de_sac" for j in m.junctions)
+    assert m.junctions and all(j.legs >= 3 or j.shape in ("cul_de_sac", "bend")
+                               for j in m.junctions)
     pos = {n.id: n.position[:2] for n in m.road_nodes}
     for j in m.junctions[:200]:
         poly = G.from_model_poly(j.polygon)

@@ -563,6 +563,11 @@ class District(_Model):
     grime: Fraction | None = None
     neon: Fraction | None = None
     greenery: Fraction | None = None
+    variety: Fraction | None = Field(
+        None, description="M21: how far the district's towers depart from boxes (0: boxes and "
+                          "mild forms, rounded or cut corners, setbacks; 1: twisted, leaning, "
+                          "stacked, split, cantilevered, framed and podded towers, the twist and "
+                          "lean at their most); default by archetype.")
     wealth: Fraction | None = Field(None, description="M11: base of the wealth field.")
     danger: Fraction | None = Field(None, description="M11: base of the danger field.")
     police: Fraction | None = Field(None, description="M11: base of the police presence "

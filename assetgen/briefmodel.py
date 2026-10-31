@@ -43,12 +43,31 @@ class Floors(_M):
     height_m: float | None
 
 
+class Arc(_M):
+    """M21: a curved stretch of the footprint (in the building frame)."""
+    center: tuple[float, float]
+    radius_m: float
+    start_deg: float
+    sweep_deg: float
+
+
+class Plate(_M):
+    """M21: a band's plate against its form's base plate (turned and scaled about the form's
+    pivot, then moved)."""
+    turn_deg: float
+    scale: float
+    shift_m: tuple[float, float]
+
+
 class Mass(_M):
     role: str
     shape: str
     z: tuple[float, float]
     footprint: Polygon
     floors: Floors
+    arcs: list[Arc] | None = Field(None, description="M21: its curved stretches (absent: none).")
+    plate: Plate | None = Field(None, description="M21: a band of a twisted, tapered or leaning "
+                                                  "shaft (absent: none).")
 
 
 class Region(_M):
@@ -252,6 +271,17 @@ class FloorGrid(_M):
                                                    "on (absent on the ground).")
 
 
+class Form(_M):
+    """M21: how the building departs from a box (citygen's `Building.form`)."""
+    kind: str
+    crown: str
+    tower: bool
+    band: int
+    pivot: tuple[float, float] | None
+    masses: list[int]
+    params: dict[str, Any]
+
+
 class BuildingRec(_M):
     type: str
     use: str
@@ -266,6 +296,7 @@ class BuildingRec(_M):
     height_m: float
     style: dict[str, Any]
     floor_grid: FloorGrid
+    form: Form | None = Field(None, description="M21: the building's form (absent: none).")
 
 
 class SpecSection(_M):

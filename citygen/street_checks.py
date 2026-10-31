@@ -314,7 +314,7 @@ def check_crosswalks(m: CityModel, n: _Net):
                              "the side street approaches of unsignalized junctions on avenues")
     have = {(x.junction_id, x.segment_id) for x in m.crosswalks}
     for j in m.junctions:
-        if j.shape == "cul_de_sac":
+        if j.shape in ("cul_de_sac", "bend"):
             continue
         legs = n.at.get(j.node_id, [])
         avenue = any(s.road_class == "avenue" for s, _ in legs)

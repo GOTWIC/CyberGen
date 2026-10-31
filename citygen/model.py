@@ -67,6 +67,54 @@ class Entity(_Model):
 
 # --- water and land --------------------------------------------------------
 
+QUAY_DECK_M = 1.5     # a quay's deck over the water (M16: on a flat city the ground stands as
+                      # high over every water body, the freeboard)
+
+
+def _m16(what: str):
+    """M16: a field left out of the JSON while unset, so a city built without M16's data
+    (or without water) keeps its bytes."""
+    return Field(None, exclude_if=lambda v: v is None, description=f"M16: {what}")
+
+
+class WaterBed(_Model):
+    """M16: the bed of a water body. Its depth at a point at distance d from the nearest
+    bank's line (the land's edge): 0 to the bank's waterline (`Bank.width_m` out), then
+    depth = toe + (D - toe) ramp(min(1, (d - width) / reach)), with the bank's `toe_m`, D the
+    body's `depth_m` (a river's or channel's at the nearest centerline point, `along`), and
+    ramp(u) = u (`shelf`), u (2 - u) (`channel`: deepest along the centerline, reach the half
+    width there) or 1 (`flat`: level between its walls)."""
+    profile: Literal["flat", "channel", "shelf"]
+    reach_m: float = Field(description="How far from the waterline the bed reaches its full "
+                                       "depth (channel: the typical half width).")
+    material: Literal["silt", "mud", "sand", "gravel", "stone"]
+    surface_m: float | None = Field(None, description="The water surface over the ground "
+                                    "datum: on a flat city -1.5 (the ground and the quay "
+                                    "decks stand QUAY_DECK_M over every water body); None on "
+                                    "a terrain city (M13's `terrain.water_levels`).")
+    along: list[ZSample] = Field(default_factory=list, description="Rivers and channels: the "
+                                 "depth at the centerline along it (s from its first point).")
+
+
+class Flow(_Model):
+    """M16: the current of a water body."""
+    kind: Literal["downstream", "tidal", "still"]
+    speed_m_s: float = Field(description="At the surface over the deepest bed (slower toward "
+                                         "the banks, as the bed rises).")
+    toward: str | None = Field(None, description="The water body it runs into (or 'sea').")
+    line: list[Point2] = Field(default_factory=list, description="The flow line in the flow's "
+                               "direction (the centerline, oriented downstream); empty when "
+                               "still or for the sea.")
+
+
+class Exposure(_Model):
+    """M16: a stretch of sea and how open it is to waves (sets their height later)."""
+    kind: Literal["open", "sheltered", "harbor"]
+    polygon: Polygon
+    fetch_m: float = Field(description="Mean open water reach over 16 directions (the map "
+                                       "edge counts as open sea).")
+
+
 class Land(Entity):
     TYPE_PREFIX: ClassVar[str] = "land"
     polygons: list[Polygon]
@@ -86,13 +134,22 @@ class Island(Entity):
     landmass_id: str | None = None
 
 
-class Sea(Entity):
+class _Water(Entity):
+    """M16's data of a water body (left out of the JSON until the stage fills it)."""
+    depth_m: float | None = _m16("the deepest water over the bed (from the surface).")
+    bed: WaterBed | None = _m16("the bed's profile and material.")
+    flow: Flow | None = _m16("the current.")
+
+
+class Sea(_Water):
     TYPE_PREFIX: ClassVar[str] = "sea"
     name: str | None = None
     polygons: list[Polygon]
+    exposure: list[Exposure] = Field(default_factory=list, exclude_if=lambda v: not v,
+                                     description="M16: open sea, sheltered water and harbors.")
 
 
-class River(Entity):
+class River(_Water):
     TYPE_PREFIX: ClassVar[str] = "river"
     name: str
     centerline: Line2
@@ -102,7 +159,7 @@ class River(Entity):
     flows_into: str | None = None
 
 
-class Channel(Entity):
+class Channel(_Water):
     TYPE_PREFIX: ClassVar[str] = "channel"
     name: str | None = None
     kind: Literal["delta_branch", "sea_channel", "separation"] = Field(
@@ -116,7 +173,7 @@ class Channel(Entity):
     polygon: Polygon
 
 
-class Waterway(Entity):
+class Waterway(_Water):
     TYPE_PREFIX: ClassVar[str] = "waterway"
     kind: Literal["canal", "creek", "inlet", "basin", "marina"]
     name: str | None = None
@@ -132,7 +189,30 @@ class Quay(Entity):
     waterway_id: str
     line: Line2
     width_m: float = 6.0
-    deck_z_m: float = 1.5
+    deck_z_m: float = QUAY_DECK_M
+
+
+BANK_KINDS = ("quay", "canal_wall", "road_embankment", "natural_bank", "beach", "marsh_edge",
+              "riprap")
+
+
+class Bank(Entity):
+    """M16: one stretch of a water body's edge, of one kind. Its line is the land's edge
+    (the top of the bank), with the water on its left; the bank falls from there to the
+    waterline `width_m` out over the water (a wall: its thickness) and on under the water to
+    its toe, where the body's bed (`WaterBed`) takes over. `type` is `bank.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "bank"
+    kind: Literal["quay", "canal_wall", "road_embankment", "natural_bank", "beach",
+                  "marsh_edge", "riprap"]
+    water_id: str
+    line: Line2
+    height_m: float | None = Field(None, description="The top over the water surface; None "
+                                   "on a quay, whose height is its quay's `deck_z_m`.")
+    width_m: float = Field(description="Horizontal run from the line to the waterline.")
+    toe_m: float = Field(description="Water depth at the foot of the bank (a wall: the bed's).")
+    district_id: str | None = None
+    quay_id: str | None = None
+    segment_id: str | None = Field(None, description="A road embankment's road.")
 
 
 class Bridge(Entity):
@@ -251,12 +331,13 @@ class RoadSegment(Entity):
 
 class Junction(Entity):
     """Intersection area of a node where three or more roads meet (curb lines with corner
-    fillets), or a cul-de-sac turning bulb. `type` is `junction.<class pair>`, e.g.
+    fillets), a cul-de-sac turning bulb, or (M17) a bend where two roads meet at an angle
+    and their rights of way overlap. `type` is `junction.<class pair>`, e.g.
     `junction.avenue_street`."""
     TYPE_PREFIX: ClassVar[str] = "junction"
     node_id: str
     polygon: Polygon
-    shape: Literal["T", "X", "multi", "cul_de_sac"]
+    shape: Literal["T", "X", "multi", "cul_de_sac", "bend"]
     legs: int
     signalized: bool = False
     corner_radius_m: float
@@ -471,17 +552,43 @@ class Property(Entity):
     name: str | None = None
 
 
+class Arc(_Model):
+    """M21: a stretch of a footprint ring on a circle. The ring's vertices between the two
+    angles lie on it (the polygon cut so that no chord sags more than 2 cm from the curve),
+    so stage 2 can draw the wall as the curve itself."""
+    center: Point2
+    radius_m: float
+    start_deg: float = Field(description="Where it starts, degrees counterclockwise from east.")
+    sweep_deg: float = Field(description="How far it runs counterclockwise (360: the circle).")
+
+
 class Mass(_Model):
     """An extruded footprint from z0 to z1. `shape` tells the blockout builder how to read it:
     prism (the footprint extruded), cylinder (footprint is a circle), dome and cone (rise
     from the footprint to a point or cap), ring (a vertical wheel whose diameter is z1 - z0,
-    its footprint the thin plan of the rim)."""
+    its footprint the thin plan of the rim).
+
+    M21: a building's form (`Building.form`) is built of such masses; a band of a twisted,
+    tapered or leaning shaft is its form's base plate turned by `turn_deg` and scaled by
+    `scale` about the form's pivot, then moved by `shift_m` (the footprint is exact either
+    way). `arcs` are the curved stretches of the footprint."""
     footprint: Polygon
     z0_m: float
     z1_m: float
     role: str = Field("body", description="podium, tower, tier, crown, spire, mechanical, "
-                                          "body, void, deck, span, leg, dock, ramp, roof, ...")
+                                          "body, void, deck, span, leg, dock, ramp, roof, "
+                                          "band, block, link, core, column, frame, pod, "
+                                          "halo, strut, mast, ...")
     shape: Literal["prism", "cylinder", "dome", "cone", "ring"] = "prism"
+    arcs: list[Arc] = Field(default_factory=list, exclude_if=lambda v: not v,
+                            description="M21: the footprint's curved stretches.")
+    turn_deg: float = Field(0.0, exclude_if=lambda v: v == 0.0,
+                            description="M21: the plate's turn from its form's base plate.")
+    scale: float = Field(1.0, exclude_if=lambda v: v == 1.0,
+                         description="M21: the plate's size against its form's base plate.")
+    shift_m: Point2 = Field((0.0, 0.0), exclude_if=lambda v: tuple(v) == (0.0, 0.0),
+                            description="M21: how far the plate is moved from its form's "
+                                        "base plate (after turning and scaling).")
 
 
 class Unit(_Model):
@@ -519,6 +626,25 @@ class Portal(_Model):
     station: bool = False
 
 
+class Form(_Model):
+    """M21: how a building departs from a box. `kind` is the shaft's form: for towers box,
+    chamfer, rounded, setback, round, oval, taper, twist, lean, stack, cantilever, split,
+    garden, gate, exo or pods; for slabs curved, bent, stepped or lifted; landmarks their
+    kind. `crown` is how the top ends (flat, tiers, sloped, cut, halo, mast, spire). The
+    masses of the shaft (`masses`, bottom up) carry their turn, scale and shift from the base
+    plate, which is centered on `pivot`; `params` holds the form's numbers (twist per floor,
+    taper, lean, ...)."""
+    kind: str
+    crown: str = "flat"
+    tower: bool = Field(False, description="A tower (40 m and taller), which the neighbor "
+                                           "rule counts.")
+    band: int = Field(-1, description="Height band of a tower (`buildings.TOWER_BANDS_M`), "
+                                      "-1 otherwise.")
+    pivot: Point2 | None = None
+    masses: list[int] = Field(default_factory=list)
+    params: dict[str, float | str] = Field(default_factory=dict)
+
+
 class Building(Entity):
     """`type` is `building.<archetype>` (podium_tower, slab, courtyard_block, megabuilding,
     terraced, shopfront_row, shanty_stack, warehouse, shed, parking_structure, lab, station,
@@ -540,6 +666,8 @@ class Building(Entity):
     plinth_m: float | None = Field(None, exclude_if=lambda v: v is None, description="M13: the lowest ground under the "
                                    "footprint; a stepped plinth fills from it up to base_m.")
     masses: Annotated[list[Mass], Field(min_length=1)]
+    form: Form | None = Field(None, exclude_if=lambda v: v is None,
+                              description="M21: the building's form and its parameters.")
     entrances: list[Entrance] = Field(default_factory=list)
     units: list[Unit] = Field(default_factory=list)
     roof_items: list[RoofItem] = Field(default_factory=list)
@@ -600,6 +728,40 @@ class GreenArea(Entity):
     z_m: float = 0.0
     building_id: str | None = Field(None, description="Green roofs: the building it tops.")
     level: int = _level()
+
+
+COVER_KINDS = ("mown_lawn", "park_lawn", "meadow", "marsh", "wasteland", "bare_dirt", "gravel",
+               "sand", "planted_bed", "overgrown_paving", "paving")
+
+
+class DesireLine(_Model):
+    """M16: a worn track across a piece of ground cover (people cutting across)."""
+    line: Line2
+    width_m: float
+    wear: Fraction = Field(description="0 a faint track, 1 bare earth.")
+
+
+class GroundCover(Entity):
+    """M16: one piece of open land (not a building, road, sidewalk or water) and what covers
+    it; the pieces of a city tile its open land once. `type` is `ground_cover.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "ground_cover"
+    kind: Literal["mown_lawn", "park_lawn", "meadow", "marsh", "wasteland", "bare_dirt",
+                  "gravel", "sand", "planted_bed", "overgrown_paving", "paving"]
+    polygon: Polygon
+    area_m2: float
+    district_id: str | None = None
+    source_id: str | None = Field(None, description="What it is the open land of: a lot (its "
+                                  "yard), an open space, a megasite or a flat site element; "
+                                  "None for land left between them.")
+    maintenance: Fraction = Field(description="0 abandoned, 1 kept daily (district wealth, "
+                                              "archetype, what it is).")
+    wear: Fraction = Field(description="Share of the piece worn by feet (its desire lines, "
+                                       "weighted by their wear; busy plazas).")
+    shade: Fraction = Field(description="Mean share of the sky that buildings and decks hide.")
+    moisture: Fraction = Field(description="Mean wetness from nearness to water.")
+    slope_deg: float = Field(0.0, description="Mean ground slope (M13; 0 on a flat city).")
+    slope_max_deg: float = 0.0
+    desire_lines: list[DesireLine] = Field(default_factory=list)
 
 
 class Prop(Entity):
@@ -776,7 +938,7 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
     "factions": Faction, "zones": Zone, "pois": Poi, "fields": GameField,
     "densities": StreetDensity, "parking": Parking, "travel_points": TravelPoint,
-    "sign_slots": SignSlot,
+    "sign_slots": SignSlot, "banks": Bank, "ground_cover": GroundCover,
     "tiles": Tile,
 }
 
@@ -862,6 +1024,10 @@ class CityModel(_Model):
     parking: list[Parking] = Field(default_factory=list)
     travel_points: list[TravelPoint] = Field(default_factory=list)
     sign_slots: list[SignSlot] = Field(default_factory=list)
+    banks: list[Bank] = Field(default_factory=list, exclude_if=lambda v: not v,
+                              description="M16: every water edge as typed bank stretches.")
+    ground_cover: list[GroundCover] = Field(default_factory=list, exclude_if=lambda v: not v,
+                                            description="M16: the open land's cover pieces.")
     tiles: list[Tile] = Field(default_factory=list)
 
     @model_validator(mode="after")

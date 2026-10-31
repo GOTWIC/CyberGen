@@ -216,6 +216,21 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
     frame = ST.Frame(old, district, dd.id, poly, {d.name: d.archetype for d in cur.districts},
                      pins=pins, keep_out=G.union(ground) if ground else None,
                      pin_buildings=pin_b, old_entry=d_old)
+    # M21: the old towers outside the district stay as they are: the new build gives each
+    # its old form and height, and the district's new ones keep their forms apart from them
+    # (`buildout.select_forms`)
+    from . import buildings as BL
+    frame.old_towers = []
+    for t in old.buildings:
+        kind = t.type.split(".", 1)[1] if "." in t.type else t.type
+        if t.district_id == dd.id or t.megasite_id or t.footprint is None or                 not (kind in BL.TOWER_KINDS or t.landmark) or t.attrs.get("pinned"):
+            continue
+        h = t.height_m - (float(t.attrs.get("deck_top_m", 0.0)) if t.level else 0.0)
+        frame.old_towers.append({
+            "id": t.id, "property_id": t.property_id, "height": h,
+            "c": G.centroid(G.from_model_poly(t.footprint)),
+            "form": t.form.kind if t.form is not None else "box",
+            "band": BL.tower_band(h) if h >= BL.TOWER_MIN_M - 1e-6 else -1})
     held = {ln.name: ln.model_dump(mode="json") for ln in old.transit_lines}
     O = old.model_dump(mode="json")
     new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,
@@ -224,7 +239,17 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
     if ov:
         model, notes = OV.apply(model, ov, old=old, district=dd.id)
         info["notes"] += notes
+    if new.model.banks or new.model.ground_cover:
+        # M16: the banks and the ground cover of the spliced city (each depends only on its
+        # own district and the roads at it, so outside the district and its seam they come
+        # back as they were: `regen_locality`); the splice leaves them out
+        model, _ = B.water_ground(model)
     checks, stats = B.check_all(spec, model)
+    if model.banks or model.ground_cover:
+        from . import water_checks as WC
+
+        with G.canonical():
+            checks.append(WC.check_locality(old, model, dd.id, poly))
     out = copy.copy(new)
     out.model, out.checks = model, checks
     stats["regenerated"] = {k: v for k, v in info.items() if k != "notes"}
@@ -361,6 +386,7 @@ class _Owner:
 
 
 KEEP_BLOCK_M2 = 1.0   # a neighbor block a seam junction moves less than this stays
+M16 = ("banks", "ground_cover")
 
 # collections that follow the ground: those on the district's ground, or on a block one of
 # its seam junctions cuts, come from the new build
@@ -453,8 +479,10 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
     ground = _Ground([zone] + near)
     own_o = _Owner(O, did, zone, frame, seam_nodes, ground)
     own_n = _Owner(N, did, zone, frame, seam_nodes, ground)
-    io = {c: {e["id"]: e for e in O.get(c, [])} for c in COLLECTIONS}
-    inn = {c: {e["id"]: e for e in N.get(c, [])} for c in COLLECTIONS}
+    # (M16's rows stay out of the splice and its closure: they are made again on the
+    # spliced city)
+    io = {c: {e["id"]: e for e in O.get(c, [])} if c not in M16 else {} for c in COLLECTIONS}
+    inn = {c: {e["id"]: e for e in N.get(c, [])} if c not in M16 else {} for c in COLLECTIONS}
     coll_of = {}
     for c in COLLECTIONS:
         for i in io[c]:

@@ -65,6 +65,8 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
+SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
+SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
               ("Kinds", "[name"), ("Refs", "[name"), ("Widths", "[real"),
               ("PointStart", "[int"), ("Points", "[vector"), ("LinkStart", "[int"),
@@ -1478,11 +1480,13 @@ class Importer:
         self.stats["actors"]["deleted"] += 1
         self.keys["deleted"].append(key)
 
-    def tags(self, key, h, ids, typ, cat, tile, district, level=0):
+    def tags(self, key, h, ids, typ, cat, tile, district, level=0, form=""):
         t = [f"cg.city={self.city}", f"cg.key={key}", f"{HASH_TAG}={h}", f"cg.type={typ}",
              f"cg.category={cat}", f"cg.tile={tile}", f"cg.district={district}"]
         if level:
             t.append(f"cg.level={level}")      # (M14: on a deck)
+        if form:
+            t.append(f"cg.form={form}")        # (M21: a building's form)
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
@@ -1491,6 +1495,7 @@ class Importer:
         replaced, stage 2's, the player start and the lights)."""
         n = sum(1 for t in self.man["tiles"] for o in t["objects"] if o["key"] not in self.skip)
         n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
+        n += len(self.man.get("swim", []))
         if self.s2:
             n += len(self.s2["actors"]) + len(self.s2["instances"])
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
@@ -1549,11 +1554,13 @@ class Importer:
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
                     a.tags = self.tags(o["key"], h, o["ids"], o["type"], o["category"],
-                                       t["name"], o["district"], o.get("level", 0))
+                                       t["name"], o["district"], o.get("level", 0),
+                                       o.get("form", ""))
 
                 self.place(have, o["key"], o["hash"], sma, make, update,
                            f"CityGen/{o['category']}")
         self.instances(have)
+        self.swim(have)
         self.actors2(have)
         self.player_start(have)
         self.lighting(have)
@@ -1686,6 +1693,33 @@ class Importer:
             self.place(have, inst["key"], inst["hash"], cls, make, update,
                        f"CityGen/{inst['category']}")
         del ts
+
+    def swim(self, have):
+        """M16: a water physics volume per box of a water body and tile (the manifest's
+        `swim`), so the player swims in a canal, a river or the sea instead of falling through
+        it. Spawned from its class, a volume gets the editor's cube brush (SWIM_BRUSH_CM),
+        scaled here to the box."""
+        cls = unreal.PhysicsVolume
+        for s in self.man.get("swim", []):
+            x0, y0, x1, y1 = s["box"]
+            z0, z1 = s["z"]
+            center = ue_loc((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0)
+
+            def make(center=center):
+                return self.eas.spawn_actor_from_class(cls, center)
+
+            def update(a, h, s=s, center=center, x0=x0, y0=y0, x1=x1, y1=y1, z0=z0, z1=z1):
+                a.set_actor_location(center, False, False)
+                a.set_actor_scale3d(unreal.Vector((x1 - x0) * 100.0 / SWIM_BRUSH_CM,
+                                                  (y1 - y0) * 100.0 / SWIM_BRUSH_CM,
+                                                  (z1 - z0) * 100.0 / SWIM_BRUSH_CM))
+                a.set_editor_property("water_volume", True)
+                a.set_editor_property("fluid_friction", SWIM_FRICTION)
+                a.tags = self.tags(s["key"], h, [s["water_id"]], "swim_volume", "swim",
+                                   s["tile"], "")
+
+            self.place(have, s["key"], s["hash"], cls.static_class(), make, update,
+                       "CityGen/swim")
 
     def player_start(self, have):
         ps = self.man["player_start"]

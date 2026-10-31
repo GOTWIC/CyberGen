@@ -86,4 +86,5 @@ def test_all_scope_entities_present():
     expected |= {"factions", "zones", "pois", "fields", "densities", "parking",
                  "travel_points", "sign_slots"}
     expected |= {"decks"}   # M14: layered districts
+    expected |= {"banks", "ground_cover"}   # M16: water and ground detail
     assert set(COLLECTIONS) == expected
