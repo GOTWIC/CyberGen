@@ -14,11 +14,12 @@ from . import blocks as BK
 from . import decks as DK
 from . import geom as G
 from . import junctions as JN
+from . import parkpaths as PP
 from . import streets as STR
 from . import trace as T
 
-PATH_KINDS = ("park", "plaza", "pocket_park", "market", "garden", "promenade", "beach")
-PATH_REACH_M = 30.0
+PATH_KINDS = PP.PATH_KINDS
+PATH_REACH_M = PP.PATH_REACH_M
 ISLAND_SEAM_M = 40.0   # M17: a regeneration links a cut-off walkway group within this far of
 #                        the district (its seam) where it can, so nothing far from it moves
 
@@ -47,40 +48,6 @@ class Local:
     # past the curb and sidewalk corners), level on the grade lines of local roads
     # (`terrain.grade`)
     cuts: dict = field(default_factory=dict)
-
-
-def open_paths(W: JN.WalkGraph, opens: list[dict]) -> int:
-    """Open space joins the walkway graph: paths from a point inside each park, plaza or
-    promenade to the walkway nodes within 30 m of it (up to four, nearest first)."""
-    pts = sorted(W.nodes)
-    if not pts:
-        return 0
-    arr = shapely.points(np.array(pts, dtype=np.float64))
-    tree = shapely.STRtree(arr)
-    n = 0
-    for o in opens:
-        if o["kind"] not in PATH_KINDS:
-            continue
-        poly = o["polygon"]
-        if poly.geom_type != "Polygon" or poly.is_empty:
-            continue
-        c = G.qpoint(poly.representative_point())
-        idx = sorted(int(i) for i in tree.query(poly, predicate="dwithin",
-                                                distance=PATH_REACH_M))
-        if not idx:
-            continue
-        cand = sorted(idx, key=lambda i: (G.dist(poly, arr[i]), pts[i]))
-        used = []
-        for i in cand:
-            p = pts[i]
-            if any(STR._dist(p, u) < 25.0 for u in used):
-                continue
-            used.append(p)
-            W.add("path", [c, p], 3.0, open_space=o.get("id"))
-            n += 1
-            if len(used) >= 4:
-                break
-    return n
 
 
 def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list,
@@ -279,9 +246,29 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
         out.open_spaces.append({"id": o["id"], "type": f"open_space.{o['kind']}",
                                 "kind": o["kind"], "polygon": P(poly), "name": o["name"],
                                 "district_id": d, "attrs": attrs})
-    n_paths = open_paths(jx["walk"], blk["open"])
+    # (park paths fix: paths on open land, passages to the open spaces the lots enclose)
+    bld = net.builder
+    pinfo = PP.open_paths(jx["walk"], blk["open"], blk["lots"],
+                          [getattr(bld, "water", None), getattr(bld, "reserves", None)],
+                          gnet.segments)
+    rec_of = {r["id"]: r for r in out.open_spaces}
+    for o in blk["open"]:
+        r = rec_of.get(o.get("id"))
+        if r is None:
+            continue
+        if o.get("passage"):
+            r["polygon"] = P(o["polygon"])
+            r["attrs"]["area_m2"] = G.q(G.area1(o["polygon"]))
+            r["attrs"]["access"] = "passage"
+            r["attrs"]["passage"] = o["passage"]
+        elif o.get("no_access"):
+            r["attrs"]["access"] = "none"
+            r["attrs"]["no_access"] = o["no_access"]
+    n_paths = pinfo["paths"]
     n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, gnet.segments,
                                 getattr(b, "frame", None))
+    # (park paths fix: every ground walkway off the lots, the buildings' ground)
+    kinfo = PP.keep_off(jx["walk"], blk["lots"])
     walk = JN.walkways(jx["walk"])
     if dplan.decks:
         walk = _deck_walks(dplan, net, jx, dko, walk)
@@ -354,6 +341,11 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                            "attrs": {k2: v for k2, v in pl["attrs"].items() if v is not None}})
     T.stage("blocks", [out.blocks, out.lots, out.open_spaces, out.places])
     out.info = {"one_way_loops": jx["one_way"], "open_paths": n_paths,
+                "open_paths_bent": pinfo["bent"], "passages": pinfo["passages"],
+                "passage_m2": pinfo["passage_m2"],
+                "open_no_access": len(pinfo["no_access"]),
+                "walkways_led_round_lots": kinfo["rerouted"],
+                "walkways_in_lots": kinfo["left"],
                 "walkway_links": n_links,
                 "angles": {did[n]: a for n, a in net.angles.items()},
                 "levelled_legs": jx["level"]["levelled"],

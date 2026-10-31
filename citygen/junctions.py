@@ -1446,14 +1446,86 @@ class WalkGraph:
         self.edges.append({"kind": kind, "pts": pts, "width": width, "z": z, "attrs": attrs})
 
 
-def _corner_point(P, a: Leg, b: Leg):
-    """Where the sidewalks of two neighboring legs meet (sidewalk centers)."""
-    oa = a.h + a.sw / 2
-    ob = b.h + b.sw / 2
+def _walk_offset(x: Leg) -> float:
+    """How far from a leg's centerline its walkers go: the sidewalk's middle, or 1 m inside
+    the edge of a road with no sidewalk (a path's, an alley's)."""
+    return x.h + x.sw / 2 if x.sw > 0 else max(x.h - 1.0, x.h / 2)
+
+
+def _corner_point(P, a: Leg, b: Leg, jrow=None):
+    """Where the sidewalks of two neighboring legs meet (sidewalk centers), b
+    counterclockwise from a. Park paths fix: where the two sidewalk lines cross when the gap
+    between the legs is under 180 degrees (the corner of the sidewalks, always on the right
+    of way), else on the gap's bisector at the sidewalks' offset (inside the junction's
+    polygon). The middle of the two sidewalk points at the cuts, which it was, lies in the
+    block's corner once the cuts are longer than the right of way is wide (a street with no
+    sidewalk, M17's long cuts), and walkers went through the corner building. `jrow`: the
+    junction's right of way taken in by ROW_IN_M (prepared), where there is a junction."""
+    oa = _walk_offset(a)
+    ob = _walk_offset(b)
     na, nb = _left(a.d), _left(b.d)
     pa = (P[0] + a.cut * a.d[0] + oa * na[0], P[1] + a.cut * a.d[1] + oa * na[1])
     pb = (P[0] + b.cut * b.d[0] - ob * nb[0], P[1] + b.cut * b.d[1] - ob * nb[1])
-    return _pt((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2), _pt(*pa), _pt(*pb)
+    mid = _pt((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2)
+    ux, uy = na[0] - nb[0], na[1] - nb[1]
+    s2 = math.sqrt(ux * ux + uy * uy) / 2        # sin of half the gap
+    if s2 < 1e-6:
+        return _on_row(P, mid, a, b, jrow), _pt(*pa), _pt(*pb)   # (on one line)
+    ux, uy = ux / (2 * s2), uy / (2 * s2)       # the gap's bisector
+    cross = a.d[0] * b.d[1] - a.d[1] * b.d[0]
+    dot = a.d[0] * b.d[0] + a.d[1] * b.d[1]
+    if cross > 0.05 or (cross > 0.0 and dot > 0.0):
+        # under 180 degrees (less a few): the two sidewalk lines' crossing, t along a and s
+        # along b from P: P + oa na + t da = P - ob nb + s db
+        rx, ry = -ob * nb[0] - oa * na[0], -ob * nb[1] - oa * na[1]
+        t = (rx * b.d[1] - ry * b.d[0]) / cross
+        s = (rx * a.d[1] - ry * a.d[0]) / cross
+        if -1e-6 <= t <= max(a.cut, oa) + oa and -1e-6 <= s <= max(b.cut, ob) + ob and \
+                t <= a.L and s <= b.L:
+            X = (P[0] + oa * na[0] + t * a.d[0], P[1] + oa * na[1] + t * a.d[1])
+        else:
+            X = mid                               # (a sharp fork: pa and pb lie close)
+    else:
+        o = (oa + ob) / 2
+        X = (P[0] + o * ux, P[1] + o * uy)
+    return _on_row(P, X, a, b, jrow), _pt(*pa), _pt(*pb)
+
+
+ROW_IN_M = 0.25     # a sidewalk corner keeps this far inside the right of way
+
+
+def _on_strip(x: Leg, q) -> bool:
+    """q on leg x's right of way (the flat-capped strip along its centerline as it runs, not
+    along its direction at the node: a leg that curves leaves that line), ROW_IN_M inside."""
+    s, d, _, _ = ST._project(x.pts, q)
+    return 1e-6 < s < x.L - 1e-6 and d <= x.row - ROW_IN_M
+
+
+def _on_row(P, X, a: Leg, b: Leg, jrow=None):
+    """X, or the point nearest it toward the node that lies on the right of way of leg a or
+    b or of the junction (`jrow`)."""
+    for lam in (1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1):
+        q = _pt(P[0] + lam * (X[0] - P[0]), P[1] + lam * (X[1] - P[1]))
+        if _on_strip(a, q) or _on_strip(b, q) or (jrow is not None and
+                                                  jrow.contains(Point(q))):
+            return q
+    return _pt(*P)
+
+
+def _jrow(lg: list):
+    """The right of way of the junction at a node (taken in by ROW_IN_M, prepared), or None
+    where there is none (a node of two legs with no cut)."""
+    n = len(lg)
+    if n < 2 or (n == 2 and not any(x.cut > 0.0 for x in lg)):
+        return None
+    g = junction_polygon(lg, row=True)
+    if g.is_empty:
+        return None
+    g = G.qpoly(g.buffer(-ROW_IN_M, join_style="mitre"))
+    if g.is_empty:
+        return None
+    shapely.prepare(g)
+    return g
 
 
 def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
@@ -1524,9 +1596,10 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                 turnarounds.append((nid, G.qpoly(Polygon(ring))))
             continue
         # corners between neighbors (sidewalk center points)
+        jrow = _jrow(lg)
         for i in range(n):
             a, b = lg[i], lg[(i + 1) % n]
-            c, _, _ = _corner_point(P, a, b)
+            c, _, _ = _corner_point(P, a, b, jrow)
             q = W.node(c)
             corner_of[(nid, a.seg["id"], "L" if a.at_start else "R")] = q
             corner_of[(nid, b.seg["id"], "R" if b.at_start else "L")] = q
@@ -1559,8 +1632,8 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
             b_ = _pt(p[0] + nrm[0] * x.h, p[1] + nrm[1] * x.h)
             prev = lg[i - 1]
             nxt = lg[(i + 1) % n]
-            right_corner = W.node(_corner_point(P, prev, x)[0])
-            left_corner = W.node(_corner_point(P, x, nxt)[0])
+            right_corner = W.node(_corner_point(P, prev, x, jrow)[0])
+            left_corner = W.node(_corner_point(P, x, nxt, jrow)[0])
             if marked:
                 cid = f"cw{len(crosswalks) + 1:05d}"
                 crosswalks.append({"id": cid, "junction_id": jid, "segment_id": x.seg["id"],
