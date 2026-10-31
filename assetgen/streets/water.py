@@ -108,9 +108,9 @@ def make_quay(inp: dict) -> Out:
             f = at(ws * (h + 0.3))
             feet.append((s, C.m(f[0]), C.m(f[1]), C.m(bot)))
     up = (0.0, 0.0, 1.0)
-    mesh.grid(pave, rows, uvs, expect=up)
-    mesh.grid("stone.coping", cop, cuv, expect=up)
-    mesh.grid("stone.quay", wall, wuv, expect=exp)
+    mesh.grid(pave, rows, _along(rows, uvs), expect=up)
+    mesh.grid("stone.coping", cop, _along(cop, cuv), expect=up)
+    mesh.grid("stone.quay", wall, _along(wall, wuv), expect=exp)
     s = BOLLARD_STEP / 2.0
     while s < P.L:
         x, y, nx, ny, _ = P.frame(s)
@@ -127,6 +127,18 @@ def make_quay(inp: dict) -> Out:
     out = Out(mesh=mesh)
     if "toe" in inp:
         out.notes["foot"] = [[x, y, z] for _, x, y, z in feet]
+    return out
+
+
+def _along(rows, uvs):
+    """UV0 with u the distance along each column's own line (in plan) from the first row:
+    a quay is 15 m wide, so round a sharp corner of its line (a basin's, or a jog of a few
+    centimeters at one) the mitered outer edge runs meters where the line runs none, and u
+    from the line's distance would stretch the texture there many times over."""
+    out = [[(uvs[0][j][0], uvs[0][j][1]) for j in range(len(rows[0]))]]
+    for i in range(1, len(rows)):
+        out.append([(out[i - 1][j][0] + dist(rows[i - 1][j][:2], rows[i][j][:2]),
+                     uvs[i][j][1]) for j in range(len(rows[i]))])
     return out
 
 

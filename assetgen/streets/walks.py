@@ -532,10 +532,34 @@ def _minus(sector, ring, holes, taken=()):
         return None
     out = []
     for p in parts:
-        r = ccw(list(p.exterior.coords)[:-1])
+        r = _onto(ccw(list(p.exterior.coords)[:-1]), taken)
         if len(r) >= 3 and not p.interiors:
             out.append(r)
     out.sort(key=lambda r: (min(r), len(r)))
+    return out
+
+
+SNAP_M = 0.0075         # half a diagonal of the overlay's 1 cm grid
+
+
+def _onto(ring, taken) -> list:
+    """The ring without a vertex the overlay's grid put beside an earlier corner's edge:
+    one within `SNAP_M` of the chord between its neighbors where that chord is an edge of
+    an earlier corner. Rounded to the grid, the point where the new corner leaves that
+    edge can fall a few millimeters inside the earlier one, a sliver of both (their
+    shared edge running the same way in each)."""
+    if not taken:
+        return ring
+    edges = {(r[k], r[(k + 1) % len(r)]) for r in taken for k in range(len(r))}
+    out = list(ring)
+    k = 0
+    while k < len(out) and len(out) > 3:
+        u, v, w = out[k - 1], out[k], out[(k + 1) % len(out)]
+        if ((w, u) in edges or (u, w) in edges) and _near(v, [u, w], False, SNAP_M):
+            del out[k]
+            k = max(k - 1, 0)
+            continue
+        k += 1
     return out
 
 
