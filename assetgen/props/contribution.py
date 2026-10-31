@@ -88,6 +88,10 @@ def props(man: dict, g) -> dict:
             "materials": MT.contribution_materials(slots), "entries": entries}
 
 
+BIG_SIGNS = {("billboard", "facade"): "billboard", ("banner", "facade"): "banner",
+             ("holo_ad", "front"): "holo", ("holo_ad", "roof"): "holo"}
+
+
 def signs(man: dict, g) -> dict:
     entries, slots = [], set()
     for t, items in g.signs.items():
@@ -98,8 +102,12 @@ def signs(man: dict, g) -> dict:
             rec = nodes.get(s["node"], {})
             slots |= set(rec.get("slots", []))
             kind = s["kind"]
+            # (shop signs replace M6's sign prototype; M20's large ads the blockout's
+            # prototypes of their kind, `blockout.SIGN_PROTO`)
+            big = BIG_SIGNS.get((kind, s["inputs"]["mount"]))
             e = {"key": s["id"], "kind": f"sign.{kind}", "hash": s["digest"][:16],
-                 "replaces": [f"prop.sign.{t}"] if kind == "shop_sign" and s["prop_id"] else [],
+                 "replaces": [f"prop.sign.{t}"] if kind == "shop_sign" and s["prop_id"] else
+                 [f"sign.{big}.{t}"] if big else [],
                  "glb": f"props/signs/{t}.glb", "node": s["node"], "asset": asset_name(s["node"]),
                  "pivot": s["pivot"], "yaw_deg": s["yaw"], "nanite": True,
                  "triangles": rec.get("triangles", 0), "slots": rec.get("slots", []),

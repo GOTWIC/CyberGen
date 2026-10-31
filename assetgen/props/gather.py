@@ -341,6 +341,11 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift, out_dir) 
         cell = cells.get(key)
         inp = {"kind": s.kind, "mount": s.mount, "w": C.m2(round(s.width_m * 20) / 20.0),
                "h": C.m2(round(s.height_m * 20) / 20.0), "style": st}
+        sa = s.attrs or {}
+        if sa.get("lit"):
+            inp["lit"] = sa["lit"]          # (M20: billboards lit as neon)
+        if s.mount == "front":
+            inp["off"] = C.m2(float(sa.get("off_m", 3.0)))   # (M20: off its facade)
         if key.startswith("ad:"):
             pal = (styles6.get((b.district_id if b is not None else None) or "") or {}).get(
                 "palette") or list(SG6.ACCENTS)

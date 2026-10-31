@@ -81,6 +81,7 @@ MATERIALS = {
     "prop_awning": "#e8a23a", "prop_car": "#c8ccd4", "prop_dumpster": "#3f7a4a",
     "prop_trash": "#6b6455", "prop_boat": "#eeeeee", "prop_concrete": "#9a9fa8",
     "prop_scaffold": "#d9b25a", "prop_kiosk": "#3a4150", "plant_trunk": "#6b4f3a",
+    "sign_ad": "#53e6ff", "sign_holo": "#7af7ff",
     "plant_crown": "#3f8a47", "plant_conifer": "#2f6e45", "plant_palm": "#7fae45",
     "plant_shrub": "#5aa060", "plant_scrub": "#7a8a4a", "plant_ivy": "#5fae55",
     "hedge": "#2f6e45", "lawn": "#4f8a57",
@@ -996,6 +997,39 @@ PROTOTYPES = {
 PLANT_BASE = {"conifer": (3.0, 10.0), "palm": (3.0, 10.0), "shrub": (1.0, 1.0),
               "overgrowth": (1.0, 1.0)}
 
+# M20: the large ads of the sign slots as prototypes, a unit face (1 x 1 m, its middle at the
+# slot's position) the instance scale stretches to the slot's width and height; x the way it
+# faces, the wall at x = 0 (AG15 draws them whole; AG8's assets replace them by key)
+PROTOTYPES.update({
+    "sign_billboard": [_bx((0.15, 0, -0.51), (0.3, 1.02, 1.02), "prop_neon"),
+                       _bx((0.17, 0, -0.5), (0.34, 1.0, 1.0), "sign_ad")],
+    "sign_banner": [_bx((0.15, 0, -0.5), (0.3, 1.0, 1.0), "prop_neon"),
+                    _bx((0.16, 0, -0.48), (0.32, 0.9, 0.96), "sign_ad")],
+    "sign_holo": [_bx((0, 0, -0.5), (0.06, 1.0, 1.0), "sign_holo")],
+})
+SIGN_PROTO = {("billboard", "facade"): "billboard", ("banner", "facade"): "banner",
+              ("holo_ad", "front"): "holo", ("holo_ad", "roof"): "holo"}
+
+
+def _signs(P: _Plan) -> None:
+    """M20: the large ads (neon billboards and banners on the facades, holo-boards over roofs
+    and in front of facades) as one instancing object per kind and tile
+    (`sign.<kind>.<tile>`); the shop signs are M6's sign props, the roof billboards M3's
+    roof items, the neon bands AG8's alone."""
+    groups: dict = {}
+    for s in P.m.sign_slots:
+        kind = SIGN_PROTO.get((s.kind, s.mount))
+        if kind is None:
+            continue
+        x, y, z = s.position
+        groups.setdefault((kind, tile_key(x, y)), []).append(
+            (s.id, [q(x), q(y), q(z), q(s.yaw_deg), 1.0, q(s.width_m), q(s.height_m)]))
+    for (kind, t), items in sorted(groups.items()):
+        P.add(f"sign.{kind}.{tile_name(*t)}", [P.city, "Signs", kind], t, f"sign_{kind}",
+              [{"k": "inst", "proto": f"sign_{kind}", "pts": [pt for _, pt in items]}],
+              {"citygen_type": f"sign_slot.{kind}", "count": len(items),
+               "citygen_ids": ";".join(i for i, _ in items)})
+
 
 def _dressing(P: _Plan) -> None:
     m = P.m
@@ -1465,6 +1499,7 @@ def make_plan(m: CityModel) -> dict:
         _decks(P)
         _tunnels(P)
         _dressing(P)
+        _signs(P)
         _terrain(P)
         cams = _cameras(P)
         swim = swim_volumes(m, P.beds)
@@ -1989,6 +2024,7 @@ def _terrain(P: _Plan) -> None:
     bored = {t.id: t.segment_ids[0] for t in m.tunnels if t.kind == "bored" and t.segment_ids}
     road_tun = {t.id: t.segment_ids[0] for t in m.tunnels
                 if t.kind in ("immersed_tube", "cut_and_cover") and t.segment_ids}
+    sign_base = {s.id: gd.base.get(s.building_id) for s in m.sign_slots if s.building_id}
     for o in list(P.objects):
         cat = o["category"]
         if cat in ("ground", "sea"):
@@ -2020,6 +2056,26 @@ def _terrain(P: _Plan) -> None:
         if cat == "skybridge":
             base = gd.sky.get(cid, 0.0)
             o["parts"] = [x for p in o["parts"] for x in _lift_part(p, lambda x_, y_: base)]
+            continue
+        if (cat.startswith("prop_") or cat.startswith("plant_")) and o["parts"] and \
+                o["parts"][0]["k"] == "inst":
+            # M20: what stands on a roof is over its building's base (as AG8 lifts it), the
+            # rest over the ground where it stands
+            p = o["parts"][0]
+            pts = []
+            for pt in p["pts"]:
+                bb = gd.building_base(pt[0], pt[1]) if pt[2] > 0.6 else None
+                pts.append([pt[0], pt[1], q(pt[2] + (bb if bb is not None else
+                                                     gd.at(pt[0], pt[1])))] + pt[3:])
+            p["pts"] = pts
+            continue
+        if cat.startswith("sign_"):
+            # M20: a sign slot's z is over its building's base, as the masses it hangs on
+            sids = str(props.get("citygen_ids") or "").split(";")
+            p = o["parts"][0]
+            p["pts"] = [[pt[0], pt[1], q(pt[2] + (sign_base.get(sid) if sign_base.get(sid)
+                                                   is not None else gd.at(pt[0], pt[1])))]
+                        + pt[3:] for sid, pt in zip(sids, p["pts"])]
             continue
         new = []
         for i, p in enumerate(o["parts"]):

@@ -1408,7 +1408,10 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
                     "yaw_deg": yaw, "width_m": w, "height_m": h, "emitter": True,
                     "two_sided": blade, "content": p.attrs.get("use") or "shop",
                     "segment_id": sid, "audience": _audience(dens.get(sid)), "attrs": {}})
-    # roof billboards (M3) and the new slots
+    # roof billboards (M3), lit as neon (M20), and the new slots
+    from . import signage as SG
+
+    pl = SG.Placer(m, dens, _audience)
     sky_ends: dict[str, list] = {}
     for sb in m.skybridges:
         for bid, pt in zip(sb.building_ids, sb.line):
@@ -1429,7 +1432,7 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
                         "yaw_deg": round(((yaw + 180.0) % 360.0) - 180.0, 1) + 0.0,
                         "width_m": q(it.size[0]), "height_m": q(it.size[2]), "emitter": True,
                         "two_sided": True, "content": "ad", "segment_id": sid,
-                        "audience": _audience(dens.get(sid)), "attrs": {}})
+                        "audience": _audience(dens.get(sid)), "attrs": {"lit": "neon"}})
         if b.footprint is None or b.landmark or b.portals or b.megasite_id:
             continue
         H = b.height_m
@@ -1437,13 +1440,9 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
         if not prisms:
             continue
         top = max(b.masses, key=lambda ms: (ms.z1_m, -ms.z0_m))
-        fp = top.footprint
+        roof = SG.roof_of(b)      # (M20: under a mast or spire, the roof it stands on)
+        fp = roof.footprint
         edges = _edges(fp)
-        # the main body: the prism with most volume
-        body = max(prisms, key=lambda ms: (round((ms.z1_m - ms.z0_m) *
-                                                 G.area(G.from_model_poly(ms.footprint)), 2),
-                                           ms.z1_m))
-        bedges = _edges(body.footprint)
         ends = sky_ends.get(b.id, [])
 
         def clear(a, bb, z0, z1):
@@ -1452,65 +1451,34 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
                         LineString([a, bb]).distance(Point(pt)) < 3.0:
                     return False
             return True
-
-        def best_edge(edges, classes, min_len):
-            best = None
-            for i, (a, bb, L, (nx, ny)) in enumerate(edges):
-                if L < min_len:
-                    continue
-                mx, my = (a[0] + bb[0]) / 2.0, (a[1] + bb[1]) / 2.0
-                hit = _nearest(stree, sgeo, Point(mx + nx * 6.0, my + ny * 6.0), 45.0,
-                               ok=lambda j: segs[j].road_class in classes)
-                if hit is None:
-                    continue
-                sid = segs[hit[1]].id
-                aud = _audience(dens.get(sid))
-                key = (aud, round(L, 4), -i)
-                if best is None or key > best[0]:
-                    best = (key, i, sid, aud)
-            return best
-        # facade billboard facing a highway or avenue
-        if H >= 25.0 and _u("bb", b.id) < 0.3 + 0.5 * neon:
-            be = best_edge(bedges, ("highway", "avenue"), 12.0)
-            if be is not None:
-                _, i, sid, aud = be
-                a, bb, L, (nx, ny) = bedges[i]
-                w = q(min(0.7 * L, 30.0))
-                h = q(w * 0.45)
-                z0, z1 = body.z0_m, body.z1_m
-                zc = q(min(max(z0 + 0.65 * (z1 - z0), z0 + h / 2.0 + 2.0, h / 2.0 + 12.0),
-                           z1 - h / 2.0 - 2.0))
-                if w >= 8.0 and zc - h / 2.0 >= max(10.0, z0 + 1.0,
-                                                    sign_top.get(b.id, 0.0) + 0.5) and \
-                        clear(a, bb, zc - h / 2, zc + h / 2):
-                    mx, my = (a[0] + bb[0]) / 2.0, (a[1] + bb[1]) / 2.0
-                    out.append({"id": f"{b.id}.slot.billboard", "type": "sign_slot.billboard",
-                                "kind": "billboard", "mount": "facade", "building_id": b.id,
-                                "prop_id": None, "roof_item": None,
-                                "position": (q(mx), q(my), zc), "yaw_deg": _yaw(nx, ny),
-                                "width_m": w, "height_m": h, "emitter": True,
-                                "two_sided": False, "content": "ad", "segment_id": sid,
-                                "audience": aud, "attrs": {"edge": i}})
-        # holo-ad over a tower roof
+        corp = c.arch.get(did) in CORP_ARCH
+        sdens, skinds = SG.params(pl.dist.get(did))
+        # holo-board over a tower roof (M20: by the district's signage)
         pads = any(it.kind in ("helipad", "av_pad") for it in b.roof_items)
-        if H >= 80.0 and not pads and top.shape == "prism" and edges and \
-                _u("holo", b.id) < neon * 0.6:
+        if "holo" in skinds and H >= SG.HOLO_ROOF_M and not pads and \
+                roof.shape == "prism" and edges and \
+                _u("holo", b.id) < SG.HOLO_ROOF_P[0] + SG.HOLO_ROOF_P[1] * sdens:
             cx, cy = _center(fp.exterior)
             short = min(L for *_, L, _n in edges)
             w = q(min(max(short * 0.8, 8.0), 30.0))
             h = q(min(max(0.15 * H, 12.0), 40.0))
-            if shapely.contains_xy(G.from_model_poly(fp), cx, cy):
+            # (over the roof's middle, clear of a mast or spire there)
+            if shapely.contains_xy(G.from_model_poly(fp), cx, cy) and not any(
+                    ms.z1_m > roof.z1_m + 0.01 and
+                    shapely.contains_xy(G.from_model_poly(ms.footprint), cx, cy)
+                    for ms in b.masses):
                 sid = facing(cx, cy)
                 out.append({"id": f"{b.id}.slot.holo_ad", "type": "sign_slot.holo_ad",
                             "kind": "holo_ad", "mount": "roof", "building_id": b.id,
                             "prop_id": None, "roof_item": None,
-                            "position": (cx, cy, q(top.z1_m + 4.0 + h / 2.0)),
+                            "position": (cx, cy, q(roof.z1_m + 4.0 + h / 2.0)),
                             "yaw_deg": _yaw(*edges[0][3]), "width_m": w, "height_m": h,
                             "emitter": True, "two_sided": True,
-                            "content": "corporate" if c.arch.get(did) in CORP_ARCH else "ad",
+                            "content": "corporate" if corp else "ad",
                             "segment_id": sid, "audience": _audience(dens.get(sid)),
                             "attrs": {}})
         # neon band at a corner of a mid-rise facade over a shopping street
+        band = None
         if 3 <= b.floors <= 15 and b.units and neon >= 0.4 and _u("neon", b.id) < neon * 0.5:
             # (M14: on a deck, its floors and the band's 8 m count from the deck top)
             floor = float(b.attrs.get("deck_top_m", 0.0)) if b.level else 0.0
@@ -1541,6 +1509,7 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
                     x, y = a[0] + ux * 1.0, a[1] + uy * 1.0
                     zc = q(lo + h / 2.0)
                     if clear(a, bb, lo, lo + h):
+                        band = (a, bb, lo, lo + h)
                         out.append({"id": f"{b.id}.slot.neon", "type": "sign_slot.neon",
                                     "kind": "neon", "mount": "facade", "building_id": b.id,
                                     "prop_id": None, "roof_item": None,
@@ -1549,6 +1518,11 @@ def build_sign_slots(c: Ctx, dens: dict) -> list[dict]:
                                     "two_sided": False, "content": "district",
                                     "segment_id": sid, "audience": _audience(dens.get(sid)),
                                     "attrs": {"edge": i}})
+        # M20: the neon billboards, banners and holo-boards on its facades
+        floor = float(b.attrs.get("deck_top_m", 0.0)) if b.level else 0.0
+        out += SG.place(pl, b, max(floor + SG.MIN_Z_M,
+                                   sign_top.get(b.id, 0.0) + SG.SIGN_GAP_M),
+                        clear, band, corp)
     out.sort(key=lambda r: r["id"])
     return out
 

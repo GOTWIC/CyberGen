@@ -899,10 +899,17 @@ class TravelPoint(Entity):
 class SignSlot(Entity):
     """A surface for signage that stages 2 and 3 fill: shop signs (the M6 sign props),
     billboards (M3 roof billboards and facade panels), holo-ads over roofs and neon bands on
-    facades; `type` is `sign_slot.<kind>`."""
+    facades; `type` is `sign_slot.<kind>`.
+
+    M20 (`signage.py`): neon billboards on facades (`attrs.orientation` landscape or
+    portrait), vertical neon banners spanning floors at a facade's corner (kind `banner`;
+    `attrs.floors`, and `attrs.wrap`, the slot of the face round the corner, where it wraps
+    it), holo-boards over roofs and projected in front of facades (mount `front`: the image's
+    middle, `attrs.off_m` in front of the facade, facing out); every billboard and banner
+    `attrs.lit` `neon`. A facade slot's position is the middle of its face on the wall."""
     TYPE_PREFIX: ClassVar[str] = "sign_slot"
-    kind: Literal["shop_sign", "billboard", "holo_ad", "neon"]
-    mount: Literal["facade", "blade", "roof"]
+    kind: Literal["shop_sign", "billboard", "holo_ad", "neon", "banner"]
+    mount: Literal["facade", "blade", "roof", "front"]
     building_id: str | None = None
     prop_id: str | None = Field(None, description="Shop signs: the M6 sign prop.")
     roof_item: int | None = Field(None, description="Roof billboards: index in roof_items.")

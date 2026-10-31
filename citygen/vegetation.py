@@ -519,7 +519,10 @@ class Overhead:
                 u = _lowest(prof, s0 - r, s0 + r) - depth
                 if u < 0.5:
                     # a road on its fill (or at grade): over what stands in its width well
-                    # under its surface
+                    # under its surface on the ground (what stands on another road's deck
+                    # beside it is at a gore, not in its fill)
+                    if own is not None and own[i] and base[i] > 0.02:
+                        continue
                     if line.distance(pt) >= half + r + tol or top <= base[i] + 0.5:
                         continue
                     u = 0.0

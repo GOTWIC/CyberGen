@@ -13,8 +13,12 @@ middle of its face (M11's position).
 | shop sign, facade | neon: tubes along the text's strokes (AG6's glyphs) on a backboard with an outline; lightbox: a box whose face shows the page cell; LED: a dark panel whose face shows the page cell; channel letters (a lightbox in a sleek district, by a hash): lit letters on a raceway; standoffs back to the wall where the brief finds it off the wall |
 | shop sign, blade | neon: an open skeleton with the text stacked in tubes; lightbox and LED: a box on two arms, both faces showing the (tall) page cell |
 | billboard | a steel frame, the ad's cell on its face (both faces on roofs), lamps on arms, a truss and catwalk on roofs |
-| holo-ad | a projector on the roof (Nanite) and the image: the holo ad's cell on translucent emissive planes with frame and scan bands, as a non-Nanite LOD chain (`extra`) |
+| holo-ad | a projector on the roof (Nanite) and the image: the holo ad's cell on translucent emissive planes with frame and scan bands, as a non-Nanite LOD chain (`extra`); in front of a facade (M20) the projector on an arm off the wall |
 | neon band | a backboard on the facade with the district's name stacked in neon tubes, an outline and chevrons |
+| banner (M20) | as a neon band: a brand's name stacked in neon tubes down a tall backboard |
+
+M20's billboards lit as neon (`lit`) have a neon tube round the face in place of the lamps
+on arms. AG15 draws the large ads whole.
 
 A face is a quad whose UV0 is its page cell (slot `page.<page>`, AG6's `sign` master;
 `holopage.<page>` on the holo master), so the text, the brand and the ad are AG6's pixels;
@@ -279,6 +283,11 @@ def billboard(m: Mesh, inp: dict) -> None:
         inset = min(0.25, 0.03 * w)
         face(m, inp, x + s * 0.002, -w / 2 + inset, w / 2 - inset, -h / 2 + inset,
              h / 2 - inset, s, MT.face_slot(inp["colors"][0]))
+        if inp.get("lit") == "neon":
+            # (M20: lit as neon, a tube round its face; AG15 draws them whole)
+            outline(m, MT.neon_slot(inp["colors"][-1]), 0.0, 0.0, w - inset, h - inset,
+                    x + s * 0.03, min(0.06, max(0.02, 0.004 * min(w, h))))
+            continue
         # lamps on arms along the bottom, pointing up at the face
         nl = max(2, int(w / 4.0))
         for i in range(nl):
@@ -302,14 +311,25 @@ def billboard(m: Mesh, inp: dict) -> None:
 
 
 def holo(m: Mesh, inp: dict) -> list:
-    """The projector (in m, Nanite) and the image as a LOD chain of translucent planes."""
+    """The projector (in m, Nanite) and the image as a LOD chain of translucent planes; M20's
+    holo-boards in front of a facade (`mount` front) project from a box on an arm off the
+    wall (`off` behind the image) under the image."""
     w, h = inp["w"], inp["h"]
     roof = -h / 2 - 4.0
     c1, c2 = MT.holo_slot(inp["colors"][0]), MT.holo_slot(inp["colors"][1])
-    # the projector on the roof
-    blk(m, "holo.base", -1.0, 1.0, -1.4, 1.4, roof, roof + 0.8)
-    pts = [(0.7 * c, 0.7 * s, roof + 0.81) for c, s in ring(12)]
-    fan(m, MT.neon_slot(inp["colors"][0]), (0.0, 0.0, roof + 0.81), pts, (0.0, 0.0, 1.0))
+    if inp["mount"] == "front":
+        wall = -inp.get("off", 3.0)
+        roof = -h / 2 - 1.2
+        blk(m, "metal.dark", wall, -0.4, -0.08, 0.08, roof + 0.25, roof + 0.4)
+        blk(m, "holo.base", -1.0, 0.2, -0.9, 0.9, roof, roof + 0.6)
+        pts = [(-0.4 + 0.45 * c, 0.45 * s, roof + 0.61) for c, s in ring(12)]
+        fan(m, MT.neon_slot(inp["colors"][0]), (-0.4, 0.0, roof + 0.61), pts,
+            (0.0, 0.0, 1.0))
+    else:
+        # the projector on the roof
+        blk(m, "holo.base", -1.0, 1.0, -1.4, 1.4, roof, roof + 0.8)
+        pts = [(0.7 * c, 0.7 * s, roof + 0.81) for c, s in ring(12)]
+        fan(m, MT.neon_slot(inp["colors"][0]), (0.0, 0.0, roof + 0.81), pts, (0.0, 0.0, 1.0))
     lods = []
     for lod in range(3):
         q = Mesh((0.0, 0.0))

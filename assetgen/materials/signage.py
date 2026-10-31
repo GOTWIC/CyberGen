@@ -129,13 +129,14 @@ def slot_texts(model, styles: dict) -> tuple[dict, dict]:
         dist = (b.district_id if b else None) or ""
         st = styles.get(dist) or {"name": city, "era": "mixed_modern", "scripts": {"latin": 1},
                                   "palette": list(ACCENTS)}
-        shape = "tall" if s.mount == "blade" else "wide"
+        shape = "tall" if s.mount == "blade" or s.kind == "banner" else "wide"
         if s.kind in ("billboard", "holo_ad"):
             slots[s.id] = f"ad:{_h(city, 'ad', s.id) % (2 * ADS_PER_PAGE)}"
             continue
         if s.kind == "neon":
             text, base = st["name"].upper(), f"district:{dist}"
-        elif s.content == "corporate" or s.content == "lobby":
+        elif s.content == "corporate" or s.content == "lobby" or s.kind == "banner":
+            # (M20: a banner carries its owner's brand, else its building's name)
             own = owner_of.get(s.building_id or "", "")
             if own and owner_n.get(own, 0) >= BRAND_MIN:
                 text, base = _owner_name(own).upper(), f"owner:{own}"
@@ -146,6 +147,8 @@ def slot_texts(model, styles: dict) -> tuple[dict, dict]:
                 text = (f"{_pick(GP.NOUN, city, dist, 'lobby', k)} "
                         f"{_pick(LOBBY_WORDS, city, dist, 'lobby', k, 'w')}").upper()
                 base = f"lobby:{dist}:{k}"
+            if s.kind == "banner":
+                base = "banner:" + base     # (its own text record: always neon)
         else:
             poi = None
             if b is not None and b.units:
@@ -172,7 +175,7 @@ def slot_texts(model, styles: dict) -> tuple[dict, dict]:
                         f"{noun} {word}" if form == 1 else word).upper()
                 base = f"shop:{dist}:{use}:{k}"
         script = _wpick(st["scripts"], city, base, "script")
-        style = STYLES[_h(city, base, "style") % 3] if s.kind != "neon" else "neon"
+        style = "neon" if s.kind in ("neon", "banner") else STYLES[_h(city, base, "style") % 3]
         color = _pick(st["palette"], city, base, "color")
         key = f"{base}:{shape}"
         if key not in texts:

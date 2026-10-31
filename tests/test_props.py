@@ -173,7 +173,10 @@ def test_blockout_plan_instances(city):
     inst = [o for o in plan["objects"] if o["parts"] and o["parts"][0]["k"] == "inst"]
     assert inst
     assert plan["stats"]["instances"] == sum(len(o["parts"][0]["pts"]) for o in inst)
-    assert plan["stats"]["instances"] == len(city.model.props) + len(city.model.plants)
+    # (M20: and the large ads, as sign prototypes)
+    ads = sum(1 for s in city.model.sign_slots if (s.kind, s.mount) in BO.SIGN_PROTO)
+    assert ads
+    assert plan["stats"]["instances"] == len(city.model.props) + len(city.model.plants) + ads
     for o in inst:
         assert o["parts"][0]["proto"] in plan["prototypes"]
         assert all(len(pt) == 7 for pt in o["parts"][0]["pts"])
