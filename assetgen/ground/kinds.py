@@ -17,7 +17,8 @@ its world cell) is kept with probability
 $$p = D\\, a\\, (1 - w)^2\\, f_s\\, (1 + 0.6\\, m)\\, f_g\\, k_t$$
 
 ($a$ the cell's area, $w$ the wear, $f_s = 1$ up to shade 0.5 falling to 0.3 at full
-shade, $m$ the moisture, $f_g$ 0.6 on slopes over 30 degrees, $k_t$ the tile's cap: at most
+shade, $m$ the moisture, $f_g$ 0.5 where the ground is steeper than 30 degrees and 0 past
+40 (M13's slope at the point), $k_t$ the tile's cap: at most
 `TILE_INSTANCES` per tile, the kept clumps then scaled up by $k_t^{-1/2}$, at most 1.5).
 Deep shade turns the mix to ferns, wet ground near water to reeds, neglect to weeds.
 """
@@ -38,7 +39,8 @@ CLUMP_TRIANGLES = 400           # one clump variant
 UNIQUE_TRIANGLES = 60_000       # every clump variant of a city together
 TILE_GROUND_TRIANGLES = 250_000
 CITY_GROUND_TRIANGLES = 12_000_000
-TILE_DRAWN_TRIANGLES = 8_000_000    # instances times their variant's triangles, one tile
+TILE_DRAWN_TRIANGLES = 12_000_000   # instances times their variant's triangles, one tile
+                                    # (within the fade radius, about half a tile's draw)
 
 # surface: (base set, worn set, shade set, tint or None, wear, moss, edge, wet)
 SURFACES: dict[str, tuple] = {

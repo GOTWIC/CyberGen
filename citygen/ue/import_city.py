@@ -867,10 +867,20 @@ def grass_master(m, defaults):
         a = expr(m, unreal.MaterialExpressionOneMinus, -1200, 900)
         link(fade, "", a, "Input")
         d = expr(m, dith_cls, -1000, 900)
-        link(a, "", d, "AlphaThreshold")
-        MEL.connect_material_property(d, "", MP.MP_OPACITY_MASK)
-        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
-        m.set_editor_property("opacity_mask_clip_value", 0.3333)
+        linked = False
+        for pin in ("AlphaThreshold", "Alpha Threshold", "Alpha"):
+            try:
+                link(a, "", d, pin)
+                linked = True
+                break
+            except RuntimeError:
+                continue
+        if linked:
+            MEL.connect_material_property(d, "", MP.MP_OPACITY_MASK)
+            m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+            m.set_editor_property("opacity_mask_clip_value", 0.3333)
+        else:
+            log("M_CgGrass: no dither input; the clumps cut off at their cull distance")
     m.set_editor_property("two_sided", True)
 
 

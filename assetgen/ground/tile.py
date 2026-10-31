@@ -40,6 +40,10 @@ from . import clumps as CL
 from . import kinds as K
 
 TRUNK_M = 0.35
+FINE_M = 0.001                 # the grass's footprint overlays
+SLOPE_FEW = 0.577              # tan 30 degrees: half the grass
+SLOPE_NONE = 0.839             # tan 40 degrees: none
+STEEP_NZ = 0.82                # a ground triangle steeper than about 35 degrees is box mapped
 DESIRE_FADE_M = 1.0
 CANOPY = (0.55, 0.25)          # shade under a crown: base + rise toward the trunk
 KL = sorted(K.CLUMPS)
@@ -243,7 +247,15 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
     s = mask[:, :, 1].astype(np.float64) / 255.0
     m = mask[:, :, 3].astype(np.float64) / 255.0
     fs = np.clip(np.where(s <= 0.5, 1.0, 1.0 - 1.4 * (s - 0.5)), 0.3, 1.0)
-    fg = np.array([0.6 if float(it["slope"]) > 30.0 else 1.0 for it in items] + [1.0])[pidx]
+    fg = np.ones((n, n))
+    if gr.g is not None:
+        # the slope at each candidate (M13): fewer from 30 degrees, none past 40 (the steps
+        # of the retaining walls, cliffs)
+        e = c / 2.0
+        gx = (gr.at(X + e, Y) - gr.at(X - e, Y)) / c
+        gy = (gr.at(X, Y + e) - gr.at(X, Y - e)) / c
+        t = np.hypot(gx, gy)
+        fg = np.where(t > SLOPE_NONE, 0.0, np.where(t > SLOPE_FEW, 0.5, 1.0))
     p = D * (c * c) * (1.0 - w) ** 2 * fs * (1.0 + 0.6 * m) * fg
     total = math.fsum(p[p > 0.0].tolist())
     kt = min(1.0, K.TILE_INSTANCES / total) if total > 0.0 else 1.0
@@ -282,24 +294,32 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
                      min(K.MAX_SCALE_UP, kt ** -0.5), 2)
     foot = np.array([K.CLUMPS[KL[k]][1] for k in ki]) * scale
     # where a footprint may stand: the grass-bearing land, clear of desire lines, decks and
-    # trunks
-    grassy = [polys[k] for k, it in enumerate(items) if K.GRASS[it["kind"]][0] > 0.0]
-    allowed = G.union_local(grassy) if grassy else Polygon()
+    # trunks; the pieces and the verges apart (a median lawn may lie a few millimeters from a
+    # lot across the road's edge: their union would bridge the road)
     cut = list(mk["corridors"]) + list(mk["decks"])
     cut += [shapely.Point(tx, ty).buffer(TRUNK_M, 8) for tx, ty in mk["trunks"]]
     for it in items:
         if it["mode"] == "strip":
             cut.append(LineString([q[:2] for q in it["zline"]]).buffer(
                 0.45, cap_style="flat"))
-    if cut:
-        allowed = G.diff(allowed, G.union_local(cut))
+    # (on a 1 mm grid: the pieces' vertices are on the 1 cm grid, and a 1 cm overlay would
+    # close a building's sub-centimeter sliver between two of them)
+    cutg = shapely.union_all(cut, grid_size=FINE_M) if cut else None
     ok = np.zeros(len(px), dtype=bool)
-    if not allowed.is_empty:
-        inside = shapely.contains_xy(allowed, px, py)
+    verge = np.array([it["mode"] != "piece" for it in items])[it_k]
+    for want in (False, True):
+        grassy = [polys[k] for k, it in enumerate(items)
+                  if K.GRASS[it["kind"]][0] > 0.0 and (it["mode"] != "piece") == want]
+        allowed = shapely.union_all(grassy, grid_size=FINE_M) if grassy else Polygon()
+        if cutg is not None and not allowed.is_empty:
+            allowed = shapely.difference(allowed, cutg, grid_size=FINE_M)
+        sel = np.nonzero(verge == want)[0]
+        if allowed.is_empty or not len(sel):
+            continue
+        sel = sel[shapely.contains_xy(allowed, px[sel], py[sel])]
         segs = _segments(allowed)
-        if segs and inside.any():
+        if segs and len(sel):
             tree = shapely.STRtree(segs)
-            sel = np.nonzero(inside)[0]
             _, dist = tree.query_nearest(shapely.points(px[sel], py[sel]),
                                          return_distance=True, all_matches=False)
             ok[sel] = np.round(dist, 4) >= foot[sel]
@@ -343,6 +363,33 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
                                                  if ((ki == k) & ok).any()}}
 
 
+def _cdt(q, mm) -> list[tuple[int, int, int]] | None:
+    """Triangles of a polygon by GEOS's constrained Delaunay triangulation, as indices into
+    its rings' vertices (mm: the rings in integer millimeters), counterclockwise; None when a
+    triangle has a vertex that is not one of them."""
+    idx = {}
+    for i, p in enumerate(p for r in mm for p in r):
+        idx.setdefault(p, i)
+    ox = mm[0][0][0] - int(round(q.exterior.coords[0][0] * 1000.0))
+    oy = mm[0][0][1] - int(round(q.exterior.coords[0][1] * 1000.0))
+    out = []
+    for t in shapely.get_parts(shapely.constrained_delaunay_triangles(q)):
+        cs = list(t.exterior.coords)[:3]
+        tri = []
+        for x, y in cs:
+            k = idx.get((int(round(x * 1000.0)) + ox, int(round(y * 1000.0)) + oy))
+            if k is None:
+                return None
+            tri.append(k)
+        flat = [p for r in mm for p in r]
+        a, b, c = flat[tri[0]], flat[tri[1]], flat[tri[2]]
+        o = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+        if o == 0:
+            continue
+        out.append((tri[0], tri[1], tri[2]) if o > 0 else (tri[0], tri[2], tri[1]))
+    return sorted(out)
+
+
 def _mesh(job, items, gr: _Ground):
     """The tile's ground: a primitive per surface."""
     x0, y0, x1, y1 = job["box"]
@@ -352,7 +399,7 @@ def _mesh(job, items, gr: _Ground):
     box = shapely.box(x0, y0, x1, y1)
     buf: dict[str, dict] = {}
     areas: dict[str, float] = {}
-    failed = []
+    failed, cdt = [], []
     cells = None
     if gr.g is not None:
         g = gr.g
@@ -393,8 +440,14 @@ def _mesh(job, items, gr: _Ground):
                 try:
                     tris = triangulate(mm[0], mm[1:])
                 except TriangulationError:
-                    failed.append(it["id"])
-                    continue
+                    # (a hole touching its outer ring at a vertex, valid but not simple for
+                    # ear clipping: GEOS's constrained Delaunay triangles, on the same
+                    # vertices)
+                    tris = _cdt(q, mm)
+                    if tris is None:
+                        failed.append(it["id"])
+                        continue
+                    cdt.append(it["id"])
                 if not tris:
                     continue
                 flat = [p for r in rings for p in r]
@@ -416,9 +469,33 @@ def _mesh(job, items, gr: _Ground):
                     b["nrm"].append(nrm)
                     b["uv"].append((round(x, 3), round(y, 3)))
                 for a, bb, cc in tris:
-                    b["idx"] += [where[a], where[bb], where[cc]]
+                    ia, ib, ic = where[a], where[bb], where[cc]
+                    if gr.g is not None and zline is None:
+                        pa, pb, pc = b["pos"][ia], b["pos"][ib], b["pos"][ic]
+                        ux, uy, uz = pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]
+                        vx, vy, vz = pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2]
+                        nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
+                        L = math.sqrt(float(nx) * nx + float(ny) * ny + float(nz) * nz) or 1.0
+                        if abs(nz) / L < STEEP_NZ:
+                            # (box mapping: the plan UV stretches on a wall's step; the
+                            # triangle's own vertices with UV0 on the axis plane it faces most)
+                            k = 0 if abs(nx) >= abs(ny) else 1
+                            if abs(nz) >= max(abs(nx), abs(ny)):
+                                k = 2
+                            ids = []
+                            for q3, n3 in ((pa, b["nrm"][ia]), (pb, b["nrm"][ib]),
+                                           (pc, b["nrm"][ic])):
+                                wx, wy, wz = ((q3[0] + ox) / 1000.0, (q3[1] + oy) / 1000.0,
+                                              q3[2] / 1000.0)
+                                uvq = ((wy, wz), (wx, wz), (wx, wy))[k]
+                                ids.append(len(b["pos"]))
+                                b["pos"].append(q3)
+                                b["nrm"].append(n3)
+                                b["uv"].append((round(uvq[0], 3), round(uvq[1], 3)))
+                            ia, ib, ic = ids
+                    b["idx"] += [ia, ib, ic]
                 del base
-            areas[it["id"]] = areas.get(it["id"], 0.0) + G.area(part)
+                areas[it["id"]] = areas.get(it["id"], 0.0) + G.area(q)
     g = Gltf(generator="assetgen AG13 ground")
     prims = []
     tris_n = 0
@@ -435,12 +512,13 @@ def _mesh(job, items, gr: _Ground):
                                uv0=np.array(b["uv"], dtype=np.float64)))
         tris_n += len(b["idx"]) // 3
     if not prims:
-        return b"", {}, areas, failed, []
+        return b"", {}, areas, failed + [f"cdt:{i}" for i in cdt], []
     name = f"ground.{tile}"
     mesh = g.mesh(name, prims)
     g.node(name, mesh, translation=(ox, oy, 0), root=True,
            extras={"citygen_type": "ground_cover", "tile": tile})
     slots = sorted(s for s in buf if buf[s]["idx"])
+    failed = failed + [f"cdt:{i}" for i in cdt]          # (the fallback's: reported)
     return g.to_glb(), {"node": name, "triangles": tris_n, "slots": slots}, areas, failed, \
         slots
 

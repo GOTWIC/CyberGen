@@ -1,7 +1,9 @@
 """Checks and stats of the ground stage (scope sections 9, 14.14):
 
 - `ground_coverage`: every piece of M16's ground cover is drawn whole (the areas its tiles
-  draw add up to its own within 0.5 % or 0.5 m2, nothing failed to triangulate), and every
+  draw add up to its own within 0.5 % or 0.5 m2, nothing failed to triangulate; a part ear
+  clipping refuses, a hole touching its outer ring, falls back to GEOS's constrained
+  Delaunay triangles on the same vertices and is listed), and every
   blockout object of the cover and the median lawns is replaced by an entry (its tile's or a
   drop);
 - `ground_grass_clear`: no clump's footprint (its kind's radius times its scale) reaches a
@@ -141,11 +143,12 @@ def report(model, man: dict, con: dict, out_dir: Path) -> dict:
     checks = []
     # coverage
     drawn: dict[str, float] = {}
-    failed = []
+    failed, cdt = [], []
     for t, r in man["tiles"].items():
         for pid, a in (r.get("areas") or {}).items():
             drawn[pid] = drawn.get(pid, 0.0) + a
-        failed += r.get("failed") or []
+        for f in r.get("failed") or []:
+            (cdt if f.startswith("cdt:") else failed).append(f.split(":", 1)[-1])
     short = []
     for g in model.ground_cover:
         a = drawn.get(g.id, 0.0)
@@ -161,6 +164,7 @@ def report(model, man: dict, con: dict, out_dir: Path) -> dict:
                    "pieces": len(model.ground_cover), "short": len(short),
                    "first_short": short[0] if short else None,
                    "triangulation_failed": sorted(set(failed))[:10],
+                   "constrained_delaunay": sorted(set(cdt))[:10],
                    "blockout_objects": len(man.get("keys") or {}),
                    "not_replaced": left[:10]})
     checks.append(_clear(model, man, out_dir))
