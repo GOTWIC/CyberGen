@@ -341,29 +341,35 @@ def _stations(k: dict):
 
 
 def _wl(x, y, nx, ny, mk, w) -> tuple[float, float]:
-    """A point of a bank's waterline (on citygen's 0.01 m grid, as the bed's edge): `width`
-    out along the normal, not mitered, so it is `width` from the line also at a vertex (where
-    the bed's slope, measured from the nearest point of the line, meets the surface)."""
+    """A point of a bank's waterline (the gap check's samples): `width` out along the normal,
+    not mitered, so it is `width` from the line also at a vertex, on the strip's edge."""
     return C.m2(x + nx * w), C.m2(y + ny * w)
 
 
 def strip(k: dict):
-    """A sloped bank's dry strip: from its line out to its waterline (its line moved `width`
-    out over the water), the polygon its mesh covers; None if degenerate."""
+    """A sloped bank's dry strip, the polygon its mesh covers and the bed leaves out: every
+    point within `width` of its line on the water's side (the line buffered on its left;
+    for a line round a whole island, the ring of beach round it, not the island), on the
+    millimeter grid; None if degenerate."""
     w = max(float(k["w"]), 0.05)
-    _, st = _stations(k)
-    if len(st) < 2:
+    P, _ = _stations(k)
+    if P is None:
         return None
-    line = [(C.m2(x), C.m2(y)) for s, x, y, nx, ny, mk in st]
-    wl = [_wl(x, y, nx, ny, mk, w) for s, x, y, nx, ny, mk in st]
-    p = shapely.make_valid(shapely.Polygon(line + wl[::-1]))
-    # (where the waterline folds over at a bend the ring crosses itself: its loops are the
-    # strip too, and the holes they leave are filled)
-    parts = [shapely.Polygon(q.exterior) for q in GR._polys(p) if q.area > 1e-6]
-    if not parts:
-        return None
-    p = shapely.union_all(parts, grid_size=0.001)
-    return p if not p.is_empty else None
+    # (round corners in 16 chords a quarter: on an 18 m beach a chord sags 2 cm)
+    line = shapely.LineString(P.p)
+    if line.is_closed and len(P.p) >= 4:
+        # a whole ring (GEOS's one-sided buffer of a closed line can take the wrong side):
+        # the ring's polygon less its inward offset (water inside), or its outward offset
+        # less the polygon (an island's shore)
+        R = shapely.make_valid(shapely.Polygon(P.p))
+        if shapely.is_ccw(line):
+            p = shapely.difference(R, R.buffer(-w, quad_segs=16))
+        else:
+            p = shapely.difference(R.buffer(w, quad_segs=16), R)
+    else:
+        p = line.buffer(w, quad_segs=16, single_sided=True)
+    p = shapely.set_precision(p, 0.001)
+    return p if not p.is_empty and p.area > 1e-6 else None
 
 
 def _bed_region(region, banks):
@@ -386,8 +392,8 @@ BANK_CELL_M = 2.0
 def _slope(k: dict, inp: dict, ground, out: Out) -> None:
     """A sloped bank: its dry strip (the polygon the bed leaves out) on a 2 m lattice, each
     point at the ground at the line's nearest point, falling to the level at `width` from
-    the line (the bed's slope: they meet along the waterline, where the strip's vertices are
-    at the level); UV0 the plan in meters (the slopes are gentle: 1 in 1.5 at the most)."""
+    the line (the bed's slope: they meet along the waterline, the strip's edge over the
+    water); UV0 the plan in meters (the slopes are gentle: 1 in 1.5 at the most)."""
     poly = strip(k)
     if poly is None:
         out.empty = "degenerate strip"
@@ -413,18 +419,13 @@ def _slope(k: dict, inp: dict, ground, out: Out) -> None:
                   "level": inp["level"]})
     lvl = fd.level(xs, ys)
     z = top - (top - lvl) * np.clip(d / w, 0.0, 1.0)
-    # (the waterline's own vertices at the level, where the bed's edge runs)
     _, st = _stations(k)
-    wl = {(C.mm(a), C.mm(b)) for sx, x, y, nx, ny, mk in st for a, b in [_wl(x, y, nx, ny, mk, w)]}
-    on = np.array([(int(a), int(b)) in wl for a, b in vmm.tolist()], dtype=bool)
-    z = np.where(on, lvl, z)
     org = _origin_mm(inp)
     pos = _pos(vmm, z, org)
     tri = _drop_flat(pos, tri)
     nm = NMesh(f"bank.{k['kind']}", pos, tri.ravel().astype(np.int64), GR.normals(pos, tri),
                np.stack([xs, ys], axis=1))
     out.nm = [nm]
-    edge = [(x, y) for sx, x, y, nx, ny, mk in st]
     step = max(1, len(st) // 40)
     out.notes["edge"] = [[C.m(a), C.m(b), C.m(float(fd.level(np.array([a]), np.array([b]))[0]))]
                          for sx, x, y, nx, ny, mk in st[::step] for a, b in [_wl(x, y, nx, ny,
