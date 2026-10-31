@@ -464,6 +464,22 @@
       ]
     },
     {
+      "id": "building_forms",
+      "title": "Building forms (M21): every arc lies on its footprint within 2 cm, a twisted shaft turns at most 3 degrees a floor, the form names its own masses, and every mass above the building's floor rests on or is fixed to another of its masses",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tower_neighbors",
+      "title": "No two towers of different owners within 150 m share a form and a height band (M21), and every tower's form record names its band",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "228 towers, 19 forms, 0 pairs within 150 m of one form and band"
+      ]
+    },
+    {
       "id": "bridge_clash",
       "title": "Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck",
       "passed": true,
@@ -562,7 +578,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "28805 things on the ground"
+        "28952 things on the ground"
       ]
     },
     {
@@ -586,11 +602,11 @@
       "failures": [],
       "notes": [
         "Low Harbor: 99% lit",
-        "Lantern Steps: 95% lit",
-        "Crown Heights: 97% lit",
-        "Old Quarter: 95% lit",
+        "Lantern Steps: 97% lit",
+        "Crown Heights: 99% lit",
+        "Old Quarter: 96% lit",
         "Ridgeback: 98% lit",
-        "Hollow: 98% lit"
+        "Hollow: 99% lit"
       ]
     },
     {
@@ -1891,9 +1907,9 @@
       "retaining_walls": 1832,
       "highest_wall_m": 19.9,
       "bored_tunnels": 4,
-      "highest_plinth_m": 13.26,
-      "parked_off_steep": 761,
-      "seats_off_steep": 150,
+      "highest_plinth_m": 14.29,
+      "parked_off_steep": 764,
+      "seats_off_steep": 151,
       "trees_off_cliffs": 0,
       "under_viaducts": 44
     },
@@ -1938,18 +1954,18 @@
       "lanes": 6343,
       "lane_connectors": 13182,
       "one_way_segments": 173,
-      "walkways": 17300,
+      "walkways": 17149,
       "walkway_km": {
         "alley": 42.85,
         "crossing": 114.98,
         "crosswalk": 17.93,
         "elevator": 0.0,
         "footbridge": 0.07,
-        "path": 71.81,
+        "path": 70.82,
         "pedestrian_street": 1.5,
         "promenade": 6.05,
         "sidewalk": 195.28,
-        "skybridge": 3.47,
+        "skybridge": 3.44,
         "stairs": 0.27,
         "underpass": 0.15
       },
@@ -2105,17 +2121,17 @@
     },
     "buildings": {
       "count": 7068,
-      "floor_area_km2": 20.524,
+      "floor_area_km2": 19.132,
       "by_type": {
         "shopfront_row": 3537,
         "shanty_stack": 2308,
         "perimeter": 461,
-        "podium_tower": 303,
+        "podium_tower": 305,
         "terraced": 186,
         "courtyard_block": 116,
         "megabuilding": 44,
         "warehouse": 37,
-        "tower": 24,
+        "tower": 22,
         "shed": 15,
         "slab": 15,
         "yard": 11,
@@ -2155,9 +2171,9 @@
           "p90": 31.5,
           "max": 49.0,
           "archetype": "entertainment_market",
-          "floor_area_km2": 2.923,
+          "floor_area_km2": 2.918,
           "coverage": 0.966,
-          "far": 4.91
+          "far": 4.9
         },
         "Crown Heights": {
           "count": 158,
@@ -2166,9 +2182,9 @@
           "p90": 220.0,
           "max": 480.0,
           "archetype": "corporate_core",
-          "floor_area_km2": 6.141,
-          "coverage": 0.826,
-          "far": 14.93
+          "floor_area_km2": 5.103,
+          "coverage": 0.823,
+          "far": 12.4
         },
         "Old Quarter": {
           "count": 3708,
@@ -2188,9 +2204,9 @@
           "p90": 166.4,
           "max": 192.0,
           "archetype": "megablock_residential",
-          "floor_area_km2": 4.042,
+          "floor_area_km2": 3.835,
           "coverage": 0.764,
-          "far": 12.99
+          "far": 12.32
         },
         "Hollow": {
           "count": 727,
@@ -2199,9 +2215,9 @@
           "p90": 59.5,
           "max": 129.5,
           "archetype": "midtown_mixed",
-          "floor_area_km2": 4.867,
+          "floor_area_km2": 4.725,
           "coverage": 0.672,
-          "far": 6.84
+          "far": 6.64
         }
       },
       "properties": 7059,
@@ -2213,39 +2229,39 @@
         "tower_cluster": 1,
         "twin_towers": 1
       },
-      "skybridges": 288,
+      "skybridges": 271,
       "skybridges_by_kind": {
         "cable": 49,
         "catwalk": 95,
-        "enclosed": 86,
-        "open_deck": 57,
+        "enclosed": 70,
+        "open_deck": 56,
         "stack": 1
       },
-      "skybridge_km": 3.47,
-      "units": 19979,
+      "skybridge_km": 3.44,
+      "units": 19973,
       "units_by_use": {
-        "food": 5203,
+        "food": 5201,
         "bar": 2906,
-        "convenience": 2090,
-        "cyberware": 2072,
+        "convenience": 2089,
+        "cyberware": 2071,
         "club": 1813,
         "arcade": 1594,
         "laundromat": 1222,
         "pawn": 1215,
         "lobby": 980,
-        "clinic": 884
+        "clinic": 882
       },
       "roof_items": {
-        "ac_unit": 14654,
-        "billboard": 1641,
-        "water_tank": 1312,
-        "antenna": 1144,
-        "mechanical": 583,
-        "av_pad": 29,
-        "helipad": 15
+        "ac_unit": 14529,
+        "billboard": 1629,
+        "water_tank": 1279,
+        "antenna": 1105,
+        "mechanical": 563,
+        "av_pad": 23,
+        "helipad": 6
       },
-      "green_roofs": 347,
-      "green_roof_m2": 226153,
+      "green_roofs": 354,
+      "green_roof_m2": 241443,
       "landmarks": [
         {
           "name": "Crown Spire",
@@ -2283,7 +2299,7 @@
       "structures": 1980,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2501
+        "walkways_added": 2350
       }
     },
     "transit": {
@@ -2312,26 +2328,26 @@
       }
     },
     "props": {
-      "props": 57519,
-      "plants": 24690,
-      "trees": 9652,
-      "instances": 82209,
+      "props": 57668,
+      "plants": 24991,
+      "trees": 9648,
+      "instances": 82659,
       "props_by_kind": {
-        "sign": 16079,
-        "awning": 13007,
+        "sign": 16076,
+        "awning": 13006,
         "ac_unit": 8647,
-        "street_light": 3750,
-        "parked_vehicle": 2744,
+        "street_light": 3806,
+        "parked_vehicle": 2747,
         "overhead_cable": 2408,
         "barrier": 2217,
-        "trash": 2062,
+        "trash": 2113,
         "railing": 1678,
-        "bollard": 1227,
+        "bollard": 1228,
         "wall_light": 837,
-        "hydrant": 746,
-        "traffic_signal": 735,
-        "trash_can": 513,
-        "bench": 368,
+        "traffic_signal": 760,
+        "hydrant": 757,
+        "trash_can": 517,
+        "bench": 370,
         "dumpster": 320,
         "bus_stop": 59,
         "scaffolding": 50,
@@ -2342,46 +2358,46 @@
         "food_stall": 1
       },
       "plants_by_kind": {
-        "shrub": 9084,
+        "shrub": 9337,
         "park_tree": 6371,
         "facade_greenery": 5504,
-        "street_tree": 1394,
-        "median_tree": 825,
+        "street_tree": 1389,
+        "median_tree": 826,
         "conifer": 621,
-        "roof_tree": 448,
+        "roof_tree": 500,
         "palm": 441,
         "overgrowth": 2
       },
       "lawn_m2": 48597,
       "hedge_km": 3.67,
       "generator": {
-        "traffic_signals": 735,
-        "bus_stops": 119,
-        "street_lights": 3499,
-        "narrow_lights": 1093,
-        "hydrants": 747,
-        "crosswalk_cans": 162,
-        "bollards": 1227,
+        "traffic_signals": 760,
+        "bus_stops": 118,
+        "street_lights": 3554,
+        "narrow_lights": 1094,
+        "hydrants": 758,
+        "crosswalk_cans": 166,
+        "bollards": 1228,
         "station_props": 0,
-        "street_trees": 1403,
+        "street_trees": 1398,
         "plaza_props": 137,
-        "park_benches": 634,
-        "parked_vehicles": 3505,
-        "alley_clutter": 2387,
-        "median_trees": 1225,
+        "park_benches": 636,
+        "parked_vehicles": 3511,
+        "alley_clutter": 2438,
+        "median_trees": 1226,
         "promenade_trees": 46,
         "park_trees": 13676,
-        "roof_plants": 2867,
+        "roof_plants": 3172,
         "facade_greenery": 5504,
         "overgrowth": 2,
-        "quay_props": 1788,
+        "quay_props": 1790,
         "highway_barriers": 2217,
         "overhead_cables": 2408,
-        "unit_dressing": 37733,
+        "unit_dressing": 37729,
         "scaffolding": 50,
         "market_gates": 0,
-        "props": 58441,
-        "plants": 24723
+        "props": 58594,
+        "plants": 25024
       }
     },
     "gameplay": {
@@ -2420,11 +2436,11 @@
       "fast_travel": 11,
       "sign_slots": {
         "shop_sign.blade": 11203,
-        "shop_sign.facade": 4876,
-        "billboard.roof": 1641,
+        "shop_sign.facade": 4873,
+        "billboard.roof": 1629,
         "neon.facade": 828,
-        "billboard.facade": 353,
-        "holo_ad.roof": 49
+        "billboard.facade": 332,
+        "holo_ad.roof": 53
       },
       "density_rows": 2977,
       "peak_traffic_vph": 9690.0,
@@ -2436,7 +2452,7 @@
         "parking": 576,
         "travel_points": 43,
         "densities": 2977,
-        "sign_slots": 18950
+        "sign_slots": 18918
       }
     },
     "separation_budget": {

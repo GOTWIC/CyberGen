@@ -1048,7 +1048,7 @@ def _build(spec, m) -> Out:
     c = Ctx(spec, m)
     placed: list[Cand] = []
     info: dict = {}
-    under_ok = _headroom(c, V.overhead(c))
+    under_ok = _headroom(c, V.overhead(c, fill=False))
     # ground things in priority order: what the street needs first, clutter last; the trees
     # go between the street furniture and the clutter (vegetation.py)
     for name, fn in GENERATORS[:7]:

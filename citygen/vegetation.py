@@ -396,15 +396,17 @@ def _z_on(prof, s: float) -> float:
     return prof[-1][1]
 
 
-def overhead(c: Ctx) -> tuple:
-    """(footprints, underside z) of everything above the ground a tree could grow into."""
+def overhead(c: Ctx, fill: bool = True) -> tuple:
+    """(footprints, underside z) of everything above the ground a tree could grow into; with
+    `fill`, M18's embankments too, from the ground up (no tree stands in a road's fill; the
+    props' headroom leaves them out: lights and furniture stand on a low road's sidewalks)."""
     m = c.m
     P = G.from_model_poly
     polys, under = [], []
     for s in m.structures:
         a = s.attrs or {}
-        if s.kind in ("retaining_wall", "embankment"):
-            continue    # M13: a wall in the ground, not over it; M18: fill under a road
+        if s.kind == "retaining_wall" or (s.kind == "embankment" and not fill):
+            continue    # M13: a wall in the ground, not over it
         if len(s.line) >= 2 and s.z1_m > 0.5:
             w = a.get("width_m", 4.0)
             polys.append(LineString([p[:2] for p in s.line]).buffer(w / 2.0 + 1.0,

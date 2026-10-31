@@ -36,9 +36,9 @@ junctions: 1600 with a leg not at the node's height at the junction edge: 49 wit
 crosswalk widths: Counter({4.0: 210, 3.0: 120, 5.0: 78})
 junctions with crosswalks: 124 of them within 40 m of another: 4
 == signs
-Counter({('shop_sign', 'blade'): 9511, ('shop_sign', 'facade'): 3338, ('billboard', 'roof'): 1294, ('neon', 'facade'): 693, ('billboard', 'facade'): 259, ('holo_ad', 'roof'): 61})
+Counter({('shop_sign', 'blade'): 9436, ('shop_sign', 'facade'): 3347, ('billboard', 'roof'): 1279, ('neon', 'facade'): 685, ('billboard', 'facade'): 246, ('holo_ad', 'roof'): 61})
 == transit supports
-  tl.halo_line elevated_rail: length 5604 m, supports 149, gap median 32 max 423 m, off the line max 13.7 m (>2 m: 20)
+  tl.halo_line elevated_rail: length 7624 m, supports 188, gap median 33 max 531 m, off the line max 19.4 m (>2 m: 16)
   tl.launch_express maglev: length 2783 m, supports 46, gap median 45 max 423 m, off the line max 14.9 m (>2 m: 14)
   tl.crown_loop sky_tube: length 2255 m, supports 16, gap median 66 max 490 m, off the line max 11.4 m (>2 m: 4)
 == trees under raised roads

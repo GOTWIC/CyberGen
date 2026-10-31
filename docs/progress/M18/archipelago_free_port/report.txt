@@ -72,6 +72,9 @@ checks:
   [pass] megasite_heights: Nothing inside a spaceport flight cone above its height limit, and nothing near one above the transitional surface (limit + 1 m per 1 m away)
   [pass] megasite_access: Every megasite reaches a road (within 40 m) and its buildings and paths join the walkway graph
          note: transit links of megasites: see transit_hubs
+  [pass] building_forms: Building forms (M21): every arc lies on its footprint within 2 cm, a twisted shaft turns at most 3 degrees a floor, the form names its own masses, and every mass above the building's floor rests on or is fixed to another of its masses
+  [pass] tower_neighbors: No two towers of different owners within 150 m share a form and a height band (M21), and every tower's form record names its band
+         note: 232 towers, 18 forms, 0 pairs within 150 m of one form and band
   [pass] bridge_clash: Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck
   [pass] road_building_clash: No road, sidewalk, ramp or deck street right of way over a building mass at the road's own height (the mass under it, or 5 m over it, clears)
   [pass] transit_routes: Every transit line of the spec is built along its whole route (every leg found)
@@ -88,14 +91,14 @@ checks:
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
          note: Kettle Container Terminal (freight_terminal): no elevated_rail or metro or monorail station within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 14279 things on the ground
+         note: 14474 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
-         note: Crown Island: 94% lit
-         note: Kettle Island: 95% lit
-         note: Westreef: 91% lit
-         note: Lumen Key: 96% lit
+         note: Crown Island: 99% lit
+         note: Kettle Island: 99% lit
+         note: Westreef: 93% lit
+         note: Lumen Key: 99% lit
          note: Palm Key: 99% lit
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
@@ -126,7 +129,7 @@ stats:
   bridges 9 (sea 5, river 0, canal 4; 1.65 km of span), pedestrian 6; named: Crown Causeway, Kettle Span, Lumen Footbridge, Reef Bridge
   landmasses with districts connected by road 5 of 5; highway planned elevated 49%; megasite reserves 3; road variant 0
   local roads street 44.54 km, alley 9.35 km, service 6.96 km, pedestrian 16.14 km, footbridge 0.1 km; 76 one-way segments, 5 footbridges
-  junctions 977 (68 signalized), crosswalks 227, sidewalks 82.38 km, lanes 2788 + 5498 connectors, walkways 9300 (alley 16.32 km, crossing 50.58 km, crosswalk 9.2 km, elevated 0.96 km, elevator 0.0 km, footbridge 0.1 km, path 46.69 km, pedestrian_street 3.57 km, promenade 12.57 km, sidewalk 104.85 km, skybridge 1.79 km, stairs 0.21 km)
+  junctions 977 (68 signalized), crosswalks 227, sidewalks 82.38 km, lanes 2788 + 5498 connectors, walkways 9302 (alley 16.32 km, crossing 50.58 km, crosswalk 9.2 km, elevated 0.95 km, elevator 0.0 km, footbridge 0.1 km, path 46.84 km, pedestrian_street 3.57 km, promenade 12.57 km, sidewalk 104.85 km, skybridge 2.03 km, stairs 0.21 km)
   junctions by type: street_street T 382, avenue_avenue T 103, street_street X 90, street T 85, pedestrian T 82, alley_alley T 46, avenue_avenue X 36, alley T 20, street_alley bend 20, pedestrian X 14, alley_alley X 12, street bend 12
   blocks 548, lots 3326 (2 merged groups), open space 13.0% of net land (beach 1, courtyard 3, green 18, park 11, plaza 26, pocket_park 160), named places 2
 
@@ -144,32 +147,32 @@ stats:
   Lumen Key                             14            101      28.6%
   Palm Key                              48             84      20.0%
 
-  buildings 3192 (15.012 km2 floor area), properties 3186, tallest 296 m; complexes campus 1, megasite 3, twin_towers 1
-  by type: shopfront_row 1300, shanty_stack 975, villa 462, podium_tower 201, courtyard_block 82, slab 39, terraced 32, tower 31, warehouse 25, lab 18, parking_structure 8, yard 8, shed 7, gate_house 1, office 1, skyport 1, station 1
-  skybridges 168 (1.79 km: cable 41, catwalk 67, enclosed 59, stack 1), ground-floor units 9690 (food 3101, convenience 1528, cyberware 1160, bar 832, pawn 758, laundromat 749, clinic 650, lobby 352, arcade 350, club 210)
-  roof items: ac_unit 6808, antenna 696, water_tank 564, billboard 481, mechanical 181, av_pad 67, helipad 24; green roofs 357 (225491 m2)
+  buildings 3193 (13.286 km2 floor area), properties 3187, tallest 296 m; complexes campus 1, megasite 3, twin_towers 1
+  by type: shopfront_row 1300, shanty_stack 975, villa 462, podium_tower 201, courtyard_block 82, slab 40, terraced 32, tower 31, warehouse 25, lab 18, parking_structure 8, yard 8, shed 7, gate_house 1, office 1, skyport 1, station 1
+  skybridges 167 (2.03 km: cable 41, catwalk 67, enclosed 58, stack 1), ground-floor units 9671 (food 3090, convenience 1524, cyberware 1158, bar 829, pawn 758, laundromat 749, clinic 650, lobby 353, arcade 350, club 210)
+  roof items: ac_unit 6704, antenna 672, water_tank 564, billboard 481, mechanical 178, av_pad 48, helipad 15; green roofs 368 (231811 m2)
   landmarks: none
   megasites: Crown Island Skyport (skyport: skyport 1); Crown Exchange (transit_nexus: bus_bay 10, drop_off 1, platform 2, plaza 2, station 1); Kettle Container Terminal (freight_terminal: berth 2, container_stack 284, gantry_crane 4, gate_house 1, office 1, rail_track 2, truck_gate 1, warehouse 2)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
-  Crown Island                     289     132.0   184.0   296.0       81%  14.3     12.253
+  Crown Island                     290     132.0   184.0   296.0       80%  12.3     10.531
   Kettle Island                     38      11.7    16.0    16.0       29%   0.3      0.122
   Westreef                        2351      15.0    21.0    27.0       95%   3.4      1.493
-  Lumen Key                         29      28.0    36.0    56.0       24%   1.8      0.329
+  Lumen Key                         29      28.0    36.0    56.0       24%   1.8      0.325
   Palm Key                         479      23.8    23.8    40.8       25%   1.6      0.763
 
-  props 29645, plants 13019 (3625 trees), 42664 instances; lawns 18216 m2, hedges 4.28 km
-  props: sign 6841, awning 5933, ac_unit 4219, bollard 2549, railing 2546, street_light 1816, parked_vehicle 1243, barrier 877, overhead_cable 862, wall_light 589, hydrant 437, bench 376, trash_can 344, traffic_signal 301, trash 281, dumpster 217, bus_stop 77, boat 34, planter 34, scaffolding 33, vending_machine 20, kiosk 16
-  plants: shrub 3552, facade_greenery 3299, overgrowth 2029, street_tree 1765, park_tree 851, palm 635, roof_tree 514, conifer 343, median_tree 31
+  props 29867, plants 13153 (3625 trees), 43020 instances; lawns 18216 m2, hedges 4.28 km
+  props: sign 6829, awning 5931, ac_unit 4219, bollard 2549, railing 2546, street_light 1904, parked_vehicle 1258, barrier 877, overhead_cable 862, wall_light 591, hydrant 462, bench 377, trash_can 356, traffic_signal 338, trash 333, dumpster 217, bus_stop 81, boat 34, planter 34, scaffolding 33, vending_machine 20, kiosk 16
+  plants: shrub 3705, facade_greenery 3299, overgrowth 1991, street_tree 1765, park_tree 851, palm 635, roof_tree 533, conifer 343, median_tree 31
 
   elevated highways 1.85 km (2 runs, 0 direct branches), deck up to 26.5 m; ramps 1 (0.26 km); interchanges diamond 1; overpasses 1
   other raised roads 13.24 km, underpass streets 0, road columns 284
 
   gameplay: 90 points of interest, 5 factions (corporate 2, gang 2, police 1), 8 territories (2 contested), 15 taxi stands, 6 fast-travel points
-  pois: vendor.food 19, vendor.pawn 14, bar.bar 13, clinic.clinic 8, clinic.ripperdoc 7, vendor.convenience 6, apartment.studio 5, bar.club 4, apartment.penthouse 3, bar.arcade 3, fixer.fixer 3, hideout.squat 2, hideout.warehouse 2, apartment.apartment 1
-  parking: street 258, garage 10, lot 1 (8382 spaces); sign slots: shop_sign.blade 3854, shop_sign.facade 2987, billboard.roof 481, neon.facade 199, billboard.facade 102, holo_ad.roof 45
+  pois: vendor.food 18, vendor.pawn 14, bar.bar 13, clinic.clinic 8, clinic.ripperdoc 7, vendor.convenience 7, apartment.studio 5, bar.club 4, apartment.penthouse 3, bar.arcade 3, fixer.fixer 3, hideout.squat 2, hideout.warehouse 2, apartment.apartment 1
+  parking: street 258, garage 10, lot 1 (8382 spaces); sign slots: shop_sign.blade 3850, shop_sign.facade 2979, billboard.roof 481, neon.facade 199, billboard.facade 74, holo_ad.roof 44
 
-  transit 8.23 km, supports 105, portals 0, buildings removed 32; stations elevated 12
+  transit 8.23 km, supports 105, portals 0, buildings removed 31; stations elevated 12
   by mode: maglev 1 lines 1.98 km 1 stations, monorail 1 lines 6.24 km 11 stations
 
   district                     archetype              landmass  km2    share  target  error

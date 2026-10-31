@@ -913,9 +913,10 @@ M18 (junctions and ramps, from the first run-through) is in place:
   or skybridge they remove (`overrides._drop`: door, lobby and elevator links, the deck), and
   in a regeneration a junction its held roads meet at one height takes it
   (`junctions._held_heights`: the old build raised it, M1b gives the node back lower);
-  props and plants take an embankment for ground (`vegetation.overhead` leaves it out, as
-  M7's comment there has it, and so do the props' ground structures: its road's own
-  keep-outs cover it), and M2's crossing locks and overhead test measure on plain arithmetic
+  lights and furniture stand on an embankment (the props' headroom reads
+  `vegetation.overhead(..., fill=False)`, their ground structures leave it out: its road's
+  own keep-outs cover it) while trees keep off it (`overhead` with `fill`, as the
+  tree-clearance check), and M2's crossing locks and overhead test measure on plain arithmetic
   (`junctions._crossings`, `_overhead`: `terrain.crossings` projects with GEOS and runs
   after M2). `GEN_VERSION` m18.1 on M21's m21.1.
 Sample builds: `docs/progress/M18/`.

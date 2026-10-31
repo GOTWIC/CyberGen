@@ -36,7 +36,7 @@ junctions: 794 with a leg not at the node's height at the junction edge: 16 with
 crosswalk widths: Counter({4.0: 169, 3.0: 92, 5.0: 70})
 junctions with crosswalks: 109 of them within 40 m of another: 2
 == signs
-Counter({('shop_sign', 'blade'): 5128, ('shop_sign', 'facade'): 1747, ('billboard', 'roof'): 592, ('neon', 'facade'): 281, ('billboard', 'facade'): 165, ('holo_ad', 'roof'): 30})
+Counter({('shop_sign', 'blade'): 5120, ('shop_sign', 'facade'): 1747, ('billboard', 'roof'): 574, ('neon', 'facade'): 281, ('billboard', 'facade'): 147, ('holo_ad', 'roof'): 29})
 == transit supports
   tl.spine_tube sky_tube: length 1525 m, supports 6, gap median 66 max 876 m, off the line max 0.0 m (>2 m: 0)
   tl.east_shore_line elevated_rail: length 2715 m, supports 86, gap median 32 max 130 m, off the line max 14.1 m (>2 m: 39)

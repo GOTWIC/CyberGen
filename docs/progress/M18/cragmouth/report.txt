@@ -71,6 +71,9 @@ checks:
   [pass] megasite_heights: Nothing inside a spaceport flight cone above its height limit, and nothing near one above the transitional surface (limit + 1 m per 1 m away)
   [pass] megasite_access: Every megasite reaches a road (within 40 m) and its buildings and paths join the walkway graph
          note: transit links of megasites: see transit_hubs
+  [pass] building_forms: Building forms (M21): every arc lies on its footprint within 2 cm, a twisted shaft turns at most 3 degrees a floor, the form names its own masses, and every mass above the building's floor rests on or is fixed to another of its masses
+  [pass] tower_neighbors: No two towers of different owners within 150 m share a form and a height band (M21), and every tower's form record names its band
+         note: 228 towers, 19 forms, 0 pairs within 150 m of one form and band
   [pass] bridge_clash: Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck
   [pass] road_building_clash: No road, sidewalk, ramp or deck street right of way over a building mass at the road's own height (the mass under it, or 5 m over it, clears)
   [pass] transit_routes: Every transit line of the spec is built along its whole route (every leg found)
@@ -86,16 +89,16 @@ checks:
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 28805 things on the ground
+         note: 28952 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades, tops 1 m under decks, skybridges, raised roads and overhangs; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
          note: Low Harbor: 99% lit
-         note: Lantern Steps: 95% lit
-         note: Crown Heights: 97% lit
-         note: Old Quarter: 95% lit
+         note: Lantern Steps: 97% lit
+         note: Crown Heights: 99% lit
+         note: Old Quarter: 96% lit
          note: Ridgeback: 98% lit
-         note: Hollow: 98% lit
+         note: Hollow: 99% lit
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
@@ -125,7 +128,7 @@ stats:
   bridges 6 (sea 0, river 2, canal 4; 0.13 km of span), pedestrian 3; named: none
   landmasses with districts connected by road 2 of 2; highway planned elevated 0%; megasite reserves 2; road variant 1
   local roads street 95.58 km, alley 30.6 km, service 12.24 km, pedestrian 7.55 km, footbridge 0.07 km; 173 one-way segments, 3 footbridges
-  junctions 1828 (129 signalized), crosswalks 472, sidewalks 151.16 km, lanes 6343 + 13182 connectors, walkways 17300 (alley 42.85 km, crossing 114.98 km, crosswalk 17.93 km, elevator 0.0 km, footbridge 0.07 km, path 71.81 km, pedestrian_street 1.5 km, promenade 6.05 km, sidewalk 195.28 km, skybridge 3.47 km, stairs 0.27 km, underpass 0.15 km)
+  junctions 1828 (129 signalized), crosswalks 472, sidewalks 151.16 km, lanes 6343 + 13182 connectors, walkways 17149 (alley 42.85 km, crossing 114.98 km, crosswalk 17.93 km, elevator 0.0 km, footbridge 0.07 km, path 70.82 km, pedestrian_street 1.5 km, promenade 6.05 km, sidewalk 195.28 km, skybridge 3.44 km, stairs 0.27 km, underpass 0.15 km)
   junctions by type: street_street T 769, street_street X 268, avenue_avenue T 183, alley_alley T 160, avenue_avenue X 125, street T 57, street_alley bend 41, pedestrian T 32, alley_alley X 30, street_alley T 25, street_service T 19, street cul_de_sac 18
   blocks 1112, lots 7062 (4 merged groups), open space 9.7% of net land (courtyard 19, green 224, park 32, plaza 197, pocket_park 47), named places 0
 
@@ -145,32 +148,32 @@ stats:
   Ridgeback                             78            106       9.4%
   Hollow                                99             82      16.2%
 
-  buildings 7068 (20.524 km2 floor area), properties 7059, tallest 480 m; complexes bridged_pair 1, landmark 1, megasite 2, straddle_building 1, tower_cluster 1, twin_towers 1
-  by type: shopfront_row 3537, shanty_stack 2308, perimeter 461, podium_tower 303, terraced 186, courtyard_block 116, megabuilding 44, warehouse 37, tower 24, shed 15, slab 15, yard 11, parking_structure 4, pavilion 2, straddle_building 2, gate_house 1, landmark.megatower 1, office 1
-  skybridges 288 (3.47 km: cable 49, catwalk 95, enclosed 86, open_deck 57, stack 1), ground-floor units 19979 (food 5203, bar 2906, convenience 2090, cyberware 2072, club 1813, arcade 1594, laundromat 1222, pawn 1215, lobby 980, clinic 884)
-  roof items: ac_unit 14654, billboard 1641, water_tank 1312, antenna 1144, mechanical 583, av_pad 29, helipad 15; green roofs 347 (226153 m2)
+  buildings 7068 (19.132 km2 floor area), properties 7059, tallest 480 m; complexes bridged_pair 1, landmark 1, megasite 2, straddle_building 1, tower_cluster 1, twin_towers 1
+  by type: shopfront_row 3537, shanty_stack 2308, perimeter 461, podium_tower 305, terraced 186, courtyard_block 116, megabuilding 44, warehouse 37, tower 22, shed 15, slab 15, yard 11, parking_structure 4, pavilion 2, straddle_building 2, gate_house 1, landmark.megatower 1, office 1
+  skybridges 271 (3.44 km: cable 49, catwalk 95, enclosed 70, open_deck 56, stack 1), ground-floor units 19973 (food 5201, bar 2906, convenience 2089, cyberware 2071, club 1813, arcade 1594, laundromat 1222, pawn 1215, lobby 980, clinic 882)
+  roof items: ac_unit 14529, billboard 1629, water_tank 1279, antenna 1105, mechanical 563, av_pad 23, helipad 6; green roofs 354 (241443 m2)
   landmarks: Crown Spire (megatower, 480 m)
   megasites: Low Harbor Freight Terminal (freight_terminal: berth 1, container_stack 147, gantry_crane 1, gate_house 1, office 1, rail_track 2, truck_gate 1, warehouse 2); Hollow Central Park (central_park: fountain 1, lawn 12, pavilion 2, plaza 1, pond 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
   Low Harbor                        61      11.2    15.7    16.0       30%   0.3      0.146
-  Lantern Steps                   2348      23.6    31.5    49.0       97%   4.9      2.923
-  Crown Heights                    158     140.0   220.0   480.0       83%  14.9      6.141
+  Lantern Steps                   2348      23.6    31.5    49.0       97%   4.9      2.918
+  Crown Heights                    158     140.0   220.0   480.0       82%  12.4      5.103
   Old Quarter                     3708      17.6    21.0    27.0       96%   3.5      2.396
-  Ridgeback                         60     150.4   166.4   192.0       76%  13.0      4.042
-  Hollow                           727      38.5    59.5   129.5       67%   6.8      4.867
+  Ridgeback                         60     150.4   166.4   192.0       76%  12.3      3.835
+  Hollow                           727      38.5    59.5   129.5       67%   6.6      4.725
 
-  props 57519, plants 24690 (9652 trees), 82209 instances; lawns 48597 m2, hedges 3.67 km
-  props: sign 16079, awning 13007, ac_unit 8647, street_light 3750, parked_vehicle 2744, overhead_cable 2408, barrier 2217, trash 2062, railing 1678, bollard 1227, wall_light 837, hydrant 746, traffic_signal 735, trash_can 513, bench 368, dumpster 320, bus_stop 59, scaffolding 50, boat 47, planter 13, kiosk 9, vending_machine 2, food_stall 1
-  plants: shrub 9084, park_tree 6371, facade_greenery 5504, street_tree 1394, median_tree 825, conifer 621, roof_tree 448, palm 441, overgrowth 2
+  props 57668, plants 24991 (9648 trees), 82659 instances; lawns 48597 m2, hedges 3.67 km
+  props: sign 16076, awning 13006, ac_unit 8647, street_light 3806, parked_vehicle 2747, overhead_cable 2408, barrier 2217, trash 2113, railing 1678, bollard 1228, wall_light 837, traffic_signal 760, hydrant 757, trash_can 517, bench 370, dumpster 320, bus_stop 59, scaffolding 50, boat 47, planter 13, kiosk 9, vending_machine 2, food_stall 1
+  plants: shrub 9337, park_tree 6371, facade_greenery 5504, street_tree 1389, median_tree 826, conifer 621, roof_tree 500, palm 441, overgrowth 2
 
   tunnels bored 4 (0.37 km), metro 7 (3.93 km), pedestrian 5 (0.15 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -52.84 m
 
-  terrain: ground up to 95.11 m; cuts to 18.7 m, fills to 18.7 m; 1832 retaining walls (highest 19.9 m), 4 bored tunnels, 2 terrain viaducts; 191 hillside greens, highest plinth 13.26 m
+  terrain: ground up to 95.11 m; cuts to 18.7 m, fills to 18.7 m; 1832 retaining walls (highest 19.9 m), 4 bored tunnels, 2 terrain viaducts; 191 hillside greens, highest plinth 14.29 m
 
   gameplay: 269 points of interest, 6 factions (gang 4, corporate 1, police 1), 13 territories (4 contested), 32 taxi stands, 11 fast-travel points
   pois: vendor.food 42, bar.bar 38, vendor.pawn 32, bar.arcade 31, vendor.convenience 25, apartment.studio 22, clinic.ripperdoc 22, clinic.clinic 16, bar.club 14, apartment.apartment 9, fixer.fixer 8, hideout.squat 4, hideout.back_room 3, hideout.warehouse 2, apartment.capsule 1
-  parking: street 556, garage 20 (16944 spaces); sign slots: shop_sign.blade 11203, shop_sign.facade 4876, billboard.roof 1641, neon.facade 828, billboard.facade 353, holo_ad.roof 49
+  parking: street 556, garage 20 (16944 spaces); sign slots: shop_sign.blade 11203, shop_sign.facade 4873, billboard.roof 1629, neon.facade 828, billboard.facade 332, holo_ad.roof 53
 
   transit 4.89 km, supports 0, portals 0, buildings removed 0; stations underground 8
   by mode: metro 1 lines 4.89 km 8 stations

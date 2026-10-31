@@ -33,7 +33,7 @@ junctions: 1828 with a leg not at the node's height at the junction edge: 34 wit
 crosswalk widths: Counter({3.0: 211, 4.0: 193, 5.0: 68})
 junctions with crosswalks: 135 of them within 40 m of another: 0
 == signs
-Counter({('shop_sign', 'blade'): 11203, ('shop_sign', 'facade'): 4876, ('billboard', 'roof'): 1641, ('neon', 'facade'): 828, ('billboard', 'facade'): 353, ('holo_ad', 'roof'): 49})
+Counter({('shop_sign', 'blade'): 11203, ('shop_sign', 'facade'): 4873, ('billboard', 'roof'): 1629, ('neon', 'facade'): 828, ('billboard', 'facade'): 332, ('holo_ad', 'roof'): 53})
 == transit supports
 == trees under raised roads
 plants under a raised road whose crown reaches its deck: 1

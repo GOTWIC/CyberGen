@@ -36,7 +36,7 @@ junctions: 1764 with a leg not at the node's height at the junction edge: 30 wit
 crosswalk widths: Counter({4.0: 230, 3.0: 71, 5.0: 40})
 junctions with crosswalks: 110 of them within 40 m of another: 6
 == signs
-Counter({('shop_sign', 'blade'): 9969, ('shop_sign', 'facade'): 3287, ('billboard', 'roof'): 1581, ('neon', 'facade'): 719, ('billboard', 'facade'): 312, ('holo_ad', 'roof'): 46})
+Counter({('shop_sign', 'blade'): 9969, ('shop_sign', 'facade'): 3287, ('billboard', 'roof'): 1572, ('neon', 'facade'): 719, ('billboard', 'facade'): 309, ('holo_ad', 'roof'): 45})
 == transit supports
   tl.halo_line elevated_rail: length 5709 m, supports 128, gap median 32 max 987 m, off the line max 12.0 m (>2 m: 31)
   tl.launch_express maglev: length 1006 m, supports 3, gap median 469 max 894 m, off the line max 0.0 m (>2 m: 0)

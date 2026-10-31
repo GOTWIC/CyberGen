@@ -30,7 +30,7 @@ junctions: 977 with a leg not at the node's height at the junction edge: 51 with
 crosswalk widths: Counter({4.0: 87, 3.0: 73, 5.0: 67})
 junctions with crosswalks: 73 of them within 40 m of another: 0
 == signs
-Counter({('shop_sign', 'blade'): 3854, ('shop_sign', 'facade'): 2987, ('billboard', 'roof'): 481, ('neon', 'facade'): 199, ('billboard', 'facade'): 102, ('holo_ad', 'roof'): 45})
+Counter({('shop_sign', 'blade'): 3850, ('shop_sign', 'facade'): 2979, ('billboard', 'roof'): 481, ('neon', 'facade'): 199, ('billboard', 'facade'): 74, ('holo_ad', 'roof'): 44})
 == transit supports
   tl.island_hopper monorail: length 6245 m, supports 95, gap median 25 max 1069 m, off the line max 10.5 m (>2 m: 13)
   tl.mainland_express maglev: length 1982 m, supports 10, gap median 45 max 57 m, off the line max 0.0 m (>2 m: 0)
