@@ -448,6 +448,22 @@
       ]
     },
     {
+      "id": "building_forms",
+      "title": "Building forms (M21): every arc lies on its footprint within 2 cm, a twisted shaft turns at most 3 degrees a floor, the form names its own masses, and every mass above the building's floor rests on or is fixed to another of its masses",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "tower_neighbors",
+      "title": "No two towers of different owners within 150 m share a form and a height band (M21), and every tower's form record names its band",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "31 towers, 11 forms, 0 pairs within 150 m of one form and band"
+      ]
+    },
+    {
       "id": "bridge_clash",
       "title": "Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck",
       "passed": true,
@@ -546,7 +562,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "23765 things on the ground"
+        "23764 things on the ground"
       ]
     },
     {
@@ -940,7 +956,7 @@
       "lanes": 5992,
       "lane_connectors": 12073,
       "one_way_segments": 138,
-      "walkways": 16386,
+      "walkways": 16382,
       "walkway_km": {
         "alley": 35.81,
         "crossing": 89.95,
@@ -948,11 +964,11 @@
         "elevated": 1.93,
         "elevator": 0.0,
         "footbridge": 0.02,
-        "path": 90.56,
+        "path": 90.87,
         "pedestrian_street": 0.86,
         "promenade": 5.17,
         "sidewalk": 184.04,
-        "skybridge": 2.83,
+        "skybridge": 2.85,
         "stairs": 1.1
       },
       "footbridges": 1,
@@ -1138,7 +1154,7 @@
     },
     "buildings": {
       "count": 6620,
-      "floor_area_km2": 20.664,
+      "floor_area_km2": 20.405,
       "by_type": {
         "shopfront_row": 3275,
         "shanty_stack": 2092,
@@ -1194,9 +1210,9 @@
           "p90": 185.6,
           "max": 217.6,
           "archetype": "megablock_residential",
-          "floor_area_km2": 9.555,
+          "floor_area_km2": 9.306,
           "coverage": 0.705,
-          "far": 10.49
+          "far": 10.22
         },
         "Highcrest": {
           "count": 709,
@@ -1227,7 +1243,7 @@
           "p90": 34.1,
           "max": 48.1,
           "archetype": "entertainment_market",
-          "floor_area_km2": 3.025,
+          "floor_area_km2": 3.021,
           "coverage": 0.937,
           "far": 4.88
         },
@@ -1249,9 +1265,9 @@
           "p90": 36.0,
           "max": 36.0,
           "archetype": "spaceport",
-          "floor_area_km2": 0.063,
-          "coverage": 0.196,
-          "far": 0.42
+          "floor_area_km2": 0.061,
+          "coverage": 0.192,
+          "far": 0.41
         },
         "Scholar Isle": {
           "count": 51,
@@ -1260,9 +1276,9 @@
           "p90": 40.0,
           "max": 76.0,
           "archetype": "research_campus",
-          "floor_area_km2": 0.79,
+          "floor_area_km2": 0.786,
           "coverage": 0.3,
-          "far": 2.48
+          "far": 2.47
         }
       },
       "properties": 6548,
@@ -1279,7 +1295,7 @@
         "enclosed": 12,
         "open_deck": 96
       },
-      "skybridge_km": 2.83,
+      "skybridge_km": 2.85,
       "units": 15691,
       "units_by_use": {
         "food": 4098,
@@ -1294,14 +1310,14 @@
         "lobby": 302
       },
       "roof_items": {
-        "ac_unit": 13457,
-        "billboard": 1440,
-        "water_tank": 1335,
-        "antenna": 914,
-        "mechanical": 129
+        "ac_unit": 13439,
+        "billboard": 1433,
+        "water_tank": 1308,
+        "antenna": 911,
+        "mechanical": 123
       },
-      "green_roofs": 474,
-      "green_roof_m2": 287263,
+      "green_roofs": 473,
+      "green_roof_m2": 287908,
       "landmarks": [
         {
           "name": null,
@@ -1352,7 +1368,7 @@
       "structures": 719,
       "tallest_m": 480.0,
       "generator": {
-        "walkways_added": 2090
+        "walkways_added": 2086
       }
     },
     "transit": {
@@ -1399,9 +1415,9 @@
     },
     "props": {
       "props": 48781,
-      "plants": 23984,
-      "trees": 7264,
-      "instances": 72765,
+      "plants": 24006,
+      "trees": 7263,
+      "instances": 72787,
       "props_by_kind": {
         "sign": 12996,
         "awning": 10804,
@@ -1413,11 +1429,11 @@
         "barrier": 1863,
         "traffic_signal": 1078,
         "wall_light": 816,
-        "bench": 787,
+        "bench": 788,
         "bollard": 738,
         "trash_can": 707,
         "hydrant": 616,
-        "dumpster": 208,
+        "dumpster": 207,
         "boat": 77,
         "bus_stop": 47,
         "scaffolding": 38,
@@ -1428,13 +1444,13 @@
         "kiosk": 1
       },
       "plants_by_kind": {
-        "shrub": 8507,
+        "shrub": 8532,
         "facade_greenery": 5274,
         "park_tree": 3889,
         "overgrowth": 2295,
-        "street_tree": 1243,
+        "street_tree": 1242,
         "conifer": 1165,
-        "roof_tree": 644,
+        "roof_tree": 642,
         "palm": 494,
         "median_tree": 473
       },
@@ -1449,15 +1465,15 @@
         "crosswalk_cans": 233,
         "bollards": 738,
         "station_props": 10,
-        "street_trees": 1243,
+        "street_trees": 1242,
         "plaza_props": 62,
-        "park_benches": 974,
+        "park_benches": 975,
         "parked_vehicles": 0,
-        "alley_clutter": 2151,
+        "alley_clutter": 2150,
         "median_trees": 897,
         "promenade_trees": 70,
         "park_trees": 10048,
-        "roof_plants": 4157,
+        "roof_plants": 4180,
         "facade_greenery": 5274,
         "overgrowth": 2295,
         "quay_props": 2988,
@@ -1467,7 +1483,7 @@
         "scaffolding": 38,
         "market_gates": 1,
         "props": 48781,
-        "plants": 23984
+        "plants": 24006
       }
     },
     "gameplay": {
@@ -1508,10 +1524,10 @@
       "sign_slots": {
         "shop_sign.blade": 9865,
         "shop_sign.facade": 3131,
-        "billboard.roof": 1440,
+        "billboard.roof": 1433,
         "neon.facade": 633,
-        "billboard.facade": 294,
-        "holo_ad.roof": 37
+        "billboard.facade": 292,
+        "holo_ad.roof": 36
       },
       "density_rows": 2793,
       "peak_traffic_vph": 9690.0,
@@ -1523,7 +1539,7 @@
         "parking": 447,
         "travel_points": 41,
         "densities": 2793,
-        "sign_slots": 15400
+        "sign_slots": 15390
       }
     },
     "water": {
