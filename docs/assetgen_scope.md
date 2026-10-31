@@ -615,7 +615,7 @@ below as its answer so that AG1 can start; any of them can still change.
 | 13.7 | The asset spec written by a session from the prompt through the `assetgen` skill; no mood boards | `.claude/skills/assetgen/SKILL.md` |
 | 13.8 | Pure Python generators, Blender for previews only | |
 | 13.9 | (a): grass baked per tile by assetgen and placed by the exporter as instanced meshes per tile, fading out between 60 and 100 m, at most 40,000 clumps a tile and 3 million a city (taken by AG13, 2026-10-31) | `assetgen/ground/kinds.py` (`TILE_INSTANCES`, `CITY_INSTANCES`, `FADE_M`) |
-| 13.10 | Open: before AG12 starts (sea waves) | |
+| 13.10 | (a) Waves in the water master (world position offset on the sea's finer surface), no Water plugin (taken in AG12, 2026-10-31) | `M_CgWater` (`citygen/ue/import_city.py`, `water_master`); the waves' weight per vertex from M16's exposure |
 
 1. **Local AI models.**
    - (a) None: everything procedural, deterministic, no ML dependency. *Recommended for the
@@ -905,6 +905,9 @@ docker image; Windows joins in AG9.
   what it needs in the brief meanwhile.
 
 ### 14.13 AG12: Water
+
+Done (`docs/assetgen_milestones.md`, AG12).
+
 
 - **Adds:** per water body and 256 m tile, keyed by the body's id: a surface mesh at its
   level (M13's profile along a river), finer on the sea, carrying the flow direction and

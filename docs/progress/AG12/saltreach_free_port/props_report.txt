@@ -1,0 +1,50 @@
+assetgen props: Saltreach Free Port: PASS
+
+  [ok] props_coverage: 30084 props (877 on AG7's barriers), 13510 plants, 7639 sign slots; 0 without an asset
+  [ok] props_families: 19 prop kinds in 5 styles, 14 plant species
+  [ok] props_replaces: 1199 prototype actors, 1199 replaced
+  [ok] props_meshes: no bad triangles
+  [ok] props_budgets: 52424 instances (at most 2907 in a tile, budgets 15000 and 300000), 27500472 triangles drawn through them, 1491711 unique triangles (budget 10000000)
+
+variants 685 in 34 families, instances 52424 (936 brackets), exact props 905, signs 7639 (4876 meshes)
+unique triangles 1491711 (signs 649116, exact 348452), drawn through instances 27500472, disk 83.2 MB
+
+instances by kind:
+  awning: 15934
+  ac_unit: 4205
+  railing: 2546
+  bollard: 2513
+  street_light: 1791
+  parked_vehicle: 1185
+  bracket: 936
+  traffic_signal: 685
+  wall_light: 610
+  hydrant: 476
+  trash_can: 428
+  trash: 342
+  bench: 333
+  dumpster: 170
+  bus_stop: 89
+  boat: 34
+  planter: 26
+  vending_machine: 18
+  kiosk: 8
+instances by species:
+  ivy: 9813
+  sedum: 2760
+  scrub: 1941
+  boxwood: 1196
+  ginkgo: 1112
+  maple: 994
+  linden: 457
+  fan_palm: 454
+  pine: 363
+  birch: 293
+  plane: 222
+  oak: 185
+  date_palm: 156
+  elm: 149
+signs: billboard.facade 65, billboard.roof 478, holo_ad.roof 44, neon.neon 204, shop_sign.channel 75, shop_sign.led 2616, shop_sign.lightbox 2415, shop_sign.neon 1742
+scripts: hangul 800, hanzi 3683, kana 74, latin 3082
+files: 0 families made, 0 tiles made, 59 kept, 0 written, 0 removed
+seconds: gather 0.58, families 0.07, tiles 0.11, write 0.3, total 1.11, workers 2

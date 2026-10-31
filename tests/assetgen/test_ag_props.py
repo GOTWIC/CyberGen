@@ -222,8 +222,12 @@ def test_m13_lifts_placements_by_base_or_ground(tmp_path):
     a, b = gather(flat, None, None, tmp_path), gather(hilly, None, None, tmp_path)
     za, zb = zs(a), zs(b)
     assert za.keys() == zb.keys()
-    lifts = {round(zb[i] - za[i], 3) for i in za}
+    # (AG12: a boat floats on M16's water, not on the ground: its body's surface, 1.5 m under
+    # the ground on the flat city)
+    boats = {p.id: p.position[2] for p in flat.props if p.type == "prop.boat"}
+    lifts = {round(zb[i] - za[i], 3) for i in za if i not in boats}
     assert lifts == {5.0, 9.0}
+    assert boats and all(round(za[i] - z, 3) == -1.5 for i, z in boats.items())
     on_bld = {p.id for p in flat.plants if (p.attrs or {}).get("building")}
     assert on_bld and all(round(zb[i] - za[i], 3) == 9.0 for i in on_bld)
     sa = {s["id"]: s["pivot"][2] for v in a.signs.values() for s in v}

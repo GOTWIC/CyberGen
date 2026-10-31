@@ -1,0 +1,22 @@
+assetgen water: Delta Megacity: PASS
+
+  [ok] water_coverage: 13 bodies, 123 banks drawn, 16 by AG7
+  [ok] water_levels: 1351159 surface vertices at their level, 41228 bed vertices checked (worst 0.001 m; 83% on M16's bed, the rest on a bank's slope over it)
+  [ok] water_gaps: 1550 waterline points on the bed, 1154 wall feet in it
+  [ok] water_meshes: no bad triangles
+  [ok] water_budgets: 2283048 triangles (budget 9000000), at most 35013 in a tile (t-01-06, budget 400000), at most 11760 stones in a tile (budget 60000)
+  [ok] water_replaces: 509 blockout water objects, 377 replaced, 132 dropped
+
+bodies 13 (canal 7, marsh 1, river 2, sea 3), 4.513 km2 of water
+pieces 290, tiles 136, triangles 2283048 (surface LODs {'lod0': 1956126, 'lod1': 495572, 'lod2': 127318, 'lod3': 30189}), stones 27797, disk 85.7 MB
+triangles by kind:
+  surface: 1956126
+  bed: 220762
+  water.bank.marsh_edge: 45225
+  water.bank.natural_bank: 44235
+  water.bank.riprap: 10069
+  water.bank.road_embankment: 3285
+  water.bank.canal_wall: 1788
+  water.bank.beach: 1558
+files: 136 tiles made, 0 kept, 136 written, 0 same bytes, 0 removed
+seconds: context 3.62, gather 0.59, make 28.38, write 1.07, total 37.28, workers 2

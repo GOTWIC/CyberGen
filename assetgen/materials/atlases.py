@@ -17,6 +17,8 @@ sampled straight by a mesh's UV0 and drawn with rows going up the surface (`pbr`
   manhole, a drain, arrows, a puddle, sand, dust; as the decals.
 - `macro`: 1024 px over 64 m: albedo and roughness variation, dirt and damp masks (RGBA),
   which the masters lay over every set so its tiling does not show.
+- `water` (AG12): ripple normals, foam and caustics over 8 m
+  (`water_surfaces.water_atlas`).
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ ROAD_CELLS = ("oil_a", "oil_b", "cracks_a", "cracks_b", "patch_a", "patch_b", "t
               "skid", "manhole", "drain", "arrow_straight", "arrow_left", "arrow_right",
               "puddle", "sand", "dust")
 MACRO_M = 64.0
-ATLASES = ("interiors", "decals", "road", "macro") + tuple(
+ATLASES = ("interiors", "decals", "road", "macro", "water") + tuple(
     f"trim_{e}" for e in ("heritage", "neon_retro", "corporate_glass", "brutalist",
                           "industrial", "clean_tech", "suburban_modern", "transit_modern",
                           "mixed_modern", "aerospace"))
@@ -369,6 +371,11 @@ def make(name: str, out_dir: str, density: int) -> dict:
     elif name.startswith("trim_"):
         maps = trim_sheet(name[5:], density)
         rec.update(strips=list(TRIM_STRIPS), tile_m=[2.0, 1.0])
+    elif name == "water":
+        # AG12: the water master's ripples and foam, the bed master's caustics
+        from .water_surfaces import WATER_TILE_M, water_atlas
+        maps = water_atlas(density)
+        rec.update(tile_m=WATER_TILE_M)
     else:
         raise KeyError(name)
     for k, a in maps.items():

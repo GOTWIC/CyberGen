@@ -17,7 +17,8 @@ district's style, its variant, its instance transform, and for the meshes made p
 - **Ground** (M13): a model z is measured from the ground where it stands, so every
   placement is lifted by its building's `base_m` when it hangs on a building or stands on
   its roof (AG1's shells stand there), else by the finished ground at its point (as the
-  blockout lifts M15's instances); nothing on a flat city.
+  blockout lifts M15's instances); nothing on a flat city. A boat (its waterline at its z)
+  floats on M16's water (AG12: the body's surface, 1.5 m under the ground on a flat city).
 """
 
 from __future__ import annotations
@@ -114,6 +115,10 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
     gd = Ground(model)
     bases = {b.id: float(b.base_m) for b in model.buildings
              if getattr(b, "base_m", None) is not None}
+    wbeds = wlev = None
+    if getattr(model, "banks", None):
+        from citygen import water as WA
+        wbeds, wlev = WA.Beds(model), WA.Levels(model)
 
     def lift(x, y, z, bid=None) -> float:
         """The height a placement's z is measured from (module docstring, Ground)."""
@@ -185,7 +190,12 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         did = ds.of(p.id, x, y)
         st = style_of(did)
         mm = mount.get(p.id)
-        z = z + lift(x, y, z, (mm or {}).get("building") or (p.attrs or {}).get("building"))
+        wid = wbeds.body_at(x, y) if kind == "boat" and wbeds is not None else None
+        if wid is not None:
+            z = z + wlev.at(wid, x, y)                 # (AG12: on M16's water)
+        else:
+            z = z + lift(x, y, z, (mm or {}).get("building") or
+                         (p.attrs or {}).get("building"))
         if kind in ST.EXACT:
             item = {"prop": {"id": p.id, "position": [C.m2(x), C.m2(y), C.m2(z)],
                              "yaw_deg": C.deg(p.yaw_deg), "scale": [C.m2(v) for v in p.scale],

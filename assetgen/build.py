@@ -1,6 +1,7 @@
 """`assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]
-[--no-props]` (scope sections 3, 4.4, 6): the building assets of a citygen build into
-`BUILD/assets/`, then its street packs, then its props, plants and signs.
+[--no-water] [--no-props] [--no-ground]` (scope sections 3, 4.4, 6): the building assets
+of a citygen build into `BUILD/assets/`, then its street packs, its water, its props, plants
+and signs, then its ground cover.
 
 1. Briefs (AG0's stage), reused from `briefs.json` when the model, spec and overrides are
    the ones it was made from; written only when they change.
@@ -22,7 +23,11 @@
 6. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
    bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
    `streets_report.json` and `.txt` (the report only when another of its files changed).
-7. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
+7. The water stage (AG12's `assetgen water`, `assetgen/water/build.py`, the same bytes; after
+   the streets, whose bridge piers foam it): `water/<tile>.glb`, `water/parts.glb`,
+   `water/manifest.json`, `unreal_contribution.water.json`, `water_report.json` and `.txt`
+   (likewise).
+8. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
    stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
    families, exact props and signs (their faces showing those pages),
    `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
@@ -495,7 +500,8 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
-          props: bool = True, ground: bool = True, progress: Progress | None = None) -> dict:
+          props: bool = True, ground: bool = True, progress: Progress | None = None,
+          water: bool = True) -> dict:
     """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
     to its notes then, else to `log`."""
     t0 = time.perf_counter()
@@ -651,6 +657,27 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
                 f"made, {n} files written")
+    if water:
+        # AG12: the water after the streets (it reads their bridge piers for its foam)
+        from .water.build import build as water_build, default_workers as water_workers
+        wrep = water_build(model, sha, out, filled, workers=workers or water_workers(),
+                           report_always=False, lib=lib, progress=progress)
+        f = wrep["files"]
+        n = len(f["written"]) + f["tiles_removed"] + sum(
+            int(bool(f[k])) for k in ("parts_written", "manifest_written",
+                                      "contribution_written", "report_written"))
+        wrote += n
+        st = wrep["stats"]
+        rep["water"] = {"ok": wrep["ok"], "bodies": st["bodies"], "pieces": st["pieces"],
+                        "tiles": st["tiles"], "triangles": st["triangles"],
+                        "stones": st["instances"], "disk_bytes": st["disk_bytes"],
+                        "failed": [c["id"] for c in wrep["checks"] if not c["ok"]],
+                        "tiles_made": f["tiles_made"], "files_written": n,
+                        "seconds": wrep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and wrep["ok"]
+        if progress is None:
+            log(f"water: {st['bodies']} bodies, {st['pieces']} pieces in {st['tiles']} "
+                f"tiles, {f['tiles_made']} made, {n} files written")
     # AG6's sign pages before AG8's signs show them; its materials and checks after them
     signs = None
     if lib is not None:
@@ -858,6 +885,13 @@ def report_text(rep: dict) -> str:
                      f"{st['triangles']:,} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if st['ok'] else 'FAIL ' + ', '.join(st['failed'])}"
                      f" ({st['tiles_made']} tiles made, {st['seconds']} s; streets_report.txt)")
+    wa = rep.get("water")
+    if wa:
+        lines.append(f"water: {wa['bodies']} bodies, {wa['pieces']} pieces in {wa['tiles']} "
+                     f"tiles, {wa['triangles']:,} triangles, {wa['stones']:,} stones, "
+                     f"{wa['disk_bytes'] / 1e6:.1f} MB; "
+                     f"{'all checks pass' if wa['ok'] else 'FAIL ' + ', '.join(wa['failed'])}"
+                     f" ({wa['tiles_made']} tiles made, {wa['seconds']} s; water_report.txt)")
     pr = rep.get("props")
     if pr is not None:
         lines.append(f"props: {pr['variants']} variants, {pr['instances']:,} instances, "

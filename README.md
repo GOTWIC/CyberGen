@@ -183,7 +183,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG13`](docs/progress/AG13)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG12`](docs/progress/AG12), [`AG13`](docs/progress/AG13)
 
 ### Cities
 
@@ -375,6 +375,33 @@ elevators. The deck's streets lie on the slab and climb to it on solid ramps; th
 undercity's roofs close up to the soffit, its fronts lit and grimy as a covered street.
 More: [`docs/progress/AG10`](docs/progress/AG10).
 
+<img src="docs/progress/AG12/vesper_bay/8k/water_canal_night.jpg" width="840">
+
+A quayed canal in Vesper Bay by night (8K): the neon and lit windows on its water, the quay
+walls with their stairs down to it, moored boats.
+
+| | |
+|---|---|
+| <img src="docs/progress/AG12/vesper_bay/8k/water_bank.jpg" width="420"> | <img src="docs/progress/AG12/vesper_bay/8k/water_harbor.jpg" width="420"> |
+| The Vess River's natural bank (8K) | The harbor basins from above (8K) |
+
+Every river, canal, harbor and the sea gets real water: a surface that carries the current,
+foam along walls, waterlines and bridge piers and, at sea, a swell by how open the water
+is; a bed of mud, silt, sand, gravel or stone at its depth, seen through clear water with
+caustics; and banks by kind, grassy natural banks, beaches, marsh mud, riprap with its
+stones, stone revetments and walls, meeting the quays and canal walls. In Unreal the water
+is Single Layer Water with flowing ripples, foam and waves, and an underwater look.
+
+```bash
+.venv/bin/python -m assetgen water out/vesper_bay
+```
+
+`assetgen build` also runs it, after the streets (`--no-water` skips it). The water stage
+writes `out/<city>/assets/water/`, one glTF pack per 256 m tile with each water body's
+surface (a chain of finer to coarser meshes) and bed, and each bank, replacing the
+blockout's water in Unreal; a regenerated district rewrites only the water near it. More:
+[`docs/progress/AG12`](docs/progress/AG12).
+
 <img src="docs/progress/AG13/vesper_bay/8k/park.jpg" width="840">
 
 A park on Vesper Bay's Scholar Isle at street level (8K): lawn grass, clover and flowers in
@@ -420,7 +447,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Deck slabs with coffered or ribbed soffits, edge fascias, rails, lights over the streets below and colonnades over parks; columns, light-well stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs that meet the slab | Done |
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
-| AG12 | Water | Real water: surfaces that flow and foam, beds, banks and beaches, swimming | Planned |
+| AG12 | Water | Water that flows, foams and (at sea) swells, beds of mud, sand and stone, natural banks, beaches, marsh edges and riprap, Single Layer Water and an underwater look in Unreal | Done |
 | AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
 | AG14 | Fit and finish | Smooth junctions and curved walls, everything resting on what it stands on, nothing through anything else | Planned |
 | AG15 | Cyberpunk facades and night | Window patterns beyond grids, mixed materials, every building lit its own way at night, lit streets | Planned |

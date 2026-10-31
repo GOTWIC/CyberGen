@@ -1022,8 +1022,7 @@ Sample builds: `docs/progress/M18/`.
 ## Asset generator (assetgen)
 
 `docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
-AG12 water after citygen's M16 (AG13, ground cover and grass, is in place), AG14 fit and finish
-and AG15 cyberpunk facades and night from the first run-through), its log
+AG14 fit and finish and AG15 cyberpunk facades and night from the first run-through), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -1411,9 +1410,55 @@ AG13 (ground cover and grass) is in place, in `assetgen/ground/` (tests
 - **Previews**: `assetgen materials preview` draws the ground tiles with AG6's materials
   (`ag6_materials.ground`, `grass`) and the clumps within 140 m of a street view's eye
   through AG8's geometry-nodes instancer. Results: `docs/progress/AG13/`.
-
-Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
-and `props` print a line per stage, a bar (n of N, time left) where the count is known and
+AG12 (water) is in place, in `assetgen/water/` (tests `tests/assetgen/test_ag_water.py`,
+goldens `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`):
+- **`assetgen water BUILD [--spec S] [--workers N] [--no-textures]`** (`build.py`; also a
+  stage of `assetgen build` after the streets, `--no-water` skips it): pieces gathered from
+  M16's data (`pieces.py`), each made from its own inputs and kept by hash as AG7's. Per water
+  body and 256 m tile (`<body>@<tile>`, the body's own water: its polygon less the bodies
+  before it in M16's order) a bed and a surface; per bank AG12 draws a piece by its id.
+- **Fields** (`fields.py`, from a piece's inputs alone): M16's depth exactly
+  (`Beds.depth_many`'s arithmetic on the body's banks within reach of the tile), the bottom
+  AG12 draws (`bottom`: M16's bed raised to every sloped bank's slope carried on under the
+  water, at a wall's toe up to its face, never within 5 cm of the surface), the level
+  (flat: `surface_m`; M13's along a river), the current (along the flow line, the sea's
+  tide along its shore, slower over shallows), foam (walls, waterlines, bridge piers from
+  AG7's notes) and the sea's wave weight (M16's exposure on a blurred 16 m raster).
+- **Meshes** (`grid.py`, `makers.py`): a region on a lattice, inside cells as two triangles,
+  edge cells clipped on the millimeter grid and triangulated exactly (a piece the ear clipper
+  cannot take split in halves), vertices shared by position. Bed (Nanite): 8 m on the sea,
+  else 4 m, leaving out each sloped bank's dry strip (line to waterline), so the bank and bed
+  meet along the waterline; a slot by M16's material, the underwater bank zone by the bank's
+  (riprap stone, beach sand, marsh mud); steep triangles UV'd on their vertical plane;
+  skirts 13 m down along edges shared with other water. Surface: LOD chains (sea 2, 4, 8,
+  16 m; inland 4, 8, 16 m), UV1 the current, COLOR_0 foam, depth, wave weight. Banks: the dry
+  strip on a 2 m lattice at the bank's slope, riprap stones as instanced parts (six meshes in
+  `water/parts.glb`), stone walls along rivers and the sea.
+- **AG7**: `Ground.water_level` is M16's surface on a flat city; quay and canal walls reach
+  M16's toe and 0.5 m into the bed (`notes.foot`); canal walls follow the waterway's
+  `canal_wall` banks (no longer across its mouth into other water); bridge piers and arch and
+  pylon footings stand 0.5 m into M16's bed (`inputs.bed`), their footprints in
+  `notes.piers`.
+- **AG6**: sets `bed_mud`, `bed_silt`, `bed_sand`, `bed_gravel`, `bed_stone` (upper band),
+  `bank_soil`, `bank_rubble`, `bank_rock` (`WATER_SETS`; generators in
+  `materials/water_surfaces.py`), the `water` atlas (ripple normals, foam, caustics),
+  `catalog.WATER` (per water kind sea, river, canal, ornamental, marsh: scattering,
+  absorption, shallow and deep color, clarity, flow, foam, waves) and `WATER_SLOT`; masters
+  `water` and `bed`; the texel check reads the water packs (beds at the upper density).
+- **Checks** (`checks.py`, on the packs read back against the model): `water_coverage`,
+  `water_levels` (surfaces at their level, beds at AG12's bottom, never deeper than M16's),
+  `water_gaps` (bank waterlines on the bed, AG12's and AG7's wall feet in it, skirts),
+  `water_meshes`, `water_budgets` (400k triangles and 60k stones a tile, 9M a city),
+  `water_replaces`. `water_report.txt`; `water/preview.png` (`preview.py`).
+- **Exporter**: `unreal_contribution.water.json` (surfaces non-Nanite LOD chains, beds and
+  banks Nanite, the drop of the blockout's water, `underwater` per body), `M_CgWater` (Single
+  Layer Water, flow-mapped ripples, depth and mask foam, the sea's Gerstner waves by world
+  position offset: decision 13.10 (a)), `M_CgBed` (caustics), a post-process volume per swim
+  box (`docs/unreal_export.md`, AG12). **Blender**: `ag6_materials.water` and `caustics`;
+  `assetgen materials preview --views water` (a canal and a river bank up close, the harbor
+  from above). Results: `docs/progress/AG12/`.
+Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
+`water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
 redrawn line on a terminal, plain lines when piped; workers never print, the parent advances;
 Blender scripts print `CGPROGRESS start|done <name>`, read by `assetgen/blenderrun.py`);

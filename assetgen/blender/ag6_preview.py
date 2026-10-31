@@ -535,6 +535,12 @@ def main():
             o.hide_viewport = True
             protos[SUFFIX.sub("", o.name)] = o
     log(f"AG8 variants: {len(protos)}")
+    wprotos = {}
+    if JOB.get("water_parts") and os.path.isfile(JOB["water_parts"]):
+        for o in import_glb(JOB["water_parts"], "water", shared=True):
+            o.hide_render = True
+            o.hide_viewport = True
+            wprotos[SUFFIX.sub("", o.name)] = o          # (AG12's riprap stones)
     gj = JOB.get("ground") or {}
     if gj.get("clumps"):
         # AG13's clumps: prototypes beside AG8's, their placements with AG8's per view
@@ -558,6 +564,10 @@ def main():
             p = f"{JOB['assets']}/streets/{tile}.glb"
             if os.path.isfile(p):
                 objs += import_glb(p, "streets")
+        for tile in v.get("water_tiles", []):
+            p = f"{JOB['assets']}/water/{tile}.glb"
+            if os.path.isfile(p):
+                objs += import_glb(p, "water")          # (AG12: surfaces, beds, banks)
         for tile in v.get("ground_tiles", []):
             p = f"{JOB['assets']}/ground/tiles/{tile}.glb"
             if os.path.isfile(p):
@@ -573,7 +583,11 @@ def main():
         for o in objs:
             if ".glass.lod" in o.name and not o.name.endswith(".lod0"):
                 o.hide_render = True
+            if ".water." in o.name and ".lod" in o.name and not o.name.endswith(".lod0"):
+                o.hide_render = True                    # (a water surface's LOD chain)
         sobjs = signs(v.get("signs", [])) + ag8(v, protos)
+        if v.get("water_points"):
+            sobjs += ag8({"ag8": {"points": v["water_points"]}}, wprotos)
         cam = camera(sc, v)
         cut = section(sc, cam, v) if v.get("section") else []
         try:

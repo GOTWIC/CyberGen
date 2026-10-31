@@ -807,7 +807,11 @@ GENERATORS = {
 
 
 def make(gen: str, n: int, tile_m: float, params: dict) -> Surface:
-    return GENERATORS[gen](n, tile_m, params)
+    fn = GENERATORS.get(gen)
+    if fn is None:
+        from .water_surfaces import GENERATORS as WATER     # (AG12's beds and banks)
+        fn = WATER[gen]
+    return fn(n, tile_m, params)
 
 
 # --- AG13: ground cover (lawn, meadow, dirt, mud, gravel, sand, moss, rubble) ---------------

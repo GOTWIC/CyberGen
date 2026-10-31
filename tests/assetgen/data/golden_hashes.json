@@ -32,7 +32,7 @@
   },
   "ag1": {
     "testport_manifest": "973c2570ddd1a2a8d569c45b66e186ba014076eeec1f1d1a2a3b1198ddc151f0",
-    "testport_files": "037531d3ecb8ef6afb51b51a722d68301d51c16540c648637ddfd1e3b737b71d",
+    "testport_files": "e54dcb5d8ec4fad80d049617864df24f08daefc467b67b66597ef27c662fdce0",
     "buildings": {
       "vesper_bay": {
         "d01.lm.e809n273.bld": "1aa6d14ac0b05968cf73cf049636ca9333d50fb2f6636880266195fd4fc516ba",
@@ -57,6 +57,6 @@
       "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
       "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
     },
-    "testport_materials": "a93b976703b8386da8a06b52e231ed856cb8a9c7e74eb53d7a139d7b0b2396a8"
+    "testport_materials": "b8aeead2857e5589fbcc15ef490a0711b8960a607f6631185befb9c73425daa5"
   }
 }
