@@ -304,7 +304,11 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
                 0.45, cap_style="flat"))
     # (on a 1 mm grid: the pieces' vertices are on the 1 cm grid, and a 1 cm overlay would
     # close a building's sub-centimeter sliver between two of them)
-    cutg = shapely.union_all(cut, grid_size=FINE_M) if cut else None
+    ko = job.get("keep_out") or {}
+    hard = [_poly(r) for r in ko.get("hard", [])] + [_poly(r) for r in job["water"]]
+    row = [_poly(r) for r in ko.get("row", [])]
+    cutg = shapely.union_all(cut + hard, grid_size=FINE_M) if cut or hard else None
+    rowg = shapely.union_all(row, grid_size=FINE_M) if row else None
     ok = np.zeros(len(px), dtype=bool)
     verge = np.array([it["mode"] != "piece" for it in items])[it_k]
     for want in (False, True):
@@ -313,6 +317,9 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
         allowed = shapely.union_all(grassy, grid_size=FINE_M) if grassy else Polygon()
         if cutg is not None and not allowed.is_empty:
             allowed = shapely.difference(allowed, cutg, grid_size=FINE_M)
+        if rowg is not None and not want and not allowed.is_empty:
+            # (a verge lies in its road's right of way: only the pieces keep off it)
+            allowed = shapely.difference(allowed, rowg, grid_size=FINE_M)
         sel = np.nonzero(verge == want)[0]
         if allowed.is_empty or not len(sel):
             continue

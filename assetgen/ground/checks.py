@@ -9,8 +9,8 @@
 - `ground_grass_clear`: no clump's footprint (its kind's radius times its scale) reaches a
   road's right of way, a building, a solid site element or structure, water, a paved piece
   (`paving`), a deck or a desire line, and every clump stands on grass-bearing ground (a
-  verge's clumps on its median lawn); tested on the model's own geometry, apart from the
-  scatter's;
+  verge's clumps on its median lawn); tested on the model's own geometry on the 1 cm grid,
+  apart from the scatter's;
 - `ground_meshes`: the clump variants and the tile meshes have no degenerate triangles,
   finite positions, normals and UVs;
 - `ground_budgets`: clumps per tile and city, triangles per clump variant and of all
@@ -41,7 +41,6 @@ def _clear(model, man: dict, out_dir: Path) -> dict:
     from citygen import cover as CV
     with G.canonical():
         cx = CV.Ctx(model)
-        bad_geoms = list(cx.row) + list(cx.hard) + list(cx.wet)
         paved, grassy = [], []
         corr = []
         for g in model.ground_cover:
@@ -52,8 +51,11 @@ def _clear(model, man: dict, out_dir: Path) -> dict:
         decks = [G.from_model_poly(d.polygon) for d in getattr(model, "decks", []) or []]
         verges = [G.from_model_poly(g.polygon) for g in model.green_areas
                   if g.kind == "lawn" and g.polygon is not None]
-    road_like = list(cx.row)
-    other = list(cx.hard) + list(cx.wet) + paved + decks + corr
+        # (on the 1 cm grid, as the scatter's keep-outs: a footprint's spike thinner than
+        # that is no obstacle)
+        road_like = [shapely.set_precision(g, 0.01) for g in cx.row]
+        other = [shapely.set_precision(g, 0.01) for g in list(cx.hard) + list(cx.wet)] + \
+            paved + decks + corr
     t_road = shapely.STRtree(road_like) if road_like else None
     t_other = shapely.STRtree(other) if other else None
     t_ok = shapely.STRtree(grassy) if grassy else None

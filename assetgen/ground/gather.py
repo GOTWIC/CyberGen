@@ -13,7 +13,10 @@ tile, so its hash is the tile's: a tile is made again only when something in it 
   grade line, z profile and AG7's `ROAD_DZ`).
 - **Around them**: M14's decks (no grass under a slab), trees (ferns and shade under their
   crowns, clear of their trunks), the water near the tile (moisture), M16's shade raster
-  (`citygen.cover.Raster`, 4 m) and M13's ground grid under the tile.
+  (`citygen.cover.Raster`, 4 m), M13's ground grid under the tile, and the keep-outs the
+  clearance check tests (M16's right of way and the buildings, solid site elements and
+  structures, `citygen.cover.Ctx`), which the grass's footprints keep clear of whatever the
+  pieces' topology.
 - **Blockout keys**: the objects M15 imports for the cover (`<district>.cover_<kind>.<tile>`)
   and the median lawns (`<district>.lawn.<tile>`), from citygen's own blockout code.
 """
@@ -224,6 +227,8 @@ def gather(m, spec_doc: dict | None = None) -> Gathered:
         tgrid[tile_key(tr[1], tr[2])].append(tr)
     wet = [b.poly for b in WA.bodies(m)]
     wtree = shapely.STRtree(wet) if wet else None
+    with G.canonical():
+        cvx = CV.Ctx(m)             # (M16's right of way and what stands on the ground)
     raster = CV.Raster(m)
     shade_u8 = np.floor(np.clip(raster.shade, 0.0, 1.0) * 255.0 + 0.5).astype(np.int64)
     ground = Ground(m)
@@ -252,6 +257,16 @@ def gather(m, spec_doc: dict | None = None) -> Gathered:
             for k in sorted(int(i) for i in wtree.query(wbox, predicate="intersects")):
                 water += _box_rings(wet[k], wb)
         job["water"] = water
+        # the keep-outs the clearance check tests (`checks._clear`): the roads' right of way,
+        # the buildings, solid site elements and structures, near the tile
+        kb = (x0 - 2.0, y0 - 2.0, x1 + 2.0, y1 + 2.0)
+        job["keep_out"] = {
+            name: [r for k in (sorted(int(i) for i in tree.query(shapely.box(*kb),
+                                                                 predicate="intersects"))
+                               if tree is not None else [])
+                   for r in _box_rings(geoms[k], kb)]
+            for name, tree, geoms in (("row", cvx.rtree, cvx.row),
+                                      ("hard", cvx.htree, cvx.hard))}
         # M16's shade raster over the tile and a cell round it (4 m cells)
         c = raster.c
         i0 = max(0, int(math.floor((x0 - raster.x0) / c)) - 1)
