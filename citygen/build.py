@@ -37,6 +37,7 @@ from . import checks as C
 from . import districts as D
 from . import geom as G
 from . import hydro as H
+from . import junctions as JN
 from . import local as LC
 from . import megasites as MS
 from . import progress as PG
@@ -451,7 +452,8 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
                                                   "every check passed"))
             T.stage(f"city_try{attempt}", [b.variant, b.stats.get("road_variant"), salt, fails])
             tries.append({"variant": b.variant, "road_variant": b.stats.get("road_variant"),
-                          "layout_salt": salt, "failures": fails})
+                          "layout_salt": salt, "failures": fails,
+                          "failed": sorted(c.id for c in b.checks if c.failures)})
             if best is None or fails < best[0]:
                 best = (fails, b)
             if not fails or attempt == CITY_RETRIES:
@@ -688,6 +690,8 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
                        "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
         T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
         ps.finish()
+    # M18: the surface of every junction not flat at its node's height (on the grade lines)
+    loc.info["junction_surfaces"] = JN.surfaces(loc.segments, loc.nodes, loc.junctions)
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
     b.notes = b.notes + loc.notes
@@ -790,8 +794,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         m = with_rows(m, {"tunnels": list(m.tunnels) + TE.bore_rows(
             tg["bores"], [s.model_dump(mode="json") for s in m.road_segments],
             b.roads.terrain[0], {d.id: d.name for d in m.districts})})
-    # M7: columns under the raised road decks (after the transit structures they avoid)
-    m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
+    # M7: columns under the raised road decks (after the transit structures they avoid);
+    # M18: retained fill under the low ones
+    m = with_rows(m, {"structures": list(m.structures) + EL.road_embankments(m) +
+                      EL.road_supports(m)})
     if m.decks:
         # M14: the deck slabs' columns (after the transit structures and road columns)
         cols, dks = DK.supports(m)

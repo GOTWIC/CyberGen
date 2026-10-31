@@ -193,8 +193,10 @@ class Ctx:
                 if ms.z0_m <= 0.5 and ms.z1_m > 0.5:
                     self.bld.append(P(ms.footprint))
                     self.bld_ids.append(e.id)
+        # (M18: an embankment is the fill under its road, which the road's own keep-outs
+        # cover; the props on its sidewalks stand on it)
         self.struct = [P(s.footprint) for s in m.structures if s.footprint is not None and
-                       s.z0_m <= 0.5 and s.z1_m > 0.0]
+                       s.z0_m <= 0.5 and s.z1_m > 0.0 and s.kind != "embankment"]
         # water (seas, rivers, channels, waterways)
         self.water = [P(p) for e in m.seas for p in e.polygons] + \
             [P(e.polygon) for e in m.rivers] + [P(e.polygon) for e in m.channels] + \
@@ -1046,7 +1048,7 @@ def _build(spec, m) -> Out:
     c = Ctx(spec, m)
     placed: list[Cand] = []
     info: dict = {}
-    under_ok = _headroom(c, V.overhead(c))
+    under_ok = _headroom(c, V.overhead(c, fill=False))
     # ground things in priority order: what the street needs first, clutter last; the trees
     # go between the street furniture and the clutter (vegetation.py)
     for name, fn in GENERATORS[:7]:

@@ -247,7 +247,9 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     # M14: the decks of layered districts (upper twins of their interior streets, ramps)
     dplan = DK.plan(spec, net, net.builder, did, getattr(b, "held_lines", None))
     darch = {did[d.name]: d.archetype for d in spec.districts}
-    jx = JN.build(net, darch, did, spec.seed or 0)
+    ctl = {did[d.name]: (d.junctions.signals, d.junctions.crosswalks)
+           for d in spec.districts if d.junctions is not None}
+    jx = JN.build(net, darch, did, spec.seed or 0, spec.highways.grades, ctl)
     T.stage("junctions", [jx["junctions"], jx["crosswalks"], jx["sidewalks"]])
     T.stage("lanes", jx["lanes"])
     gnet, gjx = DK.street_view(net, jx, dplan)
@@ -289,11 +291,19 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     T.stage("walkways", walk)
     out.nodes, out.segments, out.bridges = net.nodes, net.segments, net.bridges
     # (each junction's run along each leg's centerline out to its polygon's edge, which is
-    # square to the leg's direction: longer than the cut where the leg bends inside it)
+    # square to the leg's direction: longer than the cut where the leg bends inside it; M18:
+    # primary roads too, `terrain.grade` says where)
     for nid in sorted(jx["legs"]):
-        for x in jx["legs"][nid]:
-            # (at most 0.45 of the leg, as before M17's longer cuts: M18 levels junctions)
-            r = min(JN.run_along(x, max(x.cut, x.cut_row)), 0.45 * x.L)
+        lg = jx["legs"][nid]
+        if len(lg) < 2 or (len(lg) == 2 and not any(x.cut > 0.0 for x in lg)):
+            continue      # (no junction there)
+        for x in lg:
+            # (M18: a primary road LEVEL_OUT_M past it too; a local road's run stays M13's:
+            # longer, the grade lines of a hillside's short streets go flat and its fills pass
+            # FILL_MAX_M, as Cragmouth showed)
+            r = min(JN.run_along(x, max(x.cut, x.cut_row)) +
+                    (JN.LEVEL_OUT_M if x.cls in ("highway", "avenue") else 0.0),
+                    0.45 * x.L)
             k = (x.seg["id"], nid)
             if r > out.cuts.get(k, 0.0):
                 out.cuts[k] = r
@@ -345,7 +355,10 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     T.stage("blocks", [out.blocks, out.lots, out.open_spaces, out.places])
     out.info = {"one_way_loops": jx["one_way"], "open_paths": n_paths,
                 "walkway_links": n_links,
-                "angles": {did[n]: a for n, a in net.angles.items()}}
+                "angles": {did[n]: a for n, a in net.angles.items()},
+                "levelled_legs": jx["level"]["levelled"],
+                "unlevelled_legs": jx["level"]["kept"],
+                "raised_junctions": jx["level"]["raised"]}
     if dplan.decks:
         out.info["decks"] = DK.info(dplan, dko)
     return out

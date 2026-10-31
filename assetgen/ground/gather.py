@@ -185,9 +185,14 @@ def gather(m, spec_doc: dict | None = None) -> Gathered:
     pal = _palette(m, spec_doc)
     src = _sources(m)
     per_tile: dict[str, dict] = defaultdict(lambda: {"pieces": [], "verges": []})
+    desire_at: dict[str, list] = defaultdict(list)   # tile -> (piece id, line, width)
     used_pal: set[str] = set()
     n_grassy = 0
     for g in m.ground_cover:
+        for d in g.desire_lines:
+            line = [[G.q(x), G.q(y)] for x, y in d.line]
+            for t in _tiles_of(LineString(line).bounds, d.width_m / 2.0 + 0.1 + 2.0):
+                desire_at[t].append((g.id, line, d.width_m))
         what, sk = src.get(g.source_id, ("rest", None)) if g.source_id else ("rest", None)
         sf = K.surface_of(g.kind, what, sk)
         p = G.from_model_poly(g.polygon)
@@ -240,6 +245,14 @@ def gather(m, spec_doc: dict | None = None) -> Gathered:
         job["tile"] = t
         job["box"] = [x0, y0, x1, y1]
         bx = shapely.box(x0 - 2.0, y0 - 2.0, x1 + 2.0, y1 + 2.0)
+        # the desire lines of pieces off the tile whose corridors reach into it (only where
+        # there are some: a tile without keeps its inputs)
+        own = {r["id"] for r in job["pieces"]}
+        near_d = sorted([line, w] for pid, line, w in desire_at.get(t, ())
+                        if pid not in own and shapely.intersects(
+                            LineString(line).buffer(w / 2.0 + 0.1, cap_style="flat"), bx))
+        if near_d:
+            job["desire_near"] = near_d
         job["decks"] = [r for did, dp in decks if shapely.intersects(dp, bx)
                         for r in _box_rings(dp, bx.bounds)]
         ix, iy = tile_key(x0 + 1.0, y0 + 1.0)

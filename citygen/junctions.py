@@ -51,9 +51,19 @@ CORNER_R = {"highway": 15.0, "avenue": 12.0, "service": 6.0, "alley": 3.0, "pede
 ROW_CORNER_MIN_M = 1.0
 CORNER_RUN_MAX_M = 60.0      # longest corner (fillet or sharp) along a leg
 CUT_SHARE = 0.9              # M17: the cut-backs at a road's two ends take at most this of it
-CROSSWALK_W = 4.0
 CROSSWALK_SETBACK_M = 1.5
+# M18: crossings by need. Crosswalk widths by the class of the road crossed (4 m on every
+# crosswalk before; none on alleys and service roads), 5 m on a downtown avenue
+CROSSWALK_W = {"highway": 4.0, "avenue": 4.0, "street": 3.0}
+DOWNTOWN_ARCH = ("corporate_core", "transit_hub")
+DOWNTOWN_AVENUE_W = 5.0
 SIGNAL_STREET_ARCH = ("corporate_core", "transit_hub", "midtown_mixed")
+SIGNAL_SPACING_M = 120.0    # a junction where a street meets a primary road (or a street
+#                             crossing in SIGNAL_STREET_ARCH) gets signals only where no
+#                             signalized junction is this near along either road
+SPARSE_ARCH = ("old_town", "entertainment_market")    # (the old town and slum archetypes)
+SPARSE_SPACING_M = 200.0    # ... in them
+FEWER = 2.0                 # `junctions.signals` "fewer": the spacing this many times
 ONE_WAY_SHARE = 0.4
 TURN_STRAIGHT_DEG = 35.0
 
@@ -440,6 +450,10 @@ def _bends(lg: Leg, c: float) -> bool:
 
 
 def classify(legs: list[Leg], arch: str | None) -> tuple[str, str, bool]:
+    """(kind, shape, signal candidate). M18's candidates (`plan_signals` spaces them): two
+    primary roads meeting (always signalized), a street meeting a primary road, a four-way
+    street crossing in SIGNAL_STREET_ARCH; never an interchange of highways alone (M7), nor
+    an alley or a service road meeting a road."""
     veh = sorted([lg.cls for lg in legs if lg.cls in ST.VEHICLE],
                  key=lambda c: -ST.RANK[c])
     n = len(legs)
@@ -447,18 +461,138 @@ def classify(legs: list[Leg], arch: str | None) -> tuple[str, str, bool]:
     if not veh:
         return "pedestrian", shape, False
     kind = veh[0] if len(veh) == 1 else f"{veh[0]}_{veh[1]}"
-    sig = False
-    if all(lg.cls == "highway" for lg in legs):
+    if all(lg.cls == "highway" for lg in legs) or len(veh) < 3:
         return kind, shape, False  # an interchange in M7: no signals, no pedestrians
-    if len(veh) >= 3:
-        if veh[1] in ("highway", "avenue"):
-            sig = True
-        elif veh[0] in ("highway", "avenue") and veh[1] == "street" and len(veh) >= 4:
-            sig = True
-        elif veh[0] == "street" and veh[1] == "street" and len(veh) >= 4 and \
-                arch in SIGNAL_STREET_ARCH:
-            sig = True
-    return kind, shape, sig
+    n_p = sum(c in ST.PRIMARY for c in veh)
+    n_s = veh.count("street")
+    cand = n_p >= 3 or (n_p >= 1 and n_s >= 1) or \
+        (n_p == 0 and n_s >= 4 and arch in SIGNAL_STREET_ARCH)
+    return kind, shape, cand
+
+
+def spacing(arch: str | None, signals: str = "auto") -> float:
+    """M18: how far apart along a road the spaced signals of a district stand (and the
+    marked crossings of an avenue away from them)."""
+    d = SPARSE_SPACING_M if arch in SPARSE_ARCH else SIGNAL_SPACING_M
+    return d * (FEWER if signals == "fewer" else 1.0)
+
+
+def straight_on(legs: dict, nid: str, x: Leg, reach: float) -> list[tuple[str, float]]:
+    """The nodes along a road from node nid out along leg x, going on straight through each
+    node (the vehicle leg within TURN_STRAIGHT_DEG of straight ahead) until `reach`:
+    [(node, distance)]."""
+    out = []
+    acc = 0.0
+    seen = {nid}
+    cmin = M.cos(M.radians(TURN_STRAIGHT_DEG))
+    while True:
+        s = x.seg
+        far = s["end"] if x.at_start else s["start"]
+        acc += x.L
+        if acc > reach or far in seen:
+            return out
+        out.append((far, acc))
+        seen.add(far)
+        here = legs.get(far, [])
+        back = [y for y in here if y.seg["id"] == s["id"] and y.at_start != x.at_start]
+        if not back:
+            return out
+        bd = back[0].d
+        best = None
+        for y in here:
+            if y is back[0] or y.cls not in ST.VEHICLE:
+                continue
+            c = -(y.d[0] * bd[0] + y.d[1] * bd[1])
+            if c >= cmin and (best is None or (c, y.seg["id"]) > (best[0], best[1].seg["id"])):
+                best = (c, y)
+        if best is None:
+            return out
+        x = best[1]
+
+
+def reach(legs: dict, nid: str, d: float, only=None) -> set:
+    """The nodes within d along a road out of nid (`straight_on` along its vehicle legs, or
+    those `only` picks)."""
+    out: set = set()
+    for x in legs[nid]:
+        if x.cls in ST.VEHICLE and (only is None or only(x)):
+            out |= {n for n, _ in straight_on(legs, nid, x, d)}
+    return out
+
+
+def _spaced(cands, legs: dict, gap: dict, marked: set, only=None) -> set:
+    """Greedy spacing (candidates in order): a candidate is taken where no node of `marked`
+    (which grows) lies within its spacing along its roads, and it lies within that of none
+    taken before it (the walks along a road may part differently either way)."""
+    taken: set = set()
+    blocked: set = set()
+    for nid in cands:
+        r = reach(legs, nid, gap[nid], only)
+        if nid in blocked or r & marked:
+            continue
+        marked.add(nid)
+        taken.add(nid)
+        blocked |= r
+    return taken
+
+
+def plan_signals(legs: dict, node_arch: dict, control) -> tuple[set, dict]:
+    """M18: crossings by need. Signals where two primary roads meet; where a street meets a
+    primary road, or at a four-way street crossing in SIGNAL_STREET_ARCH, only where no
+    signalized junction is within `spacing` along either road (greedy: primary roads first,
+    then the junctions with more vehicle legs, then from the west: a node's place, not its
+    build-order id, so a district regeneration decides the same away from the district).
+    `control(nid)` is the district's `junctions` (signals, crosswalks). Returns
+    (signalized nodes, {candidate node: its spacing})."""
+    sig: set = set()
+    gap: dict = {}
+    cands = []
+    for nid in sorted(legs):
+        lg = legs[nid]
+        if len(lg) < 3:
+            continue
+        sigs = control(nid)[0]
+        if sigs == "none":
+            continue
+        _, _, cand = classify(lg, node_arch.get(nid))
+        if not cand:
+            continue
+        gap[nid] = spacing(node_arch.get(nid), sigs)
+        n_p = sum(x.cls in ST.PRIMARY for x in lg)
+        if n_p >= 3:
+            sig.add(nid)
+            continue
+        if sigs == "fewer" and not n_p:
+            continue      # ("fewer": no street crossing signalized)
+        cands.append((n_p == 0, -sum(x.cls in ST.VEHICLE for x in lg), lg[0].p, nid))
+    _spaced([c[-1] for c in sorted(cands)], legs, gap, sig)
+    return sig, gap
+
+
+def plan_crossings(legs: dict, node_arch: dict, control, signals: set) -> set:
+    """M18: the unsignalized junctions with a marked crossing of their avenue: where neither a
+    signalized junction nor another such crossing is within the district's spacing along the
+    avenue (`junctions.crosswalks` "auto"; from the west)."""
+    cands, gap = [], {}
+    for nid in sorted(legs):
+        lg = legs[nid]
+        sigs, xws = control(nid)
+        if nid in signals or xws != "auto" or len(lg) < 2 or \
+                not any(x.cls == "avenue" for x in lg) or all(x.cls == "highway" for x in lg):
+            continue
+        if len(lg) == 2 and not any(x.cut > 0.0 for x in lg):
+            continue      # (no junction there)
+        cands.append((lg[0].p, nid))
+        gap[nid] = spacing(node_arch.get(nid), sigs)
+    return _spaced([c[-1] for c in sorted(cands)], legs, gap, set(signals),
+                   lambda x: x.cls == "avenue")
+
+
+def crosswalk_w(cls: str, arch: str | None) -> float:
+    """M18: a crosswalk's width by the class of the road it crosses (0: none)."""
+    if cls == "avenue" and arch in DOWNTOWN_ARCH:
+        return DOWNTOWN_AVENUE_W
+    return CROSSWALK_W.get(cls, 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -574,6 +708,554 @@ def _z_at(prof: list[dict], s: float) -> float:
                 return max(a["z"], b["z"])
             return a["z"] + (s - a["s"]) / (b["s"] - a["s"]) * (b["z"] - a["z"])
     return prof[-1]["z"]
+
+
+LEVEL_OUT_M = 10.0      # M18: a junction holds its height this far past its polygon on a leg
+LEVEL_SHARE = 0.5       # at most this share of a leg (from both ends: all of it)
+LEVEL_STEP_M = 1.0      # sampling of a levelled profile
+LOCK_PAD_M = 3.0        # past the deck of a crossing road or a bridge span, a profile holds
+
+
+def _fixed(s: dict, held) -> bool:
+    """M18: a road whose profile the levelling leaves as it is: tunnels (M9), viaducts (M7),
+    a deck's streets and ramps (M14), footbridge stairs, a held road (M10)."""
+    a = s["attrs"]
+    return bool(s.get("tunnel") or a.get("elevated") or "deck" in a or
+                a.get("role") == "deck_ramp" or s["road_class"] == "footbridge" or
+                (held is not None and held(s)))
+
+
+def catch_grade(s: dict, gr) -> float:
+    """M18: the grade a levelled leg rejoins its profile at (`highways.grades`): a ramp's
+    maximum on ramps and local streets (M7's raised joins), a run's on primary roads."""
+    if s["attrs"].get("role") == "ramp" or s["road_class"] not in ("highway", "avenue"):
+        return gr.ramp_max
+    return gr.run_max
+
+
+def _crossings(segments) -> dict[str, list[tuple[float, tuple]]]:
+    """Points where two roads cross without a shared node (as `terrain.crossings`, which
+    runs after M2): {segment id: [(s, key)]}; the point on the 1 cm grid, s by plain
+    arithmetic on the centerline (`ST._project`), so no measure GEOS rounds reaches M2."""
+    pts = [[tuple(p) for p in s["centerline"]] for s in segments]
+    lines = [LineString(p) for p in pts]
+    tree = shapely.STRtree(lines)
+    ends = [{p[0], p[-1]} for p in pts]
+    out: dict[str, list] = {}
+    a_idx, b_idx = tree.query(lines, predicate="intersects")
+    pairs = sorted({(min(a, b), max(a, b)) for a, b in zip(a_idx.tolist(), b_idx.tolist())
+                    if a != b})
+    for a, b in pairs:
+        sa, sb = segments[a], segments[b]
+        inter = lines[a].intersection(lines[b])
+        if {sa["start"], sa["end"]} & {sb["start"], sb["end"]} and inter.geom_type == "Point":
+            continue
+        hits = [inter] if inter.geom_type == "Point" else \
+            [g for g in getattr(inter, "geoms", []) if g.geom_type == "Point"]
+        for xy in sorted({(G.q(p.x), G.q(p.y)) for p in hits}):
+            if any(_dist(xy, e) < 1.0 for e in ends[a] | ends[b]):
+                continue
+            key = ("x", sa["id"], sb["id"], xy)
+            out.setdefault(sa["id"], []).append((G.q(ST._project(pts[a], xy)[0]), key))
+            out.setdefault(sb["id"], []).append((G.q(ST._project(pts[b], xy)[0]), key))
+    return out
+
+
+def _locks(net) -> dict:
+    """Stretches of each road whose height the levelling keeps (s0, s1): bridge spans and the
+    crossings of roads that pass over or under it, a deck's width and LOCK_PAD_M wide."""
+    out: dict = {}
+    by = {s["id"]: s for s in net.segments}
+    for b in net.bridges:
+        for sid in b.get("segment_ids") or []:
+            s = by.get(sid)
+            if s is None or len(b.get("line") or []) < 2:
+                continue
+            pts = [tuple(p) for p in s["centerline"]]
+            ss = [ST._project(pts, (p[0], p[1]))[0] for p in (b["line"][0], b["line"][-1])]
+            out.setdefault(sid, []).append((min(ss) - LOCK_PAD_M, max(ss) + LOCK_PAD_M))
+    for sid, xs in _crossings(net.segments).items():
+        for sx, key in xs:
+            other = by[key[2] if key[1] == sid else key[1]]
+            h = other["width_m"] / 2.0 + LOCK_PAD_M
+            out.setdefault(sid, []).append((sx - h, sx + h))
+    return out
+
+
+def _levelled(prof: list[dict], L: float, ra: float, rb: float, g: float,
+              za: float | None = None, zb: float | None = None) -> tuple:
+    """A profile held at za (default: its start's height) over [0, ra] and at zb (its end's)
+    over [L - rb, L] (0: not held), rejoining itself at grade g: the profile clamped between
+    the cones of slope g from the held stretches (the median of the three keeps it within g
+    where it was). An end not held keeps its height too (a cone from it with no hold: the
+    hold at the other end cannot lift it off its node), and the holds shrink alike where the
+    two heights leave them no room. Returns (profile, ra, rb)."""
+    za = _z_at(prof, 0.0) if za is None else za
+    zb = _z_at(prof, L) if zb is None else zb
+    room = max(L - abs(za - zb) / g, 0.0)
+    if ra + rb > room:
+        f = room / (ra + rb)
+        ra, rb = ra * f, rb * f
+    n = max(int(math.ceil(L / LEVEL_STEP_M)), 1)
+    ss = sorted({G.q(L * k / n) for k in range(n + 1)} | {G.q(p["s"]) for p in prof} |
+                ({G.q(ra)} if ra else set()) | ({G.q(L - rb)} if rb else set()))
+    out = []
+    for s in ss:
+        z = _z_at(prof, s)
+        da, db = max(0.0, s - ra), max(0.0, L - s - rb)
+        lo = max(za - g * da, zb - g * db)
+        hi = min(za + g * da, zb + g * db)
+        out.append((s, min(max(z, lo), hi)))
+    from .elevated import compress
+
+    return [{"s": s, "z": z} for s, z in compress(out)], G.q(ra), G.q(rb)
+
+
+RAISE_MAX_M = 2.5       # M18: a junction raised at most this much to hold its legs level
+
+
+def _steepest(prof: list[dict]) -> float:
+    """The steepest grade of a z profile (both on the 1 cm grid: 1 cm of rounding)."""
+    return max(((abs(b["z"] - a["z"]) - 0.01) / (b["s"] - a["s"])
+                for a, b in zip(prof, prof[1:]) if b["s"] > a["s"]), default=0.0)
+
+
+def _changed(a: list[dict], b: list[dict]) -> bool:
+    return any(abs(p["z"] - _z_at(a, p["s"])) > 0.005 for p in b) or \
+        any(abs(p["z"] - _z_at(b, p["s"])) > 0.005 for p in a)
+
+
+def level_legs(net, legs: dict, gr, held=None, exits: dict | None = None) -> dict:
+    """M18: every leg of a junction graded to arrive level: held at its node's height out to
+    its polygon's edge (the farther of its run along to the cut and where it leaves the
+    polygon, `exits`: (segment id, at its start) -> distance) and LEVEL_OUT_M beyond, at
+    most LEVEL_SHARE of it, then back onto its own profile at `catch_grade` (`_levelled`).
+    A leg whose levelling would move a locked stretch (a bridge span, a road crossing over
+    or under it: `_locks`) keeps its profile at that end; its junction is then raised to
+    its highest leg out at its run instead (at most RAISE_MAX_M, never under another road,
+    every other leg brought up to it), else it carries the surface (`surfaces`). Roads
+    `_fixed` keep theirs, as do the legs at a node on a viaduct (a ramp leaves it along the
+    deck). Returns {"held": {(segment id, node id): run held}, counts}."""
+    if gr is None:
+        return {"held": {}, "levelled": 0, "kept": 0, "raised": 0}
+    exits = exits or {}
+    want: dict = {}
+    for nid in sorted(legs):
+        lg = legs[nid]
+        n = len(lg)
+        if n < 2 or (n == 2 and not any(x.cut > 0.0 for x in lg)):
+            continue
+        if any(x.seg["attrs"].get("elevated") for x in lg):
+            continue
+        for x in lg:
+            k = (x.seg["id"], x.at_start)
+            r = max(run_along(x, max(x.cut, x.cut_row)), exits.get(k, 0.0)) + LEVEL_OUT_M
+            want[k] = (nid, min(r, LEVEL_SHARE * x.L))
+    locks = _locks(net)
+    by = {s["id"]: s for s in net.segments}
+    runs: dict = {}       # (segment id, at start) -> run held (0: not)
+
+    def fits(s, new, old) -> bool:
+        L = G.q(ST._plen([tuple(p) for p in s["centerline"]]))
+        return all(abs(_z_at(new, t) - _z_at(old, t)) <= 0.01
+                   for s0, s1 in locks.get(s["id"], []) for t in _samples(s0, s1, L))
+
+    for s in net.segments:
+        a = want.get((s["id"], True))
+        b = want.get((s["id"], False))
+        if (a is None and b is None) or _fixed(s, held):
+            continue
+        prof = s["z_profile"]
+        ra, rb = (a[1] if a else 0.0), (b[1] if b else 0.0)
+        if all(p["z"] == 0.0 for p in prof):
+            runs[(s["id"], True)], runs[(s["id"], False)] = ra, rb
+            continue
+        L = G.q(ST._plen([tuple(p) for p in s["centerline"]]))
+        g = catch_grade(s, gr)
+        best = None
+        if _steepest(prof) > g + 1e-4:
+            # (steeper than its catch-up grade somewhere already: the cones from its two
+            # ends could not both hold it)
+            runs[(s["id"], True)], runs[(s["id"], False)] = 0.0, 0.0
+            continue
+        for xa, xb in dict.fromkeys(((ra, rb), (ra, 0.0), (0.0, rb))):
+            if not (xa or xb):
+                continue
+            new, xa, xb = _levelled(prof, L, xa, xb, g)
+            if fits(s, new, prof):
+                best = (xa, xb, new)
+                break
+        xa, xb = (best[0], best[1]) if best else (0.0, 0.0)
+        if best is not None and _changed(prof, best[2]):
+            s["z_profile"] = best[2]
+        runs[(s["id"], True)], runs[(s["id"], False)] = xa, xb
+    # a junction a leg of which could not be held level (or not out to its polygon's edge)
+    # is raised to its highest leg out at its run, its other legs brought up to it
+    node = {n["id"]: n for n in net.nodes}
+    over = _overhead(net)
+    raised = 0
+    for nid in sorted(legs):
+        lg = legs[nid]
+        ks = [(x, (x.seg["id"], x.at_start)) for x in lg]
+        if not all(k in want for _, k in ks) or any(_fixed(x.seg, held) for x in lg):
+            continue
+        if all(runs.get(k, 0.0) >= min(want[k][1], exits.get(k, 0.0) + 0.5) for _, k in ks):
+            continue
+        zn = node[nid]["position"][2]
+        top = max(_z_at(x.seg["z_profile"], want[k][1] if x.at_start else x.L - want[k][1])
+                  for x, k in ks)
+        # (M7: a local road meets a primary road at most LOCAL_JUNCTION_Z_M up)
+        cap = ST.LOCAL_JUNCTION_Z_M if any(x.cls not in ST.PRIMARY for x in lg) else math.inf
+        if not (zn + 0.01 < top <= min(zn + RAISE_MAX_M, cap)) or over(node[nid], top) or \
+                len({k[0] for _, k in ks}) < len(ks):
+            continue
+        new = {}
+        for x, k in ks:
+            s = x.seg
+            L = G.q(x.L)
+            ro = runs.get((s["id"], not x.at_start), 0.0)
+            if x.at_start:
+                prof, ra, rb = _levelled(s["z_profile"], L, want[k][1], ro,
+                                         catch_grade(s, gr), za=top)
+            else:
+                prof, ra, rb = _levelled(s["z_profile"], L, ro, want[k][1],
+                                         catch_grade(s, gr), zb=top)
+            g = catch_grade(s, gr)
+            near, far = (0.0, L) if x.at_start else (L, 0.0)
+            if not fits(s, prof, s["z_profile"]) or abs(_z_at(prof, near) - top) > 0.01 or \
+                    abs(_z_at(prof, far) - _z_at(s["z_profile"], far)) > 0.01 or \
+                    _steepest(prof) > g + 1e-4:
+                new = None
+                break
+            new[k] = (prof, ra if x.at_start else rb)
+        if not new:
+            continue
+        for x, k in ks:
+            prof, r = new[k]
+            by[x.seg["id"]]["z_profile"] = prof
+            runs[k] = r
+        pos = node[nid]["position"]
+        node[nid]["position"] = (pos[0], pos[1], G.q(top))
+        raised += 1
+    raised += _held_heights(net, legs, gr, held, want, runs, node, fits)
+    held_runs = {}
+    n_lev = n_kept = 0
+    for (sid, at_start), (nid, r) in sorted(want.items()):
+        got = runs.get((sid, at_start))
+        if got is None:
+            continue      # (a fixed road)
+        if got:
+            held_runs[(sid, nid)] = got
+            n_lev += 1
+        else:
+            n_kept += 1
+    return {"held": held_runs, "levelled": n_lev, "kept": n_kept, "raised": raised}
+
+
+def _held_heights(net, legs: dict, gr, held, want: dict, runs: dict, node: dict,
+                  fits) -> int:
+    """M18 with M10: a junction its held roads all meet at one height other than its node's
+    (the old build raised it, `level_legs`; the node comes back at M1b's height) takes
+    theirs, its other legs brought up to it as a raise does. Returns how many."""
+    if held is None:
+        return 0
+    n_set = 0
+    for nid in sorted(legs):
+        lg = legs[nid]
+        hl = [x for x in lg if held(x.seg)]
+        if not hl:
+            continue
+        ends = {G.q(_z_at(x.seg["z_profile"], 0.0 if x.at_start else G.q(x.L))) for x in hl}
+        zn = node[nid]["position"][2]
+        if len(ends) != 1 or abs(min(ends) - zn) <= 0.01:
+            continue
+        top = min(ends)
+        new = {}
+        for x in lg:
+            if held(x.seg):
+                continue
+            s = x.seg
+            L = G.q(x.L)
+            near, far = (0.0, L) if x.at_start else (L, 0.0)
+            if _fixed(s, None):
+                if abs(_z_at(s["z_profile"], near) - top) > 0.01:
+                    new = None
+                    break
+                continue
+            k = (s["id"], x.at_start)
+            r = want[k][1] if k in want else 0.0
+            ro = runs.get((s["id"], not x.at_start), 0.0)
+            g = catch_grade(s, gr)
+            if x.at_start:
+                prof, ra, rb = _levelled(s["z_profile"], L, r, ro, g, za=top)
+            else:
+                prof, ra, rb = _levelled(s["z_profile"], L, ro, r, g, zb=top)
+            if not fits(s, prof, s["z_profile"]) or abs(_z_at(prof, near) - top) > 0.01 or \
+                    abs(_z_at(prof, far) - _z_at(s["z_profile"], far)) > 0.01 or \
+                    _steepest(prof) > g + 1e-4:
+                new = None
+                break
+            new[k] = (prof, ra if x.at_start else rb)
+        if new is None:
+            continue
+        for x in lg:
+            k = (x.seg["id"], x.at_start)
+            if k in new:
+                x.seg["z_profile"], runs[k] = new[k]
+        pos = node[nid]["position"]
+        node[nid]["position"] = (pos[0], pos[1], top)
+        n_set += 1
+    return n_set
+
+
+def _overhead(net):
+    """A test whether a road passes over a node (another road's corridor over it, higher
+    than z): raising the node would take its clearance."""
+    pts = [[tuple(p) for p in s["centerline"]] for s in net.segments]
+    tree = shapely.STRtree([LineString(p) for p in pts])
+
+    def over(n, z: float) -> bool:
+        xy = (n["position"][0], n["position"][1])
+        for i in sorted(int(k) for k in tree.query(Point(xy), predicate="dwithin",
+                                                   distance=40.0)):
+            s = net.segments[i]
+            if n["id"] in (s["start"], s["end"]):
+                continue
+            # (plain arithmetic: no measure GEOS rounds reaches M2)
+            along, off = ST._project(pts[i], xy)[:2]
+            if off > s["width_m"] / 2.0 + 3.0:
+                continue
+            if _z_at(s["z_profile"], along) > z - 0.5:
+                return True
+        return False
+    return over
+
+
+# ---------------------------------------------------------------------------
+# M18: junction surfaces
+# ---------------------------------------------------------------------------
+
+FLAT_TOL_M = 0.005      # a junction with every vertex this near its node's height is flat
+ON_CUT_M = 0.02         # a vertex this near a leg's cut line takes the leg's height
+
+
+def leg_exit(pts, ring) -> tuple[float, int]:
+    """Where a leg (its centerline from the node) first leaves a junction polygon's exterior
+    ring: (distance along it, index of the ring edge it crosses), plain arithmetic on the
+    grid points; its whole length and -1 where it never does."""
+    from shapely import contains_xy
+    from shapely.geometry import Polygon as _P
+
+    poly = _P(ring)
+    n = len(ring)
+    acc = 0.0
+    hits = []
+    for a, b in zip(pts, pts[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        seg = _dist(a, b)
+        if seg <= 0.0:
+            continue
+        for k in range(n):
+            c, d = ring[k], ring[(k + 1) % n]
+            ex, ey = d[0] - c[0], d[1] - c[1]
+            den = dx * ey - dy * ex
+            if den == 0.0:
+                continue
+            t = ((c[0] - a[0]) * ey - (c[1] - a[1]) * ex) / den
+            u = ((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) / den
+            if -1e-9 <= t <= 1.0 + 1e-9 and -1e-9 <= u <= 1.0 + 1e-9:
+                hits.append((acc + t * seg, k))
+        acc += seg
+    for s, k in sorted(hits):
+        if s <= 0.05:
+            continue
+        p, _ = ST._along(pts, min(s + 0.1, acc))
+        if s + 0.1 >= acc or not bool(contains_xy(poly, p[0], p[1])):
+            return s, k
+    return acc, -1
+
+
+def prof_at(prof, s: float) -> float:
+    """A [(s, z)] profile at s (its ends beyond them)."""
+    if not prof:
+        return 0.0
+    if s <= prof[0][0]:
+        return prof[0][1]
+    for (s0, z0), (s1, z1) in zip(prof, prof[1:]):
+        if s0 <= s <= s1:
+            return z0 if s1 == s0 else z0 + (s - s0) / (s1 - s0) * (z1 - z0)
+    return prof[-1][1]
+
+
+def _cut_dist(p, E, nrm, h: float) -> float:
+    """Distance from p to a leg's cut line: through E along nrm, h either side."""
+    vx, vy = p[0] - E[0], p[1] - E[1]
+    t = max(-h, min(h, vx * nrm[0] + vy * nrm[1]))
+    return _dist((vx - t * nrm[0], vy - t * nrm[1]), (0.0, 0.0))
+
+
+def anchors_of(ring, legs: list[dict]) -> tuple[list, list, list]:
+    """The vertices a junction's legs fix (`surface`): per ring vertex the heights of the
+    legs whose cut line it is on (or whose crossed ring edge it ends); the legs' exits
+    [(leg index, s, ring edge, height)] and cut lines [(E, normal, h, height, ring edge)]."""
+    exits = []
+    cuts = []
+    for i, lg in enumerate(legs):
+        s, k = leg_exit(lg["pts"], ring)
+        if lg.get("stairs"):
+            continue
+        z = lg["z"](s)
+        E, t = ST._along(lg["pts"], s)
+        exits.append((i, s, k, z))
+        cuts.append((E, (-t[1], t[0]), lg["h"], z, k))
+    n = len(ring)
+    on: list[list[float]] = [[] for _ in range(n)]
+    for E, nrm, h, z, k in cuts:
+        for v in range(n):
+            if _cut_dist(ring[v], E, nrm, h + 0.05) <= ON_CUT_M:
+                on[v].append(z)
+    for E, nrm, h, z, k in cuts:
+        if k >= 0:
+            for v in (k, (k + 1) % n):
+                if not on[v]:
+                    on[v].append(z)
+    return on, exits, cuts
+
+
+def surface(ring, legs: list[dict]) -> tuple[list[float], list[tuple]]:
+    """M18: a junction's surface: the height of every exterior vertex. Each leg ({pts from
+    the node, z: s -> its surface height, h: half width, stairs}) leaves the polygon at its
+    exit (`leg_exit`); a vertex on its cut line there (square to the leg) or on the ring
+    edge it crosses takes the leg's height there, so the surface meets every leg where it
+    leaves, with no step; the curb lines between two legs' cut edges run evenly from one
+    height to the other along the ring (the least slope there is). Stairs (footbridges)
+    stand on the junction and shape nothing. Returns (heights, [(leg index, exit s, ring
+    edge, height)])."""
+    on, exits, cuts = anchors_of(ring, legs)
+    n = len(ring)
+    out = [sum(x) / len(x) if x else None for x in on]
+    anchors = [v for v in range(n) if out[v] is not None]
+    if anchors:
+        # (the curbs between: linear in the length along the ring from anchor to anchor)
+        cum = [0.0]
+        for v in range(n):
+            cum.append(cum[-1] + _dist(ring[v], ring[(v + 1) % n]))
+        per = cum[-1]
+        for i, a in enumerate(anchors):
+            b = anchors[(i + 1) % len(anchors)]
+            span = (cum[b] - cum[a]) % per if b != a else per
+            v = (a + 1) % n
+            while v != b:
+                f = ((cum[v] - cum[a]) % per) / span if span > 0.0 else 0.0
+                out[v] = out[a] + f * (out[b] - out[a])
+                v = (v + 1) % n
+    for v in range(n):
+        if out[v] is not None:
+            continue
+        elif cuts:
+            acc = wt = 0.0
+            for E, nrm, h, z, k in cuts:
+                w = 1.0 / (_cut_dist(ring[v], E, nrm, h) ** 2 + 1.0)
+                acc += w * z
+                wt += w
+            out[v] = acc / wt
+        else:
+            out[v] = 0.0
+    return [G.q(z) for z in out], exits
+
+
+def model_legs(m_segments, node_id: str, ground_of=None) -> list[dict]:
+    """The legs of a node for `surface`, from model rows (dicts or entities): their
+    centerlines from the node, heights over the node's ground (z profile, and on a terrain
+    city the grade line less `ground_of` the node), half widths, stairs."""
+    out = []
+    for s in m_segments:
+        g = s if isinstance(s, dict) else s.model_dump()
+        ends = [e for e in (True, False) if (g["start"] if e else g["end"]) == node_id]
+        for at_start in ends:
+            pts = [tuple(p[:2]) for p in g["centerline"]]
+            L = ST._plen(pts)
+            zp = [(p["s"], p["z"]) for p in g["z_profile"]]
+            gp = [(p["s"], p["z"]) for p in g.get("ground") or []]
+            base = ground_of or 0.0
+
+            def z(s, zp=zp, gp=gp, L=L, a=at_start, base=base):
+                t = s if a else L - s
+                return prof_at(zp, t) + (prof_at(gp, t) - base if gp else 0.0)
+            out.append({"pts": pts if at_start else pts[::-1], "z": z, "id": g["id"],
+                        "h": g["width_m"] / 2.0, "stairs": g["road_class"] == "footbridge",
+                        "cls": g["road_class"]})
+    return out
+
+
+def surfaces(segments: list[dict], nodes: list[dict], junctions: list[dict]) -> int:
+    """M18: `edge_z` on every junction that is not flat at its node's height (rows, after
+    the grading on a terrain city). Returns how many carry one."""
+    at: dict = {}
+    for s in segments:
+        at.setdefault(s["start"], []).append(s)
+        if s["end"] != s["start"]:
+            at.setdefault(s["end"], []).append(s)
+    node = {n["id"]: n for n in nodes}
+    k = 0
+    for j in junctions:
+        j.pop("edge_z", None)
+        n = node.get(j["node_id"])
+        if n is None or j.get("polygon") is None:
+            continue
+        ring = [tuple(p) for p in j["polygon"]["exterior"]]
+        legs = model_legs(at.get(j["node_id"], []), j["node_id"], n.get("ground_m"))
+        hz, _ = surface(ring, legs)
+        zn = n["position"][2]
+        if any(abs(z - zn) > FLAT_TOL_M for z in hz):
+            j["edge_z"] = hz
+            k += 1
+    return k
+
+
+def _samples(s0: float, s1: float, L: float) -> list[float]:
+    a, b = max(s0, 0.0), min(s1, L)
+    if b < a:
+        return []
+    n = max(int(math.ceil((b - a) / LEVEL_STEP_M)), 1)
+    return [a + (b - a) * k / n for k in range(n + 1)]
+
+
+def one_way_stranded(net) -> list[str]:
+    """M18: a two-way highway one of whose directions no lane can enter (at the node it
+    starts from, every other road one-way away from it: a trumpet's stem between the
+    flyover's landing and its near terminal where no near ramp arrives, now that the ramps
+    are shorter) carries the other direction only. Returns the roads made one-way (start
+    and end swapped where the direction kept runs end to start, so `one_way` runs start to
+    end; a highway has no sidewalks to turn with it)."""
+    at: dict = {}
+    for s in net.segments:
+        if s["road_class"] in ST.VEHICLE:
+            at.setdefault(s["start"], []).append(s)
+            at.setdefault(s["end"], []).append(s)
+
+    def enters(nid: str, s) -> bool:
+        others = [t for t in at.get(nid, []) if t is not s]
+        if not others:
+            return True       # (a dead end: U-turns)
+        return any(not t.get("one_way") or t["end"] == nid for t in others)
+    out = []
+    for s in sorted(net.segments, key=lambda s: s["id"]):
+        if s["road_class"] != "highway" or s.get("one_way") or s["start"] == s["end"]:
+            continue
+        fwd, bwd = enters(s["start"], s), enters(s["end"], s)
+        if fwd == bwd:
+            continue
+        if bwd:
+            # (the direction kept runs end to start)
+            s["start"], s["end"] = s["end"], s["start"]
+            s["centerline"] = s["centerline"][::-1]
+            L = s["z_profile"][-1]["s"] if s["z_profile"] else 0.0
+            s["z_profile"] = [{"s": G.q(L - p["s"]), "z": p["z"]}
+                              for p in reversed(s["z_profile"])]
+        s["one_way"] = True
+        out.append(s["id"])
+    return out
 
 
 def _with_z(pts, base, prof, s0: float) -> list:
@@ -774,8 +1456,12 @@ def _corner_point(P, a: Leg, b: Leg):
     return _pt((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2), _pt(*pa), _pt(*pb)
 
 
-def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
-    """Junctions, sidewalks, crosswalks, lanes and walkways for a street network."""
+def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
+          control: dict | None = None) -> dict:
+    """Junctions, sidewalks, crosswalks, lanes and walkways for a street network (`gr`, the
+    spec's `highways.grades`: M18 levels the legs of every junction, `level_legs`;
+    `control`, district id -> its `junctions` (signals, crosswalks): M18's crossings by
+    need, `plan_signals`)."""
     n_oneway = one_way_loops(net, district_arch, seed)
     T.detail("junctions/one_way", sorted(s["id"] for s in net.segments if s.get("one_way")))
     pos = {n["id"]: tuple(n["position"][:2]) for n in net.nodes}
@@ -788,11 +1474,22 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
         ids = s.get("district_ids") or []
         return district_arch.get(ids[0]) if ids else None
 
+    def did_of(s):
+        d = s["attrs"].get("district")
+        if d:
+            return d
+        ids = s.get("district_ids") or []
+        return ids[0] if ids else None
+
     legs = legs_at(net, arch_of)
     node_arch = {}
+    node_ctl = {}
     for nid, lg in legs.items():
         archs = sorted(a for a in (x.arch for x in lg) if a)
         node_arch[nid] = archs[0] if archs else None
+        dids = sorted(d for d in (did_of(x.seg) for x in lg) if d)
+        node_ctl[nid] = (control or {}).get(dids[0], ("auto", "auto")) if dids else \
+            ("auto", "auto")
     cut: dict = {}
     cut_row: dict = {}
     junctions, crosswalks, sidewalks = [], [], []
@@ -804,6 +1501,8 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
     for nid in sorted(legs):
         cutbacks(legs[nid], cap=False)
     share_cuts(legs)
+    signals, _ = plan_signals(legs, node_arch, lambda nid: node_ctl[nid])
+    av_marked = plan_crossings(legs, node_arch, lambda nid: node_ctl[nid], signals)
     for nid in sorted(legs):
         lg = legs[nid]
         P = pos[nid]
@@ -833,20 +1532,26 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
             corner_of[(nid, b.seg["id"], "R" if b.at_start else "L")] = q
         if n < 3 and not (n == 2 and any(x.cut > 0.0 for x in lg)):
             continue
-        kind, shape, sig = classify(lg, node_arch[nid])
+        kind, shape, _ = classify(lg, node_arch[nid])
+        sig = nid in signals
         jid = f"jn{len(junctions) + 1:05d}"
         poly = shared_pavement(lg, junction_polygon(lg))
         row_poly = junction_polygon(lg, row=True)
-        has_avenue = any(x.cls == "avenue" for x in lg)
         xw_ids = []
         walkable = any(x.cls != "highway" for x in lg)
+        xws = node_ctl[nid][1]
+        # M18: crosswalks on the approaches of signalized junctions; at an unsignalized one,
+        # across its avenue where no signalized junction or marked crossing is within the
+        # district's spacing along it; elsewhere unmarked crossings
+        av = nid in av_marked
         for i, x in enumerate(lg if walkable else []):
             if x.cls in ST.PEDESTRIAN:
                 continue
-            marked = sig or (has_avenue and x.cls not in ("avenue", "highway"))
             if x.cls == "highway" and not sig:
                 continue
-            s = x.cut + CROSSWALK_SETBACK_M + CROSSWALK_W / 2
+            xw = crosswalk_w(x.cls, node_arch[nid])
+            marked = xw > 0.0 and xws != "none" and (sig or (av and x.cls == "avenue"))
+            s = x.cut + CROSSWALK_SETBACK_M + (xw / 2 if marked else 2.0)
             s = min(s, 0.45 * x.L)
             p, t = ST._along(x.pts, s)
             nrm = _left(t)
@@ -859,11 +1564,11 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
             if marked:
                 cid = f"cw{len(crosswalks) + 1:05d}"
                 crosswalks.append({"id": cid, "junction_id": jid, "segment_id": x.seg["id"],
-                                   "line": [a_, b_], "width_m": CROSSWALK_W,
+                                   "line": [a_, b_], "width_m": xw,
                                    "signalized": sig, "attrs": {"road_class": x.cls}})
                 xw_ids.append(cid)
             W.add("crosswalk" if marked else "crossing",
-                  [right_corner, a_, b_, left_corner], CROSSWALK_W if marked else 2.0,
+                  [right_corner, a_, b_, left_corner], xw if marked else 2.0,
                   junction=jid, crosswalk=marked)
         junctions.append({"id": jid, "node_id": nid, "polygon": poly, "signalized": sig,
                           "crosswalk_ids": xw_ids, "row_polygon": row_poly,
@@ -879,6 +1584,19 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                           "attrs": {"type": cls, "shape": "cul_de_sac", "legs": 1,
                                     "corner_radius_m": heads[nid],
                                     "archetype": node_arch[nid], "classes": [cls]}})
+    absorb_shared(net, junctions)
+    # M18: the legs of every junction held level out past where they leave its polygon (the
+    # lanes take their heights)
+    exits = {}
+    for j in junctions:
+        if j["polygon"].is_empty or j["polygon"].geom_type != "Polygon":
+            continue
+        ring = G._ring(j["polygon"].exterior.coords)
+        for x in legs.get(j["node_id"], []):
+            exits[(x.seg["id"], x.at_start)] = leg_exit(x.pts, ring)[0]
+    fr = getattr(getattr(net, "builder", None), "frame", None)
+    lev = level_legs(net, legs, gr, None if fr is None else
+                     (lambda s: fr.match(s["centerline"], s) is not None), exits)
     # sidewalks and centerline walkways
     for s in net.segments:
         if s["attrs"].get("role") == "deck_ramp":
@@ -923,14 +1641,15 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int) -> dict:
                     c = corner_of.get((nid, s["id"], sd))
                     if c is not None and c != _pt(*end):
                         W.add("path", [end, c], 2.0)
+    stranded = one_way_stranded(net)
+    T.detail("junctions/stranded", stranded)
     lanes = build_lanes(net, legs, cut)
-    absorb_shared(net, junctions)
     T.detail("junctions/polygons", [j["polygon"] for j in junctions])
     T.detail("junctions/lanes", [(r["id"], r["centerline"], r["successors"]) for r in lanes])
     return {"junctions": junctions, "crosswalks": crosswalks, "sidewalks": sidewalks,
             "lanes": lanes, "walk": Ws[0], "walk_levels": {k: v for k, v in Ws.items() if k},
             "corners": corner_of, "cut": cut, "cut_row": cut_row, "one_way": n_oneway,
-            "legs": legs}
+            "legs": legs, "level": lev, "exits": exits}
 
 
 def walkways(W: WalkGraph) -> list[dict]:
