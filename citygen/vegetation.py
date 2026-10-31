@@ -25,7 +25,7 @@ import math
 import numpy as np
 import shapely
 import shapely.ops
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 from . import geom as G
 from .props import GROUND, PATH, SIDEWALK, Cand, Ctx, _u, furniture_points, length, walk, yaw_of
@@ -33,6 +33,7 @@ from .props import GROUND, PATH, SIDEWALK, Cand, Ctx, _u, furniture_points, leng
 q = G.q
 TRUNK_R = 0.45
 SIGHT_M = 6.0         # trunks this far from junction areas
+IVY_M = 2.0           # facade greenery's height on its wall
 
 STREET_SPECIES = {"corporate_core": "ginkgo", "midtown_mixed": "plane",
                   "residential_heights": "linden", "research_campus": "maple",
@@ -75,8 +76,10 @@ def street_trees(c: Ctx) -> list[Cand]:
         pts = furniture_points(w, step, 6.0 + step * _u("st0", w.id), 0.9, 6.0)
         for k, (x, y, ux, uy, _) in enumerate(pts):
             h = 7.0 + 5.0 * _u("sth", w.id, k)
-            out.append(_tree("street_tree", x, y, h, 2.2 + 1.3 * _u("stc", w.id, k), sp,
-                             keep=SIDEWALK, attrs={"sidewalk": w.id}))
+            t = _tree("street_tree", x, y, h, 2.2 + 1.3 * _u("stc", w.id, k), sp,
+                      keep=SIDEWALK, attrs={"sidewalk": w.id})
+            t.on = w.segment_id
+            out.append(t)
     return _sight(c, out)
 
 
@@ -130,10 +133,12 @@ def median_trees(c: Ctx) -> list[Cand]:
         crown_max = min(cs.median_m / 2.0 + 1.5, 3.5)
         for k, (x, y, ux, uy, _) in enumerate(walk(s.centerline, step, 12.0, 12.0)):
             h = (9.0 + 4.0 * _u("mh", s.id, k)) if palm else (7.0 + 4.0 * _u("mh", s.id, k))
-            out.append(_tree("palm" if palm else "median_tree", x, y, h,
-                             2.0 if palm else crown_max * (0.75 + 0.25 * _u("mc", s.id, k)),
-                             "fan_palm" if palm else STREET_SPECIES.get(arch, "plane"),
-                             keep=GROUND, attrs={"segment": s.id}))
+            t = _tree("palm" if palm else "median_tree", x, y, h,
+                      2.0 if palm else crown_max * (0.75 + 0.25 * _u("mc", s.id, k)),
+                      "fan_palm" if palm else STREET_SPECIES.get(arch, "plane"),
+                      keep=GROUND, attrs={"segment": s.id})
+            t.on = s.id
+            out.append(t)
     return _sight(c, out)
 
 
@@ -333,11 +338,22 @@ def facade_greenery(c: Ctx) -> list[Cand]:
             floor = 1 + int(_u("fgf", b.id, k) * max(1, min(b.floors - 1, 3)))
             if floor >= b.floors:
                 continue
-            out.append(Cand("facade_greenery", mx + nx * 0.25, my + ny * 0.25,
-                            z=q(floor * b.floor_height_m), yaw=yaw_of(ux, uy), r=0.0, keep=0,
+            # (M20: on the facade of the floor it drew, an overhanging floor's own, else
+            # the highest floor under it that has one)
+            spot = None
+            while floor >= 1 and spot is None:
+                spot = c.facade_spot(mx, my, floor * b.floor_height_m,
+                                     floor * b.floor_height_m + IVY_M, b.id, 0.25)
+                if spot is None:
+                    floor -= 1
+            if spot is None:
+                continue
+            out.append(Cand("facade_greenery", spot[0], spot[1],
+                            z=q(floor * b.floor_height_m), yaw=yaw_of(spot[4], spot[5]), r=0.0,
+                            keep=0,
                             scale=(q(min(L * 0.8, 8.0)), 1.0, 1.0),
                             attrs={"building": b.id},
-                            plant={"height_m": 2.0, "crown_radius_m": 0.4,
+                            plant={"height_m": IVY_M, "crown_radius_m": 0.4,
                                    "species": "ivy"}))
     return out
 
@@ -396,80 +412,186 @@ def _z_on(prof, s: float) -> float:
     return prof[-1][1]
 
 
-def overhead(c: Ctx) -> tuple:
-    """(footprints, underside z) of everything above the ground a tree could grow into."""
-    m = c.m
-    P = G.from_model_poly
-    polys, under = [], []
-    for s in m.structures:
-        a = s.attrs or {}
-        if s.kind == "retaining_wall":
-            continue    # M13: a wall in the ground, not over it
-        if len(s.line) >= 2 and s.z1_m > 0.5:
-            w = a.get("width_m", 4.0)
-            polys.append(LineString([p[:2] for p in s.line]).buffer(w / 2.0 + 1.0,
-                                                                   cap_style="flat"))
-            under.append(s.z0_m)
-        elif s.footprint is not None and s.z0_m > 0.5:
-            polys.append(P(s.footprint))
-            under.append(s.z0_m)
-    for sb in m.skybridges:
-        polys.append(LineString(sb.line).buffer(sb.width_m / 2.0 + 1.0, cap_style="flat"))
-        under.append(sb.z_m - 1.0)
-    for s in m.road_segments:
-        zs = [z.z for z in s.z_profile]
-        if not (s.bridge or any(z > 0.5 for z in zs)):
-            continue
-        # in 20 m pieces, each with its lowest underside (M7: a ramp or an approach falls
-        # to an embankment, which is ground, not a deck over a tree)
-        line = LineString(s.centerline)
-        prof = [(z.s, z.z) for z in s.z_profile]
-        L = line.length
-        n = max(int(math.ceil(L / 20.0)), 1)
-        for k in range(n):
-            a, b = L * k / n, L * (k + 1) / n
-            lo = min([_z_on(prof, a), _z_on(prof, b)] + [z for t, z in prof if a < t < b])
-            if lo - 1.8 < 2.0:
+ROAD_DECK_M = 1.8     # a raised road's surface over its deck's underside (M7)
+HEADROOM_M = 1.0      # M20: nothing grows or stands closer than this under what is over it
+
+
+class Overhead:
+    """M20: everything over the ground a plant could grow into or a prop stand under, its
+    underside measured along the structure where the thing stands (not a piece's lowest):
+    raised roads, ramps and flyovers (their surface less the deck, `ROAD_DECK_M`), M18's
+    embankments (fill from the ground up: nothing stands in it), transit decks, tubes and
+    beams (their line less `deck_m`), canopies, portals and M14's slabs (their underside),
+    skybridges and building masses over the ground. Undersides are heights over the ground
+    at the point (M13: masses and skybridges stand on their building's base)."""
+
+    def __init__(self, m):
+        from . import terrain as TE
+
+        self.gf = TE.ground_of(m)
+        P = G.from_model_poly
+        polys: list = []
+        # (kind, data, own road): "const" (underside, top, base) or "line" (centerline, its
+        # z profile, the depth under it); `base` a building's (M13), None over the ground
+        self.items: list = []
+        for s in m.structures:
+            a = s.attrs or {}
+            if s.kind == "retaining_wall":
+                continue    # M13: a wall in the ground, not over it
+            if s.kind == "embankment" and s.footprint is not None:
+                polys.append(P(s.footprint))
+                self.items.append(("const", (0.0, s.z1_m, None), a.get("road_id")))
+            elif len(s.line) >= 2 and s.z1_m > 0.5:
+                w = a.get("width_m", 4.0)
+                line = LineString([p[:2] for p in s.line])
+                polys.append(line.buffer(w / 2.0 + 1.0, cap_style="flat"))
+                if "deck_m" in a:
+                    cum = [0.0]
+                    for p0, p1 in zip(s.line, s.line[1:]):
+                        cum.append(cum[-1] + math.hypot(p1[0] - p0[0], p1[1] - p0[1]))
+                    prof = [(sv, p[2]) for sv, p in zip(cum, s.line)]
+                    self.items.append(("line", (line, prof, float(a["deck_m"]), w / 2.0),
+                                       None))
+                else:
+                    self.items.append(("const", (s.z0_m, s.z1_m, None), None))
+            elif s.footprint is not None and s.z0_m > 0.5:
+                polys.append(P(s.footprint))
+                self.items.append(("const", (s.z0_m, s.z1_m, None), None))
+        for sb in m.skybridges:
+            polys.append(LineString(sb.line).buffer(sb.width_m / 2.0 + 1.0, cap_style="flat"))
+            self.items.append(("const", (sb.z_m - 1.0, sb.z_m + sb.levels * sb.level_height_m,
+                                         sb.base_m), None))
+        for s in m.road_segments:
+            zs = [z.z for z in s.z_profile]
+            if not (s.bridge or any(z > 0.02 for z in zs)):
                 continue
-            piece = shapely.ops.substring(line, a, b)
-            polys.append(piece.buffer(s.width_m / 2.0 + 1.0, cap_style="flat"))
-            under.append(lo - 1.8)
-    for b in m.buildings:
-        for ms in b.masses:
-            if ms.z0_m > 0.5:
-                polys.append(P(ms.footprint))
-                under.append(ms.z0_m)
-    return polys, np.array(under)
+            line = LineString(s.centerline)
+            polys.append(line.buffer(s.width_m / 2.0 + 1.0, cap_style="flat"))
+            self.items.append(("line", (line, [(z.s, z.z) for z in s.z_profile],
+                                        ROAD_DECK_M, s.width_m / 2.0), s.id))
+        for b in m.buildings:
+            for ms in b.masses:
+                if ms.z0_m > 0.5:
+                    polys.append(P(ms.footprint))
+                    self.items.append(("const", (ms.z0_m, ms.z1_m, b.base_m), None))
+        self.polys = np.array(polys, dtype=object)
+        self.tree = shapely.STRtree(polys) if polys else None
+
+    def under(self, xy: np.ndarray, reach: np.ndarray, base: np.ndarray, own=None,
+              tol: float = 0.02, lift=None) -> np.ndarray:
+        """For each point, the lowest underside over the disc of radius `reach` around it
+        of the things whose top is over its `base` (`own`: the road it stands on, with its
+        embankment); inf where nothing is over it, `base` or less where it would stand in
+        one (a fill, a road on its fill, a mass). Distances within `tol` count as touching.
+        `lift`: per point, what its z frame stands over the ground there (M13: a roof's
+        things are measured from their building's base); the result is in that frame."""
+        out = np.full(len(xy), np.inf)
+        if self.tree is None or not len(xy):
+            return out
+        if lift is not None:
+            lift = np.asarray(lift, dtype=np.float64)
+            return self.under(xy, reach, base + lift, own, tol) - lift
+        pts = shapely.points(xy)
+        ip, ig = self.tree.query(pts, predicate="dwithin",
+                                 distance=float(reach.max()) + max(tol, 0.0) + 0.01)
+        if not len(ip):
+            return out
+        d = shapely.distance(pts[ip], self.polys[ig])
+        keep = d < reach[ip] + tol
+        ip, ig = ip[keep], ig[keep]
+        for i, k in zip(ip.tolist(), ig.tolist()):
+            kind, data, tag = self.items[k]
+            if own is not None and tag is not None and (
+                    tag in own[i] if isinstance(own[i], frozenset) else own[i] == tag):
+                continue
+            x, y = float(xy[i, 0]), float(xy[i, 1])
+            if kind == "const":
+                u, top, b0 = data
+                if b0 is not None and self.gf is not None:
+                    lift = b0 - self.gf.at(x, y)
+                    u, top = u + lift, top + lift
+            else:
+                line, prof, depth, half = data
+                pt = Point(x, y)
+                s0 = line.project(pt)
+                r = float(reach[i])
+                top = _z_on(prof, s0)
+                u = _lowest(prof, s0 - r, s0 + r) - depth
+                if u < 0.5:
+                    # a road on its fill (or at grade): over what stands in its width well
+                    # under its surface
+                    if line.distance(pt) >= half + r + tol or top <= base[i] + 0.5:
+                        continue
+                    u = 0.0
+                elif u <= base[i] + 0.01:
+                    continue      # a deck beside the thing, at its level or under it
+            if top <= base[i] + 0.01:
+                continue          # under the thing's own base: not over it
+            u = max(u, 0.0)
+            if u < out[i]:
+                out[i] = u
+        return out
+
+
+def _lowest(prof, a: float, b: float) -> float:
+    """The lowest z of a profile [(s, z)] over [a, b]."""
+    lo = min(_z_on(prof, a), _z_on(prof, b))
+    for t, z in prof:
+        if a < t < b and z < lo:
+            lo = z
+    return lo
+
+
+def overhead(c: Ctx) -> Overhead:
+    """The city's overhead (cached on the context)."""
+    if not hasattr(c, "_over"):
+        c._over = Overhead(c.m)
+    return c._over
+
+
+def roof_lift(c: Ctx, things) -> list[float] | None:
+    """On a terrain city, how far each roof plant's frame (its building's base, M13) stands
+    over the ground at it (0 for the rest); None on a flat city."""
+    if c.m.terrain is None:
+        return None
+    from . import terrain as TE
+
+    gf = TE.ground_of(c.m)
+    if "_roof_base" not in c.__dict__:
+        base = {b.id: b.base_m for b in c.m.buildings if b.base_m is not None}
+        c._roof_base = {g.id: base.get(g.building_id) for g in c.m.green_areas
+                        if g.building_id is not None}
+    out = []
+    for t in things:
+        attrs = t.attrs if isinstance(t, Cand) else (t.attrs or {})
+        b0 = c._roof_base.get(attrs.get("roof")) if attrs.get("roof") else None
+        x, y = (t.x, t.y) if isinstance(t, Cand) else t.position[:2]
+        out.append(0.0 if b0 is None else b0 - gf.at(x, y))
+    return out
 
 
 def fit_crowns(c: Ctx, cands: list[Cand]) -> list[Cand]:
-    """Each ground tree's crown narrowed to stay 1 m from the facades and its height capped
-    1 m under anything overhead; dropped when too small."""
-    trees = [t for t in cands if t.plant is not None and t.z == 0.0 and
-             t.kind not in ("facade_greenery",)]
+    """Each tree's crown narrowed to stay 1 m from the facades (on the ground) and its height
+    capped HEADROOM_M under anything over it, measured along it (M20: roof plants too);
+    dropped when too small."""
+    trees = [t for t in cands if t.plant is not None and t.kind not in ("facade_greenery",)]
     if not trees:
         return cands
-    if not hasattr(c, "_over"):
-        polys, under = overhead(c)
-        c._over = (shapely.STRtree(polys) if polys else None, np.array(polys, dtype=object),
-                   under)
     pts = shapely.points(np.array([(t.x, t.y) for t in trees]))
     crown = np.array([t.plant["crown_radius_m"] for t in trees])
     # facades: the nearest building at the ground
     tree, geoms = c.trees["bld"]
     dmin = np.full(len(trees), np.inf)
+    ground = np.array([t.z <= 0.5 for t in trees])
     if tree is not None:
         ip, ig = tree.query(pts, predicate="dwithin", distance=float(crown.max()) + 1.0)
         if len(ip):
             np.minimum.at(dmin, ip, shapely.distance(pts[ip], geoms[ig]))
-    cap = np.full(len(trees), np.inf)
-    otree, ogeoms, under = c._over
-    if otree is not None:
-        ip, ig = otree.query(pts, predicate="dwithin", distance=float(crown.max()))
-        if len(ip):
-            d = shapely.distance(pts[ip], ogeoms[ig])
-            hit = d < crown[ip] + 0.02     # (positions and crowns are on the 1 cm grid)
-            np.minimum.at(cap, ip[hit], under[ig[hit]] - 1.0)
+    dmin[~ground] = np.inf
+    base = np.array([t.z for t in trees])
+    under = overhead(c).under(np.array([(t.x, t.y) for t in trees]), crown, base,
+                              own=[t.on for t in trees], lift=roof_lift(c, trees))
+    cap = under - HEADROOM_M - base
     drop = set()
     for i, t in enumerate(trees):
         r = min(t.plant["crown_radius_m"], dmin[i] - 1.0)

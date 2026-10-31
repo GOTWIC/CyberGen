@@ -90,6 +90,16 @@ SIDEWALK = GROUND
 PARKED = REQUIRED
 LITTER = REQUIRED
 CLEAR_PATH_M = 1.8
+# M20: what hangs on a shop's wall stays on it, under its eaves
+AWNING_Z_M = 3.2
+AWNING_MIN_Z_M = 2.4     # (lower under the eaves or an overhang, at least this)
+SIGN_MIN_Z_M = 2.2       # a shop sign's foot over the sidewalk, at least (over the door)
+SIGN_EAVE_M = 0.15       # its top under the wall's top, at least
+SIGN_MIN_SCALE = 0.2     # (of the 1.8 m sign; smaller, there is none)
+MOUNT_REACH_M = 1.5      # a wall mount's point to its wall, at most (on brackets, AG8)
+STANDING = ("railing", "barrier")   # things on the ground or a road with no ground radius
+CABLE_REACH_M = 1.7      # an overhead cable's end to the wall it is tied to, at most
+CABLE_MIN_Z_M = 4.5      # its height over the street, at least
 
 
 def _u(*key) -> float:
@@ -144,6 +154,8 @@ class Cand:
     scale: tuple = (1.0, 1.0, 1.0)
     attrs: dict = field(default_factory=dict)
     plant: dict | None = None    # vegetation: height_m, crown_radius_m, species, class
+    on: str | None = None        # M20: the road whose surface it stands on (its sidewalk or
+                                 # carriageway), else the ground
 
 
 class Ctx:
@@ -235,6 +247,177 @@ class Ctx:
             if (s.attrs or {}).get("role") == "metro_entrance" and s.footprint is not None:
                 cc = P(s.footprint).centroid
                 self.no_tree.append((cc.x, cc.y))
+
+    # -- surfaces (M20) --------------------------------------------------------------------
+
+    def road_z(self, sid: str, x: float, y: float) -> tuple[float, bool]:
+        """A road's surface over the ground where (x, y) stands beside its centerline, and
+        whether the point is on it (within its corridor, the junction corners at its ends
+        included)."""
+        roads = self.__dict__.setdefault("_roads", {})
+        if sid not in roads:
+            s = self.seg.get(sid)
+            roads[sid] = None if s is None or len(s.centerline) < 2 or not s.z_profile else (
+                LineString(s.centerline), [(z.s, z.z) for z in s.z_profile],
+                max(s.cross_section.total_width_m, s.width_m) / 2.0)
+        rec = roads[sid]
+        if rec is None:
+            return 0.0, True
+        p = Point(x, y)
+        return _z_at(rec[1], rec[0].project(p)), rec[0].distance(p) <= rec[2] + 0.05
+
+    def settle(self, cands: list[Cand]) -> list[Cand]:
+        """Each thing on a road's sidewalk or carriageway stands on that road's surface (a
+        raised road's deck: its z there), the rest on the ground (z 0) or where they are
+        mounted; a thing meant for a raised road that falls off its deck (a signal beside a
+        ramp's crossing, which has no sidewalk) is left out."""
+        out = []
+        for c in cands:
+            c.x, c.y = q(c.x), q(c.y)
+            if c.on is not None and c.z == 0.0:
+                z, on = self.road_z(c.on, c.x, c.y)
+                if abs(z) > 0.02:
+                    if not on:
+                        if z > 0.5:
+                            continue
+                    else:
+                        c.z = q(z)
+            out.append(c)
+        return out
+
+    def water_z(self, wid: str, x: float, y: float) -> float:
+        """The surface of a water body over the ground at a point (M16: on a flat city the
+        ground stands the freeboard over every water body; on a terrain city M13's level)."""
+        from . import water as WA
+
+        if self.m.terrain is None:
+            return -WA.FREEBOARD_M
+        from . import terrain as TE
+
+        lv = self.__dict__.get("_levels")
+        if lv is None:
+            lv = self._levels = WA.Levels(self.m)
+        return q(lv.at(wid, x, y) - TE.ground_of(self.m).at(x, y))
+
+    def walls(self):
+        """Every building mass (its footprint's exterior) with its wall's height range over
+        the ground at a point: (tree, rings, rows (z0, z1, base, on the ground))."""
+        if "_walls" not in self.__dict__:
+            rings, rows = [], []
+            for b in self.m.buildings:
+                for ms in b.masses:
+                    if ms.role == "void" or ms.shape not in ("prism", "cylinder"):
+                        continue
+                    rings.append(G.from_model_poly(ms.footprint).exterior)
+                    rows.append((ms.z0_m, ms.z1_m, b.base_m, ms.z0_m <= 0.5, b.id))
+            self._walls = (shapely.STRtree(rings) if rings else None,
+                           np.array(rings, dtype=object), rows)
+        return self._walls
+
+    def wall_spans(self, x: float, y: float, reach: float, bid: str | None = None
+                   ) -> list[tuple]:
+        """(bottom, top, building) of the walls within `reach` of a point (of building
+        `bid` alone, when given), over the ground there (a mass on the ground from the
+        ground: its plinth, M13)."""
+        tree, rings, rows = self.walls()
+        if tree is None:
+            return []
+        p = Point(x, y)
+        hit = tree.query(p, predicate="dwithin", distance=reach)
+        out = []
+        g = None
+        for k in sorted(hit.tolist()):
+            z0, z1, base, low, owner = rows[k]
+            if bid is not None and owner != bid:
+                continue
+            lift = 0.0
+            if base is not None and self.m.terrain is not None:
+                if g is None:
+                    from . import terrain as TE
+
+                    g = TE.ground_of(self.m).at(x, y)
+                lift = base - g
+            out.append((-1e9 if low else z0 + lift, z1 + lift, owner))
+        return out
+
+    def wall_top(self, x: float, y: float, reach: float, z: float,
+                 bid: str | None = None) -> float:
+        """How high a wall within reach of a point (of building `bid`, when given) runs up
+        without a break from height z (its masses stacked; -inf where no wall stands at
+        z)."""
+        spans = self.wall_spans(x, y, reach, bid)
+        top = max((hi for lo, hi, _ in spans if lo <= z + 0.01 and hi >= z - 0.01),
+                  default=-math.inf)
+        grew = True
+        while grew and top > -math.inf:
+            grew = False
+            for lo, hi, _ in spans:
+                if lo <= top + 0.01 and hi > top + 0.01:
+                    top, grew = hi, True
+        return top
+
+    def facade_spot(self, x: float, y: float, z0: float, z1: float, bid: str, out_m: float,
+                    reach: float = 4.0):
+        """The point `out_m` in front of the wall of building `bid` nearest (x, y) whose mass
+        spans z0 to z1 there (an upper floor that overhangs the ground floor's wall: its own
+        facade), with the wall's outward normal and its direction: (x, y, nx, ny, ux, uy);
+        None where no such wall is within reach, or something over the spot comes down
+        lower than z1."""
+        tree, rings, rows = self.walls()
+        if tree is None:
+            return None
+        p = Point(x, y)
+        g = None
+        best = None
+        for k in sorted(tree.query(p, predicate="dwithin", distance=reach).tolist()):
+            lo, hi, base, low, owner = rows[k]
+            if owner != bid:
+                continue
+            lift = 0.0
+            if base is not None and self.m.terrain is not None:
+                if g is None:
+                    from . import terrain as TE
+
+                    g = TE.ground_of(self.m).at(x, y)
+                lift = base - g
+            if (not low and lo + lift > z0 + 0.01) or hi + lift < z1 - 0.01:
+                continue
+            key = (round(rings[k].distance(p), 4), k)
+            if best is None or key < best[0]:
+                best = (key, k)
+        if best is None:
+            return None
+        ring = rings[best[1]]
+        at = ring.project(p)
+        f = ring.interpolate(at)
+        a = ring.interpolate(max(at - 0.05, 0.0))
+        b = ring.interpolate(min(at + 0.05, ring.length))
+        ux, uy = b.x - a.x, b.y - a.y
+        n = math.hypot(ux, uy)
+        if n < 1e-9:
+            return None
+        ux, uy = ux / n, uy / n
+        nx, ny = uy, -ux
+        if shapely.contains_xy(shapely.Polygon(ring), f.x + nx * 0.05, f.y + ny * 0.05):
+            nx, ny = -nx, -ny
+        px, py = f.x + nx * out_m, f.y + ny * out_m
+        from . import vegetation as V
+
+        u = float(V.overhead(self).under(np.array([[px, py]], dtype=np.float64),
+                                         np.array([0.0]), np.array([z0]), tol=0.005)[0])
+        if u < z1 + 0.01:
+            return None
+        return px, py, nx, ny, ux, uy
+
+    def mount_top(self, x: float, y: float, reach: float, bid: str | None = None) -> float:
+        """How high a thing mounted on a wall at (x, y) may reach: its wall's top
+        (`wall_top` from the ground), or the underside of what is right over the point (an
+        overhang, a skybridge, a deck, a raised road), the lower."""
+        from . import vegetation as V
+
+        u = float(V.overhead(self).under(np.array([[x, y]], dtype=np.float64),
+                                         np.array([0.0]), np.array([0.0]), tol=0.005)[0])
+        return min(self.wall_top(x, y, reach, 0.0, bid), u)
 
     # -- lookups ---------------------------------------------------------------------------
 
@@ -420,7 +603,8 @@ def street_lights(c: Ctx) -> list[Cand]:
         for x, y, ux, uy, _ in furniture_points(w, step, start, 0.3):
             out.append(Cand("street_light", x, y, yaw=yaw_of(-uy * _road_side(w),
                                                                ux * _road_side(w)),
-                            r=0.3, keep=SIDEWALK, attrs={"sidewalk": w.id, "emitter": True}))
+                            r=0.3, keep=SIDEWALK, attrs={"sidewalk": w.id, "emitter": True},
+                            on=w.segment_id))
     return out
 
 
@@ -459,8 +643,12 @@ def wall_lights(c: Ctx, spots: list) -> list[Cand]:
     for (wid, x, y, nx, ny), d, t in zip(spots, near.tolist(), taken):
         if d > 1.0 or t:
             continue
-        out.append(Cand("wall_light", x - nx * min(d, 1.0) + nx * 0.2,
-                        y - ny * min(d, 1.0) + ny * 0.2, z=4.5, yaw=yaw_of(nx, ny), r=0.0,
+        px, py = x - nx * min(d, 1.0) + nx * 0.2, y - ny * min(d, 1.0) + ny * 0.2
+        # (M20: on a wall that reaches over the lamp, else lower on it, else none)
+        z = min(4.5, c.mount_top(px, py, 0.6) - 0.3)
+        if z < 3.0:
+            continue
+        out.append(Cand("wall_light", px, py, z=q(z), yaw=yaw_of(nx, ny), r=0.0,
                         keep=0, attrs={"sidewalk": wid, "emitter": True}))
     return out
 
@@ -501,7 +689,8 @@ def traffic_signals(c: Ctx) -> list[Cand]:
                                                                               0.8),
                                 py + uy * sx * 1.0 - ux * (x.width_m / 2 + 0.8),
                                 yaw=yaw_of(-ux * sx, -uy * sx), r=0.3,
-                                keep=SIDEWALK & ~XWALK, attrs={"junction": j.id}))
+                                keep=SIDEWALK & ~XWALK, attrs={"junction": j.id},
+                                on=x.segment_id))
     return out
 
 
@@ -514,7 +703,8 @@ def crosswalk_cans(c: Ctx) -> list[Cand]:
             continue
         ux, uy = (bx - ax) / L, (by - ay) / L
         out.append(Cand("trash_can", ax - ux * 1.2 - uy * (x.width_m / 2 + 2.0),
-                        ay - uy * 1.2 + ux * (x.width_m / 2 + 2.0), r=0.35, keep=SIDEWALK))
+                        ay - uy * 1.2 + ux * (x.width_m / 2 + 2.0), r=0.35, keep=SIDEWALK,
+                        on=x.segment_id))
     return out
 
 
@@ -525,7 +715,7 @@ def hydrants(c: Ctx) -> list[Cand]:
             continue
         start = 20.0 + 60.0 * _u("hyd", w.id)
         for x, y, ux, uy, _ in furniture_points(w, 100.0, start, 0.35, 10.0):
-            out.append(Cand("hydrant", x, y, r=0.3, keep=SIDEWALK))
+            out.append(Cand("hydrant", x, y, r=0.3, keep=SIDEWALK, on=w.segment_id))
     return out
 
 
@@ -547,9 +737,9 @@ def bus_stops(c: Ctx) -> list[Cand]:
         for x, y, ux, uy, sv in furniture_points(w, 350.0, start, 1.4, 25.0):
             stop = f"{w.id}.{int(sv)}"
             out.append(Cand("bus_stop", x, y, yaw=yaw_of(ux, uy), r=2.2, keep=SIDEWALK,
-                            attrs={"stop": stop}))
+                            attrs={"stop": stop}, on=w.segment_id))
             out.append(Cand("trash_can", x + ux * 3.2, y + uy * 3.2, r=0.35, keep=SIDEWALK,
-                            attrs={"stop": stop}))
+                            attrs={"stop": stop}, on=w.segment_id))
     return out
 
 
@@ -582,7 +772,7 @@ def bollards(c: Ctx) -> list[Cand]:
             k = int(half // 1.6)
             for i in range(-k, k + 1):
                 out.append(Cand("bollard", p.x - uy * 1.6 * i, p.y + ux * 1.6 * i, r=0.15,
-                                keep=GROUND & ~JUNCTION, attrs={"street": s.id}))
+                                keep=GROUND & ~JUNCTION, attrs={"street": s.id}, on=s.id))
     return out
 
 
@@ -677,14 +867,16 @@ def quay_props(c: Ctx) -> list[Cand]:
         w = ww.get(qy.waterway_id)
         wpoly = G.from_model_poly(w.polygon) if w is not None else None
         for x, y, ux, uy, _ in walk(line, 3.0, 1.5, 1.0):
-            out.append(Cand("railing", x, y, z=qy.deck_z_m, yaw=yaw_of(ux, uy), r=0.0,
+            # (M20: on the quay's deck, which is the ground; `deck_z_m` is its height over
+            # the water, the freeboard)
+            out.append(Cand("railing", x, y, yaw=yaw_of(ux, uy), r=0.0,
                             keep=0, attrs={"quay": qy.id}))
         for k, (x, y, ux, uy, _) in enumerate(walk(line, 35.0, 12.0, 8.0)):
             # inland: the side away from the water
             nx, ny = -uy, ux
             if wpoly is not None and shapely.contains_xy(wpoly, x + nx * 3.0, y + ny * 3.0):
                 nx, ny = -nx, -ny
-            out.append(Cand("bench", x + nx * 2.5, y + ny * 2.5, z=qy.deck_z_m,
+            out.append(Cand("bench", x + nx * 2.5, y + ny * 2.5,
                             yaw=yaw_of(ux, uy), r=0.9, keep=GROUND & ~QUAY,
                             attrs={"quay": qy.id}))
             if w is not None and w.kind in ("canal", "basin", "marina") and \
@@ -718,6 +910,7 @@ def boats_in_water(c: Ctx, cands: list[Cand]) -> list[Cand]:
             continue
         b.r = hx
         b.x, b.y = q(b.x), q(b.y)
+        b.z = c.water_z(b.attrs["waterway"], b.x, b.y)
         if c.fits(b):
             c.occupy(b)
             out.append(b)
@@ -748,7 +941,7 @@ def parked_vehicles(c: Ctx) -> list[Cand]:
                 yaw = yaw_of(ux, uy) if side == 1 else yaw_of(-ux, -uy)
                 out.append(Cand("parked_vehicle", x + nx * o, y + ny * o, yaw=yaw, r=2.4,
                                 keep=PARKED,
-                                attrs={"segment": s.id}))
+                                attrs={"segment": s.id}, on=s.id))
     return out
 
 
@@ -821,7 +1014,13 @@ def overhead_cables(c: Ctx) -> list[Cand]:
         if ha > 1.6 or hb > 1.6:
             continue        # a facade on both sides, at most 1.6 m behind the property line
         span = 2.0 * h + 3.0
-        z = q(6.0 + 5.0 * _u("cz", sid, k))
+        # (M20: tied to both walls, under their tops)
+        tops = [c.wall_top(px, py, CABLE_REACH_M, 0.0) for px, py in
+                ((x + nx * (h + 1.5), y + ny * (h + 1.5)), (x - nx * (h + 1.5), y - ny * (h + 1.5)))]
+        z = min(6.0 + 5.0 * _u("cz", sid, k), min(tops) - 0.5)
+        if z < CABLE_MIN_Z_M:
+            continue
+        z = q(z)
         out.append(Cand("overhead_cable", x, y, z=z, yaw=yaw_of(nx, ny), r=0.0, keep=0,
                         scale=(q(span), 1.0, 1.0), attrs={"segment": sid,
                                                           "sag_m": q(0.3 + 0.5 * h / 8.0)}))
@@ -850,26 +1049,46 @@ def unit_dressing(c: Ctx) -> list[Cand]:
                 if shapely.contains_xy(fp, mx + nx * 0.5, my + ny * 0.5):
                     nx, ny = -nx, -ny
             mx, my = (ax + bx) / 2.0, (ay + by) / 2.0
-            if u.awning_m > 0:
+            # M20: each on the unit's wall at a height it has there (the wall's top over the
+            # ground at the point; a low shop keeps its sign and awning under its eaves)
+            top = c.mount_top(mx + nx * 0.15, my + ny * 0.15, MOUNT_REACH_M, b.id)
+            az = min(AWNING_Z_M, top - 0.4)
+            if u.awning_m > 0 and az >= AWNING_MIN_Z_M:
                 out.append(Cand("awning", mx + nx * u.awning_m / 2.0, my + ny * u.awning_m / 2.0,
-                                z=3.2, yaw=yaw_of(ux, uy), keep=0,
+                                z=q(az), yaw=yaw_of(ux, uy), keep=0,
                                 scale=(q(L * 0.9), q(u.awning_m), 1.0), attrs={"unit": u.use}))
             if u.sign or _u("sign", b.id, k) < neon * 0.6:
                 blade = _u("blade", b.id, k) < neon
-                out.append(Cand("sign", ax + ux * 0.8 + nx * (0.7 if blade else 0.15),
-                                ay + uy * 0.8 + ny * (0.7 if blade else 0.15),
-                                z=q(4.0 + 2.0 * _u("sz", b.id, k)),
-                                yaw=yaw_of(nx, ny) if blade else yaw_of(ux, uy), keep=0,
-                                scale=(1.0, 1.0 if blade else q(min(L * 0.7, 6.0) / 1.2),
-                                       q(1.0 + 1.5 * neon) if blade else 0.5),
-                                attrs={"emitter": True, "blade": blade, "use": u.use}))
+                sx, sy = ax + ux * 0.8, ay + uy * 0.8
+                stop = c.mount_top(sx + nx * 0.15, sy + ny * 0.15, MOUNT_REACH_M, b.id)
+                sz = q(1.0 + 1.5 * neon) if blade else 0.5
+                h = KINDS["sign"][1][2]
+                z = min(4.0 + 2.0 * _u("sz", b.id, k), stop - SIGN_EAVE_M - h * sz)
+                if z < SIGN_MIN_Z_M:
+                    sz = q((stop - SIGN_EAVE_M - SIGN_MIN_Z_M) / h)
+                    z = SIGN_MIN_Z_M
+                if sz >= SIGN_MIN_SCALE:
+                    out.append(Cand("sign", sx + nx * (0.7 if blade else 0.15),
+                                    sy + ny * (0.7 if blade else 0.15), z=q(z),
+                                    yaw=yaw_of(nx, ny) if blade else yaw_of(ux, uy), keep=0,
+                                    scale=(1.0, 1.0 if blade else q(min(L * 0.7, 6.0) / 1.2),
+                                           sz),
+                                    attrs={"emitter": True, "blade": blade, "use": u.use}))
             if b.floors >= 2 and _u("ac", b.id, k) < grime * 0.8 and \
                     b.use in ("residential", "mixed", "retail", "hotel"):
                 floor = 1 + int(_u("acf", b.id, k) * min(b.floors - 1, 6))
-                out.append(Cand("ac_unit", mx + nx * 0.3 + ux * L * 0.25,
-                                my + ny * 0.3 + uy * L * 0.25,
-                                z=q(floor * b.floor_height_m + 0.8), yaw=yaw_of(nx, ny),
-                                keep=0, attrs={"facade": True}))
+                px, py = mx + ux * L * 0.25, my + uy * L * 0.25
+                # (M20: on the facade of the floor it drew, an overhanging floor's own,
+                # else the highest floor under it that has one)
+                while floor >= 1:
+                    z = floor * b.floor_height_m + 0.8
+                    spot = c.facade_spot(px, py, z, z + KINDS["ac_unit"][1][2], b.id, 0.3)
+                    if spot is not None:
+                        out.append(Cand("ac_unit", spot[0], spot[1], z=q(z),
+                                        yaw=yaw_of(spot[2], spot[3]), keep=0,
+                                        attrs={"facade": True}))
+                        break
+                    floor -= 1
     return out
 
 
@@ -948,7 +1167,8 @@ def alley_clutter(c: Ctx) -> list[Cand]:
                             y + ny * o + uy * _u("tj", s.id, k), r=0.25,
                             yaw=round(360.0 * _u("ty", s.id, k), 1),
                             keep=LITTER,
-                            attrs={"item": ("bag", "box", "can")[int(3 * _u("ti", s.id, k))]}))
+                            attrs={"item": ("bag", "box", "can")[int(3 * _u("ti", s.id, k))]},
+                            on=s.id))
     for w in c.sw:
         did = None
         g = None
@@ -964,7 +1184,8 @@ def alley_clutter(c: Ctx) -> list[Cand]:
                                                  3.0):
             out.append(Cand("trash", x, y, r=0.25, yaw=round(360.0 * _u("tw", w.id, sv), 1),
                             keep=SIDEWALK,
-                            attrs={"item": ("bag", "box", "can")[int(3 * _u("tk", w.id, sv))]}))
+                            attrs={"item": ("bag", "box", "can")[int(3 * _u("tk", w.id, sv))]},
+                            on=w.segment_id))
     return out
 
 
@@ -1013,27 +1234,37 @@ def build(spec, m) -> Out:
         return _build(spec, m)
 
 
-def _headroom(c: Ctx, oh):
-    """A filter: ground props that fit under what is over them (M7: a street light under a
-    viaduct deck is too tall, so it becomes a lamp hung under the deck)."""
-    polys, under = oh
-    tree = shapely.STRtree(polys) if polys else None
+def _headroom(c: Ctx):
+    """A filter (M20): everything standing on the ground or on a road, settled on its
+    surface (`Ctx.settle`), fits `vegetation.HEADROOM_M` under what is over it, measured
+    along it (M7: a street light under a viaduct deck is too tall, so it becomes a lamp hung
+    from the deck's underside); what is mounted on a wall passes."""
+    from . import vegetation as V
+
+    oh = V.overhead(c)
 
     def ok(cands: list[Cand]) -> list[Cand]:
-        if tree is None or not cands:
-            return cands
-        pts = shapely.points(np.array([(x.x, x.y) for x in cands], dtype=np.float64))
-        ip, ig = tree.query(pts, predicate="intersects")
+        cands = c.settle(cands)
+        idx = [i for i, x in enumerate(cands) if x.r > 0 or x.kind in STANDING]
         low = np.full(len(cands), np.inf)
-        np.minimum.at(low, ip, np.asarray(under)[ig])
+        if idx:
+            sub = [cands[i] for i in idx]
+            low[idx] = oh.under(np.array([(x.x, x.y) for x in sub], dtype=np.float64),
+                                np.array([max(x.r, 0.05) for x in sub]),
+                                np.array([x.z for x in sub]), own=[x.on for x in sub])
         out = []
         for x, u in zip(cands, low.tolist()):
-            h = KINDS.get(x.kind, (None, (0.0, 0.0, 0.0)))[1][2]
-            if x.z > 0.5 or u >= h + 0.3:
+            h = KINDS.get(x.kind, (None, (0.0, 0.0, 0.0)))[1][2] * x.scale[2]
+            if u - V.HEADROOM_M >= x.z + h - 1e-9:
                 out.append(x)
-            elif x.kind == "street_light" and u >= 3.0:
-                out.append(Cand("wall_light", x.x, x.y, z=q(u - 0.5), yaw=x.yaw, r=0.0,
-                                keep=0, attrs={**x.attrs, "mount": "deck", "emitter": True}))
+            elif x.kind == "street_light":
+                # hung from the underside right over its point, where that is high enough
+                u0 = float(oh.under(np.array([[x.x, x.y]]), np.array([0.0]),
+                                    np.array([x.z]), own=[x.on], tol=0.005)[0])
+                if u0 < math.inf and u0 - x.z >= 3.0:
+                    out.append(Cand("wall_light", x.x, x.y, z=q(u0), yaw=x.yaw, r=0.0,
+                                    keep=0, attrs={**x.attrs, "mount": "deck",
+                                                   "emitter": True}))
         return out
     return ok
 
@@ -1046,7 +1277,7 @@ def _build(spec, m) -> Out:
     c = Ctx(spec, m)
     placed: list[Cand] = []
     info: dict = {}
-    under_ok = _headroom(c, V.overhead(c))
+    under_ok = _headroom(c)
     # ground things in priority order: what the street needs first, clutter last; the trees
     # go between the street furniture and the clutter (vegetation.py)
     for name, fn in GENERATORS[:7]:
@@ -1055,13 +1286,13 @@ def _build(spec, m) -> Out:
         placed += got
         if name == "street_lights":
             poles, spots = narrow_lights(c)
-            got = c.place(poles)
+            got = c.place(under_ok(poles))
             got += wall_lights(c, spots)
             info["narrow_lights"] = len(got)
             placed += got
         if name == "bus_stops":
             c.no_tree += [(p.x, p.y) for p in got if p.kind == "bus_stop"]
-    got = c.place(V.fit_crowns(c, V.street_trees(c)))
+    got = c.place(V.fit_crowns(c, [t for t in c.settle(V.street_trees(c)) if t.z <= 0.5]))
     info["street_trees"] = len(got)
     placed += got
     for name, fn in GENERATORS[7:]:
@@ -1069,12 +1300,12 @@ def _build(spec, m) -> Out:
         info[name] = len(got)
         placed += got
     for name, fn in V.GENERATORS:
-        got = c.place(V.fit_crowns(c, fn(c)))
+        got = c.place(V.fit_crowns(c, c.settle(fn(c))))
         info[name] = len(got)
         placed += got
     qp = quay_props(c)
     boats = [x for x in qp if x.kind == "boat"]
-    got = c.place([x for x in qp if x.kind != "boat"]) + boats_in_water(c, boats)
+    got = c.place(under_ok([x for x in qp if x.kind != "boat"])) + boats_in_water(c, boats)
     info["quay_props"] = len(got)
     placed += got
     for name, fn in (("highway_barriers", highway_barriers),
