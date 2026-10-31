@@ -1640,6 +1640,12 @@ another hash seed, a regenerated district's water only near its changed banks, t
 contribution against the packs, the exporter's stage 2, AG7's walls in the bed and canal
 mouths open, the mesher on a hole touching its outline, the small city's and Vesper Bay's
 goldens, `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`).
+Tests that the water changes: the exporter's stage 2 (`test_stage2_from_assetgen`: the
+underwater volumes are new actors), M13's lift of props
+(`test_m13_lifts_placements_by_base_or_ground`: boats float on the water) and the stub
+model of the streets' ground test (its water bodies). The whole suite on the merged code on this PC: 782 passed, 4 skipped, 2
+failed, both known to fail on Windows (the props golden, which AG8's boats also move, and
+`test_progress`'s pipe test).
 Goldens written again on this PC on the merged code, on purpose: the streets' (AG7's walls,
 piers and canal walls on M16's water; the library's hash in the contribution; tile
 `t+03-04`, with no water in it, keeps the Mac's hash) and assetgen's `ag1` `testport_files`

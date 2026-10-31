@@ -109,7 +109,15 @@ def test_second_build_writes_nothing():
 
 def test_same_bytes_any_workers_and_hash_seed(tmp_path):
     base, _ = _small()
-    want = WB.outputs_digest(base / "assets")
+    # (the water reads AG7's bridge piers from the streets manifest beside it, which other
+    # tests may build into the small city's assets: the same piers in every output)
+    streets = base / "assets" / "streets" / "manifest.json"
+    for d in ("two", "one", "seed"):
+        if streets.is_file():
+            (tmp_path / d / "streets").mkdir(parents=True)
+            shutil.copy(streets, tmp_path / d / "streets" / "manifest.json")
+    _water(base, tmp_path / "two", workers=2)
+    want = WB.outputs_digest(tmp_path / "two")
     _water(base, tmp_path / "one", workers=1)
     assert WB.outputs_digest(tmp_path / "one") == want
     env = {**os.environ, "PYTHONHASHSEED": "4242"}
