@@ -161,7 +161,10 @@ frames take the full facade grammar, their curves as short facade edges.
 
 Images: `vesper_bay/` and `delta_megacity/` (`preview_massing.png`; 8K renders
 `render_iso_city.jpg` and the corporate cores `render_iso_d01.jpg`, `render_iso_d03.jpg`;
-`render_street_up.jpg`, looking up a Vesper Bay Corporate Core street). WIP: `wip/`.
+`render_street_up.jpg`, looking up a Vesper Bay Corporate Core street). The five samples'
+`report.json` (with `report.txt`, `preview_massing.png`, `preview_gameplay.png`,
+`preview_transit.png`) are the committed reports `tests/test_build.py` matches a fresh build
+against (M17's stay as M17 left them). WIP: `wip/`.
 
 ## District regeneration
 
