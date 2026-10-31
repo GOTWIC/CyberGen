@@ -790,7 +790,9 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   portals in the costs (`Line.hosts`; `sky_pass` takes the set), so every other tower is
   climbed or gone round. A tube that can neither is routed again taking the removable
   towers in its way out (`Line.cut`, `TOWER_CUT_W`; Vesper Bay's Crown Loop, whose two stops
-  are walls of 130 to 216 m towers). A tower hosts one station (`Builder.hosted`); a pylon
+  are walls of 130 to 216 m towers). Lines are routed apart, so a tube whose host another
+  line takes out is routed again with those towers barred as hosts (`_reroute_hosts`,
+  `Line.no_hosts`). A tower hosts one station (`Builder.hosted`); a pylon
   station slides along its line until its elevator core is clear of other lines
   (`_core_spot`, round a loop's seam).
 - **Clearances:** `SIDE_PAD_M` 6 m (2 before) from buildings in plan, or their clearance

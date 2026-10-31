@@ -38,8 +38,10 @@ and each other. Spec: `docs/citygen_scope.md`, section 12, M19.
   240 m clear on both sides (an edge tower of a dense core), along the line's way. Only hosts
   take a portal; every other tower is climbed over or gone round. Where neither works (Vesper
   Bay's Crown Loop, whose Corporate Core and The Stacks are walls of 130 to 216 m towers), the
-  tube takes the removable towers in its way out (6 in Vesper Bay), as elevated lines take out
-  what they cannot clear.
+  tube takes the removable towers in its way out, as elevated lines take out what they cannot
+  clear. Lines are routed apart, so where another line takes out a tower a tube chose as a
+  host (Delta's Maglev Line through the Skyline Loop's Corporate Core tower, on main's
+  layouts), the tube is routed again with those towers barred as hosts.
 - **Clearances.** 6 m from buildings in plan (2 m before), or under the line by its
   clearance; the roof items a line passes too close over go. 8 m over a road or sidewalk
   under the deck and its cap beams (5.5 m before); 6.5 m over a raised road's deck (with room
@@ -57,49 +59,52 @@ and each other. Spec: `docs/citygen_scope.md`, section 12, M19.
 
 ## Delta Megacity, before and after
 
-Measured on the built models (`citygen.transit_checks.check_supports`; a frame or a
-cantilever counts as one support, its columns not as columns off the line):
+Before is main with M17 and M21 (road repair, cyberpunk massing) and without M19; now is M19
+on that main. Measured on the built models (`citygen.transit_checks.check_supports`; a frame
+or a cantilever counts as one support, its columns not as columns off the line):
 
 | Line | Supports before | Now | A column off its line, before | Now | Longest span, before | Now |
 |---|---|---|---|---|---|---|
-| Maglev Line | 43 | 54 (29 columns, 12 piers, 10 frames, 3 cantilevers) | 3.1 m (3 over 2 m) | 0.01 m | 270 m | 59 m |
-| Skyline Loop (sky tube) | 19 | 9 (6 masts, 2 frames, 1 cantilever) | 13.1 m (4) | 0 m | 366 m | 476 m |
-| Delta Loop (sky tube) | 39 | 12 (10 masts, 1 pier, 1 frame) | 9.9 m (2) | 0 m | 971 m | 577 m |
-| Waterfront Monorail | 94 | 170 (54 columns, 54 piers, 38 cantilevers, 24 frames) | 13.5 m (53) | 0.01 m | 594 m | 39 m |
+| Maglev Line | 33 | 53 (34 columns, 6 piers, 7 frames, 6 cantilevers) | 14.3 m (1 over 2 m) | 0.01 m | 377 m | 78 m |
+| Skyline Loop (sky tube) | 13 | 11 (8 masts, 1 pier, 2 cantilevers) | 2.2 m (1) | 0.01 m | 671 m | 489 m |
+| Delta Loop (sky tube) | 42 | 12 (7 masts, 3 piers, 1 frame, 1 cantilever) | 9.5 m (2) | 0.01 m | 975 m | 505 m |
+| Waterfront Monorail | 141 | 196 (93 columns, 20 piers, 41 frames, 42 cantilevers) | 15.6 m (27) | 0.01 m | 400 m | 102 m (a cable span) |
 
 The run-through's script (`measure_runthrough.py`) counts every column, so on the new model
 it reports the frames' and cantilevers' columns as off the line (by design: they stand at the
-curbs under their beam) and the gaps across the tower the Skyline Loop passes through.
+curbs under their beam): its largest gaps go from 360, 720, 975 and 400 m to 162, 503, 506
+and 102 m, its columns over 2 m off the line from 1, 1, 2 and 27 to 19, 0, 3 and 104.
 
 ## Every sample
 
-All checks pass on every sample (86; 91 on Vesper Bay Decks). Full-city tries, M15 then M19:
+All checks pass on every sample (92; 97 on Vesper Bay Decks). Full-city tries, main (M21 on
+M17) then M19 on it:
 
 | City | Tries before | Now | Longest spans now (per line) |
 |---|---|---|---|
-| Delta Megacity | 1 | 1 | maglev 59, sky tubes 476 and 577, monorail 39 |
-| Vesper Bay | 1 | 1 | elevated rail 189 (a cable span over the river fork), maglev 150 (cable, river), sky tube 435 |
-| Nexus City | 1 | 1 | maglev 78, elevated rail 105 (cable, sea channel), sky tube 347 |
-| Greyhook (peninsula_city) | 1 | 1 | sky tube 506, elevated rail 34 |
-| Saltreach Free Port (archipelago) | 1 | 1 | monorail 39, maglev 56 |
-| Vesper Bay Pinned | 2 | 2 | |
-| Vesper Bay Stacks | 1 | 1 | |
-| Vesper Bay Decks | 2 | 2 | elevated rail on cable spans across the deck city |
-| Cragmouth (a metro only) | 1 | 1 (its model gains only its line's empty `attrs.spans`) | |
+| Delta Megacity | 1 | 1 | maglev 78, sky tubes 489 and 505, monorail 102 (cable) |
+| Vesper Bay | 1 | 1 | elevated rail 169 (cable), maglev 78, sky tube 560 |
+| Nexus City | 2 | 1 | maglev 58, elevated rail 62 (cable), sky tube 336 |
+| Greyhook (peninsula_city) | 2 | 2 | sky tube 375, elevated rail 50 |
+| Saltreach Free Port (archipelago) | 1 | 1 | monorail 102 (cable), maglev 57 |
+| Vesper Bay Pinned | 2 | 2 | elevated rail 61, maglev 57, sky tube 393 |
+| Vesper Bay Stacks | 2 | 2 | elevated rail 59, maglev 57, sky tube 453 |
+| Vesper Bay Decks | 4 | 2 | elevated rail 147 (cable), maglev 58, sky tube 479 |
+| Cragmouth (a metro only) | 2 | 2 (its model gains only its line's empty `attrs.spans`) | |
 
 ## Open items
 
 - **Longer sky loops.** Keeping off every tower that hosts no station makes some sky tube
-  loops longer and less round: Delta's Skyline Loop is now a 4.8 km figure-eight passing over
-  itself 13.5 m clear (a 2.75 km ring before, through seven towers without a station),
-  Vesper Bay's Crown Loop 4.4 km (2.3), Greyhook's Spine Tube 2.5 km (1.5). Routing it with
-  no host towers at all gives the same length on Delta.
+  loops longer and less round: Delta's Skyline Loop is now a 4.8 km figure-eight (a 2.6 km
+  ring on main, through 13 towers without a station), Vesper Bay's Crown Loop a 6.4 km
+  figure-eight (2.3 km on main). Greyhook's Spine Tube is 1.5 km as on main, Nexus City's
+  Spire Line 0.8 km (1.2).
 - **Two lines along one street** stack 8 m apart and the upper one's columns cannot stand
   beside the lower deck; where they share a stop for long, a frame wide enough to straddle
   both is needed (seen on the test city, not on the samples).
 - **Supports in a regenerated district** (`citygen build --district`) are planned again along
   the whole line; outside the district they come back where they were when nothing near them
   changed, but a seam can shift a few supports next to it. Regenerating Delta's Midtown (the
-  Skyline Loop's host tower stands in it) passes all 86 checks.
+  Skyline Loop's host tower stood in it on M15's layout) passed all 86 checks.
 - AG14 draws the frames, masts, piers, trusses and cable spans as assets; AG7 draws beams as
   plain boxes and masts and piers as columns until then.
