@@ -183,16 +183,16 @@ def report(model, cx, manifest: dict, pieces, assets: Path) -> dict:
                 lv = np.full(len(s), bot.level(body, 0.0, 0.0))
             else:
                 lv = np.array([bot.level(body, x, y) for x, y in zip(xs, ys)])
-            z = lv - bottom + lift
+            z = lv - F.bed_depth(bottom, lift)
             off = np.abs(s[:, 2] - z)
             n_bed += len(s)
             worst_bed = max(worst_bed, float(off.max()) if len(off) else 0.0)
             if (off > BED_TOL_M).any():
                 bed_bad.append(f"{bd['node']} {off.max():.3f} m")
-            dep = lv - (s[:, 2] - lift)
-            m16 = np.maximum(d16, F.SURFACE_GAP_M)
-            deeper += int(((dep > m16 + BED_TOL_M) & ~at_wall).sum())
-            on16 += int((np.abs(dep - m16) <= BED_TOL_M).sum())
+            dep = lv - s[:, 2]
+            deeper += int(((dep > np.maximum(d16, F.SURFACE_GAP_M) + BED_TOL_M) &
+                           ~at_wall).sum())
+            on16 += int((np.abs(dep - F.bed_depth(d16, lift)) <= BED_TOL_M).sum())
     checks.append({"id": "water_levels", "ok": not lev_bad and not bed_bad and not deeper,
                    "detail": f"{n_lev} surface vertices at their level, {n_bed} bed vertices "
                              f"checked (worst {worst_bed:.3f} m; "

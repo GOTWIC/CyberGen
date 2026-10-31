@@ -144,16 +144,20 @@ class WCtx:
         return {"z": _q(w.level_m)}
 
     def reach(self, b) -> float:
-        """How far a bank can set this body's bed (its reach, a river's widest half width,
-        and its widest bank)."""
+        """How far a bank can set this body's bed: M16's reach (a river's widest half width)
+        past its widest bank, or a sloped bank's slope carried on under the water down to the
+        body's deepest bed (`fields.bottom`: a marsh's 1 in 20 reaches far)."""
         r = float(b.ent.bed.reach_m)
         if b.coll in ("rivers", "channels"):
             r = max(r, max(b.ent.width_m) / 2.0)
         if b.ent.bed.profile == "flat":
             r = max(r, WA.FLAT_REACH_M)
-        w = max((k.width_m * (1.0 + k.toe_m / max(k.height_m or 1.5, 0.1))
-                 for k in self.lines_of.get(b.id, [])), default=0.0)
-        return r + w + REACH_PAD_M
+        D = float(b.ent.depth_m or 0.0)
+        bks = self.lines_of.get(b.id, [])
+        w = max((k.width_m for k in bks), default=0.0)
+        slope = max((k.width_m * (1.0 + D / max(k.height_m or WA.FREEBOARD_M, 0.1))
+                     for k in bks if k.kind not in ("quay", "canal_wall")), default=0.0)
+        return max(r + w, slope) + REACH_PAD_M
 
     def bank(self, k) -> dict:
         h = k.height_m

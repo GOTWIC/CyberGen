@@ -234,6 +234,13 @@ def bottom(base, lines, W, H, sloped, xs, ys) -> np.ndarray:
     return np.maximum(out, SURFACE_GAP_M)
 
 
+def bed_depth(bottom, lift: float) -> np.ndarray:
+    """The bed's depth under the surface as drawn: the bottom, less the lift a terrain city's
+    bed takes over M13's ground grid (which carries M16's beds too), never within
+    `SURFACE_GAP_M` of the surface."""
+    return np.maximum(np.asarray(bottom) - lift, SURFACE_GAP_M)
+
+
 def _tangent_many(pts, cum, xs, ys) -> tuple[np.ndarray, np.ndarray]:
     """The unit direction of a polyline at the nearest point to each point."""
     A = np.asarray(pts[:-1], dtype=np.float64)

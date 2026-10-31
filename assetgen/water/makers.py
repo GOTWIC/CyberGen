@@ -166,7 +166,7 @@ def make_body(inp: dict) -> Out:
         xs, ys = vmm[:, 0] / 1000.0, vmm[:, 1] / 1000.0
         kd = fd.nearest(xs, ys)
         depth = fd.bottom(xs, ys, kd)
-        z = fd.level(xs, ys) - depth + lift
+        z = fd.level(xs, ys) - F.bed_depth(depth, lift)
         pos = _pos(vmm, z, org)
         tri = _drop_flat(pos, tri)
         nrm = GR.normals(pos, tri)
@@ -220,7 +220,7 @@ def make_body(inp: dict) -> Out:
         z = fd.level(xs, ys)
         pos = _pos(vmm, z, org)
         tri = _drop_flat(pos, tri)
-        depth = fd.bottom(xs, ys, kd) - lift
+        depth = F.bed_depth(fd.bottom(xs, ys, kd), lift)
         vx, vy = fd.flow(xs, ys, depth, kd)
         foam = fd.foam(xs, ys, kd)
         wav = fd.waves(xs, ys, kd) if sea else np.zeros(len(xs))
@@ -255,7 +255,7 @@ def _skirts(inp, fd, org, lift):
                 dense.append((a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n))
         xs = np.array([p[0] for p in dense])
         ys = np.array([p[1] for p in dense])
-        top = fd.level(xs, ys) - fd.bottom(xs, ys) + lift
+        top = fd.level(xs, ys) - F.bed_depth(fd.bottom(xs, ys), lift)
         bot = top - SKIRT_M
         s = 0.0
         for i in range(len(dense) - 1):

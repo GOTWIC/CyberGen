@@ -236,15 +236,15 @@ WATER_SLOT: dict[str, tuple[str, str | None]] = {
 # exposure weighs it per vertex), `ripple_m` (the ripple normals' tile)
 WATER: dict[str, dict] = {
     "sea": {"scatter": [0.02, 0.07, 0.08], "absorb": [0.45, 0.11, 0.08],
-            "shallow": [0.16, 0.36, 0.36], "deep": [0.008, 0.045, 0.065], "clarity_m": 6.0,
+            "shallow": [0.16, 0.36, 0.36], "deep": [0.02, 0.075, 0.095], "clarity_m": 6.0,
             "flow": 1.0, "foam": 1.0, "waves_m": 0.55, "wave_length_m": 26.0,
             "ripple_m": 8.0},
     "river": {"scatter": [0.035, 0.06, 0.045], "absorb": [0.65, 0.3, 0.3],
-              "shallow": [0.2, 0.28, 0.2], "deep": [0.02, 0.04, 0.03], "clarity_m": 2.5,
+              "shallow": [0.2, 0.28, 0.2], "deep": [0.035, 0.06, 0.045], "clarity_m": 2.5,
               "flow": 1.0, "foam": 0.7, "waves_m": 0.0, "wave_length_m": 26.0,
               "ripple_m": 6.0},
     "canal": {"scatter": [0.03, 0.055, 0.045], "absorb": [0.75, 0.35, 0.35],
-              "shallow": [0.17, 0.25, 0.2], "deep": [0.02, 0.04, 0.035], "clarity_m": 2.0,
+              "shallow": [0.17, 0.25, 0.2], "deep": [0.035, 0.06, 0.05], "clarity_m": 2.0,
               "flow": 1.0, "foam": 0.5, "waves_m": 0.0, "wave_length_m": 26.0,
               "ripple_m": 5.0},
     "ornamental": {"scatter": [0.04, 0.11, 0.13], "absorb": [0.28, 0.07, 0.05],
