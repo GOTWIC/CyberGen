@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M18 and M21 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10 and AG13 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -183,7 +183,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG13`](docs/progress/AG13)
 
 ### Cities
 
@@ -375,6 +375,25 @@ elevators. The deck's streets lie on the slab and climb to it on solid ramps; th
 undercity's roofs close up to the soffit, its fronts lit and grimy as a covered street.
 More: [`docs/progress/AG10`](docs/progress/AG10).
 
+<img src="docs/progress/AG13/vesper_bay/8k/park.jpg" width="840">
+
+A park on Vesper Bay's Scholar Isle at street level (8K): lawn grass, clover and flowers in
+the district's colors under the trees.
+
+| | |
+|---|---|
+| <img src="docs/progress/AG13/vesper_bay/8k/lawn_edge_path.jpg" width="420"> | <img src="docs/progress/AG13/vesper_bay/8k/wasteland_lot.jpg" width="420"> |
+| A lawn's edge and the worn path leaving the street (8K) | A vacant lot in The Stacks (8K) |
+
+Every piece of open land gets its ground: lawns, meadows, marsh, wasteland, dirt, gravel,
+sand, planted beds and paving, each textured by what covers it and worn where people walk,
+mossy in deep shade, darker where it is wet. Grass and small plants grow on it by kind:
+short lawn grass, clover, flowers in each district's palette, long meadow grass, reeds and
+cattails by the water, weeds and scrub on vacant lots, ferns under the trees; none on paths,
+paving or under decks. In Unreal the grass sways in the wind and fades out past 60 to 100 m.
+`assetgen ground out/<city>` makes them (also part of `assetgen build`). More:
+[`docs/progress/AG13`](docs/progress/AG13).
+
 <img src="docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg" width="840">
 
 A shopping street in Greyhook in Unreal 5.8: street fronts, signs, props, roads and
@@ -402,7 +421,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG10 | Layered districts | Deck slabs with coffered or ribbed soffits, edge fascias, rails, lights over the streets below and colonnades over parks; columns, light-well stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs that meet the slab | Done |
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 | AG12 | Water | Real water: surfaces that flow and foam, beds, banks and beaches, swimming | Planned |
-| AG13 | Ground cover and grass | Textured ground with worn paths, grass and small plants that sway in the wind | Planned |
+| AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
 | AG14 | Fit and finish | Smooth junctions and curved walls, everything resting on what it stands on, nothing through anything else | Planned |
 | AG15 | Cyberpunk facades and night | Window patterns beyond grids, mixed materials, every building lit its own way at night, lit streets | Planned |
 

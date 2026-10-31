@@ -690,6 +690,79 @@ tint mask, masked and two-sided, Nanite `Voxelize` at distance as before) and `M
 reading `SignTex` (the holo ad page as emission, the opacity by its brightness, where
 `Textured`).
 
+## assetgen's ground contribution (AG13)
+
+`assetgen ground BUILD` (and `assetgen build`, after the props) writes
+`unreal_contribution.ground.json` (`"part": "ground"`) beside its packs:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "ground", "layer": 2,
+ "masters": ["grass", "ground"],
+ "materials": {
+  "ground.lawn.t+01+05": {"master": "ground", "color": [0.08, 0.2, 0.04],
+   "textures": {"BaseTex": "set.ground_lawn.base", "NormalTex": "...", "OrmTex": "...",
+                "WornBaseTex": "set.ground_dirt.base", "...": "...",
+                "ShadeBaseTex": "set.ground_moss.base", "...": "...",
+                "Mask": "city.ground.t+01+05", "Macro": "atlas.macro.macro"},
+   "scalars": {"TileM": 2.0, "WornTileM": 2.0, "ShadeTileM": 1.0, "MaskX0": 256.0,
+               "MaskY0": 1280.0, "MaskSize": 256.0, "WearK": 1.0, "MossK": 0.6,
+               "EdgeK": 0.5, "WetK": 0.6, "Tinted": 1.0, "Textured": 1.0},
+   "vectors": {"RefColor": [...], "WornRefColor": [...], "BaseFlat": [...], "...": "..."}},
+  "grass.meadow": {"master": "grass", "color": [0.15, 0.27, 0.04], "roughness": 0.8,
+                   "scalars": {"Wind": 1.0}, "vectors": {"DryColor": [0.46, 0.37, 0.11]}}},
+ "textures": {"city.ground.t+01+05": {"file": "ground/masks/t+01+05.png", "kind": "mask",
+                                      "srgb": false, "size": [512, 512], "...": "..."}},
+ "entries": [
+  {"key": "ground.t+01+05", "kind": "ground.cover", "glb": "ground/tiles/t+01+05.glb",
+   "node": "ground.t+01+05", "pivot": [384.0, 1408.0, 0.0], "nanite": true,
+   "triangles": 1498, "slots": ["ground.lawn.t+01+05", "..."],
+   "replaces": ["d03.cover_mown_lawn.t+01+05", "d03.lawn.t+01+05", "..."]},
+  {"key": "grass.t+01+05", "kind": "ground.grass", "pivot": [384.0, 1408.0, 0.0],
+   "parts": [{"kind": "clump.meadow.v2", "glb": "ground/clumps.glb",
+              "node": "clump.meadow.v2", "count": 3120, "triangles": 185,
+              "xforms_file": "ground/grass/t+01+05.json", "nanite": false,
+              "collision": {"none": true}, "cull_m": [60.0, 100.0], "shadow": false}]},
+  {"key": "d07.cover_paving.t-02+04", "kind": "ground.drop", "drop": true}]}
+```
+
+- **Ground**: one actor per tile in place of the blockout's ground cover objects of that
+  tile (`<district>.cover_<kind>.<tile>`, M16) and its median lawns
+  (`<district>.lawn.<tile>`, M6's verges, which nothing replaced before); a blockout object
+  whose pieces lie wholly in the tiles beside its own gets a `drop` entry (those tiles draw
+  them). Nanite, complex collision (the lawns are walked on), 0.1 m over the ground as the
+  blockout's flats were. The mesh's slots are per surface and tile: the tile's mask
+  (`ground/masks/<tile>.png`, 512 px for its 256 m, linear, row 0 its south edge: R wear, G
+  shade, B edge, A moisture) is a texture per tile, so its material is too.
+- **Grass**: decision 13.9 (a), baked per tile. An entry per tile with a part per clump
+  variant; the transforms (`[x, y, z, yaw, s, s, s]` from the pivot, the tile's middle) are
+  in `ground/grass/<tile>.json` under the part's node (`xforms_file`), not in the
+  contribution (a city has one to two million clumps). Not Nanite (the master sways by world
+  position offset), no collision, no shadows, culled between 60 and 100 m (`cull_m`), out of
+  the HLODs.
+- **Materials**: `ground` (`M_CgGround`): its three sets (base, worn, shade) on UV0 (the plan
+  position in meters) over their TileM, the mask on world x, y (`MaskX0`, `MaskY0`,
+  `MaskSize`); worn over base by the wear and the edges (`WearK`, `EdgeK`), the edge broken
+  up by the base set's height; the shade set where shade and moisture meet (`MossK`); darker
+  and smoother where wet (`WetK`); the base set tinted over its tinted pixels where `Tinted`
+  (the instance's `BaseColor`: a lawn's green). Without AG6's library (`Textured` 0) flat
+  colors (`BaseFlat`, `WornFlat`, `ShadeFlat`). `grass` (`M_CgGrass`): untextured, the
+  slot's color toward `DryColor` by the vertex colors (R height share, G tone, B dryness),
+  darker at the root, two-sided, masked, dithered out with the instance's fade
+  (`PerInstanceFadeAmount`), swaying by world position offset: the vertex's height share
+  squared times `MPC_CityGen`'s `Wind` (a new scalar, default 0.35, which stage 3 drives)
+  times the slot's own `Wind` (sedum 0.05 to plumes 1.4), two waves along the world phased
+  per instance.
+
+**What the exporter does with the ground** (AG13): a part may give `xforms_file` (relative to
+`assets/`) instead of `xforms`: the instance actor's record then holds `xforms_file`,
+`xforms_key` (the node), `count` and the file's sha256 (`xforms_sha`, in its hash), and the
+importer reads the transforms from the file (one file at a time, as the actors come tile by
+tile); a part's `cull_m` becomes the HISM's cull distances (`set_cull_distances`, start and
+end in centimeters), `shadow: false` turns its shadow off, and an instance actor with
+`cull_m` is left out of the HLODs (`enable_auto_lod_generation` off on its component and
+actor). `MPC_CityGen` gains `Wind` (a collection without it gets it, keeping `Night`).
+Masters `M_CgGround` and `M_CgGrass` (`stage2_master`).
+
 ## assetgen's materials (AG6)
 
 `assetgen build` now textures what the contributions name (`assetgen/materials/contrib.py`;
@@ -797,6 +870,7 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`d03.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on; `city.deck_road.<tile>` and `city.deck_sidewalk.<tile>` with no district until the stage 1 fixes), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |
 | Stage 1 fixes | No code change. Keys: a deck's streets and sidewalks are joined per district like the ground's (`d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`, with `cg.district=d03`; they were `city.deck_road.<tile>`, `city.deck_sidewalk.<tile>` with an empty `cg.district`), so importing Vesper Bay Decks over an M14 import replaces those actors under their new keys; its ramps keep theirs (`<segment>.ramp`). Cragmouth's local junctions are level out to their corners (more retaining wall actors on its hills, keys by wall id as before) | Not run (the coordinating session's call; `docs/progress/stage1_fixes/`) |
 | AG1 and AG7 (after M15) | Stage 2 taken as layer 2: every `assets/unreal_contribution.*.json` read in sorted order (`unreal.stage2`, the manifest's `stage2`; a key in two files refused), the blockout actors of each entry's key and `replaces` dropped, an actor per shell and street piece at its pivot (`cg.stage=2`), the packs through Interchange in their nodes' frames with their own normals, stage 2 masters (`M_CgFacade`, `M_CgGlass`, `M_CgMetal`, `M_CgRoad`, `M_CgOpaque`, `M_CgEmissive`, `M_CgTranslucent`, `M_CgFoliage`) and an instance per part and slot reading the actor's Custom Primitive Data tint, the 23 floats as the components' saved defaults, building collision as convex hulls through GeometryScript (`GeometryScripting` plugin), complex collision for streets, the sky tube glass as a non-Nanite LOD chain, container stacks as instanced actors per entry and kind, proxies imported only, `graphs.walkways` lines in the walkway data assets; `--blockout-only`; the check's walk keeps to walkable walkways (no leg over 30%, no step over 0.6 m, not under the terrain) and tries up to eight starts; the buildings contribution's `asset` is the shell node's Interchange name and its patch slots spell out their tint rule | the small test city, Greyhook and Cragmouth: blockout alone, then stage 2 over it (exactly the actors `manifest_changes` names), imported again (nothing changed), checked (507 of 507 traces down, 36 of 36 roofs and facades, 248, 130 and 81 m walked) with shots; first imports with stage 2 5 to 14 minutes, most of it Nanite builds (`docs/progress/AG1/unreal/`) |
+| AG13 | Ground cover and grass taken: `unreal_contribution.ground.json` (above); a part's transforms from a file of its tile's (`xforms_file`, its sha256 in the actor's hash), its cull distances (`cull_m`), no shadow and no HLOD; `M_CgGround` (three sets blended by a tile's mask) and `M_CgGrass` (vertex-colored clumps swaying in `MPC_CityGen`'s new `Wind`, dithered out with the instance fade); the blockout's ground cover objects and M6's median lawns replaced by key (a `drop` where their tile draws none of them); tests without Unreal (`test_stage2_takes_assetgen_ground`) | Not run (the coordinating session's call) |
 | AG8 | Props, plants and signs taken: `unreal_contribution.props.json` and `.signs.json` (above); `stage2` replaces M15's prop and plant prototype actors by key (entries keyed by them, or `replaces`, or `drop`), parts with per-instance ids, scales, collision, Nanite and `shape_preservation`; the importer skips the replaced prototypes, scales instances, sets voxel Nanite foliage, makes `M_CgHolo`; tests without Unreal (`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` now with every prototype replaced) | Greyhook and Vesper Bay imported with their props (25,837 and 46,354 actors, 785 and 1,818 s), imported again (nothing changed, 69 and 74 s) and checked (507 of 507 traces down, 36 of 36 roofs and facades, 134 and 253 m walked): the HISM counts per kind equal `props_report.txt`, no M15 prototype left, every instance at its model position, plants Nanite with `Voxelize`, holo-ads translucent 3-LOD chains, neon and lit faces emissive; shots of props by day and a neon street at night (`docs/progress/AG8/unreal/`) |
 | Play-ready (after AG1 and AG7) | Open into the city and play it: each import makes the city the project's `EditorStartupMap` and `GameDefaultMap` (`unreal.set_startup_map`, the rest of `Config/DefaultEngine.ini` as it was; `--no-startup`); `Core/BP_CityGenFlyPawn` (a SpectatorPawn, its built-in bindings, no collision, `--fly-speed` 50 m/s) and `Core/GM_CityGenFly`, the level's game mode override with `--play fly` (the default), none with `--play walk`; World Partition for flying: the main grid 256 m cells loaded `--view-range` (1500 m) around the player, the instanced HLOD layer in 512 m cells out to the city's diagonal (its merged parent layer cut off), set by the partitions' C++ property names; the HLODs built after the import (`unreal.build_hlods`, the WorldPartitionHLODsBuilder commandlet, only what changed; `--no-hlod`); every master `used_with_instanced_static_meshes` (without it the far view drew the default material, flat gray); `--check` walks with the project's own pawn whatever `--play` set, runs `ghost`, `fly` and `walk`, then flies with the fly pawn (its speed on the game's clock, through a building, the city loaded where it ends) and with `--shots` takes two views from it; an unchanged build imported again saves nothing; `unreal.manifest_changes` counts a key whose actor changes class (AG8's exact props over M15's instanced ones) as deleted and created, as the importer does | Vesper Bay (blockout only) and Greyhook (with stage 2) imported over their earlier imports, imported again, HLODs built (244 and 285), checked in both modes (507 of 507 traces down, 36 of 36 roofs and facades, 253 and 129 m walked, the console commands, 50 m/s flights) with shots from the fly pawn (`docs/progress/unreal_play/`) |
 | AG8 Unreal check | Plants' instanced actors without collision (a part's `collision: {"none": true}` now makes its HISM `NoCollision`; it reached only the mesh record before); the check tries a missed trace down again for up to 30 s (`TRACE_RETRY_S`) and counts those hits as late (the first play session after an import traced before the streamed cells' collision was in place: 346 of 507) (its streaming step's read of actors that had streamed out, which stopped Vesper Bay's first check, was fixed the same way by the play-ready exporter); `test_stage2_from_assetgen` expects the exact props' keys, whose actor changes class, as deleted and created (`manifest_changes` since the play-ready exporter) | as AG8's row |

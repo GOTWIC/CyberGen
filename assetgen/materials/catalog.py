@@ -245,6 +245,9 @@ def set_for(slot: str, era: str | None, part: str = "buildings") -> tuple[str, s
         return STREET.get(slot, ("concrete", "concrete_smooth"))
     if part in ("props", "signs"):
         return prop_set(slot)
+    if part == "ground":
+        from ..ground import kinds as GK       # (AG13: a ground slot's base set; grass none)
+        return GK.slot_set(slot)
     master, s = _master_of_building(slot)
     if slot in ERA_SLOTS:
         return master, f"{s}_{era or DEFAULT_ERA}"

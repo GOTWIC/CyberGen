@@ -1,0 +1,12 @@
+assetgen ground (AG13): Cragmouth
+all checks pass
+5381 pieces in 129 tiles (129 with ground, 126 with grass, 3 at the cap)
+clumps: 1,189,678 instances of 58 variants (10,264 triangles), 208,924,162 instanced triangles
+ground: 491,923 triangles, 129 masks, 99.7 MB on disk
+by kind: {'clover': 76971, 'fern': 38695, 'flowers': 122792, 'lawn': 440265, 'meadow': 406651, 'meadow_dry': 1518, 'reeds': 2250, 'scrub': 852, 'sedum': 6201, 'weeds': 93483}
+
+PASS ground_coverage: {'pieces': 5381, 'short': 0, 'first_short': None, 'triangulation_failed': [], 'constrained_delaunay': [], 'blockout_objects': 447, 'not_replaced': []}
+PASS ground_grass_clear: {'clumps': 1189678, 'failing': 0, 'first': None}
+PASS ground_meshes: {'files': 130, 'triangles': 502187, 'bad': 0, 'first': None}
+PASS ground_budgets: {'over': [], 'tile_instances_max': 40000, 'city_instances': 1189678, 'clump_triangles_max': 366, 'unique_triangles': 10264, 'tile_ground_triangles_max': 8506, 'city_ground_triangles': 491923, 'tile_drawn_triangles_max': 9382475, 'limits': {'tile_instances': 40000, 'city_instances': 3000000, 'clump_triangles': 400, 'unique_triangles': 60000, 'tile_ground_triangles': 250000, 'city_ground_triangles': 12000000, 'tile_drawn_triangles': 12000000}}
+seconds: {'gather': 3.85, 'clumps': 0.09, 'tiles': 42.27, 'write': 0.04, 'total': 55.54, 'workers': 3, 'slowest_tiles': [('t+03-01', 2.214), ('t+01+04', 1.972), ('t+04+01', 1.686), ('t+04+03', 1.664), ('t+00+04', 1.591)]}
