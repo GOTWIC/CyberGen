@@ -605,10 +605,11 @@ def test_check_supports_fails_off_the_line(lines):
 
 def test_check_supports_fails_long_span(lines):
     def fn(d):
-        # every support of the green line between 100 and 400 m along it goes
+        # every support of the green line from 100 m along it to past a main span goes
         t = next(t for t in d["transit_lines"] if t["name"] == "Green Line")
+        hi = 150.0 + TR.MAIN_SPAN_M[t["mode"]]
         gone = {s["id"] for s in d["structures"] if s["attrs"].get("line_id") == t["id"] and
-                100.0 < s["attrs"].get("s_m", -1.0) < 400.0}
+                100.0 < s["attrs"].get("s_m", -1.0) < hi}
         d["structures"] = [s for s in d["structures"] if s["id"] not in gone and
                            s["attrs"].get("frame") not in gone]
     c = _rerun(_mutate(lines.model, fn))["transit_supports"]

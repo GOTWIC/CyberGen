@@ -50,8 +50,9 @@ and each other. Spec: `docs/citygen_scope.md`, section 12, M19.
   16), monorail 16 to 26 m (12 to 22). Lines are profiled in order: each passes over or under
   the lines before it.
 - **Checks.** `transit_supports` (a lone column within 0.5 m of its line, a frame's beam under
-  it at the deck's underside, piers clear of the channel, no span over the longest but a
-  main span, an end overhanging half of it at most) and `transit_clearance` (in 3D along the
+  it at the deck's underside, none on a road embankment (M18's fill under a low raised road),
+  piers clear of the channel, no span over the longest but a main span, an end overhanging
+  half of it at most) and `transit_clearance` (in 3D along the
   line: building masses and roof items, a portal only with a station in it, other lines'
   tracks, platforms, supports and canopies, the roads, raised decks, navigable water).
 - **Blockout and stage 2.** Cap beams, masts with stays, pier footings; AG7 draws a beam as a

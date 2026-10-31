@@ -550,7 +550,7 @@
     },
     {
       "id": "transit_supports",
-      "title": "Supports stand under the structure (a column's middle within 0.5 m of the line, else a portal frame or a cantilever bent whose cap beam carries the deck where the line crosses it), outside lanes, buildings, road decks and the sidewalks' clear paths, in the water only as piers clear of the navigable channel; no span longer than the mode's longest (elevated rail 45 m, monorail 40, maglev 80, sky tube 600), but a main span over a navigable channel or a raised road, and an end overhanging half of it at most",
+      "title": "Supports stand under the structure (a column's middle within 0.5 m of the line, else a portal frame or a cantilever bent whose cap beam carries the deck where the line crosses it), outside lanes, buildings, road decks, road embankments and the sidewalks' clear paths, in the water only as piers clear of the navigable channel; no span longer than the mode's longest (elevated rail 45 m, monorail 40, maglev 80, sky tube 600), but a main span over a navigable channel or a raised road, and an end overhanging half of it at most",
       "passed": true,
       "failures": [],
       "notes": [

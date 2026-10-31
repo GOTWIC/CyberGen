@@ -966,16 +966,19 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   has none), else a portal frame (`leg<n>a/b` columns either side within `FRAME_REACH_M`, a
   `beam` structure `cap<n>` under the deck, `attrs.frame`) or a cantilever bent (one column
   within `CANT_REACH_M`, its arm past the deck); then any gap over the longest span filled
-  wherever a support stands. Before the stations, a dry run (`_support_room`, `_Dry`) takes
-  out the low removable buildings that alone keep a support off a gap. A gap still longer
-  is a cable-stayed main span over a navigable channel or a raised road (`MAIN_SPAN_M`:
-  rail 400, monorail 250, maglev 300), else a note; the line's `attrs.spans` lists its truss, cable and gap
-  spans; sky tube masts carry `mast_top_m` and their `stays`.
+  wherever a support stands; M18's embankments (`elevated.road_embankments`, built after the
+  transit from the same roads) are ground no support stands on. Before the stations, a dry
+  run (`_support_room`, `_Dry`) takes out the low removable buildings that alone keep a
+  support off a gap. A gap still longer is a cable-stayed main span over a navigable channel
+  or a raised road (`MAIN_SPAN_M`: rail 400, monorail 250, maglev 300), else a note; the
+  line's `attrs.spans` lists its truss, cable and gap spans; sky tube masts carry
+  `mast_top_m` and their `stays`.
 - **Checks:** `transit_supports` (lone columns within 0.5 m of the line, frames' beams under
-  it at the deck's underside, piers clear of the channel, spans within the longest, an end
-  overhanging half of it at most), `transit_clearance` (3D along the line: masses and roof
-  items, a portal only with a station in it, other lines' tracks and structures, the roads,
-  raised decks, beams over roads), `transit_altitude` knows the new needs.
+  it at the deck's underside, none on a road embankment, piers clear of the channel, spans
+  within the longest, an end overhanging half of it at most), `transit_clearance` (3D along
+  the line: masses and roof items, a portal only with a station in it, other lines' tracks
+  and structures, the roads, raised decks, beams over roads), `transit_altitude` knows the
+  new needs.
 - **Blockout and stage 2:** beams in `transit_support`, masts (two legs, stays) and pier
   footings (`_mast`, `_pier_cap`); AG7 draws a beam plainly (`transit_beam`), AG14 the rest.
   New structure kind `beam` in the model.
