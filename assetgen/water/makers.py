@@ -1,20 +1,23 @@
 """AG12's makers: a body piece's bed and surface, a bank piece's slope, wall and stones, and
 the riprap stone parts; each from its piece's inputs alone (`pieces.py`).
 
-- **Bed** (`<body>.bed.<tile>`, Nanite): the body's water on a lattice (`BED_CELL_M`), each
-  point at the level less `fields.Field.bottom` (plus M13's lift on a terrain city), a slot
-  by M16's material, and where a bank's slope runs on under the water (out to its toe) the
-  bank's (riprap and road embankments stone, a beach sand, a marsh edge mud); UV0 the plan
-  in meters, UV1 the depth (the caustics' strength). Along the edges it shares with other
-  water a skirt hangs from the bed `SKIRT_M` down, facing out, so a step between two bodies'
-  beds is closed from the shallower side.
+- **Bed** (`<body>.bed.<tile>`, Nanite): the body's water less every sloped bank's dry
+  strip (`strip`: its mesh covers it, so bank and bed meet along the waterline) on a lattice
+  (`BED_CELL_M`), each point at the level less `fields.Field.bottom` (M13's lift on a
+  terrain city, never within 5 cm of the surface), a slot by M16's material, and where a
+  bank's slope runs on under the water (out to its toe) the bank's (riprap and road
+  embankments stone, a beach sand, a marsh edge mud); a steep triangle (a step) on vertices
+  of its own, UV0 on the vertical plane it faces; UV0 else the plan in meters, UV1 the depth
+  (the caustics' strength). Along the edges it shares with other water a skirt hangs from
+  the bed `SKIRT_M` down, facing out, so a step between two bodies' beds is closed from the
+  shallower side.
 - **Surface** (`<body>.water.<tile>`, non-Nanite LODs on lattices of `SURFACE_CELLS_M`): at
   the level; UV0 the plan in meters, UV1 the current (m/s, x east, y north), COLOR_0 foam,
   depth over 12 m, the sea's wave weight.
-- **Bank**: a slope from the line (the land's edge, at the ground) out to the waterline at
-  the level, a slot by kind (the bed carries it on under the water); riprap stones on it
-  from the line to the toe; a stone wall (canal walls along rivers and the sea) from a
-  coping at the ground down past the toe.
+- **Bank**: its dry strip on a 2 m lattice, from the line (the land's edge, at the ground)
+  falling to the level at `width` out, a slot by kind (the bed carries it on under the
+  water); riprap stones on it from the line to the toe; a stone wall (canal walls along
+  rivers and the sea) from a coping at the ground down past the toe into the bed.
 """
 
 from __future__ import annotations

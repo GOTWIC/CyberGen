@@ -6,12 +6,13 @@ arithmetic (`citygen/water.py`) wherever M16 defines a value:
   waterline, then toe + (D - toe) ramp((d - width) / span); a river's or channel's D and span
   from its centerline (`along`, its widths). A piece carries the body's banks within
   `reach` of its tile, which is all that can set the depth there.
-- **Bottom** (`Field.bottom`): the depth AG12 draws, one surface from the waterline down:
-  M16's bed where it lies higher than the bank's slope carried on under the water (a bank
-  falls `height` over `width` to its waterline and on at that slope until it meets the bed;
-  M16's bed steps from 0 to the toe at the waterline), and never within `SURFACE_GAP_M` of
-  the surface (under a bank's dry slope, which hides it). Beside a wall (quay, canal wall)
-  the bed is at the wall's toe up to its face (the bank's line), where AG7 and AG12 draw the
+- **Bottom** (`Field.bottom`, `bottom`): the depth AG12 draws, one surface from the
+  waterline down: M16's bed raised to every sloped bank's slope carried on under the water
+  (a bank falls `height` over `width` to its waterline and on at that slope until it meets
+  the bed; M16's bed steps from 0 to the toe at the waterline, and from one bank's profile to
+  another's where the nearest bank changes), never within `SURFACE_GAP_M` of the surface
+  (under a bank's dry strip, which the bed leaves out). Beside a wall (quay, canal wall) the
+  bed is at the wall's toe up to its face (the bank's line), where AG7 and AG12 draw the
   walls, not M16's thickness out.
 - **Level** (`Field.level`): the surface: a flat city's `WaterBed.surface_m`, else M13's
   level (a river's along its centerline, `Levels.at`).
