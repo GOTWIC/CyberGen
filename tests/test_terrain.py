@@ -285,7 +285,10 @@ def test_road_grades_on_the_ground_within_class(hilly):
         for (s0, g0), (s1, g1) in zip(st, st[1:]):
             if s1 - s0 >= 0.5:
                 dz = abs(g1 + TE.z_on(zp, s1) - g0 - TE.z_on(zp, s0))
-                assert (dz - 0.02) / (s1 - s0) <= g + TGC.GRADE_TOL, (s.id, s0)
+                # (M18: as steep as its own z profile where that climbs more, as
+                # `ground_grades`: a ramp at 8%, a levelled leg catching up)
+                own = (abs(TE.z_on(zp, s1) - TE.z_on(zp, s0)) - 0.01) / (s1 - s0)
+                assert (dz - 0.02) / (s1 - s0) <= max(g, own) + TGC.GRADE_TOL, (s.id, s0)
     assert math.isfinite(hilly.model.terrain.stats["max_m"])
 
 

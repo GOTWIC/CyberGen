@@ -918,6 +918,87 @@ neighbor rule in `buildout.select_forms`):
   are kept neat (`forms.neat`: no corner under 40 degrees, no edge under 1 m).
 Sample builds: `docs/progress/M21/`.
 
+M18 (junctions and ramps, from the first run-through) is in place:
+- **Grades** (spec `highways.grades`, `spec.Grades`; `elevated.grades(gr)` sets the module's
+  values for one road stage, `roads.build_roads` wraps it): viaduct runs 6% design and 7% at
+  most (`RUN_GRADE`, `RUN_MAX_GRADE`), ramps, loops, flyovers and stack ramps 7% and 8%
+  (`GRADE`, `MAX_GRADE`), bridge approaches 6.5% (`APPROACH_GRADE`), 30 m vertical curves
+  (`CURVE_M`); a ramp's search still runs as long, and a loop is as big, as M7's at 5%
+  (`SEARCH_GRADE`: the steeper ramp descends sooner within it), and `_ramp` takes a longer
+  span where the shortest runs into another ramp (`clear`). A two-way highway one direction
+  of which no lane can enter (a trumpet's stem past the flyover's landing where no near ramp
+  arrives) carries the other only (`junctions.one_way_stranded`).
+- **Junction levels** (`junctions.level_legs`, in M2 after the polygons and `absorb_shared`):
+  every leg of a junction held at its node's height out to where it leaves the polygon (the
+  farther of its run to the cut and its exit, `leg_exit`) and `LEVEL_OUT_M` 10 m beyond, at
+  most half of it, then back onto its own profile at `catch_grade` (a run's maximum on primary
+  roads, a ramp's on ramps and local streets): the profile clamped between cones from the held
+  stretches (`_levelled`), never moving a locked stretch (bridge spans, roads crossing over or
+  under it, `_locks`); where it would, the junction is raised to its highest leg at its run
+  (at most `RAISE_MAX_M` 2.5 m, M7's 3 m for a local junction, never under another road),
+  else it keeps the slope. A leg's far end always keeps its node's height. Tunnels,
+  viaducts, a deck's streets and ramps, footbridges and held roads keep their profiles. On a
+  terrain city the grade lines hold primary roads too, at most `terrain.LEVEL_GRADE` 2% over
+  their junction and 10 m past it, where the natural ground there is no steeper than
+  `LEVEL_SLOPE_MAX` 4%; local roads keep M13's runs (to the polygon's edge, none at a
+  junction with a primary road: longer, a hillside's short streets went flat and Cragmouth's
+  fills passed 18 m). The grade-line solver's edges are directed (`terrain.grade`: the ground
+  rises from one station to the next by at most the class's grade, or the z profile's own
+  where steeper, less what the z profile climbs), so a steep ramp or approach no longer
+  leaves its stretch no room (a symmetric cap of zero there chained hillsides flat).
+- **Surfaces** (`junctions.surfaces`, after the grading): `Junction.edge_z`, the height of
+  every exterior vertex over the node's ground, on every junction not flat at its node's
+  height: a vertex on a leg's cut line (square to the leg where it leaves) at the leg's height
+  there, the curb between two legs linear along the ring (`surface`, `anchors_of`). The
+  blockout draws such a junction as a face through its vertices (a drape part; on a terrain
+  city every junction, over sea level) and cuts its roads back to where they leave it
+  (`blockout._trimmed`); AG7's junction piece takes its vertex heights from it.
+- **Embankments** (`elevated.road_embankments`, before the road columns): retained fill
+  (structure `embankment`, `<road>.emb<k>`, `attrs.road_id`, `s0_m`, `s1_m`, `width_m`)
+  under every raised road over land lower than `EMBANKMENT_M` 4.5 m; columns only where it is
+  higher (`SUPPORT_MIN_UNDER_M`). The blockout fills under it in the road's `<road>.deck`
+  object; AG7's road piece covers it and fills under those stretches.
+- **Crossings by need** (`junctions.plan_signals`, `plan_crossings`; per district
+  `junctions.signals` and `junctions.crosswalks`: auto, fewer, none): signals where two
+  primary roads meet; where a street meets a primary road (or a four-way street crossing in
+  the corporate core, transit hub and midtown) only with no signalized junction within
+  `SIGNAL_SPACING_M` 120 m along either road (`straight_on`; 200 m in the old town and
+  entertainment market, `SPARSE_ARCH`; twice that for "fewer"), greedily from the west, both
+  ways round; crosswalks on every approach of a signalized junction and across an
+  unsignalized junction's avenue where none is within the spacing; widths by class (street
+  3 m, avenue and highway 4 m, 5 m on a downtown avenue, none on alleys and service roads,
+  `crosswalk_w`); unmarked crossings elsewhere.
+- **Checks** (98 in all with M21's two and M16's three, 103 with decks): `ramp_grades`
+  (ramps 8%, runs and approaches 7%; `road_grades` caps every road at 8%), `junction_levels`
+  (every leg meets its junction's surface within 2 cm where it leaves, the surface level
+  across it within its class's cross slope, 2.5% primary, 3% else, the curb between two legs
+  running evenly from one's height to the other's), `crossing_spacing` (signals and marked
+  crossings only where called for and spaced, crosswalk widths); `ground_grades` lets a road
+  be as steep as its own z profile; the reports give each city try's failing checks
+  (`city_tries[].failed`) and the stats `elevated.grades`, `embankments`, `junction_levels`.
+- **Found on the new layouts:** M9's pedestrian underpasses keep their passage off column
+  footings (`tunnels._underpasses`: a transit column in a highway's median); AG7's junction
+  piece leaves out a sidewalk corner pad that would fold over an earlier one
+  (`walks._corners`); AG3's `Band.rehome` drops the ground windows a moved door takes the
+  place of (it looked for kind `window`, the windows are `win`, so a rehomed door never
+  found room among them: the small test city's new layout left a villa's entrance with no
+  door; `GEN_VERSION` ag5.2); M10's override edits drop the walkways that hang on a building
+  or skybridge they remove (`overrides._drop`: door, lobby and elevator links, the deck), and
+  in a regeneration a junction its held roads meet at one height takes it
+  (`junctions._held_heights`: the old build raised it, M1b gives the node back lower);
+  lights and furniture stand on an embankment (the props' headroom reads
+  `vegetation.overhead(..., fill=False)`, their ground structures leave it out: its road's
+  own keep-outs cover it) while trees keep off it (`overhead` with `fill`, as the
+  tree-clearance check), and M2's crossing locks and overhead test measure on plain arithmetic
+  (`junctions._crossings`, `_overhead`: `terrain.crossings` projects with GEOS and runs
+  after M2). On the merged layout a deck's skybridges clear its ramps (`Ctx.sky_roads`, from
+  the deck top) and every level's keep out of the district's buildings on its other levels
+  (`skybridges.Space(..., others)`). `GEN_VERSION` m18.2 (on M21's m21.1 and the assetgen
+  fixes' agfix.1); AG13's ground scatter keeps clear of a neighbouring piece's desire line
+  that reaches across its tile's seam (`ground.gather` `desire_near`, as the clearance check
+  does). Merged with M21, M16, the assetgen fixes and AG13.
+Sample builds: `docs/progress/M18/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.

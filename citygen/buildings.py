@@ -271,6 +271,8 @@ class Ctx:
     complexes: tuple = ()
     landmarks: list = field(default_factory=list)
     roads: list = field(default_factory=list)       # (id, class, line, width, z max)
+    sky_roads: list = field(default_factory=list)   # as roads, cleared by skybridges only
+    #                                                 (M14: a deck's ramps, from its top)
     junctions: list = field(default_factory=list)   # polygons
     water: list = field(default_factory=list)       # (id, polygon, clearance)
     opens: list = field(default_factory=list)       # (id, kind, polygon) landmark hosts
@@ -1732,7 +1734,7 @@ def phase_c(job: dict) -> dict:
     with G.canonical():
         cx = _prepare(job["ctx"])
         out = {"buildings": sorted(job["sky"], key=lambda r: r["id"]),
-               "forced": job["forced"]}
+               "forced": job["forced"], "others": job.get("others", [])}
         SB.district_skybridges(cx, out)
         rows = to_rows({"buildings": [], "properties": [],
                         "skybridges": out["skybridges"]}, cx.did)

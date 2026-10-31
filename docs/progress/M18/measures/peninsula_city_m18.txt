@@ -1,0 +1,44 @@
+== dead ends
+dead ends by class: {'highway': 1, 'avenue': 2, 'street': 42, 'service': 10, 'pedestrian': 27}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 6, 'service': 2, 'pedestrian': 5}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 5 Counter({'road': 2, 'pedestrian': 2, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 5
+Counter({'alley': 3, 'street': 2})
+   ('rs.w1044n4', 'street', 'd04.lm.w1070s44.bld', 44.2, 0.0, 4.0)
+   ('rs.w1088s95', 'street', 'd04.lm.w1070s44.bld', 44.5, 0.0, 4.0)
+   ('rs.w1072s125', 'alley', 'd04.lm.w1070s44.bld', 20.1, 0.0, 4.0)
+   ('rs.w1078s69', 'alley', 'd04.lm.w1070s44.bld', 18.1, 0.0, 4.0)
+   ('rs.w1067s13', 'alley', 'd04.lm.w1070s44.bld', 18.0, 0.0, 4.0)
+== junction levels
+junctions: 794 with a leg not at the node's height at the junction edge: 16 with a leg's end not at the node's z: 0
+== junction control
+   ('Eastside Docks', False, False) 36
+   ('Eastside Docks', True, True) 11
+   ('Hook Spaceport', False, False) 15
+   ('Hook Spaceport', False, True) 2
+   ('Hook Spaceport', True, True) 8
+   ('Lantern Strip', False, False) 349
+   ('Lantern Strip', True, True) 13
+   ('Neckgate', False, False) 58
+   ('Neckgate', False, True) 3
+   ('Neckgate', True, True) 38
+   ('The Stacks', False, False) 113
+   ('The Stacks', False, True) 2
+   ('The Stacks', True, True) 14
+   ('Wallgate Heights', False, False) 114
+   ('Wallgate Heights', True, True) 18
+crosswalk widths: Counter({4.0: 169, 3.0: 92, 5.0: 70})
+junctions with crosswalks: 109 of them within 40 m of another: 2
+== signs
+Counter({('shop_sign', 'blade'): 5120, ('shop_sign', 'facade'): 1747, ('billboard', 'roof'): 574, ('neon', 'facade'): 281, ('billboard', 'facade'): 147, ('holo_ad', 'roof'): 29})
+== transit supports
+  tl.spine_tube sky_tube: length 1525 m, supports 6, gap median 66 max 876 m, off the line max 0.0 m (>2 m: 0)
+  tl.east_shore_line elevated_rail: length 2715 m, supports 86, gap median 32 max 130 m, off the line max 14.1 m (>2 m: 39)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 0

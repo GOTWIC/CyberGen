@@ -115,8 +115,13 @@ def gather(cx: Ctx, s) -> Piece:
         # M14 (AG10): the walkways beside a deck's ramp, which the ramp carries
         inputs["ramp_walks"] = [{"id": w.id, "line": [list(p) for p in w.line]}
                                 for w in cx.ramp_walks.get(s.id, ())]
+    # M18: the model's embankments under its low stretches (the piece stands for them)
+    emb = sorted((st for st in cx.m.structures if st.kind == "embankment" and
+                  (st.attrs or {}).get("road_id") == s.id), key=lambda st: st.id)
+    if emb:
+        inputs["embankments"] = [[st.attrs["s0_m"], st.attrs["s1_m"]] for st in emb]
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
-                 cx.keys.get(s.id, []), inputs)
+                 cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +276,9 @@ def _make(inp: dict, tidy: bool) -> Out:
             _median(rd, mesh, inp, stops)
     if dk == "deck":
         _deck(rd, mesh, inp)
+        for a, b in inp.get("embankments", ()):
+            if min(b, rd.s1) - max(a, rd.s0) >= 0.5:
+                _embankment(rd, mesh, max(a, rd.s0), min(b, rd.s1))
     elif dk == "embankment":
         _embankment(rd, mesh)
     elif dk == "ramp":
@@ -608,11 +616,13 @@ def _deck_ramp(rd: Road, mesh: Mesh, inp: dict) -> dict:
     return out
 
 
-def _embankment(rd: Road, mesh: Mesh):
+def _embankment(rd: Road, mesh: Mesh, s0: float = 0.0, s1: float | None = None):
+    """Retained fill under the road from s0 to s1 (all of it by default): its two faces
+    from the road's edge down into the ground."""
     W2 = rd.W / 2.0
     for side in (1.0, -1.0):
         rows, uvs, exp = [], [], []
-        for s, vi in rd.stations(0.0, rd.L):
+        for s, vi in rd.stations(s0, rd.L if s1 is None else s1):
             x, y = rd.at(s, side * W2, vi)
             _, _, nx, ny, _ = rd.path.frame(s, vi)
             top = rd.z(s) + (0.15 if rd.side > 0 else 0.0)

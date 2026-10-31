@@ -1,0 +1,39 @@
+== dead ends
+dead ends by class: {'highway': 3, 'street': 55, 'service': 13, 'alley': 16, 'pedestrian': 29}
+of them, another road within 60 m straight ahead: {'street': 10, 'service': 3, 'alley': 4, 'pedestrian': 26}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 9 Counter({'road': 6, 'pedestrian': 3})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1828 with a leg not at the node's height at the junction edge: 34 with a leg's end not at the node's z: 0
+== junction control
+   ('Crown Heights', False, False) 64
+   ('Crown Heights', False, True) 1
+   ('Crown Heights', True, True) 36
+   ('Hollow', False, False) 109
+   ('Hollow', True, True) 40
+   ('Lantern Steps', False, False) 536
+   ('Lantern Steps', False, True) 2
+   ('Lantern Steps', True, True) 13
+   ('Low Harbor', False, False) 47
+   ('Low Harbor', False, True) 1
+   ('Low Harbor', True, True) 7
+   ('Old Quarter', False, False) 832
+   ('Old Quarter', False, True) 1
+   ('Old Quarter', True, True) 15
+   ('Ridgeback', False, False) 105
+   ('Ridgeback', False, True) 1
+   ('Ridgeback', True, True) 18
+crosswalk widths: Counter({3.0: 211, 4.0: 193, 5.0: 68})
+junctions with crosswalks: 135 of them within 40 m of another: 0
+== signs
+Counter({('shop_sign', 'blade'): 11203, ('shop_sign', 'facade'): 4873, ('billboard', 'roof'): 1629, ('neon', 'facade'): 828, ('billboard', 'facade'): 332, ('holo_ad', 'roof'): 53})
+== transit supports
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 1
