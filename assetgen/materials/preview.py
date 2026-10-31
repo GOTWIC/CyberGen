@@ -209,8 +209,8 @@ STONES_R = 320.0         # ... and its riprap stones within this of its eye
 
 def water_views(model, man: dict, width: int) -> list[dict]:
     """AG12's shows (`--views water`): `water_canal`, along the longest quayed canal from
-    over its water; `water_bank`, a river's longest natural or riprap bank from the land
-    beside it; `water_harbor`, the biggest harbor basin (else the sea's harbor water) from
+    over its water; `water_bank`, a river's longest natural or riprap bank from over the
+    water beside it; `water_harbor`, the biggest harbor basin (else the sea's harbor water) from
     above."""
     from citygen import geom as G
     from ..streets.ctx import Ground
@@ -249,10 +249,11 @@ def water_views(model, man: dict, width: int) -> list[dict]:
         tx, ty = _dir(pts, s, 50.0)
         lx, ly = -ty, tx                          # (the water's side, left of the line)
         z = level(k.water_id, x, y)
-        g = gd.at(x, y)
-        eye = [x - lx * 4.0, y - ly * 4.0, g + 2.4]
-        tgt = [x + lx * (k.width_m + 10.0) + tx * 45.0, y + ly * (k.width_m + 10.0) + ty * 45.0,
-               z]
+        # (from over the water beside it, looking along it: a hedge or a wall on the land side
+        # would hide the slope)
+        eye = [x + lx * (k.width_m + 7.0), y + ly * (k.width_m + 7.0), z + 2.2]
+        tgt = [x + lx * (k.width_m * 0.4) + tx * 40.0, y + ly * (k.width_m * 0.4) + ty * 40.0,
+               z + 0.2]
         out.append({"name": "water_bank", "ortho": False, "lens": 28.0, "eye": eye,
                     "target": tgt, "w": width, "h": h, "shell_tiles": tiles((x, y))})
     basins = [w for w in model.waterways if w.kind in ("basin", "marina")]

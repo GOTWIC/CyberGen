@@ -9,7 +9,7 @@ The full record: [`docs/assetgen_milestones.md`](../../assetgen_milestones.md), 
 | | By day | By night |
 |---|---|---|
 | A quayed canal, along its straightest stretch from 2.6 m over the water | [`water_canal.jpg`](vesper_bay/water_canal.jpg) | [`water_canal_night.jpg`](vesper_bay/water_canal_night.jpg) |
-| The Vess River's natural bank, from the land beside it | [`water_bank.jpg`](vesper_bay/water_bank.jpg) | [`water_bank_night.jpg`](vesper_bay/water_bank_night.jpg) |
+| The Vess River's natural bank, from over the water beside it | [`water_bank.jpg`](vesper_bay/water_bank.jpg) | [`water_bank_night.jpg`](vesper_bay/water_bank_night.jpg) |
 | The harbor basins from above | [`water_harbor.jpg`](vesper_bay/water_harbor.jpg) | [`water_harbor_night.jpg`](vesper_bay/water_harbor_night.jpg) |
 
 The same at 7680 px in [`vesper_bay/8k/`](vesper_bay/8k). The ground beside the water is

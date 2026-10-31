@@ -1459,7 +1459,7 @@ every water body's surface, bed and banks, `assetgen water BUILD` (also a stage 
   two scales, the swell as a bump, the foam over the lace as a matte surface) and `caustics`;
   `assetgen materials preview --views water`: `water_canal` (along the straightest stretch of
   the longest quayed canal from 2.6 m over the water), `water_bank` (a river's longest
-  natural or riprap bank from the land beside it), `water_harbor` (the biggest basin from
+  natural or riprap bank from over the water beside it), `water_harbor` (the biggest basin from
   above); AG12's water in every textured view near it.
 
 **Samples** (on M16's builds of main at 280eb35, 3 workers, the Windows PC; triangles: the
