@@ -45,6 +45,7 @@ from ..triangulate import TriangulationError, triangulate
 from . import genome as GN
 from . import parts as PT
 from . import rings as RG
+from . import slopes as SL
 from . import systems as SY
 
 BAND_MAX = 7500              # mm: the street front's height at most
@@ -111,6 +112,29 @@ def _clear(fa, depth: int, end: int, pier: bool = True) -> int:
     base = (fa.c0 if end == 0 else fa.c1) if pier else EDGE_CLEAR
     return max(base, _corner_clear(d_in, d_out, depth),
                depth + EDGE_CLEAR if _convex(d_in, d_out) else 0)
+
+
+FACE_OWN = 3000              # a door needs this much ground in front of it clear of its own walls
+
+
+def _faces_own(sb, fa, s: int, z: int) -> bool:
+    """Whether the way straight out of the facade at s meets the building's own walls
+    within `FACE_OWN`, at the height z: a crack or narrow notch in its outline (the brief
+    classes the wall by its neighbors only). A door there opens onto its own wall, as
+    against a neighbor's, so it moves (`Band.rehome`, `leftovers`)."""
+    x, y = fa.P(min(max(s, 0), fa.L), 0)[:2]
+    a = (int(round(x + fa.nx * 150)), int(round(y + fa.ny * 150)))
+    b = (int(round(x + fa.nx * FACE_OWN)), int(round(y + fa.ny * FACE_OWN)))
+    for ms in sb.masses:
+        if ms["shape"] != "prism" or not ms["z0"] <= z < ms["z1"]:
+            continue
+        for ring in ms["rings"]:
+            n = len(ring)
+            for i in range(n):
+                p, q = ring[i], ring[(i + 1) % n]
+                if p != q and RG.seg_hit(a, b, p, q):
+                    return True
+    return False
 
 
 def _blocked(fa, a: int, b: int, depth: int, edges) -> bool:
@@ -274,6 +298,9 @@ class Band:
                     units.append((k, un, s))
         ents = []
         if fa.j is not None:
+            # (AG5: behind a temple's colonnade the hall's walls are its depth shorter; an
+            # entrance at the old corner comes onto the wall's end)
+            col = int(self.ms.get("colonnade_mm", 0))
             for k, en in enumerate(br["entrances"]):
                 at = en.get("at")
                 if at is None or at["edge"] != fa.j or k in sb.done_ents:
@@ -281,6 +308,8 @@ class Band:
                 s = int(round(at["s"] * 1000)) - so
                 if -500 <= s <= L + 500:
                     ents.append((k, en, s))
+                elif col and -500 - col <= s <= L + 500 + col and L > 4000:
+                    ents.append((k, en, min(max(s, 2000), L - 2000)))
         # a main entrance not well inside a unit keeps room for its own door: the shopfronts
         # either side of it stop short (a lobby between the shops)
         spans = [(su - wu // 2 + PIER_U, su + wu // 2 - PIER_U) for _, un, su in units
@@ -301,8 +330,10 @@ class Band:
             inside = [(ke, en, se) for ke, en, se in ents
                       if s - w // 2 <= se <= s + w // 2]
             head = self._head(fa, want_a, want_b, mounts, "shop", un)
-            # (no shopfront behind a neighbor built against the wall: its door only)
-            behind = fa.cls(min(max(s, 0), L), z0 + 1200) in ("party", "hidden")
+            # (no shopfront behind a neighbor built against the wall, or facing its own
+            # wall a step away: its door only)
+            behind = fa.cls(min(max(s, 0), L), z0 + 1200) in ("party", "hidden") or \
+                _faces_own(sb, fa, min(max(s, 0), L), z0 + 1200)
             if want_b - want_a >= SHOP_MIN and head is not None and not behind:
                 got = _fit(fa, want_a, want_b, max(SHOP_R.get(use, 250), self.reveal),
                            self.edges, taken, mounts, z0, head, 0, SHOP_MIN, self.boxes)
@@ -338,9 +369,14 @@ class Band:
                 t.info.update(entrance=k, en=en, moved=True)
                 sb.done_ents.add(k)
         taken.sort(key=lambda o: o.a)
+        if sb.slope is not None and z0 <= 50:
+            taken = SL.adjust(self, fa, taken)      # (AG5: doors and shopfronts at grade)
         # the ground row's windows where nothing else is
         if ok and self.row is not None:
-            for op in self._windows(fa, taken, mounts):
+            wins = self._windows(fa, taken, mounts)
+            if sb.slope is not None and z0 <= 50:
+                wins = SL.windows_clear(self, fa, wins)
+            for op in wins:
                 taken.append(op)
         taken.sort(key=lambda o: o.a)
         for op in taken:
@@ -374,13 +410,13 @@ class Band:
                 own = [_quad(fa, o.a, o.b, o.depth) for o in ops
                        if o.depth > 0 and o.lo <= self.z0]
                 keep, self.boxes = self.boxes, [b for b in self.boxes if b not in own]
-                taken = [o for o in ops if o.kind != "window"]
+                taken = [o for o in ops if o.kind != "win"]
                 op = self._door(fa, k, en, t, taken, self._mounts(fa), True)
                 self.boxes = keep
-                if op is None:
-                    continue
+                if op is None or fa.cls((op.a + op.b) // 2, self.z0 + 1200) in INNER:
+                    continue                   # (nor slid along the facade into one)
                 op.info["moved"] = True
-                ops[:] = sorted([o for o in ops if o.kind != "window" or not (
+                ops[:] = sorted([o for o in ops if o.kind != "win" or not (
                     o.a < op.b + GAP_MIN and o.b > op.a - GAP_MIN)] + [op], key=lambda o: o.a)
                 if op.depth > 0 and op.lo <= self.z0:
                     self.boxes.append(_quad(fa, op.a, op.b, op.depth))
@@ -466,7 +502,7 @@ class Band:
         if kind == "unit":
             info.update(unit=en["unit"], un=en["un"], use=en["un"]["use"])
             info.pop("entrance")
-        if cls not in ("party", "hidden"):
+        if cls not in ("party", "hidden") and not _faces_own(sb, fa, s, z0 + 1200):
             got = _fit(fa, s - w // 2, s + w // 2, d, self.edges, taken, mounts, lo, hi,
                        DOOR_SHIFT, 0, self.boxes if lo <= z0 else None)
             if got is None and dk in ("garage", "dock", "rollup", "gate", "main"):
@@ -487,7 +523,9 @@ class Band:
                     "main", "unit") else "structure"
                 return Op(a, b, lo, hi, "door", back, dd, info)
         else:
-            return None                    # (a neighbor against it: `leftovers` moves it)
+            # (a neighbor against it, or its own wall just ahead: `rehome` or `leftovers`
+            # moves it)
+            return None
         # flush: a door on the wall at the entrance (within the facade; a facade too short
         # for one leaves it to the nearest that has room, `leftovers`)
         w = min(w, 1200)
@@ -584,6 +622,7 @@ class Band:
         pl = buf.plane((fa.nx, fa.ny, 0.0), (fa.a[0], fa.a[1], 0), (fa.ux, fa.uy, 0.0),
                        (0.0, 0.0, 1.0), fa.u0, 0.0)
         cut = [op for op in ops if op.depth > 0]
+        fa.band_ops = [op for op in ops if op.depth > 0 or op.kind in ("door", "shop")]
         for zi, (za, zz, _) in enumerate(self.zones):
             slot = self.slot(fa, zi)
             for outer, holes in _pieces(fa.L, za, zz, cut):
@@ -676,7 +715,8 @@ class Band:
         info = op.info
         use = info["use"]
         ukey = f"{sb.bid}|u{info['unit']}"
-        w, h, r = op.b - op.a, op.hi - op.lo, op.depth
+        zp = info.get("zf", op.lo)            # (AG5: on a slope, at the ground there)
+        w, h, r = op.b - op.a, op.hi - zp, op.depth
         paint = self._paint(ukey)
         frame = FRAME_SLOT[self.genes["front_frame"]] or paint
         if use in ("clinic", "cyberware"):
@@ -760,7 +800,7 @@ class Band:
                      fslot="fascia" if _u(ukey, "fascia.trim") < 0.4 else paint)
         if use == "lobby" and r < 2000:
             p["door"] = "glass"
-        sb.parts.on(fa, "shopfront", p, mid, op.lo)
+        sb.parts.on(fa, "shopfront", p, mid, zp)
         sb.used["front"]["shops"] = True
         sb.stats["storefronts"] += 1
         self._record_door(fa, op, mid + dx, dw, dh, info, kind="shop")
@@ -794,7 +834,8 @@ class Band:
         sb = self.sb
         info = op.info
         dk = info["door"]
-        w, h, r = op.b - op.a, op.hi - op.lo, op.depth
+        zp = info.get("zf", op.lo)            # (AG5: on a slope, at the ground there)
+        w, h, r = op.b - op.a, op.hi - zp, op.depth
         flush = bool(info.get("flush"))
         mid = (op.a + op.b) // 2
         p = {"w": PT.q(w), "h": PT.q(h), "r": r}
@@ -825,7 +866,7 @@ class Band:
             p.update(kind="gate", slot="door_metal")
         if flush:
             p["r"] = 0
-        sb.parts.on(fa, "door", p, mid, op.lo)
+        sb.parts.on(fa, "door", p, mid, zp)
         dh = p.get("dh", h)
         self._record_door(fa, op, mid, w, dh, info, kind=dk, lift=lift)
         if dk == "main" and not flush:
@@ -862,17 +903,20 @@ class Band:
             ids.append(f"e{info['entrance']}")
         if "unit" in info:
             ids.append(f"u{info['unit']}")
-        x, y, _ = fa.P(s, op.lo)
+        zp = info.get("zf", op.lo)
+        x, y, _ = fa.P(s, zp)
         rec = {"id": f"{sb.bid}.door.{ids[0]}", "kind": kind if kind != "unit" else "shop",
                "entrance": info.get("entrance"), "unit": info.get("unit"),
                "use": (info.get("un") or {}).get("use"),
                "walkway_id": (en or {}).get("walkway_id"),
-               "pos": [x, y, op.lo + lift], "normal": [round(fa.nx, 6), round(fa.ny, 6)],
+               "pos": [x, y, zp + lift], "normal": [round(fa.nx, 6), round(fa.ny, 6)],
                "w": int(w), "h": int(h), "depth": op.depth, "steps": lift // 150,
                "flush": bool(info.get("flush")), "moved": bool(info.get("moved")),
                "edge": fa.j,
                "s": int(s + fa.soff), "class": fa.cls(min(max(s, 0), fa.L),
                                                      op.lo + 1200)}
+        if self.ms.get("colonnade_mm"):
+            rec["under"] = int(self.ms["colonnade_mm"])    # (AG5: behind a colonnade)
         sb.doors.append(rec)
 
 
@@ -1024,9 +1068,10 @@ def leftovers(sb) -> None:
                 continue
             px, py = ax + fa.ux * t, ay + fa.uy * t
             d = math.hypot(px - x, py - y)
-            # (a wall a door fits under and open first: a door against a neighbor, into a
-            # court or on a low platform only where there is no other)
-            wall = fa.cls(t, ms["z0"] + 1200) in ("party", "hidden", "blind") + INNER
+            # (a wall a door fits under and open first: a door against a neighbor or its own
+            # wall, into a court or on a low platform only where there is no other)
+            wall = fa.cls(t, ms["z0"] + 1200) in ("party", "hidden", "blind") + INNER or \
+                _faces_own(sb, fa, t, ms["z0"] + 1200)
             key = (hh < 1800, wall, round(d), fa.j if fa.j is not None else -1, t)
             if best is None or key < best[0]:
                 best = (key, fa, ms, t)
@@ -1108,7 +1153,8 @@ def hardware(sb) -> None:
         sl = min(max(s - fa.soff, w), fa.L - w)
         if _open_at(sb, at["edge"], s - w // 2, s + w // 2, z - h, z + h):
             continue
-        sb.parts.on(fa, "mount", {"style": "plate", "w": w, "h": h}, sl, z - h // 2)
+        sb.parts.on(fa, "mount", {"style": "plate", "w": w, "h": h}, sl,
+                    _on_mass(ms, z - h // 2, h))
         sb.stats["mount_plates"] = sb.stats.get("mount_plates", 0) + 1
     for pl in br["plants"]:
         at = pl.get("at")
@@ -1128,8 +1174,15 @@ def hardware(sb) -> None:
         sl = min(max(s - fa.soff, w // 2 + 50), fa.L - w // 2 - 50)
         if _open_at(sb, at["edge"], s - w // 2, s + w // 2, z, z + h):
             continue
-        sb.parts.on(fa, "mount", {"style": "trellis", "w": w, "h": h}, sl, z)
+        sb.parts.on(fa, "mount", {"style": "trellis", "w": w, "h": h}, sl, _on_mass(ms, z, h))
         sb.stats["trellises"] = sb.stats.get("trellises", 0) + 1
+
+
+def _on_mass(ms, z0: int, h: int) -> int:
+    """A mount h tall from z0, moved up or down onto its facade's mass (`_facade_at` takes
+    a facade within 0.5 m of the prop's height: a wall light just under a belt that
+    stands off the tower under it would hang its plate in the air)."""
+    return min(max(z0, ms["z0"]), ms["z1"] - h)
 
 
 def _ties(sb, p, at) -> None:
@@ -1150,7 +1203,8 @@ def _ties(sb, p, at) -> None:
             for ds in (0, 400, -400, 800, -800):
                 if not _open_at(sb, at["edge"], s + ds - 150, s + ds + 150, z - 150, z + 150):
                     sl = min(max(s + ds - fa.soff, 200), fa.L - 200)
-                    sb.parts.on(fa, "mount", {"style": "tie", "w": 200, "h": 200}, sl, z - 100)
+                    sb.parts.on(fa, "mount", {"style": "tie", "w": 200, "h": 200}, sl,
+                                _on_mass(ms, z - 100, 200))
                     sb.stats["scaffold_ties"] = sb.stats.get("scaffold_ties", 0) + 1
                     break
 
@@ -1320,7 +1374,9 @@ def mount_check(sb) -> dict:
     its brief edge, outside every opening cut there. A mount on a stretch of its edge the
     shell tidied away (a spike of the ring, all of the edge or all but a stub of it) or over
     or under every wall of its edge (a shop sign over a low building under an M14 deck, a
-    street's sign under a building on the deck) is counted apart (`tidied`, `off`)."""
+    street's sign under a building on the deck) is counted apart (`tidied`, `off`), and so
+    is one in a skybridge's landing door (AG4: M6 does not know where the bridges land;
+    `in_landing`)."""
     br = sb.br
     items = []
     for sl in br["sign_slots"]:
@@ -1335,7 +1391,12 @@ def mount_check(sb) -> dict:
         at = pl.get("at")
         if at is not None and at["d"] <= 0.5 and pl["type"].endswith("facade_greenery"):
             items.append(("greenery", pl["id"], at, pl["position"][2] + 0.5))
-    bad, nowall, tidied, off = [], 0, 0, 0
+    bad, nowall, tidied, off, landing = [], 0, 0, 0, 0
+    doors: dict[int, list] = {}
+    for sk in br["skybridges"]:
+        ld = sb.landed.get(sk["id"])
+        if ld and sk.get("at") is not None:
+            doors.setdefault(sk["at"]["edge"], []).append(ld)
     span: dict[int, tuple[int, int]] = {}
     for fa, ms in sb.all_facades:
         lo, hi = span.get(fa.j, (ms["z0"], ms["z1"]))
@@ -1357,11 +1418,15 @@ def mount_check(sb) -> dict:
             nowall += 1
             bad.append(f"{kind} {iid} (no wall)")
             continue
+        if any(abs(s - ld["s"]) < ld["w"] // 2 + 300 and ld["z"] <= zz <= ld["z"] + ld["h"]
+               for ld in doors.get(at["edge"], ())):
+            landing += 1
+            continue
         if any(a + 1 < s < b - 1 and lo + 1 < zz < hi - 1
                for a, b, lo, hi in sb.opened.get(at["edge"], ())):
             bad.append(f"{kind} {iid}")
     return {"mounts": len(items), "on_glass": len(bad) - nowall, "no_wall": nowall,
-            "tidied": tidied, "off": off, "first": bad[:3]}
+            "tidied": tidied, "off": off, "in_landing": landing, "first": bad[:3]}
 
 
 def door_check(sb) -> dict:

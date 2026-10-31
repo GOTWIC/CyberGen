@@ -43,12 +43,31 @@ class Floors(_M):
     height_m: float | None
 
 
+class Arc(_M):
+    """M21: a curved stretch of the footprint (in the building frame)."""
+    center: tuple[float, float]
+    radius_m: float
+    start_deg: float
+    sweep_deg: float
+
+
+class Plate(_M):
+    """M21: a band's plate against its form's base plate (turned and scaled about the form's
+    pivot, then moved)."""
+    turn_deg: float
+    scale: float
+    shift_m: tuple[float, float]
+
+
 class Mass(_M):
     role: str
     shape: str
     z: tuple[float, float]
     footprint: Polygon
     floors: Floors
+    arcs: list[Arc] | None = Field(None, description="M21: its curved stretches (absent: none).")
+    plate: Plate | None = Field(None, description="M21: a band of a twisted, tapered or leaning "
+                                                  "shaft (absent: none).")
 
 
 class Region(_M):
@@ -117,6 +136,27 @@ class Portal(_M):
     line_id: str
     z: tuple[float, float]
     station: bool
+    lines: list[list[P3]] = Field(description="AG4: the sky tube's top line near the tower, "
+                                               "a polyline per tube piece (building frame, z "
+                                               "from its base).")
+    diameter_m: float
+    station_id: str | None = None
+    station_name: str | None = None
+    track_z_m: float | None = Field(None, description="The sky station's track (the tube's "
+                                                      "axis), building frame.")
+    platform: Polygon | None = Field(None, description="The sky station's platform "
+                                                       "footprint (M5), building frame.")
+
+
+class Clearance(_M):
+    """AG4: a corridor the asset keeps out of (a skybridge, a transit guideway and its
+    trains, a sky tube), near the building: a line of (x, y, z floor, z top) in the building
+    frame and a half width."""
+    kind: Literal["skybridge", "guideway", "sky_tube"]
+    id: str
+    mode: str
+    half_m: float
+    line: list[tuple[float, float, float, float]]
 
 
 class SkybridgeEnd(_M):
@@ -231,6 +271,17 @@ class FloorGrid(_M):
                                                    "on (absent on the ground).")
 
 
+class Form(_M):
+    """M21: how the building departs from a box (citygen's `Building.form`)."""
+    kind: str
+    crown: str
+    tower: bool
+    band: int
+    pivot: tuple[float, float] | None
+    masses: list[int]
+    params: dict[str, Any]
+
+
 class BuildingRec(_M):
     type: str
     use: str
@@ -245,6 +296,7 @@ class BuildingRec(_M):
     height_m: float
     style: dict[str, Any]
     floor_grid: FloorGrid
+    form: Form | None = Field(None, description="M21: the building's form (absent: none).")
 
 
 class SpecSection(_M):
@@ -261,8 +313,28 @@ class SpecSection(_M):
     landmark: dict[str, Any] | None
 
 
+class Terrain(_M):
+    """AG5: on M13's slopes, the ground along each edge of a mass on the base (None for the
+    others), from its start every `step_m` and at its end, `out_m` outside it, in meters
+    over the building's base."""
+    step_m: float
+    out_m: float
+    grade: list[list[float] | None]
+
+
+class Deck(_M):
+    """AG10: the M14 deck slab a building stands on, under, beside or in: its top and
+    soffit over the building's pivot, and the slab's plan within 3 m of the building's box
+    (its frame)."""
+    id: str
+    role: Literal["on", "under", "near", "through"]
+    top_m: float
+    underside_m: float
+    slab: list[Polygon]
+
+
 class Brief(_M):
-    brief_version: Literal[1]
+    brief_version: Literal[2]
     id: str
     origin: P2
     building: BuildingRec
@@ -284,6 +356,11 @@ class Brief(_M):
     district: District | None
     spec: SpecSection
     override: dict[str, Any] | None
+    clearances: list[Clearance] = Field(default_factory=list)
+    terrain: Terrain | None = Field(None, description="AG5: the ground along the base's "
+                                                      "edges (M13's slopes only).")
+    deck: Deck | None = Field(None, description="AG10: an M14 deck's slab it stands on, "
+                                                "under, beside or in (decks only).")
 
 
 def json_schema() -> dict:

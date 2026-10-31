@@ -71,6 +71,8 @@ HASH_TAG = "cg.hash"
 # unchanged build applies the change (stored hashes are "<version>.<content hash>")
 MESH_VERSION = "3"
 ACTOR_VERSION = "1"
+SWIM_BRUSH_CM = 200.0   # the cube brush a volume spawned from its class gets (CubeBuilder)
+SWIM_FRICTION = 0.3
 GRAPH_VARS = [("City", "string"), ("Graph", "name"), ("Hash", "string"), ("Ids", "[name"),
               ("Kinds", "[name"), ("Refs", "[name"), ("Widths", "[real"),
               ("PointStart", "[int"), ("Points", "[vector"), ("LinkStart", "[int"),
@@ -82,12 +84,16 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "5"                 # AG6: textured masters; AG8: leaves, textured holo
+STAGE2_VERSION = "7"                 # AG6: textured masters; AG8: leaves, textured holo;
+                                     # AG5: the heroes' masks (HeroMask on UV1);
+                                     # AG12: water (Single Layer Water) and bed (caustics)
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
-# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without)
-PRUNE_FILES = 500
+# a pack rename left took it over 90 minutes with the city loaded, 1000 over 6 without; a first
+# import's unused family variants, 200 to 300, 76 to 313 s), and loading the city again after
+# it takes 15 to 30 s
+PRUNE_FILES = 50
 EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
@@ -446,6 +452,16 @@ c = lerp(c, float3(0.03, 0.03, 0.028), s * 0.6);
 if (Stains > 0.5) { c = lerp(c, Stain.rgb, Stain.a * Gate.z); }
 return c;
 """
+# AG5: a hero's U2 mask on UV1 (grime, leaks, wear), where its instance sets HeroMaskOn
+HERO_CODE = """
+float3 c = C;
+if (On > 0.5) {
+  c = lerp(c, float3(0.045, 0.04, 0.032), Mask.r * 0.55);
+  c = lerp(c, c * float3(0.62, 0.58, 0.52), Mask.g * 0.7);
+  c = lerp(c, c * 1.18 + 0.02, Mask.b * 0.35);
+}
+return c;
+"""
 UV_CODE = "return UV / max(TileM, 0.01) + float2(Seed * 37.3, Seed * 71.9);"
 MACRO_UV_CODE = "return float2(WP.x, -WP.y) / 6400.0;"
 STREAK_UV_CODE = """
@@ -514,6 +530,195 @@ return Interior * lerp(day, nite * 1.2, Night);
 """
 DECAL_UV_CODE = "return (frac(UV) + float2(fmod(Cell, Cols), floor(Cell / Cols))) / float2(Cols, Rows);"
 
+# AG12: the water. A surface's mesh carries UV0 the plan in meters, UV1 the current (m/s, x
+# east, y north: Unreal's y is -north), COLOR_0 foam, depth over 12 m and the sea's wave
+# weight (M16's exposure, nothing at the waterline). Waves: four Gerstner waves on absolute
+# world position (centimeters), weighted by the vertex's wave weight, faded out from 150 to
+# 350 m from the camera (a coarser LOD's edges then meet a finer one's, which no longer moves).
+WAVE_CODE = """
+float3 p = WP;
+float3 off = float3(0, 0, 0);
+float2 dirs[4] = {float2(0.83, 0.56), float2(-0.42, 0.91), float2(0.97, -0.24), float2(0.2, 0.98)};
+float ls[4] = {1.0, 0.61, 0.37, 1.43};
+float as_[4] = {0.5, 0.28, 0.14, 0.35};
+float fade = saturate(1.0 - (length(CamPos - p) - 15000.0) / 20000.0);
+float amp = Height * 100.0 * W * fade;
+for (int i = 0; i < 4; i++) {
+  float L = max(Length * 100.0 * ls[i], 100.0);
+  float k = 6.2831853 / L;
+  float c = sqrt(980.0 / k);
+  float a = amp * as_[i];
+  float q = 0.6 / (k * max(a, 0.001) * 4.0 + 0.001);
+  q = min(q, 1.0);
+  float f = k * (dot(dirs[i], p.xy) - c * T);
+  off.xy += q * a * dirs[i] * cos(f);
+  off.z += a * sin(f);
+}
+return off;
+"""
+WAVE_NORMAL_CODE = """
+float3 p = WP;
+float2 g = float2(0, 0);
+float2 dirs[4] = {float2(0.83, 0.56), float2(-0.42, 0.91), float2(0.97, -0.24), float2(0.2, 0.98)};
+float ls[4] = {1.0, 0.61, 0.37, 1.43};
+float as_[4] = {0.5, 0.28, 0.14, 0.35};
+float fade = saturate(1.0 - (length(CamPos - p) - 15000.0) / 20000.0);
+float amp = Height * 100.0 * W * fade;
+for (int i = 0; i < 4; i++) {
+  float L = max(Length * 100.0 * ls[i], 100.0);
+  float k = 6.2831853 / L;
+  float c = sqrt(980.0 / k);
+  float f = k * (dot(dirs[i], p.xy) - c * T);
+  g += dirs[i] * (k * amp * as_[i] * cos(f));
+}
+// two ripple samples along the current (a flow map's two phases), and the waves' slope
+float3 r = normalize(lerp(N0, N1, Blend));
+float3 n = float3(r.xy * Ripple - float2(g.x, -g.y), r.z);
+return normalize(n);
+"""
+FLOW_UV_CODE = """
+float2 v = Flow * Scale;
+float ph = frac(T * 0.08 + Off);
+return float3(UV / max(TileM, 0.1) - v * ph * 0.6, ph);
+"""
+FOAM_CODE = """
+float depthFoam = saturate(1.0 - VC.g * 12.0 / 0.6) * 0.6;
+float m = saturate(VC.r * Amount + depthFoam);
+float t = saturate(Tex.r * 1.4 + Tex.g * 0.6 + Tex.b * 0.5);
+return saturate(m * (0.35 + t) - 0.15) * step(0.02, m);
+"""
+CAUSTIC_CODE = """
+float d = Depth.x;
+float2 p = WP.xy / 100.0;
+float2 a = p / TileM + float2(0.031, 0.023) * T;
+float2 b = p / (TileM * 1.37) - float2(0.019, 0.029) * T;
+float3 ca = CA.Sample(CASampler, a).rgb;
+float3 cb = CA.Sample(CASampler, b).rgb;
+float c = min(ca.r, cb.g) * 2.5 + ca.b * 0.15;
+float under = step(0.08, d) * saturate(1.0 - d / 9.0);
+return float3(0.9, 0.95, 1.0) * c * under * (1.0 - Night) * Strength;
+"""
+
+
+def water_master(m, defaults):
+    """AG12's `M_CgWater`: Single Layer Water. The kind's scattering and absorption (its
+    color deepening with the depth behind the surface, which the shading model measures);
+    ripple normals scrolled along the current in two phases of a flow map; foam from the
+    vertex mask (walls, waterlines, piers) and the shallows (the vertex depth), drawn over the
+    water by Opacity; the sea's waves by world position offset. Falls back to an opaque
+    reflective water where this engine's Python lacks the shading model's output node."""
+    MP = unreal.MaterialProperty
+    uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2600, 0, coordinate_index=0)
+    uv1 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2600, 120, coordinate_index=1)
+    vc = expr(m, unreal.MaterialExpressionVertexColor, -2600, 260)
+    tm = expr(m, unreal.MaterialExpressionTime, -2600, 400)
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -2600, 520)
+    cam = expr(m, unreal.MaterialExpressionCameraPositionWS, -2600, 640)
+    tile = sparam(m, "RippleTileM", -2600, 760, 8.0)
+    fs = sparam(m, "FlowScale", -2600, 840, 1.0)
+    # (Unreal's y is citygen's -y: the current's y turns over)
+    flip = expr(m, unreal.MaterialExpressionMultiply, -2400, 120)
+    link(uv1, "", flip, "A")
+    fl2 = expr(m, unreal.MaterialExpressionConstant2Vector, -2600, 920, r=1.0, g=-1.0)
+    link(fl2, "", flip, "B")
+    uvs = []
+    for k, off in enumerate((0.0, 0.5)):
+        c = custom(m, -2200, 100 + 200 * k, FLOW_UV_CODE, ["UV", "Flow", "Scale", "TileM",
+                                                            "T", "Off"], cmot(F3), f"CgFlowUV{k}")
+        o = expr(m, unreal.MaterialExpressionConstant, -2400, 300 + 80 * k, r=off)
+        for a, b in ((uv0, "UV"), (flip, "Flow"), (fs, "Scale"), (tile, "TileM"), (tm, "T"),
+                     (o, "Off")):
+            link(a, "", c, b)
+        mk = expr(m, unreal.MaterialExpressionComponentMask, -2000, 100 + 200 * k, r=True,
+                  g=True, b=False, a=False)
+        link(c, "", mk, "Input")
+        uvs.append((c, mk))
+    n0 = tparam(m, "NormalTex", "normal", -1800, 0, uvs[0][1], defaults)
+    n1 = tparam(m, "NormalTex", "normal", -1800, 300, uvs[1][1], defaults)
+    ph = expr(m, unreal.MaterialExpressionComponentMask, -1800, 600, r=False, g=False, b=True,
+              a=False)
+    link(uvs[0][0], "", ph, "Input")
+    blend = custom(m, -1600, 600, "return abs(P * 2.0 - 1.0);", ["P"], cmot(F1), "CgFlowBlend")
+    link(ph, "", blend, "P")
+    height = sparam(m, "WaveHeight", -2600, 1000, 0.0)
+    length = sparam(m, "WaveLength", -2600, 1080, 26.0)
+    wmask = expr(m, unreal.MaterialExpressionComponentMask, -2400, 1150, r=False, g=False,
+                 b=True, a=False)
+    link(vc, "", wmask, "Input")
+    ripple = sparam(m, "RippleStrength", -2600, 1240, 0.6)
+    wn = custom(m, -1300, 300, WAVE_NORMAL_CODE, ["WP", "CamPos", "T", "Height", "Length",
+                                                  "W", "N0", "N1", "Blend", "Ripple"],
+                cmot(F3), "CgWaveNormal")
+    for a, out, b in ((wp, "", "WP"), (cam, "", "CamPos"), (tm, "", "T"), (height, "", "Height"),
+                      (length, "", "Length"), (wmask, "", "W"), (n0, "RGB", "N0"),
+                      (n1, "RGB", "N1"), (blend, "", "Blend"), (ripple, "", "Ripple")):
+        link(a, out, wn, b)
+    wpo = custom(m, -1300, 900, WAVE_CODE, ["WP", "CamPos", "T", "Height", "Length", "W"],
+                 cmot(F3), "CgWaves")
+    for a, b in ((wp, "WP"), (cam, "CamPos"), (tm, "T"), (height, "Height"), (length, "Length"),
+                 (wmask, "W")):
+        link(a, "", wpo, b)
+    fuv = custom(m, -2200, 1400, "return UV / 4.0 + float2(0.013, 0.007) * T;", ["UV", "T"],
+                 cmot(F2), "CgFoamUV")
+    link(uv0, "", fuv, "UV")
+    link(tm, "", fuv, "T")
+    ftex = tparam(m, "FoamTex", "mask", -1900, 1400, fuv, defaults)
+    famt = sparam(m, "FoamAmount", -1900, 1700, 1.0)
+    foam = custom(m, -1300, 1400, FOAM_CODE, ["VC", "Tex", "Amount"], cmot(F1), "CgFoam")
+    for a, out, b in ((vc, "", "VC"), (ftex, "RGBA", "Tex"), (famt, "", "Amount")):
+        link(a, out, foam, b)
+    white = expr(m, unreal.MaterialExpressionConstant3Vector, -1000, -200,
+                 constant=unreal.LinearColor(0.85, 0.88, 0.9, 1.0))
+    rough = custom(m, -1000, 100, "return lerp(0.03, 0.75, F);", ["F"], cmot(F1), "CgWaterRough")
+    link(foam, "", rough, "F")
+    MEL.connect_material_property(white, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(wn, "", MP.MP_NORMAL)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    scat = vparam(m, "Scatter", -1000, 400, (0.02, 0.07, 0.08))
+    absb = vparam(m, "Absorb", -1000, 500, (0.45, 0.11, 0.08))
+    try:
+        m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
+        out = expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, -600, 450)
+        link(scat, "", out, "Scattering Coefficients")
+        link(absb, "", out, "Absorption Coefficients")
+        pg = expr(m, unreal.MaterialExpressionConstant, -800, 650, r=0.1)
+        link(pg, "", out, "PhaseG")
+        MEL.connect_material_property(foam, "", MP.MP_OPACITY)
+    except Exception as e:                    # (an engine without it: opaque water)
+        log(f"M_CgWater: no Single Layer Water ({e}); opaque water")
+        m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
+        shallow = vparam(m, "Shallow", -1000, 600, (0.16, 0.36, 0.36))
+        col = custom(m, -700, 600, "return lerp(S * 0.25, float3(0.85, 0.88, 0.9), F);",
+                     ["S", "F"], cmot(F3), "CgWaterFallback")
+        link(shallow, "", col, "S")
+        link(foam, "", col, "F")
+        MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    m.set_editor_property("two_sided", False)
+
+
+def caustics(m, uv1, defaults):
+    """AG12: the bed master's caustics (emissive): the water atlas's two networks scrolled
+    across each other on the world plan, under the water only (UV1.x, the depth), fading
+    with depth and by night."""
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -2400, 3200)
+    tm = expr(m, unreal.MaterialExpressionTime, -2400, 3300)
+    tile = sparam(m, "CausticTileM", -2400, 3400, 3.0)
+    st = sparam(m, "CausticStrength", -2400, 3480, 0.6)
+    nt = night(m, -2400, 3560)
+    tex = expr(m, unreal.MaterialExpressionTextureObjectParameter, -2400, 3650,
+               parameter_name="Caustics")
+    if defaults.get("mask") is not None:
+        tex.set_editor_property("texture", defaults["mask"])
+    c = custom(m, -1300, 3300, CAUSTIC_CODE, ["Depth", "WP", "T", "TileM", "Strength",
+                                              "Night", "CA"], cmot(F3), "CgCaustics")
+    for a, b in ((uv1, "Depth"), (wp, "WP"), (tm, "T"), (tile, "TileM"), (st, "Strength"),
+                 (nt, "Night"), (tex, "CA")):
+        link(a, "", c, b)
+    return c
+
+
 
 def tint_color(m, x, y):
     """The float3 color of TINT_CODE and its parameters."""
@@ -540,25 +745,42 @@ def tint_color(m, x, y):
     return cus
 
 
+MPC_SCALARS = (("Night", 0.0), ("Wind", 0.35))
+
+
 def mpc():
     """/Game/CityGen/Core/MPC_CityGen: `Night` (0 by day, 1 by night), which stage 3 drives;
-    the windows' rooms light, neon and signs glow with it."""
+    the windows' rooms light, neon and signs glow with it; `Wind` (AG13: 0 calm, 1 a gale),
+    which sways the grass (stage 3 drives it too). A collection without one of them gets it."""
     path = f"{CORE}/MPC_CityGen"
     if EAL.does_asset_exist(path):
-        return unreal.load_asset(path)
-    c = AT.create_asset("MPC_CityGen", CORE, unreal.MaterialParameterCollection,
-                        unreal.MaterialParameterCollectionFactoryNew())
-    p = unreal.CollectionScalarParameter()
-    p.set_editor_property("parameter_name", "Night")
-    p.set_editor_property("default_value", 0.0)
-    c.set_editor_property("scalar_parameters", [p])
-    EAL.save_loaded_asset(c)
+        c = unreal.load_asset(path)
+    else:
+        c = AT.create_asset("MPC_CityGen", CORE, unreal.MaterialParameterCollection,
+                            unreal.MaterialParameterCollectionFactoryNew())
+    have = list(c.get_editor_property("scalar_parameters"))
+    names = {str(q.get_editor_property("parameter_name")) for q in have}
+    if all(n in names for n, _ in MPC_SCALARS):
+        return c
+    for n, v in MPC_SCALARS:
+        if n not in names:
+            q = unreal.CollectionScalarParameter()
+            q.set_editor_property("parameter_name", n)
+            q.set_editor_property("default_value", v)
+            have.append(q)
+    c.set_editor_property("scalar_parameters", have)
+    EAL.save_loaded_asset(c, only_if_is_dirty=False)
     return c
 
 
 def night(m, x, y):
     return expr(m, unreal.MaterialExpressionCollectionParameter, x, y, collection=mpc(),
                 parameter_name="Night")
+
+
+def wind(m, x, y):
+    return expr(m, unreal.MaterialExpressionCollectionParameter, x, y, collection=mpc(),
+                parameter_name="Wind")
 
 
 def sparam(m, name, x, y, default=0.0, cpd=None):
@@ -658,6 +880,13 @@ def textured_surface(m, master, defaults):
         link(a, out, sur, b)
     for name, node in params.items():
         link(node, "", sur, name)
+    # AG5: a hero's mask over the surface (its own instance: HeroMask, HeroMaskOn 1)
+    uv1 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2400, 2900, coordinate_index=1)
+    hmask = tparam(m, "HeroMask", "mask", -1800, 2900, uv1, defaults)
+    hon = sparam(m, "HeroMaskOn", -1500, 2900, 0.0)
+    hero = custom(m, -700, 0, HERO_CODE, ["C", "Mask", "On"], cmot(F3), "CgHero")
+    for a, out, b in ((sur, "", "C"), (hmask, "RGBA", "Mask"), (hon, "", "On")):
+        link(a, out, hero, b)
     rough = sparam(m, "Roughness", -1500, 2650, 0.85)
     metal = sparam(m, "Metallic", -1500, 2730, 0.0)
     rc = custom(m, -1000, 400, ROUGH_CODE, ["Orm", "Macro", "Textured", "Rough", "Stains",
@@ -677,7 +906,9 @@ def textured_surface(m, master, defaults):
     link(flat, "", nl, "A")
     link(nrm, "RGB", nl, "B")
     link(params["Textured"], "", nl, "Alpha")
-    MEL.connect_material_property(sur, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(hero, "", MP.MP_BASE_COLOR)
+    if master == "bed":
+        MEL.connect_material_property(caustics(m, uv1, defaults), "", MP.MP_EMISSIVE_COLOR)
     MEL.connect_material_property(rc, "", MP.MP_ROUGHNESS)
     MEL.connect_material_property(mc, "", MP.MP_METALLIC)
     MEL.connect_material_property(nl, "", MP.MP_NORMAL)
@@ -773,6 +1004,170 @@ def glass_master(m, defaults):
     MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
 
 
+# AG13: the ground's blend weights from the tile's mask (R wear, G shade, B edge, A
+# moisture): worn over base by the wear and the edges, broken up by the base set's height;
+# the shade set (moss) where shade and wet meet; the wetness. Out: worn, shade, wet.
+GROUND_W_CODE = """
+float h = Textured > 0.5 ? B.a : 0.5;
+float wear = saturate(Mask.r * WearK * 1.25 + Mask.b * EdgeK * 0.45);
+float ww = smoothstep(h * 0.6 + 0.1, h * 0.6 + 0.35, wear);
+float wet = Mask.a * WetK;
+float ws = saturate((Mask.g - 0.45) * 1.8) * MossK * (0.5 + 0.5 * wet) * (1.0 - ww);
+return float3(ww, ws, wet);
+"""
+GROUND_C_CODE = """
+float3 b = BaseFlat;
+float3 w = WornFlat;
+float3 s = ShadeFlat;
+if (Textured > 0.5) {
+  b = B.rgb;
+  if (Tinted > 0.5) { b = lerp(b, b * Tint / max(Ref, 0.02), BO.a); }
+  b *= 0.4 + 0.6 * BO.r;
+  w = W.rgb * (0.4 + 0.6 * WO.r);
+  s = S.rgb * (0.4 + 0.6 * SO.r);
+} else if (Tinted > 0.5) {
+  b = Tint;
+}
+float3 c = lerp(lerp(b, w, Wt.x), s, Wt.y);
+c *= 0.86 + 0.28 * Macro.r;
+c *= 1.0 - 0.28 * Wt.z;
+c *= 1.0 - 0.25 * saturate(Mask.g - 0.5);
+return c;
+"""
+GROUND_R_CODE = """
+float r = Textured > 0.5 ? lerp(lerp(BO.g, WO.g, Wt.x), SO.g, Wt.y) : Rough;
+return clamp(r * (1.0 - 0.35 * Wt.z), 0.05, 1.0);
+"""
+GROUND_N_CODE = "return Textured > 0.5 ? lerp(lerp(BN, WN, Wt.x), SN, Wt.y) : float3(0, 0, 1);"
+MASK_UV_CODE = "return float2((WP.x / 100.0 - X0) / Size, (-WP.y / 100.0 - Y0) / Size);"
+# AG13: a clump's color (its slot's, toward its dry color by the vertex's dryness, darker at
+# the root, a tone per blade) and its sway: the vertex's height share squared times the
+# wind (MPC_CityGen's Wind, the slot's own Wind), two waves along the world, phased per
+# instance.
+GRASS_C_CODE = """
+float3 c = lerp(Base, Dry, VC.b);
+return c * (0.7 + 0.3 * VC.r) * (0.9 + 0.2 * VC.g);
+"""
+GRASS_WPO_CODE = """
+float k = VC.r * VC.r * Wind * Slot;
+float ph = Rand * 6.2832 + WP.x * 0.0021 - WP.y * 0.0017;
+float s = sin(T * 1.7 + ph) * 0.65 + sin(T * 3.3 + ph * 1.7) * 0.25 + 0.35;
+float3 along = float3(0.92, 0.38, 0.0) * s * k * 14.0;
+return along + float3(-0.38, 0.92, 0.0) * sin(T * 2.3 + ph * 2.1) * k * 4.0;
+"""
+
+
+def ground_master(m, defaults):
+    """AG13's ground: three sets (base, worn, shade) on UV0 / their TileM, blended per pixel
+    by the tile's mask on world x, y (GROUND_W_CODE), the base set tinted over its tinted
+    pixels where Tinted, the macro map, darker where wet or shaded."""
+    MP = unreal.MaterialProperty
+    uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -2600, 0, coordinate_index=0)
+    tex = {}
+    for k, pre in enumerate(("", "Worn", "Shade")):
+        tm = sparam(m, f"{pre}TileM", -2600, 120 + 80 * k, 2.0)
+        d = expr(m, unreal.MaterialExpressionDivide, -2400, 120 + 80 * k)
+        link(uv0, "", d, "A")
+        link(tm, "", d, "B")
+        y = -400 + 900 * k
+        tex[pre] = (tparam(m, f"{pre}BaseTex", "color", -2000, y, d, defaults),
+                    tparam(m, f"{pre}NormalTex", "normal", -2000, y + 300, d, defaults),
+                    tparam(m, f"{pre}OrmTex", "mask", -2000, y + 600, d, defaults))
+    wp = expr(m, unreal.MaterialExpressionWorldPosition, -2600, 2400)
+    ins = {"WP": wp, "X0": sparam(m, "MaskX0", -2600, 2500, 0.0),
+           "Y0": sparam(m, "MaskY0", -2600, 2580, 0.0),
+           "Size": sparam(m, "MaskSize", -2600, 2660, 256.0)}
+    muv = custom(m, -2300, 2500, MASK_UV_CODE, list(ins), cmot(F2), "CgMaskUV")
+    for k, node in ins.items():
+        link(node, "", muv, k)
+    mask = tparam(m, "Mask", "mask", -2000, 2500, muv, defaults)
+    mac_uv = custom(m, -2300, 2900, MACRO_UV_CODE, ["WP"], cmot(F2), "CgMacroUV")
+    link(wp, "", mac_uv, "WP")
+    mac = tparam(m, "Macro", "mask", -2000, 2900, mac_uv, defaults)
+    txd = sparam(m, "Textured", -1500, 2300, 0.0)
+    wts = {"WearK": 1.0, "MossK": 0.5, "EdgeK": 0.5, "WetK": 0.6}
+    w = custom(m, -1300, 1800, GROUND_W_CODE,
+               ["B", "Mask", "Textured"] + list(wts), cmot(F3), "CgGroundW")
+    link(tex[""][0], "RGBA", w, "B")
+    link(mask, "RGBA", w, "Mask")
+    link(txd, "", w, "Textured")
+    for k, (name, v) in enumerate(wts.items()):
+        link(sparam(m, name, -1500, 2400 + 80 * k, v), "", w, name)
+    cc = custom(m, -900, 0, GROUND_C_CODE,
+                ["B", "BO", "W", "WO", "S", "SO", "Mask", "Macro", "Tint", "Ref", "Tinted",
+                 "Textured", "BaseFlat", "WornFlat", "ShadeFlat", "Wt"], cmot(F3), "CgGround")
+    for a, out, b in ((tex[""][0], "RGBA", "B"), (tex[""][2], "RGBA", "BO"),
+                      (tex["Worn"][0], "RGBA", "W"), (tex["Worn"][2], "RGBA", "WO"),
+                      (tex["Shade"][0], "RGBA", "S"), (tex["Shade"][2], "RGBA", "SO"),
+                      (mask, "RGBA", "Mask"), (mac, "RGBA", "Macro"), (txd, "", "Textured"),
+                      (w, "", "Wt")):
+        link(a, out, cc, b)
+    link(vparam(m, "BaseColor", -1500, 1000, (1.0, 1.0, 1.0)), "", cc, "Tint")
+    link(vparam(m, "RefColor", -1500, 1100, (0.3, 0.3, 0.3)), "", cc, "Ref")
+    link(sparam(m, "Tinted", -1500, 1200, 0.0), "", cc, "Tinted")
+    for k, name in enumerate(("BaseFlat", "WornFlat", "ShadeFlat")):
+        link(vparam(m, name, -1500, 1300 + 100 * k, (0.25, 0.3, 0.15)), "", cc, name)
+    rc = custom(m, -900, 400, GROUND_R_CODE, ["BO", "WO", "SO", "Wt", "Textured", "Rough"],
+                cmot(F1), "CgGroundRough")
+    for a, out, b in ((tex[""][2], "RGBA", "BO"), (tex["Worn"][2], "RGBA", "WO"),
+                      (tex["Shade"][2], "RGBA", "SO"), (w, "", "Wt"), (txd, "", "Textured")):
+        link(a, out, rc, b)
+    link(sparam(m, "Roughness", -1500, 2200, 0.95), "", rc, "Rough")
+    nc = custom(m, -900, 700, GROUND_N_CODE, ["BN", "WN", "SN", "Wt", "Textured"], cmot(F3),
+                "CgGroundNormal")
+    for a, out, b in ((tex[""][1], "RGB", "BN"), (tex["Worn"][1], "RGB", "WN"),
+                      (tex["Shade"][1], "RGB", "SN"), (w, "", "Wt"), (txd, "", "Textured")):
+        link(a, out, nc, b)
+    MEL.connect_material_property(cc, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(rc, "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(nc, "", MP.MP_NORMAL)
+
+
+def grass_master(m, defaults):
+    """AG13's grass clumps: untextured, the slot's color by the vertex colors (GRASS_C_CODE),
+    two-sided, swaying by world position offset (GRASS_WPO_CODE, MPC_CityGen's Wind) and
+    dithered out as the instance fades (its cull distances), masked."""
+    MP = unreal.MaterialProperty
+    vc = expr(m, unreal.MaterialExpressionVertexColor, -1400, 0)
+    cc = custom(m, -900, 0, GRASS_C_CODE, ["Base", "Dry", "VC"], cmot(F3), "CgGrass")
+    link(vparam(m, "BaseColor", -1400, -200, (0.3, 0.45, 0.15)), "", cc, "Base")
+    link(vparam(m, "DryColor", -1400, -100, (0.6, 0.55, 0.3)), "", cc, "Dry")
+    link(vc, "", cc, "VC")
+    wpo = custom(m, -900, 400, GRASS_WPO_CODE, ["VC", "Wind", "Slot", "Rand", "WP", "T"],
+                 cmot(F3), "CgGrassWind")
+    link(vc, "", wpo, "VC")
+    link(wind(m, -1400, 300), "", wpo, "Wind")
+    link(sparam(m, "Wind", -1400, 400, 0.6), "", wpo, "Slot")
+    link(expr(m, unreal.MaterialExpressionPerInstanceRandom, -1400, 500), "", wpo, "Rand")
+    link(expr(m, unreal.MaterialExpressionWorldPosition, -1400, 600), "", wpo, "WP")
+    link(expr(m, unreal.MaterialExpressionTime, -1400, 700), "", wpo, "T")
+    MEL.connect_material_property(cc, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(sparam(m, "Roughness", -900, 250, 0.8), "", MP.MP_ROUGHNESS)
+    MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
+    fade_cls = getattr(unreal, "MaterialExpressionPerInstanceFadeAmount", None)
+    dith_cls = getattr(unreal, "MaterialExpressionDitherTemporalAA", None)
+    if fade_cls is not None and dith_cls is not None:
+        fade = expr(m, fade_cls, -1400, 900)
+        a = expr(m, unreal.MaterialExpressionOneMinus, -1200, 900)
+        link(fade, "", a, "Input")
+        d = expr(m, dith_cls, -1000, 900)
+        linked = False
+        for pin in ("AlphaThreshold", "Alpha Threshold", "Alpha"):
+            try:
+                link(a, "", d, pin)
+                linked = True
+                break
+            except RuntimeError:
+                continue
+        if linked:
+            MEL.connect_material_property(d, "", MP.MP_OPACITY_MASK)
+            m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+            m.set_editor_property("opacity_mask_clip_value", 0.3333)
+        else:
+            log("M_CgGrass: no dither input; the clumps cut off at their cull distance")
+    m.set_editor_property("two_sided", True)
+
+
 def stage2_master(master, defaults=None):
     """/Game/CityGen/Core/M_Cg<Master>. AG6's textured masters: `facade`, `metal`,
     `concrete`, `foliage`, `road` (textured_surface), `glass` (interior mapping), `neon`
@@ -780,7 +1175,10 @@ def stage2_master(master, defaults=None):
     (deferred, a cell of the decal atlas), `leaves` (AG8's leaf cards: masked by the leaf
     cover, two-sided); AG1's and AG7's `translucent` (blended, two-sided; `holo` the same
     with an emissive strength and AG6's holo ad page, AG8's holo-ads), `opaque` and
-    `emissive` (flat, an emissive strength). Each takes its color
+    `emissive` (flat, an emissive strength); AG12's `water` (Single Layer Water,
+    `water_master`) and `bed` (the textured surface with caustics); AG13's `ground` (three
+    sets blended by a tile's mask) and `grass` (vertex colored clumps swaying in
+    MPC_CityGen's Wind). Each takes its color
     from tint_color. Made, or rebuilt in place when of an older STAGE2_VERSION (its
     instances keep it as their parent)."""
     defaults = defaults or {}
@@ -794,12 +1192,18 @@ def stage2_master(master, defaults=None):
     else:
         MEL.delete_all_material_expressions(m)
     MP = unreal.MaterialProperty
-    if master in ("facade", "metal", "concrete", "foliage", "road"):
+    if master in ("facade", "metal", "concrete", "foliage", "road", "bed"):
         textured_surface(m, master, defaults)
+    elif master == "water":
+        water_master(m, defaults)
     elif master == "glass":
         glass_master(m, defaults)
     elif master == "leaves":
         leaves_master(m, defaults)
+    elif master == "ground":
+        ground_master(m, defaults)            # (AG13)
+    elif master == "grass":
+        grass_master(m, defaults)             # (AG13)
     elif master == "sign":
         uv0 = expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 0, coordinate_index=0)
         tex = tparam(m, "SignTex", "color", -700, 0, uv0, defaults)
@@ -1046,10 +1450,11 @@ class Importer:
 
     # -- meshes --
 
-    def pipeline(self, nanite=True, bake=True, pack=False):
+    def pipeline(self, nanite=True, bake=True, water=False, pack=False):
         """M15's import settings; stage 2's packs keep each mesh in its node's frame (`bake`
         off: the actor stands at the node's pivot) and build Nanite only where asked (`pack`:
-        per mesh, by the pack step)."""
+        per mesh, by the pack step); AG12's water packs keep their vertex colors and UV1 (the
+        current) at full precision, with no lightmap UVs written over it (`water`)."""
         gp = unreal.InterchangeGenericAssetsPipeline()
         gp.set_editor_property("asset_type_sub_folders", False)
         gp.set_editor_property("scene_name_sub_folder", False)
@@ -1071,6 +1476,18 @@ class Importer:
         # editor an hour to build them before its first frame (screen-space GI is enough)
         msh.set_editor_property("distance_field_resolution_scale", 0.0)
         msh.set_editor_property("max_lumen_mesh_cards", 0)
+        if water:
+            cmn = gp.get_editor_property("common_meshes_properties")
+            opt = getattr(getattr(unreal, "InterchangeVertexColorImportOption", None),
+                          "IVCIO_REPLACE", None)
+            for k, v in (("use_full_precision_u_vs", True), ("generate_lightmap_u_vs", False),
+                         ("vertex_color_import_option", opt)):
+                if v is None:
+                    continue
+                try:
+                    cmn.set_editor_property(k, v)
+                except Exception as e:          # (a property this engine version lacks)
+                    log(f"water pipeline {k}: {e}")
         stack = unreal.InterchangePipelineStackOverride()
         stack.add_pipeline(gp)
         if pack and self.pack_step is not None:
@@ -1135,7 +1552,7 @@ class Importer:
             task.save = False
             task.set_editor_property("async_", True)
             task.options = self.pipeline(nanite=any(m["nanite"] for m in pk["meshes"]),
-                                         bake=False, pack=True)
+                                         bake=False, water=pk["part"] == "water", pack=True)
             tasks.append(task)
         if not tasks:
             return
@@ -1540,14 +1957,24 @@ class Importer:
         ns = sm.get_editor_property("nanite_settings")
         shape = rec.get("shape_preservation")
         full = rec.get("fallback_full")
-        again = not self.nanite_as_asked(ns, rec) if self.fast else \
-            (bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape or full)
-        if again:                                  # (fast: the pack step set them already)
+        tgt = getattr(unreal, "NaniteFallbackTarget", None)
+        auto = getattr(tgt, "AUTO", None)
+        # (a mesh imported again keeps its Nanite settings: one whose entry no longer asks
+        # for every triangle in its fallback goes back to the automatic one)
+        stale = not full and auto is not None and \
+            ns.get_editor_property("fallback_target") != auto
+        if self.fast:                              # (the pack step set them already)
+            again = not self.nanite_as_asked(ns, rec) or stale
+        else:
+            again = bool(ns.get_editor_property("enabled")) != bool(rec["nanite"]) or shape \
+                or full or stale
+        if again:
             ns.set_editor_property("enabled", bool(rec["nanite"]))
+            if stale:
+                ns.set_editor_property("fallback_target", auto)
             if full:
                 # AG3's street fronts: complex collision is built from the fallback mesh, so
                 # the fallback keeps every triangle (doorways, steps and posts as drawn)
-                tgt = getattr(unreal, "NaniteFallbackTarget", None)
                 for k, v in (("fallback_target", getattr(tgt, "PERCENT_TRIANGLES", None)),
                              ("fallback_percent_triangles", 1.0),
                              ("fallback_relative_error", 0.0)):
@@ -1619,7 +2046,8 @@ class Importer:
             glb = os.path.join(self.build, pk["glb"])
             if not self.fast:
                 self.import_glb(glb, folder, self.pipeline(
-                    nanite=any(m["nanite"] for m in pk["meshes"]), bake=False))
+                    nanite=any(m["nanite"] for m in pk["meshes"]), bake=False,
+                    water=pk["part"] == "water"))
             st["packs_imported"] += 1
             recs = {m["asset"]: m for m in pk["meshes"]}
             for name, h in entries:
@@ -1716,11 +2144,13 @@ class Importer:
         self.stats["actors"]["deleted"] += 1
         self.keys["deleted"].append(key)
 
-    def tags(self, key, h, ids, typ, cat, tile, district, level=0):
+    def tags(self, key, h, ids, typ, cat, tile, district, level=0, form=""):
         t = [f"cg.city={self.city}", f"cg.key={key}", f"{HASH_TAG}={h}", f"cg.type={typ}",
              f"cg.category={cat}", f"cg.tile={tile}", f"cg.district={district}"]
         if level:
             t.append(f"cg.level={level}")      # (M14: on a deck)
+        if form:
+            t.append(f"cg.form={form}")        # (M21: a building's form)
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
@@ -1729,8 +2159,10 @@ class Importer:
         replaced, stage 2's, the player start and the lights)."""
         n = sum(1 for t in self.man["tiles"] for o in t["objects"] if o["key"] not in self.skip)
         n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
+        n += len(self.man.get("swim", []))
         if self.s2:
             n += len(self.s2["actors"]) + len(self.s2["instances"])
+            n += len(self.s2.get("underwater", []))       # (AG12)
         n += int(self.plays())           # (the play features' actor)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
 
@@ -1837,11 +2269,14 @@ class Importer:
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
                     a.tags = self.tags(o["key"], h, o["ids"], o["type"], o["category"],
-                                       t["name"], o["district"], o.get("level", 0))
+                                       t["name"], o["district"], o.get("level", 0),
+                                       o.get("form", ""))
 
                 self.place(have, o["key"], o["hash"], sma, make, update,
                            f"CityGen/{o['category']}")
         self.instances(have)
+        self.swim(have)
+        self.underwater(have)
         self.actors2(have)
         # (the last few: no more offloads, the always-loaded lighting and play actors among
         # them stay loaded with the last chunk)
@@ -1888,9 +2323,15 @@ class Importer:
                     c.set_collision_profile_name("NoCollision")
                 # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's)
                 doors = [unreal.Name(f"cg.door={d}") for d in r.get("doors", [])]
+                # (AG4: what a skybridge joins, `cg.link=building:<id>` or `walkway:<id>`)
+                links = [unreal.Name(f"cg.link={x}") for x in r.get("links", [])]
+                # (AG5: a landmark's or the wheel's hero, `cg.hero=<kind>`; a building on a
+                # slope, `cg.plinth=<m>` its stepped plinth under the pivot)
+                more = ([unreal.Name(f"cg.hero={r['hero']}")] if r.get("hero") else []) + \
+                    ([unreal.Name(f"cg.plinth={r['plinth_m']}")] if r.get("plinth_m") else [])
                 a.tags = self.tags(r["key"], h, r["ids"], r["type"], r["category"],
                                    r["tile"], r["district"], r.get("level", 0)) + [stage] + \
-                    doors
+                    doors + links + more
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
@@ -1910,12 +2351,27 @@ class Importer:
                 a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
                 comp.set_mobility(unreal.ComponentMobility.STATIC)
                 comp.clear_instances()
-                # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz]
+                # [x, y, z, yaw] or, with a scale (AG8's props and plants), [..., sx, sy, sz];
+                # AG13's grass in a file of the tile's (`xforms_file`, by its node)
+                xfs = r["xforms"] if "xforms" in r else self.xforms_file(r)
                 comp.add_instances([unreal.Transform(
                     unreal.Vector(xf[0] * 100.0, -xf[1] * 100.0, xf[2] * 100.0),
                     unreal.Rotator(roll=0.0, pitch=0.0, yaw=-xf[3]),
                     unreal.Vector(*(xf[4:7] if len(xf) >= 7 else (1, 1, 1))))
-                    for xf in r["xforms"]], False, False)
+                    for xf in xfs], False, False)
+                if r.get("cull_m"):
+                    # (AG13: the grass fades out between these distances, decision 13.9 a)
+                    comp.set_cull_distances(int(r["cull_m"][0] * 100.0),
+                                            int(r["cull_m"][1] * 100.0))
+                if r.get("no_shadow"):
+                    comp.set_cast_shadow(False)
+                if r.get("no_hlod"):
+                    for obj, prop in ((comp, "enable_auto_lod_generation"),
+                                      (a, "enable_auto_lod_generation")):
+                        try:
+                            obj.set_editor_property(prop, False)
+                        except Exception as ex:      # (a property this engine lacks)
+                            log(f"{r['key']}: {prop}: {ex}")
                 comp.set_default_custom_primitive_data_float_array(
                     0, [float(v) for v in r["cpd"]])
                 for slot, asset in sorted((r.get("materials") or {}).items()):
@@ -1934,6 +2390,16 @@ class Importer:
 
             self.place(have, r["key"], r["hash"], cls, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
+
+    def xforms_file(self, r):
+        """AG13: an instance actor's transforms from its tile's file (read once a file)."""
+        cache = self.__dict__.setdefault("_xf", {})
+        f = r["xforms_file"]
+        if f not in cache:
+            cache.clear()                    # (the actors come tile by tile: keep one file)
+            with open(os.path.join(self.build, f), encoding="utf-8") as fh:
+                cache[f] = json.load(fh)["nodes"]
+        return cache[f].get(r["xforms_key"], [])
 
     def instances(self, have):
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
@@ -1974,6 +2440,75 @@ class Importer:
             self.place(have, inst["key"], inst["hash"], cls, make, update,
                        f"CityGen/{inst['category']}")
         del ts
+
+    def swim(self, have):
+        """M16: a water physics volume per box of a water body and tile (the manifest's
+        `swim`), so the player swims in a canal, a river or the sea instead of falling through
+        it. Spawned from its class, a volume gets the editor's cube brush (SWIM_BRUSH_CM),
+        scaled here to the box."""
+        cls = unreal.PhysicsVolume
+        for s in self.man.get("swim", []):
+            x0, y0, x1, y1 = s["box"]
+            z0, z1 = s["z"]
+            center = ue_loc((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0)
+
+            def make(center=center):
+                return self.eas.spawn_actor_from_class(cls, center)
+
+            def update(a, h, s=s, center=center, x0=x0, y0=y0, x1=x1, y1=y1, z0=z0, z1=z1):
+                a.set_actor_location(center, False, False)
+                a.set_actor_scale3d(unreal.Vector((x1 - x0) * 100.0 / SWIM_BRUSH_CM,
+                                                  (y1 - y0) * 100.0 / SWIM_BRUSH_CM,
+                                                  (z1 - z0) * 100.0 / SWIM_BRUSH_CM))
+                a.set_editor_property("water_volume", True)
+                a.set_editor_property("fluid_friction", SWIM_FRICTION)
+                a.tags = self.tags(s["key"], h, [s["water_id"]], "swim_volume", "swim",
+                                   s["tile"], "")
+
+            self.place(have, s["key"], s["hash"], cls.static_class(), make, update,
+                       "CityGen/swim")
+
+    def underwater(self, have):
+        """AG12: an unbound post-process volume per M16 swim box (the manifest's stage 2
+        `underwater`): under the surface the view takes the water kind's tint and fog."""
+        s2 = self.man.get("stage2") or {}
+        cls = unreal.PostProcessVolume
+        for u in s2.get("underwater", []):
+            x0, y0, x1, y1 = u["box"]
+            z0, z1 = u["z"]
+            center = ue_loc((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0)
+
+            def make(center=center):
+                return self.eas.spawn_actor_from_class(cls, center)
+
+            def update(a, h, u=u, center=center, x0=x0, y0=y0, x1=x1, y1=y1, z0=z0, z1=z1):
+                a.set_actor_location(center, False, False)
+                a.set_actor_scale3d(unreal.Vector((x1 - x0) * 100.0 / SWIM_BRUSH_CM,
+                                                  (y1 - y0) * 100.0 / SWIM_BRUSH_CM,
+                                                  (z1 - z0) * 100.0 / SWIM_BRUSH_CM))
+                a.set_editor_property("unbound", False)
+                a.set_editor_property("priority", 1.0)
+                a.set_editor_property("blend_radius", 50.0)
+                ps = a.get_editor_property("settings")
+                r, g, b = u["tint"]
+                for k, v in (("override_scene_color_tint", True),
+                             ("scene_color_tint", unreal.LinearColor(r, g, b, 1.0)),
+                             ("override_color_saturation", True),
+                             ("color_saturation", unreal.Vector4(0.75, 0.75, 0.75, 1.0)),
+                             ("override_depth_of_field_focal_distance", True),
+                             ("depth_of_field_focal_distance", 100.0 / max(u["fog"], 0.01)),
+                             ("override_vignette_intensity", True),
+                             ("vignette_intensity", 0.6)):
+                    try:
+                        ps.set_editor_property(k, v)
+                    except Exception as e:      # (a setting this engine version names apart)
+                        log(f"underwater {k}: {e}")
+                a.set_editor_property("settings", ps)
+                a.tags = self.tags(u["key"], h, [u["water_id"]], "underwater", "underwater",
+                                   u["tile"], "")
+
+            self.place(have, u["key"], u["hash"], cls.static_class(), make, update,
+                       "CityGen/underwater")
 
     def player_start(self, have):
         ps = self.man["player_start"]

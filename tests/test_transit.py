@@ -456,8 +456,9 @@ def test_z_at_interpolates():
 
 
 class _B:
-    def __init__(self, top, portal_ok=True, bottom=0.0):
+    def __init__(self, top, portal_ok=True, bottom=0.0, body=None):
         self.top, self.portal_ok, self.bottom = top, portal_ok, bottom
+        self.body = top if body is None else body      # (M21: the shaft's roof)
 
 
 def test_sky_pass():
@@ -469,6 +470,8 @@ def test_sky_pass():
     assert TR.sky_pass(_B(200.0), 92.5, alt, False) == "block"
     assert TR.sky_pass(_B(200.0, portal_ok=False), 92.5, alt, True) == "block"
     assert TR.sky_pass(_B(105.0, portal_ok=False), 92.5, alt, True) == "climb"
+    # M21: a tower whose shaft ends under a mast takes no portal at the mast's height
+    assert TR.sky_pass(_B(200.0, body=78.0), 92.5, alt, True) == "block"
 
 
 # --- determinism ---------------------------------------------------------------------

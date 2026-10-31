@@ -1,0 +1,40 @@
+== dead ends
+dead ends by class: {'highway': 3, 'street': 71, 'service': 3, 'alley': 19, 'pedestrian': 43}
+of them, another road within 60 m straight ahead: {'street': 11, 'alley': 4, 'pedestrian': 31}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 32 Counter({'pedestrian': 17, 'road': 15})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1533 with a leg not at the node's height at the junction edge: 82 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 29
+   ('Corporate Core', True, True) 59
+   ('Industrial Port', False, False) 61
+   ('Industrial Port', False, True) 4
+   ('Industrial Port', True, True) 22
+   ('Midtown', False, False) 42
+   ('Midtown', True, True) 98
+   ('Old Town', False, False) 1004
+   ('Old Town', False, True) 5
+   ('Old Town', True, True) 118
+   ('Research Campus', False, False) 20
+   ('Research Campus', True, True) 15
+   ('Transit Nexus', False, False) 24
+   ('Transit Nexus', True, True) 32
+crosswalk widths: Counter({4.0: 1217})
+junctions with crosswalks: 353 of them within 40 m of another: 120
+== signs
+Counter({('shop_sign', 'blade'): 7373, ('shop_sign', 'facade'): 5552, ('billboard', 'roof'): 1049, ('neon', 'facade'): 468, ('billboard', 'facade'): 246, ('holo_ad', 'roof'): 47})
+== transit supports
+  tl.maglev_line maglev: length 2658 m, supports 33, gap median 45 max 360 m, off the line max 14.3 m (>2 m: 1)
+  tl.skyline_loop sky_tube: length 2473 m, supports 16, gap median 123 max 360 m, off the line max 13.0 m (>2 m: 3)
+  tl.delta_loop sky_tube: length 4973 m, supports 42, gap median 60 max 975 m, off the line max 9.5 m (>2 m: 2)
+  tl.waterfront_monorail monorail: length 4911 m, supports 142, gap median 25 max 393 m, off the line max 15.6 m (>2 m: 27)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 102

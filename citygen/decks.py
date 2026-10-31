@@ -410,7 +410,8 @@ def _upper(dk: Deck, net, segs: dict, pos: dict, at: dict, B) -> None:
         en = f"l1.{sid}.e"
         net.nodes.append({"id": en, "position": (end_pt[0], end_pt[1], H), "level": 1,
                           "attrs": {"kind": "end", "degree": 1, "primary_degree": 0,
-                                    "deck": dk.id, "deck_end": True}})
+                                    "deck": dk.id, "deck_end": True,
+                                    "dead_end": "deck_end"}})
         a = dk.node_twin[_inner(s, dk)]
         st, en_ = (en, a) if s["start"] == e else (a, en)
         tw = _twin(s, f"l1.{sid}", st, en_, line, dk, car)

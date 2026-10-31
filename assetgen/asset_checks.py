@@ -23,6 +23,19 @@ nearest ground walkway of its level, written into its record for stage 4) and
 glass: `fronts.mount_check`); the budgets count section 11's shopfronts, `T_UNIT` triangles
 per ground-floor unit, and `T_FRONT` per building with a street front (its band's zones,
 caps, pockets and doors).
+
+AG4: `asset_clearance` (nothing a building adds in a skybridge's, guideway's or sky tube's
+corridor, every portal open), `asset_roofs` (every roof item an asset, every green roof
+built, every portal cut and every sky station with its platforms), `asset_landings` (a
+landing door where a skybridge meets a floor line); the skybridges' own meshes are the
+skybridge stage's `asset_skybridges`.
+
+AG5: `asset_types` (every building built by its type's generator, `types.generator_of`,
+every landmark and wheel a hero with its U2 mask), `asset_families` (the members of a
+complex family share its design: the discrete genes of every group whose system they share,
+and twin towers every gene) and `asset_slopes` (every building on M13's slopes stands on a
+stepped plinth; openings lowered, raised, narrowed or left buried, lower storeys and
+retaining skirts counted). Heroes have a budget class of their own (`hero`).
 """
 
 from __future__ import annotations
@@ -47,14 +60,18 @@ CLASSES = {
     "high": {"k": 2.0, "base": 10000, "i": 7.0, "ibase": 200},
     "tower": {"k": 2.0, "base": 20000, "i": 6.0, "ibase": 400},
     "mega": {"k": 2.0, "base": 20000, "i": 6.0, "ibase": 400},
+    "hero": {"k": 4.0, "base": 250000, "i": 10.0, "ibase": 4000},
 }
 MEGA = ("building.megabuilding", "building.straddle_building")
 
 
 def budget_class(rec: dict) -> str:
-    """A building's budget class: mega (megabuildings, straddle buildings, landmarks), else by
-    height: tower (100 m or more), high (40 m), mid (12 m), low."""
+    """A building's budget class: hero (AG5: landmarks and the wheel, built by `heroes`),
+    mega (megabuildings, straddle buildings), else by height: tower (100 m or more), high
+    (40 m), mid (12 m), low."""
     t = rec["type"]
+    if rec.get("hero"):
+        return "hero"
     if t in MEGA or t.startswith("building.landmark"):
         return "mega"
     h = rec["bounds"][1][2]
@@ -276,6 +293,9 @@ def _walk_index(model):
     return out
 
 
+GRAZE_M = 0.02          # a path this near its own building's wall does not cross it
+
+
 def access(model, records: dict, briefs: dict | None = None) -> dict:
     """A door at every entrance and every unit's entrance (the shells' `doors` checks), each
     open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
@@ -289,8 +309,9 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     city's to change (scope 4.5), not as a failure: against a neighbor (its facade a party or
     blind wall: the brief's classes, `facing_neighbor`), or with no ground walkway ahead of it
     within `AHEAD_M` (open ground, a canal, a road without a sidewalk on its side, its walkway
-    behind the building: `unreachable`). A failure is a missing door, or a door with a
-    walkway just ahead that another building walls off."""
+    behind the building, or ahead only inside another building, a park path citygen runs
+    through it: `unreachable`). A failure is a missing door, or a door with a walkway just
+    ahead that another building walls off."""
     import shapely
     from shapely.geometry import LineString, Point
     walks = _walk_index(model)
@@ -308,7 +329,12 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     first = []
     faced = []
 
-    def leg_clear(bid, ax, ay, bx, by, x, y) -> bool:
+    def inside(bid, f) -> bool:
+        return ftree is not None and any(
+            fids[i] != bid and flev[i] == level.get(bid, 0)
+            for i in ftree.query(f, predicate="within").tolist())
+
+    def leg_clear(bid, ax, ay, bx, by, x, y, under=0.0) -> bool:
         if (bx - ax) ** 2 + (by - ay) ** 2 < 0.0025 or ftree is None:
             return True
         seg = LineString([(ax, ay), (bx, by)])
@@ -317,11 +343,21 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                 continue                       # (M14: under or on a deck, not in the way)
             if fids[i] != bid:
                 return False
-            # its own building only near the door (an arcade, a recess)
-            far = seg.difference(Point(x, y).buffer(OWN_M, 8))
-            if not far.is_empty and far.intersects(feet[own[bid]]):
+            # its own building only near the door (an arcade, a recess; AG5: a colonnade's
+            # depth more behind one); a path that only grazes its own wall (along it, round
+            # its corner: AG10, a door on a wall at the map's edge) is not walled off
+            far = seg.difference(Point(x, y).buffer(OWN_M + under, 8))
+            if not far.is_empty and far.intersects(inner(bid)):
                 return False
         return True
+
+    shrunk: dict = {}
+
+    def inner(bid):
+        if bid not in shrunk:
+            with G.canonical():
+                shrunk[bid] = feet[own[bid]].buffer(-GRAZE_M, join_style="mitre")
+        return shrunk[bid]
 
     for bid in sorted(records):
         r = records[bid]
@@ -348,10 +384,11 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                 if d.get("entrance") is not None else None
             # (out of the doorway STEP_M, else further out past a corner of its own that
             # juts beside it, then straight to the walkway)
+            under = float(d.get("under_m", 0.0))
             for step in STEPS_M:
                 qx, qy = x + nx * step, y + ny * step
                 q = Point(qx, qy)
-                if not leg_clear(bid, ox, oy, qx, qy, x, y):
+                if not leg_clear(bid, ox, oy, qx, qy, x, y, under):
                     break
                 for k in sorted(tree.query(q.buffer(REACH_M)).tolist(), key=lambda k: ids[k]):
                     line = geoms[k]
@@ -362,7 +399,7 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                     key = (0 if ids[k] == model_w else 1, round(dist, 3), ids[k])
                     if best is not None and key >= best[0]:
                         continue
-                    if leg_clear(bid, qx, qy, f.x, f.y, x, y):
+                    if leg_clear(bid, qx, qy, f.x, f.y, x, y, under):
                         best = (key, ids[k])
                 if best is not None:
                     break
@@ -378,7 +415,8 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
                 for k in tree.query(q.buffer(AHEAD_M)).tolist():
                     f = geoms[k].interpolate(geoms[k].project(q))
                     if (f.x - x) * nx + (f.y - y) * ny > 0.0 and \
-                            (f.x - qx) ** 2 + (f.y - qy) ** 2 <= AHEAD_M * AHEAD_M:
+                            (f.x - qx) ** 2 + (f.y - qy) ** 2 <= AHEAD_M * AHEAD_M and \
+                            not inside(bid, f):
                         ahead = True
                         break
                 if not ahead:
@@ -402,12 +440,123 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             "first": first + [f"{i}: faces a neighbor or no walkway" for i in faced[:3]]}
 
 
+def clearance(records: dict) -> dict:
+    """AG4: nothing a building adds in the corridor of a skybridge, guideway or sky tube
+    passing near it, every portal open (`envelope.clearances` per building)."""
+    bad = [k for k in sorted(records) if not records[k]["checks"]["clearance"]["ok"]]
+    cor = sum(r["checks"]["clearance"]["corridors"] for r in records.values())
+    hits = sum(r["checks"]["clearance"]["hits"] for r in records.values())
+    ph = sum(r["checks"]["clearance"]["portal_hits"] for r in records.values())
+    return {"name": "asset_clearance", "ok": not bad, "corridors": cor, "hits": hits,
+            "portal_hits": ph, "failures": len(bad),
+            "first": [f"{k}: {records[k]['checks']['clearance']['first']}" for k in bad[:5]]}
+
+
+GREEN_MIN_M2 = 4.0      # a green roof under this (a sliver of a roof) is not built
+
+
+def roofs(records: dict, briefs: dict) -> dict:
+    """AG4: an asset for every roof item of every brief (an instanced roof part, a merged
+    one, or AG8's billboard), every green roof of `GREEN_MIN_M2` or more built, every
+    portal cut through its tower (or passing between its masses, `portals_passing`), a
+    platform in every sky station's. A station whose tube passes its building with no
+    wall within reach at its floor and no roof under it (`connections._beside`) is counted
+    apart, the city's to change (`stations_out_of_reach`)."""
+    from shapely.geometry import Polygon
+    items = kinds = missing = 0
+    by: dict[str, int] = {}
+    green = green_built = green_small = 0
+    portals = cut = passes = closed = stations = platforms = 0
+    first = []
+    far = []
+    for k in sorted(records):
+        r, br = records[k], briefs.get(k) or {}
+        want = br.get("roof_items") or []
+        got = r.get("roof_items") or []
+        items += len(want)
+        if len(got) != len(want) or any(g.get("asset") is None for g in got):
+            missing += max(1, sum(1 for g in got if g.get("asset") is None))
+            if len(first) < 5:
+                first.append(f"{k}: roof item without an asset")
+        for g in got:
+            by[g["kind"]] = by.get(g["kind"], 0) + 1
+        done = set(r.get("green") or [])
+        for g in br.get("green_roofs") or []:
+            green += 1
+            if g["id"] in done:
+                green_built += 1
+                continue
+            pg = g.get("polygon") or {}
+            ext = pg.get("exterior") or []
+            a = Polygon(ext, pg.get("holes") or []).area if len(ext) >= 3 else 0.0
+            if a < GREEN_MIN_M2:
+                green_small += 1
+            elif len(first) < 5:
+                first.append(f"{k}: green roof {g['id']} not built")
+        for p in r.get("portals") or []:
+            portals += 1
+            cut += int(p["cut"])
+            # (a tube meeting no mass at its height, between a megabuilding's towers, has
+            # nothing to cut: open as it is)
+            passes += int(not p["cut"] and p.get("through", 1) == 0)
+            stations += int(p["station"])
+            platforms += int(p["station"] and p["platform"])
+            if p["station"] and not p["platform"] and p.get("out_of_reach"):
+                # (a station the city put out of its building's reach: the tube passes
+                # beside it, no wall within reach at its floor nor a roof under it; the
+                # city's to change, counted apart)
+                far.append(f"{k}: station {p['station_id']} out of reach "
+                           f"({p.get('gap_m')} m from its walls)")
+                continue
+            if (not p["cut"] and p.get("through", 1)) or (p["station"] and not p["platform"]):
+                closed += 1
+                if len(first) < 5:
+                    first.append(f"{k}: portal {p['line_id']} not open")
+    kinds = len(by)
+    green_missing = green - green_built - green_small
+    ok = missing == 0 and green_missing == 0 and closed == 0
+    return {"name": "asset_roofs", "ok": ok, "roof_items": items, "missing": missing,
+            "kinds": kinds, "by_kind": dict(sorted(by.items())), "green_roofs": green,
+            "green_built": green_built, "green_too_small": green_small, "portals": portals,
+            "portals_cut": cut, "portals_passing": passes, "portals_closed": closed,
+            "sky_stations": stations, "platforms": platforms,
+            "stations_out_of_reach": len(far), "first": first + far[:3]}
+
+
+def landings(records: dict, skybridges: dict | None = None) -> dict:
+    """AG4: a landing door in each building a skybridge meets (`connections.landings`), and
+    every skybridge an asset of its own (the skybridge stage's records). An end that lands
+    in an open portal, or at the ground floor where the street front meets it (M13's
+    slopes), needs none; one that meets no wall of the building, or whose deck is
+    on no floor line of the mass it meets (M3's floor grids apart), is counted apart, the
+    city's to change; a failure is a landing on a floor line that got no door."""
+    n = doors = 0
+    why: dict[str, int] = {}
+    first = []
+    for k in sorted(records):
+        for ld in records[k].get("landings") or []:
+            n += 1
+            if ld["door"]:
+                doors += 1
+                continue
+            w = ld.get("why", "no_room")
+            why[w] = why.get(w, 0) + 1
+            if w == "no_room" and len(first) < 5:
+                first.append(f"{k}: skybridge {ld['id']} has no landing door")
+    ok = why.get("no_room", 0) == 0
+    return {"name": "asset_landings", "ok": ok, "landings": n, "doors": doors,
+            "into_portal": why.get("portal", 0), "at_ground": why.get("ground", 0),
+            "no_edge": why.get("no_edge", 0), "off_floor": why.get("off_floor", 0),
+            "no_room": why.get("no_room", 0),
+            "skybridges": len(skybridges or {}), "first": first}
+
+
 def mounts(records: dict) -> dict:
     """Every mount on a panel or pier, never on glass (`fronts.mount_check` per building).
     A mount on a stretch of a footprint edge the shells tidy away (a spike or sliver of the
-    lot's ring: no wall stands there) or over or under every wall of its edge (M14's decks) is
-    counted apart, the city's to change."""
-    n = glass = nowall = tidied = off = 0
+    lot's ring: no wall stands there), over or under every wall of its edge (M14's decks) or
+    in a skybridge's landing door (AG4) is counted apart, the city's to change."""
+    n = glass = nowall = tidied = off = landing = 0
     first = []
     for k in sorted(records):
         m = records[k]["checks"].get("mounts") or {}
@@ -416,8 +565,151 @@ def mounts(records: dict) -> dict:
         nowall += m.get("no_wall", 0)
         tidied += m.get("tidied", 0)
         off += m.get("off", 0)
+        landing += m.get("in_landing", 0)
         if (m.get("on_glass") or m.get("no_wall")) and len(first) < 5:
             first.append(f"{k}: {m.get('first')}")
     return {"name": "asset_mounts", "ok": glass == 0 and nowall == 0, "mounts": n,
             "on_glass": glass, "no_wall": nowall, "on_tidied_edge": tidied,
-            "off_its_walls": off, "first": first}
+            "off_its_walls": off, "in_landing": landing, "first": first}
+
+
+# ---------------------------------------------------------------------------
+# AG5: types, families, slopes
+# ---------------------------------------------------------------------------
+
+def types(records: dict) -> dict:
+    """Every building built by its type's generator (`types.generator_of`); every landmark
+    and wheel a hero with its mask. Types the general grammar builds are counted apart, and
+    so is a type the generators do not list (built by the general one)."""
+    from .buildings import heroes as HE
+    from .buildings import types as TY
+    by: dict[str, dict] = {}
+    bad, first, unlisted = 0, [], {}
+    for k in sorted(records):
+        r = records[k]
+        t = r["type"]
+        want = TY.generator_of(t)
+        got = r.get("generator")
+        b = by.setdefault(want, {"buildings": 0, "features": 0})
+        b["buildings"] += 1
+        b["features"] += int(r["stats"].get("type_features", 0)) + \
+            int(r["stats"].get("hero_features", 0))
+        if want == "general" and t not in TY.GENERATORS and not t.startswith("building.landmark"):
+            unlisted[t] = unlisted.get(t, 0) + 1
+        miss = got != want
+        if HE.is_hero_type(t) and not (r.get("hero") and r["hero"].get("mask")):
+            miss = True
+        if miss:
+            bad += 1
+            if len(first) < 5:
+                first.append(f"{k}: {t} built by {got}, not {want}"
+                             if got != want else f"{k}: {t} has no hero mask")
+    return {"name": "asset_types", "ok": bad == 0, "buildings": len(records),
+            "generators": {g: by[g] for g in sorted(by)},
+            "heroes": sum(1 for r in records.values() if r.get("hero")),
+            "unlisted_types": dict(sorted(unlisted.items())), "wrong": bad, "first": first}
+
+
+def families(records: dict) -> dict:
+    """The members of a complex family share its design: the discrete genes of every group
+    whose system two members share, and twin towers every gene they both use."""
+    from .buildings import systems as SY
+    fams: dict[str, list] = {}
+    for k in sorted(records):
+        f = records[k].get("family")
+        if f:
+            fams.setdefault(f, []).append(k)
+    kinds: dict[str, int] = {}
+    bad, first = 0, []
+    for f in sorted(fams):
+        ks = fams[f]
+        cx = records[ks[0]].get("complex") or "complex"
+        kinds[cx] = kinds.get(cx, 0) + 1
+        twins = cx in SY.TWINS
+        g0 = records[ks[0]]["genes"]
+        for k in ks[1:]:
+            g1 = records[k]["genes"]
+            for gene in sorted(set(g0) & set(g1)):
+                grp = gene.split(".", 1)[0]
+                if grp not in GN.GROUPS or g0.get(f"{grp}.system") != g1.get(f"{grp}.system"):
+                    continue         # (a building's own genes: its wear, its ground floor)
+                discrete = isinstance(g0[gene], str)
+                if (discrete or twins) and g0[gene] != g1[gene]:
+                    bad += 1
+                    if len(first) < 5:
+                        first.append(f"{f}: {ks[0]} and {k} differ in {gene}")
+                    break
+    return {"name": "asset_families", "ok": bad == 0, "families": len(fams),
+            "members": sum(len(v) for v in fams.values()),
+            "kinds": dict(sorted(kinds.items())), "differ": bad, "first": first}
+
+
+SLOPE_MIN_M = 0.3      # ground this far under the base along the walls needs steps
+
+
+def slopes(records: dict) -> dict:
+    """AG5: every building on M13's slopes whose ground falls `SLOPE_MIN_M` or more under
+    its base along its walls (`grade_low_m`) stands on a stepped plinth, an open shed on
+    columns down to the ground; what the street fronts did at grade is counted (over
+    every building with a plinth, `plinth_m`)."""
+    keys = ("plinth_facades", "plinth_windows", "retaining_skirts", "openings_lowered",
+            "openings_in_plinth", "openings_raised", "openings_narrowed", "openings_buried",
+            "windows_buried", "columns_to_grade")
+    n, stepped, flat, first = 0, 0, 0, []
+    tot = {k: 0 for k in keys}
+    for k in sorted(records):
+        r = records[k]
+        if not r.get("plinth_m"):
+            continue
+        n += 1
+        st = r["stats"]
+        for key in keys:
+            tot[key] += int(st.get(key, 0))
+        if r.get("grade_low_m", 0.0) < SLOPE_MIN_M:
+            continue
+        stepped += 1
+        if not st.get("plinth_facades") and not st.get("columns_to_grade"):
+            flat += 1
+            if len(first) < 5:
+                first.append(f"{k}: the ground {r['grade_low_m']} m under its base, no step")
+    return {"name": "asset_slopes", "ok": flat == 0, "buildings": n, "falling": stepped,
+            "unstepped": flat, **tot, "first": first}
+
+
+def decks(model, records: dict) -> dict:
+    """AG10 (a city with M14 decks only): nothing of a building where its deck's slab is
+    (`buildings/decks.check`: on a deck, nothing under its top; under one, nothing over its
+    soffit; beside or in one, nothing inside it); every building on a deck stands on it
+    (its masses from the deck's top), its doors on the deck's walkways; every undercity
+    building's roof under the soffit without roof equipment or green roofs."""
+    up = {w.id for w in model.walkways if w.level}
+    by_role: dict[str, int] = {}
+    bad, first = 0, []
+    doors = on_deck = 0
+    plenums = under_items = 0
+    for k in sorted(records):
+        r = records[k]
+        d = r.get("deck")
+        if not d:
+            continue
+        by_role[d["role"]] = by_role.get(d["role"], 0) + 1
+        c = r["checks"].get("deck") or {}
+        if not c.get("ok", True):
+            bad += 1
+            if len(first) < 5:
+                first.append(f"{k} ({d['role']}): {c['inside']} vertices in the slab, "
+                             f"first at {c.get('first')}")
+        if d["role"] == "on":
+            for dr in r.get("doors") or []:
+                doors += 1
+                on_deck += dr.get("walkway_id") in up
+        elif d["role"] == "under":
+            plenums += r["stats"].get("plenums", 0)
+            under_items += len(r.get("roof_items") or []) + len(r.get("green") or [])
+    if under_items:
+        bad += 1
+        first.append(f"{under_items} roof items or green roofs under a deck")
+    return {"name": "asset_decks", "ok": bad == 0, "decks": len(model.decks),
+            "buildings": by_role, "failures": bad, "doors_on_decks": doors,
+            "doors_to_deck_walkways": on_deck, "plenums": plenums,
+            "under_roof_items": under_items, "first": first}

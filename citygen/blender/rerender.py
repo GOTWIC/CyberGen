@@ -8,7 +8,9 @@ names a render of `build.views`: `top`, `iso_city`, `iso_<district>`, `street_<n
 `cutaway` (M9, the section along the longest road tunnel) or `deck` (M14, the section across
 the biggest deck); each is
 written as TO_DIR/render_<VIEW>.jpg with the same camera as the build, `--width` pixels wide
-(README images use 7680). `citygen rerender` runs it.
+(README images use 7680). `--hide PREFIX` (repeatable) leaves out the objects whose names
+start with it (M16: `--hide city.water. --hide city.sea.` drains the water to show the beds
+and banks). `citygen rerender` runs it.
 """
 
 import json
@@ -30,6 +32,7 @@ def main():
     width, samples, names = 7680, 16, []
     eye = target = None
     lens, cname = 35.0, "custom"
+    hide = []
     rest = argv[2:]
     i = 0
     while i < len(rest):
@@ -41,9 +44,11 @@ def main():
                 target = v
             i += 4
             continue
-        if rest[i] in ("--lens", "--name"):
+        if rest[i] in ("--lens", "--name", "--hide"):
             if rest[i] == "--lens":
                 lens = float(rest[i + 1])
+            elif rest[i] == "--hide":
+                hide.append(rest[i + 1])
             else:
                 cname = rest[i + 1]
             i += 2
@@ -68,6 +73,9 @@ def main():
         raise SystemExit(f"unknown views {missing}; known: {sorted(by_name)}")
     bpy.ops.wm.open_mainfile(filepath=os.path.join(src, "city.blend"))
     scene = bpy.context.scene
+    for ob in list(bpy.data.objects):
+        if any(ob.name.startswith(p) for p in hide):
+            ob.hide_render = True
     build.setup_render(scene, samples)
     os.makedirs(to, exist_ok=True)
     done = [build.render_view(scene, by_name[n], os.path.join(to, f"render_{n}.jpg"), width,

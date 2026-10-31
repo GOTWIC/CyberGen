@@ -1,0 +1,61 @@
+assetgen streets: Delta Megacity: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 1424 blockout objects replaced
+  [ok] street_budgets: 1110949 triangles in the city (budget 20000000), at most 29661 in a tile (t-06+04, budget 2500000)
+
+coverage:
+  road_segments: 2480 of 2508 (+28 declared)
+  junctions: 1536 of 1536
+  crosswalks: 547 of 547
+  sidewalks: 3314 of 3314
+  bridges: 32 of 32
+  structures: 572 of 572
+  tunnels: 2 of 2
+  quays: 13 of 13
+  waterways: 1 of 7 (+6 declared)
+  site_elements: 836 of 836
+  decks: 0 of 0
+  transit_lines: 5 of 5
+  megasites: 3 of 3
+  stations: 18 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 9247, tiles 138, triangles 1110949, disk 70.6 MB
+triangles by kind:
+  street.sidewalk: 361375 (3314 pieces)
+  street.road: 245226 (2508 pieces)
+  street.junction: 190407 (1536 pieces)
+  street.transit.tube: 83988 (20 pieces)
+  street.transit.tube.glass: 75168 (0 pieces)
+  street.quay: 56561 (13 pieces)
+  street.transit.deck: 21414 (31 pieces)
+  street.crosswalk: 20608 (547 pieces)
+  street.tunnel.metro: 15960 (2 pieces)
+  street.bridge: 13657 (32 pieces)
+  street.site.rail_track: 10788 (2 pieces)
+  street.column: 3312 (192 pieces)
+  street.structure.canopy: 2516 (3 pieces)
+  street.site.berth: 2442 (2 pieces)
+  street.transit.pylon: 2058 (117 pieces)
+  street.site.container_stack: 1582 (791 pieces)
+  street.site.gantry_crane: 1236 (6 pieces)
+  street.transit.canopy: 1092 (21 pieces)
+  street.transit.column: 680 (68 pieces)
+  street.site.pond: 280 (1 pieces)
+  street.site.lawn: 255 (13 pieces)
+  street.site.plaza: 116 (3 pieces)
+  street.site.truck_gate: 84 (1 pieces)
+  street.site.fountain: 58 (1 pieces)
+  street.site.platform: 30 (3 pieces)
+  street.site.bus_bay: 20 (10 pieces)
+  street.site.metro_entrance: 20 (2 pieces)
+  street.site.drop_off: 12 (1 pieces)
+  street.canal_wall.canal: 4 (5 pieces)
+  street.canal_wall.basin: 0 (2 pieces)
+no mesh: inside its junctions 28, natural banks 6
+corner pads: 3853 made, 18 skipped (chain 1, no sidewalk 15, same edge 2)
+bridges: footbridge.steel 1, footbridge.stone 16, girder 15
+instances: part.container.c0 2545, part.container.c1 2532, part.container.c2 2601, part.container.c3 2603, part.container.c4 2651, part.container.c5 2724
+files: 138 tiles made, 0 kept, 138 written, 0 same bytes, 0 removed
+seconds: context 2.04, gather 1.17, make 13.25, write 0.53, total 18.05, workers 2

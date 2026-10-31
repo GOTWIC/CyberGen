@@ -171,6 +171,10 @@ class Stop:
     area: object = None             # what the stop names (district, site, place polygon)
 
 
+# M21: masses a tube portal never cuts through (it stays under the shaft's roof)
+THIN_ROLES = ("spire", "mast", "halo", "strut", "antenna")
+
+
 @dataclass
 class Bld:
     id: str
@@ -179,6 +183,7 @@ class Bld:
     removable: bool
     bottom: float = 0.0             # lowest mass (straddle spans start high)
     portal_ok: bool = False         # wide and solid enough for a tube portal
+    body: float = 0.0               # M21: the roof a portal stays under (masts, spires aside)
 
 
 @dataclass
@@ -381,8 +386,10 @@ def context(spec, m) -> Ctx:
                          "pinned" in b.attrs)
         bottom = min(ms.z0_m for ms in b.masses if ms.z1_m > ms.z0_m)
         w = G._strip_width(G.parts(poly)[0]) if G.parts(poly) else 0.0
+        body = max((ms.z1_m for ms in b.masses if ms.role not in THIN_ROLES and
+                    ms.z1_m > ms.z0_m), default=b.height_m)
         c.blds.append(Bld(b.id, poly, b.height_m, removable, bottom, w >= 12.0 and
-                          G.area(poly) >= 600.0))
+                          G.area(poly) >= 600.0, body))
     # M14: a deck's slab, with the clear height over its streets: a track passes over it
     # (`_profile_pass`; the routes do not see it)
     from .decks import CLEAR_M as DECK_CLEAR_M
@@ -1077,10 +1084,10 @@ def sky_pass(b, z: float, alt: tuple, through: bool) -> str:
     r = DECK_M["sky_tube"] / 2.0
     if b.top <= z - SKY_CLEAR_M or b.bottom >= z + 6.0:
         return "clear"
-    portal = through and b.portal_ok and b.top >= alt[0] + r + PORTAL_HEADROOM_M
+    portal = through and b.portal_ok and b.body >= alt[0] + r + PORTAL_HEADROOM_M
     climb = b.top <= alt[1] - SKY_CLEAR_M
     if portal and climb:
-        return "climb" if b.top + SKY_CLEAR_M - z <= z - (b.top - r - PORTAL_HEADROOM_M) \
+        return "climb" if b.top + SKY_CLEAR_M - z <= z - (b.body - r - PORTAL_HEADROOM_M) \
             else "portal"
     return "portal" if portal else "climb" if climb else "block"
 
@@ -2875,11 +2882,11 @@ def _fit_portals(c: Ctx, ln: Line) -> bool:
             continue
         z0 = min(ln.zs[i] for i in idx)
         z1 = max(ln.zs[i] for i in idx)
-        if b.top >= z1 + r + PORTAL_HEADROOM_M - 0.01 and b.bottom <= z0 - r - 1.0:
+        if b.body >= z1 + r + PORTAL_HEADROOM_M - 0.01 and b.bottom <= z0 - r - 1.0:
             ln.portals[bid] = (q(z0 - r - 1.0), q(z1 + r + 1.0))
         elif b.top <= z0 - SKY_CLEAR_M + 0.01:
             del ln.portals[bid]  # the track clears it after all
-        elif b.top + SKY_CLEAR_M > ln.alt[1] and b.top >= z1 + r + PORTAL_TIGHT_M - 0.01 \
+        elif b.top + SKY_CLEAR_M > ln.alt[1] and b.body >= z1 + r + PORTAL_TIGHT_M - 0.01 \
                 and b.bottom <= z0 - r - 1.0:
             # M8b: a tower the line could not climb within its altitude range keeps its
             # portal with less headroom (climbing over it would lift the line out of its
@@ -3017,7 +3024,7 @@ def _profile_pass(c: Ctx, ln: Line, gone: set, arr, need: list, runs, over_runs:
         for i, b_ in sorted(zip(ip.tolist(), ib.tolist())):
             b = c.blds[b_]
             if b.id in ln.portals:
-                cap[i] = min(cap[i], b.top - r - PORTAL_HEADROOM_M)
+                cap[i] = min(cap[i], b.body - r - PORTAL_HEADROOM_M)
     # both envelopes limited to the grade, then the base altitude between them (a clamp
     # between two functions of bounded slope keeps that slope); the lower one wins where
     # they cross (the portal there is then dropped)

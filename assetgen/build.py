@@ -1,6 +1,7 @@
 """`assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]
-[--no-props]` (scope sections 3, 4.4, 6): the building assets of a citygen build into
-`BUILD/assets/`, then its street packs, then its props, plants and signs.
+[--no-water] [--no-props] [--no-ground]` (scope sections 3, 4.4, 6): the building assets
+of a citygen build into `BUILD/assets/`, then its street packs, its water, its props, plants
+and signs, then its ground cover.
 
 1. Briefs (AG0's stage), reused from `briefs.json` when the model, spec and overrides are
    the ones it was made from; written only when they change.
@@ -14,18 +15,26 @@
    it), `proxies/<tile>.glb`, `parts/<tile>.glb` (AG2: one mesh per instanced part of the
    tile's buildings, at the origin, named by the hash of its parameters, so buildings whose
    parts coincide share it; the placements are in each building's record).
-4. Checks (`asset_checks`), `manifest.json`, `asset_report.json` and `.txt`,
-   `unreal_contribution.buildings.json`; each written only if its bytes change, tiles no
-   longer in the city removed.
-5. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
+4. AG4's skybridges (`skybridges.py`): every model skybridge a piece of its own in
+   `connections/<tile>.glb`, its record in the manifest's `skybridges`.
+5. Checks (`asset_checks`), `manifest.json`, `asset_report.json` and `.txt`,
+   `unreal_contribution.buildings.json` and `.connections.json`; each written only if its
+   bytes change, tiles no longer in the city removed.
+6. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
    bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
    `streets_report.json` and `.txt` (the report only when another of its files changed).
-6. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
+7. The water stage (AG12's `assetgen water`, `assetgen/water/build.py`, the same bytes; after
+   the streets, whose bridge piers foam it): `water/<tile>.glb`, `water/parts.glb`,
+   `water/manifest.json`, `unreal_contribution.water.json`, `water_report.json` and `.txt`
+   (likewise).
+8. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
    stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
    families, exact props and signs (their faces showing those pages),
    `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
-   (likewise); then AG6's materials and checks over every contribution and pack
-   (`materials/build.stage`).
+   (likewise); then AG13's ground stage (`assetgen ground`, `assetgen/ground/build.py`):
+   the ground of every piece of open land and its grass per tile,
+   `unreal_contribution.ground.json`, `ground_report.json` and `.txt` (likewise); then AG6's
+   materials and checks over every contribution and pack (`materials/build.stage`).
 
 An unchanged city's rebuild writes no file.
 """
@@ -47,6 +56,7 @@ from . import manifest as MF
 from .progress import Progress
 from . import spec as S
 from .buildings import collision as CO
+from .buildings import decks as DKB
 from .buildings import envelope as EN
 from .buildings import genome as GN
 from .buildings import meshbuf as MB
@@ -56,16 +66,18 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag3.6"       # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "m18.3"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
-         "spec_sha256", "briefs_sha256", "buildings", "tiles")
+         "spec_sha256", "briefs_sha256", "buildings", "tiles", "skybridges", "connections",
+         "green_replaces")
 MAX_WORKERS = 4
 DECAL_OFF_MM = 10              # AG3: a decal quad stands this far off its wall (mesh decals)
 DECAL_UV = (0.004, 0.996)      # its atlas cell's own UVs, inset so it never reads a neighbor
 # the files a build delivers besides its packs (the report holds timings, so it is not one)
-DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json")
+DELIVERED = ("briefs.json", "manifest.json", "unreal_contribution.buildings.json",
+             "unreal_contribution.connections.json")
 
 
 def tile_name(x: float, y: float) -> str:
@@ -142,10 +154,13 @@ def _bays_s11(brief: dict) -> float:
 
 
 def _part_rec(x: dict) -> dict:
-    return {"node": x["node"], "type": x["type"], "family": x["family"],
-            "count": len(x["at"]), "triangles": x["triangles"],
-            "xforms": [[C.m(a[0] / 1000.0), C.m(a[1] / 1000.0), C.m(a[2] / 1000.0),
-                        PT.yaw_deg(a[3], a[4])] for a in x["at"]]}
+    rec = {"node": x["node"], "type": x["type"], "family": x["family"],
+           "count": len(x["at"]), "triangles": x["triangles"],
+           "xforms": [[C.m(a[0] / 1000.0), C.m(a[1] / 1000.0), C.m(a[2] / 1000.0),
+                       PT.yaw_deg(a[3], a[4])] for a in x["at"]]}
+    if x["family"] in PT.INSTANCE_ALWAYS:
+        rec["roof"] = True            # (AG4: roof equipment, instanced per tile in Unreal)
+    return rec
 
 
 def _doors(sh: dict) -> list[dict]:
@@ -161,6 +176,8 @@ def _doors(sh: dict) -> list[dict]:
                     "height_m": C.m(d["h"] / 1000.0), "depth_m": C.m(d["depth"] / 1000.0),
                     "steps": d["steps"], "flush": d["flush"], "moved": bool(d.get("moved")),
                     "class": d["class"]})
+        if d.get("under"):
+            out[-1]["under_m"] = C.m(d["under"] / 1000.0)     # (AG5: behind a colonnade)
     return sorted(out, key=lambda d: d["id"])
 
 
@@ -177,7 +194,9 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         ck[key] += ckf[key]
     ck["uv0"] = True
     inst = sh["parts"]
-    env = EN.check(brief, arrs, EN.part_points(inst))
+    pp = EN.part_points(inst)
+    env = EN.check(brief, arrs, pp)
+    clr = EN.clearances(brief, arrs, pp)
     tints = _tints(gm)
     lo = np.min(np.concatenate([a["pos"] for a in arrs.values()]), axis=0) if arrs else \
         np.zeros(3, dtype=np.int64)
@@ -197,7 +216,9 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "triangles": int(sum(len(a["tri"]) for a in arrs.values())),
         "slots": {k: int(len(a["tri"])) for k, a in arrs.items()},
         "proxy": {"triangles": int(px["triangles"])},
-        "collision": CO.build(brief, sh["band_m"]),
+        "collision": CO.build(brief, sh["band_m"], sh.get("landing_doors"),
+                              {mi["mass"]: mi["under_m"] for mi in sh["masses"]
+                               if mi.get("under_m") is not None}),
         "front": {"triangles": int(sum(len(a["tri"]) for a in sh["front"].values())),
                   "slots": {k: int(len(a["tri"])) for k, a in sh["front"].items()},
                   "band_m": sh["band_m"]},
@@ -208,16 +229,46 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         "floor_m": float(brief["building"]["floor_grid"]["floor_height_m"]),
         "stats": st, "masses": sh["masses"],
         "checks": {"mesh": ck, "envelope": env, "mounts": sh["checks"]["mounts"],
-                   "doors": sh["checks"]["access"]},
+                   "doors": sh["checks"]["access"], "clearance": clr},
+        # AG4: every roof item's asset, green roofs, skybridge landings, portals
+        "roof_items": sh["roof_items"], "green": sh["green"], "landings": sh["landings"],
+        "portals": sh["portals"],
         "parts": [_part_rec(x) for x in inst],
         "instances": int(sum(len(x["at"]) for x in inst)),
         "part_triangles": int(sum(x["triangles"] for x in inst)),
     }
+    # AG5: the type's generator (or a landmark's hero), a hero's accent and UV extents
+    rec["generator"] = sh["generator"]
+    if sh.get("hero"):
+        rec["hero"] = dict(sh["hero"])
+    cx = (brief.get("property") or {}).get("complex")
+    if gm["family"] and cx:
+        rec["complex"] = cx
+    pl = SH.plinth_mm(brief)
+    if pl > 0:
+        rec["plinth_m"] = C.m(pl / 1000.0)        # (M13: its plinth's depth under the base)
+        ter = brief.get("terrain") or {}
+        rows = [v for j, r in enumerate(ter.get("grade") or []) if r
+                for k, v in enumerate(r) if _on_wall(sh["walls"].get(j, ()), min(
+                    k * ter["step_m"], brief["edges"][j]["length_m"]) * 1000.0)]
+        if rows and min(rows) < 0:
+            # (and how far the ground along its walls falls under the base: what its steps
+            # meet; not along a spike of the footprint the tidying took away)
+            rec["grade_low_m"] = C.m(-min(rows))
     if brief["building"]["floor_grid"].get("level"):
         rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
+    if brief.get("deck"):
+        # AG10: on, under, beside or in an M14 deck's slab: nothing of it where it may not be
+        rec["deck"] = {"id": brief["deck"]["id"], "role": brief["deck"]["role"]}
+        rec["checks"]["deck"] = DKB.check(brief, arrs, pp)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
     rec["class"] = AC.budget_class(rec)
     return sh, px, rec
+
+
+def _on_wall(spans, s: float) -> bool:
+    """Whether s (mm along a brief edge) is on a stretch of it a wall stands on."""
+    return any(a - 5.0 <= s <= b + 5.0 for a, b in spans)
 
 
 def _base_m(brief: dict) -> float:
@@ -233,11 +284,12 @@ def _node_extras(bid: str, rec: dict) -> dict:
     return ex
 
 
-def _shell_mesh(g: G.Gltf, bid: str, sh: dict, mats: dict, extras: dict | None = None):
+def _shell_mesh(g: G.Gltf, bid: str, sh: dict, mats: dict, hero=None,
+                extras: dict | None = None):
     """The shell's mesh, or None when it has no triangles (AG3: a street front that takes
     the building's whole height, a gate house's): its node then carries no mesh, since glTF
     has no mesh without primitives (Unreal rejects one as a bad mesh)."""
-    prims = [p for p in sh["buf"].primitives(sh["shell"], mats) if len(p.indices)]
+    prims = [p for p in sh["buf"].primitives(sh["shell"], mats, hero) if len(p.indices)]
     return g.mesh(f"{bid}.shell", prims, extras=extras) if prims else None
 
 
@@ -350,15 +402,21 @@ def tile_job(job: dict) -> dict:
             gq.node(node, mesh=mesh, root=True,
                     extras={"cg": {"part": PT.type_of(*pdefs[node]), "kind": "part"}})
         parts_glb = gq.to_glb()
+    wrote = 0
     for bid, brief, sh, px, rec in made:
         piv = (int(round(brief["origin"][0] * 1000)), int(round(brief["origin"][1] * 1000)),
                int(round(_base_m(brief) * 1000)))
         ex = _node_extras(bid, rec)
-        mesh = _shell_mesh(g, bid, sh, mats, extras={"kind": "shell"})
+        hero = None
+        if rec.get("hero") and sh.get("mask") is not None:
+            # AG5: the hero's U2 mask, a texture of its own, on UV1 in the hero UV
+            hero = (rec["hero"]["perimeter_m"], rec["hero"]["height_m"])
+            wrote += _hero_mask(out, bid, sh["mask"], rec["hero"])
+        mesh = _shell_mesh(g, bid, sh, mats, hero, extras={"kind": "shell"})
         kids = [g.node(f"{bid}.shell", mesh=mesh, extras=ex)]
         if sh["front"]:
             # AG3: the street front, its own mesh (Unreal collides it as drawn)
-            fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats),
+            fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats, hero),
                         extras={"kind": "front"})
             kids.append(g.node(f"{bid}.front", mesh=fm, extras=ex))
             rec["front"]["node"] = f"{bid}.front"
@@ -376,7 +434,6 @@ def tile_job(job: dict) -> dict:
     decals = _decal_mesh(g, job["tile"], made)
     shells = g.to_glb()
     proxies = gp.to_glb()
-    wrote = 0
     wrote += MF.write_if_changed(out / "tiles" / f"{job['tile']}.glb", shells)
     wrote += MF.write_if_changed(out / "proxies" / f"{job['tile']}.glb", proxies)
     ppath = out / "parts" / f"{job['tile']}.glb"
@@ -400,6 +457,26 @@ def tile_job(job: dict) -> dict:
                                                for a in arrs.values())),
                           "bad": part_checks["bad"]}
     return {"tile": job["tile"], "records": records, "wrote": wrote, "files": files}
+
+
+HERO_DIR = "textures/hero"       # AG5: the heroes' U2 masks, under BUILD/assets
+
+
+def _hero_mask(out: Path, bid: str, a: np.ndarray, hero: dict) -> int:
+    """Write a hero's mask PNG where its pixels changed; its file and pixel hash go into the
+    hero's record. Returns the files written (0 or 1)."""
+    from .materials import pbr as PB
+    rel = f"{HERO_DIR}/{bid}.png"
+    path = out / rel
+    sha = PB.pixels_sha256(a)
+    hero.update(mask=rel, mask_sha256=sha, mask_px=int(a.shape[0]))
+    if path.is_file():
+        from PIL import Image
+        with Image.open(path) as im:
+            if PB.pixels_sha256(np.asarray(im)) == sha:
+                return 0
+    PB.save_png(path, a)
+    return 1
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +508,8 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
-          props: bool = True, progress: Progress | None = None) -> dict:
+          props: bool = True, ground: bool = True, progress: Progress | None = None,
+          water: bool = True) -> dict:
     """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
     to its notes then, else to `log`."""
     t0 = time.perf_counter()
@@ -481,7 +559,9 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             all(bid in old_b for bid in tiles[t]) and \
             _file_ok(out / "tiles" / f"{t}.glb", ot.get("tiles")) and \
             _file_ok(out / "proxies" / f"{t}.glb", ot.get("proxies")) and \
-            (ot.get("parts") is None or _file_ok(out / "parts" / f"{t}.glb", ot.get("parts")))
+            (ot.get("parts") is None or _file_ok(out / "parts" / f"{t}.glb", ot.get("parts"))) \
+            and all((out / old_b[bid]["hero"]["mask"]).is_file() for bid in tiles[t]
+                    if (old_b.get(bid) or {}).get("hero", {}).get("mask"))
         (keep if fresh else todo).append(t)
     t3 = time.perf_counter()
     records: dict[str, dict] = {}
@@ -515,11 +595,20 @@ def build(build_dir: str | Path, spec_path: str | None = None,
     lib = MS.library_for(spec_doc, out, log=log, progress=progress) if textures else None
     k = int(spec_doc["min_gene_distance"])
     tile_parts = {t: files[t].get("parts") for t in sorted(files)}
+    from . import skybridges as SK
+    with P.stage("skybridges") as st:            # AG4: every skybridge an asset of its own
+        sky = SK.build(model, out, log if progress is None else st.note)
+    wrote += sky["wrote"]
     with P.stage("building checks"):
         acc = AC.access(model, records, briefs)
         checks = [AC.coverage(model, records), AC.envelope(records),
                   AC.meshes(records, tile_parts), AC.unique(records, k),
-                  AC.budget(records, tile_parts), acc, AC.mounts(records)]
+                  AC.budget(records, tile_parts), acc, AC.mounts(records),
+                  AC.clearance(records), AC.roofs(records, briefs),
+                  AC.landings(records, sky["records"]), sky["check"],
+                  AC.types(records), AC.families(records), AC.slopes(records)]
+        if getattr(model, "decks", None):
+            checks.append(AC.decks(model, records))     # (AG10: M14's decks)
     t5 = time.perf_counter()
     man = {"version": MF.MANIFEST_VERSION, "assetgen": __version__, "generator": GEN_VERSION,
            "library": lib_hash, "inputs": inputs, "city": model.name, "model_sha256": sha,
@@ -527,7 +616,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
            "briefs_sha256": C.sha256_bytes((out / "briefs.json").read_bytes()),
            "tiles": {t: {"hash": tile_hash[t], "buildings": tiles[t], **files[t]}
                      for t in sorted(tiles)},
-           "buildings": {bid: records[bid] for bid in sorted(records)}}
+           "buildings": {bid: records[bid] for bid in sorted(records)},
+           "skybridges": sky["records"], "connections": sky["files"]}
+    from . import contribution as UC
+    man["green_replaces"] = UC.green_replaces(model, records)
     man = MF.merge(old, man, OWNED)
     text = MF.dumps(man)
     changed = MF.write_if_changed(out / MF.MANIFEST, text)
@@ -539,9 +631,10 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             if p.is_file():
                 p.unlink()
                 wrote += 1
-    from . import contribution as UC
     wrote += MF.write_if_changed(out / "unreal_contribution.buildings.json",
                                  MF.dumps(UC.buildings(man, lib)))
+    wrote += MF.write_if_changed(out / "unreal_contribution.connections.json",
+                                 MF.dumps(SK.contribution(man, lib)))
     secs = {"load": round(t1 - t0, 2), "briefs": round(t2 - t1, 2),
             "genomes": round(t3 - t2, 2), "tiles": round(t4 - t3, 2),
             "checks": round(t5 - t4, 2), "total": round(time.perf_counter() - t0, 2)}
@@ -572,6 +665,27 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
                 f"made, {n} files written")
+    if water:
+        # AG12: the water after the streets (it reads their bridge piers for its foam)
+        from .water.build import build as water_build, default_workers as water_workers
+        wrep = water_build(model, sha, out, filled, workers=workers or water_workers(),
+                           report_always=False, lib=lib, progress=progress)
+        f = wrep["files"]
+        n = len(f["written"]) + f["tiles_removed"] + sum(
+            int(bool(f[k])) for k in ("parts_written", "manifest_written",
+                                      "contribution_written", "report_written"))
+        wrote += n
+        st = wrep["stats"]
+        rep["water"] = {"ok": wrep["ok"], "bodies": st["bodies"], "pieces": st["pieces"],
+                        "tiles": st["tiles"], "triangles": st["triangles"],
+                        "stones": st["instances"], "disk_bytes": st["disk_bytes"],
+                        "failed": [c["id"] for c in wrep["checks"] if not c["ok"]],
+                        "tiles_made": f["tiles_made"], "files_written": n,
+                        "seconds": wrep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and wrep["ok"]
+        if progress is None:
+            log(f"water: {st['bodies']} bodies, {st['pieces']} pieces in {st['tiles']} "
+                f"tiles, {f['tiles_made']} made, {n} files written")
     # AG6's sign pages before AG8's signs show them; its materials and checks after them
     signs = None
     if lib is not None:
@@ -601,6 +715,27 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"props: {st['variants']} variants, {st['instances']} instances, "
                 f"{st['signs']} signs, {f['tiles_made']} tiles made, {n} files written")
+    if ground:
+        from .ground.build import build as ground_build, default_workers as ground_workers
+        grep = ground_build(model, sha, out, spec_doc, workers=workers or ground_workers(),
+                            report_always=False, lib=lib, progress=P)
+        f = grep["files"]
+        n = len(f["written"]) + len(f["removed"]) + sum(
+            int(bool(f[k])) for k in ("manifest_written", "contribution_written",
+                                      "report_written"))
+        wrote += n
+        st = grep["stats"]
+        rep["ground"] = {"ok": grep["ok"], "pieces": st["pieces"], "tiles": st["tiles"],
+                         "instances": st["instances"],
+                         "ground_triangles": st["ground_triangles"],
+                         "disk_bytes": st["disk_bytes"],
+                         "failed": [c["name"] for c in grep["checks"] if not c["ok"]],
+                         "tiles_made": f["tiles_made"], "files_written": n,
+                         "seconds": grep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and grep["ok"]
+        if progress is None:
+            log(f"ground: {st['pieces']} pieces in {st['tiles']} tiles, {st['instances']} "
+                f"clumps, {f['tiles_made']} tiles made, {n} files written")
     if lib is not None:
         mrep = MS.stage(model, sha, out, spec_doc, lib, log, signs=signs, progress=progress)
         wrote += mrep["files_written"]
@@ -660,7 +795,12 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
         for s, n in r["slots"].items():
             by_slot[s] = by_slot.get(s, 0) + n
         for s, v in r["stats"].items():
-            stats[s] = stats.get(s, 0) + v
+            if isinstance(v, dict):          # (AG4: counts by kind, e.g. roof_form_kinds)
+                d = stats.setdefault(s, {})
+                for kk, vv in v.items():
+                    d[kk] = d.get(kk, 0) + vv
+            else:
+                stats[s] = stats.get(s, 0) + v
     tri = sum(r["triangles"] for r in recs.values())
     ptri = sum(r["proxy"]["triangles"] for r in recs.values())
     pt = sorted(r["proxy"]["triangles"] for r in recs.values())
@@ -678,6 +818,10 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
             drawn += x["count"] * x["triangles"]
     meshes = sum(t["meshes"] for t in tparts)
     mesh_tri = sum(t["triangles"] for t in tparts)
+    sk = man.get("skybridges") or {}
+    kinds: dict[str, int] = {}
+    for r in sk.values():
+        kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
     return {
         "city": man["city"], "assetgen": man["assetgen"], "generator": man["generator"],
         "buildings": len(recs), "tiles": len(man["tiles"]),
@@ -695,8 +839,12 @@ def report(man: dict, checks: list[dict], secs: dict, workers: int, made: int,
                               for k, v in sorted(by_part.items())}},
         "disk": {"tiles_bytes": disk_t, "proxies_bytes": disk_p, "parts_bytes": disk_q,
                  "bytes_per_triangle": round(disk_t / max(tri, 1), 1)},
-        "stats": {k: round(v, 2) if isinstance(v, float) else v
+        "stats": {k: round(v, 2) if isinstance(v, float) else
+                  (dict(sorted(v.items())) if isinstance(v, dict) else v)
                   for k, v in sorted(stats.items())},
+        "skybridges": {"count": len(sk), "by_kind": dict(sorted(kinds.items())),
+                       "triangles": sum(r["triangles"] for r in sk.values()),
+                       "bytes": sum(f["bytes"] for f in (man.get("connections") or {}).values())},
         "checks": {c["name"]: c for c in checks},
         "ok": all(c["ok"] for c in checks),
         "seconds": secs, "workers": workers, "tiles_made": made, "tiles_kept": kept,
@@ -717,7 +865,10 @@ def report_text(rep: dict) -> str:
              f"disk: tiles {rep['disk']['tiles_bytes'] / 1e6:.1f} MB "
              f"({rep['disk']['bytes_per_triangle']} B per triangle), proxies "
              f"{rep['disk']['proxies_bytes'] / 1e6:.1f} MB, parts "
-             f"{rep['disk']['parts_bytes'] / 1e6:.1f} MB", ""]
+             f"{rep['disk']['parts_bytes'] / 1e6:.1f} MB",
+             f"skybridges: {rep['skybridges']['count']} {rep['skybridges']['by_kind']}, "
+             f"{rep['skybridges']['triangles']:,} triangles, "
+             f"{rep['skybridges']['bytes'] / 1e6:.1f} MB", ""]
     for name, c in rep["checks"].items():
         extra = {k: v for k, v in c.items() if k not in ("name", "ok", "first")}
         lines.append(f"{'PASS' if c['ok'] else 'FAIL'} {name}: {extra}")
@@ -742,6 +893,13 @@ def report_text(rep: dict) -> str:
                      f"{st['triangles']:,} triangles, {st['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if st['ok'] else 'FAIL ' + ', '.join(st['failed'])}"
                      f" ({st['tiles_made']} tiles made, {st['seconds']} s; streets_report.txt)")
+    wa = rep.get("water")
+    if wa:
+        lines.append(f"water: {wa['bodies']} bodies, {wa['pieces']} pieces in {wa['tiles']} "
+                     f"tiles, {wa['triangles']:,} triangles, {wa['stones']:,} stones, "
+                     f"{wa['disk_bytes'] / 1e6:.1f} MB; "
+                     f"{'all checks pass' if wa['ok'] else 'FAIL ' + ', '.join(wa['failed'])}"
+                     f" ({wa['tiles_made']} tiles made, {wa['seconds']} s; water_report.txt)")
     pr = rep.get("props")
     if pr is not None:
         lines.append(f"props: {pr['variants']} variants, {pr['instances']:,} instances, "
@@ -749,6 +907,13 @@ def report_text(rep: dict) -> str:
                      f"{pr['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if pr['ok'] else 'FAIL ' + ', '.join(pr['failed'])}"
                      f" ({pr['tiles_made']} tiles made, {pr['seconds']} s; props_report.txt)")
+    gr = rep.get("ground")
+    if gr:
+        lines.append(f"ground: {gr['pieces']} pieces in {gr['tiles']} tiles, "
+                     f"{gr['instances']:,} clumps, {gr['ground_triangles']:,} ground triangles,"
+                     f" {gr['disk_bytes'] / 1e6:.1f} MB"
+                     + (f", FAILS {', '.join(gr['failed'])}" if gr["failed"] else "")
+                     + f" ({gr['tiles_made']} tiles made, {gr['seconds']} s; ground_report.txt)")
     ma = rep.get("materials")
     if ma is not None:
         lines.append(f"materials: {ma['textures']} textures; "

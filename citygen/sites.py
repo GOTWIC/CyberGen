@@ -108,7 +108,7 @@ class Site:
         ent = G.nearest(foot.exterior, Point(self.gate)) if not foot.is_empty else \
             G.centroid(b.masses[0][0])
         H = b.height
-        body = max((z1 for _, _, z1, role, _ in b.masses if role not in ("spire", "antenna")),
+        body = max((m[2] for m in b.masses if m[3] not in ("spire", "antenna")),
                    default=H)
         rec = {"id": bid, "kind": kind, "use": use, "fh": fh,
                "floors": max(1, int(body / fh + 0.5)), "height": q(H), "masses": b.masses,

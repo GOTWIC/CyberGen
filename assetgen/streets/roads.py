@@ -59,10 +59,13 @@ def raised(seg: dict) -> bool:
 
 def deck_kind(seg: dict) -> str:
     """deck (a viaduct or bridge deck), embankment (a low ramp to a raised junction), or
-    none."""
+    none; on M14's decks (AG10) slab (a deck's street, on its slab) or ramp (a deck's solid
+    ramp, its walkways beside it)."""
+    a = seg.get("attrs", {})
+    if "deck" in a:
+        return "ramp" if a.get("role") == "deck_ramp" else "slab"
     if seg.get("tunnel") or not raised(seg):
         return "none"
-    a = seg.get("attrs", {})
     elev = bool(a.get("elevated")) or a.get("role") == "ramp"
     zs = [z["z"] for z in seg.get("z_profile", [])]
     if not elev and not seg.get("bridge") and max(zs) <= EMBANKMENT_M:
@@ -108,8 +111,17 @@ def gather(cx: Ctx, s) -> Piece:
               "origin": list(bbox_center(s.centerline))}
     if "ground" not in seg and not cx.ground.flat:
         inputs["ground_pts"] = cx.ground.samples(s.centerline)
+    if s.attrs.get("role") == "deck_ramp":
+        # M14 (AG10): the walkways beside a deck's ramp, which the ramp carries
+        inputs["ramp_walks"] = [{"id": w.id, "line": [list(p) for p in w.line]}
+                                for w in cx.ramp_walks.get(s.id, ())]
+    # M18: the model's embankments under its low stretches (the piece stands for them)
+    emb = sorted((st for st in cx.m.structures if st.kind == "embankment" and
+                  (st.attrs or {}).get("road_id") == s.id), key=lambda st: st.id)
+    if emb:
+        inputs["embankments"] = [[st.attrs["s0_m"], st.attrs["s1_m"]] for st in emb]
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
-                 cx.keys.get(s.id, []), inputs)
+                 cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
 
 
 # ---------------------------------------------------------------------------
@@ -264,8 +276,13 @@ def _make(inp: dict, tidy: bool) -> Out:
             _median(rd, mesh, inp, stops)
     if dk == "deck":
         _deck(rd, mesh, inp)
+        for a, b in inp.get("embankments", ()):
+            if min(b, rd.s1) - max(a, rd.s0) >= 0.5:
+                _embankment(rd, mesh, max(a, rd.s0), min(b, rd.s1))
     elif dk == "embankment":
         _embankment(rd, mesh)
+    elif dk == "ramp":
+        out.notes["walkways"] = _deck_ramp(rd, mesh, inp)
     if not mesh.triangles:
         return Out(empty="inside its junctions")
     return out
@@ -546,11 +563,66 @@ def _deck(rd: Road, mesh: Mesh, inp: dict):
         s += 15.0
 
 
-def _embankment(rd: Road, mesh: Mesh):
+RAMP_WALK_M = 2.0       # M14's walkway beside each side of a deck's ramp
+RAMP_PARAPET_M = 0.25
+RAMP_PARAPET_H = 1.1
+
+
+def _deck_ramp(rd: Road, mesh: Mesh, inp: dict) -> dict:
+    """M14's ramp up to a deck (AG10): barriers at the carriageway's edges, a walkway on
+    each side at curb height (the model's walkways beside it), a parapet outside it, and
+    the solid ramp's walls down to the ground on both sides and across its raised ends.
+    Returns the walkways' lines put on the ramp (z over the ground, as the model's)."""
+    W2 = rd.W / 2.0
+    pave = MT.paving(inp["style"]["archetype"])
+    wi, wo = W2 + RAMP_WALK_M, W2 + RAMP_WALK_M + RAMP_PARAPET_M
+    top = RAMP_PARAPET_H + 0.15
+    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1,
+             [(W2 - 0.45, 0.0), (W2 - 0.35, 1.05), (W2, 1.05), (W2, -0.0)])
+    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1,
+             [(-W2, -0.0), (-W2, 1.05), (-W2 + 0.35, 1.05), (-W2 + 0.45, 0.0)])
+    rd.strip(mesh, pave, rd.s0, rd.s1, W2, wi, 0.15)
+    rd.strip(mesh, pave, rd.s0, rd.s1, -wi, -W2, 0.15)
+    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1, [(wi, 0.15), (wi, top), (wo, top)])
+    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1, [(-wo, top), (-wi, top), (-wi, 0.15)])
+    for side in (1.0, -1.0):
+        rows, uvs, exp = [], [], []
+        for s, vi in rd.stations(rd.s0, rd.s1):
+            x, y = rd.at(s, side * wo, vi)
+            _, _, nx, ny, _ = rd.path.frame(s, vi)
+            zt, zb = rd.z(s) + top, rd.ground(s) - 0.1
+            col = [(x, y, zt), (x, y, zb)] if side > 0 else [(x, y, zb), (x, y, zt)]
+            rows.append(col)
+            uvs.append([(s, zt), (s, zb)] if side > 0 else [(s, zb), (s, zt)])
+            exp.append((side * nx, side * ny, 0.0))
+        mesh.grid("concrete", rows, uvs, expect=exp)
+    # (its raised ends: the ramp's body across, from the ground to the road)
+    for s, sgn in ((rd.s0, -1.0), (rd.s1, 1.0)):
+        zr, zg = rd.z(s) - ROAD_DZ, rd.ground(s) - 0.1
+        if zr - zg < 0.4:
+            continue
+        x0, y0 = rd.xy(s, -wo)
+        x1, y1 = rd.xy(s, wo)
+        a, b = ((x0, y0), (x1, y1)) if sgn > 0 else ((x1, y1), (x0, y0))
+        mesh.wall("concrete", a, b, zg, zr, zg, zr)
+    out = {}
+    for w in inp.get("ramp_walks", ()):
+        line = []
+        for p in w["line"]:
+            s, _ = rd.path.project(p[0], p[1])
+            z = rd.zp(s) + ROAD_DZ + 0.15 if rd.s0 < s < rd.s1 else p[2]
+            line.append([p[0], p[1], C.m(z)])
+        out[w["id"]] = line
+    return out
+
+
+def _embankment(rd: Road, mesh: Mesh, s0: float = 0.0, s1: float | None = None):
+    """Retained fill under the road from s0 to s1 (all of it by default): its two faces
+    from the road's edge down into the ground."""
     W2 = rd.W / 2.0
     for side in (1.0, -1.0):
         rows, uvs, exp = [], [], []
-        for s, vi in rd.stations(0.0, rd.L):
+        for s, vi in rd.stations(s0, rd.L if s1 is None else s1):
             x, y = rd.at(s, side * W2, vi)
             _, _, nx, ny, _ = rd.path.frame(s, vi)
             top = rd.z(s) + (0.15 if rd.side > 0 else 0.0)

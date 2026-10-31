@@ -444,6 +444,11 @@ errors).
    names, doors, curb points, parking and sign slots. More gangs or a calmer district:
    raise or lower its `danger` (gangs hold districts at 0.45 and up); name factions with
    `faction`.
+4f. Open `preview_water.png` and `preview_ground.png` (M16): the beds by depth, the sea's
+   exposure, the banks by kind (quays, canal walls, road embankments, natural banks,
+   beaches, marsh edges, riprap) and the flow; every piece of open land by its cover kind
+   with its desire lines, shade and maintenance. More beaches: a park or green on the sea
+   shore (or a named `beach` place); wilder land: lower a district's `wealth`.
 5. If something fails or reads wrong, change the **spec**, never the code, and rebuild. Typical
    fixes: pin a river with `from`/`to` `at` so the banks get the right land; raise `sea_share`
    so an island fits; give or adjust `area_share` where a district must fill a fixed landmass

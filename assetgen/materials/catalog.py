@@ -25,6 +25,12 @@ AG8's props, plants and signs (`PROP`, `prop_set`): their slots tinted by the sl
 color as the streets', the leaf cards on `leaves` (the leaf clump tile, cut where it has no
 leaf), sign faces on `sign` with the city's sign page (`page.<page>`), holo-ad screens on
 `holo` with the holo ad page.
+
+AG12's water (`WATER_SLOT`, `WATER`): a surface per water kind on `water` (Single Layer
+Water in Unreal: the kind's scattering and absorption, so a clear sea deepens slowly and a
+marsh goes murky within a meter; its flow speed, foam and the sea's waves; ripples and foam
+from the water atlas), the beds on `bed` (their set, M16's material, with the water atlas's
+caustics), the banks, walls and riprap stones on `concrete` with their sets.
 """
 
 from __future__ import annotations
@@ -72,6 +78,48 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "riser_tile": ("facade", "tile_glazed"), "riser_stone": ("facade", "stone_dressed"),
     "riser_dark": ("facade", "stone_dressed"), "lit_menu": ("neon", None),
     "lit_white": ("neon", None),
+    # AG4: roofs, roof equipment, green roofs, facade details, portals, stations, courts,
+    # decks and skybridges (all on the shared library's sets)
+    "roof_gravel": ("facade", "ballast"), "roof_paver": ("facade", "paving_concrete_slab"),
+    "roof_deck": ("facade", "paving_timber"), "roof_walkway": ("facade",
+                                                                 "paving_concrete_tile"),
+    "roof_metal": ("metal", "seam"), "coping": ("metal", "aluminum"),
+    "coping_stone": ("facade", "sill_stone"), "soffit": ("facade", "trim_paint"),
+    "skylight": ("metal", None), "green_roof": ("foliage", "grass"),
+    "soil": ("facade", "ballast"), "equip_dark": ("metal", "metal_dark"),
+    "equip_rust": ("metal", "metal_rusty"), "equip_steel": ("metal", "metal_galvanized"),
+    "tank_timber": ("facade", "timber"), "tank_steel": ("metal", "tank_metal"),
+    "tank_panel": ("facade", "plastic"), "tank_roof": ("metal", "metal_dark"),
+    "antenna": ("metal", "metal_galvanized"), "lamp_red": ("neon", None),
+    "lamp_green": ("neon", None), "lamp_amber": ("neon", None), "lamp_white": ("neon", None),
+    "pad_deck": ("facade", "pad_concrete"), "pad_paint_white": ("facade", "road_paint"),
+    "pad_paint_yellow": ("facade", "road_paint"), "roof_wall": ("facade", "structure"),
+    "penthouse": ("facade", "structure"),
+    "escape": ("metal", "metal_dark"), "duct": ("metal", "metal_galvanized"),
+    "cable": ("facade", "rubber"), "camera": ("facade", "plastic"),
+    "camera_lens": ("metal", None), "portal_lining": ("metal", "panel_corporate_glass"),
+    "portal_floor": ("facade", "paving_granite"), "platform": ("facade", "paving_granite"),
+    "platform_edge": ("facade", "tactile"), "court_paving": ("facade", "paving_tile"),
+    "planter": ("facade", "concrete_formed"), "bridge_deck": ("facade", "concrete_formed"),
+    "bridge_floor": ("facade", "paving_granite"), "bridge_glass": ("glass", None),
+    "bridge_frame": ("metal", "aluminum"), "bridge_roof": ("metal", "seam"),
+    "bridge_steel": ("metal", "steel_painted"), "bridge_rail": ("metal", "metal_dark"),
+    # AG5: stepped plinths and retaining skirts on slopes, the type generators' and the
+    # heroes' parts
+    "plinth": ("facade", "board_concrete"), "retaining": ("facade", "concrete_formed"),
+    "eave_tile": ("facade", "roof_tile"), "eave_soffit": ("facade", "timber"),
+    "lacquer": ("metal", "metal_painted"), "stone": ("facade", "stone_dressed"),
+    "finial": ("metal", "aluminum"), "hangar_door": ("metal", "hangar"),
+    "dormer": ("facade", "plaster_heritage"), "tarp": ("facade", "patch_tarp"),
+    "shanty_roof": ("metal", "metal_rusty"), "pergola": ("facade", "timber"),
+    "chimney": ("facade", "brick_heritage"), "radome": ("facade", "plastic"),
+    "wheel_steel": ("metal", "steel_painted"), "gondola": ("metal", "aluminum"),
+    "hero_frame": ("metal", "metal_dark"), "hero_light": ("neon", None),
+    "halo_frame": ("metal", "metal_dark"), "halo_light": ("neon", None),
+    "terrace_planter": ("facade", "concrete_formed"), "terrace_green": ("foliage", "grass"),
+    "terrace_soil": ("facade", "ballast"),
+    "escape_rust": ("metal", "metal_rusty"), "atrium_glass": ("glass", None),
+    "atrium_frame": ("metal", "aluminum"),
 }
 for _s in SY.SLOTS:
     if _s.startswith("paint_"):
@@ -111,6 +159,8 @@ STREET: dict[str, tuple[str, str | None]] = {
     "concrete.barrier": ("concrete", "concrete_formed"),
     "concrete.column": ("concrete", "concrete_formed"),
     "concrete.dark": ("concrete", "concrete_smooth"),
+    "concrete.soffit": ("concrete", "concrete_formed"),
+    "concrete.fascia": ("concrete", "concrete_smooth"), "stain": ("concrete", "concrete_smooth"),
     "stone.quay": ("concrete", "stone_blocks"), "stone.coping": ("concrete", "stone_dressed"),
     "stone.arch": ("concrete", "stone_blocks"), "tile.tunnel": ("concrete", "tile_glazed"),
     "steel": ("metal", "steel_mill"), "steel.painted": ("metal", "steel_painted"),
@@ -166,9 +216,49 @@ PROP_PREFIX: dict[str, tuple[str, str | None]] = {
     "screen": ("emissive", None), "neon": ("neon", None), "lit": ("emissive", None),
     "holo": ("holo", None), "page": ("sign", None), "holopage": ("holo", None),
 }
-TEXTURED = ("facade", "concrete", "metal", "road", "foliage", "leaves")
+# AG12's water slots (`assetgen/water/materials.py`) to (master, set or None); the
+# surfaces' `water.<kind>` on `water` with the kind's `WATER` parameters
+WATER_SLOT: dict[str, tuple[str, str | None]] = {
+    "bed.silt": ("bed", "bed_silt"), "bed.mud": ("bed", "bed_mud"),
+    "bed.sand": ("bed", "bed_sand"), "bed.gravel": ("bed", "bed_gravel"),
+    "bed.stone": ("bed", "bed_stone"),
+    "bank.natural_bank": ("concrete", "bank_soil"), "bank.beach": ("concrete", "bed_sand"),
+    "bank.marsh_edge": ("concrete", "bed_mud"), "bank.riprap": ("concrete", "bank_rubble"),
+    "bank.road_embankment": ("concrete", "stone_blocks"),
+    "wall.stone": ("concrete", "stone_blocks"), "wall.coping": ("concrete", "stone_dressed"),
+    "stone.riprap": ("concrete", "bank_rock"),
+}
+# per water kind: `scatter` and `absorb` (linear RGB; Single Layer Water's coefficients per
+# meter: the water's own color, and how fast each channel fades, red first), `shallow` and
+# `deep` (linear RGB: the color over a shallow and a deep bed, the previews'), `clarity_m`
+# (how far one sees into it), `flow` (the ripples' speed over M16's current), `foam` (the
+# vertex foam's strength), `waves_m` and `wave_length_m` (the open sea's swell; M16's
+# exposure weighs it per vertex), `ripple_m` (the ripple normals' tile)
+WATER: dict[str, dict] = {
+    "sea": {"scatter": [0.02, 0.07, 0.08], "absorb": [0.45, 0.11, 0.08],
+            "shallow": [0.16, 0.36, 0.36], "deep": [0.02, 0.075, 0.095], "clarity_m": 6.0,
+            "flow": 1.0, "foam": 1.0, "waves_m": 0.55, "wave_length_m": 26.0,
+            "ripple_m": 8.0},
+    "river": {"scatter": [0.035, 0.06, 0.045], "absorb": [0.65, 0.3, 0.3],
+              "shallow": [0.2, 0.28, 0.2], "deep": [0.035, 0.06, 0.045], "clarity_m": 2.5,
+              "flow": 1.0, "foam": 0.7, "waves_m": 0.0, "wave_length_m": 26.0,
+              "ripple_m": 6.0},
+    "canal": {"scatter": [0.03, 0.055, 0.045], "absorb": [0.75, 0.35, 0.35],
+              "shallow": [0.17, 0.25, 0.2], "deep": [0.035, 0.06, 0.05], "clarity_m": 2.0,
+              "flow": 1.0, "foam": 0.5, "waves_m": 0.0, "wave_length_m": 26.0,
+              "ripple_m": 5.0},
+    "ornamental": {"scatter": [0.04, 0.11, 0.13], "absorb": [0.28, 0.07, 0.05],
+                   "shallow": [0.3, 0.55, 0.55], "deep": [0.04, 0.12, 0.15],
+                   "clarity_m": 10.0, "flow": 0.3, "foam": 0.2, "waves_m": 0.0,
+                   "wave_length_m": 26.0, "ripple_m": 4.0},
+    "marsh": {"scatter": [0.05, 0.05, 0.02], "absorb": [1.1, 0.7, 0.9],
+              "shallow": [0.18, 0.18, 0.08], "deep": [0.03, 0.035, 0.015], "clarity_m": 0.8,
+              "flow": 0.6, "foam": 0.3, "waves_m": 0.0, "wave_length_m": 26.0,
+              "ripple_m": 5.0},
+}
+TEXTURED = ("facade", "concrete", "metal", "road", "foliage", "leaves", "bed")
 MASTERS = ("facade", "glass", "metal", "concrete", "road", "neon", "sign", "decal",
-           "opaque", "emissive", "translucent", "foliage", "leaves", "holo")
+           "opaque", "emissive", "translucent", "foliage", "leaves", "holo", "water", "bed")
 
 
 def _master_of_building(slot: str) -> tuple[str, str | None]:
@@ -195,11 +285,19 @@ def prop_set(slot: str) -> tuple[str, str | None]:
 
 
 def set_for(slot: str, era: str | None, part: str = "buildings") -> tuple[str, str | None]:
-    """(master, library set) of a slot (for an era-varied slot, in that era)."""
+    """(master, library set) of a slot (for an era-varied slot, in that era); AG4's
+    `connections` (skybridges) read the building table."""
     if part == "streets":
         return STREET.get(slot, ("concrete", "concrete_smooth"))
+    if part == "water":
+        if slot.startswith("water."):
+            return "water", None
+        return WATER_SLOT.get(slot, ("concrete", "concrete_smooth"))
     if part in ("props", "signs"):
         return prop_set(slot)
+    if part == "ground":
+        from ..ground import kinds as GK       # (AG13: a ground slot's base set; grass none)
+        return GK.slot_set(slot)
     master, s = _master_of_building(slot)
     if slot in ERA_SLOTS:
         return master, f"{s}_{era or DEFAULT_ERA}"
@@ -225,6 +323,16 @@ def material(slot: str, era: str | None, lib: dict, part: str = "buildings") -> 
     scalars and vectors (the contribution's and the Blender preview's)."""
     master, s = set_for(slot, era, part)
     rec: dict = {"master": master, "textures": {}, "scalars": {}, "vectors": {}}
+    if master == "water":
+        w = WATER[slot.split(".", 1)[1]]
+        rec["textures"] = {"NormalTex": atlas_tex("water", "normal"),
+                           "FoamTex": atlas_tex("water", "foam")}
+        rec["scalars"] = {"Clarity": w["clarity_m"], "FlowScale": w["flow"],
+                          "FoamAmount": w["foam"], "WaveHeight": w["waves_m"],
+                          "WaveLength": w["wave_length_m"], "RippleTileM": w["ripple_m"]}
+        rec["vectors"] = {k.capitalize(): list(w[k]) for k in ("scatter", "absorb",
+                                                                "shallow", "deep")}
+        return rec
     if master == "decal":
         from .atlases import DECAL_CELLS
         rec["textures"] = {"BaseTex": atlas_tex("decals", "base"),
@@ -243,8 +351,11 @@ def material(slot: str, era: str | None, lib: dict, part: str = "buildings") -> 
         rec["set"] = s
     else:
         rec["scalars"]["Textured"] = 0.0
-    if master in ("facade", "metal", "concrete", "road", "foliage", "glass"):
+    if master in ("facade", "metal", "concrete", "road", "foliage", "glass", "bed"):
         rec["textures"]["Macro"] = atlas_tex("macro", "macro")
+    if master == "bed":
+        rec["textures"]["Caustics"] = atlas_tex("water", "caustics")   # (AG12)
+        rec["scalars"]["CausticTileM"] = 3.0
     if master in ("facade", "metal"):
         rec["textures"]["Decals"] = atlas_tex("decals", "base")
         rec["scalars"]["Streaks"] = 1.0 if part == "buildings" else 0.0

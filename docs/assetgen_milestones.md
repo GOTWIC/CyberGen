@@ -13,14 +13,16 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG1 | Building shells: genomes, the facade grammar with six facade systems, walls with window openings, slabs, parapets, proxies; `assetgen build` keeps unchanged assets; Blender previews; the contribution for the first assets in Unreal | Done | [`docs/progress/AG1`](progress/AG1) |
 | AG2 | Facades: windows, balconies, fins and panels as parts instanced within a building, every facade system, massing articulation, wear by grime and wealth, thumbnail uniqueness and budgets per building class | Done | [`docs/progress/AG2`](progress/AG2) |
 | AG3 | Street fronts: a shopfront per unit by use, doors, lobbies, docks, garages, awnings, sign boxes, mounts, party and blind walls; walkable doorways in Unreal | Done | [`docs/progress/AG3`](progress/AG3) |
-| AG4 | Roofs and connections: roof equipment for every roof item, helipads, green roofs, facade details, skybridges, sky tube portals and stations | Planned | |
-| AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Planned | |
+| AG4 | Roofs and connections: roof forms and finishes, roof equipment for every roof item, helipads, green roofs, facade details, skybridges with landing doors, sky tube portals and stations | Done | [`docs/progress/AG4`](progress/AG4) |
+| AG5 | Types, landmarks and slopes: per-type generators, complex families, hero landmarks, buildings on M13's slopes, the art-direction loop | Done | [`docs/progress/AG5`](progress/AG5) |
 | AG6 | Materials and textures: the shared library per era, trim sheets, decals, window interiors, signage atlases, per-building parameters; textured master materials in Unreal | Done | [`docs/progress/AG6`](progress/AG6) |
 | AG7 | Street elements: roads with markings, sidewalks, bridges, viaducts, interchanges, tunnels, quays, transit structures, megasite elements | Done | [`docs/progress/AG7`](progress/AG7) |
 | AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Done | [`docs/progress/AG8`](progress/AG8) |
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
-| AG10 | Layered districts: buildings and streets on M14's decks | Planned (after M14) | |
+| AG10 | Layered districts: M14's slabs per tile with soffits, fascias, rails, lights and colonnades, their columns, stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs meeting the soffit; `asset_decks` and `street_decks` | Done | [`docs/progress/AG10`](progress/AG10) |
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
+| AG12 | Water: per body and tile a surface (LOD chains carrying the current, a foam mask and the sea's wave weight) and a bed at M16's depth with the banks' slopes under the water; banks by kind with riprap stones; AG7's walls and piers into the bed; water textures and catalog; `M_CgWater` (Single Layer Water, waves) and underwater volumes | Done | [`docs/progress/AG12`](progress/AG12) |
+| AG13 | Ground cover and grass: every piece of M16's open land textured by its cover kind and blended by its wear, shade, edges and moisture; grass and small plants as instanced clumps per tile (decision 13.9 (a)), swaying in Unreal and fading out at 60 to 100 m; `ground_grass_clear` and the budgets | Done | [`docs/progress/AG13`](progress/AG13) |
 
 ## AG0: contract and spike
 
@@ -416,8 +418,11 @@ its manifest is AG3's.
 `citygen/unreal.py` (`fallback_full` in the mesh record and its hash, an entry's own `ids`
 and `level` on its actor, door tags, `doors_of` and the `doors` flat graph) and
 `citygen/ue/import_city.py` (the Nanite fallback at every triangle, `cg.door=` tags);
-`tests/test_unreal.py::test_stage2_takes_assetgen_fronts`. Unreal check: the coordinating
-session's call.
+`tests/test_unreal.py::test_stage2_takes_assetgen_fronts`. Unreal check: with AG4's
+(`docs/progress/AG4/unreal/`): fronts flush with their shells, doorways walkable into the
+recess to the door, the hull from the band line, every door tagged and in the doors data
+asset, decals on the walls; a one-floor building its front takes whole has an empty shell
+node, which the exporter now leaves out (its entry's `triangles` counts the front's).
 
 **Open.** Shell vertex colors for grime and edge wear are not written (the masters draw grime
 from the ground by the building's dirt height, CPD, and read no vertex colors; COLOR_0 on
@@ -430,6 +435,343 @@ main entrance's ground), so on the downhill side its shopfronts sit over the bla
 down to the lowest ground, and AG8's awnings there hang on the plinth: AG5 steps the
 plinths and the band with them. Buildings on a deck have their fronts on the slab (AG10
 does the rest). Mac = x86 waits for the deferred determinism check.
+
+## AG4: roofs and connections
+
+**Built.** What stands on and between the buildings, in the shell builder's passes
+(`assetgen/buildings/roofs.py`, `connections.py`, `details.py`, the part kit's AG4 families
+in `roofparts.py`) and a stage of its own for the skybridges (`assetgen/skybridges.py`):
+- **roof forms** (`roofs.plan`, before the masses are built; `build_form`): a pitched roof
+  stands in the building's top floor (its attic: the mass's walls stop a floor lower), or
+  for a one-floor shed in the top of its tall floor, so it never rises over the model's
+  mass. Hip and gable (a rectangular top, the era's gable share), pagoda (curled corners),
+  mansard (any other top, or where roof items need a flat top) by the crowns `pitched` and
+  `pagoda_roof` up to 12 floors; sheds, warehouses, hangars and yards by their own gene
+  (`roof_form`: sawtooth with north glazing, gable, barrel, flat); the aerospace crown
+  `dome` a barrel vault. A ridge that would rise past the attic is flattened to fit, down to
+  8 degrees (`FLATTEST`); a shed's own form needs a rectangle, else its roof stays flat; a
+  window row that then starts on the street front's top keeps a 0.1 m sill strip.
+  Eaves by the era (under 0.6 m) only on edges nothing stands against; a one-floor storey
+  on another mass is all roof. AC units, tanks and antennas on a slope stand on steel
+  dunnage down to it;
+- **finishes and copings**: every flat roof open to the sky in its era's surface with a
+  gravel field, a paver terrace or a membrane with a walkway (gene `roof_finish`); a metal
+  or stone coping on every parapet (gene `coping`);
+- **green roofs**: M3's green areas on the building as a planted bed 0.5 m in on its soil,
+  a gravel border and a paver path through the larger ones (`green_roofs`, canonical
+  geometry from citygen's `geom`, so a court touching the edge never breaks the mesh);
+- **roof items** (`items`): an asset for every one: AC units (four styles), water tanks
+  (timber, steel, panel), antennas (whip, dish, lattice), helipads and AV pads with their
+  markings and edge lights, mechanical penthouses with exhaust stacks (merged, in the
+  building's wall tint); billboards stay
+  AG8's signs. An item under a corridor (a guideway or skybridge over the roof) is made
+  lower: a shorter antenna, a squat panel tank, a penthouse without stacks
+  (`roof_items_lowered`). Access huts on roofs of three floors or more, vents and skylights
+  by roof area, the empty billboard frame crown of the neon era where no billboard stands,
+  each only where `envelope.fits` (a skylight straddling a notch of the roof is moved);
+- **parts** (`roofparts.py`): roof equipment (`ROOF`) is always instanced
+  (`parts.INSTANCE_ALWAYS`, even once in a building), on slots that take no tint, so the
+  exporter gathers it per tile; penthouses and billboard frames merge into the shell. Every
+  part closed on integer millimeters, named by its parameters;
+- **facade details** (`details.py`, after the grammar, on solid wall, off every mount,
+  each placed only where `envelope.fits`): corner downpipes (AG3's pipe at the convex
+  corners), fire escapes on three to eight floor residential, mixed and hotel buildings and
+  shopfront rows (flats over the shops) of the eras that had them, kitchen exhaust ducts
+  for food and bar units on a back facade,
+  louvered wall vents by grime, cable conduits along a floor line by grime and low wealth,
+  CCTV cameras over doors by danger. The line: AG3 keeps its street fronts, mounts and
+  blind-wall downpipes; AG8 keeps every facade prop M6 places (AC units, wall lights, signs,
+  awnings, scaffolding, overhead cables, ivy);
+- **skybridges** (`connections.skybridge`, the skybridge stage): every model skybridge a
+  piece of its own in its frame (x along its line, 0.15 m into each facade), by kind:
+  enclosed (deck on a box girder, glazed walls between mullions, roof, lit soffit, collars),
+  stack (a floor and a spandrel band per level), open deck (M3p's podium decks: paving,
+  glass balustrades, planters), catwalk (a grating on two Warren trusses), cable (a light
+  deck under two catenaries); packs `connections/<tile>.glb`, the manifest's `skybridges`,
+  `unreal_contribution.connections.json`. In the briefs a skybridge's deck is in the
+  building frame (M13: from each one's base);
+- **landing doors** (`connections.landings_of`, `landing_ops`): the floor a skybridge lands
+  on is a door row of its mass (sill 150 mm), the landing an opening of the bridge's width
+  with a frame and two glazed leaves (at least 0.9 m wide for a catwalk or cable bridge,
+  into a corner pier where the bridge lands there); a wall too thin for windows still takes
+  the door where its mass reaches 0.5 m in behind it (`shell._depth`: a notch elsewhere in
+  the footprint does not make the wall thin), and a mechanical floor a bridge lands on keeps
+  its windows.
+  A bridge landing at the ground floor (on M13's slopes, an open deck from a building
+  standing higher) meets the street front; a deck off every floor line of its mass (M3's
+  floor grids apart) is reported, not failed (`landing_records`, `why`);
+- **portals and sky stations** (`connections.portals`, `station`, `mouth_frames`): where a
+  sky tube passes through a tower, every mass across the portal's floors is split there and
+  its portal storey cut by the tube's corridor (its top line from M5, 1 m clear round the
+  7 m section, a sky station's platform footprint); the corridor's walls lined, a lit frame
+  at each mouth that has room for it, the station's platforms on both sides of the tube
+  with tactile edges. A tube that meets no mass at the portal's height (between a
+  megabuilding's towers) has nothing to cut. No balcony or other part standing out of a
+  wall comes within the tube's clear radius (`connections.in_tube`), as none enters a
+  skybridge's corridor (`parts_off_portals`, `parts_off_bridges`);
+- **decks and courts**: M3p's tower decks paved with glass balustrades and planters; a
+  court on the ground paved, planters at its corners, galleries at the podium's floor
+  lines;
+- **briefs** (`BRIEF_VERSION` 2): `clearances` (the corridors of skybridges, guideways with
+  their trains and sky tubes passing near the building, in its frame), portals with their
+  tube's lines, diameter, station and platform.
+
+**Checks** (`asset_checks`): `asset_clearance` (nothing a building adds inside a corridor,
+every portal open; `envelope.clearances`; a tower's own sky tube is held to its portal's
+test, the corridor's margin there being the lining, frame and platforms), `asset_roofs` (every roof item an asset, every
+green roof of 4 m2 or more built, every portal cut or passing, every sky station with its
+platforms), `asset_landings` (a door wherever a skybridge meets a floor line),
+`asset_skybridges` (every skybridge a closed mesh); the envelope check knows roof
+equipment (on a roof or inside the masses), courts, copings; a mount in a landing door is
+counted apart (`in_landing`: M6 does not know where the bridges land). Every detail is
+placed only where `envelope.fits` (its family's reach and its slots', as it may be merged),
+and AG4's detail slots reach as their families. AG3 fix: a door `rehome` moves never slides
+along its facade into a court (one Vesper Bay unit door, blocked by a neighbor there).
+
+**Exporter** (`docs/unreal_export.md`, "From AG4"): roof equipment one entry per tile
+(`roofs.<tile>`, parts only, a building id per instance, no collision), buildings' `replaces` the
+blockout green-roof objects whose every green area they built (`green_replaces`), the
+skybridges' contribution (an entry per skybridge by id, complex collision, `links`), a
+stage 2 entry's `links` on its actor and tagged `cg.link=` by the importer
+(`citygen/unreal.py`, `citygen/ue/import_city.py`); tests without Unreal. AG6: every new
+slot in the catalog; the connections packs in the texel density check and `materials.json`.
+Previews: `assetgen materials preview` draws the skybridges and leaves out the blockout's
+skybridges and replaced green roofs; `--views city_full` every shell at once, textured. Its
+import of a whole city was quadratic in Blender (the importer's temporary objects and the
+replaced materials removed one by one, and AG6's materials set on slots linked to the mesh,
+each of which walks every object of the file): they go in one batch per import now, and
+the materials on the object wherever no other object draws its mesh (AG2's parts and AG8's
+families go through geometry nodes, which take the mesh's materials;
+`ag6_preview.import_glb`).
+
+**Samples** (every check passes in each: the eleven building checks, AG7's streets, AG8's
+props, AG6's materials; 4 workers on the shared Mac):
+
+| City | Buildings | Shell triangles | Roof forms (mansard / pagoda / hip / gable / sawtooth / barrel) | Roof items (AC / tank / antenna / penthouse / helipad / AV pad; billboards) | Green roofs | Skybridges (enclosed / stack / open deck / catwalk / cable) | Landing doors (off a floor line) | Portals cut / passing, sky stations | Build |
+|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 31.97 M | 1,115 (969 / 38 / 24 / 26 / 50 / 8) | 15,597 (12,110 / 1,100 / 818 / 222 / 19 / 42; 1,286) | 494 of 494 | 258 (60 / 1 / 77 / 86 / 34) | 513 of 516 (3) | 14 / 6, 2 | 4:45 |
+| Greyhook | 2,671 | 17.58 M | 293 (258 / 0 / 0 / 8 / 18 / 9) | 7,789 (6,176 / 672 / 75 / 308 / 0 / 11; 547) | 430 of 430 | 170 (43 / 0 / 127 / 0 / 0) | 338 of 340 (2) | 8 / 6, 1 | 1:56 |
+| Cragmouth | 6,777 | 34.07 M | 1,269 (1,124 / 59 / 25 / 32 / 29 / 0) | 18,553 (13,974 / 1,229 / 1,109 / 556 / 11 / 34; 1,640) | 338 of 338 | 279 (75 / 0 / 54 / 99 / 51) | 533 of 558 (24, 1 at a ground floor) | none | 7:00 |
+| Vesper Bay Decks (checks only) | 5,856 | 32.32 M | 1,024 (917 / 26 / 23 / 23 / 28 / 7) | 15,850 (12,267 / 1,109 / 836 / 249 / 16 / 36; 1,337) | 494 of 494 | 266 (57 / 1 / 81 / 84 / 43) | 531 of 532 (1) | 10 / 11, 2 | 6:48 |
+
+Facade details (Vesper Bay / Greyhook / Cragmouth): fire escapes 143 / 20 / 147, kitchen
+ducts 622 / 322 / 834, cameras 880 / 431 / 831, wall vents 2,998 / 763 / 4,114, conduits
+1,739 / 694 / 2,026, corner downpipes 3,867 / 3,965 / 2,545; access huts 149 / 3 / 144,
+skylights 874 / 452 / 1,047, roof vents 6,344 / 3,924 / 8,357. Skybridges 88,596 / 35,256 /
+103,080 triangles. No sample has a roof item under a corridor (`roof_items_lowered`; the
+tests build one). Builds: `assetgen build` whole (tiles, checks, streets, props, materials),
+with other sessions' Blender runs on the machine. Images: `docs/progress/AG4/README.md`.
+
+**Goldens**: written again on the Mac (`tests/assetgen/goldens.py --builds`, then
+`--sections ag1 vesper ag6` after the last shell change, which moved nothing): briefs v2
+change every brief (clearances, portal lines, skybridge decks in the building frame), so the
+small city's briefs, the five samples' briefs and the Vesper Bay brief hashes move; AG4
+changes every shell (roofs, details, landing doors), so the small city's asset digest and
+the Vesper Bay buildings move; the buildings' contribution (roof equipment entries, green
+roof `replaces`) and `materials.json` (AG4's slots) move AG6's digest. The props golden had
+gone stale on main (main's own code writes `9ea0...` for the small city, the golden held
+`3f78...`); main wrote it again meanwhile, to the same value, and AG4 changes nothing
+there. AG7's streets golden is unchanged. After main's AG2 and AG6 Unreal check
+(building parts without collision), the roof equipment entries and their parts say
+`collision: {"none": true}` too, which moves the small city's file digest and AG6's
+digest again (the buildings' contribution is in both).
+
+**Found on the way**:
+- A small-city tower whose footprint has a 1 m notch measured 0.3 m thick (the ring's
+  least width), so its skybridge got no door: the door now asks how far the mass reaches
+  in behind the wall it lands on (`shell._depth`).
+- Vesper Bay Decks' sky tube passes megabuilding towers whose balconies reached into its
+  clear radius beside the portal: such parts are dropped (`parts_off_portals`: 15 there and
+  in Vesper Bay, 4 in Greyhook).
+- `assetgen materials preview --views city_full` took over an hour on Vesper Bay without
+  getting through the import (three quadratic steps in Blender, above).
+- M6 places facade AC units where M3p's podium decks land (24 in Vesper Bay and Cragmouth,
+  6 in Greyhook); the landing door wins and the mount check counts them apart, while AG8
+  still draws the unit there (the city's to move).
+- M5 puts a portal on megabuildings whose tube runs between the towers over the podium
+  (6 in Vesper Bay and Greyhook, 11 in Vesper Bay Decks): nothing to cut, counted as
+  passing.
+- A few skybridge decks meet a building between two floors (M3's floor grids apart; on
+  Cragmouth's slopes two buildings seated at different heights): reported, not failed.
+
+**Exporter**: as above; `tests/test_unreal.py` (`test_stage2_skybridge_links`,
+`test_stage2_takes_assetgen_roofs_and_skybridges`, and `test_stage2_from_assetgen` knowing
+the roof equipment entries, which have no node). Unreal check (`docs/progress/AG4/unreal/`):
+skybridges at their pivots with their links, floors walkable, reaching both facades; roof
+equipment counts right, `NoCollision`, nothing floating; replaced green roofs gone. Open
+from it: the hulls close the landing doors, and the sky station platforms lie inside their
+tower's hull.
+
+**Open.** For AG5: one mechanical penthouse family (variants by era), no dormers on the
+pitched roofs, the plinths on slopes still one block (the landings at a ground floor and
+the shopfronts over a plinth wait for the steps). In Unreal a building collides as its
+masses' convex hulls, which close the landing doors: a walk across a skybridge meets the
+facade (the landing floors want the street front's drawn collision, or hulls cut at the
+door). Fire escapes are not
+put on shanty stacks (their own clutter does the part). The blockout green-roof objects
+that also draw a lawn stay in Unreal under AG4's beds (their plates sit under the gravel
+border, so nothing flickers). Shell vertex colors and trim-sheet UVs stay open from AG3. The whole-city previews
+draw AG8's props only near a perspective camera (AG6's preview), so parks read bare
+there. Mac = x86 waits for the deferred determinism check.
+
+## AG5: types, landmarks and slopes
+
+**Built.** Generators per M3 type, heroes for the landmarks, buildings on M13's slopes, the
+complex families' check and the art-direction loop, in the shell builder's passes
+(`assetgen/buildings/types.py`, `heroes.py`, `slopes.py`, the part kit's AG5 families in
+`typeparts.py`) and `assetgen/review.py`:
+- **type generators** (`types.GENERATORS`; `pre` after the massing articulation, `mass` in
+  the mass loop in place of the grammar, `post` after the masses): shanty stacks (lean-to
+  sheet roofs over their top storeys, tarps on poles, water barrels, rough fire escapes and
+  ladders up the stacks, stilt balconies), megablocks (antenna farms on the towers, service
+  risers up their back walls, a neon band along the podium), warehouses and yards (canopies
+  over loading doors, ridge monitors), sheds (open sides: the roof on steel columns two
+  bays apart, walls only where a neighbour stands; doors recorded as open sides), hangars
+  (a sliding door across the apron facade, its facade kept blank), labs (fume stacks),
+  villas (a chimney through the attic, a pergola on a lower roof), terraced rows (planters
+  and rails on every terrace), temple halls (a colonnade of lacquered columns on stone
+  bases round the hall, the hall set back behind it, eaves over every tier, stairs cut
+  into the platform, a finial), pagodas (eaves over every tier, a finial), gate houses
+  (a canopy roof all round, a beacon), terminals and stations (a vaulted roof, canopies),
+  control towers (the cab: a glazed band leaning out, mullions, a roof with a radome and
+  antennas; a lit slot up the shaft), parking structures (ramps as sloped decks), straddle
+  buildings (transfer girders under the span, lamps); the rest of M3's types stay the
+  general grammar's. Everything a type adds goes through `types.put`: only where the
+  envelope allows it (`envelope.fits`) and off every skybridge, guideway and sky tube
+  corridor; counted (`stats.type_features`, by kind), the record's `generator` names it;
+- **AG4's leftovers**: the mechanical penthouse by era (`roofs.PENTHOUSE_STYLE`: deco,
+  screen, block, shed, louver); dormers on gable, hip and mansard roofs of the eras that
+  pitch them (`types.dormers`: gabled or shed dormers one per 4.2 m on the long slopes,
+  small gabled ones on a mansard's steep slope where the attic leaves room); shanty fire
+  escapes (the shanty generator); collision that leaves the landing doors open
+  (`collision.py`: a mass a skybridge lands on is cut into storeys at the door's floor and
+  head, the door's storey notched the door's width and `VESTIBULE_MM` 2.5 m deep); a sky
+  station whose tube passes beside its tower, not through it (M5 leaves Delta Megacity two),
+  gets its platform there (`connections._beside`: the station's footprint on the tower's
+  side of the tube and a deck across to the wall, `STATION_LINK` 6 m at most, cantilevered
+  or resting on a roof up to 3 m under it, its floor under the tube's lowest point over the
+  station; the envelope check lets the `platform` slot reach the station);
+- **heroes** (`heroes.py`; every landmark and M3's megasite wheel): the general shell of
+  the landmark's masses with its era system by kind (`systems.LANDMARK_SYSTEM`), its
+  palette from the spec's landmark entry (walls the darkest colour, trim the lightest, the
+  accent its most saturated) and per kind: the megatower's light seams up every arm tip,
+  aviation lights on the tiers, sky gardens on the setbacks, a halo crown and a needle;
+  the spire's seams at the octagon's corners, collars, a needle with rings and a beacon;
+  the arcology's planted terraces with glass rails on every step, a glazed space frame
+  over its atrium and a mast with dishes; the wheel built whole (twin rims tied by beams,
+  rim lights, spokes to a hub and axle, 24 to 32 gondolas, lattice legs, a crossbeam).
+  Every hero has a U2 mask (scope 13.2): 512 px, R grime (from the ground and washed down
+  under every setback), G leaks (under its windows' sills), B wear (its corners and roof
+  edges), integer-hash noise from AG6's library, in the hero UV (UV1 on every non-glass
+  slot: u the UV0's u over its longest perimeter, v the height over the building's),
+  written as `assets/textures/hero/<id>.png`; budget class `hero`;
+- **slopes** (`slopes.py`; the brief's new `terrain`: the ground along every edge of a
+  mass on the base, every metre, 0.3 m out): each facade's plinth in steps of about 4 m at
+  their lowest ground (0.15 m risers), mitred at the corners, from 0.3 m under the step up
+  to the base; doors and shopfronts at grade (lowered to the ground where it falls 0.3 m
+  or more, into the plinth whole where they would end under the base, the band putting
+  windows in their place; raised onto the ground where it rises 0.2 m or more, their head
+  up to the band's top under what is mounted over them; narrowed to the stretch that can
+  be raised where the hill climbs across a wide shopfront); lower-storey windows where a
+  step is 2.7 m or more under the base; retaining skirts where the hill stands against a
+  wall; the band's ground-row windows the hill would bury left out;
+- **complex families**: twin towers one design to the last step (no member step on the
+  continuous genes); clusters, campuses, bridged pairs and megasites share their discrete
+  genes as before;
+- **checks**: `asset_types` (every building by its type's generator, every hero with its
+  mask; types the generators do not list counted apart), `asset_families` (the members of
+  a family share the discrete genes of every group whose system they share; twins every
+  gene), `asset_slopes` (every building whose plinth is 0.3 m or more stands on a stepped
+  plinth; what the fronts did at grade counted);
+- **art direction**: `assetgen review BUILD --spec S [--prev P]` writes `review.md` and
+  `review.json` (the failed checks of every stage, numbers per district: eras, facade
+  systems, type generators, wear; spec changes since the previous round; the previews to
+  open; what to change in the spec for what one sees), `assetgen spec diff A B`; the
+  skill's step 6 runs the rounds.
+
+GEN_VERSION "ag5.0" (ag5.1 since the Unreal check's open shed fix), GENOME_VERSION 5;
+briefs unchanged on flat ground (a hilly city's briefs gain `terrain`, BRIEF_VERSION stays
+2).
+
+**Exporter** (`docs/unreal_export.md`, "From AG5"): a hero's building entry carries `hero`
+(kind, accent) and a `materials` map of its own (`<slot or era material>#<id>`: its U2 mask
+`city.hero.<id>` as `HeroMask`, `HeroMaskOn` 1 on every slot of a textured opaque master;
+its accent on its light slots, with or without AG6's library), its shell and front UV1 in
+the hero UV; a building on M13's slopes carries `plinth_m`. `citygen/unreal.py` takes an
+entry's `hero` and `plinth_m` onto its actor (in its hash; `stage2.counts.heroes`);
+`citygen/ue/import_city.py` tags them (`cg.hero=<kind>`, `cg.plinth=<m>`) and gives the
+textured masters `HeroMask` (sampled on UV1) and `HeroMaskOn` (0 by default) after their
+surface (`HERO_CODE`: grime darkens, leaks stain, wear lightens), `STAGE2_VERSION` 6. The
+buildings' hulls are notched at the landing doors (no exporter change: convex pieces as
+before). Tested without Unreal by `test_stage2_heroes_and_plinths`; the Blender preview
+draws the same (`ag6_materials._hero` on `UVMap.001`). Unreal check
+(`docs/progress/AG5/unreal/`): Cragmouth and Greyhook imported and imported again; the
+megatower and the wheel tagged `cg.hero=` with the mask on UV1 and `HeroMaskOn` 1, the
+masters at `STAGE2_VERSION` 6, no other building with it on; Cragmouth's plinths meet the
+terrain (732 of 976 corners at the wall, 210 buried uphill, 30 floating over a lower street);
+landing doors open 2.5 m in (332 of 340 in Greyhook); open sheds' hulls blocked the walk
+under the roof, fixed there (an open shed collides from its roof's underside, GEN_VERSION
+ag5.1). Open from it: Cragmouth's 63,700 Nanite meshes overrun Unreal's root pages on the
+Mac, so it cannot be played as exported; doors on slopes behind M13's retaining walls
+(Greyhook's doors 1,989 of 2,000 at grade, Cragmouth's 325 of 710); the sky platforms beside
+a tower have no collision; station platforms inside their tower's hull and garage mouths as
+in AG4.
+
+**Samples** (4 workers, 3 where the shared Mac was short of memory; every check passes in
+each: the fourteen building checks, AG7's streets, AG8's props, AG6's materials):
+
+| City | Buildings | Shell triangles | Type generators (buildings; features) | Heroes | Families (twin towers) | Dormers | Landing doors | Sky platforms beside a tower | On a plinth (stepped facades / skirts; doors lowered / raised / narrowed; buried) | Build |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 5,793 | 34.52 M | 17 (2,598; 8,170) | megatower | 8 (1) | 331 | 513 of 516 | 0 | flat | 2m29s |
+| Greyhook | 2,671 | 19.05 M | 14 (1,426; 4,227) | wheel | 7 (0) | 401 | 338 of 340 | 0 | flat | 1m19s |
+| Cragmouth | 6,777 | 37.23 M | 10 (2,520; 11,882) | megatower | 4 (0) | 157 | 533 of 558 | 0 | 4,724 (33,923 / 30,123; 5,589 / 4,502 / 634; 2,196) | 4m31s |
+| Delta Megacity | 5,417 | 35.21 M | 10 (2,099; 10,155) | megatower | 7 (1) | 154 | 647 of 652 | 2 | flat | 3m02s |
+| Nexus City | 6,519 | 35.35 M | 19 (2,757; 11,107) | megatower, spire x3, wheel | 12 (1) | 340 | 468 of 474 | 0 | flat | 3m09s |
+| Vesper Bay Decks (checks only) | 5,856 | 34.78 M | 17 (2,546; 9,373) | megatower | 8 (1) | 280 | 531 of 532 | 0 | flat | 4m20s |
+
+On a plinth: buildings whose ground falls 0.3 m or more round their base (every one on a
+stepped plinth); buried: doors and shopfronts the hill covers where it climbs past a whole
+ground storey (left in place, counted). Build: the whole `assetgen build`.
+
+**Art direction**: two rounds on Vesper Bay as the art director's stand-in
+(`docs/progress/AG5/review/`: each round's `assetgen review` sheet, notes, before and
+after). Round 1 found the Corporate Core's gold and red brand-coloured towers (an owner's
+first two brand colours can paint whole walls), the spaceport's amber parking decks,
+The Stacks without the capsule stacks the spec asks for, and Old Town's roofs nearly all
+flat; round 2's spec moved the owners' accents to third place (trim only), weighted the
+heritage era's pitched roofs two in four and raised The Stacks' capsule weight and wear.
+The core and Scholar Isle now read as quiet glass and Old Town's pitched crowns went from
+963 to 1,409; The Stacks' capsules did not come (capsule stacks are built only up to 40
+floors, `systems.FLOORS`, and its towers are taller). The round 2 spec is now
+`cities/vesper_bay/asset_spec.json`.
+
+**Goldens**: written again on the Mac (`tests/assetgen/goldens.py --builds DIR --sections ag1
+ag6 vesper`): every shell moves (the type generators, heroes, dormers, penthouse styles,
+the collision notches at landing doors), so the small city's asset digest and the Vesper Bay
+buildings move; the buildings' contribution and `materials.json` (AG5's slots, hero
+materials) move AG6's digest. Briefs on flat ground are unchanged (the samples' brief
+goldens hold); a hilly city's briefs gain `terrain`. AG7's streets and AG8's props goldens
+are unchanged.
+
+**Found on the way** (the city's, stage 1's to look at):
+- M3's arcology leaves its top tier with no area and its crown 56 m over the last tier (the
+  sample with an arcology made for the renders, Vesper Bay with The Stacks' landmark an
+  arcology); AG5 leaves out a hero's unsupported masses and moves their roof items onto the
+  roof under them (`hero_masses_unsupported`, `roof_items_moved`).
+- M5 places two of Delta Megacity's sky stations (Corporate Core, Midtown) where the tube
+  passes 1 to 3 m beside the tower at the station's height, on a track that climbs 1.5 m
+  along the platform; AG4 built a platform only in a cut portal, so those stations had none
+  (AG4's `asset_roofs` failed on them; Delta was not one of AG4's samples).
+- M3 puts some temple halls' main entrance at a corner of the hall; behind AG5's colonnade
+  the door comes onto the entrance's own wall, 2 m from the corner.
+
+**Open.** For AG9: capsule stacks over 40 floors (The Stacks' towers); a hero glass darker
+than AG6's interior-mapped glass (the megatower reads grey-blue, not the brief's
+near-black); openings the hill buries where it climbs past a whole ground storey
+(Cragmouth: 2,196 doors and shopfronts, left in place and counted:
+`openings_buried`); an entrance on the uphill side of such a storey wants the floor above
+(AG3's band is the ground floor only). The whole-city 8K renders stay AG4's (AG5 changes
+read at street and district scale). Mac = x86 waits for the deferred determinism check.
 
 ## AG6: materials and textures
 
@@ -882,6 +1224,584 @@ species (and wind) later. The sign packs are the largest files; quantized positi
 masked and two-sided, Nanite `Voxelize` still full at distance, sign faces showing their
 page cells, holo-ads textured. Mac = x86 waits for the deferred determinism check.
 
+## AG10: layered districts
+
+**Built.** Stage 2's side of citygen's M14: the decks, the buildings on and under them, and
+the deck's streets (scope 14.11; AG9's dependency waived, AG9 waits):
+- **Deck pieces** (`assetgen/streets/decks.py`, in AG7's street stage, one piece per M14
+  id in place of its blockout object, `citygen/blockout.py` `_decks` now among the keys
+  `ctx._blockout_keys` reads):
+  - **Slab** (`<deck>.slab.<tile>`, the blockout object's own key): the deck's polygon in
+    the tile (holes under 2 m2 filled), paved top and soffit; a coffered soffit in the
+    planned eras, a ribbed one elsewhere (0.3 by 0.45 m ribs every 3 m on the deck's long
+    axis), stopping at the fascia and round the undercity buildings.
+  - **Edges**: on the slab's real edges (never a tile's), a fascia with a 0.15 m upstand
+    and a 0.45 m drip edge, grime streaks down it and a stained band on the soffit inside
+    it. A rail on the upstand: posts every 1.6 m with top, mid and bottom rails, glass
+    panels in the wealthy eras. No rail where a building on the deck stands at the edge,
+    a ramp or its junction meets it, or a stair or elevator lands.
+  - **Soffit lights**: two rows every 8 m over every ground street under the slab, and one
+    over each ground junction.
+  - **Colonnade**: where the edge passes over a park or plaza, a 0.8 by 0.9 m edge beam
+    and slim columns every 7.5 m, off the park's paths, M14's columns, props, plants and
+    buildings.
+  - **Collar**: a steel collar round a building the slab is cut round (a ground building
+    within 0.5 m of it reaching over its soffit; the slab cut back 0.1 m from it).
+  - **Columns**: a square pier cap, a round shaft, a flared capital and a drop panel (the
+    shaft alone inside an undercity building), a grime band at the foot.
+  - **Stairs**: two flights of steps on a sloped soffit with stringers and handrails, the
+    half landing on two posts, a top landing across to the slab's edge.
+  - **Elevators**: a glazed shaft on a steel frame with bands (a concrete core in the plain
+    eras), a cab door at the ground and at the deck facing the street, the shaft's head
+    over the deck, a bridge across to the slab's edge.
+- **The deck's streets** (`roads.deck_kind`: `slab`, `ramp`): they lie on the slab. Before,
+  they were drawn as viaducts, with a box girder 5 cm under the soffit, barriers and
+  underside lights. A ramp (`deck_ramp`) is a solid ramp: barriers at the carriageway, a
+  2 m walkway at curb height on each side (M14's walkways beside it, their lines put on it
+  in `graphs.walkways`), parapets, walls down to the ground and across its raised ends. A
+  deck's junction gets a slab of its own only where it reaches past the deck (at a ramp's
+  top).
+- **Ground** (M13): the slab is measured from the ground the deck stands on, flat where it
+  is level (within 5 cm on a 4 m grid). Elsewhere it is in 8 m cells over the finished
+  ground, or over the base of a building on or under the deck where one stands, so it
+  meets them (`decks.Ref`). Columns, stairs and elevators run from the ground at their
+  point to the slab there.
+- **Buildings** (`assetgen/buildings/decks.py`): the brief's `deck` record (AG10, only on a
+  building on, under, beside or in a slab): the deck, the role (`on`, `under`, `near`
+  within 2 m and over its soffit, `through` for one it is cut round), top and soffit over
+  the building's pivot, and the slab's plan within 3 m of its box. With it:
+  - **Undercity** (`under`): a roof within 1.2 m of the soffit is closed up to it by a
+    louvered plenum band (its top meets the soffit); a parapet otherwise stops 0.3 m under
+    it; no roof form. The roof's equipment, the types' roof features, masts, kitchen ducts
+    and shanty barrels keep under it (`roofs.Clear` takes the soffit as a ceiling). A
+    covered street's grime from the ground up and fronts and windows lit (`genome`: wear,
+    dirt height, lit ratio).
+  - **On a deck**: nothing under the deck's top (the band and doors on the slab already,
+    AG3).
+- **Checks**, on a city with decks only:
+  - `street_decks`: every slab object, column, stair and elevator replaced by a piece with
+    a mesh; the lowest thing over a ground street clears M14's 5.5 m; every stair and
+    elevator runs from the ground to the deck's top and lands on the slab's edge.
+  - `asset_decks`: no vertex of a building's shell, front or parts' boxes where its role
+    forbids, within the slab's plan (on: under the top; under: over the soffit; near or
+    through: inside the slab). Doors of buildings on a deck on its walkways; no roof item
+    or green roof under a slab.
+  - `street_coverage` counts the decks.
+- **Previews**: `assetgen materials preview --views deck`, the section across the biggest
+  deck from the blockout's deck camera: level, 35 mm, a 2.4 to 1 frame shifted up so the
+  ground at the cut sits 3 m over its bottom, the near clip on the cut
+  (`ag6_preview.section`), the eye lifted by the ground there on a terrain city; custom
+  views for the street under the slab (by day and night), the undercity, a light well and
+  the deck's own street.
+
+**Samples** (3 workers on the shared Mac, an Unreal import running beside):
+
+| City | Decks | Slab pieces | Columns | Stairs, elevators | Deck triangles | Lights, ribs, colonnade columns | On, under, cut round | Plenums | Doors on the deck | Build |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay Decks | 1 (Highcrest, 21.9 ha, level) | 8 | 570 | 2, 2 | 95,576 | 1,144, 1,807, 133 | 158, 164, 0 | 86 | 579 of 579 | 3m04s (every tile), 7 s streets |
+| Cragmouth with decks (test) | 2 (Ridgeback 12.2 ha on its slope, Hollow 5.0 ha, level) | 14 | 495 | 4, 4 | 128,571 | 545, 194, 19 | 38, 40, 9 | 30 | 255 of 255 | 3m30s (every tile), 9 s streets |
+
+Every check passes in both, `asset_decks` and `street_decks` included; the lowest thing
+over a ground street (a light under the ribs) is 7.2 m up. A building whose brief has no
+deck record makes the same bytes, so only the deck tiles' packs change (8 of 136 in
+Vesper Bay Decks).
+
+**Found on the way**:
+- The slab's lights at first followed only the junctions: a polygon-only intersection
+  (`geom.inter`) dropped the street lines (now `geom.line_inter`, a test counts them).
+- Undercity shanty stacks put water barrels and kitchen ducts through the soffit (their
+  own placements, not through `roofs.Clear`).
+- On Cragmouth with decks, two shop doors that AG3 moves off a party wall onto a wall at
+  the map's edge failed `asset_access` as walled off. Their way to the alley runs along
+  their own wall and round its corner. The check now lets a path graze its own building
+  (2 cm, `GRAZE_M`); it fails one that crosses it.
+- Ridgeback's finished ground falls from 44 to 25 m under its slab. M14 levels a deck's
+  district, but the streets' grade lines down the ridge stay on the slope, and the deck's
+  streets follow them. Hence the draped slab (no ribs there).
+
+**Exporter**: no code change. Slabs keep their blockout keys, so the manifest's `decks`
+still name them. Every deck piece replaces its blockout object and takes its level from
+it: the slab, the deck's streets and ramps on level 1 (`cg.level=1`); the columns, stairs
+and elevators on the ground. Recorded in `unreal_export.md` ("From AG10"); test
+`test_stage2_takes_assetgen_decks`. Not run in Unreal (the coordinating session's call).
+
+**Tests**: `tests/assetgen/test_ag_decks.py` (6, on the small test city with a deck over
+Core, `agtools.deck_build`): the pieces and what they replace, every street check, the
+slab's parts and the deck's streets on it, spans and ground, the buildings on their side of
+the slab, a city without decks untouched. Goldens: `ag1` (`testport_manifest`,
+`testport_files`) and `ag6` (`testport_materials`) written again on this Mac, on purpose: one
+door in the small test city (`d04.lot.e877n1165.bld`) keeps its model walkway now that its
+path may graze its own wall (`GRAZE_M`), so the manifest and
+`unreal_contribution.buildings.json` name another walkway; every pack is byte for byte as
+before (the small city's 445 files built on main and on AG10: only that door, the reports'
+timings and the street stage's code hash differ). The street, props, briefs and sample
+goldens are unchanged.
+
+**Asks of citygen**: level all the ground under a deck's slab, the streets' grade lines
+included (Ridgeback); a column grid that keeps out of undercity buildings or says it stands
+in one; the colonnade's columns in the model (AG10 places its own off the paths); the blockout's
+`deck` camera over the ground at the cut on a terrain city (its eye is 12 m over sea level,
+inside Ridgeback's hill; AG10's section adds the ground itself).
+
+**Open.**
+- One deck level per district (as M14).
+- No ribs on a deck whose ground is not level.
+- The elevator's head over the deck is the model's 3 m: a cab's overrun, not a machine
+  room storey.
+- Undercity buildings one floor high stay 4.3 m clear of the soffit (a clean roof, no
+  plenum).
+- The Unreal check of the deck city (`docs/progress/AG10/unreal/`, after the merge): the
+  slabs keep their keys and `cg.level=1`, the columns, stairs and elevators stand on the
+  ground, the deck's streets and ramps at level 1, the data assets' `Levels` as
+  `graphs.json`; every deck grid point lands on the deck, its walkways, ramps and stairs
+  walkable. Fixed there: the deck's slab, stairs and elevators keep every triangle in their
+  Nanite fallback (`streets.build.FULL_FALLBACK`, `fallback_full`): complex collision is
+  built from it and had lost the rail (a capsule stopped at 33 of 143 edge points, 78
+  after), and the Mac editor, which renders without Nanite, drew no soffit lights. Open from
+  it: Vesper Bay Decks overruns Nanite's root pages in play on the Mac (50,008 meshes), and
+  the undercity's one-storey rows leave empty shell nodes in the packs.
+- Mac = x86 waits for the deferred determinism check.
+
+## Fixes after AG10: every check on the nine samples
+
+Full `assetgen build` runs of the nine sample cities on main after M17, M21 and M16 (Saltreach
+Free Port, Vesper Bay Pinned and Vesper Bay Stacks had last been built whole at AG2 or AG8,
+before most of the checks) failed checks in seven of them. The failures #66's builds found in
+those three had gone with M21 (its skybridges keep their corridors clear; the failing door's
+building is no longer there), and others had come. Each was fixed in the generator
+(`GEN_VERSION` agfix.1) but one, which is the city's and is counted apart:
+
+- **Moved doors in place of ground windows** (`fronts.Band.rehome`): a door that has to
+  move off its wall (a party wall, a facade too short) was meant to replace the ground
+  windows of the nearest facade with room, but its filter named window openings `window`
+  where they are `win`, so a door only fitted between windows. A villa with its entrance on
+  a 0.78 m tip of its outline got no door (Pinned, `asset_access`), and a perimeter block's
+  shop door went 13 m along its wall, walled off from its walkway (Delta, M21's open item).
+  Doors facing a neighbor: Pinned 436 to 323, Saltreach Free Port 379 to 300.
+- **No door facing its own wall** (`fronts._faces_own`): a door or shopfront whose way
+  straight out meets the building's own walls within 3 m (a crack in a perimeter block's
+  outline, 0.5 m wide at its mouth; Nexus City) moves, as one against a neighbor does.
+- **Balconies over a turned block or a sky garden** (`shell._hangs`): M21's test of a
+  first-floor balcony hanging in the air took the slab's middle only. A stacked block turned
+  over the one under it, or a tower over a sky garden's open floor, left a corner 1.8 to
+  2.4 m from any mass (Pinned, `asset_envelope`, three towers). It takes every corner now.
+- **Mounts on their mass** (`fronts._on_mass`): the plate behind a cable end the model puts
+  8 cm under an exo frame's belt, which stands 2.9 m off the tower under it, hung under the
+  belt (Stacks, `asset_envelope`). Plates, ties and trellises stay within their mass's
+  height.
+- **A mast's foot on its roof** (`shell._mast`): a concave arc in a tower's outline pulled
+  the middle of its vertices to its edge, and the mast's foot 1.1 m off the roof (Decks).
+  Where the foot does not fit there, the mast stands at the middle of the area.
+- **Skybridges over a lower roof** (`shell._finish_parts`, `roofs._off_bridges`): on
+  Cragmouth three bridges are level with a lower roof of their building (a stacked tower's
+  lower block, a pod) and cross 1.2 to 3.4 m of it before the wall they land on. Flush parts
+  (mullion caps) at that facade's top and the roof's finish were in their corridors
+  (`asset_clearance`). Flush parts now take the corridor's own test (its collars and the
+  inside of masses spared), and a flat roof's finish is cut round the corridors over it.
+- **Landing doors on simply drawn masses** (`shell._simple_landings`): M21's round,
+  twisted, tapered and leaning shafts are drawn simply until AG15, with no facade grammar to
+  cut a landing door, so a bridge landing on a round tower had none (Cragmouth,
+  `asset_landings`). The facets where it lands take a storefront door from the floor to the
+  glass ribbon's head; every facet of the ring is split at its heights, so the mesh stays
+  closed.
+- **The ground under the base along the walls** (`build.building_asset`, the shell's
+  `walls`): a 3.5 m spike in a footprint, which the shell tidies away, still brought the
+  ground at its tip (1.25 m under the base) into `grade_low_m`, so `asset_slopes` wanted a
+  step where no wall stands (Cragmouth). The ground is taken along the stretches of the
+  edges that walls stand on.
+- **Quay UVs** (`streets/water._along`): a quay's u was the distance along its line. Round
+  the traced island's basins in Pinned, its 15 m paving's mitred outer edge at a sharp
+  corner, or at a jog of a few centimeters, ran meters with almost no u, and the streets
+  met the texel density on 99.499 % of their area (99.5 % needed). u now runs along each
+  edge line's own length (99.79 %).
+- **Junction corners** (`streets/walks._onto`): a sidewalk corner cut from the earlier
+  ones on the overlay's 1 cm grid kept a vertex 4.4 mm inside an earlier corner's edge, a
+  sliver of both (Nexus City's `jn.e383n933`, `street_meshes`). A vertex within 7.5 mm of an
+  earlier corner's edge goes.
+- **The materials report** was written only when a file of its stage changed; its texel
+  check reads the other stages' packs, so a fixed shell or street piece left it saying FAIL.
+  It is written when its checks change too.
+- **Sky stations out of reach** (`connections._beside`, `asset_roofs`): M5 portals a station
+  through its building by the union of the building's masses, so a tube can pass over a
+  megabuilding's podium far from its tower: the Crown Loop's station at The Stacks in Vesper
+  Bay, Pinned and Stacks, 14.4 m from the tower at the tube's height with the podium roof
+  64 m under it (M21's open item in Vesper Bay). With no wall within 6 m at its floor and no
+  roof within 3 m under it, nothing of the building can carry a platform: counted apart
+  (`stations_out_of_reach`), the city's to change. A station the building could serve still
+  fails.
+
+**Samples** (each found by a full build with the fixes before it; then every city built
+again on the final code, every check of every stage passing):
+
+| City | Found |
+|---|---|
+| Saltreach Free Port | nothing |
+| Vesper Bay Pinned | balconies (3 towers), the villa's door, the station, the quays' texel density |
+| Vesper Bay Stacks | the mount under a belt |
+| Vesper Bay | the station (counted apart) |
+| Delta Megacity | nothing (the perimeter block's door, fixed with `rehome`) |
+| Nexus City | the door in a crack, the junction's corners |
+| Greyhook | nothing |
+| Cragmouth | three bridges over a lower roof, the round tower's landing, the spike |
+| Vesper Bay Decks | the mast |
+
+On the final code (4 workers on the shared Mac, 1.5 to 3 min a city; landing doors of the
+skybridge ends, the rest counted apart as at the ground, off a floor line or in a portal):
+
+| City | Buildings | Doors (facing a neighbor) | Landing doors | Stations out of reach | Streets at texel density |
+|---|---|---|---|---|---|
+| Saltreach Free Port | 3,186 | 11,788 (300) | 287 of 290 | 0 | 99.84 % |
+| Vesper Bay Pinned | 6,766 | 21,293 (323) | 462 of 470 | 1 | 99.79 % |
+| Vesper Bay Stacks | 6,620 | 20,653 (357) | 445 of 450 | 1 | 99.78 % |
+| Vesper Bay | 5,809 | 19,952 (368) | 467 of 470 | 1 | 99.84 % |
+| Delta Megacity | 5,516 | 21,131 (418) | 567 of 574 | 0 | 99.76 % |
+| Nexus City | 6,553 | 23,123 (415) | 450 of 454 | 0 | 99.83 % |
+| Greyhook | 2,617 | 10,265 (66) | 309 of 310 | 0 | 99.86 % |
+| Cragmouth | 7,058 | 24,638 (363) | 455 of 470 | 0 | 99.80 % |
+| Vesper Bay Decks | 5,962 | 21,756 (328) | 507 of 510 | 0 | 99.83 % |
+
+Previews of the fixed spots: [`docs/progress/agfix/`](progress/agfix).
+
+**Goldens** written again on this Mac: `ag1` (the small city's manifest and files, the Vesper
+Bay buildings' GLBs) and `ag6` (the small city's materials), since every pack carries
+`GEN_VERSION`; the street packs' (the small city, Vesper Bay and three of its six named
+tiles: their quays and junction corners); and the props golden, stale since M17, M21 and M16
+moved the small city (main gives the same digest, and nothing here changes the props).
+
+**Tests**: `tests/assetgen` and `tests/test_unreal.py` (the Unreal launches deselected): 190
+passed and 2 failed, the props golden (since written again) and Nexus City's sample briefs
+(`test_sample_briefs_golden[nexus_city]`, which fails on main too, below); new
+`test_ag_fixes.py` (4): a moved door in place of ground windows, a corner snapped onto an
+earlier one, quay UVs round a sharp corner, a station counted apart.
+
+**Asks of citygen**:
+- Portal a sky station only through a building whose tower the tube passes through, or
+  within 6 m of, at its height (the Crown Loop's station at The Stacks).
+- Nexus City's junction `jn.e383n933`: its polygon has a 29.7 m2 hole inside highway
+  `rs.e566n892`'s carriageway (unpaved in the assets), and two of its legs make a bowtie
+  corner, which puts a sidewalk corner in the carriageway.
+- Footprints with a spike (Cragmouth `d03.lot.w434n813.bld`, 3.5 m out and back) or a crack
+  (Nexus City `d06.lot.e1045s82.bld`, 7.5 m deep, 0.5 m at its mouth).
+- Skybridges level with a lower roof of the building they land on (Cragmouth): end them at
+  the roof's edge, or keep their deck clear of the roof.
+- Open decks that end several meters short of the wall they land on (Cragmouth, up to 27 m;
+  6.5 m from a round tower, M21's shaft inside the box the deck was laid to).
+- Pinned's traced Corporate Core door `d01.pin.path.w1427s613.door.e0` faces a 1.2 m court
+  between two traced buildings (counted apart as facing a neighbor).
+- Nexus City built from main on this Mac is not citygen's golden model (`a6ddd8fe...` in
+  `tests/data/golden_hashes.json`, `f74f4ffd...` here, twice; the same tries, layout salt 1,
+  and a report the same as the committed one but for its timings), so assetgen's sample
+  briefs golden for it fails.
+
+## AG13: ground cover and grass
+
+**Built.** Stage 2's side of citygen's M16 for the open land (scope 14.14; decision 13.9
+taken as (a)), in `assetgen/ground/`:
+- **AG6's sets** (`materials/library.GROUND_SETS`, generators at the end of `surfaces.py`):
+  `ground_lawn` (mown blades, faint stripes, clover, thatch, bare spots), `ground_meadow`
+  (long grass in swirling clumps, straw, seed heads, soil between), `ground_wild` (the
+  meadow gone dry, for wasteland), `ground_dirt` (clods, pebbles, roots, cracks, trodden
+  patches), `ground_mud` (ruts, smears, puddles with low roughness), `ground_gravel`
+  (stones of two sizes over dust, oil), `ground_sand` (grain, ripples, shell bits, dents),
+  `ground_moss` (cushions) and `ground_rubble` (broken concrete and brick on dirt); 2 m
+  tiles at 512 px/m (gravel and moss 1 m). Paving needed no new set: M16's paving and
+  overgrown paving take AG7's paving sets by what they pave (a plaza's granite, a market's
+  or court's cobbles, a promenade's tiles, a podium's concrete tiles, a yard's slabs, a
+  megasite's cast concrete or pads). The library grows to 134 sets, about 1 GB cooked.
+- **Surfaces** (`kinds.py`): per cover kind a base, a worn and a shade set and blend weights
+  (lawn: lawn, dirt, moss; marsh: meadow tinted dark, mud, moss; wasteland: wild, dirt,
+  rubble; gravel: gravel, dirt, moss; and so on), a lawn's green as a tint over the set's
+  vegetation.
+- **Per tile** (`gather.py`, `tile.py`; a job holds every input of its 256 m tile and its
+  hash decides whether the tile is made again):
+  - **Mask** (`ground/masks/<tile>.png`, 512 px, a pixel per 0.5 m, row 0 the south edge):
+    R wear (each desire line its own wear across its width, falling to 0 a meter past it;
+    under it the piece's wear at 0.35), G shade (M16's 4 m raster bilinear, tree crowns 0.55
+    to 0.8, 1 under a deck: finer than M16's per-piece mean, its open item), B edge (one to
+    three pixels in from where the surface changes), A moisture (1 at the water, 0 from
+    60 m, on a 2 m grid).
+  - **Ground mesh** (`ground/tiles/<tile>.glb`): every piece clipped to the tile on the 1 cm
+    grid, triangulated exactly on its millimeters, 0.1 m over the ground as the blockout's
+    flats were; on M13's terrain cut by its 4 m cells, each vertex and normal on the ground
+    grid, and a triangle steeper than about 35 degrees (the steps of the retaining walls,
+    the cliff) box mapped on its own vertices, since plan UVs stretch there (the texel
+    density check found it on Cragmouth); a part ear clipping refuses (a hole touching its
+    outer ring at a vertex: one in Nexus City) takes GEOS's constrained Delaunay triangles
+    on the same vertices. A primitive per surface and tile: the mask is per tile, so is the
+    material.
+  - **Grass** (`ground/grass/<tile>.json`): a candidate per mask pixel inside a
+    grass-bearing piece (not under a deck), jittered in it and kept by splitmix64 hashes of
+    its world cell (so a tile's grass does not depend on how the city is cut into jobs) with
+    probability $D\,a\,(1-w)^2 f_s (1 + 0.6 m) f_g k_t$ (`kinds.py`: $D$ from 0.04 per m2
+    on sand to 1.8 in planted beds; fewer in deep shade; more near water; half on ground
+    over 30 degrees, none over 40; $k_t$ the tile's cap). The clump kind from the piece's
+    mix, leaning to ferns in deep shade and under crowns, reeds on wet ground, weeds where
+    neglected; variant, yaw and scale by hash. A clump stands only where its footprint (its
+    kind's radius times its scale) lies in grass-bearing land clear of desire lines, decks,
+    trunks, and the right of way, buildings, solid structures and water the check tests
+    (`citygen.cover.Ctx`, near the tile), so the clearance holds whatever the pieces'
+    topology (two lot yards meeting at a building's corner, a median lawn a few millimeters
+    from a lot across a road's edge, a building's 3 mm spike: each let a clump through
+    before).
+- **Verges**: M6's median lawns, which the blockout drew flat over the road and nothing
+  replaced: on AG7's lawn island top (avenues, streets and service roads with a median of
+  2 m, not in the industrial and aerospace eras) grass only, at the top; on a highway's
+  median a lawn strip 3 cm over the asphalt with grass clear of the barrier; under AG7's
+  concrete island top nothing.
+- **Clumps** (`clumps.py`, `ground/clumps.glb`): lawn (32 to 42 blades), clover (trefoils,
+  white heads), flowers (stems, leaves, five or six petal heads over a tuft; a family per
+  district palette: its era's palette from `assetgen/presets.py` pushed to petal colors,
+  greys left out), meadow and meadow_dry (40 to 52 blades over straw, seed stalks), reeds
+  (plumes), cattails (sword leaves, brown heads), weeds (rosettes, a seed stalk), fern
+  (arching fronds, paired pinnae), and AG8's scrub and sedum (`props.trees` at 0.5 and 0.34
+  scale): AG8's ground plants folded in as clump kinds. M6's own scrub and sedum
+  placements stay AG8's instances (seen from far; the grass fades at 100 m). 3 or 4
+  variants each, 60 to 366 triangles, COLOR_0 for the grass master (height share, tone,
+  dryness), normals leaning up.
+- **Checks** (`checks.py`, `ground_report.json/.txt`): `ground_coverage`,
+  `ground_grass_clear` (on the model's own geometry on the 1 cm grid), `ground_meshes`,
+  `ground_budgets`. `ground/preview.png`: the city from above at 2 m a pixel and the tile
+  with the most clumps at 0.25 m.
+- **Budgets** (decision 13.9 (a)): at most 40,000 clumps a tile (the kept clumps scaled up
+  by the cap's inverse square root, at most 1.5; a tile over it by chance drops the clumps
+  kept by the least margin), 3 million a city, 400 triangles a clump variant, 60,000 for all
+  of a city's variants, 250,000 ground triangles a tile and 12 million a city, 12 million
+  instanced triangles a tile (Unreal draws about half a tile's within the fade radius).
+- **Unreal** (`docs/unreal_export.md`, AG13): `unreal_contribution.ground.json`; a ground
+  actor per tile replacing its tile's ground cover and median lawn objects, a drop for an
+  object whose tile draws none of its pieces; the grass as instanced parts whose transforms
+  stay in their tile's file (`xforms_file`), not Nanite, no collision, no shadow, culled at
+  60 to 100 m, out of the HLODs; `M_CgGround` and `M_CgGrass` (sway by world position
+  offset times `MPC_CityGen`'s new `Wind`, dithered with the instance fade). Not run in
+  Unreal (the coordinating session's call).
+- **Blender**: `assetgen materials preview` draws the ground tiles with the ground material
+  (`ag6_materials.ground`, node for node the master's blend) and the clumps within 140 m of
+  a street view's eye through AG8's geometry-nodes instancer (`grass`).
+
+**Samples** (Windows PC, 3 workers, on M16's builds of main at 280eb35, with main's fixes
+after AG10 merged in: the six samples' full `assetgen build` passes every check, buildings,
+streets, props, ground and materials; before that merge Delta's `asset_access` door, Nexus
+City's `asset_access` and `street_meshes` and Greyhook's `asset_envelope` failed with
+main's own code as well):
+
+| City | Pieces | Tiles | Clumps | Most in a tile | Tiles at the cap | Instanced triangles, most in a tile | Ground triangles (most in a tile) | Clump variants (triangles) | MB | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 4486 | 160 | 1,823,161 | 40,000 | 11 | 7,057,657 | 61,744 (1,498) | 61 (10,796) | 89 | 44 |
+| Delta Megacity | 4780 | 145 | 1,012,038 | 40,000 | 9 | 7,082,152 | 65,852 (1,141) | 61 (10,796) | 55 | 36 |
+| Saltreach Free Port | 2627 | 158 | 2,283,363 | 40,000 | 26 | 7,966,535 | 36,475 (1,346) | 55 (9,732) | 105 | 44 |
+| Nexus City | 5520 | 173 | 1,374,336 | 39,840 | 8 | 7,015,648 | 72,245 (1,135) | 67 (11,860) | 73 | 38 |
+| Greyhook | 2574 | 151 | 1,095,227 | 37,874 | 0 | 4,483,236 | 44,659 (1,008) | 55 (9,732) | 56 | 34 |
+| Cragmouth | 5381 | 129 | 1,189,678 | 40,000 | 3 | 9,382,475 | 491,923 (8,506) | 58 (10,264) | 100 | 62 |
+| Vesper Bay Decks | 4258 | 160 | 1,676,080 | 40,000 | 11 | 7,057,657 | 58,556 (1,337) | 61 (10,796) | 83 | 45 |
+
+A regeneration: Vesper Bay's Old Town (M16's regenerated model over the same base) made 27
+of its 160 tiles again, every one within 55 m of the district (whose pieces meet 26 tiles);
+the rest kept byte for byte.
+
+**Open.**
+- Not run in Unreal: the masters' graphs, `set_cull_distances`, the dither on the fade and
+  leaving the grass out of the HLODs are written to the engine's Python API but untested
+  (the coordinating session's call on a check). A grass runtime grid of its own (World
+  Partition loading the grass nearer than the city) would cut memory further.
+- Grass instances carry no per-instance color (a flower's color is its family's); stage 3
+  drives `Wind` and seasons.
+- The ground on M13's terrain follows the bilinear ground grid as the blockout's heightfield
+  does, ramps over the retaining walls' steps included (box mapped, no grass on them).
+- Deck columns standing on a lawn are not cut out of it (no grass under a deck anyway).
+- Mac = x86 waits for the deferred determinism check.
+
+## AG12: water
+
+**Built.** Stage 2's water from citygen's M16 (scope 14.13; decision 13.10 taken as (a)):
+every water body's surface, bed and banks, `assetgen water BUILD` (also a stage of
+`assetgen build`, after the streets; `--no-water` skips it), in `assetgen/water/`:
+- **Pieces** (`pieces.py`), each made from its own inputs and kept by hash as AG7's:
+  - a **body piece** per water body and 256 m tile (`<body>@<tile>`): the body's own water
+    (its polygon less the bodies before it in M16's order, the order `Beds.body_at` takes,
+    so no two overlap) in the tile, with the body's depth, profile, material and flow, its
+    level, its banks within reach of the tile, the edges it shares with other water, the
+    bridge piers there and the sea's exposure raster near it; it makes the bed
+    (`<body>.bed.<tile>`) and the surface (`<body>.water.<tile>`);
+  - a **bank piece** per bank AG12 draws (natural bank, beach, marsh edge, riprap, road
+    embankment, and canal walls along rivers and the sea): AG7 keeps the quays and the
+    waterways' canal walls;
+  - the **drop**: the blockout's water objects no piece takes the place of (sea sheets of
+    tiles with no sea, the quay and canal wall bands AG7 draws).
+- **Fields** (`fields.py`, from a piece's inputs alone):
+  - **depth**: M16's `Beds.depth_many` exactly (its nearest bank and ties, on the body's
+    banks within reach; a test compares them at random points);
+  - **bottom**, the depth AG12 draws: M16's bed raised to every sloped bank's slope carried
+    on under the water (`bottom`: all of them within reach, not only the nearest; where a
+    slope meets a wall, or a beach meets riprap, the nearer bank's bed stepped 3 m down
+    under the other's waterline), at a wall's toe up to its face (M16's bed begins the
+    wall's thickness out), never within 5 cm of the surface;
+  - **level**: a flat city's `surface_m` (-1.5), else M13's (a river's along its
+    centerline);
+  - **current**: along the body's flow line, the sea's tide along its nearest shore, times
+    the square root of the depth over the deepest there (slower over shallows);
+  - **foam**: at a wall's face, a sloped bank's waterline (wide on a beach, faint by a marsh)
+    and round AG7's bridge piers;
+  - **waves** (the sea): M16's exposure (open 1, sheltered 0.5, harbor 0.15) on a 16 m raster
+    blurred over 80 m, nothing at the waterline and full 20 m out.
+- **Meshes** (`grid.py`, `makers.py`): a region on a square lattice, the cells inside it two
+  triangles each on its points, the edge cells clipped on the millimeter grid and
+  triangulated exactly (a piece the ear clipper cannot take whole, a hole touching its
+  outline, split in halves), vertices shared by position, so each sheet is watertight.
+  - **Bed** (Nanite, complex collision): 8 m on the sea, else 4 m; it leaves out every sloped
+    bank's dry strip (the line buffered `width` over the water; a ring round an island by
+    its polygon's offsets), so bank and bed meet along the waterline; a slot by M16's
+    material (`bed.mud`, `silt`, `sand`, `gravel`, `stone`), the underwater zone of a bank by
+    the bank's (riprap and road embankment stone, beach sand, marsh mud); a steep triangle
+    (a step) on vertices of its own with UV0 on its vertical plane; skirts 13 m down along
+    the edges a body shares with other water, facing out, so a step between two beds is
+    closed from the shallower side; UV1.x the depth (caustics). On a terrain city the bed
+    lies 0.1 m over M13's ground grid (which carries M16's beds too), never within 5 cm of
+    the surface.
+  - **Surface** (non-Nanite, no collision): LOD chains on the sea's 2, 4, 8 and 16 m
+    lattices and inland 4, 8 and 16 m (screen sizes 1, 0.4, 0.15, 0.05); UV0 the plan in
+    meters, UV1 the current, COLOR_0 foam, depth over 12 m, wave weight.
+  - **Banks**: the dry strip on a 2 m lattice, each point at the ground at the line's nearest
+    point falling to the level at `width` (the bed's slope); riprap stones on it from the line
+    to the toe (six stone meshes in `water/parts.glb`, instanced, jittered and turned by a
+    hash of the bank and cell); stone walls with a coping along rivers and the sea, 0.5 m
+    into the bed.
+- **AG7** (`streets/ctx.py`, `water.py`, `structures.py`): `Ground.water_level` is M16's
+  surface on a flat city (`WATER_DEFAULT` -0.9 only for a model without M16); quay and canal
+  walls reach M16's toe and 0.5 m into the bed (`notes.foot`), the quay stairs down to the
+  new surface; canal walls follow the waterway's `canal_wall` banks (they ran round the
+  whole polygon, a dam across each canal's mouth into other water); bridge piers and arch
+  and pylon footings stand 0.5 m into M16's bed (`inputs.bed`, sampled along the bridge),
+  their footprints in `notes.piers` for AG12's foam.
+- **AG8** (`props/gather.py`): a boat floats on M16's water (its waterline at the body's
+  surface; it stood at the ground, 1.5 m over the water).
+- **AG6**: sets `bed_mud`, `bed_silt`, `bed_sand`, `bed_gravel`, `bed_stone` (under water,
+  the upper band's density), `bank_soil`, `bank_rubble`, `bank_rock` (`library.WATER_SETS`;
+  generators `sediment`, `water_rubble`, `water_soil` in `materials/water_surfaces.py`:
+  deposits, worm casts, ripple marks, pebbles, shell grit; packed stones; crumbly soil with
+  roots and grass tufts); the `water` atlas (8 m: ripple normals, foam lace at two scales and bubbles, two
+  caustic networks and their glow); `catalog.WATER`, per water kind (sea, river, canal,
+  ornamental, marsh; a body along marshes for 40% of its banks is marsh water): Single
+  Layer Water's scattering and absorption, shallow and deep colors, clarity, flow, foam,
+  swell height and length; `WATER_SLOT` for the beds, banks, walls and stones; masters
+  `water` and `bed`; the texel check reads the water packs (beds at the upper density).
+- **Checks** (`checks.py`, the packs read back against the model):
+  - `water_coverage`: each body's own water covered by its first surface LOD, and by its
+    beds with its sloped banks' dry strips (within 0.2%); every bank drawn, every quay and
+    waterway canal wall by AG7;
+  - `water_levels`: every surface vertex of every LOD at its level (1 cm); sampled bed
+    vertices at AG12's bottom from the model's own banks (2 cm), never deeper than M16's bed
+    (the share exactly on it reported);
+  - `water_gaps`: each sloped bank's waterline on the bed under it (at most 12 cm over it),
+    every wall foot (AG12's and AG7's quays and canal walls) in the bed, every shared edge
+    skirted;
+  - `water_meshes`, `water_budgets` (400,000 triangles and 60,000 stones a tile, 9 million
+    triangles a city), `water_replaces` (every blockout water object replaced or dropped).
+  - `water_report.txt`; `water/preview.png` (`preview.py`: the beds by depth, the banks by
+    kind, insets with the foam, the current and the stones).
+- **Unreal exporter** (`docs/unreal_export.md`, AG12): `unreal_contribution.water.json`;
+  `M_CgWater` (Single Layer Water: the kind's scattering and absorption, ripples along the
+  current in a flow map's two phases, foam from the vertex mask and the shallows drawn by
+  Opacity, the sea's swell as four Gerstner waves by world position offset faded out from 150
+  to 350 m), `M_CgBed` (caustics as emission under the water, fading with depth and by
+  night), the water packs imported with their vertex colors and full-precision UVs and no
+  lightmap UVs, a post-process volume beside each M16 swim box (`underwater.<water>.<tile>.<k>`:
+  the kind's tint, saturation, vignette, fog); `STAGE2_VERSION` 7.
+- **Blender**: `ag6_materials.water` (refractive, the color by depth and clarity, ripples at
+  two scales, the swell as a bump, the foam over the lace as a matte surface) and `caustics`;
+  `assetgen materials preview --views water`: `water_canal` (along the straightest stretch of
+  the longest quayed canal from 2.6 m over the water), `water_bank` (a river's longest
+  natural or riprap bank from over the water beside it), `water_harbor` (the biggest basin from
+  above); AG12's water in every textured view near it.
+
+**Samples** (M16's, M21's and M18's models, main at f27543e, built by the M18 session; AG7's
+streets, then the water, 2 workers, the Windows PC; triangles: the surfaces' first LOD, the beds
+and the banks):
+
+| City | Water bodies (kinds) | km2 | Tiles | Surface | Beds | Banks | Triangles | Most in a tile | Stones | MB | Seconds |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 10 (sea 3, river 1, marsh 2, canal 4) | 3.56 | 114 | 1,572,582 | 161,783 | 134,582 | 1,868,947 | 50,005 | 45,178 | 69.9 | 32 |
+| Delta Megacity | 13 (sea 3, river 2, marsh 1, canal 7) | 4.51 | 136 | 1,956,126 | 220,762 | 106,160 | 2,283,048 | 35,013 | 27,797 | 85.7 | 37 |
+| Saltreach Free Port | 12 (sea 4, river 5, canal 3) | 4.90 | 145 | 2,428,997 | 169,275 | 89,356 | 2,687,628 | 45,387 | 28,196 | 101.7 | 51 |
+| Nexus City | 18 (sea 5, river 2, marsh 2, canal 9) | 3.16 | 111 | 1,282,137 | 180,343 | 113,294 | 1,575,774 | 37,568 | 21,483 | 59.2 | 37 |
+| Greyhook | 6 (sea 3, river 1, canal 2) | 7.24 | 195 | 3,541,060 | 254,845 | 90,290 | 3,886,195 | 41,481 | 48,496 | 146.7 | 83 |
+| Cragmouth (terrain) | 8 (sea 4, river 2, canal 2) | 3.03 | 72 | 1,456,281 | 113,790 | 39,926 | 1,609,997 | 34,816 | 34,044 | 60.6 | 27 |
+
+The surfaces' coarser LODs add a quarter again (Vesper Bay 398,598, 103,215 and 24,844
+triangles). Every water check and every street check passes in all six; 76 to 94% of the
+bed vertices lie exactly on M16's bed, the rest on a bank's slope carried on over it.
+M18's models move the water little (its embankments and crossings change some banks and
+the bridge piers' foam).
+
+Before M18 (M16's models, main at 280eb35, with the fixes after AG10 and AG13 merged in), a
+full `assetgen build` of the six passed every check of every stage (buildings, streets,
+water, props, AG13's ground, materials; AG6's texel check with the water packs in it), and
+before the fixes after AG10 were merged in, the same checks failed as main's build of the
+same models. Merging AG13 moved no water byte. AG13's surface generators `soil` and
+`rubble` took the names AG12's banks and stony beds had used (`surfaces.make` looks AG13's
+up first), so AG12's are `water_soil` and `water_rubble`.
+
+**Regeneration** (on M16's models): M16's Old Town regeneration of Vesper Bay: 22 banks
+changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,
+every one within reach of a changed bank); 14 of 114 tiles made again, 9 written (the rest
+the same bytes), every water check passing.
+
+**Found on the way**:
+- AG7 drew canal walls round a waterway's whole polygon, so each canal's mouth into a river
+  or the sea had a stone dam across it (47 to 143 m per waterway in Vesper Bay and Delta);
+  its quay walls stopped 3 m under the water over 10.5 m deep basins, and bridge piers 4 m
+  under it over a 12 m deep sea.
+- M16's bed steps from nothing to the toe at a bank's waterline and from one bank's profile
+  to another's where the nearest bank changes: a gap of up to 3 m under a natural bank
+  where it met a wall. AG12's bed carries every sloped bank's slope on under the water.
+- A bank round a whole island (Saltreach's beach, 3.2 km) made a strip polygon of the whole
+  island (758,000 m2 of sand at the water's level), and GEOS's one-sided buffer of a closed
+  line took the land side: a ring's strip is its polygon's offset.
+- Moored boats stood at the ground, 1.5 m over M16's water (AG8 now floats them).
+
+**Exporter**: the third layer-2 part, recorded in `unreal_export.md` (AG12); tests without
+Unreal (`test_exporter_takes_the_water`: the stage 2 LOD chains, masters and the underwater
+volumes per swim box). Not run in Unreal (the coordinating session's call).
+
+**Tests**: `tests/assetgen/test_ag_water.py` (11: the small test city's water with every
+check, the fields against M16, kept by hash, the same bytes on one or three workers and
+another hash seed, a regenerated district's water only near its changed banks, the
+contribution against the packs, the exporter's stage 2, AG7's walls in the bed and canal
+mouths open, the mesher on a hole touching its outline, the small city's and Vesper Bay's
+goldens, `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`).
+Tests that the water changes: the exporter's stage 2 (`test_stage2_from_assetgen`: the
+underwater volumes are new actors), M13's lift of props
+(`test_m13_lifts_placements_by_base_or_ground`: boats float on the water) and the stub
+model of the streets' ground test (its water bodies). On the code with M18 merged in,
+`tests/assetgen` and `tests/test_unreal.py` on this PC: 218 passed, 2 skipped, 1 failed, the
+props golden (it fails on Windows, and AG8's boats move it). Earlier, the whole suite after
+merging the fixes after AG10: 782 passed, 4 skipped, 2 failed, both known to fail on Windows
+(the props golden and `test_progress`'s pipe test).
+Goldens written again on this PC on the code with M18 merged in, on purpose: the water's
+(the small city and Vesper Bay on M18's models), the streets' (AG7's walls, piers and canal
+walls on M16's water; the library's hash in the contribution) and assetgen's `ag1`
+`testport_files` and `ag6` `testport_materials` (the contributions carry the library's
+hash, which AG12's sets and atlas change; materials.json gains the water); AG13's ground
+golden, the building manifest and packs, briefs and the sample goldens are main's. The
+props golden stays main's (AG8's boats move it, so it needs writing again on the Mac).
+
+**Open.**
+- Not run in Unreal: `M_CgWater` is written against UE 5.8's Python names for the Single
+  Layer Water output node and the Interchange mesh options (logged and skipped where an
+  engine lacks one, an opaque water as fallback); the coordinating session decides on a
+  check.
+- Depth foam comes from the vertex depth (shallows under 0.6 m), not the scene depth.
+- The previews' swell is a bump of two wave bands, not the master's displaced Gerstner
+  waves; the master's wave normals take the tangent frame of UV0 (x east, y north).
+- On a terrain city the bed lies 0.1 m over M13's ground grid, which keeps M16's beds too;
+  the grid could leave the water out once AG12's beds are the bed.
+- M16's exposure zones are 32 m cells (blurred here over 80 m); a sea channel has no
+  exposure of its own (no swell inland).
+- Marsh edges have mud, not reeds (AG13's cover); quay railings and the props on quays are
+  M20's (M16's PR).
+- Stage 3: wind, rain and fog on the water, the underwater look beyond a tinted volume;
+  stage 4: boats moving with buoyancy and wakes, ferries.
+- Mac = x86 waits for the deferred determinism check.
+
 ## Order
 
 ```
@@ -905,7 +1825,8 @@ and its entry here notes it.
 
 ## Progress output
 
-`assetgen build`, `preview`, `materials preview|board`, `library`, `streets` and `props` say
+`assetgen build`, `preview`, `materials preview|board`, `library`, `streets`, `water`, `props`
+and `ground` say
 what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1's
 `citygen/progress.py`, which it will import once that lands): a line per stage (load, briefs,
 genomes, shells and parts, the library on first use, building checks, streets, signage,
@@ -939,6 +1860,8 @@ assets are not in git.
 .venv/bin/python -m assetgen materials preview BUILD [--night]          # textured renders (AG6)
 .venv/bin/python -m assetgen materials board OUT                        # material boards (AG6)
 .venv/bin/python -m assetgen streets seam BASE REGEN --district NAME    # what a regeneration changed (AG7)
+.venv/bin/python -m assetgen water BUILD [--workers 4]                  # water (AG12)
+.venv/bin/python -m assetgen ground BUILD [--workers 4]                 # ground cover and grass (AG13)
 .venv/bin/python -m assetgen review BUILD --prev P                      # art-direction round (AG5)
 .venv/bin/python -m citygen unreal BUILD PROJECT                        # the city with its assets in Unreal
 .venv/bin/python -m assetgen sweep --suite m8a --out DIR                # (AG9)

@@ -1,0 +1,42 @@
+== dead ends
+dead ends by class: {'highway': 1, 'street': 84, 'service': 7, 'alley': 32, 'pedestrian': 51}
+of them, another road within 60 m straight ahead: {'street': 73, 'service': 3, 'alley': 31, 'pedestrian': 47}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 85
+[(('avenue', 'street'), 45), (('street', 'street'), 23), (('avenue', 'avenue'), 5), (('avenue', 'pedestrian'), 4), (('street', 'pedestrian'), 3), (('highway', 'avenue'), 2), (('pedestrian', 'pedestrian'), 2), (('highway', 'highway'), 1)]
+   ('rs.e618s1039', 'rs.e707s1148', 'highway', 'highway', 307, 670, -1268)
+   ('rs.e577s1380', 'rs.e545s1522', 'highway', 'avenue', 191, 507, -1472)
+   ('rs.e577s1380', 'rs.e530s1376', 'highway', 'avenue', 203, 510, -1469)
+   ('rs.w1574s1118', 'rs.w1598s1138', 'avenue', 'street', 43, -1586, -1129)
+   ('rs.w1568s1173', 'rs.w1589s1189', 'avenue', 'street', 36, -1579, -1179)
+   ('rs.w1566s1043', 'rs.w1591s1035', 'avenue', 'street', 27, -1576, -1032)
+   ('rs.w1557s1019', 'rs.w1541s1029', 'avenue', 'street', 60, -1545, -1022)
+   ('rs.w1557s1019', 'rs.w1582s1010', 'avenue', 'street', 28, -1566, -1006)
+== bridges
+bridges: 15 Counter({'road': 6, 'pedestrian': 6, 'road_rail': 3})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 980 with a leg not at the node's height at the junction edge: 55 with a leg's end not at the node's z: 0
+== junction control
+   ('Crown Island', False, False) 47
+   ('Crown Island', True, True) 56
+   ('Kettle Island', False, False) 17
+   ('Kettle Island', True, True) 9
+   ('Lumen Key', False, False) 10
+   ('Lumen Key', True, True) 9
+   ('Palm Key', False, False) 93
+   ('Palm Key', True, True) 17
+   ('Westreef', False, False) 641
+   ('Westreef', True, True) 81
+crosswalk widths: Counter({4.0: 592})
+junctions with crosswalks: 172 of them within 40 m of another: 79
+== signs
+Counter({('shop_sign', 'blade'): 3950, ('shop_sign', 'facade'): 2933, ('billboard', 'roof'): 458, ('neon', 'facade'): 179, ('billboard', 'facade'): 70, ('holo_ad', 'roof'): 42})
+== transit supports
+  tl.island_hopper monorail: length 5885 m, supports 96, gap median 25 max 1068 m, off the line max 17.1 m (>2 m: 18)
+  tl.mainland_express maglev: length 1982 m, supports 7, gap median 48 max 135 m, off the line max 0.0 m (>2 m: 0)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 99

@@ -1,5 +1,45 @@
 {
   "$defs": {
+    "Arc": {
+      "additionalProperties": false,
+      "description": "M21: a curved stretch of the footprint (in the building frame).",
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "radius_m": {
+          "title": "Radius M",
+          "type": "number"
+        },
+        "start_deg": {
+          "title": "Start Deg",
+          "type": "number"
+        },
+        "sweep_deg": {
+          "title": "Sweep Deg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "center",
+        "radius_m",
+        "start_deg",
+        "sweep_deg"
+      ],
+      "title": "Arc",
+      "type": "object"
+    },
     "At": {
       "additionalProperties": false,
       "properties": {
@@ -119,6 +159,18 @@
         },
         "floor_grid": {
           "$ref": "#/$defs/FloorGrid"
+        },
+        "form": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Form"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: the building's form (absent: none)."
         }
       },
       "required": [
@@ -137,6 +189,109 @@
         "floor_grid"
       ],
       "title": "BuildingRec",
+      "type": "object"
+    },
+    "Clearance": {
+      "additionalProperties": false,
+      "description": "AG4: a corridor the asset keeps out of (a skybridge, a transit guideway and its\ntrains, a sky tube), near the building: a line of (x, y, z floor, z top) in the building\nframe and a half width.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "skybridge",
+            "guideway",
+            "sky_tube"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "half_m": {
+          "title": "Half M",
+          "type": "number"
+        },
+        "line": {
+          "items": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Line",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "mode",
+        "half_m",
+        "line"
+      ],
+      "title": "Clearance",
+      "type": "object"
+    },
+    "Deck": {
+      "additionalProperties": false,
+      "description": "AG10: the M14 deck slab a building stands on, under, beside or in: its top and\nsoffit over the building's pivot, and the slab's plan within 3 m of the building's box\n(its frame).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "on",
+            "under",
+            "near",
+            "through"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "top_m": {
+          "title": "Top M",
+          "type": "number"
+        },
+        "underside_m": {
+          "title": "Underside M",
+          "type": "number"
+        },
+        "slab": {
+          "items": {
+            "$ref": "#/$defs/Polygon"
+          },
+          "title": "Slab",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "top_m",
+        "underside_m",
+        "slab"
+      ],
+      "title": "Deck",
       "type": "object"
     },
     "District": {
@@ -481,6 +636,72 @@
       "title": "Floors",
       "type": "object"
     },
+    "Form": {
+      "additionalProperties": false,
+      "description": "M21: how the building departs from a box (citygen's `Building.form`).",
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "crown": {
+          "title": "Crown",
+          "type": "string"
+        },
+        "tower": {
+          "title": "Tower",
+          "type": "boolean"
+        },
+        "band": {
+          "title": "Band",
+          "type": "integer"
+        },
+        "pivot": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pivot"
+        },
+        "masses": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Masses",
+          "type": "array"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "crown",
+        "tower",
+        "band",
+        "pivot",
+        "masses",
+        "params"
+      ],
+      "title": "Form",
+      "type": "object"
+    },
     "Frontage": {
       "additionalProperties": false,
       "properties": {
@@ -621,6 +842,34 @@
         },
         "floors": {
           "$ref": "#/$defs/Floors"
+        },
+        "arcs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Arc"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: its curved stretches (absent: none).",
+          "title": "Arcs"
+        },
+        "plate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Plate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: a band of a twisted, tapered or leaning shaft (absent: none)."
         }
       },
       "required": [
@@ -843,6 +1092,41 @@
       "title": "Plant",
       "type": "object"
     },
+    "Plate": {
+      "additionalProperties": false,
+      "description": "M21: a band's plate against its form's base plate (turned and scaled about the form's\npivot, then moved).",
+      "properties": {
+        "turn_deg": {
+          "title": "Turn Deg",
+          "type": "number"
+        },
+        "scale": {
+          "title": "Scale",
+          "type": "number"
+        },
+        "shift_m": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Shift M",
+          "type": "array"
+        }
+      },
+      "required": [
+        "turn_deg",
+        "scale",
+        "shift_m"
+      ],
+      "title": "Plate",
+      "type": "object"
+    },
     "Poi": {
       "additionalProperties": false,
       "properties": {
@@ -988,12 +1272,91 @@
         "station": {
           "title": "Station",
           "type": "boolean"
+        },
+        "lines": {
+          "description": "AG4: the sky tube's top line near the tower, a polyline per tube piece (building frame, z from its base).",
+          "items": {
+            "items": {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "diameter_m": {
+          "title": "Diameter M",
+          "type": "number"
+        },
+        "station_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Id"
+        },
+        "station_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Name"
+        },
+        "track_z_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The sky station's track (the tube's axis), building frame.",
+          "title": "Track Z M"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Polygon"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The sky station's platform footprint (M5), building frame."
         }
       },
       "required": [
         "line_id",
         "z",
-        "station"
+        "station",
+        "lines",
+        "diameter_m"
       ],
       "title": "Portal",
       "type": "object"
@@ -1488,6 +1851,44 @@
       "title": "SpecSection",
       "type": "object"
     },
+    "Terrain": {
+      "additionalProperties": false,
+      "description": "AG5: on M13's slopes, the ground along each edge of a mass on the base (None for the\nothers), from its start every `step_m` and at its end, `out_m` outside it, in meters\nover the building's base.",
+      "properties": {
+        "step_m": {
+          "title": "Step M",
+          "type": "number"
+        },
+        "out_m": {
+          "title": "Out M",
+          "type": "number"
+        },
+        "grade": {
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Grade",
+          "type": "array"
+        }
+      },
+      "required": [
+        "step_m",
+        "out_m",
+        "grade"
+      ],
+      "title": "Terrain",
+      "type": "object"
+    },
     "Unit": {
       "additionalProperties": false,
       "properties": {
@@ -1601,7 +2002,7 @@
   "additionalProperties": false,
   "properties": {
     "brief_version": {
-      "const": 1,
+      "const": 2,
       "title": "Brief Version",
       "type": "integer"
     },
@@ -1761,6 +2162,37 @@
         }
       ],
       "title": "Override"
+    },
+    "clearances": {
+      "items": {
+        "$ref": "#/$defs/Clearance"
+      },
+      "title": "Clearances",
+      "type": "array"
+    },
+    "terrain": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Terrain"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "AG5: the ground along the base's edges (M13's slopes only)."
+    },
+    "deck": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Deck"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "AG10: an M14 deck's slab it stands on, under, beside or in (decks only)."
     }
   },
   "required": [

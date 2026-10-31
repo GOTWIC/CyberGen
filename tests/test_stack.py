@@ -276,11 +276,12 @@ def _with_tee(x: float, side: int):
     return net
 
 
-@pytest.mark.parametrize("x,side", [(450.0, 1), (600.0, -1)])
+@pytest.mark.parametrize("x,side", [(450.0, 1), (400.0, -1)])
 def test_avenue_junction_under_the_lifted_deck(x, side):
     """An avenue meeting the lifted highway among the stack's ramps, whose own ramps do not
     fit there, stays at grade (the viaduct does not come down for it) and ends clear of the
-    deck, so no later stage joins it to the deck."""
+    deck, so no later stage joins it to the deck. (M18: from 500 m out its own, shorter ramps
+    fit, a diamond stub.)"""
     net = _with_tee(x, side)
     st = EL.elevate(_spec(), _ctx(), net)
     assert st["interchanges"] == {"stack": 1}, st["notes"]

@@ -158,7 +158,38 @@ a district's `neon_palette` their colors and its `wear` the grime, an owner's
 .venv/bin/python -m assetgen materials board OUT/boards
 ```
 
-### 6. Report
+Since AG5 every M3 type with its own look has its generator (shanty stacks with lean-tos,
+tarps and fire escapes; megablocks with antenna farms and risers; sheds open on columns;
+hangar doors; temple colonnades, eaves and pagoda roofs; control tower cabs; vaulted
+terminals and stations; parking ramps; straddle girders), every landmark a hero (the
+three-armed megatower, spire, arcology, the wheel) with its own grime mask, twin towers one
+design, and a hilly city's buildings stand on stepped plinths with their doors at grade. A
+landmark's spec entry steers its hero: `palette` (its darkest colour the walls, its most
+saturated the light seams and halo), `crown`, `brief`.
+
+### 6. Art-direction rounds (AG5)
+
+After the first build, review it as an art director would, at most three rounds, changing
+only the spec (never code):
+
+```bash
+.venv/bin/python -m assetgen materials preview OUT              # districts and streets
+.venv/bin/python -m assetgen review OUT --spec cities/<slug>/asset_spec.json
+# change the spec, build again into OUT2 (or the same OUT after copying it), then
+.venv/bin/python -m assetgen review OUT2 --spec cities/<slug>/asset_spec.json --prev OUT
+.venv/bin/python -m assetgen spec diff OLD_SPEC NEW_SPEC
+```
+
+`review.md` (in `OUT/assets/`) lists the checks, the numbers per district (eras, facade
+systems, type generators, wear), what changed since the last round, the previews to open
+and a table of what to change for what you see (a district's `era`, `systems`, `wear`,
+`ad_density`, `neon_palette`, `signage_scripts`; an era's `window_to_wall`, `bay_m`,
+`palette`, `crowns`; owners' `brand_colors` and `facade_bias`; landmarks' `palette` and
+`crown`). Open the previews, compare them with the prompt (and its concept images), write
+down what reads wrong, change the spec, build again; stop when nothing reads wrong or after
+the third round, and say what is still off.
+
+### 7. Report
 
 Report the spec's path, what it sets and why (one line per entry), the validation result, the
 brief counts and edge classes from the brief report, the asset report's checks and triangle

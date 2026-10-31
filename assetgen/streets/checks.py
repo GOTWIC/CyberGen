@@ -26,11 +26,23 @@ def report(model, cx, manifest: dict, pieces) -> dict:
     checks = []
     cov = {}
     missing = []
+    # (pieces that stand for entities of other ids: M14's slab pieces, its deck)
+    covers = defaultdict(list)
+    for pid, r in sorted(recs.items()):
+        for c in r.get("covers", ()):
+            covers[c].append(pid)
     for name in COVERED:
         n = with_mesh = declared = 0
         for e in getattr(model, name):
             n += 1
             r = recs.get(e.id)
+            if r is None and covers.get(e.id):
+                # (a deck: covered when every piece standing for it has a mesh)
+                if all(recs[p].get("triangles", 0) > 0 for p in covers[e.id]):
+                    with_mesh += 1
+                else:
+                    missing.append(e.id)
+                continue
             if r is None:
                 missing.append(e.id)
                 continue
@@ -103,6 +115,9 @@ def report(model, cx, manifest: dict, pieces) -> dict:
     for n in replaced:
         for eid in members.get(n, []):
             r = recs.get(eid)
+            if r is None and covers.get(eid) and n in covers[eid] and \
+                    recs[n].get("triangles", 0) > 0:
+                continue        # (M14: the slab piece of that name stands for its deck)
             if r is None or not (r.get("triangles", 0) > 0 or r.get("parts") or
                                  r.get("empty") in DECLARED or eid in _covered_by_parent(model, eid)):
                 partial.append(n)
@@ -111,6 +126,9 @@ def report(model, cx, manifest: dict, pieces) -> dict:
                    "detail": f"{len(replaced)} blockout objects replaced" + (
                        f", {len(partial)} not wholly covered: {', '.join(partial[:6])}"
                        if partial else "")})
+    if model.decks:
+        from .decks import check as deck_check
+        checks.append(deck_check(model, cx, recs))
     # budgets
     tri_tile = {t: v.get("triangles", 0) for t, v in manifest["tiles"].items()}
     total = sum(tri_tile.values())

@@ -22,7 +22,7 @@ from assetgen.materials import pbr as P
 from assetgen.materials import surfaces as S
 from assetgen.streets import materials as SM
 
-from agtools import HERE, golden, small_assets, small_assets_report
+from agtools import HERE, golden, small_assets, small_assets_report, temp_dir
 
 DENSITY = 32
 _LIB: dict = {}
@@ -31,9 +31,7 @@ _LIB: dict = {}
 def small_library(tmp_path_factory=None):
     """A 32 px/m library, made once per process."""
     if "lib" not in _LIB:
-        import tempfile
-        from pathlib import Path
-        d = Path(tempfile.mkdtemp(prefix="ag6_lib_"))
+        d = temp_dir("ag6_lib")
         _LIB["lib"] = LB.generate(d, DENSITY, workers=2, log=lambda *a: None)
         _LIB["dir"] = d
     return _LIB["lib"]
@@ -185,6 +183,9 @@ def test_materials_stage_on_the_small_city():
     for e in con["entries"]:
         if e["kind"] == "decals":
             assert all(con["materials"][s]["master"] == "decal" for s in e["slots"])
+            continue
+        if e["kind"] == "roof_equipment":
+            assert e["cpd"] == []           # (AG4: untinted, per tile)
             continue
         # (AG3: a street front takes its building's parameters)
         r = man["buildings"][e["ids"][0] if e["kind"] == "building.front" else e["key"]]

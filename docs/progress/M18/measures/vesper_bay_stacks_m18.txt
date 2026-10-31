@@ -1,0 +1,45 @@
+== dead ends
+dead ends by class: {'highway': 9, 'avenue': 1, 'street': 72, 'service': 14, 'alley': 20, 'pedestrian': 26}
+of them, another road within 60 m straight ahead: {'street': 8, 'service': 2, 'alley': 1, 'pedestrian': 19}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 0
+[]
+== bridges
+bridges: 8 Counter({'road': 6, 'road_rail': 1, 'pedestrian': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 1795 with a leg not at the node's height at the junction edge: 34 with a leg's end not at the node's z: 0
+== junction control
+   ('Corporate Core', False, False) 2
+   ('Corporate Core', False, True) 2
+   ('Corporate Core', True, True) 10
+   ('Highcrest', False, False) 162
+   ('Highcrest', True, True) 19
+   ('Launch Key', False, False) 3
+   ('Launch Key', False, True) 2
+   ('Launch Key', True, True) 3
+   ('Neon Strand', False, False) 517
+   ('Neon Strand', True, True) 13
+   ('Old Town', False, False) 849
+   ('Old Town', True, True) 13
+   ('Scholar Isle', False, False) 13
+   ('Scholar Isle', True, True) 9
+   ('The Stacks', False, False) 117
+   ('The Stacks', False, True) 2
+   ('The Stacks', True, True) 18
+   ('Vess Docks', False, False) 31
+   ('Vess Docks', False, True) 3
+   ('Vess Docks', True, True) 6
+crosswalk widths: Counter({4.0: 200, 3.0: 64, 5.0: 43})
+junctions with crosswalks: 100 of them within 40 m of another: 4
+== signs
+Counter({('shop_sign', 'blade'): 10279, ('shop_sign', 'facade'): 3132, ('billboard', 'roof'): 1539, ('neon', 'facade'): 680, ('billboard', 'facade'): 289, ('holo_ad', 'roof'): 32})
+== transit supports
+  tl.halo_line elevated_rail: length 6704 m, supports 160, gap median 33 max 532 m, off the line max 11.9 m (>2 m: 15)
+  tl.launch_express maglev: length 1006 m, supports 3, gap median 469 max 894 m, off the line max 0.0 m (>2 m: 0)
+  tl.crown_line sky_tube: length 2810 m, supports 18, gap median 72 max 600 m, off the line max 9.5 m (>2 m: 3)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 4

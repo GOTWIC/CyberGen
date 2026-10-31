@@ -158,7 +158,9 @@ def test_manifest_changes(build, manifest, tmp_path):
     man = manifest[0]
     assert U.manifest_changes(man, man) == {"created": [], "updated": [], "deleted": []}
     hashes = U.actor_hashes(man)
-    assert len(hashes) == man["counts"]["objects"] + man["counts"]["instance_actors"] + 4
+    # (M16: and a swim volume per box of a water body and tile)
+    assert len(hashes) == man["counts"]["objects"] + man["counts"]["instance_actors"] + \
+        man["counts"].get("swim_volumes", 0) + 4
     plan = json.loads((build / "blockout_plan.json").read_text())
     blds = [o for o in plan["objects"] if o["category"] == "building"]
     gone, moved = blds[0], blds[1]
@@ -610,6 +612,68 @@ def test_stage2_layer(build, manifest, tmp_path):
                                           "deleted": []}
 
 
+def test_stage2_skybridge_links(build, manifest, tmp_path):
+    """AG4: a skybridge's entry (assetgen's `connections` part) is an actor at its pivot and
+    yaw that carries what it joins (`links`, the importer's `cg.link=` tags) in its hash,
+    in place of the blockout skybridge of its key."""
+    man, _, _ = manifest
+    objs = [o for t in man["tiles"] for o in t["objects"]]
+    sky = sorted(o["key"] for o in objs if o["category"] == "skybridge")
+    key = sky[0] if sky else "sb.test"
+    tile = next((t["name"] for t in man["tiles"] for o in t["objects"] if o["key"] == key),
+                man["tiles"][0]["name"])
+    entry = {"key": key, "kind": "skybridge", "hash": "s1", "replaces": [],
+             "glb": f"connections/{tile}.glb", "node": key, "asset": U.asset_name(key),
+             "pivot": [1.0, 2.0, 0.0], "yaw_deg": 30.0, "nanite": True, "triangles": 40,
+             "slots": ["bridge_deck"], "collision": {"complex": True}, "cpd": [],
+             "ids": [key], "links": ["building:a.bld", "building:b.bld", "walkway:w1"],
+             "tags": {"cg.type": "skybridge.enclosed", "cg.district": "", "cg.tile": tile}}
+    conn = {"version": 1, "stage": "assetgen", "part": "connections", "layer": 2,
+            "materials": {"bridge_deck": {"master": "facade", "color": [0.3, 0.3, 0.3],
+                                          "roughness": 0.8, "metallic": 0.0,
+                                          "tint_cpd": None}},
+            "entries": [entry]}
+    m2 = U.build_manifest(_with_contributions(build, tmp_path / "s", {"connections": conn}))[0]
+    s2 = m2["stage2"]
+    a = next(x for x in s2["actors"] if x["key"] == key)
+    assert a["links"] == entry["links"] and a["yaw_deg"] == 30.0 and a["pivot"] == [1.0, 2.0,
+                                                                                     0.0]
+    assert a["type"] == "skybridge.enclosed"
+    assert (key in s2["replaced"]) == bool(sky)
+    assert "connections.bridge_deck" in s2["materials"]
+    m3 = U.build_manifest(_with_contributions(build, tmp_path / "s3", {"connections": dict(
+        conn, entries=[dict(entry, links=entry["links"][:2])])}))[0]
+    assert U.manifest_changes(m2, m3) == {"created": [], "updated": [key], "deleted": []}
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert 'f"cg.link={x}"' in src and 'r.get("links", [])' in src
+
+
+def test_stage2_empty_shell(build, manifest, tmp_path):
+    """The AG3 and AG4 Unreal check: a one-floor building its street front takes whole has
+    an empty shell node in its pack, while its entry's `triangles` counts the front's too.
+    Its key makes no mesh (Unreal refuses an empty one, "Bad MeshDescription", and the HLOD
+    build then fails) and no actor, but still takes the blockout building's place; a shell
+    with triangles is as before."""
+    man = manifest[0]
+    fake, blds = _fake(man, json.loads((build / "graphs.json").read_text()))[:2]
+    tile = fake["buildings"]["entries"][0]["glb"]
+    full = U._Mesh()
+    full.poly([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)], "brick")
+    out = _with_contributions(build, tmp_path / "e", fake)
+    (out / "assets" / "tiles").mkdir(parents=True, exist_ok=True)
+    U.write_glb({f"{blds[0]}.shell": U._Mesh(), f"{blds[1]}.shell": full}, {},
+                out / "assets" / tile)
+    assert U.glb_triangles(out / "assets" / tile) == {f"{blds[0]}.shell": 0,
+                                                     f"{blds[1]}.shell": 1}
+    s2 = U.build_manifest(out)[0]["stage2"]
+    keys = {a["key"] for a in s2["actors"]}
+    assert blds[0] not in keys and blds[1] in keys
+    assert blds[0] in s2["replaced"] and blds[1] in s2["replaced"]
+    meshes = {m["asset"] for p in s2["packs"] for m in p["meshes"]}
+    assert U.asset_name(f"{blds[0]}.shell") not in meshes
+    assert U.asset_name(f"{blds[1]}.shell") in meshes
+
+
 def test_stage2_refuses(build, manifest, tmp_path):
     """A key in two contributions, a tint index no master reads, a contribution of another
     version or layer."""
@@ -712,6 +776,44 @@ def test_stage2_textures(build, manifest, tmp_path):
     bad["buildings"]["textures"]["city.signs_wide_0"]["kind"] = "hdr"
     with pytest.raises(ValueError, match="kind hdr"):
         U.build_manifest(_with_contributions(build, tmp_path / "t5", bad))
+
+
+def test_stage2_heroes_and_plinths(build, manifest, tmp_path):
+    """AG5: a hero's entry carries its kind (`cg.hero=` on its actor) and materials of its
+    own reading its U2 mask (a city texture, `HeroMask` on UV1 in the textured masters); a
+    new mask moves its materials, not its actor; a building on a slope carries its
+    plinth's depth (`cg.plinth=`)."""
+    man = manifest[0]
+    fake, blds = _fake(man, json.loads((build / "graphs.json").read_text()))[:2]
+    b = fake["buildings"]
+    hero = f"city.hero.{blds[0]}"
+    b["textures"] = {hero: {"file": f"textures/hero/{blds[0]}.png", "pixels_sha256": "e" * 64,
+                            "size": [512, 512], "srgb": False, "kind": "mask"}}
+    b["materials"][f"brick#{blds[0]}"] = dict(
+        b["materials"]["brick"], slot="brick", textures={"HeroMask": hero},
+        scalars={"HeroMaskOn": 1.0})
+    b["entries"][0]["materials"] = {"brick": f"brick#{blds[0]}"}
+    b["entries"][0]["hero"] = {"kind": "megatower", "accent": "#39ff8a"}
+    b["entries"][1]["plinth_m"] = 2.35
+    m2 = U.build_manifest(_with_contributions(build, tmp_path / "h1", fake))[0]
+    s2 = m2["stage2"]
+    a = {x["key"]: x for x in s2["actors"]}
+    assert a[blds[0]]["hero"] == "megatower" and "hero" not in a[blds[1]]
+    assert a[blds[1]]["plinth_m"] == 2.35 and "plinth_m" not in a[blds[0]]
+    assert s2["counts"]["heroes"] == 1
+    assert s2["textures"][hero]["folder"] == m2["content_root"] + "/Assets/Textures"
+    mat = s2["materials"][f"buildings.brick#{blds[0]}"]
+    assert mat["slot"] == "brick" and mat["scalars"] == {"HeroMaskOn": 1.0}
+    assert mat["textures"]["HeroMask"] == {"texture": hero, "hash": "e" * 16}
+    assert a[blds[0]]["materials"] == {"brick": "MI_" + U.asset_name(f"buildings.brick#{blds[0]}")}
+    f2 = copy.deepcopy(fake)
+    f2["buildings"]["textures"][hero]["pixels_sha256"] = "f" * 64
+    m3 = U.build_manifest(_with_contributions(build, tmp_path / "h2", f2))[0]
+    assert U.manifest_changes(m2, m3) == {"created": [], "updated": [], "deleted": []}
+    assert m3["stage2"]["materials"][f"buildings.brick#{blds[0]}"] != mat
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert '"HeroMask", "mask"' in src and "coordinate_index=1" in src
+    assert 'f"cg.hero={r[\'hero\']}"' in src and 'f"cg.plinth={r[\'plinth_m\']}"' in src
 
 
 def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
@@ -836,21 +938,30 @@ def test_stage2_from_assetgen(staged, manifest):
     assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
     assert set(blds) <= set(s2["replaced"])
     assert s2["counts"]["replaces_missing"] == 0
+    # (AG4's roof equipment entries, `roofs.<tile>`, are instanced parts with no node; a
+    # building its street front takes whole has a null node and asset)
     assert all(e["asset"] == (U.asset_name(e["node"]) if e["node"] else None)
-               for e in con["entries"])
+               for e in con["entries"] if "node" in e)
+    assert all("node" in e or e["kind"] == "roof_equipment" for e in con["entries"])
     for p in s2["packs"]:
         assert p["glb"], p["folder"]
         nodes = {U.asset_name(n["name"]) for n in U.read_glb_json(staged / p["glb"])["nodes"]
                  if "mesh" in n}
         assert {m["asset"] for m in p["meshes"]} <= nodes, p["folder"]
     actor_keys = {a["key"] for a in s2["actors"]}
-    # (a building with no shell mesh, its street front its whole height, is its front's
-    # actor alone)
-    shelled = {e["key"] for e in con["entries"] if e["kind"] == "building" and e["node"]}
-    assert shelled <= actor_keys and \
-        {f"{k}.front" for k in set(blds) - shelled} <= actor_keys
+    # (a one-floor building its street front takes whole has no shell mesh, its node null,
+    # or, in packs from before that, an empty shell node: no actor of its own, its front in
+    # its place; Testport's harbor freight terminal)
+    es = {e["key"]: e for e in con["entries"]}
+    empty = {k for k in blds if not es[k]["node"]
+             or U.glb_triangles(staged / "assets" / es[k]["glb"])[es[k]["node"]] == 0}
+    assert set(blds) - empty <= actor_keys and not empty & actor_keys
+    assert all(f"{k}.front" in actor_keys for k in empty)
     ch = U.manifest_changes(man, m2)
-    s2keys = actor_keys | {a["key"] for a in s2["instances"]}
+    # (AG12: an underwater post-process volume per M16 swim box, each a new actor)
+    assert s2["underwater"]
+    s2keys = actor_keys | {a["key"] for a in s2["instances"]} | \
+        {u["key"] for u in s2["underwater"]}
     # AG8's exact props (cables, scaffolding, gates) take the key of M15's instanced actor
     # they replace: a static mesh actor in its place is deleted and created
     ka, kb = U.actor_kinds(man), U.actor_kinds(m2)
@@ -924,15 +1035,12 @@ def test_stage2_takes_assetgen_fronts(staged):
     actors = {a["key"]: a for a in s2["actors"]}
     meshes = {f"{p['folder']}/{m['asset']}": m for p in s2["packs"] for m in p["meshes"]}
     ndoors = 0
-    shells = {e["key"]: e for e in con["entries"] if e["kind"] == "building"}
     for key, e in fronts.items():
         a = actors[key]
         b = key[:-len(".front")]
-        # (a building with no shell mesh, its front its whole height, has no actor of its
-        # own: its front's stands at its pivot and takes its blockout actor's place)
-        pivot = actors[b]["pivot"] if shells[b]["node"] else shells[b]["pivot"]
-        assert a["ids"] == [b] and a["pivot"] == pivot and a["cpd"] == e["cpd"]
-        assert shells[b]["node"] or (b not in actors and b in s2["replaced"])
+        # (its building's pivot; a building the front takes whole has no shell actor)
+        assert a["ids"] == [b] and a["cpd"] == e["cpd"]
+        assert b not in actors or a["pivot"] == actors[b]["pivot"]
         assert a["type"] == "building.front" and a["category"] == "building"
         m = meshes[a["mesh"]]
         assert m["collision"] == {"complex": True} and m["nanite"] and m["fallback_full"]
@@ -957,6 +1065,86 @@ def test_stage2_takes_assetgen_fronts(staged):
         for s in e["slots"]:
             mat = s2["materials"][f"buildings.{s}"]
             assert mat["master"] == "decal" and "Cell" in mat["scalars"]
+
+
+def test_stage2_takes_assetgen_ground(staged):
+    """AG13's ground and grass: an actor per tile's ground (Nanite, its slots `ground`
+    materials reading the tile's mask), every blockout ground cover object and median lawn
+    replaced (by its tile's entry or a drop), the grass as instanced actors per clump variant
+    whose transforms stay in their tile's file (its sha256 in the hash), culled at 60 to
+    100 m, no shadow, no collision, out of the HLODs; the importer's masters and `Wind`."""
+    m2, _, _ = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    con = json.loads((staged / "assets" / "unreal_contribution.ground.json").read_text())
+    actors = {a["key"]: a for a in s2["actors"]}
+    ground = [e for e in con["entries"] if e["kind"] == "ground.cover"]
+    assert ground
+    for e in ground:
+        a = actors[e["key"]]
+        for s in e["slots"]:
+            mat = s2["materials"][f"ground.{s}"]
+            assert mat["master"] == "ground"
+            assert mat["textures"]["Mask"]["texture"] == f"city.ground.{e['tile']}"
+    bo = {o["key"] for t in m2["tiles"] for o in t["objects"]}
+    cover = {k for k in bo if ".cover_" in k or ".lawn." in k}
+    assert cover and cover <= set(s2["replaced"])
+    grass = [a for a in s2["instances"] if a["entry"].startswith("grass.")]
+    assert grass
+    for a in grass:
+        assert "xforms" not in a and a["xforms_file"].startswith("assets/ground/grass/")
+        assert a["cull_m"] == [60.0, 100.0] and a["no_shadow"] and a["no_hlod"]
+        assert a["no_collision"] and a["xforms_sha"]
+        doc = json.loads((staged / a["xforms_file"]).read_text())
+        assert len(doc["nodes"][a["xforms_key"]]) == a["count"]
+    pm = {f"{pk['folder']}/{m['asset']}": m for pk in s2["packs"] for m in pk["meshes"]}
+    assert all(not pm[a["mesh"]]["nanite"] for a in grass)
+    assert {"ground", "grass"} <= set(s2["masters"])
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    assert "set_cull_distances" in src and "def ground_master" in src
+    assert "def grass_master" in src and '("Wind", 0.35)' in src
+    assert 'self.xforms_file(r)' in src
+
+
+def test_stage2_takes_assetgen_roofs_and_skybridges(staged):
+    """AG4: roof equipment leaves the buildings' entries for one entry per tile
+    (`roofs.<tile>`): an instanced actor per mesh at the origin with one building id per
+    transform, its mesh a node of the tile's part pack, without collision or era materials;
+    the green-roof objects a building replaces are blockout objects; every skybridge an
+    actor of its own with its links."""
+    m2, _, _ = U.build_manifest(staged)
+    s2 = m2["stage2"]
+    con = json.loads((staged / "assets" / "unreal_contribution.buildings.json").read_text())
+    man = json.loads((staged / "assets" / "manifest.json").read_text())
+    roofs = [e for e in con["entries"] if e["kind"] == "roof_equipment"]
+    assert roofs
+    for e in con["entries"]:
+        if e["kind"] == "building":
+            assert all(not p["kind"].startswith(("part.ac_unit", "part.water_tank",
+                                                 "part.antenna", "part.pad", "part.hut"))
+                       for p in e["parts"])
+    inst = {a["key"]: a for a in s2["instances"]}
+    n = 0
+    for e in roofs:
+        t = e["key"].split(".", 1)[1]
+        assert e["pivot"] == [0.0, 0.0, 0.0] and e["tags"]["cg.tile"] == t
+        for p in e["parts"]:
+            a = inst[f"{e['key']}.{p['kind']}"]
+            assert a["ids"] == p["ids"] and len(a["ids"]) == len(a["xforms"]) == p["count"]
+            assert a["no_collision"] and "materials" not in a   # (as AG2's parts; no era)
+            assert set(a["ids"]) <= set(man["buildings"])
+            assert p["glb"] == f"parts/{t}.glb"
+            n += p["count"]
+    assert n == sum(1 for r in man["buildings"].values() for x in r["parts"] if x.get("roof")
+                    for _ in x["xforms"])
+    green = {g for e in con["entries"] for g in e.get("replaces", [])}
+    assert green <= set(s2["replaced"]) and s2["counts"]["replaces_missing"] == 0
+    cp = staged / "assets" / "unreal_contribution.connections.json"
+    conn = json.loads(cp.read_text())
+    actors = {a["key"]: a for a in s2["actors"]}
+    for e in conn["entries"]:
+        assert e["kind"] == "skybridge" and e["key"] in s2["replaced"]
+        assert actors[e["key"]]["links"] == e["links"]
+        assert actors[e["key"]]["mesh"].startswith("Assets/Connections/")
 
 
 def test_stage2_textured_props_and_signs(staged):
@@ -987,6 +1175,90 @@ def test_stage2_textured_props_and_signs(staged):
     src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
     assert 'elif master == "leaves":' in src and "MP_OPACITY_MASK" in src
     assert 'tparam(m, "SignTex", "color"' in src and "HOLO_CODE" in src
+
+
+def _ue_script(name, *defs):
+    """The top-level functions and constants `defs` of an Unreal-side script, run here
+    without the `unreal` module (they use only the standard library)."""
+    import ast
+    tree = ast.parse((Path(U.__file__).parent / "ue" / name).read_text())
+    body = [n for n in tree.body
+            if (isinstance(n, ast.FunctionDef) and n.name in defs) or
+            (isinstance(n, ast.Assign) and any(getattr(t, "id", None) in defs
+                                               for t in n.targets))]
+    ns = {}
+    exec(compile(ast.Module(body=body, type_ignores=[]), name, "exec"), ns)
+    return ns
+
+
+def test_check_frame_times_and_warm_shots():
+    """The AG3 and AG4 Unreal check: the check's walk and flight report how long their frames
+    took (Vesper Bay's play ran at 12 to 14 s a frame before #54's fixes), its waits for
+    streaming do not list every actor every frame, roofs are traced on shells, and each
+    editor shot is rendered once small from its camera first, so Nanite has streamed the
+    view's pages in (a first render of a new view drew coarse clusters as big flat triangles
+    over the walls); a first import's few hundred unused variants are pruned by their
+    files."""
+    ns = _ue_script("check_city.py", "frame_times", "frame_line", "WARM_S", "LOAD_WAIT_S",
+                    "COUNT_EVERY_S")
+    ft = ns["frame_times"]([0.0, 0.1, 0.2, 0.35, 1.35])
+    assert ft == {"frames": 4, "median_s": 0.15, "p95_s": 1.0, "max_s": 1.0}
+    assert ns["frame_times"]([5.0]) == {"frames": 0} and ns["frame_line"]([]) == ""
+    assert "0.150 s (median)" in ns["frame_line"]([0.0, 0.1, 0.2, 0.35, 1.35])
+    assert ns["WARM_S"] >= 2.0
+    # the wait for a spot to stream in lists the city's actors every COUNT_EVERY_S once the
+    # streaming query says done, not every frame (Vesper Bay: 6.5 s frames, its far spots
+    # never streamed in, 169 of 507 traces down)
+    assert ns["COUNT_EVERY_S"] >= 1.0 and ns["LOAD_WAIT_S"] >= 120.0
+    src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    settle = src[src.index("def settle("):src.index("def teleport(")]
+    assert "time.time() >= due and streamed(world, at) is not False" in settle
+    # roofs and facades are traced on shells, not on part instancers (no collision) or fronts
+    assert 'not tag(a, "cg.type").startswith("part.")' in src
+    assert src.count('"frame_time": frame_times(ticks)') == 2
+    assert "take_high_res_screenshot(960, 540, warm, cam)" in src
+    assert _ue_script("import_city.py", "PRUNE_FILES")["PRUNE_FILES"] <= 100
+
+
+def test_check_shots_stay_under_nanites_root_pages():
+    """The AG5 Unreal check: Cragmouth's shots loaded all 75,155 of its actors and the editor
+    stopped on Nanite's root pages (49,152, its 2 GB pool on the Mac; Cragmouth has 63,700
+    Nanite meshes); past `SHOT_MESHES` distinct meshes the shots load the actors nearest the
+    city's middle up to that many meshes (actors with shared or no-Nanite meshes always), one
+    set for every view (an actor unloaded between views kept its meshes' root pages), and
+    never an HLOD actor."""
+    ns = _ue_script("check_city.py", "view_load", "mesh_of", "SHOT_MESHES")
+    vl = ns["view_load"]
+    assert 30000 <= ns["SHOT_MESHES"] <= 45000
+    rows = [("p0", "actor", 900.0, 0.0, None), ("h0", "hlod", 0.0, 0.0, None)] + \
+        [(f"m{k}", "actor", float(k), 0.0, f"mesh{k // 2}") for k in range(10)]
+    assert set(vl(rows, (0.0, 0.0), cap=5)) == {"p0"} | {f"m{k}" for k in range(10)}
+    assert vl(rows, (6.2, 0.0), cap=2) == ["m6", "m7", "m5", "m4", "p0"]
+    assert vl(rows, (100.0, 0.0), cap=1) == ["m9", "m8", "p0"]
+    src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    shots = src[src.index("def shots("):src.index("# --- the tick loop")]
+    assert shots.count("load_actors(") == 1 and "unload_actors" not in shots
+    man = {"tiles": [{"name": "t+00+00", "objects": [{"key": "city.sea.t+00+00",
+                                                      "asset": "city_sea_t+00+00"}]}],
+           "stage2": {"actors": [{"key": "a.bld", "mesh": "Assets/Buildings/t/a_bld"},
+                                 {"key": "a.holo", "mesh": "Assets/Signs/t/a_holo"}],
+                      "instances": [{"key": "a.bld.part.x", "mesh": "Assets/BuildingsParts/t/x"}],
+                      "lod_chains": [{"mesh": "Assets/Signs/t/a_holo"}]}}
+    assert ns["mesh_of"](man) == {"city.sea.t+00+00": "Meshes/t+00+00/city_sea_t+00+00",
+                                  "a.bld": "Assets/Buildings/t/a_bld", "a.holo": None,
+                                  "a.bld.part.x": "Assets/BuildingsParts/t/x"}
+
+
+def test_import_resets_a_stale_fallback():
+    """The AG10 Unreal check: a mesh imported again keeps its Nanite settings, so one whose
+    entry no longer asks for every triangle in its fallback (`fallback_full`) is put back on
+    the automatic fallback (the deck slabs kept a full one after their entries dropped it)."""
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    body = src[src.index('full = rec.get("fallback_full")'):]
+    body = body[:body.index("EAL.set_metadata_tag(sm, HASH_TAG, h)")]
+    assert "stale = not full and auto is not None" in body
+    assert 'ns.set_editor_property("fallback_target", auto)' in body
+    assert "or shape or full \\\n                or stale:" in body
 
 
 # --- in Unreal (where it is installed) ------------------------------------------------------
@@ -1114,3 +1386,56 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     assert again["actor_digest"] == second["actor_digest"]
     for d in (proj.parent, build):
         shutil.rmtree(d, ignore_errors=True)
+
+
+def test_stage2_takes_assetgen_decks(tmp_path):
+    """AG10: M14's deck pieces over the blockout of a city with a deck. Every slab object
+    (`<deck>.slab.<tile>`, an entry of that key), joined column object, stair and elevator
+    the blockout draws is replaced; the slab's actors stand on the deck's level
+    (`cg.level=1`), the columns, stairs and elevators on the ground; the deck's streets keep
+    level 1 from the joined deck objects they replace; the manifest's `decks` still name the
+    slab actors by key; the walkways beside a ramp are put on it in `graphs.walkways`."""
+    from assetgen.streets import build as SB
+
+    data = copy.deepcopy(SMALL)
+    for x in data["districts"]:
+        if x["name"] == "Core":
+            x["decks"] = {}
+    res = validate_spec(data)
+    assert res.ok, res.issues
+    m = build_city(res).model
+    build = _blockout_files(m, tmp_path / "build")
+    (build / "city_model.json").write_text(m.to_json() + "\n", encoding="utf-8")
+    rep = SB.build(m, "x" * 64, build / "assets", None, workers=1)
+    assert rep["ok"], [c for c in rep["checks"] if not c["ok"]]
+    man = U.build_manifest(build)[0]
+    s2 = man["stage2"]
+    objs = {o["key"]: o for t in man["tiles"] for o in t["objects"]}
+    deck_objs = {k for k, o in objs.items() if o["category"] in (
+        "deck_slab", "deck_column", "deck_stair", "deck_elevator", "deck_road",
+        "deck_junction", "deck_sidewalk", "deck_ramp")}
+    assert deck_objs and deck_objs <= set(s2["replaced"])
+    assert s2["counts"]["replaces_missing"] == 0
+    actors = {a["key"]: a for a in s2["actors"]}
+    slabs = [k for k, o in objs.items() if o["category"] == "deck_slab"]
+    assert slabs and all(actors[k]["level"] == 1 for k in slabs)
+    assert {k for d in man["decks"] for k in d["keys"]} == set(slabs)
+    con = json.loads((build / "assets" / "unreal_contribution.streets.json").read_text())
+    for e in con["entries"]:
+        a = actors.get(e["key"])
+        if a is None:
+            continue
+        if e["kind"] in ("street.deck.column", "street.deck.stair", "street.deck.elevator"):
+            assert "level" not in a
+        if e["kind"] in ("street.deck.slab", "street.deck.stair", "street.deck.elevator"):
+            # (AG10's Unreal check: their complex collision keeps the rail and the steps)
+            pk = next(p for p in s2["packs"] if p["glb"].endswith(e["glb"]) and p["use"] == "mesh")
+            ms = {x["asset"]: x for x in pk["meshes"]}
+            assert ms[e["asset"]].get("fallback_full") is True
+        if e["key"].startswith("l1."):
+            assert a["level"] == 1          # (a deck's street, its joined object's level)
+    ramps = [s.id for s in m.road_segments if s.attrs.get("role") == "deck_ramp"]
+    walks = con["graphs"]["walkways"]
+    for w in m.walkways:
+        if w.attrs.get("ramp") in ramps:
+            assert max(p[2] for p in walks[w.id]) >= m.decks[0].top_m

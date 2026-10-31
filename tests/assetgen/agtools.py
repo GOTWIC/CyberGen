@@ -5,9 +5,14 @@ one of its districts regenerated), with briefs; the goldens.
 which the citygen tests import by name.)
 """
 
+import atexit
 import copy
 import json
+import os
+import re
+import shutil
 import tempfile
+import time
 from pathlib import Path
 
 from conftest import CITIES, ROOT, SMALL, built_sample, write  # noqa: F401
@@ -21,13 +26,51 @@ def golden() -> dict:
     return json.loads(GOLDEN.read_text(encoding="utf-8"))
 
 
+def _alive(pid: int) -> bool:
+    if os.name == "nt":  # os.kill(pid, 0) there is a Ctrl+C to process group pid
+        import ctypes
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return ctypes.get_last_error() == 5  # access denied: alive
+        code = ctypes.c_ulong()
+        ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+        k.CloseHandle(h)
+        return not ok or code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    return True
+
+
+def temp_dir(prefix: str) -> Path:
+    """A temporary directory PREFIX_<pid>_<8 characters>, removed when the test process
+    ends. A process that is killed (a tool's timeout) never runs its atexit, so first the
+    directories of processes no longer alive are removed, and those of the older naming
+    (PREFIX_<8 characters>) a day old (a small city with its assets is about 1.4 GB)."""
+    for old in Path(tempfile.gettempdir()).glob(f"{prefix}_*"):
+        m = re.fullmatch(rf"{prefix}_(\d+)_.{{8}}", old.name)
+        try:
+            stale = not _alive(int(m[1])) if m else old.stat().st_mtime < time.time() - 86400
+        except FileNotFoundError:  # another test process removed it
+            continue
+        if stale:
+            shutil.rmtree(old, True)
+    d = Path(tempfile.mkdtemp(prefix=f"{prefix}_{os.getpid()}_"))
+    atexit.register(shutil.rmtree, d, True)
+    return d
+
+
 def small_build() -> Path:
     """The small test city (tests/conftest.py SMALL) built with the citygen CLI into
     DIR/base, with its briefs (DIR/base/assets/briefs.json); DIR."""
     if "small" not in _CACHE:
         from assetgen.cli import main as ag
         from citygen.cli import main as cg
-        d = Path(tempfile.mkdtemp(prefix="ag_small_"))
+        d = temp_dir("ag_small")
         spec = write(d, copy.deepcopy(SMALL), "spec.json")
         assert cg(["build", str(spec), str(d / "base")]) == 0
         assert ag(["brief", str(d / "base"), "--no-preview"]) == 0
@@ -47,6 +90,24 @@ def small_regen() -> Path:
         assert ag(["brief", str(out), "--no-preview"]) == 0
         _CACHE["regen"] = out
     return _CACHE["regen"]
+
+
+def deck_build() -> Path:
+    """The small test city with a deck over Core (M14, as `tests/test_decks.py`) built with
+    the citygen CLI, with its briefs: DIR (the build directory itself)."""
+    if "decks" not in _CACHE:
+        from assetgen.cli import main as ag
+        from citygen.cli import main as cg
+        d = temp_dir("ag_decks")
+        data = copy.deepcopy(SMALL)
+        for x in data["districts"]:
+            if x["name"] == "Core":
+                x["decks"] = {}
+        spec = write(d, data, "spec.json")
+        assert cg(["build", str(spec), str(d / "base")]) == 0
+        assert ag(["brief", str(d / "base"), "--no-preview"]) == 0
+        _CACHE["decks"] = d / "base"
+    return _CACHE["decks"]
 
 
 def small_assets() -> Path:

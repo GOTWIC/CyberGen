@@ -30,9 +30,12 @@ MIN_LEN_M = 8.0
 MAX_LEN_M = 80.0
 PERP_COS = 0.97          # within about 14 degrees of perpendicular
 DECK_M = 1.0             # structure depth under the deck level
+CORRIDOR_SIDE_M = 0.2    # M21: the corridor stage 2 keeps clear beside a bridge
+CORRIDOR_TOP_M = 0.3     # and over it
 ROAD_CLEAR_M = 5.5
 EXCLUDE_ROLES = ("spire", "deck", "dock", "ramp", "platform", "leg_frame", "wheel", "shack",
-                 "mechanical", "antenna", "span", "plinth", "obelisk", "shaft")
+                 "mechanical", "antenna", "span", "plinth", "obelisk", "shaft", "band", "mast",
+                 "halo", "strut", "frame", "column", "pod")
 WIDTH_M = {"enclosed": 5.0, "open_deck": 7.0, "stack": 6.0, "catwalk": 1.6, "cable": 1.2}
 LEVEL_M = {"enclosed": 4.0, "open_deck": 3.0, "stack": 4.0, "catwalk": 2.5, "cable": 2.5}
 
@@ -123,15 +126,18 @@ def deck_poly(A, B, na, da, width: float, trim: float = 0.3) -> Polygon:
 class Space:
     """Obstacles of a district: building masses, road rights of way, water, decks."""
 
-    def __init__(self, cx, recs):
+    def __init__(self, cx, recs, others=()):
+        """`others`: buildings of the district's other levels, in this one's frame (M14: a
+        deck's bridges keep out of the ground's buildings and the ground's out of the
+        deck's); obstacles only."""
         self.masses = []
-        for r in recs:
+        for r in list(recs) + list(others):
             for i, m in enumerate(r["masses"]):
                 self.masses.append((r["id"], i, m))
         self.tree = shapely.STRtree([m[2][0] for m in self.masses]) if self.masses else None
         self.roads = [(rid, G.qpoly(LineString(line).buffer(w / 2.0, cap_style="flat",
                                                             join_style="mitre")), (line, prof))
-                      for rid, cls, line, w, prof in cx.roads]
+                      for rid, cls, line, w, prof in cx.roads + cx.sky_roads]
         self.rtree = shapely.STRtree([r[1] for r in self.roads]) if self.roads else None
         self.water = list(cx.water)
         self.wtree = shapely.STRtree([w[1] for w in self.water]) if self.water else None
@@ -208,7 +214,10 @@ def connect(space: Space, ra, rb, zt: float, kind: str, levels: int, width: floa
             need, crosses, under = space.base(poly)
             if z < need - 1e-6:
                 continue
-            if space.blocked(poly, z - DECK_M, z + span):
+            # (M21: no mass within its corridor's margins, 0.2 m beside it and 0.3 m over it,
+            # as stage 2 keeps them: a block of a stacked or cantilevered tower over it)
+            wide = deck_poly(A, B, na, da, width + 2.0 * CORRIDOR_SIDE_M)
+            if space.blocked(wide, z - DECK_M, z + span + CORRIDOR_TOP_M):
                 continue
             return {"building_ids": (ra["id"], rb["id"]), "line": [A, B], "z_m": z,
                     "width_m": width, "levels": levels, "level_height_m": q(lh),
@@ -220,7 +229,7 @@ def connect(space: Space, ra, rb, zt: float, kind: str, levels: int, width: floa
 def district_skybridges(cx, out: dict) -> None:
     recs = [r for r in out["buildings"] if r["masses"]]
     by_id = {r["id"]: r for r in recs}
-    space = Space(cx, recs)
+    space = Space(cx, recs, out.get("others", ()))
     chosen = []
     deg: dict = {}
     for f in out.get("forced", []):

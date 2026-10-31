@@ -1075,7 +1075,7 @@ def _probe_ctx(cx: Ctx, d, did: str, out: dict, shared: dict):
         skybridge_density=float(d.skybridge_density), polygon=poly, focus=G.centroid(poly),
         radius=math.sqrt(A / math.pi) * 1.1, lot_area=st.lot_area, cones=cones,
         complexes=tuple(cp.kind for cp in (d.complexes or [])), landmarks=[], roads=roads,
-        junctions=junctions, water=water)
+        junctions=junctions, water=water, variety=float(d.variety))
 
 
 def _candidates(lots, used, n: int, c, kind: str, pcx, canal_first: bool) -> list:

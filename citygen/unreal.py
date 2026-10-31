@@ -289,6 +289,21 @@ def read_glb_json(path: Path) -> dict:
     return json.loads(data[20:20 + n])
 
 
+def glb_triangles(path: Path) -> dict[str, int]:
+    """Each named node's triangles in a glTF binary, read from its JSON chunk alone."""
+    with open(path, "rb") as f:
+        n = struct.unpack("<I", f.read(20)[12:16])[0]
+        js = json.loads(f.read(n))
+    acc, meshes = js.get("accessors", []), js.get("meshes", [])
+    out = {}
+    for nd in js.get("nodes", []):
+        prims = meshes[nd["mesh"]]["primitives"] if "mesh" in nd else []
+        out[nd.get("name", "")] = sum(
+            acc[p["indices"] if "indices" in p else p["attributes"]["POSITION"]]["count"] // 3
+            for p in prims)
+    return out
+
+
 # --- graphs -----------------------------------------------------------------------------------
 
 def _flat(elems: list[dict]) -> dict:
@@ -501,7 +516,7 @@ STAGE2_FOLDER = "Assets"                    # under the city's content root
 # the Custom Primitive Data indices a stage 2 material may take its tint from (the masters
 # read a color at each: AG1's wall, trim, glass, roof, spandrel and patch tints)
 TINT_CPD = (0, 8, 11, 14, 17, 20)
-SRGB_PARTS = ("streets",)                   # AG7 writes its slot colors as sRGB (0 to 1)
+SRGB_PARTS = ("streets", "water")          # AG7 and AG12 write their slot colors as sRGB
 EMISSIVE2 = {"neon": 8.0, "emissive": 4.0, "holo": 3.0}  # a master's instances' emissive
 # AG6: textures imported once per project (the shared library, `set.` and `atlas.`) or per
 # city (its sign pages, `city.`), by pixel hash
@@ -550,7 +565,9 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
     owner: dict[str, str] = {}
     mats, packs, actors, insts, chains, textures = {}, {}, [], [], [], {}
     replaced, missing, files = set(), 0, []
+    under: dict[str, dict] = {}
     sha_of: dict[str, str] = {}
+    tris_of: dict[str, dict[str, int]] = {}
 
     def pack(part, glb, use):
         stem = Path(glb).stem
@@ -569,6 +586,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             p = build / ASSETS_DIR / glb
             sha_of[glb] = hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
         return sha_of[glb]
+
+    def node_tris(glb, node):
+        # (a node's own triangles in its pack: an entry's `triangles` may count more, AG3's
+        # shell entries count their street front's too)
+        if glb not in tris_of:
+            p = build / ASSETS_DIR / glb
+            tris_of[glb] = glb_triangles(p) if p.is_file() else {}
+        return tris_of[glb].get(node, 1)
 
     def mesh(pk, node, h, collision, nanite, shape=None, fallback=False):
         a = asset_name(node)
@@ -589,6 +614,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
         part = c.get("part") or c.get("stage") or "stage2"
         files.append({"file": rel, "part": part, "stage": c.get("stage"), "sha256": sha,
                       "entries": len(c["entries"])})
+        under.update(c.get("underwater") or {})        # (AG12: per water body)
         for name, t in sorted((c.get("textures") or {}).items()):
             if t.get("kind") not in TEXTURE_KINDS:
                 raise ValueError(f"{rel}: texture {name}: kind {t.get('kind')} is not one of "
@@ -655,6 +681,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 collision = {"complex": True}
             nanite = bool(e.get("nanite", True))
             path = h = None
+            empty = False
             if e.get("lods"):
                 # a non-Nanite LOD chain: each LOD node imported, the chain made as `asset`
                 pk = pack(part, e["glb"], "mesh")
@@ -666,8 +693,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 h = content_hash([e["hash"], lods, collision])
                 chains.append({"mesh": path, "hash": h, "lods": lods, "collision": collision})
             elif e.get("node") and e.get("triangles", 0) > 0:
-                path, h = mesh(pack(part, e["glb"], "mesh"), e["node"], e["hash"], collision,
-                               nanite, fallback=bool(e.get("fallback_full")))
+                if node_tris(e["glb"], e["node"]) > 0:
+                    path, h = mesh(pack(part, e["glb"], "mesh"), e["node"], e["hash"],
+                                   collision, nanite, fallback=bool(e.get("fallback_full")))
+                else:
+                    # (AG3: a one-floor building its street front takes whole has an empty
+                    # shell node: no mesh, which Unreal refuses ("Bad MeshDescription", and
+                    # the HLOD build fails on it), but it still takes the blockout's place)
+                    empty = True
             if e.get("proxy"):
                 px = e["proxy"]
                 mesh(pack(part, px["glb"], "proxy"), px["node"], e["hash"], {"none": True},
@@ -698,9 +731,17 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                                       for slot, m in sorted(e["materials"].items())}
                 if "none" in collision:
                     a["no_collision"] = True
+                if e.get("hero"):
+                    a["hero"] = e["hero"]["kind"]          # (AG5: a landmark's or the wheel's)
+                if e.get("plinth_m"):
+                    # (AG5: its stepped plinth reaches this far under the pivot, M13's slopes)
+                    a["plinth_m"] = float(e["plinth_m"])
                 if e.get("doors"):
                     # (AG3: the doors of a street front, tagged on its actor for stage 4)
                     a["doors"] = [f"{d['id']}@{d.get('walkway_id') or ''}" for d in e["doors"]]
+                if e.get("links"):
+                    # (AG4: what a skybridge joins, `building:<id>`, `walkway:<id>`, stage 4's)
+                    a["links"] = list(e["links"])
                 a["hash"] = content_hash([a, h])
                 actors.append(a)
                 made = True
@@ -713,8 +754,22 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb), pcol,
                               p.get("nanite", True), p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
-                     "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [],
-                     "xforms": p["xforms"], **base}
+                     "pivot": pivot, "yaw_deg": yaw, "cpd": e.get("cpd") or [], **base}
+                if p.get("xforms_file"):
+                    # (AG13's grass: its transforms in a file of its tile's, by its node,
+                    # so millions of clumps stay out of the manifest; the file's sha256 in
+                    # the hash)
+                    a.update(xforms_file=f"{ASSETS_DIR}/{p['xforms_file']}",
+                             xforms_key=p["node"], count=int(p["count"]),
+                             xforms_sha=file_sha(p["xforms_file"]))
+                else:
+                    a["xforms"] = p["xforms"]
+                if p.get("cull_m"):
+                    a["cull_m"] = [float(v) for v in p["cull_m"]]     # (AG13: the grass fades)
+                if p.get("shadow") is False:
+                    a["no_shadow"] = True
+                if p.get("cull_m"):
+                    a["no_hlod"] = True          # (faded out near the player: no HLOD)
                 if p.get("ids"):
                     a["ids"] = p["ids"]          # (one citygen id per transform)
                 if pcol.get("none"):
@@ -728,7 +783,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 a["hash"] = content_hash([a, mh])
                 insts.append(a)
                 made = True
-            if not made:
+            if not made and not empty:
                 continue
             if bo:
                 replaced.add(k)
@@ -747,7 +802,19 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             if t["texture"] not in textures:
                 raise ValueError(f"material {k}: no texture {t['texture']}")
     masters = sorted({m["master"] for m in mats.values()})
+    # AG12: an underwater post-process volume beside each of M16's swim boxes of a body
+    uw = []
+    for s in man.get("swim", []):
+        u = under.get(s["water_id"])
+        if u is None:
+            continue
+        rec = {"key": "underwater." + s["key"].split(".", 1)[1], "water_id": s["water_id"],
+               "tile": s["tile"], "box": s["box"], "z": s["z"], "water": u["water"],
+               "tint": u["tint"], "fog": u["fog"]}
+        rec["hash"] = content_hash(rec)
+        uw.append(rec)
     return {"files": files, "masters": masters, "materials": mats, "packs": out_packs,
+            "underwater": uw,
             "textures": dict(sorted(textures.items())),
             "lod_chains": sorted(chains, key=lambda x: x["mesh"]),
             "actors": sorted(actors, key=lambda a: a["key"]),
@@ -755,11 +822,14 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             "replaced": sorted(replaced),
             "counts": {"entries": len(owner), "actors": len(actors),
                        "instance_actors": len(insts),
-                       "instances": sum(len(a["xforms"]) for a in insts),
+                       "instances": sum(a["count"] if "count" in a else len(a["xforms"])
+                                        for a in insts),
                        "replaced": len(replaced), "replaces_missing": missing,
                        "packs": len(out_packs),
                        "meshes": sum(len(p["meshes"]) for p in out_packs) + len(chains),
-                       "materials": len(mats), "textures": len(textures)}}
+                       "materials": len(mats), "textures": len(textures),
+                       "heroes": sum(1 for a in actors if a.get("hero")),
+                       "underwater_volumes": len(uw)}}
 
 
 def build_manifest(build_dir: str | Path, name: str | None = None,
@@ -799,6 +869,8 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
                "materials": sorted({p["m"] for p in o["parts"]})}
         if o["category"] in ("building", "landmark"):
             obj["roof"] = _roof(o["parts"])
+            if props.get("form"):
+                obj["form"] = props["form"]       # (M21: the building's form)
         if _level(o["category"], props):
             obj["level"] = _level(o["category"], props)
         if o["category"] == "deck_slab":
@@ -850,6 +922,10 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     if decks:
         # M14: the decks (their slab actors by key), for stage 4's levels
         man["decks"] = [decks[k] for k in sorted(decks)]
+    if plan.get("swim"):
+        # M16: a swim volume (water physics volume) per box of a water body and tile
+        man["swim"] = [{**s, "hash": content_hash(s)} for s in plan["swim"]]
+        man["counts"]["swim_volumes"] = len(man["swim"])
     if play:
         from . import unreal_play
         man["play"] = unreal_play.write_play(build, man["plan_sha256"], plan, instances, graphs)
@@ -870,12 +946,14 @@ def actor_hashes(man: dict) -> dict[str, str]:
     compares it by (`ue/import_city.py` hashes the player start and the lights the same way)."""
     out = {o["key"]: o["hash"] for t in man["tiles"] for o in t["objects"]}
     out.update({i["key"]: i["hash"] for i in man["instances"]})
+    out.update({s["key"]: s["hash"] for s in man.get("swim", [])})
     s2 = man.get("stage2")
     if s2:
         # stage 2's actors over the blockout's: the keys it replaces dropped, its own added
         for k in s2["replaced"]:
             out.pop(k, None)
         out.update({a["key"]: a["hash"] for a in s2["actors"] + s2["instances"]})
+        out.update({u["key"]: u["hash"] for u in s2.get("underwater", [])})
     out["player_start"] = content_hash(man["player_start"])
     out.update({k: content_hash([k, "v1"]) for k in LIGHTING})
     if man.get("play"):
@@ -888,12 +966,14 @@ def actor_kinds(man: dict) -> dict[str, str]:
     instanced one (`instances`, BP_CityGenInstances)."""
     out = {o["key"]: "mesh" for t in man["tiles"] for o in t["objects"]}
     out.update({i["key"]: "instances" for i in man["instances"]})
+    out.update({s["key"]: "swim" for s in man.get("swim", [])})
     s2 = man.get("stage2")
     if s2:
         for k in s2["replaced"]:
             out.pop(k, None)
         out.update({a["key"]: "mesh" for a in s2["actors"]})
         out.update({i["key"]: "instances" for i in s2["instances"]})
+        out.update({u["key"]: "underwater" for u in s2.get("underwater", [])})
     if man.get("play"):
         out[PLAY_KEY] = "play"
     return out

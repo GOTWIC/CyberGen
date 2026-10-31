@@ -32,10 +32,11 @@ script, not this exporter.)
 | a material instance per blockout material, parent `M_CityGen` | `/Game/CityGen/<City>/Materials/` |
 | props and plants as hierarchical instanced meshes, one actor per kind and tile, with the instances' ids | `BP_CityGenInstances` actors |
 | the lane, walkway and transit graphs as data assets | `BP_CityGenGraph` assets |
+| M16: a water physics volume per box of a water body and tile (the player swims in a canal, a river or the sea instead of falling through it) | `PhysicsVolume` actors, `CityGen/swim` |
 | a player start, a sun, a sky light and the sky atmosphere | always loaded |
 | a fly pawn and its game mode, the level's game mode override unless `--play walk` | `/Game/CityGen/Core/BP_CityGenFlyPawn`, `GM_CityGenFly` |
 | the far view: the level's instanced HLODs, built after the import | World Partition HLOD actors |
-| with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
+| with stage 2 (AG1, AG7): a static mesh actor per building shell and street piece at its own pivot, in place of the blockout actors it replaces; parts as hierarchical instances per entry and kind; AG4's skybridges by id and roof equipment instanced per tile | `/Game/CityGen/<City>/Assets/<Part>/<tile>/` |
 | stage 2's masters and an instance per part and slot | `/Game/CityGen/Core/M_Cg*`, `/Game/CityGen/<City>/Assets/Materials/` |
 | with AG6: textures (the shared library, imported once per project; a city's sign pages), textured masters, `Night` in a parameter collection, an instance per material key (era variants of the wall and roof slots) | `/Game/CityGen/Core/Textures/`, `Core/MPC_CityGen`, `/Game/CityGen/<City>/Assets/Textures/` |
 
@@ -99,7 +100,23 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 - **`--check`** plays the level twice in the editor, without saving it: walking with the
   project's character whatever `--play` set (streaming, collision, a walk along a sidewalk),
   then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
-  With `--shots DIR` it renders views of the city and two from the fly pawn.
+  The walk and the flight report how long their frames took (median, 95%, longest). With
+  `--shots DIR` it renders views of the city (each once small first, so its Nanite pages
+  have streamed in) and two from the fly pawn. The views load the whole city in the editor,
+  or for a city with more than 42,000 meshes (the manifest's, by actor key) the actors
+  nearest its middle up to 42,000 of them, for every view (`SHOT_MESHES`): every Nanite
+  mesh in memory takes a root page, the pool stops at 49,152 on the Mac (2 GB), where the
+  editor quits on a fatal error, and an actor unloaded between views keeps its meshes'.
+- **Nanite's root pages** bound how big a city can be on this route: Cragmouth's 63,700
+  Nanite meshes (stage 2 and blockout) overrun them in play, and the editor quits before
+  the first frame (the far view's instanced HLODs and the view range make no difference;
+  the AG5 Unreal check, `docs/progress/AG5/unreal/`), and so do Vesper Bay Decks' 50,008
+  (the AG10 check). Greyhook (34,000) and Vesper Bay play.
+- **Nanite in the editor on the Mac**: UE 5.8 renders these levels with Nanite off
+  (`UseNanite(METAL_SM6) returned false`), so every Nanite mesh draws its fallback; an
+  entry whose small parts must show and collide asks for a full one (`fallback_full`:
+  AG3's fronts, AG10's deck pieces). A mesh imported again whose entry no longer asks for
+  it goes back to the automatic fallback.
 
 | Flag | Default | |
 |---|---|---|
@@ -227,7 +244,7 @@ high resolution shot), and showing the lane and walkway graphs over the city for
 
 | Stage | Contribution |
 |---|---|
-| 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14) |
+| 1 citygen | the blockout, props and plants, graphs, player start, a default sun and sky (M15); terrain: the ground per tile, walls, bores, terrain viaducts and columns by id (M13); decks: the slab, deck streets and the buildings on them tagged with their level, the manifest's decks, levels in the graphs (M14); water and ground: swim volumes per water body and tile, water at its surface, beds, banks by kind and the ground cover by kind with a material each (M16) |
 | 2 assetgen | buildings replacing their blockout boxes by id (own pivots, parts as instances, simple collision), textured master materials with per-actor parameters, street meshes replacing the joined pieces, prop and plant variants, signs, LODs for the pieces Nanite does not take, HLOD and Lumen settings (per milestone: `docs/assetgen_scope.md` section 14) |
 | 3 atmosgen | lights (windows, signs, street lights), sky, weather, fog and post volumes, replacing M15's default sun and sky |
 | 4 lifegen | traffic, crowd and transit systems on the graphs, spawners |
@@ -473,6 +490,142 @@ a second node beside the shell in the tile's pack (`<id>.front`) and its own ent
 - the decal meshes as non-Nanite static mesh actors without collision, their slots the
   decal instances (`M_CgDecal`, deferred decal domain: a mesh decal over the wall behind).
 
+### From AG4: roofs, roof equipment and skybridges
+
+`assetgen build` (AG4) adds roof forms, finishes, copings, green roofs, facade details,
+portals and sky stations to the shells (no new entry: they are in each building's shell,
+front and parts), and three things the exporter takes:
+
+- **Roof equipment** (AC units, water tanks, antennas, helipads and AV pads, access huts,
+  dunnage, roof vents, skylights; `roofparts.ROOF`, always instanced) leaves the
+  buildings' `parts` for one entry per tile in `unreal_contribution.buildings.json`:
+
+  ```json
+  {"key": "roofs.t+02+00", "kind": "roof_equipment", "hash": "...", "replaces": [],
+   "pivot": [0.0, 0.0, 0.0], "yaw_deg": 0.0, "nanite": true, "triangles": 0,
+   "slots": [], "collision": {"none": true}, "cpd": [], "instances": 412,
+   "parts": [{"kind": "part.ac_unit.box.h957c3355d6", "type": "part.ac_unit.box",
+              "glb": "parts/t+02+00.glb", "node": "part.ac_unit.box.h957c3355d6",
+              "asset": "part_ac_unit_box_h957c3355d6", "count": 96, "triangles": 220,
+              "collision": {"none": true}, "xforms": [[512.4, 88.1, 31.2, 90.0]],
+              "ids": ["d03.lot.e512n88.bld"]}],
+   "tags": {"cg.type": "roof_equipment", "cg.district": "", "cg.tile": "t+02+00"}}
+  ```
+
+  Transforms in the city frame (x, y, z in meters, yaw in degrees), one building id per
+  transform; the meshes are nodes of the tile's part pack. No collision, as AG2's
+  building parts (a body per instance; the building's own collision covers its roof).
+  Their slots take no tint (no building's Custom Primitive Data reaches a tile's
+  instances) and none is era-varied (no `<slot>@<era>`, so no `materials` map). Merged roof parts
+  (penthouses, billboard frames) stay in their building's shell.
+- **Green roofs**: a building entry's `replaces` lists the blockout's joined green-roof
+  objects (`d03.green_roof.<tile>`) whose every green area is a green roof its shells
+  built (each object given to the smallest building id among them); an object that also
+  draws a lawn, or a green roof too small to build, stays.
+- **Skybridges** (and M3p's podium decks, open-deck skybridges): a part of their own,
+  `unreal_contribution.connections.json`, packs `connections/<tile>.glb` (a node per
+  skybridge at its middle, turned to its line), an entry per skybridge keyed by its id, so
+  it replaces the blockout's skybridge object of that name:
+
+  ```json
+  {"key": "d03.sb.e183n553", "kind": "skybridge", "hash": "...", "replaces": [],
+   "glb": "connections/t+00+02.glb", "node": "d03.sb.e183n553",
+   "asset": "d03_sb_e183n553", "pivot": [183.1, 553.4, 0.0], "yaw_deg": 92.6,
+   "nanite": true, "collision": {"complex": true}, "cpd": [], "ids": ["d03.sb.e183n553"],
+   "links": ["building:d03.lot.e164n586.bld", "building:d03.lot.e180n524.bld",
+             "walkway:wk.e183n553"],
+   "tags": {"cg.type": "skybridge.enclosed", "cg.district": "", "cg.tile": "t+00+02"}}
+  ```
+
+  Complex collision (its floor is walked), untinted materials (`bridge_*`, planters,
+  lamps) on the building table of AG6's catalog, `links`: the two buildings it joins and
+  its walkways, for stage 4.
+
+**What the exporter does with them** (`citygen/unreal.py`, `citygen/ue/import_city.py`):
+- the roof entries as any parts-only entry: an instanced actor per mesh (`roofs.<tile>.
+  <kind>`), its ids per instance, `NoCollision` from the parts' own `collision`
+  (`test_stage2_takes_assetgen_roofs_and_skybridges`);
+- a stage 2 entry's `links` reach its actor (in its hash) and the importer tags each one
+  `cg.link=<link>` (`test_stage2_skybridge_links`);
+- the connections part like any other: its folder `Assets/Connections/<tile>/`, its
+  materials `connections.<slot>`.
+
+### From AG5: heroes, types and slopes
+
+`assetgen build` (AG5) adds the type generators, the landmark heroes, buildings on M13's
+slopes and complex families to the shells (no new entry, no new part). Three things reach
+the exporter:
+
+- **Heroes** (every landmark and M3's megasite wheel): the building entry carries
+  `hero` (`kind`: megatower, spire, arcology, ferris_wheel; `accent`) and a `materials`
+  map of its own. Every slot of a textured opaque master (`facade`, `metal`, `concrete`)
+  takes the material `<slot or era material>#<id>`, the slot's record with the hero's U2
+  mask: texture `city.hero.<id>` (`textures/hero/<id>.png`, 512 px, kind `mask`, not sRGB:
+  R grime, G leaks, B wear) as `HeroMask`, and `HeroMaskOn` 1. The hero's shell and front
+  carry TEXCOORD_1 on every non-glass slot in the hero UV (u the UV0's u over its longest
+  perimeter, v the height over the building's), where the mask is baked. Its light slots
+  (`hero_light`, `halo_light`) take its accent colour (`<slot>#<id>` again, with or without
+  the library):
+
+  ```json
+  {"key": "d01.lm.e152n1064.bld", "kind": "building", "hero": {"kind": "megatower",
+   "accent": "#39ff8a"}, "materials": {"wall": "wall@corporate_glass#d01.lm.e152n1064.bld",
+   "hero_light": "hero_light#d01.lm.e152n1064.bld"}, "...": "..."}
+  ```
+- **Plinths**: a building on M13's slopes carries `plinth_m`, how far its stepped plinth
+  reaches under its pivot (its base, `floor_grid.base_m`) to meet the ground; the plinth is
+  in the shell and the street front, stepped to the terrain along every wall (retaining
+  skirts where the hill stands against it).
+- **Collision**: a mass a skybridge lands on is cut into storeys at each landing door's
+  floor and head, and in the door's storey its hull has a notch the door's width and 2.5 m
+  deep, so a walk across the bridge steps through the door (`collision.VESTIBULE_MM`).
+
+**What the exporter does with them** (`citygen/unreal.py`, `citygen/ue/import_city.py`):
+- an entry's `hero` and `plinth_m` reach its actor (in its hash), tagged `cg.hero=<kind>`
+  and `cg.plinth=<m>`; `stage2.counts.heroes`;
+- the hero's materials and mask texture as any other (the mask among the city's textures,
+  `Assets/Textures`); the textured masters (`facade`, `metal`, `concrete`, `foliage`,
+  `road`) gain `HeroMask` (sampled on UV1) and `HeroMaskOn` (default 0) after their surface
+  (`HERO_CODE`: grime darkens, leaks stain, wear lightens); `STAGE2_VERSION` 6 rebuilds
+  them. Tested without Unreal by `test_stage2_heroes_and_plinths`.
+
+### From AG10: layered districts
+
+`assetgen build` (AG10) gives M14's decks their assets. On a city without decks no entry,
+key or byte of any contribution changes. On a city with decks:
+
+- **Deck pieces** in `unreal_contribution.streets.json` (kinds `street.deck.slab`,
+  `street.deck.column`, `street.deck.stair`, `street.deck.elevator`; meshes in the street
+  packs, complex collision, Nanite; the slabs, stairs and elevators with a full fallback,
+  `fallback_full`, since the AG10 Unreal check):
+  - **Slabs**: one entry per deck and tile keyed by the blockout's own slab object
+    (`<deck>.slab.<tile>`, its `replaces` that key). So the slab actor keeps its key and
+    the manifest's `decks` still name it.
+  - **Columns**: one entry per column by its id, replacing the joined
+    `<district>.deck_column.<tile>`.
+  - **Stairs and elevators**: one entry each by id, replacing the blockout object of that
+    name.
+  - **The rest of the deck**: the deck's streets, junctions and sidewalks lie on the slab
+    (no viaduct girder or parapet under them) and replace the joined `deck_road`,
+    `deck_junction` and `deck_sidewalk` objects as before. A ramp's entry (`<segment>`)
+    replaces `<segment>.ramp`, now a solid ramp with a walkway on each side.
+- **Levels**: an entry takes the level of the blockout actor it takes the place of (as
+  every stage 2 entry does), so the slabs, the deck's streets and ramps keep `cg.level=1`
+  and the columns, stairs and elevators stand on the ground. Buildings on a deck carry
+  `level` 1 in their entries (AG3).
+- **Graphs**: `graphs.walkways` adds the walkways beside each ramp, put on the ramp's
+  walkway decks (z over the ground, as the model's).
+- **Buildings**: no new field. The undercity buildings' tops meet the soffit, and the
+  buildings on a deck stand on its top (the shells, `asset_decks`); their entries are as
+  before.
+
+**What the exporter does with them**: no code change. `stage2` drops every deck object a
+deck entry names, and each deck actor's level comes from the replaced object's category
+(`DECK_LEVEL`). Tested without Unreal by `test_stage2_takes_assetgen_decks`: the small city
+with a deck, its street stage over its blockout, every deck object replaced, the slab
+actors on level 1 and the manifest's `decks` naming them, the columns, stairs and
+elevators on the ground, the ramp walkways on their ramp.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -543,6 +696,100 @@ them (`SetLodFromStaticMesh`, `SetLodScreenSizes`), its actor without collision;
 `Assets/StreetsParts/parts`); the walkway graph data assets take `graphs.walkways` lines
 instead of graphs.json's (on a terrain city the ground under them, graphs.json's z there,
 is added); the new keys in the re-import digests.
+
+## assetgen's water contribution (AG12)
+
+`assetgen water BUILD` (and `assetgen build`, after the streets) writes
+`BUILD/assets/unreal_contribution.water.json` beside its packs (`BUILD/assets/water/<tile>.glb`,
+one per 256 m tile; `water/parts.glb`, the riprap stones), in AG0's format with `"part":
+"water"`, layer 2:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "water", "layer": 2,
+ "masters": ["bed", "concrete", "water"],
+ "materials": {"water.sea": {"master": "water", "textures": {"NormalTex":
+                "atlas.water.normal", "FoamTex": "atlas.water.foam"},
+                "scalars": {"Clarity": 6.0, "FlowScale": 1.0, "FoamAmount": 1.0,
+                            "WaveHeight": 0.55, "WaveLength": 26.0, "RippleTileM": 8.0},
+                "vectors": {"Scatter": [0.02, 0.07, 0.08], "Absorb": [0.45, 0.11, 0.08],
+                            "Shallow": ["..."], "Deep": ["..."]}, "...": "..."},
+               "bed.sand": {"master": "bed", "textures": {"BaseTex": "set.bed_sand.base",
+                            "Caustics": "atlas.water.caustics", "...": "..."}}, "...": {}},
+ "entries": [
+  {"key": "sea.water.t-03+01", "kind": "water.surface.sea", "replaces": ["city.sea.t-03+01"],
+   "glb": "water/t-03+01.glb", "node": "sea.water.t-03+01.lod0", "nanite": false,
+   "collision": {"none": true}, "ids": ["sea"], "pivot": [-640.0, 384.0, 0.0],
+   "lods": [{"node": "sea.water.t-03+01.lod0", "screen_size": 1.0, "triangles": 33012},
+            {"node": "...lod1", "screen_size": 0.4}, {"node": "...lod2", "screen_size": 0.15},
+            {"node": "...lod3", "screen_size": 0.05}], "...": "..."},
+  {"key": "sea.bed.t-03+01", "kind": "water.bed", "replaces": ["city.bed.t-03+01"],
+   "nanite": true, "collision": {"complex": true}, "...": "..."},
+  {"key": "sea.bank.w568n284", "kind": "water.bank.riprap",
+   "replaces": ["d02.bank_riprap.t-03+01"], "nanite": true, "collision": {"complex": true},
+   "parts": [{"kind": "part.riprap.r3", "glb": "water/parts.glb", "node": "part.riprap.r3",
+              "collision": {"none": true},
+              "xforms": [[-2.4, 1.1, -1.62, 213.4, 0.92, 0.81, 0.69], "..."]}], "...": "..."},
+  {"key": "water.blockout", "kind": "water.drop", "drop": true,
+   "replaces": ["city.sea.t+05+05", "d04.bank_quay.t+03-05", "..."]}],
+ "underwater": {"sea": {"water": "sea", "tint": [0.35, 0.62, 0.7], "fog": 0.06}, "...": {}}}
+```
+
+- **Keys**: per water body and tile, the surface `<body>.water.<tile>` and the bed
+  `<body>.bed.<tile>` (a body's own water: its polygon less the bodies before it in M16's
+  order, so no two overlap); per bank AG12 draws (natural, beach, marsh edge, riprap, road
+  embankment, and canal walls along rivers and the sea) its id. `replaces`: a surface the
+  tile's `city.sea.<tile>` (the sea) or `city.water.<tile>` (inland water), a bed the
+  tile's `city.bed.<tile>`, a bank its joined `<district>.bank_<kind>.<tile>`. The drop
+  entry (`water.blockout`) takes away the blockout's water objects no piece replaces: sea
+  sheets of tiles with no sea (they lie under the land, and under inland water 5 cm under
+  its surface they would show through the water), and the `bank_quay` and the waterways'
+  `bank_canal_wall` bands, which AG7's quay and canal wall pieces draw.
+- **Surfaces**: non-Nanite (Nanite does not take Single Layer Water), no collision (M16's
+  swim volumes are the water), a LOD chain on coarser lattices (the sea 2, 4, 8 and 16 m,
+  inland water 4, 8 and 16 m; screen sizes 1.0, 0.4, 0.15, 0.05). Vertex data the master
+  reads: UV0 the plan in meters (x east, y north), UV1 the current in m/s (x east, y
+  north: Unreal's y is citygen's -y, the master turns it over), COLOR_0 R the foam mask
+  (walls, waterlines, bridge piers), G the depth over 12 m, B the sea's wave weight (M16's
+  exposure, open 1, sheltered 0.5, harbor 0.15, nothing at the waterline). The packs keep
+  their vertex colors and full-precision UVs, with no lightmap UVs over UV1 (the importer's
+  water pipeline).
+- **Beds**: Nanite, complex collision (the floor under a swimmer), UV0 the plan in meters
+  (a steep step's triangles on vertices of their own, UV0 on the vertical plane they face),
+  UV1.x the depth (the caustics' strength). On a terrain city the bed lies 0.1 m over M13's
+  ground grid, which carries M16's beds under the water too.
+- **Banks**: Nanite, complex collision; riprap stones as an instanced actor per bank and
+  stone kind (six meshes in `water/parts.glb`; x, y, z, yaw, sx, sy, sz relative to the
+  pivot), no collision.
+- **Underwater**: per body its water kind's post-process tint and fog density; the
+  exporter puts a post-process volume beside each of M16's swim boxes of that body.
+
+**What the exporter does with water** (in this milestone): the third layer-2 part read
+like the streets' (AG12 writes its colors as sRGB: `SRGB_PARTS`), its packs imported with
+the water pipeline (vertex colors replaced, full-precision UVs, no lightmap UVs), the
+surfaces' LOD chains made from their LOD nodes as the sky tube glass's; the masters:
+- `M_CgWater` (`water_master`): the Single Layer Water shading model (its output node's
+  scattering and absorption coefficients from the water kind's `Scatter` and `Absorb`, so
+  the color deepens with the depth the shading model measures behind the surface; phase
+  0.1), ripple normals from the water atlas sampled twice along the current (UV1, a flow
+  map's two phases blended by their distance from the phase's middle, scaled by
+  `FlowScale`, tiled every `RippleTileM`), foam from the vertex mask and the shallows (the
+  vertex depth under 0.6 m) over the atlas's foam lace, drawn over the water by Opacity
+  (white, rough), and the sea's waves by world position offset: four Gerstner waves on
+  absolute world position (`WaveHeight`, `WaveLength`, the vertex's wave weight), faded out
+  between 150 and 350 m from the camera, so a coarser LOD's edges never meet a finer one's
+  moving, their slope added to the normal. Decision 13.10 (a): no Water plugin; an engine
+  whose Python lacks the shading model's output node gets opaque reflective water instead
+  (logged).
+- `M_CgBed`: the textured surface (`textured_surface`, the bed's set by M16's material:
+  mud, silt, sand, gravel, stone) with caustics as emission: the water atlas's two
+  networks scrolled across each other on the world plan (`CausticTileM`), only under the
+  water (UV1.x over 0.08 m), fading to nothing at 9 m and by night (`MPC_CityGen.Night`).
+- An unbound-off `PostProcessVolume` per swim box of a body (`underwater.<water>.<tile>.<k>`,
+  in `CityGen/underwater`, the swim box's size): the water kind's scene color tint,
+  saturation 0.75, a vignette and the focal distance of its fog; tags as the swim volumes'
+  (`cg.type=underwater`). `actor_hashes`, `actor_kinds` (`underwater`) and
+  `manifest_changes` take them, `stage2.counts.underwater_volumes`.
+`STAGE2_VERSION` 7 rebuilds the masters.
 
 ## assetgen's props and signs contributions (AG8)
 
@@ -639,6 +886,79 @@ tint mask, masked and two-sided, Nanite `Voxelize` at distance as before) and `M
 reading `SignTex` (the holo ad page as emission, the opacity by its brightness, where
 `Textured`).
 
+## assetgen's ground contribution (AG13)
+
+`assetgen ground BUILD` (and `assetgen build`, after the props) writes
+`unreal_contribution.ground.json` (`"part": "ground"`) beside its packs:
+
+```json
+{"version": 1, "stage": "assetgen", "part": "ground", "layer": 2,
+ "masters": ["grass", "ground"],
+ "materials": {
+  "ground.lawn.t+01+05": {"master": "ground", "color": [0.08, 0.2, 0.04],
+   "textures": {"BaseTex": "set.ground_lawn.base", "NormalTex": "...", "OrmTex": "...",
+                "WornBaseTex": "set.ground_dirt.base", "...": "...",
+                "ShadeBaseTex": "set.ground_moss.base", "...": "...",
+                "Mask": "city.ground.t+01+05", "Macro": "atlas.macro.macro"},
+   "scalars": {"TileM": 2.0, "WornTileM": 2.0, "ShadeTileM": 1.0, "MaskX0": 256.0,
+               "MaskY0": 1280.0, "MaskSize": 256.0, "WearK": 1.0, "MossK": 0.6,
+               "EdgeK": 0.5, "WetK": 0.6, "Tinted": 1.0, "Textured": 1.0},
+   "vectors": {"RefColor": [...], "WornRefColor": [...], "BaseFlat": [...], "...": "..."}},
+  "grass.meadow": {"master": "grass", "color": [0.15, 0.27, 0.04], "roughness": 0.8,
+                   "scalars": {"Wind": 1.0}, "vectors": {"DryColor": [0.46, 0.37, 0.11]}}},
+ "textures": {"city.ground.t+01+05": {"file": "ground/masks/t+01+05.png", "kind": "mask",
+                                      "srgb": false, "size": [512, 512], "...": "..."}},
+ "entries": [
+  {"key": "ground.t+01+05", "kind": "ground.cover", "glb": "ground/tiles/t+01+05.glb",
+   "node": "ground.t+01+05", "pivot": [384.0, 1408.0, 0.0], "nanite": true,
+   "triangles": 1498, "slots": ["ground.lawn.t+01+05", "..."],
+   "replaces": ["d03.cover_mown_lawn.t+01+05", "d03.lawn.t+01+05", "..."]},
+  {"key": "grass.t+01+05", "kind": "ground.grass", "pivot": [384.0, 1408.0, 0.0],
+   "parts": [{"kind": "clump.meadow.v2", "glb": "ground/clumps.glb",
+              "node": "clump.meadow.v2", "count": 3120, "triangles": 185,
+              "xforms_file": "ground/grass/t+01+05.json", "nanite": false,
+              "collision": {"none": true}, "cull_m": [60.0, 100.0], "shadow": false}]},
+  {"key": "d07.cover_paving.t-02+04", "kind": "ground.drop", "drop": true}]}
+```
+
+- **Ground**: one actor per tile in place of the blockout's ground cover objects of that
+  tile (`<district>.cover_<kind>.<tile>`, M16) and its median lawns
+  (`<district>.lawn.<tile>`, M6's verges, which nothing replaced before); a blockout object
+  whose pieces lie wholly in the tiles beside its own gets a `drop` entry (those tiles draw
+  them). Nanite, complex collision (the lawns are walked on), 0.1 m over the ground as the
+  blockout's flats were. The mesh's slots are per surface and tile: the tile's mask
+  (`ground/masks/<tile>.png`, 512 px for its 256 m, linear, row 0 its south edge: R wear, G
+  shade, B edge, A moisture) is a texture per tile, so its material is too.
+- **Grass**: decision 13.9 (a), baked per tile. An entry per tile with a part per clump
+  variant; the transforms (`[x, y, z, yaw, s, s, s]` from the pivot, the tile's middle) are
+  in `ground/grass/<tile>.json` under the part's node (`xforms_file`), not in the
+  contribution (a city has one to two million clumps). Not Nanite (the master sways by world
+  position offset), no collision, no shadows, culled between 60 and 100 m (`cull_m`), out of
+  the HLODs.
+- **Materials**: `ground` (`M_CgGround`): its three sets (base, worn, shade) on UV0 (the plan
+  position in meters) over their TileM, the mask on world x, y (`MaskX0`, `MaskY0`,
+  `MaskSize`); worn over base by the wear and the edges (`WearK`, `EdgeK`), the edge broken
+  up by the base set's height; the shade set where shade and moisture meet (`MossK`); darker
+  and smoother where wet (`WetK`); the base set tinted over its tinted pixels where `Tinted`
+  (the instance's `BaseColor`: a lawn's green). Without AG6's library (`Textured` 0) flat
+  colors (`BaseFlat`, `WornFlat`, `ShadeFlat`). `grass` (`M_CgGrass`): untextured, the
+  slot's color toward `DryColor` by the vertex colors (R height share, G tone, B dryness),
+  darker at the root, two-sided, masked, dithered out with the instance's fade
+  (`PerInstanceFadeAmount`), swaying by world position offset: the vertex's height share
+  squared times `MPC_CityGen`'s `Wind` (a new scalar, default 0.35, which stage 3 drives)
+  times the slot's own `Wind` (sedum 0.05 to plumes 1.4), two waves along the world phased
+  per instance.
+
+**What the exporter does with the ground** (AG13): a part may give `xforms_file` (relative to
+`assets/`) instead of `xforms`: the instance actor's record then holds `xforms_file`,
+`xforms_key` (the node), `count` and the file's sha256 (`xforms_sha`, in its hash), and the
+importer reads the transforms from the file (one file at a time, as the actors come tile by
+tile); a part's `cull_m` becomes the HISM's cull distances (`set_cull_distances`, start and
+end in centimeters), `shadow: false` turns its shadow off, and an instance actor with
+`cull_m` is left out of the HLODs (`enable_auto_lod_generation` off on its component and
+actor). `MPC_CityGen` gains `Wind` (a collection without it gets it, keeping `Night`).
+Masters `M_CgGround` and `M_CgGrass` (`stage2_master`).
+
 ## assetgen's materials (AG6)
 
 `assetgen build` now textures what the contributions name (`assetgen/materials/contrib.py`;
@@ -729,7 +1049,10 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 - **One Unreal editor at a time** on the Mac; heavy scenes go to the Windows PC. For scale,
   M15 imports a sample city in 33 to 79 s and checks it in 68 to 112 s on the Mac; with
   stage 2 (AG1's shells and AG7's streets) a first import takes 5 to 14 minutes, most of it
-  building the Nanite meshes, and an import of an unchanged build 20 to 40 s.
+  building the Nanite meshes, and an import of an unchanged build 20 to 40 s. With every
+  stage 2 part (AG1 to AG4, AG6 to AG8) a first import takes 19 minutes (Greyhook) to an hour
+  (Vesper Bay), an unchanged one 1 to 3.5 minutes (2 to 7 with the HLOD pass), and a check
+  20 to 30 minutes.
 
 ## Record
 
@@ -743,13 +1066,25 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | M14 | Layered districts: a deck's slab one actor per deck and tile (`<deck>.slab.<tile>`, with its railing), its streets, junctions, crosswalks and sidewalks in joined actors of their own (`d03.deck_road.<tile>`, `d03.deck_junction.<tile>` and so on; `city.deck_road.<tile>` and `city.deck_sidewalk.<tile>` with no district until the stage 1 fixes), its ramps one actor each (`<segment>.ramp`), columns joined per tile (`deck_column`), stair flights and elevator shafts one actor each by id, the buildings under a slab (material `bld_undercity`) and on it; actors on a deck (its slab, streets and ramps, the buildings on it) tagged `cg.level=1` (the manifest's `level`, absent on the ground, so a city without decks imports exactly as before; a road's own level, M7's viaducts and M9's tunnels, does not count: fixed in the Unreal check); the manifest's `decks` (id, level, top, district, slab keys); `graphs.json` lanes and walkways with their `level` off the ground and the flat graphs a `levels` array (the data assets' `Levels`, `CORE_VERSION` 2, empty on a city without decks); the check's walk never takes an elevator, and its traces cover each deck (a spot in the middle of its busiest slab tile) | Vesper Bay Decks imported (10477 actors, 64 s), imported again (nothing changed, 24 s) and checked (676 of 676 traces down, 66 of them on the deck itself; 48 of 48 roofs and facades; 260 m walked) with shots of a street on the deck, the same street under the slab and the deck's edge; Vesper Bay imported over its M15 import after the core assets went to `CORE_VERSION` 2 (`docs/progress/M14/unreal/`) |
 | Stage 1 fixes | No code change. Keys: a deck's streets and sidewalks are joined per district like the ground's (`d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`, with `cg.district=d03`; they were `city.deck_road.<tile>`, `city.deck_sidewalk.<tile>` with an empty `cg.district`), so importing Vesper Bay Decks over an M14 import replaces those actors under their new keys; its ramps keep theirs (`<segment>.ramp`). Cragmouth's local junctions are level out to their corners (more retaining wall actors on its hills, keys by wall id as before) | Not run (the coordinating session's call; `docs/progress/stage1_fixes/`) |
 | AG1 and AG7 (after M15) | Stage 2 taken as layer 2: every `assets/unreal_contribution.*.json` read in sorted order (`unreal.stage2`, the manifest's `stage2`; a key in two files refused), the blockout actors of each entry's key and `replaces` dropped, an actor per shell and street piece at its pivot (`cg.stage=2`), the packs through Interchange in their nodes' frames with their own normals, stage 2 masters (`M_CgFacade`, `M_CgGlass`, `M_CgMetal`, `M_CgRoad`, `M_CgOpaque`, `M_CgEmissive`, `M_CgTranslucent`, `M_CgFoliage`) and an instance per part and slot reading the actor's Custom Primitive Data tint, the 23 floats as the components' saved defaults, building collision as convex hulls through GeometryScript (`GeometryScripting` plugin), complex collision for streets, the sky tube glass as a non-Nanite LOD chain, container stacks as instanced actors per entry and kind, proxies imported only, `graphs.walkways` lines in the walkway data assets; `--blockout-only`; the check's walk keeps to walkable walkways (no leg over 30%, no step over 0.6 m, not under the terrain) and tries up to eight starts; the buildings contribution's `asset` is the shell node's Interchange name and its patch slots spell out their tint rule | the small test city, Greyhook and Cragmouth: blockout alone, then stage 2 over it (exactly the actors `manifest_changes` names), imported again (nothing changed), checked (507 of 507 traces down, 36 of 36 roofs and facades, 248, 130 and 81 m walked) with shots; first imports with stage 2 5 to 14 minutes, most of it Nanite builds (`docs/progress/AG1/unreal/`) |
+| AG13 | Ground cover and grass taken: `unreal_contribution.ground.json` (above); a part's transforms from a file of its tile's (`xforms_file`, its sha256 in the actor's hash), its cull distances (`cull_m`), no shadow and no HLOD; `M_CgGround` (three sets blended by a tile's mask) and `M_CgGrass` (vertex-colored clumps swaying in `MPC_CityGen`'s new `Wind`, dithered out with the instance fade); the blockout's ground cover objects and M6's median lawns replaced by key (a `drop` where their tile draws none of them); tests without Unreal (`test_stage2_takes_assetgen_ground`) | Not run (the coordinating session's call) |
 | AG8 | Props, plants and signs taken: `unreal_contribution.props.json` and `.signs.json` (above); `stage2` replaces M15's prop and plant prototype actors by key (entries keyed by them, or `replaces`, or `drop`), parts with per-instance ids, scales, collision, Nanite and `shape_preservation`; the importer skips the replaced prototypes, scales instances, sets voxel Nanite foliage, makes `M_CgHolo`; tests without Unreal (`test_stage2_props_replace_prototypes`, and `test_stage2_from_assetgen` now with every prototype replaced) | Greyhook and Vesper Bay imported with their props (25,837 and 46,354 actors, 785 and 1,818 s), imported again (nothing changed, 69 and 74 s) and checked (507 of 507 traces down, 36 of 36 roofs and facades, 134 and 253 m walked): the HISM counts per kind equal `props_report.txt`, no M15 prototype left, every instance at its model position, plants Nanite with `Voxelize`, holo-ads translucent 3-LOD chains, neon and lit faces emissive; shots of props by day and a neon street at night (`docs/progress/AG8/unreal/`) |
 | Play-ready (after AG1 and AG7) | Open into the city and play it: each import makes the city the project's `EditorStartupMap` and `GameDefaultMap` (`unreal.set_startup_map`, the rest of `Config/DefaultEngine.ini` as it was; `--no-startup`); `Core/BP_CityGenFlyPawn` (a SpectatorPawn, its built-in bindings, no collision, `--fly-speed` 50 m/s) and `Core/GM_CityGenFly`, the level's game mode override with `--play fly` (the default), none with `--play walk`; World Partition for flying: the main grid 256 m cells loaded `--view-range` (1500 m) around the player, the instanced HLOD layer in 512 m cells out to the city's diagonal (its merged parent layer cut off), set by the partitions' C++ property names; the HLODs built after the import (`unreal.build_hlods`, the WorldPartitionHLODsBuilder commandlet, only what changed; `--no-hlod`); every master `used_with_instanced_static_meshes` (without it the far view drew the default material, flat gray); `--check` walks with the project's own pawn whatever `--play` set, runs `ghost`, `fly` and `walk`, then flies with the fly pawn (its speed on the game's clock, through a building, the city loaded where it ends) and with `--shots` takes two views from it; an unchanged build imported again saves nothing; `unreal.manifest_changes` counts a key whose actor changes class (AG8's exact props over M15's instanced ones) as deleted and created, as the importer does | Vesper Bay (blockout only) and Greyhook (with stage 2) imported over their earlier imports, imported again, HLODs built (244 and 285), checked in both modes (507 of 507 traces down, 36 of 36 roofs and facades, 253 and 129 m walked, the console commands, 50 m/s flights) with shots from the fly pawn (`docs/progress/unreal_play/`) |
 | AG8 Unreal check | Plants' instanced actors without collision (a part's `collision: {"none": true}` now makes its HISM `NoCollision`; it reached only the mesh record before); the check tries a missed trace down again for up to 30 s (`TRACE_RETRY_S`) and counts those hits as late (the first play session after an import traced before the streamed cells' collision was in place: 346 of 507) (its streaming step's read of actors that had streamed out, which stopped Vesper Bay's first check, was fixed the same way by the play-ready exporter); `test_stage2_from_assetgen` expects the exact props' keys, whose actor changes class, as deleted and created (`manifest_changes` since the play-ready exporter) | as AG8's row |
 | AG2 | No code change: each building entry's `parts` (kind, type, glb, node, asset, count, triangles, xforms, building) and `instances`, the part meshes one pack per tile (`parts/<tile>.glb`, above), AG2's new material slots (the new walls, the parts, the industrial dado) tinted only from the six CPD channels; the stage 2 import (AG1 and AG7 row) takes them as instanced actors per entry and kind, tested by `test_stage2_takes_assetgen_parts` on the small city | Greyhook and Vesper Bay with AG6 (`docs/progress/AG6/unreal/`): one instanced actor per building and part kind (11,207 and 17,227), every instance count its entry's (833,694 and 1,320,908 instances), the parts on their walls, nothing floating or doubled; the era walls on the parts and no collision for them came with the AG2 and AG6 Unreal check (below) |
-| AG3 | Street fronts: each building's ground band its own entry and node (`<id>.front`, kind `building.front`) with complex collision and `fallback_full` (the mesh record and its hash; the importer sets the Nanite fallback to every triangle), its building's id, CPD and materials; doors tagged on the front's actor (`cg.door=<id>@<walkway>`) and gathered into a fourth flat graph, `doors` (`doors_of`); a stage 2 entry's own `ids` and `level` reach its actor; the tiles' decal meshes as entries (`decals.<tile>`, no Nanite, no collision, `decal.<cell>` slots with their cell index); tests without Unreal (`test_stage2_takes_assetgen_fronts`; `test_stage2_from_assetgen` and `test_stage2_takes_assetgen_parts` read the new entries) | Not run (the coordinating session's call; what to look for: `docs/progress/AG3/README.md`) |
+| AG3 | Street fronts: each building's ground band its own entry and node (`<id>.front`, kind `building.front`) with complex collision and `fallback_full` (the mesh record and its hash; the importer sets the Nanite fallback to every triangle), its building's id, CPD and materials; doors tagged on the front's actor (`cg.door=<id>@<walkway>`) and gathered into a fourth flat graph, `doors` (`doors_of`); a stage 2 entry's own `ids` and `level` reach its actor; the tiles' decal meshes as entries (`decals.<tile>`, no Nanite, no collision, `decal.<cell>` slots with their cell index); tests without Unreal (`test_stage2_takes_assetgen_fronts`; `test_stage2_from_assetgen` and `test_stage2_takes_assetgen_parts` read the new entries) | With AG4, in the AG3 and AG4 Unreal check (below; `docs/progress/AG4/unreal/`): Greyhook's 2,671 and Vesper Bay's 5,793 fronts at their shells' pivots with their CPD and era walls, complex collision, the Nanite fallback keeping every triangle; 10,388 and 20,991 `cg.door` tags and door data asset elements; the decal actors on `M_CgDecal` without Nanite or collision; traces and a capsule into the doorways (into the recess, to the door), the hull starting at the band line; shopfronts, neon and lit menus by day and night |
 | AG6 | Textures: the contributions' `textures` (the shared library through `assets/library`, the city's sign pages), materials with texture, scalar and vector parameters and era variants (`<slot>@<era>`), building entries' `materials` maps and 30 Custom Primitive Data floats, `unreal_contribution.materials.json` (sign pages, decals); `stage2.textures` with pixel hashes in the materials' and actors' digests; the importer's texture import by hash (library under `Core/Textures`, city pages under `Assets/Textures`), `MPC_CityGen` (`Night`), textured masters (`M_CgFacade`, `M_CgMetal`, `M_CgConcrete`, `M_CgRoad`, `M_CgFoliage`, `M_CgGlass` with interior mapping on the room grid from UV0, `M_CgNeon`, `M_CgSign`, `M_CgDecal`; `STAGE2_VERSION` 4), instance parameters, per-actor era overrides | Greyhook and Vesper Bay imported into one project (36,454 and 60,634 actors, 824 and 2,543 s; Greyhook's 237 textures in 13 s, Vesper Bay reusing 217 of them from `Core/Textures`), imported again (nothing changed, 34 and 69 s), read back and checked (Greyhook 507 of 507 traces down; Vesper Bay's play session too slow until the fixes below), shot by day and with `MPC_CityGen.Night` at 1: every pane one whole room the right way up near and far, about the lit ratio of rooms lit at night, shops in the storefronts, brick courses level with the tint on the bricks, normals right, the era instances on every actor, 30 CPD floats on every building, HLODs textured; textures 539 MB at full size, 65 MB resident (`docs/progress/AG6/unreal/`) |
 | Progress output | `citygen unreal` (and `citygen build`, `citygen blockout`) report where they are on stderr through `citygen/progress.py` (stdlib; assetgen uses it too): the importer and the check print `CYBERGEN_PROGRESS {json}` lines (a stage per group of phases, counts at most once a second, a first `plan` line with the import's counts), which `run_editor` relays while it writes the editor's output to the log byte for byte; the HLOD stage counts the builder's own lines (`World contains N HLOD actors`, a `final decision` per actor); a first import's overall estimate from this Mac's per-item times (`FIRST_IMPORT_S`), corrected by the stages done; `--quiet`, `CYBERGEN_QUIET=1`. Nothing the import makes changes | Greyhook imported with stage 2 into a new project, and with the blockout alone and `--check` (below) |
 | AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Greyhook rebuilt with it and imported over its AG6 import (16,054 sign, prop and plant actors updated, no shell or street actor; 4,329 new sign meshes, 8,150 renamed away; 39 new library textures), imported again (nothing changed, no HLOD rebuilt) and checked with shots: leaf cards masked up close, crowns full at 250 and 600 m, sign faces upright on their page cells, bark, painted cars and banded bollards; the holo-ads' faces on their page instances, blown out to white by day (a night shot is open); the prune of the renamed meshes stalled until the AG2 and AG6 Unreal check's fix (`docs/progress/AG6/unreal/`) |
 | AG2 and AG6 Unreal check | A building entry's `materials` reach its part instancers (the era walls on AG2's panels, concrete and plaster parts, per slot on the HISM); AG2's building parts get no collision (`collision: {"none": true}`, their instancers `NoCollision`: the building's simple collision covers its masses, and a body per instance, 1.3 million in Vesper Bay, stalled play; containers keep complex collision); every opaque or masked surface master is made with `used_with_nanite` as well as `used_with_instanced_static_meshes` (`usage_flags`; without it, instanced Nanite meshes drew the default material in play and recompiled at each launch, 272 warnings in Vesper Bay); `prune_meshes` keeps `Assets/Materials/` and `Assets/Textures/` (it deleted the city's sign pages after every import, under the instances that use them), and an instance whose texture parameters are empty is rebuilt (`own_textures`); a prune of more than 500 assets (`PRUNE_FILES`) deletes their package files itself on an empty level (`/Engine/Maps/Entry`): the stale packages unloaded, their files deleted, their folders scanned again by the asset registry, the city loaded again for the digests (`delete_files`; the editor's delete took over 90 minutes for the 8,435 meshes AG8 on AG6 renamed, 5 s now) | Greyhook imported again with these (10,617 part instancers updated to `NoCollision`, the 8,435 stale meshes deleted by their files in 5 s; then nothing changed, no HLOD rebuilt) and checked: 507 of 507 traces down, 35 of 36 roofs, 36 of 36 facades, 129 m walked, no usage flag warning in the log; Vesper Bay not imported again with them (its check before them failed: play at 12 to 14 s a frame, 157 of 507 traces down), an open item with the commands in `docs/progress/AG6/unreal/README.md` |
 | Play features (an exporter update on its own) | The play features above: `citygen/unreal_play.py` (the map image and play data, the plugin's install and build), the C++ plugin `citygen/ue/CityGenPlay` (the `CityGenPlay` actor, its overlay, free camera and console commands), the manifest's `play` and the play actor (key `play`, in `actor_hashes`), `--no-play`; the engine found through the Epic Games Launcher's install list (`unreal.launcher_engines`); a building whose street front takes it whole has no shell mesh (AG3's gate houses: the entry's `node` null, the front's `replaces` its key); tests `test_unreal_play.py`, `test_manifest_play` | Testport into a throwaway project (`CityDev`): import, `--check` with the play features, shots; Delta Megacity into another (`CityDelta`): import, HLODs, `--check`, shots (`docs/progress/play_features/`) |
+| AG4 | Roofs and connections: roof equipment one entry per tile (`roofs.<tile>`, parts only, an instanced actor per mesh with a building id per instance, no collision as the AG2 and AG6 check's building parts); buildings' `replaces` the blockout green-roof objects their shells build; skybridges a part of their own (`unreal_contribution.connections.json`, `connections/<tile>.glb`, an entry per skybridge by id with complex collision); a stage 2 entry's `links` carried to its actor (in its hash) and tagged `cg.link=<link>` by the importer; tests without Unreal (`test_stage2_skybridge_links`, `test_stage2_takes_assetgen_roofs_and_skybridges`) | In the AG3 and AG4 Unreal check (below; `docs/progress/AG4/unreal/`): Greyhook's 170 and Vesper Bay's 258 skybridges at their pivots and yaws with their `cg.link` tags, their floors walkable, reaching 0.15 m into both facades, whose hulls close the landing doors; roof equipment 997 and 1,867 instanced actors, every count its entry's, `NoCollision`, nothing floating; the replaced green roofs gone; every new slot on its master; the sky tube through its portal, the platforms at the tube's floor but inside the tower's hull |
+| AG3 and AG4 Unreal check | A shell node with no triangles in its pack (a one-floor building its street front takes whole; the entry's `triangles` counts the front's too) makes no mesh and no actor but still takes the blockout building's place (`glb_triangles`; the empty mesh Unreal refused, "Bad MeshDescription", failed Vesper Bay's HLOD build); the check's streaming wait lists the city's actors once the streaming query says done and then every 2 s, for up to 180 s (`settle`, `COUNT_EVERY_S`, `LOAD_WAIT_S`; listed every frame, 45,000 of them took Vesper Bay's game thread 6.5 s a frame and the far spots never streamed in: the 157 and 169 of 507 traces of the AG2 and AG6 check); roofs and facades traced on shells, not part instancers or fronts; each editor shot rendered once small first (a first render of a new view drew coarse Nanite clusters as flat triangles over the walls); the walk's and flight's frame times in the result; `PRUNE_FILES` 50 (a first import's unused variants by their files); tests `test_stage2_empty_shell`, `test_check_frame_times_and_warm_shots` | Greyhook (40,049 actors, 1,142 s, HLODs 192 s) and Vesper Bay (67,904 actors, 3,524 s; HLODs 167 s) imported into a new project, imported again (Vesper Bay: the empty shell's actor gone, then nothing changed), read back, traced and checked: 507 of 507 traces down in both, 36 of 36 roofs and facades in Vesper Bay, 130 and 253 m walked; Vesper Bay with #54's fixes walks at 0.019 s a frame (median; 0.079 s at 95%), no usage flag warning, its part and roof instancers `NoCollision`, free memory down to 11%; holo-ads show their page by night (`docs/progress/AG4/unreal/`) |
+| AG5 | Heroes, types and slopes: a hero's entry carries `hero` (kind, accent) and its own materials (`<slot>#<id>`: the U2 mask `city.hero.<id>` as `HeroMask` with `HeroMaskOn` 1 on the textured opaque masters, its accent on its lights), its shell's UV1 the hero UV; an entry's `hero` and `plinth_m` reach its actor (in its hash), tagged `cg.hero=` and `cg.plinth=`, `stage2.counts.heroes`; the textured masters sample `HeroMask` on UV1 (`STAGE2_VERSION` 6); the buildings' hulls notched at skybridge landing doors; test without Unreal (`test_stage2_heroes_and_plinths`) | In the AG5 Unreal check (below; `docs/progress/AG5/unreal/`): Cragmouth and Greyhook imported and imported again (nothing changed); the megatower and the wheel tagged `cg.hero=`, two UV channels, `HeroMask` (`T_city_hero_<id>`) with `HeroMaskOn` 1 on 14 of 20 and 4 of 5 slots, every master at 6, no other building with it on; 119 Cragmouth buildings tagged `cg.plinth=`, their plinths at the terrain at 732 of 976 corners, buried uphill at 210, floating over a lower street at 30; landing doors open 2.5 m in (332 of 340 in Greyhook) |
+| AG5 Unreal check | The check's shots stay under Nanite's root pages: they load every actor but the HLODs, or for a city with more than 42,000 meshes (the manifest's mesh of each actor key, `mesh_of`) the actors nearest its middle up to 42,000 meshes, one set for every view (`SHOT_MESHES`, `view_load`; all 75,155 of Cragmouth's actors stopped the editor on "Cannot allocate more root pages 49152/49152", and loaded per view it stopped at the fourth: an actor unloaded between views keeps its meshes'); in assetgen, an open shed collides only from its roof's underside (its hull blocked the walk under the roof; `GEN_VERSION` ag5.1, no exporter change); test `test_check_shots_stay_under_nanites_root_pages` | Greyhook checked with shots (31,379 of 40,099 actors streamed in at the start, 507 of 507 traces down, 36 of 36 roofs and facades, 130 m walked, 378 m flown; open sheds walked under at 40 of 40 sides); Cragmouth's four check views rendered, but play stops on the root pages before its first frame (its 63,700 Nanite meshes; with the HLODs off and a 700 m loading range as well), an open item for the exporter; slopes traced in the editor (doors behind M13's retaining walls, 325 of 710 within 0.2 m of the ground outside against Greyhook's 1,989 of 2,000), `docs/progress/AG5/unreal/` |
+| AG10 | Layered districts: no code change. M14's decks as street pieces in `unreal_contribution.streets.json` (kinds `street.deck.slab`, `.column`, `.stair`, `.elevator`): a slab entry per deck and tile keyed by the blockout's own slab object (`<deck>.slab.<tile>`, so the manifest's `decks` still name it), a column, stair and elevator entry each by id, replacing the joined `deck_column` objects and the flights and shafts; the deck's streets on the slab and its ramps solid with a walkway each side (`graphs.walkways`); an entry's level that of the actor it replaces (`DECK_LEVEL`), so slabs, deck streets and ramps keep `cg.level=1`; test without Unreal (`test_stage2_takes_assetgen_decks`) | In the AG10 Unreal check (below; `docs/progress/AG10/unreal/`): Vesper Bay Decks imported and imported again (nothing changed); its 8 slab actors by their blockout keys at `cg.level=1`, 570 columns, 2 stairs and 2 elevators on no level, 69 deck roads (both ramps), 41 junctions and 136 sidewalks at level 1, the data assets' `Levels` as `graphs.json` (399 lanes, 265 walkways); traces onto the deck at 971 of 971 grid points, the deck's walkways, ramps and stairs walkable |
+| AG10 Unreal check | The deck's slab, stair and elevator entries carry `fallback_full` (assetgen's street stage, `FULL_FALLBACK`): complex collision is built from the Nanite fallback, whose automatic one kept 1,370 of a slab tile's 17,597 triangles and lost the rail (a walker's capsule stopped at 33 of 143 points along the deck's edge, 78 with it), and the Mac editor, which renders with Nanite off, drew no soffit lights; a mesh imported again whose entry no longer asks for `fallback_full` goes back to the automatic fallback (`import_city`, it kept the full one); tests `test_deck_pieces_keep_a_full_fallback`, `test_import_resets_a_stale_fallback`, `test_stage2_takes_assetgen_decks` | Vesper Bay Decks imported again with the fix (the 12 deck meshes updated, 8 HLODs rebuilt); traced and shot in the editor by day and night (the soffit lights over the ground streets, the lit undercity, the light wells' stairs and elevators, the ramps, the deck's rail); the check's shots render (42,000 of its 50,008 meshes), but play stops on Nanite's root pages, an open item with Cragmouth's (`docs/progress/AG10/unreal/`) |
+| M17 | No code change: the repaired road network reaches Unreal through the blockout's joined objects as before (bend junctions and turning bulbs in the `junction` objects, street links in the roads); the dead-end tags are on the model's road nodes, which the exporter does not carry | Not run (the coordinating session's call) |
+| M18 | No code change in the exporter: a junction not flat at its node's height (`Junction.edge_z`) reaches Unreal as a face through its vertices in the joined `junction` objects (on a terrain city every junction), its roads cut back to where they leave it; the embankments under the low raised roads are in their road's `<road>.deck` actor (no actor of their own); crosswalks at their new widths in the `crosswalk` objects; the signals and the walkway graph's crossings follow the model. In stage 2, AG7's road pieces cover the embankments (`covers`, filled under those stretches) and its junction pieces take their vertex heights from `edge_z` | Not run (the coordinating session's call) |
+| M21 | Cyberpunk massing: no new actor kind. A building's masses are still one blockout object and one actor (more and finer prisms now: bands of twisted, tapered and leaning shafts, blocks, links, frames, pods, halos; curved masses cut at 1 cm chord sag, so a round tower's glTF has about 112 sides instead of 32); a mass with arcs is drawn smooth in the blockout (`set_sharp_from_angle`, 25 degrees), so its glTF carries smooth normals along the curve and sharp ones at corners; a building's form in its manifest object (`form`, from the blockout object's `form` prop) and tagged `cg.form=<kind>` on its actor (`import_city.tags`; the hash moves with the plan entry, so an import over an older one updates every building actor); stage 2's buildings as before (AG15 will draw the forms whole) | Not run (the coordinating session's call) |
+| M16 | Water and ground detail. The blockout (`blockout_plan.json`) gains a `swim` list: every water body cut into boxes per 256 m tile (16 m cells that reach the water, merged in runs along x, then runs alike in y; `blockout.swim_volumes`), each with its key (`swim.<water id>.<tile>.<k>`), the body's id, its plan box and z from 1 m under the body's deepest bed to its surface; the manifest copies it with a hash per box (`swim`, `counts.swim_volumes`), `actor_hashes`, `actor_kinds` (`swim`) and `manifest_changes` take the boxes as actors, and the importer makes a `PhysicsVolume` per box (`Importer.swim`: spawned from its class, so the editor gives it its cube brush, 200 uu; scaled to the box; `water_volume` on, `fluid_friction` 0.3; tags `cg.key`, `cg.hash`, `cg.id=<water id>`, `cg.type=swim_volume`, `cg.category=swim`, `cg.tile`); a box over a sloped bank lies under the ground there, so walking on the land never enters one. New blockout objects, each with a material of its own (`M_CityGen` instances like every blockout material): the beds of a flat city one heightfield per tile (`city.bed.<tile>`, materials `bed_shallow`, `bed_mid` and `bed_deep` by depth; on a terrain city the ground grid carries the beds under the water), the banks joined per district, kind and tile (`d03.bank_quay.<tile>`, `bank_canal_wall`, `bank_road_embankment`, `bank_natural_bank`, `bank_beach`, `bank_marsh_edge`, `bank_riprap`), the ground cover joined per district, kind and tile (`d03.cover_park_lawn.<tile>` and the other ten kinds: a material per cover kind, `cover_<kind>`), in place of the open spaces at the ground (`open_<kind>` objects remain only for podium roofs and decks). On a flat city the water and the sea stand at -1.5 m (the quay deck height under the ground, M16's freeboard; they were -0.9 and -1.2) and bridge piers start at the bed. A city without M16's data exports as before. Tests without Unreal (`tests/test_water_ground.py`: the plan's boxes, the manifest's swim volumes and cover materials, an unchanged re-import) | Not run (the coordinating session's call) |
+| AG12 | Water: `unreal_contribution.water.json` (above) as the third layer-2 part: per body and tile a surface entry (non-Nanite, no collision, a LOD chain on coarser lattices; vertex colors and full-precision UVs kept, no lightmap UVs: the importer's water pipeline) replacing `city.sea.<tile>` or `city.water.<tile>`, a bed entry (Nanite, complex collision) replacing `city.bed.<tile>`, bank entries replacing the joined `bank_<kind>` objects with riprap stones as instanced parts, a drop entry for the blockout water objects no piece replaces; masters `M_CgWater` (Single Layer Water, flow-mapped ripples on UV1's current, vertex and shallow foam by Opacity, the sea's Gerstner waves by world position offset faded out from 150 to 350 m: decision 13.10 (a)) and `M_CgBed` (caustics under the water); a post-process volume per M16 swim box of a body (`underwater.*`, the water kind's tint and fog; `actor_hashes`, `actor_kinds`, `counts.underwater_volumes`); `SRGB_PARTS` gains `water`; `STAGE2_VERSION` 7; test without Unreal (`test_exporter_takes_the_water`) | Not run (the coordinating session's call) |

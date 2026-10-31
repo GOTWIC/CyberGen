@@ -70,7 +70,6 @@ BOULEVARD = {"lanes": (3, 3), "median": 6.0, "sidewalk": (6.0, 6.0), "width": 38
 
 CLEARANCE_M = {"sea": 25.0, "river": (10.0, 15.0), "canal": (3.0, 4.0)}
 DECK_M = 1.5
-RAMP_GRADE = 0.06
 WATERFRONT_SETBACK_M = 50.0
 EDGE_KEEP_M = 40.0          # roads stay this far from the map edge, exits aside
 JUNCTION_SKIP_M = {"highway": 60.0, "avenue": 25.0}  # junction area (see checks)
@@ -2282,8 +2281,8 @@ def assemble(spec: CitySpec, ctx: Ctx, peds: list[dict]) -> RoadNet:
                                          p["line"].coords],
             "segment_ids": [],
             "attrs": {"water_class": cls_w, "span_m": G.q(p["line"].length),
-                      "ramp_length_m": G.q((clear + DECK_M) / RAMP_GRADE), "major": True,
-                      "named": True, "causeway": False}})
+                      "ramp_length_m": G.q((clear + DECK_M) / _approach_grade()),
+                      "major": True, "named": True, "causeway": False}})
     # M7: viaducts, ramps and interchanges
     from . import elevated as EL
 
@@ -2849,9 +2848,16 @@ def _spans(ctx: Ctx, ln: LineString, whole: bool = False) -> list[dict]:
                     "crosses": best_id, "clearance_m": clear, "deck_levels": [0],
                     "line": line3, "s0": G.q(s0), "s1": G.q(s1),
                     "attrs": {"water_class": WATER_CLASS[best_cls], "span_m": G.q(span.length),
-                              "ramp_length_m": G.q((clear + DECK_M) / RAMP_GRADE),
+                              "ramp_length_m": G.q((clear + DECK_M) / _approach_grade()),
                               "major": best_cls == SEA, "named": False, "causeway": False}})
     return out
+
+
+def _approach_grade() -> float:
+    """M18: the bridge approach grade of this road stage (`highways.grades.approach`)."""
+    from . import elevated as EL
+
+    return EL.APPROACH_GRADE
 
 
 def _z_profile(ln: LineString, spans: list[dict]) -> list[dict]:
@@ -3113,6 +3119,16 @@ def land_pinned_spokes(ctx: Ctx) -> None:
 
 def build_roads(spec: CitySpec, h, polygons: dict, district_ids: dict, waterways, sites,
                 open_polys: list, variant: int = 0, terrain=None) -> RoadNet:
+    from . import elevated as EL
+
+    # (M18: the spec's grades for the approaches, viaducts and ramps of this road stage)
+    with EL.grades(spec.highways.grades):
+        return _build_roads(spec, h, polygons, district_ids, waterways, sites, open_polys,
+                            variant, terrain)
+
+
+def _build_roads(spec: CitySpec, h, polygons: dict, district_ids: dict, waterways, sites,
+                 open_polys: list, variant: int = 0, terrain=None) -> RoadNet:
     ctx = Ctx(spec, h, polygons, district_ids, waterways, sites, open_polys, variant, terrain)
     find_exits(spec, ctx)
     add_pinned_roads(spec, ctx)

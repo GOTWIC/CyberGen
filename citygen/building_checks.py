@@ -849,6 +849,129 @@ def check_megasite_access(m: CityModel, bx: _B):
     return c
 
 
+ARC_TOL_M = 0.021          # M21: an arc's curve lies this close to its footprint (2 cm sag)
+TWIST_MAX_DEG = 3.0        # M21: a twisted shaft turns at most this much a floor
+REST_TOL_M = 0.011
+FREE_SHAPES = ("ring",)    # a wheel's rim turns on its legs
+
+
+def _arc_points(a, n: int = 12) -> list:
+    cx, cy = a.center
+    out = []
+    for i in range(n):
+        t = float(M.radians(a.start_deg + a.sweep_deg * (i + 0.5) / n))
+        out.append((cx + a.radius_m * float(M.cos(t)), cy + a.radius_m * float(M.sin(t))))
+    return out
+
+
+def _supported(b, k: int, polys: list) -> bool:
+    """Mass k of building b rests on another of its masses (a top at its foot, under it) or
+    is fixed to one beside it (touching over a meter of wall, their heights overlapping)."""
+    ms = b.masses[k]
+    pk = polys[k]
+    for j, o in enumerate(b.masses):
+        if j != k and abs(o.z1_m - ms.z0_m) <= REST_TOL_M and not G.apart(pk, polys[j]) and \
+                G.area1(G.inter(pk, polys[j])) >= 0.25:
+            return True
+    side = sorted((j for j, o in enumerate(b.masses) if j != k and
+                   o.z0_m < ms.z1_m - 0.01 and o.z1_m > ms.z0_m + 0.01),
+                  key=lambda j: (-G.area1(polys[j]), j))
+    near = G.qpoly(pk.buffer(0.06, join_style="mitre")) if side else None
+    for j in side:
+        if G.dist(pk, polys[j]) <= 0.05 and G.area1(G.inter(near, polys[j])) >= 0.05:
+            return True
+    return False
+
+
+def check_forms(m: CityModel, bx: _B):
+    c = _check("building_forms", "Building forms (M21): every arc lies on its footprint "
+                                 "within 2 cm, a twisted shaft turns at most 3 degrees a "
+                                 "floor, the form names its own masses, and every mass above "
+                                 "the building's floor rests on or is fixed to another of "
+                                 "its masses")
+    for b in m.buildings:
+        polys = [bx.mass_of[(b.id, k)] for k in range(len(b.masses))]
+        for k, ms in enumerate(b.masses):
+            if not ms.arcs:
+                continue
+            ring = polys[k].boundary
+            pts = [p for a in ms.arcs for p in _arc_points(a)]
+            d = G.dists(ring, np.array([Point(p) for p in pts], dtype=object))
+            if float(np.max(d)) > ARC_TOL_M:
+                _limit(c, c.failures, f"{b.id}: {ms.role} mass {k} is {float(np.max(d)):.3f} "
+                                      f"m off its arc")
+        f = b.form
+        if f is not None:
+            if any(i < 0 or i >= len(b.masses) for i in f.masses):
+                _limit(c, c.failures, f"{b.id}: form {f.kind} names a mass it does not have")
+            elif f.kind == "twist":
+                bands = sorted((b.masses[i] for i in f.masses if b.masses[i].role == "band"),
+                               key=lambda x: x.z0_m)
+                for lo, hi in zip(bands, bands[1:]):
+                    fl = max((hi.z0_m - lo.z0_m) / b.floor_height_m, 1e-9)
+                    if abs(hi.turn_deg - lo.turn_deg) / fl > TWIST_MAX_DEG + 1e-6:
+                        _limit(c, c.failures, f"{b.id}: twist of "
+                                              f"{abs(hi.turn_deg - lo.turn_deg) / fl:.2f} "
+                                              f"degrees a floor at {hi.z0_m:g} m")
+                        break
+        floor = float(b.attrs.get("deck_top_m", 0.0)) if b.level else 0.0
+        for k, ms in enumerate(b.masses):
+            if ms.z0_m <= floor + 0.05 or ms.shape in FREE_SHAPES or ms.z1_m <= ms.z0_m:
+                continue
+            if not _supported(b, k, polys):
+                _limit(c, c.failures, f"{b.id}: {ms.role} mass {k} from {ms.z0_m:g} m rests "
+                                      f"on nothing")
+    return c
+
+
+def towers(m: CityModel) -> list:
+    """M21: the towers of the neighbor rule: podium towers, towers and landmarks 40 m and
+    taller (traced and megasite buildings aside), as (building, height over its floor,
+    band, form, footprint centroid)."""
+    from . import buildings as BL
+
+    out = []
+    for b in m.buildings:
+        if b.megasite_id or b.attrs.get("pinned") or b.footprint is None:
+            continue
+        kind = b.type.split(".", 1)[1] if "." in b.type else b.type
+        floor = float(b.attrs.get("deck_top_m", 0.0)) if b.level else 0.0
+        h = b.height_m - floor
+        if not (kind in BL.TOWER_KINDS or b.landmark) or h < BL.TOWER_MIN_M - 1e-6:
+            continue
+        form = b.form.kind if b.form is not None else "box"
+        out.append((b, h, BL.tower_band(h), form, G.centroid(G.from_model_poly(b.footprint))))
+    return out
+
+
+def check_tower_neighbors(m: CityModel, bx: _B):
+    from . import buildings as BL
+
+    c = _check("tower_neighbors", "No two towers of different owners within 150 m share a "
+                                  "form and a height band (M21), and every tower's form "
+                                  "record names its band")
+    ts = towers(m)
+    for b, h, band, form, _ in ts:
+        if b.form is None or not b.form.tower or b.form.band != band:
+            _limit(c, c.failures, f"{b.id}: tower form record {b.form.kind if b.form else None}"
+                                  f" (band {b.form.band if b.form else None}, {h:g} m in band "
+                                  f"{band})")
+    R = BL.TOWER_NEAR_M
+    pairs = 0
+    for i, (a, ha, ba, fa, ca) in enumerate(ts):
+        for b, hb, bb, fb, cb in ts[i + 1:]:
+            if ba != bb or fa != fb or a.property_id == b.property_id:
+                continue
+            dx, dy = ca[0] - cb[0], ca[1] - cb[1]
+            if dx * dx + dy * dy <= R * R:
+                pairs += 1
+                _limit(c, c.failures, f"{a.id} and {b.id}: both {fa} in band {ba}, "
+                                      f"{math.sqrt(dx * dx + dy * dy):.0f} m apart")
+    c.notes.append(f"{len(ts)} towers, {len({t[3] for t in ts})} forms, {pairs} pairs within "
+                   f"{R:g} m of one form and band")
+    return c
+
+
 def run(spec: CitySpec, m: CityModel, g, bx: _B | None = None) -> list:
     bx = bx or _B(m)
     return [
@@ -865,6 +988,8 @@ def run(spec: CitySpec, m: CityModel, g, bx: _B | None = None) -> list:
         check_megasite_contents(m, bx),
         check_megasite_heights(m, bx),
         check_megasite_access(m, bx),
+        check_forms(m, bx),
+        check_tower_neighbors(m, bx),
     ]
 
 

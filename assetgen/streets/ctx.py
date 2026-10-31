@@ -42,11 +42,16 @@ def tile_of(x: float, y: float) -> str:
 
 
 class Ground:
-    """The finished ground of a model: bilinear on M13's grid, 0 on a flat city."""
+    """The finished ground of a model: bilinear on M13's grid, 0 on a flat city; the water's
+    level (M13's on a terrain city, M16's `WaterBed.surface_m` on a flat one)."""
 
     def __init__(self, m: CityModel):
         t = getattr(m, "terrain", None)
         self.flat = t is None
+        # AG12: M16's water surface of a flat city (the freeboard under the ground), by body
+        self.surface = {e.id: float(e.bed.surface_m)
+                        for e in [*m.seas, *m.rivers, *m.channels, *m.waterways]
+                        if e.bed is not None and e.bed.surface_m is not None}
         if not self.flat:
             rows = t.ground or t.natural
             self.x0, self.y0, self.cell = float(t.x0), float(t.y0), float(t.cell_m)
@@ -89,7 +94,9 @@ class Ground:
         return [C.m(prof(path.project(p[0], p[1])[0])) for p in pts]
 
     def water_level(self, wid: str | None, default: float) -> float:
-        if self.flat or wid is None or wid not in self.water:
+        if self.flat:
+            return self.surface.get(wid, default) if wid is not None else default
+        if wid is None or wid not in self.water:
             return default
         return float(self.water[wid].level_m)
 
@@ -132,10 +139,15 @@ class Ctx:
         for w in m.sidewalks:
             self.walks_on[w.segment_id].append(w)
         self.walkways_of: dict[str, list] = defaultdict(list)
+        self.ramp_walks: dict[str, list] = defaultdict(list)
         for w in m.walkways:
             sw = w.attrs.get("sidewalk")
             if w.kind == "sidewalk" and sw:
                 self.walkways_of[sw].append(w)
+            if w.attrs.get("ramp"):
+                self.ramp_walks[w.attrs["ramp"]].append(w)      # (M14: beside a deck's ramp)
+        for v in self.ramp_walks.values():
+            v.sort(key=lambda w: w.id)
         self.doors_on: dict[str, list] = defaultdict(list)
         for b in m.buildings:
             for e in b.entrances:
@@ -162,8 +174,26 @@ class Ctx:
         else:
             self.wet = None
         self.keys, self.key_tile = _blockout_keys(m)
+        # AG12: M16's beds (bridge piers stand on them; quay and canal walls reach them)
+        self.beds = None
+        if m.banks:
+            from citygen import water as WA
+            self.beds = WA.Beds(m)
+            self.levels = WA.Levels(m)
+        self.banks_of: dict[str, list] = defaultdict(list)
+        for k in m.banks:
+            self.banks_of[k.water_id].append(k)
 
     # -- helpers ---------------------------------------------------------------------------
+
+    def bed_z(self, x: float, y: float) -> float | None:
+        """M16's bed under a point of the water (absolute), None over land or without M16."""
+        if self.beds is None:
+            return None
+        wid = self.beds.body_at(x, y)
+        if wid is None:
+            return None
+        return C.m(self.levels.at(wid, x, y) - self.beds.depth(wid, x, y))
 
     def wet_at(self, x: float, y: float) -> bool:
         return bool(shapely.contains_xy(self.wet, x, y)) if self.wet is not None else False
@@ -248,6 +278,8 @@ def _blockout_keys(m: CityModel) -> tuple[dict[str, list[str]], dict[str, str]]:
         BO._open_space(P)
         BO._sites(P)
         BO._tunnels(P)
+        if getattr(m, "decks", None):
+            BO._decks(P)            # M14: slabs per tile, joined columns, stairs, elevators
         if getattr(m, "terrain", None) is not None and hasattr(BO, "_terrain"):
             BO._terrain(P)          # M13: the retaining walls (one object each since M15)
     keys: dict[str, list[str]] = defaultdict(list)

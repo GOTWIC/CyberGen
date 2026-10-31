@@ -1,0 +1,18 @@
+citygen blockout: Nexus City
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 11310 objects in the .blend, 11310 in the plan
+  [pass] blend_buildings: 6630 building objects, 6630 buildings with masses in the model
+  [pass] blend_instances: 80528 prop and plant instances evaluated in the .blend, 80528 in the plan
+  [pass] gltf_tiles: 196 tile files for 196 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 17 of 17 renders
+  [pass] blender_budget: Blender 270.8 s (budget 600 s)
+
+plan: 11310 objects, 46883 parts, 196 tiles, 6630 buildings (sha256 0992a4cf4ba0b946)
+blender 5.2.3 LTS: 860130 vertices, 341116 faces, 80528 instances, 90 materials, 137 collections
+files (MB): {"blend": 14.5, "usd": 36.2, "gltf_tiles": 49.7, "renders": 5.3}
+timings (s): {"build_s": 3.8, "save_s": 0.9, "usd_s": 25.0, "gltf_s": 91.3, "render_s": 149.5, "total_s": 270.8}
+total (s): {"plan_s": 5.1, "exports_s": 4.5, "total_s": 286.2}

@@ -110,8 +110,19 @@ def _drop(d: dict, ids: dict[str, set[str]]) -> None:
     d["properties"] = [p for p in d.get("properties", []) if p["building_ids"]]
     for m in d.get("megasites", []):
         m["member_ids"] = [x for x in m["member_ids"] if x not in gone]
-    d["skybridges"] = [s for s in d.get("skybridges", [])
-                       if not set(s["building_ids"]) & gone]
+    bridges = {s["id"] for s in d.get("skybridges", []) if set(s["building_ids"]) & gone}
+    d["skybridges"] = [s for s in d.get("skybridges", []) if s["id"] not in bridges]
+    # the walkways of what went (a building's door and lobby paths and elevators, a bridge's
+    # deck), and the neighbors that named them
+    gone |= bridges
+    walks = d.get("walkways", [])
+    drop = {w["id"] for w in walks if (w.get("attrs") or {}).get("building") in gone or
+            (w.get("attrs") or {}).get("skybridge") in gone}
+    if drop:
+        d["walkways"] = [w for w in walks if w["id"] not in drop]
+        for w in d["walkways"]:
+            if any(n in drop for n in w.get("neighbors", [])):
+                w["neighbors"] = [n for n in w["neighbors"] if n not in drop]
 
 
 # --- geometry -----------------------------------------------------------------------
@@ -185,7 +196,13 @@ def apply(model: CityModel, ov: dict, old: CityModel | None = None,
             notes += _edit(d, e)
         except OverrideError as err:
             notes.append(f"override edits[{k}] skipped: {err}")
-    return CityModel.model_validate(d), notes
+    out = CityModel.model_validate(d)
+    if out.banks or out.ground_cover:
+        # M16: the banks and the ground cover follow the edited buildings, plazas and lots
+        from .build import water_ground
+
+        out, _ = water_ground(out)
+    return out, notes
 
 
 def _where(d: dict, i: str) -> tuple[str, int]:

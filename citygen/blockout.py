@@ -42,7 +42,10 @@ from shapely.geometry import LineString, Point, Polygon, box
 from . import dmath as M
 from . import geom as G
 from .model import CityModel
+from . import water as WA
+from .cover import COVER_COLOR
 from .preview import OPEN_COLORS
+from .water import BANK_COLOR
 from .preview_massing import ELEMENT_COLORS, FLAT_COLORS, ROAD, SKYBRIDGE
 from .schematic import ARCHETYPE_COLORS, LAND, RIVER, SEA
 
@@ -60,6 +63,7 @@ Z_OPEN = 0.1
 CURB_M = 0.15
 DECK_M = 1.2           # bridge and elevated deck thickness
 EMBANKMENT_M = 3.0     # a raised street no higher than this is drawn as a solid embankment
+#                        (M18: the model's embankments fill under the low stretches of others)
 PIER_STEP_M = 40.0
 
 ROAD_COLORS = {"highway": "#2c3038", "avenue": "#353a44", "street": "#3b404b",
@@ -92,8 +96,13 @@ MATERIALS.update({f"road_{k}": v for k, v in ROAD_COLORS.items()})
 MATERIALS.update({f"open_{k}": v for k, v in OPEN_COLORS.items()})
 MATERIALS.update({f"bld_{k}": v for k, v in ARCHETYPE_COLORS.items()})
 MATERIALS.update({f"site_{k}": v for k, v in {**ELEMENT_COLORS, **FLAT_COLORS}.items()})
+# M16: beds, banks by kind, ground cover by kind
+MATERIALS.update({"bed_shallow": "#8f8264", "bed_mid": "#5f5846",
+                  "bed_deep": "#3b3832"})
+MATERIALS.update({f"bank_{k}": v for k, v in BANK_COLOR.items()})
+MATERIALS.update({f"cover_{k}": v for k, v in COVER_COLOR.items()})
 
-ACCENT_ROLES = {"crown", "spire", "mechanical"}
+ACCENT_ROLES = {"crown", "spire", "mechanical", "mast", "halo", "strut", "frame", "link"}
 DECK_ROLES = {"deck", "span"}
 SKYBRIDGE_H = {"enclosed": None, "stack": None, "open_deck": 0.6, "catwalk": 0.4, "cable": 0.3}
 
@@ -236,6 +245,17 @@ class _Plan:
         wet += [G.from_model_poly(p) for sea in m.seas for p in sea.polygons]
         self.wet = G.union(wet) if wet else Polygon()
         shapely.prepare(self.wet)
+        # M16: the water surface of a flat city with M16's data (the freeboard under the
+        # ground), its beds; None keeps the blockout's own levels
+        self.surf = -WA.FREEBOARD_M if m.banks and m.terrain is None else None
+        self.beds = WA.Beds(m) if m.banks else None
+
+    def bed_at(self, x: float, y: float) -> float:
+        """M16: the bed under a point of the water on a flat city (else the sea's level)."""
+        if self.beds is None or self.surf is None:
+            return Z_SEA
+        wid = self.beds.body_at(x, y)
+        return Z_SEA if wid is None else q(self.surf - self.beds.depth(wid, x, y))
 
     def wet_at(self, x: float, y: float) -> bool:
         """Over the water (bridge piers stand there; road columns over land)."""
@@ -284,6 +304,10 @@ def _group_of(category: str) -> str:
         return "Streets"
     if category.startswith("open_") or category == "green_roof":
         return "Open space"
+    if category.startswith("cover_"):
+        return "Ground cover"
+    if category.startswith("bank_"):
+        return "Waterfront"
     if category in ("quay", "bridge"):
         return "Waterfront"
     return category.capitalize()
@@ -314,7 +338,9 @@ def _land_and_water(P: _Plan) -> None:
             if _signed_area(sea_ring) < 0:
                 sea_ring.reverse()
             P.add(f"city.sea.{tile_name(*t)}", [P.city, "Water"], t, "sea",
-                  [{"k": "flat", "m": "sea", "z": Z_SEA, "r": sea_ring, "h": []}],
+                  [{"k": "flat", "m": "sea",
+                    "z": Z_SEA if P.surf is None else q(P.surf - SEA_UNDER_M),
+                    "r": sea_ring, "h": []}],
                   {"citygen_type": "sea"})
             for cat, geom, part in (("ground", ground, "prism"), ("water", wet, "flat")):
                 if geom.is_empty:
@@ -328,7 +354,8 @@ def _land_and_water(P: _Plan) -> None:
                         parts.append({"k": "prism", "m": "ground", "z0": Z_BASE, "z1": 0.0,
                                       "r": ext, "h": holes, "s": "prism"})
                     else:
-                        parts.append({"k": "flat", "m": "water", "z": Z_WATER, "r": ext,
+                        parts.append({"k": "flat", "m": "water",
+                                      "z": Z_WATER if P.surf is None else P.surf, "r": ext,
                                       "h": holes})
                 if parts:
                     P.add(f"city.{cat}.{tile_name(*t)}",
@@ -338,15 +365,112 @@ def _land_and_water(P: _Plan) -> None:
 
 # --- streets -----------------------------------------------------------------------------
 
+def _trimmed(s, ends: dict) -> tuple[list, list, float, float]:
+    """M18: a road's centerline (deduplicated) and z at its vertices, cut back to where it
+    leaves each junction drawn from its surface (`edge_z`: the road ends on it, so a leg that
+    slopes inside the polygon does not show through it), whole elsewhere; and how far it is
+    cut back at its start and end."""
+    from . import junctions as JN
+
+    pts = _dedupe([(x, y) for x, y in s.centerline])
+    L = sum(_dist(a, b) for a, b in zip(pts, pts[1:]))
+    a = b = 0.0
+    if s.start in ends:
+        a = JN.leg_exit(pts, ends[s.start])[0]
+    if s.end in ends:
+        b = JN.leg_exit(pts[::-1], ends[s.end])[0]
+    if not (a or b):
+        return pts, _z_along(pts, s.z_profile), 0.0, 0.0
+    if L - a - b < 0.5:
+        return [], [], a, b
+    from . import streets as ST
+
+    sub = _dedupe(ST._substring(pts, a, L - b))
+    return sub, [_z_on(s.z_profile, a + d) for d in _cum2(sub)], a, b
+
+
+def _fill(s, st, a: float, b: float) -> dict | None:
+    """M18: an embankment of the model under its road, within the road's drawn stretch
+    (from a, to b short of its end), from just under the road surface down into the
+    ground."""
+    from . import streets as ST
+
+    pts = _dedupe([(x, y) for x, y in s.centerline])
+    L = sum(_dist(p, q_) for p, q_ in zip(pts, pts[1:]))
+    s0 = max(st.attrs.get("s0_m", 0.0), a)
+    s1 = min(st.attrs.get("s1_m", L), L - b)
+    if s1 - s0 < 0.5:
+        return None
+    sub = _dedupe(ST._substring(pts, s0, s1))
+    zs = [_z_on(s.z_profile, s0 + d) for d in _cum2(sub)]
+    r = ribbon(sub, s.width_m, [z + Z_ROAD - 0.01 for z in zs])
+    if r is None:
+        return None
+    return {"k": "ribbon", "m": "embankment", "l": r[0], "rr": r[1], "t": q(max(zs) + 0.3)}
+
+
+def _z_on(profile, s: float) -> float:
+    if not profile:
+        return 0.0
+    if s <= profile[0].s:
+        return profile[0].z
+    for p0, p1 in zip(profile, profile[1:]):
+        if p0.s <= s <= p1.s:
+            return p0.z if p1.s - p0.s <= 1e-9 else p0.z + (p1.z - p0.z) * (s - p0.s) / (
+                p1.s - p0.s)
+    return profile[-1].z
+
+
+def _junction_part(j, node, terrain: bool) -> dict:
+    """M18: a junction's surface: flat at its node's height, or (`edge_z`) a face through
+    every vertex at its height, holes at the height of the vertices around them (on a terrain
+    city over sea level, as the ground grid is drawn)."""
+    ext, holes = _poly_rings(j.polygon)
+    nz = node.position[2] if node is not None else 0.0
+    ez = j.edge_z if j.edge_z and len(j.edge_z) == len(j.polygon.exterior) else None
+    if ez is None and not terrain:
+        return {"k": "flat", "m": "junction", "z": q(Z_JUNCTION + nz), "r": ext, "h": holes}
+    base = (node.ground_m or 0.0) if (terrain and node is not None) else 0.0
+    pts = [tuple(p) for p in j.polygon.exterior]
+    ez = ez or [nz] * len(pts)
+    zx = {p: z for p, z in zip(pts, ez)}
+
+    def zat(x, y):
+        if (x, y) in zx:
+            return zx[(x, y)]
+        acc = wt = 0.0
+        for (px, py), z in zip(pts, ez):
+            w = 1.0 / ((px - x) ** 2 + (py - y) ** 2 + 1.0)
+            acc += w * z
+            wt += w
+        return acc / wt
+    part = {"k": "drape", "m": "junction",
+            "r": [[x, y, q(base + Z_JUNCTION + zat(x, y))] for x, y in ext],
+            "h": [[[x, y, q(base + Z_JUNCTION + zat(x, y))] for x, y in h] for h in holes]}
+    if terrain:
+        part["abs"] = True
+    return part
+
+
 def _streets(P: _Plan) -> None:
     m = P.m
     seg_district = {}
+    terrain = m.terrain is not None
+    # (M18: the junctions drawn from their surfaces, which their roads end on)
+    ends = {j.node_id: [tuple(p) for p in j.polygon.exterior] for j in m.junctions
+            if j.edge_z}
+    embank: dict = {}
+    for st in m.structures:
+        if st.kind == "embankment" and len(st.line) >= 2:
+            embank.setdefault((st.attrs or {}).get("road_id"), []).append(st)
     for s in m.road_segments:
         did = s.district_ids[0] if s.district_ids else None
         seg_district[s.id] = did
-        pts = [(x, y) for x, y in s.centerline]
-        zs = _z_along(_dedupe(pts), s.z_profile)
-        raised = max(zs) > 0.5 if zs else False
+        pts, zs, cut0, cut1 = _trimmed(s, ends)
+        if not pts:
+            continue
+        zfull = _z_along(_dedupe([(x, y) for x, y in s.centerline]), s.z_profile)
+        raised = max(zfull) > 0.5
         r = ribbon(pts, s.width_m, [z + Z_ROAD for z in zs])
         if r is None:
             continue
@@ -378,17 +502,21 @@ def _streets(P: _Plan) -> None:
         if raised or s.bridge:
             # a deck with its own object: thickness, and piers down to the water (M7: the
             # columns over land are model structures); a low raised street (a ramp up to a
-            # raised junction, an approach's foot) is a solid embankment
+            # raised junction, an approach's foot) is a solid embankment, and (M18) the
+            # model's embankments fill under the low stretches of the others
             elev = bool(s.attrs.get("elevated")) or s.attrs.get("role") == "ramp"
-            low = not elev and not s.bridge and max(zs) <= EMBANKMENT_M
+            low = not elev and not s.bridge and max(zfull) <= EMBANKMENT_M
             cat = "elevated" if elev else ("embankment" if low else "bridge")
-            t_deck = q(max(zs) + 0.3) if low else DECK_M
+            t_deck = q(max(zfull) + 0.3) if low else DECK_M
             part = {"k": "ribbon", "m": "embankment" if low else "bridge_deck", "l": r[0],
                     "rr": r[1], "t": t_deck}
             road = {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1],
                     "t": 0.0}
             t = tile_key(*mid)
-            parts = [part, road] + ([] if low else _piers(_dedupe(pts), zs, P.wet_at))
+            fills = [] if low else [f for f in (_fill(s, st, cut0, cut1) for st in sorted(
+                embank.get(s.id, []), key=lambda st: st.id)) if f is not None]
+            parts = [part, road] + fills + ([] if low else _piers(_dedupe(pts), zs, P.wet_at,
+                                                                  P.bed_at))
             P.add(f"{s.id}.deck", P.collection(did, "Elevated" if elev else "Waterfront"), t,
                   cat, parts,
                   {"citygen_id": s.id, "citygen_type": s.type, "road_class": s.road_class,
@@ -399,13 +527,14 @@ def _streets(P: _Plan) -> None:
                {"k": "ribbon", "m": f"road_{s.road_class}", "l": r[0], "rr": r[1], "t": 0.0},
                s.id)
     nz = {n.id: n.position[2] for n in m.road_nodes}
+    node = {n.id: n for n in m.road_nodes}
     for j in m.junctions:
-        ext, holes = _poly_rings(j.polygon)
+        ext, _ = _poly_rings(j.polygon)
         cx, cy = _center(ext)
-        # (M7: a junction on a viaduct or an approach sits at its node's height)
+        # (M7: a junction on a viaduct or an approach sits at its node's height; M18: one
+        # not flat there is drawn through its surface, `edge_z`)
         P.join(P.district_at(cx, cy), "deck_junction" if j.level else "junction", cx, cy,
-               {"k": "flat", "m": "junction", "z": q(Z_JUNCTION + nz.get(j.node_id, 0.0)),
-                "r": ext, "h": holes}, j.id)
+               _junction_part(j, node.get(j.node_id), terrain), j.id)
     # (M14: a deck's crosswalks and sidewalks at its top)
     jtop = {j.id: nz.get(j.node_id, 0.0) for j in m.junctions if j.level}
     stop = {s.id: s.z_profile[0].z for s in m.road_segments if "deck" in s.attrs}
@@ -426,9 +555,9 @@ def _streets(P: _Plan) -> None:
                {"k": "ribbon", "m": "sidewalk", "l": r[0], "rr": r[1], "t": CURB_M}, w.id)
 
 
-def _piers(pts, zs, wet_at=None) -> list[dict]:
+def _piers(pts, zs, wet_at=None, bed_at=None) -> list[dict]:
     """Square piers every PIER_STEP_M under a raised deck over the water (from below the
-    water line); over land the road columns of the model carry it (M7)."""
+    water line, M16: from the bed); over land the road columns of the model carry it (M7)."""
     out = []
     acc, nxt = 0.0, PIER_STEP_M / 2.0
     for i, (a, b) in enumerate(zip(pts, pts[1:])):
@@ -438,8 +567,9 @@ def _piers(pts, zs, wet_at=None) -> list[dict]:
             z = zs[i] + (zs[i + 1] - zs[i]) * f
             x, y = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
             if z > DECK_M + 1.0 and (wet_at is None or wet_at(x, y)):
-                out.append({"k": "box", "m": "pier", "c": [q(x), q(y), Z_SEA],
-                            "d": [2.0, 2.0, q(z - DECK_M - Z_SEA)], "yaw": 0.0})
+                z0 = bed_at(x, y) if bed_at is not None else Z_SEA
+                out.append({"k": "box", "m": "pier", "c": [q(x), q(y), z0],
+                            "d": [2.0, 2.0, q(z - DECK_M - z0)], "yaw": 0.0})
             nxt += PIER_STEP_M
         acc += L
     return out
@@ -450,6 +580,8 @@ def _piers(pts, zs, wet_at=None) -> list[dict]:
 def _open_space(P: _Plan) -> None:
     m = P.m
     for o in m.open_spaces:
+        if m.ground_cover and not o.level and o.z_m <= 0.5:
+            continue     # (M16: its ground cover, `_cover`)
         ext, holes = _poly_rings(o.polygon)
         cx, cy = _center(ext)
         did = o.district_id or P.district_at(cx, cy)
@@ -476,12 +608,212 @@ def _open_space(P: _Plan) -> None:
                {"k": "ribbon", "m": "quay", "l": r[0], "rr": r[1], "t": 0.0}, qy.id)
 
 
+# --- water beds, banks and ground cover (M16) ------------------------------------------------
+
+BED_CELL_M = 8.0         # the bed's heightfield (flat cities)
+BED_BANDS = (("bed_shallow", 2.0), ("bed_mid", 6.0), ("bed_deep", 1e9))   # by depth
+BED_EDGE_M = 0.5         # its points on land, under the surface
+SEA_UNDER_M = 0.05       # the sea sheet under the inland water's surface (no z-fighting)
+BANK_T_M = 0.3
+
+
+def _cover(P: _Plan) -> None:
+    """Every piece of ground cover a flat at the open ground's height, joined per district,
+    kind and tile (`<district>.cover_<kind>.<tile>`)."""
+    for g in P.m.ground_cover:
+        ext, holes = _poly_rings(g.polygon)
+        if len(ext) < 3:
+            continue
+        cx, cy = _center(ext)
+        P.join(g.district_id or P.district_at(cx, cy), f"cover_{g.kind}", cx, cy,
+               {"k": "flat", "m": f"cover_{g.kind}", "z": Z_OPEN, "r": ext, "h": holes},
+               g.id)
+
+
+def _banks(P: _Plan) -> None:
+    """Every bank a sloped band from the land's edge (its line) down to its toe under the
+    water: the slope to the waterline `width_m` out, on at the same slope to the toe (a wall:
+    straight down to the bed), joined per district, kind and tile."""
+    m = P.m
+    if not m.banks:
+        return
+    flat = m.terrain is None
+    gd = None if flat else _Ground(m)
+    lv = WA.Levels(m)
+    quay_h = {qy.id: qy.deck_z_m for qy in m.quays}
+    for k in m.banks:
+        pts = _dedupe([(float(x), float(y)) for x, y in k.line])
+        if len(pts) < 2:
+            continue
+        h = quay_h.get(k.quay_id, WA.FREEBOARD_M) if k.height_m is None else k.height_m
+        wall = WA.SLOPE[k.kind] is None
+        out = k.width_m if wall else k.width_m * (1.0 + k.toe_m / max(h, 0.1))
+        if flat:
+            top = [0.0] * len(pts)
+            bot = [q(P.surf - k.toe_m)] * len(pts)
+        else:
+            top = [q(gd.at(x, y)) for x, y in pts]
+            bot = [q(lv.at(k.water_id, x, y) - k.toe_m) for x, y in pts]
+        r = ribbon(pts, 2.0 * max(out, 0.05), bot)
+        if r is None:
+            continue
+        upper = [[q(x), q(y), z] for (x, y), z in zip(pts, top)]
+        cx, cy = _center(pts)
+        P.join(k.district_id or P.district_at(cx, cy), f"bank_{k.kind}", cx, cy,
+               {"k": "ribbon", "m": f"bank_{k.kind}", "abs": True, "l": r[0], "rr": upper,
+                "t": BANK_T_M}, k.id)
+
+
+def _beds(P: _Plan) -> None:
+    """The beds of a flat city: a heightfield per tile, `BED_CELL_M` cells, each point at the
+    surface less the water's depth there, in three parts by the depth of the cell (shallow
+    under 2 m, middle, deep over 6 m: a material each); cells whose middle is on land left
+    open."""
+    m = P.m
+    if P.beds is None or P.surf is None or P.wet.is_empty:
+        return
+    x0, y0, x1, y1 = m.bounds
+    c = BED_CELL_M
+    ix0, iy0 = tile_key(x0, y0)
+    ix1, iy1 = tile_key(x1 - 1e-6, y1 - 1e-6)
+    bodies = list(P.beds.bl.values())
+    for ix in range(ix0, ix1 + 1):
+        for iy in range(iy0, iy1 + 1):
+            tb = box(max(ix * TILE_M, x0), max(iy * TILE_M, y0),
+                     min((ix + 1) * TILE_M, x1), min((iy + 1) * TILE_M, y1))
+            if not tb.intersects(P.wet):
+                continue
+            bx0, by0, bx1, by1 = tb.bounds
+            nx = int(round((bx1 - bx0) / c)) + 1
+            ny = int(round((by1 - by0) / c)) + 1
+            X, Y = np.meshgrid(bx0 + np.arange(nx) * c, by0 + np.arange(ny) * c)
+            Z = np.full(X.shape, float(P.surf) - BED_EDGE_M)
+            for b in bodies:
+                if not tb.intersects(b.poly):
+                    continue
+                ins = shapely.contains_xy(b.poly, X, Y)
+                if ins.any():
+                    Z[ins] = P.surf - P.beds.depth_many(b.id, X[ins], Y[ins])
+            CX, CY = np.meshgrid(bx0 + (np.arange(nx - 1) + 0.5) * c,
+                                 by0 + (np.arange(ny - 1) + 0.5) * c)
+            wet = shapely.contains_xy(P.wet, CX, CY).ravel()
+            if not wet.any():
+                continue
+            depth = (P.surf - (Z[:-1, :-1] + Z[1:, :-1] + Z[:-1, 1:] + Z[1:, 1:]) / 4.0).ravel()
+            zs = [q(float(v)) for v in Z.ravel()]
+            parts, lo = [], -1e9
+            for mat, hi in BED_BANDS:
+                cell = wet & (depth >= lo) & (depth < hi)
+                lo = hi
+                if cell.any():
+                    parts.append({"k": "grid", "m": mat, "abs": True, "x0": q(bx0),
+                                  "y0": q(by0), "c": c, "nx": nx, "ny": ny, "z": zs,
+                                  "skip": np.nonzero(~cell)[0].tolist()})
+            t = (ix, iy)
+            P.add(f"city.bed.{tile_name(*t)}", [P.city, "Water", "Beds"], t, "bed", parts,
+                  {"citygen_type": "bed"})
+
+
+SWIM_CELL_M = 16.0
+
+
+def swim_volumes(m, beds) -> list[dict]:
+    """M16, for the Unreal exporter: every water body as boxes per tile (16 m cells that
+    reach the water, merged in runs along x, then runs alike in y), from under its deepest
+    bed to its surface, so a player swims in it instead of falling through; a box over a
+    bank lies under the ground there. Keys `swim.<water>.<tile>.<k>`."""
+    if beds is None:
+        return []
+    x0, y0, x1, y1 = m.bounds
+    flat = m.terrain is None
+    lv = WA.Levels(m)
+    c = SWIM_CELL_M
+    out = []
+    ix0, iy0 = tile_key(x0, y0)
+    ix1, iy1 = tile_key(x1 - 1e-6, y1 - 1e-6)
+    for b in beds.bl.values():
+        e = b.ent
+        if e.depth_m is None:
+            continue
+        bx0, by0, bx1, by1 = b.poly.bounds
+        for ix in range(max(ix0, tile_key(bx0, by0)[0]), min(ix1, tile_key(bx1, by1)[0]) + 1):
+            for iy in range(max(iy0, tile_key(bx0, by0)[1]),
+                            min(iy1, tile_key(bx1, by1)[1]) + 1):
+                tx0, ty0 = max(ix * TILE_M, x0), max(iy * TILE_M, y0)
+                tx1, ty1 = min((ix + 1) * TILE_M, x1), min((iy + 1) * TILE_M, y1)
+                nx = int(math.ceil((tx1 - tx0) / c - 1e-9))
+                ny = int(math.ceil((ty1 - ty0) / c - 1e-9))
+                cells = shapely.box(
+                    np.tile(tx0 + np.arange(nx) * c, ny),
+                    np.repeat(ty0 + np.arange(ny) * c, nx),
+                    np.minimum(np.tile(tx0 + np.arange(1, nx + 1) * c, ny), tx1),
+                    np.minimum(np.repeat(ty0 + np.arange(1, ny + 1) * c, nx), ty1))
+                hit = shapely.intersects(b.poly, cells).reshape(ny, nx)
+                if not hit.any():
+                    continue
+                runs = {}
+                for j in range(ny):
+                    i = 0
+                    while i < nx:
+                        if not hit[j, i]:
+                            i += 1
+                            continue
+                        k = i
+                        while k + 1 < nx and hit[j, k + 1]:
+                            k += 1
+                        runs.setdefault((i, k), []).append(j)
+                        i = k + 1
+                rects = []
+                for (i, k), js in sorted(runs.items()):
+                    j0 = prev = js[0]
+                    for j in js[1:] + [None]:
+                        if j is not None and j == prev + 1:
+                            prev = j
+                            continue
+                        rects.append((j0, prev, i, k))
+                        if j is not None:
+                            j0 = prev = j
+                rects.sort()
+                t = tile_name(ix, iy)
+                for n, (j0, j1, i, k) in enumerate(rects):
+                    rx0, ry0 = tx0 + i * c, ty0 + j0 * c
+                    rx1, ry1 = min(tx0 + (k + 1) * c, tx1), min(ty0 + (j1 + 1) * c, ty1)
+                    surf = lv.at(b.id, (rx0 + rx1) / 2.0, (ry0 + ry1) / 2.0)
+                    out.append({"key": f"swim.{b.id}.{t}.{n + 1}", "water_id": b.id,
+                                "tile": t, "box": [q(rx0), q(ry0), q(rx1), q(ry1)],
+                                "z": [q(surf - e.depth_m - 1.0), q(surf)]})
+    return out
+
+
+def _terrain_beds(P: _Plan, X, Y, Z):
+    """M13's ground grid with M16's beds under the water: each body's level less its depth."""
+    lv = WA.Levels(P.m)
+    Z = Z.copy()
+    for b in P.beds.bl.values():
+        ins = shapely.contains_xy(b.poly, X, Y)
+        if not ins.any():
+            continue
+        xs, ys = X[ins], Y[ins]
+        w = lv.lv.get(b.id)
+        if w is not None and w.profile and b.id in lv.cl:
+            pts, cum = lv.cl[b.id]
+            s = WA._project_many(pts, cum, xs, ys)
+            level = np.interp(s, [p.s for p in w.profile], [p.z for p in w.profile])
+        else:
+            level = np.full(len(xs), float(w.level_m) if w is not None else 0.0)
+        Z[ins] = level - P.beds.depth_many(b.id, xs, ys)
+    return Z
+
+
 # --- buildings ----------------------------------------------------------------------------
 
 def _mass_part(ms, mat: str) -> dict:
     ext, holes = _poly_rings(ms.footprint)
-    return {"k": "prism", "m": mat, "z0": q(ms.z0_m), "z1": q(ms.z1_m), "r": ext,
-            "h": holes, "s": ms.shape}
+    out = {"k": "prism", "m": mat, "z0": q(ms.z0_m), "z1": q(ms.z1_m), "r": ext,
+           "h": holes, "s": ms.shape}
+    if ms.arcs:
+        out["a"] = 1      # (M21: drawn smooth along its arcs)
+    return out
 
 
 def _buildings(P: _Plan) -> None:
@@ -521,7 +853,8 @@ def _buildings(P: _Plan) -> None:
                "height_m": q(b.height_m), "floors": b.floors, "district": did or "",
                "archetype": arch, "name": b.name or "", "property_id": b.property_id or "",
                "lot_id": b.lot_id or "", "megasite_id": b.megasite_id or "",
-               **({"level": b.level} if b.level else {})})   # (M14: on a deck)
+               **({"level": b.level} if b.level else {}),    # (M14: on a deck)
+               **({"form": b.form.kind} if b.form is not None else {})})   # (M21)
     for s in m.skybridges:
         (ax, ay), (bx, by) = s.line[0], s.line[-1]
         hh = SKYBRIDGE_H.get(s.kind) or s.levels * s.level_height_m
@@ -574,6 +907,8 @@ def _sites(P: _Plan) -> None:
             continue    # M9: drawn with their tunnel (`_tunnels`)
         if s.kind == "retaining_wall":
             continue    # M13: drawn with the ground (`_terrain`)
+        if s.kind == "embankment":
+            continue    # M18: drawn with its road (`_streets`)
         if a.get("deck"):
             continue    # M14: drawn with their deck (`_decks`)
         if s.kind == "vent":
@@ -1227,6 +1562,9 @@ def make_plan(m: CityModel) -> dict:
         _land_and_water(P)
         _streets(P)
         _open_space(P)
+        _cover(P)
+        _banks(P)
+        _beds(P)
         _buildings(P)
         _sites(P)
         _decks(P)
@@ -1234,6 +1572,7 @@ def make_plan(m: CityModel) -> dict:
         _dressing(P)
         _terrain(P)
         cams = _cameras(P)
+        swim = swim_volumes(m, P.beds)
     for o in P.objects:
         ids = o["props"].get("citygen_ids")
         if isinstance(ids, list):
@@ -1258,6 +1597,7 @@ def make_plan(m: CityModel) -> dict:
         "cameras": cams,
         "prototypes": {k: PROTOTYPES[k] for k in protos},
         "objects": P.objects,
+        **({"swim": swim} if swim else {}),
         "stats": {"objects": len(P.objects), "by_category": dict(sorted(counts.items())),
                   "parts": sum(len(o["parts"]) for o in P.objects), "tiles": len(tiles),
                   "buildings": sum(1 for o in P.objects if o["category"] in
@@ -1363,11 +1703,12 @@ def _run(cmd: list[str], marker: str, timeout: float,
 def rerender(blockout_dir: str | Path, to_dir: str | Path, views: list[str],
              width: int = README_WIDTH, blender: str | None = None,
              samples: int = 16, eye=None, target=None, lens: float = 35.0,
-             name: str = "custom") -> list[str]:
+             name: str = "custom", hide: list[str] | None = None) -> list[str]:
     """Render chosen views of a blockout (`top`, `iso_city`, `iso_<district>`, `street_<n>`)
     again from its city.blend, `width` pixels wide, as to_dir/render_<view>.jpg (same cameras
     as the build), plus, with `eye` and `target` (plan coordinates, meters), a perspective
-    view of one's own as render_<name>.jpg. Returns the files written."""
+    view of one's own as render_<name>.jpg; `hide`: object name prefixes left out (M16:
+    `city.water.`, `city.sea.` drain the water). Returns the files written."""
     exe = find_blender(blender)
     if exe is None:
         raise RuntimeError("no Blender (set BLENDER or --blender)")
@@ -1377,6 +1718,8 @@ def rerender(blockout_dir: str | Path, to_dir: str | Path, views: list[str],
     if eye is not None and target is not None:
         cmd += ["--eye", *map(str, eye), "--target", *map(str, target), "--lens", str(lens),
                 "--name", name]
+    for h in hide or []:
+        cmd += ["--hide", h]
     done, log = _run(cmd, "CITYGEN_RERENDER_DONE", timeout=BUDGET_S)
     if done is None:
         raise RuntimeError("Blender rerender failed:\n" + log[-2000:])
@@ -1672,6 +2015,8 @@ def _ground_grid(P: _Plan, gd: _Ground) -> None:
     Z = fin.arr.copy()
     wet = shapely.contains_xy(P.wet, X, Y) if not P.wet.is_empty else np.zeros(Z.shape, bool)
     Z = np.where(wet, Z - BED_M, Z)
+    if P.beds is not None:
+        Z = _terrain_beds(P, X, Y, Z)
     land = G.union([G.from_model_poly(p) for lnd in m.land for p in lnd.polygons])
     holes = [G.from_model_poly(st.footprint) for st in m.structures
              if st.kind == "trench" and st.footprint is not None]
@@ -1764,6 +2109,8 @@ def _terrain(P: _Plan) -> None:
         cid = props.get("citygen_id")
         ids = props.get("citygen_ids")
         ids = ids if isinstance(ids, list) else None
+        if cat.startswith("bank_"):
+            continue     # (M16: absolute already)
         if cat == "water":
             o["parts"] = [{"k": "drape", "m": p["m"], "abs": True,
                            "r": [[x, y, q(level(x, y) - WATER_DROP_M)]
@@ -1802,7 +2149,7 @@ def _terrain(P: _Plan) -> None:
                 fz = (lambda v: lambda x, y: v)(bb) if bb is not None else gd.at
             else:
                 fz = gd.at
-            new += _lift_part(p, fz, drape_big=cat.startswith("open_") or cat in
+            new += _lift_part(p, fz, drape_big=cat.startswith(("open_", "cover_")) or cat in
                               ("junction", "lawn"))
         o["parts"] = new
     _ground_grid(P, gd)

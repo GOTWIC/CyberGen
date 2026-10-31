@@ -1,0 +1,49 @@
+== dead ends
+dead ends by class: {'highway': 1, 'avenue': 3, 'street': 84, 'service': 24, 'alley': 27, 'pedestrian': 26}
+of them, another road within 60 m straight ahead: {'avenue': 3, 'street': 29, 'service': 6, 'alley': 26, 'pedestrian': 19}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 73
+[(('avenue', 'street'), 34), (('avenue', 'avenue'), 10), (('street', 'street'), 9), (('highway', 'avenue'), 7), (('avenue', 'pedestrian'), 6), (('highway', 'highway'), 4), (('avenue', 'service'), 1), (('street', 'service'), 1)]
+   ('rs.w255n1141', 'rs.w242n1072', 'highway', 'avenue', 40, -253, 1085)
+   ('rs.w255n1141', 'rs.w283n1196', 'highway', 'avenue', 196, -274, 1184)
+   ('rs.w264n1289', 'rs.w283n1196', 'highway', 'avenue', 221, -276, 1204)
+   ('rs.w210n1027', 'rs.w246n963', 'highway', 'avenue', 98, -231, 1045)
+   ('rs.w210n1027', 'rs.w164n970', 'highway', 'avenue', 195, -175, 976)
+   ('rs.w210n1027', 'rs.w242n1072', 'highway', 'avenue', 572, -239, 1068)
+   ('rs.w103n658', 'rs.w164n970', 'highway', 'avenue', 225, -167, 962)
+   ('rs.w78n145', 'rs.w25n228', 'highway', 'highway', 33, -22, 116)
+== bridges
+bridges: 6 Counter({'pedestrian': 3, 'road': 2, 'road_rail': 1})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 5
+Counter({'street': 2, 'pedestrian': 2, 'alley': 1})
+   ('rs.w1131s111', 'street', 'd04.lm.w1088s127.bld', 43.6, 0.0, 4.0)
+   ('rs.w1058s130', 'street', 'd04.lm.w1088s127.bld', 45.4, 0.0, 4.0)
+   ('rs.w1121s118', 'alley', 'd04.lm.w1088s127.bld', 18.2, 0.0, 4.0)
+   ('rs.w1133s143', 'pedestrian', 'd04.lm.w1088s127.bld', 72.4, 0.0, 4.0)
+   ('rs.w1121s137', 'pedestrian', 'd04.lm.w1088s127.bld', 16.7, 0.0, 4.0)
+== junction levels
+junctions: 745 with a leg not at the node's height at the junction edge: 19 with a leg's end not at the node's z: 0
+== junction control
+   ('Eastside Docks', False, False) 10
+   ('Eastside Docks', True, True) 16
+   ('Hook Spaceport', False, False) 7
+   ('Hook Spaceport', True, True) 15
+   ('Lantern Strip', False, False) 278
+   ('Lantern Strip', True, True) 71
+   ('Neckgate', False, False) 13
+   ('Neckgate', True, True) 80
+   ('The Stacks', False, False) 78
+   ('The Stacks', True, True) 41
+   ('Wallgate Heights', False, False) 113
+   ('Wallgate Heights', True, True) 23
+crosswalk widths: Counter({4.0: 773})
+junctions with crosswalks: 246 of them within 40 m of another: 83
+== signs
+Counter({('shop_sign', 'blade'): 5386, ('shop_sign', 'facade'): 1733, ('billboard', 'roof'): 547, ('neon', 'facade'): 311, ('billboard', 'facade'): 177, ('holo_ad', 'roof'): 29})
+== transit supports
+  tl.spine_tube sky_tube: length 1503 m, supports 5, gap median 130 max 1113 m, off the line max 3.0 m (>2 m: 1)
+  tl.east_shore_line elevated_rail: length 3234 m, supports 88, gap median 32 max 274 m, off the line max 13.8 m (>2 m: 36)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 37

@@ -1,0 +1,68 @@
+assetgen streets: Vesper Bay Decks: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 1615 blockout objects replaced
+  [ok] street_decks: 1 decks: 8 slab pieces, 570 columns, 4 stairs and elevators; lowest over a ground street 7.225 m (at least 5.5)
+  [ok] street_budgets: 1304049 triangles in the city (budget 20000000), at most 38180 in a tile (t+04+04, budget 2500000)
+
+coverage:
+  road_segments: 2954 of 2956 (+2 declared)
+  junctions: 1728 of 1728
+  crosswalks: 1123 of 1123
+  sidewalks: 4390 of 4390
+  bridges: 15 of 15
+  structures: 1186 of 1186
+  tunnels: 7 of 7
+  quays: 5 of 5
+  waterways: 5 of 5
+  site_elements: 581 of 581
+  decks: 1 of 1
+  transit_lines: 4 of 4
+  megasites: 3 of 3
+  stations: 20 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 12004, tiles 145, triangles 1304049, disk 83.5 MB
+triangles by kind:
+  street.sidewalk: 466957 (4390 pieces)
+  street.road: 265786 (2956 pieces)
+  street.junction: 195954 (1728 pieces)
+  street.transit.deck: 101132 (49 pieces)
+  street.deck.slab: 75530 (8 pieces)
+  street.crosswalk: 36762 (1123 pieces)
+  street.quay: 30358 (5 pieces)
+  street.transit.tube: 25200 (6 pieces)
+  street.transit.tube.glass: 22656 (0 pieces)
+  street.tunnel.metro: 19880 (5 pieces)
+  street.deck.column: 17722 (570 pieces)
+  street.site.rail_track: 10788 (2 pieces)
+  street.column: 4936 (304 pieces)
+  street.bridge: 4679 (15 pieces)
+  street.structure.canopy: 3540 (2 pieces)
+  street.site.launch_tower: 3176 (4 pieces)
+  street.canal_wall.canal: 3068 (3 pieces)
+  street.transit.column: 2772 (154 pieces)
+  street.site.berth: 2442 (2 pieces)
+  street.deck.stair: 2080 (2 pieces)
+  street.transit.canopy: 1716 (33 pieces)
+  street.site.gantry_crane: 1236 (6 pieces)
+  street.site.container_stack: 1102 (551 pieces)
+  street.transit.pylon: 1072 (60 pieces)
+  street.site.fuel_tank: 996 (6 pieces)
+  street.site.launch_pad: 992 (4 pieces)
+  street.underpass_stair: 464 (4 pieces)
+  street.canal_wall.basin: 256 (2 pieces)
+  street.deck.elevator: 244 (2 pieces)
+  street.site.wall: 226 (1 pieces)
+  street.tunnel.pedestrian: 128 (2 pieces)
+  street.site.truck_gate: 84 (1 pieces)
+  street.site.courtyard: 64 (1 pieces)
+  street.site.gate: 30 (1 pieces)
+  street.site.lawn: 19 (1 pieces)
+  street.site.apron: 2 (1 pieces)
+no mesh: inside its junctions 2
+corner pads: 4754 made, 15 skipped (chain 1, no sidewalk 2, same edge 12)
+bridges: cable_stayed 1, footbridge.steel 1, footbridge.stone 4, girder 9
+instances: part.container.c0 2367, part.container.c1 2424, part.container.c2 2321, part.container.c3 2391, part.container.c4 2304, part.container.c5 2391
+files: 145 tiles made, 0 kept, 8 written, 137 same bytes, 0 removed
+seconds: context 0.21, gather 1.34, make 4.72, write 0.3, total 6.93, workers 3

@@ -13,9 +13,10 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M15, built in
-`docs/progress/M*`; later stages give their milestones a prefix of their own (set in their
-scope doc) so their progress folders never clash with stage 1's.
+high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M20, the
+rest of the fixes from the first run-through, `docs/run_through_1.md`),
+built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
+their scope doc) so their progress folders never clash with stage 1's.
 
 **Unreal exporter.** One exporter takes every stage's output into Unreal Engine 5.8. It is
 not a stage and has no milestones of its own: stage 1 introduces it (M15, `citygen unreal`,
@@ -742,6 +743,282 @@ The stage 1 fixes (three open items of M13 to M15) are in place:
 Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. Outputs:
 `docs/progress/stage1_fixes/`.
 
+M16 (water and ground detail) is in place, for stage 2's water (AG12) and ground cover
+(AG13): the build ends with `build.water_ground` (after the gameplay layer) on the finished
+city, `citygen/water.py` and `citygen/cover.py`, checks in `water_checks.py`, previews
+`preview_water.py` and `preview_ground.py`:
+- **Vertical frame:** on a flat city the ground stands `water.FREEBOARD_M` (1.5 m,
+  `model.QUAY_DECK_M`, a quay's `deck_z_m`: the quay deck is the ground) over every water
+  body, so the surface is at -1.5 (`WaterBed.surface_m`); on a terrain city the water stands at
+  M13's level. No bed lies under the bed M9's tunnels assume (`tunnels.BED_M` under the ground
+  datum, `water.max_depth`): the deepest water is canal 1.5, river 5.5, sea 10.5 m on a flat
+  city, 3, 7 and 12 m on a terrain city.
+- **Water bodies** (seas, rivers, channels, waterways) gain `depth_m`, `bed` (`WaterBed`:
+  profile `flat` for canals, basins and marinas, `channel` deepest along the centerline with
+  the depth by width along it, `along`, for rivers, channels, creeks and inlets, `shelf` for
+  the sea, falling over `reach_m` 250 m; material) and `flow` (`Flow`: downstream toward
+  `flows_into` or the mouth with the centerline oriented that way, a slow tide in canals and
+  inlets, still in basins, marinas and ornamental pools, tidal for the sea); the sea its
+  `exposure` (`Exposure` zones: open, sheltered under 1500 m, harbor under 400 m of mean fetch
+  over 16 integer directions on a 32 m raster, the map edge counting as open sea). All left
+  out of the JSON while unset (`model._m16`).
+- **Banks** (`banks`, `model.Bank`, id `<water>.bank.<anchor>`): the land's edge against the
+  water (`water.shore_lines`: the rings of land minus water without the map edge, water on the
+  left) sampled every 4 m and classed by what stands there: the model's quay (`quay_id`;
+  `height_m` None: the quay's `deck_z_m` is its height, one field), a canal wall (canals,
+  basins, inlets, marinas, ornamental pools; a building within 2 m), a road embankment (a road
+  within 5 m, `segment_id`), a beach (a beach open space, or a sea shore with a park or green
+  and 20 m clear of buildings), a marsh edge (a marsh open space), riprap (port and spaceport
+  shores, a megasite, a building within 6 m) or a natural bank; runs under 12 m join their
+  longer neighbor (never a quay). `width_m` is the slope's run from the line out to the
+  waterline (inside the water polygon: a wall's thickness, else slope by kind times the
+  height, at most 0.3 of the water's width at the run's lower quartile, steeper kinds where
+  it does not fit), `toe_m` the depth at its foot. A bank keeps to one water body and one
+  district and is classed only on its own district's buildings, roads and open spaces.
+- **The bed at a point** (`water.Beds.depth`, `depth_many`): the nearest bank (rounded
+  distance, ties to the first, never GEOS's pick), 0 up to its waterline, then toe + (D - toe)
+  ramp((d - width) / (reach - width)), ramp linear (shelf, flat with a 4 m reach) or u (2 - u)
+  (channel, the reach the local half width); `bed_z` in M9's frame.
+- **Ground cover** (`ground_cover`, `model.GroundCover`, id `<source>.gc.<anchor>`, else
+  `<district>.gc.<anchor>`): per district, its ground minus the water, the right of way (each
+  segment's cross-section as the blocks take it, the junctions), building footprints, solid
+  site elements and stairs, elevators, vents and portals; pieces from open spaces, lot yards,
+  flat site elements, megasites and the land left between them (parts under
+  `cover.SLIVER_M`, 3 m, are curb corners, not open land). Eleven kinds (`COVER_KINDS`: the
+  scope's ten and `paving` for plazas, forecourts and yards) by what a piece is and its
+  maintenance (district wealth and danger, what it is; megasites are kept); attributes
+  maintenance, wear, shade (4 m raster: share of 8 directions with a building above 45
+  degrees within 60 m, 1 under a deck), moisture (0 from 60 m off the water), slope (M13) and
+  `desire_lines` (walkway paths across a lawn worn by the nearest street's crowds, and
+  shortcuts across a lawn between walkway ends where the way round is 1.35 times longer).
+- **Checks** (three, on a city with M16's data: 95 on a flat sample with M17's and M21's,
+  100 on the deck sample):
+  `water_beds` (every body's data, no bed under M9's, tunnels under the water with 1.5 m of
+  backfill under the bed as it is, bridge foundations in the water on bed no deeper than their
+  footing), `water_banks` (the banks cover every edge once; quays, embankments, widths,
+  toes), `ground_cover` (no overlap, nothing under a building, road or water, the open land it
+  leaves only curb corners); a regeneration adds `regen_locality`.
+- **With M10:** `banks` and `ground_cover` are in `ids.KEEP` (named by their stage), in
+  `ids.REFS` and `ids.ORDER`; the splice leaves them out (and out of its closure) and
+  `edit._regenerate_once` runs `water_ground` on the spliced city, then
+  `water_checks.check_locality` against the old one (outside the district and `SEAM_M`, 60 m,
+  an M16 row changes only within 60 m of a changed input, `water_checks.INPUTS`: the splice's
+  own seam, a crowd density or a walkway, can reach farther); `overrides.apply` runs it again
+  after its edits.
+- **Blockout:** water and the sea at -1.5 on a flat city (the sea sheet 5 cm lower), a bed
+  heightfield per tile (`city.bed.<tile>`, 8 m cells; on a terrain city the ground grid carries
+  M16's beds), banks as bands from the line down to the toe joined per district, kind and tile
+  (`bank_<kind>`), the ground cover joined per district, kind and tile in a color per kind
+  (`cover_<kind>`) in place of the open spaces at the ground, bridge piers from the bed; the
+  plan's `swim` boxes (`blockout.swim_volumes`).
+- **Unreal exporter:** a water `PhysicsVolume` per swim box (`Importer.swim`), a material per
+  cover kind (`docs/unreal_export.md`, M16).
+A city without water or open land builds as before. Every sample has new goldens. Sample
+builds: `docs/progress/M16/`.
+
+M17 (road network repair, from the first run-through) is in place:
+- **Dead ends** (`streets.settle_dead_ends`, at the end of `clean_graph`, on the noded
+  edges, in rounds): a local road's dead end runs on to the road straight ahead
+  (`DEAD_END_REACH_M` 60, a junction there or at a node of it within `MIN_JUNCTION_GAP_M`, 8 m
+  for paths, turning at most 35 degrees, at the district's junction angle; on land, off closed
+  ground, crossing nothing but under a deck high enough: `under_deck(..., cls)`, a path under
+  4.5 m, `PATH_UNDER_CLEAR_M`, which `node_lines` also lets pass under), or joins a dead end
+  facing it (30 m); an M1b road's dead end runs on the same way as a short street
+  (`end_link`); else it stays as what it is, `RoadNode.attrs.dead_end` (`DEAD_END_KINDS`:
+  `map_edge`, `water_end`, `park_gate`, `plaza_gate` within `GATE_M` 8 m past its half width,
+  30 m for a primary road; `site_gate` within `SITE_GATE_M` 40 m of a megasite reserve, the
+  road `megasite_access` asks for; `path_end` on a path; `cul_de_sac` with a turning bulb
+  that fits, `attrs.turning_head_m`, street 12, service 10, alley 8 m, a primary road's half
+  width and 4 m; `deck_end` on M14's deck spokes; `traced_end` on a traced road, as drawn),
+  else its street goes back to its last junction (a vehicle road under `CUL_DE_SAC_MIN_M`
+  40 m from it, or with no room for a bulb). A run-on meets the roads at its junction at the
+  district angle there, legs measured 10 m out as `fix_angles` and `junction_angles` do.
+  A `water_end` is beside the water the model keeps (`Builder.water`: sea, water bodies,
+  waterways; not `wet`'s sliver between the land and the map edge, which grows edge
+  promenades); a dead end within `ON_ROAD_M` 0.1 m of another road is noded onto it (an M1b
+  road ending on another, off it by the grid's rounding).
+  A dead end reaching into another road's right of way is cut back clear of it (`_poke`; a
+  primary road's dead end cuts the local road it reaches into, `_poked`); a local road laid
+  along another (rights of way overlapping by `OVERLAP_M2` away from the nodes they share,
+  `_reach`) goes (`_overlaps`, never one whose loss parts the vehicle network, `_splits`);
+  `fix_angles` and `fix_duplicates` run again after each round of run-ons, and
+  `pedestrianize_islands` after the repair (a cut-back can leave a lane island). A cut-back
+  never takes a primary road (`_chain` stops at one); M1b is as it was (the sweep showed
+  that changing its forks and lenses moves every city's road search). `junctions.build`
+  draws the bulbs from the tag.
+- **Junctions** (`junctions.py`): each leg's cut reaches past where its right of way overlaps
+  another leg's (`overlap_cuts`: an acute corner, a leg that bends in the junction, a gore);
+  a road's two junctions share `CUT_SHARE` 0.9 of it by need (`share_cuts`, the old cap was
+  0.45 a side); a leg that bends gets its band to the cut; a degree-2 node where two roads
+  meet at an angle is a `bend` junction (`Junction.shape`, `bend_polygon`); where rights of way
+  still overlap past the cuts (a fork, a crossing at a small angle, a corner with no room for
+  its fillet), the junction polygon takes the shared pavement (`shared_pavement`); two
+  primary roads, or two roads at a node they share (a hairpin), still sharing pavement past
+  it give the overlap to the junction it touches or their node's (`absorb_shared`). M13's
+  grading still holds a junction's height at most 0.45 of a leg out (`Local.cuts`; M18
+  levels junctions).
+- **Checks** (`network_checks.py`, 4 more, 90 in all, 95 on the deck sample): `road_dead_ends` (every dead end tagged, the tag
+  true of where it is, a cul-de-sac with its bulb) and `road_overlaps` (rights of way of two
+  roads within 4 m in height overlapping more than 25 m2 outside every junction polygon, the
+  run-through's measure on the 1 cm grid: GEOS's floating overlay takes two corridors meeting
+  end to end on a 45 degree line for overlapping) with the street checks; `bridge_clash`
+  (road, pedestrian and transit bridges apart in plan or by the lower one's clearance plus the
+  upper deck) and `road_building_clash` (no road right of way over a building mass at its own
+  height, 5 m of headroom) after the building checks. Heights over the ground on a terrain
+  city; M10's regeneration runs them through `check_all`; a held road is never extended, cut
+  or dropped (`_held`), a new street meets an old road only at its nodes (a facing join onto a
+  held road's end at an old node is one). Under a regeneration's frame
+  `local.join_walk_islands` lays the old city's walkway-island links away from the district
+  again as they were (`Frame.islands`) and links a group the new streets cut off at its
+  nearest point within `ISLAND_SEAM_M` 40 m of the district (else as before), so a
+  regeneration moves no walkway far from it; a fresh build is unchanged.
+Sample builds, the run-through's measures before and after: `docs/progress/M17/`.
+
+M21 (cyberpunk massing) is in place, in `citygen/forms.py` (with `massing.Plate`, and the
+neighbor rule in `buildout.select_forms`):
+- **Model:** a form is prism masses, so every check and consumer reads it as it is. A tower's
+  shaft stands on its podium on a base plate (`massing.Plate`: a rectangle with sharp, cut
+  or rounded corners, a circle, a four-centre oval); a band of a twisted, tapered or leaning
+  shaft (role `band`) is that plate turned by `Mass.turn_deg` and scaled by `Mass.scale`
+  about the form's pivot, then moved by `Mass.shift_m`. `Building.form` names the form
+  (`kind`), its `crown`, whether it is a `tower` (podium towers, towers and landmarks 40 m
+  and taller) and its height `band` (`buildings.TOWER_BANDS_M`: 40, 56, 78, 110, 154, 215,
+  300 m), the `pivot`, the shaft's `masses` (bottom up) and its `params` (twist per floor,
+  taper, lean, chamfer, ...). New fields are left out of the JSON at their defaults.
+- **True arcs:** `Mass.arcs` (center and radius to the millimeter, start and sweep in
+  degrees); the footprint is cut by `massing.arc_steps` (a step of 2 sqrt(2 SAG / r), plain
+  arithmetic) so no chord sags over 1 cm, 2 cm at most once on the grid (`MS.circle`,
+  `ellipse`, `sector`; no more 12, 20 or 32-gons, megasite tanks and pads included).
+- **Forms** (`forms.SHAFTS`): box, chamfer, rounded, setback, round (in drums), oval, taper
+  (bands of 2 or 3 floors), twist (a band a floor, two over 48 floors, at most 3 degrees a
+  floor, 180 in all), lean, stack (3 to 5 turned and offset blocks, each over 35% on the one
+  under it), cantilever (blocks reaching out over the podium), split (two shafts, a slot and
+  links), garden (sky gardens: a core and corner columns, a green area `sky_garden`), gate (a
+  void through the upper floors), exo (columns standing off the facade, belts), pods (capsule
+  pods on a core); towers on odd plates (no rectangle fits) box, setback, taper, terrace or
+  wedge (`tower_poly`). Crowns: flat, tiers, sloped, cut, halo (a ring on struts), mast,
+  spire. Complexes' towers take box, chamfer, rounded or setback (`COMPLEX_FORMS`: their
+  skybridges need facing facades), and a complex avoids the forms of the complex towers built
+  before it near it (`Ctx.placed`). Slabs: curved (`MS.sector`) or stepped
+  (`forms.slab_form`); megabuilding towers with cut or rounded corners on some.
+- **Variety:** spec `District.variety` (presets: corporate core 0.9, midtown 0.75, transit
+  hub 0.6, entertainment 0.55, research 0.5, megablock 0.35, spaceport 0.3, residential 0.2,
+  old town 0.15, industrial 0.1) sets the draw weights (`forms.weights`: box and the mild
+  forms where low, bold forms from their `BOLD_MIN`) and how far twist, taper and lean go.
+- **Neighbor rule:** a lot tower draws its order of forms from its own generator (`_forms`,
+  salts by `FORM_INDEX`) and, in phase b, every form that fits (`forms_ok`) and the heights
+  in the bands beside its own (`band_heights`; under 40 m from the first band). Then the
+  parent (`select_forms`, tallest first, the complexes' and landmarks' towers and in a
+  regeneration the old towers outside the district fixed, `Frame.old_towers`, and a new tower
+  on an old one's lot given its old form and height, so the city outside comes back as it
+  was) gives each the first form no tower of another property within 151 m has in its band,
+  else a band beside;
+  the lots that change are built again in their chunks (`rebuild`, `force`).
+- **Checks** (two more): `building_forms` (arcs within 2.1 cm of their footprint, twist at
+  most 3 degrees a floor, every mass above the building's floor resting on or fixed to
+  another of its masses: it found M3's megabuilding decks hanging past a mid setback, now
+  placed only where both towers reach them, `_deck_held`, and a cluster's tower beside its
+  podium piece, now the piece under it), `tower_neighbors` (towers of different owners
+  within 150 m, by footprint centroid, never share a form and a band). Skybridges keep stage
+  2's corridor margins clear of every mass (0.2 m beside, 0.3 m over: `CORRIDOR_SIDE_M`,
+  `CORRIDOR_TOP_M`) and a bridge through a traced or pinned building (placed after the
+  bridges) is taken out (`buildout.bridges_clear_of`); a sky tube portal stays under a
+  tower's shaft, not its mast or spire (`transit.Bld.body`, `THIN_ROLES`).
+- **Blockout:** a mass with arcs drawn smooth along them (`set_sharp_from_angle`, 25
+  degrees); accents for mast, halo, strut, frame, link. **Exporter:** a building's form in
+  the manifest (`form`) and tagged `cg.form=`. **assetgen:** the brief carries arcs, plates
+  and the form; `shell._simple_mass` draws bands and masses curved all round simply (the
+  plate extruded, a spandrel and a ribbon of glass a floor) until AG15; skybridges never land
+  on bands, frames, pods, columns, halos or masts; a sky station's platform floor is under the
+  tube's lowest point over it (`connections.station`, as `_beside`: a rerouted Delta line put
+  a station on a 7.5% grade, and the level floor from the tube's first point met the tube);
+  a punched concrete wall under a patchwork body keeps its own wall where the patchwork
+  finish has no patch genes in its group (`shell._finish`; it raised `KeyError`); no
+  balcony hangs under a floating block (`shell._hangs`); `GEN_VERSION` m21.1. Odd-lot tiers
+  are kept neat (`forms.neat`: no corner under 40 degrees, no edge under 1 m).
+Sample builds: `docs/progress/M21/`.
+
+M18 (junctions and ramps, from the first run-through) is in place:
+- **Grades** (spec `highways.grades`, `spec.Grades`; `elevated.grades(gr)` sets the module's
+  values for one road stage, `roads.build_roads` wraps it): viaduct runs 6% design and 7% at
+  most (`RUN_GRADE`, `RUN_MAX_GRADE`), ramps, loops, flyovers and stack ramps 7% and 8%
+  (`GRADE`, `MAX_GRADE`), bridge approaches 6.5% (`APPROACH_GRADE`), 30 m vertical curves
+  (`CURVE_M`); a ramp's search still runs as long, and a loop is as big, as M7's at 5%
+  (`SEARCH_GRADE`: the steeper ramp descends sooner within it), and `_ramp` takes a longer
+  span where the shortest runs into another ramp (`clear`). A two-way highway one direction
+  of which no lane can enter (a trumpet's stem past the flyover's landing where no near ramp
+  arrives) carries the other only (`junctions.one_way_stranded`).
+- **Junction levels** (`junctions.level_legs`, in M2 after the polygons and `absorb_shared`):
+  every leg of a junction held at its node's height out to where it leaves the polygon (the
+  farther of its run to the cut and its exit, `leg_exit`) and `LEVEL_OUT_M` 10 m beyond, at
+  most half of it, then back onto its own profile at `catch_grade` (a run's maximum on primary
+  roads, a ramp's on ramps and local streets): the profile clamped between cones from the held
+  stretches (`_levelled`), never moving a locked stretch (bridge spans, roads crossing over or
+  under it, `_locks`); where it would, the junction is raised to its highest leg at its run
+  (at most `RAISE_MAX_M` 2.5 m, M7's 3 m for a local junction, never under another road),
+  else it keeps the slope. A leg's far end always keeps its node's height. Tunnels,
+  viaducts, a deck's streets and ramps, footbridges and held roads keep their profiles. On a
+  terrain city the grade lines hold primary roads too, at most `terrain.LEVEL_GRADE` 2% over
+  their junction and 10 m past it, where the natural ground there is no steeper than
+  `LEVEL_SLOPE_MAX` 4%; local roads keep M13's runs (to the polygon's edge, none at a
+  junction with a primary road: longer, a hillside's short streets went flat and Cragmouth's
+  fills passed 18 m). The grade-line solver's edges are directed (`terrain.grade`: the ground
+  rises from one station to the next by at most the class's grade, or the z profile's own
+  where steeper, less what the z profile climbs), so a steep ramp or approach no longer
+  leaves its stretch no room (a symmetric cap of zero there chained hillsides flat).
+- **Surfaces** (`junctions.surfaces`, after the grading): `Junction.edge_z`, the height of
+  every exterior vertex over the node's ground, on every junction not flat at its node's
+  height: a vertex on a leg's cut line (square to the leg where it leaves) at the leg's height
+  there, the curb between two legs linear along the ring (`surface`, `anchors_of`). The
+  blockout draws such a junction as a face through its vertices (a drape part; on a terrain
+  city every junction, over sea level) and cuts its roads back to where they leave it
+  (`blockout._trimmed`); AG7's junction piece takes its vertex heights from it.
+- **Embankments** (`elevated.road_embankments`, before the road columns): retained fill
+  (structure `embankment`, `<road>.emb<k>`, `attrs.road_id`, `s0_m`, `s1_m`, `width_m`)
+  under every raised road over land lower than `EMBANKMENT_M` 4.5 m; columns only where it is
+  higher (`SUPPORT_MIN_UNDER_M`). The blockout fills under it in the road's `<road>.deck`
+  object; AG7's road piece covers it and fills under those stretches.
+- **Crossings by need** (`junctions.plan_signals`, `plan_crossings`; per district
+  `junctions.signals` and `junctions.crosswalks`: auto, fewer, none): signals where two
+  primary roads meet; where a street meets a primary road (or a four-way street crossing in
+  the corporate core, transit hub and midtown) only with no signalized junction within
+  `SIGNAL_SPACING_M` 120 m along either road (`straight_on`; 200 m in the old town and
+  entertainment market, `SPARSE_ARCH`; twice that for "fewer"), greedily from the west, both
+  ways round; crosswalks on every approach of a signalized junction and across an
+  unsignalized junction's avenue where none is within the spacing; widths by class (street
+  3 m, avenue and highway 4 m, 5 m on a downtown avenue, none on alleys and service roads,
+  `crosswalk_w`); unmarked crossings elsewhere.
+- **Checks** (98 in all with M21's two and M16's three, 103 with decks): `ramp_grades`
+  (ramps 8%, runs and approaches 7%; `road_grades` caps every road at 8%), `junction_levels`
+  (every leg meets its junction's surface within 2 cm where it leaves, the surface level
+  across it within its class's cross slope, 2.5% primary, 3% else, the curb between two legs
+  running evenly from one's height to the other's), `crossing_spacing` (signals and marked
+  crossings only where called for and spaced, crosswalk widths); `ground_grades` lets a road
+  be as steep as its own z profile; the reports give each city try's failing checks
+  (`city_tries[].failed`) and the stats `elevated.grades`, `embankments`, `junction_levels`.
+- **Found on the new layouts:** M9's pedestrian underpasses keep their passage off column
+  footings (`tunnels._underpasses`: a transit column in a highway's median); AG7's junction
+  piece leaves out a sidewalk corner pad that would fold over an earlier one
+  (`walks._corners`); AG3's `Band.rehome` drops the ground windows a moved door takes the
+  place of (it looked for kind `window`, the windows are `win`, so a rehomed door never
+  found room among them: the small test city's new layout left a villa's entrance with no
+  door; `GEN_VERSION` ag5.2); M10's override edits drop the walkways that hang on a building
+  or skybridge they remove (`overrides._drop`: door, lobby and elevator links, the deck), and
+  in a regeneration a junction its held roads meet at one height takes it
+  (`junctions._held_heights`: the old build raised it, M1b gives the node back lower);
+  lights and furniture stand on an embankment (the props' headroom reads
+  `vegetation.overhead(..., fill=False)`, their ground structures leave it out: its road's
+  own keep-outs cover it) while trees keep off it (`overhead` with `fill`, as the
+  tree-clearance check), and M2's crossing locks and overhead test measure on plain arithmetic
+  (`junctions._crossings`, `_overhead`: `terrain.crossings` projects with GEOS and runs
+  after M2). On the merged layout a deck's skybridges clear its ramps (`Ctx.sky_roads`, from
+  the deck top) and every level's keep out of the district's buildings on its other levels
+  (`skybridges.Space(..., others)`). `GEN_VERSION` m18.2 (on M21's m21.1 and the assetgen
+  fixes' agfix.1); AG13's ground scatter keeps clear of a neighbouring piece's desire line
+  that reaches across its tile's seam (`ground.gather` `desire_near`, as the clearance check
+  does). Merged with M21, M16, the assetgen fixes and AG13.
+Sample builds: `docs/progress/M18/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
@@ -764,7 +1041,8 @@ Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. 
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG11, section 14), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
+AG14 fit and finish and AG15 cyberpunk facades and night from the first run-through), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -1013,14 +1291,194 @@ AG3 (street fronts) is in place, in `assetgen/buildings/fronts.py` and `frontpar
   on the band (`_decals`; one mesh per tile, `decals.<tile>`, mesh decals in Unreal).
   AG8 keeps every object it draws; AG3 gives the wall its fascia, panel, pier or plate.
 - **Checks**: `asset_access` (a door per entrance and unit, open to a walkway; facing a
-  neighbor or with no walkway ahead reported, not failed) and `asset_mounts` (never on
-  glass); budget allowances per unit and per front.
+  neighbor, with no walkway ahead, or ahead only inside another building (M17: a park path
+  citygen runs through it) reported, not failed) and `asset_mounts` (never on glass); budget
+  allowances per unit and per front.
 - **Previews**: AG6's `assetgen materials preview` now draws fronts, decals and AG2's parts
   beside AG8's props. Exporter: `docs/unreal_export.md`, "From AG3". Shell vertex-color
   grime and trim-sheet UVs are not done (open). Results: `docs/progress/AG3/`.
 
-Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`
-and `props` print a line per stage, a bar (n of N, time left) where the count is known and
+AG4 (roofs and connections) is in place (tests `tests/assetgen/test_ag_roofs.py`):
+- **Roofs** (`buildings/roofs.py`): roof forms in the top floor, never over the model's mass
+  (hip, gable, pagoda, mansard by crown and era; sheds' sawtooth, gable, barrel by gene;
+  `plan` before the masses), finishes and copings on flat roofs, green roofs (bed, border,
+  path), an asset for every roof item (`items`; equipment lowered under a corridor over it),
+  access huts, vents, skylights, the billboard frame crown.
+- **Parts** (`buildings/roofparts.py`): roof equipment (`ROOF`) always instanced
+  (`parts.INSTANCE_ALWAYS`) on untinted slots; penthouses, billboard frames, fire escapes,
+  ducts, vents, conduits, cameras, landing doors. Facade details in `buildings/details.py`
+  (each placed only where `envelope.fits`; the line with AG3 and AG8 in its docstring).
+- **Connections** (`buildings/connections.py`): skybridges by kind (`skybridge`), landing
+  doors in the facade grammar, portals cut through towers by the tube's corridor with sky
+  station platforms and mouth frames, decks, courts. The brief's `clearances` (skybridge,
+  guideway, sky tube corridors) and portal tube lines (`BRIEF_VERSION` 2).
+- **Skybridge stage** (`assetgen/skybridges.py`): `connections/<tile>.glb`, the manifest's
+  `skybridges`, `unreal_contribution.connections.json` (an entry per skybridge by id,
+  `links`). Roof equipment is one entry per tile (`roofs.<tile>`) in the buildings'
+  contribution; buildings replace the blockout green roof objects they build
+  (`contribution.green_replaces`).
+- **Checks**: `asset_clearance`, `asset_roofs`, `asset_landings`, `asset_skybridges`; mounts
+  in a landing door counted apart. Exporter: `links` as `cg.link=` tags
+  (`docs/unreal_export.md`, "From AG4"). `assetgen materials preview --views city_full`.
+  Results: `docs/progress/AG4/`.
+
+AG5 (types, landmarks and slopes) is in place (tests `tests/assetgen/test_ag_types.py`):
+- **Types** (`assetgen/buildings/types.py`, parts `typeparts.py`): a generator per M3 type
+  where the general grammar falls short (`types.GENERATORS`: shanty stacks, megablocks,
+  warehouses, sheds open on columns, yards, hangar doors, labs, villas, terraced rows,
+  temple halls, pagodas, gate houses, vaulted terminals and stations, control tower cabs,
+  parking ramps, straddle girders), at three points of the shell builder (`pre`, `mass`,
+  `post`); every part through `types.put` (`envelope.fits`, off the corridors). Dormers on
+  gable, hip and mansard roofs by era; the mechanical penthouse by era
+  (`roofs.PENTHOUSE_STYLE`).
+- **Heroes** (`buildings/heroes.py`): every landmark (megatower, spire, arcology) and the
+  wheel built by kind (light seams, halos, needles, terraces, atrium frames, rims, spokes,
+  gondolas, lattice legs), the landmark's palette and accent; a U2 mask per hero (grime,
+  leaks, wear, 512 px, `assets/textures/hero/<id>.png`) on UV1 in the hero UV, read by
+  per-hero materials (`contribution.heroes`, `HeroMask`); budget class `hero`.
+- **Slopes** (`buildings/slopes.py`; briefs carry `terrain`, the ground along every base
+  edge): stepped plinths, lower-storey windows, retaining skirts, doors and shopfronts at
+  grade (lowered, raised or narrowed).
+- **Collision**: hulls notched at skybridge landing doors (`collision.VESTIBULE_MM`).
+- **Sky stations beside a tower** (the tube meets no mass there): a platform deck to the
+  wall or onto a roof under it (`connections._beside`).
+- **Checks**: `asset_types`, `asset_families` (twin towers one design), `asset_slopes`.
+- **Art direction**: `assetgen review BUILD --spec S [--prev P]` (`review.md`), `assetgen
+  spec diff A B`; rounds in the skill. Results: `docs/progress/AG5/`.
+
+AG10 (layered districts) is in place (tests `tests/assetgen/test_ag_decks.py`, the small city
+with a deck over Core, `agtools.deck_build`):
+- **Deck pieces** (`assetgen/streets/decks.py`, in AG7's stage; `ctx._blockout_keys` runs the
+  blockout's `_decks`): the slab per deck and tile keyed by the blockout's own object
+  (`<deck>.slab.<tile>`; holes under 2 m2 filled, `slab_of`), with a coffered (planned eras)
+  or ribbed soffit stopping round the undercity buildings, a fascia with upstand and drip
+  edge on its real edges only, grime streaks and a stained soffit band, a rail (glass in the
+  wealthy eras; none at a building on the deck, a ramp or its junction, a stair or
+  elevator landing), soffit lights in two rows every 8 m over the ground streets, a
+  colonnade (edge beam, columns every 7.5 m off the paths) over parks and plazas, a collar
+  round a building it is cut round (`through`); columns (pier cap, shaft, capital, drop
+  panel; the shaft alone in an undercity building), switchback stairs and elevators (doors
+  at both levels, a landing or bridge to the slab's edge), each replacing its blockout
+  object. On M13's terrain the slab is measured from the ground the deck stands on
+  (`decks.Ref`: flat where level, else 8 m cells over the ground or the bases of the
+  buildings on and under it).
+- **Deck streets** (`roads.deck_kind`: `slab`, `ramp`): on the slab, no girder; a ramp solid
+  with a walkway and parapet on each side (its walkways in `graphs.walkways`); a deck
+  junction's own slab only past the deck (`walks._off_deck`).
+- **Buildings** (`assetgen/buildings/decks.py`): the brief's `deck` record (role `on`,
+  `under`, `near`, `through`; top, soffit and the slab's plan near it; only on such
+  buildings, so other briefs and packs keep their bytes). Under a slab: a roof within
+  1.2 m closed up to it by a louvered plenum band, parapets 0.3 m under it, no roof form,
+  roof equipment, type features, masts, ducts and barrels kept under it (`roofs.Clear`'s
+  ceiling), grime and lit ratio raised (`genome`).
+- **Checks**, on a city with decks only: `street_decks` (pieces, 5.5 m over the ground
+  streets, stairs and elevators reach both levels) and `asset_decks` (nothing of a building
+  inside the slab where its role forbids, deck doors on deck walkways, no roof items under
+  a slab). `asset_access` lets a door's path graze its own wall (`GRAZE_M`).
+- **Previews**: `assetgen materials preview --views deck` (the section across the biggest
+  deck, its near clip on the cut).
+- **Exporter**: no code change (each deck piece takes its level from the blockout object
+  it replaces); `docs/unreal_export.md`, "From AG10"; `test_stage2_takes_assetgen_decks`.
+  Results: `docs/progress/AG10/`.
+
+AG13 (ground cover and grass) is in place, in `assetgen/ground/` (tests
+`tests/assetgen/test_ag_ground.py`, golden `tests/assetgen/data/golden_ground.json` by
+`tests/assetgen/ground_goldens.py`):
+- **`assetgen ground BUILD [--spec S] [--workers N] [--force]`** (`build.py`; also the stage
+  of `assetgen build` after AG8's props and before AG6's materials, `--no-ground` skips it):
+  per 256 m tile (`gather.py`: a job holding every input of its tile, its hash the tile's)
+  M16's ground cover pieces meeting it, M6's median lawns (verges: grass on AG7's lawn island
+  top, a lawn strip on a highway median clear of the barrier, nothing where AG7 tops the
+  island with concrete), M14's decks, trees, the water within 60 m, M16's shade raster and
+  M13's ground grid; a tile made again only when its job's hash or the code changes.
+- **Surfaces** (`kinds.py`): per cover kind three AG6 sets, base, worn and shade
+  (`materials/library.GROUND_SETS`: `ground_lawn`, `_meadow`, `_wild`, `_dirt`, `_mud`,
+  `_gravel`, `_sand`, `_moss`, `_rubble`; generators at the end of `surfaces.py`); paving
+  and overgrown paving on AG7's paving sets by what they pave. The mask per tile
+  (`tile.py`, `ground/masks/<tile>.png`, 512 px, row 0 the south edge): R wear (desire lines,
+  the piece's wear), G shade (M16's raster bilinear, tree crowns, 1 under a deck), B edge,
+  A moisture; the ground master blends the sets by it.
+- **Ground mesh**: each piece clipped to its tile on the 1 cm grid, triangulated exactly on
+  its millimeters (`triangulate.py`), 0.1 m over the ground (on M13's terrain cut by its 4 m
+  cells, vertices and normals on the ground grid), a primitive per surface and tile
+  (`ground.<surface>.<tile>`), UV0 the plan position; `ground/tiles/<tile>.glb`.
+- **Grass** (`clumps.py`, `tile.py`): clump kinds lawn, clover, flowers (a family per
+  district palette: its era's palette pushed to petal colors), meadow, meadow_dry, reeds,
+  cattails, weeds, fern and AG8's scrub and sedum (`props.trees` at ground cover scale), 3
+  or 4 variants each, at most 400 triangles, COLOR_0 (height share, tone, dryness) for the
+  grass master, in `ground/clumps.glb`. A candidate per mask pixel (0.5 m) in a grass-bearing
+  piece, jittered and kept by splitmix64 hashes of its world cell with probability
+  density x wear x shade x moisture x slope x the tile's cap (`kinds.GRASS`, 0.04 to 1.8 per
+  m2; `TILE_INSTANCES` 40,000, the kept clumps scaled up by the cap's inverse square root,
+  at most 1.5; a tile over the cap by chance drops the clumps kept by the least margin);
+  the mix leans to ferns in deep shade and under crowns, reeds on wet ground, weeds where
+  neglected; a clump stands only where its footprint lies in grass-bearing land clear of
+  desire lines, decks and trunks. Transforms per tile in `ground/grass/<tile>.json`.
+- **Checks** (`checks.py`, `ground_report.json/.txt`): `ground_coverage` (every piece drawn
+  whole, every blockout cover object and median lawn replaced), `ground_grass_clear` (no
+  footprint on a road, building, water, paving, deck or desire line, every clump on grass;
+  on the model's own geometry), `ground_meshes`, `ground_budgets` (clumps per tile and city,
+  3 million; triangles per clump, of all clumps, of the ground per tile and city;
+  instanced triangles per tile). `ground/preview.png`: the city from above and the busiest
+  tile up close (`preview.py`).
+- **Exporter**: `unreal_contribution.ground.json` (`docs/unreal_export.md`, AG13): a ground
+  actor per tile replacing the blockout's `<district>.cover_<kind>.<tile>` and
+  `<district>.lawn.<tile>` objects (a `drop` where its tile draws none), the grass as
+  instanced parts whose transforms stay in their tile's file (`xforms_file`), not Nanite,
+  no collision, no shadow, culled at 60 to 100 m (`cull_m`), out of the HLODs; masters
+  `M_CgGround` and `M_CgGrass` (sway by world position offset, `MPC_CityGen`'s new `Wind`).
+- **Previews**: `assetgen materials preview` draws the ground tiles with AG6's materials
+  (`ag6_materials.ground`, `grass`) and the clumps within 140 m of a street view's eye
+  through AG8's geometry-nodes instancer. Results: `docs/progress/AG13/`.
+AG12 (water) is in place, in `assetgen/water/` (tests `tests/assetgen/test_ag_water.py`,
+goldens `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`):
+- **`assetgen water BUILD [--spec S] [--workers N] [--no-textures]`** (`build.py`; also a
+  stage of `assetgen build` after the streets, `--no-water` skips it): pieces gathered from
+  M16's data (`pieces.py`), each made from its own inputs and kept by hash as AG7's. Per water
+  body and 256 m tile (`<body>@<tile>`, the body's own water: its polygon less the bodies
+  before it in M16's order) a bed and a surface; per bank AG12 draws a piece by its id.
+- **Fields** (`fields.py`, from a piece's inputs alone): M16's depth exactly
+  (`Beds.depth_many`'s arithmetic on the body's banks within reach of the tile), the bottom
+  AG12 draws (`bottom`: M16's bed raised to every sloped bank's slope carried on under the
+  water, at a wall's toe up to its face, never within 5 cm of the surface), the level
+  (flat: `surface_m`; M13's along a river), the current (along the flow line, the sea's
+  tide along its shore, slower over shallows), foam (walls, waterlines, bridge piers from
+  AG7's notes) and the sea's wave weight (M16's exposure on a blurred 16 m raster).
+- **Meshes** (`grid.py`, `makers.py`): a region on a lattice, inside cells as two triangles,
+  edge cells clipped on the millimeter grid and triangulated exactly (a piece the ear clipper
+  cannot take split in halves), vertices shared by position. Bed (Nanite): 8 m on the sea,
+  else 4 m, leaving out each sloped bank's dry strip (line to waterline), so the bank and bed
+  meet along the waterline; a slot by M16's material, the underwater bank zone by the bank's
+  (riprap stone, beach sand, marsh mud); steep triangles UV'd on their vertical plane;
+  skirts 13 m down along edges shared with other water. Surface: LOD chains (sea 2, 4, 8,
+  16 m; inland 4, 8, 16 m), UV1 the current, COLOR_0 foam, depth, wave weight. Banks: the dry
+  strip on a 2 m lattice at the bank's slope, riprap stones as instanced parts (six meshes in
+  `water/parts.glb`), stone walls along rivers and the sea.
+- **AG7**: `Ground.water_level` is M16's surface on a flat city; quay and canal walls reach
+  M16's toe and 0.5 m into the bed (`notes.foot`); canal walls follow the waterway's
+  `canal_wall` banks (no longer across its mouth into other water); bridge piers and arch and
+  pylon footings stand 0.5 m into M16's bed (`inputs.bed`), their footprints in
+  `notes.piers`.
+- **AG6**: sets `bed_mud`, `bed_silt`, `bed_sand`, `bed_gravel`, `bed_stone` (upper band),
+  `bank_soil`, `bank_rubble`, `bank_rock` (`WATER_SETS`; generators in
+  `materials/water_surfaces.py`), the `water` atlas (ripple normals, foam, caustics),
+  `catalog.WATER` (per water kind sea, river, canal, ornamental, marsh: scattering,
+  absorption, shallow and deep color, clarity, flow, foam, waves) and `WATER_SLOT`; masters
+  `water` and `bed`; the texel check reads the water packs (beds at the upper density).
+- **Checks** (`checks.py`, on the packs read back against the model): `water_coverage`,
+  `water_levels` (surfaces at their level, beds at AG12's bottom, never deeper than M16's),
+  `water_gaps` (bank waterlines on the bed, AG12's and AG7's wall feet in it, skirts),
+  `water_meshes`, `water_budgets` (400k triangles and 60k stones a tile, 9M a city),
+  `water_replaces`. `water_report.txt`; `water/preview.png` (`preview.py`).
+- **Exporter**: `unreal_contribution.water.json` (surfaces non-Nanite LOD chains, beds and
+  banks Nanite, the drop of the blockout's water, `underwater` per body), `M_CgWater` (Single
+  Layer Water, flow-mapped ripples, depth and mask foam, the sea's Gerstner waves by world
+  position offset: decision 13.10 (a)), `M_CgBed` (caustics), a post-process volume per swim
+  box (`docs/unreal_export.md`, AG12). **Blender**: `ag6_materials.water` and `caustics`;
+  `assetgen materials preview --views water` (a canal and a river bank up close, the harbor
+  from above). Results: `docs/progress/AG12/`.
+Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
+`water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
 redrawn line on a terminal, plain lines when piped; workers never print, the parent advances;
 Blender scripts print `CGPROGRESS start|done <name>`, read by `assetgen/blenderrun.py`);

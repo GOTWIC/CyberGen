@@ -1,0 +1,18 @@
+citygen blockout: Delta Megacity
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 10363 objects in the .blend, 10363 in the plan
+  [pass] blend_buildings: 5516 building objects, 5516 buildings with masses in the model
+  [pass] blend_instances: 73495 prop and plant instances evaluated in the .blend, 73495 in the plan
+  [pass] gltf_tiles: 196 tile files for 196 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 12 of 12 renders
+  [pass] blender_budget: Blender 179.8 s (budget 600 s)
+
+plan: 10363 objects, 50996 parts, 196 tiles, 5516 buildings (sha256 2b931ca989cab037)
+blender 5.2.3 LTS: 1366368 vertices, 498726 faces, 73495 instances, 92 materials, 117 collections
+files (MB): {"blend": 17.3, "usd": 49.1, "gltf_tiles": 61.1, "renders": 4.4}
+timings (s): {"build_s": 3.9, "save_s": 0.8, "usd_s": 20.6, "gltf_s": 77.1, "render_s": 77.0, "total_s": 179.8}
+total (s): {"plan_s": 5.3, "exports_s": 4.7, "total_s": 195.7}

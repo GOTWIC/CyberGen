@@ -39,7 +39,7 @@ import hashlib
 
 from . import systems as SY
 
-GENOME_VERSION = 3
+GENOME_VERSION = 5
 SALT = "ag1.genome"
 GROUPS = ("base", "body", "top")
 GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay_m", "wwr",
@@ -50,12 +50,12 @@ BUILDING_GENES = ("ground", "crown", "corner", "finish", "base", "wall", "trim",
                   "roof", "mech_every", "cut", "cut_m", "setback", "setback_at",
                   "setback_m", "canopy", "canopy_m", "arcade", "arcade_m", "irreg",
                   "front_frame", "front_riser", "front_door", "front_steps", "front_fascia",
-                  "front_paint")
+                  "front_paint", "roof_form", "roof_finish", "coping")
 CONTINUOUS = ("bay_m", "wwr", "sill_m", "head_m", "reveal_m", "corner_m", "cornice_m",
               "parapet_m", "band_m", "open_p", "patch_w", "patch_h", "wear", "dirt_m",
               "wall_v", "wall_w", "trim_v", "roof_v", "balcony_m", "fin_m", "member_m",
               "pod_m", "cut_m", "setback_at", "setback_m", "canopy_m", "arcade_m", "irreg",
-              "front_recess_m", "front_shutter")
+              "front_recess_m", "front_shutter", "roof_pitch", "roof_mansard", "roof_eave_m")
 # what one unit of genome distance is for a continuous gene (a clearly visible change)
 SCALE = {"bay_m": 0.3, "wwr": 0.08, "sill_m": 0.15, "head_m": 0.15, "reveal_m": 0.05,
          "corner_m": 0.25, "cornice_m": 0.15, "parapet_m": 0.2, "band_m": 0.05,
@@ -63,7 +63,8 @@ SCALE = {"bay_m": 0.3, "wwr": 0.08, "sill_m": 0.15, "head_m": 0.15, "reveal_m": 
          "wear": 0.25, "dirt_m": 2.0, "wall_v": 0.06, "wall_w": 0.04, "trim_v": 0.06,
          "roof_v": 0.06, "balcony_m": 0.25, "fin_m": 0.12, "member_m": 0.12, "pod_m": 0.1,
          "cut_m": 0.6, "setback_at": 0.1, "setback_m": 0.8, "canopy_m": 0.3,
-         "arcade_m": 0.5, "irreg": 0.3, "front_recess_m": 0.2, "front_shutter": 0.3}
+         "arcade_m": 0.5, "irreg": 0.3, "front_recess_m": 0.2, "front_shutter": 0.3,
+         "roof_pitch": 5.0, "roof_mansard": 4.0, "roof_eave_m": 0.1}
 LIT_BY_USE = {"residential": 0.35, "hotel": 0.45, "office": 0.6, "retail": 0.5,
               "civic": 0.4, "industrial": 0.15, "parking": 0.05}
 
@@ -150,10 +151,14 @@ def make(brief: dict) -> dict:
     fam = prop.get("id") if prop and prop.get("complex") not in (None, "single") and \
         len(prop.get("building_ids") or []) > 1 else None
     fkey = fam or bid             # discrete genes and colors: the family's
+    twins = bool(fam) and prop.get("complex") in SY.TWINS
     btype = b["type"]
     weights = system_weights(spec, btype, int(b["floors"]))
     names, ws = list(weights), [weights[k] for k in weights]
     fixed = SY.TYPE_SYSTEM.get(btype)
+    if btype.startswith("building.landmark."):
+        # AG5: a hero's system by its kind
+        fixed = SY.LANDMARK_SYSTEM.get(btype.rsplit(".", 1)[1], fixed)
     if isinstance(fixed, dict):
         fixed = pick(fkey, "system.type", sorted(fixed), [fixed[k] for k in sorted(fixed)],
                      salt)
@@ -195,7 +200,9 @@ def make(brief: dict) -> dict:
                                 ("parapet_m", (0.5, 1.2), SY.STEP["parapet_m"]),
                                 ("band_m", (0.06, 0.14), SY.STEP["band_m"])):
             base = draw(fkey, f"{g}.{gene}", rng[0], rng[1], step, salt)
-            if fam:
+            if fam and twins:
+                pass                # (AG5: twin towers are one design to the last step)
+            elif fam:
                 # a family member steps one or two quantization steps off the family's value
                 k = pick(bid, f"{g}.{gene}.step", (-2, -1, 0, 1, 2), None, salt)
                 base = quant(min(max(base + k * step, rng[0]), rng[1]), step)
@@ -251,6 +258,20 @@ def make(brief: dict) -> dict:
     genes["front_fascia"] = pick(fkey, "front.fascia", ("plate", "none"), (0.75, 0.25), salt)
     genes["front_paint"] = pick(fkey, "front.paint", fr["paints"], None, salt)
     cont["front_recess_m"] = draw(fkey, "front.recess_m", 0.45, 0.9, 0.05, salt)
+    # AG4: roofs (a shed's form, a flat roof's finish, copings, pitch and eaves), drawn
+    # under purposes of their own
+    era = spec.get("era") or ""
+    sf = SY.SHED_FORMS.get(btype)
+    genes["roof_form"] = pick(fkey, "roof.form", sf[0], sf[1], salt) if sf else "flat"
+    genes["roof_finish"] = pick(fkey, "roof.finish", SY.ROOF_FINISH_NAMES,
+                                SY.ROOF_FINISHES.get(era, SY.ROOF_FINISHES["mixed_modern"]),
+                                salt)
+    genes["coping"] = pick(fkey, "roof.coping", ("metal", "none"), (0.8, 0.2), salt)
+    pr = SY.SHED_PITCH if sf else SY.PITCH.get(era, SY.PITCH["*"])
+    cont["roof_pitch"] = draw(fkey, "roof.pitch", pr[0], pr[1], 1.0, salt)
+    cont["roof_mansard"] = draw(fkey, "roof.mansard", 62.0, 72.0, 1.0, salt)
+    ev = SY.EAVE.get(era, SY.EAVE["*"])
+    cont["roof_eave_m"] = draw(fkey, "roof.eave", ev[0], ev[1], 0.05, salt)
     cont["front_shutter"] = quant(min(fr["shutter"] * (0.5 + u(fkey, "front.shutter", salt)),
                                       1.0), 0.05)
     # colors: the era's palette (a landmark's own), an owner's brand colors over it
@@ -266,9 +287,20 @@ def make(brief: dict) -> dict:
     if brand and u(fkey, "trim.brand", salt) < 0.7:
         trim = pick(fkey, "trim.brand.pick", brand, None, salt)
     dark = min(pal, key=lambda c: (sum(int(c[1 + 2 * k:3 + 2 * k], 16) for k in range(3)), c))
+    lpal = list((spec.get("landmark") or {}).get("palette") or [])
+    if lpal and b.get("landmark"):
+        # AG5: a hero in its own palette: the darkest its walls and glass, the lightest its
+        # trim (the most saturated is its accent, `heroes.accent`)
+        def lum(c):
+            return sum(int(c[1 + 2 * k:3 + 2 * k], 16) for k in range(3))
+        wall = min(lpal, key=lambda c: (lum(c), c))
+        trim = max(lpal, key=lambda c: (lum(c), c))
+        dark = wall
     genes["wall"] = wall
     genes["trim"] = trim
     genes["glass"] = pick(fkey, "glass", SY.GLASS, None, salt)
+    if lpal and b.get("landmark"):
+        genes["glass"] = wall
     genes["roof"] = pick(fkey, "roof", SY.ROOFS_INDUSTRIAL if body in SY.INDUSTRIAL else SY.ROOFS,
                          None, salt)
     dist = spec.get("district") or {}
@@ -292,6 +324,15 @@ def make(brief: dict) -> dict:
              "lit": draw(bid, "lit", 0.7, 1.3, 0.01, salt) * LIT_BY_USE.get(b["use"], 0.4),
              "seed": quant(u(bid, "seed", salt), SY.STEP["seed"])}
     extra["lit"] = quant(min(extra["lit"], 1.0), SY.STEP["lit"])
+    if (brief.get("deck") or {}).get("role") == "under":
+        # AG10: under an M14 deck, a covered street's grime from the ground up to the soffit,
+        # its fronts and windows lit day and night
+        cont["wear"] = draw(bid, "wear.deck", min(max(cont["wear"], 0.7), 0.95), 1.0,
+                            SY.STEP["wear"], salt)
+        h = float(b["height_m"])
+        cont["dirt_m"] = draw(bid, "dirt_m.deck", 0.8 * h, h + 1.0, SY.STEP["dirt_m"], salt)
+        extra["lit"] = quant(max(extra["lit"], draw(bid, "lit.deck", 0.75, 1.0, 0.01, salt)),
+                             SY.STEP["lit"])
     for name, val in sorted((ov.get("style") or {}).items()):
         if name in genes:
             genes[name] = val
@@ -319,6 +360,10 @@ def effective(genome: dict, used: dict) -> dict:
     and which features it built), as {gene: value}; the vector of the uniqueness check."""
     genes, cont = genome["genes"], genome["cont"]
     out: dict = {}
+    for g in used.get("open", []):
+        # (AG5: an open shed's columns: their bay and section)
+        out[f"{g}.bay_m"] = cont[f"{g}.bay_m"]
+        out[f"{g}.corner_m"] = cont[f"{g}.corner_m"]
     for g in used.get("groups", []):
         s = genes[f"{g}.system"]
         out[f"{g}.system"] = s
@@ -387,4 +432,15 @@ def effective(genome: dict, used: dict) -> dict:
         out["front_recess_m"] = cont["front_recess_m"]
     for gene in ("wear", "dirt_m", "wall_v", "wall_w", "roof_v"):
         out[gene] = cont[gene]
+    # AG4: the roof form a building built (its kind, pitch and eaves) and a flat roof's
+    # finish
+    form = used.get("roof")
+    if form and form != "flat":
+        out["roof_shape"] = form
+        out["roof_pitch" if form != "mansard" else "roof_mansard"] = \
+            cont["roof_pitch" if form != "mansard" else "roof_mansard"]
+        if form not in ("sawtooth",):
+            out["roof_eave_m"] = cont["roof_eave_m"]
+    if used.get("roof_finish"):
+        out["roof_finish"] = genes["roof_finish"]
     return out

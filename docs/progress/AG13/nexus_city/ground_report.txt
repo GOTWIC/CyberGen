@@ -1,0 +1,12 @@
+assetgen ground (AG13): Nexus City
+all checks pass
+5520 pieces in 173 tiles (173 with ground, 165 with grass, 8 at the cap)
+clumps: 1,374,336 instances of 67 variants (11,860 triangles), 192,410,411 instanced triangles
+ground: 72,245 triangles, 173 masks, 72.7 MB on disk
+by kind: {'cattails': 43036, 'clover': 126075, 'fern': 30581, 'flowers': 95377, 'lawn': 718556, 'meadow': 151941, 'meadow_dry': 8104, 'reeds': 111614, 'scrub': 5188, 'sedum': 14030, 'weeds': 69834}
+
+PASS ground_coverage: {'pieces': 5520, 'short': 0, 'first_short': None, 'triangulation_failed': [], 'constrained_delaunay': ['d06.lot.e1173s315.gc.e1173s315'], 'blockout_objects': 468, 'not_replaced': []}
+PASS ground_grass_clear: {'clumps': 1374336, 'failing': 0, 'first': None}
+PASS ground_meshes: {'files': 174, 'triangles': 84105, 'bad': 0, 'first': None}
+PASS ground_budgets: {'over': [], 'tile_instances_max': 39840, 'city_instances': 1374336, 'clump_triangles_max': 366, 'unique_triangles': 11860, 'tile_ground_triangles_max': 1135, 'city_ground_triangles': 72245, 'tile_drawn_triangles_max': 7015648, 'limits': {'tile_instances': 40000, 'city_instances': 3000000, 'clump_triangles': 400, 'unique_triangles': 60000, 'tile_ground_triangles': 250000, 'city_ground_triangles': 12000000, 'tile_drawn_triangles': 12000000}}
+seconds: {'gather': 3.39, 'clumps': 0.09, 'tiles': 14.9, 'write': 0.05, 'total': 34.2, 'workers': 3, 'slowest_tiles': [('t-06+01', 0.528), ('t-05-05', 0.494), ('t-04-03', 0.492), ('t+05+00', 0.482), ('t+04+00', 0.472)]}

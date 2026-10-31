@@ -152,29 +152,214 @@ def ngon(cx: float, cy: float, r: float, n: int, phase: float = 0.0) -> Polygon:
     return Polygon(pts)
 
 
+# ---------------------------------------------------------------------------
+# M21: true arcs. A curved stretch of a footprint is cut so that no chord sags more than
+# SAG_M from the curve (2 cm at most once its vertices are on the grid), and recorded as an
+# arc (center and radius to the millimeter, start and sweep), which stage 2 draws as the
+# curve itself.
+# ---------------------------------------------------------------------------
+
+SAG_M = 0.010
+
+
+def arc_steps(r: float, sweep: float) -> int:
+    """Segments of an arc of radius r over `sweep` radians so that no chord sags more than
+    SAG_M (a step of 2 sqrt(2 SAG / r) never does, since 1 - cos x <= x^2 / 2; plain
+    arithmetic, so every machine cuts the same count)."""
+    if r <= 2.0 * SAG_M or sweep <= 0.0:
+        return 1
+    step = 2.0 * math.sqrt(2.0 * SAG_M / r)
+    return max(1, int(math.ceil(sweep / step - 1e-9)))
+
+
+def _deg(a: float) -> float:
+    d = float(M.degrees(a)) % 360.0
+    return round(d if d < 359.99995 else 0.0, 4) + 0.0
+
+
+def arc_rec(cx: float, cy: float, r: float, a0: float, sweep: float) -> dict:
+    """An arc of the model (`model.Arc`) in world coordinates, angles in radians."""
+    return {"center": (round(float(cx), 3) + 0.0, round(float(cy), 3) + 0.0),
+            "radius_m": round(float(r), 3) + 0.0, "start_deg": _deg(a0),
+            "sweep_deg": round(float(M.degrees(sweep)), 4) + 0.0}
+
+
+def _arc_local(pts: list, cu: float, cv: float, r: float, a0: float, sweep: float) -> None:
+    """Local points of an arc from a0 to its end (where the next arc starts at the same
+    point, `Plate.ring` drops the repeat)."""
+    n = arc_steps(r, sweep)
+    for k in range(n + 1):
+        a = a0 + sweep * k / n
+        pts.append((cu + r * float(M.cos(a)), cv + r * float(M.sin(a))))
+
+
+class Plate:
+    """M21: a floor plate in frame `fr` (centered on its origin): a rectangle 2 hw x 2 hd
+    with corners rounded to radius r (r = the half short side: a stadium; hw = hd = r: a
+    circle) or cut by chamfer c, or a four-centre oval of semi-axes hw and hd (`oval`: two
+    end arcs and two side arcs meeting tangent). Turned, scaled and moved exactly, it gives
+    its polygon (grid, counterclockwise) and its arcs."""
+
+    __slots__ = ("fr", "hw", "hd", "r", "c", "oval")
+
+    def __init__(self, fr: Frame, hw: float, hd: float, r: float = 0.0, c: float = 0.0,
+                 oval: bool = False):
+        self.fr = fr
+        self.hw, self.hd = float(hw), float(hd)
+        lim = min(self.hw, self.hd)
+        self.oval = bool(oval) and abs(self.hw - self.hd) >= 0.5
+        if oval and not self.oval:
+            r = self.hw = self.hd = lim       # (an oval of equal axes is the circle)
+        self.r = min(max(float(r), 0.0), lim) if not self.oval else 0.0
+        self.c = min(max(float(c), 0.0), lim * 0.9) if self.r <= 0.0 and not self.oval \
+            else 0.0
+
+    @staticmethod
+    def of_rect(fr: Frame, rect) -> Plate:
+        """The plate of a rectangle that frame `fr` sees axis aligned."""
+        u0, v0, u1, v1 = fr.bounds(rect)
+        return Plate(fr.moved((u0 + u1) / 2.0, (v0 + v1) / 2.0), (u1 - u0) / 2.0,
+                     (v1 - v0) / 2.0)
+
+    def _new(self, fr=None, hw=None, hd=None, r=None, c=None, oval=None) -> Plate:
+        return Plate(self.fr if fr is None else fr, self.hw if hw is None else hw,
+                     self.hd if hd is None else hd, self.r if r is None else r,
+                     self.c if c is None else c, self.oval if oval is None else oval)
+
+    def turned(self, d_angle: float) -> Plate:
+        return self._new(fr=self.fr.turned(d_angle))
+
+    def scaled(self, f: float) -> Plate:
+        return self._new(hw=self.hw * f, hd=self.hd * f, r=self.r * f, c=self.c * f)
+
+    def grown(self, d: float) -> Plate:
+        """The plate offset outward by d (inward when negative): its corners keep their
+        center, so a rounded corner's radius grows by d."""
+        r = self.r + d if self.r > 0.0 else 0.0
+        return self._new(hw=self.hw + d, hd=self.hd + d, r=max(r, 0.0),
+                         c=self.c * (1.0 + d / max(min(self.hw, self.hd), 1.0)))
+
+    def moved(self, du: float, dv: float) -> Plate:
+        return self._new(fr=self.fr.moved(du, dv))
+
+    def shifted(self, dx: float, dy: float) -> Plate:
+        return self._new(fr=Frame(self.fr.ox + dx, self.fr.oy + dy, self.fr.angle))
+
+    def rounded(self, r: float) -> Plate:
+        return self._new(r=r, c=0.0)
+
+    @property
+    def reach(self) -> float:
+        """Farthest distance of the plate from its center (what it sweeps when turned)."""
+        if self.oval:
+            return max(self.hw, self.hd)
+        a, b = self.hw - self.r, self.hd - self.r
+        if self.c > 0.0:
+            return max(math.sqrt(self.hw * self.hw + (self.hd - self.c) ** 2),
+                       math.sqrt((self.hw - self.c) ** 2 + self.hd * self.hd))
+        return math.sqrt(a * a + b * b) + self.r
+
+    def _local(self) -> tuple[list, list]:
+        """(local points counterclockwise, local arcs (cu, cv, r, a0, sweep))."""
+        hw, hd, r, c = self.hw, self.hd, self.r, self.c
+        pts: list = []
+        arcs: list = []
+        if self.oval:
+            swap = self.hd > self.hw
+            a, b = (hd, hw) if swap else (hw, hd)
+            r1 = 0.6 * b
+            r2 = ((a - r1) * (a - r1) + b * b - r1 * r1) / (2.0 * (b - r1))
+            phi = float(M.atan2(r2 - b, a - r1))
+            for cu, cv, rr, a0, sw in ((a - r1, 0.0, r1, -phi, 2.0 * phi),
+                                       (0.0, b - r2, r2, phi, M.PI - 2.0 * phi),
+                                       (r1 - a, 0.0, r1, M.PI - phi, 2.0 * phi),
+                                       (0.0, r2 - b, r2, M.PI + phi, M.PI - 2.0 * phi)):
+                arcs.append((cu, cv, rr, a0, sw))
+                _arc_local(pts, cu, cv, rr, a0, sw)
+            if swap:   # the oval along v: a quarter turn of the plate's local frame
+                pts = [(-v, u) for u, v in pts]
+                arcs = [(-cv, cu, rr, a0 + M.HALF_PI, sw) for cu, cv, rr, a0, sw in arcs]
+            return pts, arcs
+        if r > 0.0:
+            for k, (cu, cv) in enumerate(((hw - r, r - hd), (hw - r, hd - r),
+                                          (r - hw, hd - r), (r - hw, r - hd))):
+                a0 = -M.HALF_PI + k * M.HALF_PI
+                arcs.append((cu, cv, r, a0, M.HALF_PI))
+                _arc_local(pts, cu, cv, r, a0, M.HALF_PI)
+            return pts, arcs
+        if c > 0.0:
+            return [(hw, c - hd), (hw, hd - c), (hw - c, hd), (c - hw, hd), (-hw, hd - c),
+                    (-hw, c - hd), (c - hw, -hd), (hw - c, -hd)], arcs
+        return [(hw, -hd), (hw, hd), (-hw, hd), (-hw, -hd)], arcs
+
+    def ring(self) -> list:
+        """The plate's points in world coordinates (grid, no repeats)."""
+        pts, _ = self._local()
+        out = []
+        for u, v in pts:
+            p = self.fr.world(u, v)
+            if not out or p != out[-1]:
+                out.append(p)
+        if len(out) > 1 and out[0] == out[-1]:
+            out.pop()
+        return out
+
+    def polygon(self) -> Polygon:
+        return Polygon(self.ring())
+
+    def arcs(self) -> list[dict]:
+        _, arcs = self._local()
+        out = []
+        f = self.fr
+        for cu, cv, r, a0, sw in arcs:
+            # (the center unrounded: the arc the ring's grid points were cut from)
+            x, y = f.ox + (cu * f.c - cv * f.s), f.oy + (cu * f.s + cv * f.c)
+            out.append(arc_rec(x, y, r, f.angle + a0, sw))
+        return out
+
+
+def sector(cx: float, cy: float, r_in: float, r_out: float, a0: float,
+           sweep: float) -> tuple[Polygon, list[dict]]:
+    """M21: an annular sector (a curved slab's plan) around (cx, cy) from angle a0 by
+    `sweep` radians, and its two arcs."""
+    out: list = []
+    n = arc_steps(r_out, sweep)
+    for k in range(n + 1):
+        a = a0 + sweep * k / n
+        out.append((q(cx + r_out * float(M.cos(a))), q(cy + r_out * float(M.sin(a)))))
+    n = arc_steps(r_in, sweep)
+    for k in range(n, -1, -1):
+        a = a0 + sweep * k / n
+        out.append((q(cx + r_in * float(M.cos(a))), q(cy + r_in * float(M.sin(a)))))
+    return Polygon(out), [arc_rec(cx, cy, r_out, a0, sweep), arc_rec(cx, cy, r_in, a0, sweep)]
+
+
 def circle(cx: float, cy: float, r: float) -> Polygon:
-    n = 12 if r < 3.0 else 20 if r < 12.0 else 32
-    return ngon(cx, cy, r, n)
+    """A circle cut by `arc_steps` (its arc: `circle_arcs`)."""
+    return Plate(Frame(cx, cy, 0.0), r, r, r).polygon()
 
 
-def ring(cx: float, cy: float, r_out: float, r_in: float, n: int = 32) -> Polygon:
-    outer = ngon(cx, cy, r_out, n)
-    inner = ngon(cx, cy, r_in, n)
+def circle_arcs(cx: float, cy: float, r: float) -> list[dict]:
+    return Plate(Frame(cx, cy, 0.0), r, r, r).arcs()
+
+
+def ring(cx: float, cy: float, r_out: float, r_in: float) -> Polygon:
+    outer = circle(cx, cy, r_out)
+    inner = circle(cx, cy, r_in)
     return Polygon(outer.exterior.coords, [inner.exterior.coords])
 
 
-def ellipse(fr: Frame, a: float, b: float, n: int = 32) -> Polygon:
-    pts = []
-    for k in range(n):
-        t = 2.0 * M.PI * k / n
-        pts.append(fr.world(a * float(M.cos(t)), b * float(M.sin(t))))
-    return Polygon(pts)
+def ellipse(fr: Frame, a: float, b: float) -> Polygon:
+    """An oval of semi-axes a (along u) and b: four arcs (`Plate` with `oval`)."""
+    return Plate(fr, a, b, oval=True).polygon()
 
 
-def ellipse_ring(fr: Frame, a: float, b: float, a_in: float, b_in: float,
-                 n: int = 32) -> Polygon:
-    return Polygon(ellipse(fr, a, b, n).exterior.coords,
-                   [ellipse(fr, a_in, b_in, n).exterior.coords])
+def ellipse_arcs(fr: Frame, a: float, b: float) -> list[dict]:
+    return Plate(fr, a, b, oval=True).arcs()
+
+
+def ellipse_ring(fr: Frame, a: float, b: float, a_in: float, b_in: float) -> Polygon:
+    return Polygon(ellipse(fr, a, b).exterior.coords, [ellipse(fr, a_in, b_in).exterior.coords])
 
 
 def inset(poly, d: float):

@@ -8,8 +8,9 @@
   walkways are at z 0 there; the piece also writes the walkways' corrected lines).
 - **Crosswalks**: zebra or ladder paint by the district's era, tactile paving at both
   curbs, on the dropped curb.
-- **Junctions**: the carriageway polygon at its node's height (blended toward each leg's
-  height at its cut-back where they differ), the sidewalk corners between neighboring legs
+- **Junctions**: the carriageway polygon at its node's height, or (M18) through the model's
+  surface where it carries one (`edge_z`; else blended toward each leg's height at its
+  cut-back where they differ), the sidewalk corners between neighboring legs
   (the curb return from the junction polygon, the property-line fillet rebuilt as M2 builds
   it), their curb faces, and a deck slab under a raised junction.
 """
@@ -24,6 +25,7 @@ from .. import canon as C
 from . import materials as MT
 from .ctx import Ctx, bbox_center, dump
 from .kit import Mesh, ccw
+from .kit import check as mesh_check
 from .path import Path, Profile, dist, first_exit, unit
 from .pieces import Out, Piece, maker
 from .roads import DECK_D, PEDESTRIAN, RANK, ROAD_DZ, Road, raised, street_class, \
@@ -284,8 +286,36 @@ def gather_junction(cx: Ctx, j) -> Piece:
     inputs = {"junction": dump(j), "node": list(node.position) if node else [*cxy, 0.0],
               "node_ground": getattr(node, "ground_m", None) or 0.0,
               "legs": legs, "style": cx.style(did), "origin": list(cxy)}
+    if j.level:
+        # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
+        # ramp's top) a slab of its own carries it
+        inputs["off_deck"] = _off_deck(cx, j)
     return Piece(j.id, "street.junction", "junction", cx.tile_for(j.id, ext),
                  cx.keys.get(j.id, []), inputs)
+
+
+def _off_deck(cx: Ctx, j) -> list:
+    """The parts of a deck's junction outside its deck's slab (over 0.5 m2), as rings."""
+    from citygen import geom as G
+
+    from .decks import _rings, deck_of
+    dk = None
+    for s in cx.seg_at_node.get(j.node_id, ()):
+        did = s.attrs.get("deck")
+        if did:
+            dk = next((d for d in cx.m.decks if d.id == did), None)
+            break
+    if dk is None:
+        return []
+    D = deck_of(cx, dk)
+    with G.canonical():
+        rest = G.diff(G.from_model_poly(j.polygon), D.poly)
+        out = []
+        for p in G.parts(rest):
+            if G.area1(p) >= 0.5:
+                e, hs = _rings(p)
+                out.append([[list(q) for q in e], [[list(q) for q in h] for h in hs]])
+    return out
 
 
 def _valid_parts(ring, holes) -> list:
@@ -449,8 +479,27 @@ def make_junction(inp: dict) -> Out:
     legs.sort(key=lambda r: (r["ang"], r["id"]))
     lz = [r for r in legs if "z" in r]
     flat = all(abs(r["z"] - zn) < 0.002 for r in lz)
+    # M18: the model's surface where it carries one (`edge_z`, over the node's ground): every
+    # vertex at its height, so the legs meet it with no step (AG14 draws the rest from it)
+    ez = j.get("edge_z")
+    if ez and len(ez) == len(j["polygon"]["exterior"]):
+        vz = {(p[0], p[1]): inp["node_ground"] + z + ROAD_DZ
+              for p, z in zip(j["polygon"]["exterior"], ez)}
+        vpts = list(vz.items())
+    else:
+        vz = None
 
     def zfun(x, y):
+        if vz is not None:
+            z = vz.get((x, y))
+            if z is not None:
+                return z
+            acc = wt = 0.0
+            for (px, py), pz in vpts:
+                w = 1.0 / ((x - px) ** 2 + (y - py) ** 2 + 1.0)
+                acc += pz * w
+                wt += w
+            return acc / wt
         if flat:
             return zn
         w0 = 1.0 / ((x - P[0]) ** 2 + (y - P[1]) ** 2 + 4.0)
@@ -471,7 +520,11 @@ def make_junction(inp: dict) -> Out:
         ok = any([mesh.poly(slot, r, hs, zfun=zfun) for r, hs in _valid_parts(ring, holes)])
     if not ok:
         return Out(empty="untriangulable polygon")
-    if zn - inp["node_ground"] - ROAD_DZ > 0.5:
+    if j.get("level"):
+        for r_, hs_ in inp.get("off_deck", ()):
+            mesh.prism("concrete.deck", ccw(r_), zn - ROAD_DZ - 1.2, zn - ROAD_DZ - 0.01,
+                       top=False, bottom=True, holes=[ccw(h)[::-1] for h in hs_])
+    elif zn - inp["node_ground"] - ROAD_DZ > 0.5:
         D = max(DECK_D.get(r["cls"], 1.2) for r in legs) if legs else 1.2
         mesh.prism("concrete.deck", ring, zn - ROAD_DZ - D, zn - ROAD_DZ - 0.01, top=False,
                    bottom=True)
@@ -500,10 +553,34 @@ def _minus(sector, ring, holes, taken=()):
         return None
     out = []
     for p in parts:
-        r = ccw(list(p.exterior.coords)[:-1])
+        r = _onto(ccw(list(p.exterior.coords)[:-1]), taken)
         if len(r) >= 3 and not p.interiors:
             out.append(r)
     out.sort(key=lambda r: (min(r), len(r)))
+    return out
+
+
+SNAP_M = 0.0075         # half a diagonal of the overlay's 1 cm grid
+
+
+def _onto(ring, taken) -> list:
+    """The ring without a vertex the overlay's grid put beside an earlier corner's edge:
+    one within `SNAP_M` of the chord between its neighbors where that chord is an edge of
+    an earlier corner. Rounded to the grid, the point where the new corner leaves that
+    edge can fall a few millimeters inside the earlier one, a sliver of both (their
+    shared edge running the same way in each)."""
+    if not taken:
+        return ring
+    edges = {(r[k], r[(k + 1) % len(r)]) for r in taken for k in range(len(r))}
+    out = list(ring)
+    k = 0
+    while k < len(out) and len(out) > 3:
+        u, v, w = out[k - 1], out[k], out[(k + 1) % len(out)]
+        if ((w, u) in edges or (u, w) in edges) and _near(v, [u, w], False, SNAP_M):
+            del out[k]
+            k = max(k - 1, 0)
+            continue
+        k += 1
     return out
 
 
@@ -612,8 +689,18 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
     for parts, row in drawn:
         drew = False
         for r in parts:
+            sl = mesh._slot(pave)
+            mark = (len(sl.pos), len(sl.idx), sl.auto)
+            before = mesh_check({pave: sl})["winding"]
             if not mesh.poly(pave, r, zfun=lambda x, y: zfun(x, y) + 0.15):
                 why["triangulation"] = why.get("triangulation", 0) + 1
+                continue
+            if mesh_check({pave: sl})["winding"] > before:
+                # (M18: a pad that folds over one drawn before it, on a polygon whose
+                # corners crowd each other: left out)
+                del sl.pos[mark[0]:], sl.nrm[mark[0]:], sl.uv[mark[0]:], sl.idx[mark[1]:]
+                sl.auto = mark[2]
+                why["fold"] = why.get("fold", 0) + 1
                 continue
             drew = True
             for k in range(len(r)):

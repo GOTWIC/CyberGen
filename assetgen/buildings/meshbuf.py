@@ -96,7 +96,10 @@ class Buf:
                          "layer": np.array(s["layer"], dtype=np.int64)}
         return out
 
-    def primitives(self, arrs: dict, materials: dict[str, int]) -> list[Primitive]:
+    def primitives(self, arrs: dict, materials: dict[str, int],
+                   hero: tuple[float, float] | None = None) -> list[Primitive]:
+        """`hero` (AG5): a hero's (perimeter, height) in meters: every slot but glass gets
+        UV1 in the hero UV (`heroes.hero_uv`), where its U2 mask is baked."""
         P = np.array(self.planes, dtype=np.float64).reshape(-1, 14)
         prims = []
         for name, a in arrs.items():
@@ -113,9 +116,13 @@ class Buf:
                 w = a["win"]
                 colors = np.stack([np.full(len(w), 255), np.full(len(w), 255),
                                    np.full(len(w), 255), w & 255], axis=1).astype(np.uint8)
+            uv1 = a["uv1"] if glass else None
+            if hero is not None and not glass:
+                from .heroes import hero_uv
+                uv1 = hero_uv(a["pos"], uv0, hero[0], hero[1])
             prims.append(Primitive(material=materials[name], positions=a["pos"],
                                    indices=a["tri"].reshape(-1), normals=pl[:, 0:3],
-                                   uv0=uv0, uv1=a["uv1"] if glass else None, colors=colors))
+                                   uv0=uv0, uv1=uv1, colors=colors))
         return prims
 
 

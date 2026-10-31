@@ -55,11 +55,13 @@ def test_every_building_has_a_shell_and_a_proxy():
                             (n["name"] if n["name"] in meshed else None), bid
 
 
-def test_checks_are_the_seven():
+def test_checks_are_the_fourteen():
     rep = small_assets_report()
-    assert sorted(rep["checks"]) == ["asset_access", "asset_budget", "asset_coverage",
-                                     "asset_envelope", "asset_meshes", "asset_mounts",
-                                     "asset_unique"]
+    assert sorted(rep["checks"]) == ["asset_access", "asset_budget", "asset_clearance",
+                                     "asset_coverage", "asset_envelope", "asset_families",
+                                     "asset_landings", "asset_meshes", "asset_mounts",
+                                     "asset_roofs", "asset_skybridges", "asset_slopes",
+                                     "asset_types", "asset_unique"]
     assert rep["checks"]["asset_unique"]["pairs"] > 0
 
 
@@ -155,7 +157,9 @@ def test_unreal_contribution_covers_every_building():
     fronts = {e["key"] for e in uc["entries"] if e["kind"] == "building.front"}
     assert fronts == {f"{k}.front" for k, r in man["buildings"].items()
                       if r["front"]["triangles"]}
-    assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals"}
+    # (AG4: the roof equipment of a tile, `roofs.<tile>`)
+    assert {e["kind"] for e in uc["entries"]} <= {"building", "building.front", "decals",
+                                                  "roof_equipment"}
     front = {e["key"]: e for e in uc["entries"] if e["kind"] == "building.front"}
     for e in blds:
         r = man["buildings"][e["key"]]

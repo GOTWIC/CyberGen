@@ -70,12 +70,30 @@ def buildings(con: dict, man: dict, lib: dict | None) -> dict:
     return con
 
 
-def streets(con: dict, lib: dict | None) -> dict:
+def streets(con: dict, lib: dict | None, part: str = "streets") -> dict:
+    """AG7's streets' contribution with AG6's materials (in place; returned); AG4's
+    skybridges' (`part` "connections") the same on the building table."""
     if lib is None:
         return con
     tex: set[str] = set()
     for slot in sorted(con["materials"]):
-        _decorate(con["materials"], slot, slot, None, lib, "streets", tex)
+        _decorate(con["materials"], slot, slot, None, lib, part, tex)
+    con["masters"] = sorted({m["master"] for m in con["materials"].values()})
+    con["textures"] = CT.texture_table(tex, lib)
+    con["library"] = {"version": lib["version"], "hash": lib["hash"],
+                      "density_px_m": lib["density_px_m"]}
+    return con
+
+
+def water(con: dict, lib: dict | None) -> dict:
+    """AG12's water contribution with AG6's materials (in place; returned): the surfaces on
+    `water` with their water kind's parameters (`catalog.WATER`), the beds on `bed` (their
+    set and the caustics), the banks, walls and stones on their sets."""
+    if lib is None:
+        return con
+    tex: set[str] = set()
+    for slot in sorted(con["materials"]):
+        _decorate(con["materials"], slot, slot, None, lib, "water", tex)
     con["masters"] = sorted({m["master"] for m in con["materials"].values()})
     con["textures"] = CT.texture_table(tex, lib)
     con["library"] = {"version": lib["version"], "hash": lib["hash"],

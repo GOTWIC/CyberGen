@@ -35,6 +35,7 @@ def say(op, force=True, **fields):
     _SAID[0] = now
     print(PROGRESS + " " + json.dumps({"op": op, **fields}, separators=(",", ":")), flush=True)
 DOME_STEPS = [(1.0, 0.0), (0.92388, 0.382683), (0.707107, 0.707107), (0.382683, 0.92388)]
+SMOOTH_DEG = 25.0     # M21: walls of a curved mass meeting flatter than this are drawn smooth
 
 
 def parse_args():
@@ -421,6 +422,13 @@ def build_object(o, mats, cols, tag=True):
         mesh.polygons.foreach_set("material_index", md.mats)
     mesh.validate(clean_customdata=False)
     mesh.update()
+    if any(p.get("a") for p in o["parts"]):
+        # M21: a mass with arcs is drawn smooth along them, sharp at its corners
+        try:
+            mesh.shade_smooth()
+            mesh.set_sharp_from_angle(angle=math.radians(SMOOTH_DEG))
+        except (AttributeError, TypeError):
+            pass
     obj = bpy.data.objects.new(o["name"], mesh)
     for k, v in o["props"].items():
         obj[k] = v
