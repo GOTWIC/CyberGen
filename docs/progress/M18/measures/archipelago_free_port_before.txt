@@ -1,0 +1,38 @@
+== dead ends
+dead ends by class: {'highway': 1, 'avenue': 2, 'street': 13, 'service': 7, 'alley': 2, 'pedestrian': 43}
+of them, another road within 60 m straight ahead: {'avenue': 1, 'street': 7, 'service': 3, 'alley': 2, 'pedestrian': 38}
+== overlapping roads
+pairs overlapping >25 m2 outside junctions at the same level: 1
+[(('street', 'street'), 1)]
+   ('rs.e175n66', 'rs.e244s3', 'street', 'street', 397, 244, 0)
+== bridges
+bridges: 15 Counter({'road': 6, 'pedestrian': 6, 'road_rail': 3})
+bridge pairs overlapping >10 m2 in plan: 0
+== roads into buildings
+road corridor / mass overlaps >2 m2 at the road's height: 0
+Counter()
+== junction levels
+junctions: 964 with a leg not at the node's height at the junction edge: 61 with a leg's end not at the node's z: 0
+== junction control
+   ('Crown Island', False, False) 40
+   ('Crown Island', False, True) 1
+   ('Crown Island', True, True) 43
+   ('Kettle Island', False, False) 18
+   ('Kettle Island', False, True) 2
+   ('Kettle Island', True, True) 10
+   ('Lumen Key', False, False) 15
+   ('Lumen Key', True, True) 9
+   ('Palm Key', False, False) 79
+   ('Palm Key', True, True) 17
+   ('Westreef', False, False) 649
+   ('Westreef', False, True) 2
+   ('Westreef', True, True) 79
+crosswalk widths: Counter({4.0: 542})
+junctions with crosswalks: 163 of them within 40 m of another: 74
+== signs
+Counter({('shop_sign', 'blade'): 3976, ('shop_sign', 'facade'): 2898, ('billboard', 'roof'): 478, ('neon', 'facade'): 204, ('billboard', 'facade'): 93, ('holo_ad', 'roof'): 40})
+== transit supports
+  tl.island_hopper monorail: length 6493 m, supports 113, gap median 25 max 1075 m, off the line max 15.8 m (>2 m: 15)
+  tl.mainland_express maglev: length 1982 m, supports 10, gap median 45 max 57 m, off the line max 0.0 m (>2 m: 0)
+== trees under raised roads
+plants under a raised road whose crown reaches its deck: 99

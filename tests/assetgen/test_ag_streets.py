@@ -148,10 +148,12 @@ def test_m13_ground_lifts_roads_and_structures():
     t = SimpleNamespace(x0=0.0, y0=0.0, cell_m=10.0, natural=[[0.0] * 3] * 3,
                         ground=[[0.0, 10.0, 20.0], [0.0, 10.0, 20.0], [0.0, 10.0, 20.0]],
                         water_levels=[])
-    g = Ground(SimpleNamespace(terrain=t))
+    # (AG12: Ground reads M16's water surfaces of the model's water bodies)
+    dry = dict(seas=[], rivers=[], channels=[], waterways=[])
+    g = Ground(SimpleNamespace(terrain=t, **dry))
     assert g.at(5.0, 5.0) == 5.0 and g.at(15.0, 0.0) == 15.0
     assert abs(g.at(30.0, 30.0) - 20.0) < 1e-3       # clamped to the grid, as M13 samples
-    assert Ground(SimpleNamespace()).samples([(1.0, 2.0)]) is None
+    assert Ground(SimpleNamespace(**dry)).samples([(1.0, 2.0)]) is None
     seg = {"id": "rs.e0n0", "centerline": [[0.0, 0.0], [20.0, 0.0]],
            "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 20.0, "z": 0.0}],
            "ground": [{"s": 0.0, "z": 30.0}, {"s": 20.0, "z": 31.0}], "width_m": 8.0,

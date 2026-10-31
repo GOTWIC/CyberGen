@@ -224,7 +224,8 @@ def test_loops_where_diamonds_do_not_fit(monkeypatch):
     """With no diamond ramp possible, crossings take loop ramps (a partial cloverleaf): every
     M7 check still passes, and each loop climbs at most 6% over its 270 degree turn."""
     monkeypatch.setattr(EL.Elev, "_ramp", lambda self, *a, **k: (None, "test: no diamond"))
-    b = _build(copy.deepcopy(SMALL))
+    # one worker: the road variants run in this (patched) process
+    b = build_city(validate_spec(copy.deepcopy(SMALL)), workers=1)
     failed = [(c.id, c.failures[:3]) for c in b.checks if not c.passed]
     assert not failed, failed
     st = b.stats["elevated"]

@@ -309,22 +309,35 @@ def check_clear_path(m: CityModel, n: _Net):
     return c
 
 
-def check_crosswalks(m: CityModel, n: _Net):
-    c = _check("crosswalks", "A crosswalk on every approach of every signalized junction, and on "
-                             "the side street approaches of unsignalized junctions on avenues")
+def check_crosswalks(spec: CitySpec, m: CityModel, n: _Net):
+    c = _check("crosswalks", "A crosswalk on every approach of every signalized junction (M18: "
+                             "across its highways, avenues and streets; none across an alley, a "
+                             "service road or a path) unless its district has none "
+                             "(`junctions.crosswalks`)")
     have = {(x.junction_id, x.segment_id) for x in m.crosswalks}
+    off = {d.id for d in m.districts for sd in spec.districts
+           if sd.name == d.name and sd.junctions is not None and
+           sd.junctions.crosswalks == "none"}
+    for x in m.crosswalks:
+        s = n.seg.get(x.segment_id)
+        if s is not None and s.road_class not in ("highway", "avenue", "street"):
+            c.failures.append(f"crosswalk {x.id}: across {s.id} ({s.road_class})")
     for j in m.junctions:
-        if j.shape in ("cul_de_sac", "bend"):
+        if j.shape in ("cul_de_sac", "bend") or not j.signalized:
             continue
         legs = n.at.get(j.node_id, [])
-        avenue = any(s.road_class == "avenue" for s, _ in legs)
+        # (the junction's district as M2 takes it: the first of its legs' districts)
+        dids = sorted(d for d in (s.attrs.get("district") or
+                                  (s.district_ids[0] if s.district_ids else None)
+                                  for s, _ in legs) if d)
+        if dids and dids[0] in off:
+            continue
         for s, _ in legs:
-            if s.road_class in ST.PEDESTRIAN:
+            if s.road_class not in ("highway", "avenue", "street"):
                 continue
-            need = j.signalized or (avenue and s.road_class not in PRIMARY)
-            if need and (j.id, s.id) not in have:
-                c.failures.append(f"junction {j.id} ({'signalized' if j.signalized else 'avenue'}"
-                                  f"): no crosswalk across {s.id} ({s.road_class})")
+            if (j.id, s.id) not in have:
+                c.failures.append(f"junction {j.id} (signalized): no crosswalk across {s.id} "
+                                  f"({s.road_class})")
     return c
 
 
@@ -481,7 +494,7 @@ def run(spec: CitySpec, m: CityModel, g) -> list:
         check_sizes(m, n),
         check_slivers(m, n),
         check_clear_path(m, n),
-        check_crosswalks(m, n),
+        check_crosswalks(spec, m, n),
         check_junction_placement(m, n),
         check_junction_angles(m, n),
         check_street_duplicates(m, n),

@@ -298,9 +298,182 @@ def _rim_low(fp, ov, z0: float, z1: float) -> float:
     return z0 + r - (max(r * r - d * d, 0.0)) ** 0.5
 
 
+# ---------------------------------------------------------------------------
+# M18: junction surfaces and crossings by need
+# ---------------------------------------------------------------------------
+
+LEG_TOL_M = 0.02        # a leg meets its junction's surface within this
+CROSS_SLOPE = {"highway": 0.025, "avenue": 0.025, "street": 0.03, "alley": 0.03,
+               "service": 0.03, "pedestrian": 0.03}   # across a leg where it meets it
+CURB_TOL_M = 0.02
+
+
+def junction_surface(m: CityModel, j, at: dict, ground: dict):
+    """(surface heights of the ring, legs) of a junction: its `edge_z`, else flat at its
+    node's height."""
+    from . import junctions as JN
+
+    n = ground[j.node_id]
+    ring = [tuple(p) for p in j.polygon.exterior]
+    hz = list(j.edge_z) if j.edge_z else [n[0]] * len(ring)
+    return ring, hz, JN.model_legs(at.get(j.node_id, []), j.node_id, n[1])
+
+
+def check_junction_levels(spec: CitySpec, m: CityModel):
+    from . import junctions as JN
+
+    c = _check("junction_levels", f"M18: every junction is one surface (its `edge_z`, else flat "
+                                  f"at its node's height) that meets each leg within "
+                                  f"{LEG_TOL_M * 100:g} cm where the leg leaves its polygon, "
+                                  f"level across the leg there within its class's cross slope "
+                                  f"(2.5% on primary roads, 3% on the others), its curb between "
+                                  f"two legs running evenly from one's height to the other's "
+                                  f"(footbridge stairs stand on it)")
+    at: dict = {}
+    for s in m.road_segments:
+        at.setdefault(s.start, []).append(s)
+        if s.end != s.start:
+            at.setdefault(s.end, []).append(s)
+    ground = {n.id: (n.position[2], n.ground_m) for n in m.road_nodes}
+    for j in m.junctions:
+        if j.polygon is None or j.node_id not in ground:
+            continue
+        ring, hz, legs = junction_surface(m, j, at, ground)
+        n = len(ring)
+        if len(hz) != n:
+            _lim(c, f"junction {j.id}: {len(hz)} heights for {n} vertices")
+            continue
+        on, exits, cuts = JN.anchors_of(ring, legs)
+        for (i, s, k, zl), (E, nrm, h, _, _) in zip(exits, cuts):
+            lg = legs[i]
+            if k < 0:
+                continue      # (a leg inside the polygon all the way: a short stub)
+            a, b = ring[k], ring[(k + 1) % n]
+            L2 = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2
+            f = 0.0 if L2 <= 0.0 else min(1.0, max(0.0, ((E[0] - a[0]) * (b[0] - a[0]) +
+                                                         (E[1] - a[1]) * (b[1] - a[1])) / L2))
+            zs = hz[k] + f * (hz[(k + 1) % n] - hz[k])
+            if abs(zs - zl) > LEG_TOL_M:
+                _lim(c, f"junction {j.id}: leg {lg['id']} ({lg['cls']}) at {zl:.2f} m where "
+                        f"it leaves, the surface at {zs:.2f} m")
+                continue
+            vs = [hz[v] for v in range(n) if JN._cut_dist(ring[v], E, nrm, h + 0.05) <=
+                  JN.ON_CUT_M]
+            cs = CROSS_SLOPE.get(lg["cls"], 0.03)
+            if vs and max(vs) - min(vs) > cs * 2.0 * h + 0.01:
+                _lim(c, f"junction {j.id}: {(max(vs) - min(vs)) / (2.0 * h):.1%} across leg "
+                        f"{lg['id']} ({lg['cls']}), over {cs:.1%}")
+        anchors = [v for v in range(n) if on[v]]
+        for i, a in enumerate(anchors):
+            b = anchors[(i + 1) % len(anchors)]
+            lo, hi = min(hz[a], hz[b]) - CURB_TOL_M, max(hz[a], hz[b]) + CURB_TOL_M
+            v = (a + 1) % n
+            while v != b:
+                if not lo <= hz[v] <= hi:
+                    _lim(c, f"junction {j.id}: its curb at ({ring[v][0]:.0f}, {ring[v][1]:.0f}) "
+                            f"at {hz[v]:.2f} m, outside its legs' {hz[a]:.2f} to {hz[b]:.2f} m")
+                    break
+                v = (v + 1) % n
+    return c
+
+
+def junction_stats(m: CityModel) -> dict:
+    """M18: junctions carrying a surface (`edge_z`) and its steepest slope along the curb."""
+    steep = 0.0
+    n = 0
+    for j in m.junctions:
+        if not j.edge_z or j.polygon is None:
+            continue
+        n += 1
+        ring = j.polygon.exterior
+        for v in range(len(ring)):
+            a, b = ring[v], ring[(v + 1) % len(ring)]
+            L = ST._dist(a, b)
+            if L >= 2.0:
+                steep = max(steep, (abs(j.edge_z[(v + 1) % len(ring)] - j.edge_z[v]) - 0.01) / L)
+    return {"junctions": len(m.junctions), "with_surface": n,
+            "steepest_curb": round(steep, 4)}
+
+
+def _lim(c, msg: str, n: int = 12) -> None:
+    if len(c.failures) < n:
+        c.failures.append(msg)
+    elif len(c.failures) == n:
+        c.failures.append("... more")
+
+
+def check_crossing_spacing(spec: CitySpec, m: CityModel):
+    """M18: signals and marked crossings by need (`junctions.plan_signals`,
+    `plan_crossings`), measured again on the model's roads."""
+    from types import SimpleNamespace
+
+    from . import junctions as JN
+
+    c = _check("crossing_spacing", "M18: signals only where two primary roads meet, or where a "
+                                   "street meets one (a street crossing in the corporate core, "
+                                   "transit hub and midtown) with no other signalized junction "
+                                   "within the district's spacing along either road (120 m; "
+                                   "200 m in the old town and entertainment market; twice that "
+                                   "for 'fewer'); a marked crossing at an unsignalized junction "
+                                   "only across an avenue, with none within the spacing; "
+                                   "crosswalks 3 m across a street, 4 m across an avenue (5 m "
+                                   "downtown) or a highway")
+    arch = {d.id: d.archetype for d in m.districts}
+    ctl = {d.id: (sd.junctions.signals, sd.junctions.crosswalks) for d in m.districts
+           for sd in spec.districts if sd.name == d.name and sd.junctions is not None}
+    segs = [s.model_dump(mode="json") for s in m.road_segments]
+
+    def did_of(s):
+        return s["attrs"].get("district") or (s["district_ids"][0] if s["district_ids"]
+                                               else None)
+    legs = JN.legs_at(SimpleNamespace(segments=segs), lambda s: arch.get(did_of(s)))
+    node_arch, node_ctl = {}, {}
+    for nid, lg in legs.items():
+        archs = sorted(a for a in (x.arch for x in lg) if a)
+        node_arch[nid] = archs[0] if archs else None
+        dids = sorted(d for d in (did_of(x.seg) for x in lg) if d)
+        node_ctl[nid] = ctl.get(dids[0], ("auto", "auto")) if dids else ("auto", "auto")
+    sig = {j.node_id for j in m.junctions if j.signalized}
+    marked = {}
+    for x in m.crosswalks:
+        marked.setdefault(x.junction_id, []).append(x)
+    by_j = {j.id: j for j in m.junctions}
+    av = {by_j[k].node_id for k, xs in marked.items() if k in by_j and not by_j[k].signalized}
+    for nid in sorted(sig):
+        lg = legs.get(nid, [])
+        sigs = node_ctl.get(nid, ("auto", "auto"))[0]
+        _, _, cand = JN.classify(lg, node_arch.get(nid))
+        if not cand or sigs == "none":
+            _lim(c, f"node {nid}: signalized but no signals called for")
+            continue
+        if sum(x.cls in ST.PRIMARY for x in lg) >= 3:
+            continue
+        near = JN.reach(legs, nid, JN.spacing(node_arch.get(nid), sigs)) & (sig - {nid})
+        if near:
+            _lim(c, f"node {nid}: signalized {min(near)} within "
+                    f"{JN.spacing(node_arch.get(nid), sigs):g} m along a road")
+    for nid in sorted(av):
+        sigs = node_ctl.get(nid, ("auto", "auto"))[0]
+        near = JN.reach(legs, nid, JN.spacing(node_arch.get(nid), sigs),
+                        lambda x: x.cls == "avenue") & ((sig | av) - {nid})
+        if near:
+            _lim(c, f"node {nid}: a marked crossing with {min(near)} within the spacing")
+    for k, xs in sorted(marked.items()):
+        j = by_j.get(k)
+        for x in xs:
+            cls = x.attrs.get("road_class")
+            if j is not None and not j.signalized and cls != "avenue":
+                _lim(c, f"crosswalk {x.id}: across a {cls} at an unsignalized junction")
+            want = JN.crosswalk_w(cls, j.attrs.get("archetype") if j is not None else None)
+            if abs(x.width_m - want) > 1e-6:
+                _lim(c, f"crosswalk {x.id}: {x.width_m:g} m across a {cls}, not {want:g} m")
+    return c
+
+
 def run_streets(spec: CitySpec, m: CityModel) -> list:
     """The checks a city with local streets has (M2 on)."""
-    return [check_dead_ends(spec, m), check_overlaps(spec, m)]
+    return [check_dead_ends(spec, m), check_overlaps(spec, m),
+            check_junction_levels(spec, m), check_crossing_spacing(spec, m)]
 
 
 def run_finished(spec: CitySpec, m: CityModel) -> list:

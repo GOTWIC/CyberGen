@@ -126,15 +126,18 @@ def deck_poly(A, B, na, da, width: float, trim: float = 0.3) -> Polygon:
 class Space:
     """Obstacles of a district: building masses, road rights of way, water, decks."""
 
-    def __init__(self, cx, recs):
+    def __init__(self, cx, recs, others=()):
+        """`others`: buildings of the district's other levels, in this one's frame (M14: a
+        deck's bridges keep out of the ground's buildings and the ground's out of the
+        deck's); obstacles only."""
         self.masses = []
-        for r in recs:
+        for r in list(recs) + list(others):
             for i, m in enumerate(r["masses"]):
                 self.masses.append((r["id"], i, m))
         self.tree = shapely.STRtree([m[2][0] for m in self.masses]) if self.masses else None
         self.roads = [(rid, G.qpoly(LineString(line).buffer(w / 2.0, cap_style="flat",
                                                             join_style="mitre")), (line, prof))
-                      for rid, cls, line, w, prof in cx.roads]
+                      for rid, cls, line, w, prof in cx.roads + cx.sky_roads]
         self.rtree = shapely.STRtree([r[1] for r in self.roads]) if self.roads else None
         self.water = list(cx.water)
         self.wtree = shapely.STRtree([w[1] for w in self.water]) if self.water else None
@@ -226,7 +229,7 @@ def connect(space: Space, ra, rb, zt: float, kind: str, levels: int, width: floa
 def district_skybridges(cx, out: dict) -> None:
     recs = [r for r in out["buildings"] if r["masses"]]
     by_id = {r["id"]: r for r in recs}
-    space = Space(cx, recs)
+    space = Space(cx, recs, out.get("others", ()))
     chosen = []
     deg: dict = {}
     for f in out.get("forced", []):

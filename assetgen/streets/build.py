@@ -65,6 +65,8 @@ def gather(cx: Ctx) -> list[PC.Piece]:
     for st in m.structures:
         if decks.is_deck_structure(st):
             continue                    # (M14: with their deck, below)
+        if st.kind == "embankment":
+            continue                    # (M18: with its road, which covers it)
         mk = transit.maker_for(st)
         if mk == "column":
             out.append(structures.gather_column(cx, st))

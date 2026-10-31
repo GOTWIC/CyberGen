@@ -14,6 +14,8 @@ compute (`citygen/ue/import_city.py`, `stage2_master`), so the previews show the
 - `neon`, `emissive`: emission; `sign`: an atlas page as emission; `translucent`;
 - `leaves` (AG8's leaf cards): the leaf clump tile, tinted, cut by its leaf cover; `holo`
   (AG8's holo-ads): the holo ad page glowing, see-through by its brightness;
+- `water` (AG12's surfaces, as `M_CgWater`): refractive, its color by depth and clarity,
+  ripples, the sea's swell and the foam mask; `bed`: the textured surface with caustics.
 - `ground` (AG13): three sets (base, worn, shade) blended per pixel by the tile's mask on
   world x, y (wear and edges bare the worn set, broken up by the base set's height; shade
   and wet grow the shade set; wet darkens); `grass` (AG13's clumps): the slot's color toward
@@ -565,6 +567,126 @@ def flat(mat, rec, part):
     return mat
 
 
+def water(mat, rec, files):
+    """AG12's water, as `M_CgWater` draws it: refractive (the bed seen through it), its color
+    from the water kind's shallow to deep color by the vertex depth (COLOR_0.g, over 12 m)
+    against the kind's clarity, ripple normals from the water atlas at two scales, the sea's
+    waves (COLOR_0.b, the wave weight) as a bump of two crossing wave bands, and foam from the
+    vertex mask (COLOR_0.r) and the shallows over the atlas's foam lace, drawn over the water
+    as a matte white surface."""
+    t = T(mat)
+    nt = mat.node_tree
+    bsdf = t.n["Principled BSDF"]
+    out = t.n["Material Output"]
+    sc = rec.get("scalars", {})
+    ve = rec.get("vectors", {})
+    tx = rec["textures"]
+    vc = t.new("ShaderNodeVertexColor", layer_name="Color")
+    r, g, b = t.xyz(vc.outputs["Color"])
+    depth = t.m("MULTIPLY", g, 12.0)
+    k = t.m("SUBTRACT", 1.0, t.m("EXPONENT", t.m("DIVIDE", t.m("MULTIPLY", depth, -1.0),
+                                                 max(sc.get("Clarity", 3.0), 0.1))))
+    sh, dp = ve.get("Shallow", [0.16, 0.36, 0.36]), ve.get("Deep", [0.01, 0.05, 0.07])
+    tint = t.mix(k, (sh[0], sh[1], sh[2], 1.0), (dp[0], dp[1], dp[2], 1.0))
+    geo = t.new("ShaderNodeNewGeometry")
+    wx, wy, wz = t.xyz(geo.outputs["Position"])
+    tile = max(sc.get("RippleTileM", 8.0), 0.1)
+    uv_a = t.comb(t.m("DIVIDE", wx, tile), t.m("DIVIDE", wy, tile))
+    uv_b = t.comb(t.m("ADD", t.m("DIVIDE", wx, tile * 2.7), 0.37),
+                  t.m("ADD", t.m("DIVIDE", wy, tile * 2.7), 0.61))
+    na, _ = t.tex(files[tx["NormalTex"]], uv_a, False)
+    nb, _ = t.tex(files[tx["NormalTex"]], uv_b, False)
+    nrm = t.mix(0.5, na, nb)
+    nm = t.new("ShaderNodeNormalMap", space="TANGENT", uv_map="UVMap")
+    t.link(nrm, nm.inputs["Color"])
+    nm.inputs["Strength"].default_value = 0.8
+    # the sea's swell: two crossing wave bands, a bump weighted by the exposure
+    wh = sc.get("WaveHeight", 0.0)
+    normal = nm.outputs["Normal"]
+    if wh > 0:
+        wl = max(sc.get("WaveLength", 26.0), 1.0)
+        wa = t.new("ShaderNodeTexWave", wave_type="BANDS", bands_direction="DIAGONAL")
+        wa.inputs["Scale"].default_value = 1.0 / wl
+        wa.inputs["Distortion"].default_value = 2.0
+        wb = t.new("ShaderNodeTexWave", wave_type="BANDS", bands_direction="X")
+        wb.inputs["Scale"].default_value = 1.6 / wl
+        wb.inputs["Distortion"].default_value = 1.5
+        for w in (wa, wb):
+            t.link(geo.outputs["Position"], w.inputs["Vector"])
+        hgt = t.m("MULTIPLY", t.m("ADD", wa.outputs["Fac"], t.m("MULTIPLY", wb.outputs["Fac"],
+                                                                0.6)), t.m("MULTIPLY", b, wh))
+        bump = t.new("ShaderNodeBump")
+        bump.inputs["Distance"].default_value = 1.0
+        t.link(hgt, bump.inputs["Height"])
+        t.link(nm.outputs["Normal"], bump.inputs["Normal"])
+        normal = bump.outputs["Normal"]
+    t.link(tint, bsdf.inputs["Base Color"])
+    for name, v in (("Roughness", 0.03), ("IOR", 1.333), ("Metallic", 0.0)):
+        if name in bsdf.inputs:
+            bsdf.inputs[name].default_value = v
+    for name in ("Transmission Weight", "Transmission"):
+        if name in bsdf.inputs:
+            bsdf.inputs[name].default_value = 0.92
+            break
+    t.link(normal, bsdf.inputs["Normal"])
+    # foam: the vertex mask and the shallows over the foam lace
+    fuv = t.comb(t.m("DIVIDE", wx, 4.0), t.m("DIVIDE", wy, 4.0))
+    lace, _ = t.tex(files[tx["FoamTex"]], fuv, False)
+    lr, lg, lb = t.xyz(lace)
+    shallow = t.m("MULTIPLY", t.clamp(t.m("SUBTRACT", 1.0, t.m("DIVIDE", depth, 0.6))), 0.6)
+    fm = t.clamp(t.m("ADD", t.m("MULTIPLY", r, sc.get("FoamAmount", 1.0)), shallow))
+    tex = t.clamp(t.m("ADD", t.m("ADD", t.m("MULTIPLY", lr, 1.4), t.m("MULTIPLY", lg, 0.6)),
+                      t.m("MULTIPLY", lb, 0.5)))
+    foam = t.clamp(t.m("SUBTRACT", t.m("MULTIPLY", fm, t.m("ADD", 0.35, tex)), 0.15))
+    fb = t.new("ShaderNodeBsdfPrincipled")
+    fb.inputs["Base Color"].default_value = (0.85, 0.88, 0.9, 1.0)
+    fb.inputs["Roughness"].default_value = 0.75
+    mix = t.new("ShaderNodeMixShader")
+    t.link(foam, mix.inputs["Fac"])
+    t.link(bsdf.outputs["BSDF"], mix.inputs[1])
+    t.link(fb.outputs["BSDF"], mix.inputs[2])
+    t.link(mix.outputs["Shader"], out.inputs["Surface"])
+    for attr, v in (("use_raytrace_refraction", True), ("surface_render_method", "DITHERED"),
+                    ("use_screen_refraction", True)):
+        try:
+            setattr(mat, attr, v)
+        except (AttributeError, TypeError, ValueError):
+            pass
+    return mat
+
+
+def caustics(mat, rec, files):
+    """AG12's bed: the textured surface with the water atlas's caustics as emission, two
+    networks scrolled over the plan, under the water only (UV1.x, the depth), fading with
+    depth and by night (as `M_CgBed`)."""
+    textured(mat, rec, files, "water")
+    t = T(mat)
+    bsdf = t.n["Principled BSDF"]
+    tx = rec["textures"]
+    sc = rec.get("scalars", {})
+    geo = t.new("ShaderNodeNewGeometry")
+    wx, wy, wz = t.xyz(geo.outputs["Position"])
+    tile = max(sc.get("CausticTileM", 3.0), 0.1)
+    a, _ = t.tex(files[tx["Caustics"]], t.comb(t.m("DIVIDE", wx, tile),
+                                               t.m("DIVIDE", wy, tile)), False)
+    bb, _ = t.tex(files[tx["Caustics"]], t.comb(t.m("ADD", t.m("DIVIDE", wx, tile * 1.37), 0.3),
+                                                t.m("ADD", t.m("DIVIDE", wy, tile * 1.37), 0.7)),
+                  False)
+    ar, ag, ab = t.xyz(a)
+    br, bg, bb2 = t.xyz(bb)
+    c = t.m("ADD", t.m("MULTIPLY", t.m("MINIMUM", ar, bg), 2.5), t.m("MULTIPLY", ab, 0.15))
+    uv1 = t.new("ShaderNodeUVMap", uv_map="UVMap.001").outputs["UV"]
+    d = t.xyz(uv1)[0]
+    under = t.m("MULTIPLY", t.m("GREATER_THAN", d, 0.08),
+                t.clamp(t.m("SUBTRACT", 1.0, t.m("DIVIDE", d, 9.0))))
+    night = _night(t)
+    s = t.m("MULTIPLY", t.m("MULTIPLY", c, under),
+            t.m("MULTIPLY", t.m("SUBTRACT", 1.0, night), 0.6))
+    t.link(s, bsdf.inputs["Emission Strength"])
+    bsdf.inputs["Emission Color"].default_value = (0.9, 0.95, 1.0, 1.0)
+    return mat
+
+
 def proxy(mat):
     """A far proxy: the wall tint with a window grid from the building's bay and floor
     height (UV0 in meters), the windows lit at night by its lit ratio."""
@@ -638,6 +760,10 @@ def make(name, rec, files, part):
     master = rec["master"]
     if part == "buildings" and name.endswith("_proxy"):
         return proxy(mat)
+    if master == "water" and "NormalTex" in rec.get("textures", {}):
+        return water(mat, rec, files)
+    if master == "bed" and rec.get("scalars", {}).get("Textured", 0.0) > 0:
+        return caustics(mat, rec, files)
     if master in ("facade", "concrete", "metal", "road", "foliage") and \
             rec.get("scalars", {}).get("Textured", 0.0) > 0:
         return textured(mat, rec, files, part)

@@ -219,6 +219,10 @@ def _mask(job, items, polys, gr: _Ground, X, Y):
             core = w / 2.0 - 0.1
             v = float(dw) * np.clip(1.0 - (d - core) / (DESIRE_FADE_M + 0.1), 0.0, 1.0) ** 1.5
             wear[j0:j1, i0:i1] = np.maximum(wear[j0:j1, i0:i1], v)
+    # (a desire line of a piece off the tile whose corridor reaches across the seam: its
+    # clumps keep clear of it too, as the clearance check does)
+    for line, w in job.get("desire_near", []):
+        corridors.append(LineString(line).buffer(w / 2.0 + 0.1, cap_style="flat"))
     # edges: one to three pixels in from where the surface changes
     pad = np.pad(S, 3, mode="edge")
     edge = np.zeros((n, n))

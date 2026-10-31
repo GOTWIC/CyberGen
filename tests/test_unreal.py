@@ -924,7 +924,10 @@ def test_stage2_from_assetgen(staged, manifest):
     assert set(blds) - empty <= actor_keys and not empty & actor_keys
     assert all(f"{k}.front" in actor_keys for k in empty)
     ch = U.manifest_changes(man, m2)
-    s2keys = actor_keys | {a["key"] for a in s2["instances"]}
+    # (AG12: an underwater post-process volume per M16 swim box, each a new actor)
+    assert s2["underwater"]
+    s2keys = actor_keys | {a["key"] for a in s2["instances"]} | \
+        {u["key"] for u in s2["underwater"]}
     # AG8's exact props (cables, scaffolding, gates) take the key of M15's instanced actor
     # they replace: a static mesh actor in its place is deleted and created
     ka, kb = U.actor_kinds(man), U.actor_kinds(m2)
