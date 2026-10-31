@@ -994,7 +994,9 @@ M18 (junctions and ramps, from the first run-through) is in place:
   after M2). On the merged layout a deck's skybridges clear its ramps (`Ctx.sky_roads`, from
   the deck top) and every level's keep out of the district's buildings on its other levels
   (`skybridges.Space(..., others)`). `GEN_VERSION` m18.2 (on M21's m21.1 and the assetgen
-  fixes' agfix.1). Merged with M21, M16 and the assetgen fixes.
+  fixes' agfix.1); AG13's ground scatter keeps clear of a neighbouring piece's desire line
+  that reaches across its tile's seam (`ground.gather` `desire_near`, as the clearance check
+  does). Merged with M21, M16, the assetgen fixes and AG13.
 Sample builds: `docs/progress/M18/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

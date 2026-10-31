@@ -149,9 +149,13 @@ covers them.
   streets), then, with the ramps in, through a ground building beside the deck: a deck's
   skybridges now clear its ramps (`Ctx.sky_roads`, from the deck top) and every level's keep
   out of the district's buildings on its other levels (`skybridges.Space(..., others)`);
-  every sample is unchanged by it. The M18 notes for the citygen skill (`highways.grades`, a
-  district's `junctions`) are left out of it for now (M16 changed the same file), kept in the
-  PR description.
+  every sample is unchanged by it. Merged with AG13 too (no city model moves): its ground
+  scatter cut each tile's grass by the desire lines of that tile's own pieces only, and M18's
+  small test city put a lawn's worn path 0.15 m from a clump on the next tile
+  (`ground_grass_clear`); a tile now also keeps clear of the desire lines of pieces off it
+  that reach across its seam (`ground.gather` `desire_near`). The M18 notes for the citygen
+  skill (`highways.grades`, a district's `junctions`) are left out of it for now (M16
+  changed the same file), kept in the PR description.
 
 ## Before and after
 
