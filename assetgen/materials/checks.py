@@ -110,6 +110,7 @@ FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
            ("props", "props/variants", "*.glb"),
            ("props", "props/plants", "*.glb"), ("props", "props/tiles", "t*.glb"),
            ("signs", "props/signs", "t*.glb"),
+           ("ground", "ground/tiles", "t*.glb"),         # (AG13: the ground cover)
            ("water", "water", "t*.glb"), ("water", "water", "parts.glb"))
 
 

@@ -22,6 +22,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG10 | Layered districts: M14's slabs per tile with soffits, fascias, rails, lights and colonnades, their columns, stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs meeting the soffit; `asset_decks` and `street_decks` | Done | [`docs/progress/AG10`](progress/AG10) |
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
 | AG12 | Water: per body and tile a surface (LOD chains carrying the current, a foam mask and the sea's wave weight) and a bed at M16's depth with the banks' slopes under the water; banks by kind with riprap stones; AG7's walls and piers into the bed; water textures and catalog; `M_CgWater` (Single Layer Water, waves) and underwater volumes | Done | [`docs/progress/AG12`](progress/AG12) |
+| AG13 | Ground cover and grass: every piece of M16's open land textured by its cover kind and blended by its wear, shade, edges and moisture; grass and small plants as instanced clumps per tile (decision 13.9 (a)), swaying in Unreal and fading out at 60 to 100 m; `ground_grass_clear` and the budgets | Done | [`docs/progress/AG13`](progress/AG13) |
 
 ## AG0: contract and spike
 
@@ -1490,6 +1491,123 @@ earlier one, quay UVs round a sharp corner, a station counted apart.
   and a report the same as the committed one but for its timings), so assetgen's sample
   briefs golden for it fails.
 
+## AG13: ground cover and grass
+
+**Built.** Stage 2's side of citygen's M16 for the open land (scope 14.14; decision 13.9
+taken as (a)), in `assetgen/ground/`:
+- **AG6's sets** (`materials/library.GROUND_SETS`, generators at the end of `surfaces.py`):
+  `ground_lawn` (mown blades, faint stripes, clover, thatch, bare spots), `ground_meadow`
+  (long grass in swirling clumps, straw, seed heads, soil between), `ground_wild` (the
+  meadow gone dry, for wasteland), `ground_dirt` (clods, pebbles, roots, cracks, trodden
+  patches), `ground_mud` (ruts, smears, puddles with low roughness), `ground_gravel`
+  (stones of two sizes over dust, oil), `ground_sand` (grain, ripples, shell bits, dents),
+  `ground_moss` (cushions) and `ground_rubble` (broken concrete and brick on dirt); 2 m
+  tiles at 512 px/m (gravel and moss 1 m). Paving needed no new set: M16's paving and
+  overgrown paving take AG7's paving sets by what they pave (a plaza's granite, a market's
+  or court's cobbles, a promenade's tiles, a podium's concrete tiles, a yard's slabs, a
+  megasite's cast concrete or pads). The library grows to 134 sets, about 1 GB cooked.
+- **Surfaces** (`kinds.py`): per cover kind a base, a worn and a shade set and blend weights
+  (lawn: lawn, dirt, moss; marsh: meadow tinted dark, mud, moss; wasteland: wild, dirt,
+  rubble; gravel: gravel, dirt, moss; and so on), a lawn's green as a tint over the set's
+  vegetation.
+- **Per tile** (`gather.py`, `tile.py`; a job holds every input of its 256 m tile and its
+  hash decides whether the tile is made again):
+  - **Mask** (`ground/masks/<tile>.png`, 512 px, a pixel per 0.5 m, row 0 the south edge):
+    R wear (each desire line its own wear across its width, falling to 0 a meter past it;
+    under it the piece's wear at 0.35), G shade (M16's 4 m raster bilinear, tree crowns 0.55
+    to 0.8, 1 under a deck: finer than M16's per-piece mean, its open item), B edge (one to
+    three pixels in from where the surface changes), A moisture (1 at the water, 0 from
+    60 m, on a 2 m grid).
+  - **Ground mesh** (`ground/tiles/<tile>.glb`): every piece clipped to the tile on the 1 cm
+    grid, triangulated exactly on its millimeters, 0.1 m over the ground as the blockout's
+    flats were; on M13's terrain cut by its 4 m cells, each vertex and normal on the ground
+    grid, and a triangle steeper than about 35 degrees (the steps of the retaining walls,
+    the cliff) box mapped on its own vertices, since plan UVs stretch there (the texel
+    density check found it on Cragmouth); a part ear clipping refuses (a hole touching its
+    outer ring at a vertex: one in Nexus City) takes GEOS's constrained Delaunay triangles
+    on the same vertices. A primitive per surface and tile: the mask is per tile, so is the
+    material.
+  - **Grass** (`ground/grass/<tile>.json`): a candidate per mask pixel inside a
+    grass-bearing piece (not under a deck), jittered in it and kept by splitmix64 hashes of
+    its world cell (so a tile's grass does not depend on how the city is cut into jobs) with
+    probability $D\,a\,(1-w)^2 f_s (1 + 0.6 m) f_g k_t$ (`kinds.py`: $D$ from 0.04 per m2
+    on sand to 1.8 in planted beds; fewer in deep shade; more near water; half on ground
+    over 30 degrees, none over 40; $k_t$ the tile's cap). The clump kind from the piece's
+    mix, leaning to ferns in deep shade and under crowns, reeds on wet ground, weeds where
+    neglected; variant, yaw and scale by hash. A clump stands only where its footprint (its
+    kind's radius times its scale) lies in grass-bearing land clear of desire lines, decks,
+    trunks, and the right of way, buildings, solid structures and water the check tests
+    (`citygen.cover.Ctx`, near the tile), so the clearance holds whatever the pieces'
+    topology (two lot yards meeting at a building's corner, a median lawn a few millimeters
+    from a lot across a road's edge, a building's 3 mm spike: each let a clump through
+    before).
+- **Verges**: M6's median lawns, which the blockout drew flat over the road and nothing
+  replaced: on AG7's lawn island top (avenues, streets and service roads with a median of
+  2 m, not in the industrial and aerospace eras) grass only, at the top; on a highway's
+  median a lawn strip 3 cm over the asphalt with grass clear of the barrier; under AG7's
+  concrete island top nothing.
+- **Clumps** (`clumps.py`, `ground/clumps.glb`): lawn (32 to 42 blades), clover (trefoils,
+  white heads), flowers (stems, leaves, five or six petal heads over a tuft; a family per
+  district palette: its era's palette from `assetgen/presets.py` pushed to petal colors,
+  greys left out), meadow and meadow_dry (40 to 52 blades over straw, seed stalks), reeds
+  (plumes), cattails (sword leaves, brown heads), weeds (rosettes, a seed stalk), fern
+  (arching fronds, paired pinnae), and AG8's scrub and sedum (`props.trees` at 0.5 and 0.34
+  scale): AG8's ground plants folded in as clump kinds. M6's own scrub and sedum
+  placements stay AG8's instances (seen from far; the grass fades at 100 m). 3 or 4
+  variants each, 60 to 366 triangles, COLOR_0 for the grass master (height share, tone,
+  dryness), normals leaning up.
+- **Checks** (`checks.py`, `ground_report.json/.txt`): `ground_coverage`,
+  `ground_grass_clear` (on the model's own geometry on the 1 cm grid), `ground_meshes`,
+  `ground_budgets`. `ground/preview.png`: the city from above at 2 m a pixel and the tile
+  with the most clumps at 0.25 m.
+- **Budgets** (decision 13.9 (a)): at most 40,000 clumps a tile (the kept clumps scaled up
+  by the cap's inverse square root, at most 1.5; a tile over it by chance drops the clumps
+  kept by the least margin), 3 million a city, 400 triangles a clump variant, 60,000 for all
+  of a city's variants, 250,000 ground triangles a tile and 12 million a city, 12 million
+  instanced triangles a tile (Unreal draws about half a tile's within the fade radius).
+- **Unreal** (`docs/unreal_export.md`, AG13): `unreal_contribution.ground.json`; a ground
+  actor per tile replacing its tile's ground cover and median lawn objects, a drop for an
+  object whose tile draws none of its pieces; the grass as instanced parts whose transforms
+  stay in their tile's file (`xforms_file`), not Nanite, no collision, no shadow, culled at
+  60 to 100 m, out of the HLODs; `M_CgGround` and `M_CgGrass` (sway by world position
+  offset times `MPC_CityGen`'s new `Wind`, dithered with the instance fade). Not run in
+  Unreal (the coordinating session's call).
+- **Blender**: `assetgen materials preview` draws the ground tiles with the ground material
+  (`ag6_materials.ground`, node for node the master's blend) and the clumps within 140 m of
+  a street view's eye through AG8's geometry-nodes instancer (`grass`).
+
+**Samples** (Windows PC, 3 workers, on M16's builds of main at 280eb35, with main's fixes
+after AG10 merged in: the six samples' full `assetgen build` passes every check, buildings,
+streets, props, ground and materials; before that merge Delta's `asset_access` door, Nexus
+City's `asset_access` and `street_meshes` and Greyhook's `asset_envelope` failed with
+main's own code as well):
+
+| City | Pieces | Tiles | Clumps | Most in a tile | Tiles at the cap | Instanced triangles, most in a tile | Ground triangles (most in a tile) | Clump variants (triangles) | MB | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 4486 | 160 | 1,823,161 | 40,000 | 11 | 7,057,657 | 61,744 (1,498) | 61 (10,796) | 89 | 44 |
+| Delta Megacity | 4780 | 145 | 1,012,038 | 40,000 | 9 | 7,082,152 | 65,852 (1,141) | 61 (10,796) | 55 | 36 |
+| Saltreach Free Port | 2627 | 158 | 2,283,363 | 40,000 | 26 | 7,966,535 | 36,475 (1,346) | 55 (9,732) | 105 | 44 |
+| Nexus City | 5520 | 173 | 1,374,336 | 39,840 | 8 | 7,015,648 | 72,245 (1,135) | 67 (11,860) | 73 | 38 |
+| Greyhook | 2574 | 151 | 1,095,227 | 37,874 | 0 | 4,483,236 | 44,659 (1,008) | 55 (9,732) | 56 | 34 |
+| Cragmouth | 5381 | 129 | 1,189,678 | 40,000 | 3 | 9,382,475 | 491,923 (8,506) | 58 (10,264) | 100 | 62 |
+| Vesper Bay Decks | 4258 | 160 | 1,676,080 | 40,000 | 11 | 7,057,657 | 58,556 (1,337) | 61 (10,796) | 83 | 45 |
+
+A regeneration: Vesper Bay's Old Town (M16's regenerated model over the same base) made 27
+of its 160 tiles again, every one within 55 m of the district (whose pieces meet 26 tiles);
+the rest kept byte for byte.
+
+**Open.**
+- Not run in Unreal: the masters' graphs, `set_cull_distances`, the dither on the fade and
+  leaving the grass out of the HLODs are written to the engine's Python API but untested
+  (the coordinating session's call on a check). A grass runtime grid of its own (World
+  Partition loading the grass nearer than the city) would cut memory further.
+- Grass instances carry no per-instance color (a flower's color is its family's); stage 3
+  drives `Wind` and seasons.
+- The ground on M13's terrain follows the bilinear ground grid as the blockout's heightfield
+  does, ramps over the retaining walls' steps included (box mapped, no grass on them).
+- Deck columns standing on a lawn are not cut out of it (no grass under a deck anyway).
+- Mac = x86 waits for the deferred determinism check.
+
 ## AG12: water
 
 **Built.** Stage 2's water from citygen's M16 (scope 14.13; decision 13.10 taken as (a)):
@@ -1556,9 +1674,9 @@ every water body's surface, bed and banks, `assetgen water BUILD` (also a stage 
   surface; it stood at the ground, 1.5 m over the water).
 - **AG6**: sets `bed_mud`, `bed_silt`, `bed_sand`, `bed_gravel`, `bed_stone` (under water,
   the upper band's density), `bank_soil`, `bank_rubble`, `bank_rock` (`library.WATER_SETS`;
-  generators `sediment`, `rubble`, `soil` in `materials/water_surfaces.py`: deposits, worm
-  casts, ripple marks, pebbles, shell grit; packed stones; crumbly soil with roots and grass
-  tufts); the `water` atlas (8 m: ripple normals, foam lace at two scales and bubbles, two
+  generators `sediment`, `water_rubble`, `water_soil` in `materials/water_surfaces.py`:
+  deposits, worm casts, ripple marks, pebbles, shell grit; packed stones; crumbly soil with
+  roots and grass tufts); the `water` atlas (8 m: ripple normals, foam lace at two scales and bubbles, two
   caustic networks and their glow); `catalog.WATER`, per water kind (sea, river, canal,
   ornamental, marsh; a body along marshes for 40% of its banks is marsh water): Single
   Layer Water's scattering and absorption, shallow and deep colors, clarity, flow, foam,
@@ -1695,7 +1813,8 @@ and its entry here notes it.
 
 ## Progress output
 
-`assetgen build`, `preview`, `materials preview|board`, `library`, `streets`, `water` and `props` say
+`assetgen build`, `preview`, `materials preview|board`, `library`, `streets`, `water`, `props`
+and `ground` say
 what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1's
 `citygen/progress.py`, which it will import once that lands): a line per stage (load, briefs,
 genomes, shells and parts, the library on first use, building checks, streets, signage,
@@ -1729,7 +1848,8 @@ assets are not in git.
 .venv/bin/python -m assetgen materials preview BUILD [--night]          # textured renders (AG6)
 .venv/bin/python -m assetgen materials board OUT                        # material boards (AG6)
 .venv/bin/python -m assetgen streets seam BASE REGEN --district NAME    # what a regeneration changed (AG7)
-.venv/bin/python -m assetgen water BUILD [--workers 4]                    # water (AG12)
+.venv/bin/python -m assetgen water BUILD [--workers 4]                  # water (AG12)
+.venv/bin/python -m assetgen ground BUILD [--workers 4]                 # ground cover and grass (AG13)
 .venv/bin/python -m assetgen review BUILD --prev P                      # art-direction round (AG5)
 .venv/bin/python -m citygen unreal BUILD PROJECT                        # the city with its assets in Unreal
 .venv/bin/python -m assetgen sweep --suite m8a --out DIR                # (AG9)

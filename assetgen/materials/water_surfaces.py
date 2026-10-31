@@ -3,9 +3,12 @@
 - `sediment`: a water bed of mud, silt or sand: mottled deposits, worm casts and shell grit
   on mud, drag streaks on silt, ripple marks on sand (a ramp profile across warped crests,
   the steep side downstream), pebbles where asked.
-- `rubble`: packed stones (Worley cells, rounded, dark joints of silt between them), the
-  riprap band under its stones and a stony bed.
-- `soil`: a bank's earth: crumbly soil, roots, pebbles and grass tufts.
+- `water_rubble`: packed stones (Worley cells, rounded, dark joints of silt between them),
+  the riprap band under its stones and a stony bed.
+- `water_soil`: a bank's earth: crumbly soil, roots, pebbles and grass tufts.
+
+(Named apart from AG13's `rubble` and `soil` in `surfaces.GENERATORS`, which `surfaces.make`
+looks up first.)
 - `water_atlas`: the water master's maps over `WATER_TILE_M`: ripple normals (OpenGL), foam
   (R a lacy foam network, G a finer one, B bubbles) and caustics (R and G two networks the
   bed master scrolls against each other, B their soft glow).
@@ -113,7 +116,7 @@ def soil(n: int, tile_m: float, p: dict) -> Surface:
                    full(n, 0.95), full(n, 0.0), mask.astype(F), bump=20.0)
 
 
-GENERATORS = {"sediment": sediment, "rubble": rubble, "soil": soil}
+GENERATORS = {"sediment": sediment, "water_rubble": rubble, "water_soil": soil}
 
 
 # --- the water atlas ---------------------------------------------------------------------

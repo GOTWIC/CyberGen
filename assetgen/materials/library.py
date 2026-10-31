@@ -6,8 +6,9 @@ every city, rebuilt only when its generator changes): `assetgen library [OUT]`.
   marks, profiles); the shared building surfaces (spandrel, trim, metals, patches, timber,
   stone, roof tiles, AG2's parts); the street surfaces (asphalt by class, paint, paving
   families, curbs, concrete, stone, steel, ballast, lawn, containers); AG8's prop surfaces
-  (plastic, car paint, galvanized and rusty metal, bark, leaf clumps). Each set is three
-  maps (`pbr`): base color with height, normal, occlusion-roughness-metallic with the tint
+  (plastic, car paint, galvanized and rusty metal, bark, leaf clumps); AG13's ground cover
+  (lawn, meadow and its dry wild form, dirt, mud, gravel, sand, moss, rubble). Each set is
+  three maps (`pbr`): base color with height, normal, occlusion-roughness-metallic with the tint
   mask. A set covers `tile_m` meters at the texel density of its band: 512 px/m for what is
   within reach of the street, 256 px/m above (roofs), so its size is a power of two.
 - **Atlases** (`atlases`, `interiors`): trim sheets per era, the decal atlas (grime, leaks,
@@ -360,6 +361,27 @@ PROP_SETS: dict[str, dict] = {
 }
 
 
+# AG13's ground cover (M16's open land): lawn, meadow (and its dry, wild form), dirt, mud,
+# gravel, sand, moss and rubble; the paving kinds take AG7's paving sets
+GROUND_SETS: dict[str, dict] = {
+    "ground_lawn": {"gen": "turf", "tile_m": 2.0, "band": "street",
+                    "params": {"color": "#4f7a34", "stripe_m": 1.0, "bare": 0.25}},
+    "ground_meadow": {"gen": "meadow", "tile_m": 2.0, "band": "street",
+                      "params": {"color": "#6b8a3a", "dry": 0.3}},
+    "ground_wild": {"gen": "meadow", "tile_m": 2.0, "band": "street",
+                    "params": {"color": "#7d7a44", "dry": 0.85}},
+    "ground_dirt": {"gen": "soil", "tile_m": 2.0, "band": "street",
+                    "params": {"color": "#6a5038", "dry": 0.45, "trodden": 0.35}},
+    "ground_mud": {"gen": "mud", "tile_m": 2.0, "band": "street",
+                   "params": {"color": "#4a3a2b", "puddles": 0.6}},
+    "ground_gravel": {"gen": "loose_gravel", "tile_m": 1.0, "band": "street",
+                      "params": {"color": "#8a8378", "stone_m": 0.03, "oil": 0.2}},
+    "ground_sand": {"gen": "sand", "tile_m": 2.0, "band": "street",
+                    "params": {"color": "#d2bd8a", "ripple_m": 0.12}},
+    "ground_moss": {"gen": "moss", "tile_m": 1.0, "band": "street",
+                    "params": {"color": "#4d6a2a"}},
+    "ground_rubble": {"gen": "rubble", "tile_m": 2.0, "band": "street",
+                      "params": {"color": "#7f7c75", "chunk_m": 0.12, "brick": 0.25}},
 # AG12's water beds (under the water: the upper band's density) and banks
 WATER_SETS: dict[str, dict] = {
     "bed_mud": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
@@ -371,12 +393,12 @@ WATER_SETS: dict[str, dict] = {
                             "shells": 0.5, "rough": 0.85}},
     "bed_gravel": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
                    "params": {"kind": "silt", "color": "#6f6a5f", "pebbles": 0.75}},
-    "bed_stone": {"gen": "rubble", "tile_m": 4.0, "band": "upper",
+    "bed_stone": {"gen": "water_rubble", "tile_m": 4.0, "band": "upper",
                   "params": {"color": "#5f5d58", "stone_m": 0.3, "joint": "#3a362e",
                              "wet": 0.5}},
-    "bank_soil": {"gen": "soil", "tile_m": 2.0, "band": "street",
+    "bank_soil": {"gen": "water_soil", "tile_m": 2.0, "band": "street",
                   "params": {"color": "#5d5440", "grass": "#4f6a35"}},
-    "bank_rubble": {"gen": "rubble", "tile_m": 2.0, "band": "street",
+    "bank_rubble": {"gen": "water_rubble", "tile_m": 2.0, "band": "street",
                     "params": {"color": "#6d6a63", "stone_m": 0.22}},
     "bank_rock": {"gen": "stone", "tile_m": 1.0, "band": "street",
                   "params": {"color": "#77736b", "wear": 0.8, "rough": 0.85}},
@@ -385,7 +407,7 @@ WATER_SETS: dict[str, dict] = {
 
 def sets() -> dict[str, dict]:
     out = _era_sets()
-    for d in (BUILDING_SETS, STREET_SETS, PROP_SETS, WATER_SETS):
+    for d in (BUILDING_SETS, STREET_SETS, PROP_SETS, GROUND_SETS, WATER_SETS):
         for k, v in d.items():
             if k in out:
                 raise ValueError(f"set {k} twice")

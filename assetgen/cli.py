@@ -154,7 +154,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     try:
         rep = BD.build(src, args.spec, args.overrides, args.workers,
                        streets=not args.no_streets, textures=not args.no_textures,
-                       props=not args.no_props, water=not args.no_water, progress=prog)
+                       props=not args.no_props, ground=not args.no_ground,
+                       water=not args.no_water, progress=prog)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
@@ -310,6 +311,46 @@ def cmd_props(args: argparse.Namespace) -> int:
     return EXIT_OK if rep["ok"] else EXIT_INVALID
 
 
+def cmd_ground(args: argparse.Namespace) -> int:
+    from . import brief as B
+    from . import spec as S
+    from .ground.build import build as ground_build, default_workers
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    prog = _progress(args)
+    with prog.stage("load"):
+        model, sha, bdir = B.load_model(src)
+    spec_doc = S.dump(S.fill(S.AssetSpec()))
+    if args.spec:
+        res = S.load_spec(args.spec, model)
+        for issue in res.issues:
+            print(issue, file=sys.stderr)
+        if not res.ok:
+            return EXIT_INVALID
+        spec_doc = S.dump(S.fill(res.spec))
+    out = Path(args.out) if args.out else bdir / "assets"
+    lib = None
+    if (out / "library").exists():
+        # AG6 ran on this build: the ground's materials textured with the library's sets
+        from .materials.build import library_for
+        lib = library_for(spec_doc, out, progress=prog)
+    rep = ground_build(model, sha, out, spec_doc, workers=args.workers or default_workers(),
+                       force=args.force, lib=lib, progress=prog)
+    prog.summary()
+    st, f = rep["stats"], rep["files"]
+    print(f"{rep['city']}: {st['pieces']} pieces in {st['tiles']} tiles, {st['instances']:,} "
+          f"clumps of {st['clump_variants']} variants, {st['ground_triangles']:,} ground "
+          f"triangles, {st['disk_bytes'] / 1e6:.1f} MB; {f['tiles_made']} tiles made, "
+          f"{len(f['written'])} files written in {rep['seconds']['total']} s")
+    for c in rep["checks"]:
+        if not c["ok"]:
+            print(f"check failed: {c['name']}", file=sys.stderr)
+    print(f"{'PASS' if rep['ok'] else 'FAIL'}: see {out / 'ground_report.txt'}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
 def cmd_streets_seam(args: argparse.Namespace) -> int:
     from .streets.seam import seam
     try:
@@ -416,6 +457,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="flat materials (AG1, AG7) without AG6's library and textures")
     bu.add_argument("--no-props", action="store_true",
                     help="no props, plants or signs (default: last, as `assetgen props`)")
+    bu.add_argument("--no-ground", action="store_true",
+                    help="no ground cover or grass (default: after the props, as "
+                         "`assetgen ground`)")
     bu.add_argument("--no-water", action="store_true",
                     help="no water (default: after the streets, as `assetgen water`)")
     _quiet(bu)
@@ -529,6 +573,18 @@ def build_parser() -> argparse.ArgumentParser:
                          "the plants) in Blender into DIR")
     _quiet(pr)
     pr.set_defaults(func=cmd_props)
+
+    gd = sub.add_parser("ground", help="AG13: ground cover of the open land and its grass")
+    gd.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    gd.add_argument("--spec", help="asset_spec.json (default: the era presets)")
+    gd.add_argument("--out", help="output directory (default BUILD/assets)")
+    gd.add_argument("--workers", type=int, help="worker processes (at most 4; default "
+                                                "ASSETGEN_WORKERS or 4)")
+    gd.add_argument("--force", action="store_true",
+                    help="make every tile again (files are still written only if their bytes "
+                         "change)")
+    _quiet(gd)
+    gd.set_defaults(func=cmd_ground)
     return p
 
 
