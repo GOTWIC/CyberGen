@@ -150,7 +150,9 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
            "seconds": {"signage": round(t1 - t0, 2), "materials": round(t2 - t1, 2),
                        "texel_density": round(t3 - t2, 2),
                        "total": round(time.perf_counter() - t0, 2)}}
-    if wrote or not (out / "materials_report.json").is_file():
+    # (also when its checks changed: texel density reads the other stages' packs, so a fixed
+    # shell or street piece changes the report and no file of this stage)
+    if wrote or _report_changed(out / "materials_report.json", rep):
         wrote += int(MF.write_if_changed(out / "materials_report.json", MF.dumps(rep)))
         wrote += int(MF.write_if_changed(out / "materials_report.txt", report_text(rep)))
     rep["files_written"] = wrote
@@ -159,6 +161,18 @@ def stage(model, model_sha: str, out: Path, spec_doc: dict, lib: dict, log=print
             f"texel density {'ok' if dens['ok'] else 'FAILS'} over {dens['triangles']:,} "
             f"triangles, {wrote} files written")
     return rep
+
+
+def _report_changed(path: Path, rep: dict) -> bool:
+    """Whether the report on disk is missing or says anything else than `rep` (its timings
+    aside)."""
+    try:
+        old = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    new = json.loads(MF.dumps(rep))
+    return {k: v for k, v in old.items() if k != "seconds"} != \
+        {k: v for k, v in new.items() if k != "seconds"}
 
 
 def report_text(rep: dict) -> str:

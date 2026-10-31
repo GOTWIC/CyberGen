@@ -1359,6 +1359,137 @@ inside Ridgeback's hill; AG10's section adds the ground itself).
   the undercity's one-storey rows leave empty shell nodes in the packs.
 - Mac = x86 waits for the deferred determinism check.
 
+## Fixes after AG10: every check on the nine samples
+
+Full `assetgen build` runs of the nine sample cities on main after M17, M21 and M16 (Saltreach
+Free Port, Vesper Bay Pinned and Vesper Bay Stacks had last been built whole at AG2 or AG8,
+before most of the checks) failed checks in seven of them. The failures #66's builds found in
+those three had gone with M21 (its skybridges keep their corridors clear; the failing door's
+building is no longer there), and others had come. Each was fixed in the generator
+(`GEN_VERSION` agfix.1) but one, which is the city's and is counted apart:
+
+- **Moved doors in place of ground windows** (`fronts.Band.rehome`): a door that has to
+  move off its wall (a party wall, a facade too short) was meant to replace the ground
+  windows of the nearest facade with room, but its filter named window openings `window`
+  where they are `win`, so a door only fitted between windows. A villa with its entrance on
+  a 0.78 m tip of its outline got no door (Pinned, `asset_access`), and a perimeter block's
+  shop door went 13 m along its wall, walled off from its walkway (Delta, M21's open item).
+  Doors facing a neighbor: Pinned 436 to 323, Saltreach Free Port 379 to 300.
+- **No door facing its own wall** (`fronts._faces_own`): a door or shopfront whose way
+  straight out meets the building's own walls within 3 m (a crack in a perimeter block's
+  outline, 0.5 m wide at its mouth; Nexus City) moves, as one against a neighbor does.
+- **Balconies over a turned block or a sky garden** (`shell._hangs`): M21's test of a
+  first-floor balcony hanging in the air took the slab's middle only. A stacked block turned
+  over the one under it, or a tower over a sky garden's open floor, left a corner 1.8 to
+  2.4 m from any mass (Pinned, `asset_envelope`, three towers). It takes every corner now.
+- **Mounts on their mass** (`fronts._on_mass`): the plate behind a cable end the model puts
+  8 cm under an exo frame's belt, which stands 2.9 m off the tower under it, hung under the
+  belt (Stacks, `asset_envelope`). Plates, ties and trellises stay within their mass's
+  height.
+- **A mast's foot on its roof** (`shell._mast`): a concave arc in a tower's outline pulled
+  the middle of its vertices to its edge, and the mast's foot 1.1 m off the roof (Decks).
+  Where the foot does not fit there, the mast stands at the middle of the area.
+- **Skybridges over a lower roof** (`shell._finish_parts`, `roofs._off_bridges`): on
+  Cragmouth three bridges are level with a lower roof of their building (a stacked tower's
+  lower block, a pod) and cross 1.2 to 3.4 m of it before the wall they land on. Flush parts
+  (mullion caps) at that facade's top and the roof's finish were in their corridors
+  (`asset_clearance`). Flush parts now take the corridor's own test (its collars and the
+  inside of masses spared), and a flat roof's finish is cut round the corridors over it.
+- **Landing doors on simply drawn masses** (`shell._simple_landings`): M21's round,
+  twisted, tapered and leaning shafts are drawn simply until AG15, with no facade grammar to
+  cut a landing door, so a bridge landing on a round tower had none (Cragmouth,
+  `asset_landings`). The facets where it lands take a storefront door from the floor to the
+  glass ribbon's head; every facet of the ring is split at its heights, so the mesh stays
+  closed.
+- **The ground under the base along the walls** (`build.building_asset`, the shell's
+  `walls`): a 3.5 m spike in a footprint, which the shell tidies away, still brought the
+  ground at its tip (1.25 m under the base) into `grade_low_m`, so `asset_slopes` wanted a
+  step where no wall stands (Cragmouth). The ground is taken along the stretches of the
+  edges that walls stand on.
+- **Quay UVs** (`streets/water._along`): a quay's u was the distance along its line. Round
+  the traced island's basins in Pinned, its 15 m paving's mitred outer edge at a sharp
+  corner, or at a jog of a few centimeters, ran meters with almost no u, and the streets
+  met the texel density on 99.499 % of their area (99.5 % needed). u now runs along each
+  edge line's own length (99.79 %).
+- **Junction corners** (`streets/walks._onto`): a sidewalk corner cut from the earlier
+  ones on the overlay's 1 cm grid kept a vertex 4.4 mm inside an earlier corner's edge, a
+  sliver of both (Nexus City's `jn.e383n933`, `street_meshes`). A vertex within 7.5 mm of an
+  earlier corner's edge goes.
+- **The materials report** was written only when a file of its stage changed; its texel
+  check reads the other stages' packs, so a fixed shell or street piece left it saying FAIL.
+  It is written when its checks change too.
+- **Sky stations out of reach** (`connections._beside`, `asset_roofs`): M5 portals a station
+  through its building by the union of the building's masses, so a tube can pass over a
+  megabuilding's podium far from its tower: the Crown Loop's station at The Stacks in Vesper
+  Bay, Pinned and Stacks, 14.4 m from the tower at the tube's height with the podium roof
+  64 m under it (M21's open item in Vesper Bay). With no wall within 6 m at its floor and no
+  roof within 3 m under it, nothing of the building can carry a platform: counted apart
+  (`stations_out_of_reach`), the city's to change. A station the building could serve still
+  fails.
+
+**Samples** (each found by a full build with the fixes before it; then every city built
+again on the final code, every check of every stage passing):
+
+| City | Found |
+|---|---|
+| Saltreach Free Port | nothing |
+| Vesper Bay Pinned | balconies (3 towers), the villa's door, the station, the quays' texel density |
+| Vesper Bay Stacks | the mount under a belt |
+| Vesper Bay | the station (counted apart) |
+| Delta Megacity | nothing (the perimeter block's door, fixed with `rehome`) |
+| Nexus City | the door in a crack, the junction's corners |
+| Greyhook | nothing |
+| Cragmouth | three bridges over a lower roof, the round tower's landing, the spike |
+| Vesper Bay Decks | the mast |
+
+On the final code (4 workers on the shared Mac, 1.5 to 3 min a city; landing doors of the
+skybridge ends, the rest counted apart as at the ground, off a floor line or in a portal):
+
+| City | Buildings | Doors (facing a neighbor) | Landing doors | Stations out of reach | Streets at texel density |
+|---|---|---|---|---|---|
+| Saltreach Free Port | 3,186 | 11,788 (300) | 287 of 290 | 0 | 99.84 % |
+| Vesper Bay Pinned | 6,766 | 21,293 (323) | 462 of 470 | 1 | 99.79 % |
+| Vesper Bay Stacks | 6,620 | 20,653 (357) | 445 of 450 | 1 | 99.78 % |
+| Vesper Bay | 5,809 | 19,952 (368) | 467 of 470 | 1 | 99.84 % |
+| Delta Megacity | 5,516 | 21,131 (418) | 567 of 574 | 0 | 99.76 % |
+| Nexus City | 6,553 | 23,123 (415) | 450 of 454 | 0 | 99.83 % |
+| Greyhook | 2,617 | 10,265 (66) | 309 of 310 | 0 | 99.86 % |
+| Cragmouth | 7,058 | 24,638 (363) | 455 of 470 | 0 | 99.80 % |
+| Vesper Bay Decks | 5,962 | 21,756 (328) | 507 of 510 | 0 | 99.83 % |
+
+Previews of the fixed spots: [`docs/progress/agfix/`](progress/agfix).
+
+**Goldens** written again on this Mac: `ag1` (the small city's manifest and files, the Vesper
+Bay buildings' GLBs) and `ag6` (the small city's materials), since every pack carries
+`GEN_VERSION`; the street packs' (the small city, Vesper Bay and three of its six named
+tiles: their quays and junction corners); and the props golden, stale since M17, M21 and M16
+moved the small city (main gives the same digest, and nothing here changes the props).
+
+**Tests**: `tests/assetgen` and `tests/test_unreal.py` (the Unreal launches deselected): 190
+passed and 2 failed, the props golden (since written again) and Nexus City's sample briefs
+(`test_sample_briefs_golden[nexus_city]`, which fails on main too, below); new
+`test_ag_fixes.py` (4): a moved door in place of ground windows, a corner snapped onto an
+earlier one, quay UVs round a sharp corner, a station counted apart.
+
+**Asks of citygen**:
+- Portal a sky station only through a building whose tower the tube passes through, or
+  within 6 m of, at its height (the Crown Loop's station at The Stacks).
+- Nexus City's junction `jn.e383n933`: its polygon has a 29.7 m2 hole inside highway
+  `rs.e566n892`'s carriageway (unpaved in the assets), and two of its legs make a bowtie
+  corner, which puts a sidewalk corner in the carriageway.
+- Footprints with a spike (Cragmouth `d03.lot.w434n813.bld`, 3.5 m out and back) or a crack
+  (Nexus City `d06.lot.e1045s82.bld`, 7.5 m deep, 0.5 m at its mouth).
+- Skybridges level with a lower roof of the building they land on (Cragmouth): end them at
+  the roof's edge, or keep their deck clear of the roof.
+- Open decks that end several meters short of the wall they land on (Cragmouth, up to 27 m;
+  6.5 m from a round tower, M21's shaft inside the box the deck was laid to).
+- Pinned's traced Corporate Core door `d01.pin.path.w1427s613.door.e0` faces a 1.2 m court
+  between two traced buildings (counted apart as facing a neighbor).
+- Nexus City built from main on this Mac is not citygen's golden model (`a6ddd8fe...` in
+  `tests/data/golden_hashes.json`, `f74f4ffd...` here, twice; the same tries, layout salt 1,
+  and a report the same as the committed one but for its timings), so assetgen's sample
+  briefs golden for it fails.
+
 ## AG13: ground cover and grass
 
 **Built.** Stage 2's side of citygen's M16 for the open land (scope 14.14; decision 13.9
