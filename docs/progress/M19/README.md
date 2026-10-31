@@ -9,7 +9,7 @@ and each other. Spec: `docs/citygen_scope.md`, section 12, M19.
 |---|---|
 | <img src="delta_megacity/preview_transit.png" width="420"> | <img src="vesper_bay/preview_transit.png" width="420"> |
 
-| Sky tube masts with their stays (Delta Megacity, 8K) | Monorail on portal frames over a raised road (8K) |
+| Sky tube masts with their stays (Delta Megacity, 8K) | Monorail on portal frames over a street (8K) |
 |---|---|
 | <img src="delta_megacity/render_sky_tube_masts.jpg" width="420"> | <img src="delta_megacity/render_monorail_frames.jpg" width="420"> |
 
@@ -59,46 +59,59 @@ and each other. Spec: `docs/citygen_scope.md`, section 12, M19.
 
 ## Delta Megacity, before and after
 
-Before is main with M17 and M21 (road repair, cyberpunk massing) and without M19; now is M19
-on that main. Measured on the built models (`citygen.transit_checks.check_supports`; a frame
+Before is main with M16, M17, M18 and M21 (water and ground, road repair, junctions and
+ramps, cyberpunk massing) and without M19; now is M19 on that main. Delta takes its second
+layout now (its first fails `transit_clearance`, an open item below), so the two are not the
+same streets. Measured on the built models (`citygen.transit_checks.check_supports`; a frame
 or a cantilever counts as one support, its columns not as columns off the line):
 
 | Line | Supports before | Now | A column off its line, before | Now | Longest span, before | Now |
 |---|---|---|---|---|---|---|
-| Maglev Line | 33 | 53 (34 columns, 6 piers, 7 frames, 6 cantilevers) | 14.3 m (1 over 2 m) | 0.01 m | 377 m | 78 m |
-| Skyline Loop (sky tube) | 13 | 11 (8 masts, 1 pier, 2 cantilevers) | 2.2 m (1) | 0.01 m | 671 m | 489 m |
-| Delta Loop (sky tube) | 42 | 12 (7 masts, 3 piers, 1 frame, 1 cantilever) | 9.5 m (2) | 0.01 m | 975 m | 505 m |
-| Waterfront Monorail | 141 | 196 (93 columns, 20 piers, 41 frames, 42 cantilevers) | 15.6 m (27) | 0.01 m | 400 m | 102 m (a cable span) |
+| Maglev Line | 57 | 53 (43 columns, 3 piers, 3 frames, 4 cantilevers) | 4.5 m (2 over 2 m) | 0.01 m | 135 m | 78 m |
+| Skyline Loop (sky tube) | 12 | 6 (4 masts, 1 pier, 1 cantilever) | 2.2 m (1) | 0 m | 671 m | 511 m |
+| Delta Loop (sky tube) | 42 | 13 (10 masts, 1 pier, 1 frame, 1 cantilever) | 9.5 m (2) | 0 m | 975 m | 472 m |
+| Waterfront Monorail | 68 | 93 (36 columns, 25 piers, 11 frames, 21 cantilevers) | 15.0 m (26) | 0.01 m | 213 m | 62 m (a cable span) |
 
 The run-through's script (`measure_runthrough.py`) counts every column, so on the new model
 it reports the frames' and cantilevers' columns as off the line (by design: they stand at the
-curbs under their beam): its largest gaps go from 360, 720, 975 and 400 m to 162, 503, 506
-and 102 m, its columns over 2 m off the line from 1, 1, 2 and 27 to 19, 0, 3 and 104.
+curbs under their beam) and the Skyline Loop's gap across the tower that carries it: its
+largest gaps go from 147, 714, 975 and 213 m to 167, 892, 461 and 62 m, its columns over 2 m
+off the line from 2, 1, 2 and 26 to 10, 1, 3 and 35.
 
 ## Every sample
 
-All checks pass on every sample (92; 97 on Vesper Bay Decks). Full-city tries, main (M21 on
-M17) then M19 on it:
+All checks pass on every sample (98; 103 on Vesper Bay Decks). Full-city tries, main (M18 on
+M16, M17 and M21) then M19 on it:
 
 | City | Tries before | Now | Longest spans now (per line) |
 |---|---|---|---|
-| Delta Megacity | 1 | 1 | maglev 78, sky tubes 489 and 505, monorail 102 (cable) |
-| Vesper Bay | 1 | 1 | elevated rail 169 (cable), maglev 78, sky tube 560 |
-| Nexus City | 2 | 1 | maglev 58, elevated rail 62 (cable), sky tube 336 |
-| Greyhook (peninsula_city) | 2 | 2 | sky tube 375, elevated rail 50 |
-| Saltreach Free Port (archipelago) | 1 | 1 | monorail 102 (cable), maglev 57 |
-| Vesper Bay Pinned | 2 | 2 | elevated rail 61, maglev 57, sky tube 393 |
-| Vesper Bay Stacks | 2 | 2 | elevated rail 59, maglev 57, sky tube 453 |
-| Vesper Bay Decks | 4 | 2 | elevated rail 147 (cable), maglev 58, sky tube 479 |
+| Delta Megacity | 1 | 2 | maglev 78, sky tubes 511 and 472, monorail 62 (cable) |
+| Vesper Bay | 1 | 1 | elevated rail 326 (cable, along the Vess River fork), maglev 78, sky tube 460 |
+| Nexus City | 1 | 1 | maglev 58, elevated rail 70 (cable), sky tube 336 |
+| Greyhook (peninsula_city) | 2 | 2 | sky tube 408, elevated rail 50 |
+| Saltreach Free Port (archipelago) | 1 | 1 | monorail 91 (cable), maglev 60 |
+| Vesper Bay Pinned | 2 | 2 | elevated rail 78 (cable), maglev 57, sky tube 393 |
+| Vesper Bay Stacks | 2 | 2 | elevated rail 95 (cable), maglev 57, sky tube 449 |
+| Vesper Bay Decks | 1 | 1 | elevated rail 326 (cable), maglev 78, sky tube 469 |
 | Cragmouth (a metro only) | 2 | 2 (its model gains only its line's empty `attrs.spans`) | |
 
 ## Open items
 
 - **Longer sky loops.** Keeping off every tower that hosts no station makes some sky tube
-  loops longer and less round: Delta's Skyline Loop is now a 4.8 km figure-eight (a 2.6 km
-  ring on main, through 13 towers without a station), Vesper Bay's Crown Loop a 6.4 km
-  figure-eight (2.3 km on main). Greyhook's Spine Tube is 1.5 km as on main, Nexus City's
-  Spire Line 0.8 km (1.2).
+  loops longer and less round: Delta's Skyline Loop is 3.3 km (a 2.6 km ring on main, through
+  13 towers without a station), Vesper Bay's Crown Loop a 6.5 km figure-eight (2.3 km on
+  main), Greyhook's Spine Tube 1.7 km (1.5); Nexus City's Spire Line is 0.8 km (1.1).
+- **Buildings taken out.** On M21's taller cores a tube that can neither climb over nor go
+  round takes out more buildings: Greyhook 14, Delta 13, Vesper Bay Pinned 13, Stacks 10, Vesper Bay
+  and Decks 3.
+- **Two sky loops stacked on one path** (Delta's, both stopping at Old Town): on Delta's first
+  layout the Delta Loop's Old Town station finds no spot within `CORE_SHIFT` where its
+  elevator core is 6 m clear of the Skyline Loop, so `transit_clearance` fails and Delta builds
+  on its second layout. A core beside the platform, or one shared by both stations, would
+  keep the first.
+- **A line along a river.** After M18, Vesper Bay's Halo Line runs 326 m down the Vess River
+  where it and a delta branch cross, both channels covering the water, so it is one cable span
+  (elevated rail main spans go up to 400 m; 300 failed the first layout).
 - **Two lines along one street** stack 8 m apart and the upper one's columns cannot stand
   beside the lower deck; where they share a stop for long, a frame wide enough to straddle
   both is needed (seen on the test city, not on the samples).

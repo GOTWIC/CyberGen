@@ -111,7 +111,7 @@ The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edg
 |---|---|---|
 | <img src="docs/progress/M19/delta_megacity/preview_transit.png" width="280"> | <img src="docs/progress/M19/nexus_city/preview_transit.png" width="280"> | <img src="docs/progress/M19/vesper_bay/preview_transit.png" width="280"> |
 
-| Sky tubes on cable-stayed masts (8K) | A monorail on portal frames over a raised road (8K) |
+| Sky tubes on cable-stayed masts (8K) | A monorail on portal frames over a street (8K) |
 |---|---|
 | <img src="docs/progress/M19/delta_megacity/render_sky_tube_masts.jpg" width="420"> | <img src="docs/progress/M19/delta_megacity/render_monorail_frames.jpg" width="420"> |
 
