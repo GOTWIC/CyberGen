@@ -7,8 +7,8 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15, M17, M19 and M21 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8 done, the rest to come |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M19 and M21 done |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10 and AG13 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -31,29 +31,29 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/M21/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M17/nexus_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M18/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/nexus_city/render_iso_city.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/M21/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M17/archipelago_free_port/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M18/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/archipelago_free_port/render_iso_city.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M17/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M17/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M18/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
-| <img src="docs/progress/M17/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
+| <img src="docs/progress/M18/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
 
 | Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
 |---|---|
-| <img src="docs/progress/M17/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M17/vesper_bay_decks/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M18/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
 | Districts, water, roads and lots | Buildings |
 |---|---|
-| <img src="docs/progress/M17/vesper_bay/preview_map.png" width="420"> | <img src="docs/progress/M21/vesper_bay/preview_massing.png" width="420"> |
+| <img src="docs/progress/M18/vesper_bay/preview_map.png" width="420"> | <img src="docs/progress/M21/vesper_bay/preview_massing.png" width="420"> |
 
 | Towers: twisted, tapered, leaning, stacked, split, framed, podded, with halos and cut crowns | Looking up a Corporate Core street |
 |---|---|
@@ -61,7 +61,7 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
-| <img src="docs/progress/M17/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
+| <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
 
 | Vesper Bay imported into Unreal 5.8 (8K) | Cragmouth's terraced hills in Unreal (8K) |
 |---|---|
@@ -75,9 +75,21 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 |---|---|
 | <img src="docs/progress/M13/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M13/delta_megacity/preview_gameplay.png" width="420"> |
 
-| Road levels: viaducts, ramps, interchanges | Stack interchange levels and ramp profiles |
+| Road levels: viaducts, ramps, interchanges, embankments | Stack interchange levels and ramp profiles |
 |---|---|
-| <img src="docs/progress/M13/vesper_bay/preview_elevated.png" width="420"> | <img src="docs/progress/M13/vesper_bay_stacks/preview_elevated.png" width="420"> |
+| <img src="docs/progress/M18/vesper_bay/preview_elevated.png" width="420"> | <img src="docs/progress/M18/vesper_bay_stacks/preview_elevated.png" width="420"> |
+
+| A viaduct's end on its embankment (8K) | A junction on a slope meeting every road (Cragmouth, 8K) |
+|---|---|
+| <img src="docs/progress/M18/delta_megacity/render_ramp_embankment.jpg" width="420"> | <img src="docs/progress/M18/cragmouth/render_junction_slope.jpg" width="420"> |
+
+| Water: depth, banks by kind, flow, the sea's exposure | Ground cover: lawn, meadow, marsh, paving, dirt, desire lines |
+|---|---|
+| <img src="docs/progress/M16/vesper_bay/preview_water.png" width="420"> | <img src="docs/progress/M16/vesper_bay/preview_ground.png" width="420"> |
+
+The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edge (8K).
+
+<img src="docs/progress/M16/vesper_bay/render_drained.jpg" width="840">
 
 | Terrain: grades, walls, bored tunnels | Old quarter's hill (8K) |
 |---|---|
@@ -127,9 +139,9 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | ✅ Done |
 | M14 | Layered districts | Deck cities over the streets: upper streets, lots and buildings, ramps, stairs, elevators, light wells | ✅ Done |
 | M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | ✅ Done |
-| M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | Planned |
+| M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | ✅ Done |
 | M17 | Road network repair | Every dead end on purpose (a cul-de-sac with its turning circle, a quay, a park gate, a path's end), no overlapping roads or bridges, roads clear of buildings | ✅ Done |
-| M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps, crosswalks and signals only where they are needed | Planned |
+| M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps on embankments, crosswalks and signals only where they are needed | ✅ Done |
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans (columns, portal frames, piers, sky tube masts), more room over the streets | ✅ Done |
 | M20 | Props, plants and signs | Nothing floating or growing through a road; many more large neon billboards and holo-boards on the sides and tops of buildings | Planned |
 | M21 | Cyberpunk massing | Towers twisted, tapered, leaning, stacked, cantilevered, split, cut through by sky gardens, in exoskeletons or covered in pods, with sloped, cut and halo crowns; curved slabs; true curves; no two neighboring towers alike; a `variety` per district | ✅ Done |
@@ -143,8 +155,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 `--blockout` needs Blender 5.2. While a build runs it prints each stage on stderr (water
-and districts, roads, local streets, buildings, transit, tunnels, props, gameplay, the
-blockout and its Blender steps) with its time, the layout search's tries as they happen, and a
+and districts, roads, local streets, buildings, transit, tunnels, props, gameplay, water
+and ground, the blockout and its Blender steps) with its time, the layout search's tries as they happen, and a
 bar with the time left where a stage has a count; `--quiet` turns it off. To make a new city,
 open Claude Code in this repo and ask for one (the `citygen` skill takes it from there). Editing, locking and the other commands:
 [`docs/citygen_milestones.md`](docs/citygen_milestones.md).
@@ -158,7 +170,8 @@ To see the city in Unreal Engine 5.8, import it into a project (on Windows:
 
 Open the project and press Play: you fly over the city with a free camera (W, A, S, D to
 move, the mouse to look, E or Space up, Q or C down). `--play walk` walks it with the
-project's own character instead, and `--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
+project's own character instead (it swims in the canals, rivers and the sea), and
+`--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
 alone). The import shows the same kind of progress: each stage in Unreal (packs and meshes,
 actors, saving, pruning, the HLOD build, `--check`) with a bar, the time left, and on a first
 import an estimate of the time left in all. Controls, flags and streaming:
@@ -174,31 +187,34 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG12`](docs/progress/AG12), [`AG13`](docs/progress/AG13)
 
 ### Cities
 
-Every building modelled: framed windows, mullions, spandrels, balconies, fins, louvers,
-shutters, capsule pods and structural frames on walls in one of nineteen facade styles
-chosen per district, owner and building, with chamfered and rounded corners, setback ledges,
-crowns, arcades and the wear of poor districts; Vesper Bay, Greyhook and Cragmouth also
-with their roofs, roof equipment and skybridges (8K; open one for full size).
+Every building modelled and textured, in one of nineteen facade styles per district, owner
+and building, with its roof, roof equipment and skybridges, on textured streets, bridges and
+transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K; open one for full
+size).
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/AG4/vesper_bay/8k/city_full.jpg" width="420"> | <img src="docs/progress/AG2/nexus_city/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/nexus_city/city_full.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/AG2/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG2/archipelago_free_port/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/archipelago_free_port/city_full.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/AG4/greyhook/8k/city_full.jpg" width="420"> | <img src="docs/progress/AG2/vesper_bay_pinned/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/greyhook/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/vesper_bay_pinned/city_full.jpg" width="420"> |
 
 | Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
 |---|---|
-| <img src="docs/progress/AG2/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG4/cragmouth/8k/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/cragmouth/city_full.jpg" width="420"> |
+
+| Vesper Bay Decks (a deck over Highcrest) | |
+|---|---|
+| <img src="docs/progress/AG10/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
 
 ### Up close
 
@@ -363,6 +379,52 @@ elevators. The deck's streets lie on the slab and climb to it on solid ramps; th
 undercity's roofs close up to the soffit, its fronts lit and grimy as a covered street.
 More: [`docs/progress/AG10`](docs/progress/AG10).
 
+<img src="docs/progress/AG12/vesper_bay/8k/water_canal_night.jpg" width="840">
+
+A quayed canal in Vesper Bay by night (8K): the neon and lit windows on its water, the quay
+walls with their stairs down to it, moored boats.
+
+| | |
+|---|---|
+| <img src="docs/progress/AG12/vesper_bay/8k/water_bank.jpg" width="420"> | <img src="docs/progress/AG12/vesper_bay/8k/water_harbor.jpg" width="420"> |
+| The Vess River's natural bank (8K) | The harbor basins from above (8K) |
+
+Every river, canal, harbor and the sea gets real water: a surface that carries the current,
+foam along walls, waterlines and bridge piers and, at sea, a swell by how open the water
+is; a bed of mud, silt, sand, gravel or stone at its depth, seen through clear water with
+caustics; and banks by kind, grassy natural banks, beaches, marsh mud, riprap with its
+stones, stone revetments and walls, meeting the quays and canal walls. In Unreal the water
+is Single Layer Water with flowing ripples, foam and waves, and an underwater look.
+
+```bash
+.venv/bin/python -m assetgen water out/vesper_bay
+```
+
+`assetgen build` also runs it, after the streets (`--no-water` skips it). The water stage
+writes `out/<city>/assets/water/`, one glTF pack per 256 m tile with each water body's
+surface (a chain of finer to coarser meshes) and bed, and each bank, replacing the
+blockout's water in Unreal; a regenerated district rewrites only the water near it. More:
+[`docs/progress/AG12`](docs/progress/AG12).
+
+<img src="docs/progress/AG13/vesper_bay/8k/park.jpg" width="840">
+
+A park on Vesper Bay's Scholar Isle at street level (8K): lawn grass, clover and flowers in
+the district's colors under the trees.
+
+| | |
+|---|---|
+| <img src="docs/progress/AG13/vesper_bay/8k/lawn_edge_path.jpg" width="420"> | <img src="docs/progress/AG13/vesper_bay/8k/wasteland_lot.jpg" width="420"> |
+| A lawn's edge and the worn path leaving the street (8K) | A vacant lot in The Stacks (8K) |
+
+Every piece of open land gets its ground: lawns, meadows, marsh, wasteland, dirt, gravel,
+sand, planted beds and paving, each textured by what covers it and worn where people walk,
+mossy in deep shade, darker where it is wet. Grass and small plants grow on it by kind:
+short lawn grass, clover, flowers in each district's palette, long meadow grass, reeds and
+cattails by the water, weeds and scrub on vacant lots, ferns under the trees; none on paths,
+paving or under decks. In Unreal the grass sways in the wind and fades out past 60 to 100 m.
+`assetgen ground out/<city>` makes them (also part of `assetgen build`). More:
+[`docs/progress/AG13`](docs/progress/AG13).
+
 <img src="docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg" width="840">
 
 A shopping street in Greyhook in Unreal 5.8: street fronts, signs, props, roads and
@@ -389,8 +451,8 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Deck slabs with coffered or ribbed soffits, edge fascias, rails, lights over the streets below and colonnades over parks; columns, light-well stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs that meet the slab | Done |
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
-| AG12 | Water | Real water: surfaces that flow and foam, beds, banks and beaches, swimming | Planned |
-| AG13 | Ground cover and grass | Textured ground with worn paths, grass and small plants that sway in the wind | Planned |
+| AG12 | Water | Water that flows, foams and (at sea) swells, beds of mud, sand and stone, natural banks, beaches, marsh edges and riprap, Single Layer Water and an underwater look in Unreal | Done |
+| AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
 | AG14 | Fit and finish | Smooth junctions and curved walls, everything resting on what it stands on, nothing through anything else | Planned |
 | AG15 | Cyberpunk facades and night | Window patterns beyond grids, mixed materials, every building lit its own way at night, lit streets | Planned |
 

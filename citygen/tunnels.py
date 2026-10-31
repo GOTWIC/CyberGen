@@ -1283,6 +1283,8 @@ def _underpasses(spec, m, notes: list) -> tuple[list, list, list]:
     blocked += [G.from_model_poly(s.footprint) for s in m.structures if s.footprint is not None]
     blocked += [G.from_model_poly(j.polygon) for j in m.junctions]
     btree = shapely.STRtree(blocked) if blocked else None
+    feet_of = [G.from_model_poly(s.footprint) for s in m.structures
+               if s.kind in ("column", "pylon") and s.footprint is not None]
     roads = [(LineString(s.centerline), s) for s in m.road_segments]
     rtree = shapely.STRtree([r[0] for r in roads])
     wet = G.union([poly for poly, _, _ in water_bodies(m)])
@@ -1343,6 +1345,9 @@ def _underpasses(spec, m, notes: list) -> tuple[list, list, list]:
             continue
         passage = LineString([feet[0][2], feet[1][2]])
         if passage.intersects(wet):
+            continue
+        # (M18: nor through a column's footing, a transit line's in the highway's median)
+        if any(passage.distance(f) < UND_W_M / 2.0 + 1.0 for f in feet_of):
             continue
         others = [roads[ri][1].id for ri in rtree.query(passage, predicate="intersects").tolist()
                   if roads[ri][1].id != s.id]

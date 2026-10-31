@@ -194,11 +194,16 @@ def _deck_jobs(m, sd, cx, dk, deck_lots: dict, jpolys, cwpolys, swpolys) -> list
                     "tag": "under", "lift": 0.0})
     upper = sorted(deck_lots.get((dk.district_id, 1), []), key=lambda lt: lt.id)
     if upper:
-        roads = []
+        roads, ramps = [], []
         for s in m.road_segments:
             if s.attrs.get("deck") == dk.id and s.attrs.get("role") != "deck_ramp":
                 roads.append((s.id, s.road_class, [tuple(p) for p in s.centerline], s.width_m,
                               tuple((float(z.s), 0.0) for z in s.z_profile)))
+            elif s.attrs.get("deck") == dk.id:
+                # (its ramps, from the deck top, for the skybridges: a bridge a floor over
+                # the deck crossed one near its top)
+                ramps.append((s.id, s.road_class, [tuple(p) for p in s.centerline], s.width_m,
+                              tuple((float(z.s), G.q(float(z.z) - H)) for z in s.z_profile)))
         junctions = [jpolys[i] for i, j in enumerate(m.junctions) if j.level == 1]
         junctions += [cwpolys[i] for i, c in enumerate(m.crosswalks) if c.level == 1]
         junctions += [swpolys[i] for i, w in enumerate(m.sidewalks) if w.level == 1]
@@ -206,7 +211,8 @@ def _deck_jobs(m, sd, cx, dk, deck_lots: dict, jpolys, cwpolys, swpolys) -> list
         ucx = dataclasses.replace(cx, archetype=dsp.upper or cx.archetype, seed=cx.seed + 211,
                                   height=tuple(float(v) for v in dsp.upper_height_m)
                                   if dsp.upper_height_m else cx.height,
-                                  roads=roads, junctions=junctions, water=[], opens=[],
+                                  roads=roads, sky_roads=ramps, junctions=junctions, water=[],
+                                  opens=[],
                                   block_opens={}, complexes=(), landmarks=[],
                                   cones=[(p, lim - H) for p, lim in cx.cones], notes=[])
         out.append({"ctx": ucx, "lots": [_lot_dict(lt) for lt in upper], "deck": dk.id,
@@ -351,8 +357,28 @@ def _build(spec, b, mapper=None, submit=None, side=None) -> Out:
         parts[j].append(r)
     for job in jobs:
         job["ctx"].notes = []
-    rc = _run(mapper, "phase_c", [{"ctx": job["ctx"], "sky": sk, "forced": r["forced"]}
-                                  for job, sk, r in zip(jobs, sky, ra)])
+    # (M14: each level's skybridges keep out of its district's buildings on the other levels,
+    # in its own frame: a deck's z from its top)
+    def others(j: int) -> list:
+        def get(e, key):
+            return e[key] if isinstance(e, dict) else getattr(e, key)
+
+        out_ = []
+        for k, job in enumerate(jobs):
+            if k == j or job["ctx"].did != jobs[j]["ctx"].did:
+                continue
+            dz = float(job.get("lift") or 0.0) - float(jobs[j].get("lift") or 0.0)
+            for r in parts[k]:
+                for b in r["buildings"]:
+                    out_.append({"id": get(b, "id"), "masses": [
+                        (G.from_model_poly(get(x, "footprint")), G.q(get(x, "z0_m") + dz),
+                         G.q(get(x, "z1_m") + dz), get(x, "role"), get(x, "shape"))
+                        for x in get(b, "masses")]})
+        return sorted(out_, key=lambda o: o["id"])
+
+    rc = _run(mapper, "phase_c", [{"ctx": job["ctx"], "sky": sk, "forced": r["forced"],
+                                   "others": others(j)}
+                                  for j, (job, sk, r) in enumerate(zip(jobs, sky, ra))])
     lap("phase_c")
     for j, job in enumerate(jobs):
         tag = job.get("tag")

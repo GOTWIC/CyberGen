@@ -21,6 +21,8 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
 | AG10 | Layered districts: M14's slabs per tile with soffits, fascias, rails, lights and colonnades, their columns, stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs meeting the soffit; `asset_decks` and `street_decks` | Done | [`docs/progress/AG10`](progress/AG10) |
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
+| AG12 | Water: per body and tile a surface (LOD chains carrying the current, a foam mask and the sea's wave weight) and a bed at M16's depth with the banks' slopes under the water; banks by kind with riprap stones; AG7's walls and piers into the bed; water textures and catalog; `M_CgWater` (Single Layer Water, waves) and underwater volumes | Done | [`docs/progress/AG12`](progress/AG12) |
+| AG13 | Ground cover and grass: every piece of M16's open land textured by its cover kind and blended by its wear, shade, edges and moisture; grass and small plants as instanced clumps per tile (decision 13.9 (a)), swaying in Unreal and fading out at 60 to 100 m; `ground_grass_clear` and the budgets | Done | [`docs/progress/AG13`](progress/AG13) |
 
 ## AG0: contract and spike
 
@@ -1358,6 +1360,446 @@ inside Ridgeback's hill; AG10's section adds the ground itself).
   the undercity's one-storey rows leave empty shell nodes in the packs.
 - Mac = x86 waits for the deferred determinism check.
 
+## Fixes after AG10: every check on the nine samples
+
+Full `assetgen build` runs of the nine sample cities on main after M17, M21 and M16 (Saltreach
+Free Port, Vesper Bay Pinned and Vesper Bay Stacks had last been built whole at AG2 or AG8,
+before most of the checks) failed checks in seven of them. The failures #66's builds found in
+those three had gone with M21 (its skybridges keep their corridors clear; the failing door's
+building is no longer there), and others had come. Each was fixed in the generator
+(`GEN_VERSION` agfix.1) but one, which is the city's and is counted apart:
+
+- **Moved doors in place of ground windows** (`fronts.Band.rehome`): a door that has to
+  move off its wall (a party wall, a facade too short) was meant to replace the ground
+  windows of the nearest facade with room, but its filter named window openings `window`
+  where they are `win`, so a door only fitted between windows. A villa with its entrance on
+  a 0.78 m tip of its outline got no door (Pinned, `asset_access`), and a perimeter block's
+  shop door went 13 m along its wall, walled off from its walkway (Delta, M21's open item).
+  Doors facing a neighbor: Pinned 436 to 323, Saltreach Free Port 379 to 300.
+- **No door facing its own wall** (`fronts._faces_own`): a door or shopfront whose way
+  straight out meets the building's own walls within 3 m (a crack in a perimeter block's
+  outline, 0.5 m wide at its mouth; Nexus City) moves, as one against a neighbor does.
+- **Balconies over a turned block or a sky garden** (`shell._hangs`): M21's test of a
+  first-floor balcony hanging in the air took the slab's middle only. A stacked block turned
+  over the one under it, or a tower over a sky garden's open floor, left a corner 1.8 to
+  2.4 m from any mass (Pinned, `asset_envelope`, three towers). It takes every corner now.
+- **Mounts on their mass** (`fronts._on_mass`): the plate behind a cable end the model puts
+  8 cm under an exo frame's belt, which stands 2.9 m off the tower under it, hung under the
+  belt (Stacks, `asset_envelope`). Plates, ties and trellises stay within their mass's
+  height.
+- **A mast's foot on its roof** (`shell._mast`): a concave arc in a tower's outline pulled
+  the middle of its vertices to its edge, and the mast's foot 1.1 m off the roof (Decks).
+  Where the foot does not fit there, the mast stands at the middle of the area.
+- **Skybridges over a lower roof** (`shell._finish_parts`, `roofs._off_bridges`): on
+  Cragmouth three bridges are level with a lower roof of their building (a stacked tower's
+  lower block, a pod) and cross 1.2 to 3.4 m of it before the wall they land on. Flush parts
+  (mullion caps) at that facade's top and the roof's finish were in their corridors
+  (`asset_clearance`). Flush parts now take the corridor's own test (its collars and the
+  inside of masses spared), and a flat roof's finish is cut round the corridors over it.
+- **Landing doors on simply drawn masses** (`shell._simple_landings`): M21's round,
+  twisted, tapered and leaning shafts are drawn simply until AG15, with no facade grammar to
+  cut a landing door, so a bridge landing on a round tower had none (Cragmouth,
+  `asset_landings`). The facets where it lands take a storefront door from the floor to the
+  glass ribbon's head; every facet of the ring is split at its heights, so the mesh stays
+  closed.
+- **The ground under the base along the walls** (`build.building_asset`, the shell's
+  `walls`): a 3.5 m spike in a footprint, which the shell tidies away, still brought the
+  ground at its tip (1.25 m under the base) into `grade_low_m`, so `asset_slopes` wanted a
+  step where no wall stands (Cragmouth). The ground is taken along the stretches of the
+  edges that walls stand on.
+- **Quay UVs** (`streets/water._along`): a quay's u was the distance along its line. Round
+  the traced island's basins in Pinned, its 15 m paving's mitred outer edge at a sharp
+  corner, or at a jog of a few centimeters, ran meters with almost no u, and the streets
+  met the texel density on 99.499 % of their area (99.5 % needed). u now runs along each
+  edge line's own length (99.79 %).
+- **Junction corners** (`streets/walks._onto`): a sidewalk corner cut from the earlier
+  ones on the overlay's 1 cm grid kept a vertex 4.4 mm inside an earlier corner's edge, a
+  sliver of both (Nexus City's `jn.e383n933`, `street_meshes`). A vertex within 7.5 mm of an
+  earlier corner's edge goes.
+- **The materials report** was written only when a file of its stage changed; its texel
+  check reads the other stages' packs, so a fixed shell or street piece left it saying FAIL.
+  It is written when its checks change too.
+- **Sky stations out of reach** (`connections._beside`, `asset_roofs`): M5 portals a station
+  through its building by the union of the building's masses, so a tube can pass over a
+  megabuilding's podium far from its tower: the Crown Loop's station at The Stacks in Vesper
+  Bay, Pinned and Stacks, 14.4 m from the tower at the tube's height with the podium roof
+  64 m under it (M21's open item in Vesper Bay). With no wall within 6 m at its floor and no
+  roof within 3 m under it, nothing of the building can carry a platform: counted apart
+  (`stations_out_of_reach`), the city's to change. A station the building could serve still
+  fails.
+
+**Samples** (each found by a full build with the fixes before it; then every city built
+again on the final code, every check of every stage passing):
+
+| City | Found |
+|---|---|
+| Saltreach Free Port | nothing |
+| Vesper Bay Pinned | balconies (3 towers), the villa's door, the station, the quays' texel density |
+| Vesper Bay Stacks | the mount under a belt |
+| Vesper Bay | the station (counted apart) |
+| Delta Megacity | nothing (the perimeter block's door, fixed with `rehome`) |
+| Nexus City | the door in a crack, the junction's corners |
+| Greyhook | nothing |
+| Cragmouth | three bridges over a lower roof, the round tower's landing, the spike |
+| Vesper Bay Decks | the mast |
+
+On the final code (4 workers on the shared Mac, 1.5 to 3 min a city; landing doors of the
+skybridge ends, the rest counted apart as at the ground, off a floor line or in a portal):
+
+| City | Buildings | Doors (facing a neighbor) | Landing doors | Stations out of reach | Streets at texel density |
+|---|---|---|---|---|---|
+| Saltreach Free Port | 3,186 | 11,788 (300) | 287 of 290 | 0 | 99.84 % |
+| Vesper Bay Pinned | 6,766 | 21,293 (323) | 462 of 470 | 1 | 99.79 % |
+| Vesper Bay Stacks | 6,620 | 20,653 (357) | 445 of 450 | 1 | 99.78 % |
+| Vesper Bay | 5,809 | 19,952 (368) | 467 of 470 | 1 | 99.84 % |
+| Delta Megacity | 5,516 | 21,131 (418) | 567 of 574 | 0 | 99.76 % |
+| Nexus City | 6,553 | 23,123 (415) | 450 of 454 | 0 | 99.83 % |
+| Greyhook | 2,617 | 10,265 (66) | 309 of 310 | 0 | 99.86 % |
+| Cragmouth | 7,058 | 24,638 (363) | 455 of 470 | 0 | 99.80 % |
+| Vesper Bay Decks | 5,962 | 21,756 (328) | 507 of 510 | 0 | 99.83 % |
+
+Previews of the fixed spots: [`docs/progress/agfix/`](progress/agfix).
+
+**Goldens** written again on this Mac: `ag1` (the small city's manifest and files, the Vesper
+Bay buildings' GLBs) and `ag6` (the small city's materials), since every pack carries
+`GEN_VERSION`; the street packs' (the small city, Vesper Bay and three of its six named
+tiles: their quays and junction corners); and the props golden, stale since M17, M21 and M16
+moved the small city (main gives the same digest, and nothing here changes the props).
+
+**Tests**: `tests/assetgen` and `tests/test_unreal.py` (the Unreal launches deselected): 190
+passed and 2 failed, the props golden (since written again) and Nexus City's sample briefs
+(`test_sample_briefs_golden[nexus_city]`, which fails on main too, below); new
+`test_ag_fixes.py` (4): a moved door in place of ground windows, a corner snapped onto an
+earlier one, quay UVs round a sharp corner, a station counted apart.
+
+**Asks of citygen**:
+- Portal a sky station only through a building whose tower the tube passes through, or
+  within 6 m of, at its height (the Crown Loop's station at The Stacks).
+- Nexus City's junction `jn.e383n933`: its polygon has a 29.7 m2 hole inside highway
+  `rs.e566n892`'s carriageway (unpaved in the assets), and two of its legs make a bowtie
+  corner, which puts a sidewalk corner in the carriageway.
+- Footprints with a spike (Cragmouth `d03.lot.w434n813.bld`, 3.5 m out and back) or a crack
+  (Nexus City `d06.lot.e1045s82.bld`, 7.5 m deep, 0.5 m at its mouth).
+- Skybridges level with a lower roof of the building they land on (Cragmouth): end them at
+  the roof's edge, or keep their deck clear of the roof.
+- Open decks that end several meters short of the wall they land on (Cragmouth, up to 27 m;
+  6.5 m from a round tower, M21's shaft inside the box the deck was laid to).
+- Pinned's traced Corporate Core door `d01.pin.path.w1427s613.door.e0` faces a 1.2 m court
+  between two traced buildings (counted apart as facing a neighbor).
+- Nexus City built from main on this Mac is not citygen's golden model (`a6ddd8fe...` in
+  `tests/data/golden_hashes.json`, `f74f4ffd...` here, twice; the same tries, layout salt 1,
+  and a report the same as the committed one but for its timings), so assetgen's sample
+  briefs golden for it fails.
+
+## AG13: ground cover and grass
+
+**Built.** Stage 2's side of citygen's M16 for the open land (scope 14.14; decision 13.9
+taken as (a)), in `assetgen/ground/`:
+- **AG6's sets** (`materials/library.GROUND_SETS`, generators at the end of `surfaces.py`):
+  `ground_lawn` (mown blades, faint stripes, clover, thatch, bare spots), `ground_meadow`
+  (long grass in swirling clumps, straw, seed heads, soil between), `ground_wild` (the
+  meadow gone dry, for wasteland), `ground_dirt` (clods, pebbles, roots, cracks, trodden
+  patches), `ground_mud` (ruts, smears, puddles with low roughness), `ground_gravel`
+  (stones of two sizes over dust, oil), `ground_sand` (grain, ripples, shell bits, dents),
+  `ground_moss` (cushions) and `ground_rubble` (broken concrete and brick on dirt); 2 m
+  tiles at 512 px/m (gravel and moss 1 m). Paving needed no new set: M16's paving and
+  overgrown paving take AG7's paving sets by what they pave (a plaza's granite, a market's
+  or court's cobbles, a promenade's tiles, a podium's concrete tiles, a yard's slabs, a
+  megasite's cast concrete or pads). The library grows to 134 sets, about 1 GB cooked.
+- **Surfaces** (`kinds.py`): per cover kind a base, a worn and a shade set and blend weights
+  (lawn: lawn, dirt, moss; marsh: meadow tinted dark, mud, moss; wasteland: wild, dirt,
+  rubble; gravel: gravel, dirt, moss; and so on), a lawn's green as a tint over the set's
+  vegetation.
+- **Per tile** (`gather.py`, `tile.py`; a job holds every input of its 256 m tile and its
+  hash decides whether the tile is made again):
+  - **Mask** (`ground/masks/<tile>.png`, 512 px, a pixel per 0.5 m, row 0 the south edge):
+    R wear (each desire line its own wear across its width, falling to 0 a meter past it;
+    under it the piece's wear at 0.35), G shade (M16's 4 m raster bilinear, tree crowns 0.55
+    to 0.8, 1 under a deck: finer than M16's per-piece mean, its open item), B edge (one to
+    three pixels in from where the surface changes), A moisture (1 at the water, 0 from
+    60 m, on a 2 m grid).
+  - **Ground mesh** (`ground/tiles/<tile>.glb`): every piece clipped to the tile on the 1 cm
+    grid, triangulated exactly on its millimeters, 0.1 m over the ground as the blockout's
+    flats were; on M13's terrain cut by its 4 m cells, each vertex and normal on the ground
+    grid, and a triangle steeper than about 35 degrees (the steps of the retaining walls,
+    the cliff) box mapped on its own vertices, since plan UVs stretch there (the texel
+    density check found it on Cragmouth); a part ear clipping refuses (a hole touching its
+    outer ring at a vertex: one in Nexus City) takes GEOS's constrained Delaunay triangles
+    on the same vertices. A primitive per surface and tile: the mask is per tile, so is the
+    material.
+  - **Grass** (`ground/grass/<tile>.json`): a candidate per mask pixel inside a
+    grass-bearing piece (not under a deck), jittered in it and kept by splitmix64 hashes of
+    its world cell (so a tile's grass does not depend on how the city is cut into jobs) with
+    probability $D\,a\,(1-w)^2 f_s (1 + 0.6 m) f_g k_t$ (`kinds.py`: $D$ from 0.04 per m2
+    on sand to 1.8 in planted beds; fewer in deep shade; more near water; half on ground
+    over 30 degrees, none over 40; $k_t$ the tile's cap). The clump kind from the piece's
+    mix, leaning to ferns in deep shade and under crowns, reeds on wet ground, weeds where
+    neglected; variant, yaw and scale by hash. A clump stands only where its footprint (its
+    kind's radius times its scale) lies in grass-bearing land clear of desire lines, decks,
+    trunks, and the right of way, buildings, solid structures and water the check tests
+    (`citygen.cover.Ctx`, near the tile), so the clearance holds whatever the pieces'
+    topology (two lot yards meeting at a building's corner, a median lawn a few millimeters
+    from a lot across a road's edge, a building's 3 mm spike: each let a clump through
+    before).
+- **Verges**: M6's median lawns, which the blockout drew flat over the road and nothing
+  replaced: on AG7's lawn island top (avenues, streets and service roads with a median of
+  2 m, not in the industrial and aerospace eras) grass only, at the top; on a highway's
+  median a lawn strip 3 cm over the asphalt with grass clear of the barrier; under AG7's
+  concrete island top nothing.
+- **Clumps** (`clumps.py`, `ground/clumps.glb`): lawn (32 to 42 blades), clover (trefoils,
+  white heads), flowers (stems, leaves, five or six petal heads over a tuft; a family per
+  district palette: its era's palette from `assetgen/presets.py` pushed to petal colors,
+  greys left out), meadow and meadow_dry (40 to 52 blades over straw, seed stalks), reeds
+  (plumes), cattails (sword leaves, brown heads), weeds (rosettes, a seed stalk), fern
+  (arching fronds, paired pinnae), and AG8's scrub and sedum (`props.trees` at 0.5 and 0.34
+  scale): AG8's ground plants folded in as clump kinds. M6's own scrub and sedum
+  placements stay AG8's instances (seen from far; the grass fades at 100 m). 3 or 4
+  variants each, 60 to 366 triangles, COLOR_0 for the grass master (height share, tone,
+  dryness), normals leaning up.
+- **Checks** (`checks.py`, `ground_report.json/.txt`): `ground_coverage`,
+  `ground_grass_clear` (on the model's own geometry on the 1 cm grid), `ground_meshes`,
+  `ground_budgets`. `ground/preview.png`: the city from above at 2 m a pixel and the tile
+  with the most clumps at 0.25 m.
+- **Budgets** (decision 13.9 (a)): at most 40,000 clumps a tile (the kept clumps scaled up
+  by the cap's inverse square root, at most 1.5; a tile over it by chance drops the clumps
+  kept by the least margin), 3 million a city, 400 triangles a clump variant, 60,000 for all
+  of a city's variants, 250,000 ground triangles a tile and 12 million a city, 12 million
+  instanced triangles a tile (Unreal draws about half a tile's within the fade radius).
+- **Unreal** (`docs/unreal_export.md`, AG13): `unreal_contribution.ground.json`; a ground
+  actor per tile replacing its tile's ground cover and median lawn objects, a drop for an
+  object whose tile draws none of its pieces; the grass as instanced parts whose transforms
+  stay in their tile's file (`xforms_file`), not Nanite, no collision, no shadow, culled at
+  60 to 100 m, out of the HLODs; `M_CgGround` and `M_CgGrass` (sway by world position
+  offset times `MPC_CityGen`'s new `Wind`, dithered with the instance fade). Not run in
+  Unreal (the coordinating session's call).
+- **Blender**: `assetgen materials preview` draws the ground tiles with the ground material
+  (`ag6_materials.ground`, node for node the master's blend) and the clumps within 140 m of
+  a street view's eye through AG8's geometry-nodes instancer (`grass`).
+
+**Samples** (Windows PC, 3 workers, on M16's builds of main at 280eb35, with main's fixes
+after AG10 merged in: the six samples' full `assetgen build` passes every check, buildings,
+streets, props, ground and materials; before that merge Delta's `asset_access` door, Nexus
+City's `asset_access` and `street_meshes` and Greyhook's `asset_envelope` failed with
+main's own code as well):
+
+| City | Pieces | Tiles | Clumps | Most in a tile | Tiles at the cap | Instanced triangles, most in a tile | Ground triangles (most in a tile) | Clump variants (triangles) | MB | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 4486 | 160 | 1,823,161 | 40,000 | 11 | 7,057,657 | 61,744 (1,498) | 61 (10,796) | 89 | 44 |
+| Delta Megacity | 4780 | 145 | 1,012,038 | 40,000 | 9 | 7,082,152 | 65,852 (1,141) | 61 (10,796) | 55 | 36 |
+| Saltreach Free Port | 2627 | 158 | 2,283,363 | 40,000 | 26 | 7,966,535 | 36,475 (1,346) | 55 (9,732) | 105 | 44 |
+| Nexus City | 5520 | 173 | 1,374,336 | 39,840 | 8 | 7,015,648 | 72,245 (1,135) | 67 (11,860) | 73 | 38 |
+| Greyhook | 2574 | 151 | 1,095,227 | 37,874 | 0 | 4,483,236 | 44,659 (1,008) | 55 (9,732) | 56 | 34 |
+| Cragmouth | 5381 | 129 | 1,189,678 | 40,000 | 3 | 9,382,475 | 491,923 (8,506) | 58 (10,264) | 100 | 62 |
+| Vesper Bay Decks | 4258 | 160 | 1,676,080 | 40,000 | 11 | 7,057,657 | 58,556 (1,337) | 61 (10,796) | 83 | 45 |
+
+A regeneration: Vesper Bay's Old Town (M16's regenerated model over the same base) made 27
+of its 160 tiles again, every one within 55 m of the district (whose pieces meet 26 tiles);
+the rest kept byte for byte.
+
+**Open.**
+- Not run in Unreal: the masters' graphs, `set_cull_distances`, the dither on the fade and
+  leaving the grass out of the HLODs are written to the engine's Python API but untested
+  (the coordinating session's call on a check). A grass runtime grid of its own (World
+  Partition loading the grass nearer than the city) would cut memory further.
+- Grass instances carry no per-instance color (a flower's color is its family's); stage 3
+  drives `Wind` and seasons.
+- The ground on M13's terrain follows the bilinear ground grid as the blockout's heightfield
+  does, ramps over the retaining walls' steps included (box mapped, no grass on them).
+- Deck columns standing on a lawn are not cut out of it (no grass under a deck anyway).
+- Mac = x86 waits for the deferred determinism check.
+
+## AG12: water
+
+**Built.** Stage 2's water from citygen's M16 (scope 14.13; decision 13.10 taken as (a)):
+every water body's surface, bed and banks, `assetgen water BUILD` (also a stage of
+`assetgen build`, after the streets; `--no-water` skips it), in `assetgen/water/`:
+- **Pieces** (`pieces.py`), each made from its own inputs and kept by hash as AG7's:
+  - a **body piece** per water body and 256 m tile (`<body>@<tile>`): the body's own water
+    (its polygon less the bodies before it in M16's order, the order `Beds.body_at` takes,
+    so no two overlap) in the tile, with the body's depth, profile, material and flow, its
+    level, its banks within reach of the tile, the edges it shares with other water, the
+    bridge piers there and the sea's exposure raster near it; it makes the bed
+    (`<body>.bed.<tile>`) and the surface (`<body>.water.<tile>`);
+  - a **bank piece** per bank AG12 draws (natural bank, beach, marsh edge, riprap, road
+    embankment, and canal walls along rivers and the sea): AG7 keeps the quays and the
+    waterways' canal walls;
+  - the **drop**: the blockout's water objects no piece takes the place of (sea sheets of
+    tiles with no sea, the quay and canal wall bands AG7 draws).
+- **Fields** (`fields.py`, from a piece's inputs alone):
+  - **depth**: M16's `Beds.depth_many` exactly (its nearest bank and ties, on the body's
+    banks within reach; a test compares them at random points);
+  - **bottom**, the depth AG12 draws: M16's bed raised to every sloped bank's slope carried
+    on under the water (`bottom`: all of them within reach, not only the nearest; where a
+    slope meets a wall, or a beach meets riprap, the nearer bank's bed stepped 3 m down
+    under the other's waterline), at a wall's toe up to its face (M16's bed begins the
+    wall's thickness out), never within 5 cm of the surface;
+  - **level**: a flat city's `surface_m` (-1.5), else M13's (a river's along its
+    centerline);
+  - **current**: along the body's flow line, the sea's tide along its nearest shore, times
+    the square root of the depth over the deepest there (slower over shallows);
+  - **foam**: at a wall's face, a sloped bank's waterline (wide on a beach, faint by a marsh)
+    and round AG7's bridge piers;
+  - **waves** (the sea): M16's exposure (open 1, sheltered 0.5, harbor 0.15) on a 16 m raster
+    blurred over 80 m, nothing at the waterline and full 20 m out.
+- **Meshes** (`grid.py`, `makers.py`): a region on a square lattice, the cells inside it two
+  triangles each on its points, the edge cells clipped on the millimeter grid and
+  triangulated exactly (a piece the ear clipper cannot take whole, a hole touching its
+  outline, split in halves), vertices shared by position, so each sheet is watertight.
+  - **Bed** (Nanite, complex collision): 8 m on the sea, else 4 m; it leaves out every sloped
+    bank's dry strip (the line buffered `width` over the water; a ring round an island by
+    its polygon's offsets), so bank and bed meet along the waterline; a slot by M16's
+    material (`bed.mud`, `silt`, `sand`, `gravel`, `stone`), the underwater zone of a bank by
+    the bank's (riprap and road embankment stone, beach sand, marsh mud); a steep triangle
+    (a step) on vertices of its own with UV0 on its vertical plane; skirts 13 m down along
+    the edges a body shares with other water, facing out, so a step between two beds is
+    closed from the shallower side; UV1.x the depth (caustics). On a terrain city the bed
+    lies 0.1 m over M13's ground grid (which carries M16's beds too), never within 5 cm of
+    the surface.
+  - **Surface** (non-Nanite, no collision): LOD chains on the sea's 2, 4, 8 and 16 m
+    lattices and inland 4, 8 and 16 m (screen sizes 1, 0.4, 0.15, 0.05); UV0 the plan in
+    meters, UV1 the current, COLOR_0 foam, depth over 12 m, wave weight.
+  - **Banks**: the dry strip on a 2 m lattice, each point at the ground at the line's nearest
+    point falling to the level at `width` (the bed's slope); riprap stones on it from the line
+    to the toe (six stone meshes in `water/parts.glb`, instanced, jittered and turned by a
+    hash of the bank and cell); stone walls with a coping along rivers and the sea, 0.5 m
+    into the bed.
+- **AG7** (`streets/ctx.py`, `water.py`, `structures.py`): `Ground.water_level` is M16's
+  surface on a flat city (`WATER_DEFAULT` -0.9 only for a model without M16); quay and canal
+  walls reach M16's toe and 0.5 m into the bed (`notes.foot`), the quay stairs down to the
+  new surface; canal walls follow the waterway's `canal_wall` banks (they ran round the
+  whole polygon, a dam across each canal's mouth into other water); bridge piers and arch
+  and pylon footings stand 0.5 m into M16's bed (`inputs.bed`, sampled along the bridge),
+  their footprints in `notes.piers` for AG12's foam.
+- **AG8** (`props/gather.py`): a boat floats on M16's water (its waterline at the body's
+  surface; it stood at the ground, 1.5 m over the water).
+- **AG6**: sets `bed_mud`, `bed_silt`, `bed_sand`, `bed_gravel`, `bed_stone` (under water,
+  the upper band's density), `bank_soil`, `bank_rubble`, `bank_rock` (`library.WATER_SETS`;
+  generators `sediment`, `water_rubble`, `water_soil` in `materials/water_surfaces.py`:
+  deposits, worm casts, ripple marks, pebbles, shell grit; packed stones; crumbly soil with
+  roots and grass tufts); the `water` atlas (8 m: ripple normals, foam lace at two scales and bubbles, two
+  caustic networks and their glow); `catalog.WATER`, per water kind (sea, river, canal,
+  ornamental, marsh; a body along marshes for 40% of its banks is marsh water): Single
+  Layer Water's scattering and absorption, shallow and deep colors, clarity, flow, foam,
+  swell height and length; `WATER_SLOT` for the beds, banks, walls and stones; masters
+  `water` and `bed`; the texel check reads the water packs (beds at the upper density).
+- **Checks** (`checks.py`, the packs read back against the model):
+  - `water_coverage`: each body's own water covered by its first surface LOD, and by its
+    beds with its sloped banks' dry strips (within 0.2%); every bank drawn, every quay and
+    waterway canal wall by AG7;
+  - `water_levels`: every surface vertex of every LOD at its level (1 cm); sampled bed
+    vertices at AG12's bottom from the model's own banks (2 cm), never deeper than M16's bed
+    (the share exactly on it reported);
+  - `water_gaps`: each sloped bank's waterline on the bed under it (at most 12 cm over it),
+    every wall foot (AG12's and AG7's quays and canal walls) in the bed, every shared edge
+    skirted;
+  - `water_meshes`, `water_budgets` (400,000 triangles and 60,000 stones a tile, 9 million
+    triangles a city), `water_replaces` (every blockout water object replaced or dropped).
+  - `water_report.txt`; `water/preview.png` (`preview.py`: the beds by depth, the banks by
+    kind, insets with the foam, the current and the stones).
+- **Unreal exporter** (`docs/unreal_export.md`, AG12): `unreal_contribution.water.json`;
+  `M_CgWater` (Single Layer Water: the kind's scattering and absorption, ripples along the
+  current in a flow map's two phases, foam from the vertex mask and the shallows drawn by
+  Opacity, the sea's swell as four Gerstner waves by world position offset faded out from 150
+  to 350 m), `M_CgBed` (caustics as emission under the water, fading with depth and by
+  night), the water packs imported with their vertex colors and full-precision UVs and no
+  lightmap UVs, a post-process volume beside each M16 swim box (`underwater.<water>.<tile>.<k>`:
+  the kind's tint, saturation, vignette, fog); `STAGE2_VERSION` 7.
+- **Blender**: `ag6_materials.water` (refractive, the color by depth and clarity, ripples at
+  two scales, the swell as a bump, the foam over the lace as a matte surface) and `caustics`;
+  `assetgen materials preview --views water`: `water_canal` (along the straightest stretch of
+  the longest quayed canal from 2.6 m over the water), `water_bank` (a river's longest
+  natural or riprap bank from over the water beside it), `water_harbor` (the biggest basin from
+  above); AG12's water in every textured view near it.
+
+**Samples** (M16's, M21's and M18's models, main at f27543e, built by the M18 session; AG7's
+streets, then the water, 2 workers, the Windows PC; triangles: the surfaces' first LOD, the beds
+and the banks):
+
+| City | Water bodies (kinds) | km2 | Tiles | Surface | Beds | Banks | Triangles | Most in a tile | Stones | MB | Seconds |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 10 (sea 3, river 1, marsh 2, canal 4) | 3.56 | 114 | 1,572,582 | 161,783 | 134,582 | 1,868,947 | 50,005 | 45,178 | 69.9 | 32 |
+| Delta Megacity | 13 (sea 3, river 2, marsh 1, canal 7) | 4.51 | 136 | 1,956,126 | 220,762 | 106,160 | 2,283,048 | 35,013 | 27,797 | 85.7 | 37 |
+| Saltreach Free Port | 12 (sea 4, river 5, canal 3) | 4.90 | 145 | 2,428,997 | 169,275 | 89,356 | 2,687,628 | 45,387 | 28,196 | 101.7 | 51 |
+| Nexus City | 18 (sea 5, river 2, marsh 2, canal 9) | 3.16 | 111 | 1,282,137 | 180,343 | 113,294 | 1,575,774 | 37,568 | 21,483 | 59.2 | 37 |
+| Greyhook | 6 (sea 3, river 1, canal 2) | 7.24 | 195 | 3,541,060 | 254,845 | 90,290 | 3,886,195 | 41,481 | 48,496 | 146.7 | 83 |
+| Cragmouth (terrain) | 8 (sea 4, river 2, canal 2) | 3.03 | 72 | 1,456,281 | 113,790 | 39,926 | 1,609,997 | 34,816 | 34,044 | 60.6 | 27 |
+
+The surfaces' coarser LODs add a quarter again (Vesper Bay 398,598, 103,215 and 24,844
+triangles). Every water check and every street check passes in all six; 76 to 94% of the
+bed vertices lie exactly on M16's bed, the rest on a bank's slope carried on over it.
+M18's models move the water little (its embankments and crossings change some banks and
+the bridge piers' foam).
+
+Before M18 (M16's models, main at 280eb35, with the fixes after AG10 and AG13 merged in), a
+full `assetgen build` of the six passed every check of every stage (buildings, streets,
+water, props, AG13's ground, materials; AG6's texel check with the water packs in it), and
+before the fixes after AG10 were merged in, the same checks failed as main's build of the
+same models. Merging AG13 moved no water byte. AG13's surface generators `soil` and
+`rubble` took the names AG12's banks and stony beds had used (`surfaces.make` looks AG13's
+up first), so AG12's are `water_soil` and `water_rubble`.
+
+**Regeneration** (on M16's models): M16's Old Town regeneration of Vesper Bay: 22 banks
+changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,
+every one within reach of a changed bank); 14 of 114 tiles made again, 9 written (the rest
+the same bytes), every water check passing.
+
+**Found on the way**:
+- AG7 drew canal walls round a waterway's whole polygon, so each canal's mouth into a river
+  or the sea had a stone dam across it (47 to 143 m per waterway in Vesper Bay and Delta);
+  its quay walls stopped 3 m under the water over 10.5 m deep basins, and bridge piers 4 m
+  under it over a 12 m deep sea.
+- M16's bed steps from nothing to the toe at a bank's waterline and from one bank's profile
+  to another's where the nearest bank changes: a gap of up to 3 m under a natural bank
+  where it met a wall. AG12's bed carries every sloped bank's slope on under the water.
+- A bank round a whole island (Saltreach's beach, 3.2 km) made a strip polygon of the whole
+  island (758,000 m2 of sand at the water's level), and GEOS's one-sided buffer of a closed
+  line took the land side: a ring's strip is its polygon's offset.
+- Moored boats stood at the ground, 1.5 m over M16's water (AG8 now floats them).
+
+**Exporter**: the third layer-2 part, recorded in `unreal_export.md` (AG12); tests without
+Unreal (`test_exporter_takes_the_water`: the stage 2 LOD chains, masters and the underwater
+volumes per swim box). Not run in Unreal (the coordinating session's call).
+
+**Tests**: `tests/assetgen/test_ag_water.py` (11: the small test city's water with every
+check, the fields against M16, kept by hash, the same bytes on one or three workers and
+another hash seed, a regenerated district's water only near its changed banks, the
+contribution against the packs, the exporter's stage 2, AG7's walls in the bed and canal
+mouths open, the mesher on a hole touching its outline, the small city's and Vesper Bay's
+goldens, `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`).
+Tests that the water changes: the exporter's stage 2 (`test_stage2_from_assetgen`: the
+underwater volumes are new actors), M13's lift of props
+(`test_m13_lifts_placements_by_base_or_ground`: boats float on the water) and the stub
+model of the streets' ground test (its water bodies). On the code with M18 merged in,
+`tests/assetgen` and `tests/test_unreal.py` on this PC: 218 passed, 2 skipped, 1 failed, the
+props golden (it fails on Windows, and AG8's boats move it). Earlier, the whole suite after
+merging the fixes after AG10: 782 passed, 4 skipped, 2 failed, both known to fail on Windows
+(the props golden and `test_progress`'s pipe test).
+Goldens written again on this PC on the code with M18 merged in, on purpose: the water's
+(the small city and Vesper Bay on M18's models), the streets' (AG7's walls, piers and canal
+walls on M16's water; the library's hash in the contribution) and assetgen's `ag1`
+`testport_files` and `ag6` `testport_materials` (the contributions carry the library's
+hash, which AG12's sets and atlas change; materials.json gains the water); AG13's ground
+golden, the building manifest and packs, briefs and the sample goldens are main's. The
+props golden stays main's (AG8's boats move it, so it needs writing again on the Mac).
+
+**Open.**
+- Not run in Unreal: `M_CgWater` is written against UE 5.8's Python names for the Single
+  Layer Water output node and the Interchange mesh options (logged and skipped where an
+  engine lacks one, an opaque water as fallback); the coordinating session decides on a
+  check.
+- Depth foam comes from the vertex depth (shallows under 0.6 m), not the scene depth.
+- The previews' swell is a bump of two wave bands, not the master's displaced Gerstner
+  waves; the master's wave normals take the tangent frame of UV0 (x east, y north).
+- On a terrain city the bed lies 0.1 m over M13's ground grid, which keeps M16's beds too;
+  the grid could leave the water out once AG12's beds are the bed.
+- M16's exposure zones are 32 m cells (blurred here over 80 m); a sea channel has no
+  exposure of its own (no swell inland).
+- Marsh edges have mud, not reeds (AG13's cover); quay railings and the props on quays are
+  M20's (M16's PR).
+- Stage 3: wind, rain and fog on the water, the underwater look beyond a tinted volume;
+  stage 4: boats moving with buoyancy and wakes, ferries.
+- Mac = x86 waits for the deferred determinism check.
+
 ## Order
 
 ```
@@ -1381,7 +1823,8 @@ and its entry here notes it.
 
 ## Progress output
 
-`assetgen build`, `preview`, `materials preview|board`, `library`, `streets` and `props` say
+`assetgen build`, `preview`, `materials preview|board`, `library`, `streets`, `water`, `props`
+and `ground` say
 what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1's
 `citygen/progress.py`, which it will import once that lands): a line per stage (load, briefs,
 genomes, shells and parts, the library on first use, building checks, streets, signage,
@@ -1415,6 +1858,8 @@ assets are not in git.
 .venv/bin/python -m assetgen materials preview BUILD [--night]          # textured renders (AG6)
 .venv/bin/python -m assetgen materials board OUT                        # material boards (AG6)
 .venv/bin/python -m assetgen streets seam BASE REGEN --district NAME    # what a regeneration changed (AG7)
+.venv/bin/python -m assetgen water BUILD [--workers 4]                  # water (AG12)
+.venv/bin/python -m assetgen ground BUILD [--workers 4]                 # ground cover and grass (AG13)
 .venv/bin/python -m assetgen review BUILD --prev P                      # art-direction round (AG5)
 .venv/bin/python -m citygen unreal BUILD PROJECT                        # the city with its assets in Unreal
 .venv/bin/python -m assetgen sweep --suite m8a --out DIR                # (AG9)

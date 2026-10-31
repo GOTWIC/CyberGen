@@ -459,13 +459,16 @@ def roofs(records: dict, briefs: dict) -> dict:
     """AG4: an asset for every roof item of every brief (an instanced roof part, a merged
     one, or AG8's billboard), every green roof of `GREEN_MIN_M2` or more built, every
     portal cut through its tower (or passing between its masses, `portals_passing`), a
-    platform in every sky station's."""
+    platform in every sky station's. A station whose tube passes its building with no
+    wall within reach at its floor and no roof under it (`connections._beside`) is counted
+    apart, the city's to change (`stations_out_of_reach`)."""
     from shapely.geometry import Polygon
     items = kinds = missing = 0
     by: dict[str, int] = {}
     green = green_built = green_small = 0
     portals = cut = passes = closed = stations = platforms = 0
     first = []
+    far = []
     for k in sorted(records):
         r, br = records[k], briefs.get(k) or {}
         want = br.get("roof_items") or []
@@ -498,6 +501,13 @@ def roofs(records: dict, briefs: dict) -> dict:
             passes += int(not p["cut"] and p.get("through", 1) == 0)
             stations += int(p["station"])
             platforms += int(p["station"] and p["platform"])
+            if p["station"] and not p["platform"] and p.get("out_of_reach"):
+                # (a station the city put out of its building's reach: the tube passes
+                # beside it, no wall within reach at its floor nor a roof under it; the
+                # city's to change, counted apart)
+                far.append(f"{k}: station {p['station_id']} out of reach "
+                           f"({p.get('gap_m')} m from its walls)")
+                continue
             if (not p["cut"] and p.get("through", 1)) or (p["station"] and not p["platform"]):
                 closed += 1
                 if len(first) < 5:
@@ -509,7 +519,8 @@ def roofs(records: dict, briefs: dict) -> dict:
             "kinds": kinds, "by_kind": dict(sorted(by.items())), "green_roofs": green,
             "green_built": green_built, "green_too_small": green_small, "portals": portals,
             "portals_cut": cut, "portals_passing": passes, "portals_closed": closed,
-            "sky_stations": stations, "platforms": platforms, "first": first}
+            "sky_stations": stations, "platforms": platforms,
+            "stations_out_of_reach": len(far), "first": first + far[:3]}
 
 
 def landings(records: dict, skybridges: dict | None = None) -> dict:

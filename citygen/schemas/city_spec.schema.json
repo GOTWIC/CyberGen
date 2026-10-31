@@ -694,6 +694,18 @@
           ],
           "default": null,
           "description": "M14: a layered district: an upper deck city over the ground streets."
+        },
+        "junctions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JunctionControl"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M18: signals and crosswalks by need (default 'auto' for both)."
         }
       },
       "required": [
@@ -701,6 +713,62 @@
         "archetype"
       ],
       "title": "District",
+      "type": "object"
+    },
+    "Grades": {
+      "additionalProperties": false,
+      "description": "M18: grades of the raised roads (steeper and shorter than M7's 5%, leaving less dead\nspace under them).",
+      "properties": {
+        "run": {
+          "default": 0.06,
+          "description": "Design grade of a viaduct run's ends down to the ground.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 0.1,
+          "title": "Run",
+          "type": "number"
+        },
+        "run_max": {
+          "default": 0.07,
+          "description": "Steepest a viaduct run may be.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 0.1,
+          "title": "Run Max",
+          "type": "number"
+        },
+        "ramp": {
+          "default": 0.07,
+          "description": "Design grade of ramps, loops, flyovers and stack ramps.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 0.1,
+          "title": "Ramp",
+          "type": "number"
+        },
+        "ramp_max": {
+          "default": 0.08,
+          "description": "Steepest a ramp, loop, flyover or stack ramp may be (and any raised road).",
+          "exclusiveMinimum": 0.0,
+          "maximum": 0.1,
+          "title": "Ramp Max",
+          "type": "number"
+        },
+        "approach": {
+          "default": 0.065,
+          "description": "Bridge approaches (no vertical curves).",
+          "exclusiveMinimum": 0.0,
+          "maximum": 0.1,
+          "title": "Approach",
+          "type": "number"
+        },
+        "curve_m": {
+          "default": 30.0,
+          "description": "Vertical curves of the runs and ramps.",
+          "maximum": 80.0,
+          "minimum": 10.0,
+          "title": "Curve M",
+          "type": "number"
+        }
+      },
+      "title": "Grades",
       "type": "object"
     },
     "Highways": {
@@ -773,6 +841,9 @@
           ],
           "title": "Crossings",
           "type": "string"
+        },
+        "grades": {
+          "$ref": "#/$defs/Grades"
         }
       },
       "title": "Highways",
@@ -883,6 +954,36 @@
         "position"
       ],
       "title": "Island",
+      "type": "object"
+    },
+    "JunctionControl": {
+      "additionalProperties": false,
+      "description": "M18: crossings by need in a district.",
+      "properties": {
+        "signals": {
+          "default": "auto",
+          "description": "'auto': signals where two primary roads meet, and where a street meets one (or at a street crossing in the corporate core, transit hub and midtown) with no signalized junction within 120 m along either road (200 m in the old town and entertainment market); 'fewer': twice that spacing and no street crossing signalized; 'none': no signals.",
+          "enum": [
+            "auto",
+            "fewer",
+            "none"
+          ],
+          "title": "Signals",
+          "type": "string"
+        },
+        "crosswalks": {
+          "default": "auto",
+          "description": "'auto': crosswalks on the approaches of signalized junctions and across avenues where none is within the signal spacing; 'fewer': at signalized junctions only; 'none': unmarked crossings everywhere.",
+          "enum": [
+            "auto",
+            "fewer",
+            "none"
+          ],
+          "title": "Crosswalks",
+          "type": "string"
+        }
+      },
+      "title": "JunctionControl",
       "type": "object"
     },
     "Landmark": {

@@ -47,7 +47,9 @@ def _fields(m):
 def check_grades(m) -> Check:
     c = Check("ground_grades", "Every road at most its class's grade on the ground (grade "
                                "line plus z): highways and ramps 6%, avenues 8%, streets 12%, "
-                               "alleys and pedestrian ways 15%")
+                               "alleys and pedestrian ways 15%, or (M18) as steep as its own "
+                               "z profile where that climbs more (a ramp, an approach: "
+                               "`road_grades` and `ramp_grades` hold those)")
     for s in m.road_segments:
         if not s.ground or s.road_class == "footbridge":
             continue
@@ -61,7 +63,10 @@ def check_grades(m) -> Check:
             if L < 0.5:
                 continue
             dz = abs(g1 + TE.z_on(zp, s1) - g0 - TE.z_on(zp, s0))
-            if (dz - 0.02) / L > g + GRADE_TOL:
+            # (the grade line keeps level where the z profile alone climbs at the class's
+            # grade or more)
+            own = (abs(TE.z_on(zp, s1) - TE.z_on(zp, s0)) - 0.01) / L
+            if (dz - 0.02) / L > max(g, own) + GRADE_TOL:
                 _limit(c, f"{s.id} ({s.road_class}): {dz / L:.1%} at s {s0:.0f} m "
                           f"(maximum {g:.0%})")
                 break

@@ -1,0 +1,12 @@
+assetgen ground (AG13): Vesper Bay
+all checks pass
+4486 pieces in 160 tiles (160 with ground, 154 with grass, 11 at the cap)
+clumps: 1,823,161 instances of 61 variants (10,796 triangles), 273,517,607 instanced triangles
+ground: 61,744 triangles, 160 masks, 89.1 MB on disk
+by kind: {'cattails': 117844, 'clover': 119684, 'fern': 49640, 'flowers': 98106, 'lawn': 689935, 'meadow': 270943, 'meadow_dry': 34658, 'reeds': 297832, 'scrub': 21069, 'sedum': 12596, 'weeds': 110854}
+
+PASS ground_coverage: {'pieces': 4486, 'short': 0, 'first_short': None, 'triangulation_failed': [], 'constrained_delaunay': [], 'blockout_objects': 453, 'not_replaced': []}
+PASS ground_grass_clear: {'clumps': 1823161, 'failing': 0, 'first': None}
+PASS ground_meshes: {'files': 161, 'triangles': 72540, 'bad': 0, 'first': None}
+PASS ground_budgets: {'over': [], 'tile_instances_max': 40000, 'city_instances': 1823161, 'clump_triangles_max': 366, 'unique_triangles': 10796, 'tile_ground_triangles_max': 1498, 'city_ground_triangles': 61744, 'tile_drawn_triangles_max': 7057657, 'limits': {'tile_instances': 40000, 'city_instances': 3000000, 'clump_triangles': 400, 'unique_triangles': 60000, 'tile_ground_triangles': 250000, 'city_ground_triangles': 12000000, 'tile_drawn_triangles': 12000000}}
+seconds: {'gather': 3.73, 'clumps': 0.09, 'tiles': 17.16, 'write': 0.05, 'total': 41.18, 'workers': 3, 'slowest_tiles': [('t-02+00', 0.669), ('t-02+01', 0.612), ('t+05+04', 0.605), ('t-03+00', 0.568), ('t+04+03', 0.546)]}

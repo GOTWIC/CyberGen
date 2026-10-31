@@ -37,6 +37,7 @@ from . import checks as C
 from . import districts as D
 from . import geom as G
 from . import hydro as H
+from . import junctions as JN
 from . import local as LC
 from . import megasites as MS
 from . import progress as PG
@@ -451,7 +452,8 @@ def build_city(result: Result, max_variants: int = MAX_VARIANTS, roads: bool = T
                                                   "every check passed"))
             T.stage(f"city_try{attempt}", [b.variant, b.stats.get("road_variant"), salt, fails])
             tries.append({"variant": b.variant, "road_variant": b.stats.get("road_variant"),
-                          "layout_salt": salt, "failures": fails})
+                          "layout_salt": salt, "failures": fails,
+                          "failed": sorted(c.id for c in b.checks if c.failures)})
             if best is None or fails < best[0]:
                 best = (fails, b)
             if not fails or attempt == CITY_RETRIES:
@@ -688,6 +690,8 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
                        "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
         T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
         ps.finish()
+    # M18: the surface of every junction not flat at its node's height (on the grade lines)
+    loc.info["junction_surfaces"] = JN.surfaces(loc.segments, loc.nodes, loc.junctions)
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
     b.notes = b.notes + loc.notes
@@ -790,8 +794,10 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
         m = with_rows(m, {"tunnels": list(m.tunnels) + TE.bore_rows(
             tg["bores"], [s.model_dump(mode="json") for s in m.road_segments],
             b.roads.terrain[0], {d.id: d.name for d in m.districts})})
-    # M7: columns under the raised road decks (after the transit structures they avoid)
-    m = with_rows(m, {"structures": list(m.structures) + EL.road_supports(m)})
+    # M7: columns under the raised road decks (after the transit structures they avoid);
+    # M18: retained fill under the low ones
+    m = with_rows(m, {"structures": list(m.structures) + EL.road_embankments(m) +
+                      EL.road_supports(m)})
     if m.decks:
         # M14: the deck slabs' columns (after the transit structures and road columns)
         cols, dks = DK.supports(m)
@@ -822,9 +828,14 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     with P.stage("gameplay"):
         gp = GP.build(spec, m)
     m = with_rows(m, gp.rows)
+    # M16: the water's beds, banks and current, the ground cover
+    with P.stage("water and ground"):
+        m, wg = water_ground(m)
     ps = P.begin("checks")
     for key in sorted(gp.rows):
         T.stage(f"gameplay/{key}", gp.rows[key])
+    for key in sorted(wg):
+        T.stage(f"water_ground/{key}", wg[key])
     b.model = m
     lms = SimpleNamespace(landmasses={lm.id: G.from_model_poly(lm.polygon)
                                       for lm in m.landmasses})
@@ -838,6 +849,11 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
         NC.run_finished(spec, m) + TC.run(spec, m) + \
         DK.per_level(m, lambda v: PC.run(spec, v)) + GC.run(spec, m) + DC.run(spec, m)
+    if m.banks or m.ground_cover:
+        from . import water_checks as WC
+
+        with G.canonical():
+            checks += WC.run(spec, m)
     with G.canonical():
         checks.append(EC.check_supports(m))
     st = early["stats"]
@@ -855,6 +871,8 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     st["gameplay"] = {**GC.stats(m), "generator": gp.info}
     if m.decks:
         st["decks"] = DC.stats(m)
+    if m.banks or m.ground_cover:
+        st["water"] = WC.stats(m)
     ps.finish()
     T.stage("checks_m3", [[c.id, c.passed] for c in checks])
     for key in ("separation_budget", "road_variant"):
@@ -869,6 +887,23 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     b.checks, b.stats = checks, st
     b.notes = b.notes + late_notes + pr.notes + gp.notes
     return b
+
+
+def water_ground(m: CityModel) -> tuple[CityModel, dict]:
+    """M16 on a finished city: the water bodies' beds, current and exposure, the banks
+    (`water.py`) and the ground cover (`cover.py`); (the model, the new rows). A city without
+    water or open land comes back as it was."""
+    from . import cover as CV
+    from . import water as WA
+
+    wo = WA.build(m)
+    rows = dict(wo.rows)
+    m = with_rows(m, rows) if rows else m
+    co = CV.build(m)
+    if co.rows:
+        rows["ground_cover"] = co.rows
+        m = with_rows(m, {"ground_cover": co.rows})
+    return m, rows
 
 
 def check_all(spec: CitySpec, m: CityModel) -> tuple[list, dict]:
@@ -958,4 +993,14 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_gameplay.png")
         render_gameplay(b, paths[-1])
+    if b.model.banks:
+        from .preview_water import render_water
+
+        paths.append(out / "preview_water.png")
+        render_water(b, paths[-1])
+    if b.model.ground_cover:
+        from .preview_ground import render_ground
+
+        paths.append(out / "preview_ground.png")
+        render_ground(b, paths[-1])
     return paths

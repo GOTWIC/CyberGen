@@ -16,7 +16,6 @@ from shapely.ops import unary_union
 
 from . import geom as G
 from . import relations as R
-from .elevated import APPROACH_GRADE
 from .model import CityModel
 from .spec import BoundaryKind, CitySpec
 
@@ -539,7 +538,7 @@ def bridge_water_class(g: _Geo, line: LineString) -> str | None:
     return None
 
 
-def check_bridges(m: CityModel, g: _Geo) -> Check:
+def check_bridges(spec: CitySpec, m: CityModel, g: _Geo) -> Check:
     c = Check("bridge_clearance", "Every bridge has the clearance of the water it crosses (sea "
                                   "channel and port approach 25 m+, river 10 to 15 m, canal 3 "
                                   "to 4 m), every road over water is a bridge, no junction on "
@@ -557,7 +556,7 @@ def check_bridges(m: CityModel, g: _Geo) -> Check:
         if not lo - 1e-6 <= b.clearance_m <= hi + 1e-6:
             c.failures.append(f"bridge {b.id}: clearance {b.clearance_m:g} m over {cls} water "
                               f"(needs {lo:g} to {hi:g} m)")
-        want = (b.clearance_m + 1.5) / APPROACH_GRADE
+        want = (b.clearance_m + 1.5) / spec.highways.grades.approach
         if b.ramp_length_m is not None and abs(b.ramp_length_m - want) > 0.05:
             c.failures.append(f"bridge {b.id}: ramp {b.ramp_length_m} m, expected {want:.2f} m")
         for sid in b.segment_ids:
@@ -901,7 +900,7 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
             check_road_graph(spec, m, g),
             check_districts_served(m, g),
             check_named_bridges(spec, m, g),
-            check_bridges(m, g),
+            check_bridges(spec, m, g),
             check_road_avoidance(m, g),
             check_curve_radius(m, g),
             check_segment_length(m, g),
@@ -909,7 +908,7 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         ]
         from . import elevated_checks as EC
 
-        checks += EC.run(m, supports=bool(m.buildings))
+        checks += EC.run(spec, m, supports=bool(m.buildings))
         from . import tunnel_checks as TNC
 
         checks += TNC.run(spec, m)
@@ -945,6 +944,12 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import deck_checks as DC
 
         checks += DC.run(spec, m)
+    if m.banks or m.ground_cover:
+        # (M16: on a city that carries its water and ground data)
+        from . import water_checks as WC
+
+        with G.canonical():
+            checks += WC.run(spec, m)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
@@ -959,9 +964,11 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
 
             st["terrain"] = TGC.stats(m)
     if m.lots or m.blocks or m.junctions:
+        from . import network_checks as NC
         from . import street_checks as SC
 
         st["local"] = SC.stats(spec, m)
+        st["junction_levels"] = NC.junction_stats(m)
     if m.buildings:
         from . import building_checks as BC
 
@@ -982,6 +989,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import deck_checks as DC
 
         st["decks"] = DC.stats(m)
+    if m.banks or m.ground_cover:
+        from . import water_checks as WC
+
+        st["water"] = WC.stats(m)
     return checks, st
 
 
@@ -1155,6 +1166,19 @@ def report_text(rep: dict) -> str:
                     f"tunnels, {tg.get('viaducts', 0)} terrain viaducts; "
                     f"{tg.get('slope_greens', 0)} hillside greens, highest plinth "
                     f"{tg.get('highest_plinth_m', 0):g} m"]
+    ws = st.get("water")
+    if ws:
+        out += ["", f"  water: {ws['water_bodies']} bodies ("
+                    + ", ".join(f"{b['id']} {b['depth_m']:g} m {b['flow']}"
+                                for b in ws["bodies"][:6])
+                    + (", ..." if len(ws["bodies"]) > 6 else "") + "); sea "
+                    + (", ".join(f"{k} {v} km2" for k, v in ws["exposure_km2"].items())
+                       or "none"),
+                "  banks: " + (", ".join(f"{k.replace('_', ' ')} {v['count']} ({v['km']} km)"
+                                         for k, v in ws["banks"].items()) or "none"),
+                "  ground cover: " + (", ".join(f"{k.replace('_', ' ')} {v['km2']} km2"
+                                                for k, v in ws["cover"].items()) or "none")
+                + f"; {ws['desire_lines']} desire lines"]
     gs = st.get("gameplay")
     if gs:
         out += ["", f"  gameplay: {gs['pois']} points of interest, {gs['factions']} factions ("
