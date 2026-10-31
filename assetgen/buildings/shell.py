@@ -1882,18 +1882,31 @@ class ShellBuilder:
             return
         top = max(cand, key=lambda ms: (ms["z1"], -ms["k"]))
         ring = RG.clean(top["rings"][0])
-        c = _centroid(ring)
-        if len(ring) < 3 or RG.in_poly(c, top["rings"]) != 1 or _thickness(ring) < 8000:
+        if len(ring) < 3 or _thickness(ring) < 8000:
             return
-        for it in self.br["roof_items"]:
-            x, y = it["position"][0] * 1000, it["position"][1] * 1000
-            if (x - c[0]) ** 2 + (y - c[1]) ** 2 < 3000 ** 2:
-                return
         H = int(round(float(self.br["building"]["height_m"]) * 1000))
         if crown == "mast":
             p = {"style": "mast", "h": PT.q(min(max(H // 10, 8000), 30000))}
         else:
             p = {"style": "spire", "h": PT.q(min(max(H * 18 // 100, 12000), 45000))}
+        lo, hi = PT.bounds(PT.mesh("mast", p)[1])
+
+        def foot(c) -> bool:
+            return all(RG.in_poly((c[0] + dx, c[1] + dy), top["rings"]) >= 0
+                       for dx in (lo[0], hi[0]) for dy in (lo[1], hi[1]))
+        # (the middle of its vertices, else, where a curve of the outline pulls that to its
+        # edge and the mast's foot off the roof, the middle of its area)
+        c = _centroid(ring)
+        if RG.in_poly(c, top["rings"]) != 1:
+            return
+        if not foot(c):
+            c = _area_centroid(ring)
+            if c is None or RG.in_poly(c, top["rings"]) != 1 or not foot(c):
+                return
+        for it in self.br["roof_items"]:
+            x, y = it["position"][0] * 1000, it["position"][1] * 1000
+            if (x - c[0]) ** 2 + (y - c[1]) ** 2 < 3000 ** 2:
+                return
         if self.clear.segs and self.clear.hits(c[0] - 1200, c[1] - 1200, c[0] + 1200,
                                                c[1] + 1200, top["z1"], top["z1"] + p["h"]):
             self.stats["masts_off_corridors"] = self.stats.get("masts_off_corridors", 0) + 1
@@ -2135,6 +2148,21 @@ def _blocked(fa: Facade, depth: int, edges) -> bool:
 def _centroid(ring):
     n = len(ring)
     return (sum(p[0] for p in ring) // n, sum(p[1] for p in ring) // n)
+
+
+def _area_centroid(ring):
+    """The middle of a ring's area (mm, integer shoelace sums), None for no area."""
+    a = cx = cy = 0
+    n = len(ring)
+    for i in range(n):
+        (x0, y0), (x1, y1) = ring[i], ring[(i + 1) % n]
+        c = x0 * y1 - x1 * y0
+        a += c
+        cx += (x0 + x1) * c
+        cy += (y0 + y1) * c
+    if a == 0:
+        return None
+    return (int(round(cx / (3 * a))), int(round(cy / (3 * a))))
 
 
 def _carve(segs: list, za: int, zb: int, slot: str | None) -> list:
