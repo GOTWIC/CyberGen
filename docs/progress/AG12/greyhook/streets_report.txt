@@ -1,0 +1,59 @@
+assetgen streets: Greyhook: PASS
+
+  [ok] street_coverage: 0 without an asset
+  [ok] street_meshes: no bad triangles
+  [ok] street_replaces: 998 blockout objects replaced
+  [ok] street_budgets: 629295 triangles in the city (budget 20000000), at most 20269 in a tile (t+00+03, budget 2500000)
+
+coverage:
+  road_segments: 1245 of 1249 (+4 declared)
+  junctions: 794 of 794
+  crosswalks: 730 of 730
+  sidewalks: 1788 of 1788
+  bridges: 5 of 5
+  structures: 245 of 245
+  tunnels: 5 of 5
+  quays: 5 of 5
+  waterways: 2 of 4 (+2 declared)
+  site_elements: 119 of 119
+  decks: 0 of 0
+  transit_lines: 3 of 3
+  megasites: 3 of 3
+  stations: 13 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
+
+pieces 4944, tiles 115, triangles 629295, disk 38.9 MB
+triangles by kind:
+  street.sidewalk: 255839 (1788 pieces)
+  street.road: 131300 (1249 pieces)
+  street.junction: 94325 (794 pieces)
+  street.transit.deck: 38078 (24 pieces)
+  street.crosswalk: 24844 (730 pieces)
+  street.quay: 21152 (5 pieces)
+  street.tunnel.metro: 20400 (5 pieces)
+  street.transit.tube: 16728 (4 pieces)
+  street.transit.tube.glass: 14784 (0 pieces)
+  street.bridge: 2753 (5 pieces)
+  street.site.launch_tower: 2382 (3 pieces)
+  street.column: 1626 (101 pieces)
+  street.transit.column: 1584 (88 pieces)
+  street.site.fuel_tank: 996 (6 pieces)
+  street.transit.canopy: 936 (18 pieces)
+  street.site.launch_pad: 744 (3 pieces)
+  street.site.plaza: 212 (3 pieces)
+  street.site.container_stack: 174 (87 pieces)
+  street.transit.pylon: 146 (9 pieces)
+  street.site.pitch: 118 (1 pieces)
+  street.structure.canopy: 52 (1 pieces)
+  street.canal_wall.basin: 48 (2 pieces)
+  street.site.bus_bay: 20 (10 pieces)
+  street.site.metro_entrance: 20 (2 pieces)
+  street.site.platform: 20 (2 pieces)
+  street.site.drop_off: 12 (1 pieces)
+  street.site.apron: 2 (1 pieces)
+  street.canal_wall.canal: 0 (2 pieces)
+no mesh: inside its junctions 4, natural banks 2
+corner pads: 2021 made, 7 skipped (chain 1, no sidewalk 6)
+bridges: arch 1, footbridge.steel 2, girder 2
+instances: part.container.c0 69, part.container.c1 57, part.container.c2 73, part.container.c3 70, part.container.c4 76, part.container.c5 77
+files: 115 tiles made, 0 kept, 6 written, 109 same bytes, 0 removed
+seconds: context 0.19, gather 0.19, make 2.99, write 0.22, total 3.79, workers 3

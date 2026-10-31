@@ -1,0 +1,20 @@
+assetgen water: Cragmouth: PASS
+
+  [ok] water_coverage: 8 bodies, 30 banks drawn, 6 by AG7
+  [ok] water_levels: 108718 surface vertices at their level, 21081 bed vertices checked (worst 0.001 m; 91% on M16's bed, the rest on a bank's slope over it)
+  [ok] water_gaps: 433 waterline points on the bed, 542 wall feet in it
+  [ok] water_meshes: no bad triangles
+  [ok] water_budgets: 1610200 triangles (budget 9000000), at most 34816 in a tile (t-06-05, budget 400000), at most 10384 stones in a tile (budget 60000)
+  [ok] water_replaces: 222 blockout water objects, 103 replaced, 119 dropped
+
+bodies 8 (canal 2, river 2, sea 4), 3.027 km2 of water
+pieces 116, tiles 72, triangles 1610200 (surface LODs {'lod0': 1456281, 'lod1': 366611, 'lod2': 94134, 'lod3': 23435}), stones 34044, disk 60.6 MB
+triangles by kind:
+  surface: 1456281
+  bed: 113681
+  water.bank.natural_bank: 26027
+  water.bank.riprap: 13357
+  water.bank.road_embankment: 638
+  water.bank.canal_wall: 216
+files: 72 tiles made, 0 kept, 0 written, 72 same bytes, 0 removed
+seconds: context 0.3, gather 0.11, make 6.47, write 0.22, total 10.01, workers 3

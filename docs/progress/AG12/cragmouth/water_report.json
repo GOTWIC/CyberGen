@@ -1,0 +1,125 @@
+{
+ "checks": [
+  {
+   "detail": "8 bodies, 30 banks drawn, 6 by AG7",
+   "id": "water_coverage",
+   "ok": true
+  },
+  {
+   "detail": "108718 surface vertices at their level, 21081 bed vertices checked (worst 0.001 m; 91% on M16's bed, the rest on a bank's slope over it)",
+   "id": "water_levels",
+   "ok": true
+  },
+  {
+   "detail": "433 waterline points on the bed, 542 wall feet in it",
+   "id": "water_gaps",
+   "ok": true
+  },
+  {
+   "detail": "no bad triangles",
+   "id": "water_meshes",
+   "ok": true
+  },
+  {
+   "detail": "1610200 triangles (budget 9000000), at most 34816 in a tile (t-06-05, budget 400000), at most 10384 stones in a tile (budget 60000)",
+   "id": "water_budgets",
+   "ok": true
+  },
+  {
+   "detail": "222 blockout water objects, 103 replaced, 119 dropped",
+   "id": "water_replaces",
+   "ok": true
+  }
+ ],
+ "city": "Cragmouth",
+ "files": {
+  "contribution_written": false,
+  "manifest_written": true,
+  "parts_written": false,
+  "report_written": false,
+  "tiles_kept": 0,
+  "tiles_made": 72,
+  "tiles_removed": 0,
+  "tiles_same_bytes": 72,
+  "tiles_written": 0,
+  "written": []
+ },
+ "ok": true,
+ "seconds": {
+  "context": 0.3,
+  "gather": 0.11,
+  "make": 6.47,
+  "slowest_tiles": [
+   [
+    "t-03+04",
+    1.093
+   ],
+   [
+    "t-03-03",
+    0.579
+   ],
+   [
+    "t-02-03",
+    0.544
+   ],
+   [
+    "t-01-03",
+    0.491
+   ],
+   [
+    "t-04-04",
+    0.488
+   ]
+  ],
+  "total": 10.01,
+  "workers": 3,
+  "write": 0.22
+ },
+ "stats": {
+  "bodies": 8,
+  "by_kind": {
+   "water.bank.canal_wall": 8,
+   "water.bank.natural_bank": 15,
+   "water.bank.riprap": 5,
+   "water.bank.road_embankment": 2,
+   "water.body.canal": 7,
+   "water.body.river": 13,
+   "water.body.sea": 66
+  },
+  "disk_bytes": 60601896,
+  "instances": 34044,
+  "lod_triangles": {
+   "lod0": 1456281,
+   "lod1": 366611,
+   "lod2": 94134,
+   "lod3": 23435
+  },
+  "max_tile_instances": 10384,
+  "max_tile_triangles": 34816,
+  "pieces": 116,
+  "stones": {
+   "part.riprap.r0": 5649,
+   "part.riprap.r1": 5617,
+   "part.riprap.r2": 5740,
+   "part.riprap.r3": 5707,
+   "part.riprap.r4": 5712,
+   "part.riprap.r5": 5619
+  },
+  "tiles": 72,
+  "triangles": 1610200,
+  "triangles_by_kind": {
+   "bed": 113681,
+   "surface": 1456281,
+   "water.bank.canal_wall": 216,
+   "water.bank.natural_bank": 26027,
+   "water.bank.riprap": 13357,
+   "water.bank.road_embankment": 638
+  },
+  "water_kinds": {
+   "canal": 2,
+   "river": 2,
+   "sea": 4
+  },
+  "water_m2": 3027323.8
+ }
+}

@@ -1,0 +1,21 @@
+assetgen water: Saltreach Free Port: PASS
+
+  [ok] water_coverage: 12 bodies, 45 banks drawn, 17 by AG7
+  [ok] water_levels: 1677738 surface vertices at their level, 31677 bed vertices checked (worst 0.001 m; 92% on M16's bed, the rest on a bank's slope over it)
+  [ok] water_gaps: 684 waterline points on the bed, 803 wall feet in it
+  [ok] water_meshes: no bad triangles
+  [ok] water_budgets: 2687395 triangles (budget 9000000), at most 45387 in a tile (t+00+03, budget 400000), at most 25200 stones in a tile (budget 60000)
+  [ok] water_replaces: 404 blockout water objects, 334 replaced, 70 dropped
+
+bodies 12 (canal 3, river 5, sea 4), 4.898 km2 of water
+pieces 211, tiles 146, triangles 2687395 (surface LODs {'lod0': 2428997, 'lod1': 612688, 'lod2': 157737, 'lod3': 40732}), stones 27307, disk 101.7 MB
+triangles by kind:
+  surface: 2428997
+  bed: 169210
+  water.bank.natural_bank: 45020
+  water.bank.beach: 33708
+  water.bank.riprap: 9489
+  water.bank.road_embankment: 835
+  water.bank.canal_wall: 136
+files: 146 tiles made, 0 kept, 20 written, 126 same bytes, 0 removed
+seconds: context 1.24, gather 0.27, make 15.22, write 0.29, total 19.0, workers 3

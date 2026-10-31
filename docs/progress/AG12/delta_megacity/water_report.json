@@ -1,0 +1,131 @@
+{
+ "checks": [
+  {
+   "detail": "13 bodies, 123 banks drawn, 16 by AG7",
+   "id": "water_coverage",
+   "ok": true
+  },
+  {
+   "detail": "1351159 surface vertices at their level, 41258 bed vertices checked (worst 0.000 m; 83% on M16's bed, the rest on a bank's slope over it)",
+   "id": "water_levels",
+   "ok": true
+  },
+  {
+   "detail": "1607 waterline points on the bed, 1052 wall feet in it",
+   "id": "water_gaps",
+   "ok": true
+  },
+  {
+   "detail": "no bad triangles",
+   "id": "water_meshes",
+   "ok": true
+  },
+  {
+   "detail": "2286579 triangles (budget 9000000), at most 35013 in a tile (t-01-06, budget 400000), at most 11760 stones in a tile (budget 60000)",
+   "id": "water_budgets",
+   "ok": true
+  },
+  {
+   "detail": "507 blockout water objects, 375 replaced, 132 dropped",
+   "id": "water_replaces",
+   "ok": true
+  }
+ ],
+ "city": "Delta Megacity",
+ "files": {
+  "contribution_written": false,
+  "manifest_written": true,
+  "parts_written": false,
+  "report_written": false,
+  "tiles_kept": 0,
+  "tiles_made": 136,
+  "tiles_removed": 0,
+  "tiles_same_bytes": 136,
+  "tiles_written": 0,
+  "written": []
+ },
+ "ok": true,
+ "seconds": {
+  "context": 1.32,
+  "gather": 0.29,
+  "make": 12.45,
+  "slowest_tiles": [
+   [
+    "t+02-04",
+    0.812
+   ],
+   [
+    "t+00-06",
+    0.774
+   ],
+   [
+    "t-01-06",
+    0.623
+   ],
+   [
+    "t-04-04",
+    0.581
+   ],
+   [
+    "t+00-01",
+    0.567
+   ]
+  ],
+  "total": 16.19,
+  "workers": 3,
+  "write": 0.34
+ },
+ "stats": {
+  "bodies": 13,
+  "by_kind": {
+   "water.bank.beach": 1,
+   "water.bank.canal_wall": 31,
+   "water.bank.marsh_edge": 3,
+   "water.bank.natural_bank": 47,
+   "water.bank.riprap": 15,
+   "water.bank.road_embankment": 26,
+   "water.body.canal": 38,
+   "water.body.marsh": 8,
+   "water.body.river": 40,
+   "water.body.sea": 81
+  },
+  "disk_bytes": 85743108,
+  "instances": 36400,
+  "lod_triangles": {
+   "lod0": 1956126,
+   "lod1": 495572,
+   "lod2": 127318,
+   "lod3": 30189
+  },
+  "max_tile_instances": 11760,
+  "max_tile_triangles": 35013,
+  "pieces": 290,
+  "stones": {
+   "part.riprap.r0": 6178,
+   "part.riprap.r1": 5952,
+   "part.riprap.r2": 6237,
+   "part.riprap.r3": 5955,
+   "part.riprap.r4": 5938,
+   "part.riprap.r5": 6140
+  },
+  "tiles": 136,
+  "triangles": 2286579,
+  "triangles_by_kind": {
+   "bed": 220537,
+   "surface": 1956126,
+   "water.bank.beach": 1558,
+   "water.bank.canal_wall": 1144,
+   "water.bank.marsh_edge": 45225,
+   "water.bank.natural_bank": 45563,
+   "water.bank.riprap": 13101,
+   "water.bank.road_embankment": 3325
+  },
+  "water_kinds": {
+   "canal": 7,
+   "marsh": 1,
+   "river": 2,
+   "sea": 3
+  },
+  "water_m2": 4513047.4
+ }
+}

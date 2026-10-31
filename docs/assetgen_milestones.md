@@ -21,6 +21,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
 | AG10 | Layered districts: M14's slabs per tile with soffits, fascias, rails, lights and colonnades, their columns, stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs meeting the soffit; `asset_decks` and `street_decks` | Done | [`docs/progress/AG10`](progress/AG10) |
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
+| AG12 | Water: per body and tile a surface (LOD chains carrying the current, a foam mask and the sea's wave weight) and a bed at M16's depth with the banks' slopes under the water; banks by kind with riprap stones; AG7's walls and piers into the bed; water textures and catalog; `M_CgWater` (Single Layer Water, waves) and underwater volumes | Done | [`docs/progress/AG12`](progress/AG12) |
 
 ## AG0: contract and spike
 
@@ -1358,6 +1359,182 @@ inside Ridgeback's hill; AG10's section adds the ground itself).
   the undercity's one-storey rows leave empty shell nodes in the packs.
 - Mac = x86 waits for the deferred determinism check.
 
+## AG12: water
+
+**Built.** Stage 2's water from citygen's M16 (scope 14.13; decision 13.10 taken as (a)):
+every water body's surface, bed and banks, `assetgen water BUILD` (also a stage of
+`assetgen build`, after the streets; `--no-water` skips it), in `assetgen/water/`:
+- **Pieces** (`pieces.py`), each made from its own inputs and kept by hash as AG7's:
+  - a **body piece** per water body and 256 m tile (`<body>@<tile>`): the body's own water
+    (its polygon less the bodies before it in M16's order, the order `Beds.body_at` takes,
+    so no two overlap) in the tile, with the body's depth, profile, material and flow, its
+    level, its banks within reach of the tile, the edges it shares with other water, the
+    bridge piers there and the sea's exposure raster near it; it makes the bed
+    (`<body>.bed.<tile>`) and the surface (`<body>.water.<tile>`);
+  - a **bank piece** per bank AG12 draws (natural bank, beach, marsh edge, riprap, road
+    embankment, and canal walls along rivers and the sea): AG7 keeps the quays and the
+    waterways' canal walls;
+  - the **drop**: the blockout's water objects no piece takes the place of (sea sheets of
+    tiles with no sea, the quay and canal wall bands AG7 draws).
+- **Fields** (`fields.py`, from a piece's inputs alone):
+  - **depth**: M16's `Beds.depth_many` exactly (its nearest bank and ties, on the body's
+    banks within reach; a test compares them at random points);
+  - **bottom**, the depth AG12 draws: M16's bed raised to every sloped bank's slope carried
+    on under the water (`bottom`: all of them within reach, not only the nearest; where a
+    slope meets a wall, or a beach meets riprap, the nearer bank's bed stepped 3 m down
+    under the other's waterline), at a wall's toe up to its face (M16's bed begins the
+    wall's thickness out), never within 5 cm of the surface;
+  - **level**: a flat city's `surface_m` (-1.5), else M13's (a river's along its
+    centerline);
+  - **current**: along the body's flow line, the sea's tide along its nearest shore, times
+    the square root of the depth over the deepest there (slower over shallows);
+  - **foam**: at a wall's face, a sloped bank's waterline (wide on a beach, faint by a marsh)
+    and round AG7's bridge piers;
+  - **waves** (the sea): M16's exposure (open 1, sheltered 0.5, harbor 0.15) on a 16 m raster
+    blurred over 80 m, nothing at the waterline and full 20 m out.
+- **Meshes** (`grid.py`, `makers.py`): a region on a square lattice, the cells inside it two
+  triangles each on its points, the edge cells clipped on the millimeter grid and
+  triangulated exactly (a piece the ear clipper cannot take whole, a hole touching its
+  outline, split in halves), vertices shared by position, so each sheet is watertight.
+  - **Bed** (Nanite, complex collision): 8 m on the sea, else 4 m; it leaves out every sloped
+    bank's dry strip (the line buffered `width` over the water; a ring round an island by
+    its polygon's offsets), so bank and bed meet along the waterline; a slot by M16's
+    material (`bed.mud`, `silt`, `sand`, `gravel`, `stone`), the underwater zone of a bank by
+    the bank's (riprap and road embankment stone, beach sand, marsh mud); a steep triangle
+    (a step) on vertices of its own with UV0 on its vertical plane; skirts 13 m down along
+    the edges a body shares with other water, facing out, so a step between two beds is
+    closed from the shallower side; UV1.x the depth (caustics). On a terrain city the bed
+    lies 0.1 m over M13's ground grid (which carries M16's beds too), never within 5 cm of
+    the surface.
+  - **Surface** (non-Nanite, no collision): LOD chains on the sea's 2, 4, 8 and 16 m
+    lattices and inland 4, 8 and 16 m (screen sizes 1, 0.4, 0.15, 0.05); UV0 the plan in
+    meters, UV1 the current, COLOR_0 foam, depth over 12 m, wave weight.
+  - **Banks**: the dry strip on a 2 m lattice, each point at the ground at the line's nearest
+    point falling to the level at `width` (the bed's slope); riprap stones on it from the line
+    to the toe (six stone meshes in `water/parts.glb`, instanced, jittered and turned by a
+    hash of the bank and cell); stone walls with a coping along rivers and the sea, 0.5 m
+    into the bed.
+- **AG7** (`streets/ctx.py`, `water.py`, `structures.py`): `Ground.water_level` is M16's
+  surface on a flat city (`WATER_DEFAULT` -0.9 only for a model without M16); quay and canal
+  walls reach M16's toe and 0.5 m into the bed (`notes.foot`), the quay stairs down to the
+  new surface; canal walls follow the waterway's `canal_wall` banks (they ran round the
+  whole polygon, a dam across each canal's mouth into other water); bridge piers and arch
+  and pylon footings stand 0.5 m into M16's bed (`inputs.bed`, sampled along the bridge),
+  their footprints in `notes.piers` for AG12's foam.
+- **AG8** (`props/gather.py`): a boat floats on M16's water (its waterline at the body's
+  surface; it stood at the ground, 1.5 m over the water).
+- **AG6**: sets `bed_mud`, `bed_silt`, `bed_sand`, `bed_gravel`, `bed_stone` (under water,
+  the upper band's density), `bank_soil`, `bank_rubble`, `bank_rock` (`library.WATER_SETS`;
+  generators `sediment`, `rubble`, `soil` in `materials/water_surfaces.py`: deposits, worm
+  casts, ripple marks, pebbles, shell grit; packed stones; crumbly soil with roots and grass
+  tufts); the `water` atlas (8 m: ripple normals, foam lace at two scales and bubbles, two
+  caustic networks and their glow); `catalog.WATER`, per water kind (sea, river, canal,
+  ornamental, marsh; a body along marshes for 40% of its banks is marsh water): Single
+  Layer Water's scattering and absorption, shallow and deep colors, clarity, flow, foam,
+  swell height and length; `WATER_SLOT` for the beds, banks, walls and stones; masters
+  `water` and `bed`; the texel check reads the water packs (beds at the upper density).
+- **Checks** (`checks.py`, the packs read back against the model):
+  - `water_coverage`: each body's own water covered by its first surface LOD, and by its
+    beds with its sloped banks' dry strips (within 0.2%); every bank drawn, every quay and
+    waterway canal wall by AG7;
+  - `water_levels`: every surface vertex of every LOD at its level (1 cm); sampled bed
+    vertices at AG12's bottom from the model's own banks (2 cm), never deeper than M16's bed
+    (the share exactly on it reported);
+  - `water_gaps`: each sloped bank's waterline on the bed under it (at most 12 cm over it),
+    every wall foot (AG12's and AG7's quays and canal walls) in the bed, every shared edge
+    skirted;
+  - `water_meshes`, `water_budgets` (400,000 triangles and 60,000 stones a tile, 9 million
+    triangles a city), `water_replaces` (every blockout water object replaced or dropped).
+  - `water_report.txt`; `water/preview.png` (`preview.py`: the beds by depth, the banks by
+    kind, insets with the foam, the current and the stones).
+- **Unreal exporter** (`docs/unreal_export.md`, AG12): `unreal_contribution.water.json`;
+  `M_CgWater` (Single Layer Water: the kind's scattering and absorption, ripples along the
+  current in a flow map's two phases, foam from the vertex mask and the shallows drawn by
+  Opacity, the sea's swell as four Gerstner waves by world position offset faded out from 150
+  to 350 m), `M_CgBed` (caustics as emission under the water, fading with depth and by
+  night), the water packs imported with their vertex colors and full-precision UVs and no
+  lightmap UVs, a post-process volume beside each M16 swim box (`underwater.<water>.<tile>.<k>`:
+  the kind's tint, saturation, vignette, fog); `STAGE2_VERSION` 7.
+- **Blender**: `ag6_materials.water` (refractive, the color by depth and clarity, ripples at
+  two scales, the swell as a bump, the foam over the lace as a matte surface) and `caustics`;
+  `assetgen materials preview --views water`: `water_canal` (along the straightest stretch of
+  the longest quayed canal from 2.6 m over the water), `water_bank` (a river's longest
+  natural or riprap bank from the land beside it), `water_harbor` (the biggest basin from
+  above); AG12's water in every textured view near it.
+
+**Samples** (on M16's builds of main at 280eb35, 3 workers, the Windows PC; triangles: the
+surfaces' first LOD, the beds and the banks):
+
+| City | Water bodies (kinds) | km2 | Tiles | Surface | Beds | Banks | Triangles | Most in a tile | Stones | MB | Seconds |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Vesper Bay | 10 (sea 3, river 1, marsh 2, canal 4) | 3.56 | 114 | 1,572,582 | 161,874 | 133,885 | 1,868,341 | 50,005 | 45,178 | 69.9 | 14 |
+| Delta Megacity | 13 (sea 3, river 2, marsh 1, canal 7) | 4.51 | 136 | 1,956,126 | 220,537 | 109,916 | 2,286,579 | 35,013 | 36,400 | 85.7 | 16 |
+| Saltreach Free Port | 12 (sea 4, river 5, canal 3) | 4.90 | 146 | 2,428,997 | 169,210 | 89,188 | 2,687,395 | 45,387 | 27,307 | 101.7 | 19 |
+| Nexus City | 18 (sea 5, river 2, marsh 2, canal 9) | 3.16 | 111 | 1,282,137 | 180,242 | 114,778 | 1,577,157 | 37,474 | 22,680 | 59.3 | 15 |
+| Greyhook | 6 (sea 3, river 1, canal 2) | 7.24 | 195 | 3,541,060 | 254,267 | 93,230 | 3,888,557 | 41,481 | 47,768 | 146.7 | 27 |
+| Cragmouth (terrain) | 8 (sea 4, river 2, canal 2) | 3.03 | 72 | 1,456,281 | 113,681 | 40,238 | 1,610,200 | 34,816 | 34,044 | 60.6 | 10 |
+
+The surfaces' coarser LODs add a quarter again (Vesper Bay 398,598, 103,215 and 24,844
+triangles). Every water check passes in all six; 75 to 94% of the bed vertices lie exactly
+on M16's bed, the rest on a bank's slope carried on over it. `assetgen build` is otherwise
+as on main: the same checks fail as main's build of the same models (Vesper Bay
+`asset_roofs`; Delta Megacity and Nexus City `asset_access`, Nexus City `street_meshes`;
+Greyhook `asset_envelope`; Cragmouth `asset_clearance`, `asset_landings`, `asset_slopes`;
+Saltreach all pass), AG6's texel check passes with the water packs in it.
+
+**Regeneration**: M16's Old Town regeneration of Vesper Bay (its base the build above): 22
+banks changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,
+every one within reach of a changed bank); 14 of 114 tiles made again, 9 written (the rest
+the same bytes), every water check passing.
+
+**Found on the way**:
+- AG7 drew canal walls round a waterway's whole polygon, so each canal's mouth into a river
+  or the sea had a stone dam across it (47 to 143 m per waterway in Vesper Bay and Delta);
+  its quay walls stopped 3 m under the water over 10.5 m deep basins, and bridge piers 4 m
+  under it over a 12 m deep sea.
+- M16's bed steps from nothing to the toe at a bank's waterline and from one bank's profile
+  to another's where the nearest bank changes: a gap of up to 3 m under a natural bank
+  where it met a wall. AG12's bed carries every sloped bank's slope on under the water.
+- A bank round a whole island (Saltreach's beach, 3.2 km) made a strip polygon of the whole
+  island (758,000 m2 of sand at the water's level), and GEOS's one-sided buffer of a closed
+  line took the land side: a ring's strip is its polygon's offset.
+- Moored boats stood at the ground, 1.5 m over M16's water (AG8 now floats them).
+
+**Exporter**: the third layer-2 part, recorded in `unreal_export.md` (AG12); tests without
+Unreal (`test_exporter_takes_the_water`: the stage 2 LOD chains, masters and the underwater
+volumes per swim box). Not run in Unreal (the coordinating session's call).
+
+**Tests**: `tests/assetgen/test_ag_water.py` (11: the small test city's water with every
+check, the fields against M16, kept by hash, the same bytes on one or three workers and
+another hash seed, a regenerated district's water only near its changed banks, the
+contribution against the packs, the exporter's stage 2, AG7's walls in the bed and canal
+mouths open, the mesher on a hole touching its outline, the small city's and Vesper Bay's
+goldens, `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`).
+Goldens written again on this PC, on purpose: the streets' (AG7's walls, piers and canal
+walls on M16's water; the library's hash in the contribution) and assetgen's `ag1`
+`testport_files` and `ag6` `testport_materials` (the contributions carry the library's
+hash, which AG12's sets and atlas change; materials.json gains the water); the building
+packs, briefs and the sample goldens are unchanged. The props golden stays main's (it
+needs the Mac; it moved with M16's models already, and AG8's boats now move it too).
+
+**Open.**
+- Not run in Unreal: `M_CgWater` is written against UE 5.8's Python names for the Single
+  Layer Water output node and the Interchange mesh options (logged and skipped where an
+  engine lacks one, an opaque water as fallback); the coordinating session decides on a
+  check.
+- Depth foam comes from the vertex depth (shallows under 0.6 m), not the scene depth.
+- The previews' swell is a bump of two wave bands, not the master's displaced Gerstner
+  waves; the master's wave normals take the tangent frame of UV0 (x east, y north).
+- On a terrain city the bed lies 0.1 m over M13's ground grid, which keeps M16's beds too;
+  the grid could leave the water out once AG12's beds are the bed.
+- M16's exposure zones are 32 m cells (blurred here over 80 m); a sea channel has no
+  exposure of its own (no swell inland).
+- Marsh edges have mud, not reeds (AG13's cover); quay railings and the props on quays are
+  M20's (M16's PR).
+- Stage 3: wind, rain and fog on the water, the underwater look beyond a tinted volume;
+  stage 4: boats moving with buoyancy and wakes, ferries.
+- Mac = x86 waits for the deferred determinism check.
+
 ## Order
 
 ```
@@ -1381,7 +1558,7 @@ and its entry here notes it.
 
 ## Progress output
 
-`assetgen build`, `preview`, `materials preview|board`, `library`, `streets` and `props` say
+`assetgen build`, `preview`, `materials preview|board`, `library`, `streets`, `water` and `props` say
 what they are doing on stderr (`assetgen/progress.py`, the interface of stage 1's
 `citygen/progress.py`, which it will import once that lands): a line per stage (load, briefs,
 genomes, shells and parts, the library on first use, building checks, streets, signage,
@@ -1415,6 +1592,7 @@ assets are not in git.
 .venv/bin/python -m assetgen materials preview BUILD [--night]          # textured renders (AG6)
 .venv/bin/python -m assetgen materials board OUT                        # material boards (AG6)
 .venv/bin/python -m assetgen streets seam BASE REGEN --district NAME    # what a regeneration changed (AG7)
+.venv/bin/python -m assetgen water BUILD [--workers 4]                    # water (AG12)
 .venv/bin/python -m assetgen review BUILD --prev P                      # art-direction round (AG5)
 .venv/bin/python -m citygen unreal BUILD PROJECT                        # the city with its assets in Unreal
 .venv/bin/python -m assetgen sweep --suite m8a --out DIR                # (AG9)
