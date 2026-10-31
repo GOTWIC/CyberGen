@@ -833,6 +833,8 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
                "materials": sorted({p["m"] for p in o["parts"]})}
         if o["category"] in ("building", "landmark"):
             obj["roof"] = _roof(o["parts"])
+            if props.get("form"):
+                obj["form"] = props["form"]       # (M21: the building's form)
         if _level(o["category"], props):
             obj["level"] = _level(o["category"], props)
         if o["category"] == "deck_slab":

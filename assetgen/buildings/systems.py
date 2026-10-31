@@ -365,6 +365,8 @@ ROLE_GROUP = {
     "spire": "structure", "mast": "structure", "deck": "structure", "span": "structure",
     "leg": "structure", "ramp": "structure",
     "void": "structure", "shaft": "structure",
+    # M21: the frames, columns, struts and halos of the new forms
+    "frame": "structure", "column": "structure", "strut": "structure", "halo": "structure",
 }
 
 

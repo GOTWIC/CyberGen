@@ -80,6 +80,48 @@
       "title": "Access",
       "type": "object"
     },
+    "Arc": {
+      "additionalProperties": false,
+      "description": "M21: a stretch of a footprint ring on a circle. The ring's vertices between the two\nangles lie on it (the polygon cut so that no chord sags more than 2 cm from the curve),\nso stage 2 can draw the wall as the curve itself.",
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "radius_m": {
+          "title": "Radius M",
+          "type": "number"
+        },
+        "start_deg": {
+          "description": "Where it starts, degrees counterclockwise from east.",
+          "title": "Start Deg",
+          "type": "number"
+        },
+        "sweep_deg": {
+          "description": "How far it runs counterclockwise (360: the circle).",
+          "title": "Sweep Deg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "center",
+        "radius_m",
+        "start_deg",
+        "sweep_deg"
+      ],
+      "title": "Arc",
+      "type": "object"
+    },
     "Block": {
       "additionalProperties": false,
       "properties": {
@@ -458,6 +500,18 @@
           "minItems": 1,
           "title": "Masses",
           "type": "array"
+        },
+        "form": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Form"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M21: the building's form and its parameters."
         },
         "entrances": {
           "items": {
@@ -1121,6 +1175,81 @@
         "color"
       ],
       "title": "Faction",
+      "type": "object"
+    },
+    "Form": {
+      "additionalProperties": false,
+      "description": "M21: how a building departs from a box. `kind` is the shaft's form: for towers box,\nchamfer, rounded, setback, round, oval, taper, twist, lean, stack, cantilever, split,\ngarden, gate, exo or pods; for slabs curved, bent, stepped or lifted; landmarks their\nkind. `crown` is how the top ends (flat, tiers, sloped, cut, halo, mast, spire). The\nmasses of the shaft (`masses`, bottom up) carry their turn, scale and shift from the base\nplate, which is centered on `pivot`; `params` holds the form's numbers (twist per floor,\ntaper, lean, ...).",
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "crown": {
+          "default": "flat",
+          "title": "Crown",
+          "type": "string"
+        },
+        "tower": {
+          "default": false,
+          "description": "A tower (40 m and taller), which the neighbor rule counts.",
+          "title": "Tower",
+          "type": "boolean"
+        },
+        "band": {
+          "default": -1,
+          "description": "Height band of a tower (`buildings.TOWER_BANDS_M`), -1 otherwise.",
+          "title": "Band",
+          "type": "integer"
+        },
+        "pivot": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pivot"
+        },
+        "masses": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Masses",
+          "type": "array"
+        },
+        "params": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Form",
       "type": "object"
     },
     "Frontage": {
@@ -1824,7 +1953,7 @@
     },
     "Mass": {
       "additionalProperties": false,
-      "description": "An extruded footprint from z0 to z1. `shape` tells the blockout builder how to read it:\nprism (the footprint extruded), cylinder (footprint is a circle), dome and cone (rise\nfrom the footprint to a point or cap), ring (a vertical wheel whose diameter is z1 - z0,\nits footprint the thin plan of the rim).",
+      "description": "An extruded footprint from z0 to z1. `shape` tells the blockout builder how to read it:\nprism (the footprint extruded), cylinder (footprint is a circle), dome and cone (rise\nfrom the footprint to a point or cap), ring (a vertical wheel whose diameter is z1 - z0,\nits footprint the thin plan of the rim).\n\nM21: a building's form (`Building.form`) is built of such masses; a band of a twisted,\ntapered or leaning shaft is its form's base plate turned by `turn_deg` and scaled by\n`scale` about the form's pivot, then moved by `shift_m` (the footprint is exact either\nway). `arcs` are the curved stretches of the footprint.",
       "properties": {
         "footprint": {
           "$ref": "#/$defs/Polygon"
@@ -1839,7 +1968,7 @@
         },
         "role": {
           "default": "body",
-          "description": "podium, tower, tier, crown, spire, mechanical, body, void, deck, span, leg, dock, ramp, roof, ...",
+          "description": "podium, tower, tier, crown, spire, mechanical, body, void, deck, span, leg, dock, ramp, roof, band, block, link, core, column, frame, pod, halo, strut, mast, ...",
           "title": "Role",
           "type": "string"
         },
@@ -1854,6 +1983,45 @@
           ],
           "title": "Shape",
           "type": "string"
+        },
+        "arcs": {
+          "description": "M21: the footprint's curved stretches.",
+          "items": {
+            "$ref": "#/$defs/Arc"
+          },
+          "title": "Arcs",
+          "type": "array"
+        },
+        "turn_deg": {
+          "default": 0.0,
+          "description": "M21: the plate's turn from its form's base plate.",
+          "title": "Turn Deg",
+          "type": "number"
+        },
+        "scale": {
+          "default": 1.0,
+          "description": "M21: the plate's size against its form's base plate.",
+          "title": "Scale",
+          "type": "number"
+        },
+        "shift_m": {
+          "default": [
+            0.0,
+            0.0
+          ],
+          "description": "M21: how far the plate is moved from its form's base plate (after turning and scaling).",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Shift M",
+          "type": "array"
         }
       },
       "required": [
