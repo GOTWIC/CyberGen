@@ -1008,7 +1008,7 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
               "height_m": C.m(s.height_m), "content": s.content, "prop_id": s.prop_id,
               "roof_item": s.roof_item, "emitter": s.emitter, "two_sided": s.two_sided,
               "at": loc(s.position[0], s.position[1], s.position[2])
-              if s.mount != "roof" else None}
+              if s.mount not in ("roof", "front") else None}   # (M20: in front, off its walls)
              for s in sorted(look.slots.get(b.id, []), key=lambda s: s.id)]
     pois = [{"id": p.id, "kind": p.kind, "sub": p.sub, "name": p.name,
              "unit_index": p.unit_index, "floor": p.floor, "hours": list(p.hours),

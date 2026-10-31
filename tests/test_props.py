@@ -189,8 +189,12 @@ def test_overhead_measured_along_a_ramp(city):
             continue
         line = shapely.LineString(s.centerline)
         hi = max(prof, key=lambda p: p[1])
-        lo = min(prof, key=lambda p: p[1])
-        pts = [line.interpolate(hi[0]), line.interpolate(lo[0])]
+        # (a station where the road is a little up: on its fill)
+        low = next((sv / 10.0 for sv in range(int(line.length * 10))
+                    if 0.6 < V._z_on(prof, sv / 10.0) < 1.5), None)
+        if low is None:
+            continue
+        pts = [line.interpolate(hi[0]), line.interpolate(low)]
         u = oh.under(np.array([[p.x, p.y] for p in pts]), np.array([0.1, 0.1]),
                      np.array([0.0, 0.0]))
         assert abs(u[0] - (V._lowest(prof, hi[0] - 0.1, hi[0] + 0.1) - V.ROAD_DECK_M)) < 0.6

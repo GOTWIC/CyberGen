@@ -208,18 +208,19 @@ def test_large_ads(city):
 
 
 def test_signage_spec(city):
-    """A district's `signage` sets its large ads: none at density 0, only its kinds."""
-    spec = copy.deepcopy(SMALL)
-    for d in spec["districts"]:
-        d["signage"] = {"density": 0.0}
-    out = GP.build(validate_spec(spec).filled, _bare(city.model))
+    """A district's `signage` (in its params, as M1 records the filled spec) sets its large
+    ads: none at density 0, only its kinds."""
+    spec = validate_spec(copy.deepcopy(SMALL)).filled
+
+    def with_signage(sg):
+        ds = [d.model_copy(update={"params": {**d.params, "signage": sg}})
+              for d in city.model.districts]
+        return _bare(city.model).model_copy(update={"districts": ds})
+    out = GP.build(spec, with_signage({"density": 0.0}))
     assert not [s for s in out.rows["sign_slots"] if s["kind"] in ("banner",) or
                 s["mount"] in ("front",) or (s["kind"] == "billboard" and
                                              s["mount"] == "facade")]
-    spec = copy.deepcopy(SMALL)
-    for d in spec["districts"]:
-        d["signage"] = {"density": 1.0, "kinds": ["billboard"]}
-    out = GP.build(validate_spec(spec).filled, _bare(city.model))
+    out = GP.build(spec, with_signage({"density": 1.0, "kinds": ["billboard"]}))
     kinds = {(s["kind"], s["mount"]) for s in out.rows["sign_slots"]}
     assert ("billboard", "facade") in kinds and ("banner", "facade") not in kinds
     assert ("holo_ad", "front") not in kinds and ("holo_ad", "roof") not in kinds
