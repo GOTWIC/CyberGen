@@ -73,11 +73,11 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/M17/<city>/report.json is committed, passes and matches a fresh
+    """docs/progress/M21/<city>/report.json is committed, passes and matches a fresh
     build."""
     for path in CITIES:
         slug = path.parent.name
-        folder = ROOT / "docs" / "progress" / "M17" / slug
+        folder = ROOT / "docs" / "progress" / "M21" / slug
         committed = folder / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
@@ -135,6 +135,8 @@ def test_small_city_passes(small_built):
                    "building_heights", "building_entrances", "ground_floor_units",
                    "roof_items", "complexes", "skybridges", "landmarks", "megasite_contents",
                    "megasite_heights", "megasite_access",
+                   # M21
+                   "building_forms", "tower_neighbors",
                    # M6 (no transit lines in the small city, so no M5 checks)
                    "props_keepout", "props_overlap", "tree_clearance", "street_lighting",
                    "park_planting", "boats_afloat",

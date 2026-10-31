@@ -1478,11 +1478,13 @@ class Importer:
         self.stats["actors"]["deleted"] += 1
         self.keys["deleted"].append(key)
 
-    def tags(self, key, h, ids, typ, cat, tile, district, level=0):
+    def tags(self, key, h, ids, typ, cat, tile, district, level=0, form=""):
         t = [f"cg.city={self.city}", f"cg.key={key}", f"{HASH_TAG}={h}", f"cg.type={typ}",
              f"cg.category={cat}", f"cg.tile={tile}", f"cg.district={district}"]
         if level:
             t.append(f"cg.level={level}")      # (M14: on a deck)
+        if form:
+            t.append(f"cg.form={form}")        # (M21: a building's form)
         t += [f"cg.id={i}" for i in ids]
         return [unreal.Name(x) for x in t]
 
@@ -1549,7 +1551,8 @@ class Importer:
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
                     a.tags = self.tags(o["key"], h, o["ids"], o["type"], o["category"],
-                                       t["name"], o["district"], o.get("level", 0))
+                                       t["name"], o["district"], o.get("level", 0),
+                                       o.get("form", ""))
 
                 self.place(have, o["key"], o["hash"], sma, make, update,
                            f"CityGen/{o['category']}")
