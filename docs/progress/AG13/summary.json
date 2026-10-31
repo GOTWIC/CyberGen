@@ -40,7 +40,7 @@
    "entries": 314,
    "materials": 551,
    "masks": 160,
-   "disk_bytes": 89142955
+   "disk_bytes": 89143180
   },
   "checks": {
    "ground_coverage": true,
@@ -69,7 +69,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 44.4
+  "seconds": 21.9
  },
  "delta_megacity": {
   "ok": true,
@@ -112,7 +112,7 @@
    "entries": 283,
    "materials": 470,
    "masks": 145,
-   "disk_bytes": 55481198
+   "disk_bytes": 55481419
   },
   "checks": {
    "ground_coverage": true,
@@ -141,7 +141,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 35.8
+  "seconds": 19.3
  },
  "archipelago_free_port": {
   "ok": true,
@@ -185,7 +185,7 @@
    "entries": 309,
    "materials": 391,
    "masks": 158,
-   "disk_bytes": 104946398
+   "disk_bytes": 104946561
   },
   "checks": {
    "ground_coverage": true,
@@ -214,7 +214,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 44.3
+  "seconds": 19.9
  },
  "nexus_city": {
   "ok": true,
@@ -257,7 +257,7 @@
    "entries": 338,
    "materials": 556,
    "masks": 173,
-   "disk_bytes": 72666831
+   "disk_bytes": 72667118
   },
   "checks": {
    "ground_coverage": true,
@@ -286,7 +286,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 37.5
+  "seconds": 18.1
  },
  "peninsula_city": {
   "ok": true,
@@ -326,7 +326,7 @@
    "entries": 302,
    "materials": 397,
    "masks": 151,
-   "disk_bytes": 55840020
+   "disk_bytes": 55840179
   },
   "checks": {
    "ground_coverage": true,
@@ -355,7 +355,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 34.0
+  "seconds": 17.6
  },
  "cragmouth": {
   "ok": true,
@@ -396,7 +396,7 @@
    "entries": 255,
    "materials": 474,
    "masks": 129,
-   "disk_bytes": 99747808
+   "disk_bytes": 99748002
   },
   "checks": {
    "ground_coverage": true,
@@ -425,7 +425,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 61.7
+  "seconds": 11.7
  },
  "vesper_bay_decks": {
   "ok": true,
@@ -468,7 +468,7 @@
    "entries": 316,
    "materials": 540,
    "masks": 160,
-   "disk_bytes": 82634535
+   "disk_bytes": 82634760
   },
   "checks": {
    "ground_coverage": true,
@@ -497,7 +497,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 44.7
+  "seconds": 39.6
  },
  "vesper_regen": {
   "ok": true,

@@ -9,4 +9,4 @@ PASS ground_coverage: {'pieces': 2627, 'short': 0, 'first_short': None, 'triangu
 PASS ground_grass_clear: {'clumps': 2283363, 'failing': 0, 'first': None}
 PASS ground_meshes: {'files': 159, 'triangles': 46207, 'bad': 0, 'first': None}
 PASS ground_budgets: {'over': [], 'tile_instances_max': 40000, 'city_instances': 2283363, 'clump_triangles_max': 366, 'unique_triangles': 9732, 'tile_ground_triangles_max': 1346, 'city_ground_triangles': 36475, 'tile_drawn_triangles_max': 7966535, 'limits': {'tile_instances': 40000, 'city_instances': 3000000, 'clump_triangles': 400, 'unique_triangles': 60000, 'tile_ground_triangles': 250000, 'city_ground_triangles': 12000000, 'tile_drawn_triangles': 12000000}}
-seconds: {'gather': 2.01, 'clumps': 0.09, 'tiles': 19.49, 'write': 0.04, 'total': 44.33, 'workers': 3, 'slowest_tiles': [('t-04+04', 0.737), ('t-05-05', 0.726), ('t+04+04', 0.721), ('t+05+04', 0.708), ('t+03+04', 0.705)]}
+seconds: {'gather': 1.78, 'clumps': 0.01, 'tiles': 0.54, 'write': 0.04, 'total': 19.93, 'workers': 3, 'slowest_tiles': []}

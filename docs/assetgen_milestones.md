@@ -1575,10 +1575,11 @@ taken as (a)), in `assetgen/ground/`:
   (`ag6_materials.ground`, node for node the master's blend) and the clumps within 140 m of
   a street view's eye through AG8's geometry-nodes instancer (`grass`).
 
-**Samples** (Windows PC, 3 workers, on M16's builds of main at 280eb35; `assetgen build`
-otherwise as on main: Delta's `asset_access` door, Nexus City's `asset_access` and
-`street_meshes`, Greyhook's `asset_envelope`, each also failing with main's code; every
-ground check passes):
+**Samples** (Windows PC, 3 workers, on M16's builds of main at 280eb35, with main's fixes
+after AG10 merged in: the six samples' full `assetgen build` passes every check, buildings,
+streets, props, ground and materials; before that merge Delta's `asset_access` door, Nexus
+City's `asset_access` and `street_meshes` and Greyhook's `asset_envelope` failed with
+main's own code as well):
 
 | City | Pieces | Tiles | Clumps | Most in a tile | Tiles at the cap | Instanced triangles, most in a tile | Ground triangles (most in a tile) | Clump variants (triangles) | MB | s |
 |---|---|---|---|---|---|---|---|---|---|---|
