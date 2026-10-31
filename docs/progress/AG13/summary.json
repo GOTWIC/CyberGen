@@ -69,7 +69,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 21.9
+  "seconds": 41.2
  },
  "delta_megacity": {
   "ok": true,
@@ -141,7 +141,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 19.3
+  "seconds": 32.8
  },
  "archipelago_free_port": {
   "ok": true,
@@ -214,7 +214,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 19.9
+  "seconds": 37.7
  },
  "nexus_city": {
   "ok": true,
@@ -286,7 +286,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 18.1
+  "seconds": 34.2
  },
  "peninsula_city": {
   "ok": true,
@@ -355,7 +355,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 17.6
+  "seconds": 33.1
  },
  "cragmouth": {
   "ok": true,
@@ -425,7 +425,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 11.7
+  "seconds": 55.6
  },
  "vesper_bay_decks": {
   "ok": true,
@@ -497,7 +497,7 @@
     "tile_drawn_triangles": 12000000
    }
   },
-  "seconds": 39.6
+  "seconds": 40.5
  },
  "vesper_regen": {
   "ok": true,

@@ -59,7 +59,11 @@ def _clear(model, man: dict, out_dir: Path) -> dict:
     t_road = shapely.STRtree(road_like) if road_like else None
     t_other = shapely.STRtree(other) if other else None
     t_ok = shapely.STRtree(grassy) if grassy else None
-    t_verge = shapely.STRtree(verges) if verges else None
+    # (the median lawns as one: two strips of consecutive segments meet end to end, and a
+    # clump on their seam is on neither alone)
+    vparts = np.array(G.parts(shapely.union_all(verges, grid_size=0.001)) if verges else [],
+                      dtype=object)
+    t_verge = shapely.STRtree(vparts) if len(vparts) else None
     a_road = np.array(road_like, dtype=object)
     a_other = np.array(other, dtype=object)
     rad = {nd: K.CLUMPS[r["kind"]][1] for nd, r in (man.get("clumps") or {}).items()}
@@ -82,15 +86,12 @@ def _clear(model, man: dict, out_dir: Path) -> dict:
         bad = np.zeros(len(x), dtype=bool)
         in_verge = np.zeros(len(x), dtype=bool)
         if t_verge is not None:
-            pi, gi = t_verge.query(pts, predicate="within")
+            pi, gi = t_verge.query(pts, predicate="dwithin", distance=EPS_M)
             in_verge[pi] = True
             # a verge's clump stays on its lawn
-            vi = np.nonzero(in_verge)[0]
-            if len(vi):
-                d = np.full(len(x), np.inf)
-                for p, g in zip(pi.tolist(), gi.tolist()):
-                    d[p] = min(d[p], float(shapely.distance(verges[g].exterior, pts[p])))
-                bad[vi] |= d[vi] < r[vi] - EPS_M
+            if len(pi):
+                d = shapely.distance(shapely.boundary(vparts[gi]), pts[pi])
+                bad[pi[d < r[pi] - EPS_M]] = True
         for tree, geoms, skip_verge in ((t_road, a_road, True), (t_other, a_other, False)):
             if tree is None:
                 continue

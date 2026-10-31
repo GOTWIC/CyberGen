@@ -34,12 +34,14 @@ from . import kinds as K
 
 GROUND_VERSION = 1
 MAX_WORKERS = 4
+NOT_OUTPUT = ("checks.py", "preview.py")
 
 
 def code_hash() -> str:
+    """The code the outputs come from (the checks and the preview make none of them)."""
     here = Path(__file__).resolve().parent
     root = here.parent
-    files = sorted(here.glob("*.py")) + [root / f for f in
+    files = sorted(f for f in here.glob("*.py") if f.name not in NOT_OUTPUT) + [root / f for f in
                                          ("gltf.py", "triangulate.py", "canon.py")] + \
         [root / "props" / "trees.py", root / "props" / "styles.py",
          root / "props" / "shapes.py", root / "streets" / "kit.py"]
