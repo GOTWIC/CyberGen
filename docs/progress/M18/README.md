@@ -61,7 +61,7 @@ covers them.
   marked crossing is within the spacing; unmarked crossings in the walkway graph elsewhere;
 - widths by the class crossed: street 3 m, avenue and highway 4 m, 5 m on a downtown avenue.
 
-**Checks** (three more: 95 in all with M21's two, 100 with decks):
+**Checks** (three more: 98 in all with M21's two and M16's three, 103 with decks):
 
 | Check | Rule |
 |---|---|
@@ -142,15 +142,17 @@ covers them.
   (`junctions._crossings`, `_overhead`; the ULP noise test). The stack test's avenue at
   600 m from the crossing now has room for its own, shorter ramps (from 500 m out); the
   test puts it at 400 m.
-- **Merged with M21** (cyberpunk massing): every sample rebuilt on the merged code, the
-  numbers below from those builds; `GEN_VERSION` m18.1.
+- **Merged with M21** (cyberpunk massing) **and M16** (water and ground detail): every
+  sample rebuilt on the merged code, the numbers below from those builds; `GEN_VERSION` m18.1.
+  The M18 notes for the citygen skill (`highways.grades`, a district's `junctions`) are left
+  out of it for now (M16 changed the same file), kept in the PR description.
 
 ## Before and after
 
 Builds on this Windows PC at each city's own seed, before (main at M17, `builds/M18/before`)
-and with M18 merged with M21 (`builds/M18/dev7`: the road numbers are those of the build
-before the merge, `dev4`; M21 moves only sign slots, two transit lines and one plant); the
-run-through's measure in `measures/`. "Off level": the
+and with M18 merged with M21 and M16 (`builds/M18/dev8`: the road numbers are those of the
+build before the merges, `dev4`; M21 moves only sign slots, two transit lines and one plant,
+M16 none of them); the run-through's measure in `measures/`. "Off level": the
 run-through's count of junctions with a leg reaching the polygon at another height (now the
 footbridge stairs and the junctions that carry a surface, which meet every leg with no step:
 `junction_levels` passes everywhere). "Close crosswalks": junctions with crosswalks within
@@ -158,15 +160,15 @@ footbridge stairs and the junctions that carry a surface, which meet every leg w
 
 | City | Tries | Checks | Signalized junctions | With crosswalks | Close crosswalks | Off level (with a surface) | Embankments | Road columns | Plants into a deck |
 |---|---|---|---|---|---|---|---|---|---|
-| Delta Megacity | 1 to 1 | 95 of 95 | 344 to 155 | 353 to 159 | 120 to 0 | 82 to 74 (50) | 120 (5.8 km) | 231 to 192 | 102 to 1 |
-| Vesper Bay | 1 to 1 | 95 of 95 | 317 to 119 | 323 to 124 | 167 to 4 | 62 to 49 (42) | 91 (4.2 km) | 305 to 252 | 90 to 2 |
-| Cragmouth | 2 to 2 | 95 of 95 | 400 to 129 | 405 to 135 | 168 to 0 | 432 to 437 (482) | 66 (2.9 km) | 64 to 41 | 52 to 1 |
-| Nexus City | 1 to 1 | 95 of 95 | 344 to 144 | 358 to 152 | 162 to 0 | 85 to 80 (42) | 86 (3.6 km) | 278 to 231 | 58 to 1 |
-| Vesper Bay Pinned | 2 to 2 | 95 of 95 | 293 to 100 | 297 to 110 | 175 to 6 | 49 to 30 (26) | 40 (2.1 km) | 325 to 274 | 38 to 0 |
-| Vesper Bay Decks | 6 to 1 | 100 of 100 | 341 to 119 | 346 to 124 | 208 to 4 | 50 to 49 (44) | 91 (4.2 km) | 216 to 252 | 110 to 2 |
-| Saltreach Free Port | 1 to 1 | 95 of 95 | 158 to 68 | 163 to 73 | 74 to 0 | 61 to 51 (41) | 88 (3.8 km) | 345 to 284 | 99 to 0 |
-| Greyhook | 2 to 2 | 95 of 95 | 229 to 102 | 234 to 109 | 62 to 2 | 18 to 16 (12) | 24 (1.3 km) | 101 to 89 | 26 to 0 |
-| Vesper Bay Stacks | 2 to 2 | 95 of 95 | 275 to 91 | 281 to 100 | 161 to 4 | 49 to 34 (33) | 56 (2.9 km) | 456 to 377 | 42 to 4 |
+| Delta Megacity | 1 to 1 | 98 of 98 | 344 to 155 | 353 to 159 | 120 to 0 | 82 to 74 (50) | 120 (5.8 km) | 231 to 192 | 102 to 1 |
+| Vesper Bay | 1 to 1 | 98 of 98 | 317 to 119 | 323 to 124 | 167 to 4 | 62 to 49 (42) | 91 (4.2 km) | 305 to 252 | 90 to 2 |
+| Cragmouth | 2 to 2 | 98 of 98 | 400 to 129 | 405 to 135 | 168 to 0 | 432 to 437 (482) | 66 (2.9 km) | 64 to 41 | 52 to 1 |
+| Nexus City | 1 to 1 | 98 of 98 | 344 to 144 | 358 to 152 | 162 to 0 | 85 to 80 (42) | 86 (3.6 km) | 278 to 231 | 58 to 1 |
+| Vesper Bay Pinned | 2 to 2 | 98 of 98 | 293 to 100 | 297 to 110 | 175 to 6 | 49 to 30 (26) | 40 (2.1 km) | 325 to 274 | 38 to 0 |
+| Vesper Bay Decks | 6 to 1 | 103 of 103 | 341 to 119 | 346 to 124 | 208 to 4 | 50 to 49 (44) | 91 (4.2 km) | 216 to 252 | 110 to 2 |
+| Saltreach Free Port | 1 to 1 | 98 of 98 | 158 to 68 | 163 to 73 | 74 to 0 | 61 to 51 (41) | 88 (3.8 km) | 345 to 284 | 99 to 0 |
+| Greyhook | 2 to 2 | 98 of 98 | 229 to 102 | 234 to 109 | 62 to 2 | 18 to 16 (12) | 24 (1.3 km) | 101 to 89 | 26 to 0 |
+| Vesper Bay Stacks | 2 to 2 | 98 of 98 | 275 to 91 | 281 to 100 | 161 to 4 | 49 to 34 (33) | 56 (2.9 km) | 456 to 377 | 42 to 4 |
 
 ![Delta Megacity's Old Town: signals and crosswalks before and with M18](delta_old_town_crossings.png)
 

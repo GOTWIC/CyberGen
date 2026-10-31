@@ -116,6 +116,10 @@ checks:
   [pass] travel_points: Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk
   [pass] sign_slots: Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof
          note: shop signs reach 10.2 m
+  [pass] water_beds: Every water body has its depth, bed and flow (basins, marinas and pools still; the sea's exposure covers it); no bed under M9's (canal 3, river 7, sea 12 m under the ground datum); tunnels keep 1.5 m under the bed; bridge foundations in the water on bed no deeper than their footings
+         note: 5 tunnel points and 4 bridge foundations under the water
+  [pass] water_banks: The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes
+  [pass] ground_cover: The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
          note: 89 road columns under 17 raised segments
 
@@ -175,6 +179,10 @@ stats:
   other raised roads 2.84 km, underpass streets 0, road columns 89
 
   tunnels metro 5 (2.47 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -26 m
+
+  water: 6 bodies (sea 10.5 m tidal, rv.neckwater 2.95 m downstream, d04.ww.w1123s393 1.5 m tidal, d04.ww.w839n277 1.5 m tidal, d05.ww.e1476n139 10.5 m still, d05.ww.e1232s181 10.5 m still); sea harbor 0.035 km2, open 4.235 km2, sheltered 2.718 km2
+  banks: beach 2 (1.95 km), canal wall 17 (1.02 km), natural bank 30 (13.5 km), quay 5 (3.06 km), riprap 21 (5.89 km), road embankment 4 (0.16 km)
+  ground cover: bare dirt 0.007 km2, gravel 0.534 km2, meadow 0.021 km2, mown lawn 0.452 km2, overgrown paving 0.192 km2, park lawn 0.45 km2, paving 0.512 km2, wasteland 0.031 km2; 481 desire lines
 
   gameplay: 136 points of interest, 6 factions (gang 3, corporate 2, police 1), 9 territories (1 contested), 17 taxi stands, 8 fast-travel points
   pois: vendor.food 23, bar.bar 16, clinic.ripperdoc 16, apartment.studio 15, bar.arcade 14, vendor.convenience 13, bar.club 10, vendor.pawn 9, apartment.penthouse 7, fixer.fixer 5, apartment.apartment 2, clinic.clinic 2, hideout.back_room 2, hideout.squat 1, hideout.warehouse 1

@@ -968,14 +968,14 @@ M18 (junctions and ramps, from the first run-through) is in place:
   unsignalized junction's avenue where none is within the spacing; widths by class (street
   3 m, avenue and highway 4 m, 5 m on a downtown avenue, none on alleys and service roads,
   `crosswalk_w`); unmarked crossings elsewhere.
-- **Checks** (95 in all with M21's two, 100 with decks): `ramp_grades` (ramps 8%, runs and
-  approaches 7%; `road_grades` caps every road at 8%), `junction_levels` (every leg meets its
-  junction's surface within 2 cm where it leaves, the surface level across it within its
-  class's cross slope, 2.5% primary, 3% else, the curb between two legs running evenly from
-  one's height to the other's), `crossing_spacing` (signals and marked crossings only where
-  called for and spaced, crosswalk widths); `ground_grades` lets a road be as steep as its own
-  z profile; the reports give each city try's failing checks (`city_tries[].failed`) and the
-  stats `elevated.grades`, `embankments`, `junction_levels`.
+- **Checks** (98 in all with M21's two and M16's three, 103 with decks): `ramp_grades`
+  (ramps 8%, runs and approaches 7%; `road_grades` caps every road at 8%), `junction_levels`
+  (every leg meets its junction's surface within 2 cm where it leaves, the surface level
+  across it within its class's cross slope, 2.5% primary, 3% else, the curb between two legs
+  running evenly from one's height to the other's), `crossing_spacing` (signals and marked
+  crossings only where called for and spaced, crosswalk widths); `ground_grades` lets a road
+  be as steep as its own z profile; the reports give each city try's failing checks
+  (`city_tries[].failed`) and the stats `elevated.grades`, `embankments`, `junction_levels`.
 - **Found on the new layouts:** M9's pedestrian underpasses keep their passage off column
   footings (`tunnels._underpasses`: a transit column in a highway's median); AG7's junction
   piece leaves out a sidewalk corner pad that would fold over an earlier one
@@ -991,7 +991,7 @@ M18 (junctions and ramps, from the first run-through) is in place:
   own keep-outs cover it) while trees keep off it (`overhead` with `fill`, as the
   tree-clearance check), and M2's crossing locks and overhead test measure on plain arithmetic
   (`junctions._crossings`, `_overhead`: `terrain.crossings` projects with GEOS and runs
-  after M2). `GEN_VERSION` m18.1 on M21's m21.1.
+  after M2). `GEN_VERSION` m18.1 on M21's m21.1. Merged with M21 and M16.
 Sample builds: `docs/progress/M18/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

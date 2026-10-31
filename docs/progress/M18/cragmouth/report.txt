@@ -112,6 +112,10 @@ checks:
   [pass] travel_points: Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk
   [pass] sign_slots: Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a facade of their building above the shop signs and apart from each other, holo-ads over their roof
          note: shop signs reach 10.2 m
+  [pass] water_beds: Every water body has its depth, bed and flow (basins, marinas and pools still; the sea's exposure covers it); no bed under M9's (canal 3, river 7, sea 12 m under the ground datum); tunnels keep 1.5 m under the bed; bridge foundations in the water on bed no deeper than their footings
+         note: 7 tunnel points and 7 bridge foundations under the water
+  [pass] water_banks: The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes
+  [pass] ground_cover: The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
          note: 41 road columns under 20 raised segments
 
@@ -170,6 +174,10 @@ stats:
   tunnels bored 4 (0.37 km), metro 7 (3.93 km), pedestrian 5 (0.15 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -52.84 m
 
   terrain: ground up to 95.11 m; cuts to 18.7 m, fills to 18.7 m; 1832 retaining walls (highest 19.9 m), 4 bored tunnels, 2 terrain viaducts; 191 hillside greens, highest plinth 14.29 m
+
+  water: 8 bodies (sea 12 m tidal, rv.cragwater 3.07 m downstream, d01.ww.e1171s718 12 m still, d01.ww.e987s600 12 m still, d01.ww.e814s468 12 m still, d02.ww.w1009s495 3 m tidal, ...); sea open 2.65 km2, sheltered 0.206 km2
+  banks: canal wall 6 (0.38 km), natural bank 15 (5.19 km), quay 6 (5.05 km), riprap 5 (1.92 km), road embankment 4 (0.16 km)
+  ground cover: bare dirt 0.036 km2, gravel 0.327 km2, meadow 0.746 km2, mown lawn 0.38 km2, overgrown paving 0.08 km2, park lawn 0.163 km2, paving 0.559 km2, planted bed 0.005 km2, wasteland 0.0 km2; 293 desire lines
 
   gameplay: 269 points of interest, 6 factions (gang 4, corporate 1, police 1), 13 territories (4 contested), 32 taxi stands, 11 fast-travel points
   pois: vendor.food 42, bar.bar 38, vendor.pawn 32, bar.arcade 31, vendor.convenience 25, apartment.studio 22, clinic.ripperdoc 22, clinic.clinic 16, bar.club 14, apartment.apartment 9, fixer.fixer 8, hideout.squat 4, hideout.back_room 3, hideout.warehouse 2, apartment.capsule 1

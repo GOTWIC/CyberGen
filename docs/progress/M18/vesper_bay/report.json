@@ -700,6 +700,29 @@
       ]
     },
     {
+      "id": "water_beds",
+      "title": "Every water body has its depth, bed and flow (basins, marinas and pools still; the sea's exposure covers it); no bed under M9's (canal 3, river 7, sea 12 m under the ground datum); tunnels keep 1.5 m under the bed; bridge foundations in the water on bed no deeper than their footings",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "17 tunnel points and 24 bridge foundations under the water"
+      ]
+    },
+    {
+      "id": "water_banks",
+      "title": "The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "ground_cover",
+      "title": "The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "road_supports",
       "title": "Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure",
       "passed": true,
@@ -1584,6 +1607,155 @@
         "densities": 2553,
         "sign_slots": 15054
       }
+    },
+    "water": {
+      "water_bodies": 10,
+      "bodies": [
+        {
+          "id": "sea",
+          "kind": "sea",
+          "depth_m": 10.5,
+          "flow": "tidal",
+          "speed_m_s": 0.1
+        },
+        {
+          "id": "rv.vess_river",
+          "kind": "river",
+          "depth_m": 4.95,
+          "flow": "downstream",
+          "speed_m_s": 0.8
+        },
+        {
+          "id": "ch.north_reach",
+          "kind": "delta_branch",
+          "depth_m": 3.97,
+          "flow": "downstream",
+          "speed_m_s": 0.5
+        },
+        {
+          "id": "ch.lotus_cut",
+          "kind": "delta_branch",
+          "depth_m": 4.03,
+          "flow": "downstream",
+          "speed_m_s": 0.5
+        },
+        {
+          "id": "sep.e577s1113",
+          "kind": "separation",
+          "depth_m": 1.5,
+          "flow": "downstream",
+          "speed_m_s": 0.15
+        },
+        {
+          "id": "d04.ww.e834s1215",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d04.ww.e679s977",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d05.ww.w379n1101",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d06.ww.w503s1220",
+          "kind": "basin",
+          "depth_m": 10.5,
+          "flow": "still",
+          "speed_m_s": 0.0
+        },
+        {
+          "id": "d06.ww.w346s1115",
+          "kind": "basin",
+          "depth_m": 10.5,
+          "flow": "still",
+          "speed_m_s": 0.0
+        }
+      ],
+      "banks": {
+        "canal_wall": {
+          "count": 14,
+          "km": 1.42
+        },
+        "marsh_edge": {
+          "count": 6,
+          "km": 5.86
+        },
+        "natural_bank": {
+          "count": 26,
+          "km": 8.54
+        },
+        "quay": {
+          "count": 6,
+          "km": 4.54
+        },
+        "riprap": {
+          "count": 10,
+          "km": 5.49
+        },
+        "road_embankment": {
+          "count": 16,
+          "km": 0.7
+        }
+      },
+      "exposure_km2": {
+        "harbor": 0.011,
+        "open": 1.989,
+        "sheltered": 0.97
+      },
+      "cover": {
+        "bare_dirt": {
+          "pieces": 1792,
+          "km2": 0.027
+        },
+        "gravel": {
+          "pieces": 102,
+          "km2": 0.633
+        },
+        "marsh": {
+          "pieces": 2,
+          "km2": 0.661
+        },
+        "meadow": {
+          "pieces": 74,
+          "km2": 0.121
+        },
+        "mown_lawn": {
+          "pieces": 657,
+          "km2": 0.553
+        },
+        "overgrown_paving": {
+          "pieces": 604,
+          "km2": 0.163
+        },
+        "park_lawn": {
+          "pieces": 206,
+          "km2": 0.37
+        },
+        "paving": {
+          "pieces": 892,
+          "km2": 0.669
+        },
+        "planted_bed": {
+          "pieces": 122,
+          "km2": 0.016
+        },
+        "wasteland": {
+          "pieces": 86,
+          "km2": 0.114
+        }
+      },
+      "desire_lines": 638
     },
     "separation_budget": {
       "target": 0.6,

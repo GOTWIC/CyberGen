@@ -126,6 +126,10 @@ checks:
          note: d03.deck.e1359n1225: walkways under the slab within 63 m of the sky
   [pass] deck_links: Every deck joined to the ground: at least two stairs and an elevator from ground walkways to deck walkways, every deck walkway in one walkway component with the ground's, at least one ramp from a deck street to a ground junction, its lanes in the lane graph's largest strongly connected part
   [pass] deck_levels: Every deck's streets at its top, its lots on its slab, its buildings standing on its top, its props, plants and walkways over its slab at its top; nothing on level 1 off a deck
+  [pass] water_beds: Every water body has its depth, bed and flow (basins, marinas and pools still; the sea's exposure covers it); no bed under M9's (canal 3, river 7, sea 12 m under the ground datum); tunnels keep 1.5 m under the bed; bridge foundations in the water on bed no deeper than their footings
+         note: 17 tunnel points and 24 bridge foundations under the water
+  [pass] water_banks: The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes
+  [pass] ground_cover: The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
          note: 252 road columns under 54 raised segments
 
@@ -191,6 +195,10 @@ stats:
   other raised roads 17.36 km, underpass streets 0, road columns 252
 
   tunnels metro 4 (2.57 km), pedestrian 2 (0.06 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -26 m
+
+  water: 10 bodies (sea 10.5 m tidal, rv.vess_river 4.95 m downstream, ch.north_reach 3.97 m downstream, ch.lotus_cut 4.03 m downstream, sep.e577s1113 1.5 m downstream, d04.ww.e834s1215 1.5 m tidal, ...); sea harbor 0.011 km2, open 1.989 km2, sheltered 0.97 km2
+  banks: canal wall 14 (1.42 km), marsh edge 6 (5.86 km), natural bank 26 (8.54 km), quay 6 (4.54 km), riprap 10 (5.49 km), road embankment 16 (0.7 km)
+  ground cover: bare dirt 0.029 km2, gravel 0.633 km2, marsh 0.661 km2, meadow 0.118 km2, mown lawn 0.441 km2, overgrown paving 0.163 km2, park lawn 0.37 km2, paving 0.671 km2, planted bed 0.016 km2, wasteland 0.114 km2; 628 desire lines
 
   gameplay: 199 points of interest, 8 factions (gang 4, corporate 3, police 1), 13 territories (3 contested), 29 taxi stands, 11 fast-travel points
   pois: vendor.food 35, bar.arcade 27, vendor.pawn 26, bar.bar 20, apartment.studio 18, clinic.ripperdoc 18, bar.club 11, vendor.convenience 11, clinic.clinic 10, fixer.fixer 7, apartment.penthouse 6, hideout.squat 4, apartment.apartment 2, hideout.back_room 2, hideout.warehouse 2

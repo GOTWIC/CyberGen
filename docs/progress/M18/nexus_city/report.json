@@ -702,6 +702,29 @@
       ]
     },
     {
+      "id": "water_beds",
+      "title": "Every water body has its depth, bed and flow (basins, marinas and pools still; the sea's exposure covers it); no bed under M9's (canal 3, river 7, sea 12 m under the ground datum); tunnels keep 1.5 m under the bed; bridge foundations in the water on bed no deeper than their footings",
+      "passed": true,
+      "failures": [],
+      "notes": [
+        "9 tunnel points and 110 bridge foundations under the water"
+      ]
+    },
+    {
+      "id": "water_banks",
+      "title": "The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
+      "id": "ground_cover",
+      "title": "The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m",
+      "passed": true,
+      "failures": [],
+      "notes": []
+    },
+    {
       "id": "road_supports",
       "title": "Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure",
       "passed": true,
@@ -1703,6 +1726,211 @@
         "densities": 2734,
         "sign_slots": 17085
       }
+    },
+    "water": {
+      "water_bodies": 18,
+      "bodies": [
+        {
+          "id": "sea",
+          "kind": "sea",
+          "depth_m": 10.5,
+          "flow": "tidal",
+          "speed_m_s": 0.1
+        },
+        {
+          "id": "rv.kurosawa_river",
+          "kind": "river",
+          "depth_m": 4.19,
+          "flow": "downstream",
+          "speed_m_s": 0.8
+        },
+        {
+          "id": "ch.sentinel_canal",
+          "kind": "sea_channel",
+          "depth_m": 10.5,
+          "flow": "tidal",
+          "speed_m_s": 0.4
+        },
+        {
+          "id": "ch.jade_reach",
+          "kind": "delta_branch",
+          "depth_m": 5.5,
+          "flow": "downstream",
+          "speed_m_s": 0.5
+        },
+        {
+          "id": "ch.temple_cut",
+          "kind": "delta_branch",
+          "depth_m": 5.5,
+          "flow": "downstream",
+          "speed_m_s": 0.5
+        },
+        {
+          "id": "sep.e544n502",
+          "kind": "separation",
+          "depth_m": 1.5,
+          "flow": "downstream",
+          "speed_m_s": 0.15
+        },
+        {
+          "id": "sep.e126n468",
+          "kind": "separation",
+          "depth_m": 1.5,
+          "flow": "downstream",
+          "speed_m_s": 0.15
+        },
+        {
+          "id": "sep.e321s56",
+          "kind": "separation",
+          "depth_m": 1.5,
+          "flow": "downstream",
+          "speed_m_s": 0.15
+        },
+        {
+          "id": "sep.e791s80",
+          "kind": "separation",
+          "depth_m": 1.5,
+          "flow": "downstream",
+          "speed_m_s": 0.15
+        },
+        {
+          "id": "sep.w290n476",
+          "kind": "separation",
+          "depth_m": 1.5,
+          "flow": "downstream",
+          "speed_m_s": 0.15
+        },
+        {
+          "id": "d04.ww.w470s409",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d04.ww.w231n340",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d07.ww.w665s1337",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d07.ww.e76s1019",
+          "kind": "canal",
+          "depth_m": 1.5,
+          "flow": "tidal",
+          "speed_m_s": 0.05
+        },
+        {
+          "id": "d07.ww.w996s1474",
+          "kind": "creek",
+          "depth_m": 1.0,
+          "flow": "downstream",
+          "speed_m_s": 0.2
+        },
+        {
+          "id": "d08.ww.e775s952",
+          "kind": "basin",
+          "depth_m": 10.5,
+          "flow": "still",
+          "speed_m_s": 0.0
+        },
+        {
+          "id": "d08.ww.e1216s1070",
+          "kind": "basin",
+          "depth_m": 10.5,
+          "flow": "still",
+          "speed_m_s": 0.0
+        },
+        {
+          "id": "d08.ww.e1435s992",
+          "kind": "basin",
+          "depth_m": 10.5,
+          "flow": "still",
+          "speed_m_s": 0.0
+        }
+      ],
+      "banks": {
+        "canal_wall": {
+          "count": 19,
+          "km": 1.99
+        },
+        "marsh_edge": {
+          "count": 6,
+          "km": 2.78
+        },
+        "natural_bank": {
+          "count": 41,
+          "km": 14.43
+        },
+        "quay": {
+          "count": 8,
+          "km": 7.43
+        },
+        "riprap": {
+          "count": 9,
+          "km": 2.61
+        },
+        "road_embankment": {
+          "count": 14,
+          "km": 0.48
+        }
+      },
+      "exposure_km2": {
+        "harbor": 0.001,
+        "open": 1.173,
+        "sheltered": 1.15
+      },
+      "cover": {
+        "bare_dirt": {
+          "pieces": 1977,
+          "km2": 0.032
+        },
+        "gravel": {
+          "pieces": 88,
+          "km2": 0.758
+        },
+        "marsh": {
+          "pieces": 3,
+          "km2": 0.217
+        },
+        "meadow": {
+          "pieces": 41,
+          "km2": 0.11
+        },
+        "mown_lawn": {
+          "pieces": 639,
+          "km2": 0.59
+        },
+        "overgrown_paving": {
+          "pieces": 481,
+          "km2": 0.006
+        },
+        "park_lawn": {
+          "pieces": 198,
+          "km2": 0.332
+        },
+        "paving": {
+          "pieces": 1791,
+          "km2": 1.045
+        },
+        "planted_bed": {
+          "pieces": 146,
+          "km2": 0.019
+        },
+        "wasteland": {
+          "pieces": 26,
+          "km2": 0.044
+        }
+      },
+      "desire_lines": 536
     },
     "separation_budget": {
       "target": 0.6,
