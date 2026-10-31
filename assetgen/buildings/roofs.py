@@ -787,7 +787,9 @@ def finish(sb, ms: dict, top_open) -> None:
                 return
             hs.append(hh)
         slot = "roof_gravel" if fin == "gravel" else "roof_paver"
-        if slab(sb.buf, f, hs, z, z + (40 if fin == "gravel" else 60), slot, slot):
+        t = 40 if fin == "gravel" else 60
+        if any([slab(sb.buf, e, eh, z, z + t, slot, slot)
+                for e, eh in _off_bridges(sb, f, hs, z, z + t)]):
             sb.stats["roof_finishes"] = sb.stats.get("roof_finishes", 0) + 1
             sb.used["roof_finish"] = fin
         return
@@ -814,9 +816,43 @@ def finish(sb, ms: dict, top_open) -> None:
     pts = [(int(round(p[0])), int(round(p[1]))) for p in pts]
     if not all(RG.in_poly(p, [ring] + holes) == 1 for p in pts):
         return
-    if slab(sb.buf, pts, [], z, z + 40, "roof_walkway", "roof_walkway"):
+    if any([slab(sb.buf, e, eh, z, z + 40, "roof_walkway", "roof_walkway")
+            for e, eh in _off_bridges(sb, pts, [], z, z + 40)]):
         sb.stats["roof_finishes"] = sb.stats.get("roof_finishes", 0) + 1
         sb.used["roof_finish"] = fin
+
+
+def _off_bridges(sb, ring, holes, z0: int, z1: int) -> list[tuple[list, list]]:
+    """A roof finish's polygon (mm) less the corridors of the skybridges over it within
+    z0..z1 (a bridge that lands at a lower roof's level crosses it, or passes a pod's roof
+    under its top): (exterior, holes) pieces; as it is where none does."""
+    from shapely.geometry import LineString, Polygon
+    from citygen import geom as G
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    if not sb.bridges.hits(min(xs), min(ys), max(xs), max(ys), z0, z1):
+        return [(ring, holes)]
+    cut = [(p, q, h) for p, q, h, *_ in sb.bridges.segs
+           if min(p[2], q[2]) < z1 and max(p[3], q[3]) > z0]
+    with G.canonical():
+        poly = G.qpoly(Polygon([(x / 1000.0, y / 1000.0) for x, y in ring],
+                               [[(x / 1000.0, y / 1000.0) for x, y in h] for h in holes]))
+        for p, q, h in cut:
+            if (p[0], p[1]) == (q[0], q[1]):
+                continue
+            band = LineString([(p[0] / 1000.0, p[1] / 1000.0), (q[0] / 1000.0, q[1] / 1000.0)]
+                              ).buffer(h / 1000.0, cap_style="flat")
+            poly = G.diff(poly, G.qpoly(band))
+        polys = G.to_model_polys(poly) if poly is not None and not poly.is_empty else []
+    out = []
+    for pm in polys:
+        ext = _ccw(RG.mm_ring(pm["exterior"]))
+        if len(ext) < 3 or not RG.is_simple(ext) or abs(area2(ext)) < 2 * 250_000:
+            continue
+        hs = [RG.mm_ring(hh) for hh in pm["holes"]]
+        if all(len(hh) >= 3 and RG.is_simple(hh) and RG.rings_apart(hh, ext) for hh in hs):
+            out.append((ext, hs))
+    return out
 
 
 def shapes(pg: dict, d_m: float) -> list[tuple[list, list]]:

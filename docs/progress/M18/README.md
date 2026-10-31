@@ -143,7 +143,7 @@ covers them.
   600 m from the crossing now has room for its own, shorter ramps (from 500 m out); the
   test puts it at 400 m.
 - **Merged with M21** (cyberpunk massing) **and M16** (water and ground detail): every
-  sample rebuilt on the merged code, the numbers below from those builds; `GEN_VERSION` m18.1.
+  sample rebuilt on the merged code, the numbers below from those builds; `GEN_VERSION` m18.2 (with the assetgen fixes' agfix.1).
   The M18 notes for the citygen skill (`highways.grades`, a district's `junctions`) are left
   out of it for now (M16 changed the same file), kept in the PR description.
 
