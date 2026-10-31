@@ -114,6 +114,29 @@ def _clear(fa, depth: int, end: int, pier: bool = True) -> int:
                depth + EDGE_CLEAR if _convex(d_in, d_out) else 0)
 
 
+FACE_OWN = 3000              # a door needs this much ground in front of it clear of its own walls
+
+
+def _faces_own(sb, fa, s: int, z: int) -> bool:
+    """Whether the way straight out of the facade at s meets the building's own walls
+    within `FACE_OWN`, at the height z: a crack or narrow notch in its outline (the brief
+    classes the wall by its neighbors only). A door there opens onto its own wall, as
+    against a neighbor's, so it moves (`Band.rehome`, `leftovers`)."""
+    x, y = fa.P(min(max(s, 0), fa.L), 0)[:2]
+    a = (int(round(x + fa.nx * 150)), int(round(y + fa.ny * 150)))
+    b = (int(round(x + fa.nx * FACE_OWN)), int(round(y + fa.ny * FACE_OWN)))
+    for ms in sb.masses:
+        if ms["shape"] != "prism" or not ms["z0"] <= z < ms["z1"]:
+            continue
+        for ring in ms["rings"]:
+            n = len(ring)
+            for i in range(n):
+                p, q = ring[i], ring[(i + 1) % n]
+                if p != q and RG.seg_hit(a, b, p, q):
+                    return True
+    return False
+
+
 def _blocked(fa, a: int, b: int, depth: int, edges) -> bool:
     """Whether another edge of the mass crosses the box behind the facade from a to b,
     `depth` deep (a sliver of solid there)."""
@@ -307,8 +330,10 @@ class Band:
             inside = [(ke, en, se) for ke, en, se in ents
                       if s - w // 2 <= se <= s + w // 2]
             head = self._head(fa, want_a, want_b, mounts, "shop", un)
-            # (no shopfront behind a neighbor built against the wall: its door only)
-            behind = fa.cls(min(max(s, 0), L), z0 + 1200) in ("party", "hidden")
+            # (no shopfront behind a neighbor built against the wall, or facing its own
+            # wall a step away: its door only)
+            behind = fa.cls(min(max(s, 0), L), z0 + 1200) in ("party", "hidden") or \
+                _faces_own(sb, fa, min(max(s, 0), L), z0 + 1200)
             if want_b - want_a >= SHOP_MIN and head is not None and not behind:
                 got = _fit(fa, want_a, want_b, max(SHOP_R.get(use, 250), self.reveal),
                            self.edges, taken, mounts, z0, head, 0, SHOP_MIN, self.boxes)
@@ -477,7 +502,7 @@ class Band:
         if kind == "unit":
             info.update(unit=en["unit"], un=en["un"], use=en["un"]["use"])
             info.pop("entrance")
-        if cls not in ("party", "hidden"):
+        if cls not in ("party", "hidden") and not _faces_own(sb, fa, s, z0 + 1200):
             got = _fit(fa, s - w // 2, s + w // 2, d, self.edges, taken, mounts, lo, hi,
                        DOOR_SHIFT, 0, self.boxes if lo <= z0 else None)
             if got is None and dk in ("garage", "dock", "rollup", "gate", "main"):
@@ -498,7 +523,9 @@ class Band:
                     "main", "unit") else "structure"
                 return Op(a, b, lo, hi, "door", back, dd, info)
         else:
-            return None                    # (a neighbor against it: `leftovers` moves it)
+            # (a neighbor against it, or its own wall just ahead: `rehome` or `leftovers`
+            # moves it)
+            return None
         # flush: a door on the wall at the entrance (within the facade; a facade too short
         # for one leaves it to the nearest that has room, `leftovers`)
         w = min(w, 1200)
@@ -1041,9 +1068,10 @@ def leftovers(sb) -> None:
                 continue
             px, py = ax + fa.ux * t, ay + fa.uy * t
             d = math.hypot(px - x, py - y)
-            # (a wall a door fits under and open first: a door against a neighbor, into a
-            # court or on a low platform only where there is no other)
-            wall = fa.cls(t, ms["z0"] + 1200) in ("party", "hidden", "blind") + INNER
+            # (a wall a door fits under and open first: a door against a neighbor or its own
+            # wall, into a court or on a low platform only where there is no other)
+            wall = fa.cls(t, ms["z0"] + 1200) in ("party", "hidden", "blind") + INNER or \
+                _faces_own(sb, fa, t, ms["z0"] + 1200)
             key = (hh < 1800, wall, round(d), fa.j if fa.j is not None else -1, t)
             if best is None or key < best[0]:
                 best = (key, fa, ms, t)
