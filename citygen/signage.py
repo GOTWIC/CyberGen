@@ -45,6 +45,7 @@ q = G.q
 KINDS = ("billboard", "banner", "holo")
 SKIP_ROLES = ("void", "band", "frame", "column", "strut", "halo", "mast", "pod", "link",
               "spire", "leg", "ramp", "dock", "span")
+THIN_ROLES = ("mast", "spire", "halo", "strut", "frame", "column")   # (not a roof)
 PROBE_M = 6.0            # a facade looks at what is this far in front of it
 FACE_REACH_M = {"highway": 45.0, "avenue": 45.0, "street": 30.0, "pedestrian": 25.0}
 FACE_WEIGHT = {"highway": 1.0, "avenue": 1.0, "plaza": 0.9, "street": 0.75,
@@ -72,9 +73,8 @@ WRAP_TURN_DEG = 60.0     # a banner wraps a corner turning at least this much
 GAP_M = 1.0              # between two ads on one facade
 HOLO_ROOF_M = 50.0       # holo-boards over the roofs of towers this tall
 HOLO_ROOF_P = (0.05, 0.25)   # (the share of them: the first plus the second times density)
-HOLO_FRONT_P = (0.0, 0.25)
-THIN_ROLES = ("mast", "spire", "halo", "strut", "frame", "column")
 HOLO_FRONT_M = 40.0      # and in front of the facades of towers this tall
+HOLO_FRONT_P = (0.0, 0.25)
 HOLO_OFF_M = 3.0         # the image this far in front of its facade
 HOLO_W_M = (8.0, 24.0)
 HOLO_ASPECT = 0.6
@@ -369,6 +369,7 @@ def place(pl: Placer, b, lo_of: float, sky_clear, band, corp: bool) -> list[dict
             h = min(k * fh, z1 - z0)
             if h < BANNER_FLOORS[0] * fh:
                 continue
+            k = int(h / fh + 0.5)     # (the floors it spans, under its mass's top)
             w = q(min(BANNER_W_M[1], max(BANNER_W_M[0], 0.18 * f.L)))
             end = 1 if _u("bend", b.id, f.i) < 0.5 else 0
             t0 = f.L - CORNER_GAP_M - w if end else CORNER_GAP_M
@@ -467,7 +468,7 @@ def place(pl: Placer, b, lo_of: float, sky_clear, band, corp: bool) -> list[dict
     if "holo" in kinds and top >= HOLO_FRONT_M and (
             _u("holof", b.id) < HOLO_FRONT_P[0] + HOLO_FRONT_P[1] * dens):
         for f in fs:
-            if f.face not in ("highway", "avenue", "plaza"):
+            if f.face not in ("highway", "avenue", "plaza") or f.L < HOLO_W_M[0]:
                 continue
             z0, z1 = span(f)
             w = min(max(0.5 * f.L, HOLO_W_M[0]), HOLO_W_M[1])
