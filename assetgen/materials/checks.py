@@ -108,7 +108,8 @@ FOLDERS = (("buildings", "tiles", "t*.glb"), ("buildings", "parts", "t*.glb"),
            ("connections", "connections", "t*.glb"), ("streets", "streets", "t*.glb"),
            ("props", "props/variants", "*.glb"),
            ("props", "props/plants", "*.glb"), ("props", "props/tiles", "t*.glb"),
-           ("signs", "props/signs", "t*.glb"))
+           ("signs", "props/signs", "t*.glb"),
+           ("ground", "ground/tiles", "t*.glb"))         # (AG13: the ground cover)
 
 
 def packs(assets: Path) -> int:

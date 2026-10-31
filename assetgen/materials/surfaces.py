@@ -808,3 +808,211 @@ GENERATORS = {
 
 def make(gen: str, n: int, tile_m: float, params: dict) -> Surface:
     return GENERATORS[gen](n, tile_m, params)
+
+
+# --- AG13: ground cover (lawn, meadow, dirt, mud, gravel, sand, moss, rubble) ---------------
+#
+# The sets of M16's open land. Vegetation takes the tint (mask 1: a district's lawn greener or
+# browner), soil, stones and water keep their own color (mask 0).
+
+def turf(n: int, tile_m: float, p: dict) -> Surface:
+    """Mown lawn: dense fine blades, faint mowing stripes (`stripe_m`), clover patches,
+    thatch and a few bare spots of soil (`bare`)."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#4f7a34"))
+    px, py = N.grid(n)
+    blades = N.fbm(n, max(8, count(tile_m, 0.006)), s + 1, 2, 0.55, px,
+                   (py * F(0.5)).astype(F))
+    fine = N.white(n, s + 2)
+    patch = N.fbm(n, 4, s + 3, 4)
+    k = count(tile_m, float(p.get("stripe_m", 1.0)))
+    stripe = (np.floor(px * F(k)).astype(np.int64) % 2).astype(F)
+    clover_d, _ = N.cells(n, count(tile_m, 0.03), s + 4, 0.9)
+    clover = N.smooth(0.45, 0.2, clover_d) * N.smooth(0.62, 0.72, N.fbm(n, 4, s + 5, 3))
+    bare = N.smooth(0.72, 0.8, N.fbm(n, 3, s + 6, 4)) * F(float(p.get("bare", 0.3)))
+    shade = F(0.82) + F(0.45) * (blades - F(0.5)) + F(0.18) * (patch - F(0.5)) \
+        + F(0.06) * (stripe - F(0.5)) + F(0.12) * (fine - F(0.5))
+    col = paint(n, c, shade.astype(F))
+    col = mix(col, paint(n, rgb("#5a8a3a"), (F(0.9) + F(0.2) * fine).astype(F)),
+              (clover * F(0.35)).astype(F))
+    thatch = N.smooth(0.55, 0.75, N.fbm(n, 6, s + 7, 3)) * F(0.35)
+    col = mix(col, paint(n, rgb("#8a7a4c"), (F(0.9) + F(0.2) * fine).astype(F)),
+              thatch.astype(F))
+    earth = paint(n, rgb("#5a4632"), (F(0.85) + F(0.3) * fine).astype(F))
+    col = mix(col, earth, bare.astype(F))
+    height = F(0.5) + F(0.35) * (blades - F(0.5)) + F(0.15) * clover - F(0.3) * bare
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   full(n, 0.95), full(n, 0.0), (F(1.0) - bare).astype(F), bump=10.0)
+
+
+def meadow(n: int, tile_m: float, p: dict) -> Surface:
+    """Long unmown grass: blades in swirling clumps, green over straw (`dry`), seed heads,
+    soil between the clumps."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#6b8a3a"))
+    dry = float(p.get("dry", 0.35))
+    qx, qy = N.warp(n, 4, s + 1, 0.15)
+    blades = N.fbm(n, max(8, count(tile_m, 0.01)), s + 2, 2, 0.5, qx,
+                   (qy * F(0.35)).astype(F))
+    clump_d, cid = N.cells(n, count(tile_m, 0.25), s + 3, 0.9)
+    clump = N.smooth(0.95, 0.15, clump_d) * F(0.6) + F(0.4) * N.fbm(n, count(tile_m, 0.3),
+                                                                   s + 8, 3)
+    fine = N.white(n, s + 4)
+    straw = N.smooth(0.45, 0.7, N.fbm(n, 4, s + 5, 4)) * F(dry) + F(0.25 * dry) * cid
+    heads_d, _ = N.cells(n, count(tile_m, 0.035), s + 6, 1.0)
+    heads = N.smooth(0.22, 0.1, heads_d) * N.smooth(0.55, 0.7, N.white(n, s + 7))
+    shade = F(0.72) + F(0.55) * (blades - F(0.5)) + F(0.35) * clump + F(0.1) * (fine - F(0.5))
+    col = paint(n, c, shade.astype(F))
+    col = mix(col, paint(n, rgb("#b09a5a"), shade.astype(F)), np.clip(straw, 0, 1).astype(F))
+    col = mix(col, paint(n, rgb("#d8cc9a"), (F(0.9) + F(0.2) * fine).astype(F)),
+              (heads * F(0.8)).astype(F))
+    earth = paint(n, rgb("#4a3a2a"), (F(0.8) + F(0.3) * fine).astype(F))
+    gap = N.smooth(0.25, 0.0, clump + F(0.4) * blades)
+    col = mix(col, earth, (gap * F(0.8)).astype(F))
+    height = F(0.3) + F(0.45) * clump + F(0.25) * (blades - F(0.5))
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   full(n, 0.97), full(n, 0.0), (F(1.0) - gap).astype(F), bump=25.0)
+
+
+def soil(n: int, tile_m: float, p: dict) -> Surface:
+    """Bare earth: clods, pebbles, root threads, dry cracks (`dry`), trodden smooth patches
+    (`trodden`)."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#6a5038"))
+    dry = float(p.get("dry", 0.4))
+    m = mottle(n, s, 4)
+    g = grain(n, s + 1, 1)
+    clod_d, cid = N.cells(n, count(tile_m, 0.05), s + 2, 0.95)
+    clod = N.smooth(0.7, 0.2, clod_d)
+    peb_d, pid = N.cells(n, count(tile_m, 0.02), s + 3, 1.0)
+    peb = N.smooth(0.28, 0.16, peb_d) * N.smooth(0.7, 0.8, N.white(n, s + 4))
+    roots = N.smooth(0.94, 0.97, N.ridged(n, 8, s + 5, 3)) * F(0.5)
+    cr = cracks(n, s + 6, dry) * F(dry)
+    trod = N.smooth(0.55, 0.75, N.fbm(n, 3, s + 7, 4)) * F(float(p.get("trodden", 0.3)))
+    shade = F(0.95) + F(0.3) * m + F(0.12) * g + F(0.12) * (cid - F(0.5)) * clod \
+        - F(0.35) * cr - F(0.2) * roots + F(0.1) * trod
+    col = paint(n, c, shade.astype(F))
+    col = mix(col, paint(n, rgb("#8e877b"), (F(0.8) + F(0.5) * pid).astype(F)), peb.astype(F))
+    height = F(0.45) + F(0.25) * clod * (F(1.0) - trod) + F(0.3) * peb - F(0.3) * cr \
+        + F(0.08) * g
+    rough = F(0.92) - F(0.12) * trod + F(0.04) * g
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   np.clip(rough, 0, 1).astype(F), full(n, 0.0), full(n, 0.0), bump=12.0)
+
+
+def mud(n: int, tile_m: float, p: dict) -> Surface:
+    """Wet earth: smeared, rutted, with puddles that mirror the sky (low roughness)."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#4a3a2b"))
+    px, py = N.grid(n)
+    m = mottle(n, s, 3)
+    g = grain(n, s + 1, 1)
+    ruts = N.fbm(n, 3, s + 2, 4, 0.5, px, (py * F(0.25)).astype(F))
+    rut = N.smooth(0.42, 0.3, ruts) + N.smooth(0.58, 0.7, ruts)
+    smear = N.fbm(n, 6, s + 3, 4, 0.5, (px * F(0.5)).astype(F), py)
+    pud = N.smooth(0.62, 0.68, N.fbm(n, 3, s + 4, 4)) * F(float(p.get("puddles", 0.6)))
+    shade = F(0.85) + F(0.25) * m + F(0.1) * g + F(0.2) * (smear - F(0.5)) - F(0.15) * rut
+    col = paint(n, c, shade.astype(F))
+    col = mix(col, paint(n, rgb("#2e261e"), full(n, 1.0)), (pud * F(0.85)).astype(F))
+    height = F(0.5) + F(0.2) * m - F(0.25) * rut - F(0.3) * pud + F(0.05) * g
+    rough = F(0.55) - F(0.45) * pud + F(0.08) * g
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   np.clip(rough, 0.04, 1).astype(F), full(n, 0.0), full(n, 0.0), bump=8.0)
+
+
+def loose_gravel(n: int, tile_m: float, p: dict) -> Surface:
+    """Loose gravel and grit: stones of two sizes over dust, a few darker oil spots (`oil`)."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#8a8378"))
+    d1, id1, e1 = N.cells(n, count(tile_m, float(p.get("stone_m", 0.03))), s + 1, 0.95, True)
+    d2, id2 = N.cells(n, count(tile_m, 0.012), s + 2, 1.0)
+    big = N.smooth(0.02, 0.1, e1 - d1) * N.smooth(0.75, 0.3, d1)
+    small = N.smooth(0.42, 0.2, d2)
+    g = grain(n, s + 3, 0)
+    dust = paint(n, rgb("#9c9282"), (F(0.85) + F(0.3) * g).astype(F))
+    stones = paint(n, c, (F(0.7) + F(0.6) * (id1 - F(0.5)) + F(0.4) * big).astype(F))
+    grit = paint(n, c, (F(0.75) + F(0.5) * (id2 - F(0.5))).astype(F))
+    col = mix(dust, grit, (small * F(0.8)).astype(F))
+    col = mix(col, stones, big.astype(F))
+    oil = N.smooth(0.7, 0.8, N.fbm(n, 3, s + 4, 4)) * F(float(p.get("oil", 0.2)))
+    col = mix(col, paint(n, rgb("#2e2c29"), full(n, 1.0)), (oil * F(0.6)).astype(F))
+    height = F(0.25) + F(0.6) * big + F(0.25) * small + F(0.05) * g
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   full(n, 0.9), full(n, 0.0), full(n, 0.0), bump=20.0)
+
+
+def sand(n: int, tile_m: float, p: dict) -> Surface:
+    """Fine sand: grain, wind ripples (`ripple_m`), a scatter of shell and stone bits,
+    shallow dents of footprints."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#d2bd8a"))
+    qx, qy = N.warp(n, 3, s + 1, 0.08)
+    k = count(tile_m, float(p.get("ripple_m", 0.12)))
+    t = (qy * F(k)) - np.floor(qy * F(k))
+    rip = _wave(t.astype(F)) * N.smooth(0.3, 0.6, N.fbm(n, 3, s + 2, 3))
+    g = grain(n, s + 3, 0)
+    m = mottle(n, s + 4, 3)
+    bits_d, bid = N.cells(n, count(tile_m, 0.04), s + 5, 1.0)
+    bits = N.smooth(0.12, 0.06, bits_d) * N.smooth(0.8, 0.88, N.white(n, s + 6))
+    dent_d, _ = N.cells(n, count(tile_m, 0.35), s + 7, 0.9)
+    dent = N.smooth(0.25, 0.1, dent_d) * N.smooth(0.6, 0.7, N.fbm(n, 2, s + 8, 2))
+    shade = F(0.96) + F(0.12) * m + F(0.14) * g + F(0.08) * (rip - F(0.5)) - F(0.08) * dent
+    col = paint(n, c, shade.astype(F))
+    col = mix(col, paint(n, rgb("#eee6d2"), (F(0.85) + F(0.3) * bid).astype(F)),
+              bits.astype(F))
+    height = F(0.5) + F(0.25) * rip + F(0.1) * g - F(0.2) * dent + F(0.15) * bits
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   (F(0.92) + F(0.04) * g).astype(F), full(n, 0.0), full(n, 0.0), bump=6.0)
+
+
+def moss(n: int, tile_m: float, p: dict) -> Surface:
+    """Cushion moss in the shade: rounded cushions of green and yellow green, dark gaps of
+    damp soil."""
+    s = p["seed"]
+    c = rgb(p.get("color", "#4d6a2a"))
+    d, cid = N.cells(n, count(tile_m, 0.05), s + 1, 0.9)
+    soft = N.fbm(n, count(tile_m, 0.08), s + 4, 3)
+    cush = N.smooth(0.85, 0.05, d) * N.smooth(0.15, 0.5, soft + F(0.1))         + F(0.35) * N.smooth(0.3, 0.7, soft)
+    fine = N.fbm(n, max(8, count(tile_m, 0.004)), s + 2, 2)
+    g = grain(n, s + 3, 0)
+    shade = F(0.7) + F(0.5) * cush + F(0.3) * (fine - F(0.5)) + F(0.06) * (cid - F(0.5))
+    col = paint(n, c, shade.astype(F))
+    yellow = N.smooth(0.5, 0.75, N.fbm(n, 3, s + 5, 3)) * F(0.45)
+    col = mix(col, paint(n, rgb("#8a9a3a"), shade.astype(F)), yellow.astype(F))
+    gap = N.smooth(0.25, 0.02, cush)
+    col = mix(col, paint(n, rgb("#2f2a20"), (F(0.85) + F(0.3) * g).astype(F)),
+              (gap * F(0.55)).astype(F))
+    height = F(0.2) + F(0.7) * cush + F(0.1) * fine
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   full(n, 0.9), full(n, 0.0), (F(1.0) - gap).astype(F), bump=15.0)
+
+
+def rubble(n: int, tile_m: float, p: dict) -> Surface:
+    """Rubble on dirt: angular chunks of broken concrete and brick (`brick` share), grit,
+    dust."""
+    s = p["seed"]
+    d, cid, d2 = N.cells(n, count(tile_m, float(p.get("chunk_m", 0.12))), s + 1, 0.95, True)
+    keep = N.smooth(0.3, 0.45, cid) * N.smooth(0.35, 0.55, N.fbm(n, 3, s + 6, 3) + F(0.1))
+    face = N.smooth(0.01, 0.05, d2 - d) * N.smooth(0.55 + 0.3 * 0.5, 0.3, d) * keep
+    sd, sid = N.cells(n, count(tile_m, 0.03), s + 2, 1.0)
+    grit = N.smooth(0.4, 0.2, sd) * N.smooth(0.5, 0.6, N.white(n, s + 3))
+    g = grain(n, s + 4, 1)
+    m = mottle(n, s + 5, 3)
+    dirt = paint(n, rgb(p.get("dirt", "#6a5642")),
+                 (F(0.85) + F(0.25) * m + F(0.1) * g).astype(F))
+    brick = cid > F(1.0 - float(p.get("brick", 0.3)))
+    chunk_c = np.where(brick[:, :, None], rgb("#6e3c2e")[None, None, :],
+                       rgb(p.get("color", "#8f8c84"))[None, None, :]).astype(F)
+    chunk = np.clip(chunk_c * (F(0.6) + F(0.45) * cid + F(0.15) * g
+                               + F(0.25) * (m - F(0.5)))[:, :, None], 0, 1)
+    col = mix(dirt, paint(n, rgb("#8a857a"), (F(0.8) + F(0.4) * sid).astype(F)),
+              (grit * F(0.7)).astype(F))
+    col = mix(col, chunk.astype(F), face.astype(F))
+    height = F(0.2) + F(0.7) * face * (F(0.6) + F(0.4) * cid) + F(0.15) * grit + F(0.05) * g
+    return Surface(np.clip(col, 0, 1).astype(F), np.clip(height, 0, 1).astype(F),
+                   full(n, 0.9), full(n, 0.0), full(n, 0.0), bump=40.0)
+
+
+GENERATORS.update({"turf": turf, "meadow": meadow, "soil": soil, "mud": mud,
+                   "loose_gravel": loose_gravel, "sand": sand, "moss": moss,
+                   "rubble": rubble})

@@ -26,8 +26,10 @@
    stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
    families, exact props and signs (their faces showing those pages),
    `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
-   (likewise); then AG6's materials and checks over every contribution and pack
-   (`materials/build.stage`).
+   (likewise); then AG13's ground stage (`assetgen ground`, `assetgen/ground/build.py`):
+   the ground of every piece of open land and its grass per tile,
+   `unreal_contribution.ground.json`, `ground_report.json` and `.txt` (likewise); then AG6's
+   materials and checks over every contribution and pack (`materials/build.stage`).
 
 An unchanged city's rebuild writes no file.
 """
@@ -485,7 +487,7 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
-          props: bool = True, progress: Progress | None = None) -> dict:
+          props: bool = True, ground: bool = True, progress: Progress | None = None) -> dict:
     """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
     to its notes then, else to `log`."""
     t0 = time.perf_counter()
@@ -670,6 +672,27 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"props: {st['variants']} variants, {st['instances']} instances, "
                 f"{st['signs']} signs, {f['tiles_made']} tiles made, {n} files written")
+    if ground:
+        from .ground.build import build as ground_build, default_workers as ground_workers
+        grep = ground_build(model, sha, out, spec_doc, workers=workers or ground_workers(),
+                            report_always=False, lib=lib, progress=P)
+        f = grep["files"]
+        n = len(f["written"]) + len(f["removed"]) + sum(
+            int(bool(f[k])) for k in ("manifest_written", "contribution_written",
+                                      "report_written"))
+        wrote += n
+        st = grep["stats"]
+        rep["ground"] = {"ok": grep["ok"], "pieces": st["pieces"], "tiles": st["tiles"],
+                         "instances": st["instances"],
+                         "ground_triangles": st["ground_triangles"],
+                         "disk_bytes": st["disk_bytes"],
+                         "failed": [c["name"] for c in grep["checks"] if not c["ok"]],
+                         "tiles_made": f["tiles_made"], "files_written": n,
+                         "seconds": grep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and grep["ok"]
+        if progress is None:
+            log(f"ground: {st['pieces']} pieces in {st['tiles']} tiles, {st['instances']} "
+                f"clumps, {f['tiles_made']} tiles made, {n} files written")
     if lib is not None:
         mrep = MS.stage(model, sha, out, spec_doc, lib, log, signs=signs, progress=progress)
         wrote += mrep["files_written"]
@@ -834,6 +857,13 @@ def report_text(rep: dict) -> str:
                      f"{pr['disk_bytes'] / 1e6:.1f} MB; "
                      f"{'all checks pass' if pr['ok'] else 'FAIL ' + ', '.join(pr['failed'])}"
                      f" ({pr['tiles_made']} tiles made, {pr['seconds']} s; props_report.txt)")
+    gr = rep.get("ground")
+    if gr:
+        lines.append(f"ground: {gr['pieces']} pieces in {gr['tiles']} tiles, "
+                     f"{gr['instances']:,} clumps, {gr['ground_triangles']:,} ground triangles,"
+                     f" {gr['disk_bytes'] / 1e6:.1f} MB"
+                     + (f", FAILS {', '.join(gr['failed'])}" if gr["failed"] else "")
+                     + f" ({gr['tiles_made']} tiles made, {gr['seconds']} s; ground_report.txt)")
     ma = rep.get("materials")
     if ma is not None:
         lines.append(f"materials: {ma['textures']} textures; "
