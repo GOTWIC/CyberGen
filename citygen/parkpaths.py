@@ -110,7 +110,8 @@ class Blocked:
             if G.length1(hugs[x]) <= BETWEEN_M:
                 continue
             for y in range(x + 1, len(ks)):
-                if G.length1(hugs[y]) > BETWEEN_M and                         G.length1(G.line_inter(hugs[x], rims[y])) > BETWEEN_M:
+                if G.length1(hugs[y]) > BETWEEN_M and \
+                        G.length1(G.line_inter(hugs[x], rims[y])) > BETWEEN_M:
                     return False      # (along the line between two lots)
         return True
 

@@ -33,6 +33,10 @@ GROUND_WALKS = ("sidewalk", "pedestrian_street", "promenade", "alley", "path", "
 WATER_CLEAR = {"sea": 25.0, "river": 15.0, "canal": 4.0}
 HOST_KINDS = ("park", "plaza", "promenade", "beach", "green", "pocket_park")
 DOOR_LINK_M = 18.0   # entrances farther than this from a walkway get a path to it
+RELINK_M = 60.0      # park paths fix: an entrance whose link to its nearest walkway runs
+#                      through a building links to the nearest one within this it reaches
+MASS_PAD_M = 0.1     # ... clear of every mass taken in by this
+HEAD_M = 2.5         # ... at the entrance's level (a mass this far up leaves room under it)
 
 
 @dataclass
@@ -709,6 +713,46 @@ class _Level:
         return self.idx[_nearest_on(self.tree, self.lines, self.walks, self.gi, self.land, pt,
                                     land)]
 
+    def reachable(self, pt, land: int, ok) -> int | None:
+        """The nearest ground walkway within RELINK_M on the same landmass that ok(position)
+        accepts (ties by walkway id), or None."""
+        ks = [int(i) for i in self.tree.query(pt, predicate="dwithin", distance=RELINK_M)]
+        ks = [h for h in ks if land < 0 or self.land[h] == land]
+        for h in sorted(ks, key=lambda h: (G.dist(self.lines[h], pt),
+                                           self.walks[self.gi[h]]["id"])):
+            if ok(self.idx[h]):
+                return self.idx[h]
+        return None
+
+
+class _Masses:
+    """Building masses at the ground of each level (park paths fix): a straight link from an
+    entrance to its walkway must not cut into one (MASS_PAD_M in)."""
+
+    def __init__(self, buildings):
+        self.polys, self.rows = [], []
+        for rec in buildings:
+            base = _base(rec)
+            for ms in rec.masses:
+                if ms.z0_m - base >= HEAD_M or ms.z1_m <= base:
+                    continue
+                g = G.qpoly(G.from_model_poly(ms.footprint).buffer(-MASS_PAD_M,
+                                                                   join_style="mitre"))
+                for part in G.parts(g):
+                    shapely.prepare(part)
+                    self.polys.append(part)
+                    self.rows.append(rec.level)
+        self.tree = shapely.STRtree(self.polys) if self.polys else None
+
+    def clear(self, a, b, level: int) -> bool:
+        if self.tree is None:
+            return True
+        seg = LineString([a[:2], b[:2]]) if tuple(a[:2]) != tuple(b[:2]) else Point(a[:2])
+        for i in self.tree.query(seg).tolist():
+            if self.rows[i] == level and self.polys[i].intersects(seg):
+                return False
+        return True
+
 
 def link_entrances(out: Out, walks: list) -> list:
     """Every entrance records its nearest ground walkway (M14: on its building's level);
@@ -726,11 +770,34 @@ def link_entrances(out: Out, walks: list) -> list:
     land_of = _landmass_index(out.landmasses, [l.coords[0] for l in lines])
     lvs = {lv: _Level([pos_of[i] for i in per[lv]], lines, walks, gi, land_of)
            for lv in levels if per[lv]}
+    relinked = unlinked = moved = 0
     if ents:
         pts = shapely.points(np.array([e.position for _, e in ents], dtype=np.float64))
         ent_land = _landmass_index(out.landmasses, [e.position for _, e in ents])
+        masses = _Masses(out.buildings)
         for k, (rec, e) in enumerate(ents):
-            best = lvs[rec.level if rec.level in lvs else 0].nearest(pts[k], ent_land[k])
+            lv = lvs[rec.level if rec.level in lvs else 0]
+            best = lv.nearest(pts[k], ent_land[k])
+
+            def ok(i, e=e, rec=rec):
+                return masses.clear(e.position, _foot(lines, walks, gi, i, e.position),
+                                    rec.level)
+
+            if not ok(best):
+                # (park paths fix: the nearest walkway it reaches without a building between,
+                # else a place on its own facade from which one is reached)
+                alt = lv.reachable(pts[k], ent_land[k], ok)
+                if alt is None:
+                    mv = _move_entrance(rec, e, lv, masses, ent_land[k], lines, walks, gi)
+                    if mv is None:
+                        unlinked += 1
+                    else:
+                        e.position, alt = mv
+                        pts[k] = Point(e.position)
+                        moved += 1
+                if alt is not None:
+                    best = alt
+                    relinked += 1
             e.walkway_id = walks[gi[best]]["id"]
             e.link_m = G.q(G.dist(lines[best], pts[k]))
             line_of[id(e)] = best
@@ -789,6 +856,7 @@ def link_entrances(out: Out, walks: list) -> list:
             new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True},
                         0))
     walks = _split(walks, gi, lines, splits)
+    _piece_of_foot(out, walks)
     n0 = len(walks)
     k = wk_max(walks)
     first = k + 1
@@ -808,7 +876,75 @@ def link_entrances(out: Out, walks: list) -> list:
     out.skybridges.sort(key=lambda s_: s_["id"])
     _neighbors(walks)
     out.info["walkways_added"] = len(walks) - n0 + sum(len(v) for v in splits.values())
+    out.info["entrances_relinked"] = relinked
+    out.info["entrances_moved"] = moved
+    out.info["entrances_blocked"] = unlinked
     return walks
+
+
+FACADE_STEP_M = 1.0     # an entrance moved along its facade tries places this far apart
+MOVE_MAX = 240          # ... at most this many
+
+
+def _move_entrance(rec, e, lv, masses, land: int, lines, walks, gi):
+    """Park paths fix: a place on the building's own facade (its masses at the ground) from
+    which a straight link reaches a ground walkway with no building between, the one that
+    moves the entrance least plus links shortest: (position, walkway position), or None."""
+    base = _base(rec)
+    feet = [G.from_model_poly(ms.footprint) for ms in rec.masses
+            if ms.z0_m - base < HEAD_M and ms.z1_m > base]
+    if not feet:
+        return None
+    fp = G.union(feet)
+    parts = G.parts(fp)
+    if not parts:
+        return None
+    ring = max(parts, key=lambda p: (G.area1(p), G.qbounds(p))).exterior
+    L = G.length1(ring)
+    n = max(4, min(MOVE_MAX, int(L / FACADE_STEP_M)))
+    here = Point(e.position)
+    cands = []
+    for k in range(n):
+        p = G.qpoint(ring.interpolate(L * k / n))
+        cands.append((round(G.dist(here, Point(p)), 6), p))
+    best = None
+    for dm, p in sorted(cands):
+        if best is not None and dm >= best[0]:
+            break
+        pt = Point(p)
+
+        def ok(i, p=p):
+            return masses.clear(p, _foot(lines, walks, gi, i, p), rec.level)
+
+        h = lv.reachable(pt, land, ok)
+        if h is None:
+            continue
+        score = dm + G.dist(lines[h], pt)
+        if best is None or (round(score, 6), p) < (round(best[0], 6), best[1]):
+            best = (score, p, h)
+    return None if best is None else (best[1], best[2])
+
+
+def _piece_of_foot(out: Out, walks: list) -> None:
+    """Every entrance names the piece of its walkway its link meets (a walkway split at the
+    door feet keeps its id on its first piece only)."""
+    pieces: dict = {}
+    for w in walks:
+        so = (w.get("attrs") or {}).get("split_of")
+        if so:
+            pieces.setdefault(so, []).append(w)
+    if not pieces:
+        return
+    by_id = {w["id"]: w for w in walks}
+    for rec in out.buildings:
+        for e in rec.entrances:
+            if e.walkway_id not in pieces:
+                continue
+            p = Point(e.position)
+            ws = [by_id[e.walkway_id]] + pieces[e.walkway_id]
+            w = min(ws, key=lambda w: (G.dist(LineString([q[:2] for q in w["line"]]), p),
+                                       w["id"]))
+            e.walkway_id = w["id"]
 
 
 def _landmass_index(landmasses, pts) -> list:
