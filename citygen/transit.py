@@ -53,7 +53,7 @@ from __future__ import annotations
 import bisect
 import heapq
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import shapely
@@ -937,6 +937,9 @@ def _pose_descent(c: Ctx, stops, cands, heads, cost, rho: float, cmin: float, mo
     def pose(p, h):
         return (p[0], p[1], h)
 
+    def off_map(p):
+        return p[0] < bx0 - 1.0 or p[0] > bx1 + 1.0 or p[1] < by0 - 1.0 or p[1] > by1 + 1.0
+
     def low(a, b):
         """A lower bound of seg(a, b)'s cost (the path at the cheapest cost, its curves),
         None when there is no path."""
@@ -1053,12 +1056,18 @@ def _pose_descent(c: Ctx, stops, cands, heads, cost, rho: float, cmin: float, mo
             segs = total(poses)[1]
             k = max(range(len(segs)), key=lambda i: (segs[i][0], -i))
             bad = [p for p in segs[k][2] if not np.isfinite(cost[cell_of(c, p)])]
+            # (a stretch blocked only where it runs off the map: beside those points, on it)
+            edge = not bad
+            bad = bad or [p for p in segs[k][2] if off_map(p)]
+            if not bad:
+                break
             mx = q(math.fsum(p[0] for p in bad) / len(bad))
             my = q(math.fsum(p[1] for p in bad) / len(bad))
             box = G.qpoly(shapely.box(mx - RING_VIA_M, my - RING_VIA_M, mx + RING_VIA_M,
                                       my + RING_VIA_M))
             pts_v = [p for p in _grid_in(box, RING_VIA_GRID_M)
-                     if _d(p, (mx, my)) <= RING_VIA_M and np.isfinite(cost[cell_of(c, p)])]
+                     if _d(p, (mx, my)) <= RING_VIA_M and not (edge and off_map(p)) and
+                     np.isfinite(cost[cell_of(c, p)])]
             if not pts_v:
                 break
             a, b = poses[k], poses[(k + 1) % len(poses)]
@@ -1579,6 +1588,8 @@ class Line:
     heads: dict = field(default_factory=dict)    # M19: stop index -> headings through its host
     cut: bool = False                            # M19: a sky tube that takes out the towers
     #                                              it can neither pass nor go round
+    no_hosts: frozenset = frozenset()            # M19: towers other lines take out (never
+    #                                              its hosts, `_reroute_hosts`)
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -1867,7 +1878,7 @@ def _hosts(c: Ctx, ln: Line) -> None:
         best = None
         for i in sorted(c.btree.query(zone, predicate="intersects").tolist()):
             b = c.blds[i]
-            if b.id in hosts or not zone.covers(b.poly) or \
+            if b.id in hosts or b.id in ln.no_hosts or not zone.covers(b.poly) or \
                     sky_pass(b, ln.z0, ln.alt, True) != "portal":
                 continue
             ctr = _rep(b.poly)
@@ -4447,6 +4458,64 @@ def _blocked(c: Ctx, ln: Line) -> tuple:
             len(_corridor(c, ln, ln.pts, check_only=True)))
 
 
+def _routed(c: Ctx, ln: Line, tl) -> Line:
+    """A line's route (`route_line`); a sky tube that can neither pass a tower (not at a
+    station) nor go round it is routed again taking the towers it may out of its way (M19)."""
+    route_line(c, ln)
+    if tl.mode == "sky_tube" and any(_blocked(c, ln)):
+        alt_ln = Line(ln.id, ln.name, ln.mode, ln.color, ln.loop, ln.alt, ln.z0,
+                      ln.through, cut=True, no_hosts=ln.no_hosts)
+        alt_ln.stops = [st for st in (resolve_stop(c, name, tl.mode)
+                                      for name in tl.route) if st is not None]
+        route_line(c, alt_ln)
+        if _blocked(c, alt_ln) < _blocked(c, ln):
+            ln = alt_ln
+            ln.notes.append(f"{ln.name}: takes out the towers it can neither pass "
+                            f"nor go round")
+    return ln
+
+
+def _takes_out(c: Ctx, ln: Line) -> list:
+    """The buildings a routed line takes out of its corridor (`_corridor` on a copy)."""
+    probe = replace(ln, removed=[], portals={}, conflicts=[], notes=[])
+    _corridor(c, probe, ln.pts)
+    return probe.removed
+
+
+def _reroute_hosts(c: Ctx, spec, lines: list) -> list:
+    """M19: lines are routed apart, so another line may take out a tower a sky tube chose to
+    host one of its stations. Such a tube is routed again with the towers the other lines
+    take out barred as hosts (`Line.no_hosts`), until no line takes out a host (at most
+    twice); every other line keeps its route."""
+    specs = {tl.name: tl for tl in spec.transit.lines}
+    out = list(lines)
+    for _ in range(2):
+        again = False
+        for k, ln in enumerate(out):
+            if ln.held or ln.mode != "sky_tube" or not ln.through:
+                continue
+            taken = set()
+            for o in out:
+                if o is not ln:
+                    taken.update(_takes_out(c, o))
+            lost = sorted(set(ln.hosts) & taken)
+            if not lost:
+                continue
+            tl = specs[ln.name]
+            fresh = Line(ln.id, ln.name, ln.mode, ln.color, ln.loop, ln.alt, ln.z0,
+                         ln.through, no_hosts=ln.no_hosts | frozenset(taken))
+            fresh.stops = [st for st in (resolve_stop(c, name, tl.mode)
+                                         for name in tl.route) if st is not None]
+            out[k] = _routed(c, fresh, tl)
+            out[k].notes.append(f"{ln.name}: routed again, {len(lost)} of its station "
+                                f"towers taken out by other lines")
+            T.stage(f"transit/{ln.id}/reroute", [out[k].pts])
+            again = True
+        if not again:
+            break
+    return out
+
+
 def build(spec, m, fixed: dict | None = None) -> Out:
     """`fixed` (M10, a district regeneration): line name -> the old line's row; such a line
     keeps its track and heights, and the buildings now in its way go."""
@@ -4490,22 +4559,11 @@ def _build(spec, m, fixed: dict) -> Out:
                 # (M19: the towers of its stations, as the old build chose them)
                 ln.hosts = frozenset(fx["attrs"].get("portals", []))
         else:
-            route_line(c, ln)
-            if tl.mode == "sky_tube" and any(_blocked(c, ln)):
-                # M19: a tube that can neither pass a tower (not at a station) nor go round
-                # it: routed again, taking the towers it may out of its way
-                alt_ln = Line(ln.id, ln.name, ln.mode, ln.color, ln.loop, ln.alt, ln.z0,
-                              ln.through, cut=True)
-                alt_ln.stops = [st for st in (resolve_stop(c, name, tl.mode)
-                                              for name in tl.route) if st is not None]
-                route_line(c, alt_ln)
-                if _blocked(c, alt_ln) < _blocked(c, ln):
-                    ln = alt_ln
-                    ln.notes.append(f"{ln.name}: takes out the towers it can neither pass "
-                                    f"nor go round")
+            ln = _routed(c, ln, tl)
         T.stage(f"transit/{ln.id}/route", [ln.pts, round(ln.min_radius, 2)
                                            if ln.min_radius != INF else None])
         lines.append(ln)
+    lines = _reroute_hosts(c, spec, lines)
     for ln in lines:
         ln.conflicts += [b.id for b in _corridor(c, ln, ln.pts)]
     gone = set()
