@@ -911,6 +911,7 @@ def level_legs(net, legs: dict, gr, held=None, exits: dict | None = None) -> dic
         pos = node[nid]["position"]
         node[nid]["position"] = (pos[0], pos[1], G.q(top))
         raised += 1
+    raised += _held_heights(net, legs, gr, held, want, runs, node, fits)
     held_runs = {}
     n_lev = n_kept = 0
     for (sid, at_start), (nid, r) in sorted(want.items()):
@@ -923,6 +924,62 @@ def level_legs(net, legs: dict, gr, held=None, exits: dict | None = None) -> dic
         else:
             n_kept += 1
     return {"held": held_runs, "levelled": n_lev, "kept": n_kept, "raised": raised}
+
+
+def _held_heights(net, legs: dict, gr, held, want: dict, runs: dict, node: dict,
+                  fits) -> int:
+    """M18 with M10: a junction its held roads all meet at one height other than its node's
+    (the old build raised it, `level_legs`; the node comes back at M1b's height) takes
+    theirs, its other legs brought up to it as a raise does. Returns how many."""
+    if held is None:
+        return 0
+    n_set = 0
+    for nid in sorted(legs):
+        lg = legs[nid]
+        hl = [x for x in lg if held(x.seg)]
+        if not hl:
+            continue
+        ends = {G.q(_z_at(x.seg["z_profile"], 0.0 if x.at_start else G.q(x.L))) for x in hl}
+        zn = node[nid]["position"][2]
+        if len(ends) != 1 or abs(min(ends) - zn) <= 0.01:
+            continue
+        top = min(ends)
+        new = {}
+        for x in lg:
+            if held(x.seg):
+                continue
+            s = x.seg
+            L = G.q(x.L)
+            near, far = (0.0, L) if x.at_start else (L, 0.0)
+            if _fixed(s, None):
+                if abs(_z_at(s["z_profile"], near) - top) > 0.01:
+                    new = None
+                    break
+                continue
+            k = (s["id"], x.at_start)
+            r = want[k][1] if k in want else 0.0
+            ro = runs.get((s["id"], not x.at_start), 0.0)
+            g = catch_grade(s, gr)
+            if x.at_start:
+                prof, ra, rb = _levelled(s["z_profile"], L, r, ro, g, za=top)
+            else:
+                prof, ra, rb = _levelled(s["z_profile"], L, ro, r, g, zb=top)
+            if not fits(s, prof, s["z_profile"]) or abs(_z_at(prof, near) - top) > 0.01 or \
+                    abs(_z_at(prof, far) - _z_at(s["z_profile"], far)) > 0.01 or \
+                    _steepest(prof) > g + 1e-4:
+                new = None
+                break
+            new[k] = (prof, ra if x.at_start else rb)
+        if new is None:
+            continue
+        for x in lg:
+            k = (x.seg["id"], x.at_start)
+            if k in new:
+                x.seg["z_profile"], runs[k] = new[k]
+        pos = node[nid]["position"]
+        node[nid]["position"] = (pos[0], pos[1], top)
+        n_set += 1
+    return n_set
 
 
 def _overhead(net):

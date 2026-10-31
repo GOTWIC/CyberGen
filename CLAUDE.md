@@ -845,7 +845,10 @@ M18 (junctions and ramps, from the first run-through) is in place:
   (`walks._corners`); AG3's `Band.rehome` drops the ground windows a moved door takes the
   place of (it looked for kind `window`, the windows are `win`, so a rehomed door never
   found room among them: the small test city's new layout left a villa's entrance with no
-  door; `GEN_VERSION` ag5.2).
+  door; `GEN_VERSION` ag5.2); M10's override edits drop the walkways that hang on a building
+  or skybridge they remove (`overrides._drop`: door, lobby and elevator links, the deck), and
+  in a regeneration a junction its held roads meet at one height takes it
+  (`junctions._held_heights`: the old build raised it, M1b gives the node back lower).
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

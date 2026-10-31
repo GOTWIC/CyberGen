@@ -110,8 +110,19 @@ def _drop(d: dict, ids: dict[str, set[str]]) -> None:
     d["properties"] = [p for p in d.get("properties", []) if p["building_ids"]]
     for m in d.get("megasites", []):
         m["member_ids"] = [x for x in m["member_ids"] if x not in gone]
-    d["skybridges"] = [s for s in d.get("skybridges", [])
-                       if not set(s["building_ids"]) & gone]
+    sbs = {s["id"] for s in d.get("skybridges", []) if set(s["building_ids"]) & gone}
+    d["skybridges"] = [s for s in d.get("skybridges", []) if s["id"] not in sbs]
+    # the walkways that hang on what went (a building's door, lobby and elevator links, a
+    # skybridge's deck) leave the graph
+    off = gone | sbs
+    walks = {w["id"] for w in d.get("walkways", [])
+             if (w.get("attrs") or {}).get("building") in off or
+             (w.get("attrs") or {}).get("skybridge") in off}
+    if walks:
+        d["walkways"] = [w for w in d["walkways"] if w["id"] not in walks]
+        for w in d["walkways"]:
+            if set(w["neighbors"]) & walks:
+                w["neighbors"] = [x for x in w["neighbors"] if x not in walks]
 
 
 # --- geometry -----------------------------------------------------------------------

@@ -121,7 +121,15 @@ covers them.
   off neighbors' walls and 115 off flush spots. `GEN_VERSION` ag5.2; assetgen goldens
   written again.
 - **Found on the new layouts**: an M9 underpass passage through a transit column's footing
-  (Vesper Bay's first layout); the passage now keeps off column footings.
+  (Vesper Bay's first layout); the passage now keeps off column footings. The test suite
+  found two more: M10's `plaza` and `remove` edits left the walkways of a building's
+  skybridge naming it (the small city's lot the test turns into a plaza now has a
+  skybridge; `overrides._drop` takes them out of the graph), and a district regeneration
+  brought a junction the old build had raised back at M1b's height under its held roads
+  (`junctions._held_heights`: it takes the height they meet it at). The test that blocks
+  diamond ramps runs its build in one process (the road variants ran in spawned workers,
+  where the patch did not apply; it passed on main only because the small city's own
+  crossings took loops).
 
 ## Before and after
 
