@@ -701,6 +701,9 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                     # shell node: no mesh, which Unreal refuses ("Bad MeshDescription", and
                     # the HLOD build fails on it), but it still takes the blockout's place)
                     empty = True
+            elif e["kind"] == "building" and "node" in e and not e["node"]:
+                # (packs since: such a building's shell node has no mesh, its entry no node)
+                empty = True
             if e.get("proxy"):
                 px = e["proxy"]
                 mesh(pack(part, px["glb"], "proxy"), px["node"], e["hash"], {"none": True},
