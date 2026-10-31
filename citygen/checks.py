@@ -944,6 +944,12 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import deck_checks as DC
 
         checks += DC.run(spec, m)
+    if m.banks or m.ground_cover:
+        # (M16: on a city that carries its water and ground data)
+        from . import water_checks as WC
+
+        with G.canonical():
+            checks += WC.run(spec, m)
     st = stats(spec, m, g)
     if m.road_segments:
         st.update(road_stats(spec, m, g))
@@ -983,6 +989,10 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import deck_checks as DC
 
         st["decks"] = DC.stats(m)
+    if m.banks or m.ground_cover:
+        from . import water_checks as WC
+
+        st["water"] = WC.stats(m)
     return checks, st
 
 
@@ -1156,6 +1166,19 @@ def report_text(rep: dict) -> str:
                     f"tunnels, {tg.get('viaducts', 0)} terrain viaducts; "
                     f"{tg.get('slope_greens', 0)} hillside greens, highest plinth "
                     f"{tg.get('highest_plinth_m', 0):g} m"]
+    ws = st.get("water")
+    if ws:
+        out += ["", f"  water: {ws['water_bodies']} bodies ("
+                    + ", ".join(f"{b['id']} {b['depth_m']:g} m {b['flow']}"
+                                for b in ws["bodies"][:6])
+                    + (", ..." if len(ws["bodies"]) > 6 else "") + "); sea "
+                    + (", ".join(f"{k} {v} km2" for k, v in ws["exposure_km2"].items())
+                       or "none"),
+                "  banks: " + (", ".join(f"{k.replace('_', ' ')} {v['count']} ({v['km']} km)"
+                                         for k, v in ws["banks"].items()) or "none"),
+                "  ground cover: " + (", ".join(f"{k.replace('_', ' ')} {v['km2']} km2"
+                                                for k, v in ws["cover"].items()) or "none")
+                + f"; {ws['desire_lines']} desire lines"]
     gs = st.get("gameplay")
     if gs:
         out += ["", f"  gameplay: {gs['pois']} points of interest, {gs['factions']} factions ("

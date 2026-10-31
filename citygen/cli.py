@@ -263,7 +263,8 @@ def cmd_rerender(args: argparse.Namespace) -> int:
             return EXIT_USAGE
         files = rerender(src, args.to or src, args.views, width=args.width,
                          blender=args.blender, samples=args.samples, eye=args.eye,
-                         target=args.target, lens=args.lens, name=args.name)
+                         target=args.target, lens=args.lens, name=args.name,
+                         hide=args.hide)
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_USAGE
@@ -550,6 +551,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="the point that view looks at")
     rr.add_argument("--lens", type=float, default=35.0, help="its lens in mm (default 35)")
     rr.add_argument("--name", default="custom", help="its file: render_<name>.jpg")
+    rr.add_argument("--hide", action="append", default=[], metavar="PREFIX",
+                    help="leave out the objects whose names start with PREFIX (M16: "
+                         "--hide city.water. --hide city.sea. shows the beds and banks)")
     rr.add_argument("--to", help="output folder (default: blockout_dir)")
     rr.add_argument("--width", type=int, default=7680, help="width in pixels (default 7680)")
     rr.add_argument("--samples", type=int, default=16, help="EEVEE render samples")

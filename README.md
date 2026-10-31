@@ -7,7 +7,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M15, M17, M18 and M21 done |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M18 and M21 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
@@ -83,6 +83,14 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 |---|---|
 | <img src="docs/progress/M18/delta_megacity/render_ramp_embankment.jpg" width="420"> | <img src="docs/progress/M18/cragmouth/render_junction_slope.jpg" width="420"> |
 
+| Water: depth, banks by kind, flow, the sea's exposure | Ground cover: lawn, meadow, marsh, paving, dirt, desire lines |
+|---|---|
+| <img src="docs/progress/M16/vesper_bay/preview_water.png" width="420"> | <img src="docs/progress/M16/vesper_bay/preview_ground.png" width="420"> |
+
+The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edge (8K).
+
+<img src="docs/progress/M16/vesper_bay/render_drained.jpg" width="840">
+
 | Terrain: grades, walls, bored tunnels | Old quarter's hill (8K) |
 |---|---|
 | <img src="docs/progress/stage1_fixes/cragmouth/preview_terrain.png" width="420"> | <img src="docs/progress/stage1_fixes/cragmouth/render_hillside.jpg" width="420"> |
@@ -127,7 +135,7 @@ Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowd
 | M13 | Terrain | Hills, cliffs and plateaus; roads and buildings on slopes | ✅ Done |
 | M14 | Layered districts | Deck cities over the streets: upper streets, lots and buildings, ramps, stairs, elevators, light wells | ✅ Done |
 | M15 | Unreal export | The city as an Unreal Engine 5.8 level (end of stage 1) | ✅ Done |
-| M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | Planned |
+| M16 | Water and ground detail | How deep each body of water is and which way it flows, what lines its edges, and what covers every piece of open land (lawn, meadow, marsh, wasteland, sand) | ✅ Done |
 | M17 | Road network repair | Every dead end on purpose (a cul-de-sac with its turning circle, a quay, a park gate, a path's end), no overlapping roads or bridges, roads clear of buildings | ✅ Done |
 | M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps on embankments, crosswalks and signals only where they are needed | ✅ Done |
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans, more room over the streets | Planned |
@@ -143,8 +151,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 `--blockout` needs Blender 5.2. While a build runs it prints each stage on stderr (water
-and districts, roads, local streets, buildings, transit, tunnels, props, gameplay, the
-blockout and its Blender steps) with its time, the layout search's tries as they happen, and a
+and districts, roads, local streets, buildings, transit, tunnels, props, gameplay, water
+and ground, the blockout and its Blender steps) with its time, the layout search's tries as they happen, and a
 bar with the time left where a stage has a count; `--quiet` turns it off. To make a new city,
 open Claude Code in this repo and ask for one (the `citygen` skill takes it from there). Editing, locking and the other commands:
 [`docs/citygen_milestones.md`](docs/citygen_milestones.md).
@@ -158,7 +166,8 @@ To see the city in Unreal Engine 5.8, import it into a project (on Windows:
 
 Open the project and press Play: you fly over the city with a free camera (W, A, S, D to
 move, the mouse to look, E or Space up, Q or C down). `--play walk` walks it with the
-project's own character instead, and `--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
+project's own character instead (it swims in the canals, rivers and the sea), and
+`--fly-speed` sets how fast you fly. Each import makes the city the project's startup map (`--no-startup` leaves it
 alone). The import shows the same kind of progress: each stage in Unreal (packs and meshes,
 actors, saving, pruning, the HLOD build, `--check`) with a bar, the time left, and on a first
 import an estimate of the time left in all. Controls, flags and streaming:
@@ -178,27 +187,30 @@ Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 
 ### Cities
 
-Every building modelled: framed windows, mullions, spandrels, balconies, fins, louvers,
-shutters, capsule pods and structural frames on walls in one of nineteen facade styles
-chosen per district, owner and building, with chamfered and rounded corners, setback ledges,
-crowns, arcades and the wear of poor districts; Vesper Bay, Greyhook and Cragmouth also
-with their roofs, roof equipment and skybridges (8K; open one for full size).
+Every building modelled and textured, in one of nineteen facade styles per district, owner
+and building, with its roof, roof equipment and skybridges, on textured streets, bridges and
+transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K; open one for full
+size).
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/AG4/vesper_bay/8k/city_full.jpg" width="420"> | <img src="docs/progress/AG2/nexus_city/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/nexus_city/city_full.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/AG2/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG2/archipelago_free_port/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/archipelago_free_port/city_full.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/AG4/greyhook/8k/city_full.jpg" width="420"> | <img src="docs/progress/AG2/vesper_bay_pinned/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/greyhook/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/vesper_bay_pinned/city_full.jpg" width="420"> |
 
 | Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
 |---|---|
-| <img src="docs/progress/AG2/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG4/cragmouth/8k/city_full.jpg" width="420"> |
+| <img src="docs/progress/AG10/cities/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/cragmouth/city_full.jpg" width="420"> |
+
+| Vesper Bay Decks (a deck over Highcrest) | |
+|---|---|
+| <img src="docs/progress/AG10/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
 
 ### Up close
 
