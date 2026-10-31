@@ -1,17 +1,17 @@
 {
  "checks": [
   {
-   "detail": "18 bodies, 102 banks drawn, 9 by AG7",
+   "detail": "18 bodies, 88 banks drawn, 9 by AG7",
    "id": "water_coverage",
    "ok": true
   },
   {
-   "detail": "896498 surface vertices at their level, 33756 bed vertices checked (worst 0.001 m; 75% on M16's bed, the rest on a bank's slope over it)",
+   "detail": "896498 surface vertices at their level, 33767 bed vertices checked (worst 0.001 m; 76% on M16's bed, the rest on a bank's slope over it)",
    "id": "water_levels",
    "ok": true
   },
   {
-   "detail": "1342 waterline points on the bed, 812 wall feet in it",
+   "detail": "1193 waterline points on the bed, 810 wall feet in it",
    "id": "water_gaps",
    "ok": true
   },
@@ -21,76 +21,187 @@
    "ok": true
   },
   {
-   "detail": "1577157 triangles (budget 9000000), at most 37474 in a tile (t-03-01, budget 400000), at most 11858 stones in a tile (budget 60000)",
+   "detail": "1575774 triangles (budget 9000000), at most 37568 in a tile (t-03-01, budget 400000), at most 11858 stones in a tile (budget 60000)",
    "id": "water_budgets",
    "ok": true
   },
   {
-   "detail": "451 blockout water objects, 302 replaced, 149 dropped",
+   "detail": "444 blockout water objects, 295 replaced, 149 dropped",
    "id": "water_replaces",
    "ok": true
   }
  ],
  "city": "Nexus City",
  "files": {
-  "contribution_written": false,
+  "contribution_written": true,
   "manifest_written": true,
-  "parts_written": false,
+  "parts_written": true,
   "report_written": false,
   "tiles_kept": 0,
   "tiles_made": 111,
   "tiles_removed": 0,
-  "tiles_same_bytes": 111,
-  "tiles_written": 0,
-  "written": []
+  "tiles_same_bytes": 0,
+  "tiles_written": 111,
+  "written": [
+   "t+00+01",
+   "t+00-01",
+   "t+00-02",
+   "t+00-03",
+   "t+00-04",
+   "t+00-05",
+   "t+00-06",
+   "t+01+00",
+   "t+01+01",
+   "t+01-01",
+   "t+01-02",
+   "t+01-03",
+   "t+02+00",
+   "t+02+01",
+   "t+02+02",
+   "t+02-03",
+   "t+02-04",
+   "t+02-05",
+   "t+03+00",
+   "t+03+01",
+   "t+03-01",
+   "t+03-02",
+   "t+03-03",
+   "t+03-04",
+   "t+03-05",
+   "t+04-03",
+   "t+04-04",
+   "t+04-05",
+   "t+05+06",
+   "t+05-03",
+   "t+05-04",
+   "t+05-05",
+   "t+06+04",
+   "t+06+05",
+   "t+06-02",
+   "t+06-03",
+   "t+06-04",
+   "t-01+01",
+   "t-01+02",
+   "t-01-02",
+   "t-01-03",
+   "t-02+00",
+   "t-02+01",
+   "t-02+02",
+   "t-02-01",
+   "t-02-02",
+   "t-02-03",
+   "t-02-04",
+   "t-02-06",
+   "t-03+00",
+   "t-03+01",
+   "t-03+02",
+   "t-03+03",
+   "t-03-01",
+   "t-03-02",
+   "t-03-03",
+   "t-03-04",
+   "t-03-05",
+   "t-03-06",
+   "t-04+00",
+   "t-04+01",
+   "t-04+02",
+   "t-04+03",
+   "t-04+04",
+   "t-04-01",
+   "t-04-02",
+   "t-04-03",
+   "t-04-04",
+   "t-04-05",
+   "t-04-06",
+   "t-04-07",
+   "t-05+00",
+   "t-05+01",
+   "t-05+02",
+   "t-05+03",
+   "t-05+04",
+   "t-05+05",
+   "t-05+06",
+   "t-05-01",
+   "t-05-02",
+   "t-05-03",
+   "t-05-04",
+   "t-05-05",
+   "t-05-06",
+   "t-05-07",
+   "t-06+00",
+   "t-06+02",
+   "t-06+03",
+   "t-06+04",
+   "t-06+05",
+   "t-06+06",
+   "t-06-02",
+   "t-06-03",
+   "t-06-04",
+   "t-06-05",
+   "t-06-06",
+   "t-06-07",
+   "t-07+00",
+   "t-07+01",
+   "t-07+02",
+   "t-07+03",
+   "t-07+04",
+   "t-07+05",
+   "t-07+06",
+   "t-07-01",
+   "t-07-02",
+   "t-07-03",
+   "t-07-04",
+   "t-07-05",
+   "t-07-06",
+   "t-07-07"
+  ]
  },
  "ok": true,
  "seconds": {
-  "context": 1.06,
-  "gather": 0.56,
-  "make": 10.38,
+  "context": 3.18,
+  "gather": 1.14,
+  "make": 28.4,
   "slowest_tiles": [
    [
     "t-04+04",
-    0.765
-   ],
-   [
-    "t-06+04",
-    0.736
-   ],
-   [
-    "t-05+04",
-    0.673
+    1.573
    ],
    [
     "t-06+05",
-    0.658
+    1.369
    ],
    [
     "t-03-01",
-    0.599
+    1.263
+   ],
+   [
+    "t-05+04",
+    1.252
+   ],
+   [
+    "t-03+00",
+    1.176
    ]
   ],
-  "total": 14.7,
-  "workers": 3,
-  "write": 0.22
+  "total": 36.92,
+  "workers": 2,
+  "write": 0.37
  },
  "stats": {
   "bodies": 18,
   "by_kind": {
-   "water.bank.beach": 2,
-   "water.bank.canal_wall": 23,
+   "water.bank.canal_wall": 18,
    "water.bank.marsh_edge": 6,
-   "water.bank.natural_bank": 44,
-   "water.bank.riprap": 13,
+   "water.bank.natural_bank": 41,
+   "water.bank.riprap": 9,
    "water.bank.road_embankment": 14,
    "water.body.canal": 42,
    "water.body.marsh": 11,
    "water.body.river": 7,
    "water.body.sea": 89
   },
-  "disk_bytes": 59283372,
-  "instances": 22680,
+  "disk_bytes": 59233152,
+  "instances": 21483,
   "lod_triangles": {
    "lod0": 1282137,
    "lod1": 326482,
@@ -98,26 +209,25 @@
    "lod3": 19773
   },
   "max_tile_instances": 11858,
-  "max_tile_triangles": 37474,
-  "pieces": 251,
+  "max_tile_triangles": 37568,
+  "pieces": 237,
   "stones": {
-   "part.riprap.r0": 3752,
-   "part.riprap.r1": 3819,
-   "part.riprap.r2": 3879,
-   "part.riprap.r3": 3693,
-   "part.riprap.r4": 3800,
-   "part.riprap.r5": 3737
+   "part.riprap.r0": 3570,
+   "part.riprap.r1": 3618,
+   "part.riprap.r2": 3654,
+   "part.riprap.r3": 3502,
+   "part.riprap.r4": 3613,
+   "part.riprap.r5": 3526
   },
   "tiles": 111,
-  "triangles": 1577157,
+  "triangles": 1575774,
   "triangles_by_kind": {
-   "bed": 180242,
+   "bed": 180343,
    "surface": 1282137,
-   "water.bank.beach": 2994,
-   "water.bank.canal_wall": 816,
+   "water.bank.canal_wall": 788,
    "water.bank.marsh_edge": 49063,
-   "water.bank.natural_bank": 52007,
-   "water.bank.riprap": 8606,
+   "water.bank.natural_bank": 53948,
+   "water.bank.riprap": 8203,
    "water.bank.road_embankment": 1292
   },
   "water_kinds": {

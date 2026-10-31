@@ -1,22 +1,21 @@
 assetgen water: Nexus City: PASS
 
-  [ok] water_coverage: 18 bodies, 102 banks drawn, 9 by AG7
-  [ok] water_levels: 896498 surface vertices at their level, 33756 bed vertices checked (worst 0.001 m; 75% on M16's bed, the rest on a bank's slope over it)
-  [ok] water_gaps: 1342 waterline points on the bed, 812 wall feet in it
+  [ok] water_coverage: 18 bodies, 88 banks drawn, 9 by AG7
+  [ok] water_levels: 896498 surface vertices at their level, 33767 bed vertices checked (worst 0.001 m; 76% on M16's bed, the rest on a bank's slope over it)
+  [ok] water_gaps: 1193 waterline points on the bed, 810 wall feet in it
   [ok] water_meshes: no bad triangles
-  [ok] water_budgets: 1577157 triangles (budget 9000000), at most 37474 in a tile (t-03-01, budget 400000), at most 11858 stones in a tile (budget 60000)
-  [ok] water_replaces: 451 blockout water objects, 302 replaced, 149 dropped
+  [ok] water_budgets: 1575774 triangles (budget 9000000), at most 37568 in a tile (t-03-01, budget 400000), at most 11858 stones in a tile (budget 60000)
+  [ok] water_replaces: 444 blockout water objects, 295 replaced, 149 dropped
 
 bodies 18 (canal 9, marsh 2, river 2, sea 5), 3.155 km2 of water
-pieces 251, tiles 111, triangles 1577157 (surface LODs {'lod0': 1282137, 'lod1': 326482, 'lod2': 86465, 'lod3': 19773}), stones 22680, disk 59.3 MB
+pieces 237, tiles 111, triangles 1575774 (surface LODs {'lod0': 1282137, 'lod1': 326482, 'lod2': 86465, 'lod3': 19773}), stones 21483, disk 59.2 MB
 triangles by kind:
   surface: 1282137
-  bed: 180242
-  water.bank.natural_bank: 52007
+  bed: 180343
+  water.bank.natural_bank: 53948
   water.bank.marsh_edge: 49063
-  water.bank.riprap: 8606
-  water.bank.beach: 2994
+  water.bank.riprap: 8203
   water.bank.road_embankment: 1292
-  water.bank.canal_wall: 816
-files: 111 tiles made, 0 kept, 0 written, 111 same bytes, 0 removed
-seconds: context 1.06, gather 0.56, make 10.38, write 0.22, total 14.7, workers 3
+  water.bank.canal_wall: 788
+files: 111 tiles made, 0 kept, 111 written, 0 same bytes, 0 removed
+seconds: context 3.18, gather 1.14, make 28.4, write 0.37, total 36.92, workers 2

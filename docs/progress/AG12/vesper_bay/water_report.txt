@@ -1,21 +1,21 @@
 assetgen water: Vesper Bay: PASS
 
-  [ok] water_coverage: 10 bodies, 73 banks drawn, 6 by AG7
-  [ok] water_levels: 1090154 surface vertices at their level, 31045 bed vertices checked (worst 0.001 m; 77% on M16's bed, the rest on a bank's slope over it)
-  [ok] water_gaps: 1059 waterline points on the bed, 555 wall feet in it
+  [ok] water_coverage: 10 bodies, 72 banks drawn, 6 by AG7
+  [ok] water_levels: 1090154 surface vertices at their level, 31031 bed vertices checked (worst 0.001 m; 77% on M16's bed, the rest on a bank's slope over it)
+  [ok] water_gaps: 1087 waterline points on the bed, 535 wall feet in it
   [ok] water_meshes: no bad triangles
-  [ok] water_budgets: 1868341 triangles (budget 9000000), at most 50005 in a tile (t-03-03, budget 400000), at most 22736 stones in a tile (budget 60000)
-  [ok] water_replaces: 421 blockout water objects, 287 replaced, 134 dropped
+  [ok] water_budgets: 1868947 triangles (budget 9000000), at most 50005 in a tile (t-03-03, budget 400000), at most 22736 stones in a tile (budget 60000)
+  [ok] water_replaces: 423 blockout water objects, 289 replaced, 134 dropped
 
 bodies 10 (canal 4, marsh 2, river 1, sea 3), 3.559 km2 of water
-pieces 213, tiles 114, triangles 1868341 (surface LODs {'lod0': 1572582, 'lod1': 398598, 'lod2': 103215, 'lod3': 24844}), stones 45178, disk 69.9 MB
+pieces 212, tiles 114, triangles 1868947 (surface LODs {'lod0': 1572582, 'lod1': 398598, 'lod2': 103215, 'lod3': 24844}), stones 45178, disk 69.9 MB
 triangles by kind:
   surface: 1572582
-  bed: 161874
+  bed: 161783
   water.bank.marsh_edge: 84781
-  water.bank.natural_bank: 30777
+  water.bank.natural_bank: 31550
   water.bank.riprap: 16060
   water.bank.road_embankment: 1823
-  water.bank.canal_wall: 444
-files: 114 tiles made, 0 kept, 0 written, 114 same bytes, 0 removed
-seconds: context 1.02, gather 0.22, make 10.34, write 0.32, total 14.33, workers 3
+  water.bank.canal_wall: 368
+files: 114 tiles made, 0 kept, 114 written, 0 same bytes, 0 removed
+seconds: context 2.99, gather 0.47, make 25.29, write 0.47, total 31.91, workers 2

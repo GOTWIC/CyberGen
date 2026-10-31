@@ -6,12 +6,12 @@
    "ok": true
   },
   {
-   "detail": "108718 surface vertices at their level, 21081 bed vertices checked (worst 0.001 m; 91% on M16's bed, the rest on a bank's slope over it)",
+   "detail": "108718 surface vertices at their level, 21103 bed vertices checked (worst 0.001 m; 91% on M16's bed, the rest on a bank's slope over it)",
    "id": "water_levels",
    "ok": true
   },
   {
-   "detail": "433 waterline points on the bed, 542 wall feet in it",
+   "detail": "459 waterline points on the bed, 525 wall feet in it",
    "id": "water_gaps",
    "ok": true
   },
@@ -21,72 +21,145 @@
    "ok": true
   },
   {
-   "detail": "1610200 triangles (budget 9000000), at most 34816 in a tile (t-06-05, budget 400000), at most 10384 stones in a tile (budget 60000)",
+   "detail": "1609997 triangles (budget 9000000), at most 34816 in a tile (t-06-05, budget 400000), at most 10384 stones in a tile (budget 60000)",
    "id": "water_budgets",
    "ok": true
   },
   {
-   "detail": "222 blockout water objects, 103 replaced, 119 dropped",
+   "detail": "223 blockout water objects, 104 replaced, 119 dropped",
    "id": "water_replaces",
    "ok": true
   }
  ],
  "city": "Cragmouth",
  "files": {
-  "contribution_written": false,
+  "contribution_written": true,
   "manifest_written": true,
-  "parts_written": false,
+  "parts_written": true,
   "report_written": false,
   "tiles_kept": 0,
   "tiles_made": 72,
   "tiles_removed": 0,
-  "tiles_same_bytes": 72,
-  "tiles_written": 0,
-  "written": []
+  "tiles_same_bytes": 0,
+  "tiles_written": 72,
+  "written": [
+   "t+00-02",
+   "t+00-03",
+   "t+00-04",
+   "t+00-05",
+   "t+00-06",
+   "t+01-02",
+   "t+01-03",
+   "t+01-04",
+   "t+01-05",
+   "t+01-06",
+   "t+02-02",
+   "t+02-03",
+   "t+02-04",
+   "t+02-05",
+   "t+02-06",
+   "t+03-02",
+   "t+03-03",
+   "t+03-04",
+   "t+03-05",
+   "t+03-06",
+   "t+04-02",
+   "t+04-03",
+   "t+04-04",
+   "t+04-05",
+   "t+04-06",
+   "t+05-04",
+   "t+05-05",
+   "t+05-06",
+   "t+06-04",
+   "t+06-05",
+   "t+06-06",
+   "t-01-02",
+   "t-01-03",
+   "t-01-04",
+   "t-01-05",
+   "t-01-06",
+   "t-02-02",
+   "t-02-03",
+   "t-02-04",
+   "t-02-05",
+   "t-02-06",
+   "t-03+00",
+   "t-03+01",
+   "t-03+02",
+   "t-03+03",
+   "t-03+04",
+   "t-03+05",
+   "t-03-01",
+   "t-03-02",
+   "t-03-03",
+   "t-03-04",
+   "t-03-05",
+   "t-03-06",
+   "t-04+01",
+   "t-04+02",
+   "t-04-02",
+   "t-04-03",
+   "t-04-04",
+   "t-04-05",
+   "t-04-06",
+   "t-05+02",
+   "t-05-02",
+   "t-05-04",
+   "t-05-05",
+   "t-05-06",
+   "t-06+02",
+   "t-06-04",
+   "t-06-05",
+   "t-06-06",
+   "t-07-04",
+   "t-07-05",
+   "t-07-06"
+  ]
  },
  "ok": true,
  "seconds": {
-  "context": 0.3,
-  "gather": 0.11,
-  "make": 6.47,
+  "context": 1.67,
+  "gather": 0.25,
+  "make": 17.9,
   "slowest_tiles": [
    [
     "t-03+04",
-    1.093
-   ],
-   [
-    "t-03-03",
-    0.579
+    1.667
    ],
    [
     "t-02-03",
-    0.544
+    1.219
    ],
    [
-    "t-01-03",
-    0.491
+    "t-03-03",
+    1.02
+   ],
+   [
+    "t+01-02",
+    1.019
    ],
    [
     "t-04-04",
-    0.488
+    1.008
    ]
   ],
-  "total": 10.01,
-  "workers": 3,
-  "write": 0.22
+  "total": 26.83,
+  "workers": 2,
+  "write": 0.35
  },
  "stats": {
   "bodies": 8,
   "by_kind": {
-   "water.bank.canal_wall": 8,
+   "water.bank.canal_wall": 6,
    "water.bank.natural_bank": 15,
    "water.bank.riprap": 5,
-   "water.bank.road_embankment": 2,
+   "water.bank.road_embankment": 4,
    "water.body.canal": 7,
    "water.body.river": 13,
    "water.body.sea": 66
   },
-  "disk_bytes": 60601896,
+  "disk_bytes": 60598572,
   "instances": 34044,
   "lod_triangles": {
    "lod0": 1456281,
@@ -106,14 +179,14 @@
    "part.riprap.r5": 5619
   },
   "tiles": 72,
-  "triangles": 1610200,
+  "triangles": 1609997,
   "triangles_by_kind": {
-   "bed": 113681,
+   "bed": 113790,
    "surface": 1456281,
-   "water.bank.canal_wall": 216,
-   "water.bank.natural_bank": 26027,
+   "water.bank.canal_wall": 156,
+   "water.bank.natural_bank": 25736,
    "water.bank.riprap": 13357,
-   "water.bank.road_embankment": 638
+   "water.bank.road_embankment": 677
   },
   "water_kinds": {
    "canal": 2,

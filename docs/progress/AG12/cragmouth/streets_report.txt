@@ -2,17 +2,17 @@ assetgen streets: Cragmouth: PASS
 
   [ok] street_coverage: 0 without an asset
   [ok] street_meshes: no bad triangles
-  [ok] street_replaces: 2822 blockout objects replaced
-  [ok] street_budgets: 1272899 triangles in the city (budget 20000000), at most 25246 in a tile (t-05+02, budget 2500000)
+  [ok] street_replaces: 2835 blockout objects replaced
+  [ok] street_budgets: 1203355 triangles in the city (budget 20000000), at most 25306 in a tile (t-05+02, budget 2500000)
 
 coverage:
-  road_segments: 2950 of 2970 (+20 declared)
-  junctions: 1824 of 1824
-  crosswalks: 1422 of 1422
-  sidewalks: 4088 of 4088
+  road_segments: 2957 of 2977 (+20 declared)
+  junctions: 1828 of 1828
+  crosswalks: 472 of 472
+  sidewalks: 4100 of 4100
   bridges: 9 of 9
-  structures: 1885 of 1885
-  tunnels: 20 of 20
+  structures: 1980 of 1980
+  tunnels: 16 of 16
   quays: 6 of 6
   waterways: 0 of 6 (+6 declared)
   site_elements: 303 of 303
@@ -21,22 +21,22 @@ coverage:
   megasites: 2 of 2
   stations: 8 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
 
-pieces 12533, tiles 130, triangles 1272899, disk 87.5 MB
+pieces 11631, tiles 130, triangles 1203355, disk 82.6 MB
 triangles by kind:
-  street.sidewalk: 429539 (4088 pieces)
-  street.road: 252459 (2970 pieces)
-  street.junction: 233460 (1824 pieces)
-  street.structure.retaining_wall: 226644 (1780 pieces)
-  street.crosswalk: 43826 (1422 pieces)
-  street.quay: 37546 (6 pieces)
+  street.sidewalk: 387427 (4100 pieces)
+  street.road: 261684 (2977 pieces)
+  street.junction: 234331 (1828 pieces)
+  street.structure.retaining_wall: 218376 (1832 pieces)
+  street.quay: 36614 (6 pieces)
   street.tunnel.metro: 32320 (7 pieces)
+  street.crosswalk: 16816 (472 pieces)
   street.site.rail_track: 4740 (2 pieces)
   street.bridge: 3203 (9 pieces)
-  street.tunnel.bored: 2432 (8 pieces)
+  street.tunnel.bored: 1280 (4 pieces)
   street.underpass_stair: 1160 (10 pieces)
   street.site.berth: 1074 (1 pieces)
-  street.column: 872 (64 pieces)
   street.transit.canopy: 832 (16 pieces)
+  street.column: 706 (41 pieces)
   street.transit.deck: 632 (8 pieces)
   street.site.container_stack: 566 (283 pieces)
   street.tunnel.pedestrian: 320 (5 pieces)
@@ -53,8 +53,8 @@ triangles by kind:
   street.canal_wall.canal: 0 (2 pieces)
   street.canal_wall.creek: 0 (1 pieces)
 no mesh: inside its junctions 20, natural banks 6
-corner pads: 4876 made, 11 skipped (no sidewalk 9, same edge 2)
+corner pads: 4890 made, 11 skipped (no sidewalk 9, same edge 2)
 bridges: footbridge.steel 2, footbridge.stone 1, girder 6
 instances: part.container.c0 1106, part.container.c1 1054, part.container.c2 1149, part.container.c3 1081, part.container.c4 1062, part.container.c5 1081
-files: 0 tiles made, 130 kept, 0 written, 0 same bytes, 0 removed
-seconds: context 3.82, gather 1.79, make 0.0, write 0.22, total 6.54, workers 1
+files: 130 tiles made, 0 kept, 130 written, 0 same bytes, 0 removed
+seconds: context 10.12, gather 1.96, make 18.09, write 0.6, total 31.75, workers 2

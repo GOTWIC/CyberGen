@@ -1711,30 +1711,35 @@ every water body's surface, bed and banks, `assetgen water BUILD` (also a stage 
   natural or riprap bank from over the water beside it), `water_harbor` (the biggest basin from
   above); AG12's water in every textured view near it.
 
-**Samples** (M16's models, main at 280eb35, with the fixes after AG10 and AG13 merged in;
-3 workers, the Windows PC; triangles: the surfaces' first LOD, the beds and the banks):
+**Samples** (M16's, M21's and M18's models, main at f27543e, built by the M18 session; AG7's
+streets, then the water, 2 workers, the Windows PC; triangles: the surfaces' first LOD, the beds
+and the banks):
 
 | City | Water bodies (kinds) | km2 | Tiles | Surface | Beds | Banks | Triangles | Most in a tile | Stones | MB | Seconds |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Vesper Bay | 10 (sea 3, river 1, marsh 2, canal 4) | 3.56 | 114 | 1,572,582 | 161,874 | 133,885 | 1,868,341 | 50,005 | 45,178 | 69.9 | 14 |
-| Delta Megacity | 13 (sea 3, river 2, marsh 1, canal 7) | 4.51 | 136 | 1,956,126 | 220,537 | 109,916 | 2,286,579 | 35,013 | 36,400 | 85.7 | 16 |
-| Saltreach Free Port | 12 (sea 4, river 5, canal 3) | 4.90 | 146 | 2,428,997 | 169,210 | 89,188 | 2,687,395 | 45,387 | 27,307 | 101.7 | 19 |
-| Nexus City | 18 (sea 5, river 2, marsh 2, canal 9) | 3.16 | 111 | 1,282,137 | 180,242 | 114,778 | 1,577,157 | 37,474 | 22,680 | 59.3 | 15 |
-| Greyhook | 6 (sea 3, river 1, canal 2) | 7.24 | 195 | 3,541,060 | 254,267 | 93,230 | 3,888,557 | 41,481 | 47,768 | 146.7 | 27 |
-| Cragmouth (terrain) | 8 (sea 4, river 2, canal 2) | 3.03 | 72 | 1,456,281 | 113,681 | 40,238 | 1,610,200 | 34,816 | 34,044 | 60.6 | 10 |
+| Vesper Bay | 10 (sea 3, river 1, marsh 2, canal 4) | 3.56 | 114 | 1,572,582 | 161,783 | 134,582 | 1,868,947 | 50,005 | 45,178 | 69.9 | 32 |
+| Delta Megacity | 13 (sea 3, river 2, marsh 1, canal 7) | 4.51 | 136 | 1,956,126 | 220,762 | 106,160 | 2,283,048 | 35,013 | 27,797 | 85.7 | 37 |
+| Saltreach Free Port | 12 (sea 4, river 5, canal 3) | 4.90 | 145 | 2,428,997 | 169,275 | 89,356 | 2,687,628 | 45,387 | 28,196 | 101.7 | 51 |
+| Nexus City | 18 (sea 5, river 2, marsh 2, canal 9) | 3.16 | 111 | 1,282,137 | 180,343 | 113,294 | 1,575,774 | 37,568 | 21,483 | 59.2 | 37 |
+| Greyhook | 6 (sea 3, river 1, canal 2) | 7.24 | 195 | 3,541,060 | 254,845 | 90,290 | 3,886,195 | 41,481 | 48,496 | 146.7 | 83 |
+| Cragmouth (terrain) | 8 (sea 4, river 2, canal 2) | 3.03 | 72 | 1,456,281 | 113,790 | 39,926 | 1,609,997 | 34,816 | 34,044 | 60.6 | 27 |
 
 The surfaces' coarser LODs add a quarter again (Vesper Bay 398,598, 103,215 and 24,844
-triangles). Every water check passes in all six; 75 to 94% of the bed vertices lie exactly
-on M16's bed, the rest on a bank's slope carried on over it. Every other check of
-`assetgen build` passes in all six too (buildings, streets, props, AG13's ground, materials;
-before the fixes after AG10 were merged in, the same checks failed as main's build of the
-same models), and AG6's texel check passes with the water packs in it. Merging AG13 moved
-no water byte. AG13's surface generators `soil` and `rubble` took the names AG12's banks
-and stony beds had used (`surfaces.make` looks AG13's up first), so AG12's are
-`water_soil` and `water_rubble`.
+triangles). Every water check and every street check passes in all six; 76 to 94% of the
+bed vertices lie exactly on M16's bed, the rest on a bank's slope carried on over it.
+M18's models move the water little (its embankments and crossings change some banks and
+the bridge piers' foam).
 
-**Regeneration**: M16's Old Town regeneration of Vesper Bay (its base the build above): 22
-banks changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,
+Before M18 (M16's models, main at 280eb35, with the fixes after AG10 and AG13 merged in), a
+full `assetgen build` of the six passed every check of every stage (buildings, streets,
+water, props, AG13's ground, materials; AG6's texel check with the water packs in it), and
+before the fixes after AG10 were merged in, the same checks failed as main's build of the
+same models. Merging AG13 moved no water byte. AG13's surface generators `soil` and
+`rubble` took the names AG12's banks and stony beds had used (`surfaces.make` looks AG13's
+up first), so AG12's are `water_soil` and `water_rubble`.
+
+**Regeneration** (on M16's models): M16's Old Town regeneration of Vesper Bay: 22 banks
+changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,
 every one within reach of a changed bank); 14 of 114 tiles made again, 9 written (the rest
 the same bytes), every water check passing.
 
@@ -1764,16 +1769,18 @@ goldens, `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_golden
 Tests that the water changes: the exporter's stage 2 (`test_stage2_from_assetgen`: the
 underwater volumes are new actors), M13's lift of props
 (`test_m13_lifts_placements_by_base_or_ground`: boats float on the water) and the stub
-model of the streets' ground test (its water bodies). The whole suite on the merged code on this PC: 782 passed, 4 skipped, 2
-failed, both known to fail on Windows (the props golden, which AG8's boats also move, and
-`test_progress`'s pipe test).
-Goldens written again on this PC on the merged code, on purpose: the streets' (AG7's walls,
-piers and canal walls on M16's water; the library's hash in the contribution; tile
-`t+03-04`, with no water in it, keeps the Mac's hash) and assetgen's `ag1` `testport_files`
-and `ag6` `testport_materials` (the contributions carry the library's hash, which AG12's
-sets and atlas change; materials.json gains the water); the building manifest and packs,
-briefs and the sample goldens are unchanged. The props golden stays main's (written on the
-Mac after AG10's fixes; AG8's boats move it, so it needs writing again on the Mac).
+model of the streets' ground test (its water bodies). On the code with M18 merged in,
+`tests/assetgen` and `tests/test_unreal.py` on this PC: 218 passed, 2 skipped, 1 failed, the
+props golden (it fails on Windows, and AG8's boats move it). Earlier, the whole suite after
+merging the fixes after AG10: 782 passed, 4 skipped, 2 failed, both known to fail on Windows
+(the props golden and `test_progress`'s pipe test).
+Goldens written again on this PC on the code with M18 merged in, on purpose: the water's
+(the small city and Vesper Bay on M18's models), the streets' (AG7's walls, piers and canal
+walls on M16's water; the library's hash in the contribution) and assetgen's `ag1`
+`testport_files` and `ag6` `testport_materials` (the contributions carry the library's
+hash, which AG12's sets and atlas change; materials.json gains the water); AG13's ground
+golden, the building manifest and packs, briefs and the sample goldens are main's. The
+props golden stays main's (AG8's boats move it, so it needs writing again on the Mac).
 
 **Open.**
 - Not run in Unreal: `M_CgWater` is written against UE 5.8's Python names for the Single

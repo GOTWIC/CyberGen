@@ -1,21 +1,21 @@
 assetgen water: Greyhook: PASS
 
-  [ok] water_coverage: 6 bodies, 51 banks drawn, 12 by AG7
-  [ok] water_levels: 2436356 surface vertices at their level, 47251 bed vertices checked (worst 0.001 m; 94% on M16's bed, the rest on a bank's slope over it)
-  [ok] water_gaps: 808 waterline points on the bed, 313 wall feet in it
+  [ok] water_coverage: 6 bodies, 67 banks drawn, 12 by AG7
+  [ok] water_levels: 2436356 surface vertices at their level, 47370 bed vertices checked (worst 0.001 m; 94% on M16's bed, the rest on a bank's slope over it)
+  [ok] water_gaps: 889 waterline points on the bed, 393 wall feet in it
   [ok] water_meshes: no bad triangles
-  [ok] water_budgets: 3888557 triangles (budget 9000000), at most 41481 in a tile (t+04+03, budget 400000), at most 22043 stones in a tile (budget 60000)
-  [ok] water_replaces: 531 blockout water objects, 438 replaced, 93 dropped
+  [ok] water_budgets: 3886195 triangles (budget 9000000), at most 41481 in a tile (t+04+03, budget 400000), at most 22043 stones in a tile (budget 60000)
+  [ok] water_replaces: 539 blockout water objects, 446 replaced, 93 dropped
 
 bodies 6 (canal 2, river 1, sea 3), 7.240 km2 of water
-pieces 253, tiles 195, triangles 3888557 (surface LODs {'lod0': 3541060, 'lod1': 890798, 'lod2': 226717, 'lod3': 58501}), stones 47768, disk 146.7 MB
+pieces 269, tiles 195, triangles 3886195 (surface LODs {'lod0': 3541060, 'lod1': 890798, 'lod2': 226717, 'lod3': 58501}), stones 48496, disk 146.7 MB
 triangles by kind:
   surface: 3541060
-  bed: 254267
-  water.bank.natural_bank: 53319
+  bed: 254845
+  water.bank.natural_bank: 49809
   water.bank.beach: 21669
-  water.bank.riprap: 17812
-  water.bank.road_embankment: 394
-  water.bank.canal_wall: 36
-files: 195 tiles made, 0 kept, 8 written, 187 same bytes, 0 removed
-seconds: context 2.42, gather 0.21, make 20.71, write 0.47, total 26.61, workers 3
+  water.bank.riprap: 18054
+  water.bank.road_embankment: 386
+  water.bank.canal_wall: 372
+files: 195 tiles made, 0 kept, 195 written, 0 same bytes, 0 removed
+seconds: context 7.89, gather 0.79, make 66.18, write 0.79, total 82.93, workers 2
