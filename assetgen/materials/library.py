@@ -382,6 +382,8 @@ GROUND_SETS: dict[str, dict] = {
                     "params": {"color": "#4d6a2a"}},
     "ground_rubble": {"gen": "rubble", "tile_m": 2.0, "band": "street",
                       "params": {"color": "#7f7c75", "chunk_m": 0.12, "brick": 0.25}},
+}
+
 # AG12's water beds (under the water: the upper band's density) and banks
 WATER_SETS: dict[str, dict] = {
     "bed_mud": {"gen": "sediment", "tile_m": 4.0, "band": "upper",
