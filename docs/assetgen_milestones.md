@@ -1711,8 +1711,8 @@ every water body's surface, bed and banks, `assetgen water BUILD` (also a stage 
   natural or riprap bank from over the water beside it), `water_harbor` (the biggest basin from
   above); AG12's water in every textured view near it.
 
-**Samples** (M16's models, main at 280eb35, with the fixes after AG10 merged in; 3 workers,
-the Windows PC; triangles: the surfaces' first LOD, the beds and the banks):
+**Samples** (M16's models, main at 280eb35, with the fixes after AG10 and AG13 merged in;
+3 workers, the Windows PC; triangles: the surfaces' first LOD, the beds and the banks):
 
 | City | Water bodies (kinds) | km2 | Tiles | Surface | Beds | Banks | Triangles | Most in a tile | Stones | MB | Seconds |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1726,9 +1726,12 @@ the Windows PC; triangles: the surfaces' first LOD, the beds and the banks):
 The surfaces' coarser LODs add a quarter again (Vesper Bay 398,598, 103,215 and 24,844
 triangles). Every water check passes in all six; 75 to 94% of the bed vertices lie exactly
 on M16's bed, the rest on a bank's slope carried on over it. Every other check of
-`assetgen build` passes in all six too (buildings, streets, props, materials; before the
-fixes after AG10 were merged in, the same checks failed as main's build of the same models),
-and AG6's texel check passes with the water packs in it.
+`assetgen build` passes in all six too (buildings, streets, props, AG13's ground, materials;
+before the fixes after AG10 were merged in, the same checks failed as main's build of the
+same models), and AG6's texel check passes with the water packs in it. Merging AG13 moved
+no water byte. AG13's surface generators `soil` and `rubble` took the names AG12's banks
+and stony beds had used (`surfaces.make` looks AG13's up first), so AG12's are
+`water_soil` and `water_rubble`.
 
 **Regeneration**: M16's Old Town regeneration of Vesper Bay (its base the build above): 22
 banks changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,

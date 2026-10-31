@@ -13,8 +13,8 @@ The full record: [`docs/assetgen_milestones.md`](../../assetgen_milestones.md), 
 | The Vess River's natural bank, from over the water beside it | [`water_bank.jpg`](vesper_bay/water_bank.jpg) | [`water_bank_night.jpg`](vesper_bay/water_bank_night.jpg) |
 | The harbor basins from above | [`water_harbor.jpg`](vesper_bay/water_harbor.jpg) | [`water_harbor_night.jpg`](vesper_bay/water_harbor_night.jpg) |
 
-The same at 7680 px in [`vesper_bay/8k/`](vesper_bay/8k). The ground beside the water is
-still the blockout's flat cover (AG13's).
+The same at 7680 px in [`vesper_bay/8k/`](vesper_bay/8k). They were made before AG13 was
+merged in, so the ground beside the water is still the blockout's flat cover.
 
 ## Per city
 
@@ -36,7 +36,7 @@ stages' reports of the same build (`asset_report.txt`, `streets_report.txt`,
 | [Cragmouth](cragmouth) (terrain) | 8 | 3.03 | 1,610,200 | 34,044 | 60.6 | all pass |
 
 Every other check of `assetgen build` passes in all six too (buildings, streets, props,
-materials), with main's assetgen fixes after AG10 merged in.
+AG13's ground, materials), with main merged in (the assetgen fixes after AG10, and AG13).
 
 Vesper Bay's Old Town regenerated (M16's regeneration): 22 banks changed, all in Old Town;
 15 body pieces changed, each within reach of a changed bank; 14 of 114 water tiles made
