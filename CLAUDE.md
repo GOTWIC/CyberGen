@@ -941,8 +941,8 @@ Sample builds: `docs/progress/M21/`.
 ## Asset generator (assetgen)
 
 `docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
-AG12 water and AG13 ground cover and grass after citygen's M16, AG14 fit and finish and AG15
-cyberpunk facades and night from the first run-through), its log
+AG12 water after citygen's M16 (AG13, ground cover and grass, is in place), AG14 fit and finish
+and AG15 cyberpunk facades and night from the first run-through), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
