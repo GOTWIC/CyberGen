@@ -1605,7 +1605,6 @@ the rest kept byte for byte.
 - The ground on M13's terrain follows the bilinear ground grid as the blockout's heightfield
   does, ramps over the retaining walls' steps included (box mapped, no grass on them).
 - Deck columns standing on a lawn are not cut out of it (no grass under a deck anyway).
-- The props golden needs the Mac (it carries the library's hash, which the new sets move).
 - Mac = x86 waits for the deferred determinism check.
 
 ## Order
