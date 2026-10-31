@@ -1433,8 +1433,10 @@ class ShellBuilder:
             if sills:
                 used.add("sills")
         if door:
-            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2 and                     not (zf - BALCONY_UNDER < ms["z0"] and
-                         self._hangs(fa, (bset[jb][0] + bset[jb][1]) // 2, bset[jb][2], zf)):
+            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2 and \
+                    not (zf - BALCONY_UNDER < ms["z0"] and
+                         self._hangs(fa, bset[jb][0] + 80, bset[jb][1] - 80, bset[jb][2],
+                                     zf)):
                 # the bay's balcony, once (by its first opening, where a bay has two)
                 b0, b1, d = bset[jb]
                 st = genes[f"{g}.balcony"]
@@ -1732,30 +1734,21 @@ class ShellBuilder:
             base += k
         return True
 
-    def _hangs(self, fa: Facade, s: int, d: int, zf: int) -> bool:
-        """M21: whether a balcony on a mass's first floor would hang in the air: no mass of
-        the building spans its slab's underside within a deep part's reach of its middle (a
-        cantilevered or stacked block's first floor; over a podium it stands as before)."""
-        x0, y0, _ = fa.P(s, 0)
-        x, y = x0 + fa.nx * d, y0 + fa.ny * d
+    def _hangs(self, fa: Facade, s0: int, s1: int, d: int, zf: int) -> bool:
+        """M21: whether a balcony from s0 to s1 along the facade, d deep, on a mass's first
+        floor would hang in the air: a corner of its slab with no mass of the building
+        spanning its underside within a deep part's reach (a cantilevered or stacked
+        block's first floor, a tower over a sky garden; over a podium it stands as
+        before). Every corner, as the envelope check takes the part's box: a block turned
+        or offset over the one under it reaches past it at one end of a bay only."""
         zb = zf - BALCONY_UNDER // 2
-        for o in self.masses:
-            if o["shape"] != "prism" or not (o["z0"] - 2 <= zb <= o["z1"] + 2):
-                continue
-            ring = o["rings"][0]
-            if RG.in_poly((int(round(x)), int(round(y))), [ring]) >= 0:
-                return False
-            n = len(ring)
-            for i in range(n):
-                a, b = ring[i], ring[(i + 1) % n]
-                dx, dy = b[0] - a[0], b[1] - a[1]
-                L2 = dx * dx + dy * dy
-                t = 0.0 if L2 == 0 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy)
-                                                     / L2))
-                ex, ey = a[0] + dx * t - x, a[1] + dy * t - y
-                if ex * ex + ey * ey <= BALCONY_REACH * BALCONY_REACH:
-                    return False
-        return True
+        rings = [o["rings"][0] for o in self.masses
+                 if o["shape"] == "prism" and o["z0"] - 2 <= zb <= o["z1"] + 2]
+        for s, t in ((s0, 0), (s1, 0), (s0, d), (s1, d)):
+            x0, y0, _ = fa.P(s, 0)
+            if not any(_held(x0 + fa.nx * t, y0 + fa.ny * t, ring) for ring in rings):
+                return True
+        return False
 
     def _simple_mass(self, ms: dict, g: str) -> None:
         """M21: a band of a twisted, tapered or leaning shaft, or a shaft curved all round,
@@ -2072,6 +2065,23 @@ def _blocked(fa: Facade, depth: int, edges) -> bool:
 def _centroid(ring):
     n = len(ring)
     return (sum(p[0] for p in ring) // n, sum(p[1] for p in ring) // n)
+
+
+def _held(x: float, y: float, ring) -> bool:
+    """Whether a point of a balcony's slab is inside a mass's ring or within a deep part's
+    reach of it (`_hangs`)."""
+    if RG.in_poly((int(round(x)), int(round(y))), [ring]) >= 0:
+        return True
+    n = len(ring)
+    for i in range(n):
+        a, b = ring[i], ring[(i + 1) % n]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 == 0 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        ex, ey = a[0] + dx * t - x, a[1] + dy * t - y
+        if ex * ex + ey * ey <= BALCONY_REACH * BALCONY_REACH:
+            return True
+    return False
 
 
 def _unit(a, b):

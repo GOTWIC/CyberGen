@@ -576,11 +576,13 @@ def _beside(sb, p: dict, rec: dict) -> None:
                       tube)
         walls = G.union([G.qpoly(a) for a in at]) if at else None
         decks = []
+        gap = math.inf
         for pc in G.to_model_polys(plat):
             piece = G.qpoly(Polygon(pc["exterior"], pc["holes"]))
             z0 = floor - STATION_SLAB
             rest = [z for z, rp in roofs if G.area1(G.inter(piece, G.qpoly(rp))) > 1.0]
             d = piece.distance(walls) if walls is not None else math.inf
+            gap = min(gap, d)
             if d <= STATION_LINK / 1000.0:
                 if d > 0.01:
                     # (the deck across the gap: the hull of the piece and the wall near it)
@@ -607,6 +609,13 @@ def _beside(sb, p: dict, rec: dict) -> None:
         rec["floor_m"] = round(floor / 1000.0, 3)
         sb.stats["sky_platforms"] = sb.stats.get("sky_platforms", 0) + made
         sb.stats["sky_platforms_beside"] = sb.stats.get("sky_platforms_beside", 0) + made
+    elif not decks:
+        # (nothing of the building to carry it: no wall within `STATION_LINK` at its floor,
+        # no roof within `STATION_REST` under it; M5 portals a station by the union of its
+        # building's masses, so a tube over a megabuilding's podium, far from its tower, is
+        # the city's to change; `asset_roofs` counts it apart)
+        rec["out_of_reach"] = True
+        rec["gap_m"] = None if gap == math.inf else round(gap, 2)
 
 
 def mouth_frames(sb) -> None:
