@@ -733,11 +733,37 @@ def catch_grade(s: dict, gr) -> float:
     return gr.run_max
 
 
+def _crossings(segments) -> dict[str, list[tuple[float, tuple]]]:
+    """Points where two roads cross without a shared node (as `terrain.crossings`, which
+    runs after M2): {segment id: [(s, key)]}; the point on the 1 cm grid, s by plain
+    arithmetic on the centerline (`ST._project`), so no measure GEOS rounds reaches M2."""
+    pts = [[tuple(p) for p in s["centerline"]] for s in segments]
+    lines = [LineString(p) for p in pts]
+    tree = shapely.STRtree(lines)
+    ends = [{p[0], p[-1]} for p in pts]
+    out: dict[str, list] = {}
+    a_idx, b_idx = tree.query(lines, predicate="intersects")
+    pairs = sorted({(min(a, b), max(a, b)) for a, b in zip(a_idx.tolist(), b_idx.tolist())
+                    if a != b})
+    for a, b in pairs:
+        sa, sb = segments[a], segments[b]
+        inter = lines[a].intersection(lines[b])
+        if {sa["start"], sa["end"]} & {sb["start"], sb["end"]} and inter.geom_type == "Point":
+            continue
+        hits = [inter] if inter.geom_type == "Point" else \
+            [g for g in getattr(inter, "geoms", []) if g.geom_type == "Point"]
+        for xy in sorted({(G.q(p.x), G.q(p.y)) for p in hits}):
+            if any(_dist(xy, e) < 1.0 for e in ends[a] | ends[b]):
+                continue
+            key = ("x", sa["id"], sb["id"], xy)
+            out.setdefault(sa["id"], []).append((G.q(ST._project(pts[a], xy)[0]), key))
+            out.setdefault(sb["id"], []).append((G.q(ST._project(pts[b], xy)[0]), key))
+    return out
+
+
 def _locks(net) -> dict:
     """Stretches of each road whose height the levelling keeps (s0, s1): bridge spans and the
     crossings of roads that pass over or under it, a deck's width and LOCK_PAD_M wide."""
-    from . import terrain as TE
-
     out: dict = {}
     by = {s["id"]: s for s in net.segments}
     for b in net.bridges:
@@ -748,7 +774,7 @@ def _locks(net) -> dict:
             pts = [tuple(p) for p in s["centerline"]]
             ss = [ST._project(pts, (p[0], p[1]))[0] for p in (b["line"][0], b["line"][-1])]
             out.setdefault(sid, []).append((min(ss) - LOCK_PAD_M, max(ss) + LOCK_PAD_M))
-    for sid, xs in TE.crossings(net.segments).items():
+    for sid, xs in _crossings(net.segments).items():
         for sx, key in xs:
             other = by[key[2] if key[1] == sid else key[1]]
             h = other["width_m"] / 2.0 + LOCK_PAD_M
@@ -985,18 +1011,21 @@ def _held_heights(net, legs: dict, gr, held, want: dict, runs: dict, node: dict,
 def _overhead(net):
     """A test whether a road passes over a node (another road's corridor over it, higher
     than z): raising the node would take its clearance."""
-    lines = [LineString(s["centerline"]) for s in net.segments]
-    tree = shapely.STRtree(lines)
+    pts = [[tuple(p) for p in s["centerline"]] for s in net.segments]
+    tree = shapely.STRtree([LineString(p) for p in pts])
 
     def over(n, z: float) -> bool:
-        p = Point(n["position"][:2])
-        for i in sorted(int(k) for k in tree.query(p, predicate="dwithin", distance=40.0)):
+        xy = (n["position"][0], n["position"][1])
+        for i in sorted(int(k) for k in tree.query(Point(xy), predicate="dwithin",
+                                                   distance=40.0)):
             s = net.segments[i]
             if n["id"] in (s["start"], s["end"]):
                 continue
-            if G.dist(lines[i], p) > s["width_m"] / 2.0 + 3.0:
+            # (plain arithmetic: no measure GEOS rounds reaches M2)
+            along, off = ST._project(pts[i], xy)[:2]
+            if off > s["width_m"] / 2.0 + 3.0:
                 continue
-            if _z_at(s["z_profile"], lines[i].project(p)) > z - 0.5:
+            if _z_at(s["z_profile"], along) > z - 0.5:
                 return True
         return False
     return over

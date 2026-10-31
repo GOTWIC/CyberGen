@@ -193,8 +193,10 @@ class Ctx:
                 if ms.z0_m <= 0.5 and ms.z1_m > 0.5:
                     self.bld.append(P(ms.footprint))
                     self.bld_ids.append(e.id)
+        # (M18: an embankment is the fill under its road, which the road's own keep-outs
+        # cover; the props on its sidewalks stand on it)
         self.struct = [P(s.footprint) for s in m.structures if s.footprint is not None and
-                       s.z0_m <= 0.5 and s.z1_m > 0.0]
+                       s.z0_m <= 0.5 and s.z1_m > 0.0 and s.kind != "embankment"]
         # water (seas, rivers, channels, waterways)
         self.water = [P(p) for e in m.seas for p in e.polygons] + \
             [P(e.polygon) for e in m.rivers] + [P(e.polygon) for e in m.channels] + \
