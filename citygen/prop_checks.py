@@ -1,4 +1,6 @@
-"""M6 checks: props and vegetation (scope 5.6, 5.8 and section 9)."""
+"""M6 checks: props and vegetation (scope 5.6, 5.8 and section 9); M20's `prop_support` (every
+prop, plant and roof item on a surface at its height) and `plant_headroom` (no plant within
+1 m of the underside of what is over it, measured along it)."""
 
 from __future__ import annotations
 
@@ -9,9 +11,9 @@ import shapely
 from shapely.geometry import LineString, Point
 
 from . import geom as G
+from . import vegetation as V
 from .checks import Check
 from .model import CityModel
-from . import vegetation as V
 from .props import EXCEPT, KEEP_R, KINDS, REQUIRED, Cand, Ctx
 
 LIMIT = 12

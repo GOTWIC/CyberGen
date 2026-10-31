@@ -189,6 +189,58 @@ def test_check_slots_fails(city):
     assert not _checks(m.model_copy(update={"sign_slots": low}))["sign_slots"].passed
 
 
+def test_large_ads(city):
+    """M20: neon billboards (landscape and portrait) and banners on the facades, every one
+    lit as neon; a banner round its corner names its pair."""
+    from collections import Counter
+
+    m = city.model
+    kinds = Counter((s.kind, s.mount) for s in m.sign_slots)
+    assert kinds[("billboard", "facade")] and kinds[("banner", "facade")]
+    big = [s for s in m.sign_slots if s.kind in ("billboard", "banner")]
+    assert all(s.attrs.get("lit") == "neon" for s in big)
+    face = [s for s in big if s.mount == "facade" and s.kind == "billboard"]
+    assert {s.attrs["orientation"] for s in face} == {"landscape", "portrait"}
+    slot = {s.id: s for s in m.sign_slots}
+    for s in big:
+        if "wrap" in s.attrs:
+            assert slot[s.attrs["wrap"]].attrs["wrap"] == s.id
+
+
+def test_signage_spec(city):
+    """A district's `signage` sets its large ads: none at density 0, only its kinds."""
+    spec = copy.deepcopy(SMALL)
+    for d in spec["districts"]:
+        d["signage"] = {"density": 0.0}
+    out = GP.build(validate_spec(spec).filled, _bare(city.model))
+    assert not [s for s in out.rows["sign_slots"] if s["kind"] in ("banner",) or
+                s["mount"] in ("front",) or (s["kind"] == "billboard" and
+                                             s["mount"] == "facade")]
+    spec = copy.deepcopy(SMALL)
+    for d in spec["districts"]:
+        d["signage"] = {"density": 1.0, "kinds": ["billboard"]}
+    out = GP.build(validate_spec(spec).filled, _bare(city.model))
+    kinds = {(s["kind"], s["mount"]) for s in out.rows["sign_slots"]}
+    assert ("billboard", "facade") in kinds and ("banner", "facade") not in kinds
+    assert ("holo_ad", "front") not in kinds and ("holo_ad", "roof") not in kinds
+
+
+def test_check_slots_fails_for_large_ads(city):
+    m = city.model
+    bb = next(s for s in m.sign_slots if s.kind == "billboard" and s.mount == "facade")
+    import math
+
+    a = math.radians(bb.yaw_deg)
+    out = [s.model_copy(update={"position": (s.position[0] + 6.0 * math.cos(a),
+                                             s.position[1] + 6.0 * math.sin(a),
+                                             s.position[2])})
+           if s.id == bb.id else s for s in m.sign_slots]
+    assert not _checks(m.model_copy(update={"sign_slots": out}))["sign_slots"].passed
+    dark = [s.model_copy(update={"attrs": {**s.attrs, "lit": None}}) if s.id == bb.id else s
+            for s in m.sign_slots]
+    assert not _checks(m.model_copy(update={"sign_slots": dark}))["sign_slots"].passed
+
+
 def test_lots_keep_clear_of_buildings(city):
     """Sweep regression: a setback lot over another lot's building is not placed, and the
     check sees the overlap."""

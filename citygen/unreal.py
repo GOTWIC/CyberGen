@@ -59,7 +59,7 @@ MANIFEST_VERSION = 1
 OUT_DIR = "unreal"            # BUILD_DIR/unreal (beside corporate_core_plan.json)
 CONTENT_ROOT = "/Game/CityGen"
 EMISSIVE = {"prop_light": 6.0, "prop_neon": 10.0, "prop_signal": 2.0, "sign_ad": 6.0,
-            "sign_holo": 4.0}   # (M20: the large ads' faces)
+            "sign_banner": 6.0, "sign_rim": 8.0, "sign_holo": 4.0}   # (M20: the large ads)
 ROUGHNESS = {"sea": 0.35, "water": 0.35, "prop_glass": 0.2}  # else 0.85, as in Blender
 DOME_STEPS = [(1.0, 0.0), (0.92388, 0.382683), (0.707107, 0.707107), (0.382683, 0.92388)]
 PLAYER_Z_M = 1.2              # player start above the walkway (capsule half height 0.96 m)

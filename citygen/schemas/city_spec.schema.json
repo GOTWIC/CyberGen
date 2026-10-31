@@ -694,6 +694,18 @@
           ],
           "default": null,
           "description": "M14: a layered district: an upper deck city over the ground streets."
+        },
+        "signage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Signage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M20: its buildings' large ads (default by archetype)."
         }
       },
       "required": [
@@ -1641,6 +1653,50 @@
         "from"
       ],
       "title": "River",
+      "type": "object"
+    },
+    "Signage": {
+      "additionalProperties": false,
+      "description": "M20: the large ads on the sides and tops of the district's buildings (the shop signs\nand the neon bands over shops come with the shops, by `neon`).",
+      "properties": {
+        "density": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How many: 0 none, 1 the most (a neon billboard at every level of most facades of the mid-rises and towers that face a road or plaza); default by archetype (dense in the corporate core, midtown, transit hubs, markets and entertainment districts, sparse in residential and industrial ones).",
+          "title": "Density"
+        },
+        "kinds": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "billboard",
+                  "banner",
+                  "holo"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "billboard (landscape and portrait neon billboards on the facades), banner (vertical neon banners spanning floors at a corner, some wrapping it), holo (holo-boards over tower roofs and projected in front of their facades); default by archetype.",
+          "title": "Kinds"
+        }
+      },
+      "title": "Signage",
       "type": "object"
     },
     "Source": {

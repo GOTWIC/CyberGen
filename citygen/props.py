@@ -30,6 +30,15 @@ result does not depend on the order of anything but the candidates themselves.
 | gate | market entrances |
 | dumpster | building backs along alleys and service lanes |
 | trash | bags, boxes and cans in alleys and on sidewalks, by grime |
+
+M20: everything stands on a surface the model defines at its height: the ground, a road's
+surface where it stands on its sidewalk or carriageway (`Cand.on`, `Ctx.settle`: a raised
+road's deck), the quay deck (the ground: a quay's `deck_z_m` is its height over the water),
+the water (boats, `Ctx.water_z`), a roof, or a wall at a height the wall has there (shop
+signs, awnings, AC units, wall lights and cables under the wall's top and under anything
+over the spot, `Ctx.mount_top`; AC units and facade greenery on the facade of the floor they
+are on, an overhanging floor's own, `Ctx.facade_spot`), and what stands keeps
+`vegetation.HEADROOM_M` under what is over it, measured along it (`vegetation.Overhead`).
 """
 
 from __future__ import annotations
@@ -1015,8 +1024,9 @@ def overhead_cables(c: Ctx) -> list[Cand]:
             continue        # a facade on both sides, at most 1.6 m behind the property line
         span = 2.0 * h + 3.0
         # (M20: tied to both walls, under their tops)
-        tops = [c.wall_top(px, py, CABLE_REACH_M, 0.0) for px, py in
-                ((x + nx * (h + 1.5), y + ny * (h + 1.5)), (x - nx * (h + 1.5), y - ny * (h + 1.5)))]
+        ends = ((x + nx * (h + 1.5), y + ny * (h + 1.5)),
+                (x - nx * (h + 1.5), y - ny * (h + 1.5)))
+        tops = [c.wall_top(px, py, CABLE_REACH_M, 0.0) for px, py in ends]
         z = min(6.0 + 5.0 * _u("cz", sid, k), min(tops) - 0.5)
         if z < CABLE_MIN_Z_M:
             continue

@@ -81,7 +81,8 @@ MATERIALS = {
     "prop_awning": "#e8a23a", "prop_car": "#c8ccd4", "prop_dumpster": "#3f7a4a",
     "prop_trash": "#6b6455", "prop_boat": "#eeeeee", "prop_concrete": "#9a9fa8",
     "prop_scaffold": "#d9b25a", "prop_kiosk": "#3a4150", "plant_trunk": "#6b4f3a",
-    "sign_ad": "#53e6ff", "sign_holo": "#7af7ff",
+    "sign_ad": "#ff36e8", "sign_banner": "#ffe04a", "sign_rim": "#3ff0ff",
+    "sign_holo": "#7af7ff",
     "plant_crown": "#3f8a47", "plant_conifer": "#2f6e45", "plant_palm": "#7fae45",
     "plant_shrub": "#5aa060", "plant_scrub": "#7a8a4a", "plant_ivy": "#5fae55",
     "hedge": "#2f6e45", "lawn": "#4f8a57",
@@ -1001,10 +1002,10 @@ PLANT_BASE = {"conifer": (3.0, 10.0), "palm": (3.0, 10.0), "shrub": (1.0, 1.0),
 # slot's position) the instance scale stretches to the slot's width and height; x the way it
 # faces, the wall at x = 0 (AG15 draws them whole; AG8's assets replace them by key)
 PROTOTYPES.update({
-    "sign_billboard": [_bx((0.15, 0, -0.51), (0.3, 1.02, 1.02), "prop_neon"),
+    "sign_billboard": [_bx((0.15, 0, -0.52), (0.3, 1.04, 1.04), "sign_rim"),
                        _bx((0.17, 0, -0.5), (0.34, 1.0, 1.0), "sign_ad")],
     "sign_banner": [_bx((0.15, 0, -0.5), (0.3, 1.0, 1.0), "prop_neon"),
-                    _bx((0.16, 0, -0.48), (0.32, 0.9, 0.96), "sign_ad")],
+                    _bx((0.16, 0, -0.48), (0.32, 0.8, 0.96), "sign_banner")],
     "sign_holo": [_bx((0, 0, -0.5), (0.06, 1.0, 1.0), "sign_holo")],
 })
 SIGN_PROTO = {("billboard", "facade"): "billboard", ("banner", "facade"): "banner",

@@ -259,7 +259,7 @@ class Placer:
                 for k, dd in zip(idx.tolist(), d.tolist()):
                     s = self.segs[k]
                     cls = s.road_class
-                    if cls not in FACE_REACH_M or dd > FACE_REACH_M[cls] or s.level > 0:
+                    if cls not in FACE_REACH_M or dd > FACE_REACH_M[cls]:
                         continue
                     key = (FACE_WEIGHT[cls], -dd, -k)
                     if best is None or key > best[0]:

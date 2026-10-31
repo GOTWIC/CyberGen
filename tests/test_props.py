@@ -142,6 +142,80 @@ def test_check_boats_fails(city):
     assert not _rerun(_mutate(city.model, fn))["boats_afloat"].passed
 
 
+# --- M20: on their surfaces, under what is over them -----------------------------------
+
+M20_CHECKS = {"prop_support", "plant_headroom"}
+
+
+def test_m20_checks_run(city):
+    assert M20_CHECKS <= {c.id for c in city.checks}
+
+
+def test_check_support_fails(city):
+    def lifted(d):
+        p = next(p for p in d["props"] if _kind(p) == "bench" and p["position"][2] == 0.0)
+        p["position"][2] = 0.5     # (over the ground, on no road)
+    assert not _rerun(_mutate(city.model, lifted))["prop_support"].passed
+
+    def off_wall(d):
+        p = next(p for p in d["props"] if _kind(p) == "sign")
+        p["position"][2] = 400.0   # (no wall that high)
+    assert not _rerun(_mutate(city.model, off_wall))["prop_support"].passed
+
+
+def test_quay_props_on_the_deck(city):
+    """The quay's deck is the ground (M16: the freeboard over the water): railings and
+    benches stand at z 0; boats float on the water."""
+    from citygen import water as WA
+
+    rail = [p for p in city.model.props if p.type == "prop.railing"]
+    assert rail and all(p.position[2] == 0.0 for p in rail)
+    for p in city.model.props:
+        if p.type == "prop.boat":
+            assert p.position[2] == -WA.FREEBOARD_M
+
+
+def test_overhead_measured_along_a_ramp(city):
+    """A raised road's underside is its surface less the deck where a thing stands under it,
+    and its fill (from the ground) where it is low."""
+    from citygen import vegetation as V
+
+    m = city.model
+    c = PR.Ctx(None, m)
+    oh = V.Overhead(m)
+    for s in m.road_segments:
+        prof = [(z.s, z.z) for z in s.z_profile]
+        if len(prof) < 2 or max(z for _, z in prof) < 8.0 or min(z for _, z in prof) > 1.0:
+            continue
+        line = shapely.LineString(s.centerline)
+        hi = max(prof, key=lambda p: p[1])
+        lo = min(prof, key=lambda p: p[1])
+        pts = [line.interpolate(hi[0]), line.interpolate(lo[0])]
+        u = oh.under(np.array([[p.x, p.y] for p in pts]), np.array([0.1, 0.1]),
+                     np.array([0.0, 0.0]))
+        assert abs(u[0] - (V._lowest(prof, hi[0] - 0.1, hi[0] + 0.1) - V.ROAD_DECK_M)) < 0.6
+        assert u[1] == 0.0
+        assert c.road_z(s.id, pts[0].x, pts[0].y)[0] == pytest.approx(hi[1], abs=0.05)
+        return
+    pytest.skip("no ramp in the small city")
+
+
+def test_check_headroom_fails(city):
+    m = city.model
+    seg = max((s for s in m.road_segments if s.z_profile),
+              key=lambda s: (max(z.z for z in s.z_profile), s.id))
+    if max(z.z for z in seg.z_profile) < 6.0:
+        pytest.skip("no raised road in the small city")
+    top = max(seg.z_profile, key=lambda z: z.z)
+    pt = shapely.LineString(seg.centerline).interpolate(top.s)
+
+    def fn(d):
+        t = next(p for p in d["plants"] if _kind(p) == "park_tree")
+        t["position"] = [pt.x, pt.y, 0.0]
+        t["height_m"] = top.z      # (into its deck)
+    assert not _rerun(_mutate(m, fn))["plant_headroom"].passed
+
+
 # --- helpers ----------------------------------------------------------------------------
 
 def test_hash_rng_is_fixed():

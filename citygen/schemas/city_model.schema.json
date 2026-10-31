@@ -4088,7 +4088,7 @@
     },
     "SignSlot": {
       "additionalProperties": false,
-      "description": "A surface for signage that stages 2 and 3 fill: shop signs (the M6 sign props),\nbillboards (M3 roof billboards and facade panels), holo-ads over roofs and neon bands on\nfacades; `type` is `sign_slot.<kind>`.",
+      "description": "A surface for signage that stages 2 and 3 fill: shop signs (the M6 sign props),\nbillboards (M3 roof billboards and facade panels), holo-ads over roofs and neon bands on\nfacades; `type` is `sign_slot.<kind>`.\n\nM20 (`signage.py`): neon billboards on facades (`attrs.orientation` landscape or\nportrait), vertical neon banners spanning floors at a facade's corner (kind `banner`;\n`attrs.floors`, and `attrs.wrap`, the slot of the face round the corner, where it wraps\nit), holo-boards over roofs and projected in front of facades (mount `front`: the image's\nmiddle, `attrs.off_m` in front of the facade, facing out); every billboard and banner\n`attrs.lit` `neon`. A facade slot's position is the middle of its face on the wall.",
       "properties": {
         "id": {
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
@@ -4119,7 +4119,8 @@
             "shop_sign",
             "billboard",
             "holo_ad",
-            "neon"
+            "neon",
+            "banner"
           ],
           "title": "Kind",
           "type": "string"
@@ -4128,7 +4129,8 @@
           "enum": [
             "facade",
             "blade",
-            "roof"
+            "roof",
+            "front"
           ],
           "title": "Mount",
           "type": "string"

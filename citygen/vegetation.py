@@ -13,9 +13,11 @@
 | overgrowth | vacant lots, grimy alleys |
 
 Every tree's crown is kept 1 m from the facades at its height and its top 1 m under any deck,
-skybridge, raised road or overhang above it; trunks stay off roads, the sidewalk clear path,
-quays, crosswalks and 6 m from junctions (sight lines), and away from station stairs, metro
-entrances and bus stops (all ground structures and props are in the occupancy grid).
+skybridge, raised road or overhang above it (M20: every plant's, roof plants' too, measured
+along the structure where it stands, `Overhead`; none in a road's fill, M18's embankments);
+trunks stay off roads, the sidewalk clear path, quays, crosswalks and 6 m from junctions
+(sight lines), and away from station stairs, metro entrances and bus stops (all ground
+structures and props are in the occupancy grid); no street tree on a raised road's deck.
 """
 
 from __future__ import annotations
