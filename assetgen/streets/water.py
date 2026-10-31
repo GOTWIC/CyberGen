@@ -3,11 +3,15 @@
 - **Quays**: the quay's paving at the ground, a stone coping and the quay wall down past the
   water line on the water side (found from the waterway's polygon), cast-iron bollards
   every 12 m, and stairs down to the water every 60 m along the wall.
-- **Canal walls**: every edge of a canal, basin, inlet or marina, a stone wall from the
-  ground down under the water, with a coping on the land side; creeks keep natural banks
-  (no walls).
+- **Canal walls**: a stone wall from the ground down under the water, with a coping on the
+  land side, along every edge of a canal, basin, inlet or marina where it meets the land
+  (M16's canal wall banks of the waterway; without M16's data, its whole outline); creeks
+  keep natural banks (no walls; AG12 draws them).
 
-Water stands at the blockout's level (0.9 m under the ground) or at M13's water level.
+Water stands at M16's surface (`WaterBed.surface_m`, 1.5 m under the ground on a flat city),
+at M13's water level on a terrain city, or (a model without either) at the blockout's old
+level (0.9 m under the ground). With M16's banks a wall reaches `BED_EMBED_M` into the bed at
+its foot (the bank's toe), so no gap opens under it (AG12's `water_gaps`).
 """
 
 from __future__ import annotations
@@ -18,10 +22,13 @@ from .ctx import Ctx, _inside, bbox_center, dump
 from .kit import Mesh, ccw
 from .path import Path, dist, unit
 from .pieces import Out, Piece, maker
-from .structures import WATER_DEFAULT
+from .structures import BED_EMBED_M, WATER_DEFAULT
 
 BOLLARD_STEP = 12.0
 STAIR_STEP = 60.0
+QUAY_FOOT_M = 1.5          # without M16: the quay wall this far under the water
+CANAL_FOOT_M = 2.0         # ... and a canal wall
+FOOT_STEP_M = 8.0          # AG12's gap check reads a wall's foot this often
 
 
 def gather_quay(cx: Ctx, q) -> Piece:
@@ -42,8 +49,17 @@ def gather_quay(cx: Ctx, q) -> Piece:
     inputs = {"quay": dump(q), "side": side, "ground": cx.ground.samples(q.line),
               "water_z": C.m(cx.ground.water_level(q.waterway_id, WATER_DEFAULT)),
               "style": cx.style(did), "origin": list(bbox_center(q.line))}
+    toes = [k.toe_m for k in cx.banks_of.get(q.waterway_id, ()) if k.quay_id == q.id]
+    if toes:
+        inputs["toe"] = C.m(max(toes))          # (M16: the bed at the wall's foot)
     return Piece(q.id, "street.quay", "quay", cx.tile_for(q.id, q.line),
                  cx.keys.get(q.id, []), inputs)
+
+
+def _foot(inp: dict, default: float) -> float:
+    """How far under the water a wall goes: to M16's toe and into the bed, else `default`."""
+    toe = inp.get("toe")
+    return default if toe is None else max(default, float(toe) + BED_EMBED_M)
 
 
 @maker("quay", 1)
@@ -65,10 +81,12 @@ def make_quay(inp: dict) -> Out:
     h = w / 2.0
     ws = inp["side"] or 1
     wz = inp["water_z"]
+    bot = wz - _foot(inp, QUAY_FOOT_M)
     mesh = Mesh(inp["origin"])
     pave = MT.paving(inp["style"]["archetype"])
     st = P.stations(0.0, P.L, 6.0)
     rows, uvs, cop, cuv, wall, wuv, exp = [], [], [], [], [], [], []
+    feet = []
     te = ws * h
     ti = ws * (h - 0.5)
     for s, vi in st:
@@ -82,10 +100,13 @@ def make_quay(inp: dict) -> Out:
         cop.append([(*at(c0), z + 0.06), (*at(c1), z + 0.06)])
         cuv.append([(s, c0), (s, c1)])
         e = at(te)
-        col = [(*e, z + 0.06), (*e, wz - 1.5)] if ws > 0 else [(*e, wz - 1.5), (*e, z + 0.06)]
+        col = [(*e, z + 0.06), (*e, bot)] if ws > 0 else [(*e, bot), (*e, z + 0.06)]
         wall.append(col)
         wuv.append([(s, col[0][2]), (s, col[1][2])])
         exp.append((ws * nx, ws * ny, 0.0))
+        if not feet or s - feet[-1][0] >= FOOT_STEP_M:
+            f = at(ws * (h + 0.3))
+            feet.append((s, C.m(f[0]), C.m(f[1]), C.m(bot)))
     up = (0.0, 0.0, 1.0)
     mesh.grid(pave, rows, uvs, expect=up)
     mesh.grid("stone.coping", cop, cuv, expect=up)
@@ -103,7 +124,10 @@ def make_quay(inp: dict) -> Out:
         while s + 4.0 < P.L:
             _stair(mesh, P, s, ws, h, g(s) + 0.02, wz)
             s += STAIR_STEP
-    return Out(mesh=mesh)
+    out = Out(mesh=mesh)
+    if "toe" in inp:
+        out.notes["foot"] = [[x, y, z] for _, x, y, z in feet]
+    return out
 
 
 def _stair(mesh: Mesh, P: Path, s0: float, ws: int, h: float, ztop: float, wz: float):
@@ -142,10 +166,19 @@ def _xy(P: Path, s: float, t: float):
 
 def gather_canal(cx: Ctx, w) -> Piece:
     ext = w.polygon.exterior
-    pts = list(ext) + [p for h in w.polygon.holes for p in h]
-    inputs = {"waterway": dump(w), "ground": cx.ground.samples(pts),
+    inputs = {"waterway": dump(w),
               "water_z": C.m(cx.ground.water_level(w.id, WATER_DEFAULT)),
               "origin": list(bbox_center(ext))}
+    banks = cx.banks_of.get(w.id)
+    if banks:
+        # M16: the walls where the waterway meets the land (its canal wall banks; quays have
+        # pieces of their own), not across its mouth into other water
+        walls = [k for k in banks if k.kind == "canal_wall"]
+        inputs["walls"] = [{"line": [[p[0], p[1]] for p in k.line], "toe": C.m(k.toe_m),
+                            "ground": cx.ground.samples(k.line)} for k in walls]
+    else:
+        pts = list(ext) + [p for h in w.polygon.holes for p in h]
+        inputs["ground"] = cx.ground.samples(pts)
     return Piece(w.id, f"street.canal_wall.{w.kind}", "canal", cx.tile_for(w.id, ext),
                  cx.keys.get(w.id, []), inputs)
 
@@ -157,6 +190,19 @@ def make_canal(inp: dict) -> Out:
         return Out(empty="natural banks")
     mesh = Mesh(inp["origin"])
     wz = inp["water_z"]
+    if "walls" in inp:
+        if not inp["walls"]:
+            return Out(empty="natural banks")
+        feet = []
+        for wl in inp["walls"]:
+            bot = wz - max(CANAL_FOOT_M, float(wl["toe"]) + BED_EMBED_M)
+            gnd = wl.get("ground")
+            pts = [tuple(p) for p in wl["line"]]
+            gi = {p: z for p, z in zip(pts, gnd)} if gnd else {}
+            _wall_run(mesh, pts, gi, bot, feet)
+        out = Out(mesh=mesh)
+        out.notes["foot"] = feet
+        return out
     poly = w["polygon"]
     rings = [ccw(poly["exterior"])] + [ccw(h)[::-1] for h in poly.get("holes", [])]
     gnd = inp.get("ground")
@@ -166,19 +212,29 @@ def make_canal(inp: dict) -> Out:
         for p, z in zip(raw, gnd):
             gi[(p[0], p[1])] = z
     for r in rings:
-        n = len(r)
-        u = 0.0
-        for i in range(n):
-            a, b = r[i], r[(i + 1) % n]
-            L = dist(a, b)
-            if L < 0.01:
-                continue
-            za, zb = gi.get(a, 0.0) + 0.03, gi.get(b, 0.0) + 0.03
-            # facing the water: left of a -> b
-            mesh.wall("stone.quay", b, a, wz - 2.0, zb, wz - 2.0, za, u)
-            ux, uy = unit(b[0] - a[0], b[1] - a[1])
-            ox, oy = uy * 0.45, -ux * 0.45           # to the land side
-            mesh.quad("stone.coping", (a[0], a[1], za + 0.02), (a[0] + ox, a[1] + oy, za + 0.02),
-                      (b[0] + ox, b[1] + oy, zb + 0.02), (b[0], b[1], zb + 0.02))
-            u += L
+        _wall_run(mesh, r + [r[0]], gi, wz - CANAL_FOOT_M, None)
     return Out(mesh=mesh)
+
+
+def _wall_run(mesh: Mesh, pts, gi: dict, bot: float, feet) -> None:
+    """A wall along a polyline with the water on its left, from a coping at the ground down
+    to `bot`; its foot sampled into `feet` (0.3 m out in the water)."""
+    u = 0.0
+    last = None
+    for i in range(len(pts) - 1):
+        a, b = pts[i], pts[i + 1]
+        L = dist(a, b)
+        if L < 0.01:
+            continue
+        za, zb = gi.get(a, 0.0) + 0.03, gi.get(b, 0.0) + 0.03
+        # facing the water: left of a -> b
+        mesh.wall("stone.quay", b, a, bot, zb, bot, za, u)
+        ux, uy = unit(b[0] - a[0], b[1] - a[1])
+        ox, oy = uy * 0.45, -ux * 0.45           # to the land side
+        mesh.quad("stone.coping", (a[0], a[1], za + 0.02), (a[0] + ox, a[1] + oy, za + 0.02),
+                  (b[0] + ox, b[1] + oy, zb + 0.02), (b[0], b[1], zb + 0.02))
+        if feet is not None and (last is None or u - last >= FOOT_STEP_M):
+            mx, my = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+            feet.append([C.m(mx - uy * 0.3), C.m(my + ux * 0.3), C.m(bot)])
+            last = u
+        u += L

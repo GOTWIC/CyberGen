@@ -29,7 +29,10 @@ from .pieces import Out, Piece, maker
 from .roads import DECK_D, ROAD_DZ, Road, street_class
 
 WATER_Z = {"sea": -1.2}
-WATER_DEFAULT = -0.9      # the blockout's canal and river surface
+WATER_DEFAULT = -0.9      # the blockout's canal and river surface (a model without M16's
+                          # water: else `Ground.water_level` gives M16's surface)
+PIER_FOOT_M = 4.0         # a pier's foot under the water (without M16's beds)
+BED_EMBED_M = 0.5         # ... into M16's bed under it
 
 
 class Line3:
@@ -116,6 +119,7 @@ def gather_bridge(cx: Ctx, b) -> Piece:
             segs.append({"seg": seg, "cls": street_class(s), "ends": [], "crossings": [],
                          "lanes": [], "start": s.start, "end": s.end, "origin": [0, 0]})
     pts = [(p[0], p[1]) for p in b.line]
+    bed = []
     try:
         path = Path(pts)
         wet = []
@@ -124,6 +128,8 @@ def gather_bridge(cx: Ctx, b) -> Piece:
             s = path.L * k / (n - 1)
             x, y = path.point(s)
             wet.append(1 if cx.wet_at(x, y) else 0)
+            if cx.beds is not None:
+                bed.append(cx.bed_z(x, y) if wet[-1] else None)    # (AG12: M16's bed)
     except ValueError:
         wet = []
     did = None
@@ -134,8 +140,28 @@ def gather_bridge(cx: Ctx, b) -> Piece:
     inputs = {"bridge": dump(b), "segs": segs, "wet": wet, "water_z": C.m(wl),
               "ground": cx.ground.samples(b.line), "style": cx.style(did),
               "origin": list(bbox_center(pts))}
+    if bed:
+        inputs["bed"] = bed
     return Piece(b.id, "street.bridge", "bridge", cx.tile_for(b.id, pts),
                  cx.keys.get(b.id, []), inputs)
+
+
+def _foot(inp: dict, L: float):
+    """The foot of a pier at s along the bridge: `PIER_FOOT_M` under the water, or (AG12)
+    `BED_EMBED_M` into M16's bed where that is deeper."""
+    wz = inp["water_z"]
+    bed = inp.get("bed")
+    if not bed:
+        return lambda s: wz - PIER_FOOT_M
+    n = len(bed)
+
+    def foot(s: float) -> float:
+        k = min(n - 1, max(0, int(round(s / L * (n - 1))))) if L > 0 and n > 1 else 0
+        zs = [bed[j] for j in (k - 1, k, k + 1) if 0 <= j < n and bed[j] is not None]
+        if not zs:
+            return wz - PIER_FOOT_M
+        return min(wz - PIER_FOOT_M, min(zs) - BED_EMBED_M)
+    return foot
 
 
 def _wet_runs(wet, L: float) -> list[tuple[float, float]]:
@@ -177,8 +203,10 @@ def make_bridge(inp: dict) -> Out:
     cls = segs[0]["cls"]
     D = DECK_D.get(cls, 1.2)
     wz = inp["water_z"]
+    foot = _foot(inp, ln.L)
     out = Out(mesh=mesh)
     out.notes["bridge_kind"] = kind
+    piers: list = []
     runs = _wet_runs(inp["wet"], ln.L)
     if kind.startswith("footbridge") or cls == "footbridge":
         _footbridge(mesh, ln, dict(inp, segs=segs), "footbridge.steel"
@@ -194,17 +222,21 @@ def make_bridge(inp: dict) -> Out:
         if a1 - a0 > 320.0:
             sm = (a0 + a1) / 2.0
             a0, a1 = sm - 160.0, sm + 160.0
-        _arch(mesh, ln, a0, a1, W, D, wz)
-        _piers(mesh, ln, runs, W, D, wz, skip=(a0 - 5.0, a1 + 5.0), step=40.0)
+        _arch(mesh, ln, a0, a1, W, D, wz, foot, piers)
+        _piers(mesh, ln, runs, W, D, wz, skip=(a0 - 5.0, a1 + 5.0), step=40.0, foot=foot,
+               piers=piers)
     elif kind == "cable_stayed" and main is not None:
         w0, w1 = main
         sm = (w0 + w1) / 2.0
         half = min((w1 - w0) * 0.3, 225.0)
         p0, p1 = sm - half, sm + half
-        _cable_stayed(mesh, ln, p0, p1, W, D, wz)
-        _piers(mesh, ln, runs, W, D, wz, skip=(p0 - 30.0, p1 + 30.0), step=50.0)
+        _cable_stayed(mesh, ln, p0, p1, W, D, wz, foot, piers)
+        _piers(mesh, ln, runs, W, D, wz, skip=(p0 - 30.0, p1 + 30.0), step=50.0, foot=foot,
+               piers=piers)
     else:
-        _piers(mesh, ln, runs, W, D, wz, skip=None, step=40.0)
+        _piers(mesh, ln, runs, W, D, wz, skip=None, step=40.0, foot=foot, piers=piers)
+    if piers:
+        out.notes["piers"] = piers          # (AG12: the water foams round them)
     # abutments where the bridge meets the banks
     gnd = inp.get("ground") or [0.0, 0.0]
     for s, g in ((min(4.0, ln.L / 4.0), gnd[0]), (max(ln.L - 4.0, ln.L * 0.75), gnd[-1])):
@@ -217,7 +249,19 @@ def make_bridge(inp: dict) -> Out:
     return out
 
 
-def _piers(mesh: Mesh, ln: Line3, runs, W: float, D: float, wz: float, skip, step: float):
+def _footprint(x, y, dx, dy, along: float, across: float) -> list[list[float]]:
+    """A box's plan corners (world, to the centimeter): AG12 foams the water round them."""
+    ax, ay = dx * along / 2.0, dy * along / 2.0
+    bx, by = -dy * across / 2.0, dx * across / 2.0
+    return [[C.m2(x - ax - bx), C.m2(y - ay - by)], [C.m2(x + ax - bx), C.m2(y + ay - by)],
+            [C.m2(x + ax + bx), C.m2(y + ay + by)], [C.m2(x - ax + bx), C.m2(y - ay + by)]]
+
+
+def _piers(mesh: Mesh, ln: Line3, runs, W: float, D: float, wz: float, skip, step: float,
+           foot=None, piers=None):
+    if foot is None:
+        def foot(s):
+            return wz - PIER_FOOT_M
     for r0, r1 in runs:
         if r1 - r0 < 12.0:
             continue
@@ -231,12 +275,16 @@ def _piers(mesh: Mesh, ln: Line3, runs, W: float, D: float, wz: float, skip, ste
             top = ln.z(s) - D
             if top - wz < 1.0:
                 continue
-            mesh.obox("concrete.column", x, y, wz - 4.0, 2.4, max(W - 4.0, 2.0),
-                      top - 1.2 - (wz - 4.0), dx, dy)
+            fz = foot(s)
+            mesh.obox("concrete.column", x, y, fz, 2.4, max(W - 4.0, 2.0),
+                      top - 1.2 - fz, dx, dy)
             mesh.obox("concrete.column", x, y, top - 1.2, 3.0, W - 0.5, 1.2, dx, dy)
+            if piers is not None:
+                piers.append(_footprint(x, y, dx, dy, 2.4, max(W - 4.0, 2.0)))
 
 
-def _arch(mesh: Mesh, ln: Line3, a0: float, a1: float, W: float, D: float, wz: float):
+def _arch(mesh: Mesh, ln: Line3, a0: float, a1: float, W: float, D: float, wz: float,
+          foot=None, piers=None):
     span = a1 - a0
     rise = min(0.2 * span, 70.0)
     sm = (a0 + a1) / 2.0
@@ -267,12 +315,15 @@ def _arch(mesh: Mesh, ln: Line3, a0: float, a1: float, W: float, D: float, wz: f
         for s in (a0, a1):
             x, y, nx, ny, _ = ln.path.frame(s)
             dx, dy = ln.path.tangent(s)
-            mesh.obox("concrete.column", x + nx * t, y + ny * t, wz - 4.0, 5.0, 4.0, 6.0,
-                      dx, dy)
+            fz = foot(s) if foot is not None else wz - PIER_FOOT_M
+            mesh.obox("concrete.column", x + nx * t, y + ny * t, fz, 5.0, 4.0,
+                      6.0 + (wz - PIER_FOOT_M - fz), dx, dy)
+            if piers is not None:
+                piers.append(_footprint(x + nx * t, y + ny * t, dx, dy, 5.0, 4.0))
 
 
 def _cable_stayed(mesh: Mesh, ln: Line3, p0: float, p1: float, W: float, D: float,
-                  wz: float):
+                  wz: float, foot=None, piers=None):
     main = p1 - p0
     H = max(0.25 * main, 30.0)
     for sp in (p0, p1):
@@ -283,8 +334,10 @@ def _cable_stayed(mesh: Mesh, ln: Line3, p0: float, p1: float, W: float, D: floa
         for side in (-1.0, 1.0):
             t = side * (W / 2.0 + 1.8)
             bx, by = x + nx * t, y + ny * t
-            mesh.obox("concrete.column", bx, by, wz - 4.0, 3.2, 2.6, zd + H - (wz - 4.0),
-                      dx, dy)
+            fz = foot(sp) if foot is not None else wz - PIER_FOOT_M
+            mesh.obox("concrete.column", bx, by, fz, 3.2, 2.6, zd + H - fz, dx, dy)
+            if piers is not None:
+                piers.append(_footprint(bx, by, dx, dy, 3.2, 2.6))
             tops.append((bx, by, zd + H - 1.0))
         mesh.beam("concrete.column", (tops[0][0], tops[0][1], zd - D - 0.8),
                   (tops[1][0], tops[1][1], zd - D - 0.8), 2.6, 1.6)

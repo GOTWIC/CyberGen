@@ -485,7 +485,7 @@ def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
 def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
-          props: bool = True, progress: Progress | None = None) -> dict:
+          props: bool = True, progress: Progress | None = None, water: bool = True) -> dict:
     """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
     to its notes then, else to `log`."""
     t0 = time.perf_counter()
@@ -641,6 +641,27 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         if progress is None:
             log(f"streets: {st['pieces']} pieces in {st['tiles']} tiles, {f['tiles_made']} "
                 f"made, {n} files written")
+    if water:
+        # AG12: the water after the streets (it reads their bridge piers for its foam)
+        from .water.build import build as water_build, default_workers as water_workers
+        wrep = water_build(model, sha, out, filled, workers=workers or water_workers(),
+                           report_always=False, lib=lib, progress=progress)
+        f = wrep["files"]
+        n = len(f["written"]) + f["tiles_removed"] + sum(
+            int(bool(f[k])) for k in ("parts_written", "manifest_written",
+                                      "contribution_written", "report_written"))
+        wrote += n
+        st = wrep["stats"]
+        rep["water"] = {"ok": wrep["ok"], "bodies": st["bodies"], "pieces": st["pieces"],
+                        "tiles": st["tiles"], "triangles": st["triangles"],
+                        "stones": st["instances"], "disk_bytes": st["disk_bytes"],
+                        "failed": [c["id"] for c in wrep["checks"] if not c["ok"]],
+                        "tiles_made": f["tiles_made"], "files_written": n,
+                        "seconds": wrep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and wrep["ok"]
+        if progress is None:
+            log(f"water: {st['bodies']} bodies, {st['pieces']} pieces in {st['tiles']} "
+                f"tiles, {f['tiles_made']} made, {n} files written")
     # AG6's sign pages before AG8's signs show them; its materials and checks after them
     signs = None
     if lib is not None:
