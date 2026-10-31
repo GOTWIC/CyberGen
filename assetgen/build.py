@@ -59,7 +59,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "fix1.2"         # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "fix1.4"         # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -240,10 +240,13 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     pl = SH.plinth_mm(brief)
     if pl > 0:
         rec["plinth_m"] = C.m(pl / 1000.0)        # (M13: its plinth's depth under the base)
-        rows = [v for r in (brief.get("terrain") or {}).get("grade") or [] if r for v in r]
+        ter = brief.get("terrain") or {}
+        rows = [v for j, r in enumerate(ter.get("grade") or []) if r
+                for k, v in enumerate(r) if _on_wall(sh["walls"].get(j, ()), min(
+                    k * ter["step_m"], brief["edges"][j]["length_m"]) * 1000.0)]
         if rows and min(rows) < 0:
             # (and how far the ground along its walls falls under the base: what its steps
-            # meet)
+            # meet; not along a spike of the footprint the tidying took away)
             rec["grade_low_m"] = C.m(-min(rows))
     if brief["building"]["floor_grid"].get("level"):
         rec["level"] = int(brief["building"]["floor_grid"]["level"])     # (M14: on a deck)
@@ -254,6 +257,11 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
     rec["class"] = AC.budget_class(rec)
     return sh, px, rec
+
+
+def _on_wall(spans, s: float) -> bool:
+    """Whether s (mm along a brief edge) is on a stretch of it a wall stands on."""
+    return any(a - 5.0 <= s <= b + 5.0 for a, b in spans)
 
 
 def _base_m(brief: dict) -> float:

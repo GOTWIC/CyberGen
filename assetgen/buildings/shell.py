@@ -645,6 +645,9 @@ class ShellBuilder:
                 # the collision leaves open
                 "landing_doors": [{k: ld[k] for k in ("edge", "s0", "s1", "z", "hi")}
                                   for _, ld in sorted(self.landed.items()) if "edge" in ld],
+                # what of each brief edge a wall stands on (s spans, mm; not a spike the
+                # tidying took away)
+                "walls": self.kept,
                 # AG5: the generator, a hero's kind, accent, UV extents and its U2 mask
                 "generator": self.generator, "hero": self._hero_rec(),
                 "mask": HE.bake(self)}
@@ -1781,20 +1784,64 @@ class ShellBuilder:
                 zf = z0 + f * fh
                 cuts += [zf + SIMPLE_SILL, zf + fh - SIMPLE_HEAD]
         cuts.append(z1)
-        for rg in [ring] + holes:
+        doors = self._simple_landings(ms, ring, fh)
+        levels = sorted({d for v in doors.values() for d in v})
+        for r, rg in enumerate([ring] + holes):
             m = len(rg)
             for i in range(m):
                 p, q = rg[i], rg[(i + 1) % m]
                 if p == q:
                     continue
-                for j in range(len(cuts) - 1):
-                    s = slot if j % 2 == 0 else "glass"
-                    self._vquad(s, p, q, cuts[j], cuts[j + 1])
+                segs = [(cuts[j], cuts[j + 1], slot if j % 2 == 0 else "glass")
+                        for j in range(len(cuts) - 1)]
+                # (every edge of the ring split at a landing door's sill and head, so the
+                # edges beside a door meet it at its corners)
+                for za, zb in (levels if r == 0 else ()):
+                    segs = _carve(segs, za, zb, "storefront" if (za, zb) in doors.get(i, ())
+                                  else None)
+                for za, zb, s in segs:
+                    self._vquad(s, p, q, za, zb)
         self.stats["simple_masses"] = self.stats.get("simple_masses", 0) + 1
         if len(cuts) > 2:
             self.stats["simple_glass"] = self.stats.get("simple_glass", 0) + 1
         self.mass_info.append({"mass": ms["k"], "group": g, "system": None, "rows": n,
                                "openings": 0, "simple": True})
+
+    def _simple_landings(self, ms: dict, ring, fh: int) -> dict[int, list]:
+        """The landing doors of the skybridges landing on a simply drawn mass (it has no
+        facade grammar to cut them, `connections.landing_ops`): per edge of its ring, the
+        door's height (the floor to the glass ribbon's head) on the edges within the
+        bridge's width less its collars of where it lands; recorded as landed."""
+        out: dict[int, list] = {}
+        z0, n = ms["z0"], max(1, ms["floors"])
+        if fh - SIMPLE_HEAD < 1900:
+            return out
+        for j, lst in sorted(self.landings.items()):
+            if self.br["edges"][j]["mass"] != ms["k"]:
+                continue
+            a0, ux, uy, L = AR._edge_geom(self.br, j)
+            for ld in lst:
+                f = next((f for f in range(n) if abs(z0 + f * fh - ld["z"]) <= CN.LANDING_TOL),
+                         None)
+                if f is None or ld["id"] in self.landed:
+                    continue
+                zf = z0 + f * fh
+                cx, cy = a0[0] + ux * ld["s"], a0[1] + uy * ld["s"]
+                hw = max(ld["w"] // 2 - 300, CN.DOOR_MIN // 2)
+                m = len(ring)
+                near = sorted((math.hypot((ring[i][0] + ring[(i + 1) % m][0]) / 2 - cx,
+                                          (ring[i][1] + ring[(i + 1) % m][1]) / 2 - cy), i)
+                              for i in range(m) if ring[i] != ring[(i + 1) % m])
+                if not near or near[0][0] > 2 * hw:
+                    continue                    # (it lands on no wall of the drawn ring)
+                for d, i in near:
+                    if d <= hw or i == near[0][1]:
+                        out.setdefault(i, []).append((zf, zf + fh - SIMPLE_HEAD))
+                s0, s1 = max(ld["s"] - hw, 0), min(ld["s"] + hw, int(L))
+                self.landed[ld["id"]] = {"s": ld["s"], "z": zf, "w": 2 * hw,
+                                         "h": fh - SIMPLE_HEAD, "door": True, "edge": j,
+                                         "s0": s0, "s1": s1, "hi": zf + fh - SIMPLE_HEAD}
+        return out
 
     def _screen(self, ms: dict) -> None:
         """A halo crown: the top floor a screen of fins inside the mass round an open roof,
@@ -1906,6 +1953,29 @@ class ShellBuilder:
                     if self.tubes and CN.in_tube(self.tubes, *box_):
                         self.stats["parts_off_portals"] = \
                             self.stats.get("parts_off_portals", 0) + 1
+                        continue
+                    keep.append(a)
+                at = keep
+                if not at:
+                    continue
+            elif self.bridges.segs and PT.REACH.get(fam) == "flush":
+                # (a flush part, frame or cap, where a bridge crosses a wall short of the
+                # one it lands on: over a lower roof at its floor, through a pod; the
+                # corridor's own test, which spares its collars and what is inside a mass)
+                from . import envelope as EN
+                lo, hi = PT.bounds(arrs)
+                keep = []
+                for a in at:
+                    xs, ys = [], []
+                    for cx in (lo[0], hi[0]):
+                        for cy in (lo[1], hi[1]):
+                            xs.append(a[0] + cx * a[3] - cy * a[4])
+                            ys.append(a[1] + cx * a[4] + cy * a[3])
+                    box_ = (min(xs), min(ys), max(xs), max(ys), a[2] + lo[2], a[2] + hi[2])
+                    if self.bridges.hits(*box_) and EN.clearances(self.br, {}, EN.part_points(
+                            [{"family": fam, "params": p, "at": [a]}]))["hits"]:
+                        self.stats["parts_off_bridges"] = \
+                            self.stats.get("parts_off_bridges", 0) + 1
                         continue
                     keep.append(a)
                 at = keep
@@ -2065,6 +2135,18 @@ def _blocked(fa: Facade, depth: int, edges) -> bool:
 def _centroid(ring):
     n = len(ring)
     return (sum(p[0] for p in ring) // n, sum(p[1] for p in ring) // n)
+
+
+def _carve(segs: list, za: int, zb: int, slot: str | None) -> list:
+    """Wall segments (z0, z1, slot) up a simply drawn facet split at za and zb, za..zb in
+    `slot` (None: as they were)."""
+    out = []
+    for s0, s1, s in segs:
+        for a, b, t in ((s0, min(s1, za), s), (max(s0, za), min(s1, zb), slot or s),
+                        (max(s0, zb), s1, s)):
+            if b > a:
+                out.append((a, b, t))
+    return out
 
 
 def _held(x: float, y: float, ring) -> bool:
