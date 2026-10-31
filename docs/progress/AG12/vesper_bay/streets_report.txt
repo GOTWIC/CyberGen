@@ -59,5 +59,5 @@ no mesh: inside its junctions 27, natural banks 5
 corner pads: 4205 made, 14 skipped (chain 1, no sidewalk 13)
 bridges: cable_stayed 1, footbridge.steel 1, footbridge.stone 5, girder 9
 instances: part.container.c0 2338, part.container.c1 2413, part.container.c2 2279, part.container.c3 2344, part.container.c4 2271, part.container.c5 2331
-files: 106 tiles made, 41 kept, 86 written, 20 same bytes, 0 removed
-seconds: context 0.3, gather 0.46, make 4.82, write 1.43, total 7.44, workers 3
+files: 147 tiles made, 0 kept, 4 written, 143 same bytes, 0 removed
+seconds: context 0.39, gather 2.1, make 8.84, write 0.42, total 12.23, workers 2

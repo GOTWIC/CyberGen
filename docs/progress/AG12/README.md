@@ -1,7 +1,8 @@
 # AG12: water
 
 Every water body's surface, bed and banks (`assetgen water`, and `assetgen build` after the
-streets), built on M16's builds of the six samples (main at 280eb35) on the Windows PC.
+streets), built on M16's builds of the six samples (M16's models, main at 280eb35) on the
+Windows PC.
 The full record: [`docs/assetgen_milestones.md`](../../assetgen_milestones.md), AG12.
 
 ## Views (Vesper Bay, Blender, `assetgen materials preview --views water --night`)
@@ -34,10 +35,8 @@ stages' reports of the same build (`asset_report.txt`, `streets_report.txt`,
 | [Greyhook](greyhook) | 6 | 7.24 | 3,888,557 | 47,768 | 146.7 | all pass |
 | [Cragmouth](cragmouth) (terrain) | 8 | 3.03 | 1,610,200 | 34,044 | 60.6 | all pass |
 
-`assetgen build` otherwise fails only what main's build of the same models fails (Vesper
-Bay `asset_roofs`; Delta Megacity and Nexus City `asset_access`, Nexus City
-`street_meshes`; Greyhook `asset_envelope`; Cragmouth `asset_clearance`, `asset_landings`,
-`asset_slopes`); Saltreach passes every check.
+Every other check of `assetgen build` passes in all six too (buildings, streets, props,
+materials), with main's assetgen fixes after AG10 merged in.
 
 Vesper Bay's Old Town regenerated (M16's regeneration): 22 banks changed, all in Old Town;
 15 body pieces changed, each within reach of a changed bank; 14 of 114 water tiles made

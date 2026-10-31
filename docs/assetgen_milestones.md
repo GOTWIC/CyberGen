@@ -1593,8 +1593,8 @@ every water body's surface, bed and banks, `assetgen water BUILD` (also a stage 
   natural or riprap bank from over the water beside it), `water_harbor` (the biggest basin from
   above); AG12's water in every textured view near it.
 
-**Samples** (on M16's builds of main at 280eb35, 3 workers, the Windows PC; triangles: the
-surfaces' first LOD, the beds and the banks):
+**Samples** (M16's models, main at 280eb35, with the fixes after AG10 merged in; 3 workers,
+the Windows PC; triangles: the surfaces' first LOD, the beds and the banks):
 
 | City | Water bodies (kinds) | km2 | Tiles | Surface | Beds | Banks | Triangles | Most in a tile | Stones | MB | Seconds |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1607,11 +1607,10 @@ surfaces' first LOD, the beds and the banks):
 
 The surfaces' coarser LODs add a quarter again (Vesper Bay 398,598, 103,215 and 24,844
 triangles). Every water check passes in all six; 75 to 94% of the bed vertices lie exactly
-on M16's bed, the rest on a bank's slope carried on over it. `assetgen build` is otherwise
-as on main: the same checks fail as main's build of the same models (Vesper Bay
-`asset_roofs`; Delta Megacity and Nexus City `asset_access`, Nexus City `street_meshes`;
-Greyhook `asset_envelope`; Cragmouth `asset_clearance`, `asset_landings`, `asset_slopes`;
-Saltreach all pass), AG6's texel check passes with the water packs in it.
+on M16's bed, the rest on a bank's slope carried on over it. Every other check of
+`assetgen build` passes in all six too (buildings, streets, props, materials; before the
+fixes after AG10 were merged in, the same checks failed as main's build of the same models),
+and AG6's texel check passes with the water packs in it.
 
 **Regeneration**: M16's Old Town regeneration of Vesper Bay (its base the build above): 22
 banks changed, all in Old Town; 37 water pieces changed (those 22 banks and 15 body pieces,
@@ -1641,12 +1640,13 @@ another hash seed, a regenerated district's water only near its changed banks, t
 contribution against the packs, the exporter's stage 2, AG7's walls in the bed and canal
 mouths open, the mesher on a hole touching its outline, the small city's and Vesper Bay's
 goldens, `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens.py`).
-Goldens written again on this PC, on purpose: the streets' (AG7's walls, piers and canal
-walls on M16's water; the library's hash in the contribution) and assetgen's `ag1`
-`testport_files` and `ag6` `testport_materials` (the contributions carry the library's
-hash, which AG12's sets and atlas change; materials.json gains the water); the building
-packs, briefs and the sample goldens are unchanged. The props golden stays main's (it
-needs the Mac; it moved with M16's models already, and AG8's boats now move it too).
+Goldens written again on this PC on the merged code, on purpose: the streets' (AG7's walls,
+piers and canal walls on M16's water; the library's hash in the contribution; tile
+`t+03-04`, with no water in it, keeps the Mac's hash) and assetgen's `ag1` `testport_files`
+and `ag6` `testport_materials` (the contributions carry the library's hash, which AG12's
+sets and atlas change; materials.json gains the water); the building manifest and packs,
+briefs and the sample goldens are unchanged. The props golden stays main's (written on the
+Mac after AG10's fixes; AG8's boats move it, so it needs writing again on the Mac).
 
 **Open.**
 - Not run in Unreal: `M_CgWater` is written against UE 5.8's Python names for the Single

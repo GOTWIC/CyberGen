@@ -1,9 +1,9 @@
-assetgen streets: Nexus City: FAIL
+assetgen streets: Nexus City: PASS
 
   [ok] street_coverage: 0 without an asset
-  [FAIL] street_meshes: winding 1
+  [ok] street_meshes: no bad triangles
   [ok] street_replaces: 1542 blockout objects replaced
-  [ok] street_budgets: 1167433 triangles in the city (budget 20000000), at most 28828 in a tile (t-02-02, budget 2500000)
+  [ok] street_budgets: 1167432 triangles in the city (budget 20000000), at most 28828 in a tile (t-02-02, budget 2500000)
 
 coverage:
   road_segments: 2717 of 2740 (+23 declared)
@@ -21,11 +21,11 @@ coverage:
   megasites: 7 of 7
   stations: 15 (stations are buildings (the building line, AG5); their platforms, canopies, skywalks, cores and concourses are here)
 
-pieces 10690, tiles 155, triangles 1167433, disk 73.9 MB
+pieces 10690, tiles 155, triangles 1167432, disk 73.9 MB
 triangles by kind:
   street.sidewalk: 434733 (3917 pieces)
   street.road: 249021 (2740 pieces)
-  street.junction: 211748 (1720 pieces)
+  street.junction: 211747 (1720 pieces)
   street.transit.deck: 62722 (34 pieces)
   street.quay: 52092 (8 pieces)
   street.crosswalk: 39196 (1205 pieces)
@@ -70,5 +70,5 @@ no mesh: inside its junctions 23, natural banks 7
 corner pads: 4500 made, 11 skipped (chain 1, no sidewalk 10)
 bridges: arch 1, cable_stayed 2, footbridge.steel 13, footbridge.stone 4, girder 9
 instances: part.container.c0 1427, part.container.c1 1423, part.container.c2 1502, part.container.c3 1480, part.container.c4 1473, part.container.c5 1470
-files: 155 tiles made, 0 kept, 20 written, 135 same bytes, 0 removed
-seconds: context 0.43, gather 0.7, make 6.54, write 0.41, total 8.55, workers 3
+files: 155 tiles made, 0 kept, 9 written, 146 same bytes, 0 removed
+seconds: context 0.41, gather 1.7, make 8.35, write 0.42, total 11.33, workers 2

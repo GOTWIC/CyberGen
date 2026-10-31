@@ -4,15 +4,15 @@ library ag6.2 3e0cffa7b41f086e at 512 px/m: 133 sets, 15 atlases, 700 MB source,
 signs: {'slots': 7639, 'texts': 222, 'wide': 106, 'tall': 116, 'brands': 14}
 materials per part: {'buildings': 205, 'connections': 8, 'streets': 46, 'water': 15, 'props': 97, 'signs': 32, 'materials': 6}, 294 textures
 
-PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 256, 'meets_share': {'buildings': 0.99997, 'connections': 1.0, 'streets': 0.99797, 'props': 1.0, 'signs': 1.0, 'water': 1.0}, 'needs_share': 0.995, 'tolerance': 0.75, 'flagged': ['buildings.louver', 'streets.paving.concrete_cast']}
+PASS texel_density: {'triangles': 19599253, 'street_px_m': 512, 'upper_px_m': 256, 'meets_share': {'buildings': 0.99997, 'connections': 1.0, 'streets': 0.99842, 'props': 1.0, 'signs': 1.0, 'water': 1.0}, 'needs_share': 0.995, 'tolerance': 0.75, 'flagged': ['buildings.louver']}
      buildings.ac: {'triangles': 60696, 'area_m2': 4737.5, 'below_m2': 0.0, 'min_px_m': 511.3, 'set': 'metal_painted'}
      buildings.antenna: {'triangles': 119848, 'area_m2': 2651.0, 'below_m2': 0.0, 'min_px_m': 504.0, 'set': 'metal_galvanized'}
      buildings.balcony: {'triangles': 25404, 'area_m2': 14863.5, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'structure'}
      buildings.band_panel: {'triangles': 265742, 'area_m2': 551647.2, 'below_m2': 0.1, 'min_px_m': 367.4, 'set': 'panel_corporate_glass', 'worst': {'px_m': 367.4, 'node': 'd01.lot.w451s631.bld.front', 'pack': 'tiles/t-02-03.glb'}}
-     buildings.brick: {'triangles': 454502, 'area_m2': 508917.0, 'below_m2': 0.0, 'min_px_m': 389.7, 'set': 'brick_mixed_modern'}
+     buildings.brick: {'triangles': 454048, 'area_m2': 508947.2, 'below_m2': 0.0, 'min_px_m': 389.7, 'set': 'brick_mixed_modern'}
      buildings.cabinet: {'triangles': 9024, 'area_m2': 2213.1, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'metal_dark'}
      buildings.cable: {'triangles': 86172, 'area_m2': 1822.3, 'below_m2': 0.0, 'min_px_m': 511.6, 'set': 'rubber'}
-     buildings.camera: {'triangles': 22524, 'area_m2': 152.3, 'below_m2': 0.0, 'min_px_m': 511.6, 'set': 'plastic'}
+     buildings.camera: {'triangles': 22892, 'area_m2': 154.2, 'below_m2': 0.0, 'min_px_m': 511.6, 'set': 'plastic'}
      buildings.canopy: {'triangles': 7896, 'area_m2': 24468.0, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'aluminum'}
      buildings.chimney: {'triangles': 16400, 'area_m2': 2148.2, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'brick_heritage'}
      buildings.cladding: {'triangles': 24988, 'area_m2': 109313.1, 'below_m2': 0.0, 'min_px_m': 371.3, 'set': 'cladding_mixed_modern'}
@@ -23,8 +23,8 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      buildings.coping_stone: {'triangles': 53764, 'area_m2': 32473.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'sill_stone'}
      buildings.dado: {'triangles': 716, 'area_m2': 18195.1, 'below_m2': 0.0, 'min_px_m': 497.0, 'set': 'structure'}
      buildings.dish: {'triangles': 30792, 'area_m2': 734.1, 'below_m2': 0.0, 'min_px_m': 430.5, 'set': 'metal_painted'}
-     buildings.door_metal: {'triangles': 40084, 'area_m2': 5677.2, 'below_m2': 0.0, 'min_px_m': 510.9, 'set': 'metal_dark'}
-     buildings.door_wood: {'triangles': 5652, 'area_m2': 2394.7, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'timber'}
+     buildings.door_metal: {'triangles': 39112, 'area_m2': 5357.1, 'below_m2': 0.0, 'min_px_m': 510.9, 'set': 'metal_dark'}
+     buildings.door_wood: {'triangles': 5772, 'area_m2': 2455.0, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'timber'}
      buildings.dormer: {'triangles': 1188, 'area_m2': 786.6, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'plaster_heritage'}
      buildings.duct: {'triangles': 33168, 'area_m2': 5181.8, 'below_m2': 0.0, 'min_px_m': 511.8, 'set': 'metal_galvanized'}
      buildings.equip_dark: {'triangles': 13268, 'area_m2': 311.3, 'below_m2': 0.7, 'min_px_m': 362.6, 'set': 'metal_dark', 'worst': {'px_m': 362.6, 'node': 'part.ac_unit.old.h276bc35498', 'pack': 'parts/t+01-06.glb'}}
@@ -34,11 +34,11 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      buildings.escape_rust: {'triangles': 407148, 'area_m2': 3500.8, 'below_m2': 0.0, 'min_px_m': 511.5, 'set': 'metal_rusty'}
      buildings.fascia: {'triangles': 27576, 'area_m2': 16873.1, 'below_m2': 0.0, 'min_px_m': 510.9, 'set': 'trim_paint'}
      buildings.fin: {'triangles': 14288, 'area_m2': 15263.9, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'aluminum'}
-     buildings.frame: {'triangles': 2028572, 'area_m2': 79974.9, 'below_m2': 0.0, 'min_px_m': 509.0, 'set': 'metal_dark'}
+     buildings.frame: {'triangles': 2029892, 'area_m2': 80120.7, 'below_m2': 0.0, 'min_px_m': 509.0, 'set': 'metal_dark'}
      buildings.green_roof: {'triangles': 7166, 'area_m2': 214164.0, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'grass'}
-     buildings.grille: {'triangles': 872120, 'area_m2': 13296.5, 'below_m2': 0.0, 'min_px_m': 511.3, 'set': 'metal_dark'}
+     buildings.grille: {'triangles': 872076, 'area_m2': 13295.6, 'below_m2': 0.0, 'min_px_m': 511.3, 'set': 'metal_dark'}
      buildings.hangar: {'triangles': 52, 'area_m2': 477.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'hangar'}
-     buildings.infill: {'triangles': 112564, 'area_m2': 91911.6, 'below_m2': 0.0, 'min_px_m': 503.8, 'set': 'plaster_heritage'}
+     buildings.infill: {'triangles': 112488, 'area_m2': 91921.3, 'below_m2': 0.0, 'min_px_m': 503.8, 'set': 'plaster_heritage'}
      buildings.louver: {'triangles': 171284, 'area_m2': 35773.4, 'below_m2': 562.1, 'min_px_m': 355.2, 'set': 'louver', 'worst': {'px_m': 355.2, 'node': 'part.louver.panel.h0ad229ed13', 'pack': 'parts/t+00-02.glb'}}
      buildings.mast: {'triangles': 1344, 'area_m2': 1622.1, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'aluminum'}
      buildings.member: {'triangles': 20868, 'area_m2': 53812.3, 'below_m2': 0.0, 'min_px_m': 360.2, 'set': 'metal_painted'}
@@ -61,18 +61,18 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      buildings.paint_white: {'triangles': 211340, 'area_m2': 20145.3, 'below_m2': 0.0, 'min_px_m': 510.7, 'set': 'metal_painted'}
      buildings.paint_wine: {'triangles': 102024, 'area_m2': 7556.0, 'below_m2': 0.0, 'min_px_m': 510.9, 'set': 'metal_painted'}
      buildings.paint_yellow: {'triangles': 216, 'area_m2': 25.7, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'metal_painted'}
-     buildings.panel: {'triangles': 920422, 'area_m2': 443326.6, 'below_m2': 0.0, 'min_px_m': 212.8, 'set': 'panel_mixed_modern'}
-     buildings.patch_panel: {'triangles': 256929, 'area_m2': 207582.2, 'below_m2': 0.0, 'min_px_m': 505.0, 'set': 'patch_panel'}
-     buildings.patch_ply: {'triangles': 287901, 'area_m2': 213594.3, 'below_m2': 0.0, 'min_px_m': 509.2, 'set': 'plywood'}
-     buildings.patch_rust: {'triangles': 250129, 'area_m2': 204140.9, 'below_m2': 0.0, 'min_px_m': 506.8, 'set': 'patch_rust'}
-     buildings.patch_sheet: {'triangles': 477973, 'area_m2': 290114.1, 'below_m2': 0.0, 'min_px_m': 507.0, 'set': 'patch_sheet'}
-     buildings.patch_tarp: {'triangles': 245968, 'area_m2': 202457.1, 'below_m2': 0.0, 'min_px_m': 508.6, 'set': 'patch_tarp'}
+     buildings.panel: {'triangles': 920408, 'area_m2': 443335.6, 'below_m2': 0.0, 'min_px_m': 212.8, 'set': 'panel_mixed_modern'}
+     buildings.patch_panel: {'triangles': 256925, 'area_m2': 207569.7, 'below_m2': 0.0, 'min_px_m': 505.0, 'set': 'patch_panel'}
+     buildings.patch_ply: {'triangles': 287899, 'area_m2': 213590.3, 'below_m2': 0.0, 'min_px_m': 509.2, 'set': 'plywood'}
+     buildings.patch_rust: {'triangles': 250113, 'area_m2': 204142.8, 'below_m2': 0.0, 'min_px_m': 506.8, 'set': 'patch_rust'}
+     buildings.patch_sheet: {'triangles': 477837, 'area_m2': 290143.8, 'below_m2': 0.0, 'min_px_m': 507.0, 'set': 'patch_sheet'}
+     buildings.patch_tarp: {'triangles': 245956, 'area_m2': 202447.8, 'below_m2': 0.0, 'min_px_m': 508.6, 'set': 'patch_tarp'}
      buildings.penthouse: {'triangles': 2016, 'area_m2': 66019.9, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'structure'}
      buildings.perforated: {'triangles': 612, 'area_m2': 72.2, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'perforated'}
      buildings.pergola: {'triangles': 2808, 'area_m2': 299.7, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'timber'}
-     buildings.pipe: {'triangles': 376188, 'area_m2': 17113.3, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'metal_painted'}
+     buildings.pipe: {'triangles': 376412, 'area_m2': 17123.0, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'metal_painted'}
      buildings.planter: {'triangles': 12, 'area_m2': 9.7, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'concrete_formed'}
-     buildings.plaster: {'triangles': 200488, 'area_m2': 196716.7, 'below_m2': 0.0, 'min_px_m': 459.7, 'set': 'plaster_mixed_modern'}
+     buildings.plaster: {'triangles': 200262, 'area_m2': 196746.9, 'below_m2': 0.0, 'min_px_m': 459.7, 'set': 'plaster_mixed_modern'}
      buildings.railing: {'triangles': 70500, 'area_m2': 3347.5, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'metal_dark'}
      buildings.riser_dark: {'triangles': 18660, 'area_m2': 4493.4, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'stone_dressed'}
      buildings.riser_stone: {'triangles': 46020, 'area_m2': 9146.6, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'stone_dressed'}
@@ -82,7 +82,7 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      buildings.roof_gravel: {'triangles': 60224, 'area_m2': 988755.4, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'ballast'}
      buildings.roof_metal: {'triangles': 624, 'area_m2': 134484.0, 'below_m2': 0.0, 'min_px_m': 357.7, 'set': 'seam'}
      buildings.roof_paver: {'triangles': 24048, 'area_m2': 739832.1, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'paving_concrete_slab'}
-     buildings.roof_walkway: {'triangles': 12612, 'area_m2': 30071.8, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'paving_concrete_tile'}
+     buildings.roof_walkway: {'triangles': 12612, 'area_m2': 30070.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'paving_concrete_tile'}
      buildings.roof_wall: {'triangles': 756, 'area_m2': 1913.4, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'structure'}
      buildings.rubber: {'triangles': 648, 'area_m2': 12.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'rubber'}
      buildings.seal: {'triangles': 972, 'area_m2': 147.5, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'rubber'}
@@ -92,13 +92,13 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      buildings.sill: {'triangles': 144252, 'area_m2': 9010.2, 'below_m2': 0.0, 'min_px_m': 511.8, 'set': 'sill_stone'}
      buildings.soffit: {'triangles': 2314, 'area_m2': 153265.4, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'trim_paint'}
      buildings.soil: {'triangles': 22586, 'area_m2': 224507.2, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'ballast'}
-     buildings.spandrel: {'triangles': 5199558, 'area_m2': 2671551.2, 'below_m2': 1.5, 'min_px_m': 231.5, 'set': 'spandrel', 'worst': {'px_m': 231.5, 'node': 'd01.lot.e15s943.bld.front', 'pack': 'tiles/t+00-04.glb'}}
+     buildings.spandrel: {'triangles': 5199556, 'area_m2': 2671555.2, 'below_m2': 1.5, 'min_px_m': 231.5, 'set': 'spandrel', 'worst': {'px_m': 231.5, 'node': 'd01.lot.e15s943.bld.front', 'pack': 'tiles/t+00-04.glb'}}
      buildings.spandrel_panel: {'triangles': 10644, 'area_m2': 4135.9, 'below_m2': 0.0, 'min_px_m': 511.9, 'set': 'spandrel'}
      buildings.stanchion: {'triangles': 960, 'area_m2': 13.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'aluminum'}
      buildings.steel: {'triangles': 80340, 'area_m2': 4220.4, 'below_m2': 0.0, 'min_px_m': 510.9, 'set': 'steel_mill'}
-     buildings.step: {'triangles': 5112, 'area_m2': 1262.5, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'stone_dressed'}
-     buildings.structure: {'triangles': 196199, 'area_m2': 4839561.2, 'below_m2': 0.1, 'min_px_m': 308.8, 'set': 'structure', 'worst': {'px_m': 308.8, 'node': 'd01.lot.w228s572.bld.front', 'pack': 'tiles/t-01-03.glb'}}
-     buildings.stucco: {'triangles': 846640, 'area_m2': 769114.9, 'below_m2': 0.0, 'min_px_m': 409.1, 'set': 'stucco'}
+     buildings.step: {'triangles': 5268, 'area_m2': 1299.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'stone_dressed'}
+     buildings.structure: {'triangles': 196825, 'area_m2': 4839521.0, 'below_m2': 0.1, 'min_px_m': 308.8, 'set': 'structure', 'worst': {'px_m': 308.8, 'node': 'd01.lot.w228s572.bld.front', 'pack': 'tiles/t-01-03.glb'}}
+     buildings.stucco: {'triangles': 846348, 'area_m2': 769124.1, 'below_m2': 0.0, 'min_px_m': 409.1, 'set': 'stucco'}
      buildings.tank_panel: {'triangles': 2556, 'area_m2': 787.1, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'plastic'}
      buildings.tank_roof: {'triangles': 864, 'area_m2': 726.8, 'below_m2': 0.0, 'min_px_m': 490.2, 'set': 'metal_dark'}
      buildings.tank_steel: {'triangles': 2700, 'area_m2': 1626.4, 'below_m2': 0.0, 'min_px_m': 504.0, 'set': 'tank_metal'}
@@ -110,7 +110,7 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      buildings.tile: {'triangles': 8240, 'area_m2': 70747.3, 'below_m2': 0.0, 'min_px_m': 344.9, 'set': 'roof_tile'}
      buildings.timber: {'triangles': 106032, 'area_m2': 9343.5, 'below_m2': 6.3, 'min_px_m': 339.5, 'set': 'timber', 'worst': {'px_m': 339.6, 'node': 'd03.lot.w966s888.bld.shell', 'pack': 'tiles/t-04-04.glb'}}
      buildings.trellis: {'triangles': 574956, 'area_m2': 4116.4, 'below_m2': 0.0, 'min_px_m': 511.3, 'set': 'metal_painted'}
-     buildings.trim: {'triangles': 287510, 'area_m2': 333700.2, 'below_m2': 1.3, 'min_px_m': 178.4, 'set': 'trim_paint', 'worst': {'px_m': 178.4, 'node': 'd04.mg.w1175n350.bld.w1254n251.front', 'pack': 'tiles/t-05+00.glb'}}
+     buildings.trim: {'triangles': 287638, 'area_m2': 333692.2, 'below_m2': 1.3, 'min_px_m': 178.4, 'set': 'trim_paint', 'worst': {'px_m': 178.4, 'node': 'd04.mg.w1175n350.bld.w1254n251.front', 'pack': 'tiles/t-05+00.glb'}}
      connections.bridge_deck: {'triangles': 1164, 'area_m2': 13850.3, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'concrete_formed'}
      connections.bridge_floor: {'triangles': 576, 'area_m2': 7012.5, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'paving_granite'}
      connections.bridge_frame: {'triangles': 16920, 'area_m2': 3861.8, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'aluminum'}
@@ -225,7 +225,7 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      streets.pad: {'triangles': 20, 'area_m2': 6112.1, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'pad_concrete'}
      streets.paving.brick: {'triangles': 30613, 'area_m2': 66978.9, 'below_m2': 0.4, 'min_px_m': 228.3, 'set': 'paving_brick', 'worst': {'px_m': 228.3, 'node': 'rs.e574s1251.swl', 'pack': 'streets/t+02-05.glb'}}
      streets.paving.cobble: {'triangles': 91412, 'area_m2': 196465.6, 'below_m2': 1315.1, 'min_px_m': 9.2, 'set': 'paving_cobble', 'worst': {'px_m': 9.2, 'node': 'jn.w1419s1208', 'pack': 'streets/t-06-05.glb'}}
-     streets.paving.concrete_cast: {'triangles': 10834, 'area_m2': 64787.8, 'below_m2': 1202.7, 'min_px_m': 319.0, 'set': 'paving_concrete_cast', 'worst': {'px_m': 319.0, 'node': 'jn.e1012n228', 'pack': 'streets/t+03+00.glb'}}
+     streets.paving.concrete_cast: {'triangles': 10834, 'area_m2': 64787.8, 'below_m2': 33.9, 'min_px_m': 319.0, 'set': 'paving_concrete_cast', 'worst': {'px_m': 319.0, 'node': 'jn.e1012n228', 'pack': 'streets/t+03+00.glb'}}
      streets.paving.concrete_tile: {'triangles': 140, 'area_m2': 2494.2, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'paving_concrete_tile'}
      streets.paving.granite: {'triangles': 50575, 'area_m2': 188110.3, 'below_m2': 11.5, 'min_px_m': 82.1, 'set': 'paving_granite', 'worst': {'px_m': 82.1, 'node': 'jn.e489s792.l1', 'pack': 'streets/t+01-04.glb'}}
      streets.paving.granite_dark: {'triangles': 624, 'area_m2': 7354.0, 'below_m2': 0.0, 'min_px_m': 511.6, 'set': 'paving_granite'}
@@ -255,4 +255,4 @@ PASS texel_density: {'triangles': 19598561, 'street_px_m': 512, 'upper_px_m': 25
      water.wall.coping: {'triangles': 68, 'area_m2': 540.2, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'stone_dressed'}
      water.wall.stone: {'triangles': 68, 'area_m2': 6037.7, 'below_m2': 0.0, 'min_px_m': 512.0, 'set': 'stone_blocks'}
 PASS texture_budget: {'library_cooked_bytes': 1022711125, 'library_source_bytes': 699703647, 'signs_cooked_bytes': 46137344, 'signs_source_bytes': 3553990, 'limits': {'library_cooked': 2500000000.0, 'library_source': 7000000000.0, 'signs_cooked': 300000000.0}}
-seconds: {'signage': 0.0, 'materials': 0.79, 'texel_density': 14.46, 'total': 15.3}
+seconds: {'signage': 0.0, 'materials': 0.74, 'texel_density': 10.74, 'total': 11.52}
