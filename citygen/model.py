@@ -67,6 +67,54 @@ class Entity(_Model):
 
 # --- water and land --------------------------------------------------------
 
+QUAY_DECK_M = 1.5     # a quay's deck over the water (M16: on a flat city the ground stands as
+                      # high over every water body, the freeboard)
+
+
+def _m16(what: str):
+    """M16: a field left out of the JSON while unset, so a city built without M16's data
+    (or without water) keeps its bytes."""
+    return Field(None, exclude_if=lambda v: v is None, description=f"M16: {what}")
+
+
+class WaterBed(_Model):
+    """M16: the bed of a water body. Its depth at a point at distance d from the nearest
+    bank's line (the land's edge): 0 to the bank's waterline (`Bank.width_m` out), then
+    depth = toe + (D - toe) ramp(min(1, (d - width) / reach)), with the bank's `toe_m`, D the
+    body's `depth_m` (a river's or channel's at the nearest centerline point, `along`), and
+    ramp(u) = u (`shelf`), u (2 - u) (`channel`: deepest along the centerline, reach the half
+    width there) or 1 (`flat`: level between its walls)."""
+    profile: Literal["flat", "channel", "shelf"]
+    reach_m: float = Field(description="How far from the waterline the bed reaches its full "
+                                       "depth (channel: the typical half width).")
+    material: Literal["silt", "mud", "sand", "gravel", "stone"]
+    surface_m: float | None = Field(None, description="The water surface over the ground "
+                                    "datum: on a flat city -1.5 (the ground and the quay "
+                                    "decks stand QUAY_DECK_M over every water body); None on "
+                                    "a terrain city (M13's `terrain.water_levels`).")
+    along: list[ZSample] = Field(default_factory=list, description="Rivers and channels: the "
+                                 "depth at the centerline along it (s from its first point).")
+
+
+class Flow(_Model):
+    """M16: the current of a water body."""
+    kind: Literal["downstream", "tidal", "still"]
+    speed_m_s: float = Field(description="At the surface over the deepest bed (slower toward "
+                                         "the banks, as the bed rises).")
+    toward: str | None = Field(None, description="The water body it runs into (or 'sea').")
+    line: list[Point2] = Field(default_factory=list, description="The flow line in the flow's "
+                               "direction (the centerline, oriented downstream); empty when "
+                               "still or for the sea.")
+
+
+class Exposure(_Model):
+    """M16: a stretch of sea and how open it is to waves (sets their height later)."""
+    kind: Literal["open", "sheltered", "harbor"]
+    polygon: Polygon
+    fetch_m: float = Field(description="Mean open water reach over 16 directions (the map "
+                                       "edge counts as open sea).")
+
+
 class Land(Entity):
     TYPE_PREFIX: ClassVar[str] = "land"
     polygons: list[Polygon]
@@ -86,13 +134,22 @@ class Island(Entity):
     landmass_id: str | None = None
 
 
-class Sea(Entity):
+class _Water(Entity):
+    """M16's data of a water body (left out of the JSON until the stage fills it)."""
+    depth_m: float | None = _m16("the deepest water over the bed (from the surface).")
+    bed: WaterBed | None = _m16("the bed's profile and material.")
+    flow: Flow | None = _m16("the current.")
+
+
+class Sea(_Water):
     TYPE_PREFIX: ClassVar[str] = "sea"
     name: str | None = None
     polygons: list[Polygon]
+    exposure: list[Exposure] = Field(default_factory=list, exclude_if=lambda v: not v,
+                                     description="M16: open sea, sheltered water and harbors.")
 
 
-class River(Entity):
+class River(_Water):
     TYPE_PREFIX: ClassVar[str] = "river"
     name: str
     centerline: Line2
@@ -102,7 +159,7 @@ class River(Entity):
     flows_into: str | None = None
 
 
-class Channel(Entity):
+class Channel(_Water):
     TYPE_PREFIX: ClassVar[str] = "channel"
     name: str | None = None
     kind: Literal["delta_branch", "sea_channel", "separation"] = Field(
@@ -116,7 +173,7 @@ class Channel(Entity):
     polygon: Polygon
 
 
-class Waterway(Entity):
+class Waterway(_Water):
     TYPE_PREFIX: ClassVar[str] = "waterway"
     kind: Literal["canal", "creek", "inlet", "basin", "marina"]
     name: str | None = None
@@ -132,7 +189,30 @@ class Quay(Entity):
     waterway_id: str
     line: Line2
     width_m: float = 6.0
-    deck_z_m: float = 1.5
+    deck_z_m: float = QUAY_DECK_M
+
+
+BANK_KINDS = ("quay", "canal_wall", "road_embankment", "natural_bank", "beach", "marsh_edge",
+              "riprap")
+
+
+class Bank(Entity):
+    """M16: one stretch of a water body's edge, of one kind. Its line is the land's edge
+    (the top of the bank), with the water on its left; the bank falls from there to the
+    waterline `width_m` out over the water (a wall: its thickness) and on under the water to
+    its toe, where the body's bed (`WaterBed`) takes over. `type` is `bank.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "bank"
+    kind: Literal["quay", "canal_wall", "road_embankment", "natural_bank", "beach",
+                  "marsh_edge", "riprap"]
+    water_id: str
+    line: Line2
+    height_m: float | None = Field(None, description="The top over the water surface; None "
+                                   "on a quay, whose height is its quay's `deck_z_m`.")
+    width_m: float = Field(description="Horizontal run from the line to the waterline.")
+    toe_m: float = Field(description="Water depth at the foot of the bank (a wall: the bed's).")
+    district_id: str | None = None
+    quay_id: str | None = None
+    segment_id: str | None = Field(None, description="A road embankment's road.")
 
 
 class Bridge(Entity):
@@ -650,6 +730,40 @@ class GreenArea(Entity):
     level: int = _level()
 
 
+COVER_KINDS = ("mown_lawn", "park_lawn", "meadow", "marsh", "wasteland", "bare_dirt", "gravel",
+               "sand", "planted_bed", "overgrown_paving", "paving")
+
+
+class DesireLine(_Model):
+    """M16: a worn track across a piece of ground cover (people cutting across)."""
+    line: Line2
+    width_m: float
+    wear: Fraction = Field(description="0 a faint track, 1 bare earth.")
+
+
+class GroundCover(Entity):
+    """M16: one piece of open land (not a building, road, sidewalk or water) and what covers
+    it; the pieces of a city tile its open land once. `type` is `ground_cover.<kind>`."""
+    TYPE_PREFIX: ClassVar[str] = "ground_cover"
+    kind: Literal["mown_lawn", "park_lawn", "meadow", "marsh", "wasteland", "bare_dirt",
+                  "gravel", "sand", "planted_bed", "overgrown_paving", "paving"]
+    polygon: Polygon
+    area_m2: float
+    district_id: str | None = None
+    source_id: str | None = Field(None, description="What it is the open land of: a lot (its "
+                                  "yard), an open space, a megasite or a flat site element; "
+                                  "None for land left between them.")
+    maintenance: Fraction = Field(description="0 abandoned, 1 kept daily (district wealth, "
+                                              "archetype, what it is).")
+    wear: Fraction = Field(description="Share of the piece worn by feet (its desire lines, "
+                                       "weighted by their wear; busy plazas).")
+    shade: Fraction = Field(description="Mean share of the sky that buildings and decks hide.")
+    moisture: Fraction = Field(description="Mean wetness from nearness to water.")
+    slope_deg: float = Field(0.0, description="Mean ground slope (M13; 0 on a flat city).")
+    slope_max_deg: float = 0.0
+    desire_lines: list[DesireLine] = Field(default_factory=list)
+
+
 class Prop(Entity):
     TYPE_PREFIX: ClassVar[str] = "prop"
     position: Point3
@@ -824,7 +938,7 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
     "factions": Faction, "zones": Zone, "pois": Poi, "fields": GameField,
     "densities": StreetDensity, "parking": Parking, "travel_points": TravelPoint,
-    "sign_slots": SignSlot,
+    "sign_slots": SignSlot, "banks": Bank, "ground_cover": GroundCover,
     "tiles": Tile,
 }
 
@@ -910,6 +1024,10 @@ class CityModel(_Model):
     parking: list[Parking] = Field(default_factory=list)
     travel_points: list[TravelPoint] = Field(default_factory=list)
     sign_slots: list[SignSlot] = Field(default_factory=list)
+    banks: list[Bank] = Field(default_factory=list, exclude_if=lambda v: not v,
+                              description="M16: every water edge as typed bank stretches.")
+    ground_cover: list[GroundCover] = Field(default_factory=list, exclude_if=lambda v: not v,
+                                            description="M16: the open land's cover pieces.")
     tiles: list[Tile] = Field(default_factory=list)
 
     @model_validator(mode="after")

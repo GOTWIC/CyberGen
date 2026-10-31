@@ -886,6 +886,10 @@ def build_manifest(build_dir: str | Path, name: str | None = None,
     if decks:
         # M14: the decks (their slab actors by key), for stage 4's levels
         man["decks"] = [decks[k] for k in sorted(decks)]
+    if plan.get("swim"):
+        # M16: a swim volume (water physics volume) per box of a water body and tile
+        man["swim"] = [{**s, "hash": content_hash(s)} for s in plan["swim"]]
+        man["counts"]["swim_volumes"] = len(man["swim"])
     if contribs:
         man["stage2"] = stage2(man, build, contribs)
         man["counts"]["actors"] = len(actor_hashes(man))
@@ -902,6 +906,7 @@ def actor_hashes(man: dict) -> dict[str, str]:
     compares it by (`ue/import_city.py` hashes the player start and the lights the same way)."""
     out = {o["key"]: o["hash"] for t in man["tiles"] for o in t["objects"]}
     out.update({i["key"]: i["hash"] for i in man["instances"]})
+    out.update({s["key"]: s["hash"] for s in man.get("swim", [])})
     s2 = man.get("stage2")
     if s2:
         # stage 2's actors over the blockout's: the keys it replaces dropped, its own added
@@ -918,6 +923,7 @@ def actor_kinds(man: dict) -> dict[str, str]:
     instanced one (`instances`, BP_CityGenInstances)."""
     out = {o["key"]: "mesh" for t in man["tiles"] for o in t["objects"]}
     out.update({i["key"]: "instances" for i in man["instances"]})
+    out.update({s["key"]: "swim" for s in man.get("swim", [])})
     s2 = man.get("stage2")
     if s2:
         for k in s2["replaced"]:

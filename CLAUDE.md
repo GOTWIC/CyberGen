@@ -13,8 +13,8 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M16, water and
-ground detail; M17 to M21, the fixes from the first run-through, `docs/run_through_1.md`),
+high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M20, the
+rest of the fixes from the first run-through, `docs/run_through_1.md`),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
 
@@ -722,6 +722,79 @@ The stage 1 fixes (three open items of M13 to M15) are in place:
   joins them as `d03.deck_road.<tile>`, `d03.deck_sidewalk.<tile>`.
 Cragmouth and Vesper Bay Decks have new goldens; every other city is unchanged. Outputs:
 `docs/progress/stage1_fixes/`.
+
+M16 (water and ground detail) is in place, for stage 2's water (AG12) and ground cover
+(AG13): the build ends with `build.water_ground` (after the gameplay layer) on the finished
+city, `citygen/water.py` and `citygen/cover.py`, checks in `water_checks.py`, previews
+`preview_water.py` and `preview_ground.py`:
+- **Vertical frame:** on a flat city the ground stands `water.FREEBOARD_M` (1.5 m,
+  `model.QUAY_DECK_M`, a quay's `deck_z_m`: the quay deck is the ground) over every water
+  body, so the surface is at -1.5 (`WaterBed.surface_m`); on a terrain city the water stands at
+  M13's level. No bed lies under the bed M9's tunnels assume (`tunnels.BED_M` under the ground
+  datum, `water.max_depth`): the deepest water is canal 1.5, river 5.5, sea 10.5 m on a flat
+  city, 3, 7 and 12 m on a terrain city.
+- **Water bodies** (seas, rivers, channels, waterways) gain `depth_m`, `bed` (`WaterBed`:
+  profile `flat` for canals, basins and marinas, `channel` deepest along the centerline with
+  the depth by width along it, `along`, for rivers, channels, creeks and inlets, `shelf` for
+  the sea, falling over `reach_m` 250 m; material) and `flow` (`Flow`: downstream toward
+  `flows_into` or the mouth with the centerline oriented that way, a slow tide in canals and
+  inlets, still in basins, marinas and ornamental pools, tidal for the sea); the sea its
+  `exposure` (`Exposure` zones: open, sheltered under 1500 m, harbor under 400 m of mean fetch
+  over 16 integer directions on a 32 m raster, the map edge counting as open sea). All left
+  out of the JSON while unset (`model._m16`).
+- **Banks** (`banks`, `model.Bank`, id `<water>.bank.<anchor>`): the land's edge against the
+  water (`water.shore_lines`: the rings of land minus water without the map edge, water on the
+  left) sampled every 4 m and classed by what stands there: the model's quay (`quay_id`;
+  `height_m` None: the quay's `deck_z_m` is its height, one field), a canal wall (canals,
+  basins, inlets, marinas, ornamental pools; a building within 2 m), a road embankment (a road
+  within 5 m, `segment_id`), a beach (a beach open space, or a sea shore with a park or green
+  and 20 m clear of buildings), a marsh edge (a marsh open space), riprap (port and spaceport
+  shores, a megasite, a building within 6 m) or a natural bank; runs under 12 m join their
+  longer neighbor (never a quay). `width_m` is the slope's run from the line out to the
+  waterline (inside the water polygon: a wall's thickness, else slope by kind times the
+  height, at most 0.3 of the water's width at the run's lower quartile, steeper kinds where
+  it does not fit), `toe_m` the depth at its foot. A bank keeps to one water body and one
+  district and is classed only on its own district's buildings, roads and open spaces.
+- **The bed at a point** (`water.Beds.depth`, `depth_many`): the nearest bank (rounded
+  distance, ties to the first, never GEOS's pick), 0 up to its waterline, then toe + (D - toe)
+  ramp((d - width) / (reach - width)), ramp linear (shelf, flat with a 4 m reach) or u (2 - u)
+  (channel, the reach the local half width); `bed_z` in M9's frame.
+- **Ground cover** (`ground_cover`, `model.GroundCover`, id `<source>.gc.<anchor>`, else
+  `<district>.gc.<anchor>`): per district, its ground minus the water, the right of way (each
+  segment's cross-section as the blocks take it, the junctions), building footprints, solid
+  site elements and stairs, elevators, vents and portals; pieces from open spaces, lot yards,
+  flat site elements, megasites and the land left between them (parts under
+  `cover.SLIVER_M`, 3 m, are curb corners, not open land). Eleven kinds (`COVER_KINDS`: the
+  scope's ten and `paving` for plazas, forecourts and yards) by what a piece is and its
+  maintenance (district wealth and danger, what it is; megasites are kept); attributes
+  maintenance, wear, shade (4 m raster: share of 8 directions with a building above 45
+  degrees within 60 m, 1 under a deck), moisture (0 from 60 m off the water), slope (M13) and
+  `desire_lines` (walkway paths across a lawn worn by the nearest street's crowds, and
+  shortcuts across a lawn between walkway ends where the way round is 1.35 times longer).
+- **Checks** (three, on a city with M16's data: 95 on a flat sample with M17's and M21's,
+  100 on the deck sample):
+  `water_beds` (every body's data, no bed under M9's, tunnels under the water with 1.5 m of
+  backfill under the bed as it is, bridge foundations in the water on bed no deeper than their
+  footing), `water_banks` (the banks cover every edge once; quays, embankments, widths,
+  toes), `ground_cover` (no overlap, nothing under a building, road or water, the open land it
+  leaves only curb corners); a regeneration adds `regen_locality`.
+- **With M10:** `banks` and `ground_cover` are in `ids.KEEP` (named by their stage), in
+  `ids.REFS` and `ids.ORDER`; the splice leaves them out (and out of its closure) and
+  `edit._regenerate_once` runs `water_ground` on the spliced city, then
+  `water_checks.check_locality` against the old one (outside the district and `SEAM_M`, 60 m,
+  an M16 row changes only within 60 m of a changed input, `water_checks.INPUTS`: the splice's
+  own seam, a crowd density or a walkway, can reach farther); `overrides.apply` runs it again
+  after its edits.
+- **Blockout:** water and the sea at -1.5 on a flat city (the sea sheet 5 cm lower), a bed
+  heightfield per tile (`city.bed.<tile>`, 8 m cells; on a terrain city the ground grid carries
+  M16's beds), banks as bands from the line down to the toe joined per district, kind and tile
+  (`bank_<kind>`), the ground cover joined per district, kind and tile in a color per kind
+  (`cover_<kind>`) in place of the open spaces at the ground, bridge piers from the bed; the
+  plan's `swim` boxes (`blockout.swim_volumes`).
+- **Unreal exporter:** a water `PhysicsVolume` per swim box (`Importer.swim`), a material per
+  cover kind (`docs/unreal_export.md`, M16).
+A city without water or open land builds as before. Every sample has new goldens. Sample
+builds: `docs/progress/M16/`.
 
 M17 (road network repair, from the first run-through) is in place:
 - **Dead ends** (`streets.settle_dead_ends`, at the end of `clean_graph`, on the noded

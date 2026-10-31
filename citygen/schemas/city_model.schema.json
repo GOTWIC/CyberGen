@@ -122,6 +122,141 @@
       "title": "Arc",
       "type": "object"
     },
+    "Bank": {
+      "additionalProperties": false,
+      "description": "M16: one stretch of a water body's edge, of one kind. Its line is the land's edge\n(the top of the bank), with the water on its left; the bank falls from there to the\nwaterline `width_m` out over the water (a wall: its thickness) and on under the water to\nits toe, where the body's bed (`WaterBed`) takes over. `type` is `bank.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "quay",
+            "canal_wall",
+            "road_embankment",
+            "natural_bank",
+            "beach",
+            "marsh_edge",
+            "riprap"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "water_id": {
+          "title": "Water Id",
+          "type": "string"
+        },
+        "line": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Line",
+          "type": "array"
+        },
+        "height_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The top over the water surface; None on a quay, whose height is its quay's `deck_z_m`.",
+          "title": "Height M"
+        },
+        "width_m": {
+          "description": "Horizontal run from the line to the waterline.",
+          "title": "Width M",
+          "type": "number"
+        },
+        "toe_m": {
+          "description": "Water depth at the foot of the bank (a wall: the bed's).",
+          "title": "Toe M",
+          "type": "number"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
+        },
+        "quay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quay Id"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A road embankment's road.",
+          "title": "Segment Id"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "water_id",
+        "line",
+        "width_m",
+        "toe_m"
+      ],
+      "title": "Bank",
+      "type": "object"
+    },
     "Block": {
       "additionalProperties": false,
       "properties": {
@@ -603,6 +738,43 @@
           "title": "Attrs",
           "type": "object"
         },
+        "depth_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the deepest water over the bed (from the surface).",
+          "title": "Depth M"
+        },
+        "bed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaterBed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the bed's profile and material."
+        },
+        "flow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Flow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the current."
+        },
         "name": {
           "anyOf": [
             {
@@ -955,6 +1127,48 @@
       "title": "Deck",
       "type": "object"
     },
+    "DesireLine": {
+      "additionalProperties": false,
+      "description": "M16: a worn track across a piece of ground cover (people cutting across).",
+      "properties": {
+        "line": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Line",
+          "type": "array"
+        },
+        "width_m": {
+          "title": "Width M",
+          "type": "number"
+        },
+        "wear": {
+          "description": "0 a faint track, 1 bare earth.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Wear",
+          "type": "number"
+        }
+      },
+      "required": [
+        "line",
+        "width_m",
+        "wear"
+      ],
+      "title": "DesireLine",
+      "type": "object"
+    },
     "District": {
       "additionalProperties": false,
       "properties": {
@@ -1103,6 +1317,36 @@
       "title": "Entrance",
       "type": "object"
     },
+    "Exposure": {
+      "additionalProperties": false,
+      "description": "M16: a stretch of sea and how open it is to waves (sets their height later).",
+      "properties": {
+        "kind": {
+          "enum": [
+            "open",
+            "sheltered",
+            "harbor"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "polygon": {
+          "$ref": "#/$defs/Polygon"
+        },
+        "fetch_m": {
+          "description": "Mean open water reach over 16 directions (the map edge counts as open sea).",
+          "title": "Fetch M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "polygon",
+        "fetch_m"
+      ],
+      "title": "Exposure",
+      "type": "object"
+    },
     "Faction": {
       "additionalProperties": false,
       "description": "A gang, a corporation's security or the city police; `type` is `faction.<kind>`.",
@@ -1175,6 +1419,63 @@
         "color"
       ],
       "title": "Faction",
+      "type": "object"
+    },
+    "Flow": {
+      "additionalProperties": false,
+      "description": "M16: the current of a water body.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "downstream",
+            "tidal",
+            "still"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "speed_m_s": {
+          "description": "At the surface over the deepest bed (slower toward the banks, as the bed rises).",
+          "title": "Speed M S",
+          "type": "number"
+        },
+        "toward": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The water body it runs into (or 'sea').",
+          "title": "Toward"
+        },
+        "line": {
+          "description": "The flow line in the flow's direction (the centerline, oriented downstream); empty when still or for the sea.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Line",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "speed_m_s"
+      ],
+      "title": "Flow",
       "type": "object"
     },
     "Form": {
@@ -1475,6 +1776,143 @@
         "kind"
       ],
       "title": "GreenArea",
+      "type": "object"
+    },
+    "GroundCover": {
+      "additionalProperties": false,
+      "description": "M16: one piece of open land (not a building, road, sidewalk or water) and what covers\nit; the pieces of a city tile its open land once. `type` is `ground_cover.<kind>`.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "mown_lawn",
+            "park_lawn",
+            "meadow",
+            "marsh",
+            "wasteland",
+            "bare_dirt",
+            "gravel",
+            "sand",
+            "planted_bed",
+            "overgrown_paving",
+            "paving"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "polygon": {
+          "$ref": "#/$defs/Polygon"
+        },
+        "area_m2": {
+          "title": "Area M2",
+          "type": "number"
+        },
+        "district_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District Id"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What it is the open land of: a lot (its yard), an open space, a megasite or a flat site element; None for land left between them.",
+          "title": "Source Id"
+        },
+        "maintenance": {
+          "description": "0 abandoned, 1 kept daily (district wealth, archetype, what it is).",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Maintenance",
+          "type": "number"
+        },
+        "wear": {
+          "description": "Share of the piece worn by feet (its desire lines, weighted by their wear; busy plazas).",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Wear",
+          "type": "number"
+        },
+        "shade": {
+          "description": "Mean share of the sky that buildings and decks hide.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Shade",
+          "type": "number"
+        },
+        "moisture": {
+          "description": "Mean wetness from nearness to water.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Moisture",
+          "type": "number"
+        },
+        "slope_deg": {
+          "default": 0.0,
+          "description": "Mean ground slope (M13; 0 on a flat city).",
+          "title": "Slope Deg",
+          "type": "number"
+        },
+        "slope_max_deg": {
+          "default": 0.0,
+          "title": "Slope Max Deg",
+          "type": "number"
+        },
+        "desire_lines": {
+          "items": {
+            "$ref": "#/$defs/DesireLine"
+          },
+          "title": "Desire Lines",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "polygon",
+        "area_m2",
+        "maintenance",
+        "wear",
+        "shade",
+        "moisture"
+      ],
+      "title": "GroundCover",
       "type": "object"
     },
     "Island": {
@@ -3044,6 +3482,43 @@
           "title": "Attrs",
           "type": "object"
         },
+        "depth_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the deepest water over the bed (from the surface).",
+          "title": "Depth M"
+        },
+        "bed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaterBed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the bed's profile and material."
+        },
+        "flow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Flow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the current."
+        },
         "name": {
           "title": "Name",
           "type": "string"
@@ -3443,6 +3918,43 @@
           "title": "Attrs",
           "type": "object"
         },
+        "depth_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the deepest water over the bed (from the surface).",
+          "title": "Depth M"
+        },
+        "bed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaterBed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the bed's profile and material."
+        },
+        "flow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Flow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the current."
+        },
         "name": {
           "anyOf": [
             {
@@ -3460,6 +3972,14 @@
             "$ref": "#/$defs/Polygon"
           },
           "title": "Polygons",
+          "type": "array"
+        },
+        "exposure": {
+          "description": "M16: open sea, sheltered water and harbors.",
+          "items": {
+            "$ref": "#/$defs/Exposure"
+          },
+          "title": "Exposure",
           "type": "array"
         }
       },
@@ -5022,6 +5542,65 @@
       "title": "Walkway",
       "type": "object"
     },
+    "WaterBed": {
+      "additionalProperties": false,
+      "description": "M16: the bed of a water body. Its depth at a point at distance d from the nearest\nbank's line (the land's edge): 0 to the bank's waterline (`Bank.width_m` out), then\ndepth = toe + (D - toe) ramp(min(1, (d - width) / reach)), with the bank's `toe_m`, D the\nbody's `depth_m` (a river's or channel's at the nearest centerline point, `along`), and\nramp(u) = u (`shelf`), u (2 - u) (`channel`: deepest along the centerline, reach the half\nwidth there) or 1 (`flat`: level between its walls).",
+      "properties": {
+        "profile": {
+          "enum": [
+            "flat",
+            "channel",
+            "shelf"
+          ],
+          "title": "Profile",
+          "type": "string"
+        },
+        "reach_m": {
+          "description": "How far from the waterline the bed reaches its full depth (channel: the typical half width).",
+          "title": "Reach M",
+          "type": "number"
+        },
+        "material": {
+          "enum": [
+            "silt",
+            "mud",
+            "sand",
+            "gravel",
+            "stone"
+          ],
+          "title": "Material",
+          "type": "string"
+        },
+        "surface_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The water surface over the ground datum: on a flat city -1.5 (the ground and the quay decks stand QUAY_DECK_M over every water body); None on a terrain city (M13's `terrain.water_levels`).",
+          "title": "Surface M"
+        },
+        "along": {
+          "description": "Rivers and channels: the depth at the centerline along it (s from its first point).",
+          "items": {
+            "$ref": "#/$defs/ZSample"
+          },
+          "title": "Along",
+          "type": "array"
+        }
+      },
+      "required": [
+        "profile",
+        "reach_m",
+        "material"
+      ],
+      "title": "WaterBed",
+      "type": "object"
+    },
     "WaterLevel": {
       "additionalProperties": false,
       "description": "M13: the surface of a water body over sea level; a river's falls along its centerline.",
@@ -5076,6 +5655,43 @@
           "additionalProperties": true,
           "title": "Attrs",
           "type": "object"
+        },
+        "depth_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the deepest water over the bed (from the surface).",
+          "title": "Depth M"
+        },
+        "bed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaterBed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the bed's profile and material."
+        },
+        "flow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Flow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "M16: the current."
         },
         "kind": {
           "enum": [
@@ -5626,6 +6242,22 @@
         "$ref": "#/$defs/SignSlot"
       },
       "title": "Sign Slots",
+      "type": "array"
+    },
+    "banks": {
+      "description": "M16: every water edge as typed bank stretches.",
+      "items": {
+        "$ref": "#/$defs/Bank"
+      },
+      "title": "Banks",
+      "type": "array"
+    },
+    "ground_cover": {
+      "description": "M16: the open land's cover pieces.",
+      "items": {
+        "$ref": "#/$defs/GroundCover"
+      },
+      "title": "Ground Cover",
       "type": "array"
     },
     "tiles": {

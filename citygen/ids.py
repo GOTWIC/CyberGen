@@ -46,9 +46,10 @@ TOKEN = re.compile(r"[a-z0-9_]+(?:\.[a-z0-9_]+)*")
 REFS: dict[str, tuple[str, ...]] = {
     "landmasses": ("district_ids[]",),
     "islands": ("landmass_id",),
-    "rivers": ("flows_into",),
-    "channels": ("river_id", "flows_into"),
-    "waterways": ("district_id", "connects_to"),
+    "seas": ("flow.toward",),                                                     # M16
+    "rivers": ("flows_into", "flow.toward"),
+    "channels": ("river_id", "flows_into", "flow.toward"),
+    "waterways": ("district_id", "connects_to", "flow.toward"),
     "quays": ("waterway_id",),
     "bridges": ("crosses", "segment_ids[]"),
     "districts": ("landmass_id",),
@@ -86,9 +87,12 @@ REFS: dict[str, tuple[str, ...]] = {
                 "entrances[].walkway_id", "entrances[].lane_id"),
     "travel_points": ("district_id", "access.walkway_id", "access.lane_id", "near_id"),
     "sign_slots": ("building_id", "prop_id", "segment_id"),
+    "banks": ("water_id", "district_id", "quay_id", "segment_id"),                 # M16
+    "ground_cover": ("district_id", "source_id"),
 }
 
-KEEP = ("land", "seas", "districts", "fields", "tiles", "factions")
+# (M16's banks and ground cover are named by their stage from stable ids and anchors)
+KEEP = ("land", "seas", "districts", "fields", "tiles", "factions", "banks", "ground_cover")
 # collections whose ids M11 already derives from their parents: only the parent part changes
 DERIVED = ("zones", "pois", "densities", "parking", "travel_points", "sign_slots")
 # the order the collections are named in: every parent before its children
@@ -97,7 +101,7 @@ ORDER = ("land", "seas", "districts", "fields", "tiles", "factions", "landmasses
          "bridges", "road_nodes", "road_segments", "junctions", "crosswalks", "sidewalks",
          "lanes", "walkways", "tunnels", "transit_lines", "stations", "blocks", "lots",
          "properties", "buildings", "skybridges", "decks", "structures", "site_elements",
-         "green_areas", "plants", "props") + DERIVED
+         "green_areas", "plants", "props") + DERIVED + ("banks", "ground_cover")
 NAMED = {"islands": "isl", "rivers": "rv", "transit_lines": "tl", "stations": "stn"}
 
 

@@ -158,7 +158,9 @@ def test_manifest_changes(build, manifest, tmp_path):
     man = manifest[0]
     assert U.manifest_changes(man, man) == {"created": [], "updated": [], "deleted": []}
     hashes = U.actor_hashes(man)
-    assert len(hashes) == man["counts"]["objects"] + man["counts"]["instance_actors"] + 4
+    # (M16: and a swim volume per box of a water body and tile)
+    assert len(hashes) == man["counts"]["objects"] + man["counts"]["instance_actors"] + \
+        man["counts"].get("swim_volumes", 0) + 4
     plan = json.loads((build / "blockout_plan.json").read_text())
     blds = [o for o in plan["objects"] if o["category"] == "building"]
     gone, moved = blds[0], blds[1]
