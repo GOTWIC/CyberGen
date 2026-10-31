@@ -432,11 +432,11 @@ def check_supports(m: CityModel) -> Check:
     c = _check("transit_supports",
                "Supports stand under the structure (a column's middle within 0.5 m of the "
                "line, else a portal frame or a cantilever bent whose cap beam carries the deck "
-               "where the line crosses it), outside lanes, buildings, road decks and the "
-               "sidewalks' clear paths, in the water only as piers clear of the navigable "
-               "channel; no span longer than the mode's longest (elevated rail 45 m, monorail "
-               "40, maglev 80, sky tube 600), but a main span over a navigable channel or a "
-               "raised road, and an end overhanging half of it at most")
+               "where the line crosses it), outside lanes, buildings, road decks, road "
+               "embankments and the sidewalks' clear paths, in the water only as piers clear "
+               "of the navigable channel; no span longer than the mode's longest (elevated "
+               "rail 45 m, monorail 40, maglev 80, sky tube 600), but a main span over a "
+               "navigable channel or a raised road, and an end overhanging half of it at most")
     lanes = [(LineString([p[:2] for p in x.centerline]), x.width_m) for x in m.lanes]
     ltree = shapely.STRtree([x[0] for x in lanes]) if lanes else None
     sw = sidewalk_index(m)
@@ -455,6 +455,9 @@ def check_supports(m: CityModel) -> Check:
         wet.append((poly, INF if e.ornamental else pier_reach(w, e.kind)))
     shore = _shore(m, [p for p, _ in wet])
     decks, dtree = _raised_roads(m)
+    embs = [G.from_model_poly(s.footprint) for s in m.structures
+            if s.kind == "embankment" and s.footprint is not None]
+    etree = shapely.STRtree(embs) if embs else None
     tracks = _tracks(m)
     beams = {s.id: s for s in m.structures if s.kind == "beam"}
     at: dict = {}         # line id -> [support position along it]
@@ -487,6 +490,9 @@ def check_supports(m: CityModel) -> Check:
                                      for i in dtree.query(pt, predicate="dwithin",
                                                           distance=40.0).tolist()):
             _limit(c, f"{s.id}: on a road deck")
+        if etree is not None and any(G.area(G.inter(embs[i], poly)) > 0.0 for i in
+                                     etree.query(poly, predicate="intersects").tolist()):
+            _limit(c, f"{s.id}: on a road embankment")
         if o is None:
             continue
         if a.get("frame"):

@@ -4598,10 +4598,14 @@ def _build(spec, m, fixed: dict) -> Out:
     lane_lines = [LineString([p[:2] for p in x.centerline]) for x in m.lanes]
     lanes = (shapely.STRtree(lane_lines), lane_lines, [x.width_m for x in m.lanes])
     sw = sidewalk_index(m)
+    # M18's embankments under the low raised roads, built after the transit from these roads
+    # (`road_embankments`): ground a support keeps off, as the road's own lanes
+    from .elevated import road_embankments
+    emb = [G.from_model_poly(r["footprint"]) for r in road_embankments(m)]
     # M19: the low buildings that alone keep a line's supports off it go
     _support_room(c, lines, gone, lanes, sw,
                   [G.from_model_poly(x.footprint) for x in m.structures
-                   if x.footprint is not None and x.z0_m < 0.5])
+                   if x.footprint is not None and x.z0_m < 0.5] + emb)
     T.stage("transit/profiles", [[ln.id, ln.zs] for ln in lines])
     sky_gone = set(_skybridge_hits(c, lines)) | {s.id for s in m.skybridges
                                                   if set(s.building_ids) & gone}
@@ -4627,7 +4631,7 @@ def _build(spec, m, fixed: dict) -> Out:
         B.line_structures(ln)
     # M19: the supports, once every station stands (they keep off its feet)
     ground = [G.from_model_poly(x.footprint) for x in m.structures
-              if x.footprint is not None and x.z0_m < 0.5]
+              if x.footprint is not None and x.z0_m < 0.5] + emb
     ground += [G.from_model_poly(r["footprint"]) for r in B.structures
                if r.get("footprint") is not None and r["z0_m"] < 0.5]
     ground += [LineString([p[:2] for p in line3]).buffer(width / 2.0 + 0.3)
