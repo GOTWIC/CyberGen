@@ -129,16 +129,7 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
 **Highways** (`highways`): `pattern` (`ring`, `ring_plus_spine`, `spine`, `grid`, `radial`,
 `coastal`, `none`), `exits` (default: land edges), `elevated_share` (the share of highway
 length lifted onto viaducts, M7: the densest stretches with room for ramps go up first),
-`named` routes, `grades` (M18; leave it out: ramps, loops and flyovers 7% design and 8% at
-most, viaduct runs 6% and 7%, bridge approaches 6.5%, 30 m vertical curves; gentler grades
-give longer ramps and more dead space under them).
-
-**Crossings** (a district's `junctions`, M18; leave it out for the default by need):
-`signals` `auto` (where two primary roads meet, and spaced 120 m along the roads where a
-street meets one; 200 m in the old town and entertainment market), `fewer` (twice the
-spacing) or `none`; `crosswalks` `auto` (on signalized approaches and spaced across avenues),
-`fewer` (signalized junctions only) or `none` (unmarked crossings everywhere). Use `fewer`
-or `none` for a lawless or pedestrian-hostile district.
+`named` routes.
 
 **Terrain** (`terrain`, M13; leave it out for a flat city at sea level). Use it when the
 prompt speaks of hills, slopes, cliffs, a ridge, a hill town, a city climbing from the water,
