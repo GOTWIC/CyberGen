@@ -1,6 +1,7 @@
 """`assetgen build BUILD [--spec S] [--overrides O] [--workers N] [--no-streets]
-[--no-props]` (scope sections 3, 4.4, 6): the building assets of a citygen build into
-`BUILD/assets/`, then its street packs, then its props, plants and signs.
+[--no-water] [--no-props]` (scope sections 3, 4.4, 6): the building assets of a citygen
+build into `BUILD/assets/`, then its street packs, its water, then its props, plants and
+signs.
 
 1. Briefs (AG0's stage), reused from `briefs.json` when the model, spec and overrides are
    the ones it was made from; written only when they change.
@@ -22,7 +23,11 @@
 6. The street stage (AG7's `assetgen streets`, `assetgen/streets/build.py`, the same
    bytes): `streets/<tile>.glb`, `streets/manifest.json`, `unreal_contribution.streets.json`,
    `streets_report.json` and `.txt` (the report only when another of its files changed).
-7. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
+7. The water stage (AG12's `assetgen water`, `assetgen/water/build.py`, the same bytes; after
+   the streets, whose bridge piers foam it): `water/<tile>.glb`, `water/parts.glb`,
+   `water/manifest.json`, `unreal_contribution.water.json`, `water_report.json` and `.txt`
+   (likewise).
+8. AG6's sign pages (`materials/build.signage`: `textures/`, `signs.json`), then the props
    stage (AG8's `assetgen props`, `assetgen/props/build.py`, the same bytes): the variant
    families, exact props and signs (their faces showing those pages),
    `unreal_contribution.props.json` and `.signs.json`, `props_report.json` and `.txt`
