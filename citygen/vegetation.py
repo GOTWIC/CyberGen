@@ -433,8 +433,9 @@ class Overhead:
         self.gf = TE.ground_of(m)
         P = G.from_model_poly
         polys: list = []
-        # (kind, data, own road): "const" (underside, top, base) or "line" (centerline, its
-        # z profile, the depth under it); `base` a building's (M13), None over the ground
+        # (kind, data, own road): "const" or "fill" (underside, top, base) or "line"
+        # (centerline, its z profile, the depth under it, half its width); `base` a
+        # building's (M13), None over the ground
         self.items: list = []
         for s in m.structures:
             a = s.attrs or {}
@@ -442,7 +443,7 @@ class Overhead:
                 continue    # M13: a wall in the ground, not over it
             if s.kind == "embankment" and s.footprint is not None:
                 polys.append(P(s.footprint))
-                self.items.append(("const", (0.0, s.z1_m, None), a.get("road_id")))
+                self.items.append(("fill", (0.0, s.z1_m, None), a.get("road_id")))
             elif len(s.line) >= 2 and s.z1_m > 0.5:
                 w = a.get("width_m", 4.0)
                 line = LineString([p[:2] for p in s.line])
@@ -507,7 +508,9 @@ class Overhead:
                     tag in own[i] if isinstance(own[i], frozenset) else own[i] == tag):
                 continue
             x, y = float(xy[i, 0]), float(xy[i, 1])
-            if kind == "const":
+            if kind == "fill" and own is not None and own[i] and base[i] > 0.02:
+                continue      # (a thing on another road's deck beside a fill: at a gore)
+            if kind in ("const", "fill"):
                 u, top, b0 = data
                 if b0 is not None and self.gf is not None:
                     lift = b0 - self.gf.at(x, y)
