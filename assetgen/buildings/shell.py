@@ -645,6 +645,9 @@ class ShellBuilder:
                 # the collision leaves open
                 "landing_doors": [{k: ld[k] for k in ("edge", "s0", "s1", "z", "hi")}
                                   for _, ld in sorted(self.landed.items()) if "edge" in ld],
+                # what of each brief edge a wall stands on (s spans, mm; not a spike the
+                # tidying took away)
+                "walls": self.kept,
                 # AG5: the generator, a hero's kind, accent, UV extents and its U2 mask
                 "generator": self.generator, "hero": self._hero_rec(),
                 "mask": HE.bake(self)}
@@ -1433,8 +1436,10 @@ class ShellBuilder:
             if sills:
                 used.add("sills")
         if door:
-            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2 and                     not (zf - BALCONY_UNDER < ms["z0"] and
-                         self._hangs(fa, (bset[jb][0] + bset[jb][1]) // 2, bset[jb][2], zf)):
+            if jb in bset and a_ < (bset[jb][0] + bset[jb][1]) // 2 and \
+                    not (zf - BALCONY_UNDER < ms["z0"] and
+                         self._hangs(fa, bset[jb][0] + 80, bset[jb][1] - 80, bset[jb][2],
+                                     zf)):
                 # the bay's balcony, once (by its first opening, where a bay has two)
                 b0, b1, d = bset[jb]
                 st = genes[f"{g}.balcony"]
@@ -1732,30 +1737,21 @@ class ShellBuilder:
             base += k
         return True
 
-    def _hangs(self, fa: Facade, s: int, d: int, zf: int) -> bool:
-        """M21: whether a balcony on a mass's first floor would hang in the air: no mass of
-        the building spans its slab's underside within a deep part's reach of its middle (a
-        cantilevered or stacked block's first floor; over a podium it stands as before)."""
-        x0, y0, _ = fa.P(s, 0)
-        x, y = x0 + fa.nx * d, y0 + fa.ny * d
+    def _hangs(self, fa: Facade, s0: int, s1: int, d: int, zf: int) -> bool:
+        """M21: whether a balcony from s0 to s1 along the facade, d deep, on a mass's first
+        floor would hang in the air: a corner of its slab with no mass of the building
+        spanning its underside within a deep part's reach (a cantilevered or stacked
+        block's first floor, a tower over a sky garden; over a podium it stands as
+        before). Every corner, as the envelope check takes the part's box: a block turned
+        or offset over the one under it reaches past it at one end of a bay only."""
         zb = zf - BALCONY_UNDER // 2
-        for o in self.masses:
-            if o["shape"] != "prism" or not (o["z0"] - 2 <= zb <= o["z1"] + 2):
-                continue
-            ring = o["rings"][0]
-            if RG.in_poly((int(round(x)), int(round(y))), [ring]) >= 0:
-                return False
-            n = len(ring)
-            for i in range(n):
-                a, b = ring[i], ring[(i + 1) % n]
-                dx, dy = b[0] - a[0], b[1] - a[1]
-                L2 = dx * dx + dy * dy
-                t = 0.0 if L2 == 0 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy)
-                                                     / L2))
-                ex, ey = a[0] + dx * t - x, a[1] + dy * t - y
-                if ex * ex + ey * ey <= BALCONY_REACH * BALCONY_REACH:
-                    return False
-        return True
+        rings = [o["rings"][0] for o in self.masses
+                 if o["shape"] == "prism" and o["z0"] - 2 <= zb <= o["z1"] + 2]
+        for s, t in ((s0, 0), (s1, 0), (s0, d), (s1, d)):
+            x0, y0, _ = fa.P(s, 0)
+            if not any(_held(x0 + fa.nx * t, y0 + fa.ny * t, ring) for ring in rings):
+                return True
+        return False
 
     def _simple_mass(self, ms: dict, g: str) -> None:
         """M21: a band of a twisted, tapered or leaning shaft, or a shaft curved all round,
@@ -1788,20 +1784,64 @@ class ShellBuilder:
                 zf = z0 + f * fh
                 cuts += [zf + SIMPLE_SILL, zf + fh - SIMPLE_HEAD]
         cuts.append(z1)
-        for rg in [ring] + holes:
+        doors = self._simple_landings(ms, ring, fh)
+        levels = sorted({d for v in doors.values() for d in v})
+        for r, rg in enumerate([ring] + holes):
             m = len(rg)
             for i in range(m):
                 p, q = rg[i], rg[(i + 1) % m]
                 if p == q:
                     continue
-                for j in range(len(cuts) - 1):
-                    s = slot if j % 2 == 0 else "glass"
-                    self._vquad(s, p, q, cuts[j], cuts[j + 1])
+                segs = [(cuts[j], cuts[j + 1], slot if j % 2 == 0 else "glass")
+                        for j in range(len(cuts) - 1)]
+                # (every edge of the ring split at a landing door's sill and head, so the
+                # edges beside a door meet it at its corners)
+                for za, zb in (levels if r == 0 else ()):
+                    segs = _carve(segs, za, zb, "storefront" if (za, zb) in doors.get(i, ())
+                                  else None)
+                for za, zb, s in segs:
+                    self._vquad(s, p, q, za, zb)
         self.stats["simple_masses"] = self.stats.get("simple_masses", 0) + 1
         if len(cuts) > 2:
             self.stats["simple_glass"] = self.stats.get("simple_glass", 0) + 1
         self.mass_info.append({"mass": ms["k"], "group": g, "system": None, "rows": n,
                                "openings": 0, "simple": True})
+
+    def _simple_landings(self, ms: dict, ring, fh: int) -> dict[int, list]:
+        """The landing doors of the skybridges landing on a simply drawn mass (it has no
+        facade grammar to cut them, `connections.landing_ops`): per edge of its ring, the
+        door's height (the floor to the glass ribbon's head) on the edges within the
+        bridge's width less its collars of where it lands; recorded as landed."""
+        out: dict[int, list] = {}
+        z0, n = ms["z0"], max(1, ms["floors"])
+        if fh - SIMPLE_HEAD < 1900:
+            return out
+        for j, lst in sorted(self.landings.items()):
+            if self.br["edges"][j]["mass"] != ms["k"]:
+                continue
+            a0, ux, uy, L = AR._edge_geom(self.br, j)
+            for ld in lst:
+                f = next((f for f in range(n) if abs(z0 + f * fh - ld["z"]) <= CN.LANDING_TOL),
+                         None)
+                if f is None or ld["id"] in self.landed:
+                    continue
+                zf = z0 + f * fh
+                cx, cy = a0[0] + ux * ld["s"], a0[1] + uy * ld["s"]
+                hw = max(ld["w"] // 2 - 300, CN.DOOR_MIN // 2)
+                m = len(ring)
+                near = sorted((math.hypot((ring[i][0] + ring[(i + 1) % m][0]) / 2 - cx,
+                                          (ring[i][1] + ring[(i + 1) % m][1]) / 2 - cy), i)
+                              for i in range(m) if ring[i] != ring[(i + 1) % m])
+                if not near or near[0][0] > 2 * hw:
+                    continue                    # (it lands on no wall of the drawn ring)
+                for d, i in near:
+                    if d <= hw or i == near[0][1]:
+                        out.setdefault(i, []).append((zf, zf + fh - SIMPLE_HEAD))
+                s0, s1 = max(ld["s"] - hw, 0), min(ld["s"] + hw, int(L))
+                self.landed[ld["id"]] = {"s": ld["s"], "z": zf, "w": 2 * hw,
+                                         "h": fh - SIMPLE_HEAD, "door": True, "edge": j,
+                                         "s0": s0, "s1": s1, "hi": zf + fh - SIMPLE_HEAD}
+        return out
 
     def _screen(self, ms: dict) -> None:
         """A halo crown: the top floor a screen of fins inside the mass round an open roof,
@@ -1842,18 +1882,31 @@ class ShellBuilder:
             return
         top = max(cand, key=lambda ms: (ms["z1"], -ms["k"]))
         ring = RG.clean(top["rings"][0])
-        c = _centroid(ring)
-        if len(ring) < 3 or RG.in_poly(c, top["rings"]) != 1 or _thickness(ring) < 8000:
+        if len(ring) < 3 or _thickness(ring) < 8000:
             return
-        for it in self.br["roof_items"]:
-            x, y = it["position"][0] * 1000, it["position"][1] * 1000
-            if (x - c[0]) ** 2 + (y - c[1]) ** 2 < 3000 ** 2:
-                return
         H = int(round(float(self.br["building"]["height_m"]) * 1000))
         if crown == "mast":
             p = {"style": "mast", "h": PT.q(min(max(H // 10, 8000), 30000))}
         else:
             p = {"style": "spire", "h": PT.q(min(max(H * 18 // 100, 12000), 45000))}
+        lo, hi = PT.bounds(PT.mesh("mast", p)[1])
+
+        def foot(c) -> bool:
+            return all(RG.in_poly((c[0] + dx, c[1] + dy), top["rings"]) >= 0
+                       for dx in (lo[0], hi[0]) for dy in (lo[1], hi[1]))
+        # (the middle of its vertices, else, where a curve of the outline pulls that to its
+        # edge and the mast's foot off the roof, the middle of its area)
+        c = _centroid(ring)
+        if RG.in_poly(c, top["rings"]) != 1:
+            return
+        if not foot(c):
+            c = _area_centroid(ring)
+            if c is None or RG.in_poly(c, top["rings"]) != 1 or not foot(c):
+                return
+        for it in self.br["roof_items"]:
+            x, y = it["position"][0] * 1000, it["position"][1] * 1000
+            if (x - c[0]) ** 2 + (y - c[1]) ** 2 < 3000 ** 2:
+                return
         if self.clear.segs and self.clear.hits(c[0] - 1200, c[1] - 1200, c[0] + 1200,
                                                c[1] + 1200, top["z1"], top["z1"] + p["h"]):
             self.stats["masts_off_corridors"] = self.stats.get("masts_off_corridors", 0) + 1
@@ -1913,6 +1966,29 @@ class ShellBuilder:
                     if self.tubes and CN.in_tube(self.tubes, *box_):
                         self.stats["parts_off_portals"] = \
                             self.stats.get("parts_off_portals", 0) + 1
+                        continue
+                    keep.append(a)
+                at = keep
+                if not at:
+                    continue
+            elif self.bridges.segs and PT.REACH.get(fam) == "flush":
+                # (a flush part, frame or cap, where a bridge crosses a wall short of the
+                # one it lands on: over a lower roof at its floor, through a pod; the
+                # corridor's own test, which spares its collars and what is inside a mass)
+                from . import envelope as EN
+                lo, hi = PT.bounds(arrs)
+                keep = []
+                for a in at:
+                    xs, ys = [], []
+                    for cx in (lo[0], hi[0]):
+                        for cy in (lo[1], hi[1]):
+                            xs.append(a[0] + cx * a[3] - cy * a[4])
+                            ys.append(a[1] + cx * a[4] + cy * a[3])
+                    box_ = (min(xs), min(ys), max(xs), max(ys), a[2] + lo[2], a[2] + hi[2])
+                    if self.bridges.hits(*box_) and EN.clearances(self.br, {}, EN.part_points(
+                            [{"family": fam, "params": p, "at": [a]}]))["hits"]:
+                        self.stats["parts_off_bridges"] = \
+                            self.stats.get("parts_off_bridges", 0) + 1
                         continue
                     keep.append(a)
                 at = keep
@@ -2072,6 +2148,50 @@ def _blocked(fa: Facade, depth: int, edges) -> bool:
 def _centroid(ring):
     n = len(ring)
     return (sum(p[0] for p in ring) // n, sum(p[1] for p in ring) // n)
+
+
+def _area_centroid(ring):
+    """The middle of a ring's area (mm, integer shoelace sums), None for no area."""
+    a = cx = cy = 0
+    n = len(ring)
+    for i in range(n):
+        (x0, y0), (x1, y1) = ring[i], ring[(i + 1) % n]
+        c = x0 * y1 - x1 * y0
+        a += c
+        cx += (x0 + x1) * c
+        cy += (y0 + y1) * c
+    if a == 0:
+        return None
+    return (int(round(cx / (3 * a))), int(round(cy / (3 * a))))
+
+
+def _carve(segs: list, za: int, zb: int, slot: str | None) -> list:
+    """Wall segments (z0, z1, slot) up a simply drawn facet split at za and zb, za..zb in
+    `slot` (None: as they were)."""
+    out = []
+    for s0, s1, s in segs:
+        for a, b, t in ((s0, min(s1, za), s), (max(s0, za), min(s1, zb), slot or s),
+                        (max(s0, zb), s1, s)):
+            if b > a:
+                out.append((a, b, t))
+    return out
+
+
+def _held(x: float, y: float, ring) -> bool:
+    """Whether a point of a balcony's slab is inside a mass's ring or within a deep part's
+    reach of it (`_hangs`)."""
+    if RG.in_poly((int(round(x)), int(round(y))), [ring]) >= 0:
+        return True
+    n = len(ring)
+    for i in range(n):
+        a, b = ring[i], ring[(i + 1) % n]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 == 0 else min(1.0, max(0.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        ex, ey = a[0] + dx * t - x, a[1] + dy * t - y
+        if ex * ex + ey * ey <= BALCONY_REACH * BALCONY_REACH:
+            return True
+    return False
 
 
 def _unit(a, b):
