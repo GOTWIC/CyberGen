@@ -991,8 +991,10 @@ M18 (junctions and ramps, from the first run-through) is in place:
   own keep-outs cover it) while trees keep off it (`overhead` with `fill`, as the
   tree-clearance check), and M2's crossing locks and overhead test measure on plain arithmetic
   (`junctions._crossings`, `_overhead`: `terrain.crossings` projects with GEOS and runs
-  after M2). `GEN_VERSION` m18.2 (on M21's m21.1 and the assetgen fixes' agfix.1). Merged with M21,
-  M16 and the assetgen fixes.
+  after M2). On the merged layout a deck's skybridges clear its ramps (`Ctx.sky_roads`, from
+  the deck top) and every level's keep out of the district's buildings on its other levels
+  (`skybridges.Space(..., others)`). `GEN_VERSION` m18.2 (on M21's m21.1 and the assetgen
+  fixes' agfix.1). Merged with M21, M16 and the assetgen fixes.
 Sample builds: `docs/progress/M18/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

@@ -142,10 +142,16 @@ covers them.
   (`junctions._crossings`, `_overhead`; the ULP noise test). The stack test's avenue at
   600 m from the crossing now has room for its own, shorter ramps (from 500 m out); the
   test puts it at 400 m.
-- **Merged with M21** (cyberpunk massing) **and M16** (water and ground detail): every
-  sample rebuilt on the merged code, the numbers below from those builds; `GEN_VERSION` m18.2 (with the assetgen fixes' agfix.1).
-  The M18 notes for the citygen skill (`highways.grades`, a district's `junctions`) are left
-  out of it for now (M16 changed the same file), kept in the PR description.
+- **Merged with M21** (cyberpunk massing), **M16** (water and ground detail) and the assetgen
+  fixes: every sample rebuilt on the merged code, the numbers below from those builds;
+  `GEN_VERSION` m18.2. On the merged layout the small test city's deck put a skybridge a
+  floor over the deck across one of its ramps (the deck's buildings saw only the deck's own
+  streets), then, with the ramps in, through a ground building beside the deck: a deck's
+  skybridges now clear its ramps (`Ctx.sky_roads`, from the deck top) and every level's keep
+  out of the district's buildings on its other levels (`skybridges.Space(..., others)`);
+  every sample is unchanged by it. The M18 notes for the citygen skill (`highways.grades`, a
+  district's `junctions`) are left out of it for now (M16 changed the same file), kept in the
+  PR description.
 
 ## Before and after
 
