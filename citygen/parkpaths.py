@@ -363,8 +363,19 @@ def passage(o: dict, lots: list, attach: Attach, blocked: Blocked, frontage) -> 
     run = run[::-1]
     strip = G.qpoly(LineString(run).buffer(PASSAGE_W_M / 2, cap_style="flat",
                                            join_style="mitre", mitre_limit=2.0))
-    # (the strip's first end reaches into the open space)
-    strip = G.union([strip, G.qpoly(Point(run[0]).buffer(PASSAGE_W_M / 2, quad_segs=4))])
+    out = _carve(poly, strip, near, lots, cut_ok, frontage)
+    if out is None:
+        # (the strip's first end only touches the open space at a corner: a round end)
+        disk = G.qpoly(Point(run[0]).buffer(PASSAGE_W_M / 2, quad_segs=4))
+        out = _carve(poly, G.union([strip, disk]), near, lots, cut_ok, frontage)
+    if out is not None:
+        out["run"] = run
+    return out
+
+
+def _carve(poly, strip, near: list, lots: list, cut_ok: set, frontage) -> dict | None:
+    """The strip taken from the lots it cuts (each kept whole, with most of its area and its
+    frontage) and joined to the open space, or None."""
     new_lots = {}
     taken = [poly]
     for i in near:
@@ -390,7 +401,7 @@ def passage(o: dict, lots: list, attach: Attach, blocked: Blocked, frontage) -> 
     joined = G.union(taken)
     if joined.geom_type != "Polygon":
         return None
-    return {"polygon": joined, "lots": new_lots, "run": run}
+    return {"polygon": joined, "lots": new_lots}
 
 
 def _cuttable(lt: dict) -> bool:
@@ -486,12 +497,13 @@ DETOUR_PAD_M = 0.3      # a walkway led round a lot passes its corners this far 
 DETOUR_NODES = 60
 
 
-def keep_off(W, lots: list[dict]) -> dict:
+def keep_off(W, lots: list[dict], any_z: bool = False) -> dict:
     """Every ground walkway of W off the lots: a stretch that cuts into a lot (a sidewalk's
     chord across a block's rounded corner, a crossing's leg to a corner, a link between two
     walkway groups) is led round it by the shortest way past the lots' corners
     (DETOUR_PAD_M out). Returns {"rerouted": stretches led round, "left": stretches with no
-    way round (an end inside a lot)}."""
+    way round (an end inside a lot)}. `any_z`: every edge of W (a deck's walk graph, whose
+    edges sit at its top), not only those at z 0."""
     polys = [lt["polygon"] for lt in lots]
     bl = Blocked(polys, [], -LOT_PAD_M, between=False)
     if bl.tree is None:
@@ -499,7 +511,7 @@ def keep_off(W, lots: list[dict]) -> dict:
     raw = shapely.STRtree(polys)
     out = {"rerouted": 0, "left": 0}
     for e in W.edges:
-        if abs(e["z"]) > 1e-9:
+        if abs(e["z"]) > 1e-9 and not any_z:
             continue
         pts = e["pts"]
         new = [pts[0]]

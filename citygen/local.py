@@ -269,6 +269,10 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                                 getattr(b, "frame", None))
     # (park paths fix: every ground walkway off the lots, the buildings' ground)
     kinfo = PP.keep_off(jx["walk"], blk["lots"])
+    if dplan.decks and jx["walk_levels"].get(1) is not None:
+        # (M14: a deck's walkways off the lots on it)
+        k1 = PP.keep_off(jx["walk_levels"][1], dko["upper_lots"], any_z=True)
+        kinfo = {k: kinfo[k] + k1[k] for k in kinfo}
     walk = JN.walkways(jx["walk"])
     if dplan.decks:
         walk = _deck_walks(dplan, net, jx, dko, walk)
