@@ -135,7 +135,7 @@ The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edg
 | M17 | Road network repair | Every dead end on purpose (a cul-de-sac with its turning circle, a quay, a park gate, a path's end), no overlapping roads or bridges, roads clear of buildings | ✅ Done |
 | M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps, crosswalks and signals only where they are needed | Planned |
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans, more room over the streets | Planned |
-| M20 | Props, plants and signs | Nothing floating or growing through a road; many more large neon billboards and holo-boards on the sides and tops of buildings | Planned |
+| M20 | Props, plants and signs | Nothing floating or growing through a road: every lamp, bench, railing, sign and tree on the ground, a road deck, a quay, a roof or its wall; many more large neon billboards, banners and holo-boards on the sides and tops of buildings, set per district (`signage`) | ✅ Done |
 | M21 | Cyberpunk massing | Towers twisted, tapered, leaning, stacked, cantilevered, split, cut through by sky gardens, in exoskeletons or covered in pods, with sloped, cut and halo crowns; curved slabs; true curves; no two neighboring towers alike; a `variety` per district | ✅ Done |
 
 ### Run it
