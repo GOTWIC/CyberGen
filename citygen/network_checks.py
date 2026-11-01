@@ -612,11 +612,19 @@ def check_walkway_clash(spec: CitySpec, m: CityModel):
             _lim(c, f"walkway {w.id} ({what}) runs through building {b.id} (mass {k}) at "
                     f"{z:.1f} m")
     walks = {w.id: w for w in m.walkways}
+    pieces: dict = {}     # a walkway split by a later stage: its pieces (`attrs.split_of`)
+    for w in m.walkways:
+        so = (w.attrs or {}).get("split_of")
+        if so:
+            pieces.setdefault(so, []).append(w)
     for b in m.buildings:
         for e in b.entrances:
             w = walks.get(e.walkway_id)
             if w is None or len(w.line) < 2:
                 continue
+            fam = [x for x in [w] + pieces.get(w.id, []) if len(x.line) >= 2]
+            w = min(fam, key=lambda x: (G.dist(LineString([p[:2] for p in x.line]),
+                                               Point(e.position[:2])), x.id))
             line = LineString([p[:2] for p in w.line])
             foot = entrance_foot(line, e.position)
             if tuple(foot) == tuple(e.position[:2]):

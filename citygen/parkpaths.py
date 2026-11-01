@@ -546,7 +546,8 @@ def _detour(a, b, polys, raw, bl: Blocked):
     seg = LineString([a, b])
     cand -= {a, b}
     cand = [v for v in cand if bl.clear(v, v)]
-    cand = sorted(cand, key=lambda v: (round(seg.distance(Point(v)), 6), v))[:DETOUR_NODES]
+    cap_n = min(DETOUR_NODES + int(L / 4.0), 3 * DETOUR_NODES)   # (more for a long way)
+    cand = sorted(cand, key=lambda v: (round(seg.distance(Point(v)), 6), v))[:cap_n]
     nodes = [a, b] + cand
     cap = DETOUR * L + 15.0
     dist = {0: 0.0}

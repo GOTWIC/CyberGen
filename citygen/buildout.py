@@ -714,9 +714,10 @@ class _Level:
                                     land)]
 
     def reachable(self, pt, land: int, ok) -> int | None:
-        """The nearest ground walkway within RELINK_M on the same landmass that ok(position)
-        accepts (ties by walkway id), or None."""
-        ks = [int(i) for i in self.tree.query(pt, predicate="dwithin", distance=RELINK_M)]
+        """The nearest ground walkway on the same landmass that ok(position) accepts, within
+        RELINK_M past the nearest one (ties by walkway id), or None."""
+        ks = [int(i) for i in self.tree.query(pt, predicate="dwithin",
+                                              distance=reach(self.tree, self.lines, pt))]
         ks = [h for h in ks if land < 0 or self.land[h] == land]
         for h in sorted(ks, key=lambda h: (G.dist(self.lines[h], pt),
                                            self.walks[self.gi[h]]["id"])):
@@ -725,23 +726,35 @@ class _Level:
         return None
 
 
+def reach(tree, lines, pt) -> float:
+    """How far a link from pt looks for a walkway it reaches clear: RELINK_M past the
+    nearest one (an entrance far from every walkway, on a traced district or a megasite)."""
+    hits = tree.query_nearest(pt, all_matches=True).tolist()
+    d0 = min((G.dist(lines[int(h)], pt) for h in hits), default=0.0)
+    return d0 + RELINK_M
+
+
 class _Masses:
     """Building masses at the ground of each level (park paths fix): a straight link from an
     entrance to its walkway must not cut into one (MASS_PAD_M in)."""
 
     def __init__(self, buildings):
-        self.polys, self.rows = [], []
+        self.polys, self.rows, self.bids = [], [], []
+        self.feet: dict = {}          # level -> the masses' footprints
+        self._round: dict = {}
         for rec in buildings:
             base = _base(rec)
             for ms in rec.masses:
                 if ms.z0_m - base >= HEAD_M or ms.z1_m <= base:
                     continue
-                g = G.qpoly(G.from_model_poly(ms.footprint).buffer(-MASS_PAD_M,
-                                                                   join_style="mitre"))
+                fp = G.from_model_poly(ms.footprint)
+                self.feet.setdefault(rec.level, []).append(fp)
+                g = G.qpoly(fp.buffer(-MASS_PAD_M, join_style="mitre"))
                 for part in G.parts(g):
                     shapely.prepare(part)
                     self.polys.append(part)
                     self.rows.append(rec.level)
+                    self.bids.append(rec.id)
         self.tree = shapely.STRtree(self.polys) if self.polys else None
 
     def clear(self, a, b, level: int) -> bool:
@@ -752,6 +765,45 @@ class _Masses:
             if self.rows[i] == level and self.polys[i].intersects(seg):
                 return False
         return True
+
+    def inside(self, p, level: int) -> str | None:
+        """The building a point lies inside (a mass of it at the ground of the level)."""
+        if self.tree is None:
+            return None
+        pt = Point(p[:2])
+        for i in sorted(int(k) for k in self.tree.query(pt)):
+            if self.rows[i] == level and self.polys[i].contains(pt):
+                return self.bids[i]
+        return None
+
+    def round(self, a, b, level: int):
+        """A path from a to b led round the masses of a level past their corners, clear of
+        them as `clear` sees them, or None (`parkpaths._detour`)."""
+        from . import parkpaths as PP
+
+        if level not in self._round:
+            feet = self.feet.get(level, [])
+            self._round[level] = (feet, shapely.STRtree(feet) if feet else None,
+                                  PP.Blocked(feet, [], -MASS_PAD_M, between=False))
+        feet, raw, bl = self._round[level]
+        if raw is None:
+            return [tuple(a[:2]), tuple(b[:2])]
+        return PP._detour(ST._pt(*a[:2]), ST._pt(*b[:2]), feet, raw, bl)
+
+
+def _round_link(p, lv, land: int, masses: _Masses, level: int, lines, walks, gi):
+    """Park paths fix: the nearest ground walkway within RELINK_M that a path from p led
+    round the buildings reaches: (walkway position, its points), or None."""
+    got = {}
+
+    def ok(i):
+        r = masses.round(p, _foot(lines, walks, gi, i, p), level)
+        if r is not None:
+            got[i] = r
+        return r is not None
+
+    h = lv.reachable(Point(p), land, ok)
+    return None if h is None else (h, got[h])
 
 
 def link_entrances(out: Out, walks: list) -> list:
@@ -770,8 +822,9 @@ def link_entrances(out: Out, walks: list) -> list:
     land_of = _landmass_index(out.landmasses, [l.coords[0] for l in lines])
     lvs = {lv: _Level([pos_of[i] for i in per[lv]], lines, walks, gi, land_of)
            for lv in levels if per[lv]}
-    relinked = unlinked = moved = 0
+    relinked = unlinked = moved = rounded = 0
     masses = _Masses(out.buildings)
+    round_of: dict = {}     # id(entrance) -> its path led round the buildings
     if ents:
         pts = shapely.points(np.array([e.position for _, e in ents], dtype=np.float64))
         ent_land = _landmass_index(out.landmasses, [e.position for _, e in ents])
@@ -790,7 +843,23 @@ def link_entrances(out: Out, walks: list) -> list:
                 if alt is None:
                     mv = _move_entrance(rec, e, lv, masses, ent_land[k], lines, walks, gi)
                     if mv is None:
-                        unlinked += 1
+                        rl = _round_link(e.position, lv, ent_land[k], masses, rec.level,
+                                         lines, walks, gi)
+                        if rl is None and ent_land[k] >= 0:
+                            # (no walkway of its own landmass reached: any one, a sliver of
+                            # land beside a bridge's approach)
+                            alt = lv.reachable(pts[k], -1, ok)
+                            if alt is None:
+                                rl = _round_link(e.position, lv, -1, masses, rec.level,
+                                                 lines, walks, gi)
+                        if alt is not None:
+                            pass
+                        elif rl is None:
+                            unlinked += 1
+                        else:
+                            alt = rl[0]
+                            round_of[id(e)] = rl[1]
+                            rounded += 1
                     else:
                         e.position, alt = mv
                         pts[k] = Point(e.position)
@@ -806,6 +875,7 @@ def link_entrances(out: Out, walks: list) -> list:
     new: list = []
     by_id = {r.id: r for r in out.buildings}
     linked: set = set()
+    own_path: dict = {}     # id(entrance) -> (entrance, its door path in `new`)
 
     def main_entrance(rec):
         return next((x for x in rec.entrances if x.kind in ("main", "gate")),
@@ -819,8 +889,10 @@ def link_entrances(out: Out, walks: list) -> list:
             return
         foot = _foot(lines, walks, gi, line_of[id(e)], e.position)
         splits.setdefault(line_of[id(e)], []).append(foot)
-        new.append(("path", [tuple(e.position), foot], 2.0, _base(rec),
-                    {"building": rec.id, "door": True}, rec.level))
+        new.append(("path", round_of.get(id(e)) or [tuple(e.position), foot], 2.0,
+                    _base(rec), {"building": rec.id, "door": True}, rec.level))
+        if id(e) in round_of:
+            own_path[id(e)] = (e, len(new) - 1)
         linked.add(rec.id)
 
     for sb in out.skybridges:
@@ -837,7 +909,11 @@ def link_entrances(out: Out, walks: list) -> list:
             ids.append(len(new) - 1)
             e = main_entrance(rec)
             if e is not None and tuple(e.position) != tuple(p):
-                new.append(("path", [p, tuple(e.position)], 2.0, _base(rec),
+                lob = [p, tuple(e.position)]
+                if not masses.clear(p, e.position, rec.level):
+                    # (park paths fix: from the landing to the door round the buildings)
+                    lob = masses.round(p, e.position, rec.level) or lob
+                new.append(("path", lob, 2.0, _base(rec),
                             {"building": bid, "lobby": True}, rec.level))
             door(rec)
         sb["_walk"] = ids
@@ -848,6 +924,9 @@ def link_entrances(out: Out, walks: list) -> list:
     for sid, (kind, pts, width) in out.site_walks:
         new.append((kind, [tuple(p) for p in pts], width, 0.0, {"megasite": sid}, 0))
     link_land = _landmass_index(out.landmasses, [p for _, p in out.site_links])
+    gate_round: dict = {}
+    site_poly = {r["id"]: G.from_model_poly(r["polygon"]) for r in out.megasites
+                 if isinstance(r, dict) and r.get("polygon")}
     for (sid, p), lm in zip(out.site_links, link_land):
         best = lvs[0].nearest(Point(p), lm)
         foot = _foot(lines, walks, gi, best, p)
@@ -857,10 +936,26 @@ def link_entrances(out: Out, walks: list) -> list:
                 p, _foot(lines, walks, gi, i, p), 0))
             if alt is not None:
                 best, foot = alt, _foot(lines, walks, gi, alt, p)
+            else:
+                rl = _round_link(p, lvs[0], lm, masses, 0, lines, walks, gi)
+                if rl is None and sid in site_poly:
+                    rl = _move_gate(p, site_poly[sid], lvs[0], lm, masses, lines, walks, gi)
+                if rl is not None:
+                    best, foot = rl[0], _foot(lines, walks, gi, rl[0], rl[1][-1])
+                    foot = tuple(rl[1][-1])
+                    gate_round[len(new)] = rl[1]
         splits.setdefault(best, []).append(foot)
         if foot != tuple(p):
-            new.append(("path", [tuple(p), foot], 4.0, 0.0, {"megasite": sid, "gate": True},
-                        0))
+            new.append(("path", gate_round.pop(len(new), None) or [tuple(p), foot], 4.0, 0.0,
+                        {"megasite": sid, "gate": True}, 0))
+    for rec in out.buildings:     # (an entrance led round the buildings: a path of its own)
+        for e in rec.entrances:
+            if id(e) in round_of and id(e) not in own_path:
+                foot = _foot(lines, walks, gi, line_of[id(e)], e.position)
+                splits.setdefault(line_of[id(e)], []).append(foot)
+                new.append(("path", round_of[id(e)], 2.0, _base(rec),
+                            {"building": rec.id, "door": True}, rec.level))
+                own_path[id(e)] = (e, len(new) - 1)
     walks = _split(walks, gi, lines, splits)
     _piece_of_foot(out, walks)
     n0 = len(walks)
@@ -877,6 +972,9 @@ def link_entrances(out: Out, walks: list) -> list:
         if lv:
             rec["level"] = lv
         walks.append(rec)
+    for e, i in own_path.values():
+        e.walkway_id = f"wk{first + i:06d}"
+        e.link_m = 0.0
     for sb in out.skybridges:
         sb["walkway_ids"] = [f"wk{first + i:06d}" for i in sb.pop("_walk")]
     out.skybridges.sort(key=lambda s_: s_["id"])
@@ -884,6 +982,7 @@ def link_entrances(out: Out, walks: list) -> list:
     out.info["walkways_added"] = len(walks) - n0 + sum(len(v) for v in splits.values())
     out.info["entrances_relinked"] = relinked
     out.info["entrances_moved"] = moved
+    out.info["entrances_led_round"] = rounded
     out.info["entrances_blocked"] = unlinked
     return walks
 
@@ -929,6 +1028,42 @@ def _move_entrance(rec, e, lv, masses, land: int, lines, walks, gi):
         if best is None or (round(score, 6), p) < (round(best[0], 6), best[1]):
             best = (score, p, h)
     return None if best is None else (best[1], best[2])
+
+
+GATE_STEP_M = 2.0       # a megasite gate moved along its reserve's edge tries places this
+#                         far apart, at most MOVE_MAX of them
+
+
+def _move_gate(p, poly, lv, land: int, masses, lines, walks, gi):
+    """Park paths fix: a megasite gate whose every link to a walkway runs through a building
+    (a reserve the lots ring round) moves along the reserve's edge to where a straight link
+    is clear, a path inside the reserve (round its buildings) leading there: (walkway
+    position, the path's points from p to the foot), or None."""
+    ring = poly.exterior
+    L = G.length1(ring)
+    n = max(4, min(MOVE_MAX, int(L / GATE_STEP_M)))
+    here = Point(p)
+    cands = sorted((round(G.dist(here, Point(q)), 6), q) for q in
+                   (G.qpoint(ring.interpolate(L * k / n)) for k in range(n)))
+    best = None
+    for dm, q in cands:
+        if best is not None and dm >= best[0]:
+            break
+
+        def ok(i, q=q):
+            return masses.clear(q, _foot(lines, walks, gi, i, q), 0)
+
+        h = lv.reachable(Point(q), land, ok)
+        if h is None:
+            continue
+        inner = masses.round(p, q, 0)
+        if inner is None:
+            continue
+        f = _foot(lines, walks, gi, h, q)
+        score = ST._plen(inner) + G.dist(lines[h], Point(q))
+        if best is None or (round(score, 6), q) < (round(best[0], 6), best[1]):
+            best = (score, q, h, [tuple(x) for x in inner] + [tuple(f)])
+    return None if best is None else (best[2], ST._dedupe(best[3]))
 
 
 def _piece_of_foot(out: Out, walks: list) -> None:
