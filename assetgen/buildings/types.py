@@ -383,7 +383,7 @@ def _shanty_escapes(sb) -> None:
         n = ms["floors"]
         zs = [ms["z0"] + (ms["z1"] - ms["z0"]) * f // n for f in range(0 if ms["z0"] else 1,
                                                                         n)]
-        low = PT.ROAD_CLEAR + sb.ground if cls == "alley" else 3000    # (AG14: headroom)
+        low = PT.ROAD_CLEAR + sb.ground          # (AG14: over the vehicles' headroom)
         zs = [z for z in zs if z >= low]
         if len(zs) < 2 and not (zs and ms["z0"] >= 2500):
             continue
@@ -396,7 +396,7 @@ def _shanty_escapes(sb) -> None:
             continue
         z0 = zs[0]
         p = {"w": w, "d": PT.q(min(room, 1100)), "zs": [z - z0 for z in zs] or [0],
-             "ladder": PT.q(max(z0 - (low - 400 if cls == "alley" else 2600), 0)),
+             "ladder": PT.q(max(z0 - low, 0)),
              "slot": "escape_rust"}
         if put_on(sb, fa, "escape", p, s, z0, "fire_escape"):
             made += 1

@@ -102,14 +102,15 @@ class Surfaces(TriIndex):
             owner = None if owner is None else np.asarray(owner)[up]
         super().__init__(tris, owner, cell)
 
-    def under(self, pts: np.ndarray, reach: float, exclude: np.ndarray | None = None,
+    def under(self, pts: np.ndarray, reach, exclude: np.ndarray | None = None,
               floor=None) -> np.ndarray:
         """For each point (x, y, z): the highest surface at its plan position no higher than
-        z + reach (nan where none); `exclude` (per point) an owner whose triangles do not
-        count; `floor` the ground under each point (a number, or one per point: the
+        z + reach (a number, or one per point; nan where none); `exclude` (per point) an
+        owner whose triangles do not count; `floor` the ground under each point (a number, or one per point: the
         blockout's land, which stays in the level under every asset)."""
         pts = np.asarray(pts, dtype=np.float64).reshape(-1, 3)
         out = np.full(len(pts), -np.inf)
+        R = np.broadcast_to(np.asarray(reach, dtype=np.float64), (len(pts),))
         if len(pts):
             step = max(1, CHUNK // 64)
             for s in range(0, len(pts), step):
@@ -117,13 +118,13 @@ class Surfaces(TriIndex):
                 pid, tid = self.candidates(P[:, :2])
                 if len(pid):
                     inside, z = self.heights(P[:, :2], pid, tid)
-                    keep = inside & (z <= P[pid, 2] + reach)
+                    keep = inside & (z <= P[pid, 2] + R[s:s + step][pid])
                     if exclude is not None:
                         keep &= self.owner[tid] != exclude[s:s + step][pid]
                     if keep.any():
                         np.maximum.at(out[s:s + step], pid[keep], z[keep])
         if floor is not None:
-            ok = pts[:, 2] + reach >= floor
+            ok = pts[:, 2] + R >= floor
             out = np.where(ok, np.maximum(out, floor), out)
         out[np.isinf(out)] = np.nan
         return out

@@ -98,20 +98,23 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     cap = mast_cap(float(brief["building"]["height_m"]) * 1000.0)
     out = {"vertices": 0, "outside": 0, "too_high": 0, "low_overhang": 0,
            "equipment_off_roof": 0, "over_road": 0, "parts": 0}
-    # AG14: the brief's edges, and which of them face a road with no sidewalk under the
-    # vehicles' headroom
+    # AG14: the brief's edges, and how far each one's nearest lane is (its `lane_m`; 0 where
+    # it faces a road with no sidewalk) under the vehicles' headroom
     g0 = float(ground_mm(brief))
     zr = (g0 + PT.ROAD_CLEAR) / 1000.0
     edges = []
     for e in brief.get("edges") or []:
+        lane = e.get("lane_m")
+        lane = lane * 1000.0 if lane is not None else None
         # (a stub under 1.5 m at a corner says nothing of what its neighbors face)
-        road = e["length_m"] >= 1.5 and \
-            any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"])
+        if e["length_m"] >= 1.5 and \
+                any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"]):
+            lane = 0.0
         mz = brief["masses"][e["mass"]]["z"]
         edges.append(([e["a"][0] * 1000.0, e["a"][1] * 1000.0],
-                      [e["b"][0] * 1000.0, e["b"][1] * 1000.0], road,
+                      [e["b"][0] * 1000.0, e["b"][1] * 1000.0], lane,
                       (masses[e["mass"]][0], mz[1] * 1000.0)))
-    road_edges = [(a, b, zz) for a, b, r, zz in edges if r]
+    road_edges = [(a, b, lane, zz) for a, b, lane, zz in edges if lane is not None]
     groups = []
     for name, a in arrs.items():
         pos = np.unique(a["pos"], axis=0).astype(np.float64)
@@ -201,10 +204,9 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
 
 def _over_road(x, y, z, near, edges, road_edges, g0: float) -> int:
     """AG14: vertices more than `ROAD_RELIEF_MM` past the masses under the vehicles'
-    headroom that stand in front of a brief edge facing a road with no sidewalk (within its
-    span) and nearer it, by `ROAD_RELIEF_MM` at least, than any other edge of a mass at their
-    height or over it (what reaches round a corner off the end of a street's own facade
-    stands over that street's sidewalk)."""
+    headroom that stand in front of a brief edge (within its span), about as near it as to
+    any edge of a mass at their height or over it, and reach out to its nearest lane (its
+    `lane_m` less 0.1 m): what hangs over the lanes."""
     cand = (near > ROAD_RELIEF_MM) & (z < g0 + PT.ROAD_CLEAR - TOL_MM)
     if not cand.any():
         return 0
@@ -213,21 +215,20 @@ def _over_road(x, y, z, near, edges, road_edges, g0: float) -> int:
     d_all = np.full(len(xs), np.inf)
     # (the edges of the masses at the point's height or over it: a mast's or a tower's
     # edges high up say nothing of what is under them at the street)
-    for a, b, road, (z0, z1) in edges:
-        if road:
-            continue
+    for a, b, _, (z0, z1) in edges:
         on = zs <= z1 + PARAPET_MM
         d_all = np.where(on, np.minimum(d_all, dist_polyline(xs, ys, [a, b])), d_all)
     bad = np.zeros(len(xs), dtype=bool)
-    for a, b, (z0, z1) in road_edges:
+    for a, b, lane, (z0, z1) in road_edges:
         dx, dy = b[0] - a[0], b[1] - a[1]
         L2 = dx * dx + dy * dy
         if L2 <= 0.0:
             continue
         t = ((xs - a[0]) * dx + (ys - a[1]) * dy) / L2
         d = dist_polyline(xs, ys, [a, b])
-        bad |= (t >= 0.0) & (t <= 1.0) & (d + ROAD_RELIEF_MM <= d_all) & \
-            (zs <= z1 + PARAPET_MM) & (zs >= z0 - DEEP_MM)
+        bad |= (t >= 0.0) & (t <= 1.0) & (d <= d_all + ROAD_RELIEF_MM) & \
+            (d > max(ROAD_RELIEF_MM, lane - 100.0)) & (zs <= z1 + PARAPET_MM) & \
+            (zs >= z0 - DEEP_MM)
     return int(bad.sum())
 
 

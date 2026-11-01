@@ -168,7 +168,7 @@ def escape(sb) -> None:
         n = ms["floors"]
         # (AG14: over an alley's lanes its lowest landing and drop ladder keep the
         # vehicles' headroom)
-        low = PT.ROAD_CLEAR + sb.ground if _main_class(fa) == "alley" else 3200
+        low = PT.ROAD_CLEAR + sb.ground
         zs = [ms["z0"] + (ms["z1"] - ms["z0"]) * f // n for f in range(1, n)]
         zs = [z for z in zs if z >= low]
         if len(zs) < 2:
@@ -185,7 +185,7 @@ def escape(sb) -> None:
             continue
         z0 = zs[0]
         p = {"w": w, "d": 1200, "zs": [z - z0 for z in zs],
-             "ladder": PT.q(z0 - max(3000, low - 200))}
+             "ladder": PT.q(z0 - low)}
         if not _on(sb, fa, "escape", p, s, z0):
             continue
         sb.stats["fire_escapes"] = sb.stats.get("fire_escapes", 0) + 1
@@ -223,11 +223,15 @@ def ducts(sb) -> None:
         ceil = DK.ceiling_mm(sb.br)
         if ceil is not None:
             top = min(top, ceil - int(DK.CEIL_GAP_M * 1000))
+        # (AG14: over a road with no sidewalk it starts over the vehicles' headroom)
+        z0 = sb.ground + PT.ROAD_CLEAR if fa.on_road() else 3200
+        if top - z0 < 2000:
+            continue
         for t in (0.5, 0.3, 0.7, 0.15, 0.85):
             s = int(fa.c0 + (fa.L - fa.c0 - fa.c1) * t)
-            if _free(sb, fa, s - 300, s + 300, 3000, ms["z1"]) and \
+            if _free(sb, fa, s - 300, s + 300, z0 - 200, ms["z1"]) and \
                     _on(sb, fa, "duct", {"w": 400, "dd": 300,
-                                         "h": PT.q(top - 3200)}, s, 3200):
+                                         "h": PT.q(top - z0)}, s, z0):
                 made += 1
                 break
     if made:
@@ -304,7 +308,9 @@ def cameras(sb) -> None:
             continue
         for fa, ms in facades.get(d["edge"], []):
             s = d["s"] - fa.soff + d["w"] // 2 + 450
-            z = max(d["pos"][2] + d["h"] + 500, 3300)
+            # (AG14: over the vehicles' headroom: an alley's or a junction's lanes may come
+            # to the wall where the brief's probes do not see them)
+            z = max(d["pos"][2] + d["h"] + 500, sb.ground + PT.ROAD_CLEAR + 400)
             if not 200 < s < fa.L - 200 or not ms["z0"] <= z <= ms["z1"] - 300:
                 continue
             if not _free(sb, fa, s - 150, s + 150, z - 200, z + 200):

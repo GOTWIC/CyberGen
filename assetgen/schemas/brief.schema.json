@@ -457,6 +457,19 @@
           },
           "title": "Regions",
           "type": "array"
+        },
+        "lane_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AG14: how far out from the edge the nearest lane (a road's carriageway at grade, a junction) is, under 6 m.",
+          "title": "Lane M"
         }
       },
       "required": [

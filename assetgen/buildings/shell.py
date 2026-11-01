@@ -66,6 +66,9 @@ STRIP_MIN_Z = 3000           # strips that leave the footprint stay this high (s
 ROAD_CLEAR = PT.ROAD_CLEAR   # AG14: and this high over a road with no sidewalk (an alley, a
                              # service road, a highway): vehicles' headroom
 NO_WALK = ("alley", "service", "highway")
+LANE_NEAR = 1800             # AG14: a facade whose nearest lane is nearer than this is on it
+                             # (what reaches out there starts over the headroom)
+LANE_MAX = 99.0              # (no lane within the brief's 6 m)
 PIER_MIN = 75
 GAP_MIN = 60                 # between openings
 EDGE_CLEAR = 60              # an opening's pocket from the neighbor facade's plane
@@ -156,8 +159,16 @@ class Facade:
     def on_road(self) -> bool:
         """AG14: whether this facade faces a road with no sidewalk anywhere under the
         vehicles' headroom (`on_carriageway`; the envelope's `over_road` rule, by edge)."""
+        if self.lane() is not None and self.lane() < LANE_NEAR:
+            return True
         return any(on_carriageway(r) and r["z"][0] * 1000.0 < PT.ROAD_CLEAR
                    for r in self.regions or ())
+
+    def lane(self) -> int | None:
+        """AG14: how far (mm) the nearest lane is in front of this facade's brief edge (the
+        brief's `lane_m`), None where over 6 m."""
+        v = (self.rec or {}).get("lane_m")
+        return None if v is None else int(round(v * 1000))
 
     def room(self, s: int, z: int, street: int, other: int) -> int:
         """How far out (mm) something may reach here at least 3 m up: over a street or an
@@ -165,15 +176,26 @@ class Facade:
         court or water `other`, never over an alley, a service road or a highway's lanes,
         nor in front of a party, blind or hidden wall."""
         r = self.reg(s, z)
-        if z < PT.ROAD_CLEAR and self.on_road():
-            return 0                # (AG14: over a road with no sidewalk, under the headroom)
+        cap = None
+        if z < PT.ROAD_CLEAR:
+            # (AG14: under the vehicles' headroom it stops short of the nearest lane)
+            if self.on_road() and (self.lane() is None or self.lane() < 300):
+                return 0
+            if self.lane() is not None:
+                cap = max(self.lane() - 400, 0)
         cls = r["class"] if r is not None else (self.rec["class"] if self.rec else "open")
         if cls in ("street", "front"):
             rc = r.get("road_class") if r is not None else None
-            return street if rc in ("street", "avenue") else 0
-        if cls in ("open", "park", "plaza", "courtyard", "atrium", "canal", "upper"):
-            return other
-        return 0
+            out = street if rc in ("street", "avenue") else 0
+        elif cls in ("open", "park", "plaza", "courtyard", "atrium", "canal", "upper"):
+            out = other
+        else:
+            out = 0
+        return out if cap is None else min(out, cap)
+
+
+def _or(v, default):
+    return default if v is None else v
 
 
 def on_carriageway(reg: dict | None) -> bool:
@@ -1045,6 +1067,9 @@ class ShellBuilder:
             for i in range(len(ring)):
                 j = self._j(ms, r, i)
                 ok = j is not None
+                if ok and za < ROAD_CLEAR + self.ground and \
+                        _or(self.br["edges"][j].get("lane_m"), LANE_MAX) < 1.2:
+                    ok = False              # (AG14: a lane within a strip's reach)
                 if ok:
                     for reg in self.br["edges"][j]["regions"]:
                         if reg["z"][0] * 1000 < zb and reg["z"][1] * 1000 > za and \

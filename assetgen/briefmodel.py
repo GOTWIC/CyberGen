@@ -95,6 +95,9 @@ class Edge(_M):
     class_: EdgeClass = Field(alias="class", description="The class with the most facade "
                                                          "area (hidden: all hidden).")
     regions: list[Region]
+    lane_m: float | None = Field(None, description="AG14: how far out from the edge the "
+                                                  "nearest lane (a road's carriageway at "
+                                                  "grade, a junction) is, under 6 m.")
 
 
 class Neighbor(_M):

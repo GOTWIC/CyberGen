@@ -324,10 +324,13 @@ def _things(pk: Packs, model) -> list[dict]:
                 if mesh is None:
                     continue
                 F = feet(mesh[0])
+                # (dunnage under an item on a roof form stands through the form where the
+                # roof is higher under it: its legs may reach down its whole height)
+                reach = max(REACH_M, float(np.ptp(mesh[0][:, 2])))                     if p["family"] == "dunnage" else REACH_M
                 for xf in p["xforms"]:
                     W = _xform(F, px + xf[0], py + xf[1], pz + xf[2], xf[3])
                     out.append({"id": bid, "what": f"roof.{p['family']}", "feet": W,
-                                "self": None})
+                                "self": None, "reach": reach})
     # street pieces that stand on their feet
     for pid in pk.street_ids():
         k = pk.street_kind(pid)
@@ -355,10 +358,16 @@ def _dunnage(pk: Packs) -> dict[str, list]:
             mesh = pk.part_mesh(rec.get("parts_glb", ""), p["node"])
             if mesh is None:
                 continue
-            pos, tri = mesh
+            pos, _ = mesh
+            # (a frame of steel members: what stands on it rests on its whole top, the plan
+            # box of the frame at its top)
+            lo, hi = pos.min(axis=0), pos.max(axis=0)
+            top = np.array([[lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]],
+                            [hi[0], hi[1], hi[2]], [lo[0], hi[1], hi[2]]])
+            quad = np.array([[0, 1, 2], [0, 2, 3]])
             for xf in p["xforms"]:
-                W = _xform(pos, px + xf[0], py + xf[1], pz + xf[2], xf[3])
-                T = W[tri]
+                W = _xform(top, px + xf[0], py + xf[1], pz + xf[2], xf[3])
+                T = W[quad]
                 c = T.mean(axis=(0, 1))
                 out[tile_of(c[0], c[1])].append((T.astype(np.float32),
                                                  np.full(len(T), pk.owner(f"{bid}:dunnage"))))
@@ -381,9 +390,10 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         P = np.concatenate([things[i]["feet"] for i in ids])
         ex = np.repeat(np.array([things[i]["self"] if things[i]["self"] is not None else -1
                                  for i in ids]), 5)
+        R = np.repeat(np.array([things[i].get("reach", REACH_M) for i in ids]), 5)
         fl = floor.at(P[:, :2])
-        fl = np.where(P[:, 2] + REACH_M >= fl, fl, np.nan)     # (nan over the water too)
-        zs = np.fmax(S.under(P, REACH_M, ex), fl)
+        fl = np.where(P[:, 2] + R >= fl, fl, np.nan)     # (nan over the water too)
+        zs = np.fmax(S.under(P, R, ex), fl)
         g = (P[:, 2] - zs).reshape(-1, 5)
         ok = g <= GAP_M
         for j, i in enumerate(ids):
