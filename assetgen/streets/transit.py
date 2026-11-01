@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+import math
+
 from citygen import dmath as M
 
 from .. import canon as C
@@ -169,7 +171,7 @@ def _mast(mesh: Mesh, c, z0: float, top: float, stays, g: float):
     line (`stays`, behind and ahead), each ending on a small anchor block."""
     (bx, by, _), (ax, ay, _) = stays
     dx, dy = ax - bx, ay - by
-    L = M.sqrt(dx * dx + dy * dy) or 1.0
+    L = math.sqrt(dx * dx + dy * dy) or 1.0
     ux, uy = dx / L, dy / L
     nx, ny = -uy, ux
     off = SKY_D / 2.0 + MAST_LEG_M

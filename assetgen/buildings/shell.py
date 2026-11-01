@@ -159,6 +159,8 @@ class Facade:
         court or water `other`, never over an alley, a service road or a highway's lanes,
         nor in front of a party, blind or hidden wall."""
         r = self.reg(s, z)
+        if z < PT.ROAD_CLEAR and on_carriageway(self.reg(s, 1500)):
+            return 0                # (AG14: over a road with no sidewalk, under the headroom)
         cls = r["class"] if r is not None else (self.rec["class"] if self.rec else "open")
         if cls in ("street", "front"):
             rc = r.get("road_class") if r is not None else None
@@ -1560,8 +1562,9 @@ class ShellBuilder:
         if curtain or irr <= 0:
             return
         use = self.br["building"]["use"]
-        if lo >= self._low(fa, mid) and use in ("residential", "hotel", "office", "retail") and \
-                w >= 800 and jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr and \
+        if min(lo, full if door else lo) >= self._low(fa, mid) and \
+                use in ("residential", "hotel", "office", "retail") and w >= 800 and \
+                jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr and \
                 self._bridge_free(fa, a_, b_, lo - 100, lo + 600, 400):
             P.on(fa, "ac", {"w": 660, "h": 420, "do": 350, "di": min(250, max(r - 30, 20))},
                  mid, full if door else lo)
@@ -1570,8 +1573,8 @@ class ShellBuilder:
                 _u(key, f"gr{f}.{i}") < 0.9 * irr:
             P.on(fa, "grille", {"w": qw, "h": qh}, mid, lo)
             self.used["irregular"] = True
-        if self.res and lo >= self._low(fa, mid) and pr >= 900 and \
-                _u(key, f"dish{f}.{i}") < 0.06 * irr:
+        if self.res and lo >= max(self._low(fa, mid), self._low(fa, b_ + 450)) and \
+                pr >= 900 and _u(key, f"dish{f}.{i}") < 0.06 * irr:
             P.on(fa, "dish", {"rd": 400}, b_ + 450, lo + h // 2 - 400)
             self.used["irregular"] = True
 
@@ -1616,7 +1619,7 @@ class ShellBuilder:
                         P.on(fa, "cap", {"dir": "v", "w": 70, "p": 90, "h": h}, s, zb)
                 used.add("caps")
         elif feat == "fins":
-            z0f = max(zb, self._low(fa, fa.L // 2))
+            z0f = max([zb, self._low(fa, fa.L // 2)] + [self._low(fa, s) for s in lines])
             h = PT.q(zt - z0f)
             if h >= 2000:
                 d = PT.q(cont[f"{g}.fin_m"] * 1000)
@@ -1732,7 +1735,8 @@ class ShellBuilder:
         s0, s1 = fa.c0 + 300, L - fa.c1 - 300
         if s1 - s0 < 5000:
             return
-        d = PT.q(min(cont["canopy_m"] * 1000, fa.room((s0 + s1) // 2, 1500, 1500, 2000)))
+        d = PT.q(min(cont["canopy_m"] * 1000, *(fa.room(s, 1500, 1500, 2000)
+                                               for s in (s0, (s0 + s1) // 2, s1))))
         if d < 800:
             return
         so = fa.soff
