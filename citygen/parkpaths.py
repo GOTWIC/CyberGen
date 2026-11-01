@@ -33,6 +33,8 @@ PATH_KINDS = ("park", "plaza", "pocket_park", "market", "garden", "promenade", "
 PATH_REACH_M = 30.0     # a path joins a walkway this close to its open space
 PATH_GAP_M = 25.0       # paths of one open space join the walkways this far apart
 PATH_MAX = 4            # at most this many paths per open space
+PATH_OUT_M = 20.0       # a path runs at most this far outside its open space (else it runs on
+#                         beside the walkways round it to a far foot)
 PATH_W_M = 3.0
 ATTACH_KINDS = ("sidewalk", "pedestrian_street", "promenade", "alley", "path")
 LOT_PAD_M = 0.1         # a path may run along a lot's edge, not this far into it ...
@@ -214,6 +216,11 @@ class Attach:
         return f
 
 
+def _outside(pts, poly) -> float:
+    """How far a path runs outside its open space (on a 1 mm scale)."""
+    return round(G.length1(shapely.difference(LineString(pts), poly)), 3)
+
+
 def paths_for(poly, attach: Attach, tiers: tuple) -> list:
     """Up to PATH_MAX paths from inside poly to the walkways near it: [(walkway position,
     foot, points)]. `tiers`: (clear, edge) Blocked grounds; a path clear of the lots by
@@ -239,8 +246,8 @@ def paths_for(poly, attach: Attach, tiers: tuple) -> list:
             r = route(c, foot, region, blocked, corners)
             if r is not None:
                 break
-        if r is None:
-            continue
+        if r is None or (out and _outside(r, poly) > PATH_OUT_M):
+            continue      # (none, or a second that runs on beside a walkway to a far foot)
         out.append((k, foot, ST._dedupe(r)))
         if len(out) >= PATH_MAX:
             break
