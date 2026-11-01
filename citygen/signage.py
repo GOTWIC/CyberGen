@@ -490,4 +490,33 @@ def place(pl: Placer, b, lo_of: float, sky_clear, band, corp: bool) -> list[dict
             out.append(_row(b, "holo_ad", "front", x, y, zc, _yaw(*f.n), w, h, f.sid,
                             f.aud, content, {"edge": f.i, "off_m": HOLO_OFF_M}, two=True))
             break
-    return out
+    return _apart(out)
+
+
+def _apart(rows: list[dict]) -> list[dict]:
+    """A building's ads kept apart as `sign_slots` measures it: two facing within 10 degrees
+    whose heights overlap stand at least their half widths apart in plan (facades on two
+    planes close together, a setback's and the mass's under it, keep their ads apart per
+    plane only); a later one that would overlap goes, a wrapped pair as one."""
+    def clash(a: dict, b: dict) -> bool:
+        if (a["mount"] == "front") != (b["mount"] == "front"):
+            return False
+        if abs(((a["yaw_deg"] - b["yaw_deg"]) + 180.0) % 360.0 - 180.0) > 10.0:
+            return False
+        za, zb = a["position"][2], b["position"][2]
+        if za + a["height_m"] / 2.0 <= zb - b["height_m"] / 2.0 or                 zb + b["height_m"] / 2.0 <= za - a["height_m"] / 2.0:
+            return False
+        return math.hypot(a["position"][0] - b["position"][0],
+                          a["position"][1] - b["position"][1]) < (a["width_m"] +
+                                                                  b["width_m"]) / 2.0
+
+    kept: list[dict] = []
+    drop: set = set()
+    for r in rows:
+        if r["id"] in drop or any(clash(r, k) for k in kept):
+            drop.add(r["id"])
+            if r["attrs"].get("wrap"):
+                drop.add(r["attrs"]["wrap"])
+            continue
+        kept.append(r)
+    return [r for r in kept if r["id"] not in drop]

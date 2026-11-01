@@ -357,3 +357,17 @@ def test_gameplay_stage_ignores_ulp_noise(monkeypatch, city):
         assert a == b, key
     rebuilt = with_rows(base, clean.rows)
     assert rebuilt.to_json() == city.model.to_json()
+
+
+def test_ads_on_close_planes_kept_apart():
+    """M20: ads on two facades of parallel planes close together (a setback over its mass)
+    stay apart as `sign_slots` measures them; a wrapped pair goes as one."""
+    from citygen import signage as SG
+
+    def row(i, x, z, wrap=None, yaw=0.0):
+        return {"id": i, "mount": "facade", "yaw_deg": yaw, "position": (x, 0.0, z),
+                "width_m": 2.0, "height_m": 12.0, "attrs": {"wrap": wrap} if wrap else {}}
+
+    rows = [row("a", 0.0, 20.0), row("b.a", 0.5, 21.0, "b.b"),
+            row("b.b", 1.0, 21.0, "b.a", yaw=90.0), row("c", 0.5, 40.0), row("d", 5.0, 20.0)]
+    assert [r["id"] for r in SG._apart(rows)] == ["a", "c", "d"]
