@@ -277,7 +277,6 @@ def _make(inp: dict, tidy: bool) -> Out:
     if rd.s1 - rd.s0 >= 0.3:
         rows, uvs = [], []
         for s, vi in rd.stations(rd.s0, rd.s1):
-            z = rd.z(s)
             rows.append([(*rd.at(s, t, vi), rd.z_at(s, t, vi)) for t in (-rd.h, rd.h)])
             uvs.append([(s, -rd.h), (s, rd.h)])
         mesh.grid(asphalt_slot(cls, style), rows, uvs, expect=UP)
