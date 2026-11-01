@@ -734,16 +734,23 @@ def _test_over(bid, P, fp, S: Surfaces, hits: dict, part: str | None = None):
 # The stage
 # ---------------------------------------------------------------------------
 
-def build(model, out_dir: Path, log=None, report_always: bool = True) -> dict:
+def build(model, out_dir: Path, log=None, progress=None) -> dict:
+    """Both checks on the packs under out_dir (BUILD/assets); the report written where its
+    bytes change (`written`: the files written, 0 to 2)."""
+    from ..progress import Progress
+    P = progress if progress is not None else Progress(quiet=True)
     t0 = time.perf_counter()
     a = Path(out_dir)
     pk = Packs(a, model)
-    pk.load()
+    with P.stage("fit: reading the packs"):
+        pk.load()
     t1 = time.perf_counter()
     floor = Floor(model)
-    g = grounded(pk, model, floor)
+    with P.stage("fit: asset_grounded"):
+        g = grounded(pk, model, floor)
     t2 = time.perf_counter()
-    c = clash(pk, model)
+    with P.stage("fit: asset_clash"):
+        c = clash(pk, model)
     # owner ids of roads named
     for r in c["worst"].get("building_over_road", []):
         r["roads"] = sorted(pk.names[int(x)] for x in r["roads"])
@@ -753,14 +760,8 @@ def build(model, out_dir: Path, log=None, report_always: bool = True) -> dict:
                        "clash": round(t3 - t2, 2), "total": round(t3 - t0, 2)}}
     text = report_text(rep)
     body = {k: v for k, v in rep.items() if k != "seconds"}
-    p = a / "fit_report.json"
-    data = MF.dumps(body)
-    old = p.read_text(encoding="utf-8") if p.is_file() else None
-    rep["written"] = False
-    if report_always or old != data:
-        p.write_text(data, encoding="utf-8")
-        (a / "fit_report.txt").write_text(text, encoding="utf-8")
-        rep["written"] = old != data
+    rep["written"] = int(MF.write_if_changed(a / "fit_report.json", MF.dumps(body))) + \
+        int(MF.write_if_changed(a / "fit_report.txt", text))
     if log:
         for line in text.splitlines()[:3]:
             log(line)

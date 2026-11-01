@@ -243,7 +243,7 @@ class Road:
             mesh.sweep(slot, frames, profile)
 
 
-@maker("road", 1)
+@maker("road", 2)
 def make(inp: dict) -> Out:
     """The road from its centerline as given; a road whose mesh fails the winding check (a
     micro-kink in the line folds its curb's offset lines over each other) is made again
@@ -275,10 +275,13 @@ def _make(inp: dict, tidy: bool) -> Out:
             _details(rd, mesh, inp, stops)
             _median(rd, mesh, inp, stops)
     if dk == "deck":
-        _deck(rd, mesh, inp)
-        for a, b in inp.get("embankments", ()):
-            if min(b, rd.s1) - max(a, rd.s0) >= 0.5:
-                _embankment(rd, mesh, max(a, rd.s0), min(b, rd.s1))
+        # AG14: M18's embankments carry the road where it is low; the deck's girder only
+        # between them (it ran through the fill, its sides on the fill's walls)
+        embs = [(max(a, rd.s0), min(b, rd.s1)) for a, b in inp.get("embankments", ())
+                if min(b, rd.s1) - max(a, rd.s0) >= 0.5]
+        _deck(rd, mesh, inp, _spans(0.0, rd.L, embs))
+        for a, b in embs:
+            _embankment(rd, mesh, a, b, ends=True)
     elif dk == "embankment":
         _embankment(rd, mesh)
     elif dk == "ramp":
@@ -526,7 +529,19 @@ def _median(rd: Road, mesh: Mesh, inp: dict, stops: dict):
 
 # -- decks and embankments -------------------------------------------------------------
 
-def _deck(rd: Road, mesh: Mesh, inp: dict):
+def _spans(s0: float, s1: float, holes) -> list[tuple[float, float]]:
+    """[s0, s1] less the intervals `holes` (sorted, merged), pieces of 0.05 m or more."""
+    out, at = [], s0
+    for a, b in sorted(holes):
+        if a > at:
+            out.append((at, min(a, s1)))
+        at = max(at, b)
+    if at < s1:
+        out.append((at, s1))
+    return [(a, b) for a, b in out if b - a >= 0.05]
+
+
+def _deck(rd: Road, mesh: Mesh, inp: dict, spans=None):
     cls = rd.cls
     W2 = rd.W / 2.0
     a = rd.seg.get("attrs", {})
@@ -536,7 +551,8 @@ def _deck(rd: Road, mesh: Mesh, inp: dict):
     prof = [(W2, 0.0), (W2, -0.45), (B / 2.0, -min(0.7, D * 0.6)), (B / 2.0 - 0.25, -D),
             (-(B / 2.0 - 0.25), -D), (-B / 2.0, -min(0.7, D * 0.6)), (-W2, -0.45),
             (-W2, 0.0)]
-    rd.sweep(mesh, "concrete.deck", 0.0, rd.L, prof, base=-ROAD_DZ)
+    for a, b in (spans if spans is not None else [(0.0, rd.L)]):
+        rd.sweep(mesh, "concrete.deck", a, b, prof, base=-ROAD_DZ)
     if cls not in PEDESTRIAN:
         sw = rd.side if cls in ("avenue", "street") else 0.0
         base = 0.15 if sw > 0 else 0.0
@@ -616,13 +632,28 @@ def _deck_ramp(rd: Road, mesh: Mesh, inp: dict) -> dict:
     return out
 
 
-def _embankment(rd: Road, mesh: Mesh, s0: float = 0.0, s1: float | None = None):
+def _embankment(rd: Road, mesh: Mesh, s0: float = 0.0, s1: float | None = None,
+                ends: bool = False):
     """Retained fill under the road from s0 to s1 (all of it by default): its two faces
-    from the road's edge down into the ground."""
+    from the road's edge down into the ground; `ends` (AG14, M18's embankments under a
+    deck): its faces across where the deck's girder goes on (where the road is raised
+    0.3 m or more there)."""
     W2 = rd.W / 2.0
+    s1 = rd.L if s1 is None else s1
+    if ends:
+        for s, sgn in ((s0, -1.0), (s1, 1.0)):
+            if (sgn < 0 and s <= 0.05) or (sgn > 0 and s >= rd.L - 0.05):
+                continue
+            top = rd.z(s) - ROAD_DZ
+            bot = rd.ground(s) - 0.1
+            if top - bot < 0.4:
+                continue
+            pa, pb = rd.at(s, -W2), rd.at(s, W2)
+            a_, b_ = (pa, pb) if sgn > 0 else (pb, pa)
+            mesh.wall("concrete", a_, b_, bot, top, bot, top)
     for side in (1.0, -1.0):
         rows, uvs, exp = [], [], []
-        for s, vi in rd.stations(s0, rd.L if s1 is None else s1):
+        for s, vi in rd.stations(s0, s1):
             x, y = rd.at(s, side * W2, vi)
             _, _, nx, ny, _ = rd.path.frame(s, vi)
             top = rd.z(s) + (0.15 if rd.side > 0 else 0.0)

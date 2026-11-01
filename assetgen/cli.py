@@ -155,13 +155,31 @@ def cmd_build(args: argparse.Namespace) -> int:
         rep = BD.build(src, args.spec, args.overrides, args.workers,
                        streets=not args.no_streets, textures=not args.no_textures,
                        props=not args.no_props, ground=not args.no_ground,
-                       water=not args.no_water, progress=prog)
+                       water=not args.no_water, fit=not args.no_fit, progress=prog)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INVALID
     prog.summary()
     sys.stdout.write(BD.report_text(rep))
     print(f"files written: {rep['files_written']}")
+    return EXIT_OK if rep["ok"] else EXIT_INVALID
+
+
+def cmd_fit(args: argparse.Namespace) -> int:
+    from . import brief as B
+    from .fit.build import build as fit_build, report_text
+    src = Path(args.build)
+    if not (src / "city_model.json").is_file() and not src.is_file():
+        print(f"error: {args.build}: no city_model.json", file=sys.stderr)
+        return EXIT_USAGE
+    model, _, bdir = B.load_model(src)
+    if not (bdir / "assets").is_dir():
+        print(f"error: {args.build}: no assets (run assetgen build first)", file=sys.stderr)
+        return EXIT_USAGE
+    prog = _progress(args)
+    rep = fit_build(model, bdir / "assets", progress=prog)
+    prog.summary()
+    sys.stdout.write(report_text(rep))
     return EXIT_OK if rep["ok"] else EXIT_INVALID
 
 
@@ -462,8 +480,16 @@ def build_parser() -> argparse.ArgumentParser:
                          "`assetgen ground`)")
     bu.add_argument("--no-water", action="store_true",
                     help="no water (default: after the streets, as `assetgen water`)")
+    bu.add_argument("--no-fit", action="store_true",
+                    help="no fit checks on the packs (default: last, as `assetgen fit`)")
     _quiet(bu)
     bu.set_defaults(func=cmd_build)
+
+    ft = sub.add_parser("fit", help="AG14: the fit checks on a build's packs (asset_grounded, "
+                                     "asset_clash; fit_report.txt)")
+    ft.add_argument("build", help="a citygen build directory (or its city_model.json)")
+    _quiet(ft)
+    ft.set_defaults(func=cmd_fit)
 
     lb = sub.add_parser("library", help="AG6: the shared texture library (made once, kept "
                                         "while its generator is unchanged)")

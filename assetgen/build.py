@@ -66,7 +66,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "m18.3"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag14.1"         # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -509,7 +509,7 @@ def build(build_dir: str | Path, spec_path: str | None = None,
           overrides_path: str | None = None, workers: int | None = None,
           log=print, streets: bool = True, textures: bool = True,
           props: bool = True, ground: bool = True, progress: Progress | None = None,
-          water: bool = True) -> dict:
+          water: bool = True, fit: bool = True) -> dict:
     """`progress`: stage lines and bars on stderr (`assetgen/progress.py`); the log lines go
     to its notes then, else to `log`."""
     t0 = time.perf_counter()
@@ -743,6 +743,21 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                             "failed": [c for c, v in mrep["checks"].items() if not v["ok"]],
                             "seconds": mrep["seconds"]["total"]}
         rep["ok"] = rep["ok"] and mrep["ok"]
+    if fit:
+        # AG14: the fit checks on the packs as written (`assetgen fit`)
+        from .fit.build import build as fit_build
+        frep = fit_build(model, out, progress=P)
+        wrote += frep["written"]
+        g_, c_ = frep["checks"]
+        rep["fit"] = {"ok": frep["ok"], "failed": [c["id"] for c in frep["checks"]
+                                                if not c["ok"]],
+                      "things": g_["things"], "floating": g_["floating"],
+                      "steps": g_["seams"]["steps"], "clashes": c_["clashes"],
+                      "seconds": frep["seconds"]["total"]}
+        rep["ok"] = rep["ok"] and frep["ok"]
+        if progress is None:
+            log(f"fit: {g_['things']} things, {g_['floating']} not resting, "
+                f"{g_['seams']['steps']} junction steps, {c_['clashes']} clashes")
     rep["files_written"] = wrote
     return rep
 
@@ -919,4 +934,10 @@ def report_text(rep: dict) -> str:
         lines.append(f"materials: {ma['textures']} textures; "
                      f"{'all checks pass' if ma['ok'] else 'FAIL ' + ', '.join(ma['failed'])}"
                      f" ({ma['seconds']} s; materials_report.txt)")
+    ft = rep.get("fit")
+    if ft is not None:
+        lines.append(f"fit: {ft['things']:,} things standing, {ft['floating']} not resting, "
+                     f"{ft['steps']} junction steps, {ft['clashes']} clashes; "
+                     f"{'all checks pass' if ft['ok'] else 'FAIL ' + ', '.join(ft['failed'])}"
+                     f" ({ft['seconds']} s; fit_report.txt)")
     return "\n".join(lines) + "\n"
