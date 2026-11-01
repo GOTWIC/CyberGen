@@ -70,9 +70,9 @@ def gather_structure(cx: Ctx, st, maker_name: str) -> Piece:
         inputs["ground"] = cx.ground.samples(st.line)
     if maker_name == "transit_column":
         inputs["dir"] = _line_dir(cx, a.get("line_id"), c[0], c[1])
-        if a.get("form") == "pier" or a.get("pier") or cx.wet_at(c[0], c[1]):
-            # (AG14: a pier, or any column standing in the water, on a footing down to M16's
-            # bed)
+        if cx.wet_at(c[0], c[1]):
+            # (AG14: a column standing in the water on a footing down to M16's bed; a pier
+            # on land, M19's pier, on its footing 2 m into the ground)
             bz = cx.bed_z(c[0], c[1]) if cx.beds is not None else None
             inputs["bed"] = bz if bz is not None else \
                 C.m(cx.ground.water_level(None, -1.5) - 4.0)
