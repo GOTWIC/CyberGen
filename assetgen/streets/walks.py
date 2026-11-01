@@ -545,7 +545,15 @@ def make_junction(inp: dict) -> Out:
         top, "asphalt.alley" if top in ("alley", "service") else "asphalt.street")
     if top in PEDESTRIAN:
         slot = MT.paving(style["archetype"])
-    ok = mesh.poly(slot, ring, holes, zfun=zfun)
+    cring = ring
+    if vz is not None:
+        # AG14: a leg's carriageway corners where they fall on the outline between its
+        # vertices (a road cut square across, not along the outline's own cut edge) become
+        # vertices of it at the leg's height, so the leg meets the junction there too
+        cring, extra = _with_corners(ring, legs, inp["legs"])
+        for p, z in extra:
+            vz[p] = z
+    ok = mesh.poly(slot, cring, holes, zfun=zfun, keep_straight=cring is not ring)
     if not ok:
         # a ring that touches itself: its valid parts, in a fixed order
         ok = any([mesh.poly(slot, r, hs, zfun=zfun) for r, hs in _valid_parts(ring, holes)])
@@ -563,6 +571,61 @@ def make_junction(inp: dict) -> Out:
     out = Out(mesh=mesh)
     out.notes["corner_pads"] = pads
     return out
+
+
+def _with_corners(ring, legs: list, raw: list):
+    """AG14: the outline with each leg's carriageway corners at its cut (as the road piece
+    draws them, square across the leg) inserted where they lie on an outline edge within
+    3 cm and not at a vertex; (ring, [((x, y), z)])."""
+    pts = []
+    by_id = {}
+    for lg in raw:
+        by_id.setdefault(lg["id"], []).append(lg)
+    for r in legs:
+        if "z" not in r or r.get("exit") is None:
+            continue
+        h = r["row"] - r["side"]
+        if h <= 0.3:
+            continue
+        for lg in by_id.get(r["id"], ()):
+            pts_ = lg["line"] if lg["at_start"] else lg["line"][::-1]
+            try:
+                path = Path(pts_)
+            except ValueError:
+                continue
+            s = min(r["exit"][0], path.L)
+            x, y = path.point(s)
+            tx, ty = path.tangent(s)
+            for sg in (1.0, -1.0):
+                pts.append(((C.m(x - ty * h * sg), C.m(y + tx * h * sg)), r["z"]))
+            break
+    if not pts:
+        return ring, []
+    out = list(ring)
+    extra = []
+    for (px, py), z in pts:
+        n = len(out)
+        best = None
+        for i in range(n):
+            a, b = out[i], out[(i + 1) % n]
+            if dist(a, (px, py)) < 0.05 or dist(b, (px, py)) < 0.05:
+                best = None
+                break
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            L2 = dx * dx + dy * dy
+            if L2 <= 0.0:
+                continue
+            f = ((px - a[0]) * dx + (py - a[1]) * dy) / L2
+            if not 0.0 < f < 1.0:
+                continue
+            d = abs((px - a[0]) * dy - (py - a[1]) * dx) / math.sqrt(L2)
+            if d <= 0.03 and (best is None or d < best[0]):
+                best = (d, i, (C.m2(a[0] + f * dx), C.m2(a[1] + f * dy)))
+        if best is not None:
+            _, i, q = best
+            out.insert(i + 1, q)
+            extra.append((q, z))
+    return (out if extra else ring), extra
 
 
 def _minus(sector, ring, holes, taken=()):
