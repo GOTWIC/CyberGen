@@ -31,23 +31,23 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/M18/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/nexus_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/nexus_city/render_iso_city.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/M18/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/archipelago_free_port/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/archipelago_free_port/render_iso_city.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M18/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
-| <img src="docs/progress/M18/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
+| <img src="docs/progress/M20/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
 
 | Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
 |---|---|
-| <img src="docs/progress/M18/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/vesper_bay_decks/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
@@ -61,19 +61,23 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
-| <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
+| <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M20/vesper_bay/preview_props.png" width="420"> |
+
+Neon billboards and banners on the Corporate Core's facades, from the street (8K).
+
+<img src="docs/progress/M20/vesper_bay/render_street_1.jpg" width="840">
 
 | Vesper Bay imported into Unreal 5.8 (8K) | Cragmouth's terraced hills in Unreal (8K) |
 |---|---|
 | <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/cragmouth/unreal_hillside.jpg" width="420"> |
 
-Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour.
+Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour, and the slots for signs and large neon ads.
 
-<img src="docs/progress/M13/vesper_bay/preview_gameplay.png" width="840">
+<img src="docs/progress/M20/vesper_bay/preview_gameplay.png" width="840">
 
 | Gameplay, Nexus City | Gameplay, Delta Megacity |
 |---|---|
-| <img src="docs/progress/M13/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M13/delta_megacity/preview_gameplay.png" width="420"> |
+| <img src="docs/progress/M20/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M20/delta_megacity/preview_gameplay.png" width="420"> |
 
 | Road levels: viaducts, ramps, interchanges, embankments | Stack interchange levels and ramp profiles |
 |---|---|
