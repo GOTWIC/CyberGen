@@ -21,6 +21,9 @@ corner of its instanced parts inside a mass that spans its height, or an allowed
 - AG4's roof forms in the top floor (their eaves as strips), finishes, copings and green
   roofs on the roof under the parapet's allowance;
 - on M13's slopes, a mass on the base reaches down by its plinth (`shell.plinth_mm`);
+- AG14: nothing more than `ROAD_RELIEF_MM` out over a road with no sidewalk (an alley, a
+  service road, a highway: a facade region `shell.on_carriageway`) under
+  `parts.ROAD_CLEAR` over the street front (`over_road`): the vehicles' headroom;
 - AG4's court floors, planters and gardens in a court: inside a mass's outline (its court
   is the building's), under its top.
 
@@ -35,7 +38,8 @@ import numpy as np
 from ..planar import dist_polyline, inside_poly
 from . import roofparts as RP
 from . import systems as SY
-from .shell import plinth_mm
+from . import parts as PT
+from .shell import ground_mm, on_carriageway, plinth_mm
 
 OVERHANG_MM = 910            # 0.6 m cornices, mitered up to 1.5 times at corners
 PARAPET_MM = 1210
@@ -47,6 +51,7 @@ STREET_Z = 1210
 TOL_MM = 2.0
 COLLAR_MM = 300.0            # AG4: a skybridge's collar zone at the facades it meets
 WHEEL_TOL_MM = 250.0         # AG5: a wheel's members past the box of its masses by their section
+ROAD_RELIEF_MM = 300.0       # AG14: sills, frames and reveals over a road with no sidewalk
 # merged parts keep their slots: how far each slot may reach (the rest: AG1's rule)
 SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "spandrel_panel": "flush", "shutter": "flush", "grille": "flush",
@@ -92,7 +97,17 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     top = max(z1 for _, z1, _, _ in masses) if masses else 0.0
     cap = mast_cap(float(brief["building"]["height_m"]) * 1000.0)
     out = {"vertices": 0, "outside": 0, "too_high": 0, "low_overhang": 0,
-           "equipment_off_roof": 0, "parts": 0}
+           "equipment_off_roof": 0, "over_road": 0, "parts": 0}
+    # AG14: the brief's edges, and which of them face a road with no sidewalk under the
+    # vehicles' headroom
+    g0 = float(ground_mm(brief))
+    zr = (g0 + PT.ROAD_CLEAR) / 1000.0
+    edges = []
+    for e in brief.get("edges") or []:
+        road = any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"])
+        edges.append(([e["a"][0] * 1000.0, e["a"][1] * 1000.0],
+                      [e["b"][0] * 1000.0, e["b"][1] * 1000.0], road))
+    road_edges = [(a, b) for a, b, r in edges if r]
     groups = []
     for name, a in arrs.items():
         pos = np.unique(a["pos"], axis=0).astype(np.float64)
@@ -170,11 +185,30 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
                     (z <= pr["z"][1] * 1000.0 + TOL_MM)
         bad = over & ~allowed
         out["outside"] += int(bad.sum())
+        if road_edges:
+            out["over_road"] += _over_road(x, y, z, np.where(over, near, 0.0), edges,
+                                           road_edges, g0)
         out["low_overhang"] += int((bad & (near <= DEEP_MM) & ~high).sum())
         out["too_high"] += int((z > top + PARAPET_MM).sum())
-    out["ok"] = out["outside"] == 0 and out["too_high"] == 0 and \
+    out["ok"] = out["outside"] == 0 and out["too_high"] == 0 and out["over_road"] == 0 and \
         out["equipment_off_roof"] == 0
     return out
+
+
+def _over_road(x, y, z, near, edges, road_edges, g0: float) -> int:
+    """AG14: vertices more than `ROAD_RELIEF_MM` past the masses under the vehicles'
+    headroom whose nearest brief edge faces a road with no sidewalk."""
+    cand = (near > ROAD_RELIEF_MM) & (z < g0 + PT.ROAD_CLEAR - TOL_MM)
+    if not cand.any():
+        return 0
+    xs, ys = x[cand], y[cand]
+    d_all = np.full(len(xs), np.inf)
+    for a, b, _ in edges:
+        d_all = np.minimum(d_all, dist_polyline(xs, ys, [a, b]))
+    d_road = np.full(len(xs), np.inf)
+    for a, b in road_edges:
+        d_road = np.minimum(d_road, dist_polyline(xs, ys, [a, b]))
+    return int((d_road <= d_all + TOL_MM).sum())
 
 
 def fits(brief: dict, family: str, p: dict, x: int, y: int, z: int, ux: float,

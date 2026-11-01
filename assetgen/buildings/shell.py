@@ -116,7 +116,8 @@ class Facade:
     """One mass edge: a -> b (mm), outward to the right; s along it in mm, 0..L; `soff` the
     s of its start along the brief edge it lies on (a cut or a setback moves it)."""
     __slots__ = ("a", "b", "L", "ux", "uy", "nx", "ny", "j", "u0", "rec", "c0", "c1",
-                 "regions", "soff", "d_in", "d_nx", "reveal", "podium", "grade", "band_ops")
+                 "regions", "soff", "d_in", "d_nx", "reveal", "podium", "grade", "band_ops",
+                 "arc")
 
     def __init__(self, a, b, u0: float):
         self.a, self.b = a, b
@@ -131,6 +132,7 @@ class Facade:
         self.reveal = 0
         self.grade = None
         self.band_ops = []
+        self.arc = None              # AG14: (cx, cy, side, nx, ny) on a curved wall
 
     def P(self, s: int, z: int) -> tuple[int, int, int]:
         L2 = 2 * self.L
@@ -174,6 +176,40 @@ def on_carriageway(reg: dict | None) -> bool:
         return False
     return reg.get("class") in ("street", "front", "alley") and \
         (reg.get("road_class") in NO_WALK or reg.get("class") == "alley")
+
+
+ARC_SAG = 25                 # AG14: a chord of a curved wall sags at most this (M21: 1 to 2 cm)
+ARC_CLEAR = PIER_MIN         # AG14: an opening's pocket from a chord joint on a curve
+
+
+def arc_of(arcs, a, b, n) -> tuple | None:
+    """AG14: the curved wall an edge a -> b (mm, outward normal n) is a chord of: one of its
+    mass's arcs (M21; or a ring offset from it, a setback or a crown's tier stepping in)
+    whose center both ends are equally far from, within its sweep, the chord's sag under
+    `ARC_SAG`; (cx, cy, side, nx, ny) in mm, side 1 on a convex wall, -1 on a court's."""
+    if not arcs:
+        return None
+    L = math.dist(a, b)
+    for arc in arcs:
+        cx, cy = arc["center"][0] * 1000.0, arc["center"][1] * 1000.0
+        ra, rb = math.dist(a, (cx, cy)), math.dist(b, (cx, cy))
+        if abs(ra - rb) > 5.0 or ra < 1500.0 or L >= 2.0 * ra:
+            continue
+        if ra - math.sqrt(max(ra * ra - L * L / 4.0, 0.0)) > ARC_SAG:
+            continue
+        s0, sw = arc["start_deg"], arc["sweep_deg"]
+        ok = True
+        for p in (a, b):
+            t = math.degrees(math.atan2(p[1] - cy, p[0] - cx))
+            d = (t - s0) % 360.0 if sw >= 0 else (s0 - t) % 360.0
+            if d > abs(sw) + 2.0 and d < 358.0:
+                ok = False
+        if not ok:
+            continue
+        mx, my = (a[0] + b[0]) / 2.0 - cx, (a[1] + b[1]) / 2.0 - cy
+        side = 1.0 if mx * n[0] + my * n[1] > 0 else -1.0
+        return (cx, cy, side, n[0], n[1])
+    return None
 
 
 def _corner_clear(d_in, d_out, r: int) -> int:
@@ -848,6 +884,15 @@ class ShellBuilder:
                 fa.c1 = max(corner if _turned(d_out, d_nx) else 0,
                             _corner_clear(d_out, d_nx, reveal),
                             reveal + EDGE_CLEAR if _convex(d_out, d_nx) else 0)
+                if not ms["deriv"][r][i]:
+                    fa.arc = arc_of(br["masses"][k].get("arcs"), a, b, (fa.nx, fa.ny))
+                if fa.arc is not None:
+                    # (AG14: a chord joint on a curve is no corner: its openings come to a
+                    # mullion's width of it, as a curtain wall's round a curve)
+                    if not _turned(d_in, d_out):
+                        fa.c0 = ARC_CLEAR
+                    if not _turned(d_out, d_nx):
+                        fa.c1 = ARC_CLEAR
                 ok = allow and not _blocked(fa, reveal + EDGE_CLEAR, all_edges)
                 fwall = wall
                 if ms.get("portal") and ms["deriv"][r][i] and fa.j is None:
@@ -858,8 +903,10 @@ class ShellBuilder:
                 facades.append((fa, r, i, ok))
                 self.all_facades.append((fa, ms))
                 if band is None or band < ms["z1"]:
+                    self.buf.arc = fa.arc
                     info["openings"] += self._facade(ms, g, fa, rows, fwall, sysname, reveal,
                                                      bay, ok)
+                    self.buf.arc = None
         if band is not None:
             self.buf.layer = 1
             self.buf.new_part()
@@ -867,7 +914,9 @@ class ShellBuilder:
             plans = [(fa, r, i, fb.plan(fa, ok)) for fa, r, i, ok in facades]
             fb.rehome(plans)
             for fa, r, i, ops in plans:
+                self.buf.arc = fa.arc
                 fb.emit(fa, r, i, ops)
+                self.buf.arc = None
                 self.band_facades.append((fa, ms))
             FR.caps(fb, roof=band >= ms["z1"])
             self.buf.layer = 0
@@ -1090,6 +1139,11 @@ class ShellBuilder:
         wwr = cont.get(f"{g}.wwr", 0.4) if sysname else 0.0
         open_p = cont.get(f"{g}.open_p", 0.55)
         cuts = bay_cuts(L, fa.c0, fa.c1, bay, rhythm, key) if allow and bay else []
+        curve = fa.arc is not None and allow and bay > 0 and L - fa.c0 - fa.c1 >= 300
+        if curve:
+            # AG14: a chord of a curved wall is one bay glazed from joint to joint, so its
+            # windows run round the curve as one band a floor, mullions at the joints
+            cuts = [(fa.c0, L - fa.c1)]
         patch_cols = None
         if sysname == "shanty_patchwork":
             pot = [(a_, b_, "glass") for jb, (b0, b1) in enumerate(cuts)
@@ -1129,8 +1183,10 @@ class ShellBuilder:
                         w_ = "single"
                     for jb, (b0, b1) in enumerate(cuts):
                         self.stats["bays"] += 1
-                        for a_, b_ in bay_openings(b0, b1, jb, len(cuts), w_, rhythm, wwr,
-                                                   sysname, f"{key}|{f}", open_p, bay):
+                        for a_, b_ in ([(b0, b1)] if curve and kind in ("win", "lantern")
+                                       else bay_openings(b0, b1, jb, len(cuts), w_, rhythm,
+                                                         wwr, sysname, f"{key}|{f}", open_p,
+                                                         bay)):
                             c = fa.cls((a_ + b_) // 2, zm)
                             if c in NO_WINDOW:
                                 continue
@@ -1809,6 +1865,7 @@ class ShellBuilder:
                 cuts += [zf + SIMPLE_SILL, zf + fh - SIMPLE_HEAD]
         cuts.append(z1)
         doors = self._simple_landings(ms, ring, fh)
+        arcs = self.br["masses"][ms["k"]].get("arcs") if ms.get("k") is not None else None
         levels = sorted({d for v in doors.values() for d in v})
         for r, rg in enumerate([ring] + holes):
             m = len(rg)
@@ -1823,8 +1880,12 @@ class ShellBuilder:
                 for za, zb in (levels if r == 0 else ()):
                     segs = _carve(segs, za, zb, "storefront" if (za, zb) in doors.get(i, ())
                                   else None)
+                n_ = (q[1] - p[1], -(q[0] - p[0]))
+                ln_ = math.hypot(*n_)
+                self.buf.arc = arc_of(arcs, p, q, (n_[0] / ln_, n_[1] / ln_)) if arcs else None
                 for za, zb, s in segs:
                     self._vquad(s, p, q, za, zb)
+                self.buf.arc = None
         self.stats["simple_masses"] = self.stats.get("simple_masses", 0) + 1
         if len(cuts) > 2:
             self.stats["simple_glass"] = self.stats.get("simple_glass", 0) + 1

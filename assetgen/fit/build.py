@@ -53,7 +53,7 @@ from .index import Surfaces
 
 TILE_M = 256.0
 GAP_M = 0.02
-REACH_M = 0.35
+REACH_M = 0.6
 HEADROOM_M = 4.5
 RELIEF_M = 0.3
 INSET_M = 0.1
@@ -127,7 +127,7 @@ class Packs:
         e2 = tris[:, 2] - tris[:, 0]
         n = np.cross(e1, e2)
         L = np.linalg.norm(n, axis=1)
-        up = (L > 1e-9) & (n[:, 2] > 0.2 * np.maximum(L, 1e-12))
+        up = (L > 1e-9) & (n[:, 2] > 0.05 * np.maximum(L, 1e-12))
         tris = tris[up]
         if not len(tris):
             return
@@ -392,6 +392,7 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
                 gaps[i] = float(np.nanmax(np.where(ok[j], row, -np.inf)))
             else:
                 gaps[i] = float(np.nanmin(row)) if not np.all(np.isnan(row)) else np.inf
+    steps = seams(pk)
     floating = [i for i in range(len(things)) if not gaps[i] <= GAP_M]
     by_what: dict[str, list] = defaultdict(lambda: [0, 0])
     for i, th in enumerate(things):
@@ -399,8 +400,9 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
     for i in floating:
         by_what[things[i]["what"]][1] += 1
     worst = sorted(floating, key=lambda i: (-min(gaps[i], 1e9), things[i]["id"]))[:LIST_MAX]
-    return {"id": "asset_grounded", "ok": not floating,
+    return {"id": "asset_grounded", "ok": not floating and not steps["steps"],
             "things": len(things), "floating": len(floating),
+            "seams": steps,
             "by_kind": {k: {"things": v[0], "floating": v[1]}
                         for k, v in sorted(by_what.items()) if v[1]},
             "kinds": len(by_what),
@@ -408,6 +410,57 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
                        "at": [C.m2(v) for v in things[i]["feet"][0]],
                        "gap_m": None if not np.isfinite(gaps[i]) else C.m(gaps[i])}
                       for i in worst]}
+
+
+def seams(pk: Packs) -> dict:
+    """A road meets its junction: every vertex of a road piece's carriageway that lies on a
+    junction piece's carriageway (its cut edge) is within `GAP_M` of that surface's height
+    there (no step where a leg meets its junction; a junction more than 1 m off is another
+    level)."""
+    jt, jo = [], []
+    for pid in pk.street_ids():
+        if pk.street_kind(pid) != "street.junction":
+            continue
+        T, mats = pk.street_tris(pid)
+        keep = np.array([m.startswith("asphalt") for m in mats],
+                        dtype=bool)
+        if len(T) and keep.any():
+            jt.append(T[keep])
+            jo.append(np.full(int(keep.sum()), pk.owner(pid)))
+    out = {"legs": 0, "steps": 0, "max_m": 0.0, "worst": []}
+    if not jt:
+        return out
+    S = Surfaces(np.concatenate(jt), np.concatenate(jo), min_nz=0.5)
+    rows = []
+    for pid in pk.street_ids():
+        if pk.street_kind(pid) != "street.road":
+            continue
+        T, mats = pk.street_tris(pid)
+        keep = np.array([m.startswith("asphalt") for m in mats],
+                        dtype=bool)
+        if not len(T) or not keep.any():
+            continue
+        P = np.unique(np.round(T[keep].reshape(-1, 3), 3), axis=0)
+        p_, t_ = S.candidates(P[:, :2])
+        if not len(p_):
+            continue
+        ins, z = S.heights(P[:, :2], p_, t_, eps=1e-4)
+        dz = np.abs(P[p_, 2] - z)
+        sel = ins & (dz < 1.0)
+        if not sel.any():
+            continue
+        out["legs"] += len({int(S.owner[t]) for t in t_[sel].tolist()})
+        worst = float(dz[sel].max())
+        if worst > GAP_M:
+            out["steps"] += 1
+            i = int(np.argmax(np.where(sel, dz, -1.0)))
+            rows.append((worst, pid, pk.names[int(S.owner[t_[i]])],
+                         [C.m2(v) for v in P[p_[i]]]))
+        out["max_m"] = max(out["max_m"], C.m(worst))
+    rows.sort(key=lambda r: (-r[0], r[1]))
+    out["worst"] = [{"road": r[1], "junction": r[2], "step_m": C.m(r[0]), "at": r[3]}
+                    for r in rows[:LIST_MAX]]
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -646,7 +699,7 @@ def _over_road(pk: Packs, model, S: Surfaces, out: dict, counts: dict):
         h = hits[bid]
         out["building_over_road"].append({"building": bid, "vertices": h[0],
                                           "roads": sorted(h[1])[:5], "what": sorted(h[2])[:5],
-                                          "at": h[3], "over_m": h[4]})
+                                          "at": h[3], "over_m": h[4], "reach_m": h[5]})
 
 
 def _test_over(bid, P, fp, S: Surfaces, hits: dict, part: str | None = None):
@@ -661,14 +714,20 @@ def _test_over(bid, P, fp, S: Surfaces, hits: dict, part: str | None = None):
     bad = ~np.isnan(zs) & (dz > 0.05) & (dz < HEADROOM_M)
     if not bad.any():
         return
-    # which road: the owner of the surface under the first bad vertex
-    i = int(np.nonzero(bad)[0][0])
+    # which road: the owner of the surface under the farthest bad vertex
+    B = Q[bad]
+    reach = shapely.distance(fp, shapely.points(B[:, 0], B[:, 1])) + RELIEF_M
+    k = int(np.argmax(reach))
+    i = int(np.nonzero(bad)[0][k])
     pid_, tid_ = S.candidates(Q[i:i + 1, :2])
     ins, z = S.heights(Q[i:i + 1, :2], pid_, tid_)
-    h = hits.setdefault(bid, [0, set(), set(), [C.m2(v) for v in Q[i]], C.m(float(dz[i]))])
+    h = hits.setdefault(bid, [0, set(), set(), [C.m2(v) for v in Q[i]], C.m(float(dz[i])),
+                              0.0])
     h[0] += int(bad.sum())
     h[1] |= {int(S.owner[t]) for t in tid_[ins & (z <= Q[i, 2] - 0.05)].tolist()}
     h[2].add(part or "shell")
+    if float(reach[k]) > h[5]:
+        h[3], h[4], h[5] = [C.m2(v) for v in Q[i]], C.m(float(dz[i])), C.m(float(reach[k]))
 
 
 # ---------------------------------------------------------------------------
@@ -714,6 +773,11 @@ def report_text(rep: dict) -> str:
         if c["id"] == "asset_grounded":
             lines.append(f"{'PASS' if c['ok'] else 'FAIL'} asset_grounded: {c['things']} things "
                          f"({c['kinds']} kinds), {c['floating']} not resting on a surface")
+            sm = c["seams"]
+            lines.append(f"    roads on their junctions: {sm['legs']} legs, {sm['steps']} roads "
+                         f"with a step over {GAP_M} m (largest {sm['max_m']} m)")
+            for w in sm["worst"][:10]:
+                lines.append(f"    step: {json.dumps(w, sort_keys=True)}")
             for k, v in c["by_kind"].items():
                 lines.append(f"    {k}: {v['floating']} of {v['things']}")
             for w in c["worst"][:15]:

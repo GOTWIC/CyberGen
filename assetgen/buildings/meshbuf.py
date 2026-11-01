@@ -7,6 +7,11 @@ vertices across bays, a cap's triangles share its ring), never across planes, as
 shading needs. UV0 is meters along the plane's axes (world-scale tiling, scope 5.2); UV1
 (0 to 1 over a pane) and COLOR_0 (window id in alpha) exist only on the glass slots.
 
+AG14: a plane made while a curved wall is drawn (`Buf.arc`: the arc's center and side) and
+facing that wall's way gets that arc: its vertices then take the curve's normal (radial,
+in plan) in place of the plane's, so the chords of an arc shade as one smooth wall; the
+vertices stay where they are and are welded as before.
+
 AG3: every triangle also carries the layer it belongs to (`layer`: 0 the shell, 1 the
 street front, the ground band that Unreal collides as drawn), so one buffer splits into the
 two meshes of a building (`split`); a part never spans two layers.
@@ -29,6 +34,8 @@ class Buf:
         self.part = -1
         self.layer = 0
         self._parts = 0
+        self.arc = None                 # AG14: (cx, cy, side, nx, ny) of the wall drawn
+        self.arc_of: dict[int, tuple] = {}
 
     def new_part(self) -> int:
         """A new closed part (ids never reused, so a builder may go back to an earlier one
@@ -41,7 +48,11 @@ class Buf:
         """A face plane: unit normal n, origin o (mm), UV axes (unit), UV0 at the origin."""
         self.planes.append((n[0], n[1], n[2], o[0], o[1], o[2], uax[0], uax[1], uax[2],
                             vax[0], vax[1], vax[2], u0, v0))
-        return len(self.planes) - 1
+        k = len(self.planes) - 1
+        a = self.arc
+        if a is not None and abs(n[2]) < 1e-9 and n[0] * a[3] + n[1] * a[4] > 0.9999:
+            self.arc_of[k] = (a[0], a[1], a[2])
+        return k
 
     def slot(self, name: str) -> dict:
         s = self.slots.get(name)
@@ -120,10 +131,35 @@ class Buf:
             if hero is not None and not glass:
                 from .heroes import hero_uv
                 uv1 = hero_uv(a["pos"], uv0, hero[0], hero[1])
+            nrm = pl[:, 0:3]
+            if self.arc_of:
+                nrm = _arc_normals(self.arc_of, a["pl"], pos, nrm)
             prims.append(Primitive(material=materials[name], positions=a["pos"],
-                                   indices=a["tri"].reshape(-1), normals=pl[:, 0:3],
+                                   indices=a["tri"].reshape(-1), normals=nrm,
                                    uv0=uv0, uv1=uv1, colors=colors))
         return prims
+
+
+def _arc_normals(arc_of: dict, pl: np.ndarray, pos: np.ndarray, nrm: np.ndarray):
+    """AG14: the vertices of planes on a curved wall take the curve's normal: from the
+    arc's center through the vertex in plan (outward on a convex wall, inward on a court's
+    concave one)."""
+    ids = np.array(sorted(arc_of), dtype=np.int64)
+    on = np.isin(pl, ids)
+    if not on.any():
+        return nrm
+    out = nrm.copy()
+    idx = np.nonzero(on)[0]
+    c = np.array([arc_of[int(k)] for k in pl[idx]], dtype=np.float64)
+    dx = pos[idx, 0] - c[:, 0]
+    dy = pos[idx, 1] - c[:, 1]
+    L = np.sqrt(dx * dx + dy * dy)
+    ok = L > 1.0
+    L = np.where(ok, L, 1.0)
+    out[idx, 0] = np.where(ok, c[:, 2] * dx / L, out[idx, 0])
+    out[idx, 1] = np.where(ok, c[:, 2] * dy / L, out[idx, 1])
+    out[idx, 2] = np.where(ok, 0.0, out[idx, 2])
+    return out
 
 
 def split(arrs: dict) -> tuple[dict, dict]:

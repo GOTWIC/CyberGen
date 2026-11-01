@@ -971,16 +971,42 @@ def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int, z:
 
 
 def _seat(rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int) -> int:
-    """AG14: the highest point of a roof form under an item's footprint (its corners, edge
-    middles and middle), where the item's base goes: on the form, never over it (a barrel's
-    or a sawtooth's crest lies under the mass top the model gives the item) nor into it."""
+    """AG14: where an item's base goes on a roof form: the form under its middle, or its
+    highest point under the footprint (corners, edge middles, middle) where that is over
+    `LEG_MIN` higher (the item then stands on that point, dunnage under the rest); never
+    over the form (a barrel's or a sawtooth's crest lies under the mass top the model gives
+    the item) nor deep in it."""
     hi = -math.inf
     for sx in (-1, 0, 1):
         for sy in (-1, 0, 1):
             px = x + ux * sx * w / 2.0 - uy * sy * d / 2.0
             py = y + uy * sx * w / 2.0 + ux * sy * d / 2.0
             hi = max(hi, surface(rf, px, py))
-    return int(math.ceil(hi))
+    mid = surface(rf, float(x), float(y))
+    return int(math.ceil(mid if hi - mid <= LEG_MIN else hi))
+
+
+def _onto_top(rf: dict, x: int, y: int, ux: float, uy: float, w: int,
+              d: int) -> tuple[int, int] | None:
+    """AG14: an item on a mansard's slope moved toward the middle of its roof, 0.25 m at a
+    time up to 6 m, to the first place its footprint stands wholly on the flat top."""
+    ring = rf["ring"]
+    cx = sum(p[0] for p in ring) / len(ring)
+    cy = sum(p[1] for p in ring) / len(ring)
+    dx, dy = cx - x, cy - y
+    L = math.hypot(dx, dy)
+    if L < 1.0:
+        return None
+    for k in range(1, 25):
+        t = min(250.0 * k, L)
+        px, py = x + dx / L * t, y + dy / L * t
+        if all(surface(rf, px + ux * sx * w / 2.0 - uy * sy * d / 2.0,
+                       py + uy * sx * w / 2.0 + ux * sy * d / 2.0) >= rf["zt"] - 10
+               for sx in (-1, 1) for sy in (-1, 1)):
+            return int(round(px)), int(round(py))
+        if t >= L:
+            break
+    return None
 
 
 def _top_of(ms: dict) -> int:
@@ -989,9 +1015,39 @@ def _top_of(ms: dict) -> int:
     if ms.get("screen"):
         return ms["z0"]
     rf = ms.get("roof")
-    if rf and rf["kind"] != "flat":
-        return rf["zt"]
+    if rf:
+        return rf["zt"]               # (a form that fell back to flat is extruded to it)
     return ms["z1"]
+
+
+def _pull_in(sb, it: dict, x: int, y: int, z: int) -> tuple[int, int] | None:
+    """AG14: an item whose point fell off the roof the model gave it (a crown's tier or a
+    setback stepped in under it): moved toward that roof's middle, 0.25 m at a time up to
+    4 m, to the first place its whole footprint stands on it; None where none does (or the
+    roof is a halo's screen)."""
+    sa, sc = (max(int(round(v * 1000)), 100) for v in it["size"][:2])
+    a = M.radians(float(it["yaw_deg"]))
+    ux, uy = float(M.cos(a)), float(M.sin(a))
+    for ms in sb.masses:
+        if ms.get("screen") or abs(_top_of(ms) - z) > 60:
+            continue
+        ring = ms["rings"][0]
+        cx = sum(p[0] for p in ring) / len(ring)
+        cy = sum(p[1] for p in ring) / len(ring)
+        dx, dy = cx - x, cy - y
+        L = math.hypot(dx, dy)
+        if L < 1.0:
+            continue
+        for k in range(1, 17):
+            t = min(250.0 * k, L)
+            px, py = int(round(x + dx / L * t)), int(round(y + dy / L * t))
+            if all(RG.in_poly((int(round(px + ux * sx * sa / 2 - uy * sy * sc / 2)),
+                               int(round(py + uy * sx * sa / 2 + ux * sy * sc / 2))),
+                              ms["rings"]) == 1 for sx in (-1, 1) for sy in (-1, 1)):
+                return px, py
+            if t >= L:
+                break
+    return None
 
 
 def _form_under(sb, x: int, y: int, z: int, below: bool = False) -> dict | None:
@@ -1047,8 +1103,13 @@ def items(sb) -> None:
             tops = [t for t in (_top_of(ms) for ms in sb.masses
                                 if RG.in_poly((x, y), ms["rings"]) >= 0) if t <= z + 60]
             if tops and max(tops) < z - 20:
-                z = max(tops)
-                sb.stats["roof_items_dropped"] = sb.stats.get("roof_items_dropped", 0) + 1
+                at = _pull_in(sb, it, x, y, z)
+                if at is not None:
+                    x, y = at                   # (onto the roof it was given)
+                    sb.stats["roof_items_pulled"] = sb.stats.get("roof_items_pulled", 0) + 1
+                else:
+                    z = max(tops)
+                    sb.stats["roof_items_dropped"] = sb.stats.get("roof_items_dropped", 0) + 1
         sa, sc, sz = (max(int(round(v * 1000)), 100) for v in it["size"])
         a = M.radians(float(it["yaw_deg"]))
         ux, uy = float(M.cos(a)), float(M.sin(a))
@@ -1063,6 +1124,13 @@ def items(sb) -> None:
             w_, d_ = (800, 800) if kind == "antenna" else (sa, sc)
             z0 = z
             z = _seat(rf, x, y, ux, uy, w_, d_)
+            if rf["kind"] == "mansard" and z < rf["zt"] - LEG_MIN:
+                # (on a mansard's slope: onto its flat top where it fits, else at the top
+                # on dunnage down the slope)
+                at = _onto_top(rf, x, y, ux, uy, w_, d_)
+                if at is not None:
+                    x, y = at
+                z = rf["zt"]
             if z != z0:
                 sb.stats["roof_items_seated"] = sb.stats.get("roof_items_seated", 0) + 1
         elif rf is not None and moved:
