@@ -33,6 +33,7 @@ GUIDEWAY_W = {"elevated_rail": 9.0, "monorail": 2.5, "maglev": 7.0, "sky_tube": 
               "metro": 9.0}
 TUBE_LODS = ((24, 6.0), (12, 12.0), (6, 24.0))
 TUBE_SCREEN = (1.0, 0.25, 0.06)
+TRACK_MARGIN_M = 0.5    # AG14: a platform stops this far from a track (a tube's ribs, rails)
 
 
 def _line_dir(cx: Ctx, line_id: str | None, x: float, y: float):
@@ -105,7 +106,8 @@ def track_solids(m) -> list:
                 continue
             w = float(a.get("width_m", GUIDEWAY_W.get(a.get("mode"), 6.0)))
             ln = shapely.LineString([(p[0], p[1]) for p in st.line])
-            poly = ln.buffer(w / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+            poly = ln.buffer(w / 2.0 + TRACK_MARGIN_M, cap_style="flat", join_style="mitre",
+                             mitre_limit=2.0)
             zs = [p[2] for p in st.line]
             dm = float(a.get("deck_m", st.z1_m - st.z0_m))
             out.append((poly, min(zs) - dm, max(zs)))

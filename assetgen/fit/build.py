@@ -54,6 +54,7 @@ from .index import Surfaces
 TILE_M = 256.0
 GAP_M = 0.02
 REACH_M = 0.6
+FOOTING_M = 3.0         # how far a column's footing may be set into what it stands on
 HEADROOM_M = 4.5
 RELIEF_M = 0.3
 INSET_M = 0.1
@@ -265,6 +266,23 @@ class Floor:
             self.wet = None
         if self.wet is not None:
             shapely.prepare(self.wet)
+        self.beds = self.levels = None
+        if getattr(m, "banks", None):
+            from citygen import water as WA
+            self.beds, self.levels = WA.Beds(m), WA.Levels(m)
+
+    def bed(self, xy: np.ndarray) -> np.ndarray:
+        """M16's bed under points over the water (absolute), nan elsewhere."""
+        out = np.full(len(xy), np.nan)
+        if self.beds is None or self.wet is None or not len(xy):
+            return out
+        on = shapely.contains_xy(self.wet, xy[:, 0], xy[:, 1])
+        for i in np.nonzero(on)[0].tolist():
+            x, y = float(xy[i, 0]), float(xy[i, 1])
+            wid = self.beds.body_at(x, y)
+            if wid is not None:
+                out[i] = self.levels.at(wid, x, y) - self.beds.depth(wid, x, y)
+        return out
 
     def at(self, xy: np.ndarray) -> np.ndarray:
         if self.flat:
@@ -339,7 +357,9 @@ def _things(pk: Packs, model) -> list[dict]:
         T, _ = pk.street_tris(pid)
         F = feet(T.reshape(-1, 3))
         if F is not None:
-            out.append({"id": pid, "what": k, "feet": F, "self": pk.oid.get(pid)})
+            # (a column's footing may be set into the ground or the bed by up to 3 m)
+            out.append({"id": pid, "what": k, "feet": F, "self": pk.oid.get(pid),
+                        "reach": FOOTING_M, "bed": True})
     return out
 
 
@@ -392,6 +412,10 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
                                  for i in ids]), 5)
         R = np.repeat(np.array([things[i].get("reach", REACH_M) for i in ids]), 5)
         fl = floor.at(P[:, :2])
+        # (in the water a footing stands on M16's bed)
+        wb = np.repeat(np.array([bool(things[i].get("bed")) for i in ids]), 5)
+        if wb.any():
+            fl = np.where(wb & np.isnan(fl), floor.bed(P[:, :2]), fl)
         fl = np.where(P[:, 2] + R >= fl, fl, np.nan)     # (nan over the water too)
         zs = np.fmax(S.under(P, R, ex), fl)
         g = (P[:, 2] - zs).reshape(-1, 5)
@@ -573,7 +597,7 @@ def clash(pk: Packs, model) -> dict:
     for pid in pk.street_ids():
         k = pk.street_kind(pid)
         road = k in ROADLIKE
-        transit = k in TRANSIT
+        transit = k in TRANSIT and pid.split(".glass")[0] in lines_of
         if not (road or transit):
             continue
         T, mats = pk.street_tris(pid)

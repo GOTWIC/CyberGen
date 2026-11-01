@@ -560,6 +560,7 @@ class ShellBuilder:
         self.used["front"] = {}
         # AG2
         self.parts = PT.PartSet()
+        self.parts.guard = self._clear_of_lanes      # (AG14: nothing reaching over a lane)
         self.marks = AR.marks(brief, self.units_by_edge)
         self.arcades: list[dict] = []
         self.plinth = plinth_mm(brief)

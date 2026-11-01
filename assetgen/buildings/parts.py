@@ -591,7 +591,13 @@ class PartSet:
 
     def on(self, fa, family: str, p: dict, s: int, z: int, y: int = 0,
            extra_deg: int = 0) -> None:
-        """Place at s along facade `fa` (its `P`, `ux`, `uy`), height z, y into the wall."""
+        """Place at s along facade `fa` (its `P`, `ux`, `uy`), height z, y into the wall;
+        AG14: not where the shell's `guard` (keeping off the lanes) refuses it."""
+        g = getattr(self, "guard", None)
+        if g is not None and REACH.get(family, "flush") != "flush" and \
+                not g(fa, family, p, s, z):
+            self.refused = getattr(self, "refused", 0) + 1
+            return
         x0, y0, _ = fa.P(s, z)
         self.add(family, p, x0 - int(round(fa.nx * y)), y0 - int(round(fa.ny * y)), z,
                  fa.ux, fa.uy, extra_deg)
