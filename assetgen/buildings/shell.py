@@ -159,7 +159,7 @@ class Facade:
     def on_road(self) -> bool:
         """AG14: whether this facade faces a road with no sidewalk anywhere under the
         vehicles' headroom (`on_carriageway`; the envelope's `over_road` rule, by edge)."""
-        if self.lane() is not None and self.lane() < LANE_NEAR:
+        if self.lane() is not None and self.lane() < LANE_NEAR and self.by_lane():
             return True
         return any(on_carriageway(r) and r["z"][0] * 1000.0 < PT.ROAD_CLEAR
                    for r in self.regions or ())
@@ -169,6 +169,14 @@ class Facade:
         brief edge's `lane_z_m`; 0 where lower or none): the headroom is over them."""
         v = (self.rec or {}).get("lane_z_m")
         return max(int(round(v * 1000)), 0) if v is not None else 0
+
+    def by_lane(self) -> bool:
+        """AG14: whether this facade's stretch of its brief edge is the stretch near a lane
+        (the brief's `lane_s`; a brief without it: all of it)."""
+        sp = (self.rec or {}).get("lane_s")
+        if sp is None:
+            return True
+        return self.soff < sp[1] * 1000 + 1 and self.soff + self.L > sp[0] * 1000 - 1
 
     def lane(self) -> int | None:
         """AG14: how far (mm) the nearest lane is in front of this facade's brief edge (the
@@ -187,7 +195,7 @@ class Facade:
             # (AG14: under the vehicles' headroom it stops short of the nearest lane)
             if self.on_road() and (self.lane() is None or self.lane() < 300):
                 return 0
-            if self.lane() is not None:
+            if self.lane() is not None and self.by_lane():
                 cap = max(self.lane() - 400, 0)
         cls = r["class"] if r is not None else (self.rec["class"] if self.rec else "open")
         if cls in ("street", "front"):

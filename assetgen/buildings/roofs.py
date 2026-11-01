@@ -938,36 +938,63 @@ def _place(sb, family: str, p: dict, x: int, y: int, z: int, ux: float, uy: floa
     return PT.node_name(family, p)
 
 
-def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int, z: int) -> int:
-    """Dunnage under an item of w x d at (x, y) whose base is at z over a roof form: the
-    frame's leg (0: none needed). AG14: the legs reach the lowest point of the form under
-    the frame's own corners (where they stand), not the item's."""
-    def low(w_, d_):
+def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int,
+          z: int) -> tuple[int, int, int, int]:
+    """Dunnage under an item of w x d at (x, y) whose base is at z over a roof form:
+    (the frame's leg (0: none needed), and where the item now stands: x, y, z). AG14: the
+    legs reach the lowest point of the form under the frame's own corners (where they
+    stand), not the item's; a frame that cannot stand wholly on the form there (its corners
+    past the roof's edge) is moved, with its item, toward the roof's middle until it can
+    (0.25 m at a time, up to 4 m; the item seated again there)."""
+    def low(x_, y_, w_, d_):
         lo = math.inf
         for sx in (-1, 1):
             for sy in (-1, 1):
-                px = x + ux * sx * w_ / 2.0 - uy * sy * d_ / 2.0
-                py = y + uy * sx * w_ / 2.0 + ux * sy * d_ / 2.0
+                px = x_ + ux * sx * w_ / 2.0 - uy * sy * d_ / 2.0
+                py = y_ + uy * sx * w_ / 2.0 + ux * sy * d_ / 2.0
                 lo = min(lo, surface(rf, px, py))
         return lo
-    if z - low(w, d) < LEG_MIN:
-        return 0
+    if z - low(x, y, w, d) < LEG_MIN:
+        return 0, x, y, z
+    ring = rf["ring"]
+
+    def fits(x_, y_, fw_, fd_):
+        hx, hy = fw_ / 2 + 20, fd_ / 2 + 20
+        return all(RG.in_poly((int(round(x_ + ux * sx * hx - uy * sy * hy)),
+                               int(round(y_ + uy * sx * hx + ux * sy * hy))), [ring]) == 1
+                   for sx in (-1, 1) for sy in (-1, 1))
     # the frame 0.1 m past the item, else as big as it or smaller where its box (the
     # envelope checks an instanced part's box) would reach past the roof's edge under it
-    ring = rf["ring"]
+    fw = fd = None
     for grow in (200, 0, -200, -400):
-        fw, fd = max(w + grow, 400), max(d + grow, 400)
-        hx, hy = fw / 2 + 20, fd / 2 + 20
-        if all(RG.in_poly((int(round(x + ux * sx * hx - uy * sy * hy)),
-                           int(round(y + uy * sx * hx + ux * sy * hy))), [ring]) == 1
-               for sx in (-1, 1) for sy in (-1, 1)):
+        fw_, fd_ = max(w + grow, 400), max(d + grow, 400)
+        if fits(x, y, fw_, fd_):
+            fw, fd = fw_, fd_
             break
-    leg = z - min(low(fw, fd), low(w, d))
+    if fw is None:
+        cx = sum(p[0] for p in ring) / len(ring)
+        cy = sum(p[1] for p in ring) / len(ring)
+        dx, dy = cx - x, cy - y
+        L = math.hypot(dx, dy)
+        fw_, fd_ = max(w, 400), max(d, 400)
+        for k in range(1, 17 if L >= 1.0 else 1):
+            t = min(250.0 * k, L)
+            px, py = int(round(x + dx / L * t)), int(round(y + dy / L * t))
+            if fits(px, py, fw_, fd_):
+                x, y, fw, fd = px, py, fw_, fd_
+                z = _seat(rf, x, y, ux, uy, w, d)
+                sb.stats["roof_items_pulled"] = sb.stats.get("roof_items_pulled", 0) + 1
+                break
+            if t >= L:
+                break
+        if fw is None:
+            fw, fd = max(w - 400, 400), max(d - 400, 400)
+    leg = z - min(low(x, y, fw, fd), low(x, y, w, d))
     if leg < LEG_MIN:
-        return 0
+        return 0, x, y, z
     leg = int(math.ceil(leg / 10.0)) * 10        # (to the centimeter: the legs touch)
     _place(sb, "dunnage", {"w": PT.q(fw), "d": PT.q(fd), "leg": leg}, x, y, z - leg, ux, uy)
-    return leg
+    return leg, x, y, z
 
 
 def _seat(rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int) -> int:
@@ -1141,7 +1168,7 @@ def items(sb) -> None:
             rec["asset"] = "sign"            # AG8's billboard (frame, truss, legs)
         elif kind == "ac_unit":
             if rf is not None:
-                _legs(sb, rf, x, y, ux, uy, sa, sc, z)
+                _, x, y, z = _legs(sb, rf, x, y, ux, uy, sa, sc, z)
             p = {"w": PT.q(sa), "d": PT.q(sc), "h": PT.q(sz), "style": _style(sb, "ac")}
             rec["asset"] = _place(sb, "ac_unit", p, x, y, z, ux, uy)
         elif kind == "water_tank":
@@ -1151,7 +1178,7 @@ def items(sb) -> None:
                 h, st = PT.q(max(1200, top)), "panel"
                 sb.stats["roof_items_lowered"] = sb.stats.get("roof_items_lowered", 0) + 1
             if rf is not None:
-                _legs(sb, rf, x, y, ux, uy, sa, sc, z)
+                _, x, y, z = _legs(sb, rf, x, y, ux, uy, sa, sc, z)
             p = {"r": PT.q(min(sa, sc) / 2), "h": h, "style": st}
             rec["asset"] = _place(sb, "water_tank", p, x, y, z, ux, uy)
         elif kind == "antenna":
@@ -1162,7 +1189,7 @@ def items(sb) -> None:
             st = "lattice" if h >= 9000 else ("whip" if _u(f"{sb.bid}|{k}", "ant") < 0.6
                                                else "dish")
             if rf is not None:
-                _legs(sb, rf, x, y, ux, uy, 800, 800, z)
+                _, x, y, z = _legs(sb, rf, x, y, ux, uy, 800, 800, z)
             rec["asset"] = _place(sb, "antenna", {"h": h, "style": st}, x, y, z, ux, uy)
         elif kind in ("helipad", "av_pad"):
             p = {"s": PT.q(min(sa, sc)), "h": PT.q(sz), "kind": kind}

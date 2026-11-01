@@ -471,6 +471,29 @@
           "description": "AG14: how far out from the edge the nearest lane (a road's carriageway at grade, a junction) is, under 6 m.",
           "title": "Lane M"
         },
+        "lane_s": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AG14: the stretch of the edge (s, m) within 2 m of a lane.",
+          "title": "Lane S"
+        },
         "lane_z_m": {
           "anyOf": [
             {

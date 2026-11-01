@@ -425,7 +425,7 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
     of those lanes' surfaces (absolute) within `LANE_NEAR_M` of the edge, else None: what
     leaves the wall there must stop short of the lane, or keep the vehicles' headroom over
     it."""
-    es, xs, ys, own = [], [], [], []
+    es, xs, ys, own, ss = [], [], [], [], []
     for es_b in edges_by_b:
         for e in es_b:
             if e.ring != 0 or e.mass.z0 > 5.0:
@@ -438,6 +438,7 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
                 xs.append(e.a[0] + e.u[0] * s + e.n[0] * 0.01)
                 ys.append(e.a[1] + e.u[1] * s + e.n[1] * 0.01)
                 own.append(k)
+                ss.append(s)
     if not es:
         return {}
     px, py = np.array(xs), np.array(ys)
@@ -499,8 +500,22 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
     np.minimum.at(best, own_a, gap)
     hi = np.full(len(es), -np.inf)
     np.maximum.at(hi, own_a, top)
-    return {id(e): (C.m(float(g)), C.m(float(h)) if np.isfinite(h) else None)
-            for e, g, h in zip(es, best.tolist(), hi.tolist()) if g < LANE_MAX_M}
+    # the stretch of the edge near a lane (its samples within LANE_NEAR_M)
+    sa = np.array(ss)
+    near = gap < LANE_NEAR_M
+    s0 = np.full(len(es), np.inf)
+    s1 = np.full(len(es), -np.inf)
+    np.minimum.at(s0, own_a[near], sa[near])
+    np.maximum.at(s1, own_a[near], sa[near])
+    out = {}
+    for k, e in enumerate(es):
+        if best[k] >= LANE_MAX_M:
+            continue
+        span = [C.m(max(s0[k] - LANE_STEP_M, 0.0)), C.m(min(s1[k] + LANE_STEP_M, e.L))] \
+            if np.isfinite(s0[k]) else None
+        out[id(e)] = (C.m(float(best[k])), C.m(float(hi[k])) if np.isfinite(hi[k]) else None,
+                      span)
+    return out
 
 
 def _dist_along(px: np.ndarray, py: np.ndarray, line) -> tuple[np.ndarray, np.ndarray]:
@@ -781,8 +796,10 @@ def _edge_record(e: Edge, ox: float, oy: float, faced: dict, k: int,
     if lanes and id(e) in lanes:
         # (AG14: the nearest lane in front of it; how high over the building's base the lanes
         # near it run)
-        g, h = lanes[id(e)]
+        g, h, span = lanes[id(e)]
         out["lane_m"] = g
+        if span is not None:
+            out["lane_s"] = span
         if h is not None:
             out["lane_z_m"] = C.m(h - base)
     return out

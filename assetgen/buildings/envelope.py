@@ -107,15 +107,19 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
         lane = e.get("lane_m")
         lane = lane * 1000.0 if lane is not None else None
         rise = max((e.get("lane_z_m") or 0.0) * 1000.0, 0.0)
+        # (the stretch of the edge near its lane, as a share of it: `lane_s`)
+        sp = e.get("lane_s")
+        L = max(e["length_m"], 1e-6)
+        span = (sp[0] / L, sp[1] / L) if sp is not None and lane is not None else (0.0, 1.0)
         # (a stub under 1.5 m at a corner says nothing of what its neighbors face)
         if e["length_m"] >= 1.5 and \
                 any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"]):
-            lane = 0.0
+            lane, span = 0.0, (0.0, 1.0)
         mz = brief["masses"][e["mass"]]["z"]
         edges.append(([e["a"][0] * 1000.0, e["a"][1] * 1000.0],
                       [e["b"][0] * 1000.0, e["b"][1] * 1000.0], lane,
-                      (masses[e["mass"]][0], mz[1] * 1000.0), rise))
-    road_edges = [(a, b, lane, zz, rise) for a, b, lane, zz, rise in edges
+                      (masses[e["mass"]][0], mz[1] * 1000.0), rise, span))
+    road_edges = [(a, b, lane, zz, rise, span) for a, b, lane, zz, rise, span in edges
                   if lane is not None]
     groups = []
     for name, a in arrs.items():
@@ -218,18 +222,18 @@ def _over_road(x, y, z, near, edges, road_edges, g0: float) -> int:
     d_all = np.full(len(xs), np.inf)
     # (the edges of the masses at the point's height or over it: a mast's or a tower's
     # edges high up say nothing of what is under them at the street)
-    for a, b, _, (z0, z1), _ in edges:
+    for a, b, _, (z0, z1), _, _ in edges:
         on = zs <= z1 + PARAPET_MM
         d_all = np.where(on, np.minimum(d_all, dist_polyline(xs, ys, [a, b])), d_all)
     bad = np.zeros(len(xs), dtype=bool)
-    for a, b, lane, (z0, z1), rise in road_edges:
+    for a, b, lane, (z0, z1), rise, (t0, t1) in road_edges:
         dx, dy = b[0] - a[0], b[1] - a[1]
         L2 = dx * dx + dy * dy
         if L2 <= 0.0:
             continue
         t = ((xs - a[0]) * dx + (ys - a[1]) * dy) / L2
         d = dist_polyline(xs, ys, [a, b])
-        bad |= (t >= 0.0) & (t <= 1.0) & (d <= d_all + ROAD_RELIEF_MM) & \
+        bad |= (t >= max(t0, 0.0)) & (t <= min(t1, 1.0)) & (d <= d_all + ROAD_RELIEF_MM) & \
             (d > max(ROAD_RELIEF_MM, lane - 100.0)) & (zs <= z1 + PARAPET_MM) & \
             (zs >= z0 - DEEP_MM) & (zs < g0 + PT.ROAD_CLEAR + rise - TOL_MM)
     return int(bad.sum())
