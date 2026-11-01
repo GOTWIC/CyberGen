@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M19 and M21 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10 and AG13 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG14 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -467,7 +467,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
 | AG12 | Water | Water that flows, foams and (at sea) swells, beds of mud, sand and stone, natural banks, beaches, marsh edges and riprap, Single Layer Water and an underwater look in Unreal | Done |
 | AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
-| AG14 | Fit and finish | Smooth junctions and curved walls, everything resting on what it stands on, nothing through anything else | Planned |
+| AG14 | Fit and finish | Junctions that meet their roads, smooth glazed curved walls, roof equipment on its roofs, transit frames, piers and cable-stayed masts, embankments under low decks, bridges drawn once, nothing hanging over the lanes; checks that everything rests on something and nothing passes through anything else | Done |
 | AG15 | Cyberpunk facades and night | Window patterns beyond grids, mixed materials, every building lit its own way at night, lit streets | Planned |
 
 ---

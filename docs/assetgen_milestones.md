@@ -1803,6 +1803,77 @@ props golden stays main's (AG8's boats move it, so it needs writing again on the
   stage 4: boats moving with buoyancy and wakes, ferries.
 - Mac = x86 waits for the deferred determinism check.
 
+## AG14: fit and finish
+
+**Built.** The stage 2 side of the first run-through (`docs/run_through_1.md`) for M17 to
+M21, and two checks on the meshes themselves (scope 14.15). Tests:
+`tests/assetgen/test_ag_fit.py`.
+
+- **Fit checks** (`assetgen/fit/`; `assetgen fit BUILD`, also the last stage of
+  `assetgen build`, `--no-fit` skips it; `BUILD/assets/fit_report.json` and `.txt`, written
+  only when their bytes change). The packs are read back in world space (`glb.py`: node
+  hierarchies, rotations, quantized positions, GPU instancing), the faces of every pack that
+  face up filed in a plan index of 2 m cells (`index.py`).
+  - `asset_grounded`: every standing prop and plant (not the ones on a wall, hung or
+    afloat), every roof item and dunnage frame (AG4's roof parts), and every road, transit
+    and deck column, pylon and frame leg rests on a surface under it within 2 cm: five
+    points of its feet (its mesh's lowest vertices: their box's middle and its corners 10%
+    in), three of them within 2 cm over the highest surface no more than 0.6 m over them (a
+    foot set in gravel, a lawn, a sidewalk or a bed rests; a dunnage frame may stand through
+    the form its whole height). Surfaces are the street, ground, water bed, building shell
+    and front and skybridge packs, the dunnage frames' tops, and the blockout's land (0 on a
+    flat city, M13's ground on a terrain city; none over the water), never the thing itself.
+    With it, the junction seams: every vertex of a road's carriageway on the outline of a
+    junction at one of its ends, near where its centerline first leaves that junction,
+    within 2 cm of the junction piece's surface there.
+  - `asset_clash`: a road or junction's carriageway, deck or embankment in a building mass
+    (10 cm in); a building's shell, front or instanced part more than 0.3 m past its masses
+    over a carriageway under 4.5 m; the deck tops of two bridge or raised road pieces within
+    0.3 m over more than 2 m²; a guideway, tube, beam or column in a mass outside the
+    building's portal band for its line; a track in a station platform.
+- **Junctions** (AG7 `junction` 2, `road` 2): the two ends of a leg's cut edge at the leg's
+  height (M18's curb starts a few centimeters off a skewed cut's corner); a road ends on its
+  junction's cut edge where that edge is within 1 m of its carriageway's edges (it was cut
+  square across and met the junction's surface between two of its vertices); a leg's square
+  corners inserted on the outline (or setting a vertex there); a junction M18 left without a
+  surface whose legs AG7 sees at other heights anchored to them, the curb between running
+  evenly (it was an inverse-distance blend that missed every leg's height).
+- **M19's supports** (`transit_column` 2, `transit_beam` 2): frame and cantilever legs flat
+  under their beam, haunched cap beams (full depth over the legs, 0.7 between), cantilever
+  arms tapering to 0.45 at the tip, piers on footings with chamfered tops down into M16's
+  bed, sky tube masts as cable-stayed pairs: a crosshead under the tube, two tapering legs to
+  the mast top, a tie, four stays to anchor blocks on the tube's crown. Road columns standing
+  in the water on footings too (`column` 2).
+- **Bridges drawn once** (`bridge` 2): a bridge whose model names no segment (a junction
+  splits its span) finds the raised segments along its line (`structures._carriers`) and
+  draws no deck of its own; it drew a 14 m deck over the road pieces' own. A steel
+  footbridge's edge beam stands outside the road's girder.
+- **Embankments** (M18): the deck's girder only between them (`roads._spans`), the fill's
+  faces across where the girder goes on; the fill's walls no longer share a plane with it.
+- **Roof equipment**: on the roof the shell built, which articulation may have taken lower
+  than the model's mass top (a halo crown's open roof, a stepped tier: `roofs._top_of`),
+  pulled onto its own roof where its point fell off it (`_pull_in`), seated on a form's top
+  under its middle (`_seat`; on a mansard's slope moved onto its flat top, `_onto_top`), on
+  dunnage reaching the form under the frame's own corners, the frame moved with its item
+  onto the form where it would pass the roof's edge; a mansard's surface measured in from its
+  eave ring's nearest edge (a concave ring's notch made the old measure zero over its top).
+- **Curved walls** (M21's arcs): a mass edge that is a chord of one of its mass's arcs (or of
+  a ring offset from it; `shell.arc_of`) is drawn with the curve's normal on every plane
+  facing its way (`meshbuf.Buf.arc`, `_arc_normals`: radial in plan, the vertices where they
+  were), smooth across the chords, and glazed joint to joint a floor (a chord of 0.9 to 2.8
+  m had no room for a window: round towers were blank), mullions at the joints.
+- **Headroom over the lanes**: the brief gives every edge of a mass near the ground the
+  nearest lane in front of it (`lane_m`: a carriageway at grade or a junction; `lane_s` the
+  stretch within 2 m of it; `lane_z_m` how high those lanes run over the building's base;
+  `brief.lane_gaps`, `BRIEF_VERSION` 3). Nothing that leaves a wall reaches it under 4.6 m
+  over it (`parts.ROAD_CLEAR`): balconies, canopies and the facade's reaching parts by
+  `Facade.room` and `_low`, strips and eaves by `_edge_ok`, fire escapes (landings and drop
+  ladders), ducts and cameras by their own rules, canopies stopping short of an inside
+  corner; the envelope check counts what does (`over_road`). Shanty stacks' and other
+  masses M3 overhangs a road with are the model's.
+
+<!-- AG14 numbers -->
+
 ## Order
 
 ```
