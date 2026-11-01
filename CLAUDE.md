@@ -13,8 +13,8 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M20, the
-rest of the fixes from the first run-through, `docs/run_through_1.md`),
+high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M19, the
+last of the fixes from the first run-through, `docs/run_through_1.md`),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
 
@@ -1038,7 +1038,7 @@ M20 (props, plants and signs, from the first run-through) is in place:
   `front`, `HOLO_OFF_M` 3 m out, high up, `HOLO_CLEAR_M` round the image); every billboard
   and banner `attrs.lit` neon, M3's roof billboards too. Ids from the building, kind, cell and
   height (`<bld>.slot.billboard.e123n45.z30`).
-- **Checks** (two more): `prop_support` (every prop, plant and roof item on a surface at its
+- **Checks** (two more, 100 in all on a flat sample, 105 with decks): `prop_support` (every prop, plant and roof item on a surface at its
   height within 2 cm: the ground, a road whose corridor holds it, the water, a roof, a wall
   that spans it, a deck's underside it hangs from; none on the ground in a fill; every prop
   standing 1 m under what is over it) and `plant_headroom`; `tree_clearance` keeps its
@@ -1053,6 +1053,20 @@ M20 (props, plants and signs, from the first run-through) is in place:
   (AG6: tall, neon), holo-boards in front of a facade with a projector on an arm off the wall,
   billboards lit as neon with a tube round the face, and replaces the blockout's sign
   prototypes; the brief leaves holo-boards in front of a facade off its walls.
+- **With M18 and M13** (found on the merged builds): the one `Overhead` replaces M18's
+  `overhead(..., fill=False)`: a prop on a low road's sidewalk stands on that road (`own`)
+  over its embankment, a tree never does; nothing stands on the ground inside a fill
+  (`props._off_fills`: signals, scaffolding, market gates; Vesper Bay had taken five more
+  tries over them), median barriers fit under what is over them as `prop_support` measures
+  (`_barriers_clear`); `Ctx.facade_spot` takes heights in the building's frame and returns
+  the lift at its spot (AC units and ivy on a slope), shop signs and awnings measure their
+  wall's top where they hang (`Ctx.reframe`), overhead cables find their walls 5 cm inside
+  the check's reach (`CABLE_SLACK_M`).
+Delta on main (M18, M21, M16): props off their surface 5,150 to 0 (2,903 quay railings,
+735 AC units, 252 street lights, 181 shop signs, 151 benches, 76 boats, ...), plants into a
+deck or a raised road 4 to 0; facade billboards 213 to 2,886 (1,286 landscape, 1,600
+portrait) and 999 banners, holo-boards 50 to 204 (122 over roofs, 82 in front of facades),
+the 1,008 roof billboards lit; shop signs 62 fewer (walls too low for any).
 Sample builds: `docs/progress/M20/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
