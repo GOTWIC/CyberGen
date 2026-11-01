@@ -6,17 +6,21 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
 ```
 
 - **`asset_grounded`**: everything that should stand on something rests on a surface under
-  it within `GAP_M` (2 cm): props and plants that stand (`STANDING`: not those mounted on a
-  wall, hung, or afloat), every building's roof equipment (AG4's instanced roof parts), and
-  the street pieces that stand on their feet (road, transit and deck columns, pylons,
-  frame legs). A thing's feet are its mesh's lowest vertices (within 1 cm of its lowest
-  point); five points of their plan box (its middle and corners pulled 10% in) each look
-  for the highest surface at most `REACH_M` over them (so a foot set into gravel, a lawn or
-  a sidewalk counts as standing, one buried deeper does not); it stands when three of the
-  five are within `GAP_M` of one. Surfaces are the triangles facing up of every street,
-  ground, water bed, building shell and front, skybridge pack and roof dunnage, and the
-  blockout's land under them (the level keeps it: 0 on a flat city, M13's ground on a
-  terrain city), never the thing itself.
+  it within `GAP_M` (2 cm): props and plants that stand (not those mounted on a wall, hung
+  or afloat: `NOT_STANDING`), every building's roof equipment and dunnage (AG4's instanced
+  roof parts), and the street pieces that stand on their feet (road, transit and deck
+  columns, pylons, frame legs). A thing's feet are its mesh's lowest vertices (within 1 cm
+  of its lowest point); five points of their plan box (its middle and corners pulled 10% in)
+  each look for the highest surface at most `REACH_M` (0.6 m) over them (a foot set into
+  gravel, a green roof or a sidewalk rests; a dunnage frame may stand through its form its
+  whole height, a column's footing `FOOTING_M` into the ground or the bed); it rests when
+  three of the five are within `GAP_M` over one. Surfaces are the faces facing up of every
+  street, ground, water bed, building shell and front and skybridge pack, the dunnage
+  frames' tops, and the blockout's land (0 on a flat city, M13's ground on a terrain city;
+  none over the water, where a footing takes M16's bed), never the thing itself. With it,
+  the junction seams (`seams`): every vertex of a road's carriageway on the outline of a
+  junction at one of its ends, near where its centerline first leaves it, within `GAP_M` of
+  the junction piece's surface there.
 - **`asset_clash`**:
   - *road into building*: a vertex of a road or junction piece's carriageway, deck or
     embankment inside a building mass (10 cm in from its walls, floor and roof);
@@ -24,13 +28,14 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
     than `RELIEF_M` (0.3 m: sills, frames, reveals) outside its own masses, over a
     carriageway (a road or junction piece's asphalt) and under `HEADROOM_M` (4.5 m) over
     it;
-  - *bridge drawn twice*: the deck tops of two bridge or raised road pieces lying within
-    0.3 m of each other over more than `OVERLAP_M2`;
-  - *transit through building*: a vertex of a guideway, sky tube, transit beam or column
+  - *bridge drawn twice*: the deck tops (carriageway, paving, deck) of two bridge or raised
+    road pieces within 0.3 m of each other over more than `OVERLAP_M2` (two roads leaving
+    one node, a ramp's gore, overlap by design);
+  - *transit through building*: a vertex of a line's guideway, sky tube, beam or column
     inside a building mass, except in the band of a portal the building declares for that
     line (M5);
-  - *transit through platform*: a vertex of a guideway or sky tube inside a station
-    platform (10 cm in).
+  - *transit through platform*: a vertex of a line's guideway or sky tube inside a station
+    platform as drawn (less the tracks beside it, `streets.transit.platform_rings`).
 
 Reading back every pack takes memory: the stage works tile by tile (a tile and its eight
 neighbors). Nothing here writes an asset; the report is written only when its bytes change.
@@ -708,7 +713,12 @@ def clash(pk: Packs, model) -> dict:
             tot: dict = defaultdict(float)
             for (o1, o2, _), ar in pairs.items():
                 tot[(o1, o2)] = max(tot[(o1, o2)], ar)
+            ends = {s.id: {s.start, s.end} for s in model.road_segments}
             for (o1, o2), ar in sorted(tot.items()):
+                # (two roads leaving one node overlap at their gore by design: a ramp's
+                # diverge off its viaduct)
+                if ends.get(pk.names[o1], set()) & ends.get(pk.names[o2], set()):
+                    continue
                 if ar > OVERLAP_M2:
                     counts["bridge_twice"] += 1
                     out["bridge_twice"].append({"pieces": [pk.names[o1], pk.names[o2]],
