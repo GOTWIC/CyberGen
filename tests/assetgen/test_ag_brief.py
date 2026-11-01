@@ -92,7 +92,8 @@ def test_mounted_props_and_lookups(doc, model):
             kinds[p["kind"]] = kinds.get(p["kind"], 0) + 1
             assert p["at"] is not None
         for s in br["sign_slots"]:
-            assert s["mount"] == "roof" or s["at"] is not None
+            # (M20: a holo-board in front of a facade stands off its walls, as one over a roof)
+            assert s["mount"] in ("roof", "front") or s["at"] is not None
     for k in ("sign", "awning"):
         assert kinds.get(k, 0) > 0, k
     on = sum(p["on_wall"] for br in doc["briefs"].values() for p in br["props"])
