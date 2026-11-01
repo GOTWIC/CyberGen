@@ -616,9 +616,11 @@ def _with_corners(ring, legs: list, raw: list):
     for (px, py), z in pts:
         n = len(out)
         best = None
+        near = None
         for i in range(n):
             a, b = out[i], out[(i + 1) % n]
             if dist(a, (px, py)) < 0.05 or dist(b, (px, py)) < 0.05:
+                near = a if dist(a, (px, py)) < 0.05 else b
                 best = None
                 break
             dx, dy = b[0] - a[0], b[1] - a[1]
@@ -635,7 +637,10 @@ def _with_corners(ring, legs: list, raw: list):
             _, i, q = best
             out.insert(i + 1, q)
             extra.append((q, z))
-    return (out if extra else ring), extra
+        elif near is not None:
+            extra.append(((near[0], near[1]), z))     # (a vertex already there: its height)
+    inserted = any(q not in ring for q, _ in extra)
+    return (out if inserted else ring), extra
 
 
 def _minus(sector, ring, holes, taken=()):
