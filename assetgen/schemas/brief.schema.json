@@ -2051,7 +2051,7 @@
   "additionalProperties": false,
   "properties": {
     "brief_version": {
-      "const": 2,
+      "const": 3,
       "title": "Brief Version",
       "type": "integer"
     },

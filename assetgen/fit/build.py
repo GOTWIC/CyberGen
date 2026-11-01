@@ -426,8 +426,10 @@ def seams(pk: Packs, model=None) -> dict:
     """A road meets its junctions: every vertex of a road piece's carriageway on the
     outline of a junction at one of its ends (its cut edge, within 3 cm) that lies on that
     junction piece's carriageway is within `GAP_M` of the junction's surface there (no step
-    where a leg meets its junction)."""
-    ring_of, own = {}, {}
+    where a leg meets its junction), near where its centerline crosses the outline (within
+    its half width and 1 m: not a road's side running along a junction's outline further
+    out, M17's shared pavement)."""
+    ring_of, own, cut = {}, {}, {}
     if model is not None:
         from citygen import geom as G
         jat = {j.node_id: j for j in model.junctions}
@@ -435,6 +437,10 @@ def seams(pk: Packs, model=None) -> dict:
             ring_of[j.id] = G.from_model_poly(j.polygon).exterior
         for s in model.road_segments:
             own[s.id] = {jat[n].id for n in (s.start, s.end) if n in jat}
+            cl = shapely.LineString([(p[0], p[1]) for p in s.centerline])
+            for jid in own[s.id]:
+                x = cl.intersection(ring_of[jid])
+                cut[(s.id, jid)] = (x, s.width_m / 2.0 + 1.0) if not x.is_empty else None
     jt, jo = [], []
     for pid in pk.street_ids():
         if pk.street_kind(pid) != "street.junction":
@@ -471,7 +477,10 @@ def seams(pk: Packs, model=None) -> dict:
             on = np.array([j in mine for j in jn], dtype=bool)
             sel &= on
             for k in np.nonzero(sel)[0].tolist():
-                if shapely.distance(ring_of[jn[k]], shapely.Point(P[p_[k], :2])) > 0.03:
+                pt = shapely.Point(P[p_[k], :2])
+                c = cut.get((pid, jn[k]))
+                if shapely.distance(ring_of[jn[k]], pt) > 0.03 or c is None or \
+                        shapely.distance(c[0], pt) > c[1]:
                     sel[k] = False
         if not sel.any():
             continue

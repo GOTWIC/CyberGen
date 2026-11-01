@@ -207,6 +207,17 @@ class Road:
         x, y, nx, ny, k = self.path.frame(s, vi)
         return x + nx * k * t, y + ny * k * t
 
+    def z_at(self, s: float, t: float, vi=None) -> float:
+        """The surface's height at (s, t); AG14: at an end cut along its junction's skewed
+        edge, a corner's own height (the road's at the distance along it that corner lies
+        at, as the junction's surface takes it), not the centerline's at the cut."""
+        for key, se in (("start", self.s0), ("end", self.s1)):
+            if self.cut.get(key) is not None and abs(s - se) < 1e-9:
+                x, y = self.at(s, t, vi)
+                sp, _ = self.path.project(x, y)
+                return self.z(sp)
+        return self.z(s)
+
     def xy(self, s: float, t: float):
         """(x, y) for a small decal: the plain segment normal, no miter."""
         x, y, nx, ny, _ = self.path.frame(s)
@@ -267,7 +278,7 @@ def _make(inp: dict, tidy: bool) -> Out:
         rows, uvs = [], []
         for s, vi in rd.stations(rd.s0, rd.s1):
             z = rd.z(s)
-            rows.append([(*rd.at(s, t, vi), z) for t in (-rd.h, rd.h)])
+            rows.append([(*rd.at(s, t, vi), rd.z_at(s, t, vi)) for t in (-rd.h, rd.h)])
             uvs.append([(s, -rd.h), (s, rd.h)])
         mesh.grid(asphalt_slot(cls, style), rows, uvs, expect=UP)
         if cls not in PEDESTRIAN:

@@ -342,7 +342,7 @@ class Deck(_M):
 
 
 class Brief(_M):
-    brief_version: Literal[2]
+    brief_version: Literal[3]
     id: str
     origin: P2
     building: BuildingRec
