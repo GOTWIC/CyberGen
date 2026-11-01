@@ -476,6 +476,7 @@ def check_crossing_spacing(spec: CitySpec, m: CityModel):
 
 WALK_PAD_M = 0.1        # a walkway may run along a wall, not this far into its mass
 WALK_HEAD_M = 2.5       # a mass this far over a walkway leaves room under it
+GRAZE_M = 0.05          # a walkway grazing a corner of a mass for less than this passes it
 WALK_EXEMPT = ("elevator", "skybridge")   # inside or between buildings by design
 LOT_PAD_M = 0.1         # a park path may run along a lot's edge, not this far into it
 BESIDE_M = 3.5          # an open space with a walkway this close is reached from it
@@ -494,14 +495,19 @@ def entrance_foot(line, p) -> tuple:
 
 
 class _Masses:
-    """Every building mass (absolute heights: over its base on a terrain city), taken in by
-    WALK_PAD_M, with what may pass into it."""
+    """Every building mass standing on its building's floor (a mass from WALK_HEAD_M up over
+    the floor leaves room under it, as M17's road check has it: on a slope the ground beside
+    a building is not its floor), taken in by WALK_PAD_M, with absolute heights (over its
+    base on a terrain city)."""
 
     def __init__(self, m: CityModel):
         self.rows, polys = [], []
         for b in m.buildings:
             base = b.base_m or 0.0
+            floor = min(ms.z0_m for ms in b.masses) if b.level else 0.0
             for k, ms in enumerate(b.masses):
+                if ms.z0_m - floor >= WALK_HEAD_M:
+                    continue
                 fp = G.from_model_poly(ms.footprint)
                 g = G.qpoly(fp.buffer(-WALK_PAD_M, join_style="mitre"))
                 for part in G.parts(g):
@@ -522,7 +528,7 @@ class _Masses:
             if own(b):
                 continue
             ov = shapely.intersection(line, self.polys[i])
-            if ov.is_empty or ov.length <= 0.0:
+            if ov.is_empty or ov.length <= GRAZE_M:
                 continue
             mid = ov.interpolate(0.5, normalized=True)
             z = z_at(mid)
@@ -601,8 +607,19 @@ def check_walkway_clash(spec: CitySpec, m: CityModel):
         return c
     ms = _Masses(m)
     own_of = _passes(m)
+    n_stairs = n_walled = 0
     for w in m.walkways:
         if w.kind in WALK_EXEMPT or len(w.line) < 2:
+            continue
+        if (w.attrs or {}).get("walled_in"):
+            n_walled += 1       # (a walled-in entrance's door path: counted below)
+            continue
+        if w.kind in ("stairs", "escalator") and (w.attrs or {}).get("station"):
+            # (a station's stairs run where M19 put them, between its platform or concourse
+            # and the street: counted in a note, an open item of transit's)
+            line = LineString([p[:2] for p in w.line])
+            if line.length > 0.0 and ms.hits(line, _walk_z(m, w.line), own_of(w)):
+                n_stairs += 1
             continue
         line = LineString([p[:2] for p in w.line])
         if line.length <= 0.0:
@@ -612,28 +629,45 @@ def check_walkway_clash(spec: CitySpec, m: CityModel):
             _lim(c, f"walkway {w.id} ({what}) runs through building {b.id} (mass {k}) at "
                     f"{z:.1f} m")
     walks = {w.id: w for w in m.walkways}
+    from . import buildout as BO
+
+    link_ms = None        # (an entrance's link: the masses at the ground of its level in plan,
+    #                       as the link's ends stand on different ground on a slope)
     pieces: dict = {}     # a walkway split by a later stage: its pieces (`attrs.split_of`)
     for w in m.walkways:
         so = (w.attrs or {}).get("split_of")
         if so:
             pieces.setdefault(so, []).append(w)
     for b in m.buildings:
-        for e in b.entrances:
+        walled = set((b.attrs or {}).get("walled_in", ()))
+        for ei, e in enumerate(b.entrances):
+            if ei in walled:
+                continue
             w = walks.get(e.walkway_id)
             if w is None or len(w.line) < 2:
                 continue
-            fam = [x for x in [w] + pieces.get(w.id, []) if len(x.line) >= 2]
+            fam, todo = [], [w]
+            while todo:           # (pieces of pieces too: every stage splits again)
+                x = todo.pop()
+                fam.append(x)
+                todo += pieces.get(x.id, [])
+            fam = [x for x in fam if len(x.line) >= 2]
             w = min(fam, key=lambda x: (G.dist(LineString([p[:2] for p in x.line]),
                                                Point(e.position[:2])), x.id))
             line = LineString([p[:2] for p in w.line])
             foot = entrance_foot(line, e.position)
             if tuple(foot) == tuple(e.position[:2]):
                 continue
-            z_w = _walk_z(m, w.line)(Point(foot))
-            link = LineString([e.position[:2], foot])
-            for hb, k, z in ms.hits(link, lambda p, z_w=z_w: z_w):
+            link_ms = link_ms or BO._Masses(m.buildings)
+            for hb in link_ms.blockers(e.position, foot, b.level):
                 _lim(c, f"entrance of {b.id} at {tuple(e.position)} links to {w.id} through "
-                        f"building {hb.id} (mass {k})")
+                        f"building {hb}")
+    n_ent = sum(len((b.attrs or {}).get("walled_in", ())) for b in m.buildings)
+    if n_ent:
+        c.notes.append(f"{n_ent} entrances walled in by buildings (no walkway reached from "
+                       f"their facades, `attrs.walled_in`), {n_walled} door paths of them")
+    if n_stairs:
+        c.notes.append(f"{n_stairs} station stairs pass a building at their height (transit's)")
     return c
 
 
@@ -659,9 +693,12 @@ def check_park_access(spec: CitySpec, m: CityModel):
     for g in lots:
         shapely.prepare(g)
     ltree = shapely.STRtree(lots) if lots else None
-    n_none = 0
+    n_none = n_isle = 0
     for o in m.open_spaces:
         if o.kind not in PATH_KINDS or o.level:
+            continue
+        if o.district_id is None and (o.attrs or {}).get("landmass_id"):
+            n_isle += 1         # (an islet's park, land without a district: no street on it)
             continue
         poly = G.from_model_poly(o.polygon)
         mine = paths.get(o.id, [])
@@ -684,6 +721,9 @@ def check_park_access(spec: CitySpec, m: CityModel):
                 _lim(c, f"{w.id}: the path of {o.id} crosses a lot")
     if n_none:
         c.notes.append(f"{n_none} open spaces with no way in, each saying why")
+    if n_isle:
+        c.notes.append(f"{n_isle} islet parks (land without a district) with no street to "
+                       "join")
     return c
 
 

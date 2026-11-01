@@ -766,6 +766,14 @@ class _Masses:
                 return False
         return True
 
+    def blockers(self, a, b, level: int) -> list[str]:
+        """The buildings a straight link from a to b cuts into (`clear`'s test)."""
+        if self.tree is None:
+            return []
+        seg = LineString([a[:2], b[:2]]) if tuple(a[:2]) != tuple(b[:2]) else Point(a[:2])
+        return sorted({self.bids[i] for i in self.tree.query(seg).tolist()
+                       if self.rows[i] == level and self.polys[i].intersects(seg)})
+
     def inside(self, p, level: int) -> str | None:
         """The building a point lies inside (a mass of it at the ground of the level)."""
         if self.tree is None:
@@ -825,6 +833,10 @@ def link_entrances(out: Out, walks: list) -> list:
     relinked = unlinked = moved = rounded = 0
     masses = _Masses(out.buildings)
     round_of: dict = {}     # id(entrance) -> its path led round the buildings
+    site_door: dict = {}    # id(entrance) -> (site walk index, foot, path): a megasite
+    #                         building's entrance that only reaches its site's own paths
+    site_lines = [(sid, LineString([q[:2] for q in pts])) for sid, (_, pts, _) in
+                  out.site_walks]
     if ents:
         pts = shapely.points(np.array([e.position for _, e in ents], dtype=np.float64))
         ent_land = _landmass_index(out.landmasses, [e.position for _, e in ents])
@@ -852,10 +864,21 @@ def link_entrances(out: Out, walks: list) -> list:
                             if alt is None:
                                 rl = _round_link(e.position, lv, -1, masses, rec.level,
                                                  lines, walks, gi)
+                        sd = None
+                        if alt is None and rl is None and rec.megasite_id:
+                            sd = _site_door(e.position, rec.megasite_id, site_lines, masses,
+                                            rec.level, out.site_links)
                         if alt is not None:
                             pass
+                        elif sd is not None:
+                            site_door[id(e)] = sd
+                            rounded += 1
                         elif rl is None:
+                            # (walled in: no walkway reached from anywhere on its facade, not
+                            # even round the buildings; it says so, the check counts it)
                             unlinked += 1
+                            w_ = rec.attrs.setdefault("walled_in", [])
+                            w_.append(rec.entrances.index(e))
                         else:
                             alt = rl[0]
                             round_of[id(e)] = rl[1]
@@ -867,6 +890,8 @@ def link_entrances(out: Out, walks: list) -> list:
                 if alt is not None:
                     best = alt
                     relinked += 1
+            if id(e) in site_door:
+                continue          # (named after its door path, below)
             e.walkway_id = walks[gi[best]]["id"]
             e.link_m = G.q(G.dist(lines[best], pts[k]))
             line_of[id(e)] = best
@@ -885,12 +910,15 @@ def link_entrances(out: Out, walks: list) -> list:
         if rec.id in linked:
             return
         e = main_entrance(rec)
-        if e is None:
+        if e is None or id(e) in site_door:
             return
         foot = _foot(lines, walks, gi, line_of[id(e)], e.position)
         splits.setdefault(line_of[id(e)], []).append(foot)
+        at = {"building": rec.id, "door": True}
+        if rec.entrances.index(e) in rec.attrs.get("walled_in", ()):
+            at["walled_in"] = True
         new.append(("path", round_of.get(id(e)) or [tuple(e.position), foot], 2.0,
-                    _base(rec), {"building": rec.id, "door": True}, rec.level))
+                    _base(rec), at, rec.level))
         if id(e) in round_of:
             own_path[id(e)] = (e, len(new) - 1)
         linked.add(rec.id)
@@ -921,8 +949,21 @@ def link_entrances(out: Out, walks: list) -> list:
         e = main_entrance(rec)
         if rec.megasite_id or rec.landmark or (e is not None and e.link_m > DOOR_LINK_M):
             door(rec)   # (a far entrance on a big lot gets a path, like a driveway)
-    for sid, (kind, pts, width) in out.site_walks:
-        new.append((kind, [tuple(p) for p in pts], width, 0.0, {"megasite": sid}, 0))
+    site_feet: dict = {}
+    for k_, f_, _ in site_door.values():
+        if k_ is not None:
+            site_feet.setdefault(k_, []).append(f_)
+    for k_, (sid, (kind, pts, width)) in enumerate(out.site_walks):
+        # (park paths fix: split where a site building's door path meets it)
+        for pc in _cut_at(ST._dedupe([tuple(p[:2]) for p in pts]), site_feet.get(k_, [])):
+            new.append((kind, pc, width, 0.0, {"megasite": sid}, 0))
+    for rec in out.buildings:
+        for e in rec.entrances:
+            if id(e) in site_door:
+                new.append(("path", site_door[id(e)][2], 2.0, _base(rec),
+                            {"building": rec.id, "door": True}, rec.level))
+                own_path[id(e)] = (e, len(new) - 1)
+                linked.add(rec.id)
     link_land = _landmass_index(out.landmasses, [p for _, p in out.site_links])
     gate_round: dict = {}
     site_poly = {r["id"]: G.from_model_poly(r["polygon"]) for r in out.megasites
@@ -1028,6 +1069,54 @@ def _move_entrance(rec, e, lv, masses, land: int, lines, walks, gi):
         if best is None or (round(score, 6), p) < (round(best[0], 6), best[1]):
             best = (score, p, h)
     return None if best is None else (best[1], best[2])
+
+
+def _site_door(p, sid: str, site_lines: list, masses, level: int, links=()):
+    """Park paths fix: a megasite building's entrance that reaches no street walkway joins
+    its site's own paths (which its gates join to the streets), else one of its gates (where
+    a gate path starts): (site walk index or None, foot, the door path's points), straight
+    where clear, else led round the buildings, or None."""
+    pt = Point(p[:2])
+    cands = sorted((round(G.dist(ln, pt), 6), k) for k, (s_, ln) in enumerate(site_lines)
+                   if s_ == sid)
+    for _, k in cands:
+        ln = site_lines[k][1]
+        f = G.qpoint(ln.interpolate(ln.project(pt)))
+        if masses.clear(p, f, level):
+            return (k, f, [tuple(p[:2]), f])
+        r = masses.round(p, f, level)
+        if r is not None:
+            return (k, f, [tuple(x) for x in r])
+    gates = sorted((round(G.dist(pt, Point(q)), 6), tuple(q)) for s_, q in links if s_ == sid)
+    for _, q in gates:
+        if masses.clear(p, q, level):
+            return (None, q, [tuple(p[:2]), q])
+        r = masses.round(p, q, level)
+        if r is not None:
+            return (None, q, [tuple(x) for x in r])
+    return None
+
+
+def _cut_at(pts: list, feet: list) -> list:
+    """A polyline cut at the points on it (feet), in order along it."""
+    if not feet:
+        return [pts]
+    L = ST._plen(pts)
+    ds = sorted({round(ST._project(pts, f)[0], 6) for f in feet})
+    ds = [d for d in ds if 0.05 < d < L - 0.05]
+    at = {round(ST._project(pts, f)[0], 6): ST._pt(*f) for f in feet}
+    cuts = [0.0] + ds + [L]
+    out = []
+    for a, b in zip(cuts, cuts[1:]):
+        pc = ST._substring(pts, a, b)
+        if a in at:
+            pc[0] = at[a]
+        if b in at:
+            pc[-1] = at[b]
+        pc = ST._dedupe(pc)
+        if len(pc) >= 2:
+            out.append(pc)
+    return out or [pts]
 
 
 GATE_STEP_M = 2.0       # a megasite gate moved along its reserve's edge tries places this

@@ -494,6 +494,8 @@ def _set_lot(lt: dict, poly, fr) -> None:
 # ---------------------------------------------------------------------------
 
 DETOUR_PAD_M = 0.3      # a walkway led round a lot passes its corners this far out
+KEEP_PAD_M = 0.02       # ... and keeps out of it but this far in (the buildings on a lot keep
+#                         their walls inside it, the check tests them 0.1 m in)
 DETOUR_NODES = 60
 
 
@@ -505,7 +507,7 @@ def keep_off(W, lots: list[dict], any_z: bool = False) -> dict:
     way round (an end inside a lot)}. `any_z`: every edge of W (a deck's walk graph, whose
     edges sit at its top), not only those at z 0."""
     polys = [lt["polygon"] for lt in lots]
-    bl = Blocked(polys, [], -LOT_PAD_M, between=False)
+    bl = Blocked(polys, [], -KEEP_PAD_M, between=False)
     if bl.tree is None:
         return {"rerouted": 0, "left": 0}
     raw = shapely.STRtree(polys)
