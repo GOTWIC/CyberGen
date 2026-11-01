@@ -402,7 +402,7 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
                 gaps[i] = float(np.nanmax(np.where(ok[j], row, -np.inf)))
             else:
                 gaps[i] = float(np.nanmin(row)) if not np.all(np.isnan(row)) else np.inf
-    steps = seams(pk)
+    steps = seams(pk, model)
     floating = [i for i in range(len(things)) if not gaps[i] <= GAP_M]
     by_what: dict[str, list] = defaultdict(lambda: [0, 0])
     for i, th in enumerate(things):
@@ -422,11 +422,19 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
                       for i in worst]}
 
 
-def seams(pk: Packs) -> dict:
-    """A road meets its junction: every vertex of a road piece's carriageway that lies on a
-    junction piece's carriageway (its cut edge) is within `GAP_M` of that surface's height
-    there (no step where a leg meets its junction; a junction more than 1 m off is another
-    level)."""
+def seams(pk: Packs, model=None) -> dict:
+    """A road meets its junctions: every vertex of a road piece's carriageway on the
+    outline of a junction at one of its ends (its cut edge, within 3 cm) that lies on that
+    junction piece's carriageway is within `GAP_M` of the junction's surface there (no step
+    where a leg meets its junction)."""
+    ring_of, own = {}, {}
+    if model is not None:
+        from citygen import geom as G
+        jat = {j.node_id: j for j in model.junctions}
+        for j in model.junctions:
+            ring_of[j.id] = G.from_model_poly(j.polygon).exterior
+        for s in model.road_segments:
+            own[s.id] = {jat[n].id for n in (s.start, s.end) if n in jat}
     jt, jo = [], []
     for pid in pk.street_ids():
         if pk.street_kind(pid) != "street.junction":
@@ -457,6 +465,14 @@ def seams(pk: Packs) -> dict:
         ins, z = S.heights(P[:, :2], p_, t_, eps=1e-4)
         dz = np.abs(P[p_, 2] - z)
         sel = ins & (dz < 1.0)
+        if model is not None:
+            mine = own.get(pid, set())
+            jn = [pk.names[int(o)] for o in S.owner[t_].tolist()]
+            on = np.array([j in mine for j in jn], dtype=bool)
+            sel &= on
+            for k in np.nonzero(sel)[0].tolist():
+                if shapely.distance(ring_of[jn[k]], shapely.Point(P[p_[k], :2])) > 0.03:
+                    sel[k] = False
         if not sel.any():
             continue
         out["legs"] += len({int(S.owner[t]) for t in t_[sel].tolist()})

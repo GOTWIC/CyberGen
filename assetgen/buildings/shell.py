@@ -164,6 +164,12 @@ class Facade:
         return any(on_carriageway(r) and r["z"][0] * 1000.0 < PT.ROAD_CLEAR
                    for r in self.regions or ())
 
+    def rise(self) -> int:
+        """AG14: how far (mm) the lanes near this facade run over the building's base (its
+        brief edge's `lane_z_m`; 0 where lower or none): the headroom is over them."""
+        v = (self.rec or {}).get("lane_z_m")
+        return max(int(round(v * 1000)), 0) if v is not None else 0
+
     def lane(self) -> int | None:
         """AG14: how far (mm) the nearest lane is in front of this facade's brief edge (the
         brief's `lane_m`), None where over 6 m."""
@@ -177,7 +183,7 @@ class Facade:
         nor in front of a party, blind or hidden wall."""
         r = self.reg(s, z)
         cap = None
-        if z < PT.ROAD_CLEAR:
+        if z < PT.ROAD_CLEAR + self.rise():
             # (AG14: under the vehicles' headroom it stops short of the nearest lane)
             if self.on_road() and (self.lane() is None or self.lane() < 300):
                 return 0
@@ -1053,7 +1059,7 @@ class ShellBuilder:
         a sidewalk, `ROAD_CLEAR` over the ground where the facade faces a road with no
         sidewalk (AG14)."""
         if fa.on_road():
-            return self.ground + ROAD_CLEAR
+            return self.ground + ROAD_CLEAR + fa.rise()
         return STRIP_MIN_Z
 
     def _edge_ok(self, ms: dict, za: int, zb: int) -> list[list[bool]]:
@@ -1067,14 +1073,17 @@ class ShellBuilder:
             for i in range(len(ring)):
                 j = self._j(ms, r, i)
                 ok = j is not None
-                if ok and za < ROAD_CLEAR + self.ground and \
+                rise = max(int(round(_or(self.br["edges"][j].get("lane_z_m"), 0.0) * 1000)),
+                           0) if j is not None else 0
+                if ok and za < ROAD_CLEAR + self.ground + rise and \
                         _or(self.br["edges"][j].get("lane_m"), LANE_MAX) < 1.2:
                     ok = False              # (AG14: a lane within a strip's reach)
                 if ok:
                     for reg in self.br["edges"][j]["regions"]:
                         if reg["z"][0] * 1000 < zb and reg["z"][1] * 1000 > za and \
                                 (reg["class"] in ("party", "hidden", "blind") or
-                                 (za < ROAD_CLEAR + self.ground and on_carriageway(reg))):
+                                 (za < ROAD_CLEAR + self.ground + rise and
+                                  on_carriageway(reg))):
                             ok = False
                             break
                 row.append(ok)

@@ -46,6 +46,7 @@ BRIEF_VERSION = 3      # 2: AG4 (clearances, portal tube lines, skybridges in th
                        # 3: AG14 (an edge's `lane_m`: how far the nearest lane is)
 LANE_MAX_M = 6.0       # AG14: an edge's lane further than this is no concern (none given)
 LANE_STEP_M = 1.0      # its samples along the edge
+LANE_NEAR_M = 2.0      # the lanes whose surface height an edge's `lane_z_m` is
 PARTY_M = 0.5          # another building this close: a party wall
 BLIND_M = 3.0          # this close: a blind wall (and a neighbor in the brief)
 HIDE_M = 0.05          # another mass of the same building this close outside: hidden
@@ -416,12 +417,14 @@ def face_rays(city: City, rays: list[Ray]) -> list[tuple]:
     return out
 
 
-def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, float]:
+def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
     """AG14: per exterior edge of a mass standing near the ground (by `id`), how far out
     from it the nearest lane is at its nearest (samples every `LANE_STEP_M` along it): a
-    road's carriageway (its width less its sidewalks, at grade: a road raised over 2 m is a
-    deck overhead) or a junction's polygon; only where under `LANE_MAX_M`. What leaves the
-    wall there under the vehicles' headroom must stop short of it."""
+    road's carriageway (its width less its sidewalks; a road raised over 2 m is a deck
+    overhead) or a junction's polygon; only where under `LANE_MAX_M`. With it, the highest
+    of those lanes' surfaces (absolute) within `LANE_NEAR_M` of the edge, else None: what
+    leaves the wall there must stop short of the lane, or keep the vehicles' headroom over
+    it."""
     es, xs, ys, own = [], [], [], []
     for es_b in edges_by_b:
         for e in es_b:
@@ -440,8 +443,12 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, float]:
     px, py = np.array(xs), np.array(ys)
     own_a = np.array(own, dtype=np.int64)
     gap = np.full(len(px), np.inf)
+    top = np.full(len(px), -np.inf)          # the highest lane within LANE_NEAR_M
     grid = PL.PointGrid(px, py)
     m = city.m
+    from .streets.ctx import Ground
+    from .streets.path import Profile
+    gd = Ground(m)
     for s in m.road_segments:
         if s.tunnel or s.road_class in ("footbridge", "pedestrian") or len(s.centerline) < 2:
             continue
@@ -454,8 +461,21 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, float]:
         idx = grid.query(x0 - r, y0 - r, x1 + r, y1 + r)
         if not len(idx):
             continue
-        dd = PL.dist_polyline(px[idx], py[idx], s.centerline) - half
-        gap[idx] = np.minimum(gap[idx], np.maximum(dd, 0.0))
+        dd, at = _dist_along(px[idx], py[idx], s.centerline)
+        dd = np.maximum(dd - half, 0.0)
+        gap[idx] = np.minimum(gap[idx], dd)
+        near = dd < LANE_NEAR_M
+        if near.any():
+            zp = Profile.of([z.model_dump() for z in s.z_profile])
+            g = getattr(s, "ground", None)
+            gp = Profile.of([z.model_dump() for z in g]) if g else None
+            ii = idx[near]
+            zs = np.array([zp(v) + (gp(v) if gp is not None else 0.0)
+                           for v in at[near].tolist()])
+            if gp is None and not gd.flat:
+                zs = zs + np.array([gd.at(px[i], py[i]) for i in ii.tolist()])
+            top[ii] = np.maximum(top[ii], zs)
+    nodes = {n.id: n for n in m.road_nodes}
     for j in m.junctions:
         ext = PL.ring(j.polygon.exterior)
         if len(ext) < 3:
@@ -467,10 +487,44 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, float]:
             continue
         dd = PL.dist_polyline(px[idx], py[idx], ext + ext[:1])
         ins = PL.inside_poly(px[idx], py[idx], ext, [])
-        gap[idx] = np.minimum(gap[idx], np.where(ins, 0.0, dd))
+        dd = np.where(ins, 0.0, dd)
+        gap[idx] = np.minimum(gap[idx], dd)
+        nd = nodes.get(j.node_id)
+        if nd is not None and nd.position[2] <= 2.0:
+            zj = nd.position[2] + float(getattr(nd, "ground_m", None) or 0.0) + \
+                max(list(j.edge_z or [0.0]))
+            near = dd < LANE_NEAR_M
+            top[idx[near]] = np.maximum(top[idx[near]], zj)
     best = np.full(len(es), np.inf)
     np.minimum.at(best, own_a, gap)
-    return {id(e): C.m(float(g)) for e, g in zip(es, best.tolist()) if g < LANE_MAX_M}
+    hi = np.full(len(es), -np.inf)
+    np.maximum.at(hi, own_a, top)
+    return {id(e): (C.m(float(g)), C.m(float(h)) if np.isfinite(h) else None)
+            for e, g, h in zip(es, best.tolist(), hi.tolist()) if g < LANE_MAX_M}
+
+
+def _dist_along(px: np.ndarray, py: np.ndarray, line) -> tuple[np.ndarray, np.ndarray]:
+    """(distance from each point to a polyline, the distance along it of the nearest
+    point)."""
+    best = np.full(len(px), np.inf)
+    at = np.zeros(len(px))
+    cum = 0.0
+    for i in range(len(line) - 1):
+        ax, ay = line[i][0], line[i][1]
+        bx, by = line[i + 1][0], line[i + 1][1]
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        L = math.sqrt(L2)
+        f = np.zeros(len(px)) if L2 == 0.0 else \
+            np.clip(((px - ax) * dx + (py - ay) * dy) / L2, 0.0, 1.0)
+        ex = px - (ax + f * dx)
+        ey = py - (ay + f * dy)
+        d = np.sqrt(ex * ex + ey * ey)
+        better = d < best
+        best = np.where(better, d, best)
+        at = np.where(better, cum + f * L, at)
+        cum += L
+    return best, at
 
 
 def facing_class(city: City, hit, main_seg: str | None, own_id: str) -> tuple:
@@ -700,7 +754,7 @@ def _poly(pg, ox, oy) -> dict:
 
 
 def _edge_record(e: Edge, ox: float, oy: float, faced: dict, k: int,
-                 lanes: dict | None = None) -> dict:
+                 lanes: dict | None = None, base: float = 0.0) -> dict:
     regions = []
     area: dict[str, float] = {}
     for p, q, bands in e.regions:
@@ -725,7 +779,12 @@ def _edge_record(e: Edge, ox: float, oy: float, faced: dict, k: int,
     out = {"ring": e.ring, "i": e.i, "a": C.pt(e.a, ox, oy), "b": C.pt(e.b, ox, oy),
            "length_m": C.m(e.L), "normal_deg": C.deg(yaw), "class": dom, "regions": regions}
     if lanes and id(e) in lanes:
-        out["lane_m"] = lanes[id(e)]         # (AG14: the nearest lane in front of it)
+        # (AG14: the nearest lane in front of it; how high over the building's base the lanes
+        # near it run)
+        g, h = lanes[id(e)]
+        out["lane_m"] = g
+        if h is not None:
+            out["lane_z_m"] = C.m(h - base)
     return out
 
 
@@ -1021,7 +1080,8 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
         if mm.turn_deg or mm.scale != 1.0 or tuple(mm.shift_m) != (0.0, 0.0):
             masses[-1]["plate"] = {"turn_deg": C.deg(mm.turn_deg), "scale": mm.scale,
                                    "shift_m": [C.m(mm.shift_m[0]), C.m(mm.shift_m[1])]}
-    edge_recs = [_edge_record(e, ox, oy, faced, k, lanes) for e in edges]
+    base0 = float(getattr(b, "base_m", None) or 0.0)
+    edge_recs = [_edge_record(e, ox, oy, faced, k, lanes, base0) for e in edges]
     for rec, e in zip(edge_recs, edges):
         rec["mass"] = e.mass.k
     nb = []

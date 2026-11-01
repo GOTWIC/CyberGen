@@ -98,6 +98,9 @@ class Edge(_M):
     lane_m: float | None = Field(None, description="AG14: how far out from the edge the "
                                                   "nearest lane (a road's carriageway at "
                                                   "grade, a junction) is, under 6 m.")
+    lane_z_m: float | None = Field(None, description="AG14: the highest surface of the lanes "
+                                                    "within 2 m of the edge, over the "
+                                                    "building's base.")
 
 
 class Neighbor(_M):

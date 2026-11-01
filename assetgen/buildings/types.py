@@ -383,7 +383,7 @@ def _shanty_escapes(sb) -> None:
         n = ms["floors"]
         zs = [ms["z0"] + (ms["z1"] - ms["z0"]) * f // n for f in range(0 if ms["z0"] else 1,
                                                                         n)]
-        low = PT.ROAD_CLEAR + sb.ground          # (AG14: over the vehicles' headroom)
+        low = PT.ROAD_CLEAR + sb.ground + fa.rise()   # (AG14: over the vehicles' headroom)
         zs = [z for z in zs if z >= low]
         if len(zs) < 2 and not (zs and ms["z0"] >= 2500):
             continue
