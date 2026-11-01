@@ -180,14 +180,15 @@ def test_a_mount_on_a_tidied_crack_is_counted_apart():
 
 
 def test_a_front_its_building_whole_leaves_no_shell_mesh(tmp_path):
-    """An industrial gate house of one 3.5 m floor: its street front takes its whole height,
-    so its shell has no triangles. Its node in the tile pack carries no mesh (glTF has no
+    """An industrial building of one 3.5 m floor: its street front takes its whole height,
+    so its shell has no triangles (a gate house has its beacon merged into the shell since
+    AG5; a one-storey undercity row under an AG10 deck is the case in the samples). Its node in the tile pack carries no mesh (glTF has no
     mesh without primitives; Unreal rejects one), its record names no shell node, and in
     the contribution its front takes the place of its blockout actor."""
     from assetgen import build as BD
     from assetgen.presets import ERA_PRESETS
     br = brief_of([mass([[5.0, 4.0], [-5.0, 4.0], [-5.0, -4.0], [5.0, -4.0]], 0.0, 3.5, 1)],
-                  btype="building.gate_house", era=ERA_PRESETS["industrial"],
+                  btype="building.courtyard_block", era=ERA_PRESETS["industrial"],
                   classes={(0, 0, 0): "park", (0, 0, 1): "open", (0, 0, 2): "open",
                            (0, 0, 3): "open"})
     br["building"].update(use="industrial",

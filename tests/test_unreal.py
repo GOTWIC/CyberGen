@@ -1258,7 +1258,9 @@ def test_import_resets_a_stale_fallback():
     body = body[:body.index("EAL.set_metadata_tag(sm, HASH_TAG, h)")]
     assert "stale = not full and auto is not None" in body
     assert 'ns.set_editor_property("fallback_target", auto)' in body
-    assert "or shape or full \\\n                or stale:" in body
+    # (on both paths: the fast one's pack step sets the rest before the build)
+    assert "again = not self.nanite_as_asked(ns, rec) or stale" in body
+    assert "or full or stale" in body
 
 
 # --- in Unreal (where it is installed) ------------------------------------------------------
