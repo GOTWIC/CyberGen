@@ -7,7 +7,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M19 and M21 done |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG14 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
@@ -31,23 +31,23 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/M18/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/nexus_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/nexus_city/render_iso_city.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/M18/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/archipelago_free_port/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/archipelago_free_port/render_iso_city.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M18/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
-| <img src="docs/progress/M18/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
+| <img src="docs/progress/M20/vesper_bay_stacks/render_iso_city.jpg" width="420"> | <img src="docs/progress/M8c/vesper_bay_pinned/render_iso_d01.jpg" width="420"> |
 
 | Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
 |---|---|
-| <img src="docs/progress/M18/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M18/vesper_bay_decks/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M20/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
@@ -61,19 +61,23 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
-| <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M13/vesper_bay/preview_props.png" width="420"> |
+| <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M20/vesper_bay/preview_props.png" width="420"> |
+
+Neon billboards and banners on the Corporate Core's facades, from the street (8K).
+
+<img src="docs/progress/M20/vesper_bay/render_street_1.jpg" width="840">
 
 | Vesper Bay imported into Unreal 5.8 (8K) | Cragmouth's terraced hills in Unreal (8K) |
 |---|---|
 | <img src="docs/progress/M15/vesper_bay/unreal_iso_city.jpg" width="420"> | <img src="docs/progress/M15/cragmouth/unreal_hillside.jpg" width="420"> |
 
-Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour.
+Gameplay layer: faction turf, places to go, wealth and danger, traffic and crowds by hour, and the slots for signs and large neon ads.
 
-<img src="docs/progress/M13/vesper_bay/preview_gameplay.png" width="840">
+<img src="docs/progress/M20/vesper_bay/preview_gameplay.png" width="840">
 
 | Gameplay, Nexus City | Gameplay, Delta Megacity |
 |---|---|
-| <img src="docs/progress/M13/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M13/delta_megacity/preview_gameplay.png" width="420"> |
+| <img src="docs/progress/M20/nexus_city/preview_gameplay.png" width="420"> | <img src="docs/progress/M20/delta_megacity/preview_gameplay.png" width="420"> |
 
 | Road levels: viaducts, ramps, interchanges, embankments | Stack interchange levels and ramp profiles |
 |---|---|
@@ -143,7 +147,7 @@ The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edg
 | M17 | Road network repair | Every dead end on purpose (a cul-de-sac with its turning circle, a quay, a park gate, a path's end), no overlapping roads or bridges, roads clear of buildings | ✅ Done |
 | M18 | Junctions and ramps | Junctions that meet every road at its height, steeper and shorter ramps on embankments, crosswalks and signals only where they are needed | ✅ Done |
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans (columns, portal frames, piers, sky tube masts), more room over the streets | ✅ Done |
-| M20 | Props, plants and signs | Nothing floating or growing through a road; many more large neon billboards and holo-boards on the sides and tops of buildings | Planned |
+| M20 | Props, plants and signs | Nothing floating or growing through a road: every lamp, bench, railing, sign and tree on the ground, a road deck, a quay, a roof or its wall; many more large neon billboards, banners and holo-boards on the sides and tops of buildings, set per district (`signage`) | ✅ Done |
 | M21 | Cyberpunk massing | Towers twisted, tapered, leaning, stacked, cantilevered, split, cut through by sky gardens, in exoskeletons or covered in pods, with sloped, cut and halo crowns; curved slabs; true curves; no two neighboring towers alike; a `variety` per district | ✅ Done |
 
 ### Run it

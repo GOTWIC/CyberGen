@@ -115,10 +115,6 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
     gd = Ground(model)
     bases = {b.id: float(b.base_m) for b in model.buildings
              if getattr(b, "base_m", None) is not None}
-    wbeds = wlev = None
-    if getattr(model, "banks", None):
-        from citygen import water as WA
-        wbeds, wlev = WA.Beds(model), WA.Levels(model)
 
     def lift(x, y, z, bid=None) -> float:
         """The height a placement's z is measured from (module docstring, Ground)."""
@@ -190,9 +186,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         did = ds.of(p.id, x, y)
         st = style_of(did)
         mm = mount.get(p.id)
-        wid = wbeds.body_at(x, y) if kind == "boat" and wbeds is not None else None
-        if wid is not None:
-            z = z + wlev.at(wid, x, y)                 # (AG12: on M16's water)
+        if kind == "boat":
+            # (M20: a boat's z is its water's surface over the ground at its point; AG14: so it
+            # takes the ground as everything else does: it took the water's level on top of
+            # that, 1.5 m under the water on a flat city)
+            z = z + lift(x, y, min(z, 0.0))
         else:
             z = z + lift(x, y, z, (mm or {}).get("building") or
                          (p.attrs or {}).get("building"))
@@ -351,6 +349,11 @@ def _signs(model, spec, ds: _Districts, blds: dict, mount: dict, lift, out_dir) 
         cell = cells.get(key)
         inp = {"kind": s.kind, "mount": s.mount, "w": C.m2(round(s.width_m * 20) / 20.0),
                "h": C.m2(round(s.height_m * 20) / 20.0), "style": st}
+        sa = s.attrs or {}
+        if sa.get("lit"):
+            inp["lit"] = sa["lit"]          # (M20: billboards lit as neon)
+        if s.mount == "front":
+            inp["off"] = C.m2(float(sa.get("off_m", 3.0)))   # (M20: off its facade)
         if key.startswith("ad:"):
             pal = (styles6.get((b.district_id if b is not None else None) or "") or {}).get(
                 "palette") or list(SG6.ACCENTS)
