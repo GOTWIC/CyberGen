@@ -560,6 +560,25 @@ class Decks(_Model):
                           "the district's).")
 
 
+SignageKind = Literal["billboard", "banner", "holo"]
+
+
+class Signage(_Model):
+    """M20: the large ads on the sides and tops of the district's buildings (the shop signs
+    and the neon bands over shops come with the shops, by `neon`)."""
+    density: Fraction | None = Field(
+        None, description="How many: 0 none, 1 the most (a neon billboard at every level of "
+                          "most facades of the mid-rises and towers that face a road or "
+                          "plaza); default by archetype (dense in the corporate core, "
+                          "midtown, transit hubs, markets and entertainment districts, sparse "
+                          "in residential and industrial ones).")
+    kinds: list[SignageKind] | None = Field(
+        None, description="billboard (landscape and portrait neon billboards on the "
+                          "facades), banner (vertical neon banners spanning floors at a "
+                          "corner, some wrapping it), holo (holo-boards over tower roofs and "
+                          "projected in front of their facades); default by archetype.")
+
+
 class JunctionControl(_Model):
     """M18: crossings by need in a district."""
     signals: Literal["auto", "fewer", "none"] = Field(
@@ -621,6 +640,8 @@ class District(_Model):
                           "dangerous, a corporation in corporate districts, else the police.")
     decks: Decks | None = Field(None, description="M14: a layered district: an upper deck "
                                                    "city over the ground streets.")
+    signage: Signage | None = Field(None, description="M20: its buildings' large ads "
+                                                      "(default by archetype).")
     junctions: JunctionControl | None = Field(
         None, description="M18: signals and crosswalks by need (default 'auto' for both).")
 

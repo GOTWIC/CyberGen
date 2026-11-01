@@ -1,0 +1,18 @@
+citygen blockout: Greyhook
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 6683 objects in the .blend, 6683 in the plan
+  [pass] blend_buildings: 2614 building objects, 2614 buildings with masses in the model
+  [pass] blend_instances: 44361 prop and plant instances evaluated in the .blend, 44361 in the plan
+  [pass] gltf_tiles: 256 tile files for 256 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 12 of 12 renders
+  [pass] blender_budget: Blender 165.7 s (budget 600 s)
+
+plan: 6683 objects, 24618 parts, 256 tiles, 2614 buildings (sha256 1206db03e2bf88f2)
+blender 5.2.3 LTS: 834911 vertices, 324461 faces, 44361 instances, 90 materials, 114 collections
+files (MB): {"blend": 10.2, "usd": 29.8, "gltf_tiles": 34.7, "renders": 3.0}
+timings (s): {"build_s": 3.7, "save_s": 1.4, "usd_s": 19.9, "gltf_s": 104.5, "render_s": 35.9, "total_s": 165.7}
+total (s): {"plan_s": 11.1, "exports_s": 5.3, "total_s": 189.4}

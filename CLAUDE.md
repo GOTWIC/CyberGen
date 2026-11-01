@@ -13,8 +13,8 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (planned: M18 to M20, the
-rest of the fixes from the first run-through, `docs/run_through_1.md`),
+high-level milestone table). Stage 1's milestones are M0 to M21 (M17 to M21 the fixes from the first run-through,
+`docs/run_through_1.md`),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
 
@@ -1075,6 +1075,81 @@ neighbor rule in `buildout.select_forms`):
   balcony hangs under a floating block (`shell._hangs`); `GEN_VERSION` m21.1. Odd-lot tiers
   are kept neat (`forms.neat`: no corner under 40 degrees, no edge under 1 m).
 Sample builds: `docs/progress/M21/`.
+
+M20 (props, plants and signs, from the first run-through) is in place:
+- **Under structures** (`vegetation.Overhead`): everything over the ground a plant could grow
+  into or a prop stand under, its underside measured along the structure where the thing
+  stands (a raised road's or ramp's surface less `ROAD_DECK_M` 1.8 m at the thing's station,
+  over its crown; transit decks, tubes and beams by their line less `deck_m`; canopies,
+  portals, M14's slabs, skybridges and masses over the ground; M18's embankments a fill from
+  the ground up, and a road under 0.5 m of underside a fill over its own width); heights over
+  the ground at the point (masses and skybridges from their base, roof plants in their
+  building's frame, `roof_lift`). Every plant (roof plants too) keeps `HEADROOM_M` 1 m under
+  it (`fit_crowns`), every prop standing too (`props._headroom`; a street light becomes a lamp
+  hung at the underside right over it, z its underside). No street tree on a raised deck.
+- **On their surfaces**: a thing on a road's sidewalk or carriageway (`Cand.on`) stands on
+  that road's surface at its station (`Ctx.settle`; a raised road's deck; one off a raised
+  road's deck, a signal beside a ramp's crossing, is left out); the quay deck is the ground
+  (railings and benches at z 0: a quay's `deck_z_m` is its height over the water, AG7 paves
+  it at the ground, one height), boats float on the water (`Ctx.water_z`: -1.5 on a flat
+  city, M13's level on terrain); wall mounts at a height their wall has there and under
+  anything over the spot (`Ctx.mount_top`: shop signs smaller and lower under low eaves,
+  awnings under an overhang, wall lights, overhead cables tied under both walls' tops), AC
+  units and facade greenery on the facade of their floor, an overhanging floor's own
+  (`Ctx.facade_spot`).
+- **Signs** (`citygen/signage.py`, called from `gameplay.build_sign_slots`): spec
+  `District.signage` (`density`, `kinds` of billboard, banner, holo; archetype defaults
+  `presets.ArchetypePreset.signage`, `signage_kinds`: corporate core 0.85, entertainment
+  0.95, midtown and transit hub 0.8, old town 0.6, megablock 0.45, spaceport 0.4, research
+  0.25, industrial 0.15, residential 0.12; not filled into the spec, so earlier stages keep
+  their bytes). Facades: edges of prism masses of plane faces (not M21's bands, frames,
+  columns, struts, halos, masts, pods or links; off arcs), facing a highway, avenue, street,
+  pedestrian street or plaza (`FACE_REACH_M`), open in front (`Obstacles`: nothing within
+  `OPEN_M` 3 m over the ad's height, the building's own masses too), above the shop signs and
+  10 m up, apart per facade plane, off skybridge landings and the neon band. Neon billboards
+  (kind `billboard`, mount `facade`, `attrs.orientation` landscape or portrait, a level every
+  `LEVEL_M` 30 m of facade, `BILLBOARD_P` 0.7 times density and facing), neon banners (kind
+  `banner`: 3 to 10 floors at a facade corner, a pair `.a`/`.b` naming each other in
+  `attrs.wrap` where the facade round the corner is open), holo-boards over tower roofs (50 m
+  and taller, over the roof under a mast or spire, `roof_of`) and in front of facades (mount
+  `front`, `HOLO_OFF_M` 3 m out, high up, `HOLO_CLEAR_M` round the image); every billboard
+  and banner `attrs.lit` neon, M3's roof billboards too. Ids from the building, kind, cell and
+  height (`<bld>.slot.billboard.e123n45.z30`).
+- **Checks** (two more, 100 in all on a flat sample, 105 with decks): `prop_support` (every prop, plant and roof item on a surface at its
+  height within 2 cm: the ground, a road whose corridor holds it, the water, a roof, a wall
+  that spans it, a deck's underside it hangs from; none on the ground in a fill; every prop
+  standing 1 m under what is over it) and `plant_headroom`; `tree_clearance` keeps its
+  facade, sight line and feet rules; `sign_slots` covers the new kinds (lit, orientation,
+  plane facades, open in front, a wrapped pair meeting at its corner, holo-boards in front
+  of a facade and clear round their image).
+- **Blockout**: the large ads as instanced prototypes (`sign_billboard`, `sign_banner`,
+  `sign_holo`; `sign.<kind>.<tile>`, materials `sign_ad`, `sign_banner`, `sign_rim`,
+  `sign_holo`), on terrain lifted by their building's base; props and plants on a roof lifted
+  by their building's base. **Exporter**: through M15's instancing (emissive in
+  `unreal.EMISSIVE`). **assetgen**: AG8 draws banners as neon bands with a brand's name
+  (AG6: tall, neon), holo-boards in front of a facade with a projector on an arm off the wall,
+  billboards lit as neon with a tube round the face, and replaces the blockout's sign
+  prototypes; the brief leaves holo-boards in front of a facade off its walls; `GEN_VERSION`
+  m20.1 (on the fast import's m18.3).
+- **With M18 and M13** (found on the merged builds): the one `Overhead` replaces M18's
+  `overhead(..., fill=False)`: a prop on a low road's sidewalk stands on that road (`own`)
+  over its embankment, a tree never does; nothing stands on the ground inside a fill
+  (`props._off_fills`: signals, scaffolding, market gates; Vesper Bay had taken five more
+  tries over them), median barriers fit under what is over them as `prop_support` measures
+  (`_barriers_clear`); `Ctx.facade_spot` takes heights in the building's frame and returns
+  the lift at its spot (AC units and ivy on a slope), shop signs and awnings measure their
+  wall's top where they hang (`Ctx.reframe`), overhead cables find their walls 5 cm inside
+  the check's reach (`CABLE_SLACK_M`).
+  A building's ads stay apart across close parallel planes as `sign_slots` measures them
+  (`signage._apart`: a setback's face and its mass's; the stack demo's banners).
+Delta on main (M19, M18, M21, M16): props off their surface 5,260 to 0 (2,903 quay
+railings, 730 AC units, 299 street lights, 186 shop signs, 171 ivy, 151 signals, 146
+benches, 72 boats, ...), plants reaching what is over them 7 to 0; facade billboards 214
+to 2,750 (1,154 landscape, 1,596 portrait) and 939 banners, holo-boards 57 to 201 (112
+over roofs, 89 in front of facades), the 963 roof billboards lit; shop signs 52 fewer
+(walls too low for any). Every sample, the pinned, stack and deck demos and Cragmouth
+pass every check (100, 105 with decks).
+Sample builds: `docs/progress/M20/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
