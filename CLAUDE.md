@@ -1111,11 +1111,15 @@ M20 (props, plants and signs, from the first run-through) is in place:
   the lift at its spot (AC units and ivy on a slope), shop signs and awnings measure their
   wall's top where they hang (`Ctx.reframe`), overhead cables find their walls 5 cm inside
   the check's reach (`CABLE_SLACK_M`).
-Delta on main (M18, M21, M16): props off their surface 5,150 to 0 (2,903 quay railings,
-735 AC units, 252 street lights, 181 shop signs, 151 benches, 76 boats, ...), plants into a
-deck or a raised road 4 to 0; facade billboards 213 to 2,886 (1,286 landscape, 1,600
-portrait) and 999 banners, holo-boards 50 to 204 (122 over roofs, 82 in front of facades),
-the 1,008 roof billboards lit; shop signs 62 fewer (walls too low for any).
+  A building's ads stay apart across close parallel planes as `sign_slots` measures them
+  (`signage._apart`: a setback's face and its mass's; the stack demo's banners).
+Delta on main (M19, M18, M21, M16): props off their surface 5,260 to 0 (2,903 quay
+railings, 730 AC units, 299 street lights, 186 shop signs, 171 ivy, 151 signals, 146
+benches, 72 boats, ...), plants reaching what is over them 7 to 0; facade billboards 214
+to 2,750 (1,154 landscape, 1,596 portrait) and 939 banners, holo-boards 57 to 201 (112
+over roofs, 89 in front of facades), the 963 roof billboards lit; shop signs 52 fewer
+(walls too low for any). Every sample, the pinned, stack and deck demos and Cragmouth
+pass every check (100, 105 with decks).
 Sample builds: `docs/progress/M20/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

@@ -1,0 +1,18 @@
+citygen blockout: Vesper Bay Decks
+result: PASS
+
+  [pass] blender_build: built
+  [pass] blend_opens: city.blend reopened in a fresh Blender
+  [pass] blend_objects: 11309 objects in the .blend, 11309 in the plan
+  [pass] blend_buildings: 5963 building objects, 5963 buildings with masses in the model
+  [pass] blend_instances: 79368 prop and plant instances evaluated in the .blend, 79368 in the plan
+  [pass] gltf_tiles: 196 tile files for 196 tiles with objects
+  [pass] usd_export: city.usdc
+  [pass] renders: 16 of 16 renders
+  [pass] blender_budget: Blender 268.2 s (budget 600 s)
+
+plan: 11309 objects, 49233 parts, 196 tiles, 5963 buildings (sha256 9822b888be254b4c)
+blender 5.2.3 LTS: 1220970 vertices, 461959 faces, 79368 instances, 105 materials, 143 collections
+files (MB): {"blend": 17.1, "usd": 46.3, "gltf_tiles": 58.7, "renders": 5.1}
+timings (s): {"build_s": 7.2, "save_s": 2.0, "usd_s": 39.8, "gltf_s": 124.1, "render_s": 94.8, "total_s": 268.2}
+total (s): {"plan_s": 8.8, "exports_s": 10.0, "total_s": 292.2}
