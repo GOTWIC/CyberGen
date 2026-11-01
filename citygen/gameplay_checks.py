@@ -331,9 +331,14 @@ def _box(s):
 
 
 def check_slots(m: CityModel, n: _Net) -> Check:
+    from . import signage as SG
+
     c = Check("sign_slots", "Sign and ad slots: one per M6 shop sign and M3 roof billboard, "
-                            "facade slots on a facade of their building above the shop signs "
-                            "and apart from each other, holo-ads over their roof")
+                            "facade slots on a plane facade of their building above the shop "
+                            "signs and apart from each other, open in front (M20: neon "
+                            "billboards landscape or portrait, banners whose wrapped faces "
+                            "meet at their corner, every billboard and banner lit), holo-ads "
+                            "over their roof or in front of a facade, clear round their image")
     bld = {b.id: b for b in m.buildings}
     signs = {p.id for p in m.props if p.type == "prop.sign"}
     seen: dict[str, str] = {}
@@ -365,34 +370,104 @@ def check_slots(m: CityModel, n: _Net) -> Check:
             _limit(c, f"{s.id}: building {s.building_id} missing")
             continue
         z0, z1 = _box(s)
+        a = s.attrs or {}
+        if s.kind in ("billboard", "banner") and a.get("lit") != "neon":
+            _limit(c, f"{s.id}: not lit as neon")
         if s.mount == "roof" and s.roof_item is not None:
             if not 0 <= s.roof_item < len(b.roof_items) or \
                     b.roof_items[s.roof_item].kind != "billboard":
                 _limit(c, f"{s.id}: roof item {s.roof_item} is not a billboard")
             continue
         if s.mount == "roof":
-            top = max(ms.z1_m for ms in b.masses)
+            top = SG.roof_of(b).z1_m
             inside = any(shapely.contains_xy(G.from_model_poly(ms.footprint), s.position[0],
                                              s.position[1]) and ms.z1_m >= top - 1e-6
                          for ms in b.masses)
             if not inside or z0 < top - 1e-6:
                 _limit(c, f"{s.id}: not over the roof of {b.id}")
             continue
-        on = False
-        for ms in b.masses:
-            if ms.z0_m > z0 + 1e-6 or ms.z1_m < z1 - 1e-6:
-                continue
-            if G.dist(G.from_model_poly(ms.footprint).exterior, Point(s.position[:2])) <= 0.3:
-                on = True
-                break
-        if not on:
-            _limit(c, f"{s.id}: not on a facade of {b.id} from {z0:.1f} to {z1:.1f} m")
+        p = Point(s.position[:2])
+        if s.mount == "front":
+            # M20: a holo-board's image HOLO_OFF_M in front of a facade of its building
+            off = float(a.get("off_m", SG.HOLO_OFF_M))
+            on = any(ms.z0_m <= z0 + 1e-6 and ms.z1_m >= z1 - 1e-6 and
+                     abs(G.dist(G.from_model_poly(ms.footprint).exterior, p) - off) <= 0.3 and
+                     not shapely.contains_xy(G.from_model_poly(ms.footprint), *s.position[:2])
+                     for ms in b.masses)
+            if not on:
+                _limit(c, f"{s.id}: not {off:g} m in front of a facade of {b.id}")
+        else:
+            on = None
+            for ms in b.masses:
+                if ms.z0_m > z0 + 1e-6 or ms.z1_m < z1 - 1e-6:
+                    continue
+                if G.dist(G.from_model_poly(ms.footprint).exterior, p) <= 0.3:
+                    on = ms
+                    break
+            if on is None:
+                _limit(c, f"{s.id}: not on a facade of {b.id} from {z0:.1f} to {z1:.1f} m")
+            elif s.kind in ("billboard", "banner") and (on.shape != "prism" or
+                                                         on.role in SG.SKIP_ROLES):
+                _limit(c, f"{s.id}: on a {on.role} mass, not a plane facade")
         if z0 < max(8.0, top_of.get(b.id, 0.0)) - 1e-6:
             _limit(c, f"{s.id}: starts at {z0:.1f} m, among the shop signs")
+        if s.kind == "billboard":
+            o = a.get("orientation")
+            if (o == "portrait") != (s.height_m > s.width_m) or o not in ("landscape",
+                                                                          "portrait"):
+                _limit(c, f"{s.id}: {o} at {s.width_m:g} x {s.height_m:g} m")
         by_b.setdefault(b.id, []).append(s)
+    # M20: a banner that wraps its corner and the face round it name each other and meet
+    slot = {s.id: s for s in m.sign_slots}
+    for s in m.sign_slots:
+        w = (s.attrs or {}).get("wrap")
+        if s.kind != "banner" or w is None:
+            continue
+        o = slot.get(w)
+        if o is None or (o.attrs or {}).get("wrap") != s.id or o.building_id != s.building_id \
+                or abs(_box(o)[0] - _box(s)[0]) > TOL_M or abs(_box(o)[1] - _box(s)[1]) > TOL_M:
+            _limit(c, f"{s.id}: its wrapped face {w} is not its pair")
+            continue
+        gap = math.hypot(o.position[0] - s.position[0], o.position[1] - s.position[1])
+        if gap > (s.width_m + o.width_m) / 2.0 * 1.42 + 2.0 * SG.CORNER_GAP_M + 0.1:
+            _limit(c, f"{s.id} and {w}: {gap:.1f} m apart, not round one corner")
+    # M20: open in front (billboards, banners) and clear round a holo-board's image
+    obst = SG.Obstacles(m)
+    from . import terrain as TE
+
+    flat = TE.ground_of(m) is None
+    for s in m.sign_slots:
+        if s.kind not in ("billboard", "banner", "holo_ad") or s.mount == "roof":
+            continue
+        b = bld.get(s.building_id)
+        if b is None:
+            continue
+        base = b.base_m if (b.base_m is not None and not flat) else 0.0
+        z0, z1 = _box(s)
+        ya = math.radians(s.yaw_deg)
+        nx, ny = math.cos(ya), math.sin(ya)
+        ux, uy = -ny, nx
+        x, y = s.position[0], s.position[1]
+        hw = s.width_m / 2.0 - 0.05
+        if s.mount == "front":
+            img = LineString([(x - ux * hw, y - uy * hw), (x + ux * hw, y + uy * hw)]).buffer(
+                SG.HOLO_CLEAR_M - 0.1)
+            if _hits_others(obst, img, base + z0, base + z1, b.id):
+                _limit(c, f"{s.id}: something within {SG.HOLO_CLEAR_M:g} m of its image")
+            continue
+        strip = shapely.Polygon([(x - ux * hw + nx * 0.7, y - uy * hw + ny * 0.7),
+                                 (x + ux * hw + nx * 0.7, y + uy * hw + ny * 0.7),
+                                 (x + ux * hw + nx * (SG.OPEN_M - 0.1),
+                                  y + uy * hw + ny * (SG.OPEN_M - 0.1)),
+                                 (x - ux * hw + nx * (SG.OPEN_M - 0.1),
+                                  y - uy * hw + ny * (SG.OPEN_M - 0.1))])
+        if _hits_others(obst, strip, base + z0 + 0.05, base + z1 - 0.05, None):
+            _limit(c, f"{s.id}: something stands in front of it")
     for bid, ss in by_b.items():
         for i, a in enumerate(ss):
             for b_ in ss[i + 1:]:
+                if (a.mount == "front") != (b_.mount == "front"):
+                    continue  # (a holo-board's image stands in front of the facade's ads)
                 turn = abs(((a.yaw_deg - b_.yaw_deg) + 180.0) % 360.0 - 180.0)
                 if turn > 10.0:
                     continue  # another facade
@@ -402,8 +477,27 @@ def check_slots(m: CityModel, n: _Net) -> Check:
                 gap = math.hypot(a.position[0] - b_.position[0], a.position[1] - b_.position[1])
                 if gap < (a.width_m + b_.width_m) / 2.0:
                     _limit(c, f"{a.id} and {b_.id} overlap on the same facade")
+    kinds: dict = {}
+    for s in m.sign_slots:
+        k = f"{s.kind}.{s.mount}"
+        kinds[k] = kinds.get(k, 0) + 1
     c.notes.append(f"shop signs reach {sign_top:.1f} m")
+    c.notes.append(", ".join(f"{v} {k}" for k, v in sorted(kinds.items())))
     return c
+
+
+def _hits_others(obst, geom, z0: float, z1: float, bid: str | None) -> bool:
+    """Whether anything but building `bid`'s masses (all of them: None keeps every mass)
+    meets the shape between z0 and z1."""
+    if obst.tree is None:
+        return False
+    for k in obst.tree.query(geom, predicate="intersects").tolist():
+        lo, hi, owner, _ = obst.rows[k]
+        if bid is not None and owner == bid:
+            continue
+        if lo < z1 - 0.01 and hi > z0 + 0.01:
+            return True
+    return False
 
 
 def run(spec, m: CityModel) -> list:

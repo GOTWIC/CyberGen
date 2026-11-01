@@ -189,6 +189,59 @@ def test_check_slots_fails(city):
     assert not _checks(m.model_copy(update={"sign_slots": low}))["sign_slots"].passed
 
 
+def test_large_ads(city):
+    """M20: neon billboards (landscape and portrait) and banners on the facades, every one
+    lit as neon; a banner round its corner names its pair."""
+    from collections import Counter
+
+    m = city.model
+    kinds = Counter((s.kind, s.mount) for s in m.sign_slots)
+    assert kinds[("billboard", "facade")] and kinds[("banner", "facade")]
+    big = [s for s in m.sign_slots if s.kind in ("billboard", "banner")]
+    assert all(s.attrs.get("lit") == "neon" for s in big)
+    face = [s for s in big if s.mount == "facade" and s.kind == "billboard"]
+    assert {s.attrs["orientation"] for s in face} == {"landscape", "portrait"}
+    slot = {s.id: s for s in m.sign_slots}
+    for s in big:
+        if "wrap" in s.attrs:
+            assert slot[s.attrs["wrap"]].attrs["wrap"] == s.id
+
+
+def test_signage_spec(city):
+    """A district's `signage` (in its params, as M1 records the filled spec) sets its large
+    ads: none at density 0, only its kinds."""
+    spec = validate_spec(copy.deepcopy(SMALL)).filled
+
+    def with_signage(sg):
+        ds = [d.model_copy(update={"params": {**d.params, "signage": sg}})
+              for d in city.model.districts]
+        return _bare(city.model).model_copy(update={"districts": ds})
+    out = GP.build(spec, with_signage({"density": 0.0}))
+    assert not [s for s in out.rows["sign_slots"] if s["kind"] in ("banner",) or
+                s["mount"] in ("front",) or (s["kind"] == "billboard" and
+                                             s["mount"] == "facade")]
+    out = GP.build(spec, with_signage({"density": 1.0, "kinds": ["billboard"]}))
+    kinds = {(s["kind"], s["mount"]) for s in out.rows["sign_slots"]}
+    assert ("billboard", "facade") in kinds and ("banner", "facade") not in kinds
+    assert ("holo_ad", "front") not in kinds and ("holo_ad", "roof") not in kinds
+
+
+def test_check_slots_fails_for_large_ads(city):
+    m = city.model
+    bb = next(s for s in m.sign_slots if s.kind == "billboard" and s.mount == "facade")
+    import math
+
+    a = math.radians(bb.yaw_deg)
+    out = [s.model_copy(update={"position": (s.position[0] + 6.0 * math.cos(a),
+                                             s.position[1] + 6.0 * math.sin(a),
+                                             s.position[2])})
+           if s.id == bb.id else s for s in m.sign_slots]
+    assert not _checks(m.model_copy(update={"sign_slots": out}))["sign_slots"].passed
+    dark = [s.model_copy(update={"attrs": {**s.attrs, "lit": None}}) if s.id == bb.id else s
+            for s in m.sign_slots]
+    assert not _checks(m.model_copy(update={"sign_slots": dark}))["sign_slots"].passed
+
+
 def test_lots_keep_clear_of_buildings(city):
     """Sweep regression: a setback lot over another lot's building is not placed, and the
     check sees the overlap."""
@@ -304,3 +357,17 @@ def test_gameplay_stage_ignores_ulp_noise(monkeypatch, city):
         assert a == b, key
     rebuilt = with_rows(base, clean.rows)
     assert rebuilt.to_json() == city.model.to_json()
+
+
+def test_ads_on_close_planes_kept_apart():
+    """M20: ads on two facades of parallel planes close together (a setback over its mass)
+    stay apart as `sign_slots` measures them; a wrapped pair goes as one."""
+    from citygen import signage as SG
+
+    def row(i, x, z, wrap=None, yaw=0.0):
+        return {"id": i, "mount": "facade", "yaw_deg": yaw, "position": (x, 0.0, z),
+                "width_m": 2.0, "height_m": 12.0, "attrs": {"wrap": wrap} if wrap else {}}
+
+    rows = [row("a", 0.0, 20.0), row("b.a", 0.5, 21.0, "b.b"),
+            row("b.b", 1.0, 21.0, "b.a", yaw=90.0), row("c", 0.5, 40.0), row("d", 5.0, 20.0)]
+    assert [r["id"] for r in SG._apart(rows)] == ["a", "c", "d"]

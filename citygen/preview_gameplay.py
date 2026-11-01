@@ -30,7 +30,7 @@ POI_COLORS = {"bar": "#ff4fd8", "clinic": "#4fe0ff", "vendor": "#ffd24f", "fixer
 POI_MARK = {"bar": "o", "clinic": "P", "vendor": "s", "fixer": "*", "hideout": "X",
             "apartment": "^"}
 SLOT_COLORS = {"shop_sign": "#ff7ad9", "billboard": "#ffe27a", "holo_ad": "#5ef2ff",
-               "neon": "#b06bff"}
+               "neon": "#b06bff", "banner": "#ff9a3c"}
 ROAD = "#3b404b"
 POLICE_C = "#5b8cff"
 HALF = 150.0
@@ -133,7 +133,9 @@ def _inset(ax, m) -> None:
         w = max(s.width_m, 1.0) / 2.0
         x, y = s.position[0], s.position[1]
         ax.plot([x - tx * w, x + tx * w], [y - ty * w, y + ty * w], color=col,
-                lw=2.4 if s.kind != "shop_sign" else 1.2, zorder=3.5, solid_capstyle="butt")
+                lw=1.2 if s.kind == "shop_sign" else 3.2 if s.kind in ("billboard", "banner")
+                else 2.4, ls="--" if s.mount == "front" else "-", zorder=3.5,
+                solid_capstyle="butt")
     for p in m.pois:
         x, y = p.position[:2]
         if not near((x, y), 0):
@@ -173,12 +175,16 @@ def render_gameplay(b, out, dpi: int = 110) -> None:
              weight="bold", va="top")
     gs = b.stats.get("gameplay", {}) if getattr(b, "stats", None) else {}
     if gs:
+        holo = gs["sign_slots"].get("holo_ad.roof", 0) + gs["sign_slots"].get("holo_ad.front", 0)
         fig.text(0.01, 1 - 0.85 / fh,
                  f"{gs['pois']} points of interest, {gs['factions']} factions, "
                  f"{gs['territories']} territories ({gs['contested']} contested), "
                  f"{gs['taxi_stands']} taxi stands, {gs['fast_travel']} fast-travel points, "
                  f"{gs['parking_capacity']} parking spaces, "
-                 f"{sum(gs['sign_slots'].values())} sign slots",
+                 f"{sum(gs['sign_slots'].values())} sign slots "
+                 f"({gs['sign_slots'].get('billboard.facade', 0)} neon billboards and "
+                 f"{gs['sign_slots'].get('banner.facade', 0)} banners on the facades, "
+                 f"{holo} holo-boards)",
                  color=MUTED, fontsize=10, va="top")
     axes = []
     for r in range(2):

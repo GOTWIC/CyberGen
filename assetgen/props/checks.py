@@ -5,8 +5,9 @@
   has instances; every sign slot has a sign with a mesh;
 - `props_families`: every prop kind the city uses has 4 to 12 variants in each style, every
   plant species 6 to 10 (trees) or 4 to 10 (shrubs, sedum, scrub, ivy), each with a mesh;
-- `props_replaces`: every M15 prototype actor of props and plants (one per kind and tile) is
-  replaced by an entry of the contributions, so no blockout prototype is left;
+- `props_replaces`: every M15 prototype actor of props, plants and (M20) large ads (one per
+  kind and tile) is replaced by an entry of the contributions, so no blockout prototype is
+  left;
 - `props_meshes`: no degenerate or duplicate triangles, normals that agree with their faces,
   finite UVs, in every variant, exact mesh, sign and LOD;
 - `props_budgets`: triangles per variant, plant and sign; instances per tile and city;
@@ -37,6 +38,12 @@ def _blockout_keys(model) -> set[str]:
         kind = p.type.split(".", 1)[1]
         if kind in PROTOTYPES:
             keys.add(f"plant.{kind}.{BD.tile_of(p.position[0], p.position[1])}")
+    # (M20: the large ads' prototypes, `blockout._signs`)
+    from citygen.blockout import SIGN_PROTO
+    for s in model.sign_slots:
+        kind = SIGN_PROTO.get((s.kind, s.mount))
+        if kind is not None:
+            keys.add(f"sign.{kind}.{BD.tile_of(s.position[0], s.position[1])}")
     return keys
 
 
