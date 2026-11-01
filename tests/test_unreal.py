@@ -339,9 +339,37 @@ def test_cli_manifest_only(build, tmp_path):
     out = tmp_path / "b"
     shutil.copytree(build, out)
     assert main(["unreal", str(out), "--manifest-only"]) == 0
-    for f in ("manifest.json", "prototypes.glb", "graphs.json"):
+    for f in ("manifest.json", "prototypes.glb", "graphs.json", "map.png", "play.json"):
         assert (out / "unreal" / f).is_file()
+    assert "play" in json.loads((out / "unreal" / "manifest.json").read_text())
+    assert main(["unreal", str(out), "--manifest-only", "--no-play"]) == 0
+    assert "play" not in json.loads((out / "unreal" / "manifest.json").read_text())
     assert main(["unreal", str(tmp_path / "missing"), "--manifest-only"]) == 2
+
+
+def test_manifest_play(build, manifest, tmp_path):
+    """The play features in the manifest: the map over the plan's bounds, the walkway
+    points and lamps of the city, in the manifest's hash; their actor (`play`) one more
+    than the blockout's, created over an import without them, updated when they change."""
+    out = tmp_path / "b"
+    shutil.copytree(build, out)
+    man = U.build_manifest(out, play=True)[0]
+    manifest = manifest[0]
+    p = man["play"]
+    plan = json.loads((out / "blockout_plan.json").read_text())
+    assert p["map_bounds"] == plan["bounds"] and (out / p["map"]).is_file()
+    assert p["walk_points"] > 100 and p["labels"] == len(json.loads(
+        (out / p["data"]).read_text())["labels"]) > 0
+    lights = sum(len(i["xforms"]) for i in man["instances"] if i["proto"] == "street_light")
+    assert p["lamps"] >= lights > 0
+    assert manifest["hash"] != man["hash"] and "play" not in manifest
+    assert U.actor_hashes(man)[U.PLAY_KEY] == p["hash"]
+    assert U.manifest_changes(manifest, man) == {"created": [U.PLAY_KEY], "updated": [],
+                                                 "deleted": []}
+    assert U.manifest_changes(man, manifest)["deleted"] == [U.PLAY_KEY]
+    changed = copy.deepcopy(man)
+    changed["play"]["hash"] = "0" * 16
+    assert U.manifest_changes(man, changed)["updated"] == [U.PLAY_KEY]
 
 
 def test_prepare_project_and_engine(tmp_path):
@@ -394,11 +422,13 @@ def test_play_flags(tmp_path):
     that is not one is refused before any editor runs."""
     from citygen.cli import build_parser
     a = build_parser().parse_args(["unreal", "B", "P.uproject"])
-    assert (a.play, a.fly_speed, a.view_range, a.no_startup, a.no_hlod) == \
-        ("fly", U.FLY_SPEED_M_S, U.VIEW_M, False, False)
+    assert (a.play, a.fly_speed, a.view_range, a.no_startup, a.no_hlod, a.no_play) == \
+        ("fly", U.FLY_SPEED_M_S, U.VIEW_M, False, False, False)
     a = build_parser().parse_args(["unreal", "B", "P.uproject", "--play", "walk",
-                                   "--fly-speed", "80", "--no-startup", "--no-hlod"])
-    assert (a.play, a.fly_speed, a.no_startup, a.no_hlod) == ("walk", 80.0, True, True)
+                                   "--fly-speed", "80", "--no-startup", "--no-hlod",
+                                   "--no-play"])
+    assert (a.play, a.fly_speed, a.no_startup, a.no_hlod, a.no_play) == \
+        ("walk", 80.0, True, True, True)
     with pytest.raises(SystemExit):
         build_parser().parse_args(["unreal", "B", "--play", "swim"])
     with pytest.raises(ValueError):
@@ -503,7 +533,8 @@ def test_without_assets_the_manifest_is_the_blockouts(build, manifest, tmp_path)
     only = U.build_manifest(staged, assets=False)
     assert _dump(only[0]) == _dump(man) and _dump(only[2]) == _dump(graphs)
     assert "stage2" in U.build_manifest(staged)[0]
-    assert main(["unreal", str(staged), "--manifest-only", "--blockout-only"]) == 0
+    # (--no-play: the play features' map and data are the same either way, test_manifest_play)
+    assert main(["unreal", str(staged), "--manifest-only", "--blockout-only", "--no-play"]) == 0
     written = json.loads((staged / "unreal" / "manifest.json").read_text())
     assert _dump(written) == _dump(man)
 
@@ -907,8 +938,10 @@ def test_stage2_from_assetgen(staged, manifest):
     assert blds and all(blockout[k]["category"] in ("building", "landmark") for k in blds)
     assert set(blds) <= set(s2["replaced"])
     assert s2["counts"]["replaces_missing"] == 0
-    # (AG4's roof equipment entries, `roofs.<tile>`, are instanced parts with no node)
-    assert all(e["asset"] == U.asset_name(e["node"]) for e in con["entries"] if "node" in e)
+    # (AG4's roof equipment entries, `roofs.<tile>`, are instanced parts with no node; a
+    # building its street front takes whole has a null node and asset)
+    assert all(e["asset"] == (U.asset_name(e["node"]) if e["node"] else None)
+               for e in con["entries"] if "node" in e)
     assert all("node" in e or e["kind"] == "roof_equipment" for e in con["entries"])
     for p in s2["packs"]:
         assert p["glb"], p["folder"]
@@ -916,11 +949,12 @@ def test_stage2_from_assetgen(staged, manifest):
                  if "mesh" in n}
         assert {m["asset"] for m in p["meshes"]} <= nodes, p["folder"]
     actor_keys = {a["key"] for a in s2["actors"]}
-    # (a one-floor building its street front takes whole has an empty shell node: no actor
-    # of its own, its front in its place; Testport's harbor freight terminal)
+    # (a one-floor building its street front takes whole has no shell mesh, its node null,
+    # or, in packs from before that, an empty shell node: no actor of its own, its front in
+    # its place; Testport's harbor freight terminal)
     es = {e["key"]: e for e in con["entries"]}
-    empty = {k for k in blds
-             if U.glb_triangles(staged / "assets" / es[k]["glb"])[es[k]["node"]] == 0}
+    empty = {k for k in blds if not es[k]["node"]
+             or U.glb_triangles(staged / "assets" / es[k]["glb"])[es[k]["node"]] == 0}
     assert set(blds) - empty <= actor_keys and not empty & actor_keys
     assert all(f"{k}.front" in actor_keys for k in empty)
     ch = U.manifest_changes(man, m2)
@@ -1224,7 +1258,9 @@ def test_import_resets_a_stale_fallback():
     body = body[:body.index("EAL.set_metadata_tag(sm, HASH_TAG, h)")]
     assert "stale = not full and auto is not None" in body
     assert 'ns.set_editor_property("fallback_target", auto)' in body
-    assert "or shape or full \\\n                or stale:" in body
+    # (on both paths: the fast one's pack step sets the rest before the build)
+    assert "again = not self.nanite_as_asked(ns, rec) or stale" in body
+    assert "or full or stale" in body
 
 
 # --- in Unreal (where it is installed) ------------------------------------------------------
@@ -1245,11 +1281,17 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
     rep = BO.run_blockout(build / "city_model.json", build, render=False)
     assert rep["passed"], rep
-    proj = U.new_project(tmp_path / "Proj", UE_ROOT)
+    # (not "Proj": UnrealBuildTool names modules without case, and the engine has PROJ, the
+    # GeoReferencing plugin's projection library, so the play plugin could not be built)
+    proj = U.new_project(tmp_path / "CityTest", UE_ROOT)
     first = U.import_city(build, proj)
     assert first["ok"], first.get("error")
+    # the player start, the sun, the sky light and the atmosphere, and the play features'
+    # actor where the plugin could be built (a C++ compiler UE accepts)
+    played = first["play_plugin"]["ok"]
+    assert first["play_features"]["made"] == played
     assert first["actors"]["created"] == first["actor_count"] == \
-        first["counts"]["objects"] + first["counts"]["instance_actors"] + 4
+        first["counts"]["objects"] + first["counts"]["instance_actors"] + 4 + int(played)
     # Play flies by default, the level streams for it, the project opens on the city
     assert first["play"]["mode"] == "fly" and first["streaming"]["set"]
     assert first["startup_map"] == first["level"] and first["startup_map_changed"]
@@ -1307,7 +1349,9 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     (build / "city_model.json").write_text(small.to_json() + "\n", encoding="utf-8")
     assert BO.run_blockout(build / "city_model.json", build, render=False)["passed"]
     assert asset_build(build, workers=2, log=lambda *a: None)["ok"]
-    proj = U.new_project(tmp_path / "Proj", UE_ROOT)
+    # (not "Proj": UnrealBuildTool names modules without case, and the engine has PROJ, the
+    # GeoReferencing plugin's projection library, so the play plugin could not be built)
+    proj = U.new_project(tmp_path / "CityTest", UE_ROOT)
     first = U.import_city(build, proj, assets=False)
     assert first["ok"], first.get("error")
     old = json.loads((build / "unreal" / "manifest.json").read_text())

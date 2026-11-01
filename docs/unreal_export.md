@@ -13,7 +13,9 @@ script, not this exporter.)
   [--new-project]` (and the play options below): `citygen/unreal.py` on the venv side (manifest, glTF prototypes, flat
   graphs, engine discovery, project preparation, editor runs; no Unreal needed, tested in
   pytest) and `citygen/ue/import_city.py`, `citygen/ue/check_city.py` inside the editor
-  (stdlib and `unreal` only). Details: `docs/progress/M15/README.md`.
+  (stdlib and `unreal` only). Details: `docs/progress/M15/README.md`. The play features
+  (below) add `citygen/unreal_play.py` (venv side) and the C++ plugin
+  `citygen/ue/CityGenPlay`, built into the project.
 - **After M15 merges**, a small refactor moves it into a package of its own beside the
   generators, split into a core (the manifest format, layering, project and editor
   handling, the import and check scripts, the shared engine assets) and stage 1's
@@ -126,7 +128,130 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 | `--new-project` | off | make the project from the First Person template if it is missing |
 | `--blockout-only` | off | leave out stage 2's buildings and streets |
 | `--check`, `--check-only`, `--shots DIR`, `--view ...` | | play and check the level, render views |
+| `--no-play` | off | leave out the play features (below) |
 | `--quiet` | off | no progress on stderr |
+
+### The fast import
+
+A first import with stage 2's assets spends most of its time importing and building the
+packs' meshes and spawning the actors. By default the importer takes the fast path
+(`citygen/ue/import_city.py`, notes and measurements in `docs/progress/exp_fast_import/`):
+
+- **Packs at once:** every stage 2 pack to import is queued as one async Interchange import
+  and waited for once, so packs import side by side and their meshes build on every core.
+- **Each mesh built once:** a Python Interchange pipeline step (`CgPackStep`) sets each
+  mesh's Nanite settings (on or off, shape preservation, the full fallback) on its factory
+  node before the build, and leaves the meshes the city does not place (the family packs'
+  other variants) unmade; textures get their color space, compression, group and green
+  channel the same way (`CgTextureStep`). AG12's water packs keep their water pipeline.
+- **Saves in batches:** stage 2's meshes saved in one call; the actors saved and unloaded
+  every 2,000 made (`CITYGEN_UE_OFFLOAD`, 0 for never), since each spawn scans every loaded
+  actor's label, and loaded again at the end.
+- **The import's editor:** started with `-fastexit` (it ends once the script has saved
+  everything, not after minutes of teardown) and with mesh distance fields and Lumen cards
+  off for that process only (`-ini:` overrides; every imported mesh has none anyway, and
+  their task queue could race the LOD chains). The project's own settings are untouched.
+
+The result is the same level: the same actors, assets and hashes as the one-at-a-time path,
+and an import over it updates by key and hash as always. `CITYGEN_UE_FAST=0` in the
+environment takes the one-at-a-time path instead (each pack imported, each mesh built and
+then set, saved one by one, the editor's own shutdown), for comparison or if an engine
+version's Interchange misbehaves with concurrent imports; it needs a little less memory.
+
+### Opening a big city
+
+- **The first Play** of a large city takes minutes, not seconds: Unreal shows nothing until
+  every cell within `--view-range` of the player has loaded (Delta Megacity's middle: about
+  46,000 meshes), and Windows marks the editor "Not Responding" meanwhile. It is loading, not
+  frozen; later Plays in the same editor session are much faster. `--view-range 800` loads a
+  smaller ring (the far view shows the rest).
+- **On Windows**, add the project folder and the engine folder to Windows Security's
+  exclusions (Virus & threat protection, Manage settings, Exclusions): Defender otherwise
+  scans each of the level's files (one per actor, over 100,000 for a big city) as Unreal
+  opens it.
+- **In the editor** (not playing), a World Partition level loads nothing until asked ("no
+  regions loaded"): Window > World Partition > World Partition Editor, drag a box over an
+  area, right-click, Load Region From Selection. Keep the boxes small.
+- **"Texture streaming pool memory has been exhausted"** in red over the play window: a
+  stage 2 city's textures (AG6's library at 512 px/m) want more than the GPU's pool (70% of
+  its memory by default), so the farthest stream at a lower resolution. It is the
+  engine's on-screen debug text, drawn over the minimap: the developer menu's "Engine
+  messages" row (or the console's `DisableAllScreenMessages`) hides it.
+- **The engine** is found where the Epic Games Launcher put it (its
+  `LauncherInstalled.dat`), the usual `C:\Program Files\Epic Games\UE_5.*` or
+  `/Users/Shared/Epic Games/UE_5.*` too; `--engine` or `CITYGEN_UE_ROOT` names another.
+
+## Play features
+
+Every import gives the level a minimap, a map you can teleport with, a free camera and a
+developer menu with day and night, unless `--no-play`:
+
+| Key | What it does |
+|---|---|
+| (always) | the minimap, top left: the city around you, north up, your heading as an arrow, the city's name, day or night, the keys |
+| M | the map, full screen: the whole city with district names; the wheel zooms about the cursor, the right button drags it, the left button teleports you there (a walking player onto the nearest walkway, held until the city has streamed in around it; a flying one at its height, at least 30 m over the walkway there); M or Esc closes it |
+| . | the free camera: in the game (not the editor's eject), a spectator pawn with no collision, flown with W A S D, E or Space up, Q or C down, the mouse; the wheel sets its speed (2 to 500 m/s); `.` again goes back to the player, who waited where they were |
+| Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages; click a row to change it; Tab or Esc closes it |
+
+By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
+each building's lit share), neon and signs glow brighter, the sun becomes a dim blue moon
+high in the sky, the sky light dims, the exposure is held (a fixed EV100, or the eye would
+adapt until the night looked like the day), and the street and wall lights nearest the view
+(48 by default) become real point lights, warm and without shadows, the farthest of them
+fading so a lamp entering the set does not pop. Stage 3 (atmosgen) takes the lighting over
+when it comes; the menu's switch is a developer's.
+
+**How it is built.** The play features are game logic (input, a drawn overlay, possession,
+teleporting), which Unreal's Python cannot write into a Blueprint's graph, so they are a
+small C++ runtime plugin, `CityGenPlay` (`citygen/ue/CityGenPlay`), that `citygen unreal`
+copies into the project (`Plugins/CityGenPlay`, enabled in the .uproject) and builds with
+UnrealBuildTool for the editor before the import (`unreal_play.build_plugin`, about 20 s
+the first time, skipped when its source is unchanged). It needs a C++ compiler UE 5.8
+accepts: on Windows Visual Studio 2022 17.14 or later with its MSVC 14.44 (UE 5.8 bans
+14.39 to 14.43 and 14.44 before build 35211), on a Mac Xcode. Where it cannot be built, the
+city imports without the play features (the summary line says why): a plugin never built
+is taken out of the project again, one built before stays as it was built (the level's
+play actor keeps its class, so the import can delete it). The build passes `-NoHotReloadFromIDE`, so an editor open on
+another project with Live Coding does not block it; the project being imported must be
+closed, as for any import. A project named like one of the engine's modules cannot build it:
+UnrealBuildTool compares module names without case, so a project `Proj` meets the
+GeoReferencing plugin's `PROJ` ("Expecting to find a type ... named 'PROJ'"); the city then
+imports without the play features.
+
+- **The actor**: `CityGenPlay` (key `play`, always loaded, `cg.type=play`): the map texture
+  (`Play/T_<City>_Map`, imported again only when its pixels change) and the world
+  rectangle of its corners, the walkway points, the lamp heads and kinds, district label
+  points, `MPC_CityGen`; settings (minimap radius 250 m, free camera speed 30 m/s, 48 lamp
+  lights of 2,400 cd for a street light and 600 for a wall light, 28 m radius, night
+  exposure -3 EV100, the moon at 3% of the sun, start at night, show the minimap) are its
+  properties, editable on the actor in the level.
+- **The data** (`citygen/unreal_play.py`, written beside the manifest, the manifest's `play`
+  names them with their hash): `unreal/map.png`, the city from above drawn from the
+  blockout plan (sea, land, water, parks, plazas, sidewalks, streets by class, highways in
+  amber, bridges, the transit tubes, buildings in their district's hue, landmarks lighter;
+  4,096 pixels on its long side; drawn again only when the plan changes) and
+  `unreal/play.json` (the map's bounds and size; the walkway graph's lines sampled every
+  5 m and thinned to one point per 3 m cell and level, stairs, lifts, skybridges, elevated
+  and underpass walkways left out; each street and wall light's lamp head, its prototype's
+  `prop_light` part placed by the instance's transform; a point inside each district from
+  `city_model.json`, else the gameplay layer's zones).
+- **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
+  [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
+  `CityGen.Teleport X Y` (citygen meters), `CityGen.Status` (the state as one JSON line).
+  The actor's functions are callable from Python too (`set_night`, `set_map_open`,
+  `set_free_cam`, `teleport_player_to_citygen`, `get_status`).
+- **The check** (`--check`): with the walking pawn, the overlay up, the map and the menu
+  open and close, night lights lamps near the player, the free camera there and back to the
+  same pawn, a teleport across the city that waits for streaming and lands on the ground;
+  with `--shots` the minimap, the map, the menu and the night as the play window shows them
+  (`unreal_play_*.png`, the editor's own `shot showui`).
+
+**Plan for more** (each in the actor and the overlay, the data from the venv side):
+markers on the map from the gameplay layer (points of interest, fast travel and taxi
+points, transit stations, faction turfs as a toggle), a waypoint set by a click with its
+route along the walkway or lane graph, a time-of-day slider and weather once stage 3 has
+them, a speed and field-of-view slider for the free camera, a photo mode (UI hidden, a
+high resolution shot), and showing the lane and walkway graphs over the city for stage 4.
 
 ## Contract for every stage
 
@@ -357,6 +482,11 @@ a second node beside the shell in the tile's pack (`<id>.front`) and its own ent
 - **Where**: at its building's pivot, with its building's CPD and materials (its era's walls:
   `materials` as the building's); its building's id in `ids`, so the actor's `cg.id` is the
   building's; `level` 1 for a building on an M14 deck.
+- **A front its building's whole height** (a one-floor gate house): the shell has no
+  triangles, so its node carries no mesh (glTF has no mesh without primitives) and the
+  building's entry has `node` and `asset` null (no shell mesh, no shell actor; its proxy
+  and parts as usual); the front's `replaces` names the building's key, so the front's
+  actor takes the place of the building's blockout actor.
 - **Collision**: complex (its own triangles: doorways, steps, posts and recesses collide as
   drawn). The building's convex hulls now start at the band's top (`band_m`); a mass the
   band takes whole (a one-floor shop) has none. `fallback_full`: the Nanite fallback keeps
@@ -974,6 +1104,7 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | Progress output | `citygen unreal` (and `citygen build`, `citygen blockout`) report where they are on stderr through `citygen/progress.py` (stdlib; assetgen uses it too): the importer and the check print `CYBERGEN_PROGRESS {json}` lines (a stage per group of phases, counts at most once a second, a first `plan` line with the import's counts), which `run_editor` relays while it writes the editor's output to the log byte for byte; the HLOD stage counts the builder's own lines (`World contains N HLOD actors`, a `final decision` per actor); a first import's overall estimate from this Mac's per-item times (`FIRST_IMPORT_S`), corrected by the stages done; `--quiet`, `CYBERGEN_QUIET=1`. Nothing the import makes changes | Greyhook imported with stage 2 into a new project, and with the blockout alone and `--check` (below) |
 | AG8 on AG6 | Props, plants and signs textured from the library: their contributions carry AG6's material records (catalog master and set per slot, `textures`, `scalars`, `vectors`, the `textures` table); master `M_CgLeaves` (leaf cards: the tint mask as an opacity mask, masked, two-sided, Nanite `Voxelize` kept); `M_CgHolo` reads `SignTex` (`Textured`); sign faces on page materials (`page.<page>` on `M_CgSign`, `holopage.<page>` on `M_CgHolo`, the city's sign page textures); `STAGE2_VERSION` 5 rebuilds the masters; test `test_stage2_textured_props_and_signs` | Greyhook rebuilt with it and imported over its AG6 import (16,054 sign, prop and plant actors updated, no shell or street actor; 4,329 new sign meshes, 8,150 renamed away; 39 new library textures), imported again (nothing changed, no HLOD rebuilt) and checked with shots: leaf cards masked up close, crowns full at 250 and 600 m, sign faces upright on their page cells, bark, painted cars and banded bollards; the holo-ads' faces on their page instances, blown out to white by day (a night shot is open); the prune of the renamed meshes stalled until the AG2 and AG6 Unreal check's fix (`docs/progress/AG6/unreal/`) |
 | AG2 and AG6 Unreal check | A building entry's `materials` reach its part instancers (the era walls on AG2's panels, concrete and plaster parts, per slot on the HISM); AG2's building parts get no collision (`collision: {"none": true}`, their instancers `NoCollision`: the building's simple collision covers its masses, and a body per instance, 1.3 million in Vesper Bay, stalled play; containers keep complex collision); every opaque or masked surface master is made with `used_with_nanite` as well as `used_with_instanced_static_meshes` (`usage_flags`; without it, instanced Nanite meshes drew the default material in play and recompiled at each launch, 272 warnings in Vesper Bay); `prune_meshes` keeps `Assets/Materials/` and `Assets/Textures/` (it deleted the city's sign pages after every import, under the instances that use them), and an instance whose texture parameters are empty is rebuilt (`own_textures`); a prune of more than 500 assets (`PRUNE_FILES`) deletes their package files itself on an empty level (`/Engine/Maps/Entry`): the stale packages unloaded, their files deleted, their folders scanned again by the asset registry, the city loaded again for the digests (`delete_files`; the editor's delete took over 90 minutes for the 8,435 meshes AG8 on AG6 renamed, 5 s now) | Greyhook imported again with these (10,617 part instancers updated to `NoCollision`, the 8,435 stale meshes deleted by their files in 5 s; then nothing changed, no HLOD rebuilt) and checked: 507 of 507 traces down, 35 of 36 roofs, 36 of 36 facades, 129 m walked, no usage flag warning in the log; Vesper Bay not imported again with them (its check before them failed: play at 12 to 14 s a frame, 157 of 507 traces down), an open item with the commands in `docs/progress/AG6/unreal/README.md` |
+| Play features (an exporter update on its own) | The play features above: `citygen/unreal_play.py` (the map image and play data, the plugin's install and build), the C++ plugin `citygen/ue/CityGenPlay` (the `CityGenPlay` actor, its overlay, free camera and console commands), the manifest's `play` and the play actor (key `play`, in `actor_hashes`), `--no-play`; the engine found through the Epic Games Launcher's install list (`unreal.launcher_engines`); a building whose street front takes it whole has no shell mesh (AG3's gate houses: the entry's `node` null, the front's `replaces` its key); tests `test_unreal_play.py`, `test_manifest_play` | Testport into a throwaway project (`CityDev`): import, `--check` with the play features, shots; Delta Megacity into another (`CityDelta`): import, HLODs, `--check`, shots (`docs/progress/play_features/`) |
 | AG4 | Roofs and connections: roof equipment one entry per tile (`roofs.<tile>`, parts only, an instanced actor per mesh with a building id per instance, no collision as the AG2 and AG6 check's building parts); buildings' `replaces` the blockout green-roof objects their shells build; skybridges a part of their own (`unreal_contribution.connections.json`, `connections/<tile>.glb`, an entry per skybridge by id with complex collision); a stage 2 entry's `links` carried to its actor (in its hash) and tagged `cg.link=<link>` by the importer; tests without Unreal (`test_stage2_skybridge_links`, `test_stage2_takes_assetgen_roofs_and_skybridges`) | In the AG3 and AG4 Unreal check (below; `docs/progress/AG4/unreal/`): Greyhook's 170 and Vesper Bay's 258 skybridges at their pivots and yaws with their `cg.link` tags, their floors walkable, reaching 0.15 m into both facades, whose hulls close the landing doors; roof equipment 997 and 1,867 instanced actors, every count its entry's, `NoCollision`, nothing floating; the replaced green roofs gone; every new slot on its master; the sky tube through its portal, the platforms at the tube's floor but inside the tower's hull |
 | AG3 and AG4 Unreal check | A shell node with no triangles in its pack (a one-floor building its street front takes whole; the entry's `triangles` counts the front's too) makes no mesh and no actor but still takes the blockout building's place (`glb_triangles`; the empty mesh Unreal refused, "Bad MeshDescription", failed Vesper Bay's HLOD build); the check's streaming wait lists the city's actors once the streaming query says done and then every 2 s, for up to 180 s (`settle`, `COUNT_EVERY_S`, `LOAD_WAIT_S`; listed every frame, 45,000 of them took Vesper Bay's game thread 6.5 s a frame and the far spots never streamed in: the 157 and 169 of 507 traces of the AG2 and AG6 check); roofs and facades traced on shells, not part instancers or fronts; each editor shot rendered once small first (a first render of a new view drew coarse Nanite clusters as flat triangles over the walls); the walk's and flight's frame times in the result; `PRUNE_FILES` 50 (a first import's unused variants by their files); tests `test_stage2_empty_shell`, `test_check_frame_times_and_warm_shots` | Greyhook (40,049 actors, 1,142 s, HLODs 192 s) and Vesper Bay (67,904 actors, 3,524 s; HLODs 167 s) imported into a new project, imported again (Vesper Bay: the empty shell's actor gone, then nothing changed), read back, traced and checked: 507 of 507 traces down in both, 36 of 36 roofs and facades in Vesper Bay, 130 and 253 m walked; Vesper Bay with #54's fixes walks at 0.019 s a frame (median; 0.079 s at 95%), no usage flag warning, its part and roof instancers `NoCollision`, free memory down to 11%; holo-ads show their page by night (`docs/progress/AG4/unreal/`) |
 | AG5 | Heroes, types and slopes: a hero's entry carries `hero` (kind, accent) and its own materials (`<slot>#<id>`: the U2 mask `city.hero.<id>` as `HeroMask` with `HeroMaskOn` 1 on the textured opaque masters, its accent on its lights), its shell's UV1 the hero UV; an entry's `hero` and `plinth_m` reach its actor (in its hash), tagged `cg.hero=` and `cg.plinth=`, `stage2.counts.heroes`; the textured masters sample `HeroMask` on UV1 (`STAGE2_VERSION` 6); the buildings' hulls notched at skybridge landing doors; test without Unreal (`test_stage2_heroes_and_plinths`) | In the AG5 Unreal check (below; `docs/progress/AG5/unreal/`): Cragmouth and Greyhook imported and imported again (nothing changed); the megatower and the wheel tagged `cg.hero=`, two UV channels, `HeroMask` (`T_city_hero_<id>`) with `HeroMaskOn` 1 on 14 of 20 and 4 of 5 slots, every master at 6, no other building with it on; 119 Cragmouth buildings tagged `cg.plinth=`, their plinths at the terrain at 732 of 976 corners, buried uphill at 210, floating over a lower street at 30; landing doors open 2.5 m in (332 of 340 in Greyhook) |
@@ -986,3 +1117,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | M21 | Cyberpunk massing: no new actor kind. A building's masses are still one blockout object and one actor (more and finer prisms now: bands of twisted, tapered and leaning shafts, blocks, links, frames, pods, halos; curved masses cut at 1 cm chord sag, so a round tower's glTF has about 112 sides instead of 32); a mass with arcs is drawn smooth in the blockout (`set_sharp_from_angle`, 25 degrees), so its glTF carries smooth normals along the curve and sharp ones at corners; a building's form in its manifest object (`form`, from the blockout object's `form` prop) and tagged `cg.form=<kind>` on its actor (`import_city.tags`; the hash moves with the plan entry, so an import over an older one updates every building actor); stage 2's buildings as before (AG15 will draw the forms whole) | Not run (the coordinating session's call) |
 | M16 | Water and ground detail. The blockout (`blockout_plan.json`) gains a `swim` list: every water body cut into boxes per 256 m tile (16 m cells that reach the water, merged in runs along x, then runs alike in y; `blockout.swim_volumes`), each with its key (`swim.<water id>.<tile>.<k>`), the body's id, its plan box and z from 1 m under the body's deepest bed to its surface; the manifest copies it with a hash per box (`swim`, `counts.swim_volumes`), `actor_hashes`, `actor_kinds` (`swim`) and `manifest_changes` take the boxes as actors, and the importer makes a `PhysicsVolume` per box (`Importer.swim`: spawned from its class, so the editor gives it its cube brush, 200 uu; scaled to the box; `water_volume` on, `fluid_friction` 0.3; tags `cg.key`, `cg.hash`, `cg.id=<water id>`, `cg.type=swim_volume`, `cg.category=swim`, `cg.tile`); a box over a sloped bank lies under the ground there, so walking on the land never enters one. New blockout objects, each with a material of its own (`M_CityGen` instances like every blockout material): the beds of a flat city one heightfield per tile (`city.bed.<tile>`, materials `bed_shallow`, `bed_mid` and `bed_deep` by depth; on a terrain city the ground grid carries the beds under the water), the banks joined per district, kind and tile (`d03.bank_quay.<tile>`, `bank_canal_wall`, `bank_road_embankment`, `bank_natural_bank`, `bank_beach`, `bank_marsh_edge`, `bank_riprap`), the ground cover joined per district, kind and tile (`d03.cover_park_lawn.<tile>` and the other ten kinds: a material per cover kind, `cover_<kind>`), in place of the open spaces at the ground (`open_<kind>` objects remain only for podium roofs and decks). On a flat city the water and the sea stand at -1.5 m (the quay deck height under the ground, M16's freeboard; they were -0.9 and -1.2) and bridge piers start at the bed. A city without M16's data exports as before. Tests without Unreal (`tests/test_water_ground.py`: the plan's boxes, the manifest's swim volumes and cover materials, an unchanged re-import) | Not run (the coordinating session's call) |
 | AG12 | Water: `unreal_contribution.water.json` (above) as the third layer-2 part: per body and tile a surface entry (non-Nanite, no collision, a LOD chain on coarser lattices; vertex colors and full-precision UVs kept, no lightmap UVs: the importer's water pipeline) replacing `city.sea.<tile>` or `city.water.<tile>`, a bed entry (Nanite, complex collision) replacing `city.bed.<tile>`, bank entries replacing the joined `bank_<kind>` objects with riprap stones as instanced parts, a drop entry for the blockout water objects no piece replaces; masters `M_CgWater` (Single Layer Water, flow-mapped ripples on UV1's current, vertex and shallow foam by Opacity, the sea's Gerstner waves by world position offset faded out from 150 to 350 m: decision 13.10 (a)) and `M_CgBed` (caustics under the water); a post-process volume per M16 swim box of a body (`underwater.*`, the water kind's tint and fog; `actor_hashes`, `actor_kinds`, `counts.underwater_volumes`); `SRGB_PARTS` gains `water`; `STAGE2_VERSION` 7; test without Unreal (`test_exporter_takes_the_water`) | Not run (the coordinating session's call) |
+| Fast import (an exporter update on its own) | The fast path the importer's default ("The fast import" above): stage 2's packs queued as one async Interchange import with the pack step (`CgPackStep`: per mesh Nanite settings before the build, unplaced variants not made; AG12's water pipeline on water packs), textures queued with `CgTextureStep`, finished meshes saved in one batch, actors saved and unloaded every `CITYGEN_UE_OFFLOAD` (2,000) spawned and loaded again at the end, the editor run with `-fastexit` and `FAST_INI` (no distance field or card tasks); main's reset of a stale full fallback on both paths; an entry of a building with no shell node (assetgen's packs since `GEN_VERSION` m18.3) takes the blockout's place as an empty shell does; `CITYGEN_UE_FAST=0` the one-at-a-time path. Same actor and asset digests on both paths (the Mac's A/B) | Greyhook on Windows: first import 73m41s in the editor, a second import changing nothing, `--check --shots` passing (`docs/progress/exp_fast_import/`) |
