@@ -108,6 +108,7 @@ SIGN_MIN_SCALE = 0.2     # (of the 1.8 m sign; smaller, there is none)
 MOUNT_REACH_M = 1.5      # a wall mount's point to its wall, at most (on brackets, AG8)
 STANDING = ("railing", "barrier")   # things on the ground or a road with no ground radius
 CABLE_REACH_M = 1.7      # an overhead cable's end to the wall it is tied to, at most
+CABLE_SLACK_M = 0.05     # (placing: that reach less this, so the check's rounding holds)
 CABLE_MIN_Z_M = 4.5      # its height over the street, at least
 
 
@@ -370,28 +371,22 @@ class Ctx:
     def facade_spot(self, x: float, y: float, z0: float, z1: float, bid: str, out_m: float,
                     reach: float = 4.0):
         """The point `out_m` in front of the wall of building `bid` nearest (x, y) whose mass
-        spans z0 to z1 there (an upper floor that overhangs the ground floor's wall: its own
-        facade), with the wall's outward normal and its direction: (x, y, nx, ny, ux, uy);
-        None where no such wall is within reach, or something over the spot comes down
-        lower than z1."""
+        spans z0 to z1 there (heights in the building's frame, over its base on M13's
+        terrain; an upper floor that overhangs the ground floor's wall: its own facade), with
+        the wall's outward normal, its direction and what the building's frame stands over
+        the ground at the point (a thing there is at z0 plus it over the ground: 0 on a flat
+        city): (x, y, nx, ny, ux, uy, lift); None where no such wall is within reach, or
+        something over the spot comes down lower than z1."""
         tree, rings, rows = self.walls()
         if tree is None:
             return None
         p = Point(x, y)
-        g = None
         best = None
         for k in sorted(tree.query(p, predicate="dwithin", distance=reach).tolist()):
             lo, hi, base, low, owner = rows[k]
             if owner != bid:
                 continue
-            lift = 0.0
-            if base is not None and self.m.terrain is not None:
-                if g is None:
-                    from . import terrain as TE
-
-                    g = TE.ground_of(self.m).at(x, y)
-                lift = base - g
-            if (not low and lo + lift > z0 + 0.01) or hi + lift < z1 - 0.01:
+            if (not low and lo > z0 + 0.01) or hi < z1 - 0.01:
                 continue
             key = (round(rings[k].distance(p), 4), k)
             if best is None or key < best[0]:
@@ -414,11 +409,29 @@ class Ctx:
         px, py = f.x + nx * out_m, f.y + ny * out_m
         from . import vegetation as V
 
+        # (M13: the ground at the spot, which on a slope is not the building's base)
+        lift = 0.0
+        base = rows[best[1]][2]
+        if base is not None and self.m.terrain is not None:
+            from . import terrain as TE
+
+            lift = base - TE.ground_of(self.m).at(px, py)
         u = float(V.overhead(self).under(np.array([[px, py]], dtype=np.float64),
-                                         np.array([0.0]), np.array([z0]), tol=0.005)[0])
-        if u < z1 + 0.01:
+                                         np.array([0.0]), np.array([z0 + lift]),
+                                         tol=0.005)[0])
+        if u < z1 + lift + 0.01:
             return None
-        return px, py, nx, ny, ux, uy
+        return px, py, nx, ny, ux, uy, lift
+
+    def reframe(self, x0: float, y0: float, x1: float, y1: float) -> float:
+        """What a height over the ground at (x0, y0) gains as a height over the ground at
+        (x1, y1) (M13: the ground's fall from one to the other; 0 on a flat city)."""
+        if self.m.terrain is None:
+            return 0.0
+        from . import terrain as TE
+
+        gf = TE.ground_of(self.m)
+        return gf.at(x0, y0) - gf.at(x1, y1)
 
     def mount_top(self, x: float, y: float, reach: float, bid: str | None = None) -> float:
         """How high a thing mounted on a wall at (x, y) may reach: its wall's top
@@ -1025,10 +1038,11 @@ def overhead_cables(c: Ctx) -> list[Cand]:
         if ha > 1.6 or hb > 1.6:
             continue        # a facade on both sides, at most 1.6 m behind the property line
         span = 2.0 * h + 3.0
-        # (M20: tied to both walls, under their tops)
+        # (M20: tied to both walls, under their tops; the ends a little inside the reach,
+        # as the row's rounded yaw and span put them a centimeter or two off)
         ends = ((x + nx * (h + 1.5), y + ny * (h + 1.5)),
                 (x - nx * (h + 1.5), y - ny * (h + 1.5)))
-        tops = [c.wall_top(px, py, CABLE_REACH_M, 0.0) for px, py in ends]
+        tops = [c.wall_top(px, py, CABLE_REACH_M - CABLE_SLACK_M, 0.0) for px, py in ends]
         z = min(6.0 + 5.0 * _u("cz", sid, k), min(tops) - 0.5)
         if z < CABLE_MIN_Z_M:
             continue
@@ -1063,16 +1077,19 @@ def unit_dressing(c: Ctx) -> list[Cand]:
             mx, my = (ax + bx) / 2.0, (ay + by) / 2.0
             # M20: each on the unit's wall at a height it has there (the wall's top over the
             # ground at the point; a low shop keeps its sign and awning under its eaves)
+            # (M13: heights over the ground where each thing stands, out from the wall)
             top = c.mount_top(mx + nx * 0.15, my + ny * 0.15, MOUNT_REACH_M, b.id)
-            az = min(AWNING_Z_M, top - 0.4)
+            wx, wy = mx + nx * u.awning_m / 2.0, my + ny * u.awning_m / 2.0
+            az = min(AWNING_Z_M, top + c.reframe(mx + nx * 0.15, my + ny * 0.15, wx, wy) - 0.4)
             if u.awning_m > 0 and az >= AWNING_MIN_Z_M:
-                out.append(Cand("awning", mx + nx * u.awning_m / 2.0, my + ny * u.awning_m / 2.0,
+                out.append(Cand("awning", wx, wy,
                                 z=q(az), yaw=yaw_of(ux, uy), keep=0,
                                 scale=(q(L * 0.9), q(u.awning_m), 1.0), attrs={"unit": u.use}))
             if u.sign or _u("sign", b.id, k) < neon * 0.6:
                 blade = _u("blade", b.id, k) < neon
                 sx, sy = ax + ux * 0.8, ay + uy * 0.8
-                stop = c.mount_top(sx + nx * 0.15, sy + ny * 0.15, MOUNT_REACH_M, b.id)
+                gx, gy = sx + nx * (0.7 if blade else 0.15), sy + ny * (0.7 if blade else 0.15)
+                stop = c.mount_top(sx + nx * 0.15, sy + ny * 0.15, MOUNT_REACH_M, b.id) +                     c.reframe(sx + nx * 0.15, sy + ny * 0.15, gx, gy)
                 sz = q(1.0 + 1.5 * neon) if blade else 0.5
                 h = KINDS["sign"][1][2]
                 z = min(4.0 + 2.0 * _u("sz", b.id, k), stop - SIGN_EAVE_M - h * sz)
@@ -1080,8 +1097,7 @@ def unit_dressing(c: Ctx) -> list[Cand]:
                     sz = q((stop - SIGN_EAVE_M - SIGN_MIN_Z_M) / h)
                     z = SIGN_MIN_Z_M
                 if sz >= SIGN_MIN_SCALE:
-                    out.append(Cand("sign", sx + nx * (0.7 if blade else 0.15),
-                                    sy + ny * (0.7 if blade else 0.15), z=q(z),
+                    out.append(Cand("sign", gx, gy, z=q(z),
                                     yaw=yaw_of(nx, ny) if blade else yaw_of(ux, uy), keep=0,
                                     scale=(1.0, 1.0 if blade else q(min(L * 0.7, 6.0) / 1.2),
                                            sz),
@@ -1096,7 +1112,7 @@ def unit_dressing(c: Ctx) -> list[Cand]:
                     z = floor * b.floor_height_m + 0.8
                     spot = c.facade_spot(px, py, z, z + KINDS["ac_unit"][1][2], b.id, 0.3)
                     if spot is not None:
-                        out.append(Cand("ac_unit", spot[0], spot[1], z=q(z),
+                        out.append(Cand("ac_unit", spot[0], spot[1], z=q(z + spot[6]),
                                         yaw=yaw_of(spot[2], spot[3]), keep=0,
                                         attrs={"facade": True}))
                         break
@@ -1250,13 +1266,15 @@ def _headroom(c: Ctx):
     """A filter (M20): everything standing on the ground or on a road, settled on its
     surface (`Ctx.settle`), fits `vegetation.HEADROOM_M` under what is over it, measured
     along it (M7: a street light under a viaduct deck is too tall, so it becomes a lamp hung
-    from the deck's underside); what is mounted on a wall passes."""
+    from the deck's underside); what is mounted on a wall passes. Nothing stands on the
+    ground inside a road's fill (M18's embankments: a signal at a corner beside a low ramp
+    on a slope)."""
     from . import vegetation as V
 
     oh = V.overhead(c)
 
     def ok(cands: list[Cand]) -> list[Cand]:
-        cands = c.settle(cands)
+        cands = _off_fills(c, c.settle(cands))
         idx = [i for i, x in enumerate(cands) if x.r > 0 or x.kind in STANDING]
         low = np.full(len(cands), np.inf)
         if idx:
@@ -1279,6 +1297,37 @@ def _headroom(c: Ctx):
                                                    "emitter": True}))
         return out
     return ok
+
+
+def _off_fills(c: Ctx, cands: list[Cand]) -> list[Cand]:
+    """M20: what stands on the ground (z 0) outside every road's fill (M18's embankments)."""
+    from .prop_checks import SUPPORT_TOL_M, _Roads
+
+    if "_fill_roads" not in c.__dict__:
+        c._fill_roads = _Roads(c.m)
+    fills = c._fill_roads
+    return [x for x in cands if not (abs(x.z) <= SUPPORT_TOL_M and fills.in_fill(x.x, x.y))]
+
+
+def _barriers_clear(c: Ctx, cands: list[Cand]) -> list[Cand]:
+    """M20: a median barrier fits `vegetation.HEADROOM_M` under what is over it, measured as
+    `prop_support` measures it (M13: where a highway forks on a slope, the branch that climbs
+    passes low over the end of the other's median)."""
+    from . import vegetation as V
+    from .prop_checks import SUPPORT_TOL_M, _Roads
+
+    if not cands:
+        return cands
+    if "_fill_roads" not in c.__dict__:
+        c._fill_roads = _Roads(c.m)
+    own = [c._fill_roads.own(x.x, x.y, x.z) for x in cands]
+    reach = max(KINDS["barrier"][0] or 0.05, 0.05)
+    u = V.overhead(c).under(np.array([(x.x, x.y) for x in cands], dtype=np.float64),
+                            np.full(len(cands), reach), np.array([x.z for x in cands]),
+                            own=own, tol=-SUPPORT_TOL_M)
+    h = KINDS["barrier"][1][2]
+    return [x for x, uu in zip(cands, u.tolist())
+            if x.z + h * x.scale[2] <= uu - V.HEADROOM_M + SUPPORT_TOL_M]
 
 
 def _build(spec, m) -> Out:
@@ -1324,6 +1373,10 @@ def _build(spec, m) -> Out:
                      ("overhead_cables", overhead_cables), ("unit_dressing", unit_dressing),
                      ("scaffolding", scaffolding), ("market_gates", market_gates)):
         got = fn(c)
+        if name == "highway_barriers":
+            got = _barriers_clear(c, got)
+        elif name in ("scaffolding", "market_gates"):
+            got = _off_fills(c, got)
         info[name] = len(got)
         placed += got
     props, plants = rows(c, placed)

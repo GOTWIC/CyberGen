@@ -351,7 +351,8 @@ def facade_greenery(c: Ctx) -> list[Cand]:
             if spot is None:
                 continue
             out.append(Cand("facade_greenery", spot[0], spot[1],
-                            z=q(floor * b.floor_height_m), yaw=yaw_of(spot[4], spot[5]), r=0.0,
+                            z=q(floor * b.floor_height_m + spot[6]), yaw=yaw_of(spot[4], spot[5]),
+                            r=0.0,
                             keep=0,
                             scale=(q(min(L * 0.8, 8.0)), 1.0, 1.0),
                             attrs={"building": b.id},
