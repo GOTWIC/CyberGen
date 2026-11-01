@@ -999,6 +999,47 @@ M18 (junctions and ramps, from the first run-through) is in place:
   does). Merged with M21, M16, the assetgen fixes and AG13.
 Sample builds: `docs/progress/M18/`.
 
+The park paths fix (between milestones, from PR #67's open items) is in place:
+- **Park paths** (`citygen/parkpaths.py`, called from `local._build_local` after the blocks):
+  a path from each park's, plaza's, pocket park's, market's, garden's, promenade's or
+  beach's middle to the nearest point of each ground walkway within 30 m (the walkway split
+  there, `split_edges`), up to four 25 m apart; straight where it keeps `PATH_CLEAR_M` 0.75 m
+  off every lot, the water and the megasite reserves, else the shortest bending at the open
+  space's own corners (taken in by as much, `route`), else one that may run along a lot's
+  edge but never along the line between two lots (`Blocked`, `BETWEEN_M`). Lots come from
+  M2, so a path off the lots is off M3's buildings.
+- **Passages** (`passage`, `_carve`): an open space no path reaches gets a strip
+  `PASSAGE_W_M` 3 m wide along the shortest run of lot boundaries between two lots (within
+  150 m) to a point a straight path reaches a walkway from, cut from those lots (each kept
+  whole, with 65% of its area and its frontage; never a complex's, a traced or a held lot,
+  lot attrs `passage`) and joined to the open space (attrs `access` passage, `passage` the
+  run); one still without a way in says why (`access` none, `no_access`).
+- **Sidewalk corners** (`junctions._corner_point`): where the two sidewalk lines cross under
+  180 degrees, else on the gap's bisector, moved toward the node until it lies on a leg's
+  strip or the junction's right of way (`_on_row`, `_jrow`); the middle of the two sidewalk
+  points at the cuts, which it was, lay in the block's corner once the cuts outgrew the road
+  (no sidewalk, M17's long cuts). `_walk_offset`: a road with no sidewalk is walked 1 m in
+  from its edge.
+- **Every ground walkway off the lots** (`keep_off`, after the island links): a stretch that
+  cuts into a lot is led round it past the lots' corners (0.3 m out); a deck's walkways off
+  its upper lots too.
+- **Entrances** (`buildout.link_entrances`): an entrance whose straight link to its nearest
+  walkway cuts into a building mass at its level (`_Masses`, 0.1 m in, masses under 2.5 m
+  up) links to the nearest one within `RELINK_M` 60 m it reaches clear, else moves along its
+  own facade to where it does (`_move_entrance`); every entrance names the piece of a split
+  walkway its link meets (`_piece_of_foot`). Megasite gate paths and transit station links
+  (`transit.Builder.foot`) take the nearest walkway they reach clear the same way.
+- **Checks** (`network_checks.py`): `walkway_building_clash` (no walkway but elevators and
+  skybridge decks, and no entrance link, through a building mass at its own height, heights
+  over the ground; a door, lobby or station path may enter its own building, a station's or
+  a gate's walkways its megasite's) with the finished checks, and `park_access` (every such
+  open space has a park path or a walkway within 3.5 m, or says why; park paths start inside
+  it and stay off the lots) with the street checks.
+- **Stats** (`report.json`): `open_paths_bent`, `passages`, `passage_m2`, `open_no_access`,
+  `walkways_led_round_lots`, `walkways_in_lots`, `entrances_relinked`, `entrances_moved`,
+  `entrances_blocked`. No exporter change: the walkway graph keeps its format.
+Sample builds, the measures before and after: `docs/progress/fix_paths/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
