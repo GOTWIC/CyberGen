@@ -57,7 +57,7 @@ REACH_M = 0.6
 HEADROOM_M = 4.5
 RELIEF_M = 0.3
 INSET_M = 0.1
-OVERLAP_M2 = 2.0
+OVERLAP_M2 = 5.0
 DECK_DZ_M = 0.3
 FOOT_TOL_M = 0.01
 LIST_MAX = 40
@@ -608,13 +608,21 @@ def clash(pk: Packs, model) -> dict:
              and st.footprint is not None]
     if plats:
         from citygen import geom as G
-        with G.canonical():
-            pp = [G.from_model_poly(st.footprint).buffer(-INSET_M, join_style="mitre")
-                  for st in plats]
+
+        from ..streets.transit import platform_rings
+        pp = []
+        for st in plats:
+            # (the platform as drawn: less the tracks beside it, `platform_rings`)
+            rings = platform_rings(model, st)
+            poly = G.from_model_poly(st.footprint) if rings is None else \
+                shapely.union_all([shapely.Polygon(r, hs) for r, hs in rings])
+            pp.append(poly.buffer(-INSET_M, join_style="mitre"))
         ptree = shapely.STRtree(pp)
         floor = Floor(model)
+        tracks = {st.id for st in model.structures if st.kind in ("deck", "tube") and
+                  (st.attrs or {}).get("line_id") and not (st.attrs or {}).get("station")}
         for pid in pk.street_ids():
-            if pk.street_kind(pid) not in TRACKS:
+            if pid.split(".glass")[0] not in tracks:
                 continue
             T, _ = pk.street_tris(pid)
             P = _verts(T)
@@ -641,8 +649,9 @@ def clash(pk: Packs, model) -> dict:
         T, mats = pk.street_tris(pid)
         if not len(T):
             continue
-        keep = np.array([m.split(".")[0] in ("asphalt", "paving", "concrete", "stone",
-                                             "steel") for m in mats], dtype=bool)
+        # (the deck tops: carriageway, paving and deck; not parapets, copings or steps)
+        keep = np.array([m.split(".")[0] in ("asphalt", "paving") or m == "concrete.deck"
+                         for m in mats], dtype=bool)
         T = T[keep]
         if pk.street_kind(pid) == "street.road" and (not len(T) or T[:, :, 2].max() < 0.6):
             continue

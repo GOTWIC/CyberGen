@@ -43,6 +43,8 @@ from __future__ import annotations
 import bisect
 import math
 
+import numpy as np
+
 from citygen import dmath as M
 
 from ..triangulate import TriangulationError, triangulate
@@ -1062,6 +1064,20 @@ class ShellBuilder:
             self._eaves(ms, g, rows)
         RF.finish(self, ms, top_open)        # AG4: a flat roof's finish
 
+    def _clear_of_lanes(self, fa: Facade, family: str, p: dict, s: int, z: int) -> bool:
+        """AG14: whether a part placed so keeps off the lanes (the envelope's `over_road`
+        rule on it alone; only tested near a lane under its headroom)."""
+        if fa.lane() is None or z > self.ground + ROAD_CLEAR + fa.rise() + 1500:
+            return True
+        from . import envelope as EN
+        _, arrs = PT.mesh(family, p)
+        x, y, _ = fa.P(s, z)
+        placed = PT.place(arrs, x, y, z, fa.ux, fa.uy)
+        if not placed:
+            return True
+        pts = np.concatenate([np.unique(a["pos"], axis=0) for a in placed.values()])
+        return EN.check(self.br, {}, [(pts, PT.REACH[family])])["over_road"] == 0
+
     def _low(self, fa: Facade, s: int) -> int:
         """How high something reaching out of the wall at s must start: `STRIP_MIN_Z` over
         a sidewalk, `ROAD_CLEAR` over the ground where the facade faces a road with no
@@ -1614,15 +1630,17 @@ class ShellBuilder:
                 use in ("residential", "hotel", "office", "retail") and w >= 800 and \
                 jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr and \
                 self._bridge_free(fa, a_, b_, lo - 100, lo + 600, 400):
-            P.on(fa, "ac", {"w": 660, "h": 420, "do": 350, "di": min(250, max(r - 30, 20))},
-                 mid, full if door else lo)
-            self.used["irregular"] = True
+            pac = {"w": 660, "h": 420, "do": 350, "di": min(250, max(r - 30, 20))}
+            if self._clear_of_lanes(fa, "ac", pac, mid, full if door else lo):
+                P.on(fa, "ac", pac, mid, full if door else lo)
+                self.used["irregular"] = True
         if f + ms.get("f0", 0) <= 1 and lo < 6000 and jb not in bset and \
                 _u(key, f"gr{f}.{i}") < 0.9 * irr:
             P.on(fa, "grille", {"w": qw, "h": qh}, mid, lo)
             self.used["irregular"] = True
         if self.res and lo >= max(self._low(fa, mid), self._low(fa, b_ + 450)) and \
-                pr >= 900 and _u(key, f"dish{f}.{i}") < 0.06 * irr:
+                pr >= 900 and _u(key, f"dish{f}.{i}") < 0.06 * irr and \
+                self._clear_of_lanes(fa, "dish", {"rd": 400}, b_ + 450, lo + h // 2 - 400):
             P.on(fa, "dish", {"rd": 400}, b_ + 450, lo + h // 2 - 400)
             self.used["irregular"] = True
 

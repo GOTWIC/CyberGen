@@ -420,9 +420,9 @@ def face_rays(city: City, rays: list[Ray]) -> list[tuple]:
 def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
     """AG14: per exterior edge of a mass standing near the ground (by `id`), how far out
     from it the nearest lane is at its nearest (samples every `LANE_STEP_M` along it): a
-    road's carriageway (its width less its sidewalks; a road raised over 2 m is a deck
-    overhead) or a junction's polygon; only where under `LANE_MAX_M`. With it, the highest
-    of those lanes' surfaces (absolute) within `LANE_NEAR_M` of the edge, else None: what
+    road's carriageway (its width less its sidewalks; a raised road too: what reaches over
+    its deck stands in its lanes) or a junction's polygon; only where under `LANE_MAX_M`.
+    With it, the highest of those lanes' surfaces (absolute) within `LANE_NEAR_M` of the edge, else None: what
     leaves the wall there must stop short of the lane, or keep the vehicles' headroom over
     it."""
     es, xs, ys, own, ss = [], [], [], [], []
@@ -452,8 +452,6 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
     gd = Ground(m)
     for s in m.road_segments:
         if s.tunnel or s.road_class in ("footbridge", "pedestrian") or len(s.centerline) < 2:
-            continue
-        if max((z.z for z in s.z_profile), default=0.0) > 2.0:
             continue
         sw = min(s.cross_section.sidewalk_m) if s.cross_section.sidewalk_m else 0.0
         half = max(s.width_m / 2.0 - sw, 0.5)
@@ -491,9 +489,10 @@ def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
         dd = np.where(ins, 0.0, dd)
         gap[idx] = np.minimum(gap[idx], dd)
         nd = nodes.get(j.node_id)
-        if nd is not None and nd.position[2] <= 2.0:
-            zj = nd.position[2] + float(getattr(nd, "ground_m", None) or 0.0) + \
-                max(list(j.edge_z or [0.0]))
+        if nd is not None:
+            # (a junction's surface: `edge_z` over its node's ground where M18 gives one)
+            zj = float(getattr(nd, "ground_m", None) or 0.0) + \
+                (max(j.edge_z) if j.edge_z else nd.position[2])
             near = dd < LANE_NEAR_M
             top[idx[near]] = np.maximum(top[idx[near]], zj)
     best = np.full(len(es), np.inf)

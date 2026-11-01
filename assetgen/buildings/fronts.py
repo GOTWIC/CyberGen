@@ -818,7 +818,7 @@ class Band:
                 d = PT.q(min(fa.room(sd, 3200, 1400, 1400), 1400))
                 sb.parts.on(fa, "canopy", {"style": "entrance", "L": L, "d": d, "t": 260},
                             sd, max(self.z0 + 3000, op.hi + 60))
-        if fa.room(sd, 1000, 1, 0) > 0 and _u(ukey, "rail") < 0.7:
+        if fa.room(sd, 1000, 1000, 0) >= 800 and _u(ukey, "rail") < 0.7:   # (AG14: its reach)
             L = PT.q(min(4800, op.b - sd - dw // 2 - 200))
             if L >= 1200:
                 sb.parts.on(fa, "rail", {"L": L, "out": 600}, sd + dw // 2 + 200, self.z0)

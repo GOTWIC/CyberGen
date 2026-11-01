@@ -41,7 +41,7 @@ INSTANCE_ALWAYS: frozenset = frozenset()   # (AG4: roof equipment, `roofparts`) 
 Q = 10                       # length step (mm)
 A = 5                        # angle step (degrees)
 OVERLAP = 10                 # frames reach this far into the jambs
-ROAD_CLEAR = 4600            # AG14: what leaves a wall over a road with no sidewalk (an
+ROAD_CLEAR = 4700            # AG14: what leaves a wall over a road with no sidewalk (an
                              # alley, a service road, a highway) stays this high: headroom
 
 

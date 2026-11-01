@@ -69,14 +69,71 @@ def gather_structure(cx: Ctx, st, maker_name: str) -> Piece:
         inputs["ground"] = cx.ground.samples(st.line)
     if maker_name == "transit_column":
         inputs["dir"] = _line_dir(cx, a.get("line_id"), c[0], c[1])
-        if (a.get("form") == "pier" or a.get("pier")) and cx.beds is not None:
-            bz = cx.bed_z(c[0], c[1])             # (AG14: the footing down to M16's bed)
-            if bz is not None:
-                inputs["bed"] = bz
+        if a.get("form") == "pier" or a.get("pier") or cx.wet_at(c[0], c[1]):
+            # (AG14: a pier, or any column standing in the water, on a footing down to M16's
+            # bed)
+            bz = cx.bed_z(c[0], c[1]) if cx.beds is not None else None
+            inputs["bed"] = bz if bz is not None else \
+                C.m(cx.ground.water_level(None, -1.5) - 4.0)
+    if a.get("role") == "platform" and st.footprint is not None:
+        # AG14: a platform stops at the tracks running beside it (it reached into the
+        # guideway or the tube by the model's margins)
+        cut = platform_rings(cx.m, st)
+        if cut is not None:
+            inputs["rings"] = cut
     kind = f"street.transit.{st.kind}" if a.get("line_id") or a.get("station") \
         else f"street.structure.{st.kind}"
     return Piece(st.id, kind, maker_name, cx.tile_for(st.id, pts), cx.keys.get(st.id, []),
                  inputs)
+
+
+_TRACKS: dict = {}
+
+
+def track_solids(m) -> list:
+    """AG14: every track of the model's transit lines (their guideway decks and sky tubes,
+    not a station's decks) as (plan polygon: the line buffered by half its width, flat
+    ends; bottom, top over the ground), cached per model."""
+    key = id(m)
+    if key not in _TRACKS:
+        import shapely
+        out = []
+        for st in m.structures:
+            a = st.attrs or {}
+            if st.kind not in ("deck", "tube") or not a.get("line_id") or a.get("station") \
+                    or len(st.line) < 2:
+                continue
+            w = float(a.get("width_m", GUIDEWAY_W.get(a.get("mode"), 6.0)))
+            ln = shapely.LineString([(p[0], p[1]) for p in st.line])
+            poly = ln.buffer(w / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+            zs = [p[2] for p in st.line]
+            dm = float(a.get("deck_m", st.z1_m - st.z0_m))
+            out.append((poly, min(zs) - dm, max(zs)))
+        _TRACKS.clear()
+        _TRACKS[key] = out
+    return _TRACKS[key]
+
+
+def platform_rings(m, st) -> list | None:
+    """AG14: a station platform's plan less the tracks beside it at its height, as
+    [[exterior, [holes]], ...] (largest first), or None where no track reaches into it."""
+    import shapely
+    from citygen import geom as G
+    poly = G.from_model_poly(st.footprint)
+    cut = [p for p, z0, z1 in track_solids(m)
+           if z0 < st.z1_m and z1 > st.z0_m and p.intersects(poly)]
+    if not cut:
+        return None
+    with G.canonical():
+        rest = G.diff(poly, G.qpoly(shapely.union_all(cut)))
+        parts = sorted([p for p in G.parts(rest) if G.area1(p) >= 0.5],
+                       key=lambda p: (-G.area1(p), G.qbounds(p)))
+    out = []
+    for p in parts:
+        out.append([[[C.m2(x), C.m2(y)] for x, y in list(p.exterior.coords)[:-1]],
+                    [[[C.m2(x), C.m2(y)] for x, y in list(h.coords)[:-1]]
+                     for h in p.interiors]])
+    return out
 
 
 def _g(inp: dict) -> float:
@@ -227,7 +284,7 @@ def make_transit_column(inp: dict) -> Out:
     mesh = Mesh(inp["origin"])
     mode = a.get("mode", "elevated_rail")
     c = inp["origin"]
-    pier = a.get("form") == "pier" or bool(a.get("pier"))
+    pier = a.get("form") == "pier" or bool(a.get("pier")) or inp.get("bed") is not None
     if pier:
         footing(mesh, ring, g, inp.get("bed"))
         z0 = max(z0, g + PIER_FOOT[2] - 0.05)       # the shaft from the footing's top
@@ -309,7 +366,7 @@ def make_transit_beam(inp: dict) -> Out:
     return Out(mesh=mesh)
 
 
-@maker("station_part", 1)
+@maker("station_part", 2)
 def make_station_part(inp: dict) -> Out:
     st = inp["st"]
     a = st.get("attrs", {})
@@ -362,9 +419,11 @@ def make_station_part(inp: dict) -> Out:
         ring = ccw(fp["exterior"])
         holes = fp.get("holes", [])
         if role == "platform":
-            mesh.prism("concrete.deck", ring, z0, z1 - 0.05, top=False, bottom=True,
-                       holes=holes)
-            mesh.prism("paving.granite_dark", ring, z1 - 0.05, z1, holes=holes)
+            for r_, hs_ in (inp.get("rings") or [[fp["exterior"], holes]]):
+                r_ = ccw(r_)
+                mesh.prism("concrete.deck", r_, z0, z1 - 0.05, top=False, bottom=True,
+                           holes=hs_)
+                mesh.prism("paving.granite_dark", r_, z1 - 0.05, z1, holes=hs_)
         elif role == "concourse" or z1 <= g:
             mesh.prism("concrete.dark", ring, z0, z1, bottom=True, holes=holes)
         elif role == "elevator_core":
