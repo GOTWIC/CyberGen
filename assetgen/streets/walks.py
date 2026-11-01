@@ -490,6 +490,16 @@ def make_junction(inp: dict) -> Out:
         vpts = list(vz.items())
     else:
         vz = None
+    if vz is not None:
+        # AG14: the two ends of a leg's cut edge (where its road piece ends) at the leg's
+        # height there, as the road meets them (M18's curb runs from a cut's corner a few
+        # centimeters off it where the cut is skewed)
+        for r in lz:
+            i = r["exit"][1]
+            for k in (i, (i + 1) % len(ring)):
+                if (ring[k][0], ring[k][1]) in vz:
+                    vz[(ring[k][0], ring[k][1])] = r["z"]
+        vpts = list(vz.items())
     if vz is None and not flat and lz:
         # AG14: no surface in the model (a junction M18 left flat whose legs AG7 sees at
         # other heights): each leg's cut edge at the leg's height there, the curb between

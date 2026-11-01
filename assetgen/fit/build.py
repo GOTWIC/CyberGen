@@ -438,9 +438,20 @@ def seams(pk: Packs, model=None) -> dict:
         for s in model.road_segments:
             own[s.id] = {jat[n].id for n in (s.start, s.end) if n in jat}
             cl = shapely.LineString([(p[0], p[1]) for p in s.centerline])
-            for jid in own[s.id]:
-                x = cl.intersection(ring_of[jid])
-                cut[(s.id, jid)] = (x, s.width_m / 2.0 + 1.0) if not x.is_empty else None
+            for n in (s.start, s.end):
+                j = jat.get(n)
+                if j is None:
+                    continue
+                x = cl.intersection(ring_of[j.id])
+                pts = [p for p in shapely.get_parts(x) if p.geom_type == "Point"] \
+                    if not x.is_empty else []
+                if not pts:
+                    cut[(s.id, j.id)] = None
+                    continue
+                # (the road's first crossing out of the junction from its node: its cut)
+                at = [cl.project(p) for p in pts]
+                k = at.index(min(at)) if n == s.start else at.index(max(at))
+                cut[(s.id, j.id)] = (pts[k], s.width_m / 2.0 + 1.0)
     jt, jo = [], []
     for pid in pk.street_ids():
         if pk.street_kind(pid) != "street.junction":
