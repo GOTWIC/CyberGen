@@ -104,10 +104,14 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     zr = (g0 + PT.ROAD_CLEAR) / 1000.0
     edges = []
     for e in brief.get("edges") or []:
-        road = any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"])
+        # (a stub under 1.5 m at a corner says nothing of what its neighbors face)
+        road = e["length_m"] >= 1.5 and \
+            any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"])
+        mz = brief["masses"][e["mass"]]["z"]
         edges.append(([e["a"][0] * 1000.0, e["a"][1] * 1000.0],
-                      [e["b"][0] * 1000.0, e["b"][1] * 1000.0], road))
-    road_edges = [(a, b) for a, b, r in edges if r]
+                      [e["b"][0] * 1000.0, e["b"][1] * 1000.0], road,
+                      (masses[e["mass"]][0], mz[1] * 1000.0)))
+    road_edges = [(a, b, zz) for a, b, r, zz in edges if r]
     groups = []
     for name, a in arrs.items():
         pos = np.unique(a["pos"], axis=0).astype(np.float64)
@@ -197,18 +201,34 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
 
 def _over_road(x, y, z, near, edges, road_edges, g0: float) -> int:
     """AG14: vertices more than `ROAD_RELIEF_MM` past the masses under the vehicles'
-    headroom whose nearest brief edge faces a road with no sidewalk."""
+    headroom that stand in front of a brief edge facing a road with no sidewalk (within its
+    span) and nearer it, by `ROAD_RELIEF_MM` at least, than any other edge of a mass at their
+    height or over it (what reaches round a corner off the end of a street's own facade
+    stands over that street's sidewalk)."""
     cand = (near > ROAD_RELIEF_MM) & (z < g0 + PT.ROAD_CLEAR - TOL_MM)
     if not cand.any():
         return 0
     xs, ys = x[cand], y[cand]
+    zs = z[cand]
     d_all = np.full(len(xs), np.inf)
-    for a, b, _ in edges:
-        d_all = np.minimum(d_all, dist_polyline(xs, ys, [a, b]))
-    d_road = np.full(len(xs), np.inf)
-    for a, b in road_edges:
-        d_road = np.minimum(d_road, dist_polyline(xs, ys, [a, b]))
-    return int((d_road <= d_all + TOL_MM).sum())
+    # (the edges of the masses at the point's height or over it: a mast's or a tower's
+    # edges high up say nothing of what is under them at the street)
+    for a, b, road, (z0, z1) in edges:
+        if road:
+            continue
+        on = zs <= z1 + PARAPET_MM
+        d_all = np.where(on, np.minimum(d_all, dist_polyline(xs, ys, [a, b])), d_all)
+    bad = np.zeros(len(xs), dtype=bool)
+    for a, b, (z0, z1) in road_edges:
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        if L2 <= 0.0:
+            continue
+        t = ((xs - a[0]) * dx + (ys - a[1]) * dy) / L2
+        d = dist_polyline(xs, ys, [a, b])
+        bad |= (t >= 0.0) & (t <= 1.0) & (d + ROAD_RELIEF_MM <= d_all) & \
+            (zs <= z1 + PARAPET_MM) & (zs >= z0 - DEEP_MM)
+    return int(bad.sum())
 
 
 def fits(brief: dict, family: str, p: dict, x: int, y: int, z: int, ux: float,

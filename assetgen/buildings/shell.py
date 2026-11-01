@@ -153,13 +153,19 @@ class Facade:
             return r["class"]
         return self.rec["class"] if self.rec else "open"
 
+    def on_road(self) -> bool:
+        """AG14: whether this facade faces a road with no sidewalk anywhere under the
+        vehicles' headroom (`on_carriageway`; the envelope's `over_road` rule, by edge)."""
+        return any(on_carriageway(r) and r["z"][0] * 1000.0 < PT.ROAD_CLEAR
+                   for r in self.regions or ())
+
     def room(self, s: int, z: int, street: int, other: int) -> int:
         """How far out (mm) something may reach here at least 3 m up: over a street or an
         avenue's sidewalk (2 m at least) `street`, over open ground, a park, a plaza, a
         court or water `other`, never over an alley, a service road or a highway's lanes,
         nor in front of a party, blind or hidden wall."""
         r = self.reg(s, z)
-        if z < PT.ROAD_CLEAR and on_carriageway(self.reg(s, 1500)):
+        if z < PT.ROAD_CLEAR and self.on_road():
             return 0                # (AG14: over a road with no sidewalk, under the headroom)
         cls = r["class"] if r is not None else (self.rec["class"] if self.rec else "open")
         if cls in ("street", "front"):
@@ -1024,7 +1030,7 @@ class ShellBuilder:
         """How high something reaching out of the wall at s must start: `STRIP_MIN_Z` over
         a sidewalk, `ROAD_CLEAR` over the ground where the facade faces a road with no
         sidewalk (AG14)."""
-        if on_carriageway(fa.reg(s, self.ground + 1500)):
+        if fa.on_road():
             return self.ground + ROAD_CLEAR
         return STRIP_MIN_Z
 
@@ -1738,6 +1744,14 @@ class ShellBuilder:
         d = PT.q(min(cont["canopy_m"] * 1000, *(fa.room(s, 1500, 1500, 2000)
                                                for s in (s0, (s0 + s1) // 2, s1))))
         if d < 800:
+            return
+        # (AG14: at an inside corner it stops short of the next facade's front by its depth)
+        u = (fa.ux, fa.uy)
+        if fa.d_in is not None and _turned(fa.d_in, u) and not _convex(fa.d_in, u):
+            s0 = max(s0, d + 300)
+        if fa.d_nx is not None and _turned(u, fa.d_nx) and not _convex(u, fa.d_nx):
+            s1 = min(s1, L - d - 300)
+        if s1 - s0 < 5000:
             return
         so = fa.soff
         for m0, m1, za, zb, kind in self.marks.get(fa.j, []):
