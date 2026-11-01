@@ -85,12 +85,16 @@ class Stage:
 
     def update(self, done: int, total: int | None = None, detail: str | None = None) -> None:
         with self.p.lock:
+            restart = total is not None and self.total and int(total) != self.total
             if total is not None:
                 self.total = max(0, int(total))
                 self._known()
             if detail is not None:
                 self.detail = detail
             self.done = int(done)
+            if restart:
+                # (the stage counts something else now: its rate starts again)
+                self.rate0 = (time.monotonic(), self.done)
             self.p._changed(self)
 
     def note(self, text: str) -> None:

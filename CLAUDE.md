@@ -104,7 +104,9 @@ Python deps: `requirements.txt` (shapely, svgelements, lxml, matplotlib, pillow)
 - Testing Unreal imports: UE 5.8 at `/Users/Shared/Epic Games/UE_5.8` (it ships an official Unreal
   MCP server and the PCG plugins, the route for Claude to drive the editor), always in a throwaway
   test project of the generator's own. Heavy scenes run better on the owner's Windows PC
-  (RTX 4070 Ti, 12 GB).
+  (RTX 4070 Ti, 12 GB; UE 5.8 at `C:\Games\UE_5.8`, found through the Epic Games Launcher's
+  install list; Visual Studio 2022 17.14 for the play features' plugin; Blender 5.2 in
+  Program Files, found without `BLENDER`).
 - `unreal/build_greybox_unreal.py`: editor Python script. Put it plus `corporate_core_plan.json` in
   `<UnrealProject>/Greybox/`, open a level, Tools > Execute Python Script. Clears and rebuilds its own
   actors (tag `CorporateCoreGreybox`), Ctrl+Z undoes a run. Buildings are currently oriented boxes, so
@@ -620,6 +622,32 @@ editor) is the interactive route for a Claude session. Testing is always in a th
 project of the exporter's own (`--new-project` makes one from the First Person template,
 outside the repo); never import into any other project unasked. Spec and record:
 `docs/unreal_export.md`. Sample imports: `docs/progress/M15/`.
+
+The fast import is the importer's default (an exporter update, no milestone): stage 2's packs
+queued as one async Interchange import, a Python pipeline step (`CgPackStep`,
+`CgTextureStep`) setting each mesh's Nanite settings and each texture's settings before the
+build and skipping meshes the city does not place, meshes saved in one batch, actors saved and
+unloaded every 2,000 spawned (`CITYGEN_UE_OFFLOAD`), the editor run with `-fastexit` and no
+distance field or card tasks (`unreal.FAST_INI`). Same level, same hashes;
+`CITYGEN_UE_FAST=0` takes the one-at-a-time path. Notes: `docs/progress/exp_fast_import/`.
+
+The exporter's play features are in place (an exporter update, no milestone):
+`citygen/unreal_play.py` writes `unreal/map.png` (the city from above, drawn from the
+blockout plan, again only when the plan changes) and `unreal/play.json` (walkway points every
+5 m, one per 3 m cell; lamp heads from the prototypes' `prop_light` parts; district labels),
+the manifest's `play`; it copies the C++ plugin `citygen/ue/CityGenPlay` into the project and
+builds it with UnrealBuildTool (`-NoHotReloadFromIDE`, skipped when unchanged; when no
+compiler builds it the city imports without the features, a plugin never built taken out
+again, one built before kept as built; `--no-play`).
+The importer places its `CityGenPlay` actor (key `play`, always loaded) with the map texture
+(`Play/T_<City>_Map`), points, lamps, labels and `MPC_CityGen`: in the game a minimap, M the
+map (wheel zoom, right drag pan, left click teleport onto the nearest walkway, held until
+streamed in), `.` a free camera (a spectator pawn, back to the player after), Tab the
+developer menu (day or night: `Night`, a dim moon, a fixed night exposure, the 48 lamps
+nearest the view as real lights); console commands `CityGen.*`; `--check` drives them
+(Python calls the actor's UFUNCTIONs) and shoots them with `shot showui`. Python cannot write
+Blueprint graphs, hence the C++. Spec:
+`docs/unreal_export.md`, "Play features". Results: `docs/progress/play_features/`.
 
 Greyhook reshape (its coastline made more natural and interesting: a peninsula that fans out
 into headlands): `water.coast.headlands` (2 to 5, peninsula only, in `hydro._fan_plan`,

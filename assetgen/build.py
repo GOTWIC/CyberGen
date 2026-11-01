@@ -66,7 +66,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "m18.2"          # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "m18.3"          # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -284,6 +284,15 @@ def _node_extras(bid: str, rec: dict) -> dict:
     return ex
 
 
+def _shell_mesh(g: G.Gltf, bid: str, sh: dict, mats: dict, hero=None,
+                extras: dict | None = None):
+    """The shell's mesh, or None when it has no triangles (AG3: a street front that takes
+    the building's whole height, a gate house's): its node then carries no mesh, since glTF
+    has no mesh without primitives (Unreal rejects one as a bad mesh)."""
+    prims = [p for p in sh["buf"].primitives(sh["shell"], mats, hero) if len(p.indices)]
+    return g.mesh(f"{bid}.shell", prims, extras=extras) if prims else None
+
+
 def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
     """One building alone as a GLB at its own origin (goldens): its shell and every
     placement of its instanced parts as a node of its own."""
@@ -291,7 +300,7 @@ def building_glb(bid: str, brief: dict, gm: dict | None = None) -> bytes:
     pm = [(x, PT.mesh(x["family"], x["params"])) for x in sh["parts"]]
     g = G.Gltf(generator=f"assetgen ({GEN_VERSION})")
     mats = _materials(g, sorted(set(sh["arrays"]) | {s for _, (_, a) in pm for s in a}))
-    mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["shell"], mats))
+    mesh = _shell_mesh(g, bid, sh, mats)
     kids = [g.node(f"{bid}.shell", mesh=mesh, extras=_node_extras(bid, rec))]
     if sh["front"]:
         fm = g.mesh(f"{bid}.front", sh["buf"].primitives(sh["front"], mats))
@@ -403,8 +412,7 @@ def tile_job(job: dict) -> dict:
             # AG5: the hero's U2 mask, a texture of its own, on UV1 in the hero UV
             hero = (rec["hero"]["perimeter_m"], rec["hero"]["height_m"])
             wrote += _hero_mask(out, bid, sh["mask"], rec["hero"])
-        mesh = g.mesh(f"{bid}.shell", sh["buf"].primitives(sh["shell"], mats, hero),
-                      extras={"kind": "shell"})
+        mesh = _shell_mesh(g, bid, sh, mats, hero, extras={"kind": "shell"})
         kids = [g.node(f"{bid}.shell", mesh=mesh, extras=ex)]
         if sh["front"]:
             # AG3: the street front, its own mesh (Unreal collides it as drawn)
@@ -418,7 +426,7 @@ def tile_job(job: dict) -> dict:
                      extras={"kind": "proxy"})
         gp.node(f"{bid}.proxy", mesh=pm, translation=piv, root=True, extras=ex)
         rec["glb"] = f"tiles/{job['tile']}.glb"
-        rec["node"] = f"{bid}.shell"
+        rec["node"] = f"{bid}.shell" if mesh is not None else None
         rec["proxy"].update({"glb": f"proxies/{job['tile']}.glb", "node": f"{bid}.proxy"})
         rec["tile"] = job["tile"]
         if rec["parts"]:

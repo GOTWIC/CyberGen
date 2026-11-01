@@ -222,7 +222,8 @@ def test_streamed_does_not_wait_for_a_child_holding_the_pipe(tmp_path, monkeypat
     rc = U._streamed([sys.executable, "-c", code], tmp_path / "log.txt", seen.append, 30)
     assert rc == 0 and time.time() - t < 10
     assert any(PG.MARKER in ln for ln in seen)
-    assert (tmp_path / "log.txt").read_bytes().endswith(b"done\n")
+    # (the copy is byte for byte: a child's print ends its lines with \r\n on Windows)
+    assert (tmp_path / "log.txt").read_bytes().endswith((b"done\n", b"done\r\n"))
 
 
 def test_time_left_from_when_the_count_is_known(monkeypatch):
