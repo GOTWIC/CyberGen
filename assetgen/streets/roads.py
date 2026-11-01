@@ -24,6 +24,7 @@ ROAD_DZ = 0.05          # road surface over its grade line (the blockout's groun
 MARK_DZ = 0.004         # paint over the asphalt
 PATCH_DZ = 0.002
 STEP_M = 6.0
+CUT_TOL_M = 1.0         # a junction's cut edge within this of the carriageway's edges
 EMBANKMENT_M = 3.0      # a raised street no higher than this stands on an embankment
 DECK_D = {"highway": 1.8, "avenue": 1.6, "street": 1.2, "alley": 1.0, "service": 1.0,
           "pedestrian": 0.7, "footbridge": 0.6}
@@ -182,7 +183,9 @@ class Road:
         tb = -ty * (b[0] - x) + tx * (b[1] - y)
         L, R = (a, b) if ta > tb else (b, a)
         tl, tr = max(ta, tb), min(ta, tb)
-        if abs(tl - self.h) > 0.35 or abs(tr + self.h) > 0.35:
+        # (AG14: up to 1 m off the carriageway's edge, so a cut along a junction's skewed
+        # or wider edge still ends on it, at the height the junction's surface has there)
+        if abs(tl - self.h) > CUT_TOL_M or abs(tr + self.h) > CUT_TOL_M:
             return None
         return (R, L)
 
@@ -206,17 +209,6 @@ class Road:
                 return R[0] + (Lp[0] - R[0]) * f, R[1] + (Lp[1] - R[1]) * f
         x, y, nx, ny, k = self.path.frame(s, vi)
         return x + nx * k * t, y + ny * k * t
-
-    def z_at(self, s: float, t: float, vi=None) -> float:
-        """The surface's height at (s, t); AG14: at an end cut along its junction's skewed
-        edge, a corner's own height (the road's at the distance along it that corner lies
-        at, as the junction's surface takes it), not the centerline's at the cut."""
-        for key, se in (("start", self.s0), ("end", self.s1)):
-            if self.cut.get(key) is not None and abs(s - se) < 1e-9:
-                x, y = self.at(s, t, vi)
-                sp, _ = self.path.project(x, y)
-                return self.z(sp)
-        return self.z(s)
 
     def xy(self, s: float, t: float):
         """(x, y) for a small decal: the plain segment normal, no miter."""
@@ -277,7 +269,8 @@ def _make(inp: dict, tidy: bool) -> Out:
     if rd.s1 - rd.s0 >= 0.3:
         rows, uvs = [], []
         for s, vi in rd.stations(rd.s0, rd.s1):
-            rows.append([(*rd.at(s, t, vi), rd.z_at(s, t, vi)) for t in (-rd.h, rd.h)])
+            z = rd.z(s)
+            rows.append([(*rd.at(s, t, vi), z) for t in (-rd.h, rd.h)])
             uvs.append([(s, -rd.h), (s, rd.h)])
         mesh.grid(asphalt_slot(cls, style), rows, uvs, expect=UP)
         if cls not in PEDESTRIAN:
