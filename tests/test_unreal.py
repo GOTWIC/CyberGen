@@ -1291,7 +1291,8 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     played = first["play_plugin"]["ok"]
     assert first["play_features"]["made"] == played
     assert first["actors"]["created"] == first["actor_count"] == \
-        first["counts"]["objects"] + first["counts"]["instance_actors"] + 4 + int(played)
+        first["counts"]["objects"] + first["counts"]["instance_actors"] + \
+        first["counts"].get("swim_volumes", 0) + 4 + int(played)
     # Play flies by default, the level streams for it, the project opens on the city
     assert first["play"]["mode"] == "fly" and first["streaming"]["set"]
     assert first["startup_map"] == first["level"] and first["startup_map_changed"]
