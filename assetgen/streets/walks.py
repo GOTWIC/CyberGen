@@ -9,8 +9,10 @@
 - **Crosswalks**: zebra or ladder paint by the district's era, tactile paving at both
   curbs, on the dropped curb.
 - **Junctions**: the carriageway polygon at its node's height, or (M18) through the model's
-  surface where it carries one (`edge_z`; else blended toward each leg's height at its
-  cut-back where they differ), the sidewalk corners between neighboring legs
+  surface where it carries one (`edge_z`; AG14: else, where the legs meet it at other
+  heights, each leg's cut edge at the leg's height and the curb between two legs running
+  evenly from one to the other: no step anywhere a leg meets it), the sidewalk corners
+  between neighboring legs
   (the curb return from the junction polygon, the property-line fillet rebuilt as M2 builds
   it), their curb faces, and a deck slab under a raised junction.
 """
@@ -436,7 +438,7 @@ def _area(ring) -> float:
     return s / 2.0
 
 
-@maker("junction", 1)
+@maker("junction", 2)
 def make_junction(inp: dict) -> Out:
     j = inp["junction"]
     ring = ccw(j["polygon"]["exterior"])
@@ -488,6 +490,35 @@ def make_junction(inp: dict) -> Out:
         vpts = list(vz.items())
     else:
         vz = None
+    if vz is None and not flat and lz:
+        # AG14: no surface in the model (a junction M18 left flat whose legs AG7 sees at
+        # other heights): each leg's cut edge at the leg's height there, the curb between
+        # two legs running evenly along the outline from one to the other (as M18 draws
+        # its surfaces), so every leg meets the junction with no step
+        anchor = {}
+        for r in lz:
+            i = r["exit"][1]
+            for k in (i, (i + 1) % len(ring)):
+                anchor[k] = r["z"]
+        n = len(ring)
+        cum = [0.0]
+        for k in range(n):
+            cum.append(cum[-1] + dist(ring[k], ring[(k + 1) % n]))
+        per = cum[-1] or 1.0
+        ks = sorted(anchor)
+        vz = {}
+        for k in range(n):
+            if k in anchor:
+                vz[(ring[k][0], ring[k][1])] = anchor[k]
+                continue
+            # the anchors before and after k along the ring
+            a = max([q for q in ks if q < k], default=ks[-1])
+            b = min([q for q in ks if q > k], default=ks[0])
+            da = (cum[k] - cum[a]) % per
+            db = (cum[b] - cum[k]) % per
+            f = da / (da + db) if da + db > 0 else 0.0
+            vz[(ring[k][0], ring[k][1])] = anchor[a] + (anchor[b] - anchor[a]) * f
+        vpts = list(vz.items())
 
     def zfun(x, y):
         if vz is not None:

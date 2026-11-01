@@ -718,14 +718,21 @@ def surface(rf: dict, x: float, y: float) -> float:
     kind = rf["kind"]
     zt = rf["zt"]
     if kind == "mansard":
+        # (AG14: the distance in from the eave ring to its nearest edge, not the least
+        # distance in from every edge's line, which a concave ring's notch makes negative
+        # over its top)
         B = rf["B"]
         n = len(B)
+        if RG.inside((int(round(x)), int(round(y))), B) < 0:
+            return float(rf["zf"])
         d = math.inf
         for i in range(n):
             a, b = B[i], B[(i + 1) % n]
-            ux, uy, L = _unit(a, b)
-            d = min(d, (x - a[0]) * -uy + (y - a[1]) * ux)       # inward of edge i
-        return min(zt, rf["zf"] + max(d, 0.0) * rf["tan"])
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            L2 = dx * dx + dy * dy
+            f = 0.0 if L2 == 0 else min(max(((x - a[0]) * dx + (y - a[1]) * dy) / L2, 0.0), 1.0)
+            d = min(d, math.hypot(x - a[0] - f * dx, y - a[1] - f * dy))
+        return min(zt, rf["zf"] + d * rf["tan"])
     if "frame" not in rf:
         return zt
     c, u, v = rf["frame"]
