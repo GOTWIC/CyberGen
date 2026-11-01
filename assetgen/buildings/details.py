@@ -166,8 +166,11 @@ def escape(sb) -> None:
         cands.append((rank, -fa.L, len(cands), fa, ms))
     for _, _, _, fa, ms in sorted(cands, key=lambda c: c[:3]):
         n = ms["floors"]
+        # (AG14: over an alley's lanes its lowest landing and drop ladder keep the
+        # vehicles' headroom)
+        low = PT.ROAD_CLEAR + sb.ground if _main_class(fa) == "alley" else 3200
         zs = [ms["z0"] + (ms["z1"] - ms["z0"]) * f // n for f in range(1, n)]
-        zs = [z for z in zs if z >= 3200]
+        zs = [z for z in zs if z >= low]
         if len(zs) < 2:
             continue
         w = PT.q(min(5000, fa.L * 4 // 10))
@@ -181,7 +184,8 @@ def escape(sb) -> None:
         if sb.clear.hits(x - w, y - w, x + w, y + w, 3000, zs[-1] + 1100):
             continue
         z0 = zs[0]
-        p = {"w": w, "d": 1200, "zs": [z - z0 for z in zs], "ladder": PT.q(z0 - 3000)}
+        p = {"w": w, "d": 1200, "zs": [z - z0 for z in zs],
+             "ladder": PT.q(z0 - max(3000, low - 200))}
         if not _on(sb, fa, "escape", p, s, z0):
             continue
         sb.stats["fire_escapes"] = sb.stats.get("fire_escapes", 0) + 1

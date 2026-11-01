@@ -63,6 +63,9 @@ from .meshbuf import Buf
 
 NO_WINDOW = ("party", "hidden", "firewall")
 STRIP_MIN_Z = 3000           # strips that leave the footprint stay this high (sidewalks)
+ROAD_CLEAR = PT.ROAD_CLEAR   # AG14: and this high over a road with no sidewalk (an alley, a
+                             # service road, a highway): vehicles' headroom
+NO_WALK = ("alley", "service", "highway")
 PIER_MIN = 75
 GAP_MIN = 60                 # between openings
 EDGE_CLEAR = 60              # an opening's pocket from the neighbor facade's plane
@@ -161,6 +164,16 @@ class Facade:
         if cls in ("open", "park", "plaza", "courtyard", "atrium", "canal", "upper"):
             return other
         return 0
+
+
+def on_carriageway(reg: dict | None) -> bool:
+    """AG14: whether a facade region faces a road with no sidewalk in front of it (an
+    alley, a service road, a highway): what leaves the wall there under `ROAD_CLEAR` hangs
+    over the vehicles."""
+    if reg is None:
+        return False
+    return reg.get("class") in ("street", "front", "alley") and \
+        (reg.get("road_class") in NO_WALK or reg.get("class") == "alley")
 
 
 def _corner_clear(d_in, d_out, r: int) -> int:
@@ -956,9 +969,18 @@ class ShellBuilder:
             self._eaves(ms, g, rows)
         RF.finish(self, ms, top_open)        # AG4: a flat roof's finish
 
+    def _low(self, fa: Facade, s: int) -> int:
+        """How high something reaching out of the wall at s must start: `STRIP_MIN_Z` over
+        a sidewalk, `ROAD_CLEAR` over the ground where the facade faces a road with no
+        sidewalk (AG14)."""
+        if on_carriageway(fa.reg(s, self.ground + 1500)):
+            return self.ground + ROAD_CLEAR
+        return STRIP_MIN_Z
+
     def _edge_ok(self, ms: dict, za: int, zb: int) -> list[list[bool]]:
         """Per ring edge: whether a strip may leave the footprint there between za and zb
-        (no party, hidden or blind stretch in that height)."""
+        (no party, hidden or blind stretch in that height; AG14: nothing under `ROAD_CLEAR`
+        over a road with no sidewalk)."""
         out = []
         k = ms["k"]
         for r, ring in enumerate(ms["rings"]):
@@ -969,7 +991,8 @@ class ShellBuilder:
                 if ok:
                     for reg in self.br["edges"][j]["regions"]:
                         if reg["z"][0] * 1000 < zb and reg["z"][1] * 1000 > za and \
-                                reg["class"] in ("party", "hidden", "blind"):
+                                (reg["class"] in ("party", "hidden", "blind") or
+                                 (za < ROAD_CLEAR + self.ground and on_carriageway(reg))):
                             ok = False
                             break
                 row.append(ok)
@@ -1383,7 +1406,7 @@ class ShellBuilder:
                 used.add("louvers")
             return
         if kind == "pod":
-            if lo >= STRIP_MIN_Z:
+            if lo >= self._low(fa, mid):
                 # one capsule for the whole building (as a capsule tower's are), centered
                 # in its bay; a bay narrower than it takes a capsule of its own width
                 pw = min(PT.q(cont[f"{g}.bay_m"] * 800), qw)
@@ -1412,8 +1435,8 @@ class ShellBuilder:
                                    "patch_panel"}, mid, lo)
                 self.used["irregular"] = True
                 return
-            if feat == "addons" and lo - 150 >= STRIP_MIN_Z and u1 < 0.14 * irr + 0.10 and \
-                    self._bridge_free(fa, a_ - 200, b_ + 200, lo - 150, hi + 150, 500):
+            if feat == "addons" and lo - 150 >= self._low(fa, mid) and \
+                    u1 < 0.14 * irr + 0.10 and self._bridge_free(fa, a_ - 200, b_ + 200, lo - 150, hi + 150, 500):
                 P.on(fa, "panel", {"style": "addon", "w": PT.q(w + 400),
                                    "h": PT.q(min(h + 300, 2400)), "d": 500}, mid, lo - 150)
                 used.add("addons")
@@ -1459,11 +1482,11 @@ class ShellBuilder:
                 P.on(fa, "shutter", {"w": sw, "h": qh}, b_ + 40 + sw // 2, lo)
                 used.add("shutters")
         if feat == "eggcrate" and genes.get(f"{g}.crate") == "eggcrate" and \
-                lo - 150 >= STRIP_MIN_Z and pl >= 170 and pr >= 170:
+                lo - 150 >= self._low(fa, mid) and pl >= 170 and pr >= 170:
             P.on(fa, "panel", {"style": "eggcrate", "w": qw, "h": qh, "d": 400, "t": 150,
                                "slot": wall}, mid, lo)
             used.add("eggcrate")
-        if feat == "screen" and lo - 150 >= STRIP_MIN_Z:
+        if feat == "screen" and lo - 150 >= self._low(fa, mid):
             nb = 3 if w >= 1800 else 2
             pat = genes.get(f"{g}.blades", "flat")
             for k in range(nb):
@@ -1475,13 +1498,13 @@ class ShellBuilder:
                      extra_deg=ang)
             used.add("screen")
         if genes.get(f"{g}.balcony") == "balconette" and genes[f"{g}.window"] == "tall" and \
-                lo >= STRIP_MIN_Z:
+                lo >= self._low(fa, mid):
             P.on(fa, "balconette", {"w": qw, "rh": 900}, mid, lo)
             used.add("balcony")
         if curtain or irr <= 0:
             return
         use = self.br["building"]["use"]
-        if lo >= STRIP_MIN_Z and use in ("residential", "hotel", "office", "retail") and \
+        if lo >= self._low(fa, mid) and use in ("residential", "hotel", "office", "retail") and \
                 w >= 800 and jb not in bset and _u(key, f"ac{f}.{i}") < 0.25 * irr and \
                 self._bridge_free(fa, a_, b_, lo - 100, lo + 600, 400):
             P.on(fa, "ac", {"w": 660, "h": 420, "do": 350, "di": min(250, max(r - 30, 20))},
@@ -1491,7 +1514,8 @@ class ShellBuilder:
                 _u(key, f"gr{f}.{i}") < 0.9 * irr:
             P.on(fa, "grille", {"w": qw, "h": qh}, mid, lo)
             self.used["irregular"] = True
-        if self.res and lo >= STRIP_MIN_Z and pr >= 900 and _u(key, f"dish{f}.{i}") < 0.06 * irr:
+        if self.res and lo >= self._low(fa, mid) and pr >= 900 and \
+                _u(key, f"dish{f}.{i}") < 0.06 * irr:
             P.on(fa, "dish", {"rd": 400}, b_ + 450, lo + h // 2 - 400)
             self.used["irregular"] = True
 
@@ -1536,7 +1560,7 @@ class ShellBuilder:
                         P.on(fa, "cap", {"dir": "v", "w": 70, "p": 90, "h": h}, s, zb)
                 used.add("caps")
         elif feat == "fins":
-            z0f = max(zb, STRIP_MIN_Z)
+            z0f = max(zb, self._low(fa, fa.L // 2))
             h = PT.q(zt - z0f)
             if h >= 2000:
                 d = PT.q(cont[f"{g}.fin_m"] * 1000)

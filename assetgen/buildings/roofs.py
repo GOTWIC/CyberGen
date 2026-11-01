@@ -940,17 +940,18 @@ def _place(sb, family: str, p: dict, x: int, y: int, z: int, ux: float, uy: floa
 
 def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int, z: int) -> int:
     """Dunnage under an item of w x d at (x, y) whose base is at z over a roof form: the
-    frame's leg (0: none needed)."""
-    lo = math.inf
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            px = x + ux * sx * w / 2.0 - uy * sy * d / 2.0
-            py = y + uy * sx * w / 2.0 + ux * sy * d / 2.0
-            lo = min(lo, surface(rf, px, py))
-    leg = z - lo
-    if leg < LEG_MIN:
+    frame's leg (0: none needed). AG14: the legs reach the lowest point of the form under
+    the frame's own corners (where they stand), not the item's."""
+    def low(w_, d_):
+        lo = math.inf
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                px = x + ux * sx * w_ / 2.0 - uy * sy * d_ / 2.0
+                py = y + uy * sx * w_ / 2.0 + ux * sy * d_ / 2.0
+                lo = min(lo, surface(rf, px, py))
+        return lo
+    if z - low(w, d) < LEG_MIN:
         return 0
-    leg = int(math.ceil(leg / 100.0)) * 100
     # the frame 0.1 m past the item, else as big as it or smaller where its box (the
     # envelope checks an instanced part's box) would reach past the roof's edge under it
     ring = rf["ring"]
@@ -961,13 +962,61 @@ def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int, z:
                            int(round(y + uy * sx * hx + ux * sy * hy))), [ring]) == 1
                for sx in (-1, 1) for sy in (-1, 1)):
             break
+    leg = z - min(low(fw, fd), low(w, d))
+    if leg < LEG_MIN:
+        return 0
+    leg = int(math.ceil(leg / 10.0)) * 10        # (to the centimeter: the legs touch)
     _place(sb, "dunnage", {"w": PT.q(fw), "d": PT.q(fd), "leg": leg}, x, y, z - leg, ux, uy)
     return leg
 
 
+def _seat(rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int) -> int:
+    """AG14: the highest point of a roof form under an item's footprint (its corners, edge
+    middles and middle), where the item's base goes: on the form, never over it (a barrel's
+    or a sawtooth's crest lies under the mass top the model gives the item) nor into it."""
+    hi = -math.inf
+    for sx in (-1, 0, 1):
+        for sy in (-1, 0, 1):
+            px = x + ux * sx * w / 2.0 - uy * sy * d / 2.0
+            py = y + uy * sx * w / 2.0 + ux * sy * d / 2.0
+            hi = max(hi, surface(rf, px, py))
+    return int(math.ceil(hi))
+
+
+def _top_of(ms: dict) -> int:
+    """The height a roof item on this shell mass stands at: a halo screen's open roof (its
+    floor), a roof form's top (`_seat` puts the item on the form), else its top."""
+    if ms.get("screen"):
+        return ms["z0"]
+    rf = ms.get("roof")
+    if rf and rf["kind"] != "flat":
+        return rf["zt"]
+    return ms["z1"]
+
+
+def _form_under(sb, x: int, y: int, z: int, below: bool = False) -> dict | None:
+    """AG14: the roof form an item stands on that `plan` did not file it under (an item
+    on a form mass off by more than its 60 mm, or one moved off a mass the shell left out):
+    the highest form whose mass contains the point and whose top is within 0.3 m of z (or,
+    `below`, anywhere under z + 0.3 m)."""
+    best = None
+    for ms in sb.roof_forms:
+        rf = ms.get("roof")
+        if not rf or rf["kind"] == "flat":
+            continue
+        if RG.in_poly((x, y), ms["rings"]) < 0 or rf["zt"] > z + 300 or \
+                (not below and rf["zt"] < z - 300):
+            continue
+        if best is None or rf["zt"] > best["zt"]:
+            best = rf
+    return best
+
+
 def items(sb) -> None:
     """An asset for every roof item of the brief (`sb.roof_items`: per item, its family and
-    node, `merged`, or `sign` for AG8's billboards)."""
+    node, `merged`, or `sign` for AG8's billboards). AG14: an item over a roof form stands
+    on the form's highest point under it (`_seat`), on dunnage where the form falls away
+    under its footprint by `LEG_MIN` or more."""
     br = sb.br
     clear = sb.clear
     out = []
@@ -980,6 +1029,7 @@ def items(sb) -> None:
     have = {ms["k"] for ms in sb.masses}
     for k, it in enumerate(br["roof_items"]):
         x, y, z = (int(round(v * 1000)) for v in it["position"])
+        moved = False
         if it.get("mass") is not None and it["mass"] not in have:
             # (AG5: on a mass the shell left out, a hero's unsupported crown: on the roof
             # under it)
@@ -987,7 +1037,18 @@ def items(sb) -> None:
                     RG.inside((x, y), RG.clean(ms["rings"][0])) == 1]
             if tops:
                 z = max(tops)
+                moved = True
                 sb.stats["roof_items_moved"] = sb.stats.get("roof_items_moved", 0) + 1
+        if not moved:
+            # AG14: the roof the shell built under it, which articulation may have taken
+            # lower than the model's mass top (a halo crown's screen round an open roof, a
+            # stepped crown's tier stepping in, a setback): the highest top (a screen's
+            # floor) under the item's point no higher than it
+            tops = [t for t in (_top_of(ms) for ms in sb.masses
+                                if RG.in_poly((x, y), ms["rings"]) >= 0) if t <= z + 60]
+            if tops and max(tops) < z - 20:
+                z = max(tops)
+                sb.stats["roof_items_dropped"] = sb.stats.get("roof_items_dropped", 0) + 1
         sa, sc, sz = (max(int(round(v * 1000)), 100) for v in it["size"])
         a = M.radians(float(it["yaw_deg"]))
         ux, uy = float(M.cos(a)), float(M.sin(a))
@@ -995,9 +1056,19 @@ def items(sb) -> None:
         rec = {"kind": kind, "asset": None}
         hx = abs(ux) * sa / 2 + abs(uy) * sc / 2
         hy = abs(uy) * sa / 2 + abs(ux) * sc / 2
+        rf = form_of_item.get(k)
+        if rf is None and (moved or kind in ITEM_KEEP):
+            rf = _form_under(sb, x, y, z, below=moved)
+        if rf is not None and kind in ITEM_KEEP:
+            w_, d_ = (800, 800) if kind == "antenna" else (sa, sc)
+            z0 = z
+            z = _seat(rf, x, y, ux, uy, w_, d_)
+            if z != z0:
+                sb.stats["roof_items_seated"] = sb.stats.get("roof_items_seated", 0) + 1
+        elif rf is not None and moved:
+            z = _seat(rf, x, y, ux, uy, sa, sc)
         room = clear.lowest(x - hx, y - hy, x + hx, y + hy, z) if clear.segs else None
         top = (room - z - 300) if room is not None else None
-        rf = form_of_item.get(k)
         if kind == "billboard":
             rec["asset"] = "sign"            # AG8's billboard (frame, truss, legs)
         elif kind == "ac_unit":

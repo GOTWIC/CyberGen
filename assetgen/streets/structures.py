@@ -109,9 +109,61 @@ def own_deck(b: dict, inp: dict) -> dict:
             "origin": inp["origin"]}
 
 
+def _carriers(cx: Ctx, b) -> list[str]:
+    """AG14: the road segments that carry a bridge whose `segment_ids` are empty (citygen
+    names none where a junction splits the span): the raised segments whose centerline runs
+    along the bridge line (every sample point of the line within half the segment's width
+    of it, or of one of them, at the deck's height). The bridge then draws no deck of its
+    own: its road pieces draw it (it was drawn twice)."""
+    pts = [(p[0], p[1], p[2]) for p in b.line]
+    try:
+        path = Path([(p[0], p[1]) for p in pts])
+    except ValueError:
+        return []
+    n = max(3, int(path.L / 10.0) + 1)
+    samples = [path.point(path.L * k / (n - 1)) for k in range(n)]
+    xs = [p[0] for p in samples]
+    ys = [p[1] for p in samples]
+    lo, hi = (min(xs), min(ys)), (max(xs), max(ys))
+    hits: dict[str, int] = {}
+    for sid in sorted(cx.seg):
+        s = cx.seg[sid]
+        cl = s.centerline
+        if not s.bridge and max((z.z for z in s.z_profile), default=0.0) <= 0.5:
+            continue
+        sx = [p[0] for p in cl]
+        sy = [p[1] for p in cl]
+        r = s.width_m / 2.0 + 0.5
+        if min(sx) > hi[0] + r or max(sx) < lo[0] - r or min(sy) > hi[1] + r or \
+                max(sy) < lo[1] - r:
+            continue
+        try:
+            sp = Path([(p[0], p[1]) for p in cl])
+        except ValueError:
+            continue
+        k = 0
+        for x, y in samples:
+            _, d = sp.project(x, y)
+            if abs(d) <= r:
+                k += 1
+        if k:
+            hits[sid] = k
+    # every point of the line on one of them
+    covered = 0
+    for x, y in samples:
+        for sid in hits:
+            sp = Path([(p[0], p[1]) for p in cx.seg[sid].centerline])
+            _, d = sp.project(x, y)
+            if abs(d) <= cx.seg[sid].width_m / 2.0 + 0.5:
+                covered += 1
+                break
+    return sorted(hits, key=lambda i: (-hits[i], i)) if covered >= n - 1 else []
+
+
 def gather_bridge(cx: Ctx, b) -> Piece:
     segs = []
-    for sid in b.segment_ids:
+    ids = list(b.segment_ids) or _carriers(cx, b)
+    for sid in ids:
         s = cx.seg.get(sid)
         if s is not None:
             seg = dump(s)
@@ -133,8 +185,8 @@ def gather_bridge(cx: Ctx, b) -> Piece:
     except ValueError:
         wet = []
     did = None
-    if b.segment_ids and b.segment_ids[0] in cx.seg:
-        s0 = cx.seg[b.segment_ids[0]]
+    if ids and ids[0] in cx.seg:
+        s0 = cx.seg[ids[0]]
         did = s0.district_ids[0] if s0.district_ids else s0.attrs.get("district")
     wl = cx.ground.water_level(b.crosses, WATER_Z.get(b.water_class or "", WATER_DEFAULT))
     inputs = {"bridge": dump(b), "segs": segs, "wet": wet, "water_z": C.m(wl),
@@ -182,7 +234,7 @@ def _wet_runs(wet, L: float) -> list[tuple[float, float]]:
     return runs
 
 
-@maker("bridge", 1)
+@maker("bridge", 2)
 def make_bridge(inp: dict) -> Out:
     b = inp["bridge"]
     try:
@@ -399,9 +451,10 @@ def _footbridge(mesh: Mesh, ln: Line3, inp: dict, kind: str, W: float, wz: float
                 rd.sweep(mesh, "steel.painted", 0.0, L,
                          box_prof(-w / 2.0, w / 2.0, zr - w / 2.0, zr + w / 2.0), tc=t,
                          step=1.5)
+            # (AG14: the edge beam outside the road's girder, as a fascia, not inside it)
             rd.sweep(mesh, "steel.painted", 0.0, L,
-                     box_prof(-0.15, 0.15, -0.9, -0.1), tc=side * (W2 - 0.4), base=-ROAD_DZ,
-                     step=2.0)
+                     box_prof(-0.12, 0.12, -0.7, 0.05), tc=side * (W2 + 0.12),
+                     base=-ROAD_DZ, step=2.0)
     # steps where the ramps are stairs (steeper than 15%)
     _steps(mesh, rd, "stone.coping" if kind == "footbridge.stone" else "concrete")
 
@@ -439,6 +492,34 @@ def _steps(mesh: Mesh, rd: Road, slot: str, riser: float = 0.17):
 # Road columns
 # ---------------------------------------------------------------------------
 
+PIER_FOOT = (1.8, -2.0, 1.2)    # a pier's footing (M19's blockout): times the column's half
+                                # width, bottom and top over the ground (m)
+
+
+def footing(mesh: Mesh, ring, g: float, bed: float | None = None):
+    """AG14: the footing under a pier (M19's transit piers, a road column in the water): a block wider than
+    the column from `BED_EMBED_M` into M16's bed (or 2 m under the ground) to 1.2 m over the
+    ground, a chamfered top."""
+    cx_ = sum(p[0] for p in ring) / len(ring)
+    cy_ = sum(p[1] for p in ring) / len(ring)
+    h = max(max(abs(p[0] - cx_) for p in ring), max(abs(p[1] - cy_) for p in ring)) * \
+        PIER_FOOT[0]
+    z0, z1 = g + PIER_FOOT[1], g + PIER_FOOT[2]
+    if bed is not None:
+        z0 = min(z0, bed - BED_EMBED_M)
+    sq = [(cx_ - h, cy_ - h), (cx_ + h, cy_ - h), (cx_ + h, cy_ + h), (cx_ - h, cy_ + h)]
+    mesh.prism("concrete", sq, z0, z1 - 0.3, top=False, bottom=True)
+    # the top chamfered in 0.3 m (water sheds off it), up to the column
+    h2 = h - 0.3
+    tp = [(cx_ - h2, cy_ - h2), (cx_ + h2, cy_ - h2), (cx_ + h2, cy_ + h2), (cx_ - h2, cy_ + h2)]
+    for i in range(4):
+        a, b = sq[i], sq[(i + 1) % 4]
+        c, d = tp[(i + 1) % 4], tp[i]
+        mesh.quad("concrete", (a[0], a[1], z1 - 0.3), (b[0], b[1], z1 - 0.3),
+                  (c[0], c[1], z1), (d[0], d[1], z1))
+    mesh.poly("concrete", tp, z=z1)
+
+
 def gather_column(cx: Ctx, st) -> Piece:
     a = st.attrs or {}
     s = cx.seg.get(a.get("road_id"))
@@ -450,17 +531,25 @@ def gather_column(cx: Ctx, st) -> Piece:
                 "s_m": a.get("s_m")}
     inputs = {"st": dump(st), "road": road, "ground": cx.ground.samples([c]),
               "origin": list(c)}
+    if cx.wet_at(c[0], c[1]):
+        # AG14: a column standing in the water reaches M16's bed on a footing
+        bz = cx.bed_z(c[0], c[1])
+        inputs["bed"] = bz if bz is not None else \
+            C.m(cx.ground.water_level(None, WATER_DEFAULT) - PIER_FOOT_M)
     return Piece(st.id, "street.column", "column", cx.tile_for(st.id, ring),
                  cx.keys.get(st.id, []), inputs)
 
 
-@maker("column", 1)
+@maker("column", 2)
 def make_column(inp: dict) -> Out:
     st = inp["st"]
     ring = ccw(st["footprint"]["exterior"])
     g = inp["ground"][0] if inp.get("ground") else 0.0
     z0, z1 = st["z0_m"] + g, st["z1_m"] + g
     mesh = Mesh(inp["origin"])
+    if inp.get("bed") is not None:
+        footing(mesh, ring, g, inp["bed"])         # (AG14: in the water)
+        z0 = g + PIER_FOOT[2] - 0.05
     road = inp.get("road")
     cx_, cy_ = inp["origin"][0], inp["origin"][1]
     cap = 1.0 if z1 - z0 > 3.0 else 0.0
