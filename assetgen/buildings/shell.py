@@ -164,18 +164,18 @@ class Facade:
         if self.lane() is not None and self.lane() < LANE_NEAR and self.by_lane():
             return True
         return any(on_carriageway(r) and r["z"][0] * 1000.0 < PT.ROAD_CLEAR
-                   for r in self.regions or ())
+                   for r in getattr(self, "regions", None) or ())
 
     def rise(self) -> int:
         """AG14: how far (mm) the lanes near this facade run over the building's base (its
         brief edge's `lane_z_m`; 0 where lower or none): the headroom is over them."""
-        v = (self.rec or {}).get("lane_z_m")
+        v = (getattr(self, "rec", None) or {}).get("lane_z_m")
         return max(int(round(v * 1000)), 0) if v is not None else 0
 
     def by_lane(self) -> bool:
         """AG14: whether this facade's stretch of its brief edge is the stretch near a lane
         (the brief's `lane_s`; a brief without it: all of it)."""
-        sp = (self.rec or {}).get("lane_s")
+        sp = (getattr(self, "rec", None) or {}).get("lane_s")
         if sp is None:
             return True
         return self.soff < sp[1] * 1000 + 1 and self.soff + self.L > sp[0] * 1000 - 1
@@ -183,7 +183,7 @@ class Facade:
     def lane(self) -> int | None:
         """AG14: how far (mm) the nearest lane is in front of this facade's brief edge (the
         brief's `lane_m`), None where over 6 m."""
-        v = (self.rec or {}).get("lane_m")
+        v = (getattr(self, "rec", None) or {}).get("lane_m")
         return None if v is None else int(round(v * 1000))
 
     def room(self, s: int, z: int, street: int, other: int) -> int:
