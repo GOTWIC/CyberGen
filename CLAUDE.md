@@ -623,6 +623,14 @@ project of the exporter's own (`--new-project` makes one from the First Person t
 outside the repo); never import into any other project unasked. Spec and record:
 `docs/unreal_export.md`. Sample imports: `docs/progress/M15/`.
 
+The fast import is the importer's default (an exporter update, no milestone): stage 2's packs
+queued as one async Interchange import, a Python pipeline step (`CgPackStep`,
+`CgTextureStep`) setting each mesh's Nanite settings and each texture's settings before the
+build and skipping meshes the city does not place, meshes saved in one batch, actors saved and
+unloaded every 2,000 spawned (`CITYGEN_UE_OFFLOAD`), the editor run with `-fastexit` and no
+distance field or card tasks (`unreal.FAST_INI`). Same level, same hashes;
+`CITYGEN_UE_FAST=0` takes the one-at-a-time path. Notes: `docs/progress/exp_fast_import/`.
+
 The exporter's play features are in place (an exporter update, no milestone):
 `citygen/unreal_play.py` writes `unreal/map.png` (the city from above, drawn from the
 blockout plan, again only when the plan changes) and `unreal/play.json` (walkway points every

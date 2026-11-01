@@ -1,11 +1,43 @@
-# Faster first imports with stage 2 (experiment)
+# Faster first imports with stage 2
 
-An experimental branch (`claude/exp-fast-import`), not for main as it is: what makes the first
-`citygen unreal` import of a city with stage 2 assets slow, and what the exporter alone
-(`citygen/unreal.py`, `citygen/ue/import_city.py`) can do about it. assetgen's generators and
-packs are unchanged; ideas that need assetgen are at the end.
+Began as an experimental branch (`claude/exp-fast-import`): what makes the first `citygen
+unreal` import of a city with stage 2 assets slow, and what the exporter alone
+(`citygen/unreal.py`, `citygen/ue/import_city.py`) can do about it. Since the merge with main
+of 2026-11-01 (below) it is the importer's default; `CITYGEN_UE_FAST=0` keeps the
+one-at-a-time path. The ideas that need assetgen are at the end.
 
-## Headline
+## Merged with main, on Windows (2026-11-01)
+
+Main merged in up to M19 (#64): M16's swim volumes, AG12's water (its water pipeline now also
+on the queued packs) and underwater volumes, AG13's ground and grass, AG4's roof equipment,
+AG5's heroes, M21's forms, main's reset of a stale full fallback (on both paths now). The
+branch's AG3 fix stays: a building whose street front takes it whole has no empty shell mesh
+in its pack (its record's `node` null), which closes AG10's Unreal check's open item; main's
+exporter fix for such packs (an empty shell node) stays for older builds, and an entry with no
+node counts as one. The play features (#57, merged into this branch, never into main) come to
+main with it.
+
+Greyhook (`docs/progress/M1a2/peninsula_city`) on the owner's Windows PC (20 threads, RTX
+4070 Ti 12 GB; another session's heavy build ran alongside for part of it), built on the merge
+and imported into a new First Person project (`--new-project`, the engine's default Zen
+cache):
+
+| Step | Result |
+|---|---|
+| Build | 982 stage 2 packs, 29,186 meshes, 483 textures, 42,013 actors (Greyhook has grown: AG12's water, AG13's grass, M19) |
+| Play plugin | built with Visual Studio in 60 s before the import |
+| First import, fast path | 73m41s in the editor (stage 2's packs imported 39m50s, finished 3m37s, saved 4m52s, LOD chains 2m38s; actors 16m32s with 21 offloads); the pack step matched all 982 packs and skipped 304 unplaced meshes; the texture step all 483 textures; no "Bad MeshDescription"; then the HLOD build, 288 cells in 26m24s |
+| Second import | 0 created, 0 updated, 0 deleted, 42,013 unchanged; 0 meshes or textures imported, 0 packages saved; 3m41s in the editor; HLODs none rebuilt |
+| `--check --shots` | passed: 32,601 actors loaded at the start, 506 of 507 traces down, 36 of 36 roofs, 36 of 36 facades, the walk to its end, the play features (map, menu, night with 47 lamps, free camera, a 1,171 m teleport onto the ground), the flight |
+| `CITYGEN_UE_FAST=0` | not run (about two hours more on this PC; left out by the owner's scope for this PR). The Mac's A/B on #54 below stands: 2.9x |
+
+The packs' Nanite builds are most of the time here, as on the Mac. Shots (the editor's, the
+check's views): `windows_iso_city.jpg`, `windows_street_stacks.jpg`,
+`windows_street_viaduct.jpg`, `windows_fly_low.jpg`, `windows_play_night.jpg`. The sea in the
+whole-city view reads pale grey: AG12's Single Layer Water reflecting a pale sky from high up
+(no fallback logged); AG12 has had no Unreal check of its own yet.
+
+## Headline (the Mac, before the merge)
 
 Greyhook with stage 2 (603 glTF packs, 28,230 meshes, 276 textures, 38,988 actors), a first
 import into a new project with a derived data cache of its own, `citygen unreal` from start
