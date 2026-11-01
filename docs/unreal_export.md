@@ -128,7 +128,35 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 | `--new-project` | off | make the project from the First Person template if it is missing |
 | `--blockout-only` | off | leave out stage 2's buildings and streets |
 | `--check`, `--check-only`, `--shots DIR`, `--view ...` | | play and check the level, render views |
+| `--no-play` | off | leave out the play features (below) |
 | `--quiet` | off | no progress on stderr |
+
+### The fast import
+
+A first import with stage 2's assets spends most of its time importing and building the
+packs' meshes and spawning the actors. By default the importer takes the fast path
+(`citygen/ue/import_city.py`, notes and measurements in `docs/progress/exp_fast_import/`):
+
+- **Packs at once:** every stage 2 pack to import is queued as one async Interchange import
+  and waited for once, so packs import side by side and their meshes build on every core.
+- **Each mesh built once:** a Python Interchange pipeline step (`CgPackStep`) sets each
+  mesh's Nanite settings (on or off, shape preservation, the full fallback) on its factory
+  node before the build, and leaves the meshes the city does not place (the family packs'
+  other variants) unmade; textures get their color space, compression, group and green
+  channel the same way (`CgTextureStep`). AG12's water packs keep their water pipeline.
+- **Saves in batches:** stage 2's meshes saved in one call; the actors saved and unloaded
+  every 2,000 made (`CITYGEN_UE_OFFLOAD`, 0 for never), since each spawn scans every loaded
+  actor's label, and loaded again at the end.
+- **The import's editor:** started with `-fastexit` (it ends once the script has saved
+  everything, not after minutes of teardown) and with mesh distance fields and Lumen cards
+  off for that process only (`-ini:` overrides; every imported mesh has none anyway, and
+  their task queue could race the LOD chains). The project's own settings are untouched.
+
+The result is the same level: the same actors, assets and hashes as the one-at-a-time path,
+and an import over it updates by key and hash as always. `CITYGEN_UE_FAST=0` in the
+environment takes the one-at-a-time path instead (each pack imported, each mesh built and
+then set, saved one by one, the editor's own shutdown), for comparison or if an engine
+version's Interchange misbehaves with concurrent imports; it needs a little less memory.
 
 ### Opening a big city
 
