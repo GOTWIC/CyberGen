@@ -413,6 +413,11 @@ def plan(sb) -> None:
         e = [eave if ok[0][i] else 0 for i in keep]
         if len(e) != len(ring):
             continue
+        # (AG14: an eave's mitred corner reaches in front of its neighbor edge: none beside
+        # an edge whose lane comes within a strip's reach)
+        near = [sb._lane_near(ms, i, zb) for i in keep]
+        e = [0 if near[i] or near[i - 1] or near[(i + 1) % len(e)] else e[i]
+             for i in range(len(e))]
         pitch = float(cont.get("roof_pitch", 32.0))
         if kind == "mansard":
             pitch = float(cont.get("roof_mansard", 68.0))
@@ -946,7 +951,7 @@ def _place(sb, family: str, p: dict, x: int, y: int, z: int, ux: float, uy: floa
 
 
 def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int,
-          z: int) -> tuple[int, int, int, int]:
+          z: int, whole: bool = False) -> tuple[int, int, int, int]:
     """Dunnage under an item of w x d at (x, y) whose base is at z over a roof form:
     (the frame's leg (0: none needed), and where the item now stands: x, y, z). AG14: the
     legs reach the lowest point of the form under the frame's own corners (where they
@@ -973,7 +978,8 @@ def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int,
     # the frame 0.1 m past the item, else as big as it or smaller where its box (the
     # envelope checks an instanced part's box) would reach past the roof's edge under it
     fw = fd = None
-    for grow in (200, 0, -200, -400):
+    # (`whole`: the item's own box must lie over the roof too, a frame under it or not)
+    for grow in ((200, 0) if whole else (200, 0, -200, -400)):
         fw_, fd_ = max(w + grow, 400), max(d + grow, 400)
         if fits(x, y, fw_, fd_):
             fw, fd = fw_, fd_
@@ -1196,7 +1202,12 @@ def items(sb) -> None:
             st = "lattice" if h >= 9000 else ("whip" if _u(f"{sb.bid}|{k}", "ant") < 0.6
                                                else "dish")
             if rf is not None:
-                _, x, y, z = _legs(sb, rf, x, y, ux, uy, 800, 800, z)
+                # (its frame as wide as the antenna's box, arms and dishes too: the box
+                # stays over the roof where the form puts it under the mass top)
+                lo, hi = PT.bounds(PT.mesh("antenna", {"h": h, "style": st})[1])
+                wa = max(800, int(math.ceil(2 * max(-lo[0], hi[0]))))
+                da = max(800, int(math.ceil(2 * max(-lo[1], hi[1]))))
+                _, x, y, z = _legs(sb, rf, x, y, ux, uy, wa, da, z, whole=True)
             rec["asset"] = _place(sb, "antenna", {"h": h, "style": st}, x, y, z, ux, uy)
         elif kind in ("helipad", "av_pad"):
             p = {"s": PT.q(min(sa, sc)), "h": PT.q(sz), "kind": kind}

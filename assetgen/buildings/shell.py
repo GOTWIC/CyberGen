@@ -210,6 +210,15 @@ class Facade:
         return out if cap is None else min(out, cap)
 
 
+def _seg_d2(p, a, b) -> float:
+    """Squared distance from point p to segment ab (plain arithmetic)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = dx * dx + dy * dy
+    t = 0.0 if L == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L))
+    ex, ey = a[0] + t * dx - p[0], a[1] + t * dy - p[1]
+    return ex * ex + ey * ey
+
+
 def _or(v, default):
     return default if v is None else v
 
@@ -1068,7 +1077,7 @@ class ShellBuilder:
     def _clear_of_lanes(self, fa: Facade, family: str, p: dict, s: int, z: int) -> bool:
         """AG14: whether a part placed so keeps off the lanes (the envelope's `over_road`
         rule on it alone; only tested near a lane under its headroom)."""
-        if fa.lane() is None or z > self.ground + ROAD_CLEAR + fa.rise() + 1500:
+        if self.lane_top is None or z > self.ground + ROAD_CLEAR + self.lane_top + 1500:
             return True
         from . import envelope as EN
         _, arrs = PT.mesh(family, p)
@@ -1078,6 +1087,42 @@ class ShellBuilder:
             return True
         pts = np.concatenate([np.unique(a["pos"], axis=0) for a in placed.values()])
         return EN.check(self.br, {}, [(pts, PT.REACH[family])])["over_road"] == 0
+
+    @property
+    def lane_top(self) -> int | None:
+        """AG14: the highest lane's rise over the base among the brief's edges with a lane,
+        None where no edge has one (nothing to keep off)."""
+        if not hasattr(self, "_lane_top"):
+            rs = [max(int(round((e.get("lane_z_m") or 0.0) * 1000)), 0)
+                  for e in self.br["edges"] if e.get("lane_m") is not None or
+                  any(on_carriageway(r) for r in e["regions"])]
+            self._lane_top = max(rs) if rs else None
+        return self._lane_top
+
+    def _lane_near(self, ms: dict, i: int, z: int | None = None) -> bool:
+        """AG14: whether ring edge i of a mass faces a lane within a strip's reach: its own
+        brief edge's lane, or (an upper mass's edges carry none) the lane of any brief edge
+        within 1.5 m of it in plan, while z is under that lane's headroom."""
+        j = self._j(ms, 0, i)
+        if j is not None:
+            lane = self.br["edges"][j].get("lane_m")
+            if lane is not None:
+                return lane < 1.2
+        if z is not None and (self.lane_top is None or
+                              z > self.ground + ROAD_CLEAR + self.lane_top + 1500):
+            return False
+        ring = ms["rings"][0]
+        p, q = ring[i], ring[(i + 1) % len(ring)]
+        for e in self.br["edges"]:
+            lane = e.get("lane_m")
+            if lane is None or lane >= 1.2:
+                continue
+            a = (e["a"][0] * 1000.0, e["a"][1] * 1000.0)
+            b = (e["b"][0] * 1000.0, e["b"][1] * 1000.0)
+            if min(_seg_d2(p, a, b), _seg_d2(q, a, b), _seg_d2(a, p, q),
+                   _seg_d2(b, p, q)) < 1500.0 ** 2:
+                return True
+        return False
 
     def _low(self, fa: Facade, s: int) -> int:
         """How high something reaching out of the wall at s must start: `STRIP_MIN_Z` over
