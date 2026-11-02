@@ -351,8 +351,10 @@ def _things(pk: Packs, model) -> list[dict]:
                     continue
                 F = feet(mesh[0])
                 # (dunnage under an item on a roof form stands through the form where the
-                # roof is higher under it: its legs may reach down its whole height)
-                reach = max(REACH_M, float(np.ptp(mesh[0][:, 2])))                     if p["family"] == "dunnage" else REACH_M
+                # roof is higher under it: its legs may reach down its whole height, and
+                # 5 cm more, so the roof's top at the frame's own top counts)
+                reach = (max(REACH_M, float(np.ptp(mesh[0][:, 2])) + 0.05)
+                         if p["family"] == "dunnage" else REACH_M)
                 for xf in p["xforms"]:
                     W = _xform(F, px + xf[0], py + xf[1], pz + xf[2], xf[3])
                     out.append({"id": bid, "what": f"roof.{p['family']}", "feet": W,
