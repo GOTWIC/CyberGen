@@ -1005,7 +1005,9 @@ def _legs(sb, rf: dict, x: int, y: int, ux: float, uy: float, w: int, d: int,
     leg = z - min(low(x, y, fw, fd), low(x, y, w, d))
     if leg < LEG_MIN:
         return 0, x, y, z
-    leg = int(math.ceil(leg / 10.0)) * 10        # (to the centimeter: the legs touch)
+    # (to the centimeter, set 3 cm into the roof: the form's sloped faces are drawn as
+    # triangles between the points `surface` measures, up to 3 cm under them)
+    leg = int(math.ceil((leg + 30) / 10.0)) * 10
     _place(sb, "dunnage", {"w": PT.q(fw), "d": PT.q(fd), "leg": leg}, x, y, z - leg, ux, uy)
     return leg, x, y, z
 

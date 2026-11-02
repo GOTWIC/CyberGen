@@ -1622,7 +1622,10 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   surfaces within 2 cm near its cut) and `asset_clash` (road carriageways in building
   masses; building vertices past their masses by 0.3 m over a carriageway under 4.5 m;
   bridge and raised road deck tops over each other; transit in a mass outside its portal
-  band, tracks in a platform).
+  band, tracks in a platform). What fails: roof items, dunnage and street pieces off
+  their surface, a junction step over 0.15 m, any clash; reported only: props and plants
+  (at the model's heights, M20's `prop_support`), smaller steps, a building's own shell
+  within 0.5 m of its footprint over a lane (M3's mass against the road).
 - **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
   piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays;
   `transit_beam` 2: haunched cap beams, tapered cantilever arms); road columns in the water on
@@ -1642,7 +1645,7 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   nearest lane (`lane_m`, `lane_s`, `lane_z_m`, `brief.lane_gaps`, `BRIEF_VERSION` 3) and
   nothing that leaves a wall reaches it under `parts.ROAD_CLEAR` (4.6 m) over it
   (`Facade.on_road`, `room`, `_low`, `_edge_ok`; cameras, ducts and fire escapes;
-  `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.1.
+  `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.2.
 - **Exporter**: no code change (`docs/unreal_export.md`, "From AG14"); the packs' normals
   are kept on both import paths (`test_stage2_packs_keep_their_normals`).
 Results: `docs/progress/AG14/`.

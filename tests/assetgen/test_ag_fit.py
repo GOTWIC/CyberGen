@@ -174,3 +174,4 @@ def test_small_city_passes_the_fit_checks():
     bad = {k: v for k, v in g["by_kind"].items() if k.startswith(("roof.", "street."))}
     assert not bad, bad
     assert g["seams"]["legs"] > 1000 and g["seams"]["steps"] <= 1
+    assert g["ok"] and rep["fit"]["ok"] and rep["ok"]
