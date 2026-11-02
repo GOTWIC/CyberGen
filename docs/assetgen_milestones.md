@@ -1831,6 +1831,12 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
     over a carriageway under 4.5 m; the deck tops of two bridge or raised road pieces within
     0.3 m over more than 2 m²; a guideway, tube, beam or column in a mass outside the
     building's portal band for its line; a track in a station platform.
+  - What fails and what is reported (as `asset_access` reports what is not assetgen's):
+    `asset_grounded` fails on a roof item, dunnage frame or street piece off its surface
+    and on a junction step over 0.15 m; props and plants (they stand at the model's
+    heights, M20's `prop_support`) and smaller steps are listed only. `asset_clash` fails on
+    every clash but a building's own shell within 0.5 m of its footprint over a lane (M3's
+    mass pressed against the road), which it lists.
 - **Junctions** (AG7 `junction` 2, `road` 2): the two ends of a leg's cut edge at the leg's
   height (M18's curb starts a few centimeters off a skewed cut's corner); a road ends on its
   junction's cut edge where that edge is within 1 m of its carriageway's edges (it was cut
@@ -1855,7 +1861,9 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
   pulled onto its own roof where its point fell off it (`_pull_in`), seated on a form's top
   under its middle (`_seat`; on a mansard's slope moved onto its flat top, `_onto_top`), on
   dunnage reaching the form under the frame's own corners, the frame moved with its item
-  onto the form where it would pass the roof's edge; a mansard's surface measured in from its
+  onto the form where it would pass the roof's edge, its legs set 3 cm into the roof (a
+  sloped face is drawn up to 3 cm under the points measured on it), an antenna's frame as
+  wide as its arms and dishes and never narrower than it; a mansard's surface measured in from its
   eave ring's nearest edge (a concave ring's notch made the old measure zero over its top).
 - **Curved walls** (M21's arcs): a mass edge that is a chord of one of its mass's arcs (or of
   a ring offset from it; `shell.arc_of`) is drawn with the curve's normal on every plane
@@ -1869,7 +1877,10 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
   over it (`parts.ROAD_CLEAR`): balconies, canopies and the facade's reaching parts by
   `Facade.room` and `_low`, strips and eaves by `_edge_ok`, fire escapes (landings and drop
   ladders), ducts and cameras by their own rules, canopies stopping short of an inside
-  corner; the envelope check counts what does (`over_road`). Shanty stacks' and other
+  corner; no eave beside an edge (its own or a lower mass's in plan) whose lane is within
+  1.2 m under the headroom; every reaching part of a building with a lane anywhere tested
+  against the rule before it is placed (`PartSet.guard`); the envelope check counts what
+  does (`over_road`). Shanty stacks' and other
   masses M3 overhangs a road with are the model's.
 
 <!-- AG14 numbers -->
