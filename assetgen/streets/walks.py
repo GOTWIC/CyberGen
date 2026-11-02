@@ -37,6 +37,7 @@ DROP_Z = 0.02
 RAMP_M = 1.2
 CURB_STONE_M = 0.18
 PIT_M = 1.2
+CUT_ALONG_M = 0.5       # AG14: how far along a leg an outline vertex still lies on its cut
 
 
 def _road_inputs(cx: Ctx, s) -> dict:
@@ -438,7 +439,7 @@ def _area(ring) -> float:
     return s / 2.0
 
 
-@maker("junction", 2)
+@maker("junction", 3)
 def make_junction(inp: dict) -> Out:
     j = inp["junction"]
     ring = ccw(j["polygon"]["exterior"])
@@ -477,6 +478,8 @@ def make_junction(inp: dict) -> Out:
             rec["z"] = gp(sm) + zp(sm) + ROAD_DZ
             a, b = ring[ex[1]], ring[(ex[1] + 1) % len(ring)]
             rec["mid"] = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+            rec["at"] = path.point(s)
+            rec["tan"] = path.tangent(s)
         legs.append(rec)
     legs.sort(key=lambda r: (r["ang"], r["id"]))
     lz = [r for r in legs if "z" in r]
@@ -495,8 +498,7 @@ def make_junction(inp: dict) -> Out:
         # height there, as the road meets them (M18's curb runs from a cut's corner a few
         # centimeters off it where the cut is skewed)
         for r in lz:
-            i = r["exit"][1]
-            for k in (i, (i + 1) % len(ring)):
+            for k in _cut_run(ring, r):
                 if (ring[k][0], ring[k][1]) in vz:
                     vz[(ring[k][0], ring[k][1])] = r["z"]
         vpts = list(vz.items())
@@ -507,8 +509,7 @@ def make_junction(inp: dict) -> Out:
         # its surfaces), so every leg meets the junction with no step
         anchor = {}
         for r in lz:
-            i = r["exit"][1]
-            for k in (i, (i + 1) % len(ring)):
+            for k in _cut_run(ring, r):
                 anchor[k] = r["z"]
         n = len(ring)
         cum = [0.0]
@@ -580,6 +581,37 @@ def make_junction(inp: dict) -> Out:
     pads = _corners(mesh, ring, holes, P, legs, j, style, zfun)
     out = Out(mesh=mesh)
     out.notes["corner_pads"] = pads
+    return out
+
+
+def _cut_run(ring, r: dict) -> list[int]:
+    """AG14: the outline vertices on a leg's cut: the two ends of the edge its centerline
+    leaves by, and the vertices before and after them along the outline that lie across
+    the leg within its half width of where its centerline crosses and within `CUT_ALONG_M`
+    of that point along it (M2 splits a cut at the centerline; on a steep junction M18's
+    curb may take another leg's height a few centimeters past the carriageway's corner,
+    a step the road piece would meet)."""
+    n = len(ring)
+    i = r["exit"][1]
+    if "at" not in r:
+        return [i, (i + 1) % n]
+    cx, cy = r["at"]
+    tx, ty = r["tan"]
+
+    def on(k):
+        p = ring[k]
+        ox, oy = p[0] - cx, p[1] - cy
+        return abs(ox * tx + oy * ty) <= CUT_ALONG_M and \
+            abs(-ox * ty + oy * tx) <= r["row"] + 0.05
+    out = [i, (i + 1) % n]
+    k = (i - 1) % n
+    while k not in out and on(k):
+        out.append(k)
+        k = (k - 1) % n
+    k = (i + 2) % n
+    while k not in out and on(k):
+        out.append(k)
+        k = (k + 1) % n
     return out
 
 

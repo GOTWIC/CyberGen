@@ -1624,8 +1624,7 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   bridge and raised road deck tops over each other; transit in a mass outside its portal
   band, tracks in a platform). What fails: roof items, dunnage and street pieces off
   their surface, a junction step over 0.15 m, any clash; reported only: props and plants
-  (at the model's heights, M20's `prop_support`), smaller steps, a building's own shell
-  within 0.5 m of its footprint over a lane (M3's mass against the road).
+  (at the model's heights, M20's `prop_support`) and smaller steps.
 - **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
   piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays;
   `transit_beam` 2: haunched cap beams, tapered cantilever arms); road columns in the water on
@@ -1635,7 +1634,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   low stretches, the girder only between them, their faces across where it goes on (`road`
   2, `roads._spans`); a road's skewed cut at its corners' own heights (`Road.z_at`);
   junctions without a model surface anchored to their legs' heights along the outline, a
-  leg's square-cut corners inserted on it (`junction` 2, `walks._with_corners`).
+  leg's square-cut corners inserted on it (`junction` 3, `walks._with_corners`), every
+  outline vertex on a leg's cut (within its half width across it, 0.5 m along it) at the
+  leg's height (`_cut_run`).
 - **Buildings**: roof items on the roof the shell built (`roofs._seat`, `_top_of`, `_pull_in`,
   `_onto_top`; a halo's open roof, a stepped tier, a mansard's flat top), dunnage legs to the
   form under the frame's corners, moved onto the form where a frame would pass the roof's
@@ -1645,7 +1646,7 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   nearest lane (`lane_m`, `lane_s`, `lane_z_m`, `brief.lane_gaps`, `BRIEF_VERSION` 3) and
   nothing that leaves a wall reaches it under `parts.ROAD_CLEAR` (4.6 m) over it
   (`Facade.on_road`, `room`, `_low`, `_edge_ok`; cameras, ducts and fire escapes;
-  `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.2.
+  `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.3.
 - **Exporter**: no code change (`docs/unreal_export.md`, "From AG14"); the packs' normals
   are kept on both import paths (`test_stage2_packs_keep_their_normals`).
 Results: `docs/progress/AG14/`.

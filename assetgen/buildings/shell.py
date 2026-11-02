@@ -67,6 +67,7 @@ NO_WINDOW = ("party", "hidden", "firewall")
 STRIP_MIN_Z = 3000           # strips that leave the footprint stay this high (sidewalks)
 ROAD_CLEAR = PT.ROAD_CLEAR   # AG14: and this high over a road with no sidewalk (an alley, a
                              # service road, a highway): vehicles' headroom
+SLOPE_SLACK = 600             # AG14: the headroom's margin on a slope (`rise_of`)
 NO_WALK = ("alley", "service", "highway")
 LANE_NEAR = 1800             # AG14: a facade whose nearest lane is nearer than this is on it
                              # (what reaches out there starts over the headroom)
@@ -1086,6 +1087,19 @@ class ShellBuilder:
         if not placed:
             return True
         pts = np.concatenate([np.unique(a["pos"], axis=0) for a in placed.values()])
+        if family == "member":
+            # (a flush member: low down near a lane, nothing of it past the masses' plan
+            # by more than a quarter meter, the fit check's relief less a margin)
+            low = pts[:, 2] < self.ground + ROAD_CLEAR + self.lane_top + SLOPE_SLACK
+            if low.any():
+                q = pts[low].astype(np.float64)
+                ok = np.zeros(len(q), dtype=bool)
+                for m in self.br["masses"]:
+                    ext = [(v[0] * 1000.0, v[1] * 1000.0) for v in m["footprint"]["exterior"]]
+                    ok |= EN.inside_poly(q[:, 0], q[:, 1], ext, []) | \
+                        (EN.dist_polyline(q[:, 0], q[:, 1], ext + ext[:1]) <= 250.0)
+                if not ok.all():
+                    return False
         return EN.check(self.br, {}, [(pts, PT.REACH[family])])["over_road"] == 0
 
     @property
@@ -1098,6 +1112,16 @@ class ShellBuilder:
                   any(on_carriageway(r) for r in e["regions"])]
             self._lane_top = max(rs) if rs else None
         return self._lane_top
+
+    def rise_of(self, fa: Facade) -> int:
+        """AG14: how far the lanes a part reaching off this facade may hang over run above
+        the base: its own edge's, or the highest of the building's (a fire escape or a duct
+        turns a corner, and a road climbs along a slope past the point the brief measured:
+        on a slope `SLOPE_SLACK` more, a 12% street over the 5 m a fire escape spans)."""
+        r = max(fa.rise(), self.lane_top or 0)
+        if self.lane_top is not None and self.br.get("terrain"):
+            r += SLOPE_SLACK
+        return r
 
     def _lane_near(self, ms: dict, i: int, z: int | None = None) -> bool:
         """AG14: whether ring edge i of a mass faces a lane within a strip's reach: its own
@@ -1129,7 +1153,7 @@ class ShellBuilder:
         a sidewalk, `ROAD_CLEAR` over the ground where the facade faces a road with no
         sidewalk (AG14)."""
         if fa.on_road():
-            return self.ground + ROAD_CLEAR + fa.rise()
+            return self.ground + ROAD_CLEAR + self.rise_of(fa)
         return STRIP_MIN_Z
 
     def _edge_ok(self, ms: dict, za: int, zb: int) -> list[list[bool]]:
@@ -1143,8 +1167,10 @@ class ShellBuilder:
             for i in range(len(ring)):
                 j = self._j(ms, r, i)
                 ok = j is not None
+                # (AG14: over the building's highest lane: a road climbing a slope runs
+                # higher beside the edge than where the brief measured it)
                 rise = max(int(round(_or(self.br["edges"][j].get("lane_z_m"), 0.0) * 1000)),
-                           0) if j is not None else 0
+                           self.lane_top or 0) if j is not None else 0
                 if ok and za < ROAD_CLEAR + self.ground + rise and \
                         _or(self.br["edges"][j].get("lane_m"), LANE_MAX) < 1.2:
                     ok = False              # (AG14: a lane within a strip's reach)
@@ -1604,7 +1630,8 @@ class ShellBuilder:
                 self.used["irregular"] = True
                 return
             if feat == "addons" and lo - 150 >= self._low(fa, mid) and \
-                    u1 < 0.14 * irr + 0.10 and self._bridge_free(fa, a_ - 200, b_ + 200, lo - 150, hi + 150, 500):
+                    u1 < 0.14 * irr + 0.10 and \
+                    self._bridge_free(fa, a_ - 200, b_ + 200, lo - 150, hi + 150, 500):
                 P.on(fa, "panel", {"style": "addon", "w": PT.q(w + 400),
                                    "h": PT.q(min(h + 300, 2400)), "d": 500}, mid, lo - 150)
                 used.add("addons")

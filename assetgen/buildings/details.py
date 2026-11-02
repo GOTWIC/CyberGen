@@ -168,7 +168,7 @@ def escape(sb) -> None:
         n = ms["floors"]
         # (AG14: over an alley's lanes its lowest landing and drop ladder keep the
         # vehicles' headroom)
-        low = PT.ROAD_CLEAR + sb.ground + fa.rise()
+        low = PT.ROAD_CLEAR + sb.ground + sb.rise_of(fa)
         zs = [ms["z0"] + (ms["z1"] - ms["z0"]) * f // n for f in range(1, n)]
         zs = [z for z in zs if z >= low]
         if len(zs) < 2:
@@ -224,7 +224,7 @@ def ducts(sb) -> None:
         if ceil is not None:
             top = min(top, ceil - int(DK.CEIL_GAP_M * 1000))
         # (AG14: over a road with no sidewalk it starts over the vehicles' headroom)
-        z0 = sb.ground + PT.ROAD_CLEAR + fa.rise() if fa.on_road() else 3200
+        z0 = sb.ground + PT.ROAD_CLEAR + sb.rise_of(fa) if fa.on_road() else 3200
         if top - z0 < 2000:
             continue
         for t in (0.5, 0.3, 0.7, 0.15, 0.85):
@@ -310,7 +310,7 @@ def cameras(sb) -> None:
             s = d["s"] - fa.soff + d["w"] // 2 + 450
             # (AG14: over the vehicles' headroom: an alley's or a junction's lanes may come
             # to the wall where the brief's probes do not see them)
-            z = max(d["pos"][2] + d["h"] + 500, sb.ground + PT.ROAD_CLEAR + fa.rise() + 400)
+            z = max(d["pos"][2] + d["h"] + 500, sb.ground + PT.ROAD_CLEAR + sb.rise_of(fa) + 400)
             if not 200 < s < fa.L - 200 or not ms["z0"] <= z <= ms["z1"] - 300:
                 continue
             if not _free(sb, fa, s - 150, s + 150, z - 200, z + 200):

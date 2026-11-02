@@ -60,7 +60,6 @@ TILE_M = 256.0
 GAP_M = 0.02
 REPORTED = ("prop.", "plant.")      # placed at the model's heights: reported, not failed
 STEP_FAIL_M = 0.15                  # a junction step that fails (smaller ones reported)
-SHELL_REPORT_M = 0.5                # a shell this close to its footprint over a lane: M3's
 REACH_M = 0.6
 FOOTING_M = 3.0         # how far a column's footing may be set into what it stands on
 HEADROOM_M = 4.5
@@ -746,15 +745,11 @@ def clash(pk: Packs, model) -> dict:
     if car:
         _over_road(pk, model, Surfaces(np.concatenate(car), np.concatenate(cown), min_nz=0.5),
                    out, counts)
-    # (a building's own shell within `SHELL_REPORT_M` of its footprint over a lane is the
-    # model's mass pressed against the road: reported, not failed)
-    reported = sum(1 for r in out["building_over_road"]
-                   if r["what"] == ["shell"] and r["reach_m"] <= SHELL_REPORT_M)
     for k in out:
         out[k] = sorted(out[k], key=lambda r: json.dumps(r, sort_keys=True))[:LIST_MAX]
     n = sum(counts.values())
-    return {"id": "asset_clash", "ok": n - reported == 0, "clashes": n,
-            "reported": reported, "counts": counts, "worst": out}
+    return {"id": "asset_clash", "ok": n == 0, "clashes": n, "counts": counts,
+            "worst": out}
 
 
 def _over_road(pk: Packs, model, S: Surfaces, out: dict, counts: dict):
@@ -891,9 +886,7 @@ def report_text(rep: dict) -> str:
                 lines.append(f"    {w['id']} ({w['what']}) at {w['at']} gap {w['gap_m']}")
         else:
             lines.append(f"{'PASS' if c['ok'] else 'FAIL'} asset_clash: {c['clashes']} "
-                         f"({', '.join(f'{k} {v}' for k, v in c['counts'].items())}; "
-                         f"{c['reported']} reported: a shell within {SHELL_REPORT_M} m of "
-                         f"its footprint)")
+                         f"({', '.join(f'{k} {v}' for k, v in c['counts'].items())})")
             for k, rows in c["worst"].items():
                 for r in rows[:10]:
                     lines.append(f"    {k}: {json.dumps(r, sort_keys=True)}")

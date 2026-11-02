@@ -1835,15 +1835,17 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
     `asset_grounded` fails on a roof item, dunnage frame or street piece off its surface
     and on a junction step over 0.15 m; props and plants (they stand at the model's
     heights, M20's `prop_support`) and smaller steps are listed only. `asset_clash` fails on
-    every clash but a building's own shell within 0.5 m of its footprint over a lane (M3's
-    mass pressed against the road), which it lists.
-- **Junctions** (AG7 `junction` 2, `road` 2): the two ends of a leg's cut edge at the leg's
+    every clash.
+- **Junctions** (AG7 `junction` 3, `road` 2): the two ends of a leg's cut edge at the leg's
   height (M18's curb starts a few centimeters off a skewed cut's corner); a road ends on its
   junction's cut edge where that edge is within 1 m of its carriageway's edges (it was cut
   square across and met the junction's surface between two of its vertices); a leg's square
   corners inserted on the outline (or setting a vertex there); a junction M18 left without a
   surface whose legs AG7 sees at other heights anchored to them, the curb between running
-  evenly (it was an inverse-distance blend that missed every leg's height).
+  evenly (it was an inverse-distance blend that missed every leg's height); every outline
+  vertex on a leg's cut, within its half width across the leg and 0.5 m along it, at the
+  leg's height (`_cut_run`: on a steep terrain junction M18's curb took the next leg's
+  height 15 cm past a carriageway's corner, a 0.76 m step at Cragmouth's `jn.w765s203`).
 - **M19's supports** (`transit_column` 2, `transit_beam` 2): frame and cantilever legs flat
   under their beam, haunched cap beams (full depth over the legs, 0.7 between), cantilever
   arms tapering to 0.45 at the tip, piers on footings with chamfered tops down into M16's
@@ -1880,7 +1882,11 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
   corner; no eave beside an edge (its own or a lower mass's in plan) whose lane is within
   1.2 m under the headroom; every reaching part of a building with a lane anywhere tested
   against the rule before it is placed (`PartSet.guard`); the envelope check counts what
-  does (`over_road`). Shanty stacks' and other
+  does (`over_road`). Fire escapes, ducts, cameras and the lowest reaching parts keep the
+  headroom over the building's highest lane, and on a slope 0.6 m more (`rise_of`,
+  `SLOPE_SLACK`: a 12% street climbs past where the brief measured it); strips over the
+  highest lane too; a shanty's lean-to sheet has no eave over a lane; a structural member
+  low near a lane stays within 0.25 m of the masses' plan. Shanty stacks' and other
   masses M3 overhangs a road with are the model's.
 
 **Numbers** (the samples built on main with M20, main's assetgen against AG14's; the fit
