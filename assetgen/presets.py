@@ -32,6 +32,13 @@ FACADE_SYSTEMS = (
     "capsule_stack",
     "perforated_skin",
     "hangar_cladding",
+    "led_grid",                 # AG15
+    "hex_skin",
+    "folded_glass",
+    "mesh_screen",
+    "media_facade",
+    "diagonal_glazing",
+    "slit_panel",
 )
 
 CROWNS = ("flat", "parapet", "lantern", "halo", "mast", "spire", "stepped", "pitched",

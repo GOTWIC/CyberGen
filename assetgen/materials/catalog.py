@@ -128,7 +128,7 @@ BUILDING: dict[str, tuple[str, str | None]] = {
 for _s in SY.SLOTS:
     if _s.startswith("paint_"):
         BUILDING[_s] = ("metal", "metal_painted")
-    elif _s.startswith(("neon_", "screen_")):
+    elif _s.startswith(("neon_", "screen_", "led_")):
         BUILDING[_s] = ("neon", None)
     elif _s.startswith(("poster_", "graffiti_")):
         BUILDING[_s] = ("facade", None)
