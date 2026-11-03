@@ -638,14 +638,23 @@ def check_walkway_clash(spec: CitySpec, m: CityModel):
         so = (w.attrs or {}).get("split_of")
         if so:
             pieces.setdefault(so, []).append(w)
+    doors = set()         # (an entrance with a door path of its own: that path is its link,
+    for w in m.walkways:  # tested above as a walkway)
+        if (w.attrs or {}).get("door") and (w.attrs or {}).get("building"):
+            for p in (w.line[0], w.line[-1]):
+                doors.add((w.attrs["building"], round(p[0], 2), round(p[1], 2)))
     for b in m.buildings:
         walled = set((b.attrs or {}).get("walled_in", ()))
         for ei, e in enumerate(b.entrances):
-            if ei in walled:
+            if ei in walled or (b.id, round(e.position[0], 2), round(e.position[1], 2)) in doors:
                 continue
             w = walks.get(e.walkway_id)
             if w is None or len(w.line) < 2:
                 continue
+            seen = set()
+            while (w.attrs or {}).get("split_of") in walks and w.id not in seen:
+                seen.add(w.id)    # (from the walkway it was split from: the link met the
+                w = walks[w.attrs["split_of"]]    # whole, a later stage named one piece)
             fam, todo = [], [w]
             while todo:           # (pieces of pieces too: every stage splits again)
                 x = todo.pop()

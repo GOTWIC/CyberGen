@@ -531,6 +531,8 @@ def keep_off(W, lots: list[dict], any_z: bool = False) -> dict:
                 continue
             r = _detour(a, b, polys, raw, bl)
             if r is None:
+                r = _detour(a, b, polys, raw, bl, blocks=True)
+            if r is None:
                 new.append(b)
                 out["left"] += 1
                 continue
@@ -542,13 +544,22 @@ def keep_off(W, lots: list[dict], any_z: bool = False) -> dict:
     return out
 
 
-def _detour(a, b, polys, raw, bl: Blocked):
+def _detour(a, b, polys, raw, bl: Blocked, blocks: bool = False):
     """The shortest way from a to b past the corners of the lots near them, clear of the
-    lots; None when there is none within DETOUR."""
+    lots; None when there is none within DETOUR. `blocks`: past the corners of the outline
+    the lots near make together (a block and its neighbors), for a long way round that the
+    lots' own corners, too many to try, miss."""
     L = ST._dist(a, b)
     win = LineString([a, b]).buffer(max(15.0, L), cap_style="square")
     cand = set()
-    for i in sorted(int(k) for k in raw.query(win, predicate="intersects")):
+    near = sorted(int(k) for k in raw.query(win, predicate="intersects"))
+    if blocks:
+        out = G.qpoly(G.union([polys[i] for i in near]).buffer(
+            DETOUR_PAD_M, join_style="mitre", mitre_limit=2.0).simplify(0.5))
+        for part in G.parts(out):
+            for ring in [part.exterior, *part.interiors]:
+                cand.update(ST._pt(*p) for p in G._ring(ring.coords))
+    for i in near if not blocks else ():
         g = G.qpoly(polys[i].buffer(DETOUR_PAD_M, join_style="mitre", mitre_limit=2.0))
         for part in G.parts(g):
             cand.update(ST._pt(*p) for p in G._ring(part.exterior.coords))

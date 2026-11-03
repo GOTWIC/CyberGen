@@ -796,7 +796,8 @@ class _Masses:
         feet, raw, bl = self._round[level]
         if raw is None:
             return [tuple(a[:2]), tuple(b[:2])]
-        return PP._detour(ST._pt(*a[:2]), ST._pt(*b[:2]), feet, raw, bl)
+        a, b = ST._pt(*a[:2]), ST._pt(*b[:2])
+        return PP._detour(a, b, feet, raw, bl) or PP._detour(a, b, feet, raw, bl, blocks=True)
 
 
 def _round_link(p, lv, land: int, masses: _Masses, level: int, lines, walks, gi):
