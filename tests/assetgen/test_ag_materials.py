@@ -189,7 +189,7 @@ def test_materials_stage_on_the_small_city():
             continue
         # (AG3: a street front takes its building's parameters)
         r = man["buildings"][e["ids"][0] if e["kind"] == "building.front" else e["key"]]
-        assert len(e["cpd"]) == SY.CPD_SIZE + 7 and e["cpd"][SY.CPD_SIZE:] == \
+        assert len(e["cpd"]) == SY.CPD_SIZE + 13 and e["cpd"][SY.CPD_SIZE:] == \
             r["material"]["cpd"]
         for slot, key in (e.get("materials") or {}).items():
             assert slot in CT.ERA_SLOTS and key == f"{slot}@{r['material']['era']}"

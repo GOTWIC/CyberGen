@@ -972,7 +972,7 @@ def test_stage2_from_assetgen(staged, manifest):
     assert ch["created"] == sorted((s2keys - set(blockout) - protos) | moved)
     # AG8: every prop and plant prototype actor of M15 replaced by props, plants and signs
     assert protos <= set(s2["replaced"])
-    assert all(len(a["cpd"]) == 30 for a in s2["actors"] if a["key"] in set(blds))
+    assert all(len(a["cpd"]) == 36 for a in s2["actors"] if a["key"] in set(blds))  # (AG15)
     # AG6: every texture a material names is in the build (the library through its link)
     assert s2["textures"] and all((staged / t["file"]).is_file()
                                   for t in s2["textures"].values())
