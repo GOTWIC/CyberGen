@@ -1843,7 +1843,7 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
   corners inserted on the outline (or setting a vertex there); a junction M18 left without a
   surface whose legs AG7 sees at other heights anchored to them, the curb between running
   evenly (it was an inverse-distance blend that missed every leg's height); every outline
-  vertex on a leg's cut, within its half width across the leg and 0.5 m along it, at the
+  vertex on a leg's cut, within its half width across the leg and 1 m along it, at the
   leg's height (`_cut_run`: on a steep terrain junction M18's curb took the next leg's
   height 15 cm past a carriageway's corner, a 0.76 m step at Cragmouth's `jn.w765s203`).
 - **M19's supports** (`transit_column` 2, `transit_beam` 2): frame and cantilever legs flat

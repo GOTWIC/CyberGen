@@ -37,7 +37,8 @@ DROP_Z = 0.02
 RAMP_M = 1.2
 CURB_STONE_M = 0.18
 PIT_M = 1.2
-CUT_ALONG_M = 0.5       # AG14: how far along a leg an outline vertex still lies on its cut
+CUT_ALONG_M = 1.0       # AG14: how far along a leg an outline vertex still lies on its cut
+                        # (a road piece ends on its cut edge within `roads.CUT_TOL_M`)
 
 
 def _road_inputs(cx: Ctx, s) -> dict:

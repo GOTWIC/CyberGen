@@ -1689,7 +1689,7 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   2, `roads._spans`); a road's skewed cut at its corners' own heights (`Road.z_at`);
   junctions without a model surface anchored to their legs' heights along the outline, a
   leg's square-cut corners inserted on it (`junction` 3, `walks._with_corners`), every
-  outline vertex on a leg's cut (within its half width across it, 0.5 m along it) at the
+  outline vertex on a leg's cut (within its half width across it, 1 m along it) at the
   leg's height (`_cut_run`).
 - **Buildings**: roof items on the roof the shell built (`roofs._seat`, `_top_of`, `_pull_in`,
   `_onto_top`; a halo's open roof, a stepped tier, a mansard's flat top), dunnage legs to the
