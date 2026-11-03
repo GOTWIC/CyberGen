@@ -1263,6 +1263,21 @@ def test_import_resets_a_stale_fallback():
     assert "or full or stale" in body
 
 
+def test_stage2_packs_keep_their_normals():
+    """AG14: the packs' normals are what the meshes show (flat on every plane, the curve's
+    own along M21's curved walls), so stage 2's packs are imported without recomputing them,
+    on both paths (the fast pack import and `CITYGEN_UE_FAST=0`'s one at a time)."""
+    src = (Path(U.__file__).parent / "ue" / "import_city.py").read_text()
+    body = src[src.index("    def pipeline(self"):]
+    body = body[:body.index("msh.set_editor_property(\"distance_field_resolution_scale\"")]
+    assert 'cmn.set_editor_property("recompute_normals", False)' in body
+    assert body.index("if not bake:") < body.index('"recompute_normals", False')
+    calls = [m.start() for m in __import__("re").finditer(r"self\.pipeline\(", src)]
+    stage2 = [src[c:c + 200] for c in calls if "pack=True" in src[c:c + 200] or
+              "pk[\"meshes\"]" in src[c:c + 200]]
+    assert len(stage2) == 2 and all("bake=False" in s for s in stage2)
+
+
 # --- in Unreal (where it is installed) ------------------------------------------------------
 
 UE_ROOT = U.find_engine()

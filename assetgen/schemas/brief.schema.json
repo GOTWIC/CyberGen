@@ -457,6 +457,55 @@
           },
           "title": "Regions",
           "type": "array"
+        },
+        "lane_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AG14: how far out from the edge the nearest lane (a road's carriageway at grade, a junction) is, under 6 m.",
+          "title": "Lane M"
+        },
+        "lane_s": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AG14: the stretch of the edge (s, m) within 2 m of a lane.",
+          "title": "Lane S"
+        },
+        "lane_z_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AG14: the highest surface of the lanes within 2 m of the edge, over the building's base.",
+          "title": "Lane Z M"
         }
       },
       "required": [
@@ -2002,7 +2051,7 @@
   "additionalProperties": false,
   "properties": {
     "brief_version": {
-      "const": 2,
+      "const": 3,
       "title": "Brief Version",
       "type": "integer"
     },

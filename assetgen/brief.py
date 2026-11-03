@@ -42,7 +42,11 @@ from . import canon as C
 from . import planar as PL
 from . import spec as S
 
-BRIEF_VERSION = 2      # 2: AG4 (clearances, portal tube lines, skybridges in the building frame)
+BRIEF_VERSION = 3      # 2: AG4 (clearances, portal tube lines, skybridges in the building frame)
+                       # 3: AG14 (an edge's `lane_m`: how far the nearest lane is)
+LANE_MAX_M = 6.0       # AG14: an edge's lane further than this is no concern (none given)
+LANE_STEP_M = 1.0      # its samples along the edge
+LANE_NEAR_M = 2.0      # the lanes whose surface height an edge's `lane_z_m` is
 PARTY_M = 0.5          # another building this close: a party wall
 BLIND_M = 3.0          # this close: a blind wall (and a neighbor in the brief)
 HIDE_M = 0.05          # another mass of the same building this close outside: hidden
@@ -413,6 +417,130 @@ def face_rays(city: City, rays: list[Ray]) -> list[tuple]:
     return out
 
 
+def lane_gaps(city: City, edges_by_b: list[list[Edge]]) -> dict[int, tuple]:
+    """AG14: per exterior edge of a mass standing near the ground (by `id`), how far out
+    from it the nearest lane is at its nearest (samples every `LANE_STEP_M` along it): a
+    road's carriageway (its width less its sidewalks; a raised road too: what reaches over
+    its deck stands in its lanes) or a junction's polygon; only where under `LANE_MAX_M`.
+    With it, the highest of those lanes' surfaces (absolute) within `LANE_NEAR_M` of the edge, else None: what
+    leaves the wall there must stop short of the lane, or keep the vehicles' headroom over
+    it."""
+    es, xs, ys, own, ss = [], [], [], [], []
+    for es_b in edges_by_b:
+        for e in es_b:
+            if e.ring != 0 or e.mass.z0 > 5.0:
+                continue
+            n = max(2, int(math.ceil(e.L / LANE_STEP_M)) + 1)
+            k = len(es)
+            es.append(e)
+            for j in range(n):
+                s = min(max(e.L * j / (n - 1), 0.05), max(e.L - 0.05, 0.0))
+                xs.append(e.a[0] + e.u[0] * s + e.n[0] * 0.01)
+                ys.append(e.a[1] + e.u[1] * s + e.n[1] * 0.01)
+                own.append(k)
+                ss.append(s)
+    if not es:
+        return {}
+    px, py = np.array(xs), np.array(ys)
+    own_a = np.array(own, dtype=np.int64)
+    gap = np.full(len(px), np.inf)
+    top = np.full(len(px), -np.inf)          # the highest lane within LANE_NEAR_M
+    grid = PL.PointGrid(px, py)
+    m = city.m
+    from .streets.ctx import Ground
+    from .streets.path import Profile
+    gd = Ground(m)
+    for s in m.road_segments:
+        if s.tunnel or s.road_class in ("footbridge", "pedestrian") or len(s.centerline) < 2:
+            continue
+        sw = min(s.cross_section.sidewalk_m) if s.cross_section.sidewalk_m else 0.0
+        half = max(s.width_m / 2.0 - sw, 0.5)
+        x0, y0, x1, y1 = PL.bbox(s.centerline)
+        r = half + LANE_MAX_M
+        idx = grid.query(x0 - r, y0 - r, x1 + r, y1 + r)
+        if not len(idx):
+            continue
+        dd, at = _dist_along(px[idx], py[idx], s.centerline)
+        dd = np.maximum(dd - half, 0.0)
+        gap[idx] = np.minimum(gap[idx], dd)
+        near = dd < LANE_NEAR_M
+        if near.any():
+            zp = Profile.of([z.model_dump() for z in s.z_profile])
+            g = getattr(s, "ground", None)
+            gp = Profile.of([z.model_dump() for z in g]) if g else None
+            ii = idx[near]
+            zs = np.array([zp(v) + (gp(v) if gp is not None else 0.0)
+                           for v in at[near].tolist()])
+            if gp is None and not gd.flat:
+                zs = zs + np.array([gd.at(px[i], py[i]) for i in ii.tolist()])
+            top[ii] = np.maximum(top[ii], zs)
+    nodes = {n.id: n for n in m.road_nodes}
+    for j in m.junctions:
+        ext = PL.ring(j.polygon.exterior)
+        if len(ext) < 3:
+            continue
+        x0, y0, x1, y1 = PL.bbox(ext)
+        r = LANE_MAX_M
+        idx = grid.query(x0 - r, y0 - r, x1 + r, y1 + r)
+        if not len(idx):
+            continue
+        dd = PL.dist_polyline(px[idx], py[idx], ext + ext[:1])
+        ins = PL.inside_poly(px[idx], py[idx], ext, [])
+        dd = np.where(ins, 0.0, dd)
+        gap[idx] = np.minimum(gap[idx], dd)
+        nd = nodes.get(j.node_id)
+        if nd is not None:
+            # (a junction's surface: `edge_z` over its node's ground where M18 gives one)
+            zj = float(getattr(nd, "ground_m", None) or 0.0) + \
+                (max(j.edge_z) if j.edge_z else nd.position[2])
+            near = dd < LANE_NEAR_M
+            top[idx[near]] = np.maximum(top[idx[near]], zj)
+    best = np.full(len(es), np.inf)
+    np.minimum.at(best, own_a, gap)
+    hi = np.full(len(es), -np.inf)
+    np.maximum.at(hi, own_a, top)
+    # the stretch of the edge near a lane (its samples within LANE_NEAR_M)
+    sa = np.array(ss)
+    near = gap < LANE_NEAR_M
+    s0 = np.full(len(es), np.inf)
+    s1 = np.full(len(es), -np.inf)
+    np.minimum.at(s0, own_a[near], sa[near])
+    np.maximum.at(s1, own_a[near], sa[near])
+    out = {}
+    for k, e in enumerate(es):
+        if best[k] >= LANE_MAX_M:
+            continue
+        span = [C.m(max(s0[k] - LANE_STEP_M, 0.0)), C.m(min(s1[k] + LANE_STEP_M, e.L))] \
+            if np.isfinite(s0[k]) else None
+        out[id(e)] = (C.m(float(best[k])), C.m(float(hi[k])) if np.isfinite(hi[k]) else None,
+                      span)
+    return out
+
+
+def _dist_along(px: np.ndarray, py: np.ndarray, line) -> tuple[np.ndarray, np.ndarray]:
+    """(distance from each point to a polyline, the distance along it of the nearest
+    point)."""
+    best = np.full(len(px), np.inf)
+    at = np.zeros(len(px))
+    cum = 0.0
+    for i in range(len(line) - 1):
+        ax, ay = line[i][0], line[i][1]
+        bx, by = line[i + 1][0], line[i + 1][1]
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        L = math.sqrt(L2)
+        f = np.zeros(len(px)) if L2 == 0.0 else \
+            np.clip(((px - ax) * dx + (py - ay) * dy) / L2, 0.0, 1.0)
+        ex = px - (ax + f * dx)
+        ey = py - (ay + f * dy)
+        d = np.sqrt(ex * ex + ey * ey)
+        better = d < best
+        best = np.where(better, d, best)
+        at = np.where(better, cum + f * L, at)
+        cum += L
+    return best, at
+
+
 def facing_class(city: City, hit, main_seg: str | None, own_id: str) -> tuple:
     if hit is None:
         return "open", None, None
@@ -639,7 +767,8 @@ def _poly(pg, ox, oy) -> dict:
             "holes": [[C.pt(p, ox, oy) for p in PL.ring(h)] for h in pg.holes]}
 
 
-def _edge_record(e: Edge, ox: float, oy: float, faced: dict, k: int) -> dict:
+def _edge_record(e: Edge, ox: float, oy: float, faced: dict, k: int,
+                 lanes: dict | None = None, base: float = 0.0) -> dict:
     regions = []
     area: dict[str, float] = {}
     for p, q, bands in e.regions:
@@ -661,8 +790,18 @@ def _edge_record(e: Edge, ox: float, oy: float, faced: dict, k: int) -> dict:
     else:
         dom = "hidden"
     yaw = M.degrees(M.atan2(e.n[1], e.n[0]))
-    return {"ring": e.ring, "i": e.i, "a": C.pt(e.a, ox, oy), "b": C.pt(e.b, ox, oy),
-            "length_m": C.m(e.L), "normal_deg": C.deg(yaw), "class": dom, "regions": regions}
+    out = {"ring": e.ring, "i": e.i, "a": C.pt(e.a, ox, oy), "b": C.pt(e.b, ox, oy),
+           "length_m": C.m(e.L), "normal_deg": C.deg(yaw), "class": dom, "regions": regions}
+    if lanes and id(e) in lanes:
+        # (AG14: the nearest lane in front of it; how high over the building's base the lanes
+        # near it run)
+        g, h, span = lanes[id(e)]
+        out["lane_m"] = g
+        if span is not None:
+            out["lane_s"] = span
+        if h is not None:
+            out["lane_z_m"] = C.m(h - base)
+    return out
 
 
 def _merge_regions(regions: list[dict]) -> list[dict]:
@@ -709,6 +848,7 @@ def build_briefs(model: CityModel, spec: S.AssetSpec | None = None,
         edges_by_b.append(es)
     t_cover = time.perf_counter()
     hits = face_rays(city, rays)
+    lanes = lane_gaps(city, edges_by_b)
     faced = {}
     for r, h in zip(rays, hits):
         k = r.edge.mass.b
@@ -732,7 +872,7 @@ def build_briefs(model: CityModel, spec: S.AssetSpec | None = None,
     SD.reset()
     for k, b in enumerate(model.buildings):
         briefs[b.id] = _brief(city, k, b, edges_by_b[k], faced, props.get(k, []), look,
-                              sdata, overrides, cors, ground, decks.get(b.id))
+                              sdata, overrides, cors, ground, decks.get(b.id), lanes)
     t_end = time.perf_counter()
     stats = _stats(briefs, city)
     stats["seconds"] = {"cover": round(t_cover - t0, 2), "facing": round(t_face - t_cover, 2),
@@ -932,7 +1072,7 @@ def _portal_rec(city: "City", k: int, b, p, look: "_Lookups", ground) -> dict:
 
 def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, look: _Lookups,
            sdata: dict, overrides: dict | None, cors: list | None = None,
-           ground=None, slab: dict | None = None) -> dict:
+           ground=None, slab: dict | None = None, lanes: dict | None = None) -> dict:
     ox, oy = city.origins[k]
     if ground is None:
         from .streets.ctx import Ground
@@ -956,7 +1096,8 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
         if mm.turn_deg or mm.scale != 1.0 or tuple(mm.shift_m) != (0.0, 0.0):
             masses[-1]["plate"] = {"turn_deg": C.deg(mm.turn_deg), "scale": mm.scale,
                                    "shift_m": [C.m(mm.shift_m[0]), C.m(mm.shift_m[1])]}
-    edge_recs = [_edge_record(e, ox, oy, faced, k) for e in edges]
+    base0 = float(getattr(b, "base_m", None) or 0.0)
+    edge_recs = [_edge_record(e, ox, oy, faced, k, lanes, base0) for e in edges]
     for rec, e in zip(edge_recs, edges):
         rec["mass"] = e.mass.k
     nb = []

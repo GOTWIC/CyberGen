@@ -1008,7 +1008,7 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   and structures, the roads, raised decks, beams over roads), `transit_altitude` knows the
   new needs.
 - **Blockout and stage 2:** beams in `transit_support`, masts (two legs, stays) and pier
-  footings (`_mast`, `_pier_cap`); AG7 draws a beam plainly (`transit_beam`), AG14 the rest.
+  footings (`_mast`, `_pier_cap`); AG14 draws them all (`transit_column`, `transit_beam`).
   New structure kind `beam` in the model.
 Sample builds: `docs/progress/M19/`.
 
@@ -1228,7 +1228,7 @@ Sample builds, the measures before and after: `docs/progress/fix_paths/`.
 ## Asset generator (assetgen)
 
 `docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
-AG14 fit and finish and AG15 cyberpunk facades and night from the first run-through), its log
+AG15 cyberpunk facades and night from the first run-through), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -1663,6 +1663,48 @@ goldens `tests/assetgen/data/golden_water.json` by `tests/assetgen/water_goldens
   box (`docs/unreal_export.md`, AG12). **Blender**: `ag6_materials.water` and `caustics`;
   `assetgen materials preview --views water` (a canal and a river bank up close, the harbor
   from above). Results: `docs/progress/AG12/`.
+
+AG14 (fit and finish, from the first run-through) is in place (tests
+`tests/assetgen/test_ag_fit.py`):
+- **Fit checks** (`assetgen/fit/`: `glb.py` reads the packs back in world space, `index.py`
+  a plan index of triangles, `build.py` the stage; `assetgen fit BUILD`, also the last stage
+  of `assetgen build`, `--no-fit` skips it, as do `--no-streets` and `--no-props`;
+  `fit_report.json/.txt`): `asset_grounded` (every
+  standing prop and plant, roof item and dunnage, road, transit and deck column rests on a
+  surface under it within 2 cm: five points of its feet, three of them on a surface no more
+  than 0.6 m over them (a dunnage frame its height), surfaces the up-facing triangles of
+  every pack and the blockout's land; and every road's carriageway meets its junctions'
+  surfaces within 2 cm near its cut) and `asset_clash` (road carriageways in building
+  masses; building vertices past their masses by 0.3 m over a carriageway under 4.5 m;
+  bridge and raised road deck tops over each other; transit in a mass outside its portal
+  band, tracks in a platform). What fails: roof items, dunnage and street pieces off
+  their surface, a junction step over 0.15 m, any clash; reported only: props and plants
+  (at the model's heights, M20's `prop_support`) and smaller steps.
+- **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
+  piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays;
+  `transit_beam` 2: haunched cap beams, tapered cantilever arms); road columns in the water on
+  footings (`column` 2, `structures.footing`); a bridge whose segment ids are empty finds the
+  raised segments that carry it (`structures._carriers`) and draws no deck of its own;
+  footbridge edge beams outside the girder (`bridge` 2); M18's embankments carry the deck's
+  low stretches, the girder only between them, their faces across where it goes on (`road`
+  2, `roads._spans`); a road's skewed cut at its corners' own heights (`Road.z_at`);
+  junctions without a model surface anchored to their legs' heights along the outline, a
+  leg's square-cut corners inserted on it (`junction` 3, `walks._with_corners`), every
+  outline vertex on a leg's cut (within its half width across it, 1 m along it) at the
+  leg's height (`_cut_run`).
+- **Buildings**: roof items on the roof the shell built (`roofs._seat`, `_top_of`, `_pull_in`,
+  `_onto_top`; a halo's open roof, a stepped tier, a mansard's flat top), dunnage legs to the
+  form under the frame's corners, moved onto the form where a frame would pass the roof's
+  edge, a mansard's surface by distance to its eave ring (concave rings); curved walls
+  (`shell.arc_of`: a chord of a mass's M21 arc) with the curve's normals
+  (`meshbuf.Buf.arc`, `_arc_normals`) and glazed joint to joint; briefs give every edge its
+  nearest lane (`lane_m`, `lane_s`, `lane_z_m`, `brief.lane_gaps`, `BRIEF_VERSION` 3) and
+  nothing that leaves a wall reaches it under `parts.ROAD_CLEAR` (4.6 m) over it
+  (`Facade.on_road`, `room`, `_low`, `_edge_ok`; cameras, ducts and fire escapes;
+  `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.3.
+- **Exporter**: no code change (`docs/unreal_export.md`, "From AG14"); the packs' normals
+  are kept on both import paths (`test_stage2_packs_keep_their_normals`).
+Results: `docs/progress/AG14/`.
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one

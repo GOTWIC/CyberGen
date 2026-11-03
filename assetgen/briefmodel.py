@@ -95,6 +95,14 @@ class Edge(_M):
     class_: EdgeClass = Field(alias="class", description="The class with the most facade "
                                                          "area (hidden: all hidden).")
     regions: list[Region]
+    lane_m: float | None = Field(None, description="AG14: how far out from the edge the "
+                                                  "nearest lane (a road's carriageway at "
+                                                  "grade, a junction) is, under 6 m.")
+    lane_s: tuple[float, float] | None = Field(None, description="AG14: the stretch of the "
+                                               "edge (s, m) within 2 m of a lane.")
+    lane_z_m: float | None = Field(None, description="AG14: the highest surface of the lanes "
+                                                    "within 2 m of the edge, over the "
+                                                    "building's base.")
 
 
 class Neighbor(_M):
@@ -334,7 +342,7 @@ class Deck(_M):
 
 
 class Brief(_M):
-    brief_version: Literal[2]
+    brief_version: Literal[3]
     id: str
     origin: P2
     building: BuildingRec

@@ -155,9 +155,10 @@ class Mesh:
         self._tri(sl, ids[0], ids[2], ids[3], n)
 
     def poly(self, slot: str, ring, holes=(), z=0.0, zfun=None, up: bool = True,
-             uvfun=None) -> bool:
+             uvfun=None, keep_straight: bool = False) -> bool:
         """A polygon of plan points (meters), lifted to a height (a constant or zfun(x, y)),
-        facing up (or down). Triangulated exactly on its millimeter coordinates."""
+        facing up (or down). Triangulated exactly on its millimeter coordinates
+        (`keep_straight`: every vertex kept, those on a straight run too)."""
         sl = self._slot(slot)
         rings = [ring] + list(holes)
         pts3 = []
@@ -172,7 +173,7 @@ class Mesh:
             hs.append([(p[0], p[1]) for p in q[k:k + len(h)]])
             k += len(h)
         try:
-            tris = triangulate(outer, hs)
+            tris = triangulate(outer, hs, keep_straight=keep_straight)
         except TriangulationError:
             return False
         if not tris:

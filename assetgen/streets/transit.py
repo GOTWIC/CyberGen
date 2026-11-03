@@ -6,8 +6,9 @@
 - **Sky tubes**: a glass tube (translucent, non-Nanite) with a LOD chain of 24, 12 and 6
   sides, and, Nanite, the floor inside and steel ribs every 10 m.
 - **Columns and pylons** of a line: the model's footprint as the shaft and a cap across the
-  guideway (a cradle under a sky tube); M19's cap beams of its portal frames and the arms
-  of its cantilever bents as plain beams (AG14 draws the frames, masts and piers).
+  guideway (a cradle under a sky tube). AG14 draws M19's supports: portal frames (legs
+  under a haunched cap beam), cantilever bents (a tapering arm), piers on their footings,
+  and a sky tube's cable-stayed masts (crosshead, legs, tie, stays).
 - **Stations' structures** (stations themselves are buildings, the building line's):
   platforms, skywalks (glazed, roofed), canopies on posts, covered walkways, elevator cores,
   underground concourses.
@@ -17,19 +18,22 @@
 
 from __future__ import annotations
 
+import math
+
 from citygen import dmath as M
 
 from .. import canon as C
 from .ctx import Ctx, bbox_center, dump
 from .kit import Mesh, ccw
-from .path import Path, dist, unit
+from .path import Path, Profile, dist, unit
 from .pieces import Out, Piece, maker
-from .structures import Line3, box_prof
+from .structures import PIER_FOOT, Line3, box_prof, footing
 
 GUIDEWAY_W = {"elevated_rail": 9.0, "monorail": 2.5, "maglev": 7.0, "sky_tube": 7.0,
               "metro": 9.0}
 TUBE_LODS = ((24, 6.0), (12, 12.0), (6, 24.0))
 TUBE_SCREEN = (1.0, 0.25, 0.06)
+TRACK_MARGIN_M = 0.5    # AG14: a platform stops this far from a track (a tube's ribs, rails)
 
 
 def _line_dir(cx: Ctx, line_id: str | None, x: float, y: float):
@@ -66,10 +70,72 @@ def gather_structure(cx: Ctx, st, maker_name: str) -> Piece:
         inputs["ground"] = cx.ground.samples(st.line)
     if maker_name == "transit_column":
         inputs["dir"] = _line_dir(cx, a.get("line_id"), c[0], c[1])
+        if cx.wet_at(c[0], c[1]):
+            # (AG14: a column standing in the water on a footing down to M16's bed; a pier
+            # on land, M19's pier, on its footing 2 m into the ground)
+            bz = cx.bed_z(c[0], c[1]) if cx.beds is not None else None
+            inputs["bed"] = bz if bz is not None else \
+                C.m(cx.ground.water_level(None, -1.5) - 4.0)
+    if a.get("role") == "platform" and st.footprint is not None:
+        # AG14: a platform stops at the tracks running beside it (it reached into the
+        # guideway or the tube by the model's margins)
+        cut = platform_rings(cx.m, st)
+        if cut is not None:
+            inputs["rings"] = cut
     kind = f"street.transit.{st.kind}" if a.get("line_id") or a.get("station") \
         else f"street.structure.{st.kind}"
     return Piece(st.id, kind, maker_name, cx.tile_for(st.id, pts), cx.keys.get(st.id, []),
                  inputs)
+
+
+_TRACKS: dict = {}
+
+
+def track_solids(m) -> list:
+    """AG14: every track of the model's transit lines (their guideway decks and sky tubes,
+    not a station's decks) as (plan polygon: the line buffered by half its width, flat
+    ends; bottom, top over the ground), cached per model."""
+    key = id(m)
+    if key not in _TRACKS:
+        import shapely
+        out = []
+        for st in m.structures:
+            a = st.attrs or {}
+            if st.kind not in ("deck", "tube") or not a.get("line_id") or a.get("station") \
+                    or len(st.line) < 2:
+                continue
+            w = float(a.get("width_m", GUIDEWAY_W.get(a.get("mode"), 6.0)))
+            ln = shapely.LineString([(p[0], p[1]) for p in st.line])
+            poly = ln.buffer(w / 2.0 + TRACK_MARGIN_M, cap_style="flat", join_style="mitre",
+                             mitre_limit=2.0)
+            zs = [p[2] for p in st.line]
+            dm = float(a.get("deck_m", st.z1_m - st.z0_m))
+            out.append((poly, min(zs) - dm, max(zs)))
+        _TRACKS.clear()
+        _TRACKS[key] = out
+    return _TRACKS[key]
+
+
+def platform_rings(m, st) -> list | None:
+    """AG14: a station platform's plan less the tracks beside it at its height, as
+    [[exterior, [holes]], ...] (largest first), or None where no track reaches into it."""
+    import shapely
+    from citygen import geom as G
+    poly = G.from_model_poly(st.footprint)
+    cut = [p for p, z0, z1 in track_solids(m)
+           if z0 < st.z1_m and z1 > st.z0_m and p.intersects(poly)]
+    if not cut:
+        return None
+    with G.canonical():
+        rest = G.diff(poly, G.qpoly(shapely.union_all(cut)))
+        parts = sorted([p for p in G.parts(rest) if G.area1(p) >= 0.5],
+                       key=lambda p: (-G.area1(p), G.qbounds(p)))
+    out = []
+    for p in parts:
+        out.append([[[C.m2(x), C.m2(y)] for x, y in list(p.exterior.coords)[:-1]],
+                    [[[C.m2(x), C.m2(y)] for x, y in list(h.coords)[:-1]]
+                     for h in p.interiors]])
+    return out
 
 
 def _g(inp: dict) -> float:
@@ -152,8 +218,66 @@ def make_sky_tube(inp: dict) -> Out:
                                   "screen": list(TUBE_SCREEN)}])
 
 
-@maker("transit_column", 1)
+MAST_LEG_M = 1.6                # a sky tube mast's two legs beside the tube (the blockout's)
+SKY_D = 7.0                     # the tube's diameter (citygen transit.DECK_M)
+STAY_R = 0.06                   # a stay cable's half thickness
+
+
+def _mast(mesh: Mesh, c, z0: float, top: float, stays, g: float):
+    """AG14: M19's cable-stayed mast over a sky tube's pylon: a crosshead under the tube
+    from leg to leg (what the legs stand on), the two legs either side of the tube up to the
+    mast top, tied at the top, and four stays from the leg heads to the tube's top along the
+    line (`stays`, behind and ahead), each ending on a small anchor block."""
+    (bx, by, _), (ax, ay, _) = stays
+    dx, dy = ax - bx, ay - by
+    L = math.sqrt(dx * dx + dy * dy) or 1.0
+    ux, uy = dx / L, dy / L
+    nx, ny = -uy, ux
+    off = SKY_D / 2.0 + MAST_LEG_M
+    h = MAST_LEG_M / 2.0
+    head = 1.6                                    # the crosshead's depth, under the tube
+    mesh.obox("concrete.column", c[0], c[1], z0 - head, 2.4, 2.0 * (off + h), head, ux, uy,
+              bottom=True)
+    heads = []
+    for side in (1.0, -1.0):
+        lx, ly = c[0] + nx * side * off, c[1] + ny * side * off
+        # a leg tapering a little toward its head (0.8 of its foot)
+        h1 = h * 0.8
+        foot = [(lx - ux * h - nx * h, ly - uy * h - ny * h),
+                (lx + ux * h - nx * h, ly + uy * h - ny * h),
+                (lx + ux * h + nx * h, ly + uy * h + ny * h),
+                (lx - ux * h + nx * h, ly - uy * h + ny * h)]
+        tip = [(lx - ux * h1 - nx * h1, ly - uy * h1 - ny * h1),
+               (lx + ux * h1 - nx * h1, ly + uy * h1 - ny * h1),
+               (lx + ux * h1 + nx * h1, ly + uy * h1 + ny * h1),
+               (lx - ux * h1 + nx * h1, ly - uy * h1 + ny * h1)]
+        for i in range(4):
+            a, b = foot[i], foot[(i + 1) % 4]
+            p, q = tip[(i + 1) % 4], tip[i]
+            mesh.quad("concrete.column", (a[0], a[1], z0), (b[0], b[1], z0),
+                      (p[0], p[1], top), (q[0], q[1], top))
+        mesh.poly("concrete.column", tip, z=top)
+        heads.append((lx, ly))
+    # the tie beam between the leg heads, 1.6 m under the top
+    (pa, pb) = heads
+    mesh.beam("concrete.column", (pa[0], pa[1], top - 1.6), (pb[0], pb[1], top - 1.6), 1.0,
+              1.2)
+    for lx, ly in heads:
+        for sx, sy, sz in stays:
+            zs = sz + g
+            hx, hy, hz = lx, ly, top - 0.6
+            mesh.beam("steel.cable", (hx, hy, hz), (sx, sy, zs + 0.2), 2 * STAY_R, 2 * STAY_R)
+    # an anchor block on the tube's crown where the stays of each side meet
+    for sx, sy, sz in stays:
+        mesh.box("steel", sx, sy, sz + g - 0.25, 0.6, 0.6, 0.45, M.degrees(M.atan2(uy, ux)))
+
+
+@maker("transit_column", 2)
 def make_transit_column(inp: dict) -> Out:
+    """A line's column or pylon. AG14 (M19's supports): a frame's or a cantilever's leg ends
+    flat under its cap beam (the beam piece); a pier stands on its footing; a sky tube's
+    mast carries its crosshead, legs, tie and stays; a plain column carries its cap across
+    the guideway (a cradle under a sky tube)."""
     st = inp["st"]
     a = st.get("attrs", {})
     g = _g(inp)
@@ -161,22 +285,37 @@ def make_transit_column(inp: dict) -> Out:
     z0, z1 = st["z0_m"] + g, st["z1_m"] + g
     mesh = Mesh(inp["origin"])
     mode = a.get("mode", "elevated_rail")
+    c = inp["origin"]
+    pier = a.get("form") == "pier" or bool(a.get("pier")) or inp.get("bed") is not None
+    if pier:
+        footing(mesh, ring, g, inp.get("bed"))
+        z0 = max(z0, g + PIER_FOOT[2] - 0.05)       # the shaft from the footing's top
+    if a.get("frame"):
+        mesh.prism("concrete.column", ring, z0, z1)
+        return Out(mesh=mesh)
+    mast = a.get("mast_top_m") is not None and len(a.get("stays") or []) == 2
     cap = 0.0 if mode == "monorail" else (1.6 if mode == "sky_tube" else 1.2)
     cap = min(cap, max((z1 - z0) * 0.3, 0.0))
+    if mast:
+        mesh.prism("concrete.column", ring, z0, z1 - 1.6, top=False)
+        _mast(mesh, c, z1, a["mast_top_m"] + g, a["stays"], g)
+        return Out(mesh=mesh)
     mesh.prism("concrete.column", ring, z0, z1 - cap, top=cap == 0.0)
     if cap > 0.0:
         d = inp.get("dir") or [1.0, 0.0]
-        c = inp["origin"]
         across = GUIDEWAY_W.get(mode, 6.0) - (1.0 if mode != "sky_tube" else 0.0)
-        mesh.obox("concrete.column", c[0], c[1], z1 - cap, 2.2, across, cap, d[0], d[1])
+        mesh.obox("concrete.column", c[0], c[1], z1 - cap, 2.2, across, cap, d[0], d[1],
+                  bottom=True)
     return Out(mesh=mesh)
 
 
-@maker("transit_beam", 1)
+@maker("transit_beam", 2)
 def make_transit_beam(inp: dict) -> Out:
-    """M19: a portal frame's cap beam (or a cantilever bent's arm) along its line, its top
-    the line (the deck's underside), `deck_m` deep and `width_m` wide; drawn plain until
-    AG14 draws the frames."""
+    """M19's cap beam of a portal frame (or a cantilever bent's arm) along its line, its top
+    the line (the deck's underside), `deck_m` deep and `width_m` wide. AG14: a frame's beam
+    is haunched over its legs (full depth there, 0.7 of it in the middle span); a
+    cantilever's arm tapers from full depth at its leg to
+    0.45 of it at the tip; both closed at their ends."""
     st = inp["st"]
     a = st.get("attrs", {})
     try:
@@ -186,12 +325,50 @@ def make_transit_beam(inp: dict) -> Out:
     w = a.get("width_m", 1.6)
     dm = a.get("deck_m", max(st["z1_m"] - st["z0_m"], 0.5))
     mesh = Mesh(inp["origin"])
-    mesh.sweep("concrete.column", ln.frames(0.0, ln.L, 6.0), box_prof(-w / 2.0, w / 2.0, -dm,
-                                                                      0.0))
+    L = ln.L
+    hw = w / 2.0
+    cant = a.get("form") == "cantilever"
+    # depth along the beam: knots (s, depth)
+    if cant:
+        knots = [(0.0, dm), (min(w, L), dm), (L, 0.45 * dm)]
+    else:
+        e = min(w * 1.2, L / 3.0)
+        knots = [(0.0, dm), (e, dm), (min(e + 1.5, L / 2.0), 0.7 * dm),
+                 (max(L - e - 1.5, L / 2.0), 0.7 * dm), (L - e, dm), (L, dm)]
+    ks = sorted({round(k[0], 4) for k in knots})
+    dz = Profile([(s, d) for s, d in knots])
+    rows_l, rows_r, rows_b, rows_t = [], [], [], []
+    for s in ks:
+        x, y, nx, ny, _ = ln.path.frame(min(s, L))
+        zt = ln.z(min(s, L))
+        zb = zt - dz(s)
+        lft = (x + nx * hw, y + ny * hw)
+        rgt = (x - nx * hw, y - ny * hw)
+        rows_l.append((lft, zb, zt, s))
+        rows_r.append((rgt, zb, zt, s))
+    for i in range(len(ks) - 1):
+        (la, lb0, lt0, s0), (lb, lb1, lt1, s1) = rows_l[i], rows_l[i + 1]
+        (ra, rb0, rt0, _), (rb, rb1, rt1, _) = rows_r[i], rows_r[i + 1]
+        mesh.quad("concrete.column", (ra[0], ra[1], rb0), (rb[0], rb[1], rb1),
+                  (rb[0], rb[1], rt1), (ra[0], ra[1], rt0))                 # right side
+        mesh.quad("concrete.column", (lb[0], lb[1], lb1), (la[0], la[1], lb0),
+                  (la[0], la[1], lt0), (lb[0], lb[1], lt1))                 # left side
+        mesh.quad("concrete.column", (la[0], la[1], lb0), (lb[0], lb[1], lb1),
+                  (rb[0], rb[1], rb1), (ra[0], ra[1], rb0))                 # soffit
+        mesh.quad("concrete.column", (ra[0], ra[1], rt0), (rb[0], rb[1], rt1),
+                  (lb[0], lb[1], lt1), (la[0], la[1], lt0))                 # top
+    for k, sgn in ((0, -1.0), (len(ks) - 1, 1.0)):
+        (lp, lb_, lt_, _), (rp, rb_, rt_, _) = rows_l[k], rows_r[k]
+        if sgn > 0:
+            mesh.quad("concrete.column", (rp[0], rp[1], rb_), (lp[0], lp[1], lb_),
+                      (lp[0], lp[1], lt_), (rp[0], rp[1], rt_))
+        else:
+            mesh.quad("concrete.column", (lp[0], lp[1], lb_), (rp[0], rp[1], rb_),
+                      (rp[0], rp[1], rt_), (lp[0], lp[1], lt_))
     return Out(mesh=mesh)
 
 
-@maker("station_part", 1)
+@maker("station_part", 2)
 def make_station_part(inp: dict) -> Out:
     st = inp["st"]
     a = st.get("attrs", {})
@@ -244,9 +421,11 @@ def make_station_part(inp: dict) -> Out:
         ring = ccw(fp["exterior"])
         holes = fp.get("holes", [])
         if role == "platform":
-            mesh.prism("concrete.deck", ring, z0, z1 - 0.05, top=False, bottom=True,
-                       holes=holes)
-            mesh.prism("paving.granite_dark", ring, z1 - 0.05, z1, holes=holes)
+            for r_, hs_ in (inp.get("rings") or [[fp["exterior"], holes]]):
+                r_ = ccw(r_)
+                mesh.prism("concrete.deck", r_, z0, z1 - 0.05, top=False, bottom=True,
+                           holes=hs_)
+                mesh.prism("paving.granite_dark", r_, z1 - 0.05, z1, holes=hs_)
         elif role == "concourse" or z1 <= g:
             mesh.prism("concrete.dark", ring, z0, z1, bottom=True, holes=holes)
         elif role == "elevator_core":

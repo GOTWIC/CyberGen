@@ -655,6 +655,34 @@ with a deck, its street stage over its blockout, every deck object replaced, the
 actors on level 1 and the manifest's `decks` naming them, the columns, stairs and
 elevators on the ground, the ramp walkways on their ramp.
 
+### From AG14: fit and finish
+
+AG14 (`assetgen build`, then `assetgen fit`) changes what the packs hold, not how they are
+imported: every entry keeps its key, kind, `replaces` and level, and no new entry, part or
+master is added.
+
+- **Normals**: the shells carry the curve's own normal along M21's curved walls (radial in
+  plan on every face of a chord of an arc, `meshbuf.Buf.arc`). The importer already keeps
+  the packs' normals on both paths (stage 2's packs are imported with `bake=False`, which
+  sets `recompute_normals` off: the fast pack import and `CITYGEN_UE_FAST=0`'s one at a
+  time), so the curve shades smooth in Unreal as in Blender; the test
+  `test_stage2_packs_keep_their_normals` holds both call sites to it.
+- **Street pieces drawn anew under the same keys**: transit columns and pylons (M19's
+  frame legs, piers on footings down to the bed, sky tube masts with crossheads, legs, ties
+  and stays), cap beams (haunched, or tapered cantilever arms), road columns in the water
+  on footings, junctions that meet their legs at their own heights, raised roads on M18's
+  embankments (no girder through the fill), and footbridges whose edge beam stands outside
+  the road's deck. A bridge whose road segments carry it no longer draws a deck of its own
+  (it was drawn twice); its entry keeps its key and replaces what it did.
+- **Buildings**: roof equipment on the roof the shell built (on a form, on dunnage, moved
+  onto the roof where its point fell off a crown's tier); nothing that leaves a wall hangs
+  over a lane under 4.6 m (`parts.ROAD_CLEAR`). Entries as before.
+- **`fit_report.json`** (`asset_grounded`, `asset_clash`) beside the packs is for the
+  generator only; the exporter does not read it.
+
+**What the exporter does with them**: no code change; the packs' hashes move, so an import
+over an earlier one updates the actors and meshes whose entries changed.
+
 ## assetgen's street contribution (AG7)
 
 `assetgen streets BUILD` writes `BUILD/assets/unreal_contribution.streets.json` beside its
@@ -1124,3 +1152,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | AG12 | Water: `unreal_contribution.water.json` (above) as the third layer-2 part: per body and tile a surface entry (non-Nanite, no collision, a LOD chain on coarser lattices; vertex colors and full-precision UVs kept, no lightmap UVs: the importer's water pipeline) replacing `city.sea.<tile>` or `city.water.<tile>`, a bed entry (Nanite, complex collision) replacing `city.bed.<tile>`, bank entries replacing the joined `bank_<kind>` objects with riprap stones as instanced parts, a drop entry for the blockout water objects no piece replaces; masters `M_CgWater` (Single Layer Water, flow-mapped ripples on UV1's current, vertex and shallow foam by Opacity, the sea's Gerstner waves by world position offset faded out from 150 to 350 m: decision 13.10 (a)) and `M_CgBed` (caustics under the water); a post-process volume per M16 swim box of a body (`underwater.*`, the water kind's tint and fog; `actor_hashes`, `actor_kinds`, `counts.underwater_volumes`); `SRGB_PARTS` gains `water`; `STAGE2_VERSION` 7; test without Unreal (`test_exporter_takes_the_water`) | Not run (the coordinating session's call) |
 | Fast import (an exporter update on its own) | The fast path the importer's default ("The fast import" above): stage 2's packs queued as one async Interchange import with the pack step (`CgPackStep`: per mesh Nanite settings before the build, unplaced variants not made; AG12's water pipeline on water packs), textures queued with `CgTextureStep`, finished meshes saved in one batch, actors saved and unloaded every `CITYGEN_UE_OFFLOAD` (2,000) spawned and loaded again at the end, the editor run with `-fastexit` and `FAST_INI` (no distance field or card tasks); main's reset of a stale full fallback on both paths; an entry of a building with no shell node (assetgen's packs since `GEN_VERSION` m18.3) takes the blockout's place as an empty shell does; `CITYGEN_UE_FAST=0` the one-at-a-time path. Same actor and asset digests on both paths (the Mac's A/B) | Greyhook on Windows: first import 73m41s in the editor, a second import changing nothing, `--check --shots` passing (`docs/progress/exp_fast_import/`) |
 | M20 | Props, plants and signs. No importer change: the large ads come through M15's instancing as prototypes of their own (`blockout.PROTOTYPES` `sign_billboard`, `sign_banner`, `sign_holo`, a unit face the instance scale stretches to the slot; materials `sign_ad`, `sign_banner`, `sign_rim` and `sign_holo`, emissive 6, 6, 8 and 4 in `unreal.EMISSIVE`), one `BP_CityGenInstances` actor per kind and tile keyed `sign.<kind>.<tile>`, the slots' ids as its instances' ids, on a terrain city lifted by their building's base (the masses' frame). AG8's sign entries for those slots name the actor in `replaces`. Props and plants keep their prototypes; on a terrain city the blockout lifts what stands on a roof by its building's base, as AG8 does (it took the ground at the point). | not run |
+| AG14 | No code change: the packs' content changes under the same keys ("From AG14" above): curved walls with the curve's own normals (the importer keeps the packs' normals on both paths, held by `test_stage2_packs_keep_their_normals`), M19's frames, piers, footings and masts drawn, junctions meeting their legs, embankments under low decks, a bridge's deck drawn once, roof equipment on its roofs, nothing over a lane under 4.6 m | Not run (the coordinating session's call) |

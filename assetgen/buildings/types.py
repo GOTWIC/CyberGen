@@ -332,7 +332,9 @@ def shanty_post(sb) -> None:
         if top and not items and ms["z0"] >= 2500 and W >= 2500 and D >= 2500 and \
                 _rectish(ring) and _u(f"{key}|{ms['k']}", "leanto") < 0.75:
             rise = PT.q(min(800, max(300, D * 8 // 100)))
-            p = {"W": PT.q(W), "D": PT.q(D), "rise": rise, "over": 300}
+            # (AG14: no eave past the walls over a lane under its headroom)
+            near = any(sb._lane_near(ms, i, ms["z1"]) for i in range(len(ms["rings"][0])))
+            p = {"W": PT.q(W), "D": PT.q(D), "rise": rise, "over": 0 if near else 300}
             flip = _u(f"{key}|{ms['k']}", "leanto.side") < 0.5
             ux, uy = (u if not flip else (-u[0], -u[1]))
             if put(sb, "shack_roof", p, c[0], c[1], ms["z1"], ux, uy, "lean_to"):
@@ -383,7 +385,8 @@ def _shanty_escapes(sb) -> None:
         n = ms["floors"]
         zs = [ms["z0"] + (ms["z1"] - ms["z0"]) * f // n for f in range(0 if ms["z0"] else 1,
                                                                         n)]
-        zs = [z for z in zs if z >= 3000]
+        low = PT.ROAD_CLEAR + sb.ground + sb.rise_of(fa)   # (AG14: over the vehicles' headroom)
+        zs = [z for z in zs if z >= low]
         if len(zs) < 2 and not (zs and ms["z0"] >= 2500):
             continue
         w = PT.q(min(3600, fa.L * 6 // 10))
@@ -395,7 +398,8 @@ def _shanty_escapes(sb) -> None:
             continue
         z0 = zs[0]
         p = {"w": w, "d": PT.q(min(room, 1100)), "zs": [z - z0 for z in zs] or [0],
-             "ladder": PT.q(max(z0 - 2600, 0)), "slot": "escape_rust"}
+             "ladder": PT.q(max(z0 - low, 0)),
+             "slot": "escape_rust"}
         if put_on(sb, fa, "escape", p, s, z0, "fire_escape"):
             made += 1
             sb.stats["fire_escapes"] = sb.stats.get("fire_escapes", 0) + 1

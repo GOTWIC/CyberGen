@@ -115,10 +115,6 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
     gd = Ground(model)
     bases = {b.id: float(b.base_m) for b in model.buildings
              if getattr(b, "base_m", None) is not None}
-    wbeds = wlev = None
-    if getattr(model, "banks", None):
-        from citygen import water as WA
-        wbeds, wlev = WA.Beds(model), WA.Levels(model)
 
     def lift(x, y, z, bid=None) -> float:
         """The height a placement's z is measured from (module docstring, Ground)."""
@@ -190,9 +186,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         did = ds.of(p.id, x, y)
         st = style_of(did)
         mm = mount.get(p.id)
-        wid = wbeds.body_at(x, y) if kind == "boat" and wbeds is not None else None
-        if wid is not None:
-            z = z + wlev.at(wid, x, y)                 # (AG12: on M16's water)
+        if kind == "boat":
+            # (M20: a boat's z is its water's surface over the ground at its point; AG14: so it
+            # takes the ground as everything else does: it took the water's level on top of
+            # that, 1.5 m under the water on a flat city)
+            z = z + lift(x, y, min(z, 0.0))
         else:
             z = z + lift(x, y, z, (mm or {}).get("building") or
                          (p.attrs or {}).get("building"))

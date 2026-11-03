@@ -9,8 +9,10 @@
 - **Crosswalks**: zebra or ladder paint by the district's era, tactile paving at both
   curbs, on the dropped curb.
 - **Junctions**: the carriageway polygon at its node's height, or (M18) through the model's
-  surface where it carries one (`edge_z`; else blended toward each leg's height at its
-  cut-back where they differ), the sidewalk corners between neighboring legs
+  surface where it carries one (`edge_z`; AG14: else, where the legs meet it at other
+  heights, each leg's cut edge at the leg's height and the curb between two legs running
+  evenly from one to the other: no step anywhere a leg meets it), the sidewalk corners
+  between neighboring legs
   (the curb return from the junction polygon, the property-line fillet rebuilt as M2 builds
   it), their curb faces, and a deck slab under a raised junction.
 """
@@ -35,6 +37,8 @@ DROP_Z = 0.02
 RAMP_M = 1.2
 CURB_STONE_M = 0.18
 PIT_M = 1.2
+CUT_ALONG_M = 1.0       # AG14: how far along a leg an outline vertex still lies on its cut
+                        # (a road piece ends on its cut edge within `roads.CUT_TOL_M`)
 
 
 def _road_inputs(cx: Ctx, s) -> dict:
@@ -436,7 +440,7 @@ def _area(ring) -> float:
     return s / 2.0
 
 
-@maker("junction", 1)
+@maker("junction", 3)
 def make_junction(inp: dict) -> Out:
     j = inp["junction"]
     ring = ccw(j["polygon"]["exterior"])
@@ -475,6 +479,8 @@ def make_junction(inp: dict) -> Out:
             rec["z"] = gp(sm) + zp(sm) + ROAD_DZ
             a, b = ring[ex[1]], ring[(ex[1] + 1) % len(ring)]
             rec["mid"] = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+            rec["at"] = path.point(s)
+            rec["tan"] = path.tangent(s)
         legs.append(rec)
     legs.sort(key=lambda r: (r["ang"], r["id"]))
     lz = [r for r in legs if "z" in r]
@@ -488,6 +494,43 @@ def make_junction(inp: dict) -> Out:
         vpts = list(vz.items())
     else:
         vz = None
+    if vz is not None:
+        # AG14: the two ends of a leg's cut edge (where its road piece ends) at the leg's
+        # height there, as the road meets them (M18's curb runs from a cut's corner a few
+        # centimeters off it where the cut is skewed)
+        for r in lz:
+            for k in _cut_run(ring, r):
+                if (ring[k][0], ring[k][1]) in vz:
+                    vz[(ring[k][0], ring[k][1])] = r["z"]
+        vpts = list(vz.items())
+    if vz is None and not flat and lz:
+        # AG14: no surface in the model (a junction M18 left flat whose legs AG7 sees at
+        # other heights): each leg's cut edge at the leg's height there, the curb between
+        # two legs running evenly along the outline from one to the other (as M18 draws
+        # its surfaces), so every leg meets the junction with no step
+        anchor = {}
+        for r in lz:
+            for k in _cut_run(ring, r):
+                anchor[k] = r["z"]
+        n = len(ring)
+        cum = [0.0]
+        for k in range(n):
+            cum.append(cum[-1] + dist(ring[k], ring[(k + 1) % n]))
+        per = cum[-1] or 1.0
+        ks = sorted(anchor)
+        vz = {}
+        for k in range(n):
+            if k in anchor:
+                vz[(ring[k][0], ring[k][1])] = anchor[k]
+                continue
+            # the anchors before and after k along the ring
+            a = max([q for q in ks if q < k], default=ks[-1])
+            b = min([q for q in ks if q > k], default=ks[0])
+            da = (cum[k] - cum[a]) % per
+            db = (cum[b] - cum[k]) % per
+            f = da / (da + db) if da + db > 0 else 0.0
+            vz[(ring[k][0], ring[k][1])] = anchor[a] + (anchor[b] - anchor[a]) * f
+        vpts = list(vz.items())
 
     def zfun(x, y):
         if vz is not None:
@@ -514,7 +557,15 @@ def make_junction(inp: dict) -> Out:
         top, "asphalt.alley" if top in ("alley", "service") else "asphalt.street")
     if top in PEDESTRIAN:
         slot = MT.paving(style["archetype"])
-    ok = mesh.poly(slot, ring, holes, zfun=zfun)
+    cring = ring
+    if vz is not None:
+        # AG14: a leg's carriageway corners where they fall on the outline between its
+        # vertices (a road cut square across, not along the outline's own cut edge) become
+        # vertices of it at the leg's height, so the leg meets the junction there too
+        cring, extra = _with_corners(ring, legs, inp["legs"])
+        for p, z in extra:
+            vz[p] = z
+    ok = mesh.poly(slot, cring, holes, zfun=zfun, keep_straight=cring is not ring)
     if not ok:
         # a ring that touches itself: its valid parts, in a fixed order
         ok = any([mesh.poly(slot, r, hs, zfun=zfun) for r, hs in _valid_parts(ring, holes)])
@@ -532,6 +583,97 @@ def make_junction(inp: dict) -> Out:
     out = Out(mesh=mesh)
     out.notes["corner_pads"] = pads
     return out
+
+
+def _cut_run(ring, r: dict) -> list[int]:
+    """AG14: the outline vertices on a leg's cut: the two ends of the edge its centerline
+    leaves by, and the vertices before and after them along the outline that lie across
+    the leg within its half width of where its centerline crosses and within `CUT_ALONG_M`
+    of that point along it (M2 splits a cut at the centerline; on a steep junction M18's
+    curb may take another leg's height a few centimeters past the carriageway's corner,
+    a step the road piece would meet)."""
+    n = len(ring)
+    i = r["exit"][1]
+    if "at" not in r:
+        return [i, (i + 1) % n]
+    cx, cy = r["at"]
+    tx, ty = r["tan"]
+
+    def on(k):
+        p = ring[k]
+        ox, oy = p[0] - cx, p[1] - cy
+        return abs(ox * tx + oy * ty) <= CUT_ALONG_M and \
+            abs(-ox * ty + oy * tx) <= r["row"] + 0.05
+    out = [i, (i + 1) % n]
+    k = (i - 1) % n
+    while k not in out and on(k):
+        out.append(k)
+        k = (k - 1) % n
+    k = (i + 2) % n
+    while k not in out and on(k):
+        out.append(k)
+        k = (k + 1) % n
+    return out
+
+
+def _with_corners(ring, legs: list, raw: list):
+    """AG14: the outline with each leg's carriageway corners at its cut (as the road piece
+    draws them, square across the leg) inserted where they lie on an outline edge within
+    3 cm and not at a vertex; (ring, [((x, y), z)])."""
+    pts = []
+    by_id = {}
+    for lg in raw:
+        by_id.setdefault(lg["id"], []).append(lg)
+    for r in legs:
+        if "z" not in r or r.get("exit") is None:
+            continue
+        h = r["row"] - r["side"]
+        if h <= 0.3:
+            continue
+        for lg in by_id.get(r["id"], ()):
+            pts_ = lg["line"] if lg["at_start"] else lg["line"][::-1]
+            try:
+                path = Path(pts_)
+            except ValueError:
+                continue
+            s = min(r["exit"][0], path.L)
+            x, y = path.point(s)
+            tx, ty = path.tangent(s)
+            for sg in (1.0, -1.0):
+                pts.append(((C.m(x - ty * h * sg), C.m(y + tx * h * sg)), r["z"]))
+            break
+    if not pts:
+        return ring, []
+    out = list(ring)
+    extra = []
+    for (px, py), z in pts:
+        n = len(out)
+        best = None
+        near = None
+        for i in range(n):
+            a, b = out[i], out[(i + 1) % n]
+            if dist(a, (px, py)) < 0.05 or dist(b, (px, py)) < 0.05:
+                near = a if dist(a, (px, py)) < 0.05 else b
+                best = None
+                break
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            L2 = dx * dx + dy * dy
+            if L2 <= 0.0:
+                continue
+            f = ((px - a[0]) * dx + (py - a[1]) * dy) / L2
+            if not 0.0 < f < 1.0:
+                continue
+            d = abs((px - a[0]) * dy - (py - a[1]) * dx) / math.sqrt(L2)
+            if d <= 0.03 and (best is None or d < best[0]):
+                best = (d, i, (C.m2(a[0] + f * dx), C.m2(a[1] + f * dy)))
+        if best is not None:
+            _, i, q = best
+            out.insert(i + 1, q)
+            extra.append((q, z))
+        elif near is not None:
+            extra.append(((near[0], near[1]), z))     # (a vertex already there: its height)
+    inserted = any(q not in ring for q, _ in extra)
+    return (out if inserted else ring), extra
 
 
 def _minus(sector, ring, holes, taken=()):

@@ -21,6 +21,9 @@ corner of its instanced parts inside a mass that spans its height, or an allowed
 - AG4's roof forms in the top floor (their eaves as strips), finishes, copings and green
   roofs on the roof under the parapet's allowance;
 - on M13's slopes, a mass on the base reaches down by its plinth (`shell.plinth_mm`);
+- AG14: nothing more than `ROAD_RELIEF_MM` out over a road with no sidewalk (an alley, a
+  service road, a highway: a facade region `shell.on_carriageway`) under
+  `parts.ROAD_CLEAR` over the street front (`over_road`): the vehicles' headroom;
 - AG4's court floors, planters and gardens in a court: inside a mass's outline (its court
   is the building's), under its top.
 
@@ -35,7 +38,8 @@ import numpy as np
 from ..planar import dist_polyline, inside_poly
 from . import roofparts as RP
 from . import systems as SY
-from .shell import plinth_mm
+from . import parts as PT
+from .shell import ground_mm, on_carriageway, plinth_mm
 
 OVERHANG_MM = 910            # 0.6 m cornices, mitered up to 1.5 times at corners
 PARAPET_MM = 1210
@@ -47,6 +51,7 @@ STREET_Z = 1210
 TOL_MM = 2.0
 COLLAR_MM = 300.0            # AG4: a skybridge's collar zone at the facades it meets
 WHEEL_TOL_MM = 250.0         # AG5: a wheel's members past the box of its masses by their section
+ROAD_RELIEF_MM = 300.0       # AG14: sills, frames and reveals over a road with no sidewalk
 # merged parts keep their slots: how far each slot may reach (the rest: AG1's rule)
 SLOT_REACH = {"frame": "flush", "sill": "flush", "mullion": "flush",
               "spandrel_panel": "flush", "shutter": "flush", "grille": "flush",
@@ -92,7 +97,30 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
     top = max(z1 for _, z1, _, _ in masses) if masses else 0.0
     cap = mast_cap(float(brief["building"]["height_m"]) * 1000.0)
     out = {"vertices": 0, "outside": 0, "too_high": 0, "low_overhang": 0,
-           "equipment_off_roof": 0, "parts": 0}
+           "equipment_off_roof": 0, "over_road": 0, "parts": 0}
+    # AG14: the brief's edges, and how far each one's nearest lane is (its `lane_m`; 0 where
+    # it faces a road with no sidewalk) under the vehicles' headroom
+    g0 = float(ground_mm(brief))
+    zr = (g0 + PT.ROAD_CLEAR) / 1000.0
+    edges = []
+    for e in brief.get("edges") or []:
+        lane = e.get("lane_m")
+        lane = lane * 1000.0 if lane is not None else None
+        rise = max((e.get("lane_z_m") or 0.0) * 1000.0, 0.0)
+        # (the stretch of the edge near its lane, as a share of it: `lane_s`)
+        sp = e.get("lane_s")
+        L = max(e["length_m"], 1e-6)
+        span = (sp[0] / L, sp[1] / L) if sp is not None and lane is not None else (0.0, 1.0)
+        # (a stub under 1.5 m at a corner says nothing of what its neighbors face)
+        if e["length_m"] >= 1.5 and \
+                any(on_carriageway(r) and r["z"][0] < zr for r in e["regions"]):
+            lane, span = 0.0, (0.0, 1.0)
+        mz = brief["masses"][e["mass"]]["z"]
+        edges.append(([e["a"][0] * 1000.0, e["a"][1] * 1000.0],
+                      [e["b"][0] * 1000.0, e["b"][1] * 1000.0], lane,
+                      (masses[e["mass"]][0], mz[1] * 1000.0), rise, span))
+    road_edges = [(a, b, lane, zz, rise, span) for a, b, lane, zz, rise, span in edges
+                  if lane is not None]
     groups = []
     for name, a in arrs.items():
         pos = np.unique(a["pos"], axis=0).astype(np.float64)
@@ -170,11 +198,45 @@ def check(brief: dict, arrs: dict, parts: list | None = None) -> dict:
                     (z <= pr["z"][1] * 1000.0 + TOL_MM)
         bad = over & ~allowed
         out["outside"] += int(bad.sum())
+        if road_edges:
+            out["over_road"] += _over_road(x, y, z, np.where(over, near, 0.0), edges,
+                                           road_edges, g0)
         out["low_overhang"] += int((bad & (near <= DEEP_MM) & ~high).sum())
         out["too_high"] += int((z > top + PARAPET_MM).sum())
-    out["ok"] = out["outside"] == 0 and out["too_high"] == 0 and \
+    out["ok"] = out["outside"] == 0 and out["too_high"] == 0 and out["over_road"] == 0 and \
         out["equipment_off_roof"] == 0
     return out
+
+
+def _over_road(x, y, z, near, edges, road_edges, g0: float) -> int:
+    """AG14: vertices more than `ROAD_RELIEF_MM` past the masses under the vehicles'
+    headroom that stand in front of a brief edge (within its span), about as near it as to
+    any edge of a mass at their height or over it, and reach out to its nearest lane (its
+    `lane_m` less 0.1 m): what hangs over the lanes."""
+    top = max((r[4] for r in road_edges), default=0.0)
+    cand = (near > ROAD_RELIEF_MM) & (z < g0 + PT.ROAD_CLEAR + top - TOL_MM)
+    if not cand.any():
+        return 0
+    xs, ys = x[cand], y[cand]
+    zs = z[cand]
+    d_all = np.full(len(xs), np.inf)
+    # (the edges of the masses at the point's height or over it: a mast's or a tower's
+    # edges high up say nothing of what is under them at the street)
+    for a, b, _, (z0, z1), _, _ in edges:
+        on = zs <= z1 + PARAPET_MM
+        d_all = np.where(on, np.minimum(d_all, dist_polyline(xs, ys, [a, b])), d_all)
+    bad = np.zeros(len(xs), dtype=bool)
+    for a, b, lane, (z0, z1), rise, (t0, t1) in road_edges:
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        if L2 <= 0.0:
+            continue
+        t = ((xs - a[0]) * dx + (ys - a[1]) * dy) / L2
+        d = dist_polyline(xs, ys, [a, b])
+        bad |= (t >= max(t0, 0.0)) & (t <= min(t1, 1.0)) & (d <= d_all + ROAD_RELIEF_MM) & \
+            (d > max(ROAD_RELIEF_MM, lane - 100.0)) & (zs <= z1 + PARAPET_MM) & \
+            (zs >= z0 - DEEP_MM) & (zs < g0 + PT.ROAD_CLEAR + rise - TOL_MM)
+    return int(bad.sum())
 
 
 def fits(brief: dict, family: str, p: dict, x: int, y: int, z: int, ux: float,
