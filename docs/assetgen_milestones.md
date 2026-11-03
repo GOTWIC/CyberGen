@@ -23,6 +23,8 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
 | AG12 | Water: per body and tile a surface (LOD chains carrying the current, a foam mask and the sea's wave weight) and a bed at M16's depth with the banks' slopes under the water; banks by kind with riprap stones; AG7's walls and piers into the bed; water textures and catalog; `M_CgWater` (Single Layer Water, waves) and underwater volumes | Done | [`docs/progress/AG12`](progress/AG12) |
 | AG13 | Ground cover and grass: every piece of M16's open land textured by its cover kind and blended by its wear, shade, edges and moisture; grass and small plants as instanced clumps per tile (decision 13.9 (a)), swaying in Unreal and fading out at 60 to 100 m; `ground_grass_clear` and the budgets | Done | [`docs/progress/AG13`](progress/AG13) |
+| AG14 | Fit and finish, from the first run-through: junctions meeting their roads at M18's heights, smooth curved walls, roof equipment seated on its roofs, M19's frames, piers and masts, embankments, bridges drawn once, nothing over a lane under 4.6 m; the fit checks `asset_grounded` and `asset_clash` (`assetgen fit`) | Done | [`docs/progress/AG14`](progress/AG14) |
+| AG15 | Cyberpunk facades and night, from the first run-through: seven new facade systems, window patterns and skins past the grid, two or three finishes a building, the neighbor rule (towers within 150 m never alike by day or night); every building lit its own way by use and hour, crown and edge light, logos; spot lamps, light pools and sign washes in Unreal | Done | [`docs/progress/AG15`](progress/AG15) |
 
 ## AG0: contract and spike
 
