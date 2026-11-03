@@ -150,6 +150,66 @@ def set_night(v):
         n.outputs[0].default_value = v
 
 
+# AG15: the night by schedule (`assetgen/buildings/night.py`, `HOURS`): per schedule its
+# share of the evening's lit rooms in each hour band (night, morning, day, evening, late)
+HOURS = {0: (0.5, 0.6, 0.3, 1.0, 0.8), 1: (0.12, 0.7, 0.9, 1.0, 0.35),
+         2: (0.15, 0.6, 0.25, 0.9, 1.0), 3: (0.45, 0.6, 0.35, 0.9, 1.0),
+         4: (0.2, 0.6, 0.9, 1.0, 0.8), 5: (0.6, 0.8, 0.9, 0.9, 0.7),
+         6: (0.5, 0.5, 0.5, 0.5, 0.5)}
+HOUR = [21.0]
+HOURK = []                          # (value node, schedule): its share at HOUR
+WARM = (1.0, 0.62, 0.32)
+COOL = (0.7, 0.85, 1.0)
+
+
+def _band(hour):
+    h = hour % 24.0
+    return 0 if h < 6 else (1 if h < 10 else (2 if h < 16 else (3 if h < 20 else 4)))
+
+
+def set_hour(hour):
+    """MPC_CityGen's Hour: every schedule's share of lit rooms at that hour."""
+    HOUR[0] = float(hour)
+    for n, s in HOURK:
+        n.outputs[0].default_value = HOURS[s][_band(HOUR[0])]
+
+
+def _night_rooms(t, cx, cy, h1, h2, h3, seed):
+    """AG15: (lit 0 to 1, light color) of a room (cx, cy) by the building's night (Custom
+    Primitive Data 30 to 35 as `cg_ncol`, `cg_sched`, `cg_spread`, `cg_band`; `cg_lit` the
+    evening's share): offices in bands of floors, shops brighter low down, vacant towers a
+    few lights, the rest scattered by room; the color the building's light pulled warm or
+    cool by a hash times its spread (as `M_CgGlass`'s CgRoom and CgGlass)."""
+    sched = t.attr("cg_sched")
+    k = 0.0
+    for s in range(7):
+        n = t.new("ShaderNodeValue", label=f"HourShare{s}")
+        n.outputs[0].default_value = HOURS[s][_band(HOUR[0])]
+        HOURK.append((n, s))
+        k = t.m("ADD", k, t.m("MULTIPLY", t.m("COMPARE", sched, float(s), 0.25), n.outputs[0]))
+    s_ = t.m("MULTIPLY", t.attr("cg_lit"), k)
+    vac = t.m("COMPARE", sched, 6.0, 0.25)
+    s_ = t.m("ADD", t.m("MULTIPLY", s_, t.m("SUBTRACT", 1.0, vac)), t.m("MULTIPLY", vac, 0.04))
+    shop = t.m("MULTIPLY", t.m("COMPARE", sched, 4.0, 0.25), t.m("LESS_THAN", cy, 2.5))
+    s_ = t.m("MINIMUM", t.m("MULTIPLY", s_, t.m("ADD", 1.0, t.m("MULTIPLY", shop, 0.6))), 1.0)
+    lamp = t.m("ADD", 0.35, t.m("MULTIPLY", t.m("FRACT", t.m("MULTIPLY", h1, 7.31)), 0.65))
+    plain = t.m("MULTIPLY", t.m("LESS_THAN", h2, s_), lamp)
+    band = t.m("MAXIMUM", t.attr("cg_band"), 1.0)
+    hb = t.hash3(t.comb(0.0, t.m("FLOOR", t.m("DIVIDE", cy, band)), t.m("ADD", seed, 0.53)))
+    office = t.m("MULTIPLY", t.m("MULTIPLY", t.m("LESS_THAN", hb, t.m(
+        "MINIMUM", t.m("MULTIPLY", s_, 1.25), 1.0)), t.m("LESS_THAN", h2, 0.85)),
+        t.m("ADD", 0.55, t.m("MULTIPLY", t.m("FRACT", t.m("MULTIPLY", h1, 7.31)), 0.45)))
+    is_off = t.m("COMPARE", sched, 1.0, 0.25)
+    lit = t.m("ADD", t.m("MULTIPLY", is_off, office),
+              t.m("MULTIPLY", t.m("SUBTRACT", 1.0, is_off), plain))
+    tt = t.m("MULTIPLY", t.m("MULTIPLY", t.m("SUBTRACT", t.m("FRACT", t.m("MULTIPLY", h3, 3.7)),
+                                              0.5), 2.0), t.attr("cg_spread"))
+    ncol = t.attr("cg_ncol", "Vector")
+    col = t.mix(t.clamp(tt), ncol, COOL + (1.0,))
+    col = t.mix(t.clamp(t.m("MULTIPLY", tt, -1.0)), col, WARM + (1.0,))
+    return lit, col
+
+
 def srgb_linear(c):
     return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
 
@@ -350,9 +410,10 @@ def glass(mat, rec, files, part, sky=(0.24, 0.34, 0.48)):
     av = t.m("DIVIDE", t.m("ADD", t.m("SUBTRACT", rows - 1.0, row), iv), rows)
     day, _ = t.tex(files[tx["InteriorDay"]], t.comb(au, av), True)
     nite, _ = t.tex(files[tx["InteriorNight"]], t.comb(au, av), True)
-    # a lit room at 0.35 to 1 of full brightness (lamps differ), else dark
-    lit = t.m("MULTIPLY", t.m("LESS_THAN", h2, t.attr("cg_lit")),
-              t.m("ADD", 0.35, t.m("MULTIPLY", t.m("FRACT", t.m("MULTIPLY", h1, 7.31)), 0.65)))
+    # AG15: a room lit by the building's night (schedule, hour, band), in its light's color
+    # (lamps differ), else dark
+    lit, lcol = _night_rooms(t, cx, cy, h1, h2, h3, seed)
+    nite = t.v("MULTIPLY", t.v("SCALE", nite, scale=1.4), lcol)
     # blinds: a share of rooms with a blind down to a height
     blind = t.m("MULTIPLY", t.m("LESS_THAN", h3, t.attr("cg_blinds")),
                 t.m("GREATER_THAN", py, t.m("SUBTRACT", 1.0, t.m("MULTIPLY", h2, 0.9))))
@@ -361,7 +422,7 @@ def glass(mat, rec, files, part, sky=(0.24, 0.34, 0.48)):
                     t.m("MULTIPLY", slat, 0.5))
     room_day = t.mix(blind, day, bl_day)
     room_nite = t.mix(blind, t.v("SCALE", nite, scale=lit),
-                      t.v("SCALE", t.comb(1.0, 0.85, 0.65), scale=t.m("MULTIPLY", lit, 0.45)))
+                      t.v("SCALE", lcol, scale=t.m("MULTIPLY", lit, 0.45)))
     room_nite = t.v("ADD", room_nite, t.v("SCALE", nite, scale=0.02))
     t.link(t.mix(0.35, base, sky + (1.0,)), bsdf.inputs["Base Color"])
     emit = t.mix(night, t.v("SCALE", room_day, scale=0.2),
@@ -706,13 +767,16 @@ def proxy(mat):
     glass_c = t.v("SCALE", t.attr("cg_glass", "Vector"), scale=2.0)
     t.link(t.mix(w, wall, glass_c), bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = 0.8
-    cell = t.comb(t.m("FLOOR", t.m("DIVIDE", ux, bay)), t.m("FLOOR", t.m("DIVIDE", uy, flo)),
-                  t.m("MULTIPLY", t.attr("cg_seed"), 1000.0))
-    lit = t.m("LESS_THAN", t.hash3(cell), t.attr("cg_lit"))
+    cx, cy = t.m("FLOOR", t.m("DIVIDE", ux, bay)), t.m("FLOOR", t.m("DIVIDE", uy, flo))
+    seed = t.m("MULTIPLY", t.attr("cg_seed"), 1000.0)
+    h1 = t.hash3(t.comb(cx, cy, seed))
+    h2 = t.hash3(t.comb(cx, cy, t.m("ADD", seed, 0.37)))
+    h3 = t.hash3(t.comb(cx, cy, t.m("ADD", seed, 0.71)))
+    lit, lcol = _night_rooms(t, cx, cy, h1, h2, h3, seed)   # (AG15: as the glass)
     night = _night(t)
     t.link(t.m("MULTIPLY", t.m("MULTIPLY", w, lit), t.m("MULTIPLY", night, 0.9)),
            bsdf.inputs["Emission Strength"])
-    bsdf.inputs["Emission Color"].default_value = (1.0, 0.8, 0.55, 1.0)
+    t.link(lcol, bsdf.inputs["Emission Color"])
     return mat
 
 

@@ -234,7 +234,8 @@ def import_glb(path, part, shared=False, shading="FLAT"):
                 era = pr["era"]
                 for k, v in pr.items():
                     if k.startswith("cg_"):
-                        o[k] = float(v)
+                        # (AG15: the night's light color a vector, the rest scalars)
+                        o[k] = [float(x) for x in v] if isinstance(v, list) else float(v)
         for i, ms in enumerate(o.material_slots):
             if ms.material is None:
                 continue
@@ -460,19 +461,39 @@ def ag8(v, protos):
     return objs
 
 
-def lamps(points):
+def lamps(points, washes=()):
+    """AG15: a spot light under each lamp head pointing down (0.45 m under it, outside the
+    lamp's own shadow; shadows from the nearest few), as the play features light the lamps
+    in Unreal; and a point light before each large sign near the view, in its color, that
+    washes its facade."""
     objs = []
     for k, (x, y, z) in enumerate(points):
-        d = bpy.data.lights.new(f"lamp{k}", "POINT")
-        d.energy = 9000.0
-        d.color = (1.0, 0.78, 0.52)
-        d.shadow_soft_size = 0.4
+        d = bpy.data.lights.new(f"lamp{k}", "SPOT")
+        d.energy = 14000.0
+        d.color = (1.0, 0.8, 0.56)
+        d.spot_size = math.radians(130.0)
+        d.spot_blend = 0.55
+        d.shadow_soft_size = 0.25
         try:
-            d.use_shadow = k < 24
+            d.use_shadow = k < 16
         except AttributeError:
             pass
         ob = bpy.data.objects.new(f"lamp{k}", d)
-        ob.location = (x, y, z)
+        ob.location = (x, y, z - 0.45)
+        ob.rotation_euler = (0.0, 0.0, 0.0)          # (a spot points down its -Z)
+        bpy.context.scene.collection.objects.link(ob)
+        objs.append(ob)
+    for k, w in enumerate(washes):
+        d = bpy.data.lights.new(f"wash{k}", "POINT")
+        d.energy = 2500.0 * max(1.0, min(w["size"], 12.0))
+        d.color = tuple(w["color"])
+        d.shadow_soft_size = max(1.0, w["size"] / 3.0)
+        try:
+            d.use_shadow = False
+        except AttributeError:
+            pass
+        ob = bpy.data.objects.new(f"wash{k}", d)
+        ob.location = tuple(w["pos"])
         bpy.context.scene.collection.objects.link(ob)
         objs.append(ob)
     return objs
@@ -519,6 +540,7 @@ def section(sc, cam, v):
 
 def main():
     _defer_gltf_tmp()
+    AM.set_hour(JOB.get("hour", 21.0))      # (AG15: before any material reads it)
     sc, sun = start()
     proxies = {}
     for t in JOB["proxy_tiles"]:
@@ -600,7 +622,7 @@ def main():
         for mode in JOB["modes"]:
             lighting(sc, sun, mode)
             if mode == "night" and not lobjs:
-                lobjs = lamps(v.get("lights", []))
+                lobjs = lamps(v.get("lights", []), v.get("washes", []))
             for o in lobjs:
                 o.hide_render = mode != "night"
             name = v["name"] if mode == "day" else f"{v['name']}_night"

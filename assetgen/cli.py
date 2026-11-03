@@ -511,9 +511,14 @@ def build_parser() -> argparse.ArgumentParser:
     mp.add_argument("--blockout", help="the blockout directory (default BUILD)")
     mp.add_argument("--views", nargs="*", help="districts, street, city, city_full, deck "
                                                   "(AG10: the section across the biggest deck; "
-                                                  "default districts and street) or view names")
+                                                  "default districts and street), core (AG15: "
+                                                  "the corporate core from the air and a "
+                                                  "street through it) or view names")
     mp.add_argument("--night", action="store_true", help="also every view by night")
     mp.add_argument("--only-night", action="store_true", help="only by night")
+    mp.add_argument("--hour", type=float, default=21.0,
+                    help="AG15: the hour of the night (each building's rooms lit by its "
+                         "schedule then; default 21)")
     mp.add_argument("--width", type=int, default=1920)
     mp.add_argument("--samples", type=int, default=32)
     mp.add_argument("--eye", nargs=3, type=float, action="append", default=[])

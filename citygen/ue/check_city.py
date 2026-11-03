@@ -758,10 +758,14 @@ def play_features(world, man, slug):
     RES["checks"]["play_features"] = {
         "ok": ok, "pawn": pawn0, "walk_points": got["start"]["walk_points"],
         "lamp_points": got["start"]["lamp_points"], "lamps_lit": got["night"]["lamps_lit"],
+        # (AG15: the spot lights casting shadows and the light pools past the lit lamps)
+        "lamps_shadowed": got["night"].get("lamps_shadowed"),
+        "light_pools": got["night"].get("light_pools"),
         "teleport_to": [round(tx, 1), round(ty, 1)],
         "teleported_m": round(moved, 1), "landed": down is not None, "states": got}
     RES["lines"].append(
-        f"play features: map, menu, night ({got['night']['lamps_lit']} lamps lit), free camera "
+        f"play features: map, menu, night ({got['night']['lamps_lit']} lamps lit, "
+        f"{got['night'].get('light_pools', 0)} light pools), free camera "
         f"and back, teleport {moved:.0f} m "
         + ("onto the ground" if down is not None else "with nothing under the player"))
 
