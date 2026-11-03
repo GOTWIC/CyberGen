@@ -470,12 +470,280 @@ def check_crossing_spacing(spec: CitySpec, m: CityModel):
     return c
 
 
+# ---------------------------------------------------------------------------
+# Park paths fix: walkways clear of buildings, open space reached
+# ---------------------------------------------------------------------------
+
+WALK_PAD_M = 0.1        # a walkway may run along a wall, not this far into its mass
+WALK_HEAD_M = 2.5       # a mass this far over a walkway leaves room under it
+GRAZE_M = 0.05          # a walkway grazing a corner of a mass for less than this passes it
+WALK_EXEMPT = ("elevator", "skybridge")   # inside or between buildings by design
+LOT_PAD_M = 0.1         # a park path may run along a lot's edge, not this far into it
+BESIDE_M = 3.5          # an open space with a walkway this close is reached from it
+
+
+def entrance_foot(line, p) -> tuple:
+    """Where an entrance's link meets its walkway (`buildout._foot`): the nearest point of
+    the walkway's line, or its end when that close to one."""
+    d = line.project(Point(p))
+    cs = list(line.coords)
+    if d <= 0.05:
+        return (cs[0][0], cs[0][1])
+    if d >= line.length - 0.05:
+        return (cs[-1][0], cs[-1][1])
+    return G.qpoint(line.interpolate(d))
+
+
+class _Masses:
+    """Every building mass standing on its building's floor (a mass from WALK_HEAD_M up over
+    the floor leaves room under it, as M17's road check has it: on a slope the ground beside
+    a building is not its floor), taken in by WALK_PAD_M, with absolute heights (over its
+    base on a terrain city)."""
+
+    def __init__(self, m: CityModel):
+        self.rows, polys = [], []
+        for b in m.buildings:
+            base = b.base_m or 0.0
+            floor = min(ms.z0_m for ms in b.masses) if b.level else 0.0
+            for k, ms in enumerate(b.masses):
+                if ms.z0_m - floor >= WALK_HEAD_M:
+                    continue
+                fp = G.from_model_poly(ms.footprint)
+                g = G.qpoly(fp.buffer(-WALK_PAD_M, join_style="mitre"))
+                for part in G.parts(g):
+                    shapely.prepare(part)
+                    polys.append(part)
+                    self.rows.append((b, k, fp, base + ms.z0_m, base + ms.z1_m, ms.shape))
+        self.polys = polys
+        self.tree = shapely.STRtree(polys) if polys else None
+
+    def hits(self, line: LineString, z_at, own=lambda b: False) -> list:
+        """(building, mass index, height) of the masses line runs into at its height (z_at:
+        the walkway's absolute height at a point)."""
+        out = []
+        if self.tree is None or line.length <= 0.0:
+            return out
+        for i in sorted(int(k) for k in self.tree.query(line, predicate="intersects")):
+            b, k, fp, z0, z1, shape = self.rows[i]
+            if own(b):
+                continue
+            ov = shapely.intersection(line, self.polys[i])
+            if ov.is_empty or ov.length <= GRAZE_M:
+                continue
+            mid = ov.interpolate(0.5, normalized=True)
+            z = z_at(mid)
+            if shape == "ring":
+                z0 = _rim_low(fp, fp.intersection(mid.buffer(0.5)), z0, z1)
+            if z0 < z + WALK_HEAD_M and z1 > z + 0.1:
+                out.append((b, k, z))
+        return out
+
+
+def _walk_z(m: CityModel, line3):
+    """The absolute height along a walkway (its z over the ground, M13, where it stands)."""
+    from . import terrain as TR
+
+    pts = [tuple(p) for p in line3]
+    flat = TR.ground_of(m) is None
+    xy = LineString([p[:2] for p in pts]) if len(pts) > 1 else None
+    cum = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        cum.append(cum[-1] + ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5)
+
+    def z_at(p):
+        if xy is None:
+            z = pts[0][2]
+        else:
+            s = xy.project(p)
+            z = pts[-1][2]
+            for i in range(len(pts) - 1):
+                if cum[i + 1] >= s:
+                    L = cum[i + 1] - cum[i]
+                    t = 0.0 if L <= 0 else (s - cum[i]) / L
+                    z = pts[i][2] + t * (pts[i + 1][2] - pts[i][2])
+                    break
+        return z if flat else z + TR.on_ground(m, [(p.x, p.y)])[0]
+
+    return z_at
+
+
+def _passes(m: CityModel):
+    """Who a walkway may pass into: its own building (a door or lobby path), the buildings of
+    its skybridge, its megasite, its station's host tower."""
+    host = {s.id: s.building_id for s in m.stations if s.building_id}
+    # (a station at a megasite, a transit nexus: its walkways enter the site's buildings)
+    at_site: dict = {}
+    for ms in m.megasites:
+        poly = G.from_model_poly(ms.polygon)
+        for s in m.stations:
+            if poly.covers(Point(s.position[:2])):
+                at_site.setdefault(s.id, set()).add(ms.id)
+    sky = {s.id: s.building_ids for s in m.skybridges}
+
+    def own_of(w):
+        a = w.attrs or {}
+        ids = set()
+        if a.get("building"):
+            ids.add(a["building"])
+        if a.get("skybridge") in sky:
+            ids.update(sky[a["skybridge"]])
+        if a.get("station") in host:
+            ids.add(host[a["station"]])
+        sites = set(at_site.get(a.get("station"), ()))
+        if a.get("megasite"):
+            sites.add(a["megasite"])
+        return lambda b: b.id in ids or (b.megasite_id is not None and b.megasite_id in sites)
+
+    return own_of
+
+
+def check_walkway_clash(spec: CitySpec, m: CityModel):
+    c = _check("walkway_building_clash", "No walkway (sidewalks, crossings, park paths, "
+                                         "entrance links, every pedestrian edge) through a "
+                                         "building mass at its own height (its own building "
+                                         "for a door or lobby path; a mass "
+                                         f"{WALK_HEAD_M:g} m over it clears)")
+    if not m.buildings or not m.walkways:
+        return c
+    ms = _Masses(m)
+    own_of = _passes(m)
+    n_stairs = n_walled = 0
+    for w in m.walkways:
+        if w.kind in WALK_EXEMPT or len(w.line) < 2:
+            continue
+        if (w.attrs or {}).get("walled_in"):
+            n_walled += 1       # (a walled-in entrance's door path: counted below)
+            continue
+        if w.kind in ("stairs", "escalator") and (w.attrs or {}).get("station"):
+            # (a station's stairs run where M19 put them, between its platform or concourse
+            # and the street: counted in a note, an open item of transit's)
+            line = LineString([p[:2] for p in w.line])
+            if line.length > 0.0 and ms.hits(line, _walk_z(m, w.line), own_of(w)):
+                n_stairs += 1
+            continue
+        line = LineString([p[:2] for p in w.line])
+        if line.length <= 0.0:
+            continue
+        what = ", ".join([w.kind] + sorted(w.attrs or {}))
+        for b, k, z in ms.hits(line, _walk_z(m, w.line), own_of(w)):
+            _lim(c, f"walkway {w.id} ({what}) runs through building {b.id} (mass {k}) at "
+                    f"{z:.1f} m")
+    walks = {w.id: w for w in m.walkways}
+    from . import buildout as BO
+
+    link_ms = None        # (an entrance's link: the masses at the ground of its level in plan,
+    #                       as the link's ends stand on different ground on a slope)
+    pieces: dict = {}     # a walkway split by a later stage: its pieces (`attrs.split_of`)
+    for w in m.walkways:
+        so = (w.attrs or {}).get("split_of")
+        if so:
+            pieces.setdefault(so, []).append(w)
+    doors = set()         # (an entrance with a door path of its own: that path is its link,
+    for w in m.walkways:  # tested above as a walkway)
+        if (w.attrs or {}).get("door") and (w.attrs or {}).get("building"):
+            for p in (w.line[0], w.line[-1]):
+                doors.add((w.attrs["building"], round(p[0], 2), round(p[1], 2)))
+    for b in m.buildings:
+        walled = set((b.attrs or {}).get("walled_in", ()))
+        for ei, e in enumerate(b.entrances):
+            if ei in walled or (b.id, round(e.position[0], 2), round(e.position[1], 2)) in doors:
+                continue
+            w = walks.get(e.walkway_id)
+            if w is None or len(w.line) < 2:
+                continue
+            seen = set()
+            while (w.attrs or {}).get("split_of") in walks and w.id not in seen:
+                seen.add(w.id)    # (from the walkway it was split from: the link met the
+                w = walks[w.attrs["split_of"]]    # whole, a later stage named one piece)
+            fam, todo = [], [w]
+            while todo:           # (pieces of pieces too: every stage splits again)
+                x = todo.pop()
+                fam.append(x)
+                todo += pieces.get(x.id, [])
+            fam = [x for x in fam if len(x.line) >= 2]
+            w = min(fam, key=lambda x: (G.dist(LineString([p[:2] for p in x.line]),
+                                               Point(e.position[:2])), x.id))
+            line = LineString([p[:2] for p in w.line])
+            foot = entrance_foot(line, e.position)
+            if tuple(foot) == tuple(e.position[:2]):
+                continue
+            link_ms = link_ms or BO._Masses(m.buildings)
+            for hb in link_ms.blockers(e.position, foot, b.level):
+                _lim(c, f"entrance of {b.id} at {tuple(e.position)} links to {w.id} through "
+                        f"building {hb}")
+    n_ent = sum(len((b.attrs or {}).get("walled_in", ())) for b in m.buildings)
+    if n_ent:
+        c.notes.append(f"{n_ent} entrances walled in by buildings (no walkway reached from "
+                       f"their facades, `attrs.walled_in`), {n_walled} door paths of them")
+    if n_stairs:
+        c.notes.append(f"{n_stairs} station stairs pass a building at their height (transit's)")
+    return c
+
+
+def check_park_access(spec: CitySpec, m: CityModel):
+    from .parkpaths import PATH_KINDS
+
+    c = _check("park_access", "Every park, plaza, pocket park, market, garden, promenade and "
+                              "beach has a way in (a park path, or a walkway beside it) or says "
+                              "why not; park paths start inside their open space and stay off "
+                              "the lots")
+    if not m.open_spaces:
+        return c
+    paths: dict = {}
+    for w in m.walkways:
+        os_ = (w.attrs or {}).get("open_space")
+        if os_:
+            paths.setdefault(os_, []).append(w)
+    walk_lines = [LineString([p[:2] for p in w.line]) for w in m.walkways
+                  if not w.level and len(w.line) >= 2 and w.kind not in WALK_EXEMPT]
+    wtree = shapely.STRtree(walk_lines) if walk_lines else None
+    lots = [G.qpoly(G.from_model_poly(lt.polygon).buffer(-LOT_PAD_M, join_style="mitre"))
+            for lt in m.lots if not lt.level]
+    for g in lots:
+        shapely.prepare(g)
+    ltree = shapely.STRtree(lots) if lots else None
+    n_none = n_isle = 0
+    for o in m.open_spaces:
+        if o.kind not in PATH_KINDS or o.level:
+            continue
+        if o.district_id is None and (o.attrs or {}).get("landmass_id"):
+            n_isle += 1         # (an islet's park, land without a district: no street on it)
+            continue
+        poly = G.from_model_poly(o.polygon)
+        mine = paths.get(o.id, [])
+        if (o.attrs or {}).get("access") == "none":
+            n_none += 1
+            if mine or not o.attrs.get("no_access"):
+                _lim(c, f"{o.id}: says it has no way in, but "
+                        f"{'has a park path' if mine else 'not why'}")
+            continue
+        if not mine and (wtree is None or not len(
+                wtree.query(poly, predicate="dwithin", distance=BESIDE_M))):
+            _lim(c, f"{o.id} ({o.kind}): no way in")
+        for w in mine:
+            if not (w.attrs or {}).get("split_of") and \
+                    G.dist(poly, Point(w.line[0][:2])) > 0.05:
+                _lim(c, f"{w.id}: the path of {o.id} starts outside it")
+            line = LineString([p[:2] for p in w.line])
+            if ltree is not None and any(lots[int(i)].intersects(line) for i in
+                                         ltree.query(line, predicate="intersects")):
+                _lim(c, f"{w.id}: the path of {o.id} crosses a lot")
+    if n_none:
+        c.notes.append(f"{n_none} open spaces with no way in, each saying why")
+    if n_isle:
+        c.notes.append(f"{n_isle} islet parks (land without a district) with no street to "
+                       "join")
+    return c
+
+
 def run_streets(spec: CitySpec, m: CityModel) -> list:
     """The checks a city with local streets has (M2 on)."""
     return [check_dead_ends(spec, m), check_overlaps(spec, m),
-            check_junction_levels(spec, m), check_crossing_spacing(spec, m)]
+            check_junction_levels(spec, m), check_crossing_spacing(spec, m),
+            check_park_access(spec, m)]
 
 
 def run_finished(spec: CitySpec, m: CityModel) -> list:
     """The checks that need the buildings and the transit structures (M3 and M5 on)."""
-    return [check_bridge_clash(spec, m), check_building_clash(spec, m)]
+    return [check_bridge_clash(spec, m), check_building_clash(spec, m),
+            check_walkway_clash(spec, m)]

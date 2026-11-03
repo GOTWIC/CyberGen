@@ -64,7 +64,8 @@ from . import dmath as M
 from . import geom as G
 from . import presets
 from . import trace as T
-from .buildout import _foot, _ground, _landmass_index, _nearest_on, _neighbors, _split, wk_max
+from .buildout import (_foot, _ground, _landmass_index, _Masses, _nearest_on,
+                       _neighbors, _split, reach, wk_max)
 from .roads import _arc_line, _fillet_radii
 
 CELL_M = 15.0
@@ -3778,6 +3779,8 @@ class Builder:
         self.stations: list = []
         self.nst = 0
         self.sw = sidewalk_index(c.m)
+        self.masses = _Masses(c.m.buildings)
+        self.rounds: dict = {}       # (p, foot) -> a path led round the buildings
         self.hosted: set = set()     # M19: towers that host a sky station already
         self.platforms: dict = {}    # M19: line id -> [(from, to along it, kind, core at)]
         self.tracks: list = []       # M19: every line's track (`track_rec`)
@@ -3788,10 +3791,40 @@ class Builder:
         best = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of,
                            Point(p), lm)
         f = _foot(self.glines, self.walks, self.gi, best, p)
+        if not self.masses.clear(p, f, 0):
+            # (park paths fix: the nearest ground walkway it reaches with no building between)
+            ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
+                                                   distance=reach(self.gtree, self.glines,
+                                                                  Point(p)))]
+            ks = [h for h in ks if lm < 0 or self.land_of[h] == lm]
+            for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
+                                               self.walks[self.gi[h]]["id"])):
+                f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                if self.masses.clear(p, f2, 0):
+                    best, f = h, f2
+                    break
+            else:
+                # (else led round the buildings: a path from p to f takes that way, `walk`)
+                for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
+                                                   self.walks[self.gi[h]]["id"])):
+                    f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                    r = self.masses.round(p, f2, 0)
+                    if r is not None:
+                        best, f = h, f2
+                        self.rounds[(tuple(map(q, p[:2])), tuple(map(q, f2[:2])))] = r
+                        break
         self.splits.setdefault(best, []).append(f)
         return f, _d(f, p)
 
     def walk(self, kind: str, line3: list, width: float, attrs: dict) -> int:
+        if kind == "path" and len(line3) == 2 and line3[0][2] == 0.0 and line3[1][2] == 0.0:
+            r = self.rounds.get((tuple(map(q, line3[0][:2])), tuple(map(q, line3[1][:2]))))
+            if r is not None:
+                line3 = [(x, y, 0.0) for x, y in r]
+            host = self.masses.inside(line3[0], 0)
+            if host is not None and "building" not in attrs:
+                # (park paths fix: an elevator core standing in a building leaves through it)
+                attrs = {**attrs, "building": host}
         self.new.append((kind, [tuple(map(q, p)) for p in line3], width, attrs))
         return len(self.new) - 1
 

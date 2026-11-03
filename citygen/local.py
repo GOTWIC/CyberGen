@@ -14,11 +14,12 @@ from . import blocks as BK
 from . import decks as DK
 from . import geom as G
 from . import junctions as JN
+from . import parkpaths as PP
 from . import streets as STR
 from . import trace as T
 
-PATH_KINDS = ("park", "plaza", "pocket_park", "market", "garden", "promenade", "beach")
-PATH_REACH_M = 30.0
+PATH_KINDS = PP.PATH_KINDS
+PATH_REACH_M = PP.PATH_REACH_M
 ISLAND_SEAM_M = 40.0   # M17: a regeneration links a cut-off walkway group within this far of
 #                        the district (its seam) where it can, so nothing far from it moves
 
@@ -49,42 +50,8 @@ class Local:
     cuts: dict = field(default_factory=dict)
 
 
-def open_paths(W: JN.WalkGraph, opens: list[dict]) -> int:
-    """Open space joins the walkway graph: paths from a point inside each park, plaza or
-    promenade to the walkway nodes within 30 m of it (up to four, nearest first)."""
-    pts = sorted(W.nodes)
-    if not pts:
-        return 0
-    arr = shapely.points(np.array(pts, dtype=np.float64))
-    tree = shapely.STRtree(arr)
-    n = 0
-    for o in opens:
-        if o["kind"] not in PATH_KINDS:
-            continue
-        poly = o["polygon"]
-        if poly.geom_type != "Polygon" or poly.is_empty:
-            continue
-        c = G.qpoint(poly.representative_point())
-        idx = sorted(int(i) for i in tree.query(poly, predicate="dwithin",
-                                                distance=PATH_REACH_M))
-        if not idx:
-            continue
-        cand = sorted(idx, key=lambda i: (G.dist(poly, arr[i]), pts[i]))
-        used = []
-        for i in cand:
-            p = pts[i]
-            if any(STR._dist(p, u) < 25.0 for u in used):
-                continue
-            used.append(p)
-            W.add("path", [c, p], 3.0, open_space=o.get("id"))
-            n += 1
-            if len(used) >= 4:
-                break
-    return n
-
-
 def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list,
-                      frame=None) -> int:
+                      frame=None, lots=None) -> int:
     """Walkway groups cut off on their landmass (streets reached only past a highway) join
     the main group by the shortest link up to 150 m: a pedestrian overpass where it crosses
     a highway or avenue, else a path. Under a regeneration's frame (M17) the old city's links
@@ -139,12 +106,57 @@ def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list,
                                      [pts[i] for i in groups[main]], segments):
                     n += 1
                 continue
+            if lots and not _walkable(best[1], best[2], lots):
+                # (park paths fix: a link no walkway can be led along round the lots, from
+                # inside a lot that closes a path's end: the nearest pair that can be)
+                alt = _walkable_pair(pts, arr, groups[r], groups[main], tree, lots)
+                if alt is not None:
+                    best = alt
+                elif _path_along_roads(W, [pts[i] for i in groups[r]],
+                                       [pts[i] for i in groups[main]], segments):
+                    n += 1        # (else beside the roads, as one too far off)
+                    continue
             link = LineString([best[1], best[2]])
             over = big_u is not None and link.crosses(big_u)
             W.add("elevated" if over else "path", [best[1], best[2]], 3.0,
                   z=6.5 if over else 0.0, joins="walkway island")
             n += 1
     return n
+
+
+ISLAND_PAIRS = 60      # park paths fix: pairs an island link tries when its nearest is shut in
+
+
+class _Lots:
+    """The lots a walkway keeps off (`parkpaths.keep_off`'s test), built once."""
+
+    def __init__(self, lots: list):
+        self.polys = [lt["polygon"] for lt in lots]
+        self.raw = shapely.STRtree(self.polys) if self.polys else None
+        self.bl = PP.Blocked(self.polys, [], -PP.KEEP_PAD_M, between=False)
+
+
+def _walkable(a, b, lots: "_Lots") -> bool:
+    """A link from a to b keeps off the lots, straight or led round them as `keep_off`
+    leads it."""
+    if lots.raw is None or lots.bl.clear(a, b):
+        return True
+    return PP._detour(a, b, lots.polys, lots.raw, lots.bl) is not None or \
+        PP._detour(a, b, lots.polys, lots.raw, lots.bl, blocks=True) is not None
+
+
+def _walkable_pair(pts: list, arr, own: list, other: list, tree, lots: "_Lots"):
+    """The nearest pair (distance, own point, other point) within 150 m that `_walkable`
+    accepts, among each own point's nearest other points; None if none."""
+    pairs = []
+    for i in own:
+        for k in tree.query(arr[i], predicate="dwithin", distance=150.0).tolist():
+            j = other[int(k)]
+            pairs.append((round(STR._dist(pts[i], pts[j]), 6), pts[i], pts[j]))
+    for d, a, b in sorted(pairs)[:ISLAND_PAIRS]:
+        if _walkable(a, b, lots):
+            return (d, a, b)
+    return None
 
 
 def _nearest(pts: list, arr, own: list, other: list, tree):
@@ -279,9 +291,33 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
         out.open_spaces.append({"id": o["id"], "type": f"open_space.{o['kind']}",
                                 "kind": o["kind"], "polygon": P(poly), "name": o["name"],
                                 "district_id": d, "attrs": attrs})
-    n_paths = open_paths(jx["walk"], blk["open"])
+    # (park paths fix: paths on open land, passages to the open spaces the lots enclose)
+    bld = net.builder
+    pinfo = PP.open_paths(jx["walk"], blk["open"], blk["lots"],
+                          [getattr(bld, "water", None), getattr(bld, "reserves", None)],
+                          gnet.segments)
+    rec_of = {r["id"]: r for r in out.open_spaces}
+    for o in blk["open"]:
+        r = rec_of.get(o.get("id"))
+        if r is None:
+            continue
+        if o.get("passage"):
+            r["polygon"] = P(o["polygon"])
+            r["attrs"]["area_m2"] = G.q(G.area1(o["polygon"]))
+            r["attrs"]["access"] = "passage"
+            r["attrs"]["passage"] = o["passage"]
+        elif o.get("no_access"):
+            r["attrs"]["access"] = "none"
+            r["attrs"]["no_access"] = o["no_access"]
+    n_paths = pinfo["paths"]
     n_links = join_walk_islands(jx["walk"], b.hydro.landmasses, gnet.segments,
-                                getattr(b, "frame", None))
+                                getattr(b, "frame", None), _Lots(blk["lots"]))
+    # (park paths fix: every ground walkway off the lots, the buildings' ground)
+    kinfo = PP.keep_off(jx["walk"], blk["lots"])
+    if dplan.decks and jx["walk_levels"].get(1) is not None:
+        # (M14: a deck's walkways off the lots on it)
+        k1 = PP.keep_off(jx["walk_levels"][1], dko["upper_lots"], any_z=True)
+        kinfo = {k: kinfo[k] + k1[k] for k in kinfo}
     walk = JN.walkways(jx["walk"])
     if dplan.decks:
         walk = _deck_walks(dplan, net, jx, dko, walk)
@@ -354,6 +390,11 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                            "attrs": {k2: v for k2, v in pl["attrs"].items() if v is not None}})
     T.stage("blocks", [out.blocks, out.lots, out.open_spaces, out.places])
     out.info = {"one_way_loops": jx["one_way"], "open_paths": n_paths,
+                "open_paths_bent": pinfo["bent"], "passages": pinfo["passages"],
+                "passage_m2": pinfo["passage_m2"],
+                "open_no_access": len(pinfo["no_access"]),
+                "walkways_led_round_lots": kinfo["rerouted"],
+                "walkways_in_lots": kinfo["left"],
                 "walkway_links": n_links,
                 "angles": {did[n]: a for n, a in net.angles.items()},
                 "levelled_legs": jx["level"]["levelled"],
