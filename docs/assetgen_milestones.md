@@ -1889,18 +1889,18 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
   low near a lane stays within 0.25 m of the masses' plan. Shanty stacks' and other
   masses M3 overhangs a road with are the model's.
 
-**Numbers** (the samples built on main with M20, main's assetgen against AG14's; the fit
-checks on both; `docs/progress/AG14/README.md`): things not resting on a surface, Delta
-Megacity 114 to 5, Vesper Bay 86 to 3, Cragmouth 560 to 530, Vesper Bay Decks 87 to 3 (no
-roof item, dunnage frame or street piece among them: props and plants at the model's
-heights); roads with
-a junction step over 2 cm 7 to 1, 5 to 2, 15 to 9, 5 to 2; clashes 652 to 0, 912 to 1,
-1233 to 9, 912 to 1 (all but Cragmouth's one a shell within 0.5 m of its footprint, M3's).
-Delta, Vesper Bay and Vesper Bay Decks pass every check. Cragmouth fails as on main
-(`asset_mounts`) and on a 0.76 m step at `jn.w765s203` and one shell 0.56 m over a lane.
+**Numbers** (the samples built on main with the park paths fix, main's assetgen against
+AG14's; the fit checks on both; `docs/progress/AG14/README.md`): things not resting on a
+surface, Delta Megacity 108 to 6, Vesper Bay 80 to 2, Cragmouth 564 to 535, Vesper Bay
+Decks 88 to 3 (no roof item, dunnage frame or street piece among them: props and plants at
+the model's heights); roads with a junction step over 2 cm 7 to 1, 5 to 2, 15 to 8, 3 to 2
+(the largest 0.125 m); clashes 653, 910, 1235 and 981 to 0. The fit checks pass on all
+four; Cragmouth (`asset_mounts`, `asset_access`) and Vesper Bay Decks (`asset_envelope`,
+one building) fail on main's model as before AG14.
 
 **Open**: trash cans at raised junction corners AG7 leaves without a pad; Cragmouth's quay
-railings and slope shrubs at the model's heights (M16 and M20 on terrain); the steps above;
+railings and slope shrubs at the model's heights (M16 and M20 on terrain); steps of 0.10 to
+0.13 m (Vesper Bay's level 1 junction, two steep Cragmouth junctions);
 curved facades proper (AG15); Mac = x86 (deferred); `tests/assetgen/data/golden_props.json`
 is written on the Mac.
 
