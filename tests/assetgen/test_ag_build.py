@@ -171,7 +171,7 @@ def test_unreal_contribution_covers_every_building():
             assert e["asset"] is None and front[f"{e['key']}.front"]["replaces"] == [e["key"]]
         assert e["pivot"] == r["pivot"] and e["nanite"] and not e["distance_field"]
         assert e["proxy"]["node"] == f"{e['key']}.proxy"
-        assert len(e["cpd"]) == SY.CPD_SIZE + 7        # AG1's channels and AG6's
+        assert len(e["cpd"]) == SY.CPD_SIZE + 13       # AG1's channels, AG6's and AG15's
         assert set(e["slots"]) <= set(uc["materials"])
 
 

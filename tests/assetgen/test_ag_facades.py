@@ -53,9 +53,10 @@ def test_parts_are_closed_and_named_by_their_parameters():
     from assetgen.buildings import frontparts as FP      # (AG3's: test_ag_fronts.py)
     from assetgen.buildings import roofparts as RP
     from assetgen.buildings import typeparts as TP       # (AG5's: test_ag_types.py)
+    from assetgen.buildings import skins as SK           # (AG15's: test_ag_night.py)
     ag4 = set(RP.ROOF) | set(RP.MERGED_ROOF) | set(RP.FACADE) | set(CN.FAMILIES)
-    assert set(SAMPLE) | set(FP.FAMILIES) | ag4 | set(TP.GEN) == set(PT.GEN) == \
-        set(PT.REACH)
+    assert set(SAMPLE) | set(FP.FAMILIES) | ag4 | set(TP.GEN) | set(SK.FAMILIES) == \
+        set(PT.GEN) == set(PT.REACH)
     names = set()
     for fam, p in SAMPLE.items():
         _, arrs = PT.mesh(fam, p)

@@ -3,8 +3,10 @@
 #include "Camera/PlayerCameraManager.h"
 #include "CityGenFreeCam.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/DecalComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Engine/DirectionalLight.h"
@@ -87,20 +89,62 @@ void ACityGenPlay::Setup()
 	{
 		Viewport->AddViewportWidgetContent(Overlay.ToSharedRef(), 20);
 	}
+	// AG15: a spot light under each of the nearest lamp heads, pointing down (a spot shines
+	// along its +X: pitch -90), the nearest few with shadows; light-pool decals under the
+	// lamps past them (a decal projects along its +X too)
 	for (int32 i = 0; i < LampLights; ++i)
 	{
-		UPointLightComponent* L = NewObject<UPointLightComponent>(this);
+		USpotLightComponent* L = NewObject<USpotLightComponent>(this);
 		L->SetMobility(EComponentMobility::Movable);
 		L->SetupAttachment(RootComponent);
 		L->SetUsingAbsoluteLocation(true);
+		L->SetUsingAbsoluteRotation(true);
+		L->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
 		L->SetIntensityUnits(ELightUnits::Candelas);
 		L->SetAttenuationRadius(LampRadiusM * 100.f);
-		L->SetSourceRadius(15.f);
-		L->SetCastShadows(false);
+		L->SetInnerConeAngle(LampInnerConeDeg);
+		L->SetOuterConeAngle(LampOuterConeDeg);
+		L->SetSourceRadius(12.f);
+		L->SetCastShadows(i < ShadowedLamps);
 		L->SetLightColor(FLinearColor(1.0f, 0.74f, 0.46f));
 		L->SetVisibility(false);
 		L->RegisterComponent();
 		Lamps.Add(L);
+	}
+	for (int32 i = 0; i < WashLights && i < WashPoints.Num(); ++i)
+	{
+		UPointLightComponent* W = NewObject<UPointLightComponent>(this);
+		W->SetMobility(EComponentMobility::Movable);
+		W->SetupAttachment(RootComponent);
+		W->SetUsingAbsoluteLocation(true);
+		W->SetIntensityUnits(ELightUnits::Candelas);
+		W->SetAttenuationRadius(WashRadiusM * 100.f);
+		W->SetSourceRadius(150.f);
+		W->SetCastShadows(false);
+		W->SetVisibility(false);
+		W->RegisterComponent();
+		Washes.Add(W);
+	}
+	if (LightPoolMaterial)
+	{
+		for (int32 i = 0; i < LampPools; ++i)
+		{
+			UDecalComponent* D = NewObject<UDecalComponent>(this);
+			D->SetupAttachment(RootComponent);
+			D->SetUsingAbsoluteLocation(true);
+			D->SetUsingAbsoluteRotation(true);
+			D->SetUsingAbsoluteScale(true);
+			D->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
+			D->SetDecalMaterial(LightPoolMaterial);
+			// (centered 4.5 m under the lamp head, 7 m deep: it reaches the ground under a
+			// wall light 3 m up and under a street light 7.6 m up, however Unreal reads the
+			// size, as the whole box or its half)
+			D->DecalSize = FVector(700.f, PoolRadiusM * 100.f, PoolRadiusM * 100.f);
+			D->SetFadeScreenSize(0.f);
+			D->SetVisibility(false);
+			D->RegisterComponent();
+			Pools.Add(D);
+		}
 	}
 	UE_LOG(LogCityGenPlay, Log, TEXT("CityGen play: %s, map %s, %d walkway points, %d lamps"),
 		*City, MapTexture ? *MapTexture->GetName() : TEXT("none"), WalkPoints.Num(), LampPoints.Num());
@@ -480,14 +524,27 @@ void ACityGenPlay::SetNight(bool bOn)
 		NightVolume->Settings.AutoExposureMaxBrightness = NightExposureEV100;
 		NightVolume->bEnabled = bOn;
 	}
+	if (NightCollection && bOn)
+	{
+		UKismetMaterialLibrary::SetScalarParameterValue(this, NightCollection, TEXT("Hour"), NightHour);
+	}
 	LampsAt = -1.0;
 	if (!bOn)
 	{
-		for (UPointLightComponent* L : Lamps)
+		for (USpotLightComponent* L : Lamps)
 		{
 			L->SetVisibility(false);
 		}
+		for (UDecalComponent* D : Pools)
+		{
+			D->SetVisibility(false);
+		}
+		for (UPointLightComponent* W : Washes)
+		{
+			W->SetVisibility(false);
+		}
 		LampsOn = 0;
+		PoolsOn = 0;
 	}
 	Toast(bOn ? TEXT("Night") : TEXT("Day"), 1.5f);
 	UE_LOG(LogCityGenPlay, Log, TEXT("CityGen play: %s"), bOn ? TEXT("night") : TEXT("day"));
@@ -514,7 +571,7 @@ void ACityGenPlay::UpdateLamps()
 	}
 	for (int32 k = 0; k < Lamps.Num(); ++k)
 	{
-		UPointLightComponent* L = Lamps[k];
+		USpotLightComponent* L = Lamps[k];
 		if (k >= N)
 		{
 			L->SetVisibility(false);
@@ -523,13 +580,57 @@ void ACityGenPlay::UpdateLamps()
 		const int32 i = Near[k].Value;
 		const bool bWall = LampKinds.IsValidIndex(i) && LampKinds[i] == 1;
 		const double D = FMath::Sqrt(Near[k].Key);
+		// (the farthest quarter fades out, where the light-pool decals take over)
 		const float Fade = float(FMath::Clamp((Far - D) / (0.25 * Far), 0.0, 1.0));
-		L->SetWorldLocation(LampPoints[i]);
+		L->SetWorldLocation(LampPoints[i] - FVector(0.0, 0.0, LampDropCm));
 		L->SetIntensity((bWall ? WallLampCandela : StreetLampCandela) * Fade);
 		L->SetAttenuationRadius(LampRadiusM * (bWall ? 60.f : 100.f));
 		L->SetVisibility(Fade > 0.f);
 	}
 	LampsOn = N;
+	// the light pools under the lamps past the lit ones (and under the fading ones)
+	const int32 P0 = FMath::Max(0, N - N / 4);
+	const int32 P = FMath::Min(Pools.Num(), FMath::Max(0, LampPoints.Num() - P0));
+	for (int32 k = 0; k < Pools.Num(); ++k)
+	{
+		UDecalComponent* Dc = Pools[k];
+		if (k >= P)
+		{
+			Dc->SetVisibility(false);
+			continue;
+		}
+		const int32 i = Near[P0 + k].Value;
+		const bool bWall = LampKinds.IsValidIndex(i) && LampKinds[i] == 1;
+		Dc->SetWorldLocation(LampPoints[i] - FVector(0.0, 0.0, 450.0));
+		Dc->SetWorldScale3D(FVector(1.0, bWall ? 0.6 : 1.0, bWall ? 0.6 : 1.0));
+		Dc->SetVisibility(true);
+	}
+	PoolsOn = P;
+	// the large signs nearest the view wash their facades in their color
+	if (Washes.Num() > 0)
+	{
+		TArray<TPair<double, int32>> NearW;
+		NearW.Reserve(WashPoints.Num());
+		for (int32 i = 0; i < WashPoints.Num(); ++i)
+		{
+			NearW.Add(TPair<double, int32>(FVector::DistSquared(WashPoints[i], View), i));
+		}
+		NearW.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
+		for (int32 k = 0; k < Washes.Num(); ++k)
+		{
+			UPointLightComponent* W = Washes[k];
+			if (k >= NearW.Num())
+			{
+				W->SetVisibility(false);
+				continue;
+			}
+			const int32 i = NearW[k].Value;
+			W->SetWorldLocation(WashPoints[i]);
+			W->SetLightColor(WashColors.IsValidIndex(i) ? WashColors[i] : FLinearColor::White);
+			W->SetIntensity(WashCandela);
+			W->SetVisibility(true);
+		}
+	}
 }
 
 // -- the tick --
@@ -571,18 +672,26 @@ FString ACityGenPlay::GetStatus() const
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	const FVector At = Pawn ? Pawn->GetActorLocation() : FVector::ZeroVector;
 	int32 Lit = 0;
-	for (const UPointLightComponent* L : Lamps)
+	int32 Shadowed = 0;
+	for (const USpotLightComponent* L : Lamps)
 	{
 		Lit += L->IsVisible() ? 1 : 0;
+		Shadowed += (L->IsVisible() && L->CastShadows) ? 1 : 0;
+	}
+	int32 PoolsVisible = 0;
+	for (const UDecalComponent* D : Pools)
+	{
+		PoolsVisible += D->IsVisible() ? 1 : 0;
 	}
 	return FString::Printf(TEXT("{\"ready\": %s, \"night\": %s, \"map\": %s, \"menu\": %s, "
 		"\"free_cam\": %s, \"waiting\": %s, \"pawn\": \"%s\", \"x\": %.2f, \"y\": %.2f, \"z\": %.2f, "
-		"\"lamps_lit\": %d, \"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
+		"\"lamps_lit\": %d, \"lamps_shadowed\": %d, \"light_pools\": %d, "
+		"\"lamp_points\": %d, \"walk_points\": %d, \"map_texture\": %s, "
 		"\"overlay\": %s}"),
 		bReady ? TEXT("true") : TEXT("false"), bNight ? TEXT("true") : TEXT("false"),
 		bMapOpen ? TEXT("true") : TEXT("false"), bDevOpen ? TEXT("true") : TEXT("false"),
 		IsFreeCam() ? TEXT("true") : TEXT("false"), bWaiting ? TEXT("true") : TEXT("false"),
 		Pawn ? *Pawn->GetClass()->GetName() : TEXT(""), At.X / 100.0, -At.Y / 100.0, At.Z / 100.0,
-		Lit, LampPoints.Num(), WalkPoints.Num(), MapTexture ? TEXT("true") : TEXT("false"),
+		Lit, Shadowed, PoolsVisible, LampPoints.Num(), WalkPoints.Num(), MapTexture ? TEXT("true") : TEXT("false"),
 		Overlay.IsValid() ? TEXT("true") : TEXT("false"));
 }

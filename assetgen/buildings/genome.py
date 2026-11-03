@@ -37,9 +37,11 @@ from __future__ import annotations
 
 import hashlib
 
+from citygen import dmath as DM
+
 from . import systems as SY
 
-GENOME_VERSION = 5
+GENOME_VERSION = 6
 SALT = "ag1.genome"
 GROUPS = ("base", "body", "top")
 GROUP_GENES = ("system", "window", "rhythm", "cornice", "parapet", "bands", "bay_m", "wwr",
@@ -100,10 +102,18 @@ def draw(key: str, purpose: str, lo: float, hi: float, step: float, salt: str = 
     return quant(lo + (hi - lo) * u(key, purpose, salt), step)
 
 
-def system_weights(spec: dict, btype: str, floors: int) -> dict[str, float]:
+def reach_of(brief: dict) -> float:
+    """AG15: how far a building's genome reaches past its era's systems and the grid (scope
+    14.16: furthest in the corporate core and midtown), by its district's archetype."""
+    arch = (brief.get("district") or {}).get("archetype") or ""
+    return float(SY.REACH.get(arch, SY.REACH_DEFAULT))
+
+
+def system_weights(spec: dict, btype: str, floors: int, reach: float = 0.0) -> dict[str, float]:
     """The systems a building draws from, with weights: era, district additions and owner
     bias; curtain systems not on low types (`NO_CURTAIN`), and a system outside its floor
-    range (`systems.FLOORS`) gives its weight to its stand-in."""
+    range (`systems.FLOORS`) gives its weight to its stand-in. AG15: AG15's systems with
+    `reach` times 0.8 of the era's weight between them."""
     w: dict[str, float] = {}
 
     def add(src: dict | None, scale: float = 1.0):
@@ -113,6 +123,12 @@ def system_weights(spec: dict, btype: str, floors: int) -> dict[str, float]:
     add((spec.get("era_style") or {}).get("systems"))
     add((spec.get("district") or {}).get("systems"))
     add((spec.get("owner") or {}).get("facade_bias"))
+    if reach > 0 and w:
+        tot = 0.0
+        for k in sorted(w):
+            tot += w[k]
+        add({s: 1.0 for s in SY.AG15_SYSTEMS}, round(0.8 * reach * tot /
+                                                       len(SY.AG15_SYSTEMS), 6))
     for name in sorted(SY.FLOORS):
         lo, hi, alt = SY.FLOORS[name]
         if name == "shanty_patchwork" and btype == "building.shanty_stack":
@@ -139,8 +155,51 @@ def _jitter(c: str, v: float, warm: float) -> str:
     return "#" + "".join(f"{min(max(int(round(x)), 0), 255):02x}" for x in (r, g, b))
 
 
-def make(brief: dict) -> dict:
-    """The genome of one building, from its brief."""
+def _order(key: str, purpose: str, options, weights=None, salt: str = SALT) -> list:
+    """AG15: options in a weighted random order (keys u^(1/w), largest first), every one
+    once: the alternatives the neighbor rule walks."""
+    options = list(options)
+    ws = list(weights) if weights is not None else [1.0] * len(options)
+    keyed = []
+    for o, w in zip(options, ws):
+        if w <= 0:
+            continue
+        x = max(u(key, f"{purpose}.{o}", salt), 1e-12)
+        keyed.append((-float(DM.exp(DM.log(x) / w)), str(o), o))
+    keyed.sort()
+    return [o for _, _, o in keyed]
+
+
+def _first(first, alts: list, bad) -> object:
+    """`first` unless `bad(first)`, else the first of `alts` that is not, else `first`."""
+    if not bad(first):
+        return first
+    for a in alts:
+        if not bad(a):
+            return a
+    return first
+
+
+def tower_pool(btype: str, floors: int) -> list[str]:
+    """AG15: the systems a tower may take when its era's are all taken by its neighbors:
+    glazed first, then AG15's and the panel walls (none outside its floor range)."""
+    pool = []
+    for s in SY.CURTAIN + SY.AG15_SYSTEMS + ("precast_panel", "punched_concrete",
+                                             "board_marked_concrete", "capsule_stack",
+                                             "standing_seam", "punched_brick"):
+        if s in pool:
+            continue
+        lo, hi, _ = SY.FLOORS.get(s, (0, 9999, None))
+        if lo <= floors <= hi and not (btype in SY.NO_CURTAIN and s in SY.CURTAIN):
+            pool.append(s)
+    return pool
+
+
+def make(brief: dict, avoid: dict | None = None) -> dict:
+    """The genome of one building, from its brief. AG15: `avoid` (the neighbor rule,
+    `neighbors.assign`): the body systems, (window, pattern) pairs, (wall, glass) palettes
+    and (light, accent) night looks its neighboring towers took; each is drawn again past
+    them where it can be."""
     bid = brief["id"]
     b = brief["building"]
     spec = brief["spec"]
@@ -153,7 +212,9 @@ def make(brief: dict) -> dict:
     fkey = fam or bid             # discrete genes and colors: the family's
     twins = bool(fam) and prop.get("complex") in SY.TWINS
     btype = b["type"]
-    weights = system_weights(spec, btype, int(b["floors"]))
+    reach = reach_of(brief)
+    av = avoid or {}
+    weights = system_weights(spec, btype, int(b["floors"]), reach)
     names, ws = list(weights), [weights[k] for k in weights]
     fixed = SY.TYPE_SYSTEM.get(btype)
     if btype.startswith("building.landmark."):
@@ -165,6 +226,22 @@ def make(brief: dict) -> dict:
     genes: dict = {}
     cont: dict = {}
     body = fixed or pick(fkey, "system.body", names, ws, salt)
+    if av.get("system") and not fixed:
+        # AG15: past the systems the neighbors took, the era's first, then the tower pool
+        alts = _order(fkey, "ag15.system", names, ws, salt)
+        alts += [s for s in _order(fkey, "ag15.pool", tower_pool(btype, int(b["floors"])),
+                                   None, salt) if s not in alts]
+        def taken(s_):
+            # (a system is taken where a neighbor has it, or where every window and pattern
+            # it can draw is: a ribbon has one)
+            if s_ in av["system"]:
+                return True
+            pv = av.get("pattern") or ()
+            return bool(pv) and all(
+                ((w_, "grid") if w_ in SY.PATTERN_FIXED or s_ == "shanty_patchwork"
+                 else (w_, p_)) in pv for w_ in SY.SYSTEMS[s_]["windows"]
+                for p_ in SY.PATTERNS)
+        body = _first(body, alts, taken)
     sysg = {"body": body}
     sysg["base"] = fixed or (body if u(fkey, "system.base.same", salt) < 0.55 else
                              pick(fkey, "system.base", names, ws, salt))
@@ -176,6 +253,20 @@ def make(brief: dict) -> dict:
         T = SY.SYSTEMS[s]
         genes[f"{g}.system"] = s
         genes[f"{g}.window"] = pick(fkey, f"{g}.window", T["windows"], None, salt)
+        # AG15: the window pattern over the bays, further past the grid the further the
+        # district reaches (none on a window type that fills its bays or runs as a band)
+        pw = [1.0 + 3.0 * (1.0 - reach)] + [reach] * (len(SY.PATTERNS) - 1)
+        genes[f"{g}.wpattern"] = "grid" if genes[f"{g}.window"] in SY.PATTERN_FIXED or \
+            s == "shanty_patchwork" else pick(fkey, f"{g}.wpattern", SY.PATTERNS, pw, salt)
+        if g == "body" and av.get("pattern"):
+            def _sig(w_, p_):
+                return (w_, "grid" if w_ in SY.PATTERN_FIXED or s == "shanty_patchwork"
+                        else p_)
+            pairs = [(w_, p_) for w_ in _order(fkey, "ag15.window", T["windows"], None, salt)
+                     for p_ in _order(fkey, "ag15.wpattern", SY.PATTERNS, pw, salt)]
+            w0, p0 = _first((genes["body.window"], genes["body.wpattern"]), pairs,
+                            lambda wp: _sig(*wp) in av["pattern"])
+            genes["body.window"], genes["body.wpattern"] = _sig(w0, p0)
         genes[f"{g}.rhythm"] = pick(fkey, f"{g}.rhythm", T["rhythms"], None, salt)
         genes[f"{g}.cornice"] = pick(fkey, f"{g}.cornice", T["cornices"], None, salt)
         genes[f"{g}.parapet"] = pick(fkey, f"{g}.parapet", T["parapets"], None, salt)
@@ -299,8 +390,26 @@ def make(brief: dict) -> dict:
     genes["wall"] = wall
     genes["trim"] = trim
     genes["glass"] = pick(fkey, "glass", SY.GLASS, None, salt)
+    if u(fkey, "ag15.glass.colored", salt) < 0.6 * reach:
+        # AG15: colored glass, the further the district reaches the likelier
+        genes["glass"] = pick(fkey, "ag15.glass", SY.GLASS_COLORED, None, salt)
     if lpal and b.get("landmark"):
         genes["glass"] = wall
+    elif av.get("palette"):
+        # AG15: a palette (wall, glass) no neighboring tower has: another glass first, then
+        # another wall of the era's palette
+        glasses = _order(fkey, "ag15.glass.alt", SY.GLASS + SY.GLASS_COLORED, None, salt)
+        walls = [genes["wall"]] + [c for c in _order(fkey, "ag15.wall.alt", sorted(set(pal)),
+                                                       None, salt) if c != genes["wall"]]
+        wg = _first((genes["wall"], genes["glass"]),
+                    [(w_, g_) for w_ in walls for g_ in glasses],
+                    lambda x: x in av["palette"])
+        if wg[0] != genes["wall"]:
+            wall = wg[0]
+            genes["wall"] = wall
+            if genes["trim"] == wall:
+                genes["trim"] = next((c for c in pal if c != wall), genes["trim"])
+        genes["glass"] = wg[1]
     genes["roof"] = pick(fkey, "roof", SY.ROOFS_INDUSTRIAL if body in SY.INDUSTRIAL else SY.ROOFS,
                          None, salt)
     dist = spec.get("district") or {}
@@ -324,6 +433,7 @@ def make(brief: dict) -> dict:
              "lit": draw(bid, "lit", 0.7, 1.3, 0.01, salt) * LIT_BY_USE.get(b["use"], 0.4),
              "seed": quant(u(bid, "seed", salt), SY.STEP["seed"])}
     extra["lit"] = quant(min(extra["lit"], 1.0), SY.STEP["lit"])
+    _ag15(brief, genes, cont, extra, body, fkey, bid, reach, av, salt, wealth)
     if (brief.get("deck") or {}).get("role") == "under":
         # AG10: under an M14 deck, a covered street's grime from the ground up to the soffit,
         # its fronts and windows lit day and night
@@ -349,6 +459,79 @@ def make(brief: dict) -> dict:
             "cont": cont, "extra": extra, "colors": colors}
 
 
+SCHEDULE_OF = {"office": "office", "civic": "office", "residential": "home",
+               "hotel": "hotel", "retail": "shop", "station": "shop",
+               "industrial": "industrial", "parking": "industrial"}
+LIGHT_W = {  # a schedule's color temperatures (weights over systems.LIGHT_COLORS' order)
+    "office": {"cool": 0.4, "daylight": 0.25, "neutral": 0.35},
+    "home": {"warm": 0.45, "soft": 0.35, "neutral": 0.2},
+    "hotel": {"warm": 0.6, "soft": 0.4},
+    "shop": {"neutral": 0.4, "cool": 0.3, "magenta": 0.15, "cyan": 0.15},
+    "industrial": {"daylight": 0.5, "cool": 0.5},
+}
+
+
+def is_tower(brief: dict) -> bool:
+    """AG15: a tower for the neighbor rule and the crown lights: M21's (podium towers,
+    towers and landmarks 40 m and taller); a building with no form (the brief leaves it out)
+    by the same rule on its type and height."""
+    b = brief["building"]
+    if b.get("form"):
+        return bool(b["form"].get("tower"))
+    t = b.get("type") or ""
+    return (t in ("building.podium_tower", "building.tower") or
+            t.startswith("building.landmark.")) and float(b.get("height_m") or 0.0) >= 40.0
+
+
+def _ag15(brief, genes, cont, extra, body, fkey, bid, reach, av, salt, wealth) -> None:
+    """AG15's genes: the skin over a glazed system (LED strips, fritted glass), the accent
+    of its LEDs, crown lights and logo, and the night: its schedule by use (a share of
+    towers vacant, by the district's danger and wealth), its light's color temperature,
+    how much the rooms' temperatures spread, an office's band of floors."""
+    b = brief["building"]
+    T = SY.SYSTEMS[body]
+    glazed = body in SY.CURTAIN or T["wwr"][1] >= 0.6
+    genes["skin"] = "none"
+    if glazed and T.get("feature") not in ("led", "media"):
+        genes["skin"] = pick(fkey, "ag15.skin", SY.SKINS,
+                             (1.0, 0.6 * reach, 0.4 * reach), salt)
+    accents = list(SY.ACCENTS)
+    genes["accent"] = pick(fkey, "ag15.accent", accents, None, salt)
+    tower = is_tower(brief)
+    genes["crown_light"] = pick(fkey, "ag15.crown", SY.CROWN_LIGHTS,
+                                (1.2 - 0.6 * reach, 0.1 + 0.5 * reach, 0.1 + 0.4 * reach,
+                                 0.4 * reach), salt) if tower else "none"
+    genes["logo"] = "logo" if tower and b["use"] in ("office", "mixed", "retail", "hotel",
+                                                     "civic") and \
+        u(fkey, "ag15.logo", salt) < 0.15 + 0.45 * reach else "none"
+    use = b["use"]
+    sched = SCHEDULE_OF.get(use)
+    if sched is None:
+        sched = pick(bid, "ag15.night.mixed", ("office", "home", "shop"), (0.4, 0.4, 0.2),
+                     salt)
+    dist = brief.get("district") or {}
+    danger = float(dist.get("danger") if dist.get("danger") is not None else 0.3)
+    pv = (0.02 + 0.15 * danger * (1.15 - wealth)) * (1.5 if tower else 1.0)
+    vacant = not b.get("landmark") and u(bid, "ag15.vacant", salt) < pv and \
+        not av.get("vacant")            # (a vacant tower's neighbor is lived in)
+    lw = LIGHT_W[sched]
+    light = pick(fkey, "ag15.light", sorted(lw), [lw[k] for k in sorted(lw)], salt)
+    if av.get("night"):
+        lights = _order(fkey, "ag15.light.alt", sorted(SY.LIGHT_COLORS), None, salt)
+        acc = _order(fkey, "ag15.accent.alt", accents, None, salt)
+        la = _first((light, genes["accent"]), [(l_, a_) for a_ in acc for l_ in
+                                               [light] + [x for x in lights if x != light]],
+                    lambda x: x in av["night"])
+        light, genes["accent"] = la
+    genes["light"] = light
+    extra["night"] = {"schedule": "vacant" if vacant else sched,
+                      "color": [round(v, 4) for v in SY.LIGHT_COLORS[light]],
+                      "spread": draw(bid, "ag15.spread", 0.1, 0.6, 0.05, salt),
+                      "band": int(pick(bid, "ag15.band", (2, 3, 4, 5, 6), None, salt))}
+    if vacant:
+        extra["lit"] = quant(min(extra["lit"], 0.06), SY.STEP["lit"])
+
+
 def groups_of(brief: dict) -> list[str]:
     """The mass groups a building has (base, body, top), in that order."""
     have = {SY.role_group(m["role"]) for m in brief["masses"]}
@@ -369,6 +552,8 @@ def effective(genome: dict, used: dict) -> dict:
         out[f"{g}.system"] = s
         for gene in ("window", "rhythm"):
             out[f"{g}.{gene}"] = genes[f"{g}.{gene}"]
+        if genes.get(f"{g}.wpattern", "grid") != "grid":
+            out[f"{g}.wpattern"] = genes[f"{g}.wpattern"]     # (AG15)
         for gene in ("bay_m", "wwr", "sill_m", "head_m", "reveal_m", "corner_m"):
             out[f"{g}.{gene}"] = cont[f"{g}.{gene}"]
         if s == "shanty_patchwork":
@@ -443,4 +628,12 @@ def effective(genome: dict, used: dict) -> dict:
             out["roof_eave_m"] = cont["roof_eave_m"]
     if used.get("roof_finish"):
         out["roof_finish"] = genes["roof_finish"]
+    # AG15: the skin, the crown lights and logo a building built, their accent, its light
+    for gene in ("skin", "crown_light", "logo"):
+        if used.get(gene):
+            out[gene] = genes[gene]
+    if used.get("accent"):
+        out["accent"] = genes["accent"]
+    if genes.get("light"):
+        out["light"] = genes["light"]
     return out

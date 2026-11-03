@@ -23,19 +23,28 @@ AG2_SYSTEMS = ("spandrel_ribbon", "fin_wall", "diagrid", "exoskeleton",
                "board_marked_concrete", "stucco_shutters", "timber_infill", "tiled_eaves",
                "standing_seam", "louvered_industrial", "capsule_stack", "perforated_skin",
                "hangar_cladding")
-ALL_SYSTEMS = AG1_SYSTEMS + AG2_SYSTEMS
+# AG15: facades that are not rows of rectangles (scope 14.16): LED-strip mullions, a
+# honeycomb panel screen, folded glass, a perforated mesh screen, a media facade, diagonal
+# glazing and slit windows in panels
+AG15_SYSTEMS = ("led_grid", "hex_skin", "folded_glass", "mesh_screen", "media_facade",
+                "diagonal_glazing", "slit_panel")
+ALL_SYSTEMS = AG1_SYSTEMS + AG2_SYSTEMS + AG15_SYSTEMS
 
 # a name no table here knows (an asset spec may name one) builds as the nearest system
 FALLBACK: dict[str, str] = {}
 
 CURTAIN = ("unitized_curtain_wall", "fin_wall", "diagrid", "exoskeleton", "spandrel_ribbon",
-           "perforated_skin")
+           "perforated_skin", "led_grid", "hex_skin", "folded_glass", "mesh_screen",
+           "media_facade", "diagonal_glazing")
 INDUSTRIAL = ("corrugated", "louvered_industrial", "hangar_cladding", "standing_seam")
 # systems that need a size of building: (fewest floors, most floors, the stand-in outside)
 FLOORS = {"diagrid": (10, 999, "fin_wall"), "exoskeleton": (6, 999, "fin_wall"),
           "capsule_stack": (4, 40, "precast_panel"), "tiled_eaves": (1, 6, "punched_brick"),
           "timber_infill": (2, 5, "stucco_shutters"), "shanty_patchwork": (1, 5,
-                                                                         "precast_panel")}
+                                                                         "precast_panel"),
+          # AG15: a media facade and diagonal glazing need a few floors to read
+          "media_facade": (5, 999, "spandrel_ribbon"),
+          "diagonal_glazing": (6, 999, "unitized_curtain_wall")}
 
 
 def system(name: str) -> str:
@@ -234,6 +243,95 @@ SYSTEMS: dict[str, dict] = {
         "feature": "ribs",
     },
 }
+
+# -- AG15 ---------------------------------------------------------------------------
+SYSTEMS.update({
+    "led_grid": {
+        "wall": "spandrel", "glass": "glass",
+        "windows": ("full", "split"), "rhythms": ("even", "grouped"),
+        "wwr": (0.84, 0.94), "sill": (0.1, 0.7), "head_gap": (0.3, 0.55),
+        "reveal": (0.06, 0.12), "corner": (0.2, 0.5), "bay_scale": (0.8, 1.2),
+        **_GLASSY, "feature": "led",
+    },
+    "hex_skin": {
+        "wall": "panel", "glass": "glass",
+        "windows": ("full", "wide"), "rhythms": ("even",),
+        "wwr": (0.7, 0.9), "sill": (0.2, 0.6), "head_gap": (0.3, 0.5),
+        "reveal": (0.14, 0.24), "corner": (0.3, 0.7), "bay_scale": (0.9, 1.2),
+        **_GLASSY, "frames": ("unit", "fixed"), "feature": "hex",
+    },
+    "folded_glass": {
+        "wall": "spandrel", "glass": "glass",
+        "windows": ("full",), "rhythms": ("even", "grouped"),
+        "wwr": (0.88, 0.95), "sill": (0.1, 0.4), "head_gap": (0.3, 0.5),
+        "reveal": (0.06, 0.1), "corner": (0.3, 0.7), "bay_scale": (0.7, 1.0),
+        **_GLASSY, "feature": "fold",
+    },
+    "mesh_screen": {
+        "wall": "panel", "glass": "glass",
+        "windows": ("full", "wide", "ribbon"), "rhythms": ("even",),
+        "wwr": (0.6, 0.86), "sill": (0.3, 0.8), "head_gap": (0.3, 0.5),
+        "reveal": (0.08, 0.14), "corner": (0.3, 0.8), "bay_scale": (0.8, 1.1),
+        **_GLASSY, "frames": ("unit", "fixed"), "feature": "mesh",
+    },
+    "media_facade": {
+        "wall": "band_panel", "glass": "glass",
+        "windows": ("ribbon",), "rhythms": ("even",),
+        "wwr": (0.9, 0.96), "sill": (0.7, 1.0), "head_gap": (0.35, 0.6),
+        "reveal": (0.08, 0.14), "corner": (0.3, 0.8), "bay_scale": (0.8, 1.1),
+        **_GLASSY, "parapets": ("low", "high"), "frames": ("ribbon",), "feature": "media",
+    },
+    "diagonal_glazing": {
+        "wall": "spandrel", "glass": "glass",
+        "windows": ("full",), "rhythms": ("even",),
+        "wwr": (0.9, 0.96), "sill": (0.1, 0.4), "head_gap": (0.3, 0.5),
+        "reveal": (0.2, 0.35), "corner": (0.4, 0.9), "bay_scale": (0.8, 1.0),
+        **_GLASSY, "feature": "diag",
+    },
+    "slit_panel": {
+        "wall": "panel", "finishes": ("panel", "concrete"), "glass": "glass",
+        "windows": ("slits", "slot"), "rhythms": ("even", "aba", "irregular"),
+        "wwr": (0.3, 0.55), "sill": (0.3, 0.6), "head_gap": (0.3, 0.6),
+        "reveal": (0.14, 0.24), "corner": (0.6, 1.4), "bay_scale": (0.9, 1.3),
+        "cornices": ("none",), "parapets": ("low", "high"), "bands": ("none", "every"),
+        "ground": ("storefront", "lobby"),
+        "frames": ("fixed",), "sills": ("none",), "balconies": ("none",), "feature": None,
+    },
+})
+
+# AG15: window patterns over the bays (a gene per mass group, `{g}.pattern`), applied row
+# by row (`skins.pattern_ops`): the grid as AG2 left it, openings staggered by floor, mixed
+# sizes, stepped (diagonal runs), a checkerboard, a scatter, alternating wide and narrow
+# floors
+PATTERNS = ("grid", "stagger", "mixed", "stepped", "checker", "scatter", "alternate")
+# window types a pattern leaves as they are (they fill their bays or run as one band)
+PATTERN_FIXED = ("ribbon", "strip", "louver", "pod", "clerestory", "sparse", "patch",
+                 "banded")
+# how far a district's genomes reach (scope 14.16: further in the corporate core and
+# midtown): the share of AG15's systems in a building's draw, of patterns past the grid, of
+# colored glass, LED skins, crown lights and logos
+REACH = {"corporate_core": 1.0, "midtown_mixed": 0.85, "midtown": 0.85,
+         "entertainment_market": 0.75, "transit_hub": 0.6, "megablock_residential": 0.45,
+         "research_campus": 0.45, "spaceport": 0.35, "residential_heights": 0.25,
+         "old_town": 0.1, "industrial_port": 0.05}
+REACH_DEFAULT = 0.3
+# colored glass (AG15) beside AG1's dark tints
+GLASS_COLORED = ("#1d4a5c", "#3a2350", "#4a3a1c", "#1c4a3a", "#203a6a", "#5a1f3a")
+# the accent of a building's LED strips, crown lights and logo (`led_<hex>` slots)
+ACCENTS = ("ff2a6d", "05d9e8", "b967ff", "ffb000", "39ff8a", "f2f6ff")
+# a building-wide skin over any glazed system (`skin` gene): LED strips on the bay lines,
+# fritted glass, none
+SKINS = ("none", "led", "frit")
+# crown and edge lighting on towers (`crown_light`)
+CROWN_LIGHTS = ("none", "edges", "band", "both")
+# the night's light per window: color temperatures (linear RGB at full) a building's base
+# is picked from, and the schedules by use (Custom Primitive Data 33)
+LIGHT_COLORS = {"warm": (1.0, 0.66, 0.38), "soft": (1.0, 0.78, 0.55),
+                "neutral": (1.0, 0.88, 0.74), "cool": (0.86, 0.93, 1.0),
+                "daylight": (0.74, 0.86, 1.0), "magenta": (1.0, 0.45, 0.9),
+                "cyan": (0.5, 0.95, 1.0)}
+SCHEDULES = {"default": 0, "office": 1, "home": 2, "hotel": 3, "shop": 4, "industrial": 5,
+             "vacant": 6}
 
 PATCH_SLOTS = ("patch_sheet", "patch_rust", "patch_tarp", "patch_panel", "patch_ply")
 # shanty patchwork: which patches a building is mostly made of (weights per PATCH_SLOTS)
@@ -527,6 +625,22 @@ SLOTS: dict[str, tuple] = {
     "atrium_glass": ("glass", "#2a3a48", 0.06, 0.0, None),
     "atrium_frame": ("metal", "#d6d8da", 0.4, 0.6, "trim"),
 }
+# AG15: the new facades' parts: honeycomb panels, folded glass, mesh screens, fritted glass,
+# a media facade's screens (emissive), LED strips (emissive, by accent: `led_<hex>`), logos
+SLOTS.update({
+    "hex": ("metal", "#2f3438", 0.45, 0.6, "trim"),
+    "fold_glass": ("metal", "#3b5466", 0.06, 0.4, "glass"),
+    "mesh": ("metal", "#9da3a8", 0.55, 0.7, "trim"),
+    "frit": ("facade", "#cfd5d8", 0.35, 0.0, None),
+    "media_frame": ("metal", "#15171a", 0.4, 0.6, None),
+    "logo_back": ("metal", "#121416", 0.4, 0.6, None),
+})
+MEDIA = {"screen_media_a": "#2a6cff", "screen_media_b": "#ff3d8a",
+         "screen_media_c": "#2affc8", "screen_media_d": "#ffb23d"}
+for _n, _c in MEDIA.items():
+    SLOTS[_n] = ("neon", _c, 0.4, 0.0, None)
+for _c in ACCENTS:
+    SLOTS[f"led_{_c}"] = ("neon", f"#{_c}", 0.5, 0.0, None)
 # AG3: a shopfront's paint (frame, fascia, riser, door) per unit, from its era's list
 PAINTS = {"paint_red": "#7e1f1c", "paint_green": "#1f4a36", "paint_blue": "#1d3557",
           "paint_black": "#17191b", "paint_cream": "#d6cbb0", "paint_teal": "#1f6a66",

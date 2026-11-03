@@ -13,8 +13,11 @@ class ACityGenFreeCam;
 class APlayerController;
 class APostProcessVolume;
 class SCityGenOverlay;
+class UDecalComponent;
+class UMaterialInterface;
 class UMaterialParameterCollection;
 class UPointLightComponent;
+class USpotLightComponent;
 class UTexture2D;
 
 UCLASS(HideCategories = (Actor, Input, Replication, Rendering, Collision, HLOD, Physics,
@@ -54,6 +57,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<uint8> LampKinds;
 
+	/** AG15: in front of each of M20's large facade signs (billboards, banners, holo-boards),
+	 *  where its light washes its facade by night, and its color. */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	TArray<FVector> WashPoints;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	TArray<FLinearColor> WashColors;
+
 	/** District names on the map, at LabelPoints. */
 	UPROPERTY(EditAnywhere, Category = "CityGen")
 	TArray<FString> LabelNames;
@@ -75,18 +86,61 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	float FreeCamSpeedMS = 30.f;
 
-	/** How many real lights the lamps nearest the camera get by night. */
+	/** The light-pool decal material (/Game/CityGen/Core/M_CgLightPool): a soft warm pool on
+	 *  the ground under a lamp with no light of its own (AG15). */
+	UPROPERTY(EditAnywhere, Category = "CityGen")
+	TObjectPtr<UMaterialInterface> LightPoolMaterial;
+
+	/** AG15: how many lamps nearest the camera get a real light by night: a spot light under
+	 *  the lamp head pointing down, outside the lamp mesh's shadow. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	int32 LampLights = 48;
+	int32 LampLights = 192;
+
+	/** ... of which the nearest this many cast shadows. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	int32 ShadowedLamps = 8;
+
+	/** How many lamps past the lit ones get a light-pool decal on the ground under them. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	int32 LampPools = 768;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float LampRadiusM = 28.f;
+	float LampRadiusM = 30.f;
+
+	/** How far under the lamp head the spot light hangs (cm): below the lamp's housing, so
+	 *  the lamp mesh does not shadow its own light. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float LampDropCm = 45.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float StreetLampCandela = 2400.f;
+	float LampInnerConeDeg = 50.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WallLampCandela = 600.f;
+	float LampOuterConeDeg = 78.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float StreetLampCandela = 6000.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float WallLampCandela = 1500.f;
+
+	/** How many of the large signs nearest the camera wash their facade with a light. */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	int32 WashLights = 32;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float WashCandela = 1500.f;
+
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float WashRadiusM = 25.f;
+
+	/** A light pool's radius on the ground (m). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float PoolRadiusM = 7.f;
+
+	/** The night's hour (MPC_CityGen's Hour: each building's rooms lit by its schedule). */
+	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
+	float NightHour = 21.f;
 
 	/** The night's exposure (EV100, fixed so the night stays dark). */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
@@ -180,7 +234,13 @@ private:
 	TObjectPtr<APostProcessVolume> NightVolume;
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UPointLightComponent>> Lamps;
+	TArray<TObjectPtr<USpotLightComponent>> Lamps;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UDecalComponent>> Pools;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPointLightComponent>> Washes;
 
 	TSharedPtr<SCityGenOverlay> Overlay;
 	bool bReady = false;
@@ -194,6 +254,7 @@ private:
 	double WaitStart = 0.0;
 	double LampsAt = -1.0;
 	int32 LampsOn = 0;
+	int32 PoolsOn = 0;
 	FString ToastText;
 	double ToastUntil = 0.0;
 

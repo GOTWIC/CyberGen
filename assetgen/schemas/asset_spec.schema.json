@@ -81,7 +81,14 @@
               "shanty_patchwork",
               "capsule_stack",
               "perforated_skin",
-              "hangar_cladding"
+              "hangar_cladding",
+              "led_grid",
+              "hex_skin",
+              "folded_glass",
+              "mesh_screen",
+              "media_facade",
+              "diagonal_glazing",
+              "slit_panel"
             ]
           },
           "title": "Systems",
@@ -151,7 +158,14 @@
                   "shanty_patchwork",
                   "capsule_stack",
                   "perforated_skin",
-                  "hangar_cladding"
+                  "hangar_cladding",
+                  "led_grid",
+                  "hex_skin",
+                  "folded_glass",
+                  "mesh_screen",
+                  "media_facade",
+                  "diagonal_glazing",
+                  "slit_panel"
                 ]
               },
               "type": "object"
@@ -409,7 +423,14 @@
               "shanty_patchwork",
               "capsule_stack",
               "perforated_skin",
-              "hangar_cladding"
+              "hangar_cladding",
+              "led_grid",
+              "hex_skin",
+              "folded_glass",
+              "mesh_screen",
+              "media_facade",
+              "diagonal_glazing",
+              "slit_panel"
             ]
           },
           "title": "Facade Bias",

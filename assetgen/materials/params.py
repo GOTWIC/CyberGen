@@ -11,6 +11,13 @@ Data AG6 adds after AG1's 23 floats (`CPD_LAYOUT`):
 | 27 | the top of the building over its pivot (m): where the streaks start |
 | 28 | the share of rooms with their blinds down |
 | 29 | the era's index in `library.ERAS` |
+| 30 to 32 | AG15: the night's light color (linear RGB, a color temperature) |
+| 33 | AG15: the night's schedule (`systems.SCHEDULES`: 0 default, 1 office, 2 home, 3 hotel, 4 shop, 5 industrial, 6 vacant) |
+| 34 | AG15: how far the rooms' color temperatures spread |
+| 35 | AG15: an office's band of floors (lit or dark together) |
+
+The lit share itself is AG1's index 6 (the evening's share; `buildings/night.py` scales
+it by the schedule's share in `MPC_CityGen`'s Hour).
 
 They are computed in the main process from each brief and genome on every build (cheap),
 so records kept from an earlier build get them too.
@@ -24,7 +31,12 @@ from . import library as LB
 
 CPD_EXT = {"23": "room width (m)", "24": "floor height (m)", "25": "interior atlas row",
            "26": "rain streaks", "27": "top over the pivot (m)", "28": "blinds down",
-           "29": "era index"}
+           "29": "era index",
+           # AG15: the night (`buildings/night.py`)
+           "30-32": "night light color (linear RGB)",
+           "33": "night schedule (0 default, 1 office, 2 home, 3 hotel, 4 shop, "
+                 "5 industrial, 6 vacant)",
+           "34": "color temperature spread", "35": "office band of floors"}
 BLINDS = {"office": 0.25, "apartment": 0.5, "capsule": 0.4, "shop": 0.1, "club": 0.6,
           "warehouse": 0.3}
 
@@ -41,6 +53,8 @@ def building(brief: dict, genome: dict, rec: dict) -> dict:
     streaks = min(1.0, 0.25 + 0.5 * wear + 0.3 * look["wear"])
     ext = [round(room, 3), round(floor, 3), float(row), round(streaks, 3), round(top, 3),
            BLINDS[IN.USES[row]], float(LB.ERAS.index(era))]
+    from ..buildings import night as NT
+    ext += [round(v, 4) for v in NT.cpd(genome)]        # (AG15: 30 to 35, the night)
     return {"era": era, "interior": IN.USES[row], "cpd": ext}
 
 

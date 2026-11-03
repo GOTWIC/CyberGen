@@ -58,6 +58,7 @@ from . import genome as GN
 from . import parts as PT
 from . import rings as RG
 from . import roofs as RF
+from . import skins as SK
 from . import slopes as SL
 from . import systems as SY
 from . import types as TY
@@ -367,7 +368,7 @@ def mass_rows(ms: dict, g: str, gm: dict, is_top: bool, ground: str | None,
     win = genes[f"{g}.window"]
     sill0 = int(round(cont[f"{g}.sill_m"] * 1000))
     gap0 = int(round(cont[f"{g}.head_m"] * 1000))
-    if win in ("tall", "slot"):
+    if win in ("tall", "slot", "slits"):
         sill0, gap0 = max(300, sill0 - 350), max(250, gap0 - 200)
     if win == "banded":
         sill0 += 300
@@ -486,6 +487,18 @@ def bay_openings(b0: int, b1: int, j: int, n: int, win: str, rhythm: str, wwr: f
         ow = wb - max(160, int(wb * (1.0 - wwr)))
     elif win == "slot":
         ow = int(nb * wwr * 0.55)
+    elif win == "slits":
+        # AG15: two to four slits a bay, each a fifth to a third of the module
+        k = 2 if wb < 2600 else (3 if wb < 3800 else 4)
+        each = max(300, int(nb * wwr / k * 0.7)) // SNAP * SNAP
+        gap = (wb - k * each) // (k + 1)
+        if gap < 120:
+            k, each = 1, max(300, int(nb * wwr * 0.45)) // SNAP * SNAP
+            gap = (wb - each) // 2
+        if gap < PIER_MIN:
+            return []
+        return [(b0 + gap + j * (each + gap), b0 + gap + j * (each + gap) + each)
+                for j in range(k)]
     elif win == "wide":
         ow = int(nb * wwr * 1.4)
     elif win == "square":
@@ -565,6 +578,7 @@ class ShellBuilder:
         self.done_ents: set[int] = set()
         self.band_facades: list[tuple] = []
         self.all_facades: list[tuple] = []
+        self.simple_facades: list[tuple] = []       # AG15: a simple mass's (lights, logo)
         self.checks: dict = {}
         self.band_z: int | None = None
         self.used["front"] = {}
@@ -733,6 +747,7 @@ class ShellBuilder:
         FR.walls(self)
         DT.details(self)          # AG4: downpipes, fire escapes, ducts, vents, cables, cameras
         self.checks = {"mounts": FR.mount_check(self), "access": FR.door_check(self)}
+        SK.lights(self)            # AG15: crown and edge lights, the logo
         self._finish_parts()
         self.used["groups"] = [g for g in GN.GROUPS if g in groups]
         self.used["trim"] = self.stats["strips"] > 0
@@ -1313,7 +1328,7 @@ class ShellBuilder:
                     w_ = "full" if kind == "lantern" and sysname in SY.CURTAIN \
                         else ("ribbon" if kind == "lantern" else win)
                     if kind == "shop" and win in ("sparse", "clerestory", "strip", "louver",
-                                                  "pod", "slot") or \
+                                                  "pod", "slot", "slits") or \
                             kind == "shop" and sysname == "shanty_patchwork":
                         w_ = "single"
                     if kind == "louver" and win in ("clerestory", "strip", "sparse", "slit",
@@ -1334,6 +1349,13 @@ class ShellBuilder:
                                 cw = (b_ - a_) * 3 // 10
                                 a_, b_ = (a_ + b_) // 2 - cw, (a_ + b_) // 2 + cw
                             ops.append((a_, b_, back, jb))
+                    pat = genes.get(f"{g}.wpattern", "grid")
+                    if pat != "grid" and kind == "win" and full <= lo + 200 and not curve:
+                        # AG15: the window pattern (not on a door row: its balconies)
+                        ops = SK.pattern_ops(pat, ops, f, cuts, key, sysname in SY.CURTAIN,
+                                             w_)
+                        if ops:
+                            self.used.setdefault("patterned", set()).add(g)
                 kept = []
                 for op in ops:
                     if any(op[0] < m1 and op[1] > m0 and lo < z1 and hi > z0
@@ -1383,9 +1405,12 @@ class ShellBuilder:
                 for a_, b_, *_ in ops:
                     rec.append((a_ + so, b_ + so, lo, hi))
         self.stats["openings"] += n_open
+        self._fa_mounts = mounts                # (AG15: what its parts keep clear of)
         self._wall(ms, fa, rows, cols, ops_by_row, wall, reveal, key, g, sysname, cuts, balc)
         if allow and sysname:
             self._lines(fa, ms, g, sysname, cuts, rows, reveal, mounts)
+            if not curve:
+                SK.lines(self, fa, ms, g, sysname, cuts, rows, reveal, mounts)   # (AG15)
         if sysname and ms["z0"] <= 50 and not ms.get("arcade"):
             self._canopy(fa, ms, mounts)
         return n_open
@@ -1696,6 +1721,8 @@ class ShellBuilder:
                 lo >= self._low(fa, mid):
             P.on(fa, "balconette", {"w": qw, "rh": 900}, mid, lo)
             used.add("balcony")
+        SK.opening(self, fa, ms, g, sysname, row, a_, b_, reveal, key, i,
+                   getattr(self, "_fa_mounts", ()))        # (AG15)
         if curtain or irr <= 0:
             return
         use = self.br["building"]["use"]
@@ -2010,10 +2037,26 @@ class ShellBuilder:
         buf.add(slot, bot, [(p[0], p[1], z0) for p in pts],
                 [i for t in tris for i in (t[0], t[2], t[1])])
         cuts = [z0]
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        sysname = genes.get(f"{g}.system") if g != "structure" else None
         if g != "structure" and fh >= 2400:
+            # AG15: the group's own sill and head (a ribbon a floor as its system draws it),
+            # narrower on alternate floors by its pattern
+            sill0 = min(max(int(round(cont.get(f"{g}.sill_m", 1.0) * 1000)), 300),
+                        SIMPLE_SILL + 100)
+            head0 = min(max(int(round(cont.get(f"{g}.head_m", 0.4) * 1000)), 250),
+                        SIMPLE_HEAD + 300)
+            pat = genes.get(f"{g}.wpattern", "grid")
             for f in range(n):
                 zf = z0 + f * fh
-                cuts += [zf + SIMPLE_SILL, zf + fh - SIMPLE_HEAD]
+                sl, hd = sill0, head0
+                f0 = f + ms.get("f0", 0) + int(round(z0 / max(fh, 1)))
+                if pat in ("alternate", "stagger", "stepped", "checker") and f0 % 2:
+                    sl = min(sl + 450, fh - hd - 900)
+                elif pat in ("mixed", "scatter"):
+                    sl = min(sl + int(_u(self.bid, f"simple{f0}") * 3) * 250, fh - hd - 900)
+                sl = max(min(sl, fh - hd - 600), 100)
+                cuts += [zf + sl, zf + fh - hd]
         cuts.append(z1)
         doors = self._simple_landings(ms, ring, fh)
         arcs = self.br["masses"][ms["k"]].get("arcs") if ms.get("k") is not None else None
@@ -2037,11 +2080,75 @@ class ShellBuilder:
                 for za, zb, s in segs:
                     self._vquad(s, p, q, za, zb)
                 self.buf.arc = None
+        if sysname and len(cuts) > 2:
+            self._simple_facades(ms, g, sysname, ring, doors, z0, z1)
         self.stats["simple_masses"] = self.stats.get("simple_masses", 0) + 1
         if len(cuts) > 2:
             self.stats["simple_glass"] = self.stats.get("simple_glass", 0) + 1
         self.mass_info.append({"mass": ms["k"], "group": g, "system": None, "rows": n,
                                "openings": 0, "simple": True})
+
+    def _simple_facades(self, ms: dict, g: str, sysname: str, ring, doors: dict, z0: int,
+                        z1: int) -> None:
+        """AG15: a simply drawn mass's facades (M21's bands and curved shafts): mullions
+        down every chord joint of a curve and at the group's bay along straight walls, as
+        its system draws them (caps; fins on a fin wall; LED strips on an LED system or
+        skin), clear of mounts and landing doors; its facades join the building's, for the
+        crown lights and the logo."""
+        genes, cont = self.gm["genes"], self.gm["cont"]
+        feat = SY.SYSTEMS[sysname].get("feature")
+        bay = max(int(round(cont.get(f"{g}.bay_m", 3.0) * 1000)), 1500)
+        H = PT.q(z1 - z0)
+        if H < 1000:
+            return
+        led = feat == "led" or (genes.get("skin") == "led" and g == "body")
+        slot = f"led_{genes['accent']}"
+        P = self.parts
+        used = self.used["parts"].setdefault(g, set())
+        arcs = self.br["masses"][ms["k"]].get("arcs") if ms.get("k") is not None else None
+        m = len(ring)
+        n = 0
+        for i in range(m):
+            p, q = ring[i], ring[(i + 1) % m]
+            if p == q:
+                continue
+            fa = Facade(p, q, 0.0)
+            fa.d_in = _unit(ring[(i - 1) % m], p) if ring[(i - 1) % m] != p else None
+            # (the drawn ring is the cleaned one: its edges are the brief's only where the
+            # cleaning took no vertex out)
+            j = self._j(ms, 0, i) if len(ring) == len(ms["rings"][0]) else None
+            fa.j, fa.rec, fa.regions = None, None, []
+            mounts = []
+            if j is not None:
+                fa.j, fa.rec = j, self.br["edges"][j]
+                a0, ux, uy, _ = AR._edge_geom(self.br, j)
+                fa.soff = int(round((p[0] - a0[0]) * ux + (p[1] - a0[1]) * uy))
+                mounts = [(m0 - fa.soff, m1 - fa.soff, mz0, mz1)
+                          for m0, m1, mz0, mz1 in self.mounts.get(j, [])]
+            self.simple_facades.append((fa, ms))       # (not the grammar's: no piers)
+            if doors.get(i):
+                continue
+            n_ = (fa.nx, fa.ny)
+            curved = bool(arcs) and arc_of(arcs, p, q, n_) is not None
+            ss = [0] if curved or fa.L < bay else \
+                [fa.L * k // max(1, round(fa.L / bay)) for k in range(round(fa.L / bay))]
+            for s in ss:
+                if any(s - 120 < m1 and s + 120 > m0 and z0 < mz1 and z1 > mz0
+                       for m0, m1, mz0, mz1 in mounts):
+                    continue
+                if led:
+                    P.on(fa, "led", {"dir": "v", "L": H, "t": SK.LED_T, "slot": slot}, s, z0)
+                elif feat == "fins" and not curved and z0 >= self._low(fa, s):
+                    P.on(fa, "fin", {"t": 100, "d": PT.q(cont[f"{g}.fin_m"] * 1000), "h": H},
+                         s, z0)
+                else:
+                    P.on(fa, "cap", {"dir": "v", "w": 70, "p": 90, "h": H}, s, z0)
+                n += 1
+        if n:
+            used.add("led" if led else "caps")
+            if led:
+                self.used["accent"] = True
+            self.stats["simple_mullions"] = self.stats.get("simple_mullions", 0) + n
 
     def _simple_landings(self, ms: dict, ring, fh: int) -> dict[int, list]:
         """The landing doors of the skybridges landing on a simply drawn mass (it has no

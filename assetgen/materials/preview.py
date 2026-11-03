@@ -57,6 +57,10 @@ def _props(man: dict) -> dict[str, dict]:
         out[bid] = {"era": mat["era"], "cg_wear": c[3], "cg_dirt": c[4], "cg_neon": c[5],
                     "cg_lit": c[6], "cg_seed": c[7], "cg_room": e[0], "cg_floorh": e[1],
                     "cg_row": e[2], "cg_streaks": e[3], "cg_top": e[4], "cg_blinds": e[5]}
+        if len(e) >= 13:
+            # AG15: the night (Custom Primitive Data 30 to 35)
+            out[bid].update({"cg_ncol": list(e[7:10]), "cg_sched": e[10],
+                             "cg_spread": e[11], "cg_band": e[12]})
     return out
 
 
@@ -158,7 +162,8 @@ def _ground(adir: Path, views: list) -> dict | None:
 
 
 def _lights(model, center, r) -> list[list[float]]:
-    """Street lights near a view: the lamp (8 m high, M6's prototype) over each pole."""
+    """Street lights near a view: the lamp (8 m high, M6's prototype) over each pole (AG15:
+    the preview hangs a spot light under it, pointing down)."""
     out = []
     for p in model.props:
         if p.type != "prop.street_light" or not _near(p.position, center, r):
@@ -166,6 +171,90 @@ def _lights(model, center, r) -> list[list[float]]:
         out.append([p.position[0], p.position[1], p.position[2] + 7.6 * p.scale[2]])
     out.sort(key=lambda q: ((q[0] - center[0]) ** 2 + (q[1] - center[1]) ** 2, q[0], q[1]))
     return out[:MAX_LIGHTS]
+
+
+WASH_R = 260.0           # AG15: the large signs near a night view that wash their facade
+WASH_KINDS = ("billboard", "banner", "holo_ad")
+MAX_WASHES = 40
+
+
+def _washes(model, center, r) -> list[dict]:
+    """AG15: M20's large facade signs near a view (billboards, banners, holo-boards in front
+    of a facade): a light 1.5 m in front of each, in a neon color by its id, so it washes
+    its facade by night."""
+    import hashlib
+    from ..buildings import systems as SY
+    out = []
+    for s in model.sign_slots:
+        if s.kind not in WASH_KINDS or s.mount not in ("facade", "front") or \
+                not _near(s.position, center, r):
+            continue
+        a = math.radians(s.yaw_deg)
+        h = int.from_bytes(hashlib.blake2b(s.id.encode("utf-8"), digest_size=4).digest(),
+                           "little")
+        c = SY.ACCENTS[h % len(SY.ACCENTS)]
+        out.append({"pos": [s.position[0] + 1.5 * math.cos(a), s.position[1] +
+                            1.5 * math.sin(a), s.position[2]],
+                    "color": [int(c[k:k + 2], 16) / 255.0 for k in (0, 2, 4)],
+                    "size": max(s.width_m, s.height_m)})
+    out.sort(key=lambda q: ((q["pos"][0] - center[0]) ** 2 + (q["pos"][1] - center[1]) ** 2,
+                            q["pos"][0], q["pos"][1]))
+    return out[:MAX_WASHES]
+
+
+def core_views(model, man: dict, width: int) -> list[dict]:
+    """AG15's shows (`--views core`): the corporate core (the district of most towers by
+    archetype `corporate_core`, else by towers) from the air south of it (`core`), and a
+    street through it at eye level (`core_street`: its longest avenue or street near the
+    towers' middle, looking along it)."""
+    from collections import Counter
+    towers = [b for b in model.buildings if b.form is not None and b.form.tower]
+    if not towers:
+        return []
+    arch = {d.id: d.archetype for d in model.districts}
+    n = Counter(b.district_id for b in towers)
+    did = max(n, key=lambda d: (arch.get(d) == "corporate_core", n[d], d))
+    ts = [b for b in towers if b.district_id == did]
+    from citygen import geom as G
+    ts = [b for b in ts if b.footprint is not None]
+    if not ts:
+        return []
+    cs = [G.from_model_poly(b.footprint).centroid for b in ts]
+    cx = sum(p.x for p in cs) / len(cs)
+    cy = sum(p.y for p in cs) / len(cs)
+    hmax = max(b.height_m for b in ts)
+    h = int(width * 9 / 16)
+
+    def tiles(p, rr):
+        return sorted(t for t in man["tiles"] if _tile_near(t, p, rr))
+    d = max(380.0, 2.2 * hmax)
+    out = [{"name": "core", "ortho": False, "lens": 32.0,
+            "eye": [cx - 0.42 * d, cy - d, 0.75 * hmax + 120.0],
+            "target": [cx, cy, 0.3 * hmax], "w": width, "h": h,
+            "shell_tiles": tiles((cx, cy), 650.0), "far": True}]
+    best = None
+    for s in model.road_segments:
+        if s.road_class not in ("avenue", "street") or s.level != 0 or s.bridge or s.tunnel:
+            continue
+        pts = [tuple(p) for p in s.centerline]
+        L = _plen(pts)
+        if L < 90.0:
+            continue
+        mx, my = _at(pts, L / 2.0)
+        dd = math.hypot(mx - cx, my - cy)
+        if dd > 450.0:
+            continue
+        k = (dd - 0.4 * min(L, 250.0), s.id)
+        if best is None or k < best[0]:
+            best = (k, s, pts, L)
+    if best is not None:
+        _, s, pts, L = best
+        x0, y0 = _at(pts, min(12.0, L * 0.1))
+        x1, y1 = _at(pts, min(L, 90.0))
+        out.append({"name": "core_street", "ortho": False, "lens": 24.0,
+                    "eye": [x0, y0, 1.8], "target": [x1, y1, 5.0], "w": width, "h": h,
+                    "shell_tiles": tiles((x0, y0), 420.0)})
+    return out
 
 
 def run(args, progress=None) -> dict:
@@ -187,8 +276,10 @@ def run(args, progress=None) -> dict:
     bo = Path(args.blockout) if args.blockout else bdir
     cams = PV.cameras(bdir, bo)
     which = set(args.views or ["districts", "street"])
-    kinds = {"city", "city_full", "districts", "street", "deck", "water"}
+    kinds = {"city", "city_full", "districts", "street", "deck", "water", "core"}
     views = PV.plan_views(man, cams, args.width, which & kinds)
+    if "core" in which:
+        views += core_views(model, man, args.width)          # (AG15)
     if "deck" in which and cams.get("deck"):
         from ..streets.ctx import Ground
         ox, oy = cams["deck"]["origin"]
@@ -199,7 +290,8 @@ def run(args, progress=None) -> dict:
     if named:
         allv = PV.plan_views(man, cams, args.width, {"districts", "street"})
         views = [v for v in allv if v["name"] in named] + \
-            [v for v in water_views(model, man, args.width) if v["name"] in named]
+            [v for v in water_views(model, man, args.width) if v["name"] in named] + \
+            [v for v in core_views(model, man, args.width) if v["name"] in named]
     for k, (eye, tgt) in enumerate(zip(args.eye, args.target), 1):
         near = [t for t in man["tiles"] if _tile_near(t, tgt, PV.STREET_R)]
         views.append({"name": f"custom_{k}", "ortho": False, "lens": args.lens,
@@ -215,11 +307,19 @@ def run(args, progress=None) -> dict:
             v["connection_tiles"] = sorted(set(v["shell_tiles"]) & set(ctiles))
             if v["ortho"] or v.get("section"):
                 v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
-                v["signs"], v["lights"] = [], []
+                v["signs"], v["lights"], v["washes"] = [], [], []
+            elif v.get("far") and v["name"] == "core":
+                # (AG15: the core from the air: its streets, lamps and signs round the
+                # middle it looks at)
+                v["street_tiles"] = [t for t in stiles if _tile_near(t, tgt, 650.0)]
+                v["signs"] = _signs(model, signs, adir, tgt, 450.0)
+                v["lights"] = _lights(model, tgt, 450.0)
+                v["washes"] = _washes(model, tgt, 450.0)
             else:
                 v["street_tiles"] = [t for t in stiles if _tile_near(t, v["eye"], STREET_R)]
                 v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R)
                 v["lights"] = _lights(model, v["eye"], LIGHT_R)
+                v["washes"] = _washes(model, v["eye"], WASH_R)
             st.advance()
         ag8 = _ag8(adir, views)
         wat = _water(adir, views)
@@ -241,6 +341,7 @@ def run(args, progress=None) -> dict:
            "ag8_families": (ag8 or {}).get("families", []),
            "ground": {"clumps": gr["clumps"]} if gr is not None else {},
            "proxy_tiles": sorted(man["tiles"]), "samples": args.samples,
+           "hour": float(getattr(args, "hour", 21.0) or 21.0),
            "era_slots": sorted(CT.ERA_SLOTS)}
     return _blender(job, "ag6_preview.py", args.blender, od, progress, len(views))
 

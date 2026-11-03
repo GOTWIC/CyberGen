@@ -8,7 +8,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG14 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15 done, the rest to come |
 | 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
 | 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
 | 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
@@ -205,7 +205,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG12`](docs/progress/AG12), [`AG13`](docs/progress/AG13)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG12`](docs/progress/AG12), [`AG13`](docs/progress/AG13), [`AG15`](docs/progress/AG15)
 
 ### Cities
 
@@ -235,6 +235,27 @@ size).
 | <img src="docs/progress/AG10/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
 
 ### Up close
+
+**Corporate cores by day and by night.** Neighboring towers never share a facade style,
+window pattern, palette or night look: LED-strip mullions, honeycomb panels, folded and
+colored glass, mesh and media screens, diagonal glazing and slit windows, windows staggered,
+stepped and mixed in size; at night each building lights its own way (offices in bands of
+floors, homes scattered, hotels warm, a few towers dark), with crown and edge lights and
+logos (8K).
+
+| Delta Megacity | |
+|---|---|
+| <img src="docs/progress/AG15/delta_megacity/core.jpg" width="420"> | <img src="docs/progress/AG15/delta_megacity/core_night.jpg" width="420"> |
+
+| Vesper Bay | |
+|---|---|
+| <img src="docs/progress/AG15/vesper_bay/core.jpg" width="420"> | <img src="docs/progress/AG15/vesper_bay/core_night.jpg" width="420"> |
+
+<img src="docs/progress/AG15/delta_megacity/core_street_night.jpg" width="840">
+
+A street in Delta Megacity's core at night under its lamps (8K).
+`assetgen materials preview out/<city> --views core --night` renders these. More:
+[`docs/progress/AG15`](docs/progress/AG15).
 
 <img src="docs/progress/AG2/towers.jpg" width="840">
 
@@ -472,7 +493,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG12 | Water | Water that flows, foams and (at sea) swells, beds of mud, sand and stone, natural banks, beaches, marsh edges and riprap, Single Layer Water and an underwater look in Unreal | Done |
 | AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
 | AG14 | Fit and finish | Junctions that meet their roads, smooth glazed curved walls, roof equipment on its roofs, transit frames, piers and cable-stayed masts, embankments under low decks, bridges drawn once, nothing hanging over the lanes; checks that everything rests on something and nothing passes through anything else | Done |
-| AG15 | Cyberpunk facades and night | Window patterns beyond grids, mixed materials, every building lit its own way at night, lit streets | Planned |
+| AG15 | Cyberpunk facades and night | Seven new facade styles and window patterns beyond grids, two or three finishes a building, neighboring towers never alike; every building lit its own way at night with crown lights and logos; lamps that light the streets in Unreal | Done |
 
 ---
 

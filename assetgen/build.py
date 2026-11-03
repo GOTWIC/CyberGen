@@ -66,7 +66,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag14.3"         # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "ag15.1"         # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -263,7 +263,43 @@ def building_asset(brief: dict, gm: dict) -> tuple[dict, dict, dict]:
         rec["checks"]["deck"] = DKB.check(brief, arrs, pp)
     rec["thumb"], rec["thumb_fill"] = TH.hash_of(brief, arrs, inst, tints)
     rec["class"] = AC.budget_class(rec)
+    rec["ag15"] = _ag15(brief, gm, sh, arrs, inst, tints)
     return sh, px, rec
+
+
+def _ag15(brief: dict, gm: dict, sh: dict, arrs: dict, inst: list, tints: dict) -> dict:
+    """AG15's record: whether it is a tower (the neighbor rule), its footprint's middle, its
+    signatures (system, pattern, palette, night), its night (the CPD's values) and its night
+    thumbnail's hash; how many finishes its walls show."""
+    from .buildings import neighbors as NB
+    from .buildings import night as NT
+    sig = NB.signature(gm)
+    n = gm["extra"].get("night") or {}
+    cp = NT.cpd(gm)
+    out = {"tower": GN.is_tower(brief),
+           "xy": [C.m2(brief["origin"][0]), C.m2(brief["origin"][1])],
+           "sig": {k: list(v) if isinstance(v, tuple) else v for k, v in sig.items()},
+           "night": {"schedule": n.get("schedule", "default"), "lit": gm["extra"]["lit"],
+                     "color": cp[0:3], "spread": cp[4], "band": cp[5]},
+           "finishes": sorted({s for s in arrs if s in FINISH_SLOTS} |
+                              {s for x in inst for s in PT.mesh(x["family"], x["params"])[1]
+                               if s in FINISH_SLOTS})}
+    if out["tower"]:
+        nt = {"seed": float(gm["extra"]["seed"]), "share": float(gm["extra"]["lit"]),
+              "schedule": int(cp[3]), "band": int(cp[5]), "color": cp[0:3],
+              "room_mm": float(gm["cont"]["body.bay_m"]) * 1000.0,
+              "floor_mm": float(brief["building"]["floor_grid"]["floor_height_m"] or 3.5)
+              * 1000.0}
+        out["night_thumb"] = TH.hash_of(brief, arrs, inst, tints, nt)[0]
+    return out
+
+
+# AG15: the wall and skin finishes a building can show (two or three a building)
+FINISH_SLOTS = ("concrete", "plaster", "panel", "brick", "cladding", "spandrel", "band_panel",
+                "board_concrete", "stucco", "infill", "seam", "hangar", "patch_sheet",
+                "patch_rust", "patch_tarp", "patch_panel", "patch_ply", "trim", "hex", "mesh",
+                "frit", "fold_glass", "perforated", "fin", "member", "timber", "shutter",
+                "pod", "louver")
 
 
 def _on_wall(spans, s: float) -> bool:
@@ -543,7 +579,13 @@ def build(build_dir: str | Path, spec_path: str | None = None,
         for bid in sorted(briefs):
             genomes[bid] = GN.make(briefs[bid])
             st.advance()
-    hashes = {bid: asset_hash(bh[bid], lib_hash) for bid in sorted(briefs)}
+        # AG15: the neighbor rule (towers within 150 m differ); what a tower avoided is in
+        # its asset's hash
+        from .buildings import neighbors as NB
+        avoided = NB.assign(briefs, genomes)
+    hashes = {bid: asset_hash(bh[bid] if bid not in avoided else
+                              C.digest([bh[bid], avoided[bid]]), lib_hash)
+              for bid in sorted(briefs)}
     tiles: dict[str, list[str]] = {}
     for bid in sorted(briefs):
         o = briefs[bid]["origin"]

@@ -280,6 +280,33 @@ def district_labels(build: Path) -> list[dict]:
     return sorted(out, key=lambda r: r["name"])
 
 
+WASH_KINDS = ("billboard", "banner", "holo_ad")      # AG15: M20's large signs on facades
+WASH_COLORS = ("ff2a6d", "05d9e8", "b967ff", "ffb000", "39ff8a", "f2f6ff")
+WASH_OUT_M = 1.5
+
+
+def sign_washes(build: Path) -> tuple[list[float], list[float]]:
+    """AG15: where M20's large facade signs (billboards, banners, holo-boards in front of a
+    facade) wash their facade by night: a point WASH_OUT_M in front of each (flat x, y, z,
+    meters, heights as the slots'), and its neon color by its id (flat r, g, b)."""
+    path = build / "gameplay.json"
+    if not path.is_file():
+        return [], []
+    gp = json.loads(path.read_text(encoding="utf-8"))
+    pts, cols = [], []
+    for s in sorted(gp.get("sign_slots") or [], key=lambda s: s["id"]):
+        if s.get("kind") not in WASH_KINDS or s.get("mount") not in ("facade", "front"):
+            continue
+        a = math.radians(float(s.get("yaw_deg", 0.0)))
+        x, y, z = s["position"]
+        pts += [round(x + WASH_OUT_M * math.cos(a), 2), round(y + WASH_OUT_M * math.sin(a), 2),
+                round(z, 2)]
+        c = WASH_COLORS[int(hashlib.sha256(s["id"].encode("utf-8")).hexdigest()[:8], 16)
+                        % len(WASH_COLORS)]
+        cols += [round(int(c[k:k + 2], 16) / 255.0, 3) for k in (0, 2, 4)]
+    return pts, cols
+
+
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -299,10 +326,12 @@ def write_play(build: Path, plan_sha: str, plan: dict, instances: list[dict],
         size = render_map(plan, png)
     walk = walk_points(graphs)
     lamps, kinds = lamp_points(plan, instances)
-    data = {"version": 1, "city": plan["city"],
+    washes, wash_colors = sign_washes(build)
+    data = {"version": 2, "city": plan["city"],   # (2: AG15, spot lamps and light pools)
             "map": {"file": "unreal/map.png", "bounds": plan["bounds"], "size": list(size),
                     "sha256": _sha(png.read_bytes()), "source": source},
             "walk": walk, "lamps": lamps, "lamp_kinds": kinds,
+            "washes": washes, "wash_colors": wash_colors,
             "labels": district_labels(build)}
     text = json.dumps(data, separators=(",", ":")) + "\n"
     if not data_path.is_file() or data_path.read_text(encoding="utf-8") != text:
@@ -310,7 +339,7 @@ def write_play(build: Path, plan_sha: str, plan: dict, instances: list[dict],
     return {"data": "unreal/play.json", "map": "unreal/map.png", "map_bounds": plan["bounds"],
             "map_size": list(size), "map_sha256": data["map"]["sha256"],
             "hash": _sha(text.encode("utf-8"))[:16], "walk_points": len(walk) // 3,
-            "lamps": len(kinds), "labels": len(data["labels"])}
+            "lamps": len(kinds), "washes": len(washes) // 3, "labels": len(data["labels"])}
 
 
 # --- the plugin -------------------------------------------------------------------------------

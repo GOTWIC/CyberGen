@@ -84,9 +84,10 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "7"                 # AG6: textured masters; AG8: leaves, textured holo;
+STAGE2_VERSION = "8"                 # AG6: textured masters; AG8: leaves, textured holo;
                                      # AG5: the heroes' masks (HeroMask on UV1);
-                                     # AG12: water (Single Layer Water) and bed (caustics)
+                                     # AG12: water (Single Layer Water) and bed (caustics);
+                                     # AG15: the glass's night by schedule and Hour
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
@@ -102,7 +103,9 @@ LIT_CPD = 6                          # the lit-window ratio (AG1's cpd_layout)
 # AG6's Custom Primitive Data (assetgen/materials/params.py): wear, dirt height, seed (AG0),
 # room width, floor height, interior row, rain streaks, top, blinds
 CPD = {"wear": 3, "dirt": 4, "neon": 5, "lit": 6, "seed": 7, "room": 23, "floor": 24,
-       "row": 25, "streaks": 26, "top": 27, "blinds": 28}
+       "row": 25, "streaks": 26, "top": 27, "blinds": 28,
+       # AG15: the night (assetgen/buildings/night.py): light color, schedule, spread, band
+       "ncol": 30, "sched": 33, "spread": 34, "band": 35}
 SAMPLER = {"color": "SAMPLERTYPE_COLOR", "normal": "SAMPLERTYPE_NORMAL",
            "mask": "SAMPLERTYPE_MASKS"}
 STAGE2_FOLDER = "Assets"             # citygen.unreal.STAGE2_FOLDER
@@ -517,16 +520,40 @@ float h3 = frac(sin(dot(c, float2(73.156, 52.235))) * 15731.743);
 float row = RowOverride >= 0.0 ? RowOverride : Row;
 float col = floor(h1 * (Cols - 0.001));
 float2 auv = float2((col + i.x) / Cols, (row + 1.0 - i.y) / Rows);
-float lit = h2 < Lit ? 0.35 + 0.65 * frac(h1 * 7.31) : 0.0;
-return float4(auv, lit, (h3 < Blinds && p.y > 1.0 - h2 * 0.9) ? 1.0 : 0.0);
+// AG15: the share of the evening's lit rooms lit at the hour, by the building's schedule
+// (assetgen/buildings/night.py HOURS: night, morning, day, evening, late)
+const float K[35] = {0.5, 0.6, 0.3, 1.0, 0.8,  0.12, 0.7, 0.9, 1.0, 0.35,
+                     0.15, 0.6, 0.25, 0.9, 1.0,  0.45, 0.6, 0.35, 0.9, 1.0,
+                     0.2, 0.6, 0.9, 1.0, 0.8,  0.6, 0.8, 0.9, 0.9, 0.7,
+                     0.5, 0.5, 0.5, 0.5, 0.5};
+float hr = fmod(max(Hour, 0.0), 24.0);
+int bnd = hr < 6.0 ? 0 : (hr < 10.0 ? 1 : (hr < 16.0 ? 2 : (hr < 20.0 ? 3 : 4)));
+int si = clamp((int)round(Sched), 0, 6);
+float s = Lit * K[si * 5 + bnd];
+if (si == 6) s = 0.04;
+if (si == 4 && cell.y < 2.5) s = min(1.0, s * 1.6);
+float lit = h2 < s ? 0.35 + 0.65 * frac(h1 * 7.31) : 0.0;
+if (si == 1)
+{
+    float2 bc = float2(0.0, floor(cell.y / max(Band, 1.0))) + Seed * 1000.0 + 0.53;
+    float hb = frac(sin(dot(bc, float2(12.9898, 78.233))) * 43758.5453);
+    lit = (hb < min(s * 1.25, 1.0) && h2 < 0.85) ? 0.55 + 0.45 * frac(h1 * 7.31) : 0.0;
+}
+// w: the blind (2) plus the room's color temperature draw (0 to 1)
+float blind = (h3 < Blinds && p.y > 1.0 - h2 * 0.9) ? 2.0 : 0.0;
+return float4(auv, lit, blind + frac(h3 * 3.7) * 0.999);
 """
 GLASS_CODE = """
+float blind = Room.w >= 2.0 ? 1.0 : 0.0;
+float t = (frac(Room.w) - 0.5) * 2.0 * Spread;
+float3 lc = t > 0.0 ? lerp(NCol, float3(0.7, 0.85, 1.0), saturate(t))
+                    : lerp(NCol, float3(1.0, 0.62, 0.32), saturate(-t));
 float slat = 0.75 + 0.25 * frac(UV.y * 25.0);
 float3 bd = float3(0.55, 0.53, 0.5) * slat;
-float3 day = lerp(Day.rgb, bd, Room.w) * 0.2;
-float3 nite = lerp(Nite.rgb * Room.z, float3(1.0, 0.85, 0.65) * 0.45 * Room.z, Room.w)
+float3 day = lerp(Day.rgb, bd, blind) * 0.2;
+float3 nite = lerp(Nite.rgb * 1.4 * lc * Room.z, lc * 0.45 * Room.z, blind)
             + Nite.rgb * 0.02;
-return Interior * lerp(day, nite * 1.2, Night);
+return Interior * lerp(day, nite * 1.2 * NightGain, Night);
 """
 DECAL_UV_CODE = "return (frac(UV) + float2(fmod(Cell, Cols), floor(Cell / Cols))) / float2(Cols, Rows);"
 
@@ -745,7 +772,7 @@ def tint_color(m, x, y):
     return cus
 
 
-MPC_SCALARS = (("Night", 0.0), ("Wind", 0.35))
+MPC_SCALARS = (("Night", 0.0), ("Wind", 0.35), ("Hour", 21.0))
 
 
 def mpc():
@@ -781,6 +808,60 @@ def night(m, x, y):
 def wind(m, x, y):
     return expr(m, unreal.MaterialExpressionCollectionParameter, x, y, collection=mpc(),
                 parameter_name="Wind")
+
+
+def hour(m, x, y):
+    """AG15: MPC_CityGen's Hour (0 to 24): each building's rooms lit by its schedule."""
+    return expr(m, unreal.MaterialExpressionCollectionParameter, x, y, collection=mpc(),
+                parameter_name="Hour")
+
+
+LIGHT_POOL_VERSION = "1"
+LIGHT_POOL_CODE = """
+float2 d = UV * 2.0 - 1.0;
+float r = saturate(1.0 - dot(d, d));
+return r * r;
+"""
+
+
+def light_pool_material():
+    """AG15: /Game/CityGen/Core/M_CgLightPool, the play features' light pool under a lamp
+    with no light of its own: a deferred decal, translucent, a warm emissive disc fading
+    from its middle, by MPC_CityGen's Night (none by day)."""
+    path = f"{CORE}/M_CgLightPool"
+    m = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
+    if m is not None and meta(m, "cg.pool") == LIGHT_POOL_VERSION:
+        return m
+    if m is None:
+        m = AT.create_asset("M_CgLightPool", CORE, unreal.Material, unreal.MaterialFactoryNew())
+    else:
+        MEL.delete_all_material_expressions(m)
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    MP = unreal.MaterialProperty
+    uv = expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 0, coordinate_index=0)
+    fall = custom(m, -650, 0, LIGHT_POOL_CODE, ["UV"], cmot(F1), "CgLightPool")
+    link(uv, "", fall, "UV")
+    col = expr(m, unreal.MaterialExpressionVectorParameter, -650, 200,
+               parameter_name="PoolColor", default_value=unreal.LinearColor(1.0, 0.7, 0.42, 1.0))
+    st = sparam(m, "PoolStrength", -650, 320, 2.5)
+    nt = night(m, -650, 400)
+    k = custom(m, -400, 200, "return Col.rgb * Fall * Strength * Night;",
+               ["Col", "Fall", "Strength", "Night"], cmot(F3), "CgPoolEmit")
+    for a, out, b in ((col, "", "Col"), (fall, "", "Fall"), (st, "", "Strength"),
+                      (nt, "", "Night")):
+        link(a, out, k, b)
+    op = custom(m, -400, 0, "return Fall * 0.35 * Night;", ["Fall", "Night"], cmot(F1),
+                "CgPoolOpacity")
+    link(fall, "", op, "Fall")
+    link(nt, "", op, "Night")
+    MEL.connect_material_property(k, "", MP.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(col, "", MP.MP_BASE_COLOR)
+    MEL.connect_material_property(op, "", MP.MP_OPACITY)
+    MEL.recompile_material(m)
+    EAL.set_metadata_tag(m, "cg.pool", LIGHT_POOL_VERSION)
+    EAL.save_loaded_asset(m, only_if_is_dirty=False)
+    return m
 
 
 def sparam(m, name, x, y, default=0.0, cpd=None):
@@ -976,7 +1057,11 @@ def glass_master(m, defaults):
            "Blinds": sparam(m, "Blinds", -2400, 1130, 0.3, CPD["blinds"]),
            "Back": sparam(m, "InteriorBack", -2400, 1210, 0.5),
            "Cols": sparam(m, "InteriorCols", -2400, 1290, 8.0),
-           "Rows": sparam(m, "InteriorRows", -2400, 1370, 6.0)}
+           "Rows": sparam(m, "InteriorRows", -2400, 1370, 6.0),
+           # AG15: the night's schedule and band (CPD 33, 35), MPC_CityGen's Hour
+           "Sched": sparam(m, "NightSchedule", -2400, 1450, 0.0, CPD["sched"]),
+           "Band": sparam(m, "NightBand", -2400, 1530, 3.0, CPD["band"]),
+           "Hour": hour(m, -2400, 1610)}
     room = custom(m, -2000, 600, ROOM_CODE, list(ins), cmot(F4), "CgRoom")
     for name, node in ins.items():
         link(node, "", room, name)
@@ -987,10 +1072,23 @@ def glass_master(m, defaults):
     nite = tparam(m, "InteriorNight", "color", -1600, 750, ruv, defaults)
     inter = sparam(m, "Interior", -1600, 1000, 0.0)
     nt = night(m, -1600, 1100)
-    g = custom(m, -1200, 700, GLASS_CODE, ["Day", "Nite", "Room", "Night", "UV", "Interior"],
+    # AG15: the night's light color (CPD 30 to 32), its spread (34), the night's gain
+    nc = [sparam(m, f"NightColor{c}", -1800, 1200 + 80 * k, d, CPD["ncol"] + k)
+          for k, (c, d) in enumerate((("R", 1.0), ("G", 0.88), ("B", 0.74)))]
+    rg = expr(m, unreal.MaterialExpressionAppendVector, -1600, 1250)
+    link(nc[0], "", rg, "A")
+    link(nc[1], "", rg, "B")
+    rgb = expr(m, unreal.MaterialExpressionAppendVector, -1450, 1250)
+    link(rg, "", rgb, "A")
+    link(nc[2], "", rgb, "B")
+    spread = sparam(m, "NightSpread", -1600, 1450, 0.3, CPD["spread"])
+    gain = sparam(m, "NightGain", -1600, 1530, 1.0)
+    g = custom(m, -1200, 700, GLASS_CODE, ["Day", "Nite", "Room", "Night", "UV", "Interior",
+                                           "NCol", "Spread", "NightGain"],
                cmot(F3), "CgGlass")
     for a, out, b in ((day, "RGBA", "Day"), (nite, "RGBA", "Nite"), (room, "", "Room"),
-                      (nt, "", "Night"), (uv0, "", "UV"), (inter, "", "Interior")):
+                      (nt, "", "Night"), (uv0, "", "UV"), (inter, "", "Interior"),
+                      (rgb, "", "NCol"), (spread, "", "Spread"), (gain, "", "NightGain")):
         link(a, out, g, b)
     g2 = expr(m, unreal.MaterialExpressionMultiply, -900, -300, const_b=2.0)
     link(col, "", g2, "A")
@@ -2626,6 +2724,19 @@ class Importer:
                                       for r in lab]),
                     ("night_collection", mpc())):
                 a.set_editor_property(k, v)
+            # AG15: the light pools under the lamps past the lit ones, the night's hour (a
+            # plugin built before AG15 has neither: the city imports with its lamps as were)
+            ws, wc = data.get("washes") or [], data.get("wash_colors") or []
+            for k, v in (("light_pool_material", light_pool_material()),
+                         ("night_hour", float(JOB.get("night_hour", 21.0))),
+                         ("wash_points", [ue_loc(ws[i], ws[i + 1], ws[i + 2])
+                                          for i in range(0, len(ws), 3)]),
+                         ("wash_colors", [unreal.LinearColor(wc[i], wc[i + 1], wc[i + 2], 1.0)
+                                          for i in range(0, len(wc), 3)])):
+                try:
+                    a.set_editor_property(k, v)
+                except Exception as e:
+                    log(f"play features: no {k} ({e})")
             a.tags = self.tags(PLAY_KEY, hv, [], "play", "play", "", "")
 
         self.place(have, PLAY_KEY, info["hash"], cls.static_class(), make, update, "CityGen")

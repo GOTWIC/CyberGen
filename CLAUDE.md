@@ -1227,8 +1227,7 @@ Sample builds, the measures before and after: `docs/progress/fix_paths/`.
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14; planned:
-AG15 cyberpunk facades and night from the first run-through), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -1705,6 +1704,40 @@ AG14 (fit and finish, from the first run-through) is in place (tests
 - **Exporter**: no code change (`docs/unreal_export.md`, "From AG14"); the packs' normals
   are kept on both import paths (`test_stage2_packs_keep_their_normals`).
 Results: `docs/progress/AG14/`.
+
+AG15 (cyberpunk facades and night, from the first run-through) is in place (tests
+`tests/assetgen/test_ag_night.py`):
+- **Facades** (`buildings/skins.py`): seven systems (`systems.AG15_SYSTEMS`: `led_grid`
+  LED-strip mullions, `hex_skin` honeycomb panels, `folded_glass`, `mesh_screen`,
+  `media_facade` a screen over a block of floors, `diagonal_glazing`, `slit_panel` with the
+  `slits` window), their parts (`skins.FAMILIES`: led, hex, fold, mesh, media, frit, logo;
+  slots `led_<accent>`, `screen_media_*` emissive); window patterns per group (gene
+  `{g}.wpattern`, `systems.PATTERNS`: stagger, mixed, stepped, checker, scatter, alternate,
+  applied row by row in `skins.pattern_ops`, not on door rows); a skin over any glazed
+  system (`skin`: LED strips or fritted glass); colored glass; M21's bands and curved shafts
+  get mullions, fins or LED strips at their joints and bay, their own sills by pattern
+  (`shell._simple_facades`). `genome.reach_of` (`systems.REACH` by archetype: corporate
+  core 1, midtown 0.85, ...) weights AG15's systems, patterns past the grid, colored glass,
+  skins, crown lights and logos.
+- **Neighbor rule** (`buildings/neighbors.py`): towers (`genome.is_tower`, M21's) within
+  150 m outside one family differ in system, (window, pattern), (wall, glass) and (light,
+  accent), and no two vacant towers side by side: units (a family or a tower) tallest first
+  draw again with what their earlier neighbors took (`genome.make(brief, avoid)`); what a
+  tower avoided is in its asset hash. `asset_unique` gains `neighbors` (also day and night
+  thumbnails `THUMB_MIN` apart).
+- **Night** (`buildings/night.py`): the genome's `extra.night` (schedule by use, a share of
+  towers vacant by danger and wealth; light color temperature; spread; an office's band of
+  floors), Custom Primitive Data 30 to 35 (`materials/params.py`); the lit share by schedule
+  and hour band (`HOURS`, `MPC_CityGen`'s `Hour`); crown and edge LED strips and a lit logo
+  on towers (`crown_light`, `logo`, `skins.lights`); night thumbnails (`thumb.render(...,
+  night)`, record `ag15`). `GEN_VERSION` ag15.1.
+- **Blender**: the glass and proxies light by schedule (`ag6_materials._night_rooms`,
+  `set_hour`); spot lamps and sign washes by night; `assetgen materials preview --views core`
+  (the corporate core from the air and a street through it), `--hour`.
+- **Exporter**: `M_CgGlass` by schedule and Hour (`STAGE2_VERSION` 8); the play features'
+  spot lights under the 192 nearest lamps, `M_CgLightPool` decals under 768 more, sign
+  washes (`docs/unreal_export.md`, "From AG15").
+Results: `docs/progress/AG15/`.
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one

@@ -570,7 +570,7 @@ class Band:
                 "lantern": "glass", "pod": "void"}[kind]
         w_ = win
         if kind == "shop" and (win in ("sparse", "clerestory", "strip", "louver", "pod",
-                                       "slot") or sysname == "shanty_patchwork"):
+                                       "slot", "slits") or sysname == "shanty_patchwork"):
             w_ = "single"
         if kind == "louver" and win in ("clerestory", "strip", "sparse", "slit", "patch",
                                         "square", "pod"):

@@ -1904,6 +1904,86 @@ railings and slope shrubs at the model's heights (M16 and M20 on terrain); steps
 curved facades proper (AG15); Mac = x86 (deferred); `tests/assetgen/data/golden_props.json`
 is written on the Mac.
 
+## AG15: cyberpunk facades and night
+
+**Built.** The stage 2 side of the first run-through's look (`docs/run_through_1.md`:
+buildings alike and lit alike, streets black at night), scope 14.16. Tests:
+`tests/assetgen/test_ag_night.py`.
+
+- **Facades that are not rows of rectangles** (`assetgen/buildings/skins.py`):
+  - Seven systems (`systems.AG15_SYSTEMS`): `led_grid` (curtain wall with LED-strip
+    mullions on every bay line), `hex_skin` (a honeycomb panel over every pane),
+    `folded_glass` (a V of glass out of the wall per bay, its apex off center on a grouped
+    rhythm), `mesh_screen` (perforated mesh screens on brackets over alternate floors),
+    `media_facade` (ribbon glazing and a media screen over a block of floors on the widest
+    street facade), `diagonal_glazing` (diagonal mullions over every cell, alternating so
+    they read as a diamond lattice) and `slit_panel` (panels with two to four slits a bay,
+    the new `slits` window). Their parts: `led`, `hex`, `fold`, `mesh`, `media`, `frit`,
+    `logo` (`skins.FAMILIES`), closed solids in the part frame like AG2's, instanced or
+    merged as AG2's; slots `led_<accent>` (six accents) and `screen_media_a` to `_d` on the
+    neon master, `hex`, `mesh`, `fold_glass`, `frit`, `media_frame`, `logo_back`.
+  - Window patterns per mass group (gene `{g}.wpattern`, `systems.PATTERNS`): staggered by
+    floor, mixed sizes (0.55 to 1.35 of the window), stepped (each floor a step along: diagonal
+    runs), checkerboard, scatter, alternating wide and narrow floors; applied row by row to
+    the row's openings (`skins.pattern_ops`), each kept in its bay with its piers; never on
+    a door row (its balconies) nor on window types that fill their bays or run as a band
+    (`PATTERN_FIXED`); a curtain wall's panes narrow or turn to spandrel instead of moving.
+  - A building-wide skin over any glazed system (`skin`: LED strips on every other bay
+    line of the body, or fritted glass over the lower 40% of each pane), colored glass
+    (`systems.GLASS_COLORED`), so a building shows two or three finishes (its record's
+    `ag15.finishes`).
+  - M21's bands and curved shafts (`shell._simple_mass`) get facades: each floor's ribbon at
+    its group's own sill and head (narrower on alternate floors by its pattern), mullion
+    caps (fins on a fin wall, LED strips on an LED system or skin) at every chord joint of a
+    curve and at the group's bay along straight walls, clear of mounts and landing doors
+    (`shell._simple_facades`).
+  - Reach (`genome.reach_of`, `systems.REACH` by district archetype: corporate core 1,
+    midtown 0.85, entertainment 0.75, transit hub 0.6, megablock and research 0.45, ...,
+    industrial port 0.05): AG15's systems take 0.8 of the era's weight times the reach,
+    patterns past the grid, colored glass, skins, crown lights and logos all scale with it.
+- **The neighbor rule** (`assetgen/buildings/neighbors.py`): towers (M21's: podium towers,
+  towers and landmarks 40 m and taller; `genome.is_tower`) within 150 m of each other,
+  outside one complex family, differ in system, (window, pattern), palette (wall, glass) and
+  night look (light color, accent), and no two vacant towers stand side by side. A family
+  or a tower is a unit; units go tallest first, each drawn again past what its earlier
+  neighbors took where it shares any (`genome.make(brief, avoid)`: the era's other systems,
+  then a tower pool of glazed, AG15 and panel systems, a system counting as taken where all
+  its windows and patterns are; then other windows and patterns, glass then walls, lights
+  then accents). What a tower avoided goes into its asset hash. `asset_unique` gains
+  `neighbors`: per kind the pairs that share it and, with day and night thumbnails at least
+  `THUMB_MIN` bits apart, a failure for any.
+- **Night** (`assetgen/buildings/night.py`): the genome's `extra.night`: a schedule by use
+  (offices and civic in bands of floors, homes scattered, hotels warm, shops brighter low
+  down, industrial; a mixed building drawn office, home or shop) with a share of towers
+  vacant (`(0.02 + 0.15 danger (1.15 - wealth)) x 1.5`), its light's color temperature by
+  schedule (`LIGHT_W`, `systems.LIGHT_COLORS`: warm, soft, neutral, cool, daylight, magenta,
+  cyan), how far its rooms' temperatures spread, an office's band of 2 to 6 floors. Custom
+  Primitive Data 30 to 35 (`materials/params.py`); the lit share per hour band
+  (`night.HOURS`, `model.HOUR_BANDS`) times AG1's lit share. Crown and edge lighting on
+  towers (`crown_light`: LED strips up every convex corner of the body and top masses, a
+  band round the top, both) and a lit logo (a ring, bars or chevrons in LED on a dark
+  backboard, near the top of the widest front) (`skins.lights`). The night thumbnail
+  (`thumb.render(..., night)`: rooms lit as the masters light them at 19:00, glowing slots
+  at their shade, the rest dark) is in each building's `ag15` record.
+- **Signs**: every one of M20's large slots already had an emissive asset from AG8 (lit
+  neon billboards, neon banners, holo-boards in front of facades); AG15 adds their wash on
+  the facade by night (Blender's previews, Unreal's play features).
+- **Blender**: `ag6_materials` lights the glass and the far proxies by schedule, hour, band
+  and color temperature (`_night_rooms`, `set_hour`), `ag6_preview` hangs a spot light under
+  each lamp (shadows from the nearest 16) and a point light before each large sign near the
+  view; `assetgen materials preview --views core` (the corporate core from the air south of
+  it, and `core_street`: its longest avenue or street near the towers at eye level),
+  `--hour`.
+- **Exporter** (`docs/unreal_export.md`, "From AG15" and "Play features"): `M_CgGlass` by
+  schedule and `MPC_CityGen`'s new `Hour` (`STAGE2_VERSION` 8); the play features light the
+  streets: a spot light 45 cm under each of the 192 lamps nearest the view (8 with shadows),
+  `M_CgLightPool` decals under 768 more, the 32 nearest large signs washing their facade
+  (`play.json` version 2).
+- `GEN_VERSION` ag15.1, `GENOME_VERSION` 6.
+
+**Numbers** (Delta Megacity, AG14's packs against AG15's, the same model): see
+`docs/progress/AG15/README.md`.
+
 ## Order
 
 ```

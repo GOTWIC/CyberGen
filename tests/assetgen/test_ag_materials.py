@@ -189,7 +189,7 @@ def test_materials_stage_on_the_small_city():
             continue
         # (AG3: a street front takes its building's parameters)
         r = man["buildings"][e["ids"][0] if e["kind"] == "building.front" else e["key"]]
-        assert len(e["cpd"]) == SY.CPD_SIZE + 7 and e["cpd"][SY.CPD_SIZE:] == \
+        assert len(e["cpd"]) == SY.CPD_SIZE + 13 and e["cpd"][SY.CPD_SIZE:] == \
             r["material"]["cpd"]
         for slot, key in (e.get("materials") or {}).items():
             assert slot in CT.ERA_SLOTS and key == f"{slot}@{r['material']['era']}"
@@ -221,7 +221,9 @@ def test_params_per_building():
     for bid, r in list(man["buildings"].items())[:40]:
         mat = r["material"]
         assert mat["era"] in LB.ERAS and mat["interior"] in IN.USES
-        room, floor, row, streaks, top, blinds, era = mat["cpd"]
+        room, floor, row, streaks, top, blinds, era = mat["cpd"][:7]
+        r_, g_, b_, sched, spread, band = mat["cpd"][7:]      # (AG15: the night)
+        assert 0 <= sched <= 6 and 0 <= spread <= 1 and 1 <= band <= 6 and min(r_, g_, b_) > 0
         assert 2.4 <= room <= 6.0 and floor > 2.0 and 0 <= streaks <= 1 and top > 0
         assert IN.USES[int(row)] == mat["interior"] and LB.ERAS[int(era)] == mat["era"]
         assert mat["era"] == CT.era_of_building(briefs[bid])

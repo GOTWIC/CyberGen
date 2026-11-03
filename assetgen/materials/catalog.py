@@ -120,11 +120,15 @@ BUILDING: dict[str, tuple[str, str | None]] = {
     "terrace_soil": ("facade", "ballast"),
     "escape_rust": ("metal", "metal_rusty"), "atrium_glass": ("glass", None),
     "atrium_frame": ("metal", "aluminum"),
+    # AG15: honeycomb panels, mesh screens, folded glass, fritted glass, screen frames
+    "hex": ("metal", "metal_dark"), "mesh": ("metal", "aluminum"),
+    "fold_glass": ("glass", None), "frit": ("facade", None),
+    "media_frame": ("metal", "metal_dark"), "logo_back": ("metal", "metal_dark"),
 }
 for _s in SY.SLOTS:
     if _s.startswith("paint_"):
         BUILDING[_s] = ("metal", "metal_painted")
-    elif _s.startswith(("neon_", "screen_")):
+    elif _s.startswith(("neon_", "screen_", "led_")):
         BUILDING[_s] = ("neon", None)
     elif _s.startswith(("poster_", "graffiti_")):
         BUILDING[_s] = ("facade", None)

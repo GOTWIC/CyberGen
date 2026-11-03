@@ -195,12 +195,29 @@ developer menu with day and night, unless `--no-play`:
 | Tab | the developer menu: time of day (day or night), the free camera, the minimap, the engine's on-screen messages; click a row to change it; Tab or Esc closes it |
 
 By night (`MPC_CityGen`'s `Night` 1) the windows' rooms light up (AG6's night interiors,
-each building's lit share), neon and signs glow brighter, the sun becomes a dim blue moon
-high in the sky, the sky light dims, the exposure is held (a fixed EV100, or the eye would
-adapt until the night looked like the day), and the street and wall lights nearest the view
-(48 by default) become real point lights, warm and without shadows, the farthest of them
-fading so a lamp entering the set does not pop. Stage 3 (atmosgen) takes the lighting over
-when it comes; the menu's switch is a developer's.
+lit by each building's own night since AG15: its schedule at `MPC_CityGen`'s `Hour`, its
+light's color temperature; see "From AG15"), neon, LED strips, logos and signs glow
+brighter, the sun becomes a dim blue moon high in the sky, the sky light dims, the exposure
+is held (a fixed EV100, or the eye would adapt until the night looked like the day), and the
+lamps light the streets (AG15; the run-through's streets were black at night: a point light
+at the lamp head sat inside the lamp mesh's own shadow and reached nothing on the ground):
+
+- the 192 street and wall lights nearest the view get a real **spot light** each, hung
+  `LampDropCm` (45 cm) under the lamp head, outside the lamp mesh, pointing straight down
+  (cones 50 and 78 degrees, 6,000 cd for a street light and 1,500 for a wall light, 30 m and
+  18 m of reach), warm; the nearest 8 cast shadows, the rest none; the farthest quarter
+  fades, so a lamp entering the set does not pop;
+- under the 768 lamps past them (and the fading ones) a **light-pool decal**
+  (`/Game/CityGen/Core/M_CgLightPool`: a deferred decal, a warm emissive disc fading from
+  its middle, by `Night`, 7 m across a street light, 4 m a wall light), so the streets
+  read lit far beyond the real lights;
+- the 32 of M20's large facade signs nearest the view (billboards, banners, holo-boards in
+  front of a facade) **wash their facade**: a point light 1.5 m in front of each, in its
+  neon color, no shadow.
+
+Setting night sets `MPC_CityGen`'s `Hour` to the actor's `NightHour` (21 by default).
+Stage 3 (atmosgen) takes the lighting over when it comes; the menu's switch is a
+developer's.
 
 **How it is built.** The play features are game logic (input, a drawn overlay, possession,
 teleporting), which Unreal's Python cannot write into a Blueprint's graph, so they are a
@@ -221,11 +238,15 @@ imports without the play features.
 
 - **The actor**: `CityGenPlay` (key `play`, always loaded, `cg.type=play`): the map texture
   (`Play/T_<City>_Map`, imported again only when its pixels change) and the world
-  rectangle of its corners, the walkway points, the lamp heads and kinds, district label
-  points, `MPC_CityGen`; settings (minimap radius 250 m, free camera speed 30 m/s, 48 lamp
-  lights of 2,400 cd for a street light and 600 for a wall light, 28 m radius, night
-  exposure -3 EV100, the moon at 3% of the sun, start at night, show the minimap) are its
-  properties, editable on the actor in the level.
+  rectangle of its corners, the walkway points, the lamp heads and kinds, the sign wash
+  points and colors, district label points, `MPC_CityGen`, `M_CgLightPool`; settings
+  (minimap radius 250 m, free camera speed 30 m/s; AG15: `LampLights` 192 spot lights of
+  `StreetLampCandela` 6,000 cd and `WallLampCandela` 1,500, `ShadowedLamps` 8,
+  `LampRadiusM` 30, `LampDropCm` 45, cones `LampInnerConeDeg` 50 and `LampOuterConeDeg` 78,
+  `LampPools` 768 decals of `PoolRadiusM` 7, `WashLights` 32 of `WashCandela` 1,500 and
+  `WashRadiusM` 25, `NightHour` 21; night exposure -3 EV100, the moon at 3% of the sun,
+  start at night, show the minimap) are its properties, editable on the actor in the level.
+  `CityGen.Status` also gives `lamps_shadowed` and `light_pools`.
 - **The data** (`citygen/unreal_play.py`, written beside the manifest, the manifest's `play`
   names them with their hash): `unreal/map.png`, the city from above drawn from the
   blockout plan (sea, land, water, parks, plazas, sidewalks, streets by class, highways in
@@ -234,7 +255,9 @@ imports without the play features.
   `unreal/play.json` (the map's bounds and size; the walkway graph's lines sampled every
   5 m and thinned to one point per 3 m cell and level, stairs, lifts, skybridges, elevated
   and underpass walkways left out; each street and wall light's lamp head, its prototype's
-  `prop_light` part placed by the instance's transform; a point inside each district from
+  `prop_light` part placed by the instance's transform; AG15: a point 1.5 m in front of each
+  of M20's large facade signs and its neon color by its id, from `gameplay.json`'s sign
+  slots (`washes`, `wash_colors`; `version` 2); a point inside each district from
   `city_model.json`, else the gameplay layer's zones).
 - **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
   [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
@@ -682,6 +705,39 @@ master is added.
 
 **What the exporter does with them**: no code change; the packs' hashes move, so an import
 over an earlier one updates the actors and meshes whose entries changed.
+
+### From AG15: cyberpunk facades and night
+
+- **New parts and slots**, through AG2's instancing as before (instanced kinds, or merged
+  into the shell under 8 placements): LED strips (`part.led.v`, `part.led.h`: mullions,
+  convex corners, crown bands), honeycomb panels (`part.hex.honeycomb`), folded glass bays
+  (`part.fold.glass`), mesh screens (`part.mesh.screen`), media screens (`part.media.screen`),
+  fritted glass (`part.frit.glass`), logos (`part.logo.<ring|bars|chevron>`). Slots
+  `led_<accent>` (six accents) and `screen_media_a` to `_d` are the `neon` master (emissive,
+  stronger by `Night`), `fold_glass` the glass master, `hex`, `mesh`, `media_frame`,
+  `logo_back` metal and `frit` facade (AG6's catalog).
+- **Custom Primitive Data 30 to 35** of every building actor (after AG6's 23 to 29; Unreal's
+  36 floats are all in use): the night's light color (linear RGB, a color temperature),
+  its schedule (0 default, 1 office, 2 home, 3 hotel, 4 shop, 5 industrial, 6 vacant), how
+  far its rooms' color temperatures spread, an office's band of floors. AG1's 6 (the lit
+  share) is the evening's share.
+- **`M_CgGlass`** (`STAGE2_VERSION` 8, rebuilt in place): the room's lit state from the
+  schedule's share in `MPC_CityGen`'s new **`Hour`** (0 to 24; 21 by default; the hour
+  bands of `model.HOUR_BANDS`: night, morning, day, evening, late) times the lit share, an
+  office's whole band of floors on or off, shops brighter on their low floors, a vacant tower
+  a few security lights; a lit room's color the building's light pulled warm or cool by a
+  hash times its spread (`CgRoom` returns the blind and that draw in its w); `NightGain`
+  (1) scales the rooms against the night exposure. The Blender previews draw the same
+  (`ag6_materials._night_rooms`).
+- **Play features** (the plugin's source changed, so `citygen unreal` builds it again):
+  spot lights under the lamps, light-pool decals and sign washes ("Play features" above);
+  `unreal/play.json` version 2 with `washes` and `wash_colors`; the importer sets the
+  actor's `LightPoolMaterial` (`M_CgLightPool`, made once, `cg.pool` 1), `NightHour`,
+  `WashPoints` and `WashColors` (a plugin built before AG15 has none of them: the city
+  imports with its lamps as they were).
+- **Tuning**: the lamps' candelas, the pools' strength (`PoolStrength` 2.5 on the
+  material) and `NightGain` are first values set against the night's fixed exposure (-3
+  EV100) without Unreal; the Unreal check of AG15 sets them.
 
 ## assetgen's street contribution (AG7)
 
@@ -1153,3 +1209,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | Fast import (an exporter update on its own) | The fast path the importer's default ("The fast import" above): stage 2's packs queued as one async Interchange import with the pack step (`CgPackStep`: per mesh Nanite settings before the build, unplaced variants not made; AG12's water pipeline on water packs), textures queued with `CgTextureStep`, finished meshes saved in one batch, actors saved and unloaded every `CITYGEN_UE_OFFLOAD` (2,000) spawned and loaded again at the end, the editor run with `-fastexit` and `FAST_INI` (no distance field or card tasks); main's reset of a stale full fallback on both paths; an entry of a building with no shell node (assetgen's packs since `GEN_VERSION` m18.3) takes the blockout's place as an empty shell does; `CITYGEN_UE_FAST=0` the one-at-a-time path. Same actor and asset digests on both paths (the Mac's A/B) | Greyhook on Windows: first import 73m41s in the editor, a second import changing nothing, `--check --shots` passing (`docs/progress/exp_fast_import/`) |
 | M20 | Props, plants and signs. No importer change: the large ads come through M15's instancing as prototypes of their own (`blockout.PROTOTYPES` `sign_billboard`, `sign_banner`, `sign_holo`, a unit face the instance scale stretches to the slot; materials `sign_ad`, `sign_banner`, `sign_rim` and `sign_holo`, emissive 6, 6, 8 and 4 in `unreal.EMISSIVE`), one `BP_CityGenInstances` actor per kind and tile keyed `sign.<kind>.<tile>`, the slots' ids as its instances' ids, on a terrain city lifted by their building's base (the masses' frame). AG8's sign entries for those slots name the actor in `replaces`. Props and plants keep their prototypes; on a terrain city the blockout lifts what stands on a roof by its building's base, as AG8 does (it took the ground at the point). | not run |
 | AG14 | No code change: the packs' content changes under the same keys ("From AG14" above): curved walls with the curve's own normals (the importer keeps the packs' normals on both paths, held by `test_stage2_packs_keep_their_normals`), M19's frames, piers, footings and masts drawn, junctions meeting their legs, embankments under low decks, a bridge's deck drawn once, roof equipment on its roofs, nothing over a lane under 4.6 m | Not run (the coordinating session's call) |
+| AG15 | Cyberpunk facades and night ("From AG15" above; "Play features"): new part kinds and slots through AG2's instancing (LED strips, honeycombs, folded glass, mesh and media screens, fritted glass, logos; `led_<accent>` and `screen_media_*` on `M_CgNeon`); Custom Primitive Data 30 to 35 (the night's light color, schedule, spread, band); `MPC_CityGen`'s `Hour`; `M_CgGlass` lights each room by its building's schedule at the hour and in its light's color temperature (`STAGE2_VERSION` 8); the play features light the streets: spot lights under the 192 lamps nearest the view (8 with shadows), light-pool decals (`M_CgLightPool`) under 768 more, sign washes before the 32 nearest large signs (`play.json` version 2, `washes`); `check_city` reports `lamps_shadowed` and `light_pools` | Not run here (the coordinating session dispatches it; the candelas, `PoolStrength` and `NightGain` are first values for it to set) |
