@@ -28,6 +28,7 @@ HOURS = {0: (0.5, 0.6, 0.3, 1.0, 0.8), 1: (0.12, 0.7, 0.9, 1.0, 0.35),
          4: (0.2, 0.6, 0.9, 1.0, 0.8), 5: (0.6, 0.8, 0.9, 0.9, 0.7),
          6: (0.5, 0.5, 0.5, 0.5, 0.5)}
 HOUR_DEFAULT = 21.0           # MPC_CityGen's Hour by default: the late band
+THUMB_HOUR = 19.0             # the night thumbnails' hour: the evening, the most rooms lit
 CPD = {"color": 30, "schedule": 33, "spread": 34, "band": 35}
 CPD_LAYOUT = {"30-32": "night light color (linear RGB)",
               "33": "night schedule (0 default, 1 office, 2 home, 3 hotel, 4 shop, "

@@ -142,7 +142,7 @@ def _night_glass(p0, p1, p2, night: dict) -> np.ndarray:
         v = memo.get(key)
         if v is None:
             v = NT.lit(night["seed"], night["share"], night["schedule"], night["band"],
-                       key[0], key[1])
+                       key[0], key[1], NT.THUMB_HOUR)
             memo[key] = v
         out[k] = lum * v if v > 0 else NIGHT_DARK
     return out

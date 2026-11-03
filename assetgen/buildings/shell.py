@@ -578,6 +578,7 @@ class ShellBuilder:
         self.done_ents: set[int] = set()
         self.band_facades: list[tuple] = []
         self.all_facades: list[tuple] = []
+        self.simple_facades: list[tuple] = []       # AG15: a simple mass's (lights, logo)
         self.checks: dict = {}
         self.band_z: int | None = None
         self.used["front"] = {}
@@ -2124,7 +2125,7 @@ class ShellBuilder:
                 fa.soff = int(round((p[0] - a0[0]) * ux + (p[1] - a0[1]) * uy))
                 mounts = [(m0 - fa.soff, m1 - fa.soff, mz0, mz1)
                           for m0, m1, mz0, mz1 in self.mounts.get(j, [])]
-            self.all_facades.append((fa, ms))
+            self.simple_facades.append((fa, ms))       # (not the grammar's: no piers)
             if doors.get(i):
                 continue
             n_ = (fa.nx, fa.ny)

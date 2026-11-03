@@ -512,7 +512,8 @@ def _ag15(brief, genes, cont, extra, body, fkey, bid, reach, av, salt, wealth) -
     dist = brief.get("district") or {}
     danger = float(dist.get("danger") if dist.get("danger") is not None else 0.3)
     pv = (0.02 + 0.15 * danger * (1.15 - wealth)) * (1.5 if tower else 1.0)
-    vacant = not b.get("landmark") and u(bid, "ag15.vacant", salt) < pv
+    vacant = not b.get("landmark") and u(bid, "ag15.vacant", salt) < pv and \
+        not av.get("vacant")            # (a vacant tower's neighbor is lived in)
     lw = LIGHT_W[sched]
     light = pick(fkey, "ag15.light", sorted(lw), [lw[k] for k in sorted(lw)], salt)
     if av.get("night"):

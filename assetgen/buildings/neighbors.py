@@ -26,8 +26,14 @@ KINDS = ("system", "pattern", "palette", "night")
 
 def signature(gm: dict) -> dict:
     g = gm["genes"]
+    n = (gm.get("extra") or {}).get("night") or {}
     return {"system": g["body.system"], "pattern": (g["body.window"], g["body.wpattern"]),
-            "palette": (g["wall"], g["glass"]), "night": (g.get("light"), g["accent"])}
+            "palette": (g["wall"], g["glass"]), "night": (g.get("light"), g["accent"]),
+            "schedule": n.get("schedule")}
+
+
+def _vacant(sig: dict) -> bool:
+    return sig.get("schedule") == "vacant"
 
 
 def _family(brief: dict) -> str | None:
@@ -73,13 +79,17 @@ def assign(briefs: dict, genomes: dict) -> dict[str, dict]:
                                                  for q in pos[o]):
                             near.add(o)
         avoid = {kind: {done[o][kind] for o in sorted(near)} for kind in KINDS}
+        # (no two vacant towers side by side: two dark towers light alike)
+        avoid["vacant"] = any(_vacant(done[o]) for o in near)
         first = us[k][0]
         sig = signature(genomes[first])
-        if any(sig[kind] in avoid[kind] for kind in KINDS):
+        if any(sig[kind] in avoid[kind] for kind in KINDS) or \
+                (avoid["vacant"] and _vacant(sig)):
             for b in us[k]:
                 genomes[b] = GN.make(briefs[b], avoid)
                 out[b] = {kind: sorted([list(v) if isinstance(v, tuple) else v
                                         for v in avoid[kind]], key=str) for kind in KINDS}
+                out[b]["vacant"] = avoid["vacant"]
             sig = signature(genomes[first])
         done[k] = sig
         for x, y in pos[k]:

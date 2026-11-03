@@ -149,8 +149,9 @@ def gen_logo(p: dict, b) -> None:
                      [], -320, -250, "y")
 
 
-PT.GEN.update({"led": gen_led, "hex": gen_hex, "fold": gen_fold, "mesh": gen_mesh,
-               "media": gen_media, "frit": gen_frit, "logo": gen_logo})
+FAMILIES = {"led": gen_led, "hex": gen_hex, "fold": gen_fold, "mesh": gen_mesh,
+            "media": gen_media, "frit": gen_frit, "logo": gen_logo}
+PT.GEN.update(FAMILIES)
 PT.REACH.update({"led": "flush", "hex": "flush", "fold": "strip", "mesh": "strip",
                  "media": "strip", "frit": "flush", "logo": "strip"})
 PT.TYPE_SUB.update({"hex": "honeycomb", "fold": "glass", "mesh": "screen", "media": "screen",
@@ -380,10 +381,10 @@ def lights(sb) -> None:
         return
     slot = f"led_{genes['accent']}"
     P = sb.parts
-    top = max((ms["z1"] for _, ms in sb.all_facades), default=0)
+    top = max((ms["z1"] for _, ms in (sb.all_facades + sb.simple_facades)), default=0)
     n = 0
     if cl in ("edges", "both"):
-        for fa, ms in sb.all_facades:
+        for fa, ms in (sb.all_facades + sb.simple_facades):
             if SY.role_group(ms["role"]) not in ("body", "top"):
                 continue
             d_in = getattr(fa, "d_in", None)
@@ -395,7 +396,7 @@ def lights(sb) -> None:
                      0, a)
                 n += 1
     if cl in ("band", "both"):
-        for fa, ms in sb.all_facades:
+        for fa, ms in (sb.all_facades + sb.simple_facades):
             if ms["z1"] < top - 50 or fa.L < 3000:
                 continue
             z = ms["z1"] - 450
@@ -424,7 +425,7 @@ def _logo(sb, slot: str, top: int) -> None:
     """The logo on the widest front or street facade of the topmost masses, under its
     top: free of mounts and corridors, 6 m up at least."""
     best = None
-    for fa, ms in sb.all_facades:
+    for fa, ms in (sb.all_facades + sb.simple_facades):
         if ms["z1"] < top - 50 or fa.rec is None or fa.L < 6000:
             continue
         if fa.rec.get("class") not in ("front", "street", "plaza", "park", "open", "canal",
