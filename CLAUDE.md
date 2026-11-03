@@ -1667,7 +1667,8 @@ AG14 (fit and finish, from the first run-through) is in place (tests
 `tests/assetgen/test_ag_fit.py`):
 - **Fit checks** (`assetgen/fit/`: `glb.py` reads the packs back in world space, `index.py`
   a plan index of triangles, `build.py` the stage; `assetgen fit BUILD`, also the last stage
-  of `assetgen build`, `--no-fit` skips it; `fit_report.json/.txt`): `asset_grounded` (every
+  of `assetgen build`, `--no-fit` skips it, as do `--no-streets` and `--no-props`;
+  `fit_report.json/.txt`): `asset_grounded` (every
   standing prop and plant, roof item and dunnage, road, transit and deck column rests on a
   surface under it within 2 cm: five points of its feet, three of them on a surface no more
   than 0.6 m over them (a dunnage frame its height), surfaces the up-facing triangles of

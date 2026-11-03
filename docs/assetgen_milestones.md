@@ -1810,7 +1810,7 @@ M21, and two checks on the meshes themselves (scope 14.15). Tests:
 `tests/assetgen/test_ag_fit.py`.
 
 - **Fit checks** (`assetgen/fit/`; `assetgen fit BUILD`, also the last stage of
-  `assetgen build`, `--no-fit` skips it; `BUILD/assets/fit_report.json` and `.txt`, written
+  `assetgen build`, `--no-fit` skips it, as do `--no-streets` and `--no-props`, whose packs it reads; `BUILD/assets/fit_report.json` and `.txt`, written
   only when their bytes change). The packs are read back in world space (`glb.py`: node
   hierarchies, rotations, quantized positions, GPU instancing), the faces of every pack that
   face up filed in a plan index of 2 m cells (`index.py`).

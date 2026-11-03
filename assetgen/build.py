@@ -785,8 +785,9 @@ def build(build_dir: str | Path, spec_path: str | None = None,
                             "failed": [c for c, v in mrep["checks"].items() if not v["ok"]],
                             "seconds": mrep["seconds"]["total"]}
         rep["ok"] = rep["ok"] and mrep["ok"]
-    if fit:
-        # AG14: the fit checks on the packs as written (`assetgen fit`)
+    if fit and streets and props:
+        # AG14: the fit checks on the packs as written (`assetgen fit`); not when the
+        # street or prop stage was skipped (their packs may be another city's)
         from .fit.build import build as fit_build
         frep = fit_build(model, out, progress=P)
         wrote += frep["written"]
