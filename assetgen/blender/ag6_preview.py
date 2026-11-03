@@ -469,7 +469,7 @@ def lamps(points, washes=()):
     objs = []
     for k, (x, y, z) in enumerate(points):
         d = bpy.data.lights.new(f"lamp{k}", "SPOT")
-        d.energy = 14000.0
+        d.energy = 2800.0
         d.color = (1.0, 0.8, 0.56)
         d.spot_size = math.radians(130.0)
         d.spot_blend = 0.55
@@ -485,7 +485,7 @@ def lamps(points, washes=()):
         objs.append(ob)
     for k, w in enumerate(washes):
         d = bpy.data.lights.new(f"wash{k}", "POINT")
-        d.energy = 2500.0 * max(1.0, min(w["size"], 12.0))
+        d.energy = 400.0 * max(1.0, min(w["size"], 12.0))
         d.color = tuple(w["color"])
         d.shadow_soft_size = max(1.0, w["size"] / 3.0)
         try:
