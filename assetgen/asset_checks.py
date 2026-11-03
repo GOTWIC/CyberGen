@@ -192,7 +192,9 @@ def unique(records: dict, k: int) -> dict:
                                   round(int(dist[j]) / 100.0, 2)])
     finite = nearest[nearest < 10 ** 9]
     tfin = tnear[tnear < 10 ** 9]
-    return {"name": "asset_unique", "ok": fails == 0 and tfails == 0, "k": k,
+    nb = neighbor_rule(records)
+    return {"name": "asset_unique", "ok": fails == 0 and tfails == 0 and nb["failures"] == 0,
+            "k": k, "neighbors": nb,
             "pairs": n * (n - 1) // 2,
             "failures": int(fails), "first": first + tfirst,
             "nearest": {"min": round(int(finite.min()) / 100.0, 2) if len(finite) else None,
@@ -204,6 +206,41 @@ def unique(records: dict, k: int) -> dict:
                        "nearest_median": int(np.sort(tfin)[len(tfin) // 2]) if len(tfin)
                        else None},
             "genes": {"discrete": len(disc), "continuous": len(cont)}}
+
+
+def neighbor_rule(records: dict) -> dict:
+    """AG15: towers within `neighbors.RADIUS_M` of each other (outside one family) differ in
+    system, window pattern, palette and night look (`neighbors.signature`), and their day and
+    night thumbnails by `THUMB_MIN` bits. Per kind the pairs that share it; a pair failing
+    any kind is a failure (the first few listed)."""
+    from .buildings import neighbors as NB
+    from .buildings import thumb as TH
+    ps = NB.pairs(records)
+    same = {k: 0 for k in NB.KINDS + ("day_thumb", "night_thumb")}
+    fails, first = 0, []
+
+    def bits(a, b):
+        if not a or not b:
+            return 10 ** 6
+        x = TH.distances([a, b])
+        return int(np.bitwise_count(x[0] ^ x[1]).astype(np.int64).sum())
+    for a, b in ps:
+        ra, rb = records[a]["ag15"], records[b]["ag15"]
+        bad = [k for k in NB.KINDS if ra["sig"][k] == rb["sig"][k]]
+        if records[a].get("thumb_fill", 1.0) >= THUMB_FILL and \
+                records[b].get("thumb_fill", 1.0) >= THUMB_FILL:
+            if bits(records[a].get("thumb"), records[b].get("thumb")) < THUMB_MIN:
+                bad.append("day_thumb")
+            if bits(ra.get("night_thumb"), rb.get("night_thumb")) < THUMB_MIN:
+                bad.append("night_thumb")
+        for k in bad:
+            same[k] += 1
+        if bad:
+            fails += 1
+            if len(first) < 8:
+                first.append([a, b, bad])
+    return {"towers": sum(1 for r in records.values() if (r.get("ag15") or {}).get("tower")),
+            "pairs": len(ps), "failures": fails, "same": same, "first": first}
 
 
 def hash_family(f: str | None) -> int:

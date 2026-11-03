@@ -36,7 +36,18 @@ BG = 0.16                       # the background's shade (linear)
 SUN = (0.42, -0.58, 0.70)       # toward the sun
 # instanced families drawn as boxes (the rest sit in their openings)
 DRAWN = ("balcony", "fin", "shade", "panel", "member", "pod", "ac", "dish", "column",
-         "canopy", "shutter", "balconette", "mast")
+         "canopy", "shutter", "balconette", "mast",
+         # AG15: honeycombs, folded glass, mesh screens, media screens, logos, LED strips
+         "hex", "fold", "mesh", "media", "logo", "led")
+# AG15's night thumbnail: what glows (the neon master's slots), the glass whose rooms light
+# by the building's night (`night.lit`), the rest dark
+NIGHT_DARK = 0.012
+NIGHT_GLASS = ("glass", "storefront", "storefront_dark", "glazing", "fold_glass",
+               "atrium_glass")
+
+
+def _glows(slot: str) -> bool:
+    return SY.SLOTS.get(slot, ("facade",))[0] == "neon"
 
 
 def _norm(v):
@@ -84,15 +95,20 @@ _BOX = np.array([[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1
                 dtype=np.int64)
 
 
-def _boxes(inst: list[dict], tints: dict):
-    """(p0, p1, p2, shade) of the boxes of the drawn instanced parts at every placement."""
+def _boxes(inst: list[dict], tints: dict, night: bool = False):
+    """(p0, p1, p2, shade) of the boxes of the drawn instanced parts at every placement (by
+    night a glowing part at its slot's shade, the rest dark)."""
     out = []
     for x in inst:
         if x["family"] not in DRAWN:
             continue
         _, arrs = PT.mesh(x["family"], x["params"])
         lo, hi = PT.bounds(arrs)
-        sh = slot_shade(sorted(arrs, key=lambda k: (-len(arrs[k]["tri"]), k))[0], tints)
+        main = sorted(arrs, key=lambda k: (-len(arrs[k]["tri"]), k))[0]
+        sh = slot_shade(main, tints)
+        if night:
+            glow = [k for k in sorted(arrs) if _glows(k)]
+            sh = slot_shade(glow[0], tints) if glow else NIGHT_DARK
         cx = np.array([lo[0], hi[0]] * 4, dtype=np.float64)
         cy = np.array([lo[1], lo[1], hi[1], hi[1]] * 2, dtype=np.float64)
         cz = np.array([lo[2]] * 4 + [hi[2]] * 4, dtype=np.float64)
@@ -109,8 +125,34 @@ def _boxes(inst: list[dict], tints: dict):
     return out
 
 
-def render(brief: dict, arrs: dict, inst: list[dict], tints: dict) -> np.ndarray:
-    """The building's thumbnail: SIZE x SIZE shades 0 to 255 (uint8)."""
+def _night_glass(p0, p1, p2, night: dict) -> np.ndarray:
+    """By night: each glass triangle's shade from the room its middle is in (`night.lit`
+    on a grid of the building's room width along x + y and its floor height up)."""
+    from . import night as NT
+    c = (p0 + p1 + p2) / 3.0
+    room = max(night["room_mm"], 1000.0)
+    fh = max(night["floor_mm"], 2000.0)
+    cols = np.floor((c[:, 0] + c[:, 1]) / room).astype(np.int64)
+    floors = np.floor(c[:, 2] / fh).astype(np.int64)
+    lum = _lum(night["color"])
+    out = np.empty(len(c))
+    memo: dict = {}
+    for k in range(len(c)):
+        key = (int(cols[k]), int(floors[k]))
+        v = memo.get(key)
+        if v is None:
+            v = NT.lit(night["seed"], night["share"], night["schedule"], night["band"],
+                       key[0], key[1])
+            memo[key] = v
+        out[k] = lum * v if v > 0 else NIGHT_DARK
+    return out
+
+
+def render(brief: dict, arrs: dict, inst: list[dict], tints: dict,
+           night: dict | None = None) -> np.ndarray:
+    """The building's thumbnail: SIZE x SIZE shades 0 to 255 (uint8). AG15: by `night`
+    (seed, share, schedule, band, color, room_mm, floor_mm) its rooms lit as the masters
+    light them, its neon, LED and screens glowing, the rest dark, no sun."""
     d = front_dir(brief)
     side = _norm((d[1], -d[0], 0.0))                      # d x z
     up = (side[1] * d[2] - side[2] * d[1], side[2] * d[0] - side[0] * d[2],
@@ -121,9 +163,15 @@ def render(brief: dict, arrs: dict, inst: list[dict], tints: dict) -> np.ndarray
         a = arrs[name]
         pos = a["pos"].astype(np.float64)
         t = a["tri"]
-        groups.append((pos[t[:, 0]], pos[t[:, 1]], pos[t[:, 2]],
-                       np.full(len(t), slot_shade(name, tints))))
-    groups += _boxes(inst, tints)
+        p0, p1, p2 = pos[t[:, 0]], pos[t[:, 1]], pos[t[:, 2]]
+        if night is None:
+            sh = np.full(len(t), slot_shade(name, tints))
+        elif name in NIGHT_GLASS:
+            sh = _night_glass(p0, p1, p2, night)
+        else:
+            sh = np.full(len(t), slot_shade(name, tints) if _glows(name) else NIGHT_DARK)
+        groups.append((p0, p1, p2, sh))
+    groups += _boxes(inst, tints, night is not None)
     if not groups:
         return np.full((SIZE, SIZE), int(np.minimum(np.sqrt(np.float64(BG)) * 255.0 + 0.5,
                                                     255.0)), dtype=np.uint8)
@@ -141,7 +189,7 @@ def render(brief: dict, arrs: dict, inst: list[dict], tints: dict) -> np.ndarray
     p0, p1, p2, base = p0[keep], p1[keep], p2[keep], base[keep]
     nx, ny, nz, nl = nx[keep] / nl[keep], ny[keep] / nl[keep], nz[keep] / nl[keep], None
     lam = np.maximum((nx * sun[0] + ny * sun[1]) + nz * sun[2], 0.0)
-    shade = base * (0.35 + 0.65 * lam)
+    shade = base if night is not None else base * (0.35 + 0.65 * lam)
 
     def uv(p):
         return ((p[:, 0] * side[0] + p[:, 1] * side[1]) + p[:, 2] * side[2],
@@ -229,9 +277,10 @@ def dhash(img: np.ndarray) -> str:
     return np.packbits(bits).tobytes().hex()
 
 
-def hash_of(brief: dict, arrs: dict, inst: list[dict], tints: dict) -> tuple[str, float]:
+def hash_of(brief: dict, arrs: dict, inst: list[dict], tints: dict,
+            night: dict | None = None) -> tuple[str, float]:
     """(difference hash, the share of the thumbnail the building fills)."""
-    img = render(brief, arrs, inst, tints)
+    img = render(brief, arrs, inst, tints, night)
     bg = int(np.minimum(np.sqrt(np.float64(BG)) * 255.0 + 0.5, 255.0))
     fill = round(int((img != bg).sum()) / float(SIZE * SIZE), 3)
     return dhash(img), fill
