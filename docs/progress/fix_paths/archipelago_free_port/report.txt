@@ -142,7 +142,7 @@ stats:
   bridges 9 (sea 5, river 0, canal 4; 1.65 km of span), pedestrian 6; named: Crown Causeway, Kettle Span, Lumen Footbridge, Reef Bridge
   landmasses with districts connected by road 5 of 5; highway planned elevated 49%; megasite reserves 3; road variant 0
   local roads street 44.54 km, alley 9.35 km, service 6.96 km, pedestrian 16.14 km, footbridge 0.1 km; 76 one-way segments, 5 footbridges
-  junctions 977 (68 signalized), crosswalks 227, sidewalks 82.38 km, lanes 2788 + 5498 connectors, walkways 9161 (alley 16.32 km, crossing 56.59 km, crosswalk 9.94 km, elevated 0.72 km, elevator 0.0 km, footbridge 0.1 km, path 28.47 km, pedestrian_street 3.57 km, promenade 12.57 km, sidewalk 110.09 km, skybridge 2.06 km, stairs 0.22 km)
+  junctions 977 (68 signalized), crosswalks 227, sidewalks 82.38 km, lanes 2788 + 5498 connectors, walkways 9161 (alley 16.32 km, crossing 56.59 km, crosswalk 9.94 km, elevated 0.72 km, elevator 0.0 km, footbridge 0.1 km, path 28.53 km, pedestrian_street 3.57 km, promenade 12.57 km, sidewalk 110.09 km, skybridge 2.06 km, stairs 0.22 km)
   junctions by type: street_street T 382, avenue_avenue T 103, street_street X 90, street T 85, pedestrian T 82, alley_alley T 46, avenue_avenue X 36, alley T 20, street_alley bend 20, pedestrian X 14, alley_alley X 12, street bend 12
   blocks 548, lots 3326 (2 merged groups), open space 13.0% of net land (beach 1, courtyard 3, green 18, park 11, plaza 26, pocket_park 160), named places 2
 

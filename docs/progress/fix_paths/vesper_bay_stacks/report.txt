@@ -220,7 +220,7 @@ stats:
   Scholar Isle                 research_campus        lm.e1183s260  0.600  0.073  0.073   -0.0%  (island)
 
 notes:
-  - road variant 4/1 left 3 check failures in the full city; built again on the same roads with the local layout drawn again (salt 1)
+  - road variant 4/1 left 2 check failures in the full city; built again on the same roads with the local layout drawn again (salt 1)
   - island 'Launch Key' has no room toward 'west'; it sits at bearing 328 deg from the middle of the sea
   - megasite 'Vess Freight Terminal' (freight_terminal) shrunk to 0.34 km2 (asked 0.40) to fit 'Vess Docks'
   - megasite 'Launch Key Spaceport' (spaceport) shrunk to 0.26 km2 (asked 0.50) to fit 'Launch Key'

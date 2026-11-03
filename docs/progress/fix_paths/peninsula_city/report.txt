@@ -62,7 +62,7 @@ checks:
   [pass] junction_levels: M18: every junction is one surface (its `edge_z`, else flat at its node's height) that meets each leg within 2 cm where the leg leaves its polygon, level across the leg there within its class's cross slope (2.5% on primary roads, 3% on the others), its curb between two legs running evenly from one's height to the other's (footbridge stairs stand on it)
   [pass] crossing_spacing: M18: signals only where two primary roads meet, or where a street meets one (a street crossing in the corporate core, transit hub and midtown) with no other signalized junction within the district's spacing along either road (120 m; 200 m in the old town and entertainment market; twice that for 'fewer'); a marked crossing at an unsignalized junction only across an avenue, with none within the spacing; crosswalks 3 m across a street, 4 m across an avenue (5 m downtown) or a highway
   [pass] park_access: Every park, plaza, pocket park, market, garden, promenade and beach has a way in (a park path, or a walkway beside it) or says why not; park paths start inside their open space and stay off the lots
-         note: 2 open spaces with no way in, each saying why
+         note: 1 open spaces with no way in, each saying why
          note: 2 islet parks (land without a district) with no street to join
   [pass] building_footprints: Buildings stand inside their lots (property lots, megasite reserve, or a landmark's host open space); only straddle spans leave them, over a street, clear of junctions and 5.5 m above it
   [pass] building_clear_zones: No ground mass of a building or site element on a road, junction, sidewalk, crosswalk, water, open space or another megasite's reserve or flight cone
@@ -80,7 +80,7 @@ checks:
          note: transit links of megasites: see transit_hubs
   [pass] building_forms: Building forms (M21): every arc lies on its footprint within 2 cm, a twisted shaft turns at most 3 degrees a floor, the form names its own masses, and every mass above the building's floor rests on or is fixed to another of its masses
   [pass] tower_neighbors: No two towers of different owners within 150 m share a form and a height band (M21), and every tower's form record names its band
-         note: 119 towers, 16 forms, 0 pairs within 150 m of one form and band
+         note: 126 towers, 17 forms, 0 pairs within 150 m of one form and band
   [pass] bridge_clash: Road and pedestrian bridges keep their decks and approaches apart from each other and from transit bridges in plan, or the lower one's clearance under the upper deck
   [pass] road_building_clash: No road, sidewalk, ramp or deck street right of way over a building mass at the road's own height (the mass under it, or 5 m over it, clears)
   [pass] walkway_building_clash: No walkway (sidewalks, crossings, park paths, entrance links, every pedestrian edge) through a building mass at its own height (its own building for a door or lobby path; a mass 2.5 m over it clears)
@@ -92,31 +92,31 @@ checks:
   [pass] transit_altitude: Track altitude within the mode's range (scope 5.3), higher only where it climbs, at the mode's grade, to clear navigable water, a road deck or another line
   [pass] transit_clearance: Every transit structure clears what is around it (M19), in 3D along the whole line: buildings and their roof items 6 m away in plan, or under it by 2 m (an elevated deck's underside) or 10 m (a sky tube's axis); a sky tube passes through a tower only at a sky station inside it; other lines' structures, platforms and canopies 6 m away in plan or 6.5 m apart in height; 8 m over a road or sidewalk, 6.5 m over (or under) a raised road's deck; navigable water's clearance
   [pass] transit_supports: Supports stand under the structure (a column's middle within 0.5 m of the line, else a portal frame or a cantilever bent whose cap beam carries the deck where the line crosses it), outside lanes, buildings, road decks, road embankments and the sidewalks' clear paths, in the water only as piers clear of the navigable channel; no span longer than the mode's longest (elevated rail 45 m, monorail 40, maglev 80, sky tube 600), but a main span over a navigable channel or a raised road, and an end overhanging half of it at most
-         note: 136 columns and pylons (11 piers), 48 frames and cantilevers
-         note: East Shore Line: longest span 37 m
-         note: Spine Tube: longest span 502 m
+         note: 111 columns and pylons (1 piers), 47 frames and cantilevers
+         note: East Shore Line: longest span 50 m
+         note: Spine Tube: longest span 408 m
   [pass] station_access: Every station has stairs, escalators or an elevator to the street and joins the walkway graph (elevated and sky stations next to a sidewalk or plaza)
   [pass] transit_skybridges: No skybridge in the way of an elevated or sky line (within its corridor and 3 m of its height)
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 19235 things on the ground
+         note: 21729 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops (their tops under what is over them: plant_headroom)
   [pass] street_lighting: Street or wall lights within 25 m of at least 85% of every district's sidewalks
-         note: Wallgate Heights: 99% lit
-         note: Neckgate: 97% lit
+         note: Wallgate Heights: 98% lit
+         note: Neckgate: 98% lit
          note: The Stacks: 98% lit
          note: Lantern Strip: 96% lit
          note: Eastside Docks: 99% lit
-         note: Hook Spaceport: 99% lit
+         note: Hook Spaceport: 98% lit
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] prop_support: Every prop, plant and roof item stands on a surface at its height within 2 cm (the ground, a quay deck, a road's deck, the water, a roof, a wall it is mounted on, a deck's underside it hangs from), none in a road's fill, and every prop standing fits 1 m under what is over it
-         note: 20334 on ground, 596 on road, 16363 on wall, 10506 on roof, 29 on water, 1 on hung
+         note: 22844 on ground, 581 on road, 16020 on wall, 10450 on roof, 30 on water, 1 on hung
   [pass] plant_headroom: No plant under a raised road, ramp, flyover, guideway, deck, skybridge or overhang reaches higher than its underside less 1 m, measured along it where the plant stands; none in a road's fill
-         note: 474 plants under something
+         note: 630 plants under something
   [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
-         note: 223 doors
+         note: 225 doors
   [pass] poi_reachable_car: Every point of interest, parking entrance and travel point reachable by car: its curb lane is a ground drive lane of a local road in the lane graph's largest strongly connected part, the curb on that lane within 150 m of the door
   [pass] poi_places: Points of interest: every one named (names unique among places and travel points), at its building (doors on the facade, units of the right use), fixers in an existing venue, valid hours and zones
   [pass] territories: Zones: each district's territories cover it without overlap and hold each of its blocks once, every district has a police precinct, factions and zones refer to each other
@@ -126,13 +126,13 @@ checks:
   [pass] travel_points: Taxi stands and fast travel: a fast-travel point in every district with a drive lane reachable on foot, taxi stands at least 250 m apart, every stand on its sidewalk
   [pass] sign_slots: Sign and ad slots: one per M6 shop sign and M3 roof billboard, facade slots on a plane facade of their building above the shop signs and apart from each other, open in front (M20: neon billboards landscape or portrait, banners whose wrapped faces meet at their corner, every billboard and banner lit), holo-ads over their roof or in front of a facade, clear round their image
          note: shop signs reach 10.2 m
-         note: 467 banner.facade, 1621 billboard.facade, 552 billboard.roof, 22 holo_ad.front, 27 holo_ad.roof, 319 neon.facade, 5223 shop_sign.blade, 1640 shop_sign.facade
+         note: 529 banner.facade, 1472 billboard.facade, 576 billboard.roof, 21 holo_ad.front, 33 holo_ad.roof, 281 neon.facade, 5066 shop_sign.blade, 1695 shop_sign.facade
   [pass] water_beds: Every water body has its depth, bed and flow (basins, marinas and pools still; the sea's exposure covers it); no bed under M9's (canal 3, river 7, sea 12 m under the ground datum); tunnels keep 1.5 m under the bed; bridge foundations in the water on bed no deeper than their footings
-         note: 6 tunnel points and 17 bridge foundations under the water
+         note: 5 tunnel points and 7 bridge foundations under the water
   [pass] water_banks: The banks cover every water edge once (the edge's length, every point on a bank, none overlapping); quays on their quays at the quay's height, road embankments on their roads, widths and toes
   [pass] ground_cover: The ground cover tiles the open land once: no two pieces overlap, none under a building, a road or the water, and the open land it leaves is curb corners narrower than 3 m
   [pass] road_supports: Columns under every raised road deck over land, at most 60 m apart, none in a lane, a road or junction under the deck, a building, the water or a transit structure
-         note: 85 road columns under 17 raised segments
+         note: 89 road columns under 17 raised segments
 
 stats:
   map 12.96 km2, land 5.778 km2 (districts 5.638 km2, unassigned 0.0 km2)
@@ -143,64 +143,64 @@ stats:
   district perimeter facing water 76%; boundary curvature (arc / chord over 400 m) 1.1171, land boundaries 1.0188
   open land 0.14 km2; park 'Hook Islet Park' 0.08 km2; park 'Gull Rock Park' 0.06 km2
   inner waterways 4 (1.52 km: basin 0.56, canal 0.96), quays 3.06 km
-  roads alley 5.09 km, avenue 24.59 km, footbridge 0.07 km, highway 3.23 km, pedestrian 13.32 km, service 10.87 km, street 48.3 km; 1198 segments, 829 nodes, 1 component(s); exits north_exit
-  bridges 3 (sea 0, river 2, canal 1; 0.11 km of span), pedestrian 3; named: Wallgate Bridge
-  landmasses with districts connected by road 2 of 2; highway planned elevated 41%; megasite reserves 3; road variant 1
-  local roads street 48.3 km, alley 5.09 km, service 10.87 km, pedestrian 13.32 km, footbridge 0.07 km; 40 one-way segments, 3 footbridges
-  junctions 765 (108 signalized), crosswalks 350, sidewalks 100.24 km, lanes 2684 + 4902 connectors, walkways 7450 (alley 15.96 km, crossing 50.97 km, crosswalk 15.59 km, elevated 0.93 km, elevator 0.0 km, footbridge 0.07 km, path 46.92 km, pedestrian_street 0.74 km, promenade 12.59 km, sidewalk 130.18 km, skybridge 3.21 km, stairs 0.29 km)
-  junctions by type: street_street T 288, avenue_avenue T 211, street T 68, street_street X 45, avenue_avenue X 29, alley_alley T 25, pedestrian T 15, street cul_de_sac 10, street_service T 8, highway_highway T 7, street_service bend 7, service cul_de_sac 6
-  blocks 413, lots 2674 (5 merged groups), open space 11.5% of net land (courtyard 5, green 10, park 220, plaza 127, pocket_park 2), named places 1
+  roads alley 5.89 km, avenue 24.56 km, footbridge 0.05 km, highway 3.19 km, pedestrian 19.11 km, service 11.86 km, street 44.19 km; 1244 segments, 863 nodes, 1 component(s); exits north_exit
+  bridges 3 (sea 0, river 2, canal 1; 0.11 km of span), pedestrian 2; named: Wallgate Bridge
+  landmasses with districts connected by road 2 of 2; highway planned elevated 40%; megasite reserves 3; road variant 0
+  local roads street 44.19 km, alley 5.89 km, service 11.86 km, pedestrian 19.11 km, footbridge 0.05 km; 50 one-way segments, 2 footbridges
+  junctions 794 (102 signalized), crosswalks 331, sidewalks 93.8 km, lanes 2610 + 4781 connectors, walkways 7560 (alley 17.75 km, crossing 50.59 km, crosswalk 14.71 km, elevated 0.79 km, elevator 0.0 km, footbridge 0.05 km, path 47.34 km, pedestrian_street 6.98 km, promenade 12.13 km, sidewalk 122.95 km, skybridge 2.66 km, stairs 0.28 km)
+  junctions by type: street_street T 281, avenue_avenue T 196, street T 76, street_street X 52, pedestrian T 46, avenue_avenue X 32, alley_alley T 24, street cul_de_sac 16, highway_highway T 8, service cul_de_sac 7, street_alley bend 7, street_service T 6
+  blocks 433, lots 2640 (5 merged groups), open space 11.5% of net land (courtyard 5, green 8, park 231, plaza 145), named places 1
 
   lots by archetype            count   min m2   p10    median    p90      max  median frontage m
-  entertainment_market          1394       56    112      230     436      720    15.8
-  industrial_port                 50     2065   3458     6411   13137    27167   101.5
-  megablock_residential          149     2069   2846     5170    9586    14526    89.9
-  residential_heights            785      280    464      838    1364     3656    26.7
-  spaceport                       25     2714   2887    11084   25678    28840   118.8
-  transit_hub                    271      480    758     1598    3190     5296    44.8
+  entertainment_market          1371       57    113      230     444      756    16.2
+  industrial_port                 44     2830   3959     8448   15804    22008   154.7
+  megablock_residential          133     2006   3037     5565   10474    15749    99.4
+  residential_heights            787      281    461      811    1414     3100    27.2
+  spaceport                       27     2533   4457     9289   19418    24194   122.2
+  transit_hub                    278      412    749     1553    2911     4845    44.0
 
   blocks and open space by district  blocks  median block m  open share
-  Wallgate Heights                      81             94      17.6%
-  Neckgate                              44             86       9.7%
-  The Stacks                            58            102       9.8%
-  Lantern Strip                        209             38       6.2%
-  Eastside Docks                         9            125       6.0%
-  Hook Spaceport                        12            173      16.4%
+  Wallgate Heights                      84             92      17.6%
+  Neckgate                              49             84       9.9%
+  The Stacks                            68             98      10.5%
+  Lantern Strip                        204             39       6.2%
+  Eastside Docks                        16            165       4.3%
+  Hook Spaceport                        12            143      16.1%
 
-  buildings 2657 (17.239 km2 floor area), properties 2645, tallest 243.2 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
-  by type: shopfront_row 885, villa 744, shanty_stack 424, podium_tower 241, megabuilding 114, slab 81, perimeter 32, warehouse 26, parking_structure 23, terraced 17, tower 17, hangar 14, yard 14, shed 10, courtyard_block 7, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
-  skybridges 188 (3.21 km: enclosed 42, open_deck 146), ground-floor units 8247 (food 1876, bar 1204, club 1071, convenience 1001, cyberware 859, arcade 698, pawn 582, lobby 455, laundromat 297, clinic 204)
-  roof items: ac_unit 6080, water_tank 638, billboard 552, mechanical 309, antenna 80, av_pad 5; green roofs 396 (202262 m2)
+  buildings 2614 (15.518 km2 floor area), properties 2601, tallest 230.4 m; complexes landmark 1, megabuilding_campus 3, megasite 3, straddle_building 1, tower_cluster 1
+  by type: shopfront_row 883, villa 736, shanty_stack 412, podium_tower 229, slab 94, megabuilding 87, parking_structure 29, warehouse 29, terraced 25, perimeter 23, tower 19, hangar 16, shed 14, courtyard_block 7, yard 3, straddle_building 2, control_tower 1, landmark.ferris_wheel 1, stadium 1, station 1, station_tower 1, terminal 1
+  skybridges 152 (2.66 km: enclosed 42, open_deck 110), ground-floor units 7954 (food 1857, bar 1245, club 1008, convenience 946, cyberware 806, arcade 708, pawn 528, lobby 413, laundromat 248, clinic 195)
+  roof items: ac_unit 6100, water_tank 630, billboard 576, mechanical 294, antenna 74, av_pad 9; green roofs 414 (204521 m2)
   landmarks: Lantern Wheel (ferris_wheel, 120 m)
   megasites: Neckgate Transit Nexus (transit_nexus: bus_bay 10, drop_off 1, metro_entrance 2, platform 2, plaza 2, station 1, station_tower 1); Neck Arena (stadium: pitch 1, plaza 1, stadium 1); Hook Spaceport (spaceport: apron 1, container_stack 60, control_tower 1, fuel_tank 6, hangar 3, launch_pad 3, launch_tower 3, terminal 1)
 
   buildings by district          count  median m   p90 m   max m  coverage   FAR  floor km2
-  Wallgate Heights                 784      20.4    23.8    40.8       33%   1.9      1.307
-  Neckgate                         270      38.5    66.5   108.5       70%   5.3      2.562
-  The Stacks                       149     160.0   185.6   243.2       77%  13.1     11.205
-  Lantern Strip                   1373      21.0    28.0   120.0       95%   4.3      1.550
-  Eastside Docks                    48      12.2    16.0    16.0       26%   0.3      0.106
-  Hook Spaceport                    25      24.5    36.0    36.0       29%   0.8      0.228
+  Wallgate Heights                 785      20.4    23.8    34.0       35%   2.0      1.366
+  Neckgate                         276      38.5    63.0   112.0       69%   5.4      2.567
+  The Stacks                       116     163.2   185.6   230.4       66%  11.2      9.395
+  Lantern Strip                   1358      21.0    28.0   120.0       96%   4.4      1.556
+  Eastside Docks                    44      12.5    16.0    16.0       33%   0.3      0.133
+  Hook Spaceport                    27      20.1    28.0    36.0       32%   0.8      0.221
 
-  props 26510, plants 13655 (5427 trees), 40165 instances; lawns 48501 m2, hedges 2.95 km
-  props: sign 6863, awning 4785, ac_unit 3407, street_light 3124, trash 1955, bollard 1077, railing 993, hydrant 664, parked_vehicle 576, barrier 566, bench 552, trash_can 534, traffic_signal 511, overhead_cable 459, dumpster 276, bus_stop 64, boat 29, planter 23, scaffolding 18, food_stall 15, vending_machine 10, kiosk 8, wall_light 1
-  plants: shrub 6434, park_tree 2297, palm 1286, street_tree 1221, facade_greenery 849, overgrowth 550, conifer 487, roof_tree 395, median_tree 136
+  props 26632, plants 15611 (5433 trees), 42243 instances; lawns 49199 m2, hedges 2.91 km
+  props: sign 6761, awning 4680, ac_unit 3250, street_light 2938, bollard 2009, trash 1916, railing 998, hydrant 559, barrier 557, parked_vehicle 556, trash_can 501, bench 499, traffic_signal 497, overhead_cable 481, dumpster 280, bus_stop 59, boat 30, planter 21, food_stall 15, scaffolding 11, kiosk 10, vending_machine 3, wall_light 1
+  plants: shrub 6311, overgrowth 2633, park_tree 2314, palm 1285, street_tree 1217, facade_greenery 848, conifer 469, roof_tree 386, median_tree 148
 
-  elevated highways 1.31 km (1 runs, 0 direct branches), deck up to 9 m; ramps 4 (0.94 km); interchanges diamond 1; overpasses 1
-  other raised roads 2.8 km, underpass streets 0, road columns 85
+  elevated highways 1.28 km (1 runs, 0 direct branches), deck up to 9 m; ramps 4 (0.94 km); interchanges diamond 1; overpasses 1
+  other raised roads 2.84 km, underpass streets 0, road columns 89
 
-  tunnels metro 5 (2.52 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -26 m
+  tunnels metro 5 (2.47 km); ventilation buildings 0, roads over them 0, streets over them 0, deepest road 0 m, deepest metro -26 m
 
   water: 6 bodies (sea 10.5 m tidal, rv.neckwater 2.95 m downstream, d04.ww.w1123s393 1.5 m tidal, d04.ww.w839n277 1.5 m tidal, d05.ww.e1476n139 10.5 m still, d05.ww.e1232s181 10.5 m still); sea harbor 0.035 km2, open 4.235 km2, sheltered 2.718 km2
-  banks: beach 2 (1.95 km), canal wall 22 (1.29 km), natural bank 28 (13.18 km), quay 5 (3.06 km), riprap 19 (5.94 km), road embankment 4 (0.17 km)
-  ground cover: bare dirt 0.007 km2, gravel 0.553 km2, meadow 0.031 km2, mown lawn 0.465 km2, overgrown paving 0.197 km2, park lawn 0.433 km2, paving 0.535 km2, wasteland 0.006 km2; 331 desire lines
+  banks: beach 2 (1.95 km), canal wall 17 (1.02 km), natural bank 31 (13.5 km), quay 5 (3.06 km), riprap 21 (5.89 km), road embankment 4 (0.16 km)
+  ground cover: bare dirt 0.007 km2, gravel 0.534 km2, meadow 0.02 km2, mown lawn 0.453 km2, overgrown paving 0.166 km2, park lawn 0.45 km2, paving 0.516 km2, wasteland 0.12 km2; 352 desire lines
 
-  gameplay: 142 points of interest, 6 factions (gang 3, corporate 2, police 1), 9 territories (1 contested), 18 taxi stands, 8 fast-travel points
-  pois: vendor.food 21, vendor.convenience 19, bar.bar 18, clinic.ripperdoc 16, bar.arcade 15, apartment.studio 13, vendor.pawn 10, apartment.penthouse 7, bar.club 7, fixer.fixer 5, apartment.apartment 4, clinic.clinic 3, hideout.back_room 2, hideout.squat 1, hideout.warehouse 1
-  parking: street 360, garage 55 (22665 spaces); sign slots: shop_sign.blade 5223, shop_sign.facade 1640, billboard.facade 1621, billboard.roof 552, banner.facade 467, neon.facade 319, holo_ad.roof 27, holo_ad.front 22
+  gameplay: 136 points of interest, 6 factions (gang 3, corporate 2, police 1), 9 territories (1 contested), 16 taxi stands, 8 fast-travel points
+  pois: vendor.food 22, clinic.ripperdoc 17, bar.bar 16, apartment.studio 15, vendor.convenience 15, bar.arcade 14, bar.club 10, vendor.pawn 8, apartment.penthouse 7, fixer.fixer 5, apartment.apartment 2, hideout.back_room 2, clinic.clinic 1, hideout.squat 1, hideout.warehouse 1
+  parking: street 341, garage 65 (27093 spaces); sign slots: shop_sign.blade 5066, shop_sign.facade 1695, billboard.facade 1472, billboard.roof 576, banner.facade 529, neon.facade 281, holo_ad.roof 33, holo_ad.front 21
 
-  transit 8.81 km, supports 136, portals 1, buildings removed 4; stations elevated 6, sky 4, underground 5
-  by mode: elevated_rail 1 lines 3.23 km 6 stations, metro 1 lines 3.11 km 5 stations, sky_tube 1 lines 2.48 km 4 stations
+  transit 7.55 km, supports 111, portals 0, buildings removed 21; stations elevated 5, sky 3, underground 5
+  by mode: elevated_rail 1 lines 2.77 km 5 stations, metro 1 lines 3.08 km 5 stations, sky_tube 1 lines 1.7 km 3 stations
 
   district                     archetype              landmass  km2    share  target  error
   Wallgate Heights             residential_heights    lm.e0n1628  1.159  0.205  0.215   -4.4%  (spec)
@@ -211,23 +211,22 @@ stats:
   Hook Spaceport               spaceport              lm.e0n69  0.874  0.155  0.155   +0.1%  (spec)
 
 notes:
-  - road variant 0/0, layout salt 3 left 4 check failures in the full city; built again on road variant 0/1
+  - road variant 0/0 left 1 check failures in the full city; built again on the same roads with the local layout drawn again (salt 1)
   - megasite 'Neck Arena' (stadium) shrunk to 0.02 km2 (asked 0.06) to fit 'Neckgate'
   - megasite 'Hook Spaceport' (spaceport) shrunk to 0.36 km2 (asked 0.50) to fit 'Hook Spaceport'
   - 2 underpass streets under the viaducts or over the tunnels (not built: 1 deck too low)
-  - 17 local roads cut back at junctions sharper than the district minimum
-  - 1 local roads running alongside another road removed
-  - 15 lanes reached only over pedestrian streets became pedestrian
+  - 18 local roads cut back at junctions sharper than the district minimum
+  - 3 local roads running alongside another road removed
+  - 11 lanes reached only over pedestrian streets became pedestrian
+  - 28 more lanes became pedestrian
   - 1 local roads crossing another without a junction removed
-  - 46 dead ends run on to the road ahead or the dead end facing them
-  - 43 dead-end pieces cut back to their last junction
-  - 9 dead ends cut back clear of the road they ran into
-  - 10 local roads laid along another road removed
-  - 3 local segments (2.26 km) not connected to the network were dropped
-  - lot under a wheel rim left open
+  - 39 dead ends run on to the road ahead or the dead end facing them
+  - 52 dead-end pieces cut back to their last junction
+  - 5 dead ends cut back clear of the road they ran into
+  - 11 local roads laid along another road removed
+  - 3 local segments (1.60 km) not connected to the network were dropped
+  - lot under a wheel rim left open (3 times)
+  - Spine Tube: no tower at The Stacks to host its sky station (it stands on a pylon)
   - Spine Tube: no tower at Hook Spaceport to host its sky station (it stands on a pylon)
-  - Spine Tube: rerouted around 6 building(s)
-  - Spine Tube: rerouted around 3 building(s)
-  - Spine Tube: rerouted around 2 building(s)
-  - Spine Tube: drawn from stop to stop with 345 m curves
+  - Spine Tube: takes out the towers it can neither pass nor go round
   - metro Strip Line: lowered to -26 m under foundation

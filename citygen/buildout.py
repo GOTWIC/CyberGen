@@ -741,6 +741,7 @@ class _Masses:
     def __init__(self, buildings):
         self.polys, self.rows, self.bids = [], [], []
         self.feet: dict = {}          # level -> the masses' footprints
+        self.foot_bids: dict = {}     # level -> their buildings' ids
         self._round: dict = {}
         for rec in buildings:
             base = _base(rec)
@@ -749,6 +750,7 @@ class _Masses:
                     continue
                 fp = G.from_model_poly(ms.footprint)
                 self.feet.setdefault(rec.level, []).append(fp)
+                self.foot_bids.setdefault(rec.level, []).append(rec.id)
                 g = G.qpoly(fp.buffer(-MASS_PAD_M, join_style="mitre"))
                 for part in G.parts(g):
                     shapely.prepare(part)
@@ -798,6 +800,27 @@ class _Masses:
             return [tuple(a[:2]), tuple(b[:2])]
         a, b = ST._pt(*a[:2]), ST._pt(*b[:2])
         return PP._detour(a, b, feet, raw, bl) or PP._detour(a, b, feet, raw, bl, blocks=True)
+
+    def inside_round(self, a, b, level: int, bid: str):
+        """A path from a to b that may pass through building `bid` (its own lobby) but keeps
+        out of every other building: straight, else led round them; None if none."""
+        from . import parkpaths as PP
+
+        feet = [fp for fp, x in zip(self.feet.get(level, []), self.foot_bids.get(level, []))
+                if x != bid]
+        if not feet:
+            return [tuple(a[:2]), tuple(b[:2])]
+        win = LineString([a[:2], b[:2]]).buffer(max(15.0, ST._dist(a, b)), cap_style="square")
+        tree = shapely.STRtree(feet)
+        near = [feet[int(k)] for k in sorted(int(k) for k in tree.query(win))]
+        if not near:
+            return [tuple(a[:2]), tuple(b[:2])]
+        raw = shapely.STRtree(near)
+        bl = PP.Blocked(near, [], -MASS_PAD_M, between=False)
+        a, b = ST._pt(*a[:2]), ST._pt(*b[:2])
+        if bl.clear(a, b):
+            return [a, b]
+        return PP._detour(a, b, near, raw, bl) or PP._detour(a, b, near, raw, bl, blocks=True)
 
 
 def _round_link(p, lv, land: int, masses: _Masses, level: int, lines, walks, gi):
@@ -940,8 +963,10 @@ def link_entrances(out: Out, walks: list) -> list:
             if e is not None and tuple(e.position) != tuple(p):
                 lob = [p, tuple(e.position)]
                 if not masses.clear(p, e.position, rec.level):
-                    # (park paths fix: from the landing to the door round the buildings)
-                    lob = masses.round(p, e.position, rec.level) or lob
+                    # (park paths fix: from the landing to the door round the buildings, else
+                    # through its own building, the lobby, and round the others)
+                    lob = masses.round(p, e.position, rec.level) or \
+                        masses.inside_round(p, e.position, rec.level, bid) or lob
                 new.append(("path", lob, 2.0, _base(rec),
                             {"building": bid, "lobby": True}, rec.level))
             door(rec)
