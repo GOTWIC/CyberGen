@@ -41,5 +41,15 @@ Listed, open:
 
 ## Images
 
+Vesper Bay on the AG14 code (`assetgen materials preview`, custom cameras):
+
+- `vesper_bay_transit_frame.jpg`: a portal frame's leg and haunched cap beam under the Halo
+  Line (the camera close beside the other leg).
+- `vesper_bay_round_tower.jpg`: a round tower's curved wall, smooth and glazed bay by bay.
+- `vesper_bay_quay.jpg`: a quay with its railings, benches and trash cans on the quay deck,
+  the river bank and its waterline.
+- `vesper_bay_transit_masts.jpg`: road columns, the sky tube's masts with their crossheads
+  and stays.
+
 `wip/01_small_city/`: the small test city on the AG14 code (roof items on a mansard's flat
 top, a halo crown's helipad inside its screen, a round tower glazed round its curve).
