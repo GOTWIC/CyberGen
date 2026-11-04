@@ -1760,6 +1760,18 @@ carriageway) and previewed in Blender; layer 3 of the manifest; a C++ runtime pl
 weather, effects, post) and takes over the play features' lamps, pools, washes, moon and
 night exposure. Milestones AT0 to AT7, after AG16, whose benchmark is its baseline.
 
+## Life generator (lifegen)
+
+`docs/lifegen_scope.md` (draft v0, its decisions in section 12 still open) is the plan for
+stage 4: a deterministic plan per city (population by district and hour, trips, fleet,
+signal phases, timetables, air and boat lanes, place slots) keyed by M10's ids and
+checked; a library of people (bodies, garments from sewing patterns draped in Blender,
+generated textiles, accessories and cyberware, animation, crowd stand-ins) and vehicles,
+built once per project; layer 4 of the manifest; a C++ runtime plugin, `CityGenLife`, that
+simulates it on Unreal's Mass, ZoneGraph, Smart Objects and StateTree. Nothing third-party
+goes in the repo unless its license lets anyone use it. Milestones LG0 to LG8, after AG16;
+only LG8 waits for atmosgen's hour and weather.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.
