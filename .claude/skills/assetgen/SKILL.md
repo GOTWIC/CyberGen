@@ -167,6 +167,35 @@ design, and a hilly city's buildings stand on stepped plinths with their doors a
 landmark's spec entry steers its hero: `palette` (its darkest colour the walls, its most
 saturated the light seams and halo), `crown`, `brief`.
 
+Later stages of `assetgen build`, each with its own command to run it alone and a flag to skip
+it:
+
+| Stage | Order in the build | Run it alone | Skip it | Writes / notes |
+|---|---|---|---|---|
+| Water (AG12) | after the streets | `assetgen water OUT` | `--no-water` | `OUT/assets/water/`, `water_report.txt`, `unreal_contribution.water.json`: every water body's surface, bed and banks from M16's data. The look is per water kind (`assetgen/materials/catalog.py`, `WATER`), not in the spec. `assetgen materials preview OUT --views water --night` renders a quayed canal, a river bank and the harbor. |
+| Ground cover and grass (AG13) | after the props | `assetgen ground OUT [--force]` | `--no-ground` | `OUT/assets/ground/` (tiles, masks, grass, clumps), `unreal_contribution.ground.json`, `ground_report.txt`. A round that touches the open land reads `ground/preview.png`. |
+| Fit checks (AG14) | last | `assetgen fit OUT` (about 2.5 minutes a city) | (none) | `asset_grounded` (things resting on what is under them) and `asset_clash` (no mesh through another or over a lane). They run only when the street and prop stages ran. |
+
+To fix one street piece and check the fit again, run `assetgen streets OUT` (it remakes only
+the changed pieces, in seconds), then `assetgen fit OUT`.
+
+Since AG15 a building's facade goes past the grid of rectangles, and each building is lit
+its own way at night. The genes to art-direct:
+- `{g}.wpattern`: the window pattern (stagger, mixed, stepped, checker, scatter, alternate).
+- `skin`: LED strips or fritted glass over the whole building.
+- `accent`, `crown_light`, `logo`: the night accents.
+- `light`: the night color and its spread.
+
+Seven more systems (LED grid, honeycomb, folded glass, mesh screen, media facade, diagonal
+glazing, slit windows) are in `presets.FACADE_SYSTEMS`. How far a district goes past the box
+is `systems.REACH` by archetype (corporate core 1, midtown 0.85). Towers within 150 m never
+share a system, window pattern, palette or night look: `asset_unique`'s `neighbors` result
+shows any that do. Look at day and night together:
+
+```bash
+.venv/bin/python -m assetgen materials preview OUT --views core --night [--hour H]
+```
+
 ### 6. Art-direction rounds (AG5)
 
 After the first build, review it as an art director would, at most three rounds, changing
@@ -195,3 +224,23 @@ Report the spec's path, what it sets and why (one line per entry), the validatio
 brief counts and edge classes from the brief report, the asset report's checks and triangle
 counts when assets were built, and anything in the prompt the spec could not express (it goes
 to the scope's open items).
+
+## Notes for sessions that build assetgen milestones
+
+These are for sessions changing assetgen's code, not for the spec loop above:
+- Gene names must not clash with a facade system's feature genes (timber's `pattern`
+  overwrote AG15's first `{g}.pattern`, hence `wpattern`). Facades drawn outside the grammar
+  go on `ShellBuilder.simple_facades`, never `all_facades`, whose piers the details stage
+  reads.
+- Bump `GEN_VERSION` above main's when merging a milestone that moves pack bytes, and write
+  the Vesper Bay section of `tests/assetgen/goldens.py` too, not only `--sections ag1 ag6`.
+- On Windows, never edit assetgen code while a build runs: each later stage starts new
+  workers that import the edited files.
+- Run long jobs as tracked background commands, one heavy job per slot
+  (`C:/Users/swagn/CityGen/slots/`), waiting for 4 GB of free memory. Run the suite as one
+  pytest process per file. A detached child dies when the session that started it ends its
+  turn. Kill a stopped build by its process tree's PID (`taskkill /T /F /PID n`), never by a
+  command-line pattern other sessions may share.
+- The session scratchpad is shared by every agent of a session: keep PR bodies and helper
+  scripts in a folder of your own (in a bash helper, do not reuse a loop variable's name
+  inside a function: it overwrote the loop and ran no tests).

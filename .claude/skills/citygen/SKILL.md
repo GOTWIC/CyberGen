@@ -129,7 +129,16 @@ Put the prompt in `source.prompt`, the image path in `source.image`, and judgmen
 **Highways** (`highways`): `pattern` (`ring`, `ring_plus_spine`, `spine`, `grid`, `radial`,
 `coastal`, `none`), `exits` (default: land edges), `elevated_share` (the share of highway
 length lifted onto viaducts, M7: the densest stretches with room for ramps go up first),
-`named` routes.
+`named` routes, `grades` (M18; leave it out: ramps, loops and flyovers 7% design and 8% at
+most, viaduct runs 6% and 7%, bridge approaches 6.5%, 30 m vertical curves; gentler grades
+give longer ramps and more dead space under them).
+
+**Crossings** (a district's `junctions`, M18; leave it out for the default by need):
+`signals` `auto` (where two primary roads meet, and spaced 120 m along the roads where a
+street meets one; 200 m in the old town and entertainment market), `fewer` (twice the
+spacing) or `none`; `crosswalks` `auto` (on signalized approaches and spaced across avenues),
+`fewer` (signalized junctions only) or `none` (unmarked crossings everywhere). Use `fewer` or
+`none` for a lawless or pedestrian-hostile district.
 
 **Terrain** (`terrain`, M13; leave it out for a flat city at sea level). Use it when the
 prompt speaks of hills, slopes, cliffs, a ridge, a hill town, a city climbing from the water,
@@ -221,6 +230,16 @@ Then, only where the prompt or image says so:
   `name`, `area_km2`, `edge`, `coast`, `height_limit_m`); left out = preset (spaceport, transit hub,
   industrial port and midtown archetypes bring one), `[]` = none.
 - `skybridge_density`, `grime`, `neon`, `greenery` (0 to 1): only for explicit mood words.
+- `signage` (M20): `density` (0 to 1) and `kinds` (`billboard`, `banner`, `holo`) of the large
+  neon ads on facades and tower roofs. Defaults by archetype: dense in the corporate core,
+  midtown, transit hubs, markets and entertainment, sparse in residential and industrial.
+  Set it only for explicit words ("covered in ads", "no advertising"); it is not filled into
+  the spec, so leaving it out keeps earlier builds' bytes.
+- `variety` (M21, 0 to 1): how far towers go past the box (twisted, tapered, leaning,
+  stacked, split, pods, sky gardens) and how bold their crowns are. Archetype defaults run
+  from the corporate core (0.9) down to industrial (0.1); set it only for words like "wild
+  skyline" or "uniform blocks". Towers of different owners within 150 m never share a form
+  in the same height band.
 - `wealth`, `danger`, `police` (0 to 1, M11 gameplay layer): the base of the district's
   wealth, danger and police fields; archetype defaults, set only for explicit words ("rich",
   "lawless", "heavily policed"). `faction`: the gang, corporation or police that holds the
@@ -477,6 +496,18 @@ errors).
    change spec parameters only, and build the next round. Stop when the checks pass and the
    previews match the prompt, or after the third round; if checks still fail, report them
    with what you tried; if you believe citygen itself is wrong, say so instead of editing it.
+7. Access and placement (the park paths fix, M20):
+   - `report.json` stats `open_no_access`, `passages`, `open_paths_bent`,
+     `walkways_led_round_lots`, `entrances_relinked`, `entrances_moved` and
+     `entrances_blocked` give the access picture. An open space with `attrs.access: "none"`
+     says why in `attrs.no_access`; a building with `attrs.walled_in` has an entrance with
+     no way out.
+   - A park surrounded by lots gets a 3 m passage cut from them. A park bordered only by
+     highways has no way in: add a street or a path (`places`) beside it. Megasite reserves
+     ringed by lots are reached through their gates, which move along the reserve's edge.
+   - Props and plants stand on a surface at their height (ground, a road's deck, a quay, a
+     roof, a wall); a failing `prop_support` or `plant_headroom` makes a city retry on
+     another layout, so read them first when a city takes many tries.
 
 ### 6b. Blender blockout (M4)
 
@@ -580,6 +611,26 @@ import into a project the user did not name (their game project is theirs to cho
 Report the summary lines it prints (actors created, updated, deleted, Play, the check
 lines) and attach the shots.
 
+Notes from running it (the fast import, M19 to AG15):
+- The fast import is the default (`CITYGEN_UE_FAST=0` takes the old one-at-a-time path).
+  Pass `--no-hlod` when a check does not need the far view: the HLODs took 26 minutes for
+  Greyhook on the Windows PC, and stopping the HLOD commandlet midway may be refused.
+- Unreal takes 14 to 24 GB of memory on a stage 2 city: run nothing else heavy beside it.
+  Import a Delta-sized city with `CITYGEN_UE_OFFLOAD=500` on a 32 GB PC (the default 2,000
+  ran out of memory at 61,000 of 73,293 actors). An import again after an out-of-memory
+  failure resumes cheaply: saved actors count as unchanged and the meshes are kept.
+- Past about 42,000 Nanite meshes, Play runs out of Nanite root pages unless the streaming
+  pool is smaller. The importer sets `r.Nanite.Streaming.StreamingPoolSize` for such a city.
+- Shots on a big city: `CITYGEN_UE_PLAY_SHOTS_ONLY=1` with `pday_*` views (`night_*` for
+  night) renders from the free camera in the play world. Pick cameras from the model
+  (junction `edge_z`, a transit structure's `attrs.form`, `sign_slots.yaw_deg`,
+  `form.kind`) and keep the eye out of buildings.
+- Prove a light renders before tuning it: an `AInfo` actor is hidden in the game, so its
+  components draw nothing until `SetHidden(false)`.
+- `tests/test_unreal.py` runs real Unreal imports (about 10 GB, an hour): take a slot for it.
+- In an isolated worktree on Windows, put build and import commands in a script file and run
+  that (compound shell commands are refused there).
+
 ### 7. Report
 
 Reply with:
@@ -623,3 +674,19 @@ Worked examples (prompts, specs and schematics): `docs/progress/M0/`. A pinned i
 megasites (the M3 polish; `docs/progress/M3/` before it), `docs/progress/M2/` with local streets, blocks and lots,
 `docs/progress/M1b/` with primary roads (specs in `docs/progress/M1a2/`, the water and
 district builds there and in `docs/progress/M1a/`).
+
+## Notes for sessions that build citygen milestones
+
+These are for sessions changing citygen's code, not for the spec loop above:
+- A check a placer must satisfy is mirrored exactly in the placer: same reach, same frame,
+  same predicate. A margin of a few cm inside the check's reach absorbs the rows' rounding.
+- A prop's or plant's z is over the ground at its own point (M13). Anything placed from a
+  building's floor heights adds `base_m - ground(point)` (`Ctx.facade_spot` returns it,
+  `Ctx.reframe` moves a height from one point to another). Things placed outside the
+  occupancy pass (barriers, scaffolding, market gates, cables, unit dressing) apply
+  `prop_support`'s tests themselves.
+- When the props stage changes, run it again on main's models before a full rebuild (drop
+  the props, plants and green rows, `DK.props(spec, m, PR.build)`, then `prop_checks.run`):
+  a check failing there means a city will retry on another layout.
+- Long jobs and the suite: as in assetgen's skill (tracked background commands, slots, one
+  pytest process per file, never detached children, kill by PID).
