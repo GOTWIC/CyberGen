@@ -1227,7 +1227,8 @@ Sample builds, the measures before and after: `docs/progress/fix_paths/`.
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG15, section 14), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG16, section 14; planned:
+AG16 performance, a benchmark and structural fixes before stage 3), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).

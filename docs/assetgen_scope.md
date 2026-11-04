@@ -4,7 +4,7 @@ Stage 2 (assetgen) of CyberGen's five stages. A built citygen city in; a 3D mode
 for every building, plus the street elements, props, plants and texture library the city
 needs, out, and into Unreal through the shared exporter (`docs/unreal_export.md`), which
 every assetgen milestone updates for what it adds. Like citygen it is city-agnostic, offline and
-deterministic. Its milestones carry the prefix AG (AG0 to AG15, section 14), so their
+deterministic. Its milestones carry the prefix AG (AG0 to AG16, section 14), so their
 folders in `docs/progress/` never clash with stage 1's M folders or a later stage's; their
 full record is `docs/assetgen_milestones.md`. The decisions that need Swagnik before AG1
 starts are in section 13.
@@ -698,13 +698,14 @@ docker image; Windows joins in AG9.
 | AG6 | Materials and textures | AG1; decisions 13.1, 13.3 | AG2 to AG5, AG7, AG8 |
 | AG7 | Street elements | AG0; M13 for grades | AG1 to AG6 |
 | AG8 | Props, plants and signs | AG0; decision 13.3 | AG1 to AG6 |
-| AG9 | Scale and release | AG5 to AG8, AG12 to AG15; decision 13.5 | |
+| AG9 | Scale and release | AG5 to AG8, AG12 to AG16; decision 13.5 | |
 | AG10 | Layered districts | AG9; M14 | AG11 |
 | AG11 | Interiors (only if decision 13.6 asks) | AG9 | AG10 |
 | AG12 | Water (14.13) | M16; AG6, AG7; decision 13.10 | AG4, AG5, AG13 |
 | AG13 | Ground cover and grass (14.14) | M16; AG6, AG8; decision 13.9 | AG4, AG5, AG12 |
 | AG14 | Fit and finish (14.15) | AG4, AG7, AG8; M17 to M21 | AG12, AG13 |
 | AG15 | Cyberpunk facades and night (14.16) | AG14, AG6; M20, M21 | AG12, AG13 |
+| AG16 | Performance (14.17) | AG15; the first run-through's fixes | |
 
 ### 14.1 AG0: Contract and spike
 
@@ -874,7 +875,7 @@ docker image; Windows joins in AG9.
       │     └──> AG6 ───────────────────────┤
       ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11 (if asked)
       └─> AG8 ──────────────────────────────┤
- M17 to M21 ─> AG14 (fit) ─> AG15 (night) ──┤
+ M17 to M21 ─> AG14 ─> AG15 ─> AG16 (perf) ─┤
  M16 ─┬─> AG12 (water) ─────────────────────┤
       └─> AG13 (ground cover, grass) ───────┘
 ```
@@ -899,6 +900,9 @@ docker image; Windows joins in AG9.
 - **The first run-through's fixes** (AG14, AG15; `docs/run_through_1.md`) come first: AG14
   after stage 1's M17 to M21 (it draws what they add), AG15 after AG14 (both change the
   shell), before AG5, AG12 and AG13.
+- **Performance** (AG16) comes after the first run-through's fixes and before AG9 and stage
+  3: what it fixes is stage 1 and 2 content that atmosgen will not change, and its benchmark
+  is then the baseline every later milestone, in any stage, is measured against.
 - **Stage 1 milestones assetgen waits on:** M15 and the exporter's move to its own package
   before AG0's Unreal part, M13 for AG5's slopes and AG7's grades (until then flat ground at
   z 0), M14 for AG10. The asks of section 4.5 go to citygen sessions; each milestone derives
@@ -1008,6 +1012,56 @@ checks on the generated meshes.
   under their lamps read lit at night in Unreal; budgets met; Mac = x86.
 - **Shows:** the corporate core by day and by night; a street at night under its lamps.
 - **Later stages:** the full night (fog, rain, reflections, light shafts) is stage 3's.
+
+### 14.17 AG16: Performance
+
+A whole city's runtime and import cost in Unreal, measured, then cut at its source (issue
+#96). Delta at run-through 2 on the Windows PC (RTX 4070 Ti, 32 GB: decision 13.4's target):
+73,293 actors, 53,790 distinct Nanite meshes, about 31,000 actors loaded at the player start;
+the first Play overran Nanite's root pages (49,152); frames in play-in-editor 14 ms median and
+24 ms at the 95th percentile walking, 30 and 66 ms flying at 50 m/s; the first import out of
+memory at 61,000 actors with the editor at about 20 GB (#84). These costs come from stage 1
+and 2 content (distinct meshes, actors, instancing, streaming, collision), which atmosgen will
+not change, and atmosgen's own GPU cost needs headroom and a stable baseline: hence before
+stage 3.
+
+- **Adds:**
+  - **A benchmark** (`citygen unreal BUILD UPROJECT --bench`): a fixed route through the
+    city (sidewalk walks in three districts, a flight at street level and one at 150 m across
+    the city, a teleport across it, by day and by night) in a standalone game process
+    (`-game`, not play-in-editor), recording frame time p50, p95 and p99, hitches over
+    50 ms, game, render and GPU thread times (the CSV profiler), draw calls, Nanite pool
+    and root page use, VRAM, RAM and streaming waits; at native 1440p and at a 67% screen
+    percentage with TSR, to tell how much of a frame its resolution sets. One command; the
+    results as JSON and a table (`docs/progress/AG16/bench/<city>`), kept so any later
+    milestone can be compared with them.
+  - **Targets**, Swagnik's to confirm before the fixes start. Proposed for Delta on the
+    Windows PC at 1440p: walking 16.7 ms p50 and 25 ms p95, flying 33 ms p95, no hitch over
+    100 ms, under 10 GB of VRAM; the import within 16 GB of RAM and 20 minutes.
+  - **Structural fixes**, chosen by what the benchmark shows. Candidates: parts shared
+    between buildings where their quantized parameters coincide (decision 13.2 allows it)
+    and more part families instanced, so fewer distinct Nanite meshes; fewer actors (a
+    tile's small pieces merged, packed level instances or ISM/HISM for repeated street
+    pieces and props); HLOD layers and World Partition loading ranges per category; simpler
+    collision on small and far things; the import's memory (#84); the Nanite streaming pool
+    set from the city's size.
+  - **Budgets in the build:** `asset_budget` gains limits per tile and per city on actors,
+    distinct meshes, instances and Nanite root pages, at what the benchmark shows fits.
+- **Upscaling:** TSR is measured in the benchmark. DLSS, FSR and XeSS come later, as an
+  exporter option (`--upscaler`) used only where the vendor's plugin is installed, off by
+  default; no frame generation before stage 3. Upscaling helps only a frame the GPU limits,
+  so it follows the structural fixes and never stands in for them.
+- **Unreal:** the benchmark mode in the check (`check_city.py`), the project settings it
+  writes (scalability, screen percentage, Nanite pool), and whatever the fixes change in the
+  importer; recorded in `docs/unreal_export.md`.
+- **Done when:** the benchmark runs with one command on Delta and Vesper Bay; Delta meets the
+  agreed targets on the Windows PC, or each gap is measured and its cause written down; the
+  budgets are checked in `assetgen build`; every sample still passes every check and looks
+  the same (renders before and after side by side); Mac = x86 for what the generators change.
+- **Shows:** the benchmark's table before and after; frame-time graphs along the route.
+- **Later stages:** atmosgen tunes its lighting, shadows, fog and volumetrics against this
+  benchmark in its own milestones; lifegen's crowds and traffic (CPU) get a pass of their own
+  after it.
 
 ## 15. Running it
 

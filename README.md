@@ -494,6 +494,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
 | AG14 | Fit and finish | Junctions that meet their roads, smooth glazed curved walls, roof equipment on its roofs, transit frames, piers and cable-stayed masts, embankments under low decks, bridges drawn once, nothing hanging over the lanes; checks that everything rests on something and nothing passes through anything else | Done |
 | AG15 | Cyberpunk facades and night | Seven new facade styles and window patterns beyond grids, two or three finishes a building, neighboring towers never alike; every building lit its own way at night with crown lights and logos; lamps that light the streets in Unreal | Done |
+| AG16 | Performance | A benchmark through each city in Unreal, frame time, memory and import targets, and the fixes that meet them: fewer distinct meshes and actors, more instancing, streaming and HLODs tuned | Planned |
 
 ---
 
