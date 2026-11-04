@@ -9,9 +9,9 @@ your machine.
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15 done, the rest to come |
-| 3 | [atmosgen](#stages-3-to-5) | Lighting, sky, weather and atmospherics | Planned |
-| 4 | [lifegen](#stages-3-to-5) | Traffic, crowds, trains and aircraft, generated | Planned |
-| 5 | [storygen](#stages-3-to-5) | Story, characters and cutscenes | Planned |
+| 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | Planned ([draft plan](docs/atmosgen_scope.md)) |
+| 4 | [lifegen](#stages-4-and-5) | Traffic, crowds, trains and aircraft, generated | Planned |
+| 5 | [storygen](#stages-4-and-5) | Story, characters and cutscenes | Planned |
 
 ---
 
@@ -498,11 +498,35 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 
 ---
 
-## Stages 3 to 5
+## Stage 3: atmosgen
 
-- **atmosgen:** lighting, shadows, sky, clouds and weather in Unreal: every lamp, shopfront
-  and sign lighting the streets, haze and steam, rain and wet streets, the sky lit by the
-  city, and time of day. Plan (draft): [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md).
+The city's light and air at every hour and in every weather: every lamp, shopfront and
+sign lighting the streets around it, haze and steam that catch the light, rain and wet
+streets that mirror the neon, a low sky lit from below by the city, and time of day moving
+every light and window through the night. It is planned as a generator like the first two:
+it works out where every light, fog pocket, steam vent and puddle goes from the city and
+its assets, checks that every street is lit, previews the night in Blender, and hands the
+plan to Unreal through the same exporter.
+
+Plan (draft): [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md). It starts after AG16.
+
+### Milestones
+
+| | Milestone | What it adds | Status |
+|---|---|---|---|
+| AT0 | Groundwork | Look presets and art direction spec, the plan's format, a night test of one district in Unreal | Planned |
+| AT1 | Streets at night | Street and wall lights that light sidewalks and roads, shop light spilling onto the street, deck, tunnel and station lights, a check that every street is lit | Planned |
+| AT2 | Neon and signs as light | Billboards, banners and holo-boards lighting the street and facades they face, neon spill, crown floods, aviation lights, searchlights, port and spaceport lights, flicker | Planned |
+| AT3 | Sky and time | Night, dusk and day skies, a cloud deck lit by the city, the moon, time of day driving every light and window | Planned |
+| AT4 | Air | Fog, haze, smog and mist over the water, light shafts, steam from manholes and vents | Planned |
+| AT5 | Weather | Rain kept out from under decks and awnings, wet streets and puddles, drips and splashes, wind, changing weather | Planned |
+| AT6 | Looks and art direction | Color grading and post per look and district, art-direction rounds, the prompt-to-look skill | Planned |
+| AT7 | Far city and release | The skyline glittering at night to the horizon, every sample city lit, checked in Unreal | Planned |
+
+---
+
+## Stages 4 and 5
+
 - **lifegen:** cars, crowds, trains and aircraft placed and driven procedurally on stage 1's
   lane, walkway and transit graphs.
 - **storygen:** story, characters and cutscenes.
