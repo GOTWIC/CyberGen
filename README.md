@@ -500,7 +500,9 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 
 ## Stages 3 to 5
 
-- **atmosgen:** lighting, shadows, sky, clouds and weather in Unreal.
+- **atmosgen:** lighting, shadows, sky, clouds and weather in Unreal: every lamp, shopfront
+  and sign lighting the streets, haze and steam, rain and wet streets, the sky lit by the
+  city, and time of day. Plan (draft): [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md).
 - **lifegen:** cars, crowds, trains and aircraft placed and driven procedurally on stage 1's
   lane, walkway and transit graphs.
 - **storygen:** story, characters and cutscenes.
