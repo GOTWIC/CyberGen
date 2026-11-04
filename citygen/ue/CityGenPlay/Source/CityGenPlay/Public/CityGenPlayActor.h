@@ -119,17 +119,17 @@ public:
 	float LampOuterConeDeg = 78.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float StreetLampCandela = 6000.f;
+	float StreetLampCandela = 1500.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WallLampCandela = 1500.f;
+	float WallLampCandela = 400.f;
 
 	/** How many of the large signs nearest the camera wash their facade with a light. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	int32 WashLights = 32;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WashCandela = 1500.f;
+	float WashCandela = 600.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	float WashRadiusM = 25.f;

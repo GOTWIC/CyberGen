@@ -113,6 +113,22 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   the first frame (the far view's instanced HLODs and the view range make no difference;
   the AG5 Unreal check, `docs/progress/AG5/unreal/`), and so do Vesper Bay Decks' 50,008
   (the AG10 check). Greyhook (34,000) and Vesper Bay play.
+- **A smaller streaming pool for a big city** (run-through 2): the root pages share one
+  GPU buffer of at most 2,048 MB with Nanite's streaming pool (512 MB by default), so there
+  are 49,152 of them. Delta Megacity with AG15's parts places 53,790 Nanite meshes, and its
+  first Play on the Windows PC quit on "Cannot allocate more root pages 49152/49152".
+  Every import of a city with more than 42,000 Nanite meshes (`unreal.NANITE_MANY`, counted
+  as the check counts them, `unreal.nanite_meshes`) sets
+  `r.Nanite.Streaming.StreamingPoolSize=256` in the project's `[SystemSettings]`
+  (`set_nanite_pool`): 57,344 root pages, and Delta plays. The check's editor views still
+  load up to 42,000 meshes that keep their root pages into the walk, so on such a city
+  `CITYGEN_UE_PLAY_SHOTS_ONLY=1` leaves them out (only the play window's shots and the
+  `pday_*` and `night_*` views, rendered from the free camera in the play world, by day and
+  by night, 1920 x 1080).
+- **Memory on the import**: the actors are saved and unloaded every 2,000
+  (`CITYGEN_UE_OFFLOAD`); Delta's first import on the Windows PC (32 GB, other apps open)
+  ran out of memory at 61,000 of its 73,293 actors ("The paging file is too small"), and
+  `CITYGEN_UE_OFFLOAD=500` imported the rest.
 - **Nanite in the editor on the Mac**: UE 5.8 renders these levels with Nanite off
   (`UseNanite(METAL_SM6) returned false`), so every Nanite mesh draws its fallback; an
   entry whose small parts must show and collide asks for a full one (`fallback_full`:
@@ -204,7 +220,7 @@ at the lamp head sat inside the lamp mesh's own shadow and reached nothing on th
 
 - the 192 street and wall lights nearest the view get a real **spot light** each, hung
   `LampDropCm` (45 cm) under the lamp head, outside the lamp mesh, pointing straight down
-  (cones 50 and 78 degrees, 6,000 cd for a street light and 1,500 for a wall light, 30 m and
+  (cones 50 and 78 degrees, 1,500 cd for a street light and 400 for a wall light, 30 m and
   18 m of reach), warm; the nearest 8 cast shadows, the rest none; the farthest quarter
   fades, so a lamp entering the set does not pop;
 - under the 768 lamps past them (and the fading ones) a **light-pool decal**
@@ -241,9 +257,9 @@ imports without the play features.
   rectangle of its corners, the walkway points, the lamp heads and kinds, the sign wash
   points and colors, district label points, `MPC_CityGen`, `M_CgLightPool`; settings
   (minimap radius 250 m, free camera speed 30 m/s; AG15: `LampLights` 192 spot lights of
-  `StreetLampCandela` 6,000 cd and `WallLampCandela` 1,500, `ShadowedLamps` 8,
+  `StreetLampCandela` 1,500 cd and `WallLampCandela` 400, `ShadowedLamps` 8,
   `LampRadiusM` 30, `LampDropCm` 45, cones `LampInnerConeDeg` 50 and `LampOuterConeDeg` 78,
-  `LampPools` 768 decals of `PoolRadiusM` 7, `WashLights` 32 of `WashCandela` 1,500 and
+  `LampPools` 768 decals of `PoolRadiusM` 7, `WashLights` 32 of `WashCandela` 600 and
   `WashRadiusM` 25, `NightHour` 21; night exposure -3 EV100, the moon at 3% of the sun,
   start at night, show the minimap) are its properties, editable on the actor in the level.
   `CityGen.Status` also gives `lamps_shadowed` and `light_pools`.
@@ -735,9 +751,16 @@ over an earlier one updates the actors and meshes whose entries changed.
   actor's `LightPoolMaterial` (`M_CgLightPool`, made once, `cg.pool` 1), `NightHour`,
   `WashPoints` and `WashColors` (a plugin built before AG15 has none of them: the city
   imports with its lamps as they were).
-- **Tuning**: the lamps' candelas, the pools' strength (`PoolStrength` 2.5 on the
-  material) and `NightGain` are first values set against the night's fixed exposure (-3
-  EV100) without Unreal; the Unreal check of AG15 sets them.
+- **Tuning**: the lamps' candelas, the pools' strength (`PoolStrength` on the material) and
+  `NightGain` were first values set against the night's fixed exposure (-3 EV100) without
+  Unreal. The second run-through (`docs/progress/run_through_2/`) found the lamps, pools
+  and washes drew nothing at all: `ACityGenPlay` is an `AInfo`, hidden in the game, and a
+  hidden actor's components do not render; the actor now sets `SetHidden(false)`. Lit, the
+  first values blew the streets out under that exposure, so they are a quarter: 1,500 cd
+  for a street light, 400 for a wall light, `WashCandela` 600, `PoolStrength` 1.0
+  (`LIGHT_POOL_VERSION` 2). `NightGain` stays 1. `CITYGEN_UE_LAMP_DEBUG=1` with
+  `--check --shots` and `night_*` views logs the lamps near each view and shoots it again
+  at the scales in `CITYGEN_UE_LAMP_SCALES` (comma separated), skipping the walk's checks.
 
 ## assetgen's street contribution (AG7)
 

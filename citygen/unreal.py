@@ -1092,17 +1092,58 @@ def set_startup_map(uproject: str | Path, level: str) -> bool:
     """Make `level` (/Game/CityGen/<City>/Maps/<City>) the map the editor opens and the game
     starts in: EditorStartupMap and GameDefaultMap in the project's Config/DefaultEngine.ini,
     the rest of the file as it was (its encoding and line endings too). True when it changed."""
-    ini = Path(uproject).parent / "Config" / "DefaultEngine.ini"
     ref = f"{level}.{level.rsplit('/', 1)[-1]}"
+    return set_engine_ini(uproject, MAPS_SECTION,
+                          [("EditorStartupMap", ref), ("GameDefaultMap", ref)])
+
+
+# Nanite keeps a root page for every Nanite mesh in memory, in one GPU buffer of at most
+# 2048 MB that the streaming pool (r.Nanite.Streaming.StreamingPoolSize, 512 MB by default)
+# shares: 1536 MB, 49,152 root pages, and the engine quits on a fatal error when they run
+# out. Delta Megacity with AG15's parts (53,790 meshes) ran out in its first Play on the
+# Windows PC (run-through 2), so a city with more Nanite meshes than NANITE_MANY gets a
+# smaller streaming pool, NANITE_POOL_MB: 256 MB leaves 57,344 root pages.
+NANITE_MANY = 42000
+NANITE_POOL_MB = 256
+SYSTEM_SECTION = "[SystemSettings]"
+
+
+def nanite_meshes(man: dict) -> int:
+    """The distinct Nanite meshes a manifest places (as `check_city.mesh_of` counts them:
+    blockout objects' and stage 2 actors' and part instancers' meshes, not the LOD chains)."""
+    s2 = man.get("stage2") or {}
+    lod = {c["mesh"] for c in s2.get("lod_chains", [])}
+    out = {}
+    for t in man.get("tiles", []):
+        for o in t.get("objects", []):
+            out[o["key"]] = f"Meshes/{t['name']}/{o['asset']}"
+    for r in s2.get("actors", []) + s2.get("instances", []):
+        out[r["key"]] = None if r.get("mesh") in lod else r.get("mesh")
+    return len({v for v in out.values() if v})
+
+
+def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
+    """A smaller Nanite streaming pool in the project's [SystemSettings] for a city of more
+    than NANITE_MANY Nanite meshes (more root pages; see NANITE_MANY). True when the file
+    changed; a smaller city leaves the project as it is."""
+    if nanite_meshes(man) <= NANITE_MANY:
+        return False
+    return set_engine_ini(uproject, SYSTEM_SECTION,
+                          [("r.Nanite.Streaming.StreamingPoolSize", str(NANITE_POOL_MB))])
+
+
+def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]]) -> bool:
+    """Set keys of one section of the project's Config/DefaultEngine.ini, the rest of the
+    file as it was (its encoding and line endings too). True when it changed."""
+    ini = Path(uproject).parent / "Config" / "DefaultEngine.ini"
     raw = ini.read_bytes() if ini.is_file() else b""
     bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
     text = raw.decode("utf-8-sig")
     nl = "\r\n" if "\r\n" in text else "\n"
     lines = text.splitlines()
-    want = [("EditorStartupMap", ref), ("GameDefaultMap", ref)]
-    start = next((i for i, ln in enumerate(lines) if ln.strip() == MAPS_SECTION), None)
+    start = next((i for i, ln in enumerate(lines) if ln.strip() == section), None)
     if start is None:
-        lines += ([""] if lines and lines[-1].strip() else []) + [MAPS_SECTION] + \
+        lines += ([""] if lines and lines[-1].strip() else []) + [section] + \
             [f"{k}={v}" for k, v in want]
     else:
         end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")),
@@ -1419,6 +1460,10 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     if res.get("ok") and startup:
         res["startup_map_changed"] = set_startup_map(up, res["level"])
         res["startup_map"] = res["level"]
+    if res.get("ok"):
+        man = json.loads(man_path.read_text(encoding="utf-8"))
+        res["nanite_meshes"] = nanite_meshes(man)
+        res["nanite_pool_changed"] = set_nanite_pool(up, man)
         Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n",
                                        encoding="utf-8", newline="\n")
     return res

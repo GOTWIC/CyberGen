@@ -417,6 +417,28 @@ def test_startup_map(tmp_path):
                                     "VesperBay.VesperBay\n")
 
 
+def test_nanite_pool(tmp_path, monkeypatch):
+    """A city of more Nanite meshes than NANITE_MANY gets a smaller Nanite streaming pool in
+    the project's [SystemSettings] (more root pages); a smaller one leaves the file alone."""
+    up = tmp_path / "P" / "P.uproject"
+    (tmp_path / "P" / "Config").mkdir(parents=True)
+    ini = tmp_path / "P" / "Config" / "DefaultEngine.ini"
+    ini.write_text("[/Script/Engine.RendererSettings]\nr.Lumen=1\n")
+    man = {"tiles": [{"name": "t0", "objects": [{"key": f"k{i}", "asset": f"a{i}"}
+                                                for i in range(5)]}],
+           "stage2": {"lod_chains": [{"mesh": "lod"}],
+                      "actors": [{"key": "k0", "mesh": "s0"}, {"key": "x", "mesh": "lod"}],
+                      "instances": [{"key": "p", "mesh": "s0"}]}}
+    assert U.nanite_meshes(man) == 5      # k1..k4's own, k0's and p's s0; x a LOD chain
+    monkeypatch.setattr(U, "NANITE_MANY", 5)
+    assert not U.set_nanite_pool(up, man)
+    monkeypatch.setattr(U, "NANITE_MANY", 4)
+    assert U.set_nanite_pool(up, man)
+    assert ini.read_text() == ("[/Script/Engine.RendererSettings]\nr.Lumen=1\n\n"
+                               "[SystemSettings]\nr.Nanite.Streaming.StreamingPoolSize=256\n")
+    assert not U.set_nanite_pool(up, man)
+
+
 def test_play_flags(tmp_path):
     """`--play`, `--fly-speed`, `--view-range`, `--no-startup` and `--no-hlod` parse; a play mode
     that is not one is refused before any editor runs."""
