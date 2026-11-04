@@ -270,7 +270,11 @@ def run():
     if not les.load_level(path):
         raise RuntimeError(f"cannot load {path} (import the city first)")
     yield from wait(2.0)
-    if JOB.get("shots"):
+    # CITYGEN_UE_PLAY_SHOTS_ONLY=1 leaves out the editor's views (only the play window's and
+    # the `pday_`/`night_` views): the meshes the editor views load keep their Nanite root
+    # pages, and with the play world's on top a big city (Delta Megacity with AG15, 53,790
+    # meshes) runs out of them (49,152) in the walk
+    if JOB.get("shots") and os.environ.get("CITYGEN_UE_PLAY_SHOTS_ONLY") != "1":
         yield from shots(man)
     # the walk with the project's own game mode and pawn, whatever the level's Play is (its
     # game mode override, `--play`), then a flight with the fly pawn; the level is not saved
@@ -279,13 +283,16 @@ def run():
     say("begin", label="check_walk")
     world, pawn = yield from begin_play(les)
     RES["pawn"] = pawn.get_class().get_name()
-    say("note", text="streaming around the player")
-    yield from streaming(world, pawn, man, slug)
-    say("note", text="traces onto the ground, roofs and facades")
-    yield from collision(world, pawn, man, slug)
-    say("note", text="walking the sidewalks")
-    yield from walk(world, pawn, man)
-    yield from cheats(world, pawn)
+    if os.environ.get("CITYGEN_UE_LAMP_DEBUG") != "1":
+        say("note", text="streaming around the player")
+        yield from streaming(world, pawn, man, slug)
+        say("note", text="traces onto the ground, roofs and facades")
+        yield from collision(world, pawn, man, slug)
+        say("note", text="walking the sidewalks")
+        yield from walk(world, pawn, man)
+        yield from cheats(world, pawn)
+    else:
+        yield from settle(world, slug)
     yield from play_features(world, man, slug)
     les.editor_request_end_play()
     yield from wait(2.0)
@@ -716,6 +723,11 @@ def play_features(world, man, slug):
     yield from wait(1.0)
     got["free_cam"] = status(a)
     if JOB.get("shots"):
+        # the `--view`s named `pday_*` from the free camera by day, `night_*` by night
+        a.set_night(False)
+        yield from play_views(world, a, slug, "pday_")
+        a.set_night(True)
+        yield from wait(2.0)
         # the free camera 120 m over the player, looking at the city's middle by night
         cam = unreal.GameplayStatics.get_player_pawn(world, 0)
         pc = unreal.GameplayStatics.get_player_controller(world, 0)
@@ -727,6 +739,7 @@ def play_features(world, man, slug):
             eye, ue((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0, 0.0)))
         yield from wait(3.0)
         yield from ui_shot(world, "play_free_cam_night")
+        yield from play_views(world, a, slug, "night_")
     a.set_free_cam(False)
     yield from wait(1.0)
     got["back"] = status(a)
@@ -770,7 +783,80 @@ def play_features(world, man, slug):
         + ("onto the ground" if down is not None else "with nothing under the player"))
 
 
-def ui_shot(world, name):
+def play_views(world, a, slug, prefix):
+    """The `--view`s named `<prefix>*` from the free camera in the play world (by night the
+    play features' lamps, light pools and sign washes live only there; streaming loads the
+    city around each view, where the editor's shots load at most `SHOT_MESHES` meshes near
+    the city's middle): the camera moved to each eye, the city streamed in around it, the
+    minimap hidden, a 1920 x 1080 HighResShot (no overlay)."""
+    views = [v for v in JOB.get("views", []) if v["name"].startswith(prefix)]
+    if not views:
+        return
+    cam = unreal.GameplayStatics.get_player_pawn(world, 0)
+    pc = unreal.GameplayStatics.get_player_controller(world, 0)
+    try:
+        a.set_editor_property("b_show_minimap", False)
+    except Exception:           # noqa: BLE001 (a plugin without the property)
+        pass
+    for v in views:
+        eye, tg = ue(*v["eye"]), ue(*v["target"])
+        cam.set_actor_location(eye, False, True)
+        pc.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(eye, tg))
+        try:
+            pc.player_camera_manager.set_fov(2.0 * math.degrees(
+                math.atan(18.0 / v.get("lens_mm", 28))))
+        except Exception:       # noqa: BLE001
+            pass
+        yield from settle(world, slug, at=eye)
+        yield from wait(4.0)
+        yield from ui_shot(world, v["name"], "HighResShot 1920x1080", 180)
+        log(f"play view {v['name']}")
+        if os.environ.get("CITYGEN_UE_LAMP_DEBUG") == "1" and prefix == "night_":
+            yield from lamp_debug(world, a, v)
+    try:
+        pc.player_camera_manager.unlock_fov()
+        a.set_editor_property("b_show_minimap", True)
+    except Exception:           # noqa: BLE001
+        pass
+
+
+def lamp_debug(world, a, v):
+    """Tuning aid (CITYGEN_UE_LAMP_DEBUG=1, which also skips the walk's streaming,
+    collision and walking checks): the lamps' spot lights and pools near a night view in the
+    log, then the view again with the lamps' candelas times each of CITYGEN_UE_LAMP_SCALES
+    (comma separated, default 20), `<view>_x<scale>`."""
+    eye = ue(*v["eye"])
+    spots = list(a.get_components_by_class(unreal.SpotLightComponent))
+    pools = list(a.get_components_by_class(unreal.DecalComponent))
+    vis = [s for s in spots if s.is_visible()]
+    vis.sort(key=lambda s: (s.get_world_location() - eye).length())
+    for s in vis[:4]:
+        p = s.get_world_location()
+        log(f"lamp debug {v['name']}: spot at ({p.x:.0f}, {p.y:.0f}, {p.z:.0f}) "
+            f"{(p - eye).length() / 100.0:.0f} m from the eye, intensity "
+            f"{s.get_editor_property('intensity')} {s.get_editor_property('intensity_units')}, "
+            f"radius {s.get_editor_property('attenuation_radius')}, rot "
+            f"{s.get_world_rotation()}, cones {s.get_editor_property('inner_cone_angle')}/"
+            f"{s.get_editor_property('outer_cone_angle')}, mobility {s.mobility}")
+    pv = [d for d in pools if d.is_visible()]
+    log(f"lamp debug {v['name']}: {len(vis)} of {len(spots)} spots visible, {len(pv)} of "
+        f"{len(pools)} pools; candela street "
+        f"{a.get_editor_property('street_lamp_candela')} wall "
+        f"{a.get_editor_property('wall_lamp_candela')}; decal "
+        f"{pv[0].get_editor_property('decal_size') if pv else None} "
+        f"{pv[0].get_editor_property('decal_material') if pv else None}")
+    s0 = a.get_editor_property("street_lamp_candela")
+    w0 = a.get_editor_property("wall_lamp_candela")
+    for k in os.environ.get("CITYGEN_UE_LAMP_SCALES", "20").split(","):
+        a.set_editor_property("street_lamp_candela", s0 * float(k))
+        a.set_editor_property("wall_lamp_candela", w0 * float(k))
+        yield from wait(2.0)
+        yield from ui_shot(world, f"{v['name']}_x{k}", "HighResShot 1920x1080", 180)
+    a.set_editor_property("street_lamp_candela", s0)
+    a.set_editor_property("wall_lamp_candela", w0)
+
+
+def ui_shot(world, name, cmd="shot showui", timeout=30):
     """A screenshot of the play window with its overlay (HighResShot leaves the UI out)."""
     out = JOB["shots"]
     os.makedirs(out, exist_ok=True)
@@ -791,9 +877,9 @@ def ui_shot(world, name):
     before = pngs()
     yield from wait(1.0)
     # `shot showui`: the play window as drawn, overlay included, into Saved/Screenshots
-    unreal.SystemLibrary.execute_console_command(world, "shot showui")
+    unreal.SystemLibrary.execute_console_command(world, cmd)
     t, new = time.time(), []
-    while not new and time.time() - t < 30:
+    while not new and time.time() - t < timeout:
         yield
         new = [p for p, m in pngs().items() if p not in before or m > before[p]]
     yield from wait(1.0)
@@ -959,7 +1045,9 @@ def shots(man):
     dist = 2.3 * size        # the whole city in a 30 degree field of view
     views = [("iso_city", (cx - d[0] * dist, cy - d[1] * dist, -d[2] * dist), (cx, cy, 0.0),
               30.0)]
-    for v in man["cameras"].get("street", [])[:3] + JOB.get("views", []):
+    for v in man["cameras"].get("street", [])[:3] + [
+            v for v in JOB.get("views", [])
+            if not v["name"].startswith(("night_", "pday_"))]:
         views.append((v["name"], tuple(v["eye"]), tuple(v["target"]),
                       2.0 * math.degrees(math.atan(18.0 / v.get("lens_mm", 28)))))
     files = []

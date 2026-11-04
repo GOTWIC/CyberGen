@@ -41,6 +41,10 @@ ACityGenPlay::ACityGenPlay()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	// an AInfo is hidden in the game, and a hidden actor's components draw nothing: the
+	// lamps' spot lights, light pools and sign washes are its components (run-through 2:
+	// Delta's streets stayed as dark with the lamps 20 times brighter)
+	SetHidden(false);
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;              // World Partition: always loaded
 #endif
