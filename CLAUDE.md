@@ -1749,6 +1749,17 @@ parameter and wraps its work in `P.stage(...)`, but never inside a package whose
 an output records (`streets/`, `props/`, the library's `CODE`): wrap those from the caller,
 or the goldens move.
 
+## Light and atmosphere generator (atmosgen)
+
+`docs/atmosgen_scope.md` (draft v1, its decisions in section 12 still open) is the plan for
+stage 3: a generator of light and air, not of geometry. A deterministic plan per city (every
+light that casts light, fog and smog volumes, steam emitters, rain shadow and wetness masks,
+sky glow, schedules by hour) keyed by M10's ids, checked (light on every walkway and
+carriageway) and previewed in Blender; layer 3 of the manifest; a C++ runtime plugin,
+`CityGenAtmos`, beside `CityGenPlay`, that renders it (lights per tile, time of day,
+weather, effects, post) and takes over the play features' lamps, pools, washes, moon and
+night exposure. Milestones AT0 to AT7, after AG16, whose benchmark is its baseline.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.
