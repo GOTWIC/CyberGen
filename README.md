@@ -10,8 +10,8 @@ your machine.
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15 done, the rest to come |
 | 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | Planned ([draft plan](docs/atmosgen_scope.md)) |
-| 4 | [lifegen](#stages-4-and-5) | Traffic, crowds, trains and aircraft, generated | Planned |
-| 5 | [storygen](#stages-4-and-5) | Story, characters and cutscenes | Planned |
+| 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned |
+| 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
 
 ---
 
@@ -525,11 +525,38 @@ Plan (draft): [`docs/atmosgen_scope.md`](docs/atmosgen_scope.md). It starts afte
 
 ---
 
-## Stages 4 and 5
+## Stage 4: lifegen
 
-- **lifegen:** cars, crowds, trains and aircraft placed and driven procedurally on stage 1's
-  lane, walkway and transit graphs.
-- **storygen:** story, characters and cutscenes.
+The city's people and traffic: crowds of varied, realistic people on every sidewalk,
+stair and deck, going in and out of shops, bars and homes by their hours; cars, buses,
+taxis and bikes on the roads, stopping at the signals; trains, metro, monorail, maglev and
+sky tube pods running their lines; flying cars between the towers, drones, aircraft over
+the spaceport and boats on the water. It is planned as a generator like the others: from
+stage 1's walkway, lane and transit graphs, its crowd and traffic densities by street and
+hour, its places and its districts' wealth and danger, it works out who is where, how many
+and doing what, and hands that to Unreal's crowd and traffic simulation through the same
+exporter.
+
+It starts after AG16 (performance).
+
+### Milestones
+
+| | Milestone | What it adds | Status |
+|---|---|---|---|
+| LG0 | Groundwork | A spec of who lives in each district (wealth, danger, archetype, time of day), the plan's format, the walkway and lane graphs as Unreal crowd and traffic lanes, people walking one district in Unreal as a test | Planned |
+| LG1 | People | A generated population: realistic bodies and faces, cyberpunk street fashion, hair, accessories and cyberware by district, every person different, with cheaper stand-ins for crowds far away | Planned |
+| LG2 | Crowds on the streets | People walking every sidewalk, crossing at crosswalks with the signals, taking stairs and elevators between levels, in groups and at their own pace, as many as each street has at each hour | Planned |
+| LG3 | Life at places | People at benches, stalls, vending machines and bus stops, queueing at shop doors, going in and out of buildings, bars and clinics by their opening hours; gangs on their turf and police patrols | Planned |
+| LG4 | Traffic | Cars, trucks, buses, taxis and bikes on the lanes, stopping at signals and turning by the rules, parking and leaving, rush hour and night traffic; their lights by night | Planned |
+| LG5 | Transit | Trains, metro, monorail, maglev and sky tube pods running their lines to timetables, stopping at stations, people boarding and leaving | Planned |
+| LG6 | Air and water | Flying cars on air lanes between towers and landing pads, drones, aircraft and shuttles over the spaceport, helicopters at helipads, boats and ferries on the water | Planned |
+| LG7 | Weather, reactions and release | People and traffic that follow the hour and the weather (umbrellas and shelter in rain, nightlife), step aside for the player and react to what happens near them; a performance pass for crowds and traffic; every sample city alive, checked in Unreal | Planned |
+
+---
+
+## Stage 5: storygen
+
+Story, characters and cutscenes.
 
 ---
 
