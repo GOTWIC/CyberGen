@@ -84,10 +84,11 @@ FLY_MODE = f"{CORE}/GM_CityGenFly"
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
-STAGE2_VERSION = "8"                 # AG6: textured masters; AG8: leaves, textured holo;
+STAGE2_VERSION = "9"                 # AG6: textured masters; AG8: leaves, textured holo;
                                      # AG5: the heroes' masks (HeroMask on UV1);
                                      # AG12: water (Single Layer Water) and bed (caustics);
-                                     # AG15: the glass's night by schedule and Hour
+                                     # AG15: the glass's night by schedule and Hour;
+                                     # #93: the water's pins by UE 5.8's names
 TEXTURE_VERSION = "1"
 # a prune of more assets than this deletes their package files itself, on an empty level: the
 # editor's delete makes a reachability pass over every loaded object per package (8435 meshes
@@ -397,14 +398,18 @@ def expr(m, cls, x, y, **props):
 
 def link(a, out, b, inp):
     """Connect a's output to b's input (by name, else b's only input when it has no name,
-    else by the input names b lists)."""
+    else by the input names b lists, spaces and case aside: an input without a display name
+    is named by its property, `ScatteringCoefficients` where the node draws "Scattering
+    Coefficients")."""
     if MEL.connect_material_expressions(a, out, b, inp):
         return
     names = [str(n) for n in MEL.get_material_expression_input_names(b)]
     if len(names) <= 1 and MEL.connect_material_expressions(a, out, b, ""):
         return
+    want = inp.replace(" ", "").lower()
     for name in names:
-        if name.lower() == inp.lower() and MEL.connect_material_expressions(a, out, b, name):
+        if (name.replace(" ", "").lower() == want
+                and MEL.connect_material_expressions(a, out, b, name)):
             return
     raise RuntimeError(f"cannot connect {a.get_class().get_name()} to "
                        f"{b.get_class().get_name()}.{inp}")
@@ -704,16 +709,20 @@ def water_master(m, defaults):
     MEL.connect_material_property(wpo, "", MP.MP_WORLD_POSITION_OFFSET)
     scat = vparam(m, "Scatter", -1000, 400, (0.02, 0.07, 0.08))
     absb = vparam(m, "Absorb", -1000, 500, (0.45, 0.11, 0.08))
+    out = None
     try:
         m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
         out = expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, -600, 450)
-        link(scat, "", out, "Scattering Coefficients")
-        link(absb, "", out, "Absorption Coefficients")
+        # (the output's inputs are named by their properties: UE 5.8 lists no display names)
+        link(scat, "", out, "ScatteringCoefficients")
+        link(absb, "", out, "AbsorptionCoefficients")
         pg = expr(m, unreal.MaterialExpressionConstant, -800, 650, r=0.1)
         link(pg, "", out, "PhaseG")
         MEL.connect_material_property(foam, "", MP.MP_OPACITY)
     except Exception as e:                    # (an engine without it: opaque water)
         log(f"M_CgWater: no Single Layer Water ({e}); opaque water")
+        if out is not None:                   # (left unconnected, it fails the compile:
+            MEL.delete_material_expression(m, out)  # "No inputs to Single Layer Water")
         m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
         shallow = vparam(m, "Shallow", -1000, 600, (0.16, 0.36, 0.36))
         col = custom(m, -700, 600, "return lerp(S * 0.25, float3(0.85, 0.88, 0.9), F);",

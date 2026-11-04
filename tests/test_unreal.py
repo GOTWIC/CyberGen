@@ -1479,3 +1479,93 @@ def test_stage2_takes_assetgen_decks(tmp_path):
     for w in m.walkways:
         if w.attrs.get("ramp") in ramps:
             assert max(p[2] for p in walks[w.id]) >= m.decks[0].top_m
+
+
+class _UeObj:
+    """A material, expression or class token for the Unreal-side scripts run here."""
+    def __init__(self, name):
+        self.name, self.props = name, {}
+
+    def set_editor_property(self, key, value):
+        self.props[key] = value
+
+    def get_class(self):
+        return self
+
+    def get_name(self):
+        return self.name
+
+
+class _UeNames:
+    def __getattr__(self, name):
+        return name
+
+
+class _Unreal:
+    def __getattr__(self, name):
+        if name.startswith("MaterialExpression"):
+            return name
+        if name == "CustomInput":
+            return lambda: _UeObj(name)
+        if name == "LinearColor":
+            return lambda *v: v
+        return _UeNames()
+
+
+class _Mel:
+    """MaterialEditingLibrary as UE 5.8 answers it: an expression's inputs are found by the
+    names it lists (`pins`); expressions not in `pins` take any input."""
+    def __init__(self, pins):
+        self.pins, self.made, self.deleted, self.links = pins, [], [], []
+
+    def create_material_expression(self, m, cls, x, y):
+        self.made.append(_UeObj(cls))
+        return self.made[-1]
+
+    def get_material_expression_input_names(self, e):
+        return self.pins.get(e.name, ["A", "B"])
+
+    def connect_material_expressions(self, a, out, b, inp):
+        if b.name in self.pins and inp not in self.pins[b.name]:
+            return False
+        self.links.append((a.name, b.name, inp))
+        return True
+
+    def connect_material_property(self, e, out, prop):
+        return True
+
+    def delete_material_expression(self, m, e):
+        self.deleted.append(e)
+
+
+def _water_master(pins):
+    ns = _ue_script("import_city.py", "water_master", "link", "expr", "custom", "sparam",
+                    "vparam", "tparam", "cmot", "SAMPLER", "FLOW_UV_CODE", "WAVE_NORMAL_CODE",
+                    "WAVE_CODE", "FOAM_CODE")
+    mel, logged = _Mel(pins), []
+    ns.update(unreal=_Unreal(), MEL=mel, log=logged.append, F1="CMOT_FLOAT1",
+              F2="CMOT_FLOAT2", F3="CMOT_FLOAT3", F4="CMOT_FLOAT4")
+    m = _UeObj("M_CgWater")
+    ns["water_master"](m, {})
+    return m, mel, logged
+
+
+def test_water_master_links_single_layer_water_by_ue58_names():
+    """#93: UE 5.8 names the Single Layer Water output's inputs by their properties
+    (`ScatteringCoefficients`, no space), so the water links by those (and `link` matches a
+    name with spaces and case aside); where it cannot, the opaque fallback leaves no
+    unconnected output node, which failed the material's compile ("No inputs to Single
+    Layer Water Material") and drew every water as the default checkerboard."""
+    slw = "MaterialExpressionSingleLayerWaterMaterialOutput"
+    pins = {slw: ["ScatteringCoefficients", "AbsorptionCoefficients", "PhaseG",
+                  "ColorScaleBehindWater"]}
+    m, mel, logged = _water_master(pins)
+    assert m.props["shading_model"] == "MSM_SINGLE_LAYER_WATER" and not logged
+    got = {inp for a, b, inp in mel.links if b == slw}
+    assert got == {"ScatteringCoefficients", "AbsorptionCoefficients", "PhaseG"}
+    assert not mel.deleted
+    # an engine whose output takes none of them: opaque water, the output node gone
+    m, mel, logged = _water_master({slw: ["Nothing"]})
+    assert m.props["shading_model"] == "MSM_DEFAULT_LIT" and logged
+    made = [e for e in mel.made if e.name == slw]
+    assert made and made == mel.deleted
