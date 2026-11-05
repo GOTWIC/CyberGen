@@ -31,16 +31,30 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
-**Validation (every stage, every PR; Swagnik's rule, 2026-10-27).** Before pushing a PR, make
-sure the outputs look good and nothing breaks: build the cities the change touches, every check
-passes, look at their previews and renders, and the test suite passes (recorded hashes
-regenerated on this Mac where a change moves a model on purpose, saying why). Nothing more:
-no x86, Docker, Windows or other cross-platform comparisons, no stage-trace diffs, no
-`lock --verify` runs, no seed sweeps (unless the work is about robustness), no repeated
-validation runs, and the coordinating session does not validate a PR again (it reviews the
-outputs and the diff, and has the PR merge the latest main first when they overlap). Where a
-scope's "done when" asks for Mac = x86, that part waits for the deferred determinism check in
-`docs/determinism_check.md`, which runs only when Swagnik asks for it.
+**Validation (every stage, every PR; Swagnik's rules, 2026-10-27 and 2026-11-05).** Before
+pushing a PR, make sure the outputs look good and nothing breaks, at the scale of the change: a
+check earns its place by what it can find, not by habit.
+- **Small fixes** (one feature or issue, code local to it, such as #93, #94, #95): the change's
+  own tests and the test files of the modules it touched; builds of only the cities that have
+  the feature (every check passes) and only the asset stages it touches (`assetgen streets`,
+  `props`, ..., then `fit`, not a whole `assetgen build`); their previews and renders; the
+  recorded hashes of the cities it moved rewritten from those builds, saying why. No full test
+  suite, no builds of cities without the feature, no builds of main to show a failure predates
+  the change (name it if it is a known one).
+- **Milestones and changes to shared code** (roads, junctions, ids, geometry, the build
+  driver, anything every city goes through): build the cities the change touches, every check
+  passes, look at their previews and renders, and the full test suite passes (recorded hashes
+  regenerated where a change moves a model on purpose, saying why).
+- **Main:** after a batch of merges the coordinating session runs the full test suite once on
+  main, in the background, and fixes or files what it finds. It does not validate a PR again
+  (it reviews the outputs and the diff, and has the PR merge the latest main first when they
+  overlap).
+
+Nothing more: no x86, Docker, Windows or other cross-platform comparisons, no stage-trace
+diffs, no `lock --verify` runs, no seed sweeps (unless the work is about robustness), no
+repeated validation runs. Where a scope's "done when" asks for Mac = x86, that part waits for
+the deferred determinism check in `docs/determinism_check.md`, which runs only when Swagnik
+asks for it.
 
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
 "Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
