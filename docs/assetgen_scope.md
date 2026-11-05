@@ -649,7 +649,8 @@ below as its answer so that AG1 can start; any of them can still change.
    imports?
 6. **Interiors.** Interior mapping only (recommended for v1), enterable interiors for M11
    points of interest as a stage 2 milestone (AG11: bars, clinics, apartments; large
-   scope), or left to the projects that use the cities.
+   scope), or left to the projects that use the cities. *Decided* (Swagnik, 2026-11-05): AG11
+   is a planned milestone, not scheduled yet.
 7. **Art direction input.** Asset spec per city written by a session from the prompt
    (recommended), with review rounds on renders; do you want to give reference images per era
    or district (mood boards) that the skill reads, as citygen reads concept maps?
@@ -700,7 +701,7 @@ docker image; Windows joins in AG9.
 | AG8 | Props, plants and signs | AG0; decision 13.3 | AG1 to AG6 |
 | AG9 | Scale and release | AG5 to AG8, AG12 to AG16; decision 13.5 | |
 | AG10 | Layered districts | AG9; M14 | AG11 |
-| AG11 | Interiors (only if decision 13.6 asks) | AG9 | AG10 |
+| AG11 | Interiors (planned, not scheduled yet) | AG9 | AG10 |
 | AG12 | Water (14.13) | M16; AG6, AG7; decision 13.10 | AG4, AG5, AG13 |
 | AG13 | Ground cover and grass (14.14) | M16; AG6, AG8; decision 13.9 | AG4, AG5, AG12 |
 | AG14 | Fit and finish (14.15) | AG4, AG7, AG8; M17 to M21 | AG12, AG13 |
@@ -864,7 +865,7 @@ docker image; Windows joins in AG9.
   (facades from their deck, deck undersides, supports, stair and elevator cores) and street
   elements on the decks, with their entries in the exporter; done when M14's samples pass
   every assetgen check.
-- **AG11, interiors** (only if decision 13.6 asks for them): enterable interiors for M11's
+- **AG11, interiors** (planned, not scheduled yet; Swagnik, 2026-11-05): enterable interiors for M11's
   points of interest (bars, clinics, vendors, apartments), generated from the unit's
   footprint and use.
 
@@ -873,7 +874,7 @@ docker image; Windows joins in AG9.
 ```
  AG0 ─┬─> AG1 ─> AG2 ─> AG3 ─> AG4 ─> AG5 ──┐
       │     └──> AG6 ───────────────────────┤
-      ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11 (if asked)
+      ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11
       └─> AG8 ──────────────────────────────┤
  M17 to M21 ─> AG14 ─> AG15 ─> AG16 (perf) ─┤
  M16 ─┬─> AG12 (water) ─────────────────────┤
@@ -1035,9 +1036,13 @@ stage 3.
     percentage with TSR, to tell how much of a frame its resolution sets. One command; the
     results as JSON and a table (`docs/progress/AG16/bench/<city>`), kept so any later
     milestone can be compared with them.
-  - **Targets**, Swagnik's to confirm before the fixes start. Proposed for Delta on the
-    Windows PC at 1440p: walking 16.7 ms p50 and 25 ms p95, flying 33 ms p95, no hitch over
-    100 ms, under 10 GB of VRAM; the import within 16 GB of RAM and 20 minutes.
+  - **Targets** (Swagnik, 2026-11-05), for Delta on the Windows PC at 1440p output (TSR at a
+    67% screen percentage counts; native reported beside it): at least 60 fps everywhere,
+    16.7 ms at the 95th percentile walking and flying, by day and by night, where that can be
+    reached; else at least 40 fps, 25 ms at the 95th percentile, with each gap to 60 measured
+    and its cause written down. No hitch over 100 ms, under 10 GB of VRAM. The import's
+    memory and time have no target: cut them only where it is low-hanging fruit that costs
+    nothing in quality or frame time (#84).
   - **Structural fixes**, chosen by what the benchmark shows. Candidates: parts shared
     between buildings where their quantized parameters coincide (decision 13.2 allows it)
     and more part families instanced, so fewer distinct Nanite meshes; fewer actors (a

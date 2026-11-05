@@ -489,7 +489,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG8 | Props, plants and signs | Street furniture and parked cars in variants per district style, trees by species, shrubs and ivy, shop signs with their text, neon, billboards, holo-ads | Done |
 | AG9 | Every city modelled | All sample cities with their assets, in Blender and Unreal; frozen releases | Planned |
 | AG10 | Layered districts | Deck slabs with coffered or ribbed soffits, edge fascias, rails, lights over the streets below and colonnades over parks; columns, light-well stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs that meet the slab | Done |
-| AG11 | Interiors | Enterable bars, clinics, shops and apartments | Maybe |
+| AG11 | Interiors | Enterable bars, clinics, shops and apartments | Planned |
 | AG12 | Water | Water that flows, foams and (at sea) swells, beds of mud, sand and stone, natural banks, beaches, marsh edges and riprap, Single Layer Water and an underwater look in Unreal | Done |
 | AG13 | Ground cover and grass | Textured ground with worn paths for every piece of open land, grass and small plants by kind that sway in the wind and fade with distance | Done |
 | AG14 | Fit and finish | Junctions that meet their roads, smooth glazed curved walls, roof equipment on its roofs, transit frames, piers and cable-stayed masts, embankments under low decks, bridges drawn once, nothing hanging over the lanes; checks that everything rests on something and nothing passes through anything else | Done |
