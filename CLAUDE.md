@@ -1941,7 +1941,9 @@ update behind a "By device" toggle. Each machine writes only its own file.
 `.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` to main
 ("Usage: <device> after #N"), pulling first, and pushes. This is the one exception to "no
 refresh on every push": it needs no ask. Never write another device's file; a usage commit
-needs no further usage update.
+needs no further usage update. `site/usage/cloud.json` is entered by hand (`manual`, a
+`cost_usd` with no tokens or sessions: the cloud sessions' credit spent, whose logs stay on
+Anthropic's servers); `usage.py` never writes it, and it changes only when Swagnik asks.
 
 ## Working preferences
 
