@@ -2971,7 +2971,11 @@ def support_context(m) -> dict:
               for t in m.transit_lines if t.mode != "metro" and len(t.path) >= 2]
     junc = [(G.from_model_poly(j.polygon), j.node_id) for j in m.junctions]
     nz = {n.id: n.position[2] for n in m.road_nodes}
+    # (access fix: a park's path under a viaduct, which its columns keep off)
+    paths = [(LineString([p[:2] for p in w.line]), w.width_m) for w in m.walkways
+             if (w.attrs or {}).get("under_road") and len(w.line) >= 2]
     return {
+        "paths": paths, "ptree": shapely.STRtree([p[0] for p in paths]) if paths else None,
         "roads": roads, "rtree": shapely.STRtree([r[0] for r in roads]) if roads else None,
         "wet": wet, "wtree": shapely.STRtree(wet) if wet else None,
         "blds": blds, "btree": shapely.STRtree(blds) if blds else None,
@@ -3083,6 +3087,11 @@ def column_free(cx: dict, s, p, size: float, top: float) -> bool:
             z_o = _z_at([(z.s, z.z) for z in o.z_profile], ln.project(pt))
             if z_o < top - 1.0:
                 return False      # a road under the deck: the column would stand in it
+    if cx.get("ptree") is not None:
+        for i in cx["ptree"].query(pt, predicate="dwithin", distance=size + 4.0).tolist():
+            ln, w = cx["paths"][i]
+            if G.dist(ln, pt) < w / 2.0 + size / 2.0 + 0.5:
+                return False      # (a park's path passing under the deck)
     if cx["jtree"] is not None:
         for i in sorted(int(x) for x in cx["jtree"].query(sq, predicate="intersects")):
             poly, nid = cx["junc"][i]

@@ -3969,10 +3969,24 @@ class Builder:
             f, d = self.foot(e)
             stepped = d < 0.5
             if d < 0.5:  # stairs need a run: step the kiosk 12 m along the concourse (M8c)
+                e0 = e
                 r = line.interpolate(min(METRO_RUN_M, line.length / 2.0) if tag == "a" else
                                      max(line.length - METRO_RUN_M, line.length / 2.0))
                 e = (q(r.x), q(r.y))
                 if _d(e, f) < 0.5:
+                    continue
+                if not self.masses.clear(f, e, 0):
+                    # (access fix, #87: a stepped stair would pass under a building's ground
+                    # floor: an elevator straight down from the sidewalk instead)
+                    acc.append(self.walk("elevator", [(e0[0], e0[1], 0.0),
+                                                      (e0[0], e0[1], z)], 2.5,
+                                         {"station": sid}))
+                    if _d(e0, f) > 0.0:
+                        acc.append(self.walk("path", [(e0[0], e0[1], 0.0), (f[0], f[1], 0.0)],
+                                             3.0, {"station": sid}))
+                    sq = G.qpoly(Point(f).buffer(2.5, cap_style="square"))
+                    self.struct(f"{sid}.ent{tag}", "canopy", 0.0, 3.2, footprint=sq,
+                                attrs={"station": sid, "role": "metro_entrance"})
                     continue
             acc.append(self.walk("stairs", [(f[0], f[1], 0.0), (e[0], e[1], z)], 3.0,
                                  {"station": sid}))
@@ -4001,7 +4015,10 @@ class Builder:
         ends = [seg[0], seg[-1]] if not pylon else [self._core_end(ln, seg)]
         for e, tag in zip(ends, ("a", "b")):
             f, d = self.foot(e)
-            if pylon or d < 1.0:
+            # (access fix, #87: a sidewalk reached only round the buildings: an elevator
+            # down and a path led round, not a stair straight through them)
+            rounded = (tuple(map(q, e[:2])), tuple(map(q, f[:2]))) in self.rounds
+            if pylon or d < 1.0 or rounded:
                 # an elevator core: on the pylon (sky stations), or where the sidewalk is
                 # right under the platform end
                 acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
