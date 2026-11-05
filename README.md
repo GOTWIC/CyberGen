@@ -5,6 +5,8 @@ that is laid out, modelled, lit, populated and given a story. Describe a city to
 the `citygen` skill turns the description into a spec, and the generators build the rest on
 your machine.
 
+**Gallery:** the build so far, step by step in pictures, at https://gotwic.github.io/CyberGen/
+
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done |

@@ -1,0 +1,632 @@
+{
+  "title": "CyberGen",
+  "subtitle": "Build log gallery",
+  "lede": "Generators for cyberpunk open cities, from one text prompt to a city you can fly through in Unreal Engine. This is the build so far, step by step, as the pictures were made.",
+  "repo": "https://github.com/GOTWIC/CyberGen",
+  "branch": "main",
+  "site": "https://gotwic.github.io/CyberGen/",
+  "backdrop": {"dark": "ag15-night", "light": "ag15-day"},
+  "next": "Next: stage 3, atmosgen (light, sky and weather), stage 4, lifegen (crowds, traffic, trains and aircraft), then stage 5, storygen.",
+  "stages": [
+    {
+      "key": "1",
+      "label": "Stage 1",
+      "name": "layoutgen",
+      "blurb": "From a prompt to a complete city layout: water, districts, roads, buildings, transit, terrain, props and gameplay data, built as a Blender blockout and imported into Unreal Engine 5.8."
+    },
+    {
+      "key": "2",
+      "label": "Stage 2",
+      "name": "assetgen",
+      "blurb": "A unique 3D model for every building, plus streets, props, signs, water, ground and textures, each replacing its blockout piece in Blender and in Unreal."
+    },
+    {
+      "key": "ue",
+      "label": "In Unreal",
+      "name": "exporter and run-throughs",
+      "blurb": "The one exporter every stage shares, and the run-throughs where a whole city is flown and walked in Unreal Engine 5.8 to find what to fix next."
+    }
+  ],
+  "entries": [
+    {
+      "id": "m0-spec",
+      "date": "2026-10-24",
+      "stage": "1",
+      "milestone": "M0",
+      "milestone_name": "City spec",
+      "title": "A city as a spec",
+      "image": "docs/progress/M0/nexus_city/schematic.png",
+      "caption": "Before anything is generated, a prompt becomes a spec: districts by archetype, water, highways, transit lines, landmarks and megasites, each with rules for where it goes. This is Nexus City's spec drawn as a schematic, the plan every later step builds from."
+    },
+    {
+      "id": "m1a-water",
+      "date": "2026-10-24",
+      "stage": "1",
+      "milestone": "M1a",
+      "milestone_name": "Water and districts",
+      "title": "Water first",
+      "image": "docs/progress/M1a/archipelago_free_port/preview_map.png",
+      "caption": "Saltreach Free Port's first map: five islands in the sea, each one a district, with rivers and canals running inside them. Water comes first, and everything else is laid out around it."
+    },
+    {
+      "id": "m1a2-delta",
+      "date": "2026-10-24",
+      "stage": "1",
+      "milestone": "M1a2",
+      "milestone_name": "Organic districts",
+      "title": "Curved borders and a river delta",
+      "image": "docs/progress/M1a2/delta_megacity/preview_map.png",
+      "caption": "A visual pass made the layout organic: district borders curve and rivers meander. Delta Megacity's river fans out into a delta with marsh between its branches, an island hub in a river loop and port slips along the shore."
+    },
+    {
+      "id": "m1b-roads",
+      "date": "2026-10-24",
+      "stage": "1",
+      "milestone": "M1b",
+      "milestone_name": "Primary roads",
+      "title": "Highways, avenues and bridges",
+      "image": "docs/progress/M1b/nexus_city/preview_map.png",
+      "caption": "Highways and avenues routed across Nexus City, with exits, smooth curves and bridges that cross the water where it is narrowest. The hatched areas are held for megasites, such as the spaceport and the harbor's industry."
+    },
+    {
+      "id": "m2-streets",
+      "date": "2026-10-24",
+      "stage": "1",
+      "milestone": "M2",
+      "milestone_name": "Streets, blocks and lots",
+      "title": "Every street and every lot",
+      "image": "docs/progress/M2/delta_megacity/preview_map.png",
+      "caption": "Local streets fill each of Delta Megacity's districts in its own pattern: a rotated grid in the Corporate Core, winding lanes in the old town, a ring round the island hub. The streets cut the land into blocks and lots, with plazas, parks and footbridges between them."
+    },
+    {
+      "id": "m2-detail",
+      "date": "2026-10-24",
+      "stage": "1",
+      "milestone": "M2",
+      "milestone_name": "Streets, blocks and lots",
+      "title": "Street level, 400 m at a time",
+      "image": "docs/progress/M2/delta_megacity/preview_detail.png",
+      "caption": "Four close-ups at street level: lanes, sidewalks, crosswalks and curb corners at every junction, and lots facing their streets, from the Corporate Core's diagonal grid to the old town's tight blocks, the port and Midtown."
+    },
+    {
+      "id": "m3-buildings",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M3",
+      "milestone_name": "Buildings",
+      "title": "A building on every lot",
+      "image": "docs/progress/M3/nexus_city/preview_massing.png",
+      "caption": "Every lot in Nexus City gets a building that suits its district: podium towers and slabs downtown, megablocks, shopfront rows, warehouses at the harbor, campuses and landmarks. Heights stay within each district's range and rise toward its core."
+    },
+    {
+      "id": "m3p-megablocks",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M3p",
+      "milestone_name": "Building polish",
+      "title": "Megablocks that read as towers",
+      "image": "docs/progress/M3p/compare/vesper_bay_stacks.png",
+      "caption": "The Stacks before (left) and after (right) a polish pass: each megablock became a podium with separate stepped towers on it, courts open to the sky and decks between the towers, so the district stays dense but its shapes read."
+    },
+    {
+      "id": "m4-top",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M4",
+      "milestone_name": "Blender blockout",
+      "title": "The first 3D model",
+      "image": "docs/progress/M4/vesper_bay/render_top.jpg",
+      "caption": "The layout built as a 3D blockout in Blender, every building, street and site as simple geometry, and exported as USD and as glTF tiles 256 m across for game engines. Vesper Bay seen from straight above."
+    },
+    {
+      "id": "m4-core",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M4",
+      "milestone_name": "Blender blockout",
+      "title": "The Corporate Core in 3D",
+      "image": "docs/progress/M4/vesper_bay/render_iso_d01.jpg",
+      "caption": "The Corporate Core from the air in the same blockout, each district in its own color, with the oval of Scholar Isle and its campus in front."
+    },
+    {
+      "id": "m5-transit",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M5",
+      "milestone_name": "Transit",
+      "title": "From metro to sky tubes",
+      "image": "docs/progress/M5/delta_megacity/preview_transit.png",
+      "caption": "Delta Megacity's transit: a metro under the streets, elevated rail and a monorail over them, a maglev, and sky tube loops threading the towers, each line routed within its mode's curve radius and given stations with stairs and elevators."
+    },
+    {
+      "id": "m6-street",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M6",
+      "milestone_name": "Props and plants",
+      "title": "Street furniture and trees",
+      "image": "docs/progress/M6/vesper_bay/render_street_1.jpg",
+      "caption": "At eye level the streets fill up: street lights, signals, benches, kiosks, parked cars and street trees, each kept clear of the lanes, crosswalks and doors. An elevated line runs overhead."
+    },
+    {
+      "id": "m7-viaducts",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M7",
+      "milestone_name": "Elevated highways",
+      "title": "Highways on viaducts",
+      "image": "docs/progress/M7/delta_megacity/preview_elevated.png",
+      "caption": "Stretches of Delta Megacity's highways lifted onto viaducts where the city is dense and the ramps fit, colored by deck height, with a diamond interchange up close and a run's profile up onto the deck and back down, on columns every 32 m."
+    },
+    {
+      "id": "m7b-city",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M7b",
+      "milestone_name": "Traced districts and interchanges",
+      "title": "The whole city at once",
+      "image": "docs/progress/M7b/vesper_bay/render_iso_city.jpg",
+      "caption": "The first view of a whole city from the south: Vesper Bay's districts, the spaceport island, the river and the harbor, with a sky tube loop over the towers."
+    },
+    {
+      "id": "m7b-traced",
+      "date": "2026-10-25",
+      "stage": "1",
+      "milestone": "M7b",
+      "milestone_name": "Traced districts and interchanges",
+      "title": "A hand-traced district in a generated city",
+      "image": "docs/progress/M7b/vesper_bay_pinned/render_iso_d01.jpg",
+      "caption": "The Corporate Core was traced by hand from a concept map, then dropped into a generated Vesper Bay as an island of its own, the megatower at its center, with roads, bridges and a sky tube tying it to the rest of the city."
+    },
+    {
+      "id": "m8d-trumpet",
+      "date": "2026-10-26",
+      "stage": "1",
+      "milestone": "M8",
+      "milestone_name": "Reliability and interchanges",
+      "title": "A trumpet interchange",
+      "image": "docs/progress/M8d/vesper_bay/render_trumpet.jpg",
+      "caption": "A round of reliability work made every seed give a working city, and the interchanges grew up with it. Vesper Bay's trumpet now has one loop inside and a flyover whose bell wraps around it; a sky tube curves past in front."
+    },
+    {
+      "id": "m9-tunnels",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M9",
+      "milestone_name": "Tunnels",
+      "title": "Under the city",
+      "image": "docs/progress/M9/nexus_city/preview_tunnels.png",
+      "caption": "Nexus City's ring highway dips under Midtown in a cut-and-cover tunnel, shown in plan, at street scale and in profile, with the metro beside it going deep under the water. Pedestrian underpasses came in the same step."
+    },
+    {
+      "id": "m10-regen",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M10",
+      "milestone_name": "Editing",
+      "title": "Regenerate one district",
+      "image": "docs/progress/M10/regenerated/vesper_bay__neon_strand_diff.png",
+      "caption": "One district built again on a new seed while the rest of the city stays as it was: Neon Strand regenerated, with what is unchanged in grey, removed in red, added in green, and reshaped in yellow along the seam with its neighbor."
+    },
+    {
+      "id": "m11-gameplay",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M11",
+      "milestone_name": "Gameplay layer",
+      "title": "Factions, wealth and danger",
+      "image": "docs/progress/M11/vesper_bay/preview_gameplay.png",
+      "caption": "What a game needs from the city: faction turf and places to go (bars, clinics, vendors, hideouts, fixers), maps of wealth, danger and police, traffic and crowds by hour, parking, fast travel, and slots for signs."
+    },
+    {
+      "id": "m12-stack",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M12",
+      "milestone_name": "Stack interchanges",
+      "title": "Four levels of highway",
+      "image": "docs/progress/M12/vesper_bay_stacks/render_stack.jpg",
+      "caption": "Where two highways cross, a four-level stack interchange: eight one-way ramps, the left turns flying highest over the core. Shown in Vesper Bay Stacks, a version of the sample city with its highways redrawn to make room for one."
+    },
+    {
+      "id": "m13-terrain",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M13",
+      "milestone_name": "Terrain",
+      "title": "Hills and cliffs",
+      "image": "docs/progress/M13/cragmouth/render_iso_city.jpg",
+      "caption": "Cragmouth, the first city on real ground: hills, a ridge and a plateau standing on a cliff over the bay. Roads follow graded lines, retaining walls hold the steps, and buildings stand on plinths down the slope."
+    },
+    {
+      "id": "greyhook-coast",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "Update",
+      "milestone_name": "Greyhook's coast",
+      "title": "A peninsula of headlands",
+      "image": "docs/progress/greyhook_reshape/peninsula_city/render_iso_city.jpg",
+      "caption": "Greyhook's coast redrawn to look more natural: a mainland strip, a narrow neck, then a peninsula that fans out into three headlands with coves between them, and two islet parks offshore."
+    },
+    {
+      "id": "m15-unreal",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M15",
+      "milestone_name": "Unreal export",
+      "title": "Into Unreal Engine",
+      "image": "docs/progress/M15/vesper_bay/unreal_iso_city.jpg",
+      "caption": "The end of stage 1: one command imports the whole city into Unreal Engine 5.8 as a streaming level with collision, materials and instanced props, every piece named by its id, so importing again updates only what changed."
+    },
+    {
+      "id": "m15-hills",
+      "date": "2026-10-27",
+      "stage": "1",
+      "milestone": "M15",
+      "milestone_name": "Unreal export",
+      "title": "Cragmouth in Unreal",
+      "image": "docs/progress/M15/cragmouth/unreal_hillside.jpg",
+      "caption": "Cragmouth's hills in Unreal: the ground comes in as a heightfield per tile, with towers on the high ground and tree-lined streets stepping down the slope."
+    },
+    {
+      "id": "m14-decks",
+      "date": "2026-10-28",
+      "stage": "1",
+      "milestone": "M14",
+      "milestone_name": "Layered districts",
+      "title": "A street under the deck",
+      "image": "docs/progress/M14/unreal/unreal_under_deck.jpg",
+      "caption": "A district can carry a second city on a slab 9 m over its streets, with its own streets, lots and buildings, joined to the ground by ramps, stairs, elevators and light wells. Under it, in Unreal: a ground street between the undercity's shopfronts, the slab on its columns, lights hung from it."
+    },
+    {
+      "id": "m16-drained",
+      "date": "2026-10-30",
+      "stage": "1",
+      "milestone": "M16",
+      "milestone_name": "Water and ground detail",
+      "title": "The harbor, drained",
+      "image": "docs/progress/M16/vesper_bay/render_drained.jpg",
+      "caption": "Every body of water gets a depth, a bed and a flow, every shore a bank by kind (quay, canal wall, beach, marsh, riprap), and every piece of open land a ground cover. With the water taken away, Vesper Bay's harbor basins and sea bed show their depths."
+    },
+    {
+      "id": "m17-dead-ends",
+      "date": "2026-10-30",
+      "stage": "1",
+      "milestone": "M17",
+      "milestone_name": "Road network repair",
+      "title": "No road ends by accident",
+      "image": "docs/progress/M17/delta_dead_ends_overlaps.png",
+      "caption": "From the first run-through in Unreal: Delta Megacity's dead ends before (left, each red mark one with no reason) and after (right), where every one is a cul-de-sac with a turning circle, a quay, a park or site gate, a path's end or the map's edge, and no two roads overlap."
+    },
+    {
+      "id": "m18-embankment",
+      "date": "2026-10-30",
+      "stage": "1",
+      "milestone": "M18",
+      "milestone_name": "Junctions and ramps",
+      "title": "Ramps on embankments",
+      "image": "docs/progress/M18/delta_megacity/render_ramp_embankment.jpg",
+      "caption": "Steeper, shorter ramps, and junctions that meet every road at its own height. Where a viaduct comes down low it now lands on a retained embankment instead of columns, leaving no dead space underneath."
+    },
+    {
+      "id": "m19-frames",
+      "date": "2026-10-30",
+      "stage": "1",
+      "milestone": "M19",
+      "milestone_name": "Transit structures",
+      "title": "Supports under the track",
+      "image": "docs/progress/M19/delta_megacity/render_monorail_frames.jpg",
+      "caption": "Transit lines keep clear of buildings and stand on supports at even spans: columns under the track, piers in the water, and portal frames like these, which carry a monorail over a street on a beam between two legs."
+    },
+    {
+      "id": "m19-masts",
+      "date": "2026-10-30",
+      "stage": "1",
+      "milestone": "M19",
+      "milestone_name": "Transit structures",
+      "title": "Sky tubes on masts",
+      "image": "docs/progress/M19/delta_megacity/render_sky_tube_masts.jpg",
+      "caption": "Sky tubes got long spans hung from cable-stayed masts some 400 m apart. On November 5 they went back to plain pylons, with rings that light up at night (in Stage 2 below)."
+    },
+    {
+      "id": "m21-forms",
+      "date": "2026-10-30",
+      "stage": "1",
+      "milestone": "M21",
+      "milestone_name": "Cyberpunk massing",
+      "title": "Towers that are not boxes",
+      "image": "docs/progress/M21/vesper_bay/render_iso_d01.jpg",
+      "caption": "The Corporate Core with new tower forms: twisted, tapered, leaning, stacked, split, cut through by sky gardens, in exoskeletons or covered in pods, with halo and cut crowns, true curves, and no two neighbors alike."
+    },
+    {
+      "id": "m20-neon",
+      "date": "2026-11-01",
+      "stage": "1",
+      "milestone": "M20",
+      "milestone_name": "Props, plants and signs",
+      "title": "Neon on every facade",
+      "image": "docs/progress/M20/vesper_bay/render_street_1.jpg",
+      "caption": "Billboards and banners on the Corporate Core's facades seen from the street: many more large ads on the sides and tops of buildings, set per district, while every lamp, bench, railing and tree now stands on something solid."
+    },
+    {
+      "id": "m20-city",
+      "date": "2026-11-01",
+      "stage": "1",
+      "milestone": "M20",
+      "milestone_name": "Props, plants and signs",
+      "title": "Vesper Bay as stage 1 leaves it",
+      "image": "docs/progress/M20/vesper_bay/render_iso_city.jpg",
+      "caption": "The whole layout, from the water and the roads to the last sign, ready for stage 2 to model every building."
+    },
+    {
+      "id": "ag0-edges",
+      "date": "2026-10-27",
+      "stage": "2",
+      "milestone": "AG0",
+      "milestone_name": "Groundwork",
+      "title": "What every wall faces",
+      "image": "docs/progress/AG0/vesper_bay/preview_edges.png",
+      "caption": "Stage 2 starts from a brief for each building. Every facade in Vesper Bay is classed by what it faces (the main street, other streets, alleys, water, plazas, parks, a neighbor's party wall), which later decides its windows, doors and signs."
+    },
+    {
+      "id": "ag0-spike",
+      "date": "2026-10-27",
+      "stage": "2",
+      "milestone": "AG0",
+      "milestone_name": "Groundwork",
+      "title": "First test buildings in Unreal",
+      "image": "docs/progress/AG0/unreal/unreal_tower.jpg",
+      "caption": "A first spike: generated test buildings (an office tower of nearly a million triangles, a shopfront row and a shanty stack) brought into Unreal 5.8 to measure what a city of unique buildings would cost before building the rest."
+    },
+    {
+      "id": "ag7-interchange",
+      "date": "2026-10-27",
+      "stage": "2",
+      "milestone": "AG7",
+      "milestone_name": "Street elements",
+      "title": "Ramps on four levels",
+      "image": "docs/progress/AG7/vesper_bay_stacks/streets_interchange.jpg",
+      "caption": "Street models around the stack interchange in Vesper Bay Stacks: ramps on four levels with parapets, columns and pier caps, lane markings, sidewalks, crosswalks and the sky tube. The buildings are still the blockout's boxes."
+    },
+    {
+      "id": "ag1-shells",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG1",
+      "milestone_name": "Building shells",
+      "title": "A model for every building",
+      "image": "docs/progress/AG1/vesper_bay/city_full.jpg",
+      "caption": "Every building in Vesper Bay as a model of its own: walls with window openings, storefronts, floor slabs, parapets and cornices in six facade styles, each with a light stand-in for distant views."
+    },
+    {
+      "id": "ag1-unreal",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG1",
+      "milestone_name": "Building shells",
+      "title": "Shells in Unreal",
+      "image": "docs/progress/AG1/unreal/greyhook/unreal_district_the_stacks.jpg",
+      "caption": "Greyhook's The Stacks in Unreal with the shells in place of the blockout boxes: towers with punched windows and skybridges, tinted building by building, with collision."
+    },
+    {
+      "id": "ag2-towers",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG2",
+      "milestone_name": "Facades",
+      "title": "The tallest tower of every era",
+      "image": "docs/progress/AG2/towers.jpg",
+      "caption": "Windows, balconies, fins, louvers and frames as repeated parts, in nineteen facade styles. Here the tallest building of each era stands in its own style."
+    },
+    {
+      "id": "ag2-sheet",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG2",
+      "milestone_name": "Facades",
+      "title": "64 buildings drawn at random",
+      "image": "docs/progress/AG2/vesper_bay/contact_sheet.jpg",
+      "caption": "64 of Vesper Bay's buildings picked at random and framed alone: corner cuts, setbacks, crowns and arcades, weathered by district, no two alike."
+    },
+    {
+      "id": "ag3-fronts",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG3",
+      "milestone_name": "Street fronts",
+      "title": "Shopfronts by night",
+      "image": "docs/progress/AG3/greyhook/8k/shopfronts_night.jpg",
+      "caption": "Every building's street front: a shopfront for each shop by what it sells, shutters and grilles where the district is rough, lobby doors, loading docks and garages, and doorways you can walk through in Unreal. Greyhook's old town by night."
+    },
+    {
+      "id": "ag6-textures",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG6",
+      "milestone_name": "Materials and textures",
+      "title": "Textured, and lit at night",
+      "image": "docs/progress/AG6/vesper_bay/8k/street_2_night.jpg",
+      "caption": "A library of tileable surfaces in each era's look, a room behind every window that lights up at night, grime and rain streaks, and the city's own shop signs in its districts' scripts. A street in The Stacks, Vesper Bay, by night."
+    },
+    {
+      "id": "ag8-alley",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG8",
+      "milestone_name": "Props, plants and signs",
+      "title": "An alley in Neon Strand",
+      "image": "docs/progress/AG8/vesper_bay/neon_strand_night_8k.jpg",
+      "caption": "Props, plants and signs as real models in variants for each district style: shop signs with their names in neon, lightboxes and blade signs, awnings, AC units and bollards. An alley in Neon Strand at night."
+    },
+    {
+      "id": "ag4-sky-station",
+      "date": "2026-10-29",
+      "stage": "2",
+      "milestone": "AG4",
+      "milestone_name": "Roofs and connections",
+      "title": "A sky station inside a tower",
+      "image": "docs/progress/AG4/vesper_bay/8k/sky_station.jpg",
+      "caption": "Roofs finished with their equipment, and the links between buildings: skybridges that land in doors, and sky tubes that pass through towers in portals, with a platform where a station stands, as here in the Corporate Core."
+    },
+    {
+      "id": "ag4-unreal",
+      "date": "2026-10-30",
+      "stage": "2",
+      "milestone": "AG4",
+      "milestone_name": "Roofs and connections",
+      "title": "A shopping street in Unreal",
+      "image": "docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg",
+      "caption": "A shopping street in Greyhook in Unreal 5.8, everything in view from stage 2: street fronts, signs in several scripts, props, textured roads and buildings."
+    },
+    {
+      "id": "ag5-landmarks",
+      "date": "2026-10-30",
+      "stage": "2",
+      "milestone": "AG5",
+      "milestone_name": "Building types and landmarks",
+      "title": "Landmarks as hero buildings",
+      "image": "docs/progress/AG5/landmarks_8k.jpg",
+      "caption": "Each landmark built by kind, with weathering of its own: the megatower over Vesper Bay's Corporate Core, Nexus City's spires, an arcology in The Stacks and Greyhook's wheel. Shanty stacks, hangars, temples and the other building types got generators of their own too."
+    },
+    {
+      "id": "ag10-city",
+      "date": "2026-10-30",
+      "stage": "2",
+      "milestone": "AG10",
+      "milestone_name": "Layered districts",
+      "title": "Every building modelled",
+      "image": "docs/progress/AG10/cities/vesper_bay/city_full.jpg",
+      "caption": "Vesper Bay with stage 2's assets: every building modelled and textured in its district's styles, with its roof, equipment and skybridges, on textured streets, bridges and transit structures."
+    },
+    {
+      "id": "ag10-under-slab",
+      "date": "2026-10-30",
+      "stage": "2",
+      "milestone": "AG10",
+      "milestone_name": "Layered districts",
+      "title": "Under the slab, by night",
+      "image": "docs/progress/AG10/vesper_bay_decks/8k/under_slab_night.jpg",
+      "caption": "The deck modelled: a ribbed soffit with lights over the ground street, columns, and an undercity whose fronts glow like a covered street. Vesper Bay Decks by night."
+    },
+    {
+      "id": "ag12-canal",
+      "date": "2026-10-31",
+      "stage": "2",
+      "milestone": "AG12",
+      "milestone_name": "Water",
+      "title": "A canal by night",
+      "image": "docs/progress/AG12/vesper_bay/8k/water_canal_night.jpg",
+      "caption": "Water that flows and foams along walls and piers, over beds of mud, sand and stone, between banks of every kind. A quayed canal in Vesper Bay by night, with the neon and lit windows on its water."
+    },
+    {
+      "id": "ag13-park",
+      "date": "2026-10-31",
+      "stage": "2",
+      "milestone": "AG13",
+      "milestone_name": "Ground cover and grass",
+      "title": "Grass under the trees",
+      "image": "docs/progress/AG13/vesper_bay/8k/park.jpg",
+      "caption": "Every piece of open land textured by what covers it and worn where people walk, with grass and small plants by kind. A park on Scholar Isle: lawn, clover and flowers in the district's colors under the trees."
+    },
+    {
+      "id": "ag14-fit",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG14",
+      "milestone_name": "Fit and finish",
+      "title": "Everything rests on something",
+      "image": "docs/progress/AG14/vesper_bay_transit_masts.jpg",
+      "caption": "Fixes from the first run-through: road columns and the sky tube's masts with their crossheads and stays drawn in full, junctions that meet their roads, roof equipment on its roofs, and nothing floating or passing through anything else."
+    },
+    {
+      "id": "ag15-day",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG15",
+      "milestone_name": "Cyberpunk facades and night",
+      "title": "Delta Megacity's core by day",
+      "image": "docs/progress/AG15/delta_megacity/core.jpg",
+      "caption": "Seven new facade styles (LED-strip mullions, honeycomb panels, folded and colored glass, media screens, diagonal glazing, slit windows) and window patterns beyond the grid. Neighboring towers never share a style."
+    },
+    {
+      "id": "ag15-night",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG15",
+      "milestone_name": "Cyberpunk facades and night",
+      "title": "The same core by night",
+      "image": "docs/progress/AG15/delta_megacity/core_night.jpg",
+      "caption": "At night each building lights its own way: offices in bands of floors, homes scattered, hotels warm, a few towers dark, with lights on their crowns and edges and their logos lit."
+    },
+    {
+      "id": "ag15-street",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG15",
+      "milestone_name": "Cyberpunk facades and night",
+      "title": "A core street under its lamps",
+      "image": "docs/progress/AG15/delta_megacity/core_street_night.jpg",
+      "caption": "Street level in Delta Megacity's core at night: LED-strip facades, lit shopfronts and windows, traffic, and the street lamps."
+    },
+    {
+      "id": "fix-sky-tubes",
+      "date": "2026-11-05",
+      "stage": "2",
+      "milestone": "Fix",
+      "milestone_name": "Sky tube pylons and rings",
+      "title": "Lit rings on the Crown Loop",
+      "image": "docs/progress/sky_tubes/night_rings_every1.jpg",
+      "caption": "From the second run-through: sky tubes stand on plain pylons again, and their rings light up at night, every ring or every second or third one, chosen per line. Vesper Bay's Crown Loop over Highcrest, looking toward the Corporate Core."
+    },
+    {
+      "id": "fix-barriers",
+      "date": "2026-11-05",
+      "stage": "2",
+      "milestone": "Fix",
+      "milestone_name": "Barriers at junctions",
+      "title": "Barriers that stop where they should",
+      "image": "docs/progress/barriers/vesper_bay_ramp_gore_after.jpg",
+      "caption": "Also from the second run-through: road barriers no longer run through junctions and crosswalks. Each one ends where its road meets another, sloped down or capped. An on-ramp joining a highway in Vesper Bay."
+    },
+    {
+      "id": "ue-fly",
+      "date": "2026-10-28",
+      "stage": "ue",
+      "milestone": "Exporter",
+      "milestone_name": "Open, play and fly",
+      "title": "Press Play and fly",
+      "image": "docs/progress/unreal_play/vesper_bay_fly_over.jpg",
+      "caption": "The exporter leaves a project ready to play: open it, press Play and fly. Vesper Bay from 220 m up, the far city streaming in as you go."
+    },
+    {
+      "id": "ue-night",
+      "date": "2026-10-29",
+      "stage": "ue",
+      "milestone": "Exporter",
+      "milestone_name": "Play features",
+      "title": "Minimap, map and night",
+      "image": "docs/progress/play_features/play_night.jpg",
+      "caption": "A small plugin adds a minimap, a full map you can teleport from, a free camera and a menu that turns the city to night, when the windows, neon and street lights come on. Delta Megacity by night. The same day, the first run-through flew and walked this city end to end and listed what to fix."
+    },
+    {
+      "id": "ue-fast-import",
+      "date": "2026-11-01",
+      "stage": "ue",
+      "milestone": "Exporter",
+      "milestone_name": "Fast import",
+      "title": "The Stacks on the Windows PC",
+      "image": "docs/progress/exp_fast_import/windows_street_stacks.jpg",
+      "caption": "A faster first import for cities with stage 2's assets, now the default. Greyhook's The Stacks in Unreal on a desktop PC: textured towers, skybridges, the sky tube, street trees and grass."
+    },
+    {
+      "id": "ue-rt2",
+      "date": "2026-11-03",
+      "stage": "ue",
+      "milestone": "RT2",
+      "milestone_name": "Second run-through",
+      "title": "Old Town by night",
+      "image": "docs/progress/run_through_2/shots/night_a4_oldtown_canal.jpg",
+      "caption": "The second run-through: Delta Megacity built again with every fix and flown through in Unreal, the issues of the first run-through fixed. By night the lamps now light the street, here in Old Town beside its canal."
+    }
+  ]
+}
