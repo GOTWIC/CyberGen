@@ -1,25 +1,25 @@
 {
  "device": "windows",
  "label": "Windows PC",
- "updated": "2026-11-05T22:48:49Z",
+ "updated": "2026-11-05T22:49:34Z",
  "sessions": 23,
  "worktree_sessions": 23,
  "subagents": 11,
  "totals": {
-  "total": 5499142948,
-  "input": 24652,
-  "output": 8881104,
+  "total": 5501388016,
+  "input": 24660,
+  "output": 8883157,
   "cache_write_5m": 155362727,
-  "cache_write_1h": 36813277,
-  "cache_read": 5298061188
+  "cache_write_1h": 36818817,
+  "cache_read": 5300298655
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 24652,
-   "output": 8881104,
+   "input": 24660,
+   "output": 8883157,
    "cache_write_5m": 155362727,
-   "cache_write_1h": 36813277,
-   "cache_read": 5298061188
+   "cache_write_1h": 36818817,
+   "cache_read": 5300298655
   }
  },
  "days": {
@@ -64,8 +64,8 @@
    "sessions": 3
   },
   "2026-11-05": {
-   "total": 1252042954,
-   "output": 1802194,
+   "total": 1254288022,
+   "output": 1804247,
    "sessions": 9
   }
  }
