@@ -232,19 +232,21 @@ def _clear_spans(P: Path, t0: float, t1: float, rings: list) -> list:
     from citygen import geom as G
     half = max(abs(t0), abs(t1))
     with G.canonical():
-        band = shapely.LineString(P.p).buffer(half, cap_style="flat", join_style="mitre",
-                                              mitre_limit=2.0)
-        inner = [shapely.make_valid(shapely.Polygon(r)).buffer(-CLIP_M, join_style="mitre")
+        band = G.qpoly(shapely.LineString(P.p).buffer(half, cap_style="flat",
+                                                      join_style="mitre", mitre_limit=2.0))
+        inner = [G.qpoly(shapely.make_valid(shapely.Polygon(r)).buffer(-CLIP_M,
+                                                                       join_style="mitre"))
                  for r in rings if len(r) >= 3]
         inner = [g for g in inner if not g.is_empty]
-        x = shapely.intersection(band, shapely.union_all(inner)) if inner else None
+        u = G.union(inner) if inner else None
+        x = G.inter(band, u) if u is not None else None
+        parts = G.parts(x) if x is not None and not x.is_empty else []
     blocked = []
-    if x is not None and not x.is_empty:
-        for part in shapely.get_parts(x):
-            if part.is_empty or part.area <= 1e-6:
-                continue
-            ss = [P.project(q[0], q[1])[0] for q in shapely.get_coordinates(part)]
-            blocked.append((max(0.0, min(ss) - 0.01), min(P.L, max(ss) + 0.01)))
+    for part in parts:
+        if G.area1(part) <= 1e-6:
+            continue
+        ss = [P.project(q[0], q[1])[0] for q in part.exterior.coords]
+        blocked.append((max(0.0, C.m2(min(ss) - 0.01)), min(P.L, C.m2(max(ss) + 0.01))))
     blocked.sort()
     spans, at = [], 0.0
     for lo, hi in blocked:
@@ -253,20 +255,19 @@ def _clear_spans(P: Path, t0: float, t1: float, rings: list) -> list:
         at = max(at, hi)
     if P.L - at >= 0.3:
         spans.append((C.m2(at), P.L))
-    if x is None or x.is_empty:
+    if not parts:
         return spans
     # (each stretch as drawn, mitred at the line's vertices, where the grown line is not:
     # shortened 10 cm at a time at the end nearer what it still covers)
-    u = shapely.union_all(inner)
     out = []
     for a, b in spans:
         while b - a >= 0.3:
-            ov = shapely.intersection(_drawn(P, a, b, t0, t1), u)
-            if ov.is_empty or ov.area <= 1e-4:
+            with G.canonical():
+                ov = G.inter(G.qpoly(_drawn(P, a, b, t0, t1)), u)
+            if ov.is_empty or G.area1(ov) <= 1e-4:
                 out.append((a, b))
                 break
-            c = ov.representative_point()
-            sc, _ = P.project(c.x, c.y)
+            sc = min(P.project(q[0], q[1])[0] for g in G.parts(ov) for q in g.exterior.coords)
             if sc - a <= b - sc:
                 a = C.m2(a + 0.1)
             else:
