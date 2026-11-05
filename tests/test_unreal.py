@@ -1242,6 +1242,18 @@ def test_check_frame_times_and_warm_shots():
     assert _ue_script("import_city.py", "PRUNE_FILES")["PRUNE_FILES"] <= 100
 
 
+def test_check_roofs_from_the_ground_floor():
+    """#83: a roof trace counts 3 m over the ground the building stands on, a stage 2
+    building's pivot (its base): its shell's bounds start at its street front's top (a
+    one-storey shed or yard: 7.5 m up, its roof 2.5 m over that) or are an open shed's roof
+    slab alone, so Delta's Industrial Port sheds and yards missed with their hulls there."""
+    src = (Path(U.__file__).parent / "ue" / "check_city.py").read_text()
+    col = src[src.index("\ndef collision("):src.index("\ndef ", src.index("\ndef collision(") + 10)]
+    assert 'if "cg.stage=2" in tags_of(a):' in col
+    assert "floor = min(floor, a.get_actor_location().z)" in col
+    assert 'h["point"].z > floor + 300.0' in col and "o.z - e.z + 300.0" not in col
+
+
 def test_check_shots_stay_under_nanites_root_pages():
     """The AG5 Unreal check: Cragmouth's shots loaded all 75,155 of its actors and the editor
     stopped on Nanite's root pages (49,152, its 2 GB pool on the Mac; Cragmouth has 63,700
@@ -1304,6 +1316,10 @@ def test_stage2_packs_keep_their_normals():
 
 UE_ROOT = U.find_engine()
 BLENDER = BO.find_blender()
+# (the small city is 2.4 km a side: at the default 1.5 km view range every cell is loaded
+# wherever the player stands, so the streaming check, which wants a teleport to load cells the
+# start did not, streams it at a range smaller than the city)
+SMALL_VIEW_M = 600.0
 
 
 @pytest.mark.skipif(UE_ROOT is None or BLENDER is None,
@@ -1321,7 +1337,7 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     # (not "Proj": UnrealBuildTool names modules without case, and the engine has PROJ, the
     # GeoReferencing plugin's projection library, so the play plugin could not be built)
     proj = U.new_project(tmp_path / "CityTest", UE_ROOT)
-    first = U.import_city(build, proj)
+    first = U.import_city(build, proj, view_m=SMALL_VIEW_M)
     assert first["ok"], first.get("error")
     # the player start, the sun, the sky light and the atmosphere, and the play features'
     # actor where the plugin could be built (a C++ compiler UE accepts)
@@ -1335,7 +1351,7 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     assert first["startup_map"] == first["level"] and first["startup_map_changed"]
     assert f"GameDefaultMap={first['level']}." in \
         (proj.parent / "Config" / "DefaultEngine.ini").read_text()
-    second = U.import_city(build, proj)
+    second = U.import_city(build, proj, view_m=SMALL_VIEW_M)
     assert second["ok"], second.get("error")
     assert second["actors"]["created"] == second["actors"]["updated"] == \
         second["actors"]["deleted"] == 0
@@ -1350,7 +1366,7 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     build2.mkdir()
     (build2 / "city_model.json").write_text(regenerated.to_json() + "\n", encoding="utf-8")
     assert BO.run_blockout(build2 / "city_model.json", build2, render=False)["passed"]
-    third = U.import_city(build2, proj)
+    third = U.import_city(build2, proj, view_m=SMALL_VIEW_M)
     assert third["ok"], third.get("error")
     want = U.manifest_changes(json.loads((build / "unreal" / "manifest.json").read_text()),
                               json.loads((build2 / "unreal" / "manifest.json").read_text()))
@@ -1361,7 +1377,7 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
     assert third["actors"]["unchanged"] == \
         third["actor_count"] - len(want["created"]) - len(want["updated"])
     # and what it changed was saved: the same build again changes nothing
-    fourth = U.import_city(build2, proj)
+    fourth = U.import_city(build2, proj, view_m=SMALL_VIEW_M)
     assert fourth["ok"], fourth.get("error")
     assert fourth["actors"]["created"] == fourth["actors"]["updated"] == \
         fourth["actors"]["deleted"] == fourth["dirty_packages"] == 0
@@ -1374,9 +1390,25 @@ def test_unreal_import_small_city(small, regenerated, tmp_path):
         shutil.rmtree(d, ignore_errors=True)
 
 
+def _rows(build, name):
+    """The rows the import's digests hash (CITYGEN_UE_DIGEST_ROWS), kept as `name`."""
+    src = build / "unreal" / "digest_rows.json"
+    dst = build.parent / f"{name}_rows.json"
+    shutil.copyfile(src, dst)
+    return json.loads(dst.read_text(encoding="utf-8"))
+
+
+def _rows_diff(a, b) -> str:
+    """The actors' rows in one import and not the other (the first few), for a message."""
+    sa = {json.dumps(r) for r in a["actors"]}
+    sb = {json.dumps(r) for r in b["actors"]}
+    return (f"only in the first: {sorted(sa - sb)[:4]}; "
+            f"only in the second: {sorted(sb - sa)[:4]}")
+
+
 @pytest.mark.skipif(UE_ROOT is None or BLENDER is None,
                     reason="Unreal Engine 5 or Blender not installed")
-def test_unreal_import_stage2_small_city(small, tmp_path):
+def test_unreal_import_stage2_small_city(small, tmp_path, monkeypatch):
     """Stage 2 over the blockout in Unreal: the small city imported alone, then with
     assetgen's buildings and streets (exactly the actors `manifest_changes` names change),
     imported again (nothing changes), checked in play-in-editor, back to the blockout (its
@@ -1390,8 +1422,10 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     # (not "Proj": UnrealBuildTool names modules without case, and the engine has PROJ, the
     # GeoReferencing plugin's projection library, so the play plugin could not be built)
     proj = U.new_project(tmp_path / "CityTest", UE_ROOT)
+    monkeypatch.setenv("CITYGEN_UE_DIGEST_ROWS", "1")
     first = U.import_city(build, proj, assets=False)
     assert first["ok"], first.get("error")
+    rows_first = _rows(build, "first")
     old = json.loads((build / "unreal" / "manifest.json").read_text())
     assert "stage2" not in old and "stage2" not in first
     second = U.import_city(build, proj)
@@ -1417,8 +1451,11 @@ def test_unreal_import_stage2_small_city(small, tmp_path):
     back = U.import_city(build, proj, assets=False)
     assert back["ok"], back.get("error")
     assert {k: back["keys"][k] for k in want} == U.manifest_changes(new, old)
+    # (the actors stage 2 had updated in place are as the blockout spawns them again:
+    # `import_city.unstage`)
+    rows_back = _rows(build, "back")
     assert (back["actor_digest"], back["actor_count"]) == \
-        (first["actor_digest"], first["actor_count"])
+        (first["actor_digest"], first["actor_count"]), _rows_diff(rows_first, rows_back)
     again = U.import_city(build, proj)
     assert again["ok"], again.get("error")
     assert {k: again["keys"][k] for k in want} == want

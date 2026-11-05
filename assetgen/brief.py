@@ -52,6 +52,8 @@ BLIND_M = 3.0          # this close: a blind wall (and a neighbor in the brief)
 HIDE_M = 0.05          # another mass of the same building this close outside: hidden
 MOUNT_M = 0.5          # a facade prop's mount point within this of a facade: on the wall
 MOUNT_OFF_M = 2.0      # within this: still the building's, off the wall
+UNIT_REACH_M = 2.0     # #88: how much farther than its nearest wall (one facing a neighbor) a
+                       # unit may sit on a facade facing its own street
 PROBES_M = (0.75, 1.5, 2.5, 4.0, 6.0, 9.0, 13.0, 18.0, 24.0, 32.0, 40.0, 50.0, 60.0)
 EYE_M = 1.5            # probes look out at the facade part's base plus this
 MIN_LEN_M = 0.0005     # stretches and bands are on the millimeter grid: drop only empty ones
@@ -672,13 +674,26 @@ def mount_points(p) -> list[tuple]:
     return [(None, x, y, z, reach)]
 
 
-def mount_props(city: City, edges_by_b: list[list[Edge]]) -> dict[int, list[dict]]:
+def frame_z(model: CityModel, ground, k: int, x: float, y: float, z: float) -> float:
+    """#88: a facade prop's or plant's height in building k's frame. M20 measures it over the
+    ground where it stands (`props.Ctx.facade_spot`: the floor's height plus what the frame
+    stands over the ground there), the masses from the building's base (M13's `base_m`): on a
+    slope the two differ by the ground's rise from the base; on a flat city they are one."""
+    base = getattr(model.buildings[k], "base_m", None)
+    if ground is None or getattr(ground, "flat", True) or base is None:
+        return z
+    return z + ground.at(x, y) - float(base)
+
+
+def mount_props(city: City, edges_by_b: list[list[Edge]],
+                ground=None) -> dict[int, list[dict]]:
     """Props on each building: scaffolding by `attrs.building`; facade props on the
     building whose facade their mount point is nearest. A prop is `on_wall` when that
     point is within 0.5 m of a facade whose mass spans its height; one up to 2 m off, or
     beside a wall that ends below it (M6 places by ground-floor units and floor numbers,
     not by the mass at that height), is still the building's, with `on_wall` false and its
-    gap, for AG3 to bracket or drop. Ties go to the smaller id."""
+    gap, for AG3 to bracket or drop. Ties go to the smaller id. Heights in each building's
+    frame (`frame_z`: on M13's slopes the model's are over the ground at the prop)."""
     out: dict[int, list[dict]] = {}
     m = city.m
     stats: dict[str, list[int]] = {}
@@ -688,11 +703,12 @@ def mount_props(city: City, edges_by_b: list[list[Edge]]) -> dict[int, list[dict
             k = city.bidx.get(p.attrs.get("building"))
             if k is not None:
                 loc = locate(edges_by_b[k], p.position[0], p.position[1], 0.5)
-                out.setdefault(k, []).append(_prop_entry(city, k, p, None, loc, True, 0.0))
+                out.setdefault(k, []).append(_prop_entry(city, k, p, None, loc, True, 0.0,
+                                                         ground))
             continue
         if kind not in FACADE_PROPS:
             continue
-        for end, x, y, z, reach in mount_points(p):
+        for end, x, y, z0, reach in mount_points(p):
             tol = reach + MOUNT_OFF_M
             best = None
             seen = set()
@@ -701,6 +717,7 @@ def mount_props(city: City, edges_by_b: list[list[Edge]]) -> dict[int, list[dict
                 if k in seen:
                     continue
                 seen.add(k)
+                z = frame_z(m, ground, k, p.position[0], p.position[1], z0)
                 loc = locate(edges_by_b[k], x, y, z)
                 gap = None if loc is None else max(loc[0] - reach, 0.0)
                 on = gap is not None and gap <= MOUNT_M
@@ -718,16 +735,19 @@ def mount_props(city: City, edges_by_b: list[list[Edge]]) -> dict[int, list[dict
                 continue
             st[0 if best[3] else 1] += 1
             out.setdefault(best[1], []).append(
-                _prop_entry(city, best[1], p, end, best[2], best[3], best[4]))
+                _prop_entry(city, best[1], p, end, best[2], best[3], best[4], ground))
     city.mount_stats = stats
     for k in out:
         out[k].sort(key=lambda e: (e["id"], -1 if e.get("end") is None else e["end"]))
     return out
 
 
-def _prop_entry(city: City, k: int, p, end, loc, on: bool, gap: float) -> dict:
+def _prop_entry(city: City, k: int, p, end, loc, on: bool, gap: float,
+                ground=None) -> dict:
     ox, oy = city.origins[k]
-    e = {"id": p.id, "kind": p.type.split(".")[1], "position": C.pt3(p.position, ox, oy),
+    x, y, z = p.position
+    e = {"id": p.id, "kind": p.type.split(".")[1],
+         "position": C.pt3((x, y, frame_z(city.m, ground, k, x, y, z)), ox, oy),
          "yaw_deg": C.deg(p.yaw_deg), "scale": [C.m(v) for v in p.scale],
          "attrs": p.attrs, "at": at(loc), "on_wall": on, "gap_m": C.m(gap)}
     if end is not None:
@@ -859,12 +879,12 @@ def build_briefs(model: CityModel, spec: S.AssetSpec | None = None,
         else:
             faced[id(r)] = facing_class(city, h, city.mains[k], b.id)
     t_face = time.perf_counter()
-    props = mount_props(city, edges_by_b)
+    from .streets.ctx import Ground
+    ground = Ground(model)
+    props = mount_props(city, edges_by_b, ground)
     t_props = time.perf_counter()
     briefs = {}
     look = _Lookups(model)
-    from .streets.ctx import Ground
-    ground = Ground(model)
     cors = corridors(model, ground)
     from .buildings import decks as BD
     from .streets import decks as SD
@@ -1111,14 +1131,45 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
         (a blade sign over a lower shack, a skybridge end on a setback)."""
         return at(locate(edges, x, y, z) or locate(edges, x, y, z, tol_z=math.inf))
 
+    def region_at(j, s):
+        for r in edge_recs[j]["regions"]:
+            if r["s"][0] - 1e-6 <= s <= r["s"][1] + 1e-6 and r["z"][0] <= 0.5:
+                return r
+        return None
+
+    def unit_loc(u):
+        """A unit on the facade nearest its edge's middle; #88: where that wall faces another
+        building (a party, blind or open wall towards a neighbor: M3's unit edge cut a
+        corner the footprint's tidying moved) and a facade within `UNIT_REACH_M` more faces
+        the unit's own street, on that one (its door opens to its sidewalk)."""
+        (ax, ay), (bx, by) = u.edge
+        mx, my = (ax + bx) / 2.0, (ay + by) / 2.0
+        lo = locate(edges, mx, my, 0.5) or locate(edges, mx, my, 0.5, tol_z=math.inf)
+        if lo is None or not u.segment_id:
+            return at(lo)
+        r0 = region_at(lo[2], lo[3])
+        if r0 is None or r0.get("ref") == u.segment_id or r0.get("ref") not in city.bidx:
+            return at(lo)
+        best = None
+        for j, e in enumerate(edges):
+            if not e.mass.z0 - 0.5 <= 0.5 <= e.mass.z1 + 0.5:
+                continue
+            d, s = PL.point_seg_dist((mx, my), e.a, e.b)
+            r = region_at(j, s)
+            if d > lo[0] + UNIT_REACH_M or r is None or r.get("ref") != u.segment_id:
+                continue
+            key = (d, e.mass.k, j)
+            if best is None or key < best[0]:
+                best = (key, e.mass.k, j, s)
+        return at(lo if best is None else (best[0][0], best[1], best[2], best[3]))
+
     units = []
     for u in b.units:
-        (ax, ay), (bx, by) = u.edge
         units.append({"edge": [C.pt(u.edge[0], ox, oy), C.pt(u.edge[1], ox, oy)],
                       "use": u.use, "width_m": C.m(u.width_m), "segment_id": u.segment_id,
                       "awning_m": C.m(u.awning_m), "sign": u.sign,
                       "entrance": C.pt(u.entrance, ox, oy) if u.entrance else None,
-                      "at": loc((ax + bx) / 2.0, (ay + by) / 2.0, 0.5)})
+                      "at": unit_loc(u)})
     ents = [{"position": C.pt(e.position, ox, oy), "kind": e.kind, "segment_id": e.segment_id,
              "walkway_id": e.walkway_id, "at": loc(e.position[0], e.position[1], 0.5)}
             for e in b.entrances]
@@ -1155,9 +1206,16 @@ def _brief(city: City, k: int, b, edges: list[Edge], faced: dict, props: list, l
              "unit_index": p.unit_index, "floor": p.floor, "hours": list(p.hours),
              "host_id": p.host_id}
             for p in sorted(look.pois.get(b.id, []), key=lambda p: p.id)]
+    def plant_z(p):
+        # (#88: facade greenery over the ground where it grows, as M20 puts it; roof plants
+        # are in the building's frame already)
+        x, y, z = p.position
+        return frame_z(city.m, ground, k, x, y, z) if p.type.endswith("facade_greenery")             else z
+
     plants = [{"id": p.id, "type": p.type, "species": p.species,
-               "position": C.pt3(p.position, ox, oy), "height_m": C.m(p.height_m),
-               "attrs": p.attrs, "at": loc(p.position[0], p.position[1], p.position[2])}
+               "position": C.pt3((p.position[0], p.position[1], plant_z(p)), ox, oy),
+               "height_m": C.m(p.height_m),
+               "attrs": p.attrs, "at": loc(p.position[0], p.position[1], plant_z(p))}
               for p in sorted(look.plants.get(b.id, []), key=lambda p: p.id)]
     green = [{"id": g.id, "z_m": C.m(g.z_m),
               "polygon": _poly(g.polygon, ox, oy) if g.polygon else None}

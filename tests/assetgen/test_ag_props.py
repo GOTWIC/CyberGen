@@ -216,8 +216,9 @@ def test_placements_pick_their_variant_from_their_id():
 
 
 def test_m13_lifts_placements_by_base_or_ground(tmp_path):
-    """On a terrain city a placement stands on its building's base when it hangs on a
-    building, else on the finished ground at its point; on a flat city nothing moves."""
+    """On a terrain city a placement stands on its building's base when it stands on its
+    roof (and a sign slot on its building's), else on the finished ground at its point, a
+    wall mount too (#88); on a flat city nothing moves."""
     from types import SimpleNamespace
 
     from assetgen.props.gather import gather
@@ -259,8 +260,15 @@ def test_m13_lifts_placements_by_base_or_ground(tmp_path):
     assert lifts == {5.0, 9.0}
     assert boats and all(round(z, 3) == -1.5 and round(za[i], 3) == -1.5
                          for i, z in boats.items())
-    on_bld = {p.id for p in flat.plants if (p.attrs or {}).get("building")}
-    assert on_bld and all(round(zb[i] - za[i], 3) == 9.0 for i in on_bld)
+    roof = {p.id for p in flat.plants if (p.attrs or {}).get("building")
+            and p.type != "plant.facade_greenery"}
+    assert roof and all(round(zb[i] - za[i], 3) == 9.0 for i in roof)
+    # (#88: a wall mount stands over the ground where it hangs, as M20 measures it, not over
+    # its building's base: facade greenery, AC units, wall lights, awnings)
+    ivy = {p.id for p in flat.plants if p.type == "plant.facade_greenery"}
+    mounts = {p.id for p in flat.props if p.type.split(".")[1] in
+              ("ac_unit", "wall_light", "awning")} & za.keys()
+    assert ivy and mounts and all(round(zb[i] - za[i], 3) == 5.0 for i in ivy | mounts)
     sa = {s["id"]: s["pivot"][2] for v in a.signs.values() for s in v}
     sb = {s["id"]: s["pivot"][2] for v in b.signs.values() for s in v}
     bid = {s.id: s.building_id for s in flat.sign_slots}

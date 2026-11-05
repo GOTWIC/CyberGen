@@ -221,8 +221,15 @@ def make(brief: dict, avoid: dict | None = None) -> dict:
         # AG5: a hero's system by its kind
         fixed = SY.LANDMARK_SYSTEM.get(btype.rsplit(".", 1)[1], fixed)
     if isinstance(fixed, dict):
-        fixed = pick(fkey, "system.type", sorted(fixed), [fixed[k] for k in sorted(fixed)],
-                     salt)
+        opts = sorted(fixed)
+        ows = [fixed[k] for k in opts]
+        fixed = pick(fkey, "system.type", opts, ows, salt)
+        if av.get("system") and fixed in av["system"]:
+            # (#88: a hero's or a type's system drawn from its weights, past the systems its
+            # neighboring towers took where it can: Nexus City's spire went after a taller
+            # tower beside it with the same curtain wall)
+            fixed = _first(fixed, _order(fkey, "ag15.system.type", opts, ows, salt),
+                           lambda s_: s_ in av["system"])
     genes: dict = {}
     cont: dict = {}
     body = fixed or pick(fkey, "system.body", names, ws, salt)

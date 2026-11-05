@@ -499,6 +499,13 @@ def collision(world, pawn, man, slug):
         for a in blds[:12]:
             o, e = a.get_actor_bounds(False)
             top = o.z + e.z
+            # (#83: a stage 2 shell stands over its street front, AG3's own actor, so its
+            # bounds start at the band's top, 7.5 m up on a one-storey shed or yard, or are an
+            # open shed's roof slab alone: the ground it stands on is its pivot, the base its
+            # ground floor stands at; a blockout box starts on the ground)
+            floor = o.z - e.z
+            if "cg.stage=2" in tags_of(a):
+                floor = min(floor, a.get_actor_location().z)
             roofs["tried"] += 1
             # stopped on the building or on what stands on it (a green roof, a skybridge),
             # well above the ground: at the manifest's point inside its highest footprint,
@@ -510,8 +517,8 @@ def collision(world, pawn, man, slug):
                 pts.insert(0, (r[0] * 100.0, -r[1] * 100.0))
             for x, y in pts:
                 h = trace(world, unreal.Vector(x, y, top + 500.0),
-                          unreal.Vector(x, y, o.z - e.z - 100.0), [pawn])
-                if h is not None and h["point"].z > o.z - e.z + 300.0:
+                          unreal.Vector(x, y, floor - 100.0), [pawn])
+                if h is not None and h["point"].z > floor + 300.0:
                     roofs["hit"] += 1
                     break
             else:

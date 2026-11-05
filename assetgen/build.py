@@ -66,7 +66,7 @@ from .buildings import shell as SH
 from .buildings import systems as SY
 from .buildings import thumb as TH
 
-GEN_VERSION = "ag15.1"         # bump whenever the packs' bytes change (they carry only this,
+GEN_VERSION = "fixassets.1"    # bump whenever the packs' bytes change (they carry only this,
                                # not the package version, so a kept tile is a fresh one)
 TILE_M = 256.0
 OWNED = ("version", "assetgen", "generator", "library", "inputs", "city", "model_sha256",
@@ -519,6 +519,18 @@ def _hero_mask(out: Path, bid: str, a: np.ndarray, hero: dict) -> int:
 # The city
 # ---------------------------------------------------------------------------
 
+def _state(bdir: Path) -> dict | None:
+    """citygen's build state beside the model (M10: `city_state.json`), if there is one."""
+    import json
+    p = bdir / "city_state.json"
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+
+
 def _briefs(model, sha: str, bdir: Path, out: Path, spec, ov: dict | None,
             inputs: dict, old: dict | None, log) -> tuple[dict, dict, int]:
     """{id: brief}, {id: brief hash}, files written."""
@@ -580,9 +592,12 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             genomes[bid] = GN.make(briefs[bid])
             st.advance()
         # AG15: the neighbor rule (towers within 150 m differ); what a tower avoided is in
-        # its asset's hash
+        # its asset's hash. With M10, a district regeneration's city keeps the towers
+        # outside the district as their records have them (`neighbors.held_towers`)
         from .buildings import neighbors as NB
-        avoided = NB.assign(briefs, genomes)
+        held = NB.held_towers(briefs, bh, (old or {}).get("buildings") or {},
+                              _state(bdir), {d.name: d.id for d in model.districts})
+        avoided = NB.assign(briefs, genomes, held)
     hashes = {bid: asset_hash(bh[bid] if bid not in avoided else
                               C.digest([bh[bid], avoided[bid]]), lib_hash)
               for bid in sorted(briefs)}
@@ -630,6 +645,12 @@ def build(build_dir: str | Path, spec_path: str | None = None,
             files[r["tile"]] = r["files"]
             wrote += r["wrote"]
             st.advance()
+    for bid, rec in records.items():
+        ag = rec.get("ag15")
+        if ag and ag.get("tower"):
+            # (what its genome avoided, for a later regeneration to hold it: `held_towers`)
+            ag["avoided"] = avoided.get(bid)
+            ag["held"] = bid in held
     t4 = time.perf_counter()
     from .materials import build as MS
     from .materials import params as MP

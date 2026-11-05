@@ -303,6 +303,39 @@ def blueprint(path, parent, variables, hism=False):
     return BEL.generated_class(bp)
 
 
+STAGE_TAG = "cg.stage=2"
+
+
+def unstage(a, comps) -> bool:
+    """A blockout actor updated in the place of a stage 2 actor of its key (the same class,
+    so `place` updates it in place, as `manifest_changes` counts it: an import back to the
+    blockout): what stage 2 set on it undone, so it is as one spawned for the blockout (its
+    rotation, the slot materials, the collision profile, cull distances, shadow and HLOD).
+    Whether it was one (its tags are still stage 2's when its update starts)."""
+    if STAGE_TAG not in [str(t) for t in a.tags]:
+        return False
+    a.set_actor_rotation(unreal.Rotator(roll=0.0, pitch=0.0, yaw=0.0), False)
+    for c in comps:
+        for what, fn in (("materials", lambda: c.empty_override_materials()),
+                         ("collision", lambda: c.set_collision_profile_name("BlockAll")),
+                         ("shadow", lambda: c.set_cast_shadow(True))):
+            try:
+                fn()
+            except Exception as ex:          # (an API this engine lacks: logged, not fatal)
+                log(f"unstage {what}: {ex}")
+        if isinstance(c, unreal.InstancedStaticMeshComponent):
+            try:
+                c.set_cull_distances(0, 0)
+                c.set_editor_property("enable_auto_lod_generation", True)
+            except Exception as ex:
+                log(f"unstage instances: {ex}")
+    try:
+        a.set_editor_property("enable_auto_lod_generation", True)
+    except Exception:
+        pass                                 # (not every actor class has it)
+    return True
+
+
 def fly_classes(speed_m_s):
     """The fly pawn, a SpectatorPawn (its built-in bindings: WASD, E or Space up, Q or C down,
     the mouse to look) at `speed_m_s` with no collision, and the game mode that spawns it;
@@ -2372,6 +2405,9 @@ class Importer:
 
                 def update(a, h, o=o, sm=sm, t=t):
                     c = a.static_mesh_component
+                    if unstage(a, [c]):
+                        self.stats["actors"]["unstaged"] = \
+                            self.stats["actors"].get("unstaged", 0) + 1
                     c.set_static_mesh(sm)
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
@@ -2526,6 +2562,9 @@ class Importer:
             def update(a, h, inst=inst, cx=cx, cy=cy, center=center):
                 comp = a.get_components_by_class(
                     unreal.HierarchicalInstancedStaticMeshComponent)[0]
+                if unstage(a, [comp]):
+                    self.stats["actors"]["unstaged"] = \
+                        self.stats["actors"].get("unstaged", 0) + 1
                 comp.set_static_mesh(self.protos[
                     self.man["prototypes"]["kinds"][inst["proto"]]["asset"]])
                 a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
@@ -2881,6 +2920,11 @@ class Importer:
             if EAL.does_directory_exist(f):
                 for a in sorted(EAL.list_assets(f, recursive=True)):
                     assets.append([a, meta(unreal.load_asset(a), HASH_TAG)])
+        if os.environ.get("CITYGEN_UE_DIGEST_ROWS") == "1":
+            # (what the digests hash, beside the result, to tell two imports apart)
+            with open(os.path.join(os.path.dirname(JOB["result"]), "digest_rows.json"), "w",
+                      encoding="utf-8", newline="\n") as fh:
+                json.dump({"actors": rows, "assets": assets}, fh, indent=0)
         return {"actor_count": len(rows), "actor_digest": sha16(rows),
                 "asset_count": len(assets), "asset_digest": sha16(assets)}
 

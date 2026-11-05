@@ -12,6 +12,13 @@ neighbors changed is made again.
 
 Signatures: system the body's; pattern (body window, body pattern); palette (wall, glass);
 night (light color, accent).
+
+With M10 (a district regeneration, `held_towers`): in a city its build state says a district
+regeneration made, every tower outside the district the last regeneration made whose brief
+is as its record has it keeps the genome it had (drawn again past what its record says it
+avoided, so the same genome and asset hash): those go first and the district's towers, and
+any other whose brief changed, take what they took to avoid, as M21's forms
+(`Frame.old_towers`) keep the city outside the district as it was.
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from . import genome as GN
 
 RADIUS_M = 150.0
 KINDS = ("system", "pattern", "palette", "night")
+TUPLE_KINDS = ("pattern", "palette", "night")
 
 
 def signature(gm: dict) -> dict:
@@ -55,9 +63,45 @@ def units(briefs: dict) -> dict[str, list[str]]:
     return out
 
 
-def assign(briefs: dict, genomes: dict) -> dict[str, dict]:
+def avoid_sets(rec: dict) -> dict:
+    """A record's `avoided` (lists, as `assign` writes them) as `genome.make` takes it."""
+    out = {}
+    for kind in KINDS:
+        vals = rec.get(kind) or []
+        out[kind] = {tuple(v) if kind in TUPLE_KINDS else v for v in vals}
+    out["vacant"] = bool(rec.get("vacant"))
+    return out
+
+
+def held_towers(briefs: dict, hashes: dict, old_records: dict, state: dict | None,
+                districts: dict[str, str]) -> dict[str, dict | None]:
+    """The towers a district regeneration holds (M10): {id: what its genome avoided, None
+    where it was drawn as made}. Only in a city its build state (`city_state.json`) says a
+    regeneration made (its `edits`); a tower is held when it stands outside the district of
+    the last edit, its record is a tower's with AG15's `avoided` (a record written before
+    this rule has none: it is drawn anew) and its brief hash is its record's. `districts`:
+    {district name: id}."""
+    edits = (state or {}).get("edits") or []
+    if not edits or not old_records:
+        return {}
+    last = districts.get(edits[-1].get("district"))
+    out: dict[str, dict | None] = {}
+    for bid in sorted(briefs):
+        rec = old_records.get(bid) or {}
+        ag = rec.get("ag15") or {}
+        if not ag.get("tower") or "avoided" not in ag or rec.get("brief") != hashes.get(bid):
+            continue
+        if briefs[bid]["building"].get("district_id") == last or not GN.is_tower(briefs[bid]):
+            continue
+        out[bid] = ag["avoided"]
+    return out
+
+
+def assign(briefs: dict, genomes: dict, held: dict | None = None) -> dict[str, dict]:
     """Apply the rule to `genomes` (in place); {id: what it avoided} of every tower drawn
-    again (lists, sorted, for hashing and the record)."""
+    again (lists, sorted, for hashing and the record). `held` (`held_towers`): towers that
+    keep the genome they had; a unit (a family or a tower) whose members are all held goes
+    first, drawn past what it avoided before, and the rest avoid it."""
     us = units(briefs)
     pos = {k: [(float(briefs[b]["origin"][0]), float(briefs[b]["origin"][1])) for b in m]
            for k, m in us.items()}
@@ -68,7 +112,22 @@ def assign(briefs: dict, genomes: dict) -> dict[str, dict]:
     grid: dict[tuple[int, int], list[str]] = {}
     done: dict[str, dict] = {}
     out: dict[str, dict] = {}
+    held = held or {}
+    kept = [k for k in order if all(b in held for b in us[k])]
+    for k in kept:
+        for b in us[k]:
+            if held[b] is not None:
+                genomes[b] = GN.make(briefs[b], avoid_sets(held[b]))
+                out[b] = held[b]
+        done[k] = signature(genomes[us[k][0]])
+        for x, y in pos[k]:
+            key = (math.floor(x / cell), math.floor(y / cell))
+            if k not in grid.setdefault(key, []):
+                grid[key].append(k)
+    kept_set = set(kept)
     for k in order:
+        if k in kept_set:
+            continue
         near: set[str] = set()
         for x, y in pos[k]:
             cx, cy = math.floor(x / cell), math.floor(y / cell)
