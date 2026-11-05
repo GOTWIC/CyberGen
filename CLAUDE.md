@@ -1914,8 +1914,9 @@ only LG8 waits for atmosgen's hour and weather.
 from `docs/progress/`, grouped by stage, each with a caption. `site/gallery.json` holds the
 entries (`id`, `date` the image's first commit: `git log --follow --diff-filter=A
 --format=%as -- <path> | tail -1`, `stage` 1, 2 or `ue`, `milestone`, `milestone_name`,
-`title`, `image` a repo path, `caption` of one to three sentences for people looking at the
-project: no hashes, goldens, check counts or test talk); `site/index.html` is the template
+`title`, `image` a repo path, `caption` a one-liner where possible, not necessarily a full
+sentence, saying only what is needed to explain the picture: no extra detail, no hashes,
+goldens, check counts or test talk); `site/index.html` is the template
 `site/build.py` fills in, beside `style.css` (the Neon Terminal look with glass panels, light
 and dark) and `app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
 it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px and 640 px
