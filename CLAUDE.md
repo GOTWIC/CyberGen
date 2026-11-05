@@ -31,16 +31,30 @@ separate local session for it (import the cities it touches into a throwaway pro
 check's own, import again, `--check`, shots). Spec and the record of what each milestone
 changed in it: `docs/unreal_export.md`.
 
-**Validation (every stage, every PR; Swagnik's rule, 2026-10-27).** Before pushing a PR, make
-sure the outputs look good and nothing breaks: build the cities the change touches, every check
-passes, look at their previews and renders, and the test suite passes (recorded hashes
-regenerated on this Mac where a change moves a model on purpose, saying why). Nothing more:
-no x86, Docker, Windows or other cross-platform comparisons, no stage-trace diffs, no
-`lock --verify` runs, no seed sweeps (unless the work is about robustness), no repeated
-validation runs, and the coordinating session does not validate a PR again (it reviews the
-outputs and the diff, and has the PR merge the latest main first when they overlap). Where a
-scope's "done when" asks for Mac = x86, that part waits for the deferred determinism check in
-`docs/determinism_check.md`, which runs only when Swagnik asks for it.
+**Validation (every stage, every PR; Swagnik's rules, 2026-10-27 and 2026-11-05).** Before
+pushing a PR, make sure the outputs look good and nothing breaks, at the scale of the change: a
+check earns its place by what it can find, not by habit.
+- **Small fixes** (one feature or issue, code local to it, such as #93, #94, #95): the change's
+  own tests and the test files of the modules it touched; builds of only the cities that have
+  the feature (every check passes) and only the asset stages it touches (`assetgen streets`,
+  `props`, ..., then `fit`, not a whole `assetgen build`); their previews and renders; the
+  recorded hashes of the cities it moved rewritten from those builds, saying why. No full test
+  suite, no builds of cities without the feature, no builds of main to show a failure predates
+  the change (name it if it is a known one).
+- **Milestones and changes to shared code** (roads, junctions, ids, geometry, the build
+  driver, anything every city goes through): build the cities the change touches, every check
+  passes, look at their previews and renders, and the full test suite passes (recorded hashes
+  regenerated where a change moves a model on purpose, saying why).
+- **Main:** after a batch of merges the coordinating session runs the full test suite once on
+  main, in the background, and fixes or files what it finds. It does not validate a PR again
+  (it reviews the outputs and the diff, and has the PR merge the latest main first when they
+  overlap).
+
+Nothing more: no x86, Docker, Windows or other cross-platform comparisons, no stage-trace
+diffs, no `lock --verify` runs, no seed sweeps (unless the work is about robustness), no
+repeated validation runs. Where a scope's "done when" asks for Mac = x86, that part waits for
+the deferred determinism check in `docs/determinism_check.md`, which runs only when Swagnik
+asks for it.
 
 The sample city is **Vesper Bay** (`cities/vesper_bay`, golden key `vesper_bay`; pinned demo
 "Vesper Bay Pinned" in `cities/vesper_bay_pinned`).
@@ -989,7 +1003,8 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   towers, ground stretches, a nexus platform, a sky station's elevator core) at the mode's
   span (`support_spacing_m` is now (span, longest): rail 30/45, monorail 25/40, maglev 50/80,
   sky tube 420/600), each moved at most `SPAN_MOVE` (15%) to free ground: a column under
-  the line (`form` column, `mast` for sky tubes), a pier in the water within `pier_reach` of
+  the line (`form` column; a sky tube's a plain pylon, `mast` with the sky tube fixes'
+  `supports: mast`), a pier in the water within `pier_reach` of
   the shore (the navigable channel down the middle, `CHANNEL_M` wide at most; the open sea
   has none), else a portal frame (`leg<n>a/b` columns either side within `FRAME_REACH_M`, a
   `beam` structure `cap<n>` under the deck, `attrs.frame`) or a cantilever bent (one column
@@ -999,8 +1014,8 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   run (`_support_room`, `_Dry`) takes out the low removable buildings that alone keep a
   support off a gap. A gap still longer is a cable-stayed main span over a navigable channel
   or a raised road (`MAIN_SPAN_M`: rail 400, monorail 250, maglev 300), else a note; the
-  line's `attrs.spans` lists its truss, cable and gap spans; sky tube masts carry
-  `mast_top_m` and their `stays`.
+  line's `attrs.spans` lists its truss, cable and gap spans; sky tube masts (`mast` only)
+  carry `mast_top_m` and their `stays`.
 - **Checks:** `transit_supports` (lone columns within 0.5 m of the line, frames' beams under
   it at the deck's underside, none on a road embankment, piers clear of the channel, spans
   within the longest, an end overhanging half of it at most), `transit_clearance` (3D along
@@ -1010,7 +1025,21 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
 - **Blockout and stage 2:** beams in `transit_support`, masts (two legs, stays) and pier
   footings (`_mast`, `_pier_cap`); AG14 draws them all (`transit_column`, `transit_beam`).
   New structure kind `beam` in the model.
-Sample builds: `docs/progress/M19/`.
+- **Sky tube fixes** (issues #94 and #97, after run-through 2): spec
+  `transit.sky_tube.supports` and `lit_rings_every` (defaults for every sky tube line; a
+  line's own `supports` and `lit_rings_every` win; `TransitLine` validates them on sky tubes
+  only, `Transit.sky_tube_style`; mode defaults `presets.SKY_TUBE_SUPPORTS` "pylon",
+  `SKY_TUBE_LIT_RINGS_EVERY` 1; left out of the filled spec, so `spec_sha256` and every city
+  without sky tubes keep their bytes). With `pylon` every sky tube support is a plain pylon
+  at M19's positions (`_column`'s form `column`, `_masts` not run), drawn as before M19 (a
+  shaft and a cradle across the tube, blockout and AG7); `mast` gives M19's masts back
+  record for record. A tube's rings (`tube_rings`: n evenly spaced along the whole line
+  near `RING_M` 10 m, n a multiple of the frequency, a loop's from its seam, an open line's
+  half a spacing in; ring k lit when k is a multiple of it) are cut into the 400 m tube
+  pieces (`attrs.rings`: [distance along the piece's own line, lit] for its stretch
+  [s, e) of the line); the line's `attrs.support_style` and `attrs.rings` (count, lit,
+  every, spacing_m). AG7 draws the ribs there with an LED band on each lit one.
+Sample builds: `docs/progress/M19/`; the sky tube fixes: `docs/progress/sky_tubes/`.
 
 M21 (cyberpunk massing) is in place, in `citygen/forms.py` (with `massing.Plate`, and the
 neighbor rule in `buildout.select_forms`):
@@ -1709,7 +1738,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   and keep 1 m off a crosswalk, railings also off any road's carriageway but a pedestrian
   street's (footbridge decks too), at their height (`props._clear_of_roads`).
 - **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
-  piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays;
+  piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays
+  where the model has them (`supports: mast`; plain pylons with their cradle by default,
+  issue #94);
   `transit_beam` 2: haunched cap beams, tapered cantilever arms); road columns in the water on
   footings (`column` 2, `structures.footing`); a bridge whose segment ids are empty finds the
   raised segments that carry it (`structures._carriers`) and draws no deck of its own;
@@ -1732,7 +1763,14 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.3.
 - **Exporter**: no code change (`docs/unreal_export.md`, "From AG14"); the packs' normals
   are kept on both import paths (`test_stage2_packs_keep_their_normals`).
-Results: `docs/progress/AG14/`.
+- **Sky tube rings** (issue #97, after run-through 2): `sky_tube` 2 draws the ribs at the
+  model's rings (`attrs.rings`, the line's evenly spaced rings in the piece's stretch; a
+  model without them every 10 m from 5 m in), each lit ring with an LED band on the rib's
+  outer face (`RIB_N` 12 beams, `LED_W` 0.2 m along the line) in the line's color at full
+  brightness (`streets.materials.led_slot`: slot `led.<hex>`, made on demand by
+  `slot_spec`, master `emissive`; AG6's catalog puts `led.` on `neon`, brighter by
+  `MPC_CityGen`'s `Night` in Unreal and in the Blender night previews).
+Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`.
 
 AG15 (cyberpunk facades and night, from the first run-through) is in place (tests
 `tests/assetgen/test_ag_night.py`):

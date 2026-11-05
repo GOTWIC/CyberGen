@@ -4,6 +4,7 @@ with its stations in route order, a line's route does not depend on the other li
 
 import copy
 import functools
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -578,18 +579,154 @@ def test_supports_under_the_line(lines):
     assert {c.id: c for c in lines.checks}["transit_supports"].passed
 
 
-def test_sky_tube_masts_and_hosts(lines):
-    """M19: a sky tube's pylons are cable-stayed masts over the tube; a tower it passes
-    through hosts one of its sky stations."""
+def test_sky_tube_pylons_and_hosts(lines):
+    """#94: a sky tube's supports are plain pylons by default (no mast top, no stays); M19:
+    a tower it passes through hosts one of its sky stations."""
     m = lines.model
     t = _line(json.loads(m.to_json()), "sky_tube")
-    masts = [s for s in m.structures if s.attrs.get("line_id") == t["id"] and
-             s.attrs.get("form") == "mast"]
-    for s in masts:
-        assert s.attrs["mast_top_m"] > s.z1_m + 20.0
-        assert len(s.attrs["stays"]) == 2
+    assert t["attrs"]["support_style"] == "pylon"
+    sup = [s for s in m.structures if s.attrs.get("line_id") == t["id"] and
+           s.kind in ("column", "pylon")]
+    assert sup
+    for s in sup:
+        assert s.attrs.get("form") != "mast", s.id
+        assert "mast_top_m" not in s.attrs and "stays" not in s.attrs, s.id
     hosted = {s.building_id for s in m.stations if t["id"] in s.line_ids}
     assert set(t["attrs"]["portals"]) <= hosted
+
+
+def _rings_along(m, t) -> tuple[list[tuple[float, bool]], float, bool]:
+    """A sky tube line's rings along the whole line from its tube pieces (each piece's own
+    distance plus where its line starts along the track); the line's length; a loop."""
+    path = [tuple(p[:2]) for p in t.path]
+    cum = [0.0]
+    for a, b in zip(path, path[1:]):
+        cum.append(cum[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    out = []
+    for st in m.structures:
+        if st.kind == "tube" and st.attrs.get("line_id") == t.id:
+            c0 = cum[path.index(tuple(st.line[0][:2]))]
+            out += [(c0 + s, lit) for s, lit in st.attrs["rings"]]
+    return sorted(out), cum[-1], path[0] == path[-1] and t.loop
+
+
+def _check_rings(m, t, every):
+    rings, L, loop = _rings_along(m, t)
+    n = len(rings)
+    assert n > 0 and n % every == 0, (t.name, n, every)
+    assert t.attrs["rings"] == {"count": n, "lit": n // every, "every": every,
+                                "spacing_m": pytest.approx(L / n, abs=1e-3)}
+    d = L / n
+    assert 0.9 * TR.RING_M <= d <= 1.1 * TR.RING_M
+    first = 0.0 if loop else d / 2.0
+    for k, (s, lit) in enumerate(rings):
+        assert s == pytest.approx(first + k * d, abs=0.02), (t.name, k)
+        assert lit == (k % every == 0), (t.name, k)
+
+
+def test_sky_tube_rings(lines):
+    """#97: a sky tube's rings run evenly spaced along the whole line (not per piece), near
+    10 m apart, ring k lit when k is a multiple of the frequency (every ring by default)."""
+    m = lines.model
+    t = next(x for x in m.transit_lines if x.mode == "sky_tube")
+    assert sum(1 for s in m.structures if s.kind == "tube" and
+               s.attrs.get("line_id") == t.id) >= 2       # (the pattern runs across pieces)
+    _check_rings(m, t, 1)
+    for s in m.structures:
+        if s.kind == "deck" and s.attrs.get("line_id"):
+            assert "rings" not in s.attrs                 # (tubes only)
+    for x in m.transit_lines:
+        if x.mode != "sky_tube":
+            assert "rings" not in x.attrs and "support_style" not in x.attrs
+
+
+def test_tube_rings_round_a_loop():
+    """#97: a loop's rings start at its seam, so the lit ones are `every` spacings apart
+    round it; an open line's half a spacing in from each end; the count a multiple of
+    the frequency."""
+    for every in (1, 2, 3, 4):
+        r = TR.tube_rings(1234.5, True, every)
+        n = len(r)
+        assert n % every == 0 and r[0] == (0.0, True)
+        lit = [s for s, x in r if x]
+        gaps = [b - a for a, b in zip(lit, lit[1:])] + [lit[0] + 1234.5 - lit[-1]]
+        assert max(gaps) - min(gaps) < 1e-6 and len(lit) == n // every
+        o = TR.tube_rings(1234.5, False, every)
+        d = 1234.5 / len(o)
+        assert o[0][0] == pytest.approx(d / 2) and o[-1][0] == pytest.approx(1234.5 - d / 2)
+        assert [x for _, x in o] == [k % every == 0 for k in range(len(o))]
+
+
+def test_sky_tube_masts_and_lit_ring_frequency(lines, no_transit, monkeypatch):
+    """#94: `supports: mast` gives M19's cable-stayed masts at the same supports; #97: the
+    line's lit ring frequency (here 3) keeps the rings evenly spaced, lights every third
+    and makes their count a multiple of 3. Both hold for a line routed again (M19's
+    `_routed` and `_reroute_hosts` make a fresh line: here every line is made afresh)."""
+    spec = lines.spec
+    tl = next(x for x in spec.transit.lines if x.mode == "sky_tube")
+    reroute = TR._reroute_hosts
+    monkeypatch.setattr(TR, "_reroute_hosts", lambda c, sp, ls: [
+        replace(ln, supports="pylon", lit_every=1) for ln in reroute(c, sp, ls)])
+
+    def alone(line):
+        one = spec.model_copy(update={"transit": spec.transit.model_copy(
+            update={"lines": [line]})})
+        return TR.build(one, no_transit)
+
+    plain = alone(tl)
+    mast = alone(tl.model_copy(update={"supports": "mast", "lit_rings_every": 3}))
+
+    def new(out, kinds):
+        return {r["id"]: r for r in out.rows["structures"]
+                if isinstance(r, dict) and r["kind"] in kinds}
+    a, b = new(plain, ("column", "pylon", "beam")), new(mast, ("column", "pylon", "beam"))
+    assert a.keys() == b.keys() and a
+    masts = 0
+    for k in a:
+        ra, rb = a[k], b[k]
+        assert ra["footprint"] == rb["footprint"] and ra["z1_m"] == rb["z1_m"]
+        if rb["attrs"].get("form") == "mast":
+            masts += 1
+            assert ra["attrs"]["form"] == "column"
+            assert rb["attrs"]["mast_top_m"] > rb["z1_m"] + 20.0
+            assert len(rb["attrs"]["stays"]) == 2
+            assert {x: v for x, v in rb["attrs"].items()
+                    if x not in ("mast_top_m", "stays", "form")} == \
+                {x: v for x, v in ra["attrs"].items() if x != "form"}
+        else:
+            assert ra == rb
+    assert masts > 0
+    ta, tb = plain.rows["transit_lines"][0], mast.rows["transit_lines"][0]
+    assert ta["attrs"]["support_style"] == "pylon" and tb["attrs"]["support_style"] == "mast"
+    rb_ = tb["attrs"]["rings"]
+    assert rb_["every"] == 3 and rb_["count"] % 3 == 0 and rb_["lit"] == rb_["count"] // 3
+    lit = sum(1 for r in new(mast, ("tube",)).values() for _, v in r["attrs"]["rings"] if v)
+    assert lit == rb_["lit"]
+
+
+def test_sky_tube_style_in_the_spec():
+    """#94, #97: a line's own `supports` and `lit_rings_every`, else the city's
+    `transit.sky_tube`, else the mode's (pylon, every ring); only on sky tube lines."""
+    data = copy.deepcopy(LINES)
+    spec = validate_spec(data).filled
+    tl = next(x for x in spec.transit.lines if x.mode == "sky_tube")
+    assert spec.transit.sky_tube_style(tl) == ("pylon", 1)
+    data["transit"]["sky_tube"] = {"supports": "mast", "lit_rings_every": 2}
+    spec = validate_spec(copy.deepcopy(data)).filled
+    tl = next(x for x in spec.transit.lines if x.mode == "sky_tube")
+    assert spec.transit.sky_tube_style(tl) == ("mast", 2)
+    data["transit"]["lines"][2]["lit_rings_every"] = 4
+    data["transit"]["lines"][2]["supports"] = "pylon"
+    spec = validate_spec(data).filled
+    tl = next(x for x in spec.transit.lines if x.mode == "sky_tube")
+    assert spec.transit.sky_tube_style(tl) == ("pylon", 4)
+    for bad in ({"supports": "mast"}, {"lit_rings_every": 2}):
+        d = copy.deepcopy(LINES)
+        d["transit"]["lines"][1].update(bad)                 # an elevated rail line
+        assert not validate_spec(d).ok
+    d = copy.deepcopy(LINES)
+    d["transit"]["lines"][2]["lit_rings_every"] = 0
+    assert not validate_spec(d).ok
 
 
 def test_check_supports_fails_off_the_line(lines):

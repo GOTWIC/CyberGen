@@ -71,8 +71,9 @@ def render_transit(b, out, dpi: int = 150) -> None:
     if sup:
         c = np.array([[P(s.footprint).centroid.x, P(s.footprint).centroid.y] for s in sup])
         ax.scatter(c[:, 0], c[:, 1], s=1.2, c="#9aa0aa", zorder=3, linewidths=0)
-        # M19: piers in the water and the sky tubes' masts stand out
-        big = [s for s in sup if (s.attrs or {}).get("form") in ("pier", "mast")]
+        # M19: piers in the water and the sky tubes' pylons (or masts) stand out
+        big = [s for s in sup if (s.attrs or {}).get("form") in ("pier", "mast") or
+               (s.attrs or {}).get("mode") == "sky_tube"]
         if big:
             c = np.array([[P(s.footprint).centroid.x, P(s.footprint).centroid.y] for s in big])
             ax.scatter(c[:, 0], c[:, 1], s=9, marker="s", c="#c8ccd4", zorder=3.1,

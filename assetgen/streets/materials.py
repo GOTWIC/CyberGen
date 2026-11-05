@@ -8,7 +8,8 @@ the look in Blender and Unreal. Paving and curb families follow the district's e
 from __future__ import annotations
 
 # masters: road (asphalt and paint), opaque (concrete, stone, paving), metal, emissive
-# (light strips), translucent (sky tube glass, non-Nanite)
+# (light strips, a sky tube's LED bands `led.<hex>`), translucent (sky tube glass,
+# non-Nanite)
 MASTERS = ("road", "opaque", "metal", "emissive", "translucent", "foliage")
 
 SLOTS: dict[str, tuple[str, str, float, float]] = {
@@ -118,11 +119,37 @@ def srgb(hexcolor: str) -> tuple[float, float, float, float]:
     return tuple(round(int(h[k:k + 2], 16) / 255.0, 4) for k in (0, 2, 4)) + (1.0,)
 
 
+LED_DEFAULT = "#22e5ff"    # (the sky tube palette's first color)
+
+
+def led_slot(hexcolor: str | None) -> str:
+    """#97: the slot of the LED band on a sky tube's lit rings, in its line's color at full
+    brightness (the hue kept, its brightest channel 255): `led.<hex>`, made on demand
+    (`slot_spec`); AG6 puts it on the neon master (brighter by night)."""
+    h = (hexcolor or LED_DEFAULT).lstrip("#").lower()
+    c = [int(h[k:k + 2], 16) for k in (0, 2, 4)]
+    top = max(c)
+    if top == 0:
+        return led_slot(LED_DEFAULT)
+    return "led." + "".join(f"{min(255, (v * 255 + top // 2) // top):02x}" for v in c)
+
+
+def slot_spec(name: str) -> tuple[str, str, float, float]:
+    """A slot's (master, color, roughness, metallic): the table's, or an LED band's
+    (`led.<hex>`, emissive in its color)."""
+    if name in SLOTS:
+        return SLOTS[name]
+    pre, _, h = name.partition(".")
+    if pre == "led" and len(h) == 6:
+        return ("emissive", "#" + h, 0.3, 0.0)
+    raise KeyError(name)
+
+
 def gltf_materials(g, names) -> dict[str, int]:
     """Add the slots used (sorted) to a glTF document; their indices."""
     out = {}
     for n in sorted(set(names)):
-        master, color, rough, metal = SLOTS[n]
+        master, color, rough, metal = slot_spec(n)
         out[n] = g.material(n, srgb(color), metallic=metal, roughness=rough,
                             extras={"master": master})
     return out
@@ -131,7 +158,7 @@ def gltf_materials(g, names) -> dict[str, int]:
 def contribution_materials(names) -> dict:
     out = {}
     for n in sorted(set(names)):
-        master, color, rough, metal = SLOTS[n]
+        master, color, rough, metal = slot_spec(n)
         out[n] = {"master": master, "color": [round(v, 4) for v in srgb(color)[:3]],
                   "roughness": rough, "metallic": metal}
     return out
