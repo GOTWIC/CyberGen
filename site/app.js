@@ -76,6 +76,33 @@
     document.querySelectorAll(".stage").forEach((s) => spy.observe(s));
   }
 
+  // ---- Usage panel: every device added up, or each device apart ---------------
+  const usage = document.getElementById("usage");
+  if (usage) {
+    // Times in the viewer's own zone (the page carries them in UTC).
+    usage.querySelectorAll("time[datetime]").forEach((t) => {
+      const d = new Date(t.getAttribute("datetime"));
+      if (!isNaN(d)) t.textContent = d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    });
+    const more = document.getElementById("usage-more");
+    const models = document.getElementById("usage-models");
+    more.addEventListener("click", () => {
+      const open = models.hidden;
+      models.hidden = !open;
+      more.classList.toggle("on", open);
+      more.setAttribute("aria-expanded", String(open));
+    });
+    const toggle = document.getElementById("usage-toggle");
+    const devices = document.getElementById("usage-devices");
+    toggle.addEventListener("click", () => {
+      const on = usage.dataset.view !== "devices";
+      usage.dataset.view = on ? "devices" : "all";
+      toggle.classList.toggle("on", on);
+      toggle.setAttribute("aria-pressed", String(on));
+      devices.hidden = !on;
+    });
+  }
+
   // ---- Day and night slider ---------------------------------------------------
   document.querySelectorAll(".compare").forEach((c) => {
     const handle = c.querySelector(".cmp-handle");
