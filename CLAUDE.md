@@ -1910,15 +1910,20 @@ only LG8 waits for atmosgen's hour and weather.
 
 ## Gallery site (GitHub Pages)
 
-`site/` is the public gallery at https://gotwic.github.io/CyberGen/: a timeline of pictures
-from `docs/progress/`, grouped by stage, each with a caption. `site/gallery.json` holds the
-entries (`id`, `date` the image's first commit: `git log --follow --diff-filter=A
---format=%as -- <path> | tail -1`, `stage` 1, 2 or `ue`, `milestone`, `milestone_name`,
-`title`, `image` a repo path, `caption` a one-liner where possible, not necessarily a full
-sentence, saying only what is needed to explain the picture: no extra detail, no hashes,
-goldens, check counts or test talk); `site/index.html` is the template
-`site/build.py` fills in, beside `style.css` (the Neon Terminal look with glass panels, light
-and dark) and `app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
+`site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
+swagnik.org/CyberGen/). Two pages: the landing page, a showcase (`index.html`): a curated
+few pictures, each with a title of its own, a one-line caption and a Stage 1 or Stage 2
+label (no dates), the day and night core behind a slider; and the build log (`log.html`, a
+tab): a timeline of pictures from `docs/progress/`, grouped by stage. `site/gallery.json`
+holds the log's entries (`id`, `date` the image's first commit: `git log --follow
+--diff-filter=A --format=%as -- <path> | tail -1`, `stage` 1, 2 or `ue`, `milestone`,
+`milestone_name`, `title`, `image` a repo path, `caption` a one-liner where possible, not
+necessarily a full sentence, saying only what is needed to explain the picture: no extra
+detail, no hashes, goldens, check counts or test talk) and the showcase's `items`
+(`entry`, or `entries` and `labels` for a pair, by log id, `title`, `caption`, `wide` for
+the full width). `site/index.html` and `site/log.html` are the templates `site/build.py`
+fills in, beside `style.css` (the Neon Terminal look with glass panels, light and dark) and
+`app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
 it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px and 640 px
 JPEGs) and deploys; resized images are never committed. Preview with `.venv/bin/python
 site/build.py --out <folder outside the repo>`. Add or change entries only when Swagnik asks:

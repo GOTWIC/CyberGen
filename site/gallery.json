@@ -7,6 +7,26 @@
   "site": "https://gotwic.github.io/CyberGen/",
   "backdrop": {"dark": "ag15-night", "light": "ag15-day"},
   "next": "Next: stage 3, atmosgen (light, sky and weather), stage 4, lifegen (crowds, traffic, trains and aircraft), then stage 5, storygen.",
+  "showcase": {
+    "kicker": "Cyberpunk city generator",
+    "heading": "Cyberpunk cities from a single prompt",
+    "items": [
+      {"entry": "m2-streets", "title": "Street plan", "caption": "Each district laid out in its own street pattern, down to the lot."},
+      {"entry": "m3-buildings", "title": "Massing", "caption": "Nexus City's buildings, shaped and sized by district."},
+      {"entry": "m5-transit", "title": "Transit network", "caption": "Metro, elevated rail, monorail, maglev and sky tubes across Delta Megacity."},
+      {"entry": "m7b-city", "title": "First whole city", "caption": "Vesper Bay's first complete blockout, seen from the south."},
+      {"entry": "m11-gameplay", "title": "Gameplay layer", "caption": "Faction turf, places to go, wealth, danger, traffic and crowds."},
+      {"entry": "m13-terrain", "title": "Cragmouth", "caption": "A port city on hills, its plateau standing on a cliff over the bay."},
+      {"entry": "m20-city", "title": "Complete layout", "caption": "Vesper Bay with every tower, transit line, prop and sign in place.", "wide": true},
+      {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props in Greyhook, in Unreal Engine."},
+      {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel."},
+      {"entry": "ag10-city", "title": "Vesper Bay, modelled", "caption": "Every building with a model and textures of its own.", "wide": true},
+      {"entry": "ag12-canal", "title": "Canal at night", "caption": "Neon and lit windows on a Vesper Bay canal.", "wide": true},
+      {"entries": ["ag15-day", "ag15-night"], "labels": ["Day", "Night"], "title": "Day and night", "caption": "Delta Megacity's core, every tower lit its own way after dark.", "wide": true},
+      {"entry": "ag15-street", "title": "Core street", "caption": "Street level in Delta Megacity's core at night."},
+      {"entry": "fix-sky-tubes", "title": "Crown Loop", "caption": "A sky tube loop on pylons, its rings lit at night."}
+    ]
+  },
   "stages": [
     {
       "key": "1",

@@ -3,6 +3,13 @@
 (() => {
   const root = document.documentElement;
   const body = document.body;
+  const hashId = () => decodeURIComponent(location.hash.slice(1));
+
+  // A link to a log entry made before the showcase became the front page.
+  if (body.dataset.page === "showcase" && location.hash && !document.getElementById(hashId())) {
+    location.replace("log.html" + location.hash);
+    return;
+  }
 
   // ---- Theme: auto (follow the system), light, dark -----------------------
   const themeBtn = document.getElementById("theme");
@@ -13,7 +20,7 @@
   function applyTheme(t) {
     theme = t;
     if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
-    themeBtn.textContent = "Theme: " + t;
+    (themeBtn.querySelector(".theme-val") || themeBtn).textContent = t;
     try { if (t === "auto") localStorage.removeItem("cg-theme"); else localStorage.setItem("cg-theme", t); } catch (e) { /* ignore */ }
   }
   applyTheme(theme);
@@ -50,7 +57,6 @@
       if (scroll) el.scrollIntoView({ block: "start" });
     }
   }
-  const hashId = () => decodeURIComponent(location.hash.slice(1));
   document.addEventListener("click", (e) => {
     const a = e.target.closest('a[href^="#"]');
     if (a) reveal(decodeURIComponent(a.getAttribute("href").slice(1)), false);
@@ -70,6 +76,28 @@
     document.querySelectorAll(".stage").forEach((s) => spy.observe(s));
   }
 
+  // ---- Day and night slider ---------------------------------------------------
+  document.querySelectorAll(".compare").forEach((c) => {
+    const handle = c.querySelector(".cmp-handle");
+    let pos = 50;
+    let dragging = false;
+    const set = (p) => {
+      pos = Math.max(0, Math.min(100, p));
+      c.style.setProperty("--pos", pos + "%");
+      if (handle) handle.setAttribute("aria-valuenow", String(Math.round(pos)));
+    };
+    const at = (x) => { const r = c.getBoundingClientRect(); set(((x - r.left) / r.width) * 100); };
+    c.addEventListener("pointerdown", (e) => { dragging = true; c.setPointerCapture(e.pointerId); at(e.clientX); });
+    c.addEventListener("pointermove", (e) => { if (dragging) at(e.clientX); });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((n) => c.addEventListener(n, () => { dragging = false; }));
+    if (handle) handle.addEventListener("keydown", (e) => {
+      const step = { ArrowLeft: -5, ArrowRight: 5, PageDown: -25, PageUp: 25 }[e.key];
+      if (step !== undefined) { e.preventDefault(); set(pos + step); }
+      else if (e.key === "Home") { e.preventDefault(); set(0); }
+      else if (e.key === "End") { e.preventDefault(); set(100); }
+    });
+  });
+
   // ---- Image viewer -----------------------------------------------------------
   const lb = document.getElementById("lb");
   if (!lb || typeof lb.showModal !== "function") return;
@@ -81,7 +109,8 @@
   const lbCount = lb.querySelector(".lb-count");
   let current = null;
 
-  const visible = () => [...document.querySelectorAll(".entry")].filter((el) => el.offsetParent !== null);
+  const visible = () => [...document.querySelectorAll(".entry")]
+    .filter((el) => el.offsetParent !== null && el.querySelector("a.shot"));
 
   function show(entry) {
     current = entry;
@@ -90,7 +119,7 @@
     lbImg.src = shot.getAttribute("href");
     lbImg.alt = entry.querySelector(".entry-title").textContent;
     lbTitle.textContent = lbImg.alt;
-    lbText.textContent = entry.querySelector("figcaption").textContent;
+    lbText.textContent = (entry.querySelector(".cap") || entry.querySelector("figcaption")).textContent;
     lbSrc.href = shot.dataset.src;
     lbTags.replaceChildren(...[...entry.querySelectorAll(".entry-head > *")].map((n) => n.cloneNode(true)));
     lbTags.dataset.stage = entry.dataset.stage;
