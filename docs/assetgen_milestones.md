@@ -2162,7 +2162,7 @@ only the corners with a sidewalk (`barriers.junction_area`), and a highway's cor
 none, so the run was paved over the leg's own carriageway past its cut, under the median's
 end (#103's median stops 0.15 m off the junction's outline). `_roads_near` now takes every
 corner's roads (`junction_area(..., every=True)`), the leg's own among them; a junction
-paves less only where a road draws its carriageway anyway. Results: RESULTS.
+paves less only where a road draws its carriageway anyway. Results: Nexus City's fit passes (a full assetgen build: no clash, nothing off its surface); on #104's six cities (main's models, this fix's streets, props and fit) streets and props pass, no clash and no step over 2 cm (roof plants aside: those runs build no roofs).
 
 ## Order
 
