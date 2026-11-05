@@ -2144,8 +2144,9 @@ A fix between milestones, from run-through 2 and AG14's open items, on #95's bar
   up at a highway junction (over nothing on main too). Every check of the stages passes on
   the six cities. Table: `docs/progress/fix_junctions/README.md`.
 - **Exporter**: no code change (`docs/unreal_export.md`, record row "#82, #89").
-- **Open** (#105): a cul-de-sac's road ends square on its cut short of its bulb's
-  curve (a carriageway wedge, also on main); AG7's mitre bulge at a sharp alley hairpin
+- **Open** (#105): the top of `jn.e217s328`, whose legs meet it between 0.8 and 12.3 m, on
+  M18's curb-run surface (its pads and slab edges at odd angles); a cul-de-sac's road ends
+  square on its cut short of its bulb's curve (a carriageway wedge, also on main); AG7's mitre bulge at a sharp alley hairpin
   (Decks' `rs.e1681s1093`; the mitre is in `streets/path.py`, in AG12's and AG13's code
   hashes too); sidewalk slivers under 10 cm (Delta 9.7 m2); Stacks' signal; AG14's grounded
   rule takes a thing as resting when one of its five feet is. M17's long junctions and the
