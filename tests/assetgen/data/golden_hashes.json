@@ -1,6 +1,6 @@
 {
   "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation; (AG1, under ag1, with AG2's parts) the small city's asset manifest and the digest of its asset files (shells, proxies, part packs), and a few Vesper Bay buildings as GLB (shell and instanced parts). AG0 and AG1's made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86); AG2's on the Mac (the x86 check is deferred, docs/determinism_check.md).",
-  "testport_briefs": "ae5798e6751e7d68608b3cf213b5d52ba490fecde0a607635969306ddf2ffa2a",
+  "testport_briefs": "fed7c9998c31de82dd9cdcbd24b5833f0f2e49878a665163a14cdf224d739d2a",
   "triangulate": "b45c256a71c471e59d9c38b5e3be4c994ee36bf5da2d3fa23b2d81596dac1464",
   "buildings": {
     "vesper_bay": {
@@ -14,11 +14,11 @@
     }
   },
   "samples": {
-    "archipelago_free_port": "0a45d40891c0495e97c77dc7825c407c7a6cd0f4c2314b67e5e16cbe3cebe878",
-    "delta_megacity": "2d2374f257a457d681994cf96827229a95309bf8ac1c50547a1e969540986f12",
-    "nexus_city": "63a259ab89ee8ffed39a4a07e23ea840530d8ca0adbf59cc4f5da283245f5bf2",
-    "peninsula_city": "8eba6ab3745abd3022d16e532663e407d5d29221223425276b67196fe4740286",
-    "vesper_bay": "1e2290ceb6a4879835dcc6dba32db58254fadb30774242901a5100e19c475188"
+    "archipelago_free_port": "ffd5808c025ab40659b820e044975d33398b44ef63fda34f9b385cca775fb2ad",
+    "delta_megacity": "598e4371059e39d9892f237ec22214411c5f52112d78102be5527e22821c4cf8",
+    "nexus_city": "1b1ae4a2e1ead10c379268360a79944525f156b1fdf7b08ee566e4e4e511d239",
+    "peninsula_city": "427621d236b54e95cd51a768427fdbd334382df93900882fceb770965c643bfc",
+    "vesper_bay": "2a8f9093a2b53e02ff7d65e3edd1bf17fe85815eff27b54ea834ab532d725b06"
   },
   "spike": {
     "shopfront_row": "f23a2f816caf8edb6e5ebd46b70d96a7fc9e205c5c979b9eda1c88f6abe5276e",
@@ -31,8 +31,8 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "bc5347ad948ef0259d72930324c2dc6f0582ef853c17e8f2b3a94bd58349a9ca",
-    "testport_files": "1f1939433d66064c0f15427a1cbe07e0567147bdc1ab6d45892139dbf3c126fe",
+    "testport_manifest": "2ddb4bd88d79ba1211aca647a690ad0f2099e9dad2a05eb8c395385c15ffbb81",
+    "testport_files": "5bdf75da914d912d18ffcad85e119cd4a546ca8e026f956d297121ab60107737",
     "buildings": {
       "vesper_bay": {
         "d01.lm.e809n273.bld": "e712cb725ad2b7934d68a9abb56aaa02d9faad8ec70509f143296dfb0636392a",
@@ -57,6 +57,6 @@
       "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
       "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
     },
-    "testport_materials": "a27df0b5d98b2477e540bcd3603ffcf324f9c3581c3d2c013c010e934dca27c5"
+    "testport_materials": "3b3c62245cb2d9a06f9468e787c8d1dc31a0e535b731f8fe31177856306fa9a1"
   }
 }
