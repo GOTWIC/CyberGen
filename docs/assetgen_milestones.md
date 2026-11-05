@@ -2005,7 +2005,7 @@ After run-through 2 (citygen side: `docs/citygen_milestones.md`, "Sky tube fixes
   demand by `slot_spec`, master `emissive`; AG6's catalog puts `led.` on `neon`, which glows
   more by `MPC_CityGen`'s `Night` in Unreal and by the previews' night). The pattern is the
   model's, so it runs on across the 400 m pieces and round a loop's seam.
-- **Numbers**: AG_NUMBERS
+- **Numbers**: an LED band is 96 triangles a lit ring: Vesper Bay's Crown Loop (654 rings on 17 tube pieces) 133,662 tube triangles with every ring lit, 102,270 with every second, 91,806 with every third (only those 17 pieces, in 16 tiles, differ between the three); Delta's two loops (826 rings, 22 pieces) 168,870. `assetgen build` passes every check on Vesper Bay, Delta Megacity and Greyhook; Nexus City fails two building checks exactly as main does (`asset_unique`: one pair of neighboring towers, `d01.lm.w98n1260.bld` and `d01.lot.e26n1332.bld`, share a facade system; `asset_access`: 2 blocked doors), its 6,459 briefs identical to main's.
 - **Exporter**: no code change (`docs/unreal_export.md`, record row "Sky tube fixes").
 
 ## Order
