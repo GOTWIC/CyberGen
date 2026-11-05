@@ -94,7 +94,7 @@ this fix's (3840 px).
 
 ## Left open
 
-Filed as ISSUE_LINK; none fails a check.
+Filed as #105; none fails a check.
 
 - A cul-de-sac's road ends square on its cut and its bulb's outline starts on the curve, so a
   wedge of carriageway between them is drawn by neither (also on main; Delta's
