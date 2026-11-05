@@ -9,7 +9,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done, M22 planned |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15 done, the rest to come |
 | 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | Planned ([draft plan](docs/atmosgen_scope.md)) |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
@@ -151,6 +151,7 @@ The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edg
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans (columns, portal frames, piers, sky tube masts), more room over the streets | ✅ Done |
 | M20 | Props, plants and signs | Nothing floating or growing through a road: every lamp, bench, railing, sign and tree on the ground, a road deck, a quay, a roof or its wall; many more large neon billboards, banners and holo-boards on the sides and tops of buildings, set per district (`signage`) | ✅ Done |
 | M21 | Cyberpunk massing | Towers twisted, tapered, leaning, stacked, cantilevered, split, cut through by sky gardens, in exoskeletons or covered in pods, with sloped, cut and halo crowns; curved slabs; true curves; no two neighboring towers alike; a `variety` per district | ✅ Done |
+| M22 | Pavement map | One exact map of every road, junction, sidewalk and median surface, with shared edges and one height per point, so roads and junctions meet with no gap or step | Planned |
 
 ### Run it
 
@@ -497,6 +498,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG14 | Fit and finish | Junctions that meet their roads, smooth glazed curved walls, roof equipment on its roofs, transit frames, piers and cable-stayed masts, embankments under low decks, bridges drawn once, nothing hanging over the lanes; checks that everything rests on something and nothing passes through anything else | Done |
 | AG15 | Cyberpunk facades and night | Seven new facade styles and window patterns beyond grids, two or three finishes a building, neighboring towers never alike; every building lit its own way at night with crown lights and logos; lamps that light the streets in Unreal | Done |
 | AG16 | Performance | A benchmark through each city in Unreal, frame time, memory and import targets, and the fixes that meet them: fewer distinct meshes and actors, more instancing, streaming and HLODs tuned | Planned |
+| AG17 | Road surfaces | Roads, junctions, sidewalks, medians and barriers drawn from the pavement map, joined seamlessly | Planned |
 
 ---
 

@@ -1,0 +1,72 @@
+{
+ "device": "windows",
+ "label": "Windows PC",
+ "updated": "2026-11-05T22:49:34Z",
+ "sessions": 23,
+ "worktree_sessions": 23,
+ "subagents": 11,
+ "totals": {
+  "total": 5501388016,
+  "input": 24660,
+  "output": 8883157,
+  "cache_write_5m": 155362727,
+  "cache_write_1h": 36818817,
+  "cache_read": 5300298655
+ },
+ "models": {
+  "claude-opus-5-5": {
+   "input": 24660,
+   "output": 8883157,
+   "cache_write_5m": 155362727,
+   "cache_write_1h": 36818817,
+   "cache_read": 5300298655
+  }
+ },
+ "days": {
+  "2026-10-28": {
+   "total": 18117518,
+   "output": 82368,
+   "sessions": 1
+  },
+  "2026-10-29": {
+   "total": 339871980,
+   "output": 921997,
+   "sessions": 3
+  },
+  "2026-10-30": {
+   "total": 1523490642,
+   "output": 2273840,
+   "sessions": 7
+  },
+  "2026-10-31": {
+   "total": 969363184,
+   "output": 1775745,
+   "sessions": 11
+  },
+  "2026-11-01": {
+   "total": 600964105,
+   "output": 762875,
+   "sessions": 1
+  },
+  "2026-11-02": {
+   "total": 121856263,
+   "output": 135272,
+   "sessions": 1
+  },
+  "2026-11-03": {
+   "total": 372499170,
+   "output": 524214,
+   "sessions": 2
+  },
+  "2026-11-04": {
+   "total": 300937132,
+   "output": 602599,
+   "sessions": 3
+  },
+  "2026-11-05": {
+   "total": 1254288022,
+   "output": 1804247,
+   "sessions": 9
+  }
+ }
+}
