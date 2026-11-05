@@ -4,7 +4,8 @@
     python site/usage.py [--device mac|windows|NAME] [--logs DIR] [--dry-run]
 
 Reads the session logs Claude Code keeps on this machine (~/.claude/projects, or
-$CLAUDE_CONFIG_DIR/projects, or --logs) and writes site/usage/<device>.json: token
+$CLAUDE_CONFIG_DIR/projects, or --logs), adds their responses to the device's ledger
+and writes site/usage/<device>.json from it: token
 totals, sessions, subagents, models and a per-day series, with the time it ran. Each
 machine writes only its own file; site/build.py adds the files up for the showcase and
 shows each device apart behind a toggle and prices every model's tokens by type
@@ -19,13 +20,23 @@ in the repo ran in (a session resumed after the repo moved or was renamed carrie
 earlier lines with it). Subagent logs sit in their parent session's folder and carry
 its working folder, so they count with it.
 Each API response is counted once (message id and request id, as ccusage does).
+
+The ledger, site/usage/ledger/<device>/<YYYY-MM>.csv, keeps every response ever
+recorded, so a log Claude Code deletes later still counts and a session still running
+adds its later responses at the next run. A row holds nothing of the conversation:
+a hash of the message and request ids, the UTC time, hashes of the session and
+subagent ids, whether the session ran in a worktree, the model and its five token
+counts. The device's summary is made from the whole ledger.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import glob
+import hashlib
+import io
 import json
 import os
 import sys
@@ -35,8 +46,10 @@ from pathlib import Path
 SITE = Path(__file__).resolve().parent
 ROOT = SITE.parent
 OUT = SITE / "usage"
+LEDGER = OUT / "ledger"
 LABELS = {"mac": "Mac", "windows": "Windows PC"}
 KINDS = ("input", "output", "cache_write_5m", "cache_write_1h", "cache_read")
+COLUMNS = ("key", "time", "session", "agent", "worktree", "model") + KINDS
 
 
 def kinds_of(u: dict) -> dict[str, int]:
@@ -117,8 +130,9 @@ def read_sessions(logs: Path) -> dict[str, dict]:
                 m = o.get("message")
                 u = m.get("usage") if isinstance(m, dict) else None
                 if u and o.get("timestamp"):
+                    agent = o.get("agentId") if o.get("isSidechain") else None
                     s["rows"].append(((m.get("id"), o.get("requestId")), o["timestamp"],
-                                      m.get("model") or "?", u))
+                                      m.get("model") or "?", u, agent))
     return sessions, files
 
 
@@ -140,41 +154,111 @@ def local_day(ts: str) -> str:
     return t.astimezone().date().isoformat()
 
 
-def summarize(sessions: dict[str, dict], ids: list[str], device: str, label: str) -> dict:
-    seen = set()
+def short(text: str, n: int) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:n]
+
+
+def utc(ts: str) -> str:
+    t = dt.datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(dt.timezone.utc)
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def weight(row: dict) -> int:
+    return sum(int(row[k]) for k in KINDS)
+
+
+def log_rows(sessions: dict[str, dict], ids: list[str]) -> dict[str, dict]:
+    """The ledger's rows from the logs: one per API response, ids hashed, no content.
+    A response logged more than once (a line per content block, a resumed session's
+    copy) keeps its largest record."""
+    rows: dict[str, dict] = {}
+    for sid in ids:
+        s = sessions[sid]
+        wt = int(any(WORKTREES in c for _, c in s["cwds"]))
+        for (mid, rid), ts, model, u, agent in s["rows"]:
+            if model == "<synthetic>":
+                continue
+            if u.get("speed") == "fast":
+                model += ":fast"
+            n = kinds_of(u)
+            key = short(f"{mid}|{rid}" if (mid or rid) else f"{sid}|{ts}|{sorted(n.items())}", 16)
+            row = {"key": key, "time": utc(ts), "session": short(sid, 12),
+                   "agent": short(agent, 12) if agent else "", "worktree": str(wt), "model": model,
+                   **{k: str(v) for k, v in n.items()}}
+            if key not in rows or weight(row) > weight(rows[key]):
+                rows[key] = row
+    return rows
+
+
+def read_ledger(device: str) -> dict[str, dict]:
+    rows: dict[str, dict] = {}
+    for p in sorted((LEDGER / device).glob("*.csv")):
+        with open(p, newline="", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                rows[row["key"]] = row
+    return rows
+
+
+def merge(old: dict[str, dict], new: dict[str, dict]) -> dict[str, dict]:
+    """Every row ever recorded: a row the logs no longer hold stays; a response
+    still being logged takes its largest record."""
+    out = dict(old)
+    for key, row in new.items():
+        if key not in out or weight(row) > weight(out[key]):
+            out[key] = row
+    return out
+
+
+def write_ledger(device: str, rows: dict[str, dict]) -> list[Path]:
+    """One CSV a month (UTC), rows by time; a file is written only when it changes."""
+    months: dict[str, list[dict]] = defaultdict(list)
+    for row in rows.values():
+        months[row["time"][:7]].append(row)
+    folder = LEDGER / device
+    folder.mkdir(parents=True, exist_ok=True)
+    written = []
+    for month, rs in sorted(months.items()):
+        rs.sort(key=lambda r: (r["time"], r["key"]))
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=COLUMNS, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rs)
+        path = folder / f"{month}.csv"
+        text = buf.getvalue()
+        if not path.is_file() or path.read_text(encoding="utf-8") != text:
+            path.write_text(text, encoding="utf-8", newline="")
+            written.append(path)
+    return written
+
+
+def summarize(rows: dict[str, dict], device: str, label: str) -> dict:
     totals: Counter = Counter()
     models: dict[str, Counter] = defaultdict(Counter)
     days: dict[str, Counter] = defaultdict(Counter)
     day_sessions: dict[str, set] = defaultdict(set)
-    agents = 0
-    worktree = 0
-    for sid in ids:
-        s = sessions[sid]
-        agents += len(s["agents"])
-        worktree += any(WORKTREES in c for _, c in s["cwds"])
-        for key, ts, model, u in s["rows"]:
-            if key != (None, None):
-                if key in seen:
-                    continue
-                seen.add(key)
-            if model == "<synthetic>":
-                continue
-            day = local_day(ts)
-            n = kinds_of(u)
-            if u.get("speed") == "fast":
-                model += ":fast"
-            totals.update(n)
-            days[day].update(n)
-            models[model].update(n)
-            day_sessions[day].add(sid)
+    sessions: set = set()
+    worktree: set = set()
+    agents: set = set()
+    for row in rows.values():
+        n = {k: int(row[k]) for k in KINDS}
+        day = local_day(row["time"])
+        totals.update(n)
+        days[day].update(n)
+        models[row["model"]].update(n)
+        day_sessions[day].add(row["session"])
+        sessions.add(row["session"])
+        if row["worktree"] == "1":
+            worktree.add(row["session"])
+        if row["agent"]:
+            agents.add(row["agent"])
     totals["total"] = sum(totals[k] for k in KINDS)
     return {
         "device": device,
         "label": label,
         "updated": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "sessions": len(ids),
-        "worktree_sessions": worktree,
-        "subagents": agents,
+        "sessions": len(sessions),
+        "worktree_sessions": len(worktree),
+        "subagents": len(agents),
         "totals": {k: totals[k] for k in ("total",) + KINDS},
         "models": {m: {k: c[k] for k in KINDS}
                    for m, c in sorted(models.items(), key=lambda kv: -sum(kv[1].values()))},
@@ -196,13 +280,18 @@ def main() -> None:
         sys.exit(f"no session logs at {logs}")
     sessions, files = read_sessions(logs)
     ids = cybergen_sessions(sessions, files, norm(str(ROOT)))
-    data = summarize(sessions, ids, device, args.label or LABELS.get(device, device))
+    old = read_ledger(device)
+    rows = merge(old, log_rows(sessions, ids))
+    data = summarize(rows, device, args.label or LABELS.get(device, device))
     t = data["totals"]
     print(f"{data['label']}: {data['sessions']} sessions ({data['worktree_sessions']} in worktrees), "
           f"{data['subagents']} subagents, {t['total']:,} tokens ({t['output']:,} output), "
           f"{len(data['days'])} days")
+    print(f"ledger: {len(rows):,} responses ({len(rows) - len(old):,} new)")
     if args.dry_run:
         return
+    for p in write_ledger(device, rows):
+        print(f"wrote {p.relative_to(ROOT)}")
     OUT.mkdir(exist_ok=True)
     path = OUT / f"{device}.json"
     path.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")

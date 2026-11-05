@@ -1,25 +1,25 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-05T22:28:41Z",
- "sessions": 30,
+ "updated": "2026-11-05T22:41:02Z",
+ "sessions": 29,
  "worktree_sessions": 28,
  "subagents": 1,
  "totals": {
-  "total": 6391629476,
-  "input": 36438,
-  "output": 15523155,
+  "total": 6394785489,
+  "input": 36466,
+  "output": 15534771,
   "cache_write_5m": 155522,
-  "cache_write_1h": 56059416,
-  "cache_read": 6319854945
+  "cache_write_1h": 56073028,
+  "cache_read": 6322985702
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 36306,
-   "output": 15475503,
+   "input": 36334,
+   "output": 15487119,
    "cache_write_5m": 155522,
-   "cache_write_1h": 55889369,
-   "cache_read": 6309656557
+   "cache_write_1h": 55902981,
+   "cache_read": 6312787314
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -81,8 +81,8 @@
    "sessions": 1
   },
   "2026-11-05": {
-   "total": 218052714,
-   "output": 480951,
+   "total": 221208727,
+   "output": 492567,
    "sessions": 3
   }
  }
