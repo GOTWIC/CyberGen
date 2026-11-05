@@ -124,7 +124,10 @@ def gather(cx: Ctx, s) -> Piece:
     # (#95: where each barrier runs and how it ends, `barriers.road_runs`)
     from . import barriers as BR
     if BR.runs_of(inputs["seg"], inputs["cls"]):
-        inputs["barriers"] = BR.road_runs(cx, s, inputs)     # (none: no room for them)
+        by: set = set()
+        inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)  # (none: no room for them)
+        # (what they were taken from, for `seam`)
+        inputs["barriers_by"] = sorted(by - {s.id})
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
                  cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
 

@@ -7,32 +7,40 @@ footbridge has railings or stone parapets (`structures.py`). Each is a *run*: a 
 offsets from the centerline (`Run`), drawn over the *spans* this module gives it.
 
 - **Spans** (`road_runs`, at gather time, so a road's inputs hold them): a run goes from
-  cut to cut (the junctions' cut edges at the road's ends), less where it would come
-  within `CLEAR_M` of a junction at its ends (unless that junction carries it on), of the
-  carriageway of another road at those nodes (a gore, an acute corner), or within
-  `XWALK_CLEAR_M` of a crosswalk on its road; spans under `MIN_SPAN_M` are left out.
+  cut to cut (the junctions' cut edges at the road's ends), less where it would come within
+  `CLEAR_M` of a junction at its ends (unless that junction carries it on), of the
+  carriageway of another road at those nodes (a gore, an acute corner), of another junction
+  (its outline and its corner pads' sectors, `junction_area`) or another road's carriageway
+  alongside at its height (`_level_with`), or within `XWALK_CLEAR_M` of a crosswalk; spans
+  under `MIN_SPAN_M` are left out.
 - **Ends**: `join` where the junction carries the run on (the run ends on the junction's
   cut edge, `cut_frame`, the junction's barrier starting there); `stop` (a terminal: a
   jersey slopes down to `TOE_F` of its height over `END_M`, a ramped end; a parapet or a
-  railing is closed by a cap); `open` at a node with no junction (the next road's run goes
-  on from there).
-- **A raised road's parapets** end at the corner of their junction: on the cut edge's
-  corner where the road has no sidewalk, else where its sidewalk ends on its property line
-  (the start of the junction's corner pad, as `walks._corners` finds it). Where the road
-  meets another road's carriageway first, there.
+  railing is closed by a cap); `corner` (a raised road's parapet at its junction's corner);
+  `open` at a node with no junction (the next road's run goes on from there).
+- **A raised road's parapets** end at the corner of their junction: on the cut edge where
+  the road has no sidewalk, else where its property line meets the line its sidewalk ends
+  on (the start of the junction's corner pad, as `walks._corners` finds it), their end
+  frame along that line (`corner_points`). Where the road meets something first, there.
 - **Junctions** (`junction_plan`, at gather time for the junction and the roads at it):
   - a raised junction (its node over `RAISED_M`, on a slab of its own) carries a parapet
-    round each corner between two legs one of which has parapets: along the corner's
-    sidewalk pad (its property line) where the junction draws one, else along its outline;
+    round each corner between two legs one of which has parapets: along the outer edges of
+    the corner's drawn sidewalk pads (where open ground lies outside them,
+    `walks._open_out`), else along its outline;
   - at grade, a corner between two highway legs with guard walls carries a guard wall
     along its outline (when that runs `CORNER_MIN_M` or more);
   - a junction with exactly two median legs facing each other (`MEDIAN_ANGLE_DEG` or more
-    apart), with no connector lane across the line between their medians' ends, carries
-    the median across (`median`); their medians join it.
+    apart), with no connector lane across the line between their medians' ends
+    (`median_end`), carries the median across; their medians join it.
   The road sides that face a corner barrier, and the medians of a link, end as `join`.
+  Each junction barrier is clipped (`clip_line`) clear of what `Keepout` holds: its legs'
+  carriageways as their road pieces draw them (`leg_ends`), its own connector lanes, its
+  and its neighbors' crosswalks, and the other roads, junctions and building masses near it
+  at its height (`near_of_junction`).
 
-Every decision is plain arithmetic on the model's coordinates or an overlay on citygen's
-1 cm grid (`geom.canonical`), and every value handed on is rounded to the centimeter.
+Every decision is plain arithmetic on the model's coordinates or a shapely predicate or
+overlay (on citygen's 1 cm grid where its output is handed on, `geom.canonical`), and every
+value handed on is rounded to the centimeter.
 """
 
 from __future__ import annotations
@@ -299,13 +307,6 @@ def junction_plan(cx, j) -> dict:
     return out
 
 
-def exit_mid(ring, ex) -> tuple[float, float]:
-    """The middle of a leg's exit edge."""
-    i = ex[1]
-    a, b = ring[i], ring[(i + 1) % len(ring)]
-    return ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
-
-
 def median_end(ring, ex, path, h: float) -> tuple[float, float]:
     """Where a road's median meets its junction (as `Road.at` puts offset 0 at its cut): the
     middle of the exit edge where that edge is the road's cut (it spans the carriageway
@@ -443,6 +444,7 @@ def near_of_junction(cx, j) -> dict:
     zone = poly.buffer(NEAR_M)
     zj = _junction_z(cx, j)
     legs = {s.id for s in cx.seg_at_node.get(j.node_id, ())}
+    by: set = set()
     roads = []
     for k in sorted(tree.query(zone).tolist()):
         s = segs[k]
@@ -460,6 +462,7 @@ def near_of_junction(cx, j) -> dict:
                 s.width_m / 2.0 - s.cross_section.sidewalk_m[0]
             roads.append({"line": [[C.m2(c[0]), C.m2(c[1])] for c in p.coords],
                           "h": C.m(h)})
+            by.add(s.id)
     rings, ids = [], [j.id]
     for k in sorted(jtree.query(zone).tolist()):
         o = jns[k]
@@ -470,26 +473,37 @@ def near_of_junction(cx, j) -> dict:
             continue
         rings += [[[C.m2(p[0]), C.m2(p[1])] for p in rg] for rg in junction_area(cx, o)]
         ids.append(o.id)
+        by |= _area_by(cx, o)
     xws = []
     for jid in ids:
         for c in sorted(xw.get(jid, ()), key=lambda c: c.id):
             xws.append({"line": [list(c.line[0][:2]), list(c.line[-1][:2])],
                         "width": c.width_m})
+            by.add(c.id)
+    cons = [ln for ln in sorted(_connectors(cx, j.node_id), key=lambda ln: ln.id)
+            if len(ln.centerline) >= 2]
     lanes = [{"line": [[C.m2(q[0]), C.m2(q[1])] for q in ln.centerline],
-              "h": C.m(ln.width_m / 2.0)}
-             for ln in sorted(_connectors(cx, j.node_id), key=lambda ln: ln.id)
-             if len(ln.centerline) >= 2]
+              "h": C.m(ln.width_m / 2.0)} for ln in cons]
+    by |= {ln.id for ln in cons}
     # the building masses there at its height (a corner's property line runs by them)
     mtree, mpolys, mrows = _masses(cx)
     blds = []
     if mtree is not None:
         for k in sorted(mtree.query(zone).tolist()):
-            _, _, z0, z1 = mrows[k]
+            bid, _, z0, z1 = mrows[k]
             if z0 > zj[1] + PARAPET_H + Z_NEAR_M or z1 < zj[0]:
                 continue
             blds.append([[C.m2(p[0]), C.m2(p[1])] for p in mpolys[k].exterior.coords[:-1]])
+            by.add(bid)
+    # (`by`: the entities all this was taken from, so a change to any of them explains a
+    # change to the junction's piece: `seam`)
     return {"roads": roads, "junctions": rings, "xwalks": xws, "lanes": lanes,
-            "buildings": blds}
+            "buildings": blds, "by": sorted(by)}
+
+
+def _area_by(cx, j) -> set:
+    """What a junction's area (`junction_area`) is taken from: it and its legs."""
+    return {j.id, j.node_id} | {s.id for s in cx.seg_at_node.get(j.node_id, ())}
 
 
 def junction_area(cx, j) -> list[list]:
@@ -842,7 +856,8 @@ def _root(g, L: float, at: str, step: float = 1.0):
     return None
 
 
-def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
+def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
+              by: set | None = None) -> list[dict]:
     """The spans of a road's barrier runs: [{"name", "spans": [[a, b, end_a, end_b]]}] with
     ends `join`, `stop` or `open` (module docstring)."""
     from .roads import Road, street_class
@@ -857,6 +872,7 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
     if rd.s1 - rd.s0 < MIN_SPAN_M:
         return []
     ends = {e["at"]: e for e in inputs["ends"]}
+    by = set() if by is None else by
     plan = {}
     jpoly = {}
     sectors = {}
@@ -865,6 +881,8 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
         j = cx.junction_at.get(nid)
         if j is None or "junction" not in ends.get(at, {}):
             continue
+        # (its plan and corners read the junction, its legs and its connector lanes)
+        by |= _area_by(cx, j) | {ln.id for ln in _connectors(cx, nid)}
         plan[at] = junction_plan(cx, j)
         jpoly[at] = G.from_model_poly(j.polygon)
         sectors[at] = [_valid(rg) for rg in junction_area(cx, j)[1:]]
@@ -896,6 +914,7 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
         ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
         if ln.length >= 0.5:
             xws.append(ln.buffer(c.width_m / 2.0 + XWALK_CLEAR_M, cap_style="flat"))
+            by.add(c.id)
     # other junctions its barriers pass at its height (not those at its ends), and their
     # crosswalks
     _, _, _, jtree, jns, polys, xwat = _index(cx)
@@ -909,11 +928,13 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
         if not _near_z(_road_z(s, c_.x, c_.y), _junction_z(cx, o)):
             continue
         others += [_valid(rg).buffer(CLEAR_M) for rg in junction_area(cx, o)]
+        by |= _area_by(cx, o)
         for c in sorted(xwat.get(o.id, ()), key=lambda c: c.id):
             a, b = c.line[0], c.line[-1]
             ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
             if ln.length >= 0.5:
                 xws.append(ln.buffer(c.width_m / 2.0 + XWALK_CLEAR_M, cap_style="flat"))
+                by.add(c.id)
     # other roads alongside it, not those at its ends: their carriageway where it is at its
     # height (a ramp's low end beside a street it does not meet; a road it passes over or
     # under is not)
@@ -928,7 +949,10 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
         cls = street_class(o)
         half = o.width_m / 2.0 if cls in PEDESTRIAN else \
             o.width_m / 2.0 - o.cross_section.sidewalk_m[0]
-        others += _level_with(s, o, slines[k], wide, half + CLEAR_M)
+        got = _level_with(s, o, slines[k], wide, half + CLEAR_M)
+        if got:
+            others += got
+            by.add(o.id)
     out = []
     for run in runs:
         key_s = leg_key(s.id, True)
@@ -1167,5 +1191,5 @@ def draw_line(mesh, slot: str, pts, profile, zfun, base: float = 0.0, jersey: bo
 
 __all__ = ["Run", "runs_of", "rail_runs", "junction_plan", "road_runs", "draw_run",
            "draw_line", "cut_frame", "end_frame", "cap", "JERSEY", "PARAPET_H", "PARAPET_W",
-           "leg_key", "exit_mid", "median_end", "parapet_profile", "shifted", "Keepout",
+           "leg_key", "median_end", "parapet_profile", "shifted", "Keepout",
            "clip_line"]

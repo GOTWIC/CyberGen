@@ -204,7 +204,9 @@ def gather_bridge(cx: Ctx, b) -> Piece:
         s0 = cx.seg[ids[0]]
         rin = road_gather(cx, s0).inputs
         rk = kind if kind.startswith("footbridge") else "footbridge.steel"
-        inputs["rails"] = BR.road_runs(cx, s0, rin, runs=BR.rail_runs(rin["seg"], rk))
+        by: set = set()
+        inputs["rails"] = BR.road_runs(cx, s0, rin, runs=BR.rail_runs(rin["seg"], rk), by=by)
+        inputs["rails_by"] = sorted(by | {s0.id})
     return Piece(b.id, "street.bridge", "bridge", cx.tile_for(b.id, pts),
                  cx.keys.get(b.id, []), inputs)
 
