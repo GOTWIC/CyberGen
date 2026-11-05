@@ -136,3 +136,20 @@ def test_a_sidewalk_is_not_drawn_over_a_junction():
     y = np.array([p[1] for sl in cut.mesh.slots.values() for p in sl.pos]) / 1000.0
     assert not ((y > 10.06) & (y < 29.94)).any()
     assert y.min() < -19.9 and y.max() > 39.9
+
+
+def test_a_prop_in_a_raised_corner_with_no_pad_is_left_out():
+    """#89: AG8 leaves out a standing thing in a raised junction's corner (AG7's notes) at
+    the junction's height that stands on neither its carriageway nor a pad AG7 drew; one on
+    the ground under it, or on a pad, stays."""
+    from assetgen.props.gather import _RaisedCorners
+    note = {"area": [[[0.0, 0.0], [20.0, 0.0], [20.0, 20.0], [0.0, 20.0]]],
+            "carriageway": [[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]],
+            "z": [8.0, 8.5],
+            "pads": [[[10.0, 0.0, 8.2], [20.0, 0.0, 8.2], [20.0, 5.0, 8.2], [10.0, 5.0, 8.2]]]}
+    rc = _RaisedCorners([note])
+    assert rc.unpaved(15.0, 15.0, 8.1)          # in the corner, no pad under it
+    assert not rc.unpaved(15.0, 2.5, 8.1)       # on a pad
+    assert not rc.unpaved(5.0, 5.0, 8.1)        # on the carriageway (#95's to keep off)
+    assert not rc.unpaved(15.0, 15.0, 0.0)      # on the ground under the junction
+    assert not rc.unpaved(30.0, 30.0, 8.1)      # not in its corners

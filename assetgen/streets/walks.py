@@ -154,9 +154,14 @@ def _clip_rings(cx: Ctx, s, w) -> list:
         with G.canonical():
             parts = sorted(G.parts(G.qpoly(poly)), key=lambda q: (G.qbounds(q), G.area1(q)))
         for part in parts:
-            out.append({"id": o.id, "ring": [[C.m2(p[0]), C.m2(p[1])]
-                                             for p in part.exterior.coords[:-1]]})
+            out.append({"id": o.id, "by": _ends_of(cx, o),
+                        "ring": [[C.m2(p[0]), C.m2(p[1])] for p in part.exterior.coords[:-1]]})
     return out
+
+
+def _ends_of(cx: Ctx, s) -> list:
+    """The junctions at a road's ends (its carriageway as drawn ends on their outlines)."""
+    return sorted(cx.junction_at[n].id for n in {s.start, s.end} if n in cx.junction_at)
 
 
 def _carriageways(cx: Ctx, g, skip=()) -> list:
@@ -478,6 +483,9 @@ def gather_junction(cx: Ctx, j) -> Piece:
     rd = _roads_near(cx, j)
     if rd:
         inputs["roads"] = rd
+    sw = _walks_in(cx, j)
+    if sw:
+        inputs["walks"] = sw
     if j.level:
         # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
         # ramp's top) a slab of its own carries it
@@ -538,6 +546,7 @@ def _overlaps(cx: Ctx, j) -> list:
         if a1 > a0 or (a1 == a0 and o.id < j.id):
             sf = _surface(_junction_base(cx, o))
             rec["owner"] = True
+            rec["by"] = sorted(BR._area_by(cx, o))
             rec["drawn"] = [[x_, y_, C.m(sf["zfun"](x_, y_))] for x_, y_ in sf["cring"]]
             # (and its corners: this one's pads keep off what it paves)
             rec["area"] = [[[C.m2(q[0]), C.m2(q[1])] for q in rg]
@@ -571,7 +580,44 @@ def _roads_near(cx: Ctx, j) -> list:
         with G.canonical():
             parts = sorted(G.parts(G.qpoly(poly)), key=lambda q: (G.qbounds(q), G.area1(q)))
         for part in parts:
-            out.append([[C.m2(p[0]), C.m2(p[1])] for p in part.exterior.coords[:-1]])
+            out.append({"id": o.id, "by": _ends_of(cx, o),
+                        "ring": [[C.m2(p[0]), C.m2(p[1])] for p in part.exterior.coords[:-1]]})
+    return out
+
+
+def _walks_in(cx: Ctx, j) -> list:
+    """#82: the sidewalks of a junction's legs whose slab reaches into its corners (by over
+    `CLIP_M2`: a leg's own sidewalk beside a ramp it runs on inside the junction), as
+    {"id", "ring"}: its pads keep off them (the sidewalk piece paves them)."""
+    from citygen import geom as G
+
+    from . import barriers as BR
+    area = BR.junction_area(cx, j)
+    if len(area) < 2:
+        return []
+    with G.canonical():
+        sec = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(r))) for r in area[1:]])
+        sec = G.diff(sec, G.from_model_poly(j.polygon))
+    legs = {s.id for s in cx.seg_at_node.get(j.node_id, ())}
+    by = cx.__dict__.get("_sidewalks_of")
+    if by is None:
+        by = {}
+        for w in cx.m.sidewalks:
+            by.setdefault(w.segment_id, []).append(w)
+        cx._sidewalks_of = by
+    out = []
+    for w in sorted((w for sid in legs for w in by.get(sid, ())), key=lambda w: w.id):
+        if len(w.line) < 2:
+            continue
+        band = shapely.LineString([(p[0], p[1]) for p in w.line]).buffer(
+            w.width_m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+        if band.is_empty or shapely.intersection(band, sec).area <= CLIP_M2:
+            continue
+        with G.canonical():
+            parts = sorted(G.parts(G.qpoly(band)), key=lambda q: (G.qbounds(q), G.area1(q)))
+        for part in parts:
+            out.append({"id": w.id, "ring": [[C.m2(q[0]), C.m2(q[1])]
+                                             for q in part.exterior.coords[:-1]]})
     return out
 
 
@@ -592,7 +638,7 @@ def _lanes_off(cx: Ctx, j) -> list:
         line = shapely.LineString([(q[0], q[1]) for q in ln.centerline])
         cor = line.buffer(h, cap_style="flat", join_style="mitre", mitre_limit=2.0)
         if shapely.difference(cor, poly).area > OVERLAP_M2:
-            out.append({"line": [[C.m2(q[0]), C.m2(q[1])] for q in ln.centerline],
+            out.append({"id": ln.id, "line": [[C.m2(q[0]), C.m2(q[1])] for q in ln.centerline],
                         "h": C.m(h)})
     return out
 
@@ -758,7 +804,8 @@ def make_junction(inp: dict) -> Out:
     # it draws, with the connector lanes that run off it round its corners
     sectors = _sectors(ring, P, legs, j)
     car = _carriageway(inp, sf, sectors)
-    others = [o["ring"] for o in inp.get("overlaps", ())] + list(inp.get("roads", ()))
+    others = [o["ring"] for o in inp.get("overlaps", ())] + \
+        [r["ring"] for r in inp.get("roads", ())]
     if car is None:
         ok = mesh.poly(slot, cring, holes, zfun=zfun, keep_straight=cring is not ring)
         if not ok:
@@ -800,13 +847,15 @@ def make_junction(inp: dict) -> Out:
     rows: dict = {}
     curbs = [r for r, _ in drawn] + [h for _, hs in drawn for h in hs] + list(others)
     block = None
-    if car is not None or others:
+    if car is not None or others or inp.get("walks"):
         from citygen import geom as G
         with G.canonical():
             gs = [G.qpoly(shapely.make_valid(shapely.Polygon(r, hs))) for r, hs in drawn]
             gs += [G.qpoly(shapely.make_valid(shapely.Polygon(o))) for o in others]
             gs += [G.qpoly(shapely.make_valid(shapely.Polygon(rg)))
                    for o in inp.get("overlaps", ()) for rg in o.get("area", ())]
+            gs += [G.qpoly(shapely.make_valid(shapely.Polygon(w["ring"])))
+                   for w in inp.get("walks", ())]
             block = G.union(gs) if gs else None
     made: list = []
     pads = _corners(mesh, ring, holes, P, legs, j, style, bz, rows, sectors=sectors,
@@ -1375,15 +1424,21 @@ def _sectors(ring, P, legs, j) -> list:
         Pa = (P[0] + cut_a * da[0], P[1] + cut_a * da[1])
         Pb = (P[0] + cut_b * db[0], P[1] + cut_b * db[1])
         sector = [P, Pa] + row + [Pb]
-        if c is not None and len(row) >= 4 and (_bends(a, P, Ca) or _bends(b, P, Cb)):
+        if _bends(a, P, Ca) or _bends(b, P, Cb):
             # #82: a leg that bends before its cut (a curving avenue run on inside its
-            # junction to the next node): the sector along its own line and property line,
-            # not straight on from the node (a wedge 100 m long beside a curving ramp)
-            ka, kb = _along(a, P, Ca, a["row"], ta), _along(b, P, Cb, -b["row"], tb)
-            if ka is not None and kb is not None:
-                (ca, oa), (cb, ob) = ka, kb
-                row = [oa[-1]] + oa[::-1][1:-1] + row[1:-1] + ob[1:-1] + [ob[-1]]
-                sector = ca + row + cb[::-1]
+            # junction to the next node, one that turns inside it): the sector along its own
+            # line and property line, not straight on from the node (a wedge 100 m long
+            # beside a curving ramp, or a sliver where the leg turns away)
+            if c is not None and len(row) >= 4:
+                ka, kb = _along(a, P, Ca, a["row"], ta), _along(b, P, Cb, -b["row"], tb)
+                if ka is not None and kb is not None:
+                    (ca, oa), (cb, ob) = ka, kb
+                    row = [oa[-1]] + oa[::-1][1:-1] + row[1:-1] + ob[1:-1] + [ob[-1]]
+                    sector = ca + row + cb[::-1]
+            else:
+                got = _meet_along(a, P, Ca, b, Cb)
+                if got is not None:
+                    row, sector = got
         out.append({"i": i, "sector": sector, "row": row, "sidewalk": side})
     return out
 
@@ -1433,6 +1488,33 @@ def _bends(lg: dict, P, C_) -> bool:
         if abs((q[0] - P[0]) * d[1] - (q[1] - P[1]) * d[0]) > BEND_M:
             return True
     return False
+
+
+def _meet_along(a: dict, P, Ca, b: dict, Cb):
+    """#82: a corner between two legs one of which bends, with no fillet: leg a's property
+    line (left) and leg b's (right) along their own lines from the node out to their cuts,
+    joined where they cross (the crossing nearest a's node end), else end to end at the
+    node; (row, sector) or None."""
+    from shapely.ops import substring
+    ka, kb = _along(a, P, Ca, a["row"], 0.0), _along(b, P, Cb, -b["row"], 0.0)
+    if ka is None or kb is None:
+        return None
+    (ca, oa), (cb, ob) = ka, kb
+    if len(oa) < 2 or len(ob) < 2:
+        return None
+    la, lb = shapely.LineString(oa), shapely.LineString(ob)
+    x = la.intersection(lb)
+    pts = [g for g in shapely.get_parts(x) if g.geom_type == "Point"] if not x.is_empty else []
+    if pts:
+        X = min(pts, key=lambda g: (la.project(g), g.x, g.y))
+        ra = [(C.m2(q[0]), C.m2(q[1])) for q in
+              substring(la, la.project(X), la.length).coords][::-1]
+        rb = [(C.m2(q[0]), C.m2(q[1])) for q in
+              substring(lb, lb.project(X), lb.length).coords]
+        row = ra + rb[1:]
+    else:
+        row = oa[::-1] + ob
+    return row, ca + row + cb[::-1]
 
 
 def _along(lg: dict, P, C_, off: float, t0: float):
