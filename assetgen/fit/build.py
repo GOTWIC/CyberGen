@@ -21,7 +21,7 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
   the junction seams (`seams`): every vertex of a road's carriageway on the outline of a
   junction at one of its ends, near where its centerline first leaves it, within `GAP_M` of
   the junction piece's surface there. What fails: anything assetgen seats itself (roof
-  items, dunnage, street pieces), the trash cans, quay railings and shrubs (#89, `FAILED`)
+  items, dunnage, street pieces), the quay railings and shrubs (#89, `FAILED`)
   and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
   `prop_support`) and are listed, not failed.
 - **`asset_clash`**:
@@ -70,7 +70,7 @@ from .index import Surfaces
 TILE_M = 256.0
 GAP_M = 0.02
 REPORTED = ("prop.", "plant.")      # placed at the model's heights: reported, not failed ...
-FAILED = ("prop.trash_can", "prop.railing", "plant.shrub")   # ... but these (#89: seated)
+FAILED = ("prop.railing", "plant.shrub")     # ... but these (#89: seated on terrain)
 STEP_FAIL_M = GAP_M                 # a junction step that fails (#89: every one over 2 cm)
 REACH_M = 0.6
 FOOTING_M = 3.0         # how far a column's footing may be set into what it stands on
@@ -456,7 +456,7 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         by_what[things[i]["what"]][1] += 1
     worst = sorted(floating, key=lambda i: (-min(gaps[i], 1e9), things[i]["id"]))[:LIST_MAX]
     # (what fails: what assetgen seats itself, roof items, dunnage and street pieces, the
-    # props and plants #89 seats (trash cans, quay railings, shrubs) and any step; other
+    # props and plants #89 seats (quay railings, shrubs) and any step; other
     # props and plants stand at the model's heights (M20's `prop_support`) and are
     # reported, as `asset_access` reports)
     failing = [i for i in floating if not things[i]["what"].startswith(REPORTED) or

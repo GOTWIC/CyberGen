@@ -1723,8 +1723,8 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   masses; building vertices past their masses by 0.3 m over a carriageway under 4.5 m;
   bridge and raised road deck tops over each other; transit in a mass outside its portal
   band, tracks in a platform). What fails: roof items, dunnage and street pieces off
-  their surface, any junction step over 2 cm and floating trash cans, quay railings and
-  shrubs (since #89), any clash; reported only: other props and plants (at the model's
+  their surface, any junction step over 2 cm and floating quay railings and shrubs
+  (since #89), any clash; reported only: other props and plants (at the model's
   heights, M20's `prop_support`). Since issue #95
   `asset_clash` also checks barriers and props at junctions (`fit/barriers.py`): any
   barrier (AG7's `concrete.barrier`, a footbridge's railings, a deck's rails, a trench's

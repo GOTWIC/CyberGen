@@ -219,6 +219,25 @@ def _foot(feet: dict, sp: str, k: int):
     return feet[key]
 
 
+def _prop_foot(feet: dict, kind: str, style: str, k: int):
+    """#89: a prop variant's foot as AG14 takes it: the middle of the plan box of its lowest
+    vertices and their height, in its frame (m); made once per variant."""
+    key = (kind, style, k)
+    if key not in feet:
+        from .variants import make
+        m = make(kind, style, k)
+        pts = [q for sl in m.slots.values() for q in sl.pos]
+        if not pts:
+            feet[key] = None
+        else:
+            z0 = min(q[2] for q in pts)
+            low = [q for q in pts if q[2] <= z0 + 10]
+            xs, ys = [q[0] for q in low], [q[1] for q in low]
+            feet[key] = ((min(xs) + max(xs)) / 2000.0, (min(ys) + max(ys)) / 2000.0,
+                         z0 / 1000.0)
+    return feet[key]
+
+
 def _seat(gd, feet: dict, sp: str, k: int, x: float, y: float, yaw: float, sc) -> float:
     """#89: the height of a plant on a terrain city's ground (its instance's z): its foot
     (`_foot`, turned and scaled as placed) `SEAT_SINK_M` into the ground under the foot's
@@ -431,6 +450,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
 
     brackets = 0
     fit = None
+    pfeet: dict = {}
     for p in sorted(model.props, key=lambda p: p.id):
         kind = p.type.split(".", 1)[1]
         g.kinds[kind] = g.kinds.get(kind, 0) + 1
@@ -508,6 +528,17 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
                 continue
         kinds_used.add(kind)
         yaw = p.yaw_deg
+        if kind == "railing" and not gd.flat and (p.attrs or {}).get("quay") in quays:
+            # (#89: its foot, the variant's lowest posts, on the quay's paving: a 3 m
+            # railing's end post stood off a steep quay by up to 0.5 m)
+            f = _prop_foot(pfeet, kind, st, k)
+            if f is not None:
+                u, v, z0 = f
+                a_ = M.radians(yaw)
+                c_, s_ = M.cos(a_), M.sin(a_)
+                fx = x + c_ * u * p.scale[0] - s_ * v * p.scale[1]
+                fy = y + s_ * u * p.scale[0] + c_ * v * p.scale[1]
+                z = C.m(quays[p.attrs["quay"]](fx, fy) - z0 * p.scale[2])
         if kind == "awning":
             poly = foot.get(mm["building"]) if mm else near_foot(x, y)
             if not _wall_plus_y(poly, x, y, yaw, p.scale[1] / 2.0 + 0.25):
