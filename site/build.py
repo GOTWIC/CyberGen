@@ -250,8 +250,7 @@ def render_filters(g: dict) -> str:
 def render_stats(g: dict) -> str:
     dates = sorted(e["date"] for e in g["entries"])
     first, last = dt.date.fromisoformat(dates[0]), dt.date.fromisoformat(dates[-1])
-    items = [("Pictures", str(len(g["entries"]))),
-             ("Days", str((last - first).days + 1)),
+    items = [("Days", str((last - first).days + 1)),
              ("Milestones", str(milestone_count(g["entries"]))),
              ("Stages built", f"{len([s for s in g['stages'] if s['key'].isdigit()])} of 5")]
     return "".join(f'<div><dt class="lbl">{esc(k)}</dt><dd class="mono">{esc(v)}</dd></div>' for k, v in items)
