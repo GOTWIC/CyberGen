@@ -63,6 +63,10 @@ under the near arm); the pattern runs on across them.
 
 ## Results
 
+Each city's folder here has its build report (`report.json`, `report.txt`) and
+`preview_transit.png`; the five samples' also `preview_gameplay.png` (their reports are the
+ones `tests/test_build.py::test_committed_reports_match` compares with a fresh build).
+
 Every city the change touches, built on this branch (`citygen build`, the blockout for the
 samples and demos), against main's full-city tries (in brackets, from
 `docs/progress/fix_paths/`):
