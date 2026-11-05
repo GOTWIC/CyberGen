@@ -916,7 +916,8 @@ def _surface(inp: dict) -> dict:
                "key": f"{lg['id']}@{'s' if lg['at_start'] else 'e'}",
                "path": path, "h": lg["width"] / 2.0 - side,
                "zs": (lambda s, gp=gp, zp=zp, a=lg["at_start"], L=Lr:
-                      gp(s if a else L - s) + zp(s if a else L - s) + ROAD_DZ)}
+                      gp(s if a else L - s) + zp(s if a else L - s) + ROAD_DZ),
+               "knots": sorted({(k if lg["at_start"] else Lr - k) for k in zp.s + gp.s})}
         if ex is not None:
             s = ex[0]
             rec["z"] = rec["zs"](s)
@@ -972,6 +973,17 @@ def _surface(inp: dict) -> dict:
             db = (cum[b] - cum[k]) % per
             f = da / (da + db) if da + db > 0 else 0.0
             vz[(ring[k][0], ring[k][1])] = anchor[a] + (anchor[b] - anchor[a]) * f
+    if vz is None and flat and lz:
+        # #89: a junction level at its node whose outline runs on along a leg's side past
+        # its cut, where the road already climbs: those outline vertices at the road's
+        # height (`_run_z`, `_with_corners`), the rest at the node's
+        runs = {k: _run_z(ring, r, k) for r in lz for k in _cut_run(ring, r)}
+        _, extra = _with_corners(ring, legs, inp["legs"])
+        if any(abs(z - zn) > 0.002 for z in runs.values()) or \
+                any(abs(z - zn) > 0.002 for _, z in extra):
+            vz = {(p[0], p[1]): zn for p in ring}
+            for k, z in runs.items():
+                vz[(ring[k][0], ring[k][1])] = z
     if vz is not None:
         _along_legs(ring, lz, vz)
     vpts = list(vz.items()) if vz is not None else []
@@ -1207,8 +1219,7 @@ def _run_z(ring, r: dict, k: int) -> float:
         return r["z"]
     p = ring[k]
     path, s0, h = r["path"], r["exit"][0], r["h"]
-    rows = [(s0, None)] + [(path.cum[q], q) for q in range(1, len(path.p) - 1)
-                           if s0 < path.cum[q] <= s0 + RUN_ROW_M]
+    rows = _road_rows(r)
     best = None
     for sv, vi in rows:
         x, y, nx, ny, kk = path.frame(sv, vi)
@@ -1220,6 +1231,33 @@ def _run_z(ring, r: dict, k: int) -> float:
         return r["zs"](best[1]) if best[1] > s0 else r["z"]
     s_k, _ = path.project(p[0], p[1])
     return r["zs"](s_k) if s_k > s0 + 0.01 else r["z"]
+
+
+def _road_rows(r: dict) -> list:
+    """#89: the stations (s along the leg from its node, vertex index or None) of the leg's
+    road piece's rows from its cut out to `RUN_ROW_M` past it, as `roads.Road.stations`
+    lays them (the cut, the line's vertices, the height profiles' knots, and the first
+    gap cut evenly at `roads.STEP_M`)."""
+    from .roads import STEP_M
+    path = r["path"]
+    s0 = min(r["exit"][0], path.L)
+    vs = {path.cum[q]: q for q in range(1, len(path.p) - 1)}
+    marks = sorted([c for c in vs if c > s0 + 1e-6] +
+                   [c for c in r.get("knots", ()) if s0 + 1e-6 < c < path.L - 1e-6])
+    out = [(s0, None)]
+    nxt = marks[0] if marks else path.L
+    gap = nxt - s0
+    n = int(gap / STEP_M)
+    if gap > STEP_M * n + 1e-9:
+        n += 1
+    cand = [s0 + gap * q / n for q in range(1, n)] + marks
+    for c in sorted(set(cand)):
+        if c > s0 + RUN_ROW_M:
+            break
+        if c - out[-1][0] < 0.02:
+            continue
+        out.append((c, vs.get(c)))
+    return out
 
 
 def _spans(ring, r: dict) -> bool:
@@ -1293,6 +1331,16 @@ def _with_corners(ring, legs: list, raw: list):
             tx, ty = path.tangent(s)
             for sg in (1.0, -1.0):
                 pts.append(((C.m(x - ty * h * sg), C.m(y + tx * h * sg)), r["z"]))
+            # (#89: and the side points of its rows just past the cut, where the outline
+            # runs on along the road's side: there they are its vertices at the road's
+            # height, as at its corners)
+            ends = pts[-2:]
+            for sv, vi in _road_rows(r)[1:]:
+                x, y, nx, ny, kk = path.frame(sv, vi)
+                for sg in (1.0, -1.0):
+                    q = (C.m(x + nx * kk * h * sg), C.m(y + ny * kk * h * sg))
+                    if all(dist(q, e[0]) > 0.1 for e in ends):
+                        pts.append((q, r["zs"](sv)))
             break
     if not pts:
         return ring, []

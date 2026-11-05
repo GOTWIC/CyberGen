@@ -153,3 +153,24 @@ def test_a_prop_in_a_raised_corner_with_no_pad_is_left_out():
     assert not rc.unpaved(5.0, 5.0, 8.1)        # on the carriageway (#95's to keep off)
     assert not rc.unpaved(15.0, 15.0, 0.0)      # on the ground under the junction
     assert not rc.unpaved(30.0, 30.0, 8.1)      # not in its corners
+
+
+def test_a_cul_de_sac_has_a_sidewalk_round_its_bulb():
+    """#82: a turning bulb gets a band of its leg's sidewalk width round it, less the leg's
+    right of way (the leg's own sidewalks run up to it; they used to run on into it)."""
+    import math
+
+    from assetgen.streets import walks as W
+    ring = [(12.0 * math.cos(2 * math.pi * k / 24), 12.0 * math.sin(2 * math.pi * k / 24))
+            for k in range(24)]
+    inp = _junction("jn.c", ring, (0.0, 0.0, 0.0),
+                    [_leg("rs.c", [(0.0, 0.0), (-80.0, 0.0)], [(0, 0.0), (80, 0.0)],
+                          width=16.0, side=3.0, cls="street")])
+    inp["junction"]["shape"] = "cul_de_sac"
+    out = W.make_junction(inp)
+    pave = [k for k in out.mesh.slots if k.startswith("paving")]
+    assert pave and out.notes["corner_pads"][0] == 1
+    P = np.array([p for k in pave for p in out.mesh.slots[k].pos], dtype=np.float64) / 1000.0
+    r = np.hypot(P[:, 0], P[:, 1])
+    assert r.min() > 11.0 and r.max() < 15.3                  # round the bulb, 3 m wide
+    assert not ((P[:, 0] < -12.5) & (np.abs(P[:, 1]) < 7.9)).any()   # not on the leg
