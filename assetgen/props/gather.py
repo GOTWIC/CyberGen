@@ -199,6 +199,27 @@ class _Fit:
 RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
 
 
+def _quay_tops(model, gd) -> dict:
+    """#89: per quay, its paving's height at a point as AG7 draws it (`streets.water.
+    make_quay`: the ground sampled at the quay line's vertices to the millimeter, linear
+    along the line between them, 2 cm over it)."""
+    from ..streets.path import Path as SPath
+    from ..streets.path import Profile
+    from ..streets.water import QUAY_PAVE_DZ
+    out = {}
+    for q in model.quays:
+        try:
+            P = SPath(q.line)
+        except ValueError:
+            continue
+        gnd = gd.samples(q.line)
+        if not gnd or len(gnd) != len(P.p):
+            continue
+        prof = Profile(list(zip(P.cum, gnd)))
+        out[q.id] = (lambda x, y, P=P, prof=prof: prof(P.project(x, y)[0]) + QUAY_PAVE_DZ)
+    return out
+
+
 class _RaisedCorners:
     """#89: the corners of AG7's raised junctions (`walks.make_junction`'s notes: the
     sectors between its legs, its carriageway as drawn and the pads it drew there, with
@@ -304,6 +325,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
     gd = Ground(model)
     bases = {b.id: float(b.base_m) for b in model.buildings
              if getattr(b, "base_m", None) is not None}
+    quays = {} if gd.flat else _quay_tops(model, gd)
 
     def lift(x, y, z, bid=None) -> float:
         """The height a placement's z is measured from (module docstring, Ground)."""
@@ -391,6 +413,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             # takes the ground as everything else does: it took the water's level on top of
             # that, 1.5 m under the water on a flat city)
             z = z + lift(x, y, min(z, 0.0))
+        elif kind == "railing" and not gd.flat and (p.attrs or {}).get("quay") in quays:
+            # (#89: on a terrain city a quay's railing stands on the quay's paving as AG7
+            # draws it, its ground sampled at the quay line's vertices: M13's ground at the
+            # railing's own point stood off it on a slope)
+            z = z + quays[p.attrs["quay"]](x, y)
         else:
             z = z + lift(x, y, z, (mm or {}).get("building") or
                          (p.attrs or {}).get("building"))
