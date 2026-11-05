@@ -5,8 +5,10 @@
 
 Reads site/gallery.json, resizes each entry's image from the repo (a file under
 docs/progress/) into DIR/img/<id>.jpg (at most 2000 px wide) and DIR/thumb/<id>.jpg
-(640 px wide), and writes DIR/index.html from the template site/index.html with the
-entries filled in, beside style.css, app.js and gallery.json. Needs Pillow only.
+(640 px wide), and writes two pages from their templates: DIR/index.html, the showcase
+(gallery.json's "showcase": a curated few of the entries with titles and captions of
+their own), and DIR/log.html, the build log (every entry), beside style.css, app.js and
+gallery.json. Needs Pillow only.
 
 The resized images are build output: never commit them. The Pages workflow
 (.github/workflows/pages.yml) runs this on every change to site/. Run it locally into
@@ -43,8 +45,7 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 MILESTONE_RE = re.compile(r"^(M|AG)(\d+)")
 DAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
-TEMPLATE_KEYS = ("TITLE", "DESCRIPTION", "SITE", "OG_IMAGE", "REPO", "FILTERS", "RAIL",
-                 "KICKER", "LEDE", "STATS", "STRIP", "STAGES", "NEXT", "BUILT")
+TOKEN_RE = re.compile(r"\{\{([A-Z_]+)\}\}")
 
 
 def fail(errors: list[str]) -> None:
@@ -87,6 +88,27 @@ def load(path: Path) -> dict:
             errors.append(f"backdrop: no entry {key!r}")
     if not g.get("entries"):
         errors.append("no entries")
+    show = g.get("showcase", {})
+    for f in ("kicker", "heading"):
+        if not isinstance(show.get(f), str) or not show[f].strip():
+            errors.append(f"showcase: missing {f}")
+    if not show.get("items"):
+        errors.append("showcase: no items")
+    for i, it in enumerate(show.get("items", [])):
+        where = f"showcase item {i} ({it.get('title', '?')})"
+        refs = it.get("entries") or ([it["entry"]] if it.get("entry") else [])
+        if not refs or ("entries" in it and len(refs) != 2):
+            errors.append(f"{where}: needs an entry, or entries as a pair")
+        for r in refs:
+            if r not in seen:
+                errors.append(f"{where}: no entry {r!r}")
+        if "labels" in it and len(it["labels"]) != len(refs):
+            errors.append(f"{where}: one label per entry")
+        for f in ("title", "caption"):
+            if not isinstance(it.get(f), str) or not it[f].strip():
+                errors.append(f"{where}: missing {f}")
+            elif any(ch in it[f] for ch in BANNED):
+                errors.append(f"{where}: {f} has an em or en dash")
     if errors:
         fail(errors)
     return g
@@ -276,6 +298,79 @@ def render_strip(g: dict) -> str:
     return f'<div class="strip-cols">{"".join(cols)}</div><div class="strip-legend">{legend}</div>'
 
 
+def stage_labels(g: dict) -> dict[str, str]:
+    return {s["key"]: s["label"] for s in g["stages"]}
+
+
+def picture(e: dict, dims: tuple[int, int], sizes: str, cls: str = "") -> str:
+    w, h = dims
+    i = esc(e["id"])
+    return (f'<img{cls} src="thumb/{i}.jpg" srcset="thumb/{i}.jpg {THUMB_W}w, img/{i}.jpg {w}w" sizes="{sizes}" '
+            f'width="{w}" height="{h}" loading="lazy" decoding="async" alt="">')
+
+
+def render_stage_keys(g: dict) -> str:
+    by_id = {e["id"]: e for e in g["entries"]}
+    shown = []
+    for it in g["showcase"]["items"]:
+        stage = by_id[(it.get("entries") or [it.get("entry")])[0]]["stage"]
+        if stage not in shown:
+            shown.append(stage)
+    names = {s["key"]: s for s in g["stages"]}
+    keys = "".join(f'<span class="key" data-stage="{esc(k)}"><i></i>{esc(names[k]["label"])} · {esc(names[k]["name"])}</span>'
+                   for k in shown)
+    return keys + '<a class="btn" href="log.html">Build log</a>'
+
+
+def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
+    """The showcase's cards: one picture each, or a pair (day and night) behind a slider."""
+    by_id = {e["id"]: e for e in g["entries"]}
+    labels = stage_labels(g)
+    out = []
+    for it in g["showcase"]["items"]:
+        refs = it.get("entries") or [it["entry"]]
+        first = by_id[refs[0]]
+        wide = bool(it.get("wide"))
+        sizes = "(max-width: 900px) calc(100vw - 58px), " + ("1130px" if wide else "560px")
+        if len(refs) == 1:
+            src_url = f"{g['repo']}/blob/{g['branch']}/{quote(first['image'])}"
+            # Maps and charts (PNG) are shown whole in their frame; renders fill it.
+            fit = " fit" if first["image"].lower().endswith(".png") else ""
+            media = (f'<a class="shot frame{fit}" href="img/{esc(first["id"])}.jpg" data-src="{esc(src_url)}" '
+                     f'aria-label="{esc(it["title"])}, full size">{picture(first, dims[first["id"]], sizes)}</a>')
+        else:
+            a, b = (by_id[r] for r in refs)
+            la, lb = it.get("labels", ["Before", "After"])
+            w, h = dims[a["id"]]
+            under = picture(b, dims[b["id"]], sizes, ' class="cmp-b"')
+            over = picture(a, dims[a["id"]], sizes, ' class="cmp-a"')
+            media = (f'<div class="compare" style="--pos:50%;aspect-ratio:{w}/{h}">{under}{over}'
+                     f'<span class="cmp-tag l">{esc(la)}</span><span class="cmp-tag r">{esc(lb)}</span>'
+                     f'<span class="cmp-line" aria-hidden="true"></span>'
+                     f'<span class="cmp-handle" role="slider" tabindex="0" aria-label="{esc(la)} and {esc(lb)}: '
+                     f'drag or use the arrow keys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></span></div>')
+        out.append(f"""
+    <li class="entry{' wide' if wide else ''}{' pair' if len(refs) > 1 else ''}" id="show-{esc(refs[0])}" data-stage="{esc(first['stage'])}">
+      <article class="card">
+        {media}
+        <div class="show-text">
+          <header class="entry-head"><span class="chip ms">{esc(labels[first['stage']])}</span></header>
+          <h3 class="entry-title">{esc(it['title'])}</h3>
+          <p class="cap">{esc(it['caption'])}</p>
+        </div>
+      </article>
+    </li>""")
+    return "".join(out)
+
+
+def fill(name: str, out: Path, values: dict[str, str]) -> None:
+    page = (SITE / name).read_text(encoding="utf-8")
+    missing = sorted(set(TOKEN_RE.findall(page)) - values.keys())
+    if missing:
+        fail([f"{name}: no value for {missing}"])
+    (out / name).write_text(TOKEN_RE.sub(lambda m: values[m.group(1)], page), encoding="utf-8")
+
+
 def build(out: Path) -> None:
     g = load(SITE / "gallery.json")
     out.mkdir(parents=True, exist_ok=True)
@@ -305,38 +400,42 @@ def build(out: Path) -> None:
     latest = max(e["date"] for e in g["entries"])
     dates = sorted(e["date"] for e in g["entries"])
     og = g.get("backdrop", {}).get("dark") or g["entries"][-1]["id"]
-    values = {
-        "TITLE": esc(f"{g['title']}: {g['subtitle'].lower()}"),
+    show = g["showcase"]
+    common = {
         "DESCRIPTION": esc(g["lede"]),
-        "SITE": esc(g["site"]),
         "OG_IMAGE": esc(f"{g['site']}img/{og}.jpg"),
         "REPO": esc(g["repo"]),
-        "FILTERS": render_filters(g),
-        "RAIL": render_rail(g),
-        "KICKER": esc(f"{g['subtitle']} · {dates[0]} to {dates[-1]}"),
-        "LEDE": esc(g["lede"]),
-        "STATS": render_stats(g),
-        "STRIP": render_strip(g),
-        "STAGES": render_stages(g, dims, latest),
         "NEXT": esc(g.get("next", "")),
         "BUILT": esc(dt.date.today().isoformat()),
     }
-    page = (SITE / "index.html").read_text(encoding="utf-8")
-    for key in TEMPLATE_KEYS:
-        token = "{{" + key + "}}"
-        if token not in page:
-            fail([f"index.html has no {token}"])
-        page = page.replace(token, values[key])
-    leftover = re.findall(r"\{\{[A-Z_]+\}\}", page)
-    if leftover:
-        fail([f"index.html has unknown tokens {sorted(set(leftover))}"])
-    (out / "index.html").write_text(page, encoding="utf-8")
+    fill("index.html", out, {
+        **common,
+        "TITLE": esc(f"{g['title']}: {show['heading'].lower()}"),
+        "PAGE_URL": esc(g["site"]),
+        "KICKER": esc(show["kicker"]),
+        "HEADING": esc(show["heading"]),
+        "LEDE": esc(g["lede"]),
+        "STAGE_KEYS": render_stage_keys(g),
+        "ITEMS": render_showcase(g, dims),
+    })
+    fill("log.html", out, {
+        **common,
+        "TITLE": esc(f"{g['title']}: {g['subtitle'].lower()}"),
+        "PAGE_URL": esc(f"{g['site']}log.html"),
+        "FILTERS": render_filters(g),
+        "RAIL": render_rail(g),
+        "KICKER": esc(f"{g['subtitle']} · {dates[0]} to {dates[-1]}"),
+        "STATS": render_stats(g),
+        "STRIP": render_strip(g),
+        "STAGES": render_stages(g, dims, latest),
+    })
     for name in ("style.css", "app.js", "gallery.json"):
         shutil.copyfile(SITE / name, out / name)
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
-    print(f"{len(g['entries'])} entries, {made} images made, site {total / 1e6:.1f} MB in {out}")
+    print(f"{len(g['entries'])} entries, {len(show['items'])} on the showcase, {made} images made, "
+          f"site {total / 1e6:.1f} MB in {out}")
 
 
 def main() -> None:

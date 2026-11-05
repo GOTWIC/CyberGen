@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Template: site/build.py fills in the double-brace tokens from site/gallery.json. Edit entries there, not here. -->
+<!-- The showcase (landing page) template: site/build.py fills in the double-brace tokens from site/gallery.json ("showcase"). Edit items there, not here. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -9,7 +9,7 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="{{TITLE}}">
 <meta property="og:description" content="{{DESCRIPTION}}">
-<meta property="og:url" content="{{SITE}}">
+<meta property="og:url" content="{{PAGE_URL}}">
 <meta property="og:image" content="{{OG_IMAGE}}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0a0c10" media="(prefers-color-scheme: dark)">
@@ -21,43 +21,36 @@
 <link rel="stylesheet" href="style.css">
 <script>try{var t=localStorage.getItem("cg-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 </head>
-<body data-filter="all">
+<body data-page="showcase">
 <div class="backdrop" aria-hidden="true"></div>
 
 <header class="topbar">
-  <a class="brand" href="#top"><b>CyberGen</b><span>// build log</span></a>
-  <nav class="filters" aria-label="Show a stage">
-    <button class="btn on" type="button" data-filter="all" aria-pressed="true">All</button>{{FILTERS}}
+  <a class="brand" href="./"><b>CyberGen</b></a>
+  <nav class="tabs" aria-label="Pages">
+    <a class="btn on" href="./" aria-current="page">Showcase</a>
+    <a class="btn" href="log.html"><span class="wide-only">Build </span>log</a>
   </nav>
   <div class="spacer"></div>
-  <button class="btn" type="button" id="theme" title="Switch between the system theme, light and dark">Theme: auto</button>
-  <a class="btn" href="{{REPO}}">GitHub</a>
+  <button class="btn" type="button" id="theme" title="Switch between the system theme, light and dark"><span class="wide-only">Theme: </span><span class="theme-val">auto</span></button>
+  <a class="btn gh" href="{{REPO}}">GitHub</a>
 </header>
 
-<div class="shell">
-  <aside class="rail" aria-label="Contents">
-{{RAIL}}
-  </aside>
+<main class="page" id="top">
+  <section class="hero glass show-hero">
+    <div class="lbl kicker"><span class="dot"></span>{{KICKER}}</div>
+    <h1>{{HEADING}}</h1>
+    <p class="lede">{{LEDE}}</p>
+    <div class="stage-keys">{{STAGE_KEYS}}</div>
+  </section>
 
-  <main id="top">
-    <section class="hero glass">
-      <div class="lbl kicker"><span class="dot"></span>{{KICKER}}</div>
-      <h1>Building a cyberpunk city generator</h1>
-      <p class="lede">{{LEDE}}</p>
-      <dl class="stats">{{STATS}}</dl>
-      <div class="strip" aria-label="Pictures by day">
-        <div class="lbl">Pictures by day</div>
-        {{STRIP}}
-      </div>
-    </section>
-{{STAGES}}
+  <ul class="showcase">{{ITEMS}}
+  </ul>
 
-    <footer class="foot">
-      <p>{{NEXT}}</p>
-      <p class="mono">CyberGen · <a href="{{REPO}}">source on GitHub</a> · page built {{BUILT}}</p>
-    </footer>
-  </main>
-</div>
+  <footer class="foot">
+    <p>{{NEXT}}</p>
+    <p class="mono">CyberGen · <a href="log.html">build log</a> · <a href="{{REPO}}">source on GitHub</a> · page built {{BUILT}}</p>
+  </footer>
+</main>
 
 <dialog id="lb" aria-label="Image viewer">
   <div class="lb-bar">

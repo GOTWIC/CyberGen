@@ -152,7 +152,9 @@ a:hover { text-decoration: underline; }
   text-shadow: 0 0 14px color-mix(in srgb, var(--signal) 45%, transparent);
 }
 .brand span { font-family: var(--font-mono); font-size: 11px; letter-spacing: var(--ls-label); color: var(--text-dim); text-transform: uppercase; }
-.filters { display: flex; gap: 6px; }
+.tabs, .filters { display: flex; gap: 6px; }
+.tabs .btn.on { --h: var(--signal); }
+.tabs + .filters { margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); }
 .filters [data-filter="all"] { --h: var(--signal); }
 
 /* ---- Layout ------------------------------------------------------------- */
@@ -274,6 +276,57 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .foot p { margin: 0 0 8px; }
 .foot .mono { font-size: 11px; color: var(--text-dim); }
 
+/* ---- Showcase (the landing page) ---------------------------------------- */
+.page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+.show-hero { max-width: none; margin-bottom: 28px; }
+.show-hero h1 { font-size: 30px; }
+.stage-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.stage-keys .key { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.stage-keys .key i { width: 10px; height: 7px; border-radius: 1px; background: var(--h); }
+.showcase { list-style: none; margin: 0 0 32px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.showcase .entry { margin: 0; }
+.showcase .entry.wide { grid-column: 1 / -1; }
+.showcase .card {
+  height: 100%; padding: 8px 8px 14px; background: var(--glass); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--glass-edge);
+}
+/* Pictures sit on a dark screen whatever the theme: maps and night renders blend into it. */
+.frame { aspect-ratio: 16 / 9; background: #07090c; }
+.frame img { object-fit: cover; }
+.frame.fit img { object-fit: contain; }
+.showcase .entry.wide .frame { aspect-ratio: auto; }
+.showcase .entry.wide .frame img { height: auto; }
+.show-text { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 10px; padding: 12px 6px 0; }
+.show-text .entry-title { margin: 0; font-size: 17px; }
+.show-text .cap { grid-column: 1 / -1; margin: 5px 0 0; font-size: 14px; color: color-mix(in srgb, var(--text) 78%, var(--text-muted)); }
+
+/* Day and night: one picture over the other, cut where the handle stands. */
+.compare {
+  position: relative; overflow: hidden; border-radius: var(--r); border: 1px solid var(--line);
+  background: #07090c; touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none;
+}
+.compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.compare .cmp-a { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
+.cmp-line {
+  position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; margin-left: -1px;
+  background: var(--signal); box-shadow: 0 0 12px -2px var(--signal); pointer-events: none;
+}
+.cmp-handle {
+  position: absolute; top: 50%; left: var(--pos); width: 36px; height: 36px; margin: -18px 0 0 -18px;
+  display: grid; place-items: center; border-radius: var(--r); border: 1px solid var(--signal);
+  background: color-mix(in srgb, var(--ink-050) 70%, transparent); box-shadow: var(--glow-2);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.cmp-handle::before { content: "\25C2\00A0\25B8"; font-size: 11px; color: var(--signal); }
+.cmp-tag {
+  position: absolute; top: 12px; padding: 3px 8px; border-radius: var(--r-sm);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  color: #e0e6f0; background: rgb(10 12 16 / .6); border: 1px solid rgb(224 230 240 / .18); pointer-events: none;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.cmp-tag.l { left: 12px; }
+.cmp-tag.r { right: 12px; }
+
 /* ---- Lightbox ----------------------------------------------------------- */
 #lb {
   width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0;
@@ -314,8 +367,16 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
   .topbar { flex-wrap: wrap; padding: 8px 16px; gap: 8px; }
   .topbar .spacer { display: none; }
   .brand { margin-right: auto; }
-  .brand span { display: none; }
+  .brand span, .wide-only, .topbar .gh { display: none; }
   .filters { order: 5; width: 100%; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .tabs + .filters { margin-left: 0; padding-left: 0; border-left: 0; }
+  .page { padding: 20px 16px 64px; }
+  .show-hero h1 { font-size: 22px; }
+  .showcase { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .showcase .card { padding: 6px 6px 12px; }
+  .cmp-tag { top: 8px; }
+  .cmp-tag.l { left: 8px; }
+  .cmp-tag.r { right: 8px; }
   .filters::-webkit-scrollbar { display: none; }
   html { scroll-padding-top: 110px; }
   main { padding: 20px 16px 64px; }
