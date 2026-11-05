@@ -981,6 +981,80 @@ def highway_barriers(c: Ctx) -> list[Cand]:
     return out
 
 
+ROAD_CLEAR_M = 0.15     # a railing or a median barrier keeps this off what is not its own
+ROAD_XWALK_M = 1.0      # ... and this off a crosswalk
+ROAD_Z_M = 1.5          # a road or junction counts within this of the thing's height
+
+
+def _road_keep(c: Ctx):
+    """#95: what a quay railing or a highway's median barrier keeps off (built once): every
+    junction's area, the carriageway (between its curbs) of every road but a pedestrian
+    street (bridges' and footbridges' decks too) and every crosswalk, as an STRtree of
+    shapes with (kind, owner, height over the ground or the road's z profile)."""
+    if "_roadkeep" in c.__dict__:
+        return c._roadkeep
+    shapes, rows = [], []
+    node_z = {n.id: n.position[2] for n in c.m.road_nodes}
+    for j in c.m.junctions:
+        shapes.append(G.from_model_poly(j.polygon))
+        rows.append(("junction", j.id, node_z.get(j.node_id, 0.0)))
+    for s in c.m.road_segments:
+        if s.road_class == "pedestrian" or len(s.centerline) < 2:
+            continue
+        cs = s.cross_section
+        half = s.width_m / 2.0 if s.road_class == "footbridge" else \
+            (cs.total_width_m - cs.sidewalk_m[0] - cs.sidewalk_m[1]) / 2.0
+        shapes.append(LineString(s.centerline).buffer(half, cap_style="flat"))
+        rows.append(("road", s.id, [(z.s, z.z) for z in s.z_profile]))
+    seg = {s.id: s for s in c.m.road_segments}
+    for x in c.m.crosswalks:
+        s = seg.get(x.segment_id)
+        shapes.append(LineString(x.line).buffer(x.width_m / 2.0 + ROAD_XWALK_M - ROAD_CLEAR_M,
+                                                cap_style="flat"))
+        rows.append(("xwalk", x.segment_id,
+                     [(z.s, z.z) for z in s.z_profile] if s is not None else []))
+    c._roadkeep = (shapely.STRtree(shapes) if shapes else None, rows, seg)
+    return c._roadkeep
+
+
+def _clear_of_roads(c: Ctx, cands: list[Cand], own: bool = False) -> list[Cand]:
+    """#95: the candidates (railings, median barriers: their length along their yaw) clear
+    of `_road_keep` at their height by `ROAD_CLEAR_M` (`own`: a median barrier stands on its
+    own highway, `attrs.segment`, so its carriageway and the other roads' do not count)."""
+    tree, rows, seg = _road_keep(c)
+    if tree is None or not cands:
+        return cands
+    boxes = []
+    for x in cands:
+        L, W = KINDS[x.kind][1][0] * x.scale[0], KINDS[x.kind][1][1] * x.scale[1]
+        a = math.radians(x.yaw)
+        ca, sa = math.cos(a), math.sin(a)
+        boxes.append(shapely.Polygon([(x.x + ca * u - sa * v, x.y + sa * u + ca * v)
+                                      for u, v in ((-L / 2, -W / 2), (L / 2, -W / 2),
+                                                   (L / 2, W / 2), (-L / 2, W / 2))])
+                     .buffer(ROAD_CLEAR_M, join_style="mitre"))
+    ci, gi = tree.query(np.array(boxes, dtype=object), predicate="intersects")
+    bad = set()
+    for i, g in sorted(zip(ci.tolist(), gi.tolist())):
+        if i in bad:
+            continue
+        kind, owner, z = rows[g]
+        x = cands[i]
+        if kind == "road" and own:
+            continue
+        if kind == "junction":
+            zt = z
+        else:
+            s = seg.get(owner)
+            if s is None:
+                continue
+            at = LineString(s.centerline).project(Point(x.x, x.y))
+            zt = _z_at(z, at)
+        if abs(zt - x.z) <= ROAD_Z_M:
+            bad.add(i)
+    return [x for i, x in enumerate(cands) if i not in bad]
+
+
 def _z_at(prof, s: float) -> float:
     if not prof:
         return 0.0
@@ -1366,7 +1440,12 @@ def _build(spec, m) -> Out:
         placed += got
     qp = quay_props(c)
     boats = [x for x in qp if x.kind == "boat"]
-    got = c.place(under_ok([x for x in qp if x.kind != "boat"])) + boats_in_water(c, boats)
+    # (#95: a railing along a quay never crosses a road's carriageway, a junction or a
+    # crosswalk where a road meets the quay)
+    clear = {id(x) for x in _clear_of_roads(c, [x for x in qp if x.kind == "railing"])}
+    got = c.place(under_ok([x for x in qp if x.kind != "boat" and
+                            (x.kind != "railing" or id(x) in clear)])) + \
+        boats_in_water(c, boats)
     info["quay_props"] = len(got)
     placed += got
     for name, fn in (("highway_barriers", highway_barriers),
@@ -1374,7 +1453,8 @@ def _build(spec, m) -> Out:
                      ("scaffolding", scaffolding), ("market_gates", market_gates)):
         got = fn(c)
         if name == "highway_barriers":
-            got = _barriers_clear(c, got)
+            # (#95: and off the junctions and crosswalks on their highway)
+            got = _clear_of_roads(c, _barriers_clear(c, got), own=True)
         elif name in ("scaffolding", "market_gates"):
             got = _off_fills(c, got)
         info[name] = len(got)

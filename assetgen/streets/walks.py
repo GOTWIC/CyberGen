@@ -626,7 +626,8 @@ def _junction_barriers(mesh: Mesh, ring, legs, plan: dict, rows: dict, zfun):
         if a["exit"] is None or b["exit"] is None:
             continue
         if c["kind"] == "parapet" and i in rows:
-            draw(rows[i], parapet, 0.15)
+            for line in rows[i]:
+                draw(line, parapet, 0.15)
             continue
         ch = BR._chain(ring, a["exit"][1], b["exit"][1])
         if ch is not None:
@@ -795,9 +796,23 @@ def _near(p, line, closed: bool, tol: float = 0.03) -> bool:
     return False
 
 
+def _chains(edges: list) -> list[list]:
+    """Edges (p, q) joined end to start into polylines, in their order."""
+    out: list[list] = []
+    for p, q in edges:
+        if out and out[-1][-1] == p:
+            out[-1].append(q)
+        else:
+            out.append([p, q])
+    if len(out) > 1 and out[-1][-1] == out[0][0]:
+        out[0] = out.pop() + out[0][1:]
+    return out
+
+
 def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) -> list:
     """Sidewalk corners between neighboring legs; [made, skipped, why skipped];
-    `rows_out` (#95) gets each drawn corner's property line, by its first leg's index."""
+    `rows_out` (#95) gets each drawn corner's outer edges along its property line (its
+    pads' edges there, counterclockwise: the pad on their left), by its first leg's index."""
     made = skipped = 0
     n = len(legs)
     if n < 2 or j.get("shape") == "cul_de_sac":
@@ -885,6 +900,7 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
     ends: set = set()
     for parts, row, i in drawn:
         drew = False
+        edge: list = []         # (#95) the pads' edges on the property line, as drawn
         for r in parts:
             sl = mesh._slot(pave)
             mark = (len(sl.pos), len(sl.idx), sl.auto)
@@ -900,6 +916,12 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
                 why["fold"] = why.get("fold", 0) + 1
                 continue
             drew = True
+            for k in range(len(r)):
+                p, q = r[k], r[(k + 1) % len(r)]
+                mid = ((p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0)
+                if uses[tuple(sorted((p, q)))] == 1 and not _near(mid, ring, True) and \
+                        _near(mid, row, False):
+                    edge.append((p, q))
             for k in range(len(r)):
                 p, q = r[k], r[(k + 1) % len(r)]
                 if uses[tuple(sorted((p, q)))] > 1:
@@ -919,8 +941,8 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
                               zfun(*q) - ROAD_DZ - 0.02, zfun(*q) + 0.15)
         if drew:
             made += 1
-            if rows_out is not None:
-                rows_out[i] = row
+            if rows_out is not None and edge:
+                rows_out[i] = _chains(edge)
         else:
             skipped += 1
     return [made, skipped, dict(sorted(why.items()))]

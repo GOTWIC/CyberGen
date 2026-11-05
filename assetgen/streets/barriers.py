@@ -375,6 +375,22 @@ def _index(cx):
     return ix
 
 
+def _masses(cx):
+    """Every building mass's footprint with the heights it spans (absolute), indexed."""
+    ms = cx.__dict__.get("_barrier_masses")
+    if ms is None:
+        rows, polys = [], []
+        for b in sorted(cx.m.buildings, key=lambda b: b.id):
+            base = float(getattr(b, "base_m", None) or 0.0)
+            for k, m in enumerate(b.masses):
+                if m.role == "void":
+                    continue
+                polys.append(G.from_model_poly(m.footprint))
+                rows.append((b.id, k, base + m.z0_m, base + m.z1_m))
+        ms = cx._barrier_masses = (shapely.STRtree(polys) if polys else None, polys, rows)
+    return ms
+
+
 def _junction_z(cx, j) -> tuple[float, float]:
     """The heights a junction's surface spans (absolute: its node's, and M18's surface
     round its outline where it has one)."""
@@ -448,7 +464,21 @@ def near_of_junction(cx, j) -> dict:
         for c in sorted(xw.get(jid, ()), key=lambda c: c.id):
             xws.append({"line": [list(c.line[0][:2]), list(c.line[-1][:2])],
                         "width": c.width_m})
-    return {"roads": roads, "junctions": rings, "xwalks": xws}
+    lanes = [{"line": [[C.m2(q[0]), C.m2(q[1])] for q in ln.centerline],
+              "h": C.m(ln.width_m / 2.0)}
+             for ln in sorted(_connectors(cx, j.node_id), key=lambda ln: ln.id)
+             if len(ln.centerline) >= 2]
+    # the building masses there at its height (a corner's property line runs by them)
+    mtree, mpolys, mrows = _masses(cx)
+    blds = []
+    if mtree is not None:
+        for k in sorted(mtree.query(zone).tolist()):
+            _, _, z0, z1 = mrows[k]
+            if z0 > zj[1] + PARAPET_H + Z_NEAR_M or z1 < zj[0]:
+                continue
+            blds.append([[C.m2(p[0]), C.m2(p[1])] for p in mpolys[k].exterior.coords[:-1]])
+    return {"roads": roads, "junctions": rings, "xwalks": xws, "lanes": lanes,
+            "buildings": blds}
 
 
 def junction_area(cx, j) -> list[list]:
@@ -560,9 +590,10 @@ def _inside(ring, x: float, y: float) -> bool:
 class Keepout:
     """What a junction's own barriers keep off (#95): each leg's carriageway as its road
     piece draws it (past its cut, within its half width and `CLEAR_M`), the carriageways of
-    other roads near it and the surfaces of other junctions near it at its height
-    (`near`), and the crosswalks near it (`XWALK_CLEAR_M` past their edges, `CLEAR_M` past
-    their ends). Plain arithmetic on the inputs."""
+    other roads near it, the surfaces of other junctions near it and the building masses
+    there at its height, its own connector lanes (`near`), and the crosswalks near it
+    (`XWALK_CLEAR_M` past their edges, `CLEAR_M` past their ends). Plain arithmetic on the
+    inputs."""
 
     def __init__(self, legs: list[dict], xwalks: list[dict], ring=None, near=None):
         self.legs = []
@@ -600,8 +631,15 @@ class Keepout:
                 self.roads.append((Path(r["line"]), r["h"]))
             except ValueError:
                 continue
+        # (its own connector lanes: where M17 laid a corner pad over a turning lane)
+        self.lanes = []
+        for r in near.get("lanes", ()):
+            try:
+                self.lanes.append((Path(r["line"]), r["h"]))
+            except ValueError:
+                continue
         self.rings = []
-        for rg in near.get("junctions", ()):
+        for rg in list(near.get("junctions", ())) + list(near.get("buildings", ())):
             xs = [p[0] for p in rg]
             ys = [p[1] for p in rg]
             self.rings.append((rg, min(xs), min(ys), max(xs), max(ys)))
@@ -629,6 +667,10 @@ class Keepout:
         for path, h in self.roads:
             s, t = path.project(x, y)
             if abs(t) < h + CLEAR_M and 1e-6 < s < path.L - 1e-6:
+                return True
+        for path, h in self.lanes:
+            _, t = path.project(x, y)
+            if abs(t) < h:
                 return True
         for rg, x0, y0, x1, y1 in self.rings:
             if x0 - CLEAR_M <= x <= x1 + CLEAR_M and y0 - CLEAR_M <= y <= y1 + CLEAR_M:

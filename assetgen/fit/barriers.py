@@ -12,8 +12,9 @@ on a deck piece), and an open tunnel approach's walls (a trench). What it may no
   asphalt, or a pedestrian street's paving): over it in plan more than `INSET_M` in from
   its outline and between `BELOW_M` under and `ABOVE_M` over its surface there (a bridge's
   railings stand on its own road's deck);
-- **barrier in junction**: the same on a junction's surface, the junction's own barriers
-  excepted;
+- **barrier in junction**: the same on a junction's surface; a junction's own barriers (its
+  corner parapets and guard walls, a median across it) on its own surface only where they
+  stand in one of its connector lanes (within the lane's half width less `INSET_M`);
 - **barrier on crosswalk**: the same on a crosswalk (the model's rectangle less `INSET_M`,
   at the pavement's height there), the road's own median barrier included;
 - **barrier through barrier**: two pieces' barriers through each other: over `MEET_M2` of
@@ -294,6 +295,13 @@ def barrier_clash(pk, model) -> dict:
     by_kind: dict[str, int] = defaultdict(int)
     near_j: dict[str, int] = defaultdict(int)
 
+    # (a junction's connector lanes, which its own barriers keep out of)
+    lanes: dict[str, list] = defaultdict(list)
+    for ln in model.lanes:
+        if ln.kind == "connector" and ln.node_id and len(ln.centerline) >= 2:
+            lanes[ln.node_id].append((shapely.LineString([(p[0], p[1]) for p in
+                                                          ln.centerline]), ln.width_m / 2.0))
+
     def shared(pa: str, pb: str) -> bool:
         na = seg_nodes.get(pa, set()) | ({node_of_j[pa]} if pa in node_of_j else set())
         nb = seg_nodes.get(pb, set()) | ({node_of_j[pb]} if pb in node_of_j else set())
@@ -311,13 +319,24 @@ def barrier_clash(pk, model) -> dict:
             if dd > r[1]:
                 r[1], r[2] = dd, a
             r[3].add(what[a])
+        if pid in node_of_j and lanes.get(node_of_j[pid]):
+            mine = [a for a, oo, _ in tg.on_pavement(P, set(), BELOW_M, ABOVE_M) if oo in own]
+            if mine:
+                idx = np.array(sorted(set(mine)), dtype=np.int64)
+                pts = shapely.points(P[idx, 0], P[idx, 1])
+                inl = np.zeros(len(idx), dtype=bool)
+                for ln, hw in lanes[node_of_j[pid]]:
+                    inl |= shapely.distance(ln, pts) < hw - INSET_M
+                if inl.any():
+                    a = int(idx[np.nonzero(inl)[0][0]])
+                    per[pk.owner(pid)] = [int(inl.sum()), 0.0, a, {what[a]}]
         for oo, (n, dd, a, ws) in sorted(per.items()):
             tpid = pk.names[oo]
             junction = tg.kind_of.get(oo) == "street.junction"
             key = "barrier_in_junction" if junction else "barrier_on_road"
             if junction:
-                cause = "its own end" if node_of_j.get(tpid) in seg_nodes.get(pid, ()) else \
-                    "another junction"
+                cause = "its own lanes" if tpid == pid else "its own end" \
+                    if node_of_j.get(tpid) in seg_nodes.get(pid, ()) else "another junction"
             else:
                 cause = "a road at a node it shares" if shared(pid, tpid) else "another road"
             counts[key] += 1
