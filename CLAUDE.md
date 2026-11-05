@@ -13,8 +13,8 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (M17 to M21 the fixes from the first run-through,
-`docs/run_through_1.md`),
+high-level milestone table). Stage 1's milestones are M0 to M22 (M17 to M21 the fixes from the first run-through,
+`docs/run_through_1.md`; M22, planned, from the second),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
 
@@ -1299,8 +1299,9 @@ No exporter change. Sample builds and the numbers before and after:
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG16, section 14; planned:
-AG16 performance, a benchmark and structural fixes before stage 3), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG17, section 14; planned:
+AG16 performance, a benchmark and structural fixes before stage 3; AG17 road surfaces by
+construction from stage 1's M22 pavement map, section 14.18), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
@@ -1822,7 +1823,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   raised junction follows its surface (`_draped`); corner sectors follow a leg that bends
   (`_along`, `_meet_along`), none between twin legs (`_twins`); pads keep off other
   junctions, roads, sidewalks and the connector lanes, whose runs off the outline round the
-  corners are paved (notes `paved`), and stand on the curb's height (`_edge_z`); a
+  corners are paved (notes `paved`) off the roads in every corner, a leg's own past its
+  cut too (#114: `_roads_near`, `barriers.junction_area(..., every=True)`), and stand on the
+  curb's height (`_edge_z`); a
   cul-de-sac gets a sidewalk round its bulb (`_bulb`); sidewalks and medians are not drawn
   over a carriageway at their height (`_clip_rings`, `roads._median_clip`,
   `_clear_spans`), a sidewalk's stretch a carriageway reaches over only in part drawn flat
@@ -1929,6 +1932,24 @@ it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px a
 JPEGs) and deploys; resized images are never committed. Preview with `.venv/bin/python
 site/build.py --out <folder outside the repo>`. Add or change entries only when Swagnik asks:
 no refresh on every push or milestone.
+
+**Usage panel** (top of the showcase): `site/usage.py` (stdlib only) reads this machine's
+Claude Code session logs (`~/.claude/projects`), keeps the sessions that ran in this repo
+(worktree sessions, their subagents and an earlier location of the repo included), merges
+their API responses into the device's ledger (`site/usage/ledger/<device>/<YYYY-MM>.csv`: one
+row per response, hashed ids, time, model and token counts, nothing of the conversation;
+rows are never removed, so logs Claude Code deletes still count) and writes
+`site/usage/<device>.json` from the whole ledger (`mac` or `windows` by platform: tokens by
+model and type, sessions, a per-day series, the time it ran); `build.py` adds the device files up, with each device and its last
+update behind a "By device" toggle. Each machine writes only its own file.
+**After every PR is closed (merged or not), on every machine:** the session that closed it
+(or merged it) runs `python site/usage.py` on its own machine (`.venv/bin/python` on the Mac,
+`.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` and its ledger folder to main
+("Usage: <device> after #N"), pulling first, and pushes. This is the one exception to "no
+refresh on every push": it needs no ask. Never write another device's file; a usage commit
+needs no further usage update. `site/usage/cloud.json` is entered by hand (`manual`, a
+`cost_usd` with no tokens or sessions: the cloud sessions' credit spent, whose logs stay on
+Anthropic's servers); `usage.py` never writes it, and it changes only when Swagnik asks.
 
 ## Working preferences
 

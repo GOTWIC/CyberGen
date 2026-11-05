@@ -541,11 +541,13 @@ def _area_by(cx, j) -> set:
     return {j.id, j.node_id} | {s.id for s in cx.seg_at_node.get(j.node_id, ())}
 
 
-def junction_area(cx, j) -> list[list]:
+def junction_area(cx, j, every: bool = False) -> list[list]:
     """What a junction piece may pave (`walks.make_junction`): its outline and, for each
     corner with a sidewalk, the sector its pad is cut from (`walks._sectors`: from the node
-    out to both sidewalks' ends and round the property line), as rings. Cached."""
-    cache = cx.__dict__.setdefault("_junction_areas", {})
+    out to both sidewalks' ends and round the property line), as rings. `every`: every
+    corner's sector, with a sidewalk or not (#114: the connector lanes' runs off the
+    outline are paved in any of them). Cached."""
+    cache = cx.__dict__.setdefault("_junction_areas_all" if every else "_junction_areas", {})
     if j.id in cache:
         return cache[j.id]
     from .walks import _bulb, _sectors
@@ -568,7 +570,7 @@ def junction_area(cx, j) -> list[list]:
                        "row": lg["seg"].width_m / 2.0, "L": lg["path"].L})
         for sc in _sectors(ring, P, wl, {"shape": j.shape,
                                          "corner_radius_m": j.corner_radius_m}):
-            if sc["sidewalk"] and "sector" in sc:
+            if (every or sc["sidewalk"]) and "sector" in sc:
                 out.append(sc["sector"])
     cache[j.id] = out
     return out

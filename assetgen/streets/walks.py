@@ -681,13 +681,14 @@ def _overlaps(cx: Ctx, j) -> list:
 
 
 def _roads_near(cx: Ctx, j) -> list:
-    """#82: the carriageways (as AG7 draws them) of roads other than its legs that reach
-    into a junction's corners (`barriers.junction_area`) at its height, as rings: its
-    pads keep off them."""
+    """#82: the carriageways (as AG7 draws them) of the roads, its legs among them, that
+    reach into a junction's corners (`barriers.junction_area`, every corner's: #114, the
+    connector lanes' runs are paved in a corner with no sidewalk too) at its height, as
+    rings: its pads and paved lanes keep off them."""
     from citygen import geom as G
 
     from . import barriers as BR
-    area = BR.junction_area(cx, j)
+    area = BR.junction_area(cx, j, every=True)
     if len(area) < 2:
         return []
     with G.canonical():
