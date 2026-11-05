@@ -175,6 +175,52 @@ def test_quay_props_on_the_deck(city):
             assert p.position[2] == -WA.FREEBOARD_M
 
 
+def test_railings_and_median_barriers_keep_off_junctions(city):
+    """#95: a quay railing (its 3 m) never reaches more than 5 cm onto a junction a vehicle
+    road meets, a road's carriageway at its height or a crosswalk; a highway's median
+    barrier (its 4 m) never onto such a junction or a crosswalk. (A railing along the quay
+    at a promenade's edge stays.)"""
+    import math
+
+    m = city.model
+    node_z = {n.id: n.position[2] for n in m.road_nodes}
+    vehicle = {n for s in m.road_segments if s.road_class not in ("pedestrian", "footbridge")
+               for n in (s.start, s.end)}
+    junc = [(G.from_model_poly(j.polygon).buffer(-0.05), node_z.get(j.node_id, 0.0))
+            for j in m.junctions if j.node_id in vehicle]
+    seg = {s.id: s for s in m.road_segments}
+
+    def xz(x) -> float:
+        s = seg[x.segment_id]
+        at = shapely.LineString(s.centerline).project(shapely.Point(x.line[0]))
+        return PR._z_at([(z.s, z.z) for z in s.z_profile], at)
+    xw = [(shapely.LineString(x.line).buffer(x.width_m / 2.0, cap_style="flat"), xz(x))
+          for x in m.crosswalks if x.segment_id in seg]
+    ground = [shapely.LineString(s.centerline).buffer(
+        (s.cross_section.total_width_m - sum(s.cross_section.sidewalk_m)) / 2.0 - 0.05,
+        cap_style="flat") for s in m.road_segments
+        if s.road_class not in ("pedestrian", "footbridge") and
+        max((z.z for z in s.z_profile), default=0.0) < 0.5]
+    seen = {"railing": 0, "barrier": 0}
+    for p in m.props:
+        k = p.type.split(".", 1)[1]
+        if k not in seen:
+            continue
+        seen[k] += 1
+        L, W = PR.KINDS[k][1][0] * p.scale[0], PR.KINDS[k][1][1]
+        a = math.radians(p.yaw_deg)
+        ca, sa = math.cos(a), math.sin(a)
+        x, y, z = p.position
+        box = shapely.Polygon([(x + ca * u - sa * v, y + sa * u + ca * v)
+                               for u, v in ((-L / 2, -W / 2), (L / 2, -W / 2), (L / 2, W / 2),
+                                            (-L / 2, W / 2))])
+        assert not any(box.intersects(j) for j, jz in junc if abs(jz - z) < 1.5), p.id
+        assert not any(box.intersects(c) for c, cz in xw if abs(cz - z) < 1.5), p.id
+        if k == "railing":
+            assert not any(box.intersects(r) for r in ground), p.id
+    assert seen["railing"]
+
+
 def test_overhead_measured_along_a_ramp(city):
     """A raised road's underside is its surface less the deck where a thing stands under it,
     and its fill (from the ground) where it is low."""

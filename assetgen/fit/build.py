@@ -35,7 +35,12 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
     inside a building mass, except in the band of a portal the building declares for that
     line (M5);
   - *transit through platform*: a vertex of a line's guideway or sky tube inside a station
-    platform as drawn (less the tracks beside it, `streets.transit.platform_rings`).
+    platform as drawn (less the tracks beside it, `streets.transit.platform_rings`);
+  - *barriers and props at junctions* (#95, `barriers.py`): a barrier (median barrier,
+    guard wall, parapet, railing, a junction's corner parapet or median) standing on another
+    road's carriageway, on a junction's surface (a junction's own in one of its lanes), on a
+    crosswalk, or through another piece's barrier; a standing prop on a vehicle
+    carriageway, a junction or a crosswalk, or through a barrier.
 
 Reading back every pack takes memory: the stage works tile by tile (a tile and its eight
 neighbors). Nothing here writes an asset; the report is written only when its bytes change.
@@ -745,11 +750,17 @@ def clash(pk: Packs, model) -> dict:
     if car:
         _over_road(pk, model, Surfaces(np.concatenate(car), np.concatenate(cown), min_nz=0.5),
                    out, counts)
+    # -- barriers and props at junctions (#95)
+    from .barriers import barrier_clash
+    bc = barrier_clash(pk, model)
+    for k, v in bc["counts"].items():
+        counts[k] = v
+        out[k] = bc["worst"][k]
     for k in out:
         out[k] = sorted(out[k], key=lambda r: json.dumps(r, sort_keys=True))[:LIST_MAX]
     n = sum(counts.values())
     return {"id": "asset_clash", "ok": n == 0, "clashes": n, "counts": counts,
-            "worst": out}
+            "barriers_by_kind": bc["by_kind"], "worst": out}
 
 
 def _over_road(pk: Packs, model, S: Surfaces, out: dict, counts: dict):
@@ -887,6 +898,8 @@ def report_text(rep: dict) -> str:
         else:
             lines.append(f"{'PASS' if c['ok'] else 'FAIL'} asset_clash: {c['clashes']} "
                          f"({', '.join(f'{k} {v}' for k, v in c['counts'].items())})")
+            for k, v in (c.get("barriers_by_kind") or {}).items():
+                lines.append(f"    {k}: {v}")
             for k, rows in c["worst"].items():
                 for r in rows[:10]:
                     lines.append(f"    {k}: {json.dumps(r, sort_keys=True)}")

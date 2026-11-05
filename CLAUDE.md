@@ -1419,6 +1419,22 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
 - Goldens in their own file, `tests/assetgen/data/golden_streets.json`
   (`tests/assetgen/streets_goldens.py [--builds DIR]`), Mac = x86. Bump nothing for a
   generator change: the code hash is in every tile's hash.
+- **Barriers** (issue #95, `barriers.py`): a road's median barrier, guard walls, parapets,
+  a deck ramp's barriers and parapets and a footbridge's railings are runs (`runs_of`,
+  `rail_runs`) over spans its gather works out (`road_runs`, the inputs' `barriers`,
+  `rails`): cut to cut, less where a run comes within `CLEAR_M` (0.15 m) of a junction at
+  its ends that does not carry it on, of another leg's carriageway there, of another
+  junction (its outline and corner pad sectors, `junction_area`) at its height, or within
+  `XWALK_CLEAR_M` (1 m) of a crosswalk. A raised road's parapet ends on its cut edge, or on
+  a sidewalk where its junction's corner pad begins (`corner_points`); ends are `join`,
+  `stop` (a jersey slopes down to `TOE_F` of its height over `END_M` 3 m, a parapet is
+  capped: `draw_run`, `cap`), `open` (no junction: the next road goes on). A junction
+  (`junction_plan`) carries a parapet round each corner of a raised junction (along its
+  drawn pads' property line, else its outline), a guard wall along an at-grade corner
+  between two guard-walled highways, and a median across where two median legs face each
+  other with no connector lane across (`median_end`); each clipped clear of its legs'
+  drawn carriageways (`leg_ends`), its lanes, the crosswalks, other roads, junctions and
+  building masses near it at its height (`near_of_junction`, `Keepout`, `clip_line`).
 
 AG2 (facades) is in place (tests `tests/assetgen/test_ag_facades.py`):
 - **Parts** (`buildings/parts.py`): windows by frame style (with sills and lintels),
@@ -1750,7 +1766,19 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   bridge and raised road deck tops over each other; transit in a mass outside its portal
   band, tracks in a platform). What fails: roof items, dunnage and street pieces off
   their surface, a junction step over 0.15 m, any clash; reported only: props and plants
-  (at the model's heights, M20's `prop_support`) and smaller steps.
+  (at the model's heights, M20's `prop_support`) and smaller steps. Since issue #95
+  `asset_clash` also checks barriers and props at junctions (`fit/barriers.py`): any
+  barrier (AG7's `concrete.barrier`, a footbridge's railings, a deck's rails, a trench's
+  walls) standing on another road's carriageway, on a junction's surface (a junction's own
+  barriers in one of its connector lanes), on a crosswalk, or through another piece's
+  barrier (two pieces at a node they share may overlap where they join, `JOIN_M2`), more
+  than `INSET_M` (0.1 m) in; any standing prop's low footprint (AG8's variant, 2 m up) on a
+  vehicle carriageway, a junction or a crosswalk (parked vehicles, a signal at its
+  crosswalk's end excepted) or through a barrier. AG8 draws a prop's hashed variant, else the
+  next of its family in turn, that keeps clear of them, else leaves the prop out (`props/gather._Fit`), and M6's
+  quay railings and median barriers stand at most 5 cm onto a junction a vehicle road meets
+  and keep 1 m off a crosswalk, railings also off any road's carriageway but a pedestrian
+  street's (footbridge decks too), at their height (`props._clear_of_roads`).
 - **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
   piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays
   where the model has them (`supports: mast`; plain pylons with their cradle by default,

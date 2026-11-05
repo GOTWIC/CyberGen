@@ -194,6 +194,19 @@ def gather_bridge(cx: Ctx, b) -> Piece:
               "origin": list(bbox_center(pts))}
     if bed:
         inputs["bed"] = bed
+    # (#95: a footbridge's railings or stone parapets end short of the junctions at its
+    # road's ends and keep off the other roads there, `barriers.road_runs`)
+    kind = bridge_kind(inputs["bridge"], inputs["style"])
+    if ids and ids[0] in cx.seg and (kind.startswith("footbridge") or (
+            segs and segs[0]["cls"] == "footbridge")):
+        from . import barriers as BR
+        from .roads import gather as road_gather
+        s0 = cx.seg[ids[0]]
+        rin = road_gather(cx, s0).inputs
+        rk = kind if kind.startswith("footbridge") else "footbridge.steel"
+        by: set = set()
+        inputs["rails"] = BR.road_runs(cx, s0, rin, runs=BR.rail_runs(rin["seg"], rk), by=by)
+        inputs["rails_by"] = sorted(by | {s0.id})
     return Piece(b.id, "street.bridge", "bridge", cx.tile_for(b.id, pts),
                  cx.keys.get(b.id, []), inputs)
 
@@ -420,11 +433,26 @@ def _footbridge(mesh: Mesh, ln: Line3, inp: dict, kind: str, W: float, wz: float
         return
     L = rd.L
     W2 = rd.W / 2.0
+    from . import barriers as BR
+    given = {r["name"]: r["spans"] for r in inp.get("rails") or ()}
+
+    def spans(name):
+        # (#95: between the junctions at its ends; a bridge gathered without them whole)
+        if "rails" in inp:
+            return given.get(name, [])
+        return [[0.0, L, "stop", "stop"]]
     if kind == "footbridge.stone":
         for side in (-1.0, 1.0):
             prof = box_prof(W2 - 0.3, W2, 0.0, 0.95) if side > 0 else \
                 box_prof(-W2, -W2 + 0.3, 0.0, 0.95)
-            rd.sweep(mesh, "stone.coping", 0.0, L, prof, base=-ROAD_DZ, step=1.5)
+            for a, b, ea, eb in spans("stone_l" if side > 0 else "stone_r"):
+                if b - a < 0.05:
+                    continue
+                rd.sweep(mesh, "stone.coping", a, b, prof, base=-ROAD_DZ, step=1.5)
+                for s_, e, out in ((a, ea, -1.0), (b, eb, 1.0)):
+                    if e != "open":
+                        BR.cap(mesh, "stone.coping", BR.end_frame(rd, s_, -ROAD_DZ), prof,
+                               1.0, out)
             # the arch ring under the deck, both faces
             t = side * W2
             pts = []
@@ -441,16 +469,19 @@ def _footbridge(mesh: Mesh, ln: Line3, inp: dict, kind: str, W: float, wz: float
     else:
         for side in (-1.0, 1.0):
             t = side * (W2 - 0.05)
-            s = 0.0
-            while s <= L + 1e-6:
-                x, y = rd.xy(min(s, L), t)
-                z = rd.z(min(s, L))
-                mesh.beam("steel.painted", (x, y, z), (x, y, z + 1.1), 0.06, 0.06)
-                s += 1.5
-            for zr, w in ((1.1, 0.07), (0.55, 0.04)):
-                rd.sweep(mesh, "steel.painted", 0.0, L,
-                         box_prof(-w / 2.0, w / 2.0, zr - w / 2.0, zr + w / 2.0), tc=t,
-                         step=1.5)
+            for a, b, _, _ in spans("rail_l" if side > 0 else "rail_r"):
+                if b - a < 0.05:
+                    continue
+                n = max(1, int(math.ceil((b - a) / 1.5 - 1e-9)))
+                for k in range(n + 1):
+                    s = a + (b - a) * k / n
+                    x, y = rd.xy(s, t)
+                    z = rd.z(s)
+                    mesh.beam("steel.painted", (x, y, z), (x, y, z + 1.1), 0.06, 0.06)
+                for zr, w in ((1.1, 0.07), (0.55, 0.04)):
+                    rd.sweep(mesh, "steel.painted", a, b,
+                             box_prof(-w / 2.0, w / 2.0, zr - w / 2.0, zr + w / 2.0), tc=t,
+                             step=1.5)
             # (AG14: the edge beam outside the road's girder, as a fascia, not inside it)
             rd.sweep(mesh, "steel.painted", 0.0, L,
                      box_prof(-0.12, 0.12, -0.7, 0.05), tc=side * (W2 + 0.12),
