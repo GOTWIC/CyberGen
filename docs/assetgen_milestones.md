@@ -25,6 +25,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG13 | Ground cover and grass: every piece of M16's open land textured by its cover kind and blended by its wear, shade, edges and moisture; grass and small plants as instanced clumps per tile (decision 13.9 (a)), swaying in Unreal and fading out at 60 to 100 m; `ground_grass_clear` and the budgets | Done | [`docs/progress/AG13`](progress/AG13) |
 | AG14 | Fit and finish, from the first run-through: junctions meeting their roads at M18's heights, smooth curved walls, roof equipment seated on its roofs, M19's frames, piers and masts, embankments, bridges drawn once, nothing over a lane under 4.6 m; the fit checks `asset_grounded` and `asset_clash` (`assetgen fit`) | Done | [`docs/progress/AG14`](progress/AG14) |
 | AG15 | Cyberpunk facades and night, from the first run-through: seven new facade systems, window patterns and skins past the grid, two or three finishes a building, the neighbor rule (towers within 150 m never alike by day or night); every building lit its own way by use and hour, crown and edge light, logos; spot lamps, light pools and sign washes in Unreal | Done | [`docs/progress/AG15`](progress/AG15) |
+| Sky tube fixes | Fixes between milestones (issues #94, #97): sky tubes on plain pylons drawn as before M19 (masts an option), ribs at citygen's rings along the whole line, an LED band in the line's color on each lit one (neon, brighter by night) | Done | [`docs/progress/sky_tubes`](progress/sky_tubes) |
 | AG16 | Performance (scope 14.17, issue #96): a benchmark in a standalone game process, frame time, VRAM, RAM and import targets for Delta on the Windows PC, structural fixes from what it shows, budgets in the build; upscaling measured, DLSS later | Planned | |
 
 ## AG0: contract and spike
@@ -1986,6 +1987,26 @@ buildings alike and lit alike, streets black at night), scope 14.16. Tests:
 
 **Numbers** (Delta Megacity, AG14's packs against AG15's, the same model): see
 `docs/progress/AG15/README.md`.
+
+## Sky tube fixes (issues #94, #97)
+
+After run-through 2 (citygen side: `docs/citygen_milestones.md`, "Sky tube fixes").
+
+- **Pylons** (#94): citygen's sky tube supports are plain pylons by default (form `column`,
+  no `mast_top_m` or `stays`), so AG7's `transit_column` draws a shaft and a cradle across the
+  tube, as the sky tubes' columns were drawn before M19; with `transit.sky_tube.supports:
+  mast` the model carries M19's masts and AG14's crosshead, legs, tie and stays are drawn as
+  before. No code change in `transit_column`.
+- **Rings** (#97): `sky_tube` 2 draws the ribs at the model's rings (`attrs.rings` of the
+  tube piece: its stretch of the line's evenly spaced rings, [distance along its own line,
+  lit]; a model without them keeps one every 10 m from 5 m in, none lit) and on each lit
+  one an LED band on the rib's outer face (12 beams, 0.2 m along the line, 5 cm deep) in the
+  line's color at full brightness (`streets.materials.led_slot`, slot `led.<hex>` made on
+  demand by `slot_spec`, master `emissive`; AG6's catalog puts `led.` on `neon`, which glows
+  more by `MPC_CityGen`'s `Night` in Unreal and by the previews' night). The pattern is the
+  model's, so it runs on across the 400 m pieces and round a loop's seam.
+- **Numbers**: AG_NUMBERS
+- **Exporter**: no code change (`docs/unreal_export.md`, record row "Sky tube fixes").
 
 ## Order
 
