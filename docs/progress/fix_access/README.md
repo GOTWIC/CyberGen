@@ -48,7 +48,9 @@ round, an entrance still walled in:
 
 Station stairs (M19, `citygen/transit.py`): an elevated platform end whose sidewalk is only
 reached round the buildings gets an elevator and a path led round, not a stair straight
-through them (Pinned's Stacks station ran an 80 m stair through a block); a metro stair
+through them, and none of its own where that end stands over the water (Pinned's Stacks
+station ran an 80 m stair from a platform end over the river through a block; its other end's
+stair serves it); a metro stair
 stepped along its concourse that would pass under a building's ground floor becomes an
 elevator straight down from the sidewalk. `walkway_building_clash` now fails walled-in
 entrances and station stairs through a building (both were notes).
@@ -63,7 +65,7 @@ itself. With that and the park fixes, the first layout passes every check.
 
 The second layout (`layout_salt` 1, no longer reached) fails `transit_supports`: the Crown
 Loop sky tube runs 772 m over the corporate core's streets with no free spot for a pylon
-(600 m allowed). That is transit's, not the deck's, and is left as an issue.
+(600 m allowed). That is transit's, not the deck's, and is drafted as an issue (see the PR).
 
 ## Numbers
 
