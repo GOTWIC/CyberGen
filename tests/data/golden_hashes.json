@@ -11,24 +11,24 @@
   },
   "cities": {
     "archipelago_free_port": "d38e1835f3cdb7fc3ed5e082ff47e51472b15df0f80417d04efaad7bfc931315",
-    "delta_megacity": "1c873a5036f763bf6a80e4fb0600237c2e815311170fd4d4fd088113d8b0aaa5",
-    "nexus_city": "7846ca09f691b677cf938d2e2826c24af60ee46e088ab1fcd3426b8ab8905b75",
-    "peninsula_city": "d182d23efec10ec14221e82bfcf4ccb9a07a28cf175e8ea5b81cefbbd5c8fd75",
-    "vesper_bay": "7db9b35222bfa22d0a4ebb062947f5add4cd6eca2c4f811a3422f596c6b4d31b"
+    "delta_megacity": "0471ffb873a83109de5e77d46b8f9f25c81373d446ee6401529043d1caa12124",
+    "nexus_city": "1b0776bd1318c687240eb502d9e86912dd4465a49830a4f54ce85cf6e8ebade3",
+    "peninsula_city": "514cd1b68720740556d83865f865b04f6233c678e434e4646db47920f85e2089",
+    "vesper_bay": "2710b84819b2741566e9553302562a9774cf0517146b37ef37a71cec0f16f599"
   },
   "blockout_plans": {
     "archipelago_free_port": "c4d7d26a36abcb9bd7291a6c269f5d6ca75e3172d1ee9c2105005821562c46aa",
-    "delta_megacity": "f4704c8ffa9904db0b3d22b9d1f012325f6f734a8d77c4246c1ae7b913974b5e",
-    "nexus_city": "fccb621b038bfdb0299d57769d4f40a0a1ed918776eff3611bc042dd70bfb844",
-    "peninsula_city": "c53a46462f841d855964c7ef3cbbdcf20ff89c14cfd7bee2ed9793fe486893bb",
-    "vesper_bay": "b0e694b6de340af822c7c9de92d03b428eb267580fa8cd98f7eb99bd3af975ea",
+    "delta_megacity": "e1fcd753db2b0d2641413826c3c50b805bc5d3ad7cc4e838de85ce8b6c2e130d",
+    "nexus_city": "8f6822a7d6909eefab5ec0cc712e89250664e3d3636f116a3d91fc8dd21fece9",
+    "peninsula_city": "848e07dc39920d5cc34d25118d7fc8a5f1974a5d5dd82316a6370aff6f94d1c0",
+    "vesper_bay": "9a0582fbb604a2acb56e65d22550a909b4628f9dcc57baed242251dd34d2d1cd",
     "cragmouth": "4644b37bb704ad1c6b0380b1a32565d622989c3d341945d210628d7055d257e2",
-    "vesper_bay_decks": "5c94a401f61e9211839409e8d1d29c4d48e3b762c9f39edc28555d834b9880f5"
+    "vesper_bay_decks": "acb7037acd1ee113bcba2a09ee52ec8c4cc7050c168f481117ed7bdd909cb02d"
   },
   "terrain_cities": {
     "cragmouth": "d6444a1fe8a8dcf6726803e8cc566acf4ec8393584d7c533a6a3f26fea0e7e4f"
   },
   "deck_cities": {
-    "vesper_bay_decks": "b171415a3ee01920b1b0f74585385dfe6845291e41c97b8f6487d53fd4de4d89"
+    "vesper_bay_decks": "34b71c791c53b2a1d364dfafc50a73b3be1732b9a7c99ec4adf189d39b6148a4"
   }
 }

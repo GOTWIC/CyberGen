@@ -2050,8 +2050,9 @@ the junctions made it hard to tell whether the road geometry itself was still wr
 - **Numbers** (Delta Megacity, the same check on main's packs and this fix's): barriers on
   another road 11 to 0, in a junction 139 to 0, on a crosswalk 75 to 0, through each other
   10 to 0; props on a carriageway 108 to 0 (93 quay railings, 6 benches, 4 dumpsters, 3
-  bollards, a trash can, a traffic signal); the city builds on the same two full-city tries.
-  Every sample: `docs/progress/barriers/README.md`.
+  bollards, a trash can, a traffic signal); in the model 488 of Delta's 2,838 quay railing
+  pieces and 559 of its 2,116 median barrier props are left out; the city builds on the same
+  two full-city tries. Every sample: `docs/progress/barriers/README.md`.
 - **Open** (the road geometry, #82 and #89): at junctions whose own surface is wrong (the
   five-leg raised `jn.e217s328`, two overlapping junctions round it; corner pads drawn over
   a turning lane) the corner parapets are clipped away rather than drawn across the lanes,

@@ -48,7 +48,8 @@ drew them).
   vehicle carriageway, junction and crosswalk at its height, else leaves it out; M6's quay
   railings stand at most 5 cm onto a vehicle junction or a road's carriageway and keep 1 m
   off a crosswalk (a railing at a promenade's edge stays), and the median barrier props keep
-  off junctions and crosswalks (the blockout too).
+  off junctions and crosswalks (the blockout too): in Delta's model 488 of 2,838 quay railing
+  pieces and 559 of 2,116 median barrier props are left out.
 - **Check**: AG14's `asset_clash` fails on any barrier on another road's carriageway, on a
   junction (a junction's own barriers in one of its lanes), on a crosswalk, or through
   another piece's barrier, and any standing prop on a carriageway, junction or crosswalk or
@@ -70,7 +71,10 @@ drew them).
 ## Every sample
 
 Each sample built with `citygen build` and `assetgen build` on this branch (Windows PC),
-then measured with the check:
+then measured with the check; after main's sky tube fixes (#102) came in, the samples they
+move and Saltreach were built again (`citygen build`, `assetgen streets`, `props`) and
+measured again, 0 on each. `<city>/` holds the five samples' reports and previews from those
+builds (`tests/test_build.py::test_committed_reports_match` reads them):
 
 | Sample | Full-city tries (main, this fix) | Barrier and prop crossings | Other assetgen checks failing (on main too) |
 |---|---|---|---|
