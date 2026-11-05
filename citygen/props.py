@@ -981,22 +981,29 @@ def highway_barriers(c: Ctx) -> list[Cand]:
     return out
 
 
-ROAD_CLEAR_M = 0.15     # a railing or a median barrier keeps this off what is not its own
-ROAD_XWALK_M = 1.0      # ... and this off a crosswalk
+ROAD_IN_M = 0.05        # a railing or a median barrier reaches at most this onto a road
+ROAD_XWALK_M = 1.0      # ... and keeps this off a crosswalk
 ROAD_Z_M = 1.5          # a road or junction counts within this of the thing's height
 
 
 def _road_keep(c: Ctx):
-    """#95: what a quay railing or a highway's median barrier keeps off (built once): every
-    junction's area, the carriageway (between its curbs) of every road but a pedestrian
-    street (bridges' and footbridges' decks too) and every crosswalk, as an STRtree of
-    shapes with (kind, owner, height over the ground or the road's z profile)."""
+    """#95: what a quay railing or a highway's median barrier keeps off (built once): the
+    area of every junction a vehicle road meets, the carriageway (between its curbs) of every
+    road but a pedestrian street (bridges' and footbridges' decks too), each less
+    `ROAD_IN_M` round its edge, and every crosswalk `ROAD_XWALK_M` round; an STRtree of the
+    shapes with (kind, owner, height over the ground or the road's z profile). A railing
+    along the quay at the edge of a promenade, or of a street's junction, stays."""
     if "_roadkeep" in c.__dict__:
         return c._roadkeep
     shapes, rows = [], []
     node_z = {n.id: n.position[2] for n in c.m.road_nodes}
+    walk = ("pedestrian", "footbridge")
+    vehicle = {n for s in c.m.road_segments if s.road_class not in walk
+               for n in (s.start, s.end)}
     for j in c.m.junctions:
-        shapes.append(G.from_model_poly(j.polygon))
+        if j.node_id not in vehicle:
+            continue
+        shapes.append(G.from_model_poly(j.polygon).buffer(-ROAD_IN_M, join_style="mitre"))
         rows.append(("junction", j.id, node_z.get(j.node_id, 0.0)))
     for s in c.m.road_segments:
         if s.road_class == "pedestrian" or len(s.centerline) < 2:
@@ -1004,12 +1011,12 @@ def _road_keep(c: Ctx):
         cs = s.cross_section
         half = s.width_m / 2.0 if s.road_class == "footbridge" else \
             (cs.total_width_m - cs.sidewalk_m[0] - cs.sidewalk_m[1]) / 2.0
-        shapes.append(LineString(s.centerline).buffer(half, cap_style="flat"))
+        shapes.append(LineString(s.centerline).buffer(half - ROAD_IN_M, cap_style="flat"))
         rows.append(("road", s.id, [(z.s, z.z) for z in s.z_profile]))
     seg = {s.id: s for s in c.m.road_segments}
     for x in c.m.crosswalks:
         s = seg.get(x.segment_id)
-        shapes.append(LineString(x.line).buffer(x.width_m / 2.0 + ROAD_XWALK_M - ROAD_CLEAR_M,
+        shapes.append(LineString(x.line).buffer(x.width_m / 2.0 + ROAD_XWALK_M,
                                                 cap_style="flat"))
         rows.append(("xwalk", x.segment_id,
                      [(z.s, z.z) for z in s.z_profile] if s is not None else []))
@@ -1018,9 +1025,9 @@ def _road_keep(c: Ctx):
 
 
 def _clear_of_roads(c: Ctx, cands: list[Cand], own: bool = False) -> list[Cand]:
-    """#95: the candidates (railings, median barriers: their length along their yaw) clear
-    of `_road_keep` at their height by `ROAD_CLEAR_M` (`own`: a median barrier stands on its
-    own highway, `attrs.segment`, so its carriageway and the other roads' do not count)."""
+    """#95: the candidates (railings, median barriers: their length along their yaw by
+    their width) that keep off `_road_keep` at their height (`own`: a median barrier stands
+    on its own highway, `attrs.segment`, so no road's carriageway counts for it)."""
     tree, rows, seg = _road_keep(c)
     if tree is None or not cands:
         return cands
@@ -1031,8 +1038,7 @@ def _clear_of_roads(c: Ctx, cands: list[Cand], own: bool = False) -> list[Cand]:
         ca, sa = math.cos(a), math.sin(a)
         boxes.append(shapely.Polygon([(x.x + ca * u - sa * v, x.y + sa * u + ca * v)
                                       for u, v in ((-L / 2, -W / 2), (L / 2, -W / 2),
-                                                   (L / 2, W / 2), (-L / 2, W / 2))])
-                     .buffer(ROAD_CLEAR_M, join_style="mitre"))
+                                                   (L / 2, W / 2), (-L / 2, W / 2))]))
     ci, gi = tree.query(np.array(boxes, dtype=object), predicate="intersects")
     bad = set()
     for i, g in sorted(zip(ci.tolist(), gi.tolist())):
