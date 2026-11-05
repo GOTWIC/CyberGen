@@ -1000,7 +1000,10 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
         for at, key in (("start", key_s), ("end", key_e)):
             if at in plan:
                 jn = plan[at]["joins"].get(key, {})
-                joined[at] = bool(jn.get(run.side if run.side != "m" else "m"))
+                # (a jersey joins only on a cut edge it can end on, `cut_frame`; else it
+                # stops short)
+                joined[at] = bool(jn.get(run.side if run.side != "m" else "m")) and (
+                    run.edge or rd.cut.get(at) is not None)
             else:
                 joined[at] = None           # no junction: the run goes on
         # where the run may start and end: the cut, or (a parapet at the road's edge) its
