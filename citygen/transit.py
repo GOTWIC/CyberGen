@@ -4018,8 +4018,7 @@ class Builder:
             # (access fix, #87: a sidewalk reached only round the buildings: an elevator
             # down and a path led round, not a stair straight through them)
             rounded = (tuple(map(q, e[:2])), tuple(map(q, f[:2]))) in self.rounds
-            if rounded and not pylon and d >= 1.0 and \
-                    _landmass_index(self.lms, [e])[0] < 0:
+            if rounded and not pylon and d >= 1.0 and self._over_water(e):
                 continue          # (an end over the water: the station's other end serves it)
             if pylon or d < 1.0 or rounded:
                 # an elevator core: on the pylon (sky stations), or where the sidewalk is
@@ -4047,6 +4046,21 @@ class Builder:
             acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
                                  {"station": sid}))
         self._skywalk(sid, seg, foot, z, bld, gone, acc)
+
+    def _over_water(self, p) -> bool:
+        """Access fix: whether a point stands in a water body (sea, river, channel,
+        waterway; a landmass polygon covers the canals in it)."""
+        if getattr(self, "_wet", None) is None:
+            from .tunnels import water_bodies
+
+            polys = [poly for poly, _, _ in water_bodies(self.c.m)]
+            self._wet = shapely.STRtree(polys) if polys else False
+            self._wet_polys = polys
+        if self._wet is False:
+            return False
+        pt = Point(p[:2])
+        return any(self._wet_polys[int(i)].covers(pt)
+                   for i in self._wet.query(pt, predicate="intersects"))
 
     def _core_near(self, ln: Line, e) -> bool:
         """Whether another line passes an elevator core at e closer than SIDE_PAD_M."""
