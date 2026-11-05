@@ -4018,6 +4018,9 @@ class Builder:
             # (access fix, #87: a sidewalk reached only round the buildings: an elevator
             # down and a path led round, not a stair straight through them)
             rounded = (tuple(map(q, e[:2])), tuple(map(q, f[:2]))) in self.rounds
+            if rounded and not pylon and d >= 1.0 and \
+                    _landmass_index(self.lms, [e])[0] < 0:
+                continue          # (an end over the water: the station's other end serves it)
             if pylon or d < 1.0 or rounded:
                 # an elevator core: on the pylon (sky stations), or where the sidewalk is
                 # right under the platform end
