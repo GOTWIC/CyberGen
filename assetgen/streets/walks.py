@@ -569,6 +569,10 @@ def _junction_base(cx: Ctx, j) -> dict:
                 leg["ground"] = [z.model_dump() for z in g]
             elif not cx.ground.flat:
                 leg["ground_pts"] = cx.ground.samples(s.centerline)
+            # (#89: the junction at its far end, where its road piece's far cut is)
+            far = cx.junction_at.get(s.end if at_start else s.start)
+            if far is not None and far.id != j.id:
+                leg["far"] = {"id": far.id, "ring": [list(q) for q in far.polygon.exterior]}
             legs.append(leg)
     cxy = bbox_center(j.polygon.exterior)
     return {"junction": dump(j), "node": list(node.position) if node else [*cxy, 0.0],
@@ -1041,7 +1045,23 @@ def make_junction(inp: dict) -> Out:
             "carriageway": [[[C.m2(x), C.m2(y)] for x, y in r] for r, _ in drawn],
             "z": [C.m(min(hz(x, y) for r, _ in drawn for x, y in r)),
                   C.m(max(hz(x, y) for r, _ in drawn for x, y in r))],
-            "pads": made}
+            "pads": made,
+            # (and its legs' rights of way from the node to their cuts: between two twin
+            # legs, or a corner with no pad, nothing is drawn there)
+            "rows": _leg_rows(sf["lz"])}
+    return out
+
+
+def _leg_rows(legs) -> list:
+    """#89: each leg's right of way from its junction's node out to its cut, as rings."""
+    out = []
+    for r in legs:
+        if r.get("exit") is None or r["exit"][0] <= 0.05:
+            continue
+        g = _drawn(r["path"], 0.0, min(r["exit"][0], r["path"].L), -r["row"], r["row"])
+        for q in getattr(g, "geoms", [g]):
+            if q.geom_type == "Polygon" and q.area > 0.01:
+                out.append([[C.m2(x), C.m2(y)] for x, y in q.exterior.coords[:-1]])
     return out
 
 
@@ -1083,6 +1103,10 @@ def _surface(inp: dict) -> dict:
                "zs": (lambda s, gp=gp, zp=zp, a=lg["at_start"], L=Lr:
                       gp(s if a else L - s) + zp(s if a else L - s) + ROAD_DZ),
                "knots": sorted({(k if lg["at_start"] else Lr - k) for k in zp.s + gp.s})}
+        if lg.get("far"):
+            fx = first_exit(path.p[::-1], ccw(lg["far"]["ring"]))
+            if fx is not None:
+                rec["far"] = Lr - min(fx[0], Lr)
         if ex is not None:
             s = ex[0]
             rec["z"] = rec["zs"](s)
@@ -1251,6 +1275,26 @@ def _draped(mesh: Mesh, slot: str, ring, holes, zf, D: float) -> None:
 
 
 CAR_MIN_M2 = 0.5        # #82: pieces of a lane's run off its junction smaller than this go
+SPIKE_COS = 0.99863     # ... and a vertex where its outline turns back within 3 degrees (a
+                        # needle the overlay leaves) (`_despike`)
+
+
+def _despike(r: list) -> list:
+    """#82: a ring without its needles: vertices where it turns back within 3 degrees (or
+    repeats), plain arithmetic on its grid points."""
+    r = list(r)
+    changed = True
+    while changed and len(r) > 3:
+        changed = False
+        for i in range(len(r)):
+            a, p, b = r[i - 1], r[i], r[(i + 1) % len(r)]
+            ux, uy, vx, vy = p[0] - a[0], p[1] - a[1], b[0] - p[0], b[1] - p[1]
+            lu, lv = math.hypot(ux, uy), math.hypot(vx, vy)
+            if lu < 1e-9 or lv < 1e-9 or ux * vx + uy * vy < -SPIKE_COS * lu * lv:
+                del r[i]
+                changed = True
+                break
+    return r
 
 
 def _carriageway(inp: dict, sf: dict, sectors: list):
@@ -1301,9 +1345,12 @@ def _carriageway(inp: dict, sf: dict, sectors: list):
         for p in sorted(G.parts(g), key=lambda q: (G.qbounds(q), G.area1(q))):
             if G.area1(p) < CAR_MIN_M2:
                 continue
-            e = ccw([(c[0], c[1]) for c in p.exterior.coords[:-1]])
-            hs = [ccw([(c[0], c[1]) for c in h.coords[:-1]])[::-1] for h in p.interiors]
-            drawn.append((e, hs))
+            e = _despike(ccw([(c[0], c[1]) for c in p.exterior.coords[:-1]]))
+            hs = [_despike(ccw([(c[0], c[1]) for c in h.coords[:-1]])[::-1])
+                  for h in p.interiors]
+            if len(e) < 3:
+                continue
+            drawn.append((e, [h for h in hs if len(h) >= 3]))
     if (add is None and len(drawn) == 1 and not drawn[0][1] and
             {tuple(p) for p in drawn[0][0]} == {tuple(p) for p in cring}):
         return None       # (the owners only touch it)
@@ -1379,6 +1426,8 @@ def _junction_barriers(mesh: Mesh, ring, legs, plan: dict, rows: dict, zfun):
 
 
 RUN_ROW_M = 3.0         # #89: a road row this far past its cut can reach back onto the outline
+SHORT_ROAD_M = 12.0     # ... and every row of a road this short between its cuts (its far cut
+                        # can lie on the outline of a junction that overlaps the other)
 
 
 def _run_z(ring, r: dict, k: int) -> float:
@@ -1412,15 +1461,20 @@ def _run_z(ring, r: dict, k: int) -> float:
 
 def _road_rows(r: dict) -> list:
     """#89: the stations (s along the leg from its node, vertex index or None) of the leg's
-    road piece's rows from its cut out to `RUN_ROW_M` past it, as `roads.Road.stations`
-    lays them (the cut, the line's vertices, the height profiles' knots, and the first
-    gap cut evenly at `roads.STEP_M`)."""
+    road piece's rows from its cut out to `RUN_ROW_M` past it (to its far cut where the
+    road is under `SHORT_ROAD_M` between them), as `roads.Road.stations` lays them (the
+    cut, the line's vertices, the height profiles' knots, and the first gap cut evenly at
+    `roads.STEP_M`)."""
     from .roads import STEP_M
     path = r["path"]
     s0 = min(r["exit"][0], path.L)
     vs = {path.cum[q]: q for q in range(1, len(path.p) - 1)}
+    far = r.get("far")
+    short = far is not None and s0 + 1e-6 < far <= s0 + SHORT_ROAD_M and far < path.L - 1e-6
+    lim = far if short else s0 + RUN_ROW_M
     marks = sorted([c for c in vs if c > s0 + 1e-6] +
-                   [c for c in r.get("knots", ()) if s0 + 1e-6 < c < path.L - 1e-6])
+                   [c for c in r.get("knots", ()) if s0 + 1e-6 < c < path.L - 1e-6] +
+                   ([far] if short else []))
     out = [(s0, None)]
     nxt = marks[0] if marks else path.L
     gap = nxt - s0
@@ -1429,7 +1483,7 @@ def _road_rows(r: dict) -> list:
         n += 1
     cand = [s0 + gap * q / n for q in range(1, n)] + marks
     for c in sorted(set(cand)):
-        if c > s0 + RUN_ROW_M:
+        if c > lim + 1e-9:
             break
         if c - out[-1][0] < 0.02:
             continue

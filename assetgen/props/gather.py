@@ -276,19 +276,25 @@ def _quay_tops(model, gd) -> dict:
 
 class _RaisedCorners:
     """#89: the corners of AG7's raised junctions (`walks.make_junction`'s notes: the
-    sectors between its legs, its carriageway as drawn and the pads it drew there, with
-    their tops). A standing thing in a corner, at the junction's height, on neither its
-    carriageway nor a pad has nothing under it: AG7 leaves a pad out where it would fold
-    over another or the junction's lanes or a neighbor's pavement take its place."""
+    sectors between its legs and its legs' rights of way from the node to their cuts, its
+    carriageway as drawn and the pads it drew there, with their tops). A standing thing
+    there, at the junction's height, on neither a carriageway nor a pad nor a sidewalk has
+    nothing under it: AG7 leaves a pad out where it would fold over another or the
+    junction's lanes or a neighbor's pavement take its place, and draws no corner between
+    two twin legs."""
 
-    def __init__(self, notes: list):
+    def __init__(self, notes: list, sidewalks=()):
         self.rows = []
         polys = []
+        bands = [shapely.LineString(w.line).buffer(w.width_m / 2.0 + 0.05, cap_style="flat")
+                 for w in sidewalks if len(w.line) >= 2]
+        self.bands = bands
+        self.walks = shapely.STRtree(bands) if bands else None
         for rz in notes:
             pads = [p for p in rz.get("pads", ()) if len(p) >= 3]
             zs = [q[2] for p in pads for q in p] + list(rz.get("z", ()))
-            area = [shapely.Polygon([(q[0], q[1]) for q in a]) for a in rz.get("area", ())
-                    if len(a) >= 3]
+            area = [shapely.Polygon([(q[0], q[1]) for q in a])
+                    for a in list(rz.get("area", ())) + list(rz.get("rows", ())) if len(a) >= 3]
             area = [a if a.is_valid else shapely.make_valid(a) for a in area]
             if not area:
                 continue
@@ -305,14 +311,17 @@ class _RaisedCorners:
         if self.tree is None:
             return False
         pt = shapely.points(x, y)
+        hit = False
         for k in sorted(self.tree.query(pt, predicate="intersects").tolist()):
             area, pads, car, zr = self.rows[k]
             if zr is not None and not zr[0] - 0.15 - RAISED_Z_M <= z <= zr[1] + RAISED_Z_M:
                 continue
             if any(p.intersects(pt) for p in pads) or any(c.intersects(pt) for c in car):
-                continue
-            return True
-        return False
+                return False
+            hit = True
+        if hit and self.walks is not None and len(self.walks.query(pt, predicate="intersects")):
+            return False        # (on a sidewalk: AG7 draws it off the carriageways)
+        return hit
 
 
 def _carriageway(s, cls: str, jring: dict):
@@ -431,7 +440,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             roads = set()
             raised = []
             paved = []
-    corners = _RaisedCorners(raised)
+    corners = _RaisedCorners(raised, model.sidewalks)
     segs = {s.id: s for s in model.road_segments}
 
     def style_of(did):
