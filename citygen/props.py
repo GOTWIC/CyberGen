@@ -946,7 +946,8 @@ class Moorings:
         self.reach = max((x[2] for x in self.quays), default=0.0)
 
     def quay_hit(self, hull) -> str | None:
-        """The first quay (by id) whose band the hull reaches into, else None."""
+        """The id of the first quay (by its index in the model's quays) whose band the hull
+        reaches into, else None."""
         if self.tree is None:
             return None
         for k in sorted(int(i) for i in self.tree.query(hull, predicate="dwithin",
