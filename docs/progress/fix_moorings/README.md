@@ -74,11 +74,11 @@ the small city's asset manifest, files and materials); `golden_props.json` (the 
 city's boats, 47 to 43) and `golden_ground.json` (its contribution records the model's
 sha256). `golden_water.json` and the building goldens do not move.
 
-Two assetgen goldens did not match main before this change: `golden_props.json` (main's
-small city gives 109 files, the golden says 98; it is written again here anyway, as the
-boats move it) and `golden_streets.json`'s Vesper Bay `all` (main's model and this branch's
-both give `8bab9a4e...`, the golden says `dc06fabb...`; this change does not move it, so it
-is left as it is).
+`golden_props.json` did not match main before this change (main's small city gave 109
+files, the golden said 98); it is written again here anyway, as the boats move it. After
+main's median fix (#117) was merged in, the small city's materials digest (`ag6`'s
+`testport_materials`, which hashes its streets contribution) was written again on both
+changes; #117's street goldens hold with the moved boats.
 
 ## Images
 
