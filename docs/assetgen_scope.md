@@ -706,7 +706,7 @@ docker image; Windows joins in AG9.
 | AG13 | Ground cover and grass (14.14) | M16; AG6, AG8; decision 13.9 | AG4, AG5, AG12 |
 | AG14 | Fit and finish (14.15) | AG4, AG7, AG8; M17 to M21 | AG12, AG13 |
 | AG15 | Cyberpunk facades and night (14.16) | AG14, AG6; M20, M21 | AG12, AG13 |
-| AG16 | Performance (14.17) | AG15; the first run-through's fixes | |
+| AG16 | Performance (14.17) | AG15; the first run-through's fixes; AG17 | |
 | AG17 | Road surfaces by construction (14.18) | M22; AG14 | |
 
 ### 14.1 AG0: Contract and spike
@@ -908,7 +908,8 @@ docker image; Windows joins in AG9.
   is then the baseline every later milestone, in any stage, is measured against.
 - **Road surfaces** (M22, then AG17; 14.18) come from run-through 2's road recheck: one
   pavement map in the model, with shared edges and one height per point, so pieces meet by
-  construction. Recommended before AG16, so its benchmark measures the final street pieces.
+  construction. They come before AG16 (Swagnik, 2026-11-05), so its benchmark measures the
+  final street pieces.
 - **Stage 1 milestones assetgen waits on:** M15 and the exporter's move to its own package
   before AG0's Unreal part, M13 for AG5's slopes and AG7's grades (until then flat ground at
   z 0), M14 for AG10. The asks of section 4.5 go to citygen sessions; each milestone derives
@@ -1226,13 +1227,11 @@ cul-de-sac bulb) with these invariants:
 **Shows:** before and after renders of `jn.e217s328`, a cul-de-sac, a hairpin, a raised
 junction and a corner with its pad and crosswalk; a seam close up in Unreal.
 
-**Order and size:** M22, then AG17, each one session (M22's larger parts are the map and the
-level separation; AG17 rewrites the junction and walk makers and reuses most of the road
-maker). Two orders against AG16:
-- **(a) Roads first (recommended):** AG16 then measures the final street pieces. Delta has
-  10,489 today, and clusters and bend faces change that count, which AG16 may merge further.
-- **(b) AG16 first:** the performance work starts now, and AG16's street figures are measured
-  again after AG17.
+**Order and size:** M22, then AG17, then AG16 (Swagnik, 2026-11-05), each one session.
+M22's larger parts are the map and the level separation. AG17 rewrites the junction and walk
+makers and reuses most of the road maker. Roads come first so AG16 measures the final street
+pieces: Delta has 10,489 today, and clusters and bend faces change that count, which AG16 may
+merge further.
 
 ## 15. Running it
 
