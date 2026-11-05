@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import math
 
+import shapely
+
 from citygen import dmath as M
 
 from .. import canon as C
@@ -39,6 +41,9 @@ CURB_STONE_M = 0.18
 PIT_M = 1.2
 CUT_ALONG_M = 1.0       # AG14: how far along a leg an outline vertex still lies on its cut
                         # (a road piece ends on its cut edge within `roads.CUT_TOL_M`)
+CLIP_M = 0.05           # #82: a sidewalk's slab stops this far into a junction's carriageway
+RAISED_M = 0.5          # #89: a junction this far over its ground is raised (`barriers.RAISED_M`)
+CLIP_M2 = 0.05          # ... where it reaches over this much of it
 
 
 def _road_inputs(cx: Ctx, s) -> dict:
@@ -94,11 +99,100 @@ def gather_sidewalk(cx: Ctx, w) -> Piece:
     inputs = {"walk": dump(w), "road": road, "style": cx.style(_district(cx, s)),
               "drops": sorted(drops), "trees": sorted(trees),
               "origin": list(bbox_center(w.line))}
+    clip = _clip_rings(cx, s, w)
+    if clip:
+        inputs["clip"] = clip
     if raised(road["seg"]):
         inputs["walkways"] = [{"id": k.id, "line": [list(p) for p in k.line]}
                               for k in sorted(cx.walkways_of.get(w.id, ()), key=lambda k: k.id)]
     return Piece(w.id, "street.sidewalk", "sidewalk", cx.tile_for(w.id, w.line),
                  cx.keys.get(w.id, []), inputs)
+
+
+def _clip_rings(cx: Ctx, s, w) -> list:
+    """#82: the junction outlines a sidewalk's slab reaches into (by over `CLIP_M2` past
+    `CLIP_M`): any junction at its height (within `barriers.Z_NEAR_M` of the road there),
+    its road's own end junctions always. M2 lays a sidewalk along the whole road where the
+    road's cuts at its two junctions overlap (a short road between two junctions whose
+    polygons overlap), so it runs through both; a road's sidewalk can also run into a
+    neighboring junction that overlaps its own. Rings in the model's coordinates, by
+    junction id."""
+    from citygen import geom as G
+
+    from . import barriers as BR
+    try:
+        band = shapely.LineString([(p[0], p[1]) for p in w.line]).buffer(
+            w.width_m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+    except (ValueError, shapely.errors.GEOSException):
+        return []
+    _, _, _, jtree, jns, polys, _ = BR._index(cx)
+    ends = {cx.junction_at[n].id for n in (s.start, s.end) if n in cx.junction_at}
+    out = []
+    for k in sorted(jtree.query(band).tolist()):
+        j = jns[k]
+        inner = polys[k].buffer(-CLIP_M, join_style="mitre")
+        if inner.is_empty:
+            continue
+        x = shapely.intersection(band, inner)
+        if x.is_empty or x.area <= CLIP_M2:
+            continue
+        if j.id not in ends:
+            c = x.representative_point()
+            if not BR._near_z(BR._road_z(s, c.x, c.y), BR._junction_z(cx, j)):
+                continue
+        out.append({"id": j.id, "ring": [[C.m2(p[0]), C.m2(p[1])]
+                                         for p in G.from_model_poly(j.polygon).exterior.coords[:-1]]})
+    return out
+
+
+def _clear_spans(P: Path, t0: float, t1: float, rings: list, step: float = 0.25) -> list:
+    """#82: the stretches [(a, b)] of a sidewalk (its line P, its slab across t0..t1) whose
+    cross-section stays clear of the rings (more than `CLIP_M` inside one is not), each end
+    found to the centimeter; stretches under 0.3 m are left out."""
+    from .barriers import _inside, _seg_dist
+    boxes = []
+    for r in rings:
+        xs = [p[0] for p in r]
+        ys = [p[1] for p in r]
+        boxes.append((r, min(xs), min(ys), max(xs), max(ys)))
+    ts = [t0 + (t1 - t0) * f for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+
+    def clear(s: float) -> bool:
+        x, y, nx, ny, _ = P.frame(s)
+        for t in ts:
+            px, py = x + nx * t, y + ny * t
+            for r, x0, y0, x1, y1 in boxes:
+                if x0 <= px <= x1 and y0 <= py <= y1 and _inside(r, px, py) and \
+                        min(_seg_dist(px, py, r[i - 1], r[i]) for i in range(len(r))) > CLIP_M:
+                    return False
+        return True
+
+    n = max(1, int(math.ceil(P.L / step)))
+    ss = [P.L * k / n for k in range(n + 1)]
+    ok = [clear(s) for s in ss]
+
+    def edge(a: float, b: float) -> float:
+        # (a clear, b not: the last clear point to a centimeter)
+        while abs(b - a) > 0.01:
+            m = (a + b) / 2.0
+            if clear(m):
+                a = m
+            else:
+                b = m
+        return a
+    out = []
+    start = None
+    for k, f in enumerate(ok):
+        if f and start is None:
+            start = 0.0 if k == 0 else edge(ss[k], ss[k - 1])
+        if not f and start is not None:
+            end = edge(ss[k - 1], ss[k])
+            if end - start >= 0.3:
+                out.append((C.m2(start), C.m2(end)))
+            start = None
+    if start is not None and P.L - start >= 0.3:
+        out.append((C.m2(start), P.L))
+    return out
 
 
 def _drop_f(s: float, drops) -> float:
@@ -134,7 +228,40 @@ def make_sidewalk(inp: dict) -> Out:
     offs = [0.0, CURB_STONE_M] + ([RAMP_M] if width > RAMP_M + 0.3 else []) + [width]
     curb_slot = MT.curb(style["archetype"])
     pave = MT.paving(style["archetype"])
-    st = P.stations(0.0, P.L, 5.0, extra)
+    spans = [(0.0, P.L)]
+    if inp.get("clip"):
+        # (#82: only where the slab is off every junction's carriageway it reaches into)
+        spans = _clear_spans(P, t_curb, t_curb + sgn * width, [c["ring"] for c in inp["clip"]])
+        if not spans:
+            return Out(empty="inside its junctions")
+    for s0, s1 in spans:
+        _slab(mesh, P, rd, s0, s1, extra, drops, offs, t_curb, sgn, curb_h, curb_slot, pave)
+    # tree pits
+    for ts, tt, _ in inp["trees"]:
+        if inp.get("clip") and not any(a + PIT_M / 2.0 <= ts <= b - PIT_M / 2.0
+                                       for a, b in spans):
+            continue
+        tt = max(min(tt, width / 2.0 - PIT_M / 2.0 - 0.2), -width / 2.0 + PIT_M / 2.0 + 0.2) \
+            if width > PIT_M + 0.4 else 0.0
+        hp = PIT_M / 2.0
+        ring = [(ts - hp, tt - hp), (ts + hp, tt - hp), (ts + hp, tt + hp), (ts - hp, tt + hp)]
+
+        def fmap(u, v):
+            x, y, nx, ny, _ = P.frame(u)
+            rs, _ = rd.path.project(x, y)
+            return x + nx * v, y + ny * v, rd.z(rs) + curb_h + 0.003
+        mesh.poly_map("grate", ring, (), fmap)
+    out = Out(mesh=mesh)
+    if inp.get("walkways"):
+        out.notes["walkways"] = {k["id"]: walkway_fix(rd, k["line"], curb_h)
+                                 for k in inp["walkways"]}
+    return out
+
+
+def _slab(mesh: Mesh, P: Path, rd: Road, s0: float, s1: float, extra, drops, offs, t_curb,
+          sgn, curb_h, curb_slot, pave):
+    """A sidewalk's slab, curb stone, curb face and back face from s0 to s1."""
+    st = P.stations(s0, s1, 5.0, extra)
     rows, uvs, zs, hs, nrm = [], [], [], [], []
     for s, vi in st:
         x, y, nx, ny, k = P.frame(s, vi)
@@ -177,23 +304,6 @@ def make_sidewalk(inp: dict) -> Out:
             buv.append([(s, gnd[2]), (s, b[2])])
     mesh.grid(curb_slot, face, fuv, expect=[(-sgn * a, -sgn * b, 0.0) for a, b in nrm])
     mesh.grid(pave, back, buv, expect=[(sgn * a, sgn * b, 0.0) for a, b in nrm])
-    # tree pits
-    for ts, tt, _ in inp["trees"]:
-        tt = max(min(tt, width / 2.0 - PIT_M / 2.0 - 0.2), -width / 2.0 + PIT_M / 2.0 + 0.2) \
-            if width > PIT_M + 0.4 else 0.0
-        hp = PIT_M / 2.0
-        ring = [(ts - hp, tt - hp), (ts + hp, tt - hp), (ts + hp, tt + hp), (ts - hp, tt + hp)]
-
-        def fmap(u, v):
-            x, y, nx, ny, _ = P.frame(u)
-            rs, _ = rd.path.project(x, y)
-            return x + nx * v, y + ny * v, rd.z(rs) + curb_h + 0.003
-        mesh.poly_map("grate", ring, (), fmap)
-    out = Out(mesh=mesh)
-    if inp.get("walkways"):
-        out.notes["walkways"] = {k["id"]: walkway_fix(rd, k["line"], curb_h)
-                                 for k in inp["walkways"]}
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +379,8 @@ def make_crosswalk(inp: dict) -> Out:
 # Junctions
 # ---------------------------------------------------------------------------
 
-def gather_junction(cx: Ctx, j) -> Piece:
+def _junction_base(cx: Ctx, j) -> dict:
+    """What a junction's surface is made from (`_surface`): itself, its node and its legs."""
     node = cx.node.get(j.node_id)
     legs = []
     for s in sorted(cx.seg_at_node.get(j.node_id, ()), key=lambda s: s.id):
@@ -284,12 +395,24 @@ def gather_junction(cx: Ctx, j) -> Piece:
             elif not cx.ground.flat:
                 leg["ground_pts"] = cx.ground.samples(s.centerline)
             legs.append(leg)
+    cxy = bbox_center(j.polygon.exterior)
+    return {"junction": dump(j), "node": list(node.position) if node else [*cxy, 0.0],
+            "node_ground": getattr(node, "ground_m", None) or 0.0, "legs": legs}
+
+
+def gather_junction(cx: Ctx, j) -> Piece:
     ext = j.polygon.exterior
     cxy = bbox_center(ext)
     did = cx.district_of_point(*cxy)
-    inputs = {"junction": dump(j), "node": list(node.position) if node else [*cxy, 0.0],
-              "node_ground": getattr(node, "ground_m", None) or 0.0,
-              "legs": legs, "style": cx.style(did), "origin": list(cxy)}
+    inputs = _junction_base(cx, j)
+    inputs.update({"style": cx.style(did), "origin": list(cxy)})
+    # #82: the junctions overlapping it, and the connector lanes that run off its outline
+    ov = _overlaps(cx, j)
+    if ov:
+        inputs["overlaps"] = ov
+    ln = _lanes_off(cx, j)
+    if ln:
+        inputs["lanes"] = ln
     if j.level:
         # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
         # ramp's top) a slab of its own carries it
@@ -306,6 +429,78 @@ def gather_junction(cx: Ctx, j) -> Piece:
                               "near": near}
     return Piece(j.id, "street.junction", "junction", cx.tile_for(j.id, ext),
                  cx.keys.get(j.id, []), inputs)
+
+
+OVERLAP_M2 = 0.5        # #82: junction outlines overlapping by more than this share it
+LANE_IN_M = 0.25        # ... and a connector lane is paved this far in from its edges
+
+
+def _overlaps(cx: Ctx, j) -> list:
+    """#82: the junctions whose outline overlaps this one's by over `OVERLAP_M2` at its
+    height (their surfaces within `barriers.Z_NEAR_M`): {"id", "ring" (their outline), and
+    where it owns the overlap (the larger outline, else the earlier id) "owner" and "drawn"
+    (its outline with its legs' carriageway corners, as (x, y, z): the heights its surface
+    has there, `_surface`)}. M17 joins the pavement two roads share to the junctions it
+    runs out of; where two roads run side by side between the same two nodes, both
+    junctions took the whole stretch between them (Delta's `jn.e217s328` and
+    `jn.e170s444`, 11 m apart in height), and each drew it at its own heights."""
+    from citygen import geom as G
+
+    from . import barriers as BR
+    _, _, _, jtree, jns, polys, _ = BR._index(cx)
+    at = {o.id: k for k, o in enumerate(jns)}
+    k0 = at.get(j.id)
+    if k0 is None:
+        return []
+    me = polys[k0]
+    zj = BR._junction_z(cx, j)
+    out = []
+    for k in sorted(jtree.query(me).tolist()):
+        o = jns[k]
+        if o.id == j.id:
+            continue
+        with G.canonical():
+            x = G.inter(me, polys[k])
+            ar = G.area1(x) if not x.is_empty else 0.0
+        if ar <= OVERLAP_M2:
+            continue
+        zo = BR._junction_z(cx, o)
+        if zo[0] - BR.Z_NEAR_M > zj[1] or zo[1] + BR.Z_NEAR_M < zj[0]:
+            continue
+        a0, a1 = round(G.area1(me), 2), round(G.area1(polys[k]), 2)
+        rec = {"id": o.id, "ring": [[C.m2(q[0]), C.m2(q[1])]
+                                    for q in G.from_model_poly(o.polygon).exterior.coords[:-1]]}
+        if a1 > a0 or (a1 == a0 and o.id < j.id):
+            sf = _surface(_junction_base(cx, o))
+            rec["owner"] = True
+            rec["drawn"] = [[x_, y_, C.m(sf["zfun"](x_, y_))] for x_, y_ in sf["cring"]]
+            # (and its corners: this one's pads keep off what it paves)
+            rec["area"] = [[[C.m2(q[0]), C.m2(q[1])] for q in rg]
+                           for rg in BR.junction_area(cx, o)[1:]]
+        out.append(rec)
+    return out
+
+
+def _lanes_off(cx: Ctx, j) -> list:
+    """#82: the junction's connector lanes whose corridor (its width less `LANE_IN_M` a
+    side) runs off its outline by over `OVERLAP_M2`: {"line", "h"}."""
+    from citygen import geom as G
+
+    from . import barriers as BR
+    lanes = [ln for ln in sorted(BR._connectors(cx, j.node_id), key=lambda ln: ln.id)
+             if len(ln.centerline) >= 2 and ln.width_m / 2.0 - LANE_IN_M > 0.5]
+    if not lanes:
+        return []
+    poly = G.from_model_poly(j.polygon)
+    out = []
+    for ln in lanes:
+        h = ln.width_m / 2.0 - LANE_IN_M
+        line = shapely.LineString([(q[0], q[1]) for q in ln.centerline])
+        cor = line.buffer(h, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+        if shapely.difference(cor, poly).area > OVERLAP_M2:
+            out.append({"line": [[C.m2(q[0]), C.m2(q[1])] for q in ln.centerline],
+                        "h": C.m(h)})
+    return out
 
 
 def _off_deck(cx: Ctx, j) -> list:
@@ -452,6 +647,101 @@ def _area(ring) -> float:
 
 @maker("junction", 3)
 def make_junction(inp: dict) -> Out:
+    sf = _surface(inp)
+    j = inp["junction"]
+    ring, holes, legs, zn, zfun, vz = sf["ring"], sf["holes"], sf["legs"], sf["zn"], \
+        sf["zfun"], sf["vz"]
+    cring = sf["cring"]
+    P = (inp["node"][0], inp["node"][1])
+    style = inp["style"]
+    mesh = Mesh(inp["origin"])
+    top = max((r["cls"] for r in legs), key=lambda c: RANK.get(c, 0), default="street")
+    slot = {"highway": "asphalt.highway", "avenue": "asphalt.avenue"}.get(
+        top, "asphalt.alley" if top in ("alley", "service") else "asphalt.street")
+    if top in PEDESTRIAN:
+        slot = MT.paving(style["archetype"])
+    # #82: the carriageway as drawn: the outline less what an overlapping junction that owns
+    # it draws, with the connector lanes that run off it round its corners
+    sectors = _sectors(ring, P, legs, j)
+    car = _carriageway(inp, sf, sectors)
+    others = [o["ring"] for o in inp.get("overlaps", ())]
+    if car is None:
+        ok = mesh.poly(slot, cring, holes, zfun=zfun, keep_straight=cring is not ring)
+        if not ok:
+            # a ring that touches itself: its valid parts, in a fixed order
+            ok = any([mesh.poly(slot, r, hs, zfun=zfun) for r, hs in _valid_parts(ring, holes)])
+        if not ok:
+            return Out(empty="untriangulable polygon")
+        drawn = [(cring, holes)]
+        hz = zfun
+        bz = zfun if vz is None else _edge_z([[(x, y, zfun(x, y)) for x, y in cring]])
+    else:
+        drawn, hz, paved = car
+        if not drawn:
+            return Out(empty="inside an overlapping junction")
+        for r, hs in drawn:
+            mesh.poly(slot, r, hs, zfun=hz, keep_straight=True)
+        rz = [[(x, y, hz(x, y)) for x, y in r] for r, _ in drawn]
+        rz += [[(p[0], p[1], p[2]) for p in o["drawn"]] for o in inp.get("overlaps", ())
+               if o.get("drawn")]
+        bz = _edge_z(rz)
+    # (raised: its node or a leg where it leaves it over its ground by `RAISED_M`)
+    up = zn - inp["node_ground"] - ROAD_DZ > RAISED_M or \
+        any(r["zo"] > RAISED_M for r in sf["lz"])
+    if j.get("level"):
+        for r_, hs_ in inp.get("off_deck", ()):
+            mesh.prism("concrete.deck", ccw(r_), zn - ROAD_DZ - 1.2, zn - ROAD_DZ - 0.01,
+                       top=False, bottom=True, holes=[ccw(h)[::-1] for h in hs_])
+    elif car is None and vz is None:
+        if zn - inp["node_ground"] - ROAD_DZ > 0.5:
+            D = max(DECK_D.get(r["cls"], 1.2) for r in legs) if legs else 1.2
+            mesh.prism("concrete.deck", ring, zn - ROAD_DZ - D, zn - ROAD_DZ - 0.01,
+                       top=False, bottom=True)
+    elif up:
+        # (#82: under a raised junction whose surface is not level, the slab follows it: a
+        # flat slab at its node's height stood through its lower stretches)
+        D = max(DECK_D.get(r["cls"], 1.2) for r in legs) if legs else 1.2
+        for r, hs in drawn:
+            _draped(mesh, "concrete.deck", r, hs, hz, D)
+    rows: dict = {}
+    curbs = [r for r, _ in drawn] + [h for _, hs in drawn for h in hs] + list(others)
+    block = None
+    if car is not None or others:
+        from citygen import geom as G
+        with G.canonical():
+            gs = [G.qpoly(shapely.make_valid(shapely.Polygon(r, hs))) for r, hs in drawn]
+            gs += [G.qpoly(shapely.make_valid(shapely.Polygon(o))) for o in others]
+            gs += [G.qpoly(shapely.make_valid(shapely.Polygon(rg)))
+                   for o in inp.get("overlaps", ()) for rg in o.get("area", ())]
+            block = G.union(gs) if gs else None
+    made: list = []
+    pads = _corners(mesh, ring, holes, P, legs, j, style, bz, rows, sectors=sectors,
+                    block=block, curbs=curbs, pads_out=made)
+    if inp.get("barriers"):
+        _junction_barriers(mesh, ring, legs, inp["barriers"], rows, bz)
+    out = Out(mesh=mesh)
+    out.notes["corner_pads"] = pads
+    if car is not None and car[2]:
+        # (#82: the connector lanes' runs it paves past its outline; AG8 keeps props off them)
+        out.notes["paved"] = car[2]
+    if not j.get("level") and drawn and up:
+        # (#89: on a raised junction a thing stands only where AG7 paves: its carriageway
+        # and the corner pads it drew, in the corners between its legs; AG8 reads this)
+        out.notes["raised"] = {
+            "area": [[[C.m2(x), C.m2(y)] for x, y in sc["sector"]] for sc in sectors
+                     if "sector" in sc and sc["sidewalk"]],
+            "carriageway": [[[C.m2(x), C.m2(y)] for x, y in r] for r, _ in drawn],
+            "z": [C.m(min(hz(x, y) for r, _ in drawn for x, y in r)),
+                  C.m(max(hz(x, y) for r, _ in drawn for x, y in r))],
+            "pads": made}
+    return out
+
+
+def _surface(inp: dict) -> dict:
+    """A junction's outline, legs and heights: {ring, holes, legs, lz, flat, zn, vz (height
+    of each outline vertex, None where level at its node), zfun, cring (the outline with
+    its legs' carriageway corners)}. Shared by its piece and (#82) the pieces of junctions
+    that overlap it."""
     j = inp["junction"]
     ring = ccw(j["polygon"]["exterior"])
     # holes: M2 leaves only slivers (a ring touching the outline); a junction is paved through
@@ -459,8 +749,6 @@ def make_junction(inp: dict) -> Out:
              if abs(_area(h)) >= 4.0 and not any(tuple(p) in {tuple(q) for q in ring} for p in h)]
     P = (inp["node"][0], inp["node"][1])
     zn = inp["node"][2] + inp["node_ground"] + ROAD_DZ
-    style = inp["style"]
-    mesh = Mesh(inp["origin"])
     legs = []
     for lg in inp["legs"]:
         pts = lg["line"] if lg["at_start"] else lg["line"][::-1]
@@ -472,7 +760,6 @@ def make_junction(inp: dict) -> Out:
         if lg.get("ground"):
             gp = Profile.of(lg["ground"])
         elif lg.get("ground_pts"):
-            g = lg["ground_pts"] if lg["at_start"] else lg["ground_pts"][::-1]
             gp = Profile(list(zip(Path(lg["line"]).cum, lg["ground_pts"])))
         else:
             gp = Profile([])
@@ -484,11 +771,13 @@ def make_junction(inp: dict) -> Out:
         rec = {"cls": cls, "d": d, "ang": M.atan2(d[1], d[0]), "L": Lr, "row": lg["width"] / 2.0,
                "side": side, "id": lg["id"], "exit": ex,
                "key": f"{lg['id']}@{'s' if lg['at_start'] else 'e'}",
-               "path": path, "h": lg["width"] / 2.0 - side}
+               "path": path, "h": lg["width"] / 2.0 - side,
+               "zs": (lambda s, gp=gp, zp=zp, a=lg["at_start"], L=Lr:
+                      gp(s if a else L - s) + zp(s if a else L - s) + ROAD_DZ)}
         if ex is not None:
             s = ex[0]
-            sm = s if lg["at_start"] else Lr - s
-            rec["z"] = gp(sm) + zp(sm) + ROAD_DZ
+            rec["z"] = rec["zs"](s)
+            rec["zo"] = zp(s if lg["at_start"] else Lr - s)   # (over its ground)
             a, b = ring[ex[1]], ring[(ex[1] + 1) % len(ring)]
             rec["mid"] = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
             rec["at"] = path.point(s)
@@ -503,7 +792,6 @@ def make_junction(inp: dict) -> Out:
     if ez and len(ez) == len(j["polygon"]["exterior"]):
         vz = {(p[0], p[1]): inp["node_ground"] + z + ROAD_DZ
               for p, z in zip(j["polygon"]["exterior"], ez)}
-        vpts = list(vz.items())
     else:
         vz = None
     if vz is not None:
@@ -514,7 +802,6 @@ def make_junction(inp: dict) -> Out:
             for k in _cut_run(ring, r):
                 if (ring[k][0], ring[k][1]) in vz:
                     vz[(ring[k][0], ring[k][1])] = r["z"]
-        vpts = list(vz.items())
     if vz is None and not flat and lz:
         # AG14: no surface in the model (a junction M18 left flat whose legs AG7 sees at
         # other heights): each leg's cut edge at the leg's height there, the curb between
@@ -542,7 +829,9 @@ def make_junction(inp: dict) -> Out:
             db = (cum[b] - cum[k]) % per
             f = da / (da + db) if da + db > 0 else 0.0
             vz[(ring[k][0], ring[k][1])] = anchor[a] + (anchor[b] - anchor[a]) * f
-        vpts = list(vz.items())
+    if vz is not None:
+        _along_legs(ring, lz, vz)
+    vpts = list(vz.items()) if vz is not None else []
 
     def zfun(x, y):
         if vz is not None:
@@ -564,11 +853,6 @@ def make_junction(inp: dict) -> Out:
             acc += r["z"] * w
             wt += w
         return acc / wt
-    top = max((r["cls"] for r in legs), key=lambda c: RANK.get(c, 0), default="street")
-    slot = {"highway": "asphalt.highway", "avenue": "asphalt.avenue"}.get(
-        top, "asphalt.alley" if top in ("alley", "service") else "asphalt.street")
-    if top in PEDESTRIAN:
-        slot = MT.paving(style["archetype"])
     cring = ring
     if vz is not None:
         # AG14: a leg's carriageway corners where they fall on the outline between its
@@ -577,27 +861,149 @@ def make_junction(inp: dict) -> Out:
         cring, extra = _with_corners(ring, legs, inp["legs"])
         for p, z in extra:
             vz[p] = z
-    ok = mesh.poly(slot, cring, holes, zfun=zfun, keep_straight=cring is not ring)
-    if not ok:
-        # a ring that touches itself: its valid parts, in a fixed order
-        ok = any([mesh.poly(slot, r, hs, zfun=zfun) for r, hs in _valid_parts(ring, holes)])
-    if not ok:
-        return Out(empty="untriangulable polygon")
-    if j.get("level"):
-        for r_, hs_ in inp.get("off_deck", ()):
-            mesh.prism("concrete.deck", ccw(r_), zn - ROAD_DZ - 1.2, zn - ROAD_DZ - 0.01,
-                       top=False, bottom=True, holes=[ccw(h)[::-1] for h in hs_])
-    elif zn - inp["node_ground"] - ROAD_DZ > 0.5:
-        D = max(DECK_D.get(r["cls"], 1.2) for r in legs) if legs else 1.2
-        mesh.prism("concrete.deck", ring, zn - ROAD_DZ - D, zn - ROAD_DZ - 0.01, top=False,
-                   bottom=True)
-    rows: dict = {}
-    pads = _corners(mesh, ring, holes, P, legs, j, style, zfun, rows)
-    if inp.get("barriers"):
-        _junction_barriers(mesh, ring, legs, inp["barriers"], rows, zfun)
-    out = Out(mesh=mesh)
-    out.notes["corner_pads"] = pads
-    return out
+    return {"ring": ring, "holes": holes, "legs": legs, "lz": lz, "flat": flat, "zn": zn,
+            "vz": vz, "zfun": zfun, "cring": cring}
+
+
+LONG_LEG_M = 40.0       # #82: a leg running this far inside its junction ...
+ALONG_FROM_M = 15.0     # ... gives the outline beside it its height from here on
+
+
+def _along_legs(ring, lz: list, vz: dict) -> None:
+    """#82: where a leg runs on inside its junction past `LONG_LEG_M` (M17 laid two roads
+    between the same two nodes side by side, and their shared pavement joined both
+    junctions: the whole ramp between them), the outline beside it (within its right of
+    way, from `ALONG_FROM_M` off the node to a meter short of its exit) takes the leg's
+    height there: M18's curb, running evenly from one leg's cut to the next round the
+    outline, stood meters off the ramp. A vertex beside two such legs takes the nearer's."""
+    long = [r for r in lz if r["exit"][0] >= LONG_LEG_M]
+    if not long:
+        return
+    cuts = {k for r in lz for k in _cut_run(ring, r)}
+    for k, p in enumerate(ring):
+        if k in cuts:
+            continue
+        best = None
+        for r in long:
+            s, t = r["path"].project(p[0], p[1])
+            if ALONG_FROM_M <= s <= r["exit"][0] - 1.0 and abs(t) <= r["row"] + 0.05 and \
+                    (best is None or abs(t) < best[0]):
+                best = (abs(t), r["zs"](s))
+        if best is not None:
+            vz[(p[0], p[1])] = best[1]
+
+
+def _edge_z(rings) -> callable:
+    """#82: the height at a point of the nearest point on rings of (x, y, z) vertices (linear
+    along each edge; ties to the first): what a corner pad, its curb and a junction's own
+    barriers stand on (an inverse-distance blend of the outline's vertices stood off the
+    curb between them)."""
+    segs = []
+    for r in rings:
+        n = len(r)
+        for i in range(n):
+            segs.append((r[i], r[(i + 1) % n]))
+
+    def f(x: float, y: float) -> float:
+        best = None
+        for (ax, ay, az), (bx, by, bz) in segs:
+            dx, dy = bx - ax, by - ay
+            L2 = dx * dx + dy * dy
+            t = 0.0 if L2 <= 0.0 else min(max(((x - ax) * dx + (y - ay) * dy) / L2, 0.0), 1.0)
+            ex, ey = x - ax - dx * t, y - ay - dy * t
+            d2 = ex * ex + ey * ey
+            if best is None or d2 < best[0] - 1e-12:
+                best = (d2, az + (bz - az) * t)
+        return best[1] if best is not None else 0.0
+    return f
+
+
+def _draped(mesh: Mesh, slot: str, ring, holes, zf, D: float) -> None:
+    """A slab D deep under a surface (its vertices at zf): its sides and underside."""
+    for rr in [ring] + list(holes):
+        n = len(rr)
+        for i in range(n):
+            a, b = rr[i], rr[(i + 1) % n]
+            mesh.wall(slot, a, b, zf(*a) - ROAD_DZ - D, zf(*a) - ROAD_DZ - 0.01,
+                      zf(*b) - ROAD_DZ - D, zf(*b) - ROAD_DZ - 0.01)
+    mesh.poly(slot, ring, holes, zfun=lambda x, y: zf(x, y) - ROAD_DZ - D, up=False,
+              keep_straight=True)
+
+
+CAR_MIN_M2 = 0.5        # #82: pieces of a lane's run off its junction smaller than this go
+
+
+def _carriageway(inp: dict, sf: dict, sectors: list):
+    """#82: the carriageway a junction draws, as ([(ring, holes)], height function), or None
+    where it is its outline (as before): its outline less the junctions that overlap it and
+    own the overlap (`overlaps`: the larger outline draws it whole), with each connector
+    lane's run off the outline within the corners between its legs (`lanes`: M2 lays a
+    turning lane over the sidewalk corner, past the curb). Heights: the outline's own
+    vertices as before; a vertex on an owner's outline its height there (so the two
+    surfaces meet along it); a vertex of a lane's run the curb's at its nearest point."""
+    from citygen import geom as G
+    own = [o for o in inp.get("overlaps", ()) if o.get("owner")]
+    lanes = inp.get("lanes") or []
+    if not own and not lanes:
+        return None
+    holes, cring, zfun = sf["holes"], sf["cring"], sf["zfun"]
+    with G.canonical():
+        base = G.qpoly(shapely.make_valid(shapely.Polygon(cring, holes)))
+        add = None
+        if lanes and any("sector" in s for s in sectors):
+            cor = G.union([G.qpoly(shapely.LineString(ln["line"]).buffer(
+                ln["h"], cap_style="flat", join_style="mitre", mitre_limit=2.0))
+                for ln in lanes])
+            sec = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(s["sector"])))
+                           for s in sectors if "sector" in s])
+            add = G.diff(G.inter(cor, sec), base)
+            parts = [p for p in G.parts(add) if G.area1(p) >= CAR_MIN_M2]
+            add = G.union(parts) if parts else None
+        if add is None and not own:
+            return None
+        g = base if add is None else G.union([base, add])
+        if own:
+            g = G.diff(g, G.union([G.qpoly(shapely.make_valid(shapely.Polygon(o["ring"])))
+                                   for o in own]))
+        drawn = []
+        for p in sorted(G.parts(g), key=lambda q: (G.qbounds(q), G.area1(q))):
+            if G.area1(p) < CAR_MIN_M2:
+                continue
+            e = ccw([(c[0], c[1]) for c in p.exterior.coords[:-1]])
+            hs = [ccw([(c[0], c[1]) for c in h.coords[:-1]])[::-1] for h in p.interiors]
+            drawn.append((e, hs))
+    if (add is None and len(drawn) == 1 and not drawn[0][1] and
+            {tuple(p) for p in drawn[0][0]} == {tuple(p) for p in cring}):
+        return None       # (the owners only touch it)
+    own_rings = [[(q[0], q[1]) for q in o["drawn"]] for o in own]
+    seam = _edge_z([[(q[0], q[1], q[2]) for q in o["drawn"]] for o in own]) if own else None
+    curb = _edge_z([[(x, y, zfun(x, y)) for x, y in cring]])
+    vz = sf["vz"]
+    hz_of: dict = {}
+    for r, hs in drawn:
+        for x, y in list(r) + [q for h in hs for q in h]:
+            if (x, y) in hz_of:
+                continue
+            if seam is not None and any(_near((x, y), o, True, 0.015) for o in own_rings):
+                z = seam(x, y)
+            elif vz is not None and (x, y) in vz:
+                z = vz[(x, y)]
+            elif vz is None:
+                z = zfun(x, y)
+            else:
+                z = curb(x, y)
+            hz_of[(x, y)] = z
+
+    def hz(x, y):
+        z = hz_of.get((x, y))
+        return z if z is not None else curb(x, y)
+    paved = []
+    if add is not None:
+        for p_ in sorted(G.parts(add), key=lambda q: (G.qbounds(q), G.area1(q))):
+            e = [(c[0], c[1]) for c in p_.exterior.coords[:-1]]
+            paved.append([[C.m2(x), C.m2(y), C.m(hz(x, y) - inp["node_ground"] - ROAD_DZ)]
+                          for x, y in e])
+    return drawn, hz, paved
 
 
 def _junction_barriers(mesh: Mesh, ring, legs, plan: dict, rows: dict, zfun):
@@ -731,9 +1137,9 @@ def _with_corners(ring, legs: list, raw: list):
     return (out if inserted else ring), extra
 
 
-def _minus(sector, ring, holes, taken=()):
-    """The sector polygon less the junction polygon and the corners already made, as
-    counterclockwise rings (citygen's snapped overlay), or None."""
+def _minus(sector, ring, holes, taken=(), block=None):
+    """The sector polygon less the junction polygon (#82: and `block`) and the corners
+    already made, as counterclockwise rings (citygen's snapped overlay), or None."""
     import shapely
     from shapely.geometry import Polygon
 
@@ -742,6 +1148,8 @@ def _minus(sector, ring, holes, taken=()):
         with G.canonical():
             a = G.qpoly(shapely.make_valid(Polygon(sector)))
             b = G.qpoly(shapely.make_valid(Polygon(ring, holes)))
+            if block is not None:
+                b = G.union([b, block])
             if taken:
                 b = G.union([b] + [Polygon(t) for t in taken])
             d = G.diff(a, b)
@@ -809,29 +1217,27 @@ def _chains(edges: list) -> list[list]:
     return out
 
 
-def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) -> list:
-    """Sidewalk corners between neighboring legs; [made, skipped, why skipped];
-    `rows_out` (#95) gets each drawn corner's outer edges along its property line (its
-    pads' edges there, counterclockwise: the pad on their left), by its first leg's index."""
-    made = skipped = 0
+def _sectors(ring, P, legs, j) -> list:
+    """The corners between neighboring legs: {"i" (its first leg's index), "sector" (from
+    the node out to both legs' cut lines and round the property line), "row" (the property
+    line), "sidewalk" (whether either leg has one)} or {"i", "skip": why}."""
+    out: list = []
     n = len(legs)
     if n < 2 or j.get("shape") == "cul_de_sac":
-        return [0, 0, {}]
-    why: dict[str, int] = {}
-    taken: list = []          # earlier corners: a later one never overlaps them
-    drawn: list = []
-    pave = MT.paving(style["archetype"])
-    curb_slot = MT.curb(style["archetype"])
+        return out
     r_all = j.get("corner_radius_m", 6.0)
     N = len(ring)
     for i in range(n):
         a, b = legs[i], legs[(i + 1) % n]
-        if a["exit"] is None or b["exit"] is None or (a["side"] <= 0.0 and b["side"] <= 0.0):
+        if a["exit"] is None or b["exit"] is None:
+            continue
+        side = not (a["side"] <= 0.0 and b["side"] <= 0.0)
+        if _twins(a, b):
+            out.append({"i": i, "skip": "twin legs", "sidewalk": side})
             continue
         ea, eb = a["exit"][1], b["exit"][1]
         if ea == eb:
-            skipped += 1
-            why["same edge"] = why.get("same edge", 0) + 1
+            out.append({"i": i, "skip": "same edge", "sidewalk": side})
             continue
         chain = []
         k = (ea + 1) % N
@@ -843,8 +1249,7 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
             if len(chain) > N:
                 break
         if len(chain) < 2 or len(chain) > N:
-            skipped += 1
-            why["chain"] = why.get("chain", 0) + 1
+            out.append({"i": i, "skip": "chain", "sidewalk": side})
             continue
         Ca, Cb = chain[0], chain[-1]
         da, db = a["d"], b["d"]
@@ -873,12 +1278,99 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
                     if 0.0 <= xa <= cut_a + 0.01 and 0.0 <= xb <= cut_b + 0.01:
                         row.append(X)
         row.append(Rb)
+        Pa = (P[0] + cut_a * da[0], P[1] + cut_a * da[1])
+        Pb = (P[0] + cut_b * db[0], P[1] + cut_b * db[1])
+        sector = [P, Pa] + row + [Pb]
+        if c is not None and len(row) >= 4 and (_bends(a, P, Ca) or _bends(b, P, Cb)):
+            # #82: a leg that bends before its cut (a curving avenue run on inside its
+            # junction to the next node): the sector along its own line and property line,
+            # not straight on from the node (a wedge 100 m long beside a curving ramp)
+            ka, kb = _along(a, P, Ca, a["row"], ta), _along(b, P, Cb, -b["row"], tb)
+            if ka is not None and kb is not None:
+                (ca, oa), (cb, ob) = ka, kb
+                row = [oa[-1]] + oa[::-1][1:-1] + row[1:-1] + ob[1:-1] + [ob[-1]]
+                sector = ca + row + cb[::-1]
+        out.append({"i": i, "sector": sector, "row": row, "sidewalk": side})
+    return out
+
+
+BEND_M = 0.5            # #82: a leg bends where its line leaves its direction by this
+
+
+def _twins(a: dict, b: dict) -> bool:
+    """#82: two legs run side by side inside their junction to the same far node (both
+    past `LONG_LEG_M`): the ground between them is the pavement they share, no corner."""
+    pa, pb = a["path"].p[-1], b["path"].p[-1]
+    return a["exit"][0] >= LONG_LEG_M and b["exit"][0] >= LONG_LEG_M and \
+        abs(pa[0] - pb[0]) <= 0.05 and abs(pa[1] - pb[1]) <= 0.05
+
+
+def _bends(lg: dict, P, C_) -> bool:
+    """Whether a leg's line leaves its direction from the node by over `BEND_M` before its
+    cut (the outline vertex C_ there)."""
+    path, d = lg["path"], lg["d"]
+    s_cut, _ = path.project(C_[0], C_[1])
+    for q, sq in zip(path.p[1:-1], path.cum[1:-1]):
+        if sq >= s_cut:
+            break
+        if abs((q[0] - P[0]) * d[1] - (q[1] - P[1]) * d[0]) > BEND_M:
+            return True
+    return False
+
+
+def _along(lg: dict, P, C_, off: float, t0: float):
+    """A leg's centerline from the node to its cut and its property line (offset `off`,
+    left positive) from `t0` along it out to the cut, as point lists from the node out;
+    None where the cut is not past t0."""
+    path = lg["path"]
+    s_cut, _ = path.project(C_[0], C_[1])
+    if s_cut <= t0 + 0.5:
+        return None
+    center = [P] + [q for q, sq in zip(path.p[1:-1], path.cum[1:-1]) if sq < s_cut] + \
+        [path.point(s_cut)]
+    offs = []
+    for sv, vi in path.stations(t0, s_cut, 1e9):
+        x, y, nx, ny, k = path.frame(sv, vi)
+        offs.append((C.m2(x + nx * k * off), C.m2(y + ny * k * off)))
+    return center, offs
+
+
+def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None, sectors=None,
+             block=None, curbs=None, pads_out=None) -> list:
+    """Sidewalk corners between neighboring legs; [made, skipped, why skipped];
+    `rows_out` (#95) gets each drawn corner's outer edges along its property line (its
+    pads' edges there, counterclockwise: the pad on their left), by its first leg's index.
+    #82: `block` (shapely) is the carriageway as drawn where it is not the outline (less an
+    overlapping junction's, with the connector lanes run off it) and the overlapping
+    junctions' outlines, which no pad covers; `curbs` the rings the pads' curbs face;
+    `zfun` the carriageway's height at the curb nearest a point (the pads stand 0.15 m
+    over it); `pads_out` (#89) gets each pad drawn as a ring of (x, y, top)."""
+    made = skipped = 0
+    n = len(legs)
+    if n < 2 or j.get("shape") == "cul_de_sac":
+        return [0, 0, {}]
+    if sectors is None:
+        sectors = _sectors(ring, P, legs, j)
+    if curbs is None:
+        curbs = [ring] + list(holes)
+    outer = [ring] if block is None else [c for c in curbs if c not in holes]
+    why: dict[str, int] = {}
+    taken: list = []          # earlier corners: a later one never overlaps them
+    drawn: list = []
+    pave = MT.paving(style["archetype"])
+    curb_slot = MT.curb(style["archetype"])
+    for sc in sectors:
+        if not sc["sidewalk"]:
+            continue
+        if "skip" in sc:
+            skipped += 1
+            why[sc["skip"]] = why.get(sc["skip"], 0) + 1
+            continue
+        i, row = sc["i"], sc["row"]
         # the corner: the sector from the node out to both sidewalks' ends and round the
         # property line, less the carriageway (the junction polygon); a leg without a
         # sidewalk leaves at most a sliver, which is dropped
-        Pa = (P[0] + cut_a * da[0], P[1] + cut_a * da[1])
-        Pb = (P[0] + cut_b * db[0], P[1] + cut_b * db[1])
-        parts = _minus([P, Pa] + row + [Pb], ring, holes, taken)
+        parts = _minus(sc["sector"], ring, holes, taken, block)
         if parts is None:
             skipped += 1
             why["overlay"] = why.get("overlay", 0) + 1
@@ -916,11 +1408,13 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
                 why["fold"] = why.get("fold", 0) + 1
                 continue
             drew = True
+            if pads_out is not None:
+                pads_out.append([[C.m2(x), C.m2(y), C.m(zfun(x, y) + 0.15)] for x, y in r])
             for k in range(len(r)):
                 p, q = r[k], r[(k + 1) % len(r)]
                 mid = ((p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0)
-                if uses[tuple(sorted((p, q)))] == 1 and not _near(mid, ring, True) and \
-                        _near(mid, row, False):
+                if uses[tuple(sorted((p, q)))] == 1 and \
+                        not any(_near(mid, c, True) for c in curbs) and _near(mid, row, False):
                     edge.append((p, q))
             for k in range(len(r)):
                 p, q = r[k], r[(k + 1) % len(r)]
@@ -933,7 +1427,7 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
                 ends.add((q, 1))
                 ends.add((p, -1))
                 mid = ((p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0)
-                if _near(mid, ring, True) or any(_near(mid, h, True) for h in holes):
+                if any(_near(mid, c, True) for c in curbs):
                     mesh.wall(curb_slot, p, q, zfun(*p), zfun(*p) + 0.15, zfun(*q),
                               zfun(*q) + 0.15)
                 elif _near(mid, row, False):
@@ -951,7 +1445,7 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
         # pads abut along their property lines)
         pads = [r for parts, _, _ in drawn for r in parts]
         for i in sorted(rows_out):
-            keep = [e for e in rows_out[i] if _open_out(e, ring, pads, legs)]
+            keep = [e for e in rows_out[i] if _open_out(e, outer, pads, legs)]
             if keep:
                 rows_out[i] = _chains(keep)
             else:
@@ -959,9 +1453,10 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
     return [made, skipped, dict(sorted(why.items()))]
 
 
-def _open_out(e, ring, pads, legs, out_m: float = 0.3) -> bool:
+def _open_out(e, outer, pads, legs, out_m: float = 0.3) -> bool:
     """Whether the ground 0.3 m outside an edge (to its right: counterclockwise rings) is
-    open: off the junction's outline, every pad and every leg's right of way."""
+    open: off the junction's outline (#82: the carriageway's outer rings as drawn and the
+    overlapping junctions' outlines), every pad and every leg's right of way."""
     from .barriers import _inside
     (px, py), (qx, qy) = e
     dx, dy = qx - px, qy - py
@@ -969,7 +1464,7 @@ def _open_out(e, ring, pads, legs, out_m: float = 0.3) -> bool:
     if L < 1e-6:
         return False
     ox, oy = (px + qx) / 2.0 + dy / L * out_m, (py + qy) / 2.0 - dx / L * out_m
-    if _inside(ring, ox, oy) or any(_inside(r, ox, oy) for r in pads):
+    if any(_inside(r, ox, oy) for r in outer) or any(_inside(r, ox, oy) for r in pads):
         return False
     for lg in legs:
         path = lg.get("path")

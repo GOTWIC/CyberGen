@@ -108,7 +108,7 @@ class _Fit:
     `FIT_LOW_M` over its foot, their convex hull, turned and scaled as placed) reaches at
     most `FIT_CLEAR_M` onto one. Variants are made once to measure them."""
 
-    def __init__(self, model):
+    def __init__(self, model, paved=()):
         from ..streets.roads import street_class
         shapes, rows = [], []
         node_z = {n.id: n.position[2] for n in model.road_nodes}
@@ -133,6 +133,13 @@ class _Fit:
                 ln = shapely.LineString([(p[0], p[1]) for p in s.centerline])
                 shapes.append(poly)
                 rows.append(("road", ln, [(z.s, z.z) for z in s.z_profile]))
+            # (#82: the connector lanes' runs AG7 paves past a junction's outline)
+            for ring in paved:
+                if len(ring) < 3:
+                    continue
+                g = shapely.Polygon([(q[0], q[1]) for q in ring])
+                shapes.append(g if g.is_valid else shapely.make_valid(g))
+                rows.append(("junction", None, sum(q[2] for q in ring) / len(ring)))
             seg = {s.id: s for s in model.road_segments}
             for c in model.crosswalks:
                 s = seg.get(c.segment_id)
@@ -187,6 +194,50 @@ class _Fit:
             if abs(zt - z) <= FIT_Z_M:
                 return False
         return True
+
+
+RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
+
+
+class _RaisedCorners:
+    """#89: the corners of AG7's raised junctions (`walks.make_junction`'s notes: the
+    sectors between its legs, its carriageway as drawn and the pads it drew there, with
+    their tops). A standing thing in a corner, at the junction's height, on neither its
+    carriageway nor a pad has nothing under it: AG7 leaves a pad out where it would fold
+    over another or the junction's lanes or a neighbor's pavement take its place."""
+
+    def __init__(self, notes: list):
+        self.rows = []
+        polys = []
+        for rz in notes:
+            pads = [p for p in rz.get("pads", ()) if len(p) >= 3]
+            zs = [q[2] for p in pads for q in p] + list(rz.get("z", ()))
+            area = [shapely.Polygon([(q[0], q[1]) for q in a]) for a in rz.get("area", ())
+                    if len(a) >= 3]
+            area = [a if a.is_valid else shapely.make_valid(a) for a in area]
+            if not area:
+                continue
+            car = [shapely.Polygon([(q[0], q[1]) for q in c]) for c in rz.get("carriageway", ())
+                   if len(c) >= 3]
+            u = shapely.union_all(area)
+            polys.append(u)
+            self.rows.append((u, [shapely.Polygon([(q[0], q[1]) for q in p]) for p in pads],
+                              [c if c.is_valid else shapely.make_valid(c) for c in car],
+                              (min(zs), max(zs)) if zs else None))
+        self.tree = shapely.STRtree(polys) if polys else None
+
+    def unpaved(self, x: float, y: float, z: float) -> bool:
+        if self.tree is None:
+            return False
+        pt = shapely.points(x, y)
+        for k in sorted(self.tree.query(pt, predicate="intersects").tolist()):
+            area, pads, car, zr = self.rows[k]
+            if zr is not None and not zr[0] - 0.15 - RAISED_Z_M <= z <= zr[1] + RAISED_Z_M:
+                continue
+            if any(p.intersects(pt) for p in pads) or any(c.intersects(pt) for c in car):
+                continue
+            return True
+        return False
 
 
 def _carriageway(s, cls: str, jring: dict):
@@ -284,17 +335,27 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
                 continue
             mount.setdefault(e["id"], {"building": bid, "on_wall": e["on_wall"],
                                        "gap": float(e["gap_m"])})
-    # AG7's road pieces with their median barrier
+    # AG7's road pieces with their median barrier, and (#89) its raised junctions' corners
     roads = set()
+    raised = []
+    paved: list = []
     smf = Path(out_dir) / "streets" / "manifest.json"
     if smf.is_file():
         try:
             sm = json.loads(smf.read_text(encoding="utf-8"))
-            for pid, r in sm.get("pieces", {}).items():
+            for pid, r in sorted(sm.get("pieces", {}).items()):
                 if r.get("kind") == "street.road" and r.get("triangles", 0) > 0:
                     roads.add(pid)
+                rz = (r.get("notes") or {}).get("raised")
+                if r.get("kind") == "street.junction" and rz:
+                    raised.append(rz)
+                if r.get("kind") == "street.junction":
+                    paved += (r.get("notes") or {}).get("paved") or []
         except (OSError, ValueError):
             roads = set()
+            raised = []
+            paved = []
+    corners = _RaisedCorners(raised)
     segs = {s.id: s for s in model.road_segments}
 
     def style_of(did):
@@ -367,11 +428,16 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         else:
             k = ST.pick(n, "ag8.prop", p.id)
             alts = [(k + i) % n for i in range(n)]
+        if kind not in FIT_SKIP and kind not in NOT_STANDING and corners.unpaved(x, y, z):
+            # (#89: in a raised junction's corner where AG7 draws no pad: nothing to stand on)
+            g.dropped[p.id] = "a raised junction's corner with no pad (#89)"
+            groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
+            continue
         if kind not in FIT_SKIP and kind not in NOT_STANDING:
             # (#95: the variant drawn, else the next of its family, that keeps clear of the
             # carriageways, junctions and crosswalks; none: the prop is left out)
             if fit is None:
-                fit = _Fit(model)
+                fit = _Fit(model, paved)
             k = next((kk for kk in alts if fit.clear(kind, st, kk, x, y, p.position[2],
                                                       p.yaw_deg, p.scale)), None)
             if k is None:

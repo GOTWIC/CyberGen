@@ -292,11 +292,11 @@ def _ends(model) -> dict[str, set]:
     return out
 
 
-def barrier_clash(pk, model) -> dict:
+def barrier_clash(pk, model, tg: Targets | None = None) -> dict:
     """The clashes of the module docstring: {"counts", "by_kind" (by what and cause),
     "near_junction" (of the counts, those within `NEAR_JUNCTION_M` of a junction),
     "worst"}."""
-    tg = Targets(pk, model)
+    tg = tg if tg is not None else Targets(pk, model)
     br = Barriers(pk, model)
     node_of_j = {j.id: j.node_id for j in model.junctions}
     seg_nodes = _ends(model)

@@ -40,7 +40,10 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
     guard wall, parapet, railing, a junction's corner parapet or median) standing on another
     road's carriageway, on a junction's surface (a junction's own in one of its lanes), on a
     crosswalk, or through another piece's barrier; a standing prop on a vehicle
-    carriageway, a junction or a crosswalk, or through a barrier.
+    carriageway, a junction or a crosswalk, or through a barrier;
+  - *strips over a carriageway* (#82, `strips.py`): a sidewalk, a junction's sidewalk
+    corner or a road's median over a junction's carriageway or another road's, at its
+    height.
 
 Reading back every pack takes memory: the stage works tile by tile (a tile and its eight
 neighbors). Nothing here writes an asset; the report is written only when its bytes change.
@@ -750,17 +753,21 @@ def clash(pk: Packs, model) -> dict:
     if car:
         _over_road(pk, model, Surfaces(np.concatenate(car), np.concatenate(cown), min_nz=0.5),
                    out, counts)
-    # -- barriers and props at junctions (#95)
-    from .barriers import barrier_clash
-    bc = barrier_clash(pk, model)
-    for k, v in bc["counts"].items():
-        counts[k] = v
-        out[k] = bc["worst"][k]
+    # -- barriers and props at junctions (#95), strips over a carriageway (#82)
+    from .barriers import Targets, barrier_clash
+    from .strips import strip_clash
+    tg = Targets(pk, model)
+    bc = barrier_clash(pk, model, tg)
+    sc = strip_clash(pk, model, tg)
+    for r in (bc, sc):
+        for k, v in r["counts"].items():
+            counts[k] = v
+            out[k] = r["worst"][k]
     for k in out:
         out[k] = sorted(out[k], key=lambda r: json.dumps(r, sort_keys=True))[:LIST_MAX]
     n = sum(counts.values())
     return {"id": "asset_clash", "ok": n == 0, "clashes": n, "counts": counts,
-            "barriers_by_kind": bc["by_kind"], "worst": out}
+            "barriers_by_kind": bc["by_kind"], "strips_by_kind": sc["by_kind"], "worst": out}
 
 
 def _over_road(pk: Packs, model, S: Surfaces, out: dict, counts: dict):
@@ -899,6 +906,8 @@ def report_text(rep: dict) -> str:
             lines.append(f"{'PASS' if c['ok'] else 'FAIL'} asset_clash: {c['clashes']} "
                          f"({', '.join(f'{k} {v}' for k, v in c['counts'].items())})")
             for k, v in (c.get("barriers_by_kind") or {}).items():
+                lines.append(f"    {k}: {v}")
+            for k, v in (c.get("strips_by_kind") or {}).items():
                 lines.append(f"    {k}: {v}")
             for k, rows in c["worst"].items():
                 for r in rows[:10]:
