@@ -2058,6 +2058,99 @@ the junctions made it hard to tell whether the road geometry itself was still wr
   a turning lane) the corner parapets are clipped away rather than drawn across the lanes,
   so those corners are open; a footbridge's stairs start inside its junction.
 
+## Fix: junction surfaces, corners and leftovers (issues #82, #89)
+
+A fix between milestones, from run-through 2 and AG14's open items, on #95's barriers. Tests:
+`tests/assetgen/test_ag_junctions.py`; outputs `docs/progress/fix_junctions/`.
+
+- **What was wrong at `jn.e217s328`** (#82, Delta): a highway and an avenue run side by
+  side between it and `jn.e170s444`, 125 m up an 8 m ramp; M17 joined their shared
+  pavement to both junctions, so each outline held the whole ramp (they overlap by
+  2,851 m2) and each drew it at its own heights (M18's curb, running evenly round each
+  outline from leg to leg, 1 to 2 m apart where they cross); each drew corner pads in
+  sectors 125 m long, straight on from the node past a curving avenue; the slab under a
+  raised junction was a flat prism at its node's height, its walls standing through the
+  lower half of the ramp (the strips of the run-through's shot); and the avenue's
+  sidewalks (M2 lays them along the whole road where its cuts overlap) lay on the ramp.
+  The same causes, smaller, ran through every sample (Delta 415 strips over a junction's
+  carriageway and 8 over a road's on main, Vesper Bay 416 and 11, Cragmouth 345 and 2).
+- **Junction surfaces** (`assetgen/streets/walks.py`): of two junctions whose outlines
+  overlap at one height, the larger draws the overlap and the other its outline less it,
+  its vertices on the owner's outline at the owner's heights (`_overlaps`,
+  `_carriageway`); where a leg runs on inside its junction past 40 m, the outline beside it
+  takes the leg's height (`_along_legs`); the slab under a raised junction follows its
+  surface (`_draped`); a junction wholly inside an overlapping one draws nothing (declared
+  in `street_coverage`); a drawn outline loses the needles the overlay can leave (a vertex
+  where it turns back within 3 degrees, `_despike`: Vesper Bay Pinned's `jn.e256s533`,
+  whose slab's walls folded) and is paved through holes under 4 m2, as its outline is (two
+  touching at a point folded Stacks' `jn.e1134s1550` over a pad); a piece of draped slab
+  that would fold is left out.
+- **Corners**: a corner's sector follows a leg that bends before its cut, along its own
+  line and property line (`_along`, `_meet_along`: a leg turning inside its junction left
+  its corner a sliver, and a trash can there over nothing); no corner between two legs
+  that run to the same far node (`_twins`); the pads keep off other junctions and roads
+  within the check's headroom, the sidewalks beside them and the connector lanes, whose
+  runs off the outline in the corners are paved, 2 m off buildings (`_carriageway`, notes
+  `paved`); pads, their curbs and a junction's own barriers stand on the carriageway's
+  height at the nearest curb (`_edge_z`; an inverse-distance blend of the outline's
+  vertices before, off the curb between them); a cul-de-sac gets a sidewalk round its bulb
+  (`_bulb`); a corner's #95 parapet follows its pads' edges joined in any order (`_chains`:
+  a pad drawn in parts gave two lines meeting end to end, whose end faces folded).
+- **Sidewalks and medians**: drawn only where they are off every junction's carriageway
+  and every other road's within the check's headroom (`_clip_rings`, `_clear_spans`: the
+  overlap's pieces projected onto the line, each stretch checked as its rows draw it,
+  mitred at the line's vertices; `roads._median_clip`): M2 lays a road's sidewalks along its
+  whole length where its cuts overlap, and M17's long junctions and cul-de-sac bulbs reach
+  over their legs' sidewalks. Where a junction or road reaches over only part of a
+  sidewalk's width, the stretch's slab goes and the rest of its width is drawn flat at the
+  sidewalk's height, with a face down along its open edges (`_fills`, `_fill`; pieces
+  under 0.05 m2 or 10 cm wide left out): the corner pads keep off the sidewalks' bands, so
+  without it a sidewalk's end beside its junction was left open (Delta 459 m2 over 522
+  sidewalks, a traffic signal 1.08 m over the ground).
+- **Steps** (#89): an outline vertex on a leg's cut takes the height of the road row it
+  lies on (`_run_z`: the cut row, or a mitred row at a bend just past the cut that reaches
+  back over it, else the road's side past the cut), and the side points of the road's rows
+  within 3 m past the cut that fall on the outline become its vertices at the road's height
+  (`_road_rows`, `_with_corners`), every row to its far cut on a road under 12 m between
+  its cuts (leg `far`: Pinned's `rs.e312s524` runs 6.4 m between two overlapping
+  junctions, its far row on the owner's outline); a junction level at its node takes them
+  too.
+- **Props and plants** (#89, AG8): a standing prop on a raised junction's corner pad stands
+  with its foot on the pad as AG7 triangulates it (`_RaisedCorners.pad_top`: a pad follows
+  its nearest curb, 0.78 m under a trash can on Stacks' `jn.w579n1145`, which climbs 5 m);
+  one in a raised junction's corner or its legs' rights of way inside their cuts, at the
+  junction's height, on no pad, carriageway or sidewalk AG7 draws, is left out (AG7's notes
+  `raised` with every corner's sector and `rows`: between two twin legs no corner is
+  drawn, and a highway's corner has no pad); the #95 variant fit keeps props off the lanes
+  AG7 paves; on a terrain city a quay's railing stands with its foot (the variant's lowest
+  posts, as AG14 takes them) on the quay as AG7 draws it (`_quay_tops`: the quay piece made
+  again with AG7's code, the highest of its paving and coping, its rows mitred at bends;
+  `_Tops`), and a plant on the ground with its foot's middle 5 cm into the ground
+  (`_seat`: a shrub's foot is its crown's underside, off its pivot, which floated over a
+  hillside green's slope).
+- **Checks** (AG14): `asset_clash` fails on a sidewalk, junction corner or median over a
+  junction's carriageway or another road's within the headroom (`fit/strips.py`);
+  `asset_grounded` fails on any step over 2 cm (0.15 m before) and on floating quay
+  railings and shrubs (`FAILED`); other props and plants stay listed.
+- **Numbers** (main's street packs measured with the new checks, against this fix's;
+  `assetgen streets`, `props`, `ground`, `fit` on the same models): roads with a step
+  over 2 cm onto their junction, Delta 1 (0.022 m) to 0, Vesper Bay and its Decks 2
+  (0.102 m) to 0, Pinned 2 (0.43 m) to 0, Stacks 2 (0.349 m) to 0, Cragmouth 8 (0.125 m) to
+  0 (largest left 0.002 to 0.015 m); sidewalks, corners and medians over a carriageway,
+  Delta 415 and 8, Vesper Bay 416 and 11, Decks 413 and 3, Pinned 432 and 5, Stacks 408 and
+  6, Cragmouth 345 and 2, all to 0; things off their surface, Delta 6 (5 trash cans at raised
+  corners, a street light) to 1 (the street light, 3.9 cm), Cragmouth 533 (313 quay railings,
+  214 shrubs, 4 trash cans, a signal, a conifer) to 0, the others 0 but Stacks' signal 22.5 m
+  up at a highway junction (over nothing on main too). Every check of the stages passes on
+  the six cities. Table: `docs/progress/fix_junctions/README.md`.
+- **Exporter**: no code change (`docs/unreal_export.md`, record row "#82, #89").
+- **Open** (ISSUE_LINK): a cul-de-sac's road ends square on its cut short of its bulb's
+  curve (a carriageway wedge, also on main); AG7's mitre bulge at a sharp alley hairpin
+  (Decks' `rs.e1681s1093`; the mitre is in `streets/path.py`, in AG12's and AG13's code
+  hashes too); sidewalk slivers under 10 cm (Delta 9.7 m2); Stacks' signal; AG14's grounded
+  rule takes a thing as resting when one of its five feet is. M17's long junctions and the
+  deck girders under junctions are the road recheck's.
+
 ## Order
 
 ```

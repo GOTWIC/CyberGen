@@ -50,7 +50,21 @@ Main's street packs measured with the new checks, against this fix's packs (`ass
 streets`, `props`, `ground`, `fit` on the same city models; every check of those stages
 passes on every city).
 
-NUMBERS_TABLE
+| City | Roads with a step over 2 cm onto their junction (largest) | Sidewalks, corners and medians over a junction's or a road's carriageway | Things off their surface (AG14, this fix) |
+|---|---|---|---|
+| Delta Megacity | 1 (0.022 m) to 0 (0.002 m) | 415 and 8 to 0 | 6 (5 trash cans, a street light) to 1 (the street light, 3.9 cm, reported) |
+| Vesper Bay | 2 (0.102 m) to 0 (0.006 m) | 416 and 11 to 0 | 0 |
+| Vesper Bay Decks | 2 (0.102 m) to 0 (0.006 m) | 413 and 3 to 0 | 0 |
+| Vesper Bay Pinned | 2 (0.430 m, `jn.e368s514`) to 0 (0.004 m) | 432 and 5 to 0 | 0 |
+| Vesper Bay Stacks | 2 (0.349 m, `jn.e559s304`) to 0 (0.003 m) | 408 and 6 to 0 | 1 (a traffic signal at a highway junction 22.5 m up, over nothing on main too, reported) |
+| Cragmouth | 8 (0.125 m) to 0 (0.015 m) | 345 and 2 to 0 | 533 (313 quay railings, 214 shrubs, 4 trash cans, a signal, a conifer) to 0 |
+
+Things off their surface on main were measured on Delta and Cragmouth only. Delta's
+sidewalks left open beside their junctions by the clip (before the fill): 459 m2 over 522
+sidewalks; with it, 9.7 m2 over 95 in slivers under 10 cm wide or 0.05 m2. Delta's five
+trash cans at raised corners with no pad on main all stand on a pad now; AG8 would leave
+out a standing prop in a raised junction's corner or legs with nothing under it (one on
+Vesper Bay Pinned, between two twin legs).
 
 ## Renders
 
@@ -58,4 +72,18 @@ RENDERS
 
 ## Left open
 
-OPEN
+Filed as ISSUE_LINK; none fails a check.
+
+- A cul-de-sac's road ends square on its cut and its bulb's outline starts on the curve, so a
+  wedge of carriageway between them is drawn by neither (also on main; Delta's
+  `rs.e898n497` at `jn.e928n528`, in the cul-de-sac plans above).
+- AG7's mitre bulge at a sharp alley hairpin (Vesper Bay Decks' `rs.e1681s1093`, about
+  2.5 m past the edge at a turn of 110 degrees): the mitre is in `streets/path.py`, whose
+  bytes are also in AG12's and AG13's code hashes.
+- Sidewalk slivers under 10 cm wide or 0.05 m2 (above).
+- Stacks' traffic signal 22.5 m up at `jn.w338s983` and Delta's street light 3.9 cm off a
+  sloped sidewalk (both on main too, reported).
+- AG14's grounded rule takes a thing as resting when one of its five feet is (the smallest
+  gap where fewer than three are within 2 cm).
+- Left for the road recheck, as asked: M17's long junctions and the deck girders under
+  junctions.
