@@ -395,6 +395,8 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .usage-devices thead th { font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-dim); }
 .usage-devices tbody th { font-weight: 500; }
 .usage-devices tbody th i { display: inline-block; width: 10px; height: 7px; border-radius: 1px; margin-right: 8px; background: var(--dc); }
+.usage-devices tbody th small { display: block; margin-left: 18px; font-size: 11px; color: var(--text-dim); font-weight: 400; }
+.usage-devices .na { color: var(--text-dim); }
 .usage-foot { margin: 10px 0 0; font-size: 11px; color: var(--text-dim); }
 
 /* ---- Phones and small windows ------------------------------------------ */

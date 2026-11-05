@@ -363,7 +363,7 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     return "".join(out)
 
 
-DEVICE_ORDER = ("mac", "windows")
+DEVICE_ORDER = ("mac", "windows", "cloud")
 # API prices in dollars per million tokens (Anthropic's first-party rates): input,
 # output, cache read; cache writes are 1.25x input (5-minute) and 2x input (1-hour);
 # fast mode (a model id ending ":fast") is 2x standard. A model not listed shows "no
@@ -401,13 +401,19 @@ def usd(x: float) -> str:
 
 
 def load_usage() -> list[dict]:
-    """The per-device usage files site/usage.py writes (site/usage/<device>.json)."""
+    """The per-device usage files site/usage.py writes (site/usage/<device>.json), and
+    hand-entered ones ("manual": a spend in dollars, "cost_usd", with no logs behind it:
+    cloud sessions, whose logs stay on Anthropic's servers)."""
     out = []
     for p in sorted((SITE / "usage").glob("*.json")):
         u = json.loads(p.read_text(encoding="utf-8"))
-        for f in ("device", "label", "updated", "sessions", "subagents", "totals", "days"):
+        need = ("device", "label", "updated") + (("cost_usd",) if u.get("manual") else
+                                                 ("sessions", "subagents", "totals", "days"))
+        for f in need:
             if f not in u:
                 fail([f"usage/{p.name}: missing {f}"])
+        if u.get("manual"):
+            u.update(sessions=0, subagents=0, totals=dict.fromkeys(("total",) + KINDS, 0), days={}, models={})
         out.append(u)
     rank = {d: i for i, d in enumerate(DEVICE_ORDER)}
     return sorted(out, key=lambda u: (rank.get(u["device"], len(rank)), u["device"]))
@@ -427,6 +433,8 @@ def stamp(iso: str) -> str:
 
 
 def device_cost(u: dict) -> float:
+    if u.get("manual"):
+        return float(u["cost_usd"])
     return sum(sum((cost(m, t) or {}).values()) for m, t in u.get("models", {}).items())
 
 
@@ -505,10 +513,16 @@ def render_usage(us: list[dict]) -> str:
                     f'<span class="mono">{label}</span></div>')
         d += dt.timedelta(days=1)
     rows = "".join(
-        f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}</th>'
-        f'<td class="mono">{big(u["totals"]["total"])}</td><td class="mono">{usd(device_cost(u))}</td>'
-        f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>'
-        f'<td class="mono">{stamp(u["updated"])}</td></tr>' for u in us)
+        f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}'
+        + (f'<small>{esc(u.get("note", "entered by hand"))}</small>' if u.get("manual") else "") + '</th>'
+        + (f'<td class="mono na">n/a</td><td class="mono">{usd(device_cost(u))}</td>'
+           f'<td class="mono na">n/a</td><td class="mono na">n/a</td>' if u.get("manual") else
+           f'<td class="mono">{big(u["totals"]["total"])}</td><td class="mono">{usd(device_cost(u))}</td>'
+           f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>')
+        + f'<td class="mono">{stamp(u["updated"])}</td></tr>' for u in us)
+    manual = [u for u in us if u.get("manual")]
+    extra = (" " + " ".join(f"{u['label']}: {u.get('note', 'entered by hand')}, in the cost only, "
+                            f"its tokens and sessions unknown." for u in manual)) if manual else ""
     newest = max(u["updated"] for u in us)
     return f"""
   <section class="usage glass" id="usage" data-view="all" aria-label="Claude Code usage">
@@ -528,7 +542,7 @@ def render_usage(us: list[dict]) -> str:
         <tbody>{rows}</tbody>
       </table>
     </div>
-    <p class="usage-foot">Tokens include cache reads and writes. API cost is what the tokens would cost at Anthropic's published API prices. Each device records its own sessions, worktree sessions and subagents included.</p>
+    <p class="usage-foot">Tokens include cache reads and writes. API cost is what the tokens would cost at Anthropic's published API prices. Each device records its own sessions, worktree sessions and subagents included.{esc(extra)}</p>
   </section>"""
 
 
