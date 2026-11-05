@@ -1732,8 +1732,8 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   barrier (two pieces at a node they share may overlap where they join, `JOIN_M2`), more
   than `INSET_M` (0.1 m) in; any standing prop's low footprint (AG8's variant, 2 m up) on a
   vehicle carriageway, a junction or a crosswalk (parked vehicles, a signal at its
-  crosswalk's end excepted) or through a barrier. AG8 draws the first variant of a prop's
-  family that keeps clear of them, else leaves the prop out (`props/gather._Fit`), and M6's
+  crosswalk's end excepted) or through a barrier. AG8 draws a prop's hashed variant, else the
+  next of its family in turn, that keeps clear of them, else leaves the prop out (`props/gather._Fit`), and M6's
   quay railings and median barriers stand at most 5 cm onto a junction a vehicle road meets
   and keep 1 m off a crosswalk, railings also off any road's carriageway but a pedestrian
   street's (footbridge decks too), at their height (`props._clear_of_roads`).

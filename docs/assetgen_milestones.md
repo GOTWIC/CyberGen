@@ -2037,7 +2037,7 @@ the junctions made it hard to tell whether the road geometry itself was still wr
   median across where nothing turns across it, each clipped clear of its legs' drawn
   carriageways, its own lanes, crosswalks, other roads, junctions and building masses near
   it. Footbridge railings end short of their junctions too.
-- **Props**: AG8 draws the first variant of a prop's family whose footprint (2 m up) keeps
+- **Props**: AG8 draws a prop's hashed variant, else the next of its family, whose footprint (2 m up) keeps
   within 5 cm of every vehicle carriageway, junction and crosswalk at its height, else
   leaves the prop out (`props/gather._Fit`); M6's quay railings and median barriers stand at
   most 5 cm onto a junction a vehicle road meets and keep 1 m off a crosswalk, railings also

@@ -44,7 +44,7 @@ drew them).
   their road pieces draw them), its own lanes, its crosswalks, other roads and junctions
   near it at its height and the building masses there.
 - **Footbridges**: railings and stone parapets end short of their junctions.
-- **Props**: AG8 draws the first variant of a prop's family that keeps clear of every
+- **Props**: AG8 draws a prop's hashed variant, else the next of its family, that keeps clear of every
   vehicle carriageway, junction and crosswalk at its height, else leaves it out; M6's quay
   railings stand at most 5 cm onto a vehicle junction or a road's carriageway and keep 1 m
   off a crosswalk (a railing at a promenade's edge stays), and the median barrier props keep
