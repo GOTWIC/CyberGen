@@ -1723,8 +1723,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   masses; building vertices past their masses by 0.3 m over a carriageway under 4.5 m;
   bridge and raised road deck tops over each other; transit in a mass outside its portal
   band, tracks in a platform). What fails: roof items, dunnage and street pieces off
-  their surface, a junction step over 0.15 m, any clash; reported only: props and plants
-  (at the model's heights, M20's `prop_support`) and smaller steps. Since issue #95
+  their surface, any junction step over 2 cm and floating trash cans, quay railings and
+  shrubs (since #89), any clash; reported only: other props and plants (at the model's
+  heights, M20's `prop_support`). Since issue #95
   `asset_clash` also checks barriers and props at junctions (`fit/barriers.py`): any
   barrier (AG7's `concrete.barrier`, a footbridge's railings, a deck's rails, a trench's
   walls) standing on another road's carriageway, on a junction's surface (a junction's own
@@ -1770,7 +1771,27 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   brightness (`streets.materials.led_slot`: slot `led.<hex>`, made on demand by
   `slot_spec`, master `emissive`; AG6's catalog puts `led.` on `neon`, brighter by
   `MPC_CityGen`'s `Night` in Unreal and in the Blender night previews).
-Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`.
+- **Junctions** (issues #82, #89, after #95; `walks.py`): of two junctions whose outlines
+  overlap at one height the larger draws the overlap, the other its outline less it at the
+  owner's heights on the seam (`_overlaps`, `_carriageway`; Delta's `jn.e217s328` and
+  `jn.e170s444` each held the whole ramp between them); the outline beside a leg run on
+  inside its junction past 40 m takes the leg's height (`_along_legs`); the slab under a
+  raised junction follows its surface (`_draped`); corner sectors follow a leg that bends
+  (`_along`, `_meet_along`), none between twin legs (`_twins`); pads keep off other
+  junctions, roads, sidewalks and the connector lanes, whose runs off the outline round the
+  corners are paved (notes `paved`), and stand on the curb's height (`_edge_z`); a
+  cul-de-sac gets a sidewalk round its bulb (`_bulb`); sidewalks and medians are not drawn
+  over a carriageway at their height (`_clip_rings`, `roads._median_clip`,
+  `_clear_spans`); an outline vertex on a leg's cut takes the height of the road row it lies
+  on, and road rows just past the cut that fall on the outline become its vertices
+  (`_run_z`, `_road_rows`, `_with_corners`). AG8 leaves out a prop with no pad under it on a
+  raised junction's corner (notes `raised`, `props/gather._RaisedCorners`) and keeps props
+  off the paved lanes; on a terrain city quay railings stand on the quay's paving
+  (`_quay_tops`) and ground plants on the lowest ground under their foot (`_foot_ground`).
+  `asset_clash` also fails on a sidewalk, junction corner or median over a carriageway at
+  its height (`fit/strips.py`).
+Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`; the junctions
+fix: `docs/progress/fix_junctions/`.
 
 AG15 (cyberpunk facades and night, from the first run-through) is in place (tests
 `tests/assetgen/test_ag_night.py`):
