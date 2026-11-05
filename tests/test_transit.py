@@ -4,6 +4,7 @@ with its stations in route order, a line's route does not depend on the other li
 
 import copy
 import functools
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -656,12 +657,16 @@ def test_tube_rings_round_a_loop():
         assert [x for _, x in o] == [k % every == 0 for k in range(len(o))]
 
 
-def test_sky_tube_masts_and_lit_ring_frequency(lines, no_transit):
+def test_sky_tube_masts_and_lit_ring_frequency(lines, no_transit, monkeypatch):
     """#94: `supports: mast` gives M19's cable-stayed masts at the same supports; #97: the
     line's lit ring frequency (here 3) keeps the rings evenly spaced, lights every third
-    and makes their count a multiple of 3."""
+    and makes their count a multiple of 3. Both hold for a line routed again (M19's
+    `_routed` and `_reroute_hosts` make a fresh line: here every line is made afresh)."""
     spec = lines.spec
     tl = next(x for x in spec.transit.lines if x.mode == "sky_tube")
+    reroute = TR._reroute_hosts
+    monkeypatch.setattr(TR, "_reroute_hosts", lambda c, sp, ls: [
+        replace(ln, supports="pylon", lit_every=1) for ln in reroute(c, sp, ls)])
 
     def alone(line):
         one = spec.model_copy(update={"transit": spec.transit.model_copy(

@@ -480,7 +480,8 @@ class Transit(_Model):
         `sky_tube`, else the mode's (presets.SKY_TUBE_SUPPORTS, SKY_TUBE_LIT_RINGS_EVERY)."""
         city = self.sky_tube or SkyTube()
         sup = line.supports or city.supports or presets.SKY_TUBE_SUPPORTS
-        every = line.lit_rings_every or city.lit_rings_every or             presets.SKY_TUBE_LIT_RINGS_EVERY
+        every = (line.lit_rings_every or city.lit_rings_every or
+                 presets.SKY_TUBE_LIT_RINGS_EVERY)
         return sup, int(every)
 
 

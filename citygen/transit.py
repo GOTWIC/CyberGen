@@ -4619,8 +4619,6 @@ def _build(spec, m, fixed: dict) -> Out:
         alt = tuple(tl.altitude_m) if tl.altitude_m else pre.default_altitude_m
         ln = Line(f"tl{i + 1:02d}", tl.name, tl.mode, colors[i], tl.loop, alt,
                   base_z(tl.mode, alt), bool(tl.through_towers))
-        if tl.mode == "sky_tube":
-            ln.supports, ln.lit_every = spec.transit.sky_tube_style(tl)
         for name in tl.route:
             st = resolve_stop(c, name, tl.mode)
             if st is None:
@@ -4650,6 +4648,12 @@ def _build(spec, m, fixed: dict) -> Out:
                                            if ln.min_radius != INF else None])
         lines.append(ln)
     lines = _reroute_hosts(c, spec, lines)
+    # #94, #97: a sky tube's supports and lit rings (set once routed: a line routed again,
+    # `_routed`, `_reroute_hosts`, is a fresh one)
+    specs = {tl.name: tl for tl in spec.transit.lines}
+    for ln in lines:
+        if ln.mode == "sky_tube":
+            ln.supports, ln.lit_every = spec.transit.sky_tube_style(specs[ln.name])
     for ln in lines:
         ln.conflicts += [b.id for b in _corridor(c, ln, ln.pts)]
     gone = set()
