@@ -4021,8 +4021,11 @@ class Builder:
             if pylon or d < 1.0 or rounded:
                 # an elevator core: on the pylon (sky stations), or where the sidewalk is
                 # right under the platform end
-                acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)], 2.5,
-                                     {"station": sid}))
+                if not (rounded and not pylon and d >= 1.0 and tuple(e) == tuple(seg[0])):
+                    # (but at the first end of a platform round the buildings: its own
+                    # elevator, below, is there)
+                    acc.append(self.walk("elevator", [(e[0], e[1], 0.0), (e[0], e[1], z)],
+                                         2.5, {"station": sid}))
                 if f != tuple(e):
                     acc.append(self.walk("path", [(e[0], e[1], 0.0), (f[0], f[1], 0.0)], 3.0,
                                          {"station": sid}))

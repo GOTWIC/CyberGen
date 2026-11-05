@@ -1224,15 +1224,57 @@ The park paths fix (between milestones, from PR #67's open items) is in place:
   the ground, a 5 cm graze passing; a door, lobby or station path may enter its own building,
   a station's or a gate's walkways its megasite's; no entrance's straight link to its walkway
   or that walkway's later pieces through a ground mass of its level, as `_Masses` tests;
-  walled-in entrances and station stairs, M19's, counted in notes) with the finished checks,
-  and `park_access` (every such open space has a park path or a walkway within 3.5 m, or says
-  why; park paths start inside it and stay off the lots; islet parks, land without a
-  district, in a note) with the street checks: 102 checks on a flat sample, 107 with decks.
+  walled-in entrances and station stairs, M19's, counted in notes until the access fixes,
+  which fail them) with the finished checks, and `park_access` (every such open space has a
+  park path or a walkway within 3.5 m, or said why until the access fixes; park paths start
+  inside it and stay off the lots; islet parks, land without a district, in a note) with the
+  street checks: 102 checks on a flat sample, 107 with decks.
 - **Stats** (`report.json`): `open_paths_bent`, `passages`, `passage_m2`, `open_no_access`,
   `walkways_led_round_lots`, `walkways_in_lots`, `entrances_relinked`, `entrances_moved`,
   `entrances_led_round`, `entrances_blocked`. No exporter change: the walkway graph keeps its
   format.
 Sample builds, the measures before and after: `docs/progress/fix_paths/`.
+
+The access fixes (issues #86, #87 and #91, after run-through 2) are in place:
+- **Ways into open space** (`parkpaths.open_paths`, a second pass over the open spaces the
+  park paths and passages leave without a way in, so a city with none keeps its bytes): a
+  path to a neighbor open space's park path within 30 m (`Attach(W, parks=True)`, attrs
+  `access` via_open_space), else one to a walkway up to `UNDER_REACH_M` 90 m away passing
+  under the raised roads between (`low_roads`: every carriageway lower than `UNDER_DECK_M`
+  5 m, over M18's embankments, and the junctions of nodes that low are blocked, a covered
+  tunnel's lid is not; `under_paths`, joining only a walkway whose road is at grade at its
+  foot, `foot_z`, as a raised road's sidewalks are at z 0 in the walk graph; `access`
+  under_road, the path `attrs.under_road`, which M7's road columns keep off,
+  `elevated.column_free`; `access` path where it crosses no road); both new kinds block the
+  carriageways at grade. A park with no street (`blocks` makes a roadless piece over
+  1500 m2 a park) still without a way in (an interchange's infield, a strip between the sea
+  and a megasite) becomes a green verge (kind `green`, `attrs.verge` the reason), as the
+  smaller roadless pieces are; any other open space left says why and fails `park_access`.
+- **Walled-in entrances** (`buildout.link_entrances`, after M3's moves and ways round): an
+  entrance its own complex walls in (towers on one podium) reaches the nearest walkway
+  through the complex (`_through_complex`: a door path with `attrs.through` the property,
+  which the check lets enter that property's buildings), else a gateway `GATE_W_M` 3 m wide
+  is cut through the low buildings (`GATE_MAX_H_M` 30 m, no landmark, traced, held or formed
+  building, no portal; `_gate_ok`) on its straight link to one of the nearest walkways
+  (`_gateway`, `_cut_gate`): each mass standing on the ground there keeps its legs beside
+  the gateway and a mass over it from `GATE_CLEAR_M` 4.5 m up to its top (the first leg keeps
+  the mass's index, the rest go last; the footprint stays the outline;
+  `Building.attrs.passage_cut` the link). Stats `entrances_through_complex`,
+  `entrances_gateways`.
+- **Station stairs** (`transit.Builder._elevated`, `_metro`): an elevated platform end whose
+  sidewalk is reached only round the buildings gets an elevator and a path led round, not a
+  stair straight through them; a metro stair stepped along its concourse that would pass
+  under a building's ground floor becomes an elevator straight down from the sidewalk.
+- **Checks:** `walkway_building_clash` fails a walled-in entrance and station stairs through
+  a building (both were notes) and notes the gateways; `park_access` fails an open space
+  with no way in and notes the long paths and the verges (islet parks stay a note).
+- **Deck columns** (#91, `decks.supports`): the fill-in's last resort, the nearest point of
+  the thin allowed strip, was tested with `thin.contains`, which leaves out the strip's own
+  boundary where that point lies, so a column there was kept or dropped by the grid's
+  rounding; it is tested against the allowed zone (0.1 m round it). Vesper Bay Decks builds
+  on its first full-city try (3 before).
+No exporter change. Sample builds and the numbers before and after:
+`docs/progress/fix_access/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 

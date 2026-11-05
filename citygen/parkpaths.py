@@ -534,13 +534,24 @@ def _grade_of(W, segments: list, junctions: list, nodes: list):
 
 
 def _rows_near(segments: list, zone) -> list:
-    """The rights of way of the roads near zone (a path that crosses one passes under it)."""
+    """(segment id, right of way) of the roads near zone."""
     out = []
     for s in segments:
         pts = [tuple(p[:2]) for p in s["centerline"]]
         if len(pts) >= 2 and not G.apart(LineString(pts), zone, s["width_m"]):
-            out.append(LineString(pts).buffer(s["width_m"] / 2.0, cap_style="flat"))
+            out.append((s["id"], LineString(pts).buffer(s["width_m"] / 2.0, cap_style="flat")))
     return out
+
+
+def _under(W, ps: list, att: Attach, rows: list) -> bool:
+    """Whether a path of ps crosses the right of way of a road other than the one its
+    walkway runs on at its foot (it passes under that road)."""
+    for k, _, pts in ps:
+        own = W.edges[att.idx[k]]["attrs"].get("segment")
+        line = LineString(pts)
+        if any(sid != own and r.intersects(line) for sid, r in rows):
+            return True
+    return False
 
 
 def under_paths(o: dict, attach: Attach, lots: list, others: list, low, at_grade=None) -> list:
@@ -618,8 +629,7 @@ def open_paths(W, opens: list[dict], lots: list[dict], others: list, segments: l
         if ps:
             o["far_path"] = "via_open_space"
             info["via_open_space"] += 1
-            rows = _rows_near(segments, zone) if segments else []
-            under = any(r.intersects(LineString(pts)) for _, _, pts in ps for r in rows)
+            under = _under(W, ps, mates, _rows_near(segments, zone) if segments else [])
             _add(W, o, ps, mates, splits, info, under_road=under)
             continue
         if segments:
@@ -628,8 +638,7 @@ def open_paths(W, opens: list[dict], lots: list[dict], others: list, segments: l
             ps = under_paths(o, attach, lots, others, low,
                              lambda k, f: grade(attach.idx[k], f) <= GRADE_FOOT_M)
             if ps:
-                rows = _rows_near(segments, zone)
-                under = any(r.intersects(LineString(pts)) for _, _, pts in ps for r in rows)
+                under = _under(W, ps, attach, _rows_near(segments, zone))
                 o["far_path"] = "under_road" if under else "path"
                 info["under_roads" if under else "far_paths"] += 1
                 _add(W, o, ps, attach, splits, info, under_road=under)
