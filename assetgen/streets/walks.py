@@ -53,6 +53,8 @@ def _under(zs, zc) -> bool:
     over the strip to `HEAD_M` under it)."""
     return zc[1] >= zs[0] - HEAD_M and zc[0] <= zs[1] + UNDER_M
 CLIP_M2 = 0.0005        # ... where it reaches over this much of it
+FILL_M2 = 0.05          # #82: a piece of a stretch it drops, off those carriageways, this big
+FILL_W_M = 0.1          # ... and this wide (twice its area over its perimeter) is drawn flat
 
 
 def _road_inputs(cx: Ctx, s) -> dict:
@@ -275,6 +277,79 @@ def _clear_spans(P: Path, t0: float, t1: float, rings: list) -> list:
     return out
 
 
+def _fills(P: Path, spans: list, t0: float, t1: float, rings: list) -> list:
+    """#82: the pieces of a sidewalk's band between the stretches `_clear_spans` keeps, off
+    the rings (counterclockwise rings on the grid, with their holes): where a junction or
+    road reaches over the band's inner edge, the stretch goes, and the rest of its width is
+    drawn flat (`_fill`). Pieces under `FILL_M2` or `FILL_W_M` wide are left out."""
+    from citygen import geom as G
+    gaps, at = [], 0.0
+    for a, b in spans:
+        if a - at > 0.01:
+            gaps.append((at, a))
+        at = b
+    if P.L - at > 0.01:
+        gaps.append((at, P.L))
+    if not gaps:
+        return []
+    out = []
+    with G.canonical():
+        inner = [G.qpoly(shapely.make_valid(shapely.Polygon(r))) for r in rings if len(r) >= 3]
+        inner = [g for g in inner if not g.is_empty]
+        u = G.union(inner) if inner else None
+        for a, b in gaps:
+            g = G.qpoly(_drawn(P, a, b, t0, t1))
+            if u is not None:
+                g = G.diff(g, u)
+            for part in G.parts(g):
+                ar = G.area1(part)
+                if ar < FILL_M2:
+                    continue
+                per = sum(math.hypot(q[0] - p_[0], q[1] - p_[1])
+                          for rg in [part.exterior, *part.interiors]
+                          for p_, q in zip(rg.coords[:-1], rg.coords[1:]))
+                if 2.0 * ar < FILL_W_M * per:
+                    continue
+                part = shapely.geometry.polygon.orient(part, 1.0)
+                ring = [(C.m2(x), C.m2(y)) for x, y in part.exterior.coords[:-1]]
+                holes = [[(C.m2(x), C.m2(y)) for x, y in h.coords[:-1]]
+                         for h in part.interiors]
+                out.append((ring, holes))
+    return out
+
+
+def _fill(mesh: Mesh, rd: Road, ring, holes, curb_h: float, curb_slot: str, pave: str,
+          ends) -> bool:
+    """#82: a piece of a sidewalk (`_fills`) flat at its height (the road's at the point,
+    plus the curb), with a face down to under the road along every edge but where it meets
+    a slab the sidewalk draws (`ends`); left out where it would fold."""
+    def zf(x, y):
+        return rd.z(rd.path.project(x, y)[0]) + curb_h
+    slots = (pave, curb_slot)
+    marks = {}
+    for sn in slots:
+        sl = mesh._slot(sn)
+        marks[sn] = (len(sl.pos), len(sl.idx), sl.auto, mesh_check({sn: sl})["winding"])
+    ok = mesh.poly(pave, ring, holes, zfun=zf)
+    if ok:
+        for r in [ring] + list(holes):
+            for k in range(len(r)):
+                a, b = r[k], r[(k + 1) % len(r)]
+                mid = shapely.Point((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+                if ends is not None and ends.boundary.distance(mid) <= 0.02:
+                    continue
+                lo = curb_h + ROAD_DZ + 0.02
+                mesh.wall(curb_slot, a, b, zf(*a) - lo, zf(*a), zf(*b) - lo, zf(*b))
+        ok = all(mesh_check({sn: mesh._slot(sn)})["winding"] <= marks[sn][3] for sn in slots)
+    if not ok:
+        for sn in slots:
+            sl = mesh._slot(sn)
+            n, i, auto, _ = marks[sn]
+            del sl.pos[n:], sl.nrm[n:], sl.uv[n:], sl.idx[i:]
+            sl.auto = auto
+    return ok
+
+
 def _drawn(P: Path, a: float, b: float, t0: float, t1: float):
     """A strip along P from a to b between offsets t0 and t1, as its rows draw it (square at
     its ends, mitred at the line's vertices), shapely."""
@@ -320,14 +395,22 @@ def make_sidewalk(inp: dict) -> Out:
     offs = [0.0, CURB_STONE_M] + ([RAMP_M] if width > RAMP_M + 0.3 else []) + [width]
     curb_slot = MT.curb(style["archetype"])
     pave = MT.paving(style["archetype"])
-    spans = [(0.0, P.L)]
+    spans, fills = [(0.0, P.L)], []
     if inp.get("clip"):
-        # (#82: only where the slab is off every junction's carriageway it reaches into)
-        spans = _clear_spans(P, t_curb, t_curb + sgn * width, [c["ring"] for c in inp["clip"]])
-        if not spans:
+        # (#82: only where the slab is off every junction's carriageway it reaches into;
+        # where it is not, the rest of its width flat)
+        rings = [c["ring"] for c in inp["clip"]]
+        spans = _clear_spans(P, t_curb, t_curb + sgn * width, rings)
+        fills = _fills(P, spans, t_curb, t_curb + sgn * width, rings)
+        if not spans and not fills:
             return Out(empty="inside its junctions")
     for s0, s1 in spans:
         _slab(mesh, P, rd, s0, s1, extra, drops, offs, t_curb, sgn, curb_h, curb_slot, pave)
+    if fills:
+        ends = shapely.union_all([_drawn(P, a, b, t_curb, t_curb + sgn * width)
+                                  for a, b in spans]) if spans else None
+        for ring, holes in fills:
+            _fill(mesh, rd, ring, holes, curb_h, curb_slot, pave, ends)
     # tree pits
     for ts, tt, _ in inp["trees"]:
         if inp.get("clip") and not any(a + PIT_M / 2.0 <= ts <= b - PIT_M / 2.0

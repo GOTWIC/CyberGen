@@ -4,6 +4,7 @@ sidewalk, a junction's corner or a median over a junction's carriageway (`fit.st
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from assetgen.fit.strips import strip_clash
 
@@ -136,6 +137,48 @@ def test_a_sidewalk_is_not_drawn_over_a_junction():
     y = np.array([p[1] for sl in cut.mesh.slots.values() for p in sl.pos]) / 1000.0
     assert not ((y > 10.06) & (y < 29.94)).any()
     assert y.min() < -19.9 and y.max() > 39.9
+
+
+
+def test_a_sidewalk_draws_the_rest_of_its_width_beside_a_junction():
+    """#82: where a junction reaches over only part of a sidewalk's width, the stretch's
+    slab goes and the rest of its width is drawn flat (`walks._fills`), not left open."""
+    from assetgen.streets import walks as W
+    seg = {"id": "rs.a", "centerline": [[0.0, -20.0], [0.0, 40.0]], "width_m": 20.0,
+           "road_class": "avenue", "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 60.0, "z": 0.0}],
+           "cross_section": {"sidewalk_m": [3.0, 3.0], "median_m": 0.0, "curb_m": 0.15},
+           "attrs": {}}
+    road = {"seg": seg, "cls": "avenue", "ends": [], "crossings": [], "lanes": [],
+            "start": "a", "end": "b", "origin": [0.0, 0.0]}
+    walk = {"id": "rs.a.swl", "line": [[-8.5, -20.0], [-8.5, 40.0]], "width_m": 3.0,
+            "side": "left", "curb_m": 0.15}
+    inp = {"walk": walk, "road": road, "style": STYLE, "drops": [], "trees": [],
+           "origin": [0.0, 0.0],
+           "clip": [{"id": "jn.x", "ring": [[-20.0, 10.0], [-9.0, 10.0], [-9.0, 30.0],
+                                            [-20.0, 30.0]]}]}
+    out = W.make_sidewalk(inp)
+
+    def top_at(x, y):
+        """The highest up-facing triangle over (x, y), or None."""
+        best = None
+        for sl in out.mesh.slots.values():
+            Q = np.array(sl.pos, dtype=np.float64) / 1000.0
+            for t in np.array(sl.idx).reshape(-1, 3):
+                a, b, c = Q[t]
+                d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+                if d <= 1e-9:
+                    continue
+                u = ((b[0] - x) * (c[1] - y) - (b[1] - y) * (c[0] - x)) / d
+                v = ((c[0] - x) * (a[1] - y) - (c[1] - y) * (a[0] - x)) / d
+                if u >= 0 and v >= 0 and u + v <= 1:
+                    z = u * a[2] + v * b[2] + (1 - u - v) * c[2]
+                    best = z if best is None else max(best, z)
+        return best
+    slab = top_at(-9.5, 0.0)                                        # the slab off it
+    assert slab is not None and top_at(-8.0, 20.0) == pytest.approx(slab, abs=0.005)
+    assert top_at(-9.5, 20.0) is None                               # not over the junction
+    from assetgen.streets.kit import check
+    assert not any(check(out.mesh.slots).values())
 
 
 def test_a_prop_in_a_raised_corner_with_no_pad_is_left_out():
