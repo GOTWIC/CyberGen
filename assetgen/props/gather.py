@@ -123,12 +123,15 @@ class _Fit:
                     continue
                 shapes.append(G.from_model_poly(j.polygon))
                 rows.append(("junction", None, node_z.get(j.node_id, 0.0)))
+            jring = {j.node_id: [list(p) for p in j.polygon.exterior] for j in model.junctions}
             for s in model.road_segments:
                 if street_class(s) in car or len(s.centerline) < 2:
                     continue
-                h = s.width_m / 2.0 - s.cross_section.sidewalk_m[0]
+                poly = _carriageway(s, street_class(s), jring)
+                if poly is None:
+                    continue
                 ln = shapely.LineString([(p[0], p[1]) for p in s.centerline])
-                shapes.append(ln.buffer(h, cap_style="flat"))
+                shapes.append(poly)
                 rows.append(("road", ln, [(z.s, z.z) for z in s.z_profile]))
             seg = {s.id: s for s in model.road_segments}
             for c in model.crosswalks:
@@ -184,6 +187,34 @@ class _Fit:
             if abs(zt - z) <= FIT_Z_M:
                 return False
         return True
+
+
+def _carriageway(s, cls: str, jring: dict):
+    """A road's carriageway as AG7's road piece draws it (`streets.roads.Road`: from the cut
+    edge at one junction to the other's, mitred at its centerline's vertices), shapely; None
+    where it has none."""
+    from ..streets.roads import Road
+    ends = []
+    for at, nid in (("start", s.start), ("end", s.end)):
+        e = {"at": at}
+        if nid in jring:
+            e["junction"] = {"ring": jring[nid]}
+        ends.append(e)
+    try:
+        rd = Road({"seg": s.model_dump(mode="json", exclude_none=True), "cls": cls,
+                   "ends": ends})
+    except ValueError:
+        return None
+    if rd.s1 - rd.s0 < 0.05:
+        return None
+    left, right = [], []
+    for sv, vi in rd.stations(rd.s0, rd.s1):
+        left.append(rd.at(sv, rd.h, vi))
+        right.append(rd.at(sv, -rd.h, vi))
+    poly = shapely.Polygon(left + right[::-1])
+    if not poly.is_valid:
+        poly = shapely.make_valid(poly)
+    return poly
 
 
 def _z_along(prof, s: float) -> float:
