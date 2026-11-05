@@ -20,6 +20,7 @@
       {"entry": "m20-city", "title": "Complete layout", "caption": "Vesper Bay with every tower, transit line, prop and sign in place.", "wide": true},
       {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props in Greyhook, in Unreal Engine."},
       {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel."},
+      {"entry": "ag8-props", "title": "Street props", "caption": "Every street prop and vehicle in the neon style, laid out.", "wide": true},
       {"entry": "ag10-city", "title": "Vesper Bay, modelled", "caption": "Every building with a model and textures of its own.", "wide": true},
       {"entry": "ag12-canal", "title": "Canal at night", "caption": "Neon and lit windows on a Vesper Bay canal.", "wide": true},
       {"entries": ["ag15-day", "ag15-night"], "labels": ["Day", "Night"], "title": "Day and night", "caption": "Delta Megacity's core, every tower lit its own way after dark.", "wide": true},
@@ -437,6 +438,16 @@
       "title": "An alley in Neon Strand",
       "image": "docs/progress/AG8/vesper_bay/neon_strand_night_8k.jpg",
       "caption": "Neon shop signs, lightboxes and awnings in a Neon Strand alley at night."
+    },
+    {
+      "id": "ag8-props",
+      "date": "2026-10-28",
+      "stage": "2",
+      "milestone": "AG8",
+      "milestone_name": "Props, plants and signs",
+      "title": "Every street prop, laid out",
+      "image": "docs/progress/AG8/sheets/sheet_neon_8k.jpg",
+      "caption": "The neon district's street lights, signals, shelters, stalls, kiosks, barriers, cars and boats."
     },
     {
       "id": "ag4-sky-station",
