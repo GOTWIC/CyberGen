@@ -254,13 +254,17 @@ def _seat(gd, feet: dict, sp: str, k: int, x: float, y: float, yaw: float, sc) -
 
 
 def _quay_tops(model, gd) -> dict:
-    """#89: per quay, its paving's height at a point as AG7 draws it (`streets.water.
-    make_quay`: the ground sampled at the quay line's vertices to the millimeter, linear
-    along the line between them, 2 cm over it)."""
+    """#89: per quay, the height of its top at a point as AG7 draws it: the quay piece made
+    here from the same inputs (`streets.water.gather_quay`, `make_quay`), the highest of its
+    paving and the coping along its edge (rows every 6 m, mitred at the line's bends); off
+    them its paving's profile along the line (the ground at the line's vertices, linear
+    between them, 2 cm over it)."""
+    from ..streets.ctx import Ctx
     from ..streets.path import Path as SPath
     from ..streets.path import Profile
-    from ..streets.water import QUAY_PAVE_DZ
+    from ..streets.water import QUAY_PAVE_DZ, gather_quay, make_quay
     out = {}
+    cx = Ctx(model) if model.quays else None
     for q in model.quays:
         try:
             P = SPath(q.line)
@@ -270,8 +274,47 @@ def _quay_tops(model, gd) -> dict:
         if not gnd or len(gnd) != len(P.p):
             continue
         prof = Profile(list(zip(P.cum, gnd)))
-        out[q.id] = (lambda x, y, P=P, prof=prof: prof(P.project(x, y)[0]) + QUAY_PAVE_DZ)
+        pc = gather_quay(cx, q)
+        o = make_quay(pc.inputs)
+        tops = _Tops(o.mesh, pc.inputs.get("origin", (0.0, 0.0)),
+                     lambda sn: sn.startswith("paving") or sn == "stone.coping")
+        out[q.id] = (lambda x, y, P=P, prof=prof, tops=tops:
+                     tops.at(x, y, prof(P.project(x, y)[0]) + QUAY_PAVE_DZ))
     return out
+
+
+class _Tops:
+    """#89: the up-facing triangles of some of a mesh's slots in world meters: the highest
+    at a point, else a default."""
+
+    def __init__(self, mesh, origin, keep):
+        tris = []
+        if mesh is not None:
+            for sn, sl in sorted(mesh.slots.items()):
+                if not keep(sn):
+                    continue
+                Q = [(q[0] / 1000.0 + origin[0], q[1] / 1000.0 + origin[1], q[2] / 1000.0)
+                     for q in sl.pos]
+                for t in range(0, len(sl.idx), 3):
+                    a, b, c = Q[sl.idx[t]], Q[sl.idx[t + 1]], Q[sl.idx[t + 2]]
+                    d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+                    if d > 1e-9:
+                        tris.append((a, b, c, d))
+        self.tris = tris
+        self.box = [(min(a[0], b[0], c[0]), min(a[1], b[1], c[1]), max(a[0], b[0], c[0]),
+                     max(a[1], b[1], c[1])) for a, b, c, _ in tris]
+
+    def at(self, x: float, y: float, default: float) -> float:
+        best = None
+        for (a, b, c, d), (x0, y0, x1, y1) in zip(self.tris, self.box):
+            if not (x0 - 1e-6 <= x <= x1 + 1e-6 and y0 - 1e-6 <= y <= y1 + 1e-6):
+                continue
+            u = ((b[0] - x) * (c[1] - y) - (b[1] - y) * (c[0] - x)) / d
+            v = ((c[0] - x) * (a[1] - y) - (c[1] - y) * (a[0] - x)) / d
+            if u >= -1e-9 and v >= -1e-9 and u + v <= 1.0 + 1e-9:
+                z = u * a[2] + v * b[2] + (1.0 - u - v) * c[2]
+                best = z if best is None else max(best, z)
+        return default if best is None else best
 
 
 class _RaisedCorners:
