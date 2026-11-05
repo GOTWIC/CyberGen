@@ -20,7 +20,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG8 | Props, plants and signs: prop variants per district style, trees by species, neon signs, billboards, holo-ads | Done | [`docs/progress/AG8`](progress/AG8) |
 | AG9 | Scale and release: every sample modelled, `assetgen sweep`, the Windows check, `assetgen lock`, HLOD and Lumen settings at city scale | Planned | |
 | AG10 | Layered districts: M14's slabs per tile with soffits, fascias, rails, lights and colonnades, their columns, stairs and elevators; the deck's streets on the slab and solid ramps; undercity roofs meeting the soffit; `asset_decks` and `street_decks` | Done | [`docs/progress/AG10`](progress/AG10) |
-| AG11 | Interiors for M11's places | Only if decision 13.6 asks | |
+| AG11 | Interiors for M11's places | Planned (not scheduled yet) | |
 | AG12 | Water: per body and tile a surface (LOD chains carrying the current, a foam mask and the sea's wave weight) and a bed at M16's depth with the banks' slopes under the water; banks by kind with riprap stones; AG7's walls and piers into the bed; water textures and catalog; `M_CgWater` (Single Layer Water, waves) and underwater volumes | Done | [`docs/progress/AG12`](progress/AG12) |
 | AG13 | Ground cover and grass: every piece of M16's open land textured by its cover kind and blended by its wear, shade, edges and moisture; grass and small plants as instanced clumps per tile (decision 13.9 (a)), swaying in Unreal and fading out at 60 to 100 m; `ground_grass_clear` and the budgets | Done | [`docs/progress/AG13`](progress/AG13) |
 | AG14 | Fit and finish, from the first run-through: junctions meeting their roads at M18's heights, smooth curved walls, roof equipment seated on its roofs, M19's frames, piers and masts, embankments, bridges drawn once, nothing over a lane under 4.6 m; the fit checks `asset_grounded` and `asset_clash` (`assetgen fit`) | Done | [`docs/progress/AG14`](progress/AG14) |
@@ -1992,7 +1992,7 @@ buildings alike and lit alike, streets black at night), scope 14.16. Tests:
 ```
  AG0 ─┬─> AG1 ─> AG2 ─> AG3 ─> AG4 ─> AG5 ──┐
       │     └──> AG6 ───────────────────────┤
-      ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11 (if asked)
+      ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11
       └─> AG8 ──────────────────────────────┘
 ```
 
