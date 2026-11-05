@@ -69,19 +69,68 @@ drew them).
 
 ## Every sample
 
-SAMPLES
+Each sample built with `citygen build` and `assetgen build` on this branch (Windows PC),
+then measured with the check:
+
+| Sample | Full-city tries (main, this fix) | Barrier and prop crossings | Other assetgen checks failing (on main too) |
+|---|---|---|---|
+| Delta Megacity | 2, 2 | 343 to 0 | none |
+| Vesper Bay | 1, 1 | 372 to 0 | none |
+| Nexus City | 1, 1 | 0 | `asset_unique` (two towers share a system), `asset_access` (2 doors blocked) |
+| Greyhook | 2, 2 | 0 | none |
+| Saltreach Free Port | 1, 1 | 0 | `asset_envelope` (one part over a road) |
+| Vesper Bay Pinned | 2, 2 | 0 | `asset_grounded` (a 0.43 m step at `jn.e368s514`) |
+| Vesper Bay Stacks | 2, 2 | 0 | `asset_grounded` (a 0.349 m step at `jn.e559s304`) |
+| Vesper Bay Decks | 3, 3 | 0 | `asset_envelope` (`d05.lot.w576n1053.bld`) |
+| Cragmouth | 2, 2 | 0 | `asset_access` (1 door blocked), `asset_mounts` (64 off their walls, 1 on glass) |
+
+Every citygen check passes on every sample (102, 107 with decks). Main was measured on
+Delta and Vesper Bay only; the failing checks in the last column are about buildings and
+junction surfaces, which this fix does not touch (the briefs and building packs are as on
+main).
 
 ## Renders
 
 8K, before (main) and after, textured (`assetgen materials preview --eye --target`):
 
-RENDERS
+| View | Main | This fix |
+|---|---|---|
+| Delta, a highway crossing an avenue at grade (medians on both) | [before](delta_highway_junction_before.jpg) | [after](delta_highway_junction_after.jpg) |
+| Delta, a raised junction of five legs (`jn.e217s328`) | [before](delta_raised_junction_before.jpg) | [after](delta_raised_junction_after.jpg) |
+| Delta, a raised highway crossing an avenue (medians on both, `jn.e179n1530`) | [before](delta_raised_avenue_junction_before.jpg) | [after](delta_raised_avenue_junction_after.jpg) |
+| Vesper Bay, an off-ramp's gore on a highway | [before](vesper_bay_ramp_gore_before.jpg) | [after](vesper_bay_ramp_gore_after.jpg) |
+
+![Delta highway junction, after](delta_highway_junction_after.jpg)
 
 Top-down plans (barriers red, asphalt dark, paving tan, junction outlines blue, crosswalks
 green, connector lanes magenta; `plot_plan.py`):
 
-PLANS
+| View | Main | This fix |
+|---|---|---|
+| Highway junction | [before](plan_highway_junction_before.png) | [after](plan_highway_junction_after.png) |
+| Raised junction | [before](plan_raised_junction_before.png) | [after](plan_raised_junction_after.png) |
+| Raised avenue junction | [before](plan_raised_avenue_junction_before.png) | [after](plan_raised_avenue_junction_after.png) |
+| Ramp gore | [before](plan_ramp_gore_before.png) | [after](plan_ramp_gore_after.png) |
 
 ## For the road recheck
 
-ROADS
+What the barriers hid, or what they now leave open, for Swagnik's recheck of the roads
+(none of it changed here):
+
+- **Overlapping raised junctions:** Delta's five-leg `jn.e217s328` overlaps `jn.e170s444`;
+  their corner pads and sidewalk slabs still cross each other (#82). The barriers keep off
+  both.
+- **Corner pads over turning lanes:** where a raised junction's corner pad is drawn over a
+  connector lane (Delta's `jn.e179n1530`), that corner gets no parapet (one would stand in
+  the lane), so the deck edge there is open until the pads are fixed.
+- **Long junctions:** M17's long cuts make some junction polygons reach 30 m and more along
+  a leg (an avenue exit 121 m), over sidewalks and carriageways; the legs' barriers end at
+  them, so there are long gaps in the guard walls and parapets there.
+- **Footbridge stairs** start inside their junctions; the railings now stop at the
+  junction's edge.
+- **Junction steps (on main too):** Vesper Bay Pinned's `jn.e368s514` (0.43 m to
+  `rs.e312s524`) and Vesper Bay Stacks' `jn.e559s304` (0.349 m to `rs.e536s213`).
+- **Alley hairpins:** AG7's mitre at a sharp bend bulges the carriageway (Vesper Bay
+  Decks' `rs.e1681s1093`).
+- **Deck girders:** a raised road's girder is still drawn its whole length, under its
+  junctions.
