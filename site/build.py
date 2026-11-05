@@ -433,50 +433,77 @@ def stamp(iso: str) -> str:
 
 
 def device_cost(u: dict) -> float:
+    """What a device's tokens would cost at API prices, billed count (each request once)."""
     if u.get("manual"):
         return float(u["cost_usd"])
     return sum(sum((cost(m, t) or {}).values()) for m, t in u.get("models", {}).items())
 
 
-def model_table(us: list[dict]) -> dict[str, dict[str, int]]:
-    """Every device's tokens by model and type, added up."""
+VIEWS = ("stats", "billed")
+
+
+def counts(u: dict, view: str) -> dict:
+    """A device's tokens in one count: "billed" (each API response once, as Anthropic
+    bills it) or "stats" (as Claude Code's own usage statistics count them: every log
+    line, a response once per content block). A device file from before the stats count
+    falls back to its billed figures (`stats_pending`)."""
+    if view == "stats" and "stats" in u:
+        return u["stats"]
+    return {"totals": u["totals"], "models": u.get("models", {}), "days": u["days"]}
+
+
+def stats_pending(u: dict) -> bool:
+    """A device whose stats count is not complete yet: its file predates the count, or
+    some of its older ledger rows have no line count."""
+    return not u.get("manual") and not u.get("stats", {}).get("complete", False)
+
+
+def model_table(us: list[dict], view: str) -> dict[str, dict[str, int]]:
+    """Every device's tokens by model and type, added up, in one count."""
     out: dict[str, dict[str, int]] = {}
     for u in us:
-        for m, t in u.get("models", {}).items():
+        for m, t in counts(u, view)["models"].items():
             row = out.setdefault(m, dict.fromkeys(KINDS, 0))
             for k in KINDS:
                 row[k] += int(t.get(k, 0))
     return dict(sorted(out.items(), key=lambda kv: -sum(kv[1].values())))
 
 
-def usage_figures(us: list[dict]) -> dict[str, int]:
-    days = set().union(*(u["days"] for u in us))
-    return {"total": sum(u["totals"]["total"] for u in us),
+def usage_figures(us: list[dict], view: str) -> dict[str, int]:
+    days = set().union(*(counts(u, view)["days"] for u in us))
+    return {"total": sum(counts(u, view)["totals"]["total"] for u in us),
             "cost": sum(device_cost(u) for u in us),
-            "output": sum(u["totals"]["output"] for u in us),
+            "output": sum(counts(u, view)["totals"]["output"] for u in us),
             "sessions": sum(u["sessions"] for u in us),
             "subagents": sum(u["subagents"] for u in us),
             "days": len(days)}
 
 
-def render_usage(us: list[dict]) -> str:
-    """The showcase's usage panel: every device added up, each device apart behind a toggle."""
-    if not us:
-        return ""
-    tot = usage_figures(us)
-    more = ('<button class="btn mini" type="button" id="usage-more" aria-expanded="false" '
-            'aria-controls="usage-models">By model</button>')
-    kpis = "".join(f'<div><dt class="lbl">{k}</dt><dd class="mono">{v}</dd></div>' for k, v in (
-        ("Tokens", big(tot["total"]) + more), ("API cost", usd(tot["cost"])),
-        ("Sessions", f'{tot["sessions"]:,}'), ("Active days", str(tot["days"]))))
-    # Tokens and their cost by model and type, every device added up.
-    mt = model_table(us)
+def render_view(us: list[dict], view: str) -> str:
+    """One count's figures: the key numbers, a column a day, the table by model (with costs
+    in the billed count only) and the table by device."""
+    billed = view == "billed"
+    tot = usage_figures(us, view)
+    more = (f'<button class="btn mini" type="button" data-usage-more aria-expanded="false" '
+            f'aria-controls="usage-models-{view}">By model</button>')
+    kpis = [("Tokens", big(tot["total"]) + more)]
+    if billed:
+        kpis.append(("API cost", usd(tot["cost"])))
+    kpis += [("Sessions", f'{tot["sessions"]:,}'), ("Active days", str(tot["days"]))]
+    kpis_html = "".join(f'<div><dt class="lbl">{k}</dt><dd class="mono">{v}</dd></div>' for k, v in kpis)
+
+    def cell(n: int, c: float | None) -> str:
+        small = f'<small>{usd(c) if c is not None else "no price"}</small>' if billed else ""
+        return f'<td class="mono">{big(n)}{small}</td>'
+
+    # Tokens (and in the billed count their cost) by model and type, every device added up.
+    mt = model_table(us, view)
     head = "".join(f'<th scope="col">{KIND_NAMES[k]}</th>' for k in KINDS)
     body = []
     sums = dict.fromkeys(KINDS, 0)
     sum_cost = dict.fromkeys(KINDS, 0.0)
     for m, t in mt.items():
-        c = cost(m, t)
+        c = cost(m, t) if billed else None
         base, _, speed = m.partition(":")
         name = MODEL_NAMES.get(base, base) + (" (fast)" if speed else "")
         cells = []
@@ -484,65 +511,100 @@ def render_usage(us: list[dict]) -> str:
             sums[k] += t[k]
             if c:
                 sum_cost[k] += c[k]
-            cells.append(f'<td class="mono">{big(t[k])}<small>{usd(c[k]) if c else "no price"}</small></td>')
-        total = usd(sum(c.values())) if c else "no price"
+            cells.append(cell(t[k], c[k] if c else None))
         body.append(f'<tr><th scope="row">{esc(name)}</th>{"".join(cells)}'
-                    f'<td class="mono">{big(sum(t.values()))}<small>{total}</small></td></tr>')
-    foot = "".join(f'<td class="mono">{big(sums[k])}<small>{usd(sum_cost[k])}</small></td>' for k in KINDS)
-    models = (f'<div class="usage-models" id="usage-models" hidden><table>'
+                    f'{cell(sum(t.values()), sum(c.values()) if c else None)}</tr>')
+    foot = "".join(cell(sums[k], sum_cost[k]) for k in KINDS)
+    models = (f'<div class="usage-models" id="usage-models-{view}" hidden><table>'
               f'<thead><tr><th scope="col">Model</th>{head}<th scope="col">All</th></tr></thead>'
               f'<tbody>{"".join(body)}</tbody>'
               f'<tfoot><tr><th scope="row">All models</th>{foot}'
-              f'<td class="mono">{big(tot["total"])}<small>{usd(tot["cost"])}</small></td></tr></tfoot>'
+              f'{cell(tot["total"], tot["cost"])}</tr></tfoot>'
               f'</table></div>')
     # A column a day, first to last, stacked by device.
-    days = sorted(set().union(*(u["days"] for u in us)))
-    first, last = dt.date.fromisoformat(days[0]), dt.date.fromisoformat(days[-1])
-    peak = max(sum(u["days"].get(d, {}).get("total", 0) for u in us) for d in days) or 1
+    days = sorted(set().union(*(counts(u, view)["days"] for u in us)))
     cols = []
-    d = first
-    while d <= last:
-        key = d.isoformat()
-        parts = [(u, u["days"].get(key, {}).get("total", 0)) for u in us]
-        n = sum(v for _, v in parts)
-        segs = "".join(f'<i data-device="{esc(u["device"])}" style="height:{100 * v / peak:.2f}%"></i>'
-                       for u, v in parts if v)
-        tip = f"{key}: {big(n)} tokens" + "".join(f" · {u['label']} {big(v)}" for u, v in parts if v)
-        label = f"{d.day:02d}" if d in (first, last) or d.day == 1 else ""
-        cols.append(f'<div class="ucol" title="{esc(tip)}"><div class="ubar">{segs}</div>'
-                    f'<span class="mono">{label}</span></div>')
-        d += dt.timedelta(days=1)
-    rows = "".join(
-        f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}'
-        + (f'<small>{esc(u.get("note", "entered by hand"))}</small>' if u.get("manual") else "") + '</th>'
-        + (f'<td class="mono na">n/a</td><td class="mono">{usd(device_cost(u))}</td>'
-           f'<td class="mono na">n/a</td><td class="mono na">n/a</td>' if u.get("manual") else
-           f'<td class="mono">{big(u["totals"]["total"])}</td><td class="mono">{usd(device_cost(u))}</td>'
-           f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>')
-        + f'<td class="mono">{stamp(u["updated"])}</td></tr>' for u in us)
+    if days:
+        first, last = dt.date.fromisoformat(days[0]), dt.date.fromisoformat(days[-1])
+        peak = max(sum(counts(u, view)["days"].get(d, {}).get("total", 0) for u in us) for d in days) or 1
+        d = first
+        while d <= last:
+            key = d.isoformat()
+            parts = [(u, counts(u, view)["days"].get(key, {}).get("total", 0)) for u in us]
+            n = sum(v for _, v in parts)
+            segs = "".join(f'<i data-device="{esc(u["device"])}" style="height:{100 * v / peak:.2f}%"></i>'
+                           for u, v in parts if v)
+            tip = f"{key}: {big(n)} tokens" + "".join(f" · {u['label']} {big(v)}" for u, v in parts if v)
+            label = f"{d.day:02d}" if d in (first, last) or d.day == 1 else ""
+            cols.append(f'<div class="ucol" title="{esc(tip)}"><div class="ubar">{segs}</div>'
+                        f'<span class="mono">{label}</span></div>')
+            d += dt.timedelta(days=1)
+    cost_head = '<th scope="col">API cost</th>' if billed else ""
+
+    def row(u: dict) -> str:
+        if u.get("manual"):
+            note = f'<small>{esc(u.get("note", "entered by hand"))}</small>'
+        elif not billed and stats_pending(u):
+            note = "<small>each response once until its next usage update</small>"
+        else:
+            note = ""
+        cost_cell = f'<td class="mono">{usd(device_cost(u))}</td>' if billed else ""
+        if u.get("manual"):
+            cells = (f'<td class="mono na">n/a</td>{cost_cell}'
+                     f'<td class="mono na">n/a</td><td class="mono na">n/a</td>')
+        else:
+            cells = (f'<td class="mono">{big(counts(u, view)["totals"]["total"])}</td>{cost_cell}'
+                     f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>')
+        return (f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}{note}</th>'
+                f'{cells}<td class="mono">{stamp(u["updated"])}</td></tr>')
+
+    devices = (f'<div class="usage-devices" data-usage-devices hidden><table>'
+               f'<thead><tr><th scope="col">Device</th><th scope="col">Tokens</th>{cost_head}'
+               f'<th scope="col">Sessions</th><th scope="col">Days</th>'
+               f'<th scope="col">Last updated</th></tr></thead>'
+               f'<tbody>{"".join(row(u) for u in us)}</tbody></table></div>')
     manual = [u for u in us if u.get("manual")]
-    extra = (" " + " ".join(f"{u['label']}: {u.get('note', 'entered by hand')}, in the cost only, "
-                            f"its tokens and sessions unknown." for u in manual)) if manual else ""
+    pending = [u["label"] for u in us if stats_pending(u)]
+    if billed:
+        text = ("Each API request counted once, as Anthropic bills it. Tokens include cache reads and "
+                "writes. API cost is what the tokens would cost at Anthropic's published API prices. Each "
+                "device records its own sessions, worktree sessions and subagents included.")
+        text += "".join(f" {u['label']}: {u.get('note', 'entered by hand')}, in the cost only, its "
+                        f"tokens and sessions unknown." for u in manual)
+    else:
+        text = ("Tokens as Claude Code's own usage statistics count them (/usage, stats): every line of "
+                "the session logs, and Claude Code logs a response once per part (its thinking, text and "
+                "each tool call), so most responses count about twice. Billing counts each request once, "
+                "as Anthropic bills it, with its cost. Tokens include cache reads and writes. Each device "
+                "records its own sessions, worktree sessions and subagents included.")
+        if pending:
+            text += (f" {' and '.join(pending)}: each response once until "
+                     f"{'its' if len(pending) == 1 else 'their'} next usage update.")
+        text += "".join(f" {u['label']}: in the Billing view's cost only." for u in manual)
+    return (f'<div class="usage-view" data-count="{view}"{" hidden" if billed else ""}>'
+            f'<div class="usage-body"><dl class="usage-kpis">{kpis_html}</dl>'
+            f'<div class="usage-chart" aria-hidden="true">{"".join(cols)}</div></div>{models}{devices}'
+            f'<p class="usage-foot">{esc(text)}</p></div>')
+
+
+def render_usage(us: list[dict]) -> str:
+    """The showcase's usage panel: every device added up, each device apart behind a toggle;
+    tokens as Claude Code's own stats count them, and the billed count with its cost behind
+    the Billing button."""
+    if not us:
+        return ""
     newest = max(u["updated"] for u in us)
     return f"""
-  <section class="usage glass" id="usage" data-view="all" aria-label="Claude Code usage">
+  <section class="usage glass" id="usage" data-view="all" data-count="stats" aria-label="Claude Code usage">
     <div class="usage-head">
       <span class="lbl"><span class="dot"></span>Claude Code usage on CyberGen</span>
       <span class="spacer"></span>
       <span class="usage-note mono">{len(us)} device{'s' if len(us) != 1 else ''} · updated {stamp(newest)}</span>
-      <button class="btn" type="button" id="usage-toggle" aria-pressed="false" aria-controls="usage-devices">By device</button>
+      <button class="btn" type="button" id="usage-toggle" aria-pressed="false">By device</button>
+      <button class="btn" type="button" id="usage-billing" aria-pressed="false" title="Each request once, as Anthropic bills it, with its cost">Billing</button>
     </div>
-    <div class="usage-body">
-      <dl class="usage-kpis">{kpis}</dl>
-      <div class="usage-chart" aria-hidden="true">{''.join(cols)}</div>
-    </div>{models}
-    <div class="usage-devices" id="usage-devices" hidden>
-      <table>
-        <thead><tr><th scope="col">Device</th><th scope="col">Tokens</th><th scope="col">API cost</th><th scope="col">Sessions</th><th scope="col">Days</th><th scope="col">Last updated</th></tr></thead>
-        <tbody>{rows}</tbody>
-      </table>
-    </div>
-    <p class="usage-foot">Tokens include cache reads and writes. API cost is what the tokens would cost at Anthropic's published API prices. Each device records its own sessions, worktree sessions and subagents included.{esc(extra)}</p>
+    {render_view(us, "stats")}
+    {render_view(us, "billed")}
   </section>"""
 
 
