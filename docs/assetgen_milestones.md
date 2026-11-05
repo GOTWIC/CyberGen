@@ -2153,6 +2153,18 @@ A fix between milestones, from run-through 2 and AG14's open items, on #95's bar
   rule takes a thing as resting when one of its five feet is. M17's long junctions and the
   deck girders under junctions are the road recheck's.
 
+## Fix: a median under a paved lane (issue #114)
+
+On Nexus City (not one of #104's six) `asset_clash` found the median of the highway
+`rs.e230s1005` 0.299 m into its own junction `jn.e211s944`: #104 paves a connector lane's
+run off the outline within the corners between the legs (`walks._carriageway`, notes
+`paved`), keeping it off the roads that reach into those corners (`_roads_near`), but took
+only the corners with a sidewalk (`barriers.junction_area`), and a highway's corner has
+none, so the run was paved over the leg's own carriageway past its cut, under the median's
+end (#103's median stops 0.15 m off the junction's outline). `_roads_near` now takes every
+corner's roads (`junction_area(..., every=True)`), the leg's own among them; a junction
+paves less only where a road draws its carriageway anyway. Results: Nexus City's fit passes (a full assetgen build: no clash, nothing off its surface); on #104's six cities (main's models, this fix's streets, props and fit) streets and props pass, no clash and no step over 2 cm (roof plants aside: those runs build no roofs).
+
 ## Order
 
 ```

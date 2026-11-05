@@ -1823,7 +1823,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   raised junction follows its surface (`_draped`); corner sectors follow a leg that bends
   (`_along`, `_meet_along`), none between twin legs (`_twins`); pads keep off other
   junctions, roads, sidewalks and the connector lanes, whose runs off the outline round the
-  corners are paved (notes `paved`), and stand on the curb's height (`_edge_z`); a
+  corners are paved (notes `paved`) off the roads in every corner, a leg's own past its
+  cut too (#114: `_roads_near`, `barriers.junction_area(..., every=True)`), and stand on the
+  curb's height (`_edge_z`); a
   cul-de-sac gets a sidewalk round its bulb (`_bulb`); sidewalks and medians are not drawn
   over a carriageway at their height (`_clip_rings`, `roads._median_clip`,
   `_clear_spans`), a sidewalk's stretch a carriageway reaches over only in part drawn flat
