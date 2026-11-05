@@ -323,6 +323,10 @@ def test_strip_park_joins_its_neighbors_path():
         mine = [e for e in W.edges if e["attrs"].get("open_space") == "o2"]
         assert mine and strip["polygon"].covers(Point(mine[0]["pts"][0]))
         assert front["polygon"].covers(Point(mine[0]["pts"][-1]))
+        # (it joins the neighbor's path at an end, its middle: no park path is split, so
+        # each still starts inside its own open space)
+        theirs = [e for e in W.edges if e["attrs"].get("open_space") == "o1"]
+        assert len(theirs) == 1 and mine[0]["pts"][-1] == theirs[0]["pts"][0]
 
 
 def test_far_path_joins_no_raised_sidewalk():

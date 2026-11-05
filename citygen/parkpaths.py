@@ -205,6 +205,7 @@ class Attach:
         self.lines = [LineString(W.edges[i]["pts"]) for i in self.idx]
         self.tree = shapely.STRtree(self.lines) if self.lines else None
         self.W = W
+        self.parks = parks
 
     def near(self, geom, d: float) -> list[int]:
         """Positions of the walkways within d of geom, nearest first."""
@@ -214,8 +215,13 @@ class Attach:
         return sorted(ks, key=lambda k: (G.dist(geom, self.lines[k]), k))
 
     def foot(self, k: int, geom) -> tuple[float, float]:
-        """The point of walkway k nearest geom (its end when that close to one)."""
+        """The point of walkway k nearest geom (its end when that close to one; another
+        open space's path at its nearer end, its open space's middle or its foot, so no
+        park path is split and each still starts inside its own)."""
         pts = self.W.edges[self.idx[k]]["pts"]
+        if self.parks:
+            ends = [ST._pt(*pts[0]), ST._pt(*pts[-1])]
+            return min(ends, key=lambda v: (round(G.dist(geom, Point(v)), 6), v))
         f = G.nearest(self.lines[k], geom)
         if ST._dist(f, pts[0]) <= EDGE_SNAP_M:
             return ST._pt(*pts[0])
@@ -572,9 +578,10 @@ def open_paths(W, opens: list[dict], lots: list[dict], others: list, segments: l
     """Paths from every park, plaza, pocket park, market, garden, promenade and beach of
     `opens` (dicts with id, kind, polygon) to the ground walkways of W beside it, passages to
     the enclosed ones (their polygons and the lots they cut are updated in place: `lots`
-    dicts with polygon, area_m2, frontage, frontage_ids); access fix (#86): paths under the
-    raised roads to the ones only roads cut off, and a park that has no street and still no
-    way in becomes a green verge (`o["verge"]`, as the smaller roadless pieces are).
+    dicts with polygon, area_m2, frontage, frontage_ids); access fix (#86), for the ones
+    still without a way in: a path to a neighbor open space's path, else one under the
+    raised roads (or to a walkway past 30 m, `o["far_path"]`), else a park that has no
+    street becomes a green verge (`o["verge"]`, as the smaller roadless pieces are).
     Returns counts and the open spaces left with no way in, with why."""
     from .blocks import Frontage
 
