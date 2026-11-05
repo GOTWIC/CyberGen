@@ -147,7 +147,7 @@ def _median_clip(cx: Ctx, s) -> list:
     from citygen import geom as G
 
     from . import barriers as BR
-    from .walks import CLIP_M, CLIP_M2
+    from .walks import CLIP_M, CLIP_M2, _under
     band = shapely.LineString([(p[0], p[1]) for p in s.centerline]).buffer(
         m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
     _, _, _, jtree, jns, polys, _ = BR._index(cx)
@@ -159,7 +159,8 @@ def _median_clip(cx: Ctx, s) -> list:
         if x is None or x.is_empty or x.area <= CLIP_M2:
             continue
         c = x.representative_point()
-        if not BR._near_z(BR._road_z(s, c.x, c.y), BR._junction_z(cx, j)):
+        zm = BR._road_z(s, c.x, c.y)
+        if not _under((zm, zm), BR._junction_z(cx, j)):
             continue
         out.append({"id": j.id, "ring": [[C.m2(p[0]), C.m2(p[1])] for p in
                                          G.from_model_poly(j.polygon).exterior.coords[:-1]]})

@@ -197,6 +197,21 @@ class _Fit:
 
 
 RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
+# #89: a plant's foot on a terrain city (its lowest vertices, as AG14 finds them): a share of
+# its crown for those without a trunk, else a trunk's half width
+FOOT_R = {"shrub": 0.9, "overgrowth": 0.9}
+TRUNK_R_M = 0.35
+FOOT_SINK_M = 0.5       # ... at most this under the ground at its middle
+
+
+def _foot_ground(gd, x: float, y: float, r: float) -> float:
+    """#89: the ground a plant on a slope stands on: the lowest of the ground at its middle
+    and at eight points round its foot (radius r), at most `FOOT_SINK_M` under the middle's
+    (AG14 rests it when three of five points of its foot are on a surface within 2 cm)."""
+    z0 = gd.at(x, y)
+    zs = [z0] + [gd.at(x + r * M.cos(M.PI * k / 4.0), y + r * M.sin(M.PI * k / 4.0))
+                 for k in range(8)]
+    return C.m(max(min(zs), z0 - FOOT_SINK_M))
 
 
 def _quay_tops(model, gd) -> dict:
@@ -513,7 +528,15 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         g.species[sp] = g.species.get(sp, 0) + 1
         species_used.add(sp)
         x, y, z = p.position
-        z = z + lift(x, y, z, (p.attrs or {}).get("building"))
+        bid = (p.attrs or {}).get("building")
+        if not gd.flat and z == 0.0 and bid is None and typ not in ("facade_greenery",):
+            # (#89: on a terrain city a plant on the ground stands on the lowest ground under
+            # its foot: a shrub's foot is its crown's underside, as wide as the crown, which
+            # floated over the downhill side of a hillside green; a tree's is its trunk)
+            z = _foot_ground(gd, x, y, FOOT_R.get(typ, TRUNK_R_M) * (
+                p.crown_radius_m if typ in FOOT_R else 1.0))
+        else:
+            z = z + lift(x, y, z, bid)
         t = tile_of(x, y)
         key = f"plant.{typ}.{t}"
         cx, cy = tile_center(t)

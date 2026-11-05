@@ -43,6 +43,15 @@ CUT_ALONG_M = 1.0       # AG14: how far along a leg an outline vertex still lies
                         # (a road piece ends on its cut edge within `roads.CUT_TOL_M`)
 CLIP_M = 0.02           # #82: a sidewalk's slab stops this far into a junction's carriageway
 RAISED_M = 0.5          # #89: a junction this far over its ground is raised (`barriers.RAISED_M`)
+HEAD_M = 4.5            # #82: a strip keeps off a carriageway it is over by less than this
+UNDER_M = 1.0           # ... or under by less than this (AG14's `fit.strips`)
+
+
+def _under(zs, zc) -> bool:
+    """#82: whether a carriageway at heights zc (lo, hi) is where a strip at heights zs
+    (lo, hi) would stand on it or over it without headroom (`fit.strips`: from `UNDER_M`
+    over the strip to `HEAD_M` under it)."""
+    return zc[1] >= zs[0] - HEAD_M and zc[0] <= zs[1] + UNDER_M
 CLIP_M2 = 0.0005        # ... where it reaches over this much of it
 
 
@@ -139,7 +148,8 @@ def _clip_rings(cx: Ctx, s, w) -> list:
             continue
         if j.id not in ends:
             c = x.representative_point()
-            if not BR._near_z(BR._road_z(s, c.x, c.y), BR._junction_z(cx, j)):
+            zs = BR._road_z(s, c.x, c.y)
+            if not _under((zs, zs), BR._junction_z(cx, j)):
                 continue
         out.append({"id": j.id, "ring": [[C.m2(p[0]), C.m2(p[1])]
                                          for p in G.from_model_poly(j.polygon).exterior.coords[:-1]]})
@@ -149,7 +159,8 @@ def _clip_rings(cx: Ctx, s, w) -> list:
         if x is None or x.is_empty or x.area <= CLIP_M2:
             continue
         c = x.representative_point()
-        if abs(BR._road_z(s, c.x, c.y) - BR._road_z(o, c.x, c.y)) > BR.Z_NEAR_M:
+        zs, zo = BR._road_z(s, c.x, c.y), BR._road_z(o, c.x, c.y)
+        if not _under((zs, zs), (zo, zo)):
             continue
         with G.canonical():
             parts = sorted(G.parts(G.qpoly(poly)), key=lambda q: (G.qbounds(q), G.area1(q)))
@@ -559,12 +570,13 @@ def _overlaps(cx: Ctx, j) -> list:
         if ar <= OVERLAP_M2 and reach <= CLIP_M2:
             continue
         zo = BR._junction_z(cx, o)
-        if zo[0] - BR.Z_NEAR_M > zj[1] or zo[1] + BR.Z_NEAR_M < zj[0]:
+        level = not (zo[0] - BR.Z_NEAR_M > zj[1] or zo[1] + BR.Z_NEAR_M < zj[0])
+        if not level and not _under(zj, zo):
             continue
         a0, a1 = round(G.area1(me), 2), round(G.area1(polys[k]), 2)
         rec = {"id": o.id, "ring": [[C.m2(q[0]), C.m2(q[1])]
                                     for q in G.from_model_poly(o.polygon).exterior.coords[:-1]]}
-        if ar > OVERLAP_M2 and (a1 > a0 or (a1 == a0 and o.id < j.id)):
+        if level and ar > OVERLAP_M2 and (a1 > a0 or (a1 == a0 and o.id < j.id)):
             sf = _surface(_junction_base(cx, o))
             rec["owner"] = True
             rec["by"] = sorted(BR._area_by(cx, o))
@@ -595,7 +607,8 @@ def _roads_near(cx: Ctx, j) -> list:
         if x.is_empty or x.area <= CLIP_M2:
             continue
         c = x.representative_point()
-        if not BR._near_z(BR._road_z(o, c.x, c.y), zj):
+        zo = BR._road_z(o, c.x, c.y)
+        if not _under(zj, (zo, zo)):
             continue
         with G.canonical():
             parts = sorted(G.parts(G.qpoly(poly)), key=lambda q: (G.qbounds(q), G.area1(q)))
