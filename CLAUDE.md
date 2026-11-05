@@ -1238,8 +1238,9 @@ Sample builds, the measures before and after: `docs/progress/fix_paths/`.
 The access fixes (issues #86, #87 and #91, after run-through 2) are in place:
 - **Ways into open space** (`parkpaths.open_paths`, a second pass over the open spaces the
   park paths and passages leave without a way in, so a city with none keeps its bytes): a
-  path to a neighbor open space's park path within 30 m (`Attach(W, parks=True)`, attrs
-  `access` via_open_space), else one to a walkway up to `UNDER_REACH_M` 90 m away passing
+  path to a neighbor open space's park path within 30 m, joined at its nearer end (that
+  open space's middle or its foot, so no park path is split; `Attach(W, parks=True)`,
+  attrs `access` via_open_space), else one to a walkway up to `UNDER_REACH_M` 90 m away passing
   under the raised roads between (`low_roads`: every carriageway lower than `UNDER_DECK_M`
   5 m, over M18's embankments, and the junctions of nodes that low are blocked, a covered
   tunnel's lid is not; `under_paths`, joining only a walkway whose road is at grade at its

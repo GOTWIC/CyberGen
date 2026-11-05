@@ -606,7 +606,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "26528 things on the ground"
+        "26524 things on the ground"
       ]
     },
     {
@@ -659,7 +659,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "28955 on ground, 1394 on road, 36771 on wall, 20327 on roof, 49 on water, 320 on hung"
+        "28657 on ground, 1087 on road, 36771 on wall, 20327 on roof, 49 on water, 320 on hung"
       ]
     },
     {
@@ -668,7 +668,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "1782 plants under something"
+        "1781 plants under something"
       ]
     },
     {
@@ -1046,7 +1046,7 @@
       "lanes": 5466,
       "lane_connectors": 10715,
       "one_way_segments": 98,
-      "walkways": 15006,
+      "walkways": 15005,
       "walkway_km": {
         "alley": 31.6,
         "crossing": 106.75,
@@ -1054,7 +1054,7 @@
         "elevated": 1.82,
         "elevator": 0.0,
         "footbridge": 0.22,
-        "path": 51.59,
+        "path": 51.58,
         "pedestrian_street": 2.74,
         "promenade": 6.77,
         "sidewalk": 197.06,
@@ -1546,24 +1546,24 @@
       }
     },
     "props": {
-      "props": 47196,
-      "plants": 25383,
-      "trees": 6245,
-      "instances": 72579,
+      "props": 46594,
+      "plants": 25380,
+      "trees": 6242,
+      "instances": 71974,
       "props_by_kind": {
         "sign": 12583,
         "awning": 10143,
         "ac_unit": 6937,
         "street_light": 3806,
         "trash": 2110,
-        "barrier": 1816,
         "overhead_cable": 1778,
         "bollard": 1566,
-        "railing": 1452,
+        "barrier": 1337,
+        "railing": 1330,
         "parked_vehicle": 1135,
         "wall_light": 907,
         "hydrant": 763,
-        "trash_can": 572,
+        "trash_can": 571,
         "traffic_signal": 565,
         "bench": 512,
         "dumpster": 301,
@@ -1580,7 +1580,7 @@
         "shrub": 8771,
         "overgrowth": 4794,
         "facade_greenery": 4743,
-        "park_tree": 2322,
+        "park_tree": 2319,
         "street_tree": 1840,
         "conifer": 946,
         "roof_tree": 830,
@@ -1600,23 +1600,23 @@
         "station_props": 7,
         "street_trees": 1840,
         "plaza_props": 129,
-        "park_benches": 697,
+        "park_benches": 696,
         "parked_vehicles": 1135,
         "alley_clutter": 2411,
         "median_trees": 1112,
         "promenade_trees": 25,
-        "park_trees": 7779,
+        "park_trees": 7776,
         "roof_plants": 5090,
         "facade_greenery": 4743,
         "overgrowth": 4794,
-        "quay_props": 1583,
-        "highway_barriers": 1816,
+        "quay_props": 1461,
+        "highway_barriers": 1337,
         "overhead_cables": 1778,
         "unit_dressing": 29663,
         "scaffolding": 48,
         "market_gates": 1,
-        "props": 47196,
-        "plants": 25383
+        "props": 46594,
+        "plants": 25380
       }
     },
     "gameplay": {
@@ -1823,7 +1823,7 @@
           "km2": 0.158
         }
       },
-      "desire_lines": 343
+      "desire_lines": 342
     },
     "separation_budget": {
       "target": 0.6,

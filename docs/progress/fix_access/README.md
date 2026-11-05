@@ -11,7 +11,9 @@ enclosed it; those it could not reach said so (`access: none`). A second pass no
 (most cities have none, so their open spaces are as they were):
 
 1. a path to a neighbor open space's path within 30 m (a strip park behind a park, a loop's
-   infield beside the park round it), `access: via_open_space`;
+   infield beside the park round it), joined at that path's nearer end (the neighbor's
+   middle, where its paths meet, or its walkway foot), so no park path is split and each
+   still starts inside its own open space, `access: via_open_space`;
 2. else a path to a walkway up to 90 m away that passes under the raised roads between:
    every carriageway lower than 5 m (so over M18's embankments, which fill under 4.5 m) and
    every junction that low is blocked, and the walkway it joins must be at grade at its foot

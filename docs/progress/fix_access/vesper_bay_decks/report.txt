@@ -100,7 +100,7 @@ checks:
   [pass] transit_hubs: Every hub is served by its lines, and every megasite that needs transit has a station of one of its modes within 150 m
          note: Launch Key Spaceport (spaceport): no maglev or sky_tube station within 150 m
   [pass] props_keepout: Props and trunks stay out of lanes, crosswalks, junctions, buildings, water, entrances and driveways, ground structures and the sidewalk clear path (1.8 m)
-         note: 25935 things on the ground
+         note: 25931 things on the ground
          note: d03.deck.e1359n1225: 481 things on the ground
   [pass] props_overlap: Nothing on the ground overlaps anything else (props, trunks, shrubs)
   [pass] tree_clearance: Crowns 1 m from the facades; trunks 6 m from junctions and clear of station stairs, metro entrances and bus stops (their tops under what is over them: plant_headroom)
@@ -117,10 +117,10 @@ checks:
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] prop_support: Every prop, plant and roof item stands on a surface at its height within 2 cm (the ground, a quay deck, a road's deck, the water, a roof, a wall it is mounted on, a deck's underside it hangs from), none in a road's fill, and every prop standing fits 1 m under what is over it
-         note: 28366 on ground, 1394 on road, 39202 on wall, 19518 on roof, 49 on water, 582 on hung
+         note: 28068 on ground, 1087 on road, 39202 on wall, 19518 on roof, 49 on water, 582 on hung
          note: d03.deck.e1359n1225: 484 on ground, 0 on road, 978 on wall, 1004 on roof, 0 on water, 0 on hung
   [pass] plant_headroom: No plant under a raised road, ramp, flyover, guideway, deck, skybridge or overhang reaches higher than its underside less 1 m, measured along it where the plant stands; none in a road's fill
-         note: 1894 plants under something
+         note: 1893 plants under something
          note: d03.deck.e1359n1225: 0 plants under something
   [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
          note: 275 doors
@@ -160,7 +160,7 @@ stats:
   bridges 10 (sea 1, river 4, canal 5; 0.75 km of span), pedestrian 6; named: Launch Causeway
   landmasses with districts connected by road 5 of 5; highway planned elevated 18%; megasite reserves 3; road variant 0
   local roads street 89.12 km, alley 20.72 km, service 10.88 km, pedestrian 9.52 km, footbridge 0.22 km; 98 one-way segments, 6 footbridges
-  junctions 1646 (119 signalized), crosswalks 408, sidewalks 153.67 km, lanes 5618 + 11011 connectors, walkways 15320 (alley 31.6 km, crossing 110.81 km, crosswalk 18.79 km, elevated 1.82 km, elevator 0.0 km, footbridge 0.22 km, path 52.7 km, pedestrian_street 2.74 km, promenade 6.77 km, sidewalk 206.62 km, skybridge 3.24 km, stairs 1.03 km, underpass 0.06 km)
+  junctions 1646 (119 signalized), crosswalks 408, sidewalks 153.67 km, lanes 5618 + 11011 connectors, walkways 15319 (alley 31.6 km, crossing 110.81 km, crosswalk 18.79 km, elevated 1.82 km, elevator 0.0 km, footbridge 0.22 km, path 52.7 km, pedestrian_street 2.74 km, promenade 6.77 km, sidewalk 206.62 km, skybridge 3.24 km, stairs 1.03 km, underpass 0.06 km)
   junctions by type: street_street T 778, avenue_avenue T 218, street_street X 135, alley_alley T 103, avenue_avenue X 73, street T 69, street_alley bend 41, pedestrian T 36, street cul_de_sac 29, street_alley T 21, alley_alley X 18, highway_highway T 16
   blocks 909, lots 6107 (5 merged groups), open space 11.3% of net land (courtyard 10, green 24, market 1, park 180, plaza 139, pocket_park 141, promenade 1), named places 3
 
@@ -201,9 +201,9 @@ stats:
   Launch Key                        14      21.8    40.0    48.0       24%   0.5      0.113
   Scholar Isle                      56      28.0    36.0    60.0       26%   2.0      0.645
 
-  props 50062, plants 26374 (6233 trees), 76436 instances; lawns 42733 m2, hedges 10.29 km
-  props: sign 13702, awning 11417, ac_unit 7085, street_light 3794, trash 2110, barrier 1816, overhead_cable 1778, bollard 1566, railing 1452, wall_light 1169, parked_vehicle 1136, hydrant 821, trash_can 573, traffic_signal 565, bench 518, dumpster 301, bus_stop 96, scaffolding 55, boat 49, planter 33, kiosk 9, vending_machine 9, food_stall 7, gate 1
-  plants: shrub 8792, facade_greenery 5611, overgrowth 4842, park_tree 2316, street_tree 1837, conifer 941, roof_tree 896, palm 715, median_tree 424
+  props 49460, plants 26371 (6230 trees), 75831 instances; lawns 42733 m2, hedges 10.29 km
+  props: sign 13702, awning 11417, ac_unit 7085, street_light 3794, trash 2110, overhead_cable 1778, bollard 1566, barrier 1337, railing 1330, wall_light 1169, parked_vehicle 1136, hydrant 821, trash_can 572, traffic_signal 565, bench 518, dumpster 301, bus_stop 96, scaffolding 55, boat 49, planter 33, kiosk 9, vending_machine 9, food_stall 7, gate 1
+  plants: shrub 8792, facade_greenery 5611, overgrowth 4842, park_tree 2313, street_tree 1837, conifer 941, roof_tree 896, palm 715, median_tree 424
 
   elevated highways 1.9 km (1 runs, 0 direct branches), deck up to 9 m; ramps 10 (3.06 km); interchanges diamond 2, trumpet 1 (1 trumpet flyover, up to 16.6 m); overpasses 3
   other raised roads 17.36 km, underpass streets 0, road columns 252
@@ -212,7 +212,7 @@ stats:
 
   water: 10 bodies (sea 10.5 m tidal, rv.vess_river 4.95 m downstream, ch.north_reach 3.97 m downstream, ch.lotus_cut 4.03 m downstream, sep.e577s1113 1.5 m downstream, d04.ww.e834s1215 1.5 m tidal, ...); sea harbor 0.011 km2, open 1.989 km2, sheltered 0.97 km2
   banks: canal wall 12 (1.28 km), marsh edge 6 (5.86 km), natural bank 29 (8.48 km), quay 6 (4.54 km), riprap 11 (5.69 km), road embankment 16 (0.7 km)
-  ground cover: bare dirt 0.029 km2, gravel 0.631 km2, marsh 0.661 km2, meadow 0.162 km2, mown lawn 0.432 km2, overgrown paving 0.154 km2, park lawn 0.37 km2, paving 0.669 km2, planted bed 0.016 km2, wasteland 0.158 km2; 356 desire lines
+  ground cover: bare dirt 0.029 km2, gravel 0.631 km2, marsh 0.661 km2, meadow 0.162 km2, mown lawn 0.432 km2, overgrown paving 0.154 km2, park lawn 0.37 km2, paving 0.669 km2, planted bed 0.016 km2, wasteland 0.158 km2; 355 desire lines
 
   gameplay: 199 points of interest, 8 factions (gang 4, corporate 3, police 1), 13 territories (3 contested), 32 taxi stands, 11 fast-travel points
   pois: vendor.food 35, vendor.pawn 27, bar.arcade 26, bar.bar 21, apartment.studio 18, clinic.ripperdoc 18, bar.club 11, clinic.clinic 10, vendor.convenience 10, fixer.fixer 7, apartment.penthouse 6, hideout.squat 4, apartment.apartment 2, hideout.back_room 2, hideout.warehouse 2
