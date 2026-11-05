@@ -990,7 +990,8 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
             if at in jpoly and ((not run.edge and not joined[at]) or (run.edge and (
                     sidewalk or rd.cut.get(at) is None))):
                 F.append(jpoly[at].buffer(CLEAR_M))
-            if at in jpoly and run.edge and sidewalk:
+            # (and off its corner pads, where M17 laid one over its carriageway)
+            if at in jpoly and (run.edge and sidewalk or not run.edge):
                 F += sectors[at]
         spans = _spans(rd, run, a0, b0, F)
         rows = []

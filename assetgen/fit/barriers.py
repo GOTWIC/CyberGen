@@ -12,7 +12,8 @@ on a deck piece), and an open tunnel approach's walls (a trench). What it may no
   asphalt, or a pedestrian street's paving): over it in plan more than `INSET_M` in from
   its outline and between `BELOW_M` under and `ABOVE_M` over its surface there (a bridge's
   railings stand on its own road's deck);
-- **barrier in junction**: the same on a junction's surface; a junction's own barriers (its
+- **barrier in junction**: the same on a junction's carriageway, or past `PAD_INSET_M` on
+  its sidewalk corners (its paving); a junction's own barriers (its
   corner parapets and guard walls, a median across it) on its own surface only where they
   stand in one of its connector lanes (within the lane's half width less `INSET_M`);
 - **barrier on crosswalk**: the same on a crosswalk (the model's rectangle less `INSET_M`,
@@ -42,6 +43,8 @@ from .. import canon as C
 from .index import Surfaces, TriIndex
 
 INSET_M = 0.1           # how far into a surface a barrier or prop must reach to cross it
+PAD_INSET_M = 0.5       # ... into a junction's sidewalk corners (its paving: where a leg's
+                        # parapet on its property line meets the corner's)
 BELOW_M = 0.3           # a barrier point under a surface by this still stands on it
 ABOVE_M = 2.0           # ... and over it by this (a parapet over a road under is not on it)
 MEET_M2 = 0.05          # plan overlap of two barriers that counts as through each other
@@ -144,6 +147,7 @@ class Targets:
         # (a vehicle carriageway: asphalt; a pedestrian street's paving is walked on)
         self.S = Surfaces(T, O, min_nz=0.5)
         self.V = Surfaces(T[A], O[A], min_nz=0.5)
+        self.W = Surfaces(T[~A], O[~A], min_nz=0.5)
         self._outlines: dict = {}
         xs, self.xw_ids, self.xw_own = [], [], []
         for c in model.crosswalks:
@@ -162,10 +166,10 @@ class Targets:
                        for j in model.junctions]
         self.jtree = shapely.STRtree(self.jpolys) if self.jpolys else None
 
-    def outline(self, o: int, vehicle: bool = False):
+    def outline(self, o: int, vehicle=False):
         key = (o, vehicle)
         if key not in self._outlines:
-            S = self.V if vehicle else self.S
+            S = self.W if vehicle == "paving" else self.V if vehicle else self.S
             sel = S.owner == o
             self._outlines[key] = _outline(S.t[sel]) if sel.any() else None
         return self._outlines[key]
@@ -178,12 +182,12 @@ class Targets:
         return bool(len(i))
 
     def on_pavement(self, P: np.ndarray, exclude: set, lo: float, hi: float,
-                    vehicle: bool = False) -> list[tuple[int, int, float]]:
+                    vehicle=False, inset: float = INSET_M) -> list[tuple[int, int, float]]:
         """(point index, owner, depth) of points standing on a piece's pavement (`vehicle`:
-        its asphalt only): inside one of its triangles in plan with the point between `lo`
-        under and `hi` over it, and `INSET_M` in from the piece's outline; owners in
-        `exclude` left out."""
-        S = self.V if vehicle else self.S
+        its asphalt only; "paving": its paving only): inside one of its triangles in plan
+        with the point between `lo` under and `hi` over it, and `inset` in from the outline
+        of that pavement; owners in `exclude` left out."""
+        S = self.W if vehicle == "paving" else self.V if vehicle else self.S
         pid, tid = S.candidates(P[:, :2])
         if not len(pid):
             return []
@@ -205,7 +209,7 @@ class Targets:
             idx = np.array(by_o[o], dtype=np.int64)
             inside = shapely.contains_xy(g, P[idx, 0], P[idx, 1])
             d = shapely.distance(g.boundary, shapely.points(P[idx, 0], P[idx, 1]))
-            sel = inside & (d > INSET_M)
+            sel = inside & (d > inset)
             out += [(a, o, dd) for a, dd in zip(idx[sel].tolist(), d[sel].tolist())]
         return out
 
@@ -319,7 +323,14 @@ def barrier_clash(pk, model) -> dict:
         what = br.classify(pid, P)
         own = {pk.oid[x] for x in br.own.get(pid, ()) if x in pk.oid} | {pk.owner(pid)}
         per: dict = {}
-        for a, oo, dd in tg.on_pavement(P, own, BELOW_M, ABOVE_M):
+        # (a road's pavement whole; a junction's carriageway, and its sidewalk corners past
+        # `PAD_INSET_M`)
+        roads_ = {o for o, k in tg.kind_of.items() if k != "street.junction"}
+        hits = [h for h in tg.on_pavement(P, own, BELOW_M, ABOVE_M) if h[1] in roads_]
+        hits += tg.on_pavement(P, own | roads_, BELOW_M, ABOVE_M, vehicle=True)
+        hits += tg.on_pavement(P, own | roads_, BELOW_M, ABOVE_M, vehicle="paving",
+                               inset=PAD_INSET_M)
+        for a, oo, dd in hits:
             r = per.setdefault(oo, [0, 0.0, a, set()])
             r[0] += 1
             if dd > r[1]:
