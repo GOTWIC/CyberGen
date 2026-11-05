@@ -7,7 +7,8 @@ Reads the session logs Claude Code keeps on this machine (~/.claude/projects, or
 $CLAUDE_CONFIG_DIR/projects, or --logs) and writes site/usage/<device>.json: token
 totals, sessions, subagents, models and a per-day series, with the time it ran. Each
 machine writes only its own file; site/build.py adds the files up for the showcase and
-shows each device apart behind a toggle. Python 3.9+ standard library only.
+shows each device apart behind a toggle and prices every model's tokens by type
+(fast mode responses are kept apart as `<model>:fast`). Python 3.9+ standard library only.
 
 Which sessions are CyberGen's: Claude Code files a session's log under the folder it
 ran in, so every worktree session (`<repo>/.claude/worktrees/<name>`) looks like a
@@ -35,9 +36,18 @@ SITE = Path(__file__).resolve().parent
 ROOT = SITE.parent
 OUT = SITE / "usage"
 LABELS = {"mac": "Mac", "windows": "Windows PC"}
-FIELDS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
-SHORT = {"input_tokens": "input", "output_tokens": "output",
-         "cache_creation_input_tokens": "cache_write", "cache_read_input_tokens": "cache_read"}
+KINDS = ("input", "output", "cache_write_5m", "cache_write_1h", "cache_read")
+
+
+def kinds_of(u: dict) -> dict[str, int]:
+    """One API response's tokens by type; cache writes split by their lifetime (a
+    record without the split counts as 5-minute writes)."""
+    write = int(u.get("cache_creation_input_tokens") or 0)
+    split = u.get("cache_creation") or {}
+    h1 = int(split.get("ephemeral_1h_input_tokens") or 0)
+    return {"input": int(u.get("input_tokens") or 0), "output": int(u.get("output_tokens") or 0),
+            "cache_write_5m": write - h1, "cache_write_1h": h1,
+            "cache_read": int(u.get("cache_read_input_tokens") or 0)}
 WORKTREES = "/.claude/worktrees/"
 
 
@@ -133,7 +143,7 @@ def local_day(ts: str) -> str:
 def summarize(sessions: dict[str, dict], ids: list[str], device: str, label: str) -> dict:
     seen = set()
     totals: Counter = Counter()
-    models: Counter = Counter()
+    models: dict[str, Counter] = defaultdict(Counter)
     days: dict[str, Counter] = defaultdict(Counter)
     day_sessions: dict[str, set] = defaultdict(set)
     agents = 0
@@ -150,12 +160,14 @@ def summarize(sessions: dict[str, dict], ids: list[str], device: str, label: str
             if model == "<synthetic>":
                 continue
             day = local_day(ts)
-            n = {SHORT[f]: int(u.get(f) or 0) for f in FIELDS}
+            n = kinds_of(u)
+            if u.get("speed") == "fast":
+                model += ":fast"
             totals.update(n)
             days[day].update(n)
-            models[model] += sum(n.values())
+            models[model].update(n)
             day_sessions[day].add(sid)
-    totals["total"] = sum(totals[k] for k in SHORT.values())
+    totals["total"] = sum(totals[k] for k in KINDS)
     return {
         "device": device,
         "label": label,
@@ -163,9 +175,10 @@ def summarize(sessions: dict[str, dict], ids: list[str], device: str, label: str
         "sessions": len(ids),
         "worktree_sessions": worktree,
         "subagents": agents,
-        "totals": {k: totals[k] for k in ("total", "input", "output", "cache_write", "cache_read")},
-        "models": dict(sorted(models.items(), key=lambda kv: -kv[1])),
-        "days": {d: {"total": sum(c[k] for k in SHORT.values()), "output": c["output"],
+        "totals": {k: totals[k] for k in ("total",) + KINDS},
+        "models": {m: {k: c[k] for k in KINDS}
+                   for m, c in sorted(models.items(), key=lambda kv: -sum(kv[1].values()))},
+        "days": {d: {"total": sum(c[k] for k in KINDS), "output": c["output"],
                      "sessions": len(day_sessions[d])} for d, c in sorted(days.items())},
     }
 

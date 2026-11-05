@@ -364,6 +364,40 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
 
 
 DEVICE_ORDER = ("mac", "windows")
+# API prices in dollars per million tokens (Anthropic's first-party rates): input,
+# output, cache read; cache writes are 1.25x input (5-minute) and 2x input (1-hour);
+# fast mode (a model id ending ":fast") is 2x standard. A model not listed shows "no
+# price" and adds nothing to the cost: add its rates here when it is used.
+PRICES = {
+    "claude-fable-5-1": (10.00, 50.00, 0.25),
+    "claude-opus-5-5": (4.00, 20.00, 0.20),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.20),
+}
+KINDS = ("input", "output", "cache_write_5m", "cache_write_1h", "cache_read")
+KIND_NAMES = {"input": "Input", "output": "Output", "cache_write_5m": "Cache write 5m",
+              "cache_write_1h": "Cache write 1h", "cache_read": "Cache read"}
+MODEL_NAMES = {"claude-fable-5-1": "Fable 5.1", "claude-fable-5": "Fable 5", "claude-opus-5-5": "Opus 5.5",
+               "claude-opus-5": "Opus 5", "claude-sonnet-5-5": "Sonnet 5.5", "claude-sonnet-5": "Sonnet 5",
+               "claude-haiku-5-5": "Haiku 5.5"}
+
+
+def rates(model: str) -> dict[str, float] | None:
+    base, _, speed = model.partition(":")
+    p = PRICES.get(base)
+    if not p:
+        return None
+    k = 2 if speed == "fast" else 1
+    i, o, r = (k * v for v in p)
+    return {"input": i, "output": o, "cache_write_5m": 1.25 * i, "cache_write_1h": 2 * i, "cache_read": r}
+
+
+def cost(model: str, tokens: dict[str, int]) -> dict[str, float] | None:
+    r = rates(model)
+    return None if r is None else {k: tokens.get(k, 0) * r[k] / 1e6 for k in KINDS}
+
+
+def usd(x: float) -> str:
+    return f"${x:,.0f}" if x >= 100 else f"${x:,.2f}"
 
 
 def load_usage() -> list[dict]:
@@ -392,9 +426,25 @@ def stamp(iso: str) -> str:
     return f'<time datetime="{esc(iso)}">{t:%Y-%m-%d %H:%M} UTC</time>'
 
 
+def device_cost(u: dict) -> float:
+    return sum(sum((cost(m, t) or {}).values()) for m, t in u.get("models", {}).items())
+
+
+def model_table(us: list[dict]) -> dict[str, dict[str, int]]:
+    """Every device's tokens by model and type, added up."""
+    out: dict[str, dict[str, int]] = {}
+    for u in us:
+        for m, t in u.get("models", {}).items():
+            row = out.setdefault(m, dict.fromkeys(KINDS, 0))
+            for k in KINDS:
+                row[k] += int(t.get(k, 0))
+    return dict(sorted(out.items(), key=lambda kv: -sum(kv[1].values())))
+
+
 def usage_figures(us: list[dict]) -> dict[str, int]:
     days = set().union(*(u["days"] for u in us))
     return {"total": sum(u["totals"]["total"] for u in us),
+            "cost": sum(device_cost(u) for u in us),
             "output": sum(u["totals"]["output"] for u in us),
             "sessions": sum(u["sessions"] for u in us),
             "subagents": sum(u["subagents"] for u in us),
@@ -406,9 +456,37 @@ def render_usage(us: list[dict]) -> str:
     if not us:
         return ""
     tot = usage_figures(us)
+    more = ('<button class="btn mini" type="button" id="usage-more" aria-expanded="false" '
+            'aria-controls="usage-models">By model</button>')
     kpis = "".join(f'<div><dt class="lbl">{k}</dt><dd class="mono">{v}</dd></div>' for k, v in (
-        ("Tokens", big(tot["total"])), ("Output tokens", big(tot["output"])),
+        ("Tokens", big(tot["total"]) + more), ("API cost", usd(tot["cost"])),
         ("Sessions", f'{tot["sessions"]:,}'), ("Active days", str(tot["days"]))))
+    # Tokens and their cost by model and type, every device added up.
+    mt = model_table(us)
+    head = "".join(f'<th scope="col">{KIND_NAMES[k]}</th>' for k in KINDS)
+    body = []
+    sums = dict.fromkeys(KINDS, 0)
+    sum_cost = dict.fromkeys(KINDS, 0.0)
+    for m, t in mt.items():
+        c = cost(m, t)
+        base, _, speed = m.partition(":")
+        name = MODEL_NAMES.get(base, base) + (" (fast)" if speed else "")
+        cells = []
+        for k in KINDS:
+            sums[k] += t[k]
+            if c:
+                sum_cost[k] += c[k]
+            cells.append(f'<td class="mono">{big(t[k])}<small>{usd(c[k]) if c else "no price"}</small></td>')
+        total = usd(sum(c.values())) if c else "no price"
+        body.append(f'<tr><th scope="row">{esc(name)}</th>{"".join(cells)}'
+                    f'<td class="mono">{big(sum(t.values()))}<small>{total}</small></td></tr>')
+    foot = "".join(f'<td class="mono">{big(sums[k])}<small>{usd(sum_cost[k])}</small></td>' for k in KINDS)
+    models = (f'<div class="usage-models" id="usage-models" hidden><table>'
+              f'<thead><tr><th scope="col">Model</th>{head}<th scope="col">All</th></tr></thead>'
+              f'<tbody>{"".join(body)}</tbody>'
+              f'<tfoot><tr><th scope="row">All models</th>{foot}'
+              f'<td class="mono">{big(tot["total"])}<small>{usd(tot["cost"])}</small></td></tr></tfoot>'
+              f'</table></div>')
     # A column a day, first to last, stacked by device.
     days = sorted(set().union(*(u["days"] for u in us)))
     first, last = dt.date.fromisoformat(days[0]), dt.date.fromisoformat(days[-1])
@@ -428,7 +506,7 @@ def render_usage(us: list[dict]) -> str:
         d += dt.timedelta(days=1)
     rows = "".join(
         f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}</th>'
-        f'<td class="mono">{big(u["totals"]["total"])}</td><td class="mono">{big(u["totals"]["output"])}</td>'
+        f'<td class="mono">{big(u["totals"]["total"])}</td><td class="mono">{usd(device_cost(u))}</td>'
         f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>'
         f'<td class="mono">{stamp(u["updated"])}</td></tr>' for u in us)
     newest = max(u["updated"] for u in us)
@@ -443,14 +521,14 @@ def render_usage(us: list[dict]) -> str:
     <div class="usage-body">
       <dl class="usage-kpis">{kpis}</dl>
       <div class="usage-chart" aria-hidden="true">{''.join(cols)}</div>
-    </div>
+    </div>{models}
     <div class="usage-devices" id="usage-devices" hidden>
       <table>
-        <thead><tr><th scope="col">Device</th><th scope="col">Tokens</th><th scope="col">Output</th><th scope="col">Sessions</th><th scope="col">Days</th><th scope="col">Last updated</th></tr></thead>
+        <thead><tr><th scope="col">Device</th><th scope="col">Tokens</th><th scope="col">API cost</th><th scope="col">Sessions</th><th scope="col">Days</th><th scope="col">Last updated</th></tr></thead>
         <tbody>{rows}</tbody>
       </table>
     </div>
-    <p class="usage-foot">Tokens include cache reads and writes. Each device records its own sessions, worktree sessions and subagents included.</p>
+    <p class="usage-foot">Tokens include cache reads and writes. API cost is what the tokens would cost at Anthropic's published API prices. Each device records its own sessions, worktree sessions and subagents included.</p>
   </section>"""
 
 

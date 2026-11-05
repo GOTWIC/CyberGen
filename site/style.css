@@ -381,7 +381,15 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .usage [data-device="windows"] { --dc: var(--dev-windows); }
 .usage [data-device]:not([data-device="mac"]):not([data-device="windows"]) { --dc: var(--dev-other); }
 .usage[data-view="devices"] .ubar i { background: var(--dc); }
-.usage-devices { margin-top: 12px; overflow-x: auto; }
+.btn.mini { padding: 2px 6px; font-size: 9px; margin-left: 10px; vertical-align: middle; }
+.usage-models, .usage-devices { margin-top: 12px; overflow-x: auto; }
+.usage-models table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.usage-models th, .usage-models td { padding: 6px 14px 6px 0; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.usage-models th:first-child { text-align: left; }
+.usage-models thead th { font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-dim); }
+.usage-models tbody th, .usage-models tfoot th { font-weight: 500; }
+.usage-models tfoot td, .usage-models tfoot th { border-bottom: 0; border-top: 1px solid var(--line); }
+.usage-models small { display: block; font-size: 11px; color: var(--text-muted); }
 .usage-devices table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .usage-devices th, .usage-devices td { padding: 6px 12px 6px 0; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line-soft); }
 .usage-devices thead th { font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-dim); }

@@ -84,6 +84,14 @@
       const d = new Date(t.getAttribute("datetime"));
       if (!isNaN(d)) t.textContent = d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
     });
+    const more = document.getElementById("usage-more");
+    const models = document.getElementById("usage-models");
+    more.addEventListener("click", () => {
+      const open = models.hidden;
+      models.hidden = !open;
+      more.classList.toggle("on", open);
+      more.setAttribute("aria-expanded", String(open));
+    });
     const toggle = document.getElementById("usage-toggle");
     const devices = document.getElementById("usage-devices");
     toggle.addEventListener("click", () => {
