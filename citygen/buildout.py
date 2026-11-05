@@ -37,6 +37,13 @@ RELINK_M = 60.0      # park paths fix: an entrance whose link to its nearest wal
 #                      through a building links to the nearest one within this it reaches
 MASS_PAD_M = 0.1     # ... clear of every mass taken in by this
 HEAD_M = 2.5         # ... at the entrance's level (a mass this far up leaves room under it)
+GATE_W_M = 3.0       # access fix (#87): a gateway this wide cut through the low buildings
+#                      that wall an entrance in ...
+GATE_CLEAR_M = 4.5   # ... with this much clear under the floors left over it (M17's path
+#                      headroom) ...
+GATE_MAX_H_M = 30.0  # ... through buildings no taller than this (no towers) ...
+GATE_TRIES = 8       # ... on the straight link to one of the nearest walkways
+GATE_DOOR_M = 1.0    # a gateway keeps this clear of the cut building's own entrances
 
 
 @dataclass
@@ -854,9 +861,11 @@ def link_entrances(out: Out, walks: list) -> list:
     land_of = _landmass_index(out.landmasses, [l.coords[0] for l in lines])
     lvs = {lv: _Level([pos_of[i] for i in per[lv]], lines, walks, gi, land_of)
            for lv in levels if per[lv]}
-    relinked = unlinked = moved = rounded = 0
+    relinked = unlinked = moved = rounded = through = gates = 0
     masses = _Masses(out.buildings)
+    by_bid = {r.id: r for r in out.buildings}
     round_of: dict = {}     # id(entrance) -> its path led round the buildings
+    through_of: dict = {}   # id(entrance) -> the complex (property) its path passes through
     site_door: dict = {}    # id(entrance) -> (site walk index, foot, path): a megasite
     #                         building's entrance that only reaches its site's own paths
     site_lines = [(sid, LineString([q[:2] for q in pts])) for sid, (_, pts, _) in
@@ -892,14 +901,33 @@ def link_entrances(out: Out, walks: list) -> list:
                         if alt is None and rl is None and rec.megasite_id:
                             sd = _site_door(e.position, rec.megasite_id, site_lines, masses,
                                             rec.level, out.site_links)
+                        th = gw = None
+                        if alt is None and sd is None and rl is None:
+                            # (access fix, #87: through its own complex's podium, a lobby,
+                            # else a gateway cut through the low buildings in its way)
+                            th = _through_complex(rec, e, lv, ent_land[k], lines, walks, gi,
+                                                  out.buildings)
+                            if th is None:
+                                gw = _gateway(rec, e, lv, masses, ent_land[k], lines, walks,
+                                              gi, by_bid)
+                                if gw is not None:
+                                    masses = _Masses(out.buildings)
                         if alt is not None:
                             pass
                         elif sd is not None:
                             site_door[id(e)] = sd
                             rounded += 1
+                        elif th is not None:
+                            alt = th[0]
+                            round_of[id(e)] = th[1]
+                            through_of[id(e)] = rec.property_id
+                            through += 1
+                        elif gw is not None:
+                            alt = gw
+                            gates += 1
                         elif rl is None:
                             # (walled in: no walkway reached from anywhere on its facade, not
-                            # even round the buildings; it says so, the check counts it)
+                            # even round the buildings; it says so, the check fails it)
                             unlinked += 1
                             w_ = rec.attrs.setdefault("walled_in", [])
                             w_.append(rec.entrances.index(e))
@@ -941,6 +969,8 @@ def link_entrances(out: Out, walks: list) -> list:
         at = {"building": rec.id, "door": True}
         if rec.entrances.index(e) in rec.attrs.get("walled_in", ()):
             at["walled_in"] = True
+        if id(e) in through_of:
+            at["through"] = through_of[id(e)]
         new.append(("path", round_of.get(id(e)) or [tuple(e.position), foot], 2.0,
                     _base(rec), at, rec.level))
         if id(e) in round_of:
@@ -1020,8 +1050,10 @@ def link_entrances(out: Out, walks: list) -> list:
             if id(e) in round_of and id(e) not in own_path:
                 foot = _foot(lines, walks, gi, line_of[id(e)], e.position)
                 splits.setdefault(line_of[id(e)], []).append(foot)
-                new.append(("path", round_of[id(e)], 2.0, _base(rec),
-                            {"building": rec.id, "door": True}, rec.level))
+                at = {"building": rec.id, "door": True}
+                if id(e) in through_of:
+                    at["through"] = through_of[id(e)]
+                new.append(("path", round_of[id(e)], 2.0, _base(rec), at, rec.level))
                 own_path[id(e)] = (e, len(new) - 1)
     walks = _split(walks, gi, lines, splits)
     _piece_of_foot(out, walks)
@@ -1051,6 +1083,8 @@ def link_entrances(out: Out, walks: list) -> list:
     out.info["entrances_moved"] = moved
     out.info["entrances_led_round"] = rounded
     out.info["entrances_blocked"] = unlinked
+    out.info["entrances_through_complex"] = through
+    out.info["entrances_gateways"] = gates
     return walks
 
 
@@ -1095,6 +1129,112 @@ def _move_entrance(rec, e, lv, masses, land: int, lines, walks, gi):
         if best is None or (round(score, 6), p) < (round(best[0], 6), best[1]):
             best = (score, p, h)
     return None if best is None else (best[1], best[2])
+
+
+def _through_complex(rec, e, lv, land: int, lines, walks, gi, buildings):
+    """Access fix (#87): an entrance its own complex walls in (towers on one podium, their
+    podiums overlapping round it) reaches the nearest walkway through the complex, its
+    lobby: a straight path that only passes the masses of its own property's buildings,
+    else one led round the others. (walkway position, path points) or None."""
+    if not rec.property_id:
+        return None
+    sib = [b for b in buildings if b.property_id == rec.property_id and b.id != rec.id]
+    if not sib:
+        return None
+    ms = _Masses([b for b in buildings if b.property_id != rec.property_id or b.id == rec.id])
+    p = e.position
+    pt = Point(p)
+    h = lv.reachable(pt, land, lambda i: ms.clear(p, _foot(lines, walks, gi, i, p),
+                                                  rec.level))
+    if h is not None:
+        return h, [tuple(p), _foot(lines, walks, gi, h, p)]
+    rl = _round_link(p, lv, land, ms, rec.level, lines, walks, gi)
+    return rl
+
+
+def _gateway(rec, e, lv, masses, land: int, lines, walks, gi, by_id: dict) -> int | None:
+    """Access fix (#87): the nearest walkway (of GATE_TRIES) that a straight link from the
+    entrance reaches through low buildings only (`_gate_ok`), with a gateway GATE_W_M wide
+    cut through each: a mass standing on the ground there keeps its legs beside the
+    gateway and a mass over it from GATE_CLEAR_M up to its top, so the roof and the floors
+    above run on (`_cut_gate`). The walkway's position, or None."""
+    p = e.position
+    pt = Point(p)
+    ks = [int(i) for i in lv.tree.query(pt, predicate="dwithin",
+                                        distance=reach(lv.tree, lv.lines, pt))]
+    ks = [h for h in ks if land < 0 or lv.land[h] == land]
+    ks.sort(key=lambda h: (G.dist(lv.lines[h], pt), lv.walks[lv.gi[h]]["id"]))
+    for h in ks[:GATE_TRIES]:
+        i = lv.idx[h]
+        foot = _foot(lines, walks, gi, i, p)
+        if ST._dist(p, foot) < GATE_W_M:
+            continue
+        bids = masses.blockers(p, foot, rec.level)
+        if not bids or rec.id in bids:
+            continue
+        bs = [by_id[x] for x in bids]
+        if not all(_gate_ok(b, rec.level) for b in bs):
+            continue
+        strip = G.qpoly(LineString([tuple(p[:2]), tuple(foot[:2])]).buffer(
+            GATE_W_M / 2.0, cap_style="flat", join_style="mitre"))
+        cuts = [_cut_gate(b, strip) for b in bs]
+        if any(c is None for c in cuts):
+            continue
+        for b, ms in zip(bs, cuts):
+            b.masses = ms
+            b.attrs.setdefault("passage_cut", []).append(
+                [list(map(G.q, p[:2])), list(map(G.q, foot[:2]))])
+        return i
+    return None
+
+
+def _gate_ok(b, level: int) -> bool:
+    """A building a gateway may be cut through: low (GATE_MAX_H_M), on the same level, no
+    landmark, traced, held or pinned building, no M21 form (its mass indices), no portal."""
+    a = b.attrs or {}
+    return (not b.landmark and b.level == level and b.form is None and not b.portals and
+            not (a.get("pinned") or a.get("pin") or a.get("held")) and
+            b.height_m - _base(b) <= GATE_MAX_H_M + 1e-9)
+
+
+def _cut_gate(b, strip):
+    """The masses of b with a gateway cut along strip, or None where it may not be: every
+    mass standing on the ground across it a plain prism tall enough for a floor over the
+    gateway, none of b's own entrances or units in it. The first leg keeps the mass's place
+    in the list (indices stay), the other legs and the mass over the gateway go last."""
+    base = _base(b)
+    for x in b.entrances:
+        if G.dist(strip, Point(x.position)) < GATE_DOOR_M:
+            return None
+    for u in b.units:
+        if LineString([tuple(u.edge[0]), tuple(u.edge[1])]).intersects(strip):
+            return None
+    keep, extra = list(b.masses), []
+    top = G.q(base + GATE_CLEAR_M)
+    hit = False
+    for k, ms in enumerate(b.masses):
+        fp = G.from_model_poly(ms.footprint)
+        if ms.z0_m - base >= HEAD_M or ms.z1_m <= base or \
+                G.area1(G.inter(fp, strip)) < 0.01:
+            continue
+        if ms.shape != "prism" or ms.arcs or ms.turn_deg or ms.scale != 1.0 or \
+                tuple(ms.shift_m) != (0.0, 0.0) or ms.z1_m < top + 1.0:
+            return None
+        legs = sorted((g for g in G.parts(G.diff(fp, strip)) if G.area1(g) >= 1.0),
+                      key=lambda g: (-G.area1(g), G.qbounds(g)))
+        over = [g for g in G.parts(G.inter(fp, strip)) if G.area1(g) >= 0.01]
+        if not legs or not over:
+            return None
+        row = ms.model_dump(mode="python")
+
+        def mass(g, **kw):
+            return type(ms).model_validate({**row, "footprint": G.to_model_poly(g), **kw})
+
+        keep[k] = mass(legs[0])
+        extra += [mass(g) for g in legs[1:]]
+        extra += [mass(g, z0_m=top) for g in over]
+        hit = True
+    return keep + extra if hit else None
 
 
 def _site_door(p, sid: str, site_lines: list, masses, level: int, links=()):

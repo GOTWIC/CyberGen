@@ -42,9 +42,16 @@ def test_park_paths_on_open_land():
         line = LineString([p[:2] for p in w.line])
         assert not any(lt.intersects(line) for lt in lots if not G.apart(lt, line)), w.id
     reached = {(w.attrs or {}).get("open_space") for w in paths}
+    walks = [LineString([p[:2] for p in w.line]) for w in m.walkways
+             if not w.level and len(w.line) >= 2 and not (w.attrs or {}).get("open_space")]
     for o in m.open_spaces:
+        # (access fix, #86: every open space has a way in, a path or a walkway beside it)
         if o.kind in PP.PATH_KINDS and not o.level and o.id not in reached:
-            assert o.attrs.get("access") == "none" and o.attrs.get("no_access"), o.id
+            assert o.attrs.get("access") != "none", o.id
+            poly = G.from_model_poly(o.polygon)
+            assert o.district_id is None or any(
+                G.dist(poly, w) <= NC.BESIDE_M for w in walks if not G.apart(poly, w, 4.0)), \
+                o.id
 
 
 def test_no_entrance_links_through_a_building():
@@ -109,6 +116,74 @@ def test_check_walkway_clash_fails():
     assert len(bad.failures) == 1 and "links to w1 through building b1" in bad.failures[0]
 
 
+def test_check_walkway_clash_fails_a_walled_in_entrance():
+    # (access fix, #87: no longer a note)
+    ent = {"position": (20.0, 10.0), "kind": "main", "walkway_id": "w1", "link_m": 30.0}
+    b = _bld("b1", box(0, 0, 20, 20), entrances=[ent])
+    b["attrs"] = {"walled_in": [0]}
+    m = _model(buildings=[b], walkways=[_walk("w1", [(50, -10), (50, 30)])])
+    bad = NC.check_walkway_clash(_spec(), m)
+    assert len(bad.failures) == 1 and "walled in" in bad.failures[0]
+
+
+def _link(buildings: list, walks: list):
+    from citygen import buildout as BO
+    from citygen.model import COLLECTIONS
+
+    with G.canonical():
+        out = BO.Out(buildings=[COLLECTIONS["buildings"].model_validate(b) for b in buildings])
+        rows = BO.link_entrances(out, [{**w, "neighbors": []} for w in walks])
+    return out, rows
+
+
+def test_gateway_through_a_low_building_that_walls_an_entrance_in():
+    # an office behind a long shed (11 m) along the street: no way round within reach, so a
+    # gateway is cut through the shed, its roof running on over the gateway
+    ent = {"position": (10.0, 5.0), "kind": "main"}
+    office = {**_bld("b1", box(0, 0, 10, 10), entrances=[ent]), "property_id": "p1"}
+    shed = _bld("b2", box(12, -100, 16, 100))
+    shed.update(property_id="p2", height_m=11.0, type="building.shed", use="industrial",
+                entrances=[{"position": (16.0, 60.0), "kind": "main"}])
+    shed["masses"][0]["z1_m"] = 11.0
+    out, _ = _link([office, shed], [_walk("w1", [(20, -120), (20, 120)])])
+    o, s = out.buildings
+    assert not o.attrs.get("walled_in") and out.info["entrances_gateways"] == 1
+    assert s.attrs.get("passage_cut") and len(s.masses) == 3
+    low = [ms for ms in s.masses if ms.z0_m == 0.0]
+    over = [ms for ms in s.masses if ms.z0_m > 0.0]
+    assert len(low) == 2 and len(over) == 1 and over[0].z0_m == 4.5 and over[0].z1_m == 11.0
+    gap = G.from_model_poly(over[0].footprint)
+    assert abs(G.area1(gap) - 4.0 * 3.0) < 0.05 and gap.contains(Point(14.0, 5.0))
+    # the check sees no walkway through it, and the entrance's link is clear
+    m = _model(buildings=[b.model_dump(mode="python") for b in out.buildings],
+               walkways=[_walk("w1", [(20, -120), (20, 120)])])
+    assert NC.check_walkway_clash(_spec(), m).passed
+
+
+def test_entrance_its_complex_walls_in_leaves_through_its_lobby():
+    # twin towers on one podium, the east one's entrance on a face its sibling and a
+    # neighbor close: its door path runs through the complex (property p1)
+    ent = {"position": (30.0, 30.0), "kind": "main"}
+    a = {**_bld("b1", box(20, 0, 40, 30), entrances=[ent]), "property_id": "p1"}
+    sib = {**_bld("b2", box(10, 30, 50, 50)), "property_id": "p1",
+           "entrances": [{"position": (30.0, 50.0), "kind": "main"}]}
+    others = [{**_bld(f"b{k}", g), "property_id": f"p{k}", "entrances": [
+        {"position": e, "kind": "main"}]} for k, g, e in (
+        (3, box(0, -10, 20, 50), (0.0, 20.0)), (4, box(40, -10, 60, 50), (60.0, 20.0)),
+        (5, box(20, -10, 40, 0), (30.0, -10.0)))]
+    walks = [_walk("w1", [(-40, 55), (100, 55)])]
+    out, rows = _link([a, sib] + others, walks)
+    b1 = out.buildings[0]
+    assert not b1.attrs.get("walled_in") and out.info["entrances_through_complex"] == 1
+    door = [w for w in rows if (w.get("attrs") or {}).get("building") == "b1" and
+            w["attrs"].get("door")]
+    assert door and door[0]["attrs"].get("through") == "p1"
+    m = _model(buildings=[b.model_dump(mode="python") for b in out.buildings],
+               walkways=[_walk(w["id"], [p[:2] for p in w["line"]], w["kind"], **w["attrs"])
+                         for w in rows])
+    assert NC.check_walkway_clash(_spec(), m).passed
+
+
 def test_check_park_access_fails():
     park = G.to_model_poly(box(0, 0, 30, 30))
     lot = {"id": "l1", "block_id": "k1", "district_id": "d1", "archetype": "midtown_mixed",
@@ -121,8 +196,10 @@ def test_check_park_access_fails():
     far = _walk("w9", [(-100, -100), (-100, 100)])
     bad = NC.check_park_access(_spec(), city([far]))
     assert len(bad.failures) == 1 and "no way in" in bad.failures[0]
+    # (access fix, #86: saying why is no longer enough)
     said = city([far], {"access": "none", "no_access": "no walkway within 30 m"})
-    assert NC.check_park_access(_spec(), said).passed
+    bad = NC.check_park_access(_spec(), said)
+    assert len(bad.failures) == 1 and "no walkway within 30 m" in bad.failures[0]
     across = _walk("w1", [(15, 15), (70, 15)], kind="path", open_space="o1")
     bad = NC.check_park_access(_spec(), city([far, across]))
     assert any("crosses a lot" in f for f in bad.failures)
@@ -189,6 +266,88 @@ def test_passage_to_an_enclosed_park():
         assert len(cut) == 2 and all(lt["area_m2"] < 1200.0 for lt in cut)
         assert all(not poly.overlaps(lt["polygon"]) or
                    G.area1(G.inter(poly, lt["polygon"])) < 0.01 for lt in lots)
+
+
+def _highway(z: float, sid: str = "h1", y: float = 45.0) -> dict:
+    return {"id": sid, "road_class": "highway", "width_m": 30.0,
+            "centerline": [(-60.0, y), (120.0, y)],
+            "z_profile": [{"s": 0.0, "z": z}, {"s": 180.0, "z": z}],
+            "cross_section": {"sidewalk_m": [0.0, 0.0]}}
+
+
+def _cut_off(z: float, segs=None):
+    """A park only a highway (deck at z) borders, a sidewalk 45 m off past the highway."""
+    W = _graph([[(-60.0, 75.0), (120.0, 75.0)]])
+    park = {"id": "o1", "kind": "park", "polygon": G.qpoly(box(0, 0, 40, 30))}
+    info = PP.open_paths(W, [park], [], [], segs if segs is not None else [_highway(z)])
+    return W, park, info
+
+
+def test_path_under_a_viaduct_to_a_park_only_roads_border():
+    with G.canonical():
+        W, park, info = _cut_off(9.0)
+        assert info["under_roads"] == 1 and not info["no_access"] and not info["verges"]
+        assert park.get("far_path") == "under_road" and park["kind"] == "park"
+        paths = [e for e in W.edges if e["attrs"].get("open_space") == "o1"]
+        assert paths and all(e["attrs"].get("under_road") for e in paths)
+        assert park["polygon"].covers(Point(paths[0]["pts"][0]))
+        assert abs(paths[0]["pts"][-1][1] - 75.0) < 0.01
+
+
+def test_park_behind_an_at_grade_highway_is_a_verge():
+    with G.canonical():
+        # (an at-grade or low deck: no path crosses its carriageway; a park with no street
+        # that no walkway reaches is a green verge, as M2 makes the small roadless pieces)
+        for z in (0.0, 4.0):
+            W, park, info = _cut_off(z)
+            assert info["verges"] == 1 and info["under_roads"] == 0, z
+            assert park["kind"] == "green" and park.get("verge"), z
+            assert not [e for e in W.edges if e["attrs"].get("open_space")], z
+        # one with a street frontage (no walkway on it here) stays a park and says why
+        street = {"id": "s1", "road_class": "street", "width_m": 10.0,
+                  "centerline": [(-60.0, -5.0), (120.0, -5.0)]}
+        W, park, info = _cut_off(0.0, [_highway(0.0), street])
+        assert park["kind"] == "park" and info["no_access"] and not info["verges"]
+
+
+def test_strip_park_joins_its_neighbors_path():
+    with G.canonical():
+        # a park beside the street and a strip park behind it, no walkway within 30 m of the
+        # strip: its path joins the first park's
+        W = _graph([[(-20.0, -5.0), (60.0, -5.0)]])
+        front = {"id": "o1", "kind": "park", "polygon": G.qpoly(box(0, 0, 40, 40))}
+        strip = {"id": "o2", "kind": "park", "polygon": G.qpoly(box(0, 40, 40, 50))}
+        info = PP.open_paths(W, [strip, front], [], [], [])
+        assert info["via_open_space"] == 1 and not info["no_access"] and not info["verges"]
+        assert strip.get("far_path") == "via_open_space"
+        mine = [e for e in W.edges if e["attrs"].get("open_space") == "o2"]
+        assert mine and strip["polygon"].covers(Point(mine[0]["pts"][0]))
+        assert front["polygon"].covers(Point(mine[0]["pts"][-1]))
+        # (it joins the neighbor's path at an end, its middle: no park path is split, so
+        # each still starts inside its own open space)
+        theirs = [e for e in W.edges if e["attrs"].get("open_space") == "o1"]
+        assert len(theirs) == 1 and mine[0]["pts"][-1] == theirs[0]["pts"][0]
+
+
+def test_far_path_joins_no_raised_sidewalk():
+    with G.canonical():
+        # (the sidewalks of a raised road are at z 0 in the walk graph: a path that passes
+        # under a viaduct never joins one where its road is up)
+        W = JN.WalkGraph()
+        W.add("sidewalk", [(-60.0, 75.0), (120.0, 75.0)], 2.0, segment="s2")
+        up = {"id": "s2", "road_class": "avenue", "width_m": 10.0,
+              "centerline": [(-60.0, 78.0), (120.0, 78.0)],
+              "z_profile": [{"s": 0.0, "z": 9.0}, {"s": 180.0, "z": 9.0}],
+              "cross_section": {"sidewalk_m": [3.0, 3.0]}}
+        park = {"id": "o1", "kind": "park", "polygon": G.qpoly(box(0, 0, 40, 30))}
+        info = PP.open_paths(W, [park], [], [], [_highway(9.0), up])
+        assert info["under_roads"] == 0 and info["verges"] == 1 and park["kind"] == "green"
+        # a path with no road between, to a walkway past 30 m: a plain path
+        W = _graph([[(-60.0, 75.0), (120.0, 75.0)]])
+        park = {"id": "o1", "kind": "park", "polygon": G.qpoly(box(0, 0, 40, 30))}
+        info = PP.open_paths(W, [park], [], [], [_highway(9.0, y=-60.0)])
+        assert info["far_paths"] == 1 and park.get("far_path") == "path"
+        assert not any(e["attrs"].get("under_road") for e in W.edges)
 
 
 def test_keep_off_leads_a_walkway_round_a_lot():

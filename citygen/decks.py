@@ -1392,7 +1392,10 @@ def supports(m) -> tuple[list, list]:
             if thin.is_empty:
                 continue
             q = ST._pt(*shapely.ops.nearest_points(thin, Point(sp))[0].coords[0])
-            if ST._dist(q, sp) <= r - 0.1 and thin.contains(Point(q)):
+            # (access fix, #91: q lies on the thin strip's boundary, which `thin.contains`
+            # leaves out, so a column there was kept or dropped by the grid's rounding; the
+            # strip is the allowed zone taken in by 0.1 m, so test that)
+            if ST._dist(q, sp) <= r - 0.1 and ok_zone.contains(Point(q)):
                 keep.append(q)
         ids = []
         oct_ = [(COLUMN_R * M.cos(M.PI * (2 * k + 1) / 8), COLUMN_R * M.sin(M.PI * (2 * k + 1) / 8))

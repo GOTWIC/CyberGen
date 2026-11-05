@@ -295,7 +295,7 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
     bld = net.builder
     pinfo = PP.open_paths(jx["walk"], blk["open"], blk["lots"],
                           [getattr(bld, "water", None), getattr(bld, "reserves", None)],
-                          gnet.segments)
+                          gnet.segments, gjx["junctions"], gnet.nodes)
     rec_of = {r["id"]: r for r in out.open_spaces}
     for o in blk["open"]:
         r = rec_of.get(o.get("id"))
@@ -306,6 +306,15 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             r["attrs"]["area_m2"] = G.q(G.area1(o["polygon"]))
             r["attrs"]["access"] = "passage"
             r["attrs"]["passage"] = o["passage"]
+        elif o.get("far_path"):
+            # (access fix: a path to a neighbor open space's path, under a viaduct, or to a
+            # walkway past the usual reach)
+            r["attrs"]["access"] = o["far_path"]
+        elif o.get("verge"):
+            # (access fix: a roadless park no walkway reaches is a green verge)
+            r["kind"] = o["kind"]
+            r["type"] = f"open_space.{o['kind']}"
+            r["attrs"]["verge"] = o["verge"]
         elif o.get("no_access"):
             r["attrs"]["access"] = "none"
             r["attrs"]["no_access"] = o["no_access"]
@@ -393,6 +402,8 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                 "open_paths_bent": pinfo["bent"], "passages": pinfo["passages"],
                 "passage_m2": pinfo["passage_m2"],
                 "open_no_access": len(pinfo["no_access"]),
+                "open_under_roads": pinfo["under_roads"], "open_far_paths": pinfo["far_paths"],
+                "open_via_open_space": pinfo["via_open_space"], "open_verges": pinfo["verges"],
                 "walkways_led_round_lots": kinfo["rerouted"],
                 "walkways_in_lots": kinfo["left"],
                 "walkway_links": n_links,
