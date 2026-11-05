@@ -243,7 +243,19 @@ def test_m13_lifts_placements_by_base_or_ground(tmp_path):
     # (a boat floats on M16's water, not on the ground: M20 gives it its body's surface over
     # the ground, 1.5 m under it on the flat city; AG14 takes it as given)
     boats = {p.id: p.position[2] for p in flat.props if p.type == "prop.boat"}
-    lifts = {round(zb[i] - za[i], 3) for i in za if i not in boats}
+    # (#89: a plant on the ground stands with its foot `SEAT_SINK_M` into the ground, its
+    # foot's height off its pivot a few centimeters)
+    from assetgen.props.gather import SEAT_SINK_M
+    seated = {p.id for p in flat.plants if p.position[2] == 0.0
+              and not (p.attrs or {}).get("building") and p.type != "plant.facade_greenery"}
+    assert seated and all(abs(zb[i] - za[i] - (5.0 - SEAT_SINK_M)) <= 0.1 for i in seated)
+    # (and a quay's railing with its foot on the quay's paving as AG7 draws it)
+    from assetgen.streets.water import QUAY_PAVE_DZ
+    quay = {p.id for p in flat.props if p.type == "prop.railing"
+            and (p.attrs or {}).get("quay")} & za.keys()
+    assert quay and all(abs(zb[i] - za[i] - (5.0 + QUAY_PAVE_DZ)) <= 0.1 for i in quay)
+    lifts = {round(zb[i] - za[i], 3) for i in za
+             if i not in boats and i not in seated and i not in quay}
     assert lifts == {5.0, 9.0}
     assert boats and all(round(z, 3) == -1.5 and round(za[i], 3) == -1.5
                          for i, z in boats.items())

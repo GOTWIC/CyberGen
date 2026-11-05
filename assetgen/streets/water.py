@@ -29,6 +29,7 @@ STAIR_STEP = 60.0
 QUAY_FOOT_M = 1.5          # without M16: the quay wall this far under the water
 CANAL_FOOT_M = 2.0         # ... and a canal wall
 FOOT_STEP_M = 8.0          # AG12's gap check reads a wall's foot this often
+QUAY_PAVE_DZ = 0.02        # the paving over the ground (AG8 seats a quay railing on it, #89)
 
 
 def gather_quay(cx: Ctx, q) -> Piece:
@@ -91,7 +92,7 @@ def make_quay(inp: dict) -> Out:
     ti = ws * (h - 0.5)
     for s, vi in st:
         x, y, nx, ny, k = P.frame(s, vi)
-        z = g(s) + 0.02
+        z = g(s) + QUAY_PAVE_DZ
         at = lambda t: (x + nx * k * t, y + ny * k * t)
         a_, b_ = (-h, ti) if ws > 0 else (ti, h)
         rows.append([(*at(a_), z), (*at(b_), z)])

@@ -108,7 +108,7 @@ class _Fit:
     `FIT_LOW_M` over its foot, their convex hull, turned and scaled as placed) reaches at
     most `FIT_CLEAR_M` onto one. Variants are made once to measure them."""
 
-    def __init__(self, model):
+    def __init__(self, model, paved=()):
         from ..streets.roads import street_class
         shapes, rows = [], []
         node_z = {n.id: n.position[2] for n in model.road_nodes}
@@ -133,6 +133,13 @@ class _Fit:
                 ln = shapely.LineString([(p[0], p[1]) for p in s.centerline])
                 shapes.append(poly)
                 rows.append(("road", ln, [(z.s, z.z) for z in s.z_profile]))
+            # (#82: the connector lanes' runs AG7 paves past a junction's outline)
+            for ring in paved:
+                if len(ring) < 3:
+                    continue
+                g = shapely.Polygon([(q[0], q[1]) for q in ring])
+                shapes.append(g if g.is_valid else shapely.make_valid(g))
+                rows.append(("junction", None, sum(q[2] for q in ring) / len(ring)))
             seg = {s.id: s for s in model.road_segments}
             for c in model.crosswalks:
                 s = seg.get(c.segment_id)
@@ -187,6 +194,220 @@ class _Fit:
             if abs(zt - z) <= FIT_Z_M:
                 return False
         return True
+
+
+RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
+SEAT_SINK_M = 0.05      # #89: a plant's foot set this far into the ground at its middle
+
+
+def _foot(feet: dict, sp: str, k: int):
+    """A plant variant's foot as AG14 takes it (`fit.build.feet`): the middle of the plan box
+    of its lowest vertices and their height, in its frame (m); made once per variant."""
+    key = (sp, k)
+    if key not in feet:
+        from .trees import make
+        m = make(sp, k)
+        pts = [q for sl in m.slots.values() for q in sl.pos]
+        if not pts:
+            feet[key] = None
+        else:
+            z0 = min(q[2] for q in pts)
+            low = [q for q in pts if q[2] <= z0 + 10]
+            xs, ys = [q[0] for q in low], [q[1] for q in low]
+            feet[key] = ((min(xs) + max(xs)) / 2000.0, (min(ys) + max(ys)) / 2000.0,
+                         z0 / 1000.0)
+    return feet[key]
+
+
+def _prop_foot(feet: dict, kind: str, style: str, k: int):
+    """#89: a prop variant's foot as AG14 takes it: the middle of the plan box of its lowest
+    vertices and their height, in its frame (m); made once per variant."""
+    key = (kind, style, k)
+    if key not in feet:
+        from .variants import make
+        m = make(kind, style, k)
+        pts = [q for sl in m.slots.values() for q in sl.pos]
+        if not pts:
+            feet[key] = None
+        else:
+            z0 = min(q[2] for q in pts)
+            low = [q for q in pts if q[2] <= z0 + 10]
+            xs, ys = [q[0] for q in low], [q[1] for q in low]
+            feet[key] = ((min(xs) + max(xs)) / 2000.0, (min(ys) + max(ys)) / 2000.0,
+                         z0 / 1000.0)
+    return feet[key]
+
+
+def _seat(gd, feet: dict, sp: str, k: int, x: float, y: float, yaw: float, sc) -> float:
+    """#89: the height of a plant on a terrain city's ground (its instance's z): its foot
+    (`_foot`, turned and scaled as placed) `SEAT_SINK_M` into the ground under the foot's
+    middle. A shrub's foot is its crown's underside, off its pivot, over a hillside green's
+    slope: at the ground under its pivot it floated a few centimeters over the slope."""
+    f = _foot(feet, sp, k)
+    if f is None:
+        return C.m(gd.at(x, y))
+    u, v, z0 = f
+    a = M.radians(yaw)
+    c, s = M.cos(a), M.sin(a)
+    g = gd.at(x + c * u * sc[0] - s * v * sc[1], y + s * u * sc[0] + c * v * sc[1])
+    return C.m(g - SEAT_SINK_M - z0 * sc[2])
+
+
+def _quay_tops(model, gd) -> dict:
+    """#89: per quay, the height of its top at a point as AG7 draws it: the quay piece made
+    here from the same inputs (`streets.water.gather_quay`, `make_quay`), the highest of its
+    paving and the coping along its edge (rows every 6 m, mitred at the line's bends); off
+    them its paving's profile along the line (the ground at the line's vertices, linear
+    between them, 2 cm over it)."""
+    from ..streets.ctx import Ctx
+    from ..streets.path import Path as SPath
+    from ..streets.path import Profile
+    from ..streets.water import QUAY_PAVE_DZ, gather_quay, make_quay
+    out = {}
+    cx = Ctx(model) if model.quays else None
+    for q in model.quays:
+        try:
+            P = SPath(q.line)
+        except ValueError:
+            continue
+        gnd = gd.samples(q.line)
+        if not gnd or len(gnd) != len(P.p):
+            continue
+        prof = Profile(list(zip(P.cum, gnd)))
+        pc = gather_quay(cx, q)
+        o = make_quay(pc.inputs)
+        tops = _Tops(o.mesh, pc.inputs.get("origin", (0.0, 0.0)),
+                     lambda sn: sn.startswith("paving") or sn == "stone.coping")
+        out[q.id] = (lambda x, y, P=P, prof=prof, tops=tops:
+                     tops.at(x, y, prof(P.project(x, y)[0]) + QUAY_PAVE_DZ))
+    return out
+
+
+class _Tops:
+    """#89: the up-facing triangles of some of a mesh's slots in world meters: the highest
+    at a point, else a default."""
+
+    def __init__(self, mesh, origin, keep):
+        tris = []
+        if mesh is not None:
+            for sn, sl in sorted(mesh.slots.items()):
+                if not keep(sn):
+                    continue
+                Q = [(q[0] / 1000.0 + origin[0], q[1] / 1000.0 + origin[1], q[2] / 1000.0)
+                     for q in sl.pos]
+                for t in range(0, len(sl.idx), 3):
+                    a, b, c = Q[sl.idx[t]], Q[sl.idx[t + 1]], Q[sl.idx[t + 2]]
+                    d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+                    if d > 1e-9:
+                        tris.append((a, b, c, d))
+        self.tris = tris
+        self.box = [(min(a[0], b[0], c[0]), min(a[1], b[1], c[1]), max(a[0], b[0], c[0]),
+                     max(a[1], b[1], c[1])) for a, b, c, _ in tris]
+
+    def at(self, x: float, y: float, default: float) -> float:
+        best = None
+        for (a, b, c, d), (x0, y0, x1, y1) in zip(self.tris, self.box):
+            if not (x0 - 1e-6 <= x <= x1 + 1e-6 and y0 - 1e-6 <= y <= y1 + 1e-6):
+                continue
+            u = ((b[0] - x) * (c[1] - y) - (b[1] - y) * (c[0] - x)) / d
+            v = ((c[0] - x) * (a[1] - y) - (c[1] - y) * (a[0] - x)) / d
+            if u >= -1e-9 and v >= -1e-9 and u + v <= 1.0 + 1e-9:
+                z = u * a[2] + v * b[2] + (1.0 - u - v) * c[2]
+                best = z if best is None else max(best, z)
+        return default if best is None else best
+
+
+class _RaisedCorners:
+    """#89: the corners of AG7's raised junctions (`walks.make_junction`'s notes: the
+    sectors between its legs and its legs' rights of way from the node to their cuts, its
+    carriageway as drawn and the pads it drew there, with their tops). A standing thing
+    there, at the junction's height, on neither a carriageway nor a pad nor a sidewalk has
+    nothing under it: AG7 leaves a pad out where it would fold over another or the
+    junction's lanes or a neighbor's pavement take its place, and draws no corner between
+    two twin legs."""
+
+    def __init__(self, notes: list, sidewalks=()):
+        self.rows = []
+        self.tops = []          # (each row's pads with their heights, for `pad_top`)
+        self._tris: dict = {}
+        polys = []
+        bands = [shapely.LineString(w.line).buffer(w.width_m / 2.0 + 0.05, cap_style="flat")
+                 for w in sidewalks if len(w.line) >= 2]
+        self.bands = bands
+        self.walks = shapely.STRtree(bands) if bands else None
+        for rz in notes:
+            pads = [p for p in rz.get("pads", ()) if len(p) >= 3]
+            zs = [q[2] for p in pads for q in p] + list(rz.get("z", ()))
+            area = [shapely.Polygon([(q[0], q[1]) for q in a])
+                    for a in list(rz.get("area", ())) + list(rz.get("rows", ())) if len(a) >= 3]
+            area = [a if a.is_valid else shapely.make_valid(a) for a in area]
+            if not area:
+                continue
+            car = [shapely.Polygon([(q[0], q[1]) for q in c]) for c in rz.get("carriageway", ())
+                   if len(c) >= 3]
+            u = shapely.union_all(area)
+            polys.append(u)
+            self.tops.append(pads)
+            self.rows.append((u, [shapely.Polygon([(q[0], q[1]) for q in p]) for p in pads],
+                              [c if c.is_valid else shapely.make_valid(c) for c in car],
+                              (min(zs), max(zs)) if zs else None))
+        self.tree = shapely.STRtree(polys) if polys else None
+
+    def unpaved(self, x: float, y: float, z: float) -> bool:
+        if self.tree is None:
+            return False
+        pt = shapely.points(x, y)
+        hit = False
+        for k in sorted(self.tree.query(pt, predicate="intersects").tolist()):
+            area, pads, car, zr = self.rows[k]
+            if zr is not None and not zr[0] - 0.15 - RAISED_Z_M <= z <= zr[1] + RAISED_Z_M:
+                continue
+            if any(p.intersects(pt) for p in pads) or any(c.intersects(pt) for c in car):
+                return False
+            hit = True
+        if hit and self.walks is not None and len(self.walks.query(pt, predicate="intersects")):
+            return False        # (on a sidewalk: AG7 draws it off the carriageways)
+        return hit
+
+    def pad_top(self, x: float, y: float, z: float):
+        """The height of the corner pad of a raised junction at (x, y), as AG7 triangulates
+        it (its vertices at their heights), where the junction is at z; else None."""
+        if self.tree is None:
+            return None
+        pt = shapely.points(x, y)
+        for k in sorted(self.tree.query(pt, predicate="intersects").tolist()):
+            _, pads, _, zr = self.rows[k]
+            if zr is not None and not zr[0] - 0.15 - RAISED_Z_M <= z <= zr[1] + RAISED_Z_M:
+                continue
+            for i, pg in enumerate(pads):
+                if not pg.intersects(pt):
+                    continue
+                for a, b, c in self._pad_tris(k, i):
+                    d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+                    if abs(d) < 1e-12:
+                        continue
+                    u = ((b[0] - x) * (c[1] - y) - (b[1] - y) * (c[0] - x)) / d
+                    v = ((c[0] - x) * (a[1] - y) - (c[1] - y) * (a[0] - x)) / d
+                    if u >= -1e-9 and v >= -1e-9 and u + v <= 1.0 + 1e-9:
+                        return u * a[2] + v * b[2] + (1.0 - u - v) * c[2]
+        return None
+
+    def _pad_tris(self, k: int, i: int) -> list:
+        if (k, i) not in self._tris:
+            from ..streets.kit import Mesh
+            ring = self.tops[k][i]
+            zmap = {(q[0], q[1]): q[2] for q in ring}
+            m = Mesh((0.0, 0.0))
+            m.poly("pad", [(q[0], q[1]) for q in ring],
+                   zfun=lambda x_, y_: zmap.get((C.m2(x_), C.m2(y_)), 0.0))
+            sl = m.slots.get("pad")
+            tris = []
+            if sl is not None:
+                P = [(q[0] / 1000.0, q[1] / 1000.0, q[2] / 1000.0) for q in sl.pos]
+                tris = [(P[sl.idx[t]], P[sl.idx[t + 1]], P[sl.idx[t + 2]])
+                        for t in range(0, len(sl.idx), 3)]
+            self._tris[(k, i)] = tris
+        return self._tris[(k, i)]
 
 
 def _carriageway(s, cls: str, jring: dict):
@@ -253,6 +474,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
     gd = Ground(model)
     bases = {b.id: float(b.base_m) for b in model.buildings
              if getattr(b, "base_m", None) is not None}
+    quays = {} if gd.flat else _quay_tops(model, gd)
 
     def lift(x, y, z, bid=None) -> float:
         """The height a placement's z is measured from (module docstring, Ground)."""
@@ -284,17 +506,27 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
                 continue
             mount.setdefault(e["id"], {"building": bid, "on_wall": e["on_wall"],
                                        "gap": float(e["gap_m"])})
-    # AG7's road pieces with their median barrier
+    # AG7's road pieces with their median barrier, and (#89) its raised junctions' corners
     roads = set()
+    raised = []
+    paved: list = []
     smf = Path(out_dir) / "streets" / "manifest.json"
     if smf.is_file():
         try:
             sm = json.loads(smf.read_text(encoding="utf-8"))
-            for pid, r in sm.get("pieces", {}).items():
+            for pid, r in sorted(sm.get("pieces", {}).items()):
                 if r.get("kind") == "street.road" and r.get("triangles", 0) > 0:
                     roads.add(pid)
+                rz = (r.get("notes") or {}).get("raised")
+                if r.get("kind") == "street.junction" and rz:
+                    raised.append(rz)
+                if r.get("kind") == "street.junction":
+                    paved += (r.get("notes") or {}).get("paved") or []
         except (OSError, ValueError):
             roads = set()
+            raised = []
+            paved = []
+    corners = _RaisedCorners(raised, model.sidewalks)
     segs = {s.id: s for s in model.road_segments}
 
     def style_of(did):
@@ -313,6 +545,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
 
     brackets = 0
     fit = None
+    pfeet: dict = {}
     for p in sorted(model.props, key=lambda p: p.id):
         kind = p.type.split(".", 1)[1]
         g.kinds[kind] = g.kinds.get(kind, 0) + 1
@@ -330,6 +563,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             # takes the ground as everything else does: it took the water's level on top of
             # that, 1.5 m under the water on a flat city)
             z = z + lift(x, y, min(z, 0.0))
+        elif kind == "railing" and not gd.flat and (p.attrs or {}).get("quay") in quays:
+            # (#89: on a terrain city a quay's railing stands on the quay's paving as AG7
+            # draws it, its ground sampled at the quay line's vertices: M13's ground at the
+            # railing's own point stood off it on a slope)
+            z = z + quays[p.attrs["quay"]](x, y)
         else:
             z = z + lift(x, y, z, (mm or {}).get("building") or
                          (p.attrs or {}).get("building"))
@@ -367,19 +605,48 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         else:
             k = ST.pick(n, "ag8.prop", p.id)
             alts = [(k + i) % n for i in range(n)]
+        if kind not in FIT_SKIP and kind not in NOT_STANDING and corners.unpaved(x, y, z):
+            # (#89: in a raised junction's corner where AG7 draws no pad: nothing to stand on)
+            g.dropped[p.id] = "a raised junction's corner with no pad (#89)"
+            groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
+            continue
         if kind not in FIT_SKIP and kind not in NOT_STANDING:
             # (#95: the variant drawn, else the next of its family, that keeps clear of the
             # carriageways, junctions and crosswalks; none: the prop is left out)
             if fit is None:
-                fit = _Fit(model)
+                fit = _Fit(model, paved)
             k = next((kk for kk in alts if fit.clear(kind, st, kk, x, y, p.position[2],
                                                       p.yaw_deg, p.scale)), None)
             if k is None:
                 g.dropped[p.id] = "no variant clear of the carriageway (#95)"
                 groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
                 continue
+        if kind not in FIT_SKIP and kind not in NOT_STANDING:
+            # (#89: on a raised junction's corner pad, its foot on the pad as AG7 draws it:
+            # a pad follows its nearest curb, off the model's height on a steep junction)
+            f = _prop_foot(pfeet, kind, st, k)
+            if f is not None:
+                u, v, z0 = f
+                a_ = M.radians(p.yaw_deg)
+                c_, s_ = M.cos(a_), M.sin(a_)
+                fx = x + c_ * u * p.scale[0] - s_ * v * p.scale[1]
+                fy = y + s_ * u * p.scale[0] + c_ * v * p.scale[1]
+                pz = corners.pad_top(fx, fy, z)
+                if pz is not None:
+                    z = C.m(pz - z0 * p.scale[2])
         kinds_used.add(kind)
         yaw = p.yaw_deg
+        if kind == "railing" and not gd.flat and (p.attrs or {}).get("quay") in quays:
+            # (#89: its foot, the variant's lowest posts, on the quay's paving: a 3 m
+            # railing's end post stood off a steep quay by up to 0.5 m)
+            f = _prop_foot(pfeet, kind, st, k)
+            if f is not None:
+                u, v, z0 = f
+                a_ = M.radians(yaw)
+                c_, s_ = M.cos(a_), M.sin(a_)
+                fx = x + c_ * u * p.scale[0] - s_ * v * p.scale[1]
+                fy = y + s_ * u * p.scale[0] + c_ * v * p.scale[1]
+                z = C.m(quays[p.attrs["quay"]](fx, fy) - z0 * p.scale[2])
         if kind == "awning":
             poly = foot.get(mm["building"]) if mm else near_foot(x, y)
             if not _wall_plus_y(poly, x, y, yaw, p.scale[1] / 2.0 + 0.25):
@@ -414,13 +681,17 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             brackets += 1
     # -- plants
     species_used = set()
+    feet: dict = {}
     for p in sorted(model.plants, key=lambda p: p.id):
         typ = p.type.split(".", 1)[1]
         sp = p.species if p.species in ST.PLANT_VARIANTS else ST.SPECIES_OF_TYPE.get(typ, "oak")
         g.species[sp] = g.species.get(sp, 0) + 1
         species_used.add(sp)
         x, y, z = p.position
-        z = z + lift(x, y, z, (p.attrs or {}).get("building"))
+        bid = (p.attrs or {}).get("building")
+        seat = not gd.flat and z == 0.0 and bid is None and typ != "facade_greenery"
+        if not seat:
+            z = z + lift(x, y, z, bid)
         t = tile_of(x, y)
         key = f"plant.{typ}.{t}"
         cx, cy = tile_center(t)
@@ -440,9 +711,13 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             continue
         k = ST.pick(ST.PLANT_VARIANTS[sp], "ag8.plant", p.id)
         yaw = C.deg(360.0 * ST.u("ag8.yaw", p.id) - 180.0)
+        sc = (C.m(p.crown_radius_m / r0), C.m(p.crown_radius_m / r0), C.m(p.height_m / h0))
+        if seat:
+            # (#89: on a terrain city a plant on the ground stands with its foot on the
+            # slope, `_seat`)
+            z = _seat(gd, feet, sp, k, x, y, yaw, sc)
         add(key, typ, "plant", t, ST.plant_name(sp, k),
-            [C.m(x - cx), C.m(y - cy), C.m(z), yaw, C.m(p.crown_radius_m / r0),
-             C.m(p.crown_radius_m / r0), C.m(p.height_m / h0)], p.id)
+            [C.m(x - cx), C.m(y - cy), C.m(z), yaw, *sc], p.id)
     g.families = sorted([("prop", k) for k in kinds_used | {kk for kk in g.kinds
                                                              if kk in ST.PROP_VARIANTS}]) + \
         sorted(("plant", s) for s in species_used)

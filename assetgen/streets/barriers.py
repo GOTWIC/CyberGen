@@ -543,58 +543,33 @@ def _area_by(cx, j) -> set:
 
 def junction_area(cx, j) -> list[list]:
     """What a junction piece may pave (`walks.make_junction`): its outline and, for each
-    corner with a sidewalk, the sector its pad is cut from (`walks._corners`: from the node
+    corner with a sidewalk, the sector its pad is cut from (`walks._sectors`: from the node
     out to both sidewalks' ends and round the property line), as rings. Cached."""
     cache = cx.__dict__.setdefault("_junction_areas", {})
     if j.id in cache:
         return cache[j.id]
-    from .walks import _arc, _corner, _meet
+    from .walks import _bulb, _sectors
     ring, legs = _legs(cx, j)
     out = [list(ring)]
     node = cx.node.get(j.node_id)
-    n = len(legs)
-    if node is not None and n >= 2 and j.shape != "cul_de_sac":
+    if j.shape == "cul_de_sac" and len(legs) == 1:
+        # (#82: a turning bulb's sidewalk round it, `walks._bulb`)
+        lg = legs[0]
+        side = 0.0 if _cls(lg["seg"]) in PEDESTRIAN else lg["seg"].cross_section.sidewalk_m[0]
+        for sc in _bulb(ring, {"exit": lg["exit"], "side": side, "path": lg["path"],
+                               "row": lg["seg"].width_m / 2.0}):
+            out.append(sc["sector"])
+    if node is not None and len(legs) >= 2 and j.shape != "cul_de_sac":
         P = (node.position[0], node.position[1])
-        N = len(ring)
-        r_all = j.corner_radius_m
-        for i in range(n):
-            a, b = legs[i], legs[(i + 1) % n]
-            sa = 0.0 if _cls(a["seg"]) in PEDESTRIAN else a["seg"].cross_section.sidewalk_m[0]
-            sb = 0.0 if _cls(b["seg"]) in PEDESTRIAN else b["seg"].cross_section.sidewalk_m[0]
-            if a["exit"] is None or b["exit"] is None or (sa <= 0.0 and sb <= 0.0):
-                continue
-            ea, eb = a["exit"][1], b["exit"][1]
-            if ea == eb:
-                continue
-            Ca, Cb = ring[(ea + 1) % N], ring[eb]
-            da, db = a["d"], b["d"]
-            na, nb = (-da[1], da[0]), (-db[1], db[0])
-            ra, rb = a["seg"].width_m / 2.0, b["seg"].width_m / 2.0
-            cut_a = (Ca[0] - P[0]) * da[0] + (Ca[1] - P[1]) * da[1]
-            cut_b = (Cb[0] - P[0]) * db[0] + (Cb[1] - P[1]) * db[1]
-            Ra = (P[0] + cut_a * da[0] + ra * na[0], P[1] + cut_a * da[1] + ra * na[1])
-            Rb = (P[0] + cut_b * db[0] - rb * nb[0], P[1] + cut_b * db[1] - rb * nb[1])
-            rr = max(r_all - max(sa, sb), 1.0)
-            c = _corner(P, da, db, ra, rb, rr, a["path"].L, b["path"].L)
-            row = [Ra]
-            if c is not None:
-                ta, tb, Ta, Tb, O = c
-                if ta <= cut_a + 0.01 and tb <= cut_b + 0.01:
-                    row.append(Ta)
-                    if O is not None:
-                        row += _arc(O, Ta, Tb, rr)
-                        row.append(Tb)
-                else:
-                    X = _meet(P, da, db, ra, rb)
-                    if X is not None:
-                        xa = (X[0] - P[0]) * da[0] + (X[1] - P[1]) * da[1]
-                        xb = (X[0] - P[0]) * db[0] + (X[1] - P[1]) * db[1]
-                        if 0.0 <= xa <= cut_a + 0.01 and 0.0 <= xb <= cut_b + 0.01:
-                            row.append(X)
-            row.append(Rb)
-            Pa = (P[0] + cut_a * da[0], P[1] + cut_a * da[1])
-            Pb = (P[0] + cut_b * db[0], P[1] + cut_b * db[1])
-            out.append([P, Pa] + row + [Pb])
+        wl = []
+        for lg in legs:
+            side = 0.0 if _cls(lg["seg"]) in PEDESTRIAN else lg["seg"].cross_section.sidewalk_m[0]
+            wl.append({"exit": lg["exit"], "d": lg["d"], "side": side, "path": lg["path"],
+                       "row": lg["seg"].width_m / 2.0, "L": lg["path"].L})
+        for sc in _sectors(ring, P, wl, {"shape": j.shape,
+                                         "corner_radius_m": j.corner_radius_m}):
+            if sc["sidewalk"] and "sector" in sc:
+                out.append(sc["sector"])
     cache[j.id] = out
     return out
 

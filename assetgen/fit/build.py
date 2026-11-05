@@ -20,7 +20,10 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
   none over the water, where a footing takes M16's bed), never the thing itself. With it,
   the junction seams (`seams`): every vertex of a road's carriageway on the outline of a
   junction at one of its ends, near where its centerline first leaves it, within `GAP_M` of
-  the junction piece's surface there.
+  the junction piece's surface there. What fails: anything assetgen seats itself (roof
+  items, dunnage, street pieces), the quay railings and shrubs (#89, `FAILED`)
+  and any step over `GAP_M`; other props and plants stand at the model's heights (M20's
+  `prop_support`) and are listed, not failed.
 - **`asset_clash`**:
   - *road into building*: a vertex of a road or junction piece's carriageway, deck or
     embankment inside a building mass (10 cm in from its walls, floor and roof);
@@ -40,7 +43,10 @@ BUILD/assets/fit_report.json, .txt     the two checks, their counts and the wors
     guard wall, parapet, railing, a junction's corner parapet or median) standing on another
     road's carriageway, on a junction's surface (a junction's own in one of its lanes), on a
     crosswalk, or through another piece's barrier; a standing prop on a vehicle
-    carriageway, a junction or a crosswalk, or through a barrier.
+    carriageway, a junction or a crosswalk, or through a barrier;
+  - *strips over a carriageway* (#82, `strips.py`): a sidewalk, a junction's sidewalk
+    corner or a road's median over a junction's carriageway or another road's, at its
+    height.
 
 Reading back every pack takes memory: the stage works tile by tile (a tile and its eight
 neighbors). Nothing here writes an asset; the report is written only when its bytes change.
@@ -63,8 +69,9 @@ from .index import Surfaces
 
 TILE_M = 256.0
 GAP_M = 0.02
-REPORTED = ("prop.", "plant.")      # placed at the model's heights: reported, not failed
-STEP_FAIL_M = 0.15                  # a junction step that fails (smaller ones reported)
+REPORTED = ("prop.", "plant.")      # placed at the model's heights: reported, not failed ...
+FAILED = ("prop.railing", "plant.shrub")     # ... but these (#89: seated on terrain)
+STEP_FAIL_M = GAP_M                 # a junction step that fails (#89: every one over 2 cm)
 REACH_M = 0.6
 FOOTING_M = 3.0         # how far a column's footing may be set into what it stands on
 HEADROOM_M = 4.5
@@ -448,10 +455,12 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
     for i in floating:
         by_what[things[i]["what"]][1] += 1
     worst = sorted(floating, key=lambda i: (-min(gaps[i], 1e9), things[i]["id"]))[:LIST_MAX]
-    # (what fails: what assetgen seats itself, roof items, dunnage and street pieces, and a
-    # step a car would feel; props and plants stand at the model's heights (M20's
-    # `prop_support`) and smaller steps are reported, as `asset_access` reports)
-    failing = [i for i in floating if not things[i]["what"].startswith(REPORTED)]
+    # (what fails: what assetgen seats itself, roof items, dunnage and street pieces, the
+    # props and plants #89 seats (quay railings, shrubs) and any step; other
+    # props and plants stand at the model's heights (M20's `prop_support`) and are
+    # reported, as `asset_access` reports)
+    failing = [i for i in floating if not things[i]["what"].startswith(REPORTED) or
+               things[i]["what"] in FAILED]
     return {"id": "asset_grounded",
             "ok": not failing and steps["max_m"] <= STEP_FAIL_M,
             "things": len(things), "floating": len(floating), "failing": len(failing),
@@ -750,17 +759,21 @@ def clash(pk: Packs, model) -> dict:
     if car:
         _over_road(pk, model, Surfaces(np.concatenate(car), np.concatenate(cown), min_nz=0.5),
                    out, counts)
-    # -- barriers and props at junctions (#95)
-    from .barriers import barrier_clash
-    bc = barrier_clash(pk, model)
-    for k, v in bc["counts"].items():
-        counts[k] = v
-        out[k] = bc["worst"][k]
+    # -- barriers and props at junctions (#95), strips over a carriageway (#82)
+    from .barriers import Targets, barrier_clash
+    from .strips import strip_clash
+    tg = Targets(pk, model)
+    bc = barrier_clash(pk, model, tg)
+    sc = strip_clash(pk, model, tg)
+    for r in (bc, sc):
+        for k, v in r["counts"].items():
+            counts[k] = v
+            out[k] = r["worst"][k]
     for k in out:
         out[k] = sorted(out[k], key=lambda r: json.dumps(r, sort_keys=True))[:LIST_MAX]
     n = sum(counts.values())
     return {"id": "asset_clash", "ok": n == 0, "clashes": n, "counts": counts,
-            "barriers_by_kind": bc["by_kind"], "worst": out}
+            "barriers_by_kind": bc["by_kind"], "strips_by_kind": sc["by_kind"], "worst": out}
 
 
 def _over_road(pk: Packs, model, S: Surfaces, out: dict, counts: dict):
@@ -899,6 +912,8 @@ def report_text(rep: dict) -> str:
             lines.append(f"{'PASS' if c['ok'] else 'FAIL'} asset_clash: {c['clashes']} "
                          f"({', '.join(f'{k} {v}' for k, v in c['counts'].items())})")
             for k, v in (c.get("barriers_by_kind") or {}).items():
+                lines.append(f"    {k}: {v}")
+            for k, v in (c.get("strips_by_kind") or {}).items():
                 lines.append(f"    {k}: {v}")
             for k, rows in c["worst"].items():
                 for r in rows[:10]:

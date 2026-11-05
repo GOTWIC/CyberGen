@@ -69,14 +69,16 @@ def report(model, g, man: dict, con_p: dict, con_s: dict) -> dict:
             if nodes.get(s["node"], {}).get("triangles", 0) > 0:
                 signs_ok.add(s["id"])
     slot_ids = {s.id for s in model.sign_slots}
-    plants_missing = [p.id for p in model.plants if p.id not in have]
+    plants_missing = [p.id for p in model.plants if p.id not in have and p.id not in g.dropped]
     signs_missing = sorted(slot_ids - signs_ok)
     sign_props = {s.prop_id for s in model.sign_slots if s.prop_id}
     unslotted = sorted(pid for pid, how in g.covered.items()
                        if how == "sign slot" and pid not in sign_props)
     bad = missing + plants_missing + signs_missing + unslotted
     checks.append({"id": "props_coverage", "ok": not bad,
-                   "detail": f"{len(model.props)} props ({len(g.dropped)} on AG7's barriers), "
+                   "detail": f"{len(model.props)} props ({len(g.dropped)} props and plants left "
+                             f"out: on AG7's barriers, no variant clear of a carriageway, a "
+                             f"raised corner with no pad), "
                              f"{len(model.plants)} plants, {len(slot_ids)} sign slots; "
                              f"{len(bad)} without an asset"
                              + (f": {', '.join(sorted(bad)[:6])}" if bad else "")})

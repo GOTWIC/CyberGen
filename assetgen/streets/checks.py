@@ -2,8 +2,9 @@
 mesh validity, the blockout objects the pieces replace, budgets, disk.
 
 - `street_coverage`: every entity of the street collections has a piece with a mesh, or a
-  declared reason it needs none (a segment wholly inside its junctions, a creek's natural
-  banks); every transit line has guideway, tube or tunnel pieces; every megasite's elements
+  declared reason it needs none (a segment or a sidewalk wholly inside its junctions, a
+  junction wholly inside an overlapping one that draws it (#82), a creek's natural banks);
+  every transit line has guideway, tube or tunnel pieces; every megasite's elements
   are covered; stations are the building line's (their structures are covered here).
 - `street_meshes`: no degenerate or duplicate triangles, winding that agrees with the
   normals, indices in range, finite UVs, unit normals, in every piece and LOD.
@@ -18,7 +19,7 @@ from collections import Counter, defaultdict
 
 from .build import CITY_TRIANGLE_BUDGET, COVERED, TILE_TRIANGLE_BUDGET
 
-DECLARED = ("inside its junctions", "natural banks")
+DECLARED = ("inside its junctions", "inside an overlapping junction", "natural banks")
 
 
 def report(model, cx, manifest: dict, pieces) -> dict:
