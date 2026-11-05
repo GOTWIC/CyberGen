@@ -944,7 +944,7 @@ def _surface(inp: dict) -> dict:
         for r in lz:
             for k in _cut_run(ring, r):
                 if (ring[k][0], ring[k][1]) in vz:
-                    vz[(ring[k][0], ring[k][1])] = r["z"]
+                    vz[(ring[k][0], ring[k][1])] = _run_z(ring, r, k)
     if vz is None and not flat and lz:
         # AG14: no surface in the model (a junction M18 left flat whose legs AG7 sees at
         # other heights): each leg's cut edge at the leg's height there, the curb between
@@ -953,7 +953,7 @@ def _surface(inp: dict) -> dict:
         anchor = {}
         for r in lz:
             for k in _cut_run(ring, r):
-                anchor[k] = r["z"]
+                anchor[k] = _run_z(ring, r, k)
         n = len(ring)
         cum = [0.0]
         for k in range(n):
@@ -1187,6 +1187,54 @@ def _junction_barriers(mesh: Mesh, ring, legs, plan: dict, rows: dict, zfun):
         if len(ends) == 2 and all(r["exit"] is not None for r in ends):
             pa, pb = (BR.median_end(ring, r["exit"], r["path"], r["h"]) for r in ends)
             draw([pa, pb], BR.JERSEY)
+
+
+RUN_ROW_M = 3.0         # #89: a road row this far past its cut can reach back onto the outline
+
+
+def _run_z(ring, r: dict, k: int) -> float:
+    """#89: the height of an outline vertex on a leg's cut (`_cut_run`): the leg's at its
+    cut where the road piece's end row lies on the cut edge (its two ends, when the edge
+    spans the carriageway as `roads.Road._edge` takes it); else, where the vertex is a side
+    point of one of the road piece's rows (its cut row, or a mitred row at a bend of its
+    line within `RUN_ROW_M` past the cut, which reaches back over the cut where the road
+    turns sharply), that row's height; else, past the cut beside the road (M17's shared
+    pavement), the leg's height there; else the leg's at its cut. (The leg's height at the
+    cut stood 2 to 40 cm off the road piece there on a steep leg.)"""
+    n = len(ring)
+    i = r["exit"][1]
+    if k in (i, (i + 1) % n) and _spans(ring, r):
+        return r["z"]
+    p = ring[k]
+    path, s0, h = r["path"], r["exit"][0], r["h"]
+    rows = [(s0, None)] + [(path.cum[q], q) for q in range(1, len(path.p) - 1)
+                           if s0 < path.cum[q] <= s0 + RUN_ROW_M]
+    best = None
+    for sv, vi in rows:
+        x, y, nx, ny, kk = path.frame(sv, vi)
+        for t in (-h, h):
+            d = dist((x + nx * kk * t, y + ny * kk * t), p)
+            if d <= 0.05 and (best is None or d < best[0]):
+                best = (d, sv)
+    if best is not None:
+        return r["zs"](best[1]) if best[1] > s0 else r["z"]
+    s_k, _ = path.project(p[0], p[1])
+    return r["zs"](s_k) if s_k > s0 + 0.01 else r["z"]
+
+
+def _spans(ring, r: dict) -> bool:
+    """Whether a leg's exit edge spans its carriageway, as `roads.Road._edge` decides where
+    its road piece's end row lies on it."""
+    from .roads import CUT_TOL_M
+    n = len(ring)
+    i = r["exit"][1]
+    a, b = ring[i], ring[(i + 1) % n]
+    s = r["exit"][0]
+    x, y = r["path"].point(s)
+    tx, ty = r["path"].tangent(s)
+    ta = -ty * (a[0] - x) + tx * (a[1] - y)
+    tb = -ty * (b[0] - x) + tx * (b[1] - y)
+    return abs(max(ta, tb) - r["h"]) <= CUT_TOL_M and abs(min(ta, tb) + r["h"]) <= CUT_TOL_M
 
 
 def _cut_run(ring, r: dict) -> list[int]:
