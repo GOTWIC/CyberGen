@@ -1915,8 +1915,9 @@ swagnik.org/CyberGen/). Two pages: the landing page, a showcase (`index.html`): 
 few pictures, each with a title of its own, a one-line caption and a Stage 1 or Stage 2
 label (no dates), the day and night core behind a slider; and the build log (`log.html`, a
 tab): a timeline of pictures from `docs/progress/`, grouped by stage. `site/gallery.json`
-holds the log's entries (`id`, `date` the image's first commit: `git log --follow
---diff-filter=A --format=%as -- <path> | tail -1`, `stage` 1, 2 or `ue`, `milestone`,
+holds the log's entries (`id`, `date` the first commit of the step's first picture, `git log
+--follow --diff-filter=A --format=%as -- <path> | tail -1`, kept when a picture is rendered
+again (new renders go in `docs/progress/gallery_refresh/`), `stage` 1, 2 or `ue`, `milestone`,
 `milestone_name`, `title`, `image` a repo path, `caption` a one-liner where possible, not
 necessarily a full sentence, saying only what is needed to explain the picture: no extra
 detail, no hashes, goldens, check counts or test talk) and the showcase's `items`

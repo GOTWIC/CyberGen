@@ -25,7 +25,7 @@
       {"entry": "ag12-canal", "title": "Canal at night", "caption": "Neon and lit windows on a Vesper Bay canal.", "wide": true},
       {"entries": ["ag15-day", "ag15-night"], "labels": ["Day", "Night"], "title": "Day and night", "caption": "Delta Megacity's core, every tower lit its own way after dark.", "wide": true},
       {"entry": "ag15-street", "title": "Core street", "caption": "Street level in Delta Megacity's core at night."},
-      {"entry": "fix-sky-tubes", "title": "Crown Loop", "caption": "A sky tube loop on pylons, its rings lit at night."}
+      {"entry": "fix-sky-tubes", "title": "Crown Loop", "caption": "A sky tube loop through the Corporate Core, its rings lit at night."}
     ]
   },
   "stages": [
@@ -476,7 +476,7 @@
       "milestone": "AG5",
       "milestone_name": "Building types and landmarks",
       "title": "Landmarks as hero buildings",
-      "image": "docs/progress/AG5/landmarks_8k.jpg",
+      "image": "docs/progress/gallery_refresh/landmarks_8k.jpg",
       "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel."
     },
     {
@@ -486,7 +486,7 @@
       "milestone": "AG10",
       "milestone_name": "Layered districts",
       "title": "Every building modelled",
-      "image": "docs/progress/AG10/cities/vesper_bay/city_full.jpg",
+      "image": "docs/progress/gallery_refresh/vesper_bay_city_full.jpg",
       "caption": "Vesper Bay with every building modelled and textured."
     },
     {
@@ -566,8 +566,8 @@
       "milestone": "Fix",
       "milestone_name": "Sky tube pylons and rings",
       "title": "Lit rings on the Crown Loop",
-      "image": "docs/progress/sky_tubes/night_rings_every1.jpg",
-      "caption": "A sky tube on plain pylons, its rings lit at night."
+      "image": "docs/progress/gallery_refresh/crown_loop_night.jpg",
+      "caption": "The Crown Loop's lit rings winding through the Corporate Core at night."
     },
     {
       "id": "ue-fly",
