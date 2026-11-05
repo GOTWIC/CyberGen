@@ -84,33 +84,22 @@
       const d = new Date(t.getAttribute("datetime"));
       if (!isNaN(d)) t.textContent = d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
     });
-    // "By model": each count's own table.
-    usage.querySelectorAll("[data-usage-more]").forEach((more) => {
-      const models = document.getElementById(more.getAttribute("aria-controls"));
-      more.addEventListener("click", () => {
-        const open = models.hidden;
-        models.hidden = !open;
-        more.classList.toggle("on", open);
-        more.setAttribute("aria-expanded", String(open));
-      });
+    const more = document.getElementById("usage-more");
+    const models = document.getElementById("usage-models");
+    more.addEventListener("click", () => {
+      const open = models.hidden;
+      models.hidden = !open;
+      more.classList.toggle("on", open);
+      more.setAttribute("aria-expanded", String(open));
     });
-    // "By device": both counts' device tables and the chart's device colors.
     const toggle = document.getElementById("usage-toggle");
+    const devices = document.getElementById("usage-devices");
     toggle.addEventListener("click", () => {
       const on = usage.dataset.view !== "devices";
       usage.dataset.view = on ? "devices" : "all";
       toggle.classList.toggle("on", on);
       toggle.setAttribute("aria-pressed", String(on));
-      usage.querySelectorAll("[data-usage-devices]").forEach((d) => { d.hidden = !on; });
-    });
-    // "Billing": each request once, with its cost, in place of Claude Code's own count.
-    const billing = document.getElementById("usage-billing");
-    billing.addEventListener("click", () => {
-      const on = usage.dataset.count !== "billed";
-      usage.dataset.count = on ? "billed" : "stats";
-      billing.classList.toggle("on", on);
-      billing.setAttribute("aria-pressed", String(on));
-      usage.querySelectorAll(".usage-view").forEach((v) => { v.hidden = v.dataset.count !== usage.dataset.count; });
+      devices.hidden = !on;
     });
   }
 
