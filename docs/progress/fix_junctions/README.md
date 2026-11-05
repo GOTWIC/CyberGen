@@ -68,7 +68,29 @@ Vesper Bay Pinned, between two twin legs).
 
 ## Renders
 
-RENDERS
+Delta Megacity, `assetgen materials preview` with the same four cameras on main's packs and
+this fix's (3840 px).
+
+| Main | This fix |
+|---|---|
+| ![](delta_e217_ramp_before.jpg) | ![](delta_e217_ramp_after.jpg) |
+| ![](delta_e179_corners_before.jpg) | ![](delta_e179_corners_after.jpg) |
+| ![](delta_raised_corner_before.jpg) | ![](delta_raised_corner_after.jpg) |
+| ![](delta_cul_de_sac_before.jpg) | ![](delta_cul_de_sac_after.jpg) |
+
+1. The ramp between `jn.e170s444` and `jn.e217s328`, from the south: on main the slab's
+   walls and both junctions' pads covered it; now it is one carriageway with its
+   crosswalks and the avenue's sidewalk beside it. At the top, where `jn.e217s328`'s five
+   legs meet between 0.8 and 12.3 m, its corner pads and slab edges still stand at odd
+   angles: the junction's surface is M18's curb run evenly round its outline, which no
+   surface between legs that far apart can follow (left for the road recheck).
+2. `jn.e179n1530`: the connector lanes' runs are paved and the corner pads keep off them.
+3. A raised corner 12.5 m up: on main its pad stopped short, the trash can
+   (`d04.prop.trash_can.w1n1381`, the wire basket) stood at its edge over nothing and #95's
+   parapet zigzagged round it; now the pad reaches the crosswalk's end, the basket stands on
+   it and the parapet runs straight. The short concrete block in front of the crosswalk on
+   main is not drawn now.
+4. A cul-de-sac: its sidewalk round the bulb, the legs' sidewalks no longer over it.
 
 ## Left open
 
@@ -85,5 +107,7 @@ Filed as ISSUE_LINK; none fails a check.
   sloped sidewalk (both on main too, reported).
 - AG14's grounded rule takes a thing as resting when one of its five feet is (the smallest
   gap where fewer than three are within 2 cm).
+- The top of `jn.e217s328` (render 1): a junction whose legs meet it between 0.8 and
+  12.3 m keeps M18's curb-run surface, and its pads and slab edges follow it.
 - Left for the road recheck, as asked: M17's long junctions and the deck girders under
   junctions.
