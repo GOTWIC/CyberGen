@@ -1932,13 +1932,16 @@ no refresh on every push or milestone.
 
 **Usage panel** (top of the showcase): `site/usage.py` (stdlib only) reads this machine's
 Claude Code session logs (`~/.claude/projects`), keeps the sessions that ran in this repo
-(worktree sessions, their subagents and an earlier location of the repo included) and writes
-`site/usage/<device>.json` (`mac` or `windows` by platform: tokens, sessions, a per-day
-series, the time it ran); `build.py` adds the device files up, with each device and its last
+(worktree sessions, their subagents and an earlier location of the repo included), merges
+their API responses into the device's ledger (`site/usage/ledger/<device>/<YYYY-MM>.csv`: one
+row per response, hashed ids, time, model and token counts, nothing of the conversation;
+rows are never removed, so logs Claude Code deletes still count) and writes
+`site/usage/<device>.json` from the whole ledger (`mac` or `windows` by platform: tokens by
+model and type, sessions, a per-day series, the time it ran); `build.py` adds the device files up, with each device and its last
 update behind a "By device" toggle. Each machine writes only its own file.
 **After every PR is closed (merged or not), on every machine:** the session that closed it
 (or merged it) runs `python site/usage.py` on its own machine (`.venv/bin/python` on the Mac,
-`.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` to main
+`.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` and its ledger folder to main
 ("Usage: <device> after #N"), pulling first, and pushes. This is the one exception to "no
 refresh on every push": it needs no ask. Never write another device's file; a usage commit
 needs no further usage update. `site/usage/cloud.json` is entered by hand (`manual`, a
