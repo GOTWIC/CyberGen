@@ -323,12 +323,14 @@ class Mesh:
                     for k in range(n)]
             self.poly(slot, ring, z=z1)
 
-    def sweep(self, slot: str, frames, profile, closed: bool = False, uscale=None):
+    def sweep(self, slot: str, frames, profile, closed: bool = False, uscale=None,
+              zscale=None):
         """A cross-section swept along frames [(x, y, z, nx, ny, k, s), ...] (left normal
         nx, ny, miter factor k, distance s): profile [(t, dz), ...] in the section plane (t
         to the left, dz up), clockwise in that plane (counterclockwise as seen looking along
         the direction of travel) for an outward-facing surface. Each profile edge is a strip of its own (hard edges at
-        the profile's corners), smooth along the path."""
+        the profile's corners), smooth along the path. `zscale` (one per frame): the
+        section's heights scaled there (a barrier's ramped end)."""
         prof = list(profile) + ([profile[0]] if closed else [])
         for e in range(len(prof) - 1):
             (t0, z0), (t1, z1) = prof[e], prof[e + 1]
@@ -336,10 +338,13 @@ class Mesh:
             if w < 1e-4:
                 continue
             rows, uvs, exp = [], [], []
-            dt, dz = t1 - t0, z1 - z0
-            for (x, y, z, nx, ny, k, s) in frames:
-                rows.append([(x + nx * k * t0, y + ny * k * t0, z + z0),
-                             (x + nx * k * t1, y + ny * k * t1, z + z1)])
+            dt = t1 - t0
+            for i, (x, y, z, nx, ny, k, s) in enumerate(frames):
+                f = 1.0 if zscale is None else zscale[i]
+                za, zb = z0 * f, z1 * f
+                dz = zb - za
+                rows.append([(x + nx * k * t0, y + ny * k * t0, z + za),
+                             (x + nx * k * t1, y + ny * k * t1, z + zb)])
                 uvs.append([(s, 0.0), (s, w)])
                 # the section edge (dt, dz) faces (-dz, dt) in the section plane
                 exp.append((-dz * nx, -dz * ny, dt))

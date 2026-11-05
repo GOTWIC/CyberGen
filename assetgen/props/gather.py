@@ -90,6 +90,144 @@ def _wall_plus_y(poly, x: float, y: float, yaw: float, reach: float) -> bool:
     return dp <= dm
 
 
+FIT_CLEAR_M = 0.05      # a prop's footprint reaches at most this onto a carriageway
+FIT_LOW_M = 2.0         # its footprint: what of it is this low (AG14's `PROP_LOW_M`)
+FIT_Z_M = 1.5           # a road or junction counts within this of the prop's height
+FIT_SKIP = ("parked_vehicle", "barrier")     # on a carriageway by design
+# what does not stand on its feet (as AG14's `fit.build.NOT_STANDING`: mounted, hung, afloat,
+# drawn whole as an exact mesh)
+NOT_STANDING = {"awning", "wall_light", "ac_unit", "overhead_cable", "cable", "boat", "sign",
+                "scaffolding", "bracket", "neon", "gate", "facade_greenery", "shop_sign",
+                "blade_sign", "billboard", "holo_ad", "neon_band", "string_lights"}
+
+
+class _Fit:
+    """#95: whether a standing prop's variant stands clear of every vehicle carriageway
+    (AG7 paves it between the curbs), junction and crosswalk at its height (a traffic
+    signal at its crosswalk's end by design): its footprint (the variant's vertices up to
+    `FIT_LOW_M` over its foot, their convex hull, turned and scaled as placed) reaches at
+    most `FIT_CLEAR_M` onto one. Variants are made once to measure them."""
+
+    def __init__(self, model):
+        from ..streets.roads import street_class
+        shapes, rows = [], []
+        node_z = {n.id: n.position[2] for n in model.road_nodes}
+        legs: dict = defaultdict(list)
+        for s in model.road_segments:
+            legs[s.start].append(s)
+            legs[s.end].append(s)
+        car = ("pedestrian", "footbridge")
+        with G.canonical():
+            for j in model.junctions:
+                if all(street_class(s) in car for s in legs.get(j.node_id, ())):
+                    continue
+                shapes.append(G.from_model_poly(j.polygon))
+                rows.append(("junction", None, node_z.get(j.node_id, 0.0)))
+            jring = {j.node_id: [list(p) for p in j.polygon.exterior] for j in model.junctions}
+            for s in model.road_segments:
+                if street_class(s) in car or len(s.centerline) < 2:
+                    continue
+                poly = _carriageway(s, street_class(s), jring)
+                if poly is None:
+                    continue
+                ln = shapely.LineString([(p[0], p[1]) for p in s.centerline])
+                shapes.append(poly)
+                rows.append(("road", ln, [(z.s, z.z) for z in s.z_profile]))
+            seg = {s.id: s for s in model.road_segments}
+            for c in model.crosswalks:
+                s = seg.get(c.segment_id)
+                if s is None:
+                    continue
+                ln = shapely.LineString([(p[0], p[1]) for p in c.line])
+                shapes.append(ln.buffer(c.width_m / 2.0, cap_style="flat"))
+                rows.append(("xwalk", shapely.LineString([(p[0], p[1]) for p in s.centerline]),
+                             [(z.s, z.z) for z in s.z_profile]))
+        with G.canonical():
+            self.shapes = [G.qpoly(g.buffer(-FIT_CLEAR_M)) for g in shapes]
+        self.rows = rows
+        self.tree = shapely.STRtree(self.shapes) if shapes else None
+        self.hulls: dict = {}
+
+    def hull(self, kind: str, style: str, k: int) -> list | None:
+        key = (kind, style, k)
+        if key not in self.hulls:
+            from .variants import make
+            m = make(kind, style, k)
+            pts = [p for sl in m.slots.values() for p in sl.pos]
+            if not pts:
+                self.hulls[key] = None
+            else:
+                z0 = min(p[2] for p in pts)
+                low = [(p[0] / 1000.0, p[1] / 1000.0) for p in pts
+                       if p[2] <= z0 + FIT_LOW_M * 1000.0]
+                h = shapely.convex_hull(shapely.multipoints(low))
+                self.hulls[key] = list(h.exterior.coords)[:-1] if h.geom_type == "Polygon" \
+                    else None
+        return self.hulls[key]
+
+    def clear(self, kind: str, style: str, k: int, x: float, y: float, z: float,
+              yaw: float, scale) -> bool:
+        if self.tree is None:
+            return True
+        ring = self.hull(kind, style, k)
+        if ring is None:
+            return True
+        a = M.radians(yaw)
+        c, s = M.cos(a), M.sin(a)
+        poly = shapely.Polygon([(x + c * u * scale[0] - s * v * scale[1],
+                                 y + s * u * scale[0] + c * v * scale[1]) for u, v in ring])
+        for gi in sorted(self.tree.query(poly, predicate="intersects").tolist()):
+            kind_, ln, zp = self.rows[gi]
+            if kind_ == "xwalk" and kind == "traffic_signal":
+                continue
+            if kind_ == "junction":
+                zt = zp
+            else:
+                zt = _z_along(zp, ln.project(shapely.points(x, y)))
+            if abs(zt - z) <= FIT_Z_M:
+                return False
+        return True
+
+
+def _carriageway(s, cls: str, jring: dict):
+    """A road's carriageway as AG7's road piece draws it (`streets.roads.Road`: from the cut
+    edge at one junction to the other's, mitred at its centerline's vertices), shapely; None
+    where it has none."""
+    from ..streets.roads import Road
+    ends = []
+    for at, nid in (("start", s.start), ("end", s.end)):
+        e = {"at": at}
+        if nid in jring:
+            e["junction"] = {"ring": jring[nid]}
+        ends.append(e)
+    try:
+        rd = Road({"seg": s.model_dump(mode="json", exclude_none=True), "cls": cls,
+                   "ends": ends})
+    except ValueError:
+        return None
+    if rd.s1 - rd.s0 < 0.05:
+        return None
+    left, right = [], []
+    for sv, vi in rd.stations(rd.s0, rd.s1):
+        left.append(rd.at(sv, rd.h, vi))
+        right.append(rd.at(sv, -rd.h, vi))
+    poly = shapely.Polygon(left + right[::-1])
+    if not poly.is_valid:
+        poly = shapely.make_valid(poly)
+    return poly
+
+
+def _z_along(prof, s: float) -> float:
+    if not prof:
+        return 0.0
+    if s <= prof[0][0]:
+        return prof[0][1]
+    for (s0, z0), (s1, z1) in zip(prof, prof[1:]):
+        if s <= s1:
+            return z0 if s1 <= s0 else z0 + (z1 - z0) * (s - s0) / (s1 - s0)
+    return prof[-1][1]
+
+
 def _seg_dist(px, py, a, b) -> float:
     ax, ay = a
     bx, by = b
@@ -174,6 +312,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         p["ids"].append(pid)
 
     brackets = 0
+    fit = None
     for p in sorted(model.props, key=lambda p: p.id):
         kind = p.type.split(".", 1)[1]
         g.kinds[kind] = g.kinds.get(kind, 0) + 1
@@ -219,14 +358,27 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
                 g.dropped[p.id] = "the road piece's median barrier (AG7)"
                 groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
                 continue
-        kinds_used.add(kind)
         n = ST.PROP_VARIANTS[kind]
         if kind == "trash":
             item = (p.attrs or {}).get("item", "bag")
             base = {"bag": 0, "box": 4, "can": 8}.get(item, 0)
             k = base + ST.pick(4, "ag8.prop", p.id)
+            alts = [base + (k - base + i) % 4 for i in range(4)]
         else:
             k = ST.pick(n, "ag8.prop", p.id)
+            alts = [(k + i) % n for i in range(n)]
+        if kind not in FIT_SKIP and kind not in NOT_STANDING:
+            # (#95: the variant drawn, else the next of its family, that keeps clear of the
+            # carriageways, junctions and crosswalks; none: the prop is left out)
+            if fit is None:
+                fit = _Fit(model)
+            k = next((kk for kk in alts if fit.clear(kind, st, kk, x, y, p.position[2],
+                                                      p.yaw_deg, p.scale)), None)
+            if k is None:
+                g.dropped[p.id] = "no variant clear of the carriageway (#95)"
+                groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
+                continue
+        kinds_used.add(kind)
         yaw = p.yaw_deg
         if kind == "awning":
             poly = foot.get(mm["building"]) if mm else near_foot(x, y)
