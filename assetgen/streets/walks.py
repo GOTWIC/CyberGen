@@ -1038,10 +1038,11 @@ def make_junction(inp: dict) -> Out:
         out.notes["paved"] = car[2]
     if not j.get("level") and drawn and up:
         # (#89: on a raised junction a thing stands only where AG7 paves: its carriageway
-        # and the corner pads it drew, in the corners between its legs; AG8 reads this)
+        # and the corner pads it drew, in the corners between its legs (a corner with no
+        # sidewalk has none); AG8 reads this)
         out.notes["raised"] = {
             "area": [[[C.m2(x), C.m2(y)] for x, y in sc["sector"]] for sc in sectors
-                     if "sector" in sc and sc["sidewalk"]],
+                     if "sector" in sc],
             "carriageway": [[[C.m2(x), C.m2(y)] for x, y in r] for r, _ in drawn],
             "z": [C.m(min(hz(x, y) for r, _ in drawn for x, y in r)),
                   C.m(max(hz(x, y) for r, _ in drawn for x, y in r))],
@@ -1074,7 +1075,7 @@ def _surface(inp: dict) -> dict:
     ring = ccw(j["polygon"]["exterior"])
     # holes: M2 leaves only slivers (a ring touching the outline); a junction is paved through
     holes = [ccw(h)[::-1] for h in j["polygon"].get("holes", [])
-             if abs(_area(h)) >= 4.0 and not any(tuple(p) in {tuple(q) for q in ring} for p in h)]
+             if abs(_area(h)) >= HOLE_M2 and not any(tuple(p) in {tuple(q) for q in ring} for p in h)]
     P = (inp["node"][0], inp["node"][1])
     zn = inp["node"][2] + inp["node_ground"] + ROAD_DZ
     legs = []
@@ -1262,8 +1263,11 @@ def _edge_z(rings) -> callable:
     return f
 
 
-def _draped(mesh: Mesh, slot: str, ring, holes, zf, D: float) -> None:
-    """A slab D deep under a surface (its vertices at zf): its sides and underside."""
+def _draped(mesh: Mesh, slot: str, ring, holes, zf, D: float) -> bool:
+    """A slab D deep under a surface (its vertices at zf): its sides and underside; left
+    out where it would fold over what the slot holds (a sliver of an overlap)."""
+    sl = mesh._slot(slot)
+    mark = (len(sl.pos), len(sl.idx), sl.auto, mesh_check({slot: sl})["winding"])
     for rr in [ring] + list(holes):
         n = len(rr)
         for i in range(n):
@@ -1272,9 +1276,15 @@ def _draped(mesh: Mesh, slot: str, ring, holes, zf, D: float) -> None:
                       zf(*b) - ROAD_DZ - D, zf(*b) - ROAD_DZ - 0.01)
     mesh.poly(slot, ring, holes, zfun=lambda x, y: zf(x, y) - ROAD_DZ - D, up=False,
               keep_straight=True)
+    if mesh_check({slot: sl})["winding"] <= mark[3]:
+        return True
+    del sl.pos[mark[0]:], sl.nrm[mark[0]:], sl.uv[mark[0]:], sl.idx[mark[1]:]
+    sl.auto = mark[2]
+    return False
 
 
 CAR_MIN_M2 = 0.5        # #82: pieces of a lane's run off its junction smaller than this go
+HOLE_M2 = 4.0           # a junction is paved through holes smaller than this
 SPIKE_COS = 0.99863     # ... and a vertex where its outline turns back within 3 degrees (a
                         # needle the overlay leaves) (`_despike`)
 
@@ -1350,7 +1360,9 @@ def _carriageway(inp: dict, sf: dict, sectors: list):
                   for h in p.interiors]
             if len(e) < 3:
                 continue
-            drawn.append((e, [h for h in hs if len(h) >= 3]))
+            # (paved through its small holes, as its outline's: two touching at a point
+            # fold the triangulation)
+            drawn.append((e, [h for h in hs if len(h) >= 3 and abs(_area(h)) >= HOLE_M2]))
     if (add is None and len(drawn) == 1 and not drawn[0][1] and
             {tuple(p) for p in drawn[0][0]} == {tuple(p) for p in cring}):
         return None       # (the owners only touch it)

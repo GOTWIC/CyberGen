@@ -285,6 +285,8 @@ class _RaisedCorners:
 
     def __init__(self, notes: list, sidewalks=()):
         self.rows = []
+        self.tops = []          # (each row's pads with their heights, for `pad_top`)
+        self._tris: dict = {}
         polys = []
         bands = [shapely.LineString(w.line).buffer(w.width_m / 2.0 + 0.05, cap_style="flat")
                  for w in sidewalks if len(w.line) >= 2]
@@ -302,6 +304,7 @@ class _RaisedCorners:
                    if len(c) >= 3]
             u = shapely.union_all(area)
             polys.append(u)
+            self.tops.append(pads)
             self.rows.append((u, [shapely.Polygon([(q[0], q[1]) for q in p]) for p in pads],
                               [c if c.is_valid else shapely.make_valid(c) for c in car],
                               (min(zs), max(zs)) if zs else None))
@@ -322,6 +325,46 @@ class _RaisedCorners:
         if hit and self.walks is not None and len(self.walks.query(pt, predicate="intersects")):
             return False        # (on a sidewalk: AG7 draws it off the carriageways)
         return hit
+
+    def pad_top(self, x: float, y: float, z: float):
+        """The height of the corner pad of a raised junction at (x, y), as AG7 triangulates
+        it (its vertices at their heights), where the junction is at z; else None."""
+        if self.tree is None:
+            return None
+        pt = shapely.points(x, y)
+        for k in sorted(self.tree.query(pt, predicate="intersects").tolist()):
+            _, pads, _, zr = self.rows[k]
+            if zr is not None and not zr[0] - 0.15 - RAISED_Z_M <= z <= zr[1] + RAISED_Z_M:
+                continue
+            for i, pg in enumerate(pads):
+                if not pg.intersects(pt):
+                    continue
+                for a, b, c in self._pad_tris(k, i):
+                    d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+                    if abs(d) < 1e-12:
+                        continue
+                    u = ((b[0] - x) * (c[1] - y) - (b[1] - y) * (c[0] - x)) / d
+                    v = ((c[0] - x) * (a[1] - y) - (c[1] - y) * (a[0] - x)) / d
+                    if u >= -1e-9 and v >= -1e-9 and u + v <= 1.0 + 1e-9:
+                        return u * a[2] + v * b[2] + (1.0 - u - v) * c[2]
+        return None
+
+    def _pad_tris(self, k: int, i: int) -> list:
+        if (k, i) not in self._tris:
+            from ..streets.kit import Mesh
+            ring = self.tops[k][i]
+            zmap = {(q[0], q[1]): q[2] for q in ring}
+            m = Mesh((0.0, 0.0))
+            m.poly("pad", [(q[0], q[1]) for q in ring],
+                   zfun=lambda x_, y_: zmap.get((C.m2(x_), C.m2(y_)), 0.0))
+            sl = m.slots.get("pad")
+            tris = []
+            if sl is not None:
+                P = [(q[0] / 1000.0, q[1] / 1000.0, q[2] / 1000.0) for q in sl.pos]
+                tris = [(P[sl.idx[t]], P[sl.idx[t + 1]], P[sl.idx[t + 2]])
+                        for t in range(0, len(sl.idx), 3)]
+            self._tris[(k, i)] = tris
+        return self._tris[(k, i)]
 
 
 def _carriageway(s, cls: str, jring: dict):
@@ -535,6 +578,19 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
                 g.dropped[p.id] = "no variant clear of the carriageway (#95)"
                 groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
                 continue
+        if kind not in FIT_SKIP and kind not in NOT_STANDING:
+            # (#89: on a raised junction's corner pad, its foot on the pad as AG7 draws it:
+            # a pad follows its nearest curb, off the model's height on a steep junction)
+            f = _prop_foot(pfeet, kind, st, k)
+            if f is not None:
+                u, v, z0 = f
+                a_ = M.radians(p.yaw_deg)
+                c_, s_ = M.cos(a_), M.sin(a_)
+                fx = x + c_ * u * p.scale[0] - s_ * v * p.scale[1]
+                fy = y + s_ * u * p.scale[0] + c_ * v * p.scale[1]
+                pz = corners.pad_top(fx, fy, z)
+                if pz is not None:
+                    z = C.m(pz - z0 * p.scale[2])
         kinds_used.add(kind)
         yaw = p.yaw_deg
         if kind == "railing" and not gd.flat and (p.attrs or {}).get("quay") in quays:

@@ -1782,12 +1782,16 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   corners are paved (notes `paved`), and stand on the curb's height (`_edge_z`); a
   cul-de-sac gets a sidewalk round its bulb (`_bulb`); sidewalks and medians are not drawn
   over a carriageway at their height (`_clip_rings`, `roads._median_clip`,
-  `_clear_spans`); an outline vertex on a leg's cut takes the height of the road row it lies
-  on, and road rows just past the cut that fall on the outline become its vertices
-  (`_run_z`, `_road_rows`, `_with_corners`). AG8 leaves out a prop with no pad under it on a
-  raised junction's corner (notes `raised`, `props/gather._RaisedCorners`) and keeps props
-  off the paved lanes; on a terrain city quay railings stand on the quay's paving
-  (`_quay_tops`) and ground plants on the lowest ground under their foot (`_foot_ground`).
+  `_clear_spans`), a sidewalk's stretch a carriageway reaches over only in part drawn flat
+  on the rest of its width (`_fills`, `_fill`); drawn outlines lose the needles an overlay
+  leaves (`_despike`); an outline vertex on a leg's cut takes the height of the road row it
+  lies on, and road rows just past the cut (to the far cut on a road under 12 m) that fall
+  on the outline become its vertices (`_run_z`, `_road_rows`, `_with_corners`, leg `far`).
+  AG8 leaves out a standing prop on a raised junction's corner or its legs' rights of way
+  inside the cuts with no pad, carriageway or sidewalk under it (notes `raised`,
+  `props/gather._RaisedCorners`) and keeps props off the paved lanes; on a terrain city
+  quay railings stand with their foot on the quay's paving (`_quay_tops`, `_prop_foot`)
+  and ground plants with their foot's middle 5 cm into the ground (`_seat`).
   `asset_clash` also fails on a sidewalk, junction corner or median over a carriageway at
   its height (`fit/strips.py`).
 Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`; the junctions
