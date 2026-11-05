@@ -178,10 +178,13 @@ def test_nothing_overhead_is_open_from_below():
 def test_placements_pick_their_variant_from_their_id():
     """A prop's variant is the hash of its id within its kind and style's family, not its
     order: the contribution's parts hold every prop id once, under the variant the hash
-    names."""
+    names, unless that one would reach a carriageway, junction or crosswalk (#95): then the
+    next of its family in turn that keeps clear (the small city is flat: z as in the model)."""
+    from assetgen.props.gather import _Fit
     base, _ = _small()
     con = json.loads((base / "assets" / "unreal_contribution.props.json").read_text())
     model = load_model(base)[0]
+    props = {p.id: p for p in model.props}
     kind_of = {p.id: p.type.split(".", 1)[1] for p in model.props}
     seen = {}
     for e in con["entries"]:
@@ -191,10 +194,25 @@ def test_placements_pick_their_variant_from_their_id():
                                                            "wall_light"):
                     seen.setdefault(pid, part["kind"])
     assert seen
+    fit, moved = None, 0
     for pid, part in seen.items():
         kind = kind_of[pid]
         k = int(part.rsplit(".v", 1)[1])
-        assert k == ST.pick(ST.PROP_VARIANTS[kind], "ag8.prop", pid)
+        n = ST.PROP_VARIANTS[kind]
+        h = ST.pick(n, "ag8.prop", pid)
+        if k == h:
+            continue
+        fit = fit or _Fit(model)
+        style = part.split(".")[2]
+        p = props[pid]
+        x, y, z = p.position
+        turns = [(h + i) % n for i in range(n)]
+        assert k in turns
+        for kk in turns[:turns.index(k)]:
+            assert not fit.clear(kind, style, kk, x, y, z, p.yaw_deg, p.scale), (pid, kk)
+        assert fit.clear(kind, style, k, x, y, z, p.yaw_deg, p.scale), pid
+        moved += 1
+    assert moved < 0.05 * len(seen)
 
 
 def test_m13_lifts_placements_by_base_or_ground(tmp_path):
