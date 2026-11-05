@@ -294,6 +294,16 @@ def gather_junction(cx: Ctx, j) -> Piece:
         # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
         # ramp's top) a slab of its own carries it
         inputs["off_deck"] = _off_deck(cx, j)
+    # (#95: the barriers it carries between its legs, `barriers.junction_plan`)
+    from . import barriers as BR
+    plan = BR.junction_plan(cx, j)
+    if plan["corners"] or plan["median"]:
+        near = BR.near_of_junction(cx, j)
+        near["ends"] = BR.leg_ends(cx, j)
+        inputs["barriers"] = {"corners": [{"a": c["a"], "b": c["b"], "kind": c["kind"]}
+                                          for c in plan["corners"]],
+                              "median": plan["median"], "xwalks": near.pop("xwalks"),
+                              "near": near}
     return Piece(j.id, "street.junction", "junction", cx.tile_for(j.id, ext),
                  cx.keys.get(j.id, []), inputs)
 
@@ -472,7 +482,9 @@ def make_junction(inp: dict) -> Out:
         side = 0.0 if cls in PEDESTRIAN else lg["side"]
         d = _leg_dir(path.p, P)
         rec = {"cls": cls, "d": d, "ang": M.atan2(d[1], d[0]), "L": Lr, "row": lg["width"] / 2.0,
-               "side": side, "id": lg["id"], "exit": ex}
+               "side": side, "id": lg["id"], "exit": ex,
+               "key": f"{lg['id']}@{'s' if lg['at_start'] else 'e'}",
+               "path": path, "h": lg["width"] / 2.0 - side}
         if ex is not None:
             s = ex[0]
             sm = s if lg["at_start"] else Lr - s
@@ -579,10 +591,52 @@ def make_junction(inp: dict) -> Out:
         D = max(DECK_D.get(r["cls"], 1.2) for r in legs) if legs else 1.2
         mesh.prism("concrete.deck", ring, zn - ROAD_DZ - D, zn - ROAD_DZ - 0.01, top=False,
                    bottom=True)
-    pads = _corners(mesh, ring, holes, P, legs, j, style, zfun)
+    rows: dict = {}
+    pads = _corners(mesh, ring, holes, P, legs, j, style, zfun, rows)
+    if inp.get("barriers"):
+        _junction_barriers(mesh, ring, legs, inp["barriers"], rows, zfun)
     out = Out(mesh=mesh)
     out.notes["corner_pads"] = pads
     return out
+
+
+def _junction_barriers(mesh: Mesh, ring, legs, plan: dict, rows: dict, zfun):
+    """#95: what a junction carries between its legs (`barriers.junction_plan`): a parapet
+    round a raised junction's corner (along its sidewalk pad's property line where one is
+    drawn, else its outline), a guard wall along an at-grade highway corner, a median
+    barrier across."""
+    from . import barriers as BR
+    n = len(legs)
+    at = {r["key"]: i for i, r in enumerate(legs)}
+    keep = BR.Keepout(legs, plan.get("xwalks", ()), ring, plan.get("near"))
+    parapet = BR.parapet_profile(0.0, "r")
+    guard = BR.shifted(BR.JERSEY, BR.GUARD_IN_M)
+
+    def draw(pts, prof, base=0.0):
+        # (each part clear of the legs' carriageways and the crosswalks)
+        offs = (min(t for t, _ in prof), sum(t for t, _ in prof) / len(prof),
+                max(t for t, _ in prof))
+        for part in BR.clip_line(pts, offs, keep):
+            BR.draw_line(mesh, "concrete.barrier", part, prof, zfun, base=base)
+    for c in plan.get("corners", ()):
+        i = at.get(c["a"])
+        if i is None or n < 2 or legs[(i + 1) % n]["key"] != c["b"]:
+            continue
+        a, b = legs[i], legs[(i + 1) % n]
+        if a["exit"] is None or b["exit"] is None:
+            continue
+        if c["kind"] == "parapet" and i in rows:
+            draw(rows[i], parapet, 0.15)
+            continue
+        ch = BR._chain(ring, a["exit"][1], b["exit"][1])
+        if ch is not None:
+            draw(ch, parapet if c["kind"] == "parapet" else guard)
+    med = plan.get("median")
+    if med:
+        ends = [legs[at[k]] for k in med if k in at]
+        if len(ends) == 2 and all(r["exit"] is not None for r in ends):
+            pa, pb = (BR.median_end(ring, r["exit"], r["path"], r["h"]) for r in ends)
+            draw([pa, pb], BR.JERSEY)
 
 
 def _cut_run(ring, r: dict) -> list[int]:
@@ -741,8 +795,9 @@ def _near(p, line, closed: bool, tol: float = 0.03) -> bool:
     return False
 
 
-def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
-    """Sidewalk corners between neighboring legs; [made, skipped, why skipped]."""
+def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) -> list:
+    """Sidewalk corners between neighboring legs; [made, skipped, why skipped];
+    `rows_out` (#95) gets each drawn corner's property line, by its first leg's index."""
     made = skipped = 0
     n = len(legs)
     if n < 2 or j.get("shape") == "cul_de_sac":
@@ -819,16 +874,16 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
             why["no sidewalk"] = why.get("no sidewalk", 0) + 1
             continue
         taken += parts
-        drawn.append((parts, row))
+        drawn.append((parts, row, i))
     # faces along the pads' edges, in a second pass: an edge two pads share gets none
     uses: dict = {}
-    for parts, _ in drawn:
+    for parts, _, _ in drawn:
         for r in parts:
             for k in range(len(r)):
                 key = tuple(sorted((r[k], r[(k + 1) % len(r)])))
                 uses[key] = uses.get(key, 0) + 1
     ends: set = set()
-    for parts, row in drawn:
+    for parts, row, i in drawn:
         drew = False
         for r in parts:
             sl = mesh._slot(pave)
@@ -864,6 +919,8 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun) -> list:
                               zfun(*q) - ROAD_DZ - 0.02, zfun(*q) + 0.15)
         if drew:
             made += 1
+            if rows_out is not None:
+                rows_out[i] = row
         else:
             skipped += 1
     return [made, skipped, dict(sorted(why.items()))]

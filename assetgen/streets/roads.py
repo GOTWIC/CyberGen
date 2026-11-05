@@ -121,6 +121,10 @@ def gather(cx: Ctx, s) -> Piece:
                   (st.attrs or {}).get("road_id") == s.id), key=lambda st: st.id)
     if emb:
         inputs["embankments"] = [[st.attrs["s0_m"], st.attrs["s1_m"]] for st in emb]
+    # (#95: where each barrier runs and how it ends, `barriers.road_runs`)
+    from . import barriers as BR
+    if BR.runs_of(inputs["seg"], inputs["cls"]):
+        inputs["barriers"] = BR.road_runs(cx, s, inputs)     # (none: no room for them)
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
                  cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
 
@@ -277,6 +281,7 @@ def _make(inp: dict, tidy: bool) -> Out:
             stops = _markings(rd, mesh, inp)
             _details(rd, mesh, inp, stops)
             _median(rd, mesh, inp, stops)
+    _barriers(rd, mesh, inp)
     if dk == "deck":
         # AG14: M18's embankments carry the road where it is low; the deck's girder only
         # between them (it ran through the fill, its sides on the fill's walls)
@@ -493,21 +498,33 @@ def _details(rd: Road, mesh: Mesh, inp: dict, stops: dict):
 
 # -- medians -------------------------------------------------------------------------
 
-JERSEY = [(-0.3, 0.0), (-0.3, 0.08), (-0.15, 0.33), (-0.075, 0.81), (0.075, 0.81),
-          (0.15, 0.33), (0.3, 0.08), (0.3, 0.0)]
+def _barriers(rd: Road, mesh: Mesh, inp: dict):
+    """The road's barriers (a highway's median barrier and an at-grade highway's guard
+    walls, a raised road's parapets, a deck ramp's barriers and parapets) over the spans
+    `barriers.road_runs` gave them, with their ends (#95); a road gathered without them (a
+    bridge's own deck) from cut to cut, closed at both ends."""
+    from . import barriers as BR
+    runs = BR.runs_of(rd.seg, rd.cls)
+    if not runs:
+        return
+    given = {r["name"]: r for r in inp.get("barriers", ())}
+    for run in runs:
+        ends = None
+        if "barriers" in inp:
+            g = given.get(run.name)
+            if not g:
+                continue
+            spans, ends = g["spans"], g.get("frames")
+        else:
+            spans = [[rd.s0, rd.s1, "stop", "stop"]]
+        BR.draw_run(mesh, rd, run, spans, ends=ends)
 
 
 def _median(rd: Road, mesh: Mesh, inp: dict, stops: dict):
     m = rd.cs.get("median_m", 0.0)
     cls = rd.cls
     if cls == "highway":
-        if m > 0.0:
-            rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1, JERSEY)
-        if deck_kind(rd.seg) == "none":
-            # guard walls along the outer edges of an at-grade highway
-            for tc in (-rd.h + 0.35, rd.h - 0.35):
-                rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1, JERSEY, tc=tc)
-        return
+        return          # (its median barrier and guard walls: `_barriers`)
     if m < 1.0 or cls not in ("avenue", "street", "service"):
         return
     sa = stops.get("start", rd.s0 + 1.0) + 1.0
@@ -556,14 +573,7 @@ def _deck(rd: Road, mesh: Mesh, inp: dict, spans=None):
             (-W2, 0.0)]
     for a, b in (spans if spans is not None else [(0.0, rd.L)]):
         rd.sweep(mesh, "concrete.deck", a, b, prof, base=-ROAD_DZ)
-    if cls not in PEDESTRIAN:
-        sw = rd.side if cls in ("avenue", "street") else 0.0
-        base = 0.15 if sw > 0 else 0.0
-        rd.sweep(mesh, "concrete.barrier", 0.0, rd.L,
-                 [(W2 - 0.45, 0.0), (W2 - 0.35, 1.05), (W2, 1.05), (W2, -0.0)], base=base)
-        rd.sweep(mesh, "concrete.barrier", 0.0, rd.L,
-                 [(-W2, -0.0), (-W2, 1.05), (-W2 + 0.35, 1.05), (-W2 + 0.45, 0.0)],
-                 base=base)
+    # (its parapets: `_barriers`, between its junctions' corners, #95)
     sid = inp["seg"]["id"]
     if cls not in PEDESTRIAN and rd.s1 - rd.s0 > 10.0:
         s = rd.s0 + 45.0 * rnd(sid, "joint")
@@ -588,28 +598,23 @@ RAMP_PARAPET_H = 1.1
 
 
 def _deck_ramp(rd: Road, mesh: Mesh, inp: dict) -> dict:
-    """M14's ramp up to a deck (AG10): barriers at the carriageway's edges, a walkway on
-    each side at curb height (the model's walkways beside it), a parapet outside it, and
-    the solid ramp's walls down to the ground on both sides and across its raised ends.
+    """M14's ramp up to a deck (AG10): a walkway on each side at curb height (the model's
+    walkways beside it), and the solid ramp's walls down to the ground on both sides (up to
+    the walkways) and across its raised ends; its barriers at the carriageway's edges and
+    the parapets outside the walkways are runs (`barriers.runs_of`, `_barriers`).
     Returns the walkways' lines put on the ramp (z over the ground, as the model's)."""
     W2 = rd.W / 2.0
     pave = MT.paving(inp["style"]["archetype"])
     wi, wo = W2 + RAMP_WALK_M, W2 + RAMP_WALK_M + RAMP_PARAPET_M
-    top = RAMP_PARAPET_H + 0.15
-    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1,
-             [(W2 - 0.45, 0.0), (W2 - 0.35, 1.05), (W2, 1.05), (W2, -0.0)])
-    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1,
-             [(-W2, -0.0), (-W2, 1.05), (-W2 + 0.35, 1.05), (-W2 + 0.45, 0.0)])
+    # (its barriers and parapets: `_barriers`, #95; the walls below carry the walkways)
     rd.strip(mesh, pave, rd.s0, rd.s1, W2, wi, 0.15)
     rd.strip(mesh, pave, rd.s0, rd.s1, -wi, -W2, 0.15)
-    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1, [(wi, 0.15), (wi, top), (wo, top)])
-    rd.sweep(mesh, "concrete.barrier", rd.s0, rd.s1, [(-wo, top), (-wi, top), (-wi, 0.15)])
     for side in (1.0, -1.0):
         rows, uvs, exp = [], [], []
         for s, vi in rd.stations(rd.s0, rd.s1):
             x, y = rd.at(s, side * wo, vi)
             _, _, nx, ny, _ = rd.path.frame(s, vi)
-            zt, zb = rd.z(s) + top, rd.ground(s) - 0.1
+            zt, zb = rd.z(s) + 0.15, rd.ground(s) - 0.1
             col = [(x, y, zt), (x, y, zb)] if side > 0 else [(x, y, zb), (x, y, zt)]
             rows.append(col)
             uvs.append([(s, zt), (s, zb)] if side > 0 else [(s, zb), (s, zt)])
