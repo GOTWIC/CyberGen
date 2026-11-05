@@ -364,12 +364,49 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
 
 
 DEVICE_ORDER = ("mac", "windows", "cloud")
+# API prices in dollars per million tokens (Anthropic's first-party rates): input,
+# output, cache read; cache writes are 1.25x input (5-minute) and 2x input (1-hour);
+# fast mode (a model id ending ":fast") is 2x standard. A model not listed shows "no
+# price" and adds nothing to the cost: add its rates here when it is used. The panel
+# prices the billable tokens (each request once), never the Claude stats count.
+PRICES = {
+    "claude-fable-5-1": (10.00, 50.00, 0.25),
+    "claude-opus-5-5": (4.00, 20.00, 0.20),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.20),
+}
 KINDS = ("input", "output", "cache_write_5m", "cache_write_1h", "cache_read")
 KIND_NAMES = {"input": "Input", "output": "Output", "cache_write_5m": "Cache write 5m",
               "cache_write_1h": "Cache write 1h", "cache_read": "Cache read"}
 MODEL_NAMES = {"claude-fable-5-1": "Fable 5.1", "claude-fable-5": "Fable 5", "claude-opus-5-5": "Opus 5.5",
                "claude-opus-5": "Opus 5", "claude-sonnet-5-5": "Sonnet 5.5", "claude-sonnet-5": "Sonnet 5",
                "claude-haiku-5-5": "Haiku 5.5"}
+
+
+def rates(model: str) -> dict[str, float] | None:
+    base, _, speed = model.partition(":")
+    p = PRICES.get(base)
+    if not p:
+        return None
+    k = 2 if speed == "fast" else 1
+    i, o, r = (k * v for v in p)
+    return {"input": i, "output": o, "cache_write_5m": 1.25 * i, "cache_write_1h": 2 * i, "cache_read": r}
+
+
+def cost(model: str, tokens: dict[str, int]) -> dict[str, float] | None:
+    r = rates(model)
+    return None if r is None else {k: tokens.get(k, 0) * r[k] / 1e6 for k in KINDS}
+
+
+def usd(x: float) -> str:
+    return f"${x:,.0f}" if x >= 100 else f"${x:,.2f}"
+
+
+def device_cost(u: dict) -> float:
+    """What a device's billable tokens would cost at API prices (a hand-entered device: its
+    spend)."""
+    if u.get("manual"):
+        return float(u["cost_usd"])
+    return sum(sum((cost(m, t) or {}).values()) for m, t in u.get("models", {}).items())
 
 
 def load_usage() -> list[dict]:
@@ -442,30 +479,42 @@ def render_usage(us: list[dict]) -> str:
     days = sorted(set().union(*(u["days"] for u in us)))
     more = ('<button class="btn mini" type="button" id="usage-more" aria-expanded="false" '
             'aria-controls="usage-models">By model</button>')
+    total_cost = sum(device_cost(u) for u in us)
     kpis = "".join(f'<div><dt class="lbl">{k}</dt><dd class="mono">{v}</dd></div>' for k, v in (
         ("Claude stats tokens", big(stats_total) + more), ("Billable tokens", big(billed_total)),
+        ("API cost", usd(total_cost)),
         ("Sessions", f'{sum(u["sessions"] for u in us):,}'), ("Active days", str(len(days)))))
-    # Tokens by model and type, every device added up: the stats count, billable under it.
+    # Tokens by model and type, every device added up: the stats count, and under it the
+    # billable count with its cost at API prices.
     st, bt = model_table(us, "stats"), model_table(us, "billed")
     order = sorted(st, key=lambda m: -sum(st[m].values()))
 
-    def cell(s: int, b: int) -> str:
-        return f'<td class="mono">{big(s)}<small>{big(b)}</small></td>'
+    def cell(s: int, b: int, c: float | None) -> str:
+        return (f'<td class="mono">{big(s)}<small>{big(b)} · '
+                f'{usd(c) if c is not None else "no price"}</small></td>')
 
     head = "".join(f'<th scope="col">{KIND_NAMES[k]}</th>' for k in KINDS)
     body = []
+    sum_cost = dict.fromkeys(KINDS, 0.0)
     for m in order:
         s, b = st[m], bt.get(m, dict.fromkeys(KINDS, 0))
+        c = cost(m, b)
+        if c:
+            for k in KINDS:
+                sum_cost[k] += c[k]
         base, _, speed = m.partition(":")
         name = MODEL_NAMES.get(base, base) + (" (fast)" if speed else "")
-        body.append(f'<tr><th scope="row">{esc(name)}</th>{"".join(cell(s[k], b[k]) for k in KINDS)}'
-                    f'{cell(sum(s.values()), sum(b.values()))}</tr>')
-    foot = "".join(cell(sum(st[m][k] for m in st), sum(bt[m][k] for m in bt)) for k in KINDS)
+        body.append(f'<tr><th scope="row">{esc(name)}</th>'
+                    f'{"".join(cell(s[k], b[k], c[k] if c else None) for k in KINDS)}'
+                    f'{cell(sum(s.values()), sum(b.values()), sum(c.values()) if c else None)}</tr>')
+    foot = "".join(cell(sum(st[m][k] for m in st), sum(bt[m][k] for m in bt), sum_cost[k]) for k in KINDS)
     models = (f'<div class="usage-models" id="usage-models" hidden><table>'
               f'<thead><tr><th scope="col">Model</th>{head}<th scope="col">All</th></tr></thead>'
               f'<tbody>{"".join(body)}</tbody>'
-              f'<tfoot><tr><th scope="row">All models</th>{foot}{cell(stats_total, billed_total)}</tr></tfoot>'
-              f'</table><p class="usage-note mono">Each cell: Claude stats tokens, billable tokens under them.</p></div>')
+              f'<tfoot><tr><th scope="row">All models</th>{foot}'
+              f'{cell(stats_total, billed_total, sum(sum_cost.values()))}</tr></tfoot>'
+              f'</table><p class="usage-note mono">Each cell: Claude stats tokens; under them, billable tokens '
+              f'and their API cost.</p></div>')
     # A column a day, first to last, stacked by device, in the stats count.
     cols = []
     if days:
@@ -487,13 +536,15 @@ def render_usage(us: list[dict]) -> str:
 
     def row(u: dict) -> str:
         if u.get("manual"):
-            note = f'<small>{esc(u.get("note", "entered by hand"))}: ${float(u["cost_usd"]):,.0f}, tokens unknown</small>'
-            cells = '<td class="mono na">n/a</td>' * 4
+            note = f'<small>{esc(u.get("note", "entered by hand"))}, tokens unknown</small>'
+            cells = ('<td class="mono na">n/a</td>' * 2 + f'<td class="mono">{usd(device_cost(u))}</td>'
+                     + '<td class="mono na">n/a</td>' * 2)
         else:
             note = ("<small>stats count once per request until its next usage update</small>"
                     if stats_pending(u) else "")
             cells = (f'<td class="mono">{big(counts(u, "stats")["totals"]["total"])}</td>'
                      f'<td class="mono">{big(counts(u, "billed")["totals"]["total"])}</td>'
+                     f'<td class="mono">{usd(device_cost(u))}</td>'
                      f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>')
         return (f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}{note}</th>'
                 f'{cells}<td class="mono">{stamp(u["updated"])}</td></tr>')
@@ -502,8 +553,11 @@ def render_usage(us: list[dict]) -> str:
     text = ("Claude stats tokens are counted as Claude Code's own usage statistics count them (/usage, "
             "stats): every line of the session logs, and Claude Code logs a response once per part (its "
             "thinking, text and each tool call), so most responses count about twice. Billable tokens count "
-            "each API request once, as Anthropic bills it. Both include cache reads and writes. Each device "
-            "records its own sessions, worktree sessions and subagents included.")
+            "each API request once, as Anthropic bills it. Both include cache reads and writes. API cost is "
+            "what the billable tokens would cost at Anthropic's published API prices. Each device records "
+            "its own sessions, worktree sessions and subagents included.")
+    text += "".join(f" {u['label']}: {u.get('note', 'entered by hand')}, in the cost only, its tokens and "
+                    f"sessions unknown." for u in us if u.get("manual"))
     if pending:
         text += (f" {' and '.join(pending)}: Claude stats tokens counted once per request until "
                  f"{'its' if len(pending) == 1 else 'their'} next usage update.")
@@ -522,7 +576,7 @@ def render_usage(us: list[dict]) -> str:
     </div>{models}
     <div class="usage-devices" id="usage-devices" hidden>
       <table>
-        <thead><tr><th scope="col">Device</th><th scope="col">Claude stats tokens</th><th scope="col">Billable tokens</th><th scope="col">Sessions</th><th scope="col">Days</th><th scope="col">Last updated</th></tr></thead>
+        <thead><tr><th scope="col">Device</th><th scope="col">Claude stats tokens</th><th scope="col">Billable tokens</th><th scope="col">API cost</th><th scope="col">Sessions</th><th scope="col">Days</th><th scope="col">Last updated</th></tr></thead>
         <tbody>{''.join(row(u) for u in us)}</tbody>
       </table>
     </div>
