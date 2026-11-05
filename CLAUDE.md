@@ -13,8 +13,8 @@ code, tooling, procedural generation, and most asset work.
 **Layout by stage.** Each stage has its own generator package (`citygen/` for stage 1), spec
 (`docs/<generator>_scope.md`), full milestone log (`docs/<generator>_milestones.md`, the
 detailed per-milestone record for sessions) and section in the root README (images, then a
-high-level milestone table). Stage 1's milestones are M0 to M21 (M17 to M21 the fixes from the first run-through,
-`docs/run_through_1.md`),
+high-level milestone table). Stage 1's milestones are M0 to M22 (M17 to M21 the fixes from the first run-through,
+`docs/run_through_1.md`; M22, planned, from the second),
 built in `docs/progress/M*`; later stages give their milestones a prefix of their own (set in
 their scope doc) so their progress folders never clash with stage 1's.
 
@@ -1299,8 +1299,9 @@ No exporter change. Sample builds and the numbers before and after:
 
 ## Asset generator (assetgen)
 
-`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG16, section 14; planned:
-AG16 performance, a benchmark and structural fixes before stage 3), its log
+`docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG17, section 14; planned:
+AG16 performance, a benchmark and structural fixes before stage 3; AG17 road surfaces by
+construction from stage 1's M22 pavement map, section 14.18), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
 only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
