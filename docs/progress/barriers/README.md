@@ -102,7 +102,7 @@ main).
 | Delta, a highway crossing an avenue at grade (medians on both) | [before](delta_highway_junction_before.jpg) | [after](delta_highway_junction_after.jpg) |
 | Delta, a raised junction of five legs (`jn.e217s328`) | [before](delta_raised_junction_before.jpg) | [after](delta_raised_junction_after.jpg) |
 | Delta, a raised highway crossing an avenue (medians on both, `jn.e179n1530`) | [before](delta_raised_avenue_junction_before.jpg) | [after](delta_raised_avenue_junction_after.jpg) |
-| Vesper Bay, an off-ramp's gore on a highway | [before](vesper_bay_ramp_gore_before.jpg) | [after](vesper_bay_ramp_gore_after.jpg) |
+| Vesper Bay, an on-ramp's gore on a highway (`rs.e443n884` joining) | [before](vesper_bay_ramp_gore_before.jpg) | [after](vesper_bay_ramp_gore_after.jpg) |
 
 ![Delta highway junction, after](delta_highway_junction_after.jpg)
 
