@@ -1929,6 +1929,19 @@ JPEGs) and deploys; resized images are never committed. Preview with `.venv/bin/
 site/build.py --out <folder outside the repo>`. Add or change entries only when Swagnik asks:
 no refresh on every push or milestone.
 
+**Usage panel** (top of the showcase): `site/usage.py` (stdlib only) reads this machine's
+Claude Code session logs (`~/.claude/projects`), keeps the sessions that ran in this repo
+(worktree sessions, their subagents and an earlier location of the repo included) and writes
+`site/usage/<device>.json` (`mac` or `windows` by platform: tokens, sessions, a per-day
+series, the time it ran); `build.py` adds the device files up, with each device and its last
+update behind a "By device" toggle. Each machine writes only its own file.
+**After every PR is closed (merged or not), on every machine:** the session that closed it
+(or merged it) runs `python site/usage.py` on its own machine (`.venv/bin/python` on the Mac,
+`.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` to main
+("Usage: <device> after #N"), pulling first, and pushes. This is the one exception to "no
+refresh on every push": it needs no ask. Never write another device's file; a usage commit
+needs no further usage update.
+
 ## Working preferences
 
 - Execute tasks end to end and ask for the access you need, rather than handing back scripts to run.

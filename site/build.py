@@ -363,6 +363,97 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     return "".join(out)
 
 
+DEVICE_ORDER = ("mac", "windows")
+
+
+def load_usage() -> list[dict]:
+    """The per-device usage files site/usage.py writes (site/usage/<device>.json)."""
+    out = []
+    for p in sorted((SITE / "usage").glob("*.json")):
+        u = json.loads(p.read_text(encoding="utf-8"))
+        for f in ("device", "label", "updated", "sessions", "subagents", "totals", "days"):
+            if f not in u:
+                fail([f"usage/{p.name}: missing {f}"])
+        out.append(u)
+    rank = {d: i for i, d in enumerate(DEVICE_ORDER)}
+    return sorted(out, key=lambda u: (rank.get(u["device"], len(rank)), u["device"]))
+
+
+def big(n: int) -> str:
+    for size, unit in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if n >= size:
+            v = n / size
+            return f"{v:.{2 if v < 10 else 1 if v < 100 else 0}f}{unit}"
+    return str(n)
+
+
+def stamp(iso: str) -> str:
+    t = dt.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return f'<time datetime="{esc(iso)}">{t:%Y-%m-%d %H:%M} UTC</time>'
+
+
+def usage_figures(us: list[dict]) -> dict[str, int]:
+    days = set().union(*(u["days"] for u in us))
+    return {"total": sum(u["totals"]["total"] for u in us),
+            "output": sum(u["totals"]["output"] for u in us),
+            "sessions": sum(u["sessions"] for u in us),
+            "subagents": sum(u["subagents"] for u in us),
+            "days": len(days)}
+
+
+def render_usage(us: list[dict]) -> str:
+    """The showcase's usage panel: every device added up, each device apart behind a toggle."""
+    if not us:
+        return ""
+    tot = usage_figures(us)
+    kpis = "".join(f'<div><dt class="lbl">{k}</dt><dd class="mono">{v}</dd></div>' for k, v in (
+        ("Tokens", big(tot["total"])), ("Output tokens", big(tot["output"])),
+        ("Sessions", f'{tot["sessions"]:,}'), ("Active days", str(tot["days"]))))
+    # A column a day, first to last, stacked by device.
+    days = sorted(set().union(*(u["days"] for u in us)))
+    first, last = dt.date.fromisoformat(days[0]), dt.date.fromisoformat(days[-1])
+    peak = max(sum(u["days"].get(d, {}).get("total", 0) for u in us) for d in days) or 1
+    cols = []
+    d = first
+    while d <= last:
+        key = d.isoformat()
+        parts = [(u, u["days"].get(key, {}).get("total", 0)) for u in us]
+        n = sum(v for _, v in parts)
+        segs = "".join(f'<i data-device="{esc(u["device"])}" style="height:{100 * v / peak:.2f}%"></i>'
+                       for u, v in parts if v)
+        tip = f"{key}: {big(n)} tokens" + "".join(f" · {u['label']} {big(v)}" for u, v in parts if v)
+        label = f"{d.day:02d}" if d in (first, last) or d.day == 1 else ""
+        cols.append(f'<div class="ucol" title="{esc(tip)}"><div class="ubar">{segs}</div>'
+                    f'<span class="mono">{label}</span></div>')
+        d += dt.timedelta(days=1)
+    rows = "".join(
+        f'<tr data-device="{esc(u["device"])}"><th scope="row"><i></i>{esc(u["label"])}</th>'
+        f'<td class="mono">{big(u["totals"]["total"])}</td><td class="mono">{big(u["totals"]["output"])}</td>'
+        f'<td class="mono">{u["sessions"]:,}</td><td class="mono">{len(u["days"])}</td>'
+        f'<td class="mono">{stamp(u["updated"])}</td></tr>' for u in us)
+    newest = max(u["updated"] for u in us)
+    return f"""
+  <section class="usage glass" id="usage" data-view="all" aria-label="Claude Code usage">
+    <div class="usage-head">
+      <span class="lbl"><span class="dot"></span>Claude Code usage on CyberGen</span>
+      <span class="spacer"></span>
+      <span class="usage-note mono">{len(us)} device{'s' if len(us) != 1 else ''} · updated {stamp(newest)}</span>
+      <button class="btn" type="button" id="usage-toggle" aria-pressed="false" aria-controls="usage-devices">By device</button>
+    </div>
+    <div class="usage-body">
+      <dl class="usage-kpis">{kpis}</dl>
+      <div class="usage-chart" aria-hidden="true">{''.join(cols)}</div>
+    </div>
+    <div class="usage-devices" id="usage-devices" hidden>
+      <table>
+        <thead><tr><th scope="col">Device</th><th scope="col">Tokens</th><th scope="col">Output</th><th scope="col">Sessions</th><th scope="col">Days</th><th scope="col">Last updated</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    <p class="usage-foot">Tokens include cache reads and writes. Each device records its own sessions, worktree sessions and subagents included.</p>
+  </section>"""
+
+
 def fill(name: str, out: Path, values: dict[str, str]) -> None:
     page = (SITE / name).read_text(encoding="utf-8")
     missing = sorted(set(TOKEN_RE.findall(page)) - values.keys())
@@ -416,6 +507,7 @@ def build(out: Path) -> None:
         "HEADING": esc(show["heading"]),
         "LEDE": esc(g["lede"]),
         "STAGE_KEYS": render_stage_keys(g),
+        "USAGE": render_usage(load_usage()),
         "ITEMS": render_showcase(g, dims),
     })
     fill("log.html", out, {
