@@ -67,7 +67,40 @@ Loop sky tube runs 772 m over the corporate core's streets with no free spot for
 
 ## Numbers
 
-FILL_TABLE
+Main (on the sky tube and barriers fixes) before the slash, this branch after. Open spaces
+with no way in are those that said so (`access: none`); islet parks (land without a district)
+stay a note and are not counted. The last column is how the open spaces that had none are
+reached now.
+
+| City | Full-city tries | Open spaces with no way in | Walled-in entrances | Station stairs through a building | Ways in now |
+|---|---|---|---|---|---|
+| Saltreach Free Port | 1 / 1 | 0 / 0 | 0 / 0 | 0 / 0 | (byte-identical) |
+| Delta Megacity | 2 / 2 | 0 / 0 | 0 / 0 | 0 / 0 | (byte-identical) |
+| Nexus City | 1 / 1 | 0 / 0 | 0 / 0 | 0 / 0 | (byte-identical) |
+| Greyhook | 2 / 2 | 1 / 0 | 0 / 0 | 0 / 0 | 1 path along the shore to a street's end |
+| Vesper Bay | 1 / 1 | 1 / 0 | 2 / 0 | 0 / 0 | 1 to a neighbor's path (under the loop ramp); 1 gateway |
+| Vesper Bay Pinned | 2 / 2 | 3 / 0 | 0 / 0 | 1 / 0 | 2 verges, 1 path along the shore |
+| Vesper Bay Stacks | 2 / 2 | 9 / 0 | 0 / 0 | 0 / 0 | 8 verges (the stack's infields), 1 path along the shore |
+| Vesper Bay Decks | 3 / 1 | 2 / 0 | 1 / 0 | 1 / 0 | 2 to a neighbor's path; 1 gateway |
+| Cragmouth | 2 / 2 | 2 / 0 | 0 / 0 | 0 / 0 | 1 verge, 1 to a neighbor's path |
+
+Vesper Bay Decks now builds on its first layout, so its cases are that layout's (the freight
+terminal's gateway, a strip park and the loop's infield); main's third layout had a tower
+walled in by its own complex's podium (the case `_through_complex` serves, tested in
+`tests/test_park_paths.py`) and a metro stair under a building. Every city passes every check
+(102, 107 with the deck). The small test city (`tests/conftest.py` SMALL) had two loop
+infields with no way in; both now join their neighbor park's path under their loop ramp, so
+its assetgen goldens move too.
+
+Assets (`assetgen`, the stages each change can reach, then `assetgen fit`): Vesper Bay and
+Vesper Bay Decks (buildings, streets, props, ground, materials, fit: the gateway building's
+shell, front and doors, `asset_access` with every door reached), Cragmouth, Greyhook, Vesper
+Bay Pinned and Vesper Bay Stacks (streets, ground, fit). Every check passes but the two
+demos' `asset_grounded`, each on one raised junction's step (Pinned: 0.43 m where road
+`rs.e312s524` meets junction `jn.e368s514`; Stacks: 0.35 m, `rs.e536s213` at `jn.e559s304`):
+both cities' roads, nodes and junctions are main's record for record, so these predate this
+change (AG7's junction drawing on raised junctions, the open junction-steps item; AG14 was
+validated on the samples, not the demos).
 
 ## Images
 
@@ -81,7 +114,15 @@ FILL_TABLE
   fill-in now places on the thin strip.
 - `vesper_bay_decks/plan_strip_park_before.png`, `plan_strip_park_after.png`: a strip park
   with no way in (red), then its path to its neighbor's.
-- FILL_IMAGES
+- `vesper_bay_pinned/plan_station_stair_before.png`, `plan_station_stair_after.png`: the
+  Stacks station's 80 m stair through a block, then none at that platform end, which stands
+  over the river (the station's other end has its stair); `plan_spaceport_strip_*.png`: a strip
+  between the sea and the spaceport, then its path along the shore; `plan_junction_infield_*`:
+  the land between the raised ring and the water, then a verge.
+- `vesper_bay_stacks/plan_stack_infields_before.png`, `plan_stack_infields_after.png`: the
+  stack interchange's eight infield parks, then verges.
+- `cragmouth/plan_verge_after.png`, `plan_pocket_park_after.png`;
+  `peninsula_city/plan_park_after.png`.
 
 Plan views by `plot_access.py` (open space with no way in red, masses on the ground filled,
 those over it dotted, park paths red, door paths magenta, a walled-in entrance a red cross);

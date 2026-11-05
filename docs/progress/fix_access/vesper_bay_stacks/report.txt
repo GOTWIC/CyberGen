@@ -114,7 +114,7 @@ checks:
   [pass] park_planting: Every park, pocket park and garden of 800 m2 or more at the ground, at least 6 m wide, has trees or shrubs (a narrower strip is a path with verges)
   [pass] boats_afloat: Boats lie in their waterway, clear of bridges
   [pass] prop_support: Every prop, plant and roof item stands on a surface at its height within 2 cm (the ground, a quay deck, a road's deck, the water, a roof, a wall it is mounted on, a deck's underside it hangs from), none in a road's fill, and every prop standing fits 1 m under what is over it
-         note: 28582 on ground, 1709 on road, 39483 on wall, 21578 on roof, 77 on water, 375 on hung
+         note: 28233 on ground, 1485 on road, 39483 on wall, 21578 on roof, 77 on water, 375 on hung
   [pass] plant_headroom: No plant under a raised road, ramp, flyover, guideway, deck, skybridge or overhang reaches higher than its underside less 1 m, measured along it where the plant stands; none in a road's fill
          note: 1791 plants under something
   [pass] poi_reachable_foot: Every point of interest, parking entrance and travel point reachable on foot: its door opens on a ground walkway within 40 m in the walkway component of its landmass, and its curb point is on the same component
@@ -190,8 +190,8 @@ stats:
   Launch Key                        13      24.1    29.1    36.0       21%   0.6      0.081
   Scholar Isle                      51      28.0    36.0    48.0       30%   2.3      0.731
 
-  props 48790, plants 25780 (7246 trees), 74570 instances; lawns 35605 m2, hedges 6.38 km
-  props: sign 13300, awning 10862, ac_unit 7459, street_light 3587, railing 2711, overhead_cable 2281, trash 2126, barrier 1861, wall_light 1002, bollard 847, bench 787, hydrant 637, trash_can 544, traffic_signal 372, dumpster 216, boat 77, bus_stop 45, scaffolding 43, food_stall 11, vending_machine 10, planter 9, kiosk 2, gate 1
+  props 48217, plants 25780 (7246 trees), 73997 instances; lawns 35605 m2, hedges 6.38 km
+  props: sign 13300, awning 10862, ac_unit 7459, street_light 3587, railing 2596, overhead_cable 2281, trash 2126, barrier 1403, wall_light 1002, bollard 847, bench 787, hydrant 637, trash_can 544, traffic_signal 372, dumpster 216, boat 77, bus_stop 45, scaffolding 43, food_stall 11, vending_machine 10, planter 9, kiosk 2, gate 1
   plants: shrub 8488, facade_greenery 4954, overgrowth 4374, park_tree 3973, conifer 1209, street_tree 1001, roof_tree 718, palm 584, median_tree 479
 
   elevated highways 2.27 km (1 runs, 0 direct branches), deck up to 9 m; ramps 10 (5.48 km); interchanges diamond 1, stack 1 (8 directional ramps of stacks and turbines, up to 27 m); overpasses 4

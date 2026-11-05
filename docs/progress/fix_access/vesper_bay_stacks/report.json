@@ -656,7 +656,7 @@
       "passed": true,
       "failures": [],
       "notes": [
-        "28582 on ground, 1709 on road, 39483 on wall, 21578 on roof, 77 on water, 375 on hung"
+        "28233 on ground, 1485 on road, 39483 on wall, 21578 on roof, 77 on water, 375 on hung"
       ]
     },
     {
@@ -1539,19 +1539,19 @@
       }
     },
     "props": {
-      "props": 48790,
+      "props": 48217,
       "plants": 25780,
       "trees": 7246,
-      "instances": 74570,
+      "instances": 73997,
       "props_by_kind": {
         "sign": 13300,
         "awning": 10862,
         "ac_unit": 7459,
         "street_light": 3587,
-        "railing": 2711,
+        "railing": 2596,
         "overhead_cable": 2281,
         "trash": 2126,
-        "barrier": 1861,
+        "barrier": 1403,
         "wall_light": 1002,
         "bollard": 847,
         "bench": 787,
@@ -1601,13 +1601,13 @@
         "roof_plants": 4344,
         "facade_greenery": 4954,
         "overgrowth": 4374,
-        "quay_props": 2991,
-        "highway_barriers": 1861,
+        "quay_props": 2876,
+        "highway_barriers": 1403,
         "overhead_cables": 2281,
         "unit_dressing": 31621,
         "scaffolding": 43,
         "market_gates": 1,
-        "props": 48790,
+        "props": 48217,
         "plants": 25780
       }
     },
