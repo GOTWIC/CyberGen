@@ -942,10 +942,43 @@ def _corners(mesh: Mesh, ring, holes, P, legs, j, style, zfun, rows_out=None) ->
         if drew:
             made += 1
             if rows_out is not None and edge:
-                rows_out[i] = _chains(edge)
+                rows_out[i] = edge
         else:
             skipped += 1
+    if rows_out is not None:
+        # (#95: a corner's barrier only on those edges with open ground outside them: not
+        # the outline, another corner's pad or a leg's right of way, where two corners'
+        # pads abut along their property lines)
+        pads = [r for parts, _, _ in drawn for r in parts]
+        for i in sorted(rows_out):
+            keep = [e for e in rows_out[i] if _open_out(e, ring, pads, legs)]
+            if keep:
+                rows_out[i] = _chains(keep)
+            else:
+                del rows_out[i]
     return [made, skipped, dict(sorted(why.items()))]
+
+
+def _open_out(e, ring, pads, legs, out_m: float = 0.3) -> bool:
+    """Whether the ground 0.3 m outside an edge (to its right: counterclockwise rings) is
+    open: off the junction's outline, every pad and every leg's right of way."""
+    from .barriers import _inside
+    (px, py), (qx, qy) = e
+    dx, dy = qx - px, qy - py
+    L = math.sqrt(dx * dx + dy * dy)
+    if L < 1e-6:
+        return False
+    ox, oy = (px + qx) / 2.0 + dy / L * out_m, (py + qy) / 2.0 - dx / L * out_m
+    if _inside(ring, ox, oy) or any(_inside(r, ox, oy) for r in pads):
+        return False
+    for lg in legs:
+        path = lg.get("path")
+        if path is None:
+            continue
+        s, t = path.project(ox, oy)
+        if abs(t) <= lg["row"] + 0.05 and 1e-6 < s < path.L - 1e-6:
+            return False
+    return True
 
 
 __all__ = ["gather_sidewalk", "gather_crosswalk", "gather_junction", "math"]

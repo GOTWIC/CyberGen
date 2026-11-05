@@ -1987,6 +1987,54 @@ buildings alike and lit alike, streets black at night), scope 14.16. Tests:
 **Numbers** (Delta Megacity, AG14's packs against AG15's, the same model): see
 `docs/progress/AG15/README.md`.
 
+## Fix: barriers and props at junctions (issue #95)
+
+A fix between milestones, from run-through 2 (Delta in Unreal): barriers and props crossing
+the junctions made it hard to tell whether the road geometry itself was still wrong. Tests:
+`tests/assetgen/test_ag_barriers.py`; outputs `docs/progress/barriers/`.
+
+- **What crossed what, and why** (Delta on main, measured with the new check): a raised
+  road's parapets ran the whole segment (`roads._deck`, 0 to L), through the junction at
+  each end and across the other legs' parapets and crosswalks (98 parapets in their own
+  junction, 7 in another, 58 on crosswalks); a highway's median barrier and an at-grade
+  highway's guard walls ran cut to cut with open ends (`roads._median`), through the
+  crosswalks of a signalized junction (57 medians, 10 guard walls) and a few metres into a
+  skewed junction; a footbridge's railings ran its whole road (`structures._footbridge`), 30
+  into their junctions; M6's quay railings had no keep-outs at all (93 on junctions and road
+  ends at the quay); a few furniture props (15) reached the asphalt because AG8's variants
+  are larger than M6's placement radii (a bench 2.0 m to M6's 1.8, a dumpster 2.5 by 1.8 to
+  2.0 by 1.2). M14's deck ramps drew theirs cut to cut with open ends too. citygen's
+  `highway_barriers` walked the centerline through the junctions, but AG8 drops every one
+  of them where AG7 draws the median (all of Delta's), so in the assets they never showed.
+- **Barrier runs** (`assetgen/streets/barriers.py`, CLAUDE.md's AG7 "Barriers"): every
+  barrier a run over spans worked out at gather time, ended at its junction with a ramped
+  jersey end or a capped parapet, never within 0.15 m of another leg's carriageway, a
+  junction that does not carry it on or another junction at its height, nor within 1 m of a
+  crosswalk; a raised road's parapet ends on its cut edge or where its junction's corner pad
+  begins. A junction carries a parapet round a raised junction's corners (along its drawn
+  pads), a guard wall along an at-grade corner between two guard-walled highways and a
+  median across where nothing turns across it, each clipped clear of its legs' drawn
+  carriageways, its own lanes, crosswalks, other roads, junctions and building masses near
+  it. Footbridge railings end short of their junctions too.
+- **Props**: AG8 draws the first variant of a prop's family whose footprint (2 m up) keeps
+  within 5 cm of every vehicle carriageway, junction and crosswalk at its height, else
+  leaves the prop out (`props/gather._Fit`); M6's quay railings and median barriers keep off
+  junctions, crosswalks and (railings) other roads' carriageways (`citygen/props.py`
+  `_clear_of_roads`).
+- **Check** (`assetgen/fit/barriers.py`, part of AG14's `asset_clash`): any barrier on
+  another road's carriageway, on a junction's surface (a junction's own barriers in one of
+  its lanes), on a crosswalk, or through another piece's barrier; any standing prop on a
+  vehicle carriageway, junction or crosswalk or through a barrier. It fails on any.
+- **Numbers** (Delta Megacity, the same check on main's packs and this fix's): barriers on
+  another road 11 to 0, in a junction 141 to 0, on a crosswalk 75 to 0, through each other
+  10 to 0; props on a carriageway 108 to 0 (93 quay railings, 6 benches, 4 dumpsters, 3
+  bollards, a trash can, a traffic signal); the city builds on the same two full-city tries.
+  Every sample: `docs/progress/barriers/README.md`.
+- **Open** (the road geometry, #82 and #89): at junctions whose own surface is wrong (the
+  five-leg raised `jn.e217s328`, two overlapping junctions round it; corner pads drawn over
+  a turning lane) the corner parapets are clipped away rather than drawn across the lanes,
+  so those corners are open; a footbridge's stairs start inside its junction.
+
 ## Order
 
 ```

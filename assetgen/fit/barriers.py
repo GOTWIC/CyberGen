@@ -16,7 +16,7 @@ on a deck piece), and an open tunnel approach's walls (a trench). What it may no
   corner parapets and guard walls, a median across it) on its own surface only where they
   stand in one of its connector lanes (within the lane's half width less `INSET_M`);
 - **barrier on crosswalk**: the same on a crosswalk (the model's rectangle less `INSET_M`,
-  at the pavement's height there), the road's own median barrier included;
+  at its road's or junction's pavement height there), the road's own median included;
 - **barrier through barrier**: two pieces' barriers through each other: over `MEET_M2` of
   plan overlap at heights that overlap (two pieces meeting at a node they share join with
   at most `JOIN_M2`, a corner's worth);
@@ -145,7 +145,7 @@ class Targets:
         self.S = Surfaces(T, O, min_nz=0.5)
         self.V = Surfaces(T[A], O[A], min_nz=0.5)
         self._outlines: dict = {}
-        xs, self.xw_ids = [], []
+        xs, self.xw_ids, self.xw_own = [], [], []
         for c in model.crosswalks:
             a, b = c.line[0], c.line[-1]
             ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
@@ -153,6 +153,9 @@ class Targets:
                 continue
             xs.append(ln.buffer(c.width_m / 2.0, cap_style="flat"))
             self.xw_ids.append(c.id)
+            # (a crosswalk lies on its road's and its junction's pavement, at their height)
+            self.xw_own.append({pk.oid[i] for i in (c.segment_id, c.junction_id)
+                                if i in pk.oid})
         self.xw_in = [x.buffer(-INSET_M) for x in xs]
         self.xw_tree = shapely.STRtree(self.xw_in) if xs else None
         self.jpolys = [shapely.Polygon([(p[0], p[1]) for p in j.polygon.exterior])
@@ -218,6 +221,9 @@ class Targets:
         ins, z = self.S.heights(P[pi, :2], pid, tid, eps=1e-6)
         dz = P[pi[pid], 2] - z
         ok = ins & (dz >= -lo) & (dz <= hi)
+        own = np.array([int(self.S.owner[t]) in self.xw_own[int(ci[a])]
+                        for a, t in zip(pid.tolist(), tid.tolist())], dtype=bool)
+        ok &= own
         return sorted({(int(pi[a]), int(ci[a])) for a in pid[ok].tolist()})
 
 
@@ -386,8 +392,9 @@ def barrier_clash(pk, model) -> dict:
                 if not inx.any():
                     continue
                 Q = P[inx]
-                zt = tops[q_].under(Q, 0.05)
-                ok = ~np.isnan(zt) & (Q[:, 2] >= zt - 1.6)
+                # (inside the other's body: its top at or over the point, within its height)
+                zt = tops[q_].under(Q, 1.6)
+                ok = ~np.isnan(zt) & (zt >= Q[:, 2] - 0.05) & (Q[:, 2] >= zt - 1.6)
                 if ok.any():
                     hit += int(ok.sum())
                     at = at if at is not None else Q[np.nonzero(ok)[0][0]]
