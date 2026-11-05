@@ -1,25 +1,25 @@
 {
  "device": "windows",
  "label": "Windows PC",
- "updated": "2026-11-05T23:36:17Z",
+ "updated": "2026-11-05T23:45:30Z",
  "sessions": 23,
  "worktree_sessions": 23,
  "subagents": 11,
  "totals": {
-  "total": 5588310286,
-  "input": 25032,
-  "output": 9180856,
+  "total": 5615040097,
+  "input": 25124,
+  "output": 9239343,
   "cache_write_5m": 155362727,
-  "cache_write_1h": 37406670,
-  "cache_read": 5386335001
+  "cache_write_1h": 37491454,
+  "cache_read": 5412921449
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 25032,
-   "output": 9180856,
+   "input": 25124,
+   "output": 9239343,
    "cache_write_5m": 155362727,
-   "cache_write_1h": 37406670,
-   "cache_read": 5386335001
+   "cache_write_1h": 37491454,
+   "cache_read": 5412921449
   }
  },
  "days": {
@@ -64,27 +64,27 @@
    "sessions": 3
   },
   "2026-11-05": {
-   "total": 1341210292,
-   "output": 2101946,
+   "total": 1367940103,
+   "output": 2160433,
    "sessions": 9
   }
  },
  "stats": {
   "totals": {
-   "total": 11518476866,
-   "input": 50286,
-   "output": 22754909,
+   "total": 11580870186,
+   "input": 50500,
+   "output": 22915229,
    "cache_write_5m": 208064847,
-   "cache_write_1h": 80349027,
-   "cache_read": 11207257797
+   "cache_write_1h": 80555368,
+   "cache_read": 11269284242
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 50286,
-    "output": 22754909,
+    "input": 50500,
+    "output": 22915229,
     "cache_write_5m": 208064847,
-    "cache_write_1h": 80349027,
-    "cache_read": 11207257797
+    "cache_write_1h": 80555368,
+    "cache_read": 11269284242
    }
   },
   "days": {
@@ -129,8 +129,8 @@
     "sessions": 3
    },
    "2026-11-05": {
-    "total": 2776458324,
-    "output": 5237951,
+    "total": 2838851644,
+    "output": 5398271,
     "sessions": 9
    }
   },
