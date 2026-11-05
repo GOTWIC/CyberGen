@@ -1943,11 +1943,12 @@ platform: tokens by model and type, sessions, a per-day series, the time it ran)
 **Stats** (`stats`), what Claude Code's own `/usage` stats show: every log line, and Claude
 Code logs a response once per content block with the whole response's usage on each line, so
 about twice the billed count. **Billed** (`totals`, `models`, `days`): each request once, as
-Anthropic bills it. `build.py` adds the device files up and shows the stats count with no cost
-by default, the billed count with its API cost behind a "Billing" button, each device and its
-last update behind a "By device" toggle. A device file or ledger row from before the stats count
-counts once per request there until that device's next run fills in its line counts (said in
-the panel). Each machine writes only its own file.
+Anthropic bills it. `build.py` adds the device files up and shows both, no cost: "Claude stats
+tokens" and "Billable tokens" at the top, the chart a column a day in the stats count, both
+counts per model and type behind "By model" and per device (with sessions, days and last update)
+behind "By device". A device file or ledger row from before the stats count counts once per
+request in it until that device's next run fills in its line counts (said in the panel). Each
+machine writes only its own file.
 **After every PR is closed (merged or not), on every machine:** the session that closed it
 (or merged it) runs `python site/usage.py` on its own machine (`.venv/bin/python` on the Mac,
 `.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` and its ledger folder to main

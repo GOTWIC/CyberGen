@@ -22,12 +22,12 @@ its working folder, so they count with it.
 Two counts of the same responses:
 - **Billed** (`totals`, `models`, `days`): each API response counted once (message id and
   request id, as ccusage does and Anthropic's cost-tracking guide asks), which is what
-  Anthropic bills and what the dashboard's Billing view prices.
+  Anthropic bills: the dashboard's "Billable tokens".
 - **Stats** (`stats`: `totals`, `models`, `days`, `complete`): what Claude Code's own
   usage statistics (`/usage` -> stats) show. Claude Code writes a response into its log
   once per content block (thinking, text, each tool call), every line with the whole
-  response's usage, and its stats add up every line, about twice the billed count. The
-  dashboard shows this count by default, so it reads like Claude Code's own page.
+  response's usage, and its stats add up every line, about twice the billed count: the
+  dashboard's "Claude stats tokens", which its chart shows.
 
 The ledger, site/usage/ledger/<device>/<YYYY-MM>.csv, keeps every response ever
 recorded, so a log Claude Code deletes later still counts and a session still running
