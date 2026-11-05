@@ -42,7 +42,9 @@ Runs after M3, on the city with its buildings, so every line sees what it passes
    elevated walkways from platforms to buildings with a floor at platform level.
 6. **Structures:** deck, guideway or tube per leg, columns or pylons at the mode's spacing
    (in road medians, at the curbs of streets without one, never in lanes, sidewalk clear paths,
-   buildings or water), station platforms, canopies.
+   buildings or water), station platforms, canopies. A sky tube's supports are plain pylons
+   (#94; `mast`: M19's cable-stayed masts), its rings evenly spaced along the whole line, a
+   multiple of its lit ring frequency, each lit or not by its index (#97, `tube_rings`).
 
 Coordinates are on the 0.01 m grid; the raster search, the fillets and every decision use exact
 predicates, sorted tree hits and plain arithmetic (dmath angles), like the road builder.
@@ -1591,6 +1593,8 @@ class Line:
     #                                              it can neither pass nor go round
     no_hosts: frozenset = frozenset()            # M19: towers other lines take out (never
     #                                              its hosts, `_reroute_hosts`)
+    supports: str = "pylon"                      # sky tubes (#94): "pylon" or "mast"
+    lit_every: int = 1                           # sky tubes (#97): every how many rings lit
 
 
 def _densify(pts, step: float = 10.0) -> list[tuple]:
@@ -3446,6 +3450,7 @@ GROUND_TOP_M = 1.0       # a track whose underside is this low runs on the groun
 # (the open sea has none: a pier may stand anywhere in it)
 CHANNEL_M = {"river": 40.0, "delta_branch": 40.0, "sea_channel": 120.0, "separation": 12.0,
              "canal": 8.0, "creek": 8.0, "inlet": 30.0, "basin": 30.0, "marina": 30.0}
+RING_M = 10.0            # #97: a sky tube's rings about this far apart along its line
 MAST_RATIO = 0.12        # a sky tube's mast rises this share of its longer span over the tube
 MAST_MIN_M = 20.0
 STAY_SHARE = 0.4         # its stays reach this share of each span along the tube
@@ -3474,6 +3479,26 @@ def _runs(idx: list) -> list[tuple[int, int]]:
     return out
 
 
+def _closed(ln: Line) -> bool:
+    """A loop whose track closes on itself (its last point its first)."""
+    return ln.loop and len(ln.pts) > 2 and ln.pts[0] == ln.pts[-1]
+
+
+def tube_rings(L: float, closed: bool, every: int) -> list[tuple[float, bool]]:
+    """#97: a sky tube's rings along its whole line (plan length L), [(s, lit)] in order: n
+    of them evenly spaced near RING_M apart, n a multiple of `every`; a loop's from its seam
+    (ring 0 at s = 0, so the pattern runs on round it), an open line's half a spacing in from
+    each end. Ring k is lit when k is a multiple of `every`, so the lit rings are `every`
+    spacings apart all along the line, across the pieces it is cut into."""
+    every = max(1, int(every))
+    if L <= 0.0:
+        return []
+    n = every * max(1, int(math.floor(L / (RING_M * every) + 0.5)))
+    d = L / n
+    off = 0.0 if closed else 0.5
+    return [((k + off) * d, k % every == 0) for k in range(n)]
+
+
 class _Track:
     """A line's track by arc length: points, heights and the normal at any s."""
 
@@ -3482,7 +3507,7 @@ class _Track:
         self.pts, self.zs = ln.pts, ln.zs
         self.cum = _cum(ln.pts)
         self.L = self.cum[-1]
-        self.closed = ln.loop and len(ln.pts) > 2 and ln.pts[0] == ln.pts[-1]
+        self.closed = _closed(ln)
         self.line = LineString(ln.pts)
 
     def _i(self, s: float) -> tuple[int, float]:
@@ -4087,7 +4112,9 @@ class Builder:
     # -- line structures --------------------------------------------------------------------
 
     def line_structures(self, ln: Line) -> None:
-        """The deck or tube of a line, in 400 m pieces along its top line."""
+        """The deck or tube of a line, in 400 m pieces along its top line. A sky tube's
+        pieces carry their stretch of the line's rings (#97, `tube_rings`): `attrs.rings`,
+        [distance along the piece's own line, lit] of each ring in [s, e) of the line."""
         mode = ln.mode
         if mode == "metro":
             return
@@ -4096,6 +4123,8 @@ class Builder:
         piece = 400.0
         k, s = 0, 0.0
         kind = "tube" if mode == "sky_tube" else "deck"
+        rings = tube_rings(cum[-1], _closed(ln), ln.lit_every) if kind == "tube" else []
+        r = 0
         while s < cum[-1] - 0.01:
             e = min(cum[-1], s + piece)
             i0 = max(i for i in range(len(cum)) if cum[i] <= s + 1e-9)
@@ -4103,12 +4132,19 @@ class Builder:
             k += 1
             # the structure's top line (rail level, or the top of a tube)
             line = [(pts[i][0], pts[i][1], zs[i] + above(mode)) for i in range(i0, i1 + 1)]
+            attrs = {"line_id": ln.id, "mode": mode, "width_m": WIDTH_M[mode],
+                     "deck_m": DECK_M[mode], "color": ln.color}
+            if kind == "tube":
+                own = []
+                last = e >= cum[-1] - 0.01
+                while r < len(rings) and (rings[r][0] < e - 1e-9 or last):
+                    own.append([q(rings[r][0] - cum[i0]), rings[r][1]])
+                    r += 1
+                attrs["rings"] = own
             if len(line) >= 2:
                 self.struct(f"{ln.id}.{'tb' if kind == 'tube' else 'dk'}{k:03d}", kind,
                             min(z for _, _, z in line) - DECK_M[mode],
-                            max(z for _, _, z in line), line=line,
-                            attrs={"line_id": ln.id, "mode": mode, "width_m": WIDTH_M[mode],
-                                   "deck_m": DECK_M[mode], "color": ln.color})
+                            max(z for _, _, z in line), line=line, attrs=attrs)
             s = e
 
     # -- supports (M19) ---------------------------------------------------------------------
@@ -4190,7 +4226,7 @@ class Builder:
                     spans.append([a_, b_, "gap"])
             elif G_ > TRUSS_OVER * span:
                 spans.append([a_, b_, "truss"])
-        if mode == "sky_tube":
+        if mode == "sky_tube" and ln.supports == "mast":
             self._masts(ln, T_, sorted(placed), carriers)
         return len(placed), sorted(spans)
 
@@ -4311,8 +4347,8 @@ class Builder:
         self.struct(f"{ln.id}.col{n:04d}", "pylon" if ln.mode in ("sky_tube", "maglev")
                     else "column", 0.0, top, footprint=sq,
                     attrs={"line_id": ln.id, "mode": ln.mode,
-                           "form": "mast" if ln.mode == "sky_tube" and form == "column"
-                           else form, "s_m": q(s)})
+                           "form": "mast" if ln.mode == "sky_tube" and form == "column" and
+                           ln.supports == "mast" else form, "s_m": q(s)})
 
     def _frame(self, ln: Line, T_, keep: "Keep", s: float, top: float) -> bool:
         """A portal frame across the line at s (a column each side, the nearest free spot
@@ -4373,9 +4409,9 @@ class Builder:
         return False
 
     def _masts(self, ln: Line, T_, placed: list, carriers: list) -> None:
-        """M19: a sky tube's pylons are cable-stayed masts: a mast MAST_RATIO of its longer
-        span over the tube's top, stays fanned to STAY_SHARE of each span (never past a
-        carrier)."""
+        """M19: a sky tube's pylons as cable-stayed masts (`supports` "mast"; by default,
+        #94, plain pylons): a mast MAST_RATIO of its longer span over the tube's top, stays
+        fanned to STAY_SHARE of each span (never past a carrier)."""
         recs = [r for r in self.structures if r["attrs"].get("line_id") == ln.id and
                 r["attrs"].get("form") == "mast"]
         if not recs:
@@ -4421,6 +4457,19 @@ class Out:
     lines: list
     notes: list
     info: dict
+
+
+def _tube_attrs(ln: Line) -> dict:
+    """#94, #97: a sky tube line's support style and its rings (count, how many lit, every
+    how many, spacing along the line); nothing for the other modes."""
+    if ln.mode != "sky_tube" or len(ln.pts) < 2:
+        return {}
+    L = _cum(ln.pts)[-1]                  # (as `line_structures` measures it)
+    rings = tube_rings(L, _closed(ln), ln.lit_every)
+    d = L / len(rings) if rings else 0.0
+    return {"support_style": ln.supports,
+            "rings": {"count": len(rings), "lit": sum(1 for _, lit in rings if lit),
+                      "every": ln.lit_every, "spacing_m": round(d, 4)}}
 
 
 def _colors(spec) -> list[str]:
@@ -4570,6 +4619,8 @@ def _build(spec, m, fixed: dict) -> Out:
         alt = tuple(tl.altitude_m) if tl.altitude_m else pre.default_altitude_m
         ln = Line(f"tl{i + 1:02d}", tl.name, tl.mode, colors[i], tl.loop, alt,
                   base_z(tl.mode, alt), bool(tl.through_towers))
+        if tl.mode == "sky_tube":
+            ln.supports, ln.lit_every = spec.transit.sky_tube_style(tl)
         for name in tl.route:
             st = resolve_stop(c, name, tl.mode)
             if st is None:
@@ -4691,7 +4742,7 @@ def _build(spec, m, fixed: dict) -> Out:
                       "removed_buildings": sorted(set(ln.removed)),
                       "portals": sorted(ln.portals), "conflicts": sorted(set(ln.conflicts)),
                       "through_towers": ln.through, "supports": supports[ln.id],
-                      "spans": spans[ln.id]}})
+                      "spans": spans[ln.id], **_tube_attrs(ln)}})
     # ground walkways split at the station feet, then the new walkways
     walks = _split(walks, B.gi, B.glines, B.splits)
     k = wk_max(walks)

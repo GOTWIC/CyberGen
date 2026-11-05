@@ -77,6 +77,7 @@ HighwayPattern = Literal["ring", "ring_plus_spine", "spine", "grid", "radial", "
 BridgeKind = Literal["road", "rail", "road_rail", "pedestrian"]
 TransitCrossing = Literal["own_bridge", "shared_deck", "auto"]
 TunnelWater = Literal["never", "auto", "prefer"]
+SkyTubeSupports = Literal["pylon", "mast"]
 
 MEGASITE_KINDS: tuple[str, ...] = MegasiteKind.__args__  # type: ignore[attr-defined]
 DIRECTIONS: tuple[str, ...] = Direction.__args__  # type: ignore[attr-defined]
@@ -419,6 +420,14 @@ class TransitLine(_Model):
         None, description="[min, max] track altitude; default by mode, checked against mode limits.")
     through_towers: bool = Field(False, description="sky_tube only: passes through tower portals.")
     color: Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")] | None = None
+    supports: SkyTubeSupports | None = Field(
+        None, description="sky_tube only: 'pylon' (plain pylons under the tube) or 'mast' "
+                          "(cable-stayed masts over the tube's pylons); default "
+                          "transit.sky_tube.supports.")
+    lit_rings_every: Annotated[int, Field(ge=1)] | None = Field(
+        None, description="sky_tube only: every how many of the tube's rings (about 10 m "
+                          "apart) carry a lit LED band: 1 every ring, 2 every second, ...; "
+                          "default transit.sky_tube.lit_rings_every.")
 
     @property
     def loop(self) -> bool:
@@ -426,8 +435,9 @@ class TransitLine(_Model):
 
     @model_validator(mode="after")
     def _mode_rules(self) -> TransitLine:
-        if self.through_towers and self.mode != "sky_tube":
-            raise ValueError(f"through_towers only applies to sky_tube lines, not {self.mode}")
+        for key in ("through_towers", "supports", "lit_rings_every"):
+            if getattr(self, key) not in (None, False) and self.mode != "sky_tube":
+                raise ValueError(f"{key} only applies to sky_tube lines, not {self.mode}")
         if self.altitude_m is not None:
             lo, hi = self.altitude_m
             mlo, mhi = presets.TRANSIT_MODES[self.mode].altitude_m
@@ -443,11 +453,35 @@ class TransitLine(_Model):
         return self
 
 
+class SkyTube(_Model):
+    """How the city's sky tubes look (#94, #97): defaults for every sky_tube line, which
+    each line may set for itself."""
+    supports: SkyTubeSupports | None = Field(
+        None, description="'pylon' (default): a plain pylon under the tube at every support; "
+                          "'mast': a cable-stayed mast over each pylon, its stays fanned to "
+                          "the tube along the spans.")
+    lit_rings_every: Annotated[int, Field(ge=1)] | None = Field(
+        None, description="Every how many of a tube's rings (evenly spaced, about 10 m apart, "
+                          "a multiple of this many along each line) carry a lit LED band in "
+                          "the line's color: 1 (default) every ring, 2 every second, 3 every "
+                          "third, ...")
+
+
 class Transit(_Model):
     hubs: list[str] | None = Field(
         None, description="Interchange names (districts, places or megasites). Default: transit "
                           "hub districts and transit_nexus sites.")
     lines: list[TransitLine] = Field(default_factory=list)
+    sky_tube: SkyTube | None = Field(
+        None, description="Defaults for the sky_tube lines: their supports and lit rings.")
+
+    def sky_tube_style(self, line: TransitLine) -> tuple[str, int]:
+        """(supports, lit_rings_every) of a sky tube line: its own, else the city's
+        `sky_tube`, else the mode's (presets.SKY_TUBE_SUPPORTS, SKY_TUBE_LIT_RINGS_EVERY)."""
+        city = self.sky_tube or SkyTube()
+        sup = line.supports or city.supports or presets.SKY_TUBE_SUPPORTS
+        every = line.lit_rings_every or city.lit_rings_every or             presets.SKY_TUBE_LIT_RINGS_EVERY
+        return sup, int(every)
 
 
 # ---------------------------------------------------------------------------

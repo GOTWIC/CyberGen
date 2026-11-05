@@ -158,7 +158,7 @@ class ModePreset:
     max_grade: float | None
     min_curve_radius_m: float | None
     # M19: (span, longest span) between supports; the sky tube's span is the middle of 360 to
-    # 480 m, its longest the cable-stayed masts' 600 m
+    # 480 m, its longest 600 m (the spans of M19's cable-stayed masts, kept for the pylons)
     support_spacing_m: tuple[float, float] | None
     station_spacing_m: tuple[float, float]
     palette: tuple[str, ...] = field(default=())
@@ -177,6 +177,11 @@ TRANSIT_MODES: dict[str, ModePreset] = {
     "sky_tube": ModePreset((40, 150), (70, 120), 0.08, 300, (420, 600), (800, 1600),
                            ("#22e5ff", "#8ff3ff", "#0aa6bd")),
 }
+
+# Sky tubes' look (#94, #97; spec `transit.sky_tube` and each line's own): plain pylons under
+# the tube ('mast': M19's cable-stayed masts), every ring lit
+SKY_TUBE_SUPPORTS = "pylon"
+SKY_TUBE_LIT_RINGS_EVERY = 1
 
 # ---------------------------------------------------------------------------
 # Water (sections 4.2, 5.4)

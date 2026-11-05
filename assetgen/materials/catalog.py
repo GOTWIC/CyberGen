@@ -292,6 +292,8 @@ def set_for(slot: str, era: str | None, part: str = "buildings") -> tuple[str, s
     """(master, library set) of a slot (for an era-varied slot, in that era); AG4's
     `connections` (skybridges) read the building table."""
     if part == "streets":
+        if slot.startswith("led."):
+            return "neon", None                    # (#97: a sky tube's lit ring bands)
         return STREET.get(slot, ("concrete", "concrete_smooth"))
     if part == "water":
         if slot.startswith("water."):
