@@ -1705,8 +1705,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   vehicle carriageway, a junction or a crosswalk (parked vehicles, a signal at its
   crosswalk's end excepted) or through a barrier. AG8 draws the first variant of a prop's
   family that keeps clear of them, else leaves the prop out (`props/gather._Fit`), and M6's
-  quay railings and median barriers keep off junctions, crosswalks and (railings) other
-  roads' carriageways at their height (`props._clear_of_roads`).
+  quay railings and median barriers stand at most 5 cm onto a junction a vehicle road meets
+  and keep 1 m off a crosswalk, railings also off any road's carriageway but a pedestrian
+  street's (footbridge decks too), at their height (`props._clear_of_roads`).
 - **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
   piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays;
   `transit_beam` 2: haunched cap beams, tapered cantilever arms); road columns in the water on

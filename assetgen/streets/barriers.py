@@ -41,6 +41,7 @@ import math
 from dataclasses import dataclass
 
 import shapely
+from shapely.ops import nearest_points, substring
 
 from citygen import dmath as M
 from citygen import geom as G
@@ -60,6 +61,7 @@ MEDIAN_ANGLE_DEG = 120.0
 BAND_STEP_M = 2.0       # stations of the band a run's spans are found on
 NEAR_M = 30.0           # what a junction's barriers look out for round it
 Z_NEAR_M = 2.5          # ... at its height (roads and junctions over or under it are not)
+SIDE_REACH_M = 20.0     # a road's barriers look this far beside it for other roads
 
 JERSEY = [(-0.3, 0.0), (-0.3, 0.08), (-0.15, 0.33), (-0.075, 0.81), (0.075, 0.81),
           (0.15, 0.33), (0.3, 0.08), (0.3, 0.0)]
@@ -406,19 +408,28 @@ def _near_z(z: float, zr: tuple[float, float]) -> bool:
     return zr[0] - Z_NEAR_M <= z <= zr[1] + Z_NEAR_M
 
 
+_ROADZ: dict = {}
+
+
 def _road_z(s, x: float, y: float) -> float:
     """A road's surface (absolute: its grade line plus its z profile) nearest a point."""
     from .path import Profile
-    try:
-        path = Path(s.centerline)
-    except ValueError:
-        return 0.0
+    key = (s.id, len(s.centerline), s.centerline[0], s.centerline[-1])
+    got = _ROADZ.get(key)
+    if got is None:
+        try:
+            path = Path(s.centerline)
+        except ValueError:
+            return 0.0
+        zp = Profile.of([z.model_dump() for z in s.z_profile]) if s.z_profile else None
+        g = getattr(s, "ground", None)
+        gp = Profile.of([q.model_dump() for q in g]) if g else None
+        if len(_ROADZ) > 4096:
+            _ROADZ.clear()
+        got = _ROADZ[key] = (path, zp, gp)
+    path, zp, gp = got
     at, _ = path.project(x, y)
-    z = Profile.of([z.model_dump() for z in s.z_profile])(at) if s.z_profile else 0.0
-    g = getattr(s, "ground", None)
-    if g:
-        z += Profile.of([q.model_dump() for q in g])(at)
-    return z
+    return (zp(at) if zp is not None else 0.0) + (gp(at) if gp is not None else 0.0)
 
 
 def near_of_junction(cx, j) -> dict:
@@ -878,7 +889,7 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
                 continue
             if ln.length < 0.01:
                 continue
-            others.append(ln.buffer(half + CLEAR_M, cap_style="flat"))
+            others.append(ln.buffer(half + CLEAR_M, cap_style="flat", join_style="mitre"))
     xws = []
     for c in sorted(cx.cross_on.get(s.id, ()), key=lambda c: c.id):
         a, b = c.line[0], c.line[-1]
@@ -903,6 +914,21 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
             ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
             if ln.length >= 0.5:
                 xws.append(ln.buffer(c.width_m / 2.0 + XWALK_CLEAR_M, cap_style="flat"))
+    # other roads alongside it, not those at its ends: their carriageway where it is at its
+    # height (a ramp's low end beside a street it does not meet; a road it passes over or
+    # under is not)
+    stree, sall, slines = _index(cx)[:3]
+    at_ends = {o.id for n in (s.start, s.end) for o in cx.seg_at_node.get(n, ())}
+    me = shapely.LineString([(p[0], p[1]) for p in s.centerline])
+    wide = me.buffer(s.width_m / 2.0 + 1.0 + SIDE_REACH_M)
+    for k in sorted(stree.query(wide, predicate="intersects").tolist()):
+        o = sall[k]
+        if o.id in at_ends or len(o.centerline) < 2:
+            continue
+        cls = street_class(o)
+        half = o.width_m / 2.0 if cls in PEDESTRIAN else \
+            o.width_m / 2.0 - o.cross_section.sidewalk_m[0]
+        others += _level_with(s, o, slines[k], wide, half + CLEAR_M)
     out = []
     for run in runs:
         key_s = leg_key(s.id, True)
@@ -960,6 +986,38 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None) -> list[dict]:
             if frames:
                 r_["frames"] = frames
             out.append(r_)
+    return out
+
+
+def _level_with(s, o, line, reach, half: float, step: float = 2.0) -> list:
+    """Another road's strip (`half` either side of its centerline) along the stretches of
+    it within `reach` where its surface is within `Z_NEAR_M` of road s's nearest it."""
+    me = shapely.LineString([(c[0], c[1]) for c in s.centerline])
+    part = shapely.intersection(line, reach)
+    out = []
+    for g in shapely.get_parts(part):
+        if g.geom_type != "LineString" or g.is_empty or g.length < 0.5:
+            continue
+        n = max(1, int(math.ceil(g.length / step)))
+        ds = [g.length * k / n for k in range(n + 1)]
+        ok = []
+        for d in ds:
+            p = g.interpolate(d)
+            q = nearest_points(me, p)[0]
+            ok.append(abs(_road_z(s, q.x, q.y) - _road_z(o, p.x, p.y)) <= Z_NEAR_M)
+        # (runs of samples at its height, each a step longer at both ends, along the road's
+        # own line, mitred as AG7 draws it)
+        start = None
+        for k, good in enumerate(ok + [False]):
+            if good and start is None:
+                start = k
+            elif not good and start is not None:
+                a_ = max(ds[start] - g.length / n, 0.0)
+                b_ = min(ds[k - 1] + g.length / n, g.length)
+                if b_ - a_ > 0.1:
+                    sub = substring(g, a_, b_)
+                    out.append(sub.buffer(half, cap_style="flat", join_style="mitre"))
+                start = None
     return out
 
 

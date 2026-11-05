@@ -2018,9 +2018,10 @@ the junctions made it hard to tell whether the road geometry itself was still wr
   it. Footbridge railings end short of their junctions too.
 - **Props**: AG8 draws the first variant of a prop's family whose footprint (2 m up) keeps
   within 5 cm of every vehicle carriageway, junction and crosswalk at its height, else
-  leaves the prop out (`props/gather._Fit`); M6's quay railings and median barriers keep off
-  junctions, crosswalks and (railings) other roads' carriageways (`citygen/props.py`
-  `_clear_of_roads`).
+  leaves the prop out (`props/gather._Fit`); M6's quay railings and median barriers stand at
+  most 5 cm onto a junction a vehicle road meets and keep 1 m off a crosswalk, railings also
+  off any road's carriageway but a pedestrian street's (`citygen/props.py`
+  `_clear_of_roads`); a railing at a promenade's edge stays.
 - **Check** (`assetgen/fit/barriers.py`, part of AG14's `asset_clash`): any barrier on
   another road's carriageway, on a junction's surface (a junction's own barriers in one of
   its lanes), on a crosswalk, or through another piece's barrier; any standing prop on a
