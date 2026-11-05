@@ -1800,6 +1800,45 @@
       "title": "Signage",
       "type": "object"
     },
+    "SkyTube": {
+      "additionalProperties": false,
+      "description": "How the city's sky tubes look (#94, #97): defaults for every sky_tube line, which\neach line may set for itself.",
+      "properties": {
+        "supports": {
+          "anyOf": [
+            {
+              "enum": [
+                "pylon",
+                "mast"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "'pylon' (default): a plain pylon under the tube at every support; 'mast': a cable-stayed mast over each pylon, its stays fanned to the tube along the spans.",
+          "title": "Supports"
+        },
+        "lit_rings_every": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Every how many of a tube's rings (evenly spaced, about 10 m apart, a multiple of this many along each line) carry a lit LED band in the line's color: 1 (default) every ring, 2 every second, 3 every third, ...",
+          "title": "Lit Rings Every"
+        }
+      },
+      "title": "SkyTube",
+      "type": "object"
+    },
     "Source": {
       "additionalProperties": false,
       "properties": {
@@ -1944,6 +1983,18 @@
           },
           "title": "Lines",
           "type": "array"
+        },
+        "sky_tube": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkyTube"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Defaults for the sky_tube lines: their supports and lit rings."
         }
       },
       "title": "Transit",
@@ -2017,6 +2068,37 @@
           ],
           "default": null,
           "title": "Color"
+        },
+        "supports": {
+          "anyOf": [
+            {
+              "enum": [
+                "pylon",
+                "mast"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "sky_tube only: 'pylon' (plain pylons under the tube) or 'mast' (cable-stayed masts over the tube's pylons); default transit.sky_tube.supports.",
+          "title": "Supports"
+        },
+        "lit_rings_every": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "sky_tube only: every how many of the tube's rings (about 10 m apart) carry a lit LED band: 1 every ring, 2 every second, ...; default transit.sky_tube.lit_rings_every.",
+          "title": "Lit Rings Every"
         }
       },
       "required": [

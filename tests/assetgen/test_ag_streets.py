@@ -141,6 +141,33 @@ def test_sky_tube_lods_non_nanite():
         assert not any(K.check(m.slots).values())
 
 
+def test_sky_tube_rings_and_led_bands():
+    """#97: the ribs stand at the model's rings (the piece's stretch of the line's), an LED
+    band in the line's color at full brightness on each lit one; a model without rings
+    keeps one every 10 m from 5 m in, none lit."""
+    from assetgen.streets.materials import led_slot, slot_spec
+    from assetgen.streets.transit import LED_W, make_sky_tube
+    st = {"id": "tl.x.tb.e0n0", "kind": "tube", "z0_m": 89.0, "z1_m": 96.0,
+          "line": [[0.0, 0.0, 96.0], [40.0, 0.0, 96.0], [80.0, 10.0, 96.0]],
+          "attrs": {"line_id": "tl.x", "mode": "sky_tube", "width_m": 7.0, "deck_m": 7.0,
+                    "color": "#0aa6bd",
+                    "rings": [[3.0, True], [12.5, False], [22.0, False], [31.5, True]]}}
+    out = make_sky_tube({"st": st, "origin": [40.0, 5.0], "ground_c": None})
+    led = led_slot("#0aa6bd")
+    assert led == "led.0de0ff" and slot_spec(led) == ("emissive", "#0de0ff", 0.3, 0.0)
+    assert not any(K.check(out.mesh.slots).values())
+    # 12 beams of 4 quads a ring: 4 ribs, the first and the last lit
+    ribs, bands = out.mesh.slots["steel.painted"], out.mesh.slots[led]
+    assert len(ribs.idx) == 4 * 12 * 4 * 2 * 3 and len(bands.idx) == 2 * 12 * 4 * 2 * 3
+    xs = {round(p[0] / 1000.0 + 40.0, 2) for p in bands.pos}
+    assert min(xs) >= 3.0 - LED_W and max(xs) <= 31.5 + LED_W
+    assert not any(3.0 + LED_W < x < 31.5 - LED_W for x in xs)
+    old = dict(st, attrs={k: v for k, v in st["attrs"].items() if k != "rings"})
+    out2 = make_sky_tube({"st": old, "origin": [40.0, 5.0], "ground_c": None})
+    assert led not in out2.mesh.slots
+    assert len(out2.mesh.slots["steel.painted"].idx) == 8 * 12 * 4 * 2 * 3   # 5, 15, ..., 75
+
+
 def test_m13_ground_lifts_roads_and_structures():
     """M13's contract: a road's surface is its grade line plus its z profile; anything else
     stands on the terrain grid at its point (bilinear)."""

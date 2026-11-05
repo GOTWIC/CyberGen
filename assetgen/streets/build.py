@@ -150,7 +150,7 @@ def make_tile(tile: str, pieces: list[dict]) -> dict:
     g = Gltf(generator=f"assetgen {__version__} streets")
     mats = MT.gltf_materials(g, slots)
     for name, i in mats.items():
-        if MT.SLOTS[name][0] == "translucent":
+        if MT.slot_spec(name)[0] == "translucent":
             g.materials[i]["alphaMode"] = "BLEND"
             g.materials[i]["doubleSided"] = True
             g.materials[i]["pbrMetallicRoughness"]["baseColorFactor"][3] = 0.35

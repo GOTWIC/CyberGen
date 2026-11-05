@@ -4,11 +4,14 @@
   two slab tracks and their rails, monorail as a concrete beam with a running strip, maglev
   as a T guideway with its guide rails.
 - **Sky tubes**: a glass tube (translucent, non-Nanite) with a LOD chain of 24, 12 and 6
-  sides, and, Nanite, the floor inside and steel ribs every 10 m.
+  sides, and, Nanite, the floor inside and steel ribs at the model's rings (#97: evenly
+  spaced along the whole line, `attrs.rings`), each lit ring with an LED band on the rib's
+  outer face in the line's color (`led.<hex>`, the neon master).
 - **Columns and pylons** of a line: the model's footprint as the shaft and a cap across the
-  guideway (a cradle under a sky tube). AG14 draws M19's supports: portal frames (legs
-  under a haunched cap beam), cantilever bents (a tapering arm), piers on their footings,
-  and a sky tube's cable-stayed masts (crosshead, legs, tie, stays).
+  guideway (a cradle under a sky tube: #94's plain pylons). AG14 draws M19's supports:
+  portal frames (legs under a haunched cap beam), cantilever bents (a tapering arm), piers
+  on their footings, and, with `supports` "mast", a sky tube's cable-stayed masts
+  (crosshead, legs, tie, stays).
 - **Stations' structures** (stations themselves are buildings, the building line's):
   platforms, skywalks (glazed, roofed), canopies on posts, covered walkways, elevator cores,
   underground concourses.
@@ -25,6 +28,7 @@ from citygen import dmath as M
 from .. import canon as C
 from .ctx import Ctx, bbox_center, dump
 from .kit import Mesh, ccw
+from .materials import led_slot
 from .path import Path, Profile, dist, unit
 from .pieces import Out, Piece, maker
 from .structures import PIER_FOOT, Line3, box_prof, footing
@@ -183,7 +187,36 @@ def _ring(R: float, zc: float, n: int):
             for k in range(n)]
 
 
-@maker("sky_tube", 1)
+RIB_N = 12              # a rib's sides
+RIB_R = 0.12            # a rib's middle this far outside the tube
+RIB_W, RIB_H = 0.3, 0.22    # its section: along the line, across it
+LED_W, LED_H = 0.2, 0.05    # #97: a lit ring's LED band on the rib's outer face
+
+
+def tube_rings(a: dict, L: float) -> list:
+    """A tube piece's rings: [s along its line, lit] from the model (#97: the line's rings
+    in this piece's stretch); a model from before it, every 10 m from 5 m in, none lit."""
+    rings = a.get("rings")
+    if rings is None:
+        out, s = [], 5.0
+        while s < L:
+            out.append([s, False])
+            s += 10.0
+        return out
+    return [[min(max(float(s), 0.0), L), bool(lit)] for s, lit in rings]
+
+
+def _rib(mesh: Mesh, slot: str, x, y, nx, ny, z, r: float, w: float, h: float):
+    """A ring of RIB_N beams round the tube's axis (x, y, z) at radius r in the section
+    plane (normal (nx, ny)), each w along the line and h across it."""
+    n = RIB_N
+    pts = [(x + nx * r * M.cos(2 * M.PI * k / n), y + ny * r * M.cos(2 * M.PI * k / n),
+            z + r * M.sin(2 * M.PI * k / n)) for k in range(n)]
+    for k in range(n):
+        mesh.beam(slot, pts[k], pts[(k + 1) % n], w, h)
+
+
+@maker("sky_tube", 2)
 def make_sky_tube(inp: dict) -> Out:
     st = inp["st"]
     a = st.get("attrs", {})
@@ -198,17 +231,16 @@ def make_sky_tube(inp: dict) -> Out:
     fr = ln.frames(0.0, ln.L, 6.0)
     mesh.sweep("concrete.deck", fr, box_prof(-2.2, 2.2, zc - R * 0.72 - 0.3,
                                              zc - R * 0.72), )
-    s = 5.0
-    while s < ln.L:
+    led = led_slot(a.get("color"))
+    # the LED band's beams on the rib's beams' outer faces: their chords moved out by half
+    # the rib and half the band (a vertex radius 1 / cos(pi / n) times that)
+    r_led = R + RIB_R + (RIB_H + LED_H) / 2.0 / M.cos(M.PI / RIB_N)
+    for s, lit in tube_rings(a, ln.L):
         x, y, nx, ny, _ = ln.path.frame(s)
         z = ln.z(s) + zc
-        n = 12
-        pts = [(x + nx * (R + 0.12) * M.cos(2 * M.PI * k / n),
-                y + ny * (R + 0.12) * M.cos(2 * M.PI * k / n),
-                z + (R + 0.12) * M.sin(2 * M.PI * k / n)) for k in range(n)]
-        for k in range(n):
-            mesh.beam("steel.painted", pts[k], pts[(k + 1) % n], 0.3, 0.22)
-        s += 10.0
+        _rib(mesh, "steel.painted", x, y, nx, ny, z, R + RIB_R, RIB_W, RIB_H)
+        if lit:
+            _rib(mesh, led, x, y, nx, ny, z, r_led, LED_W, LED_H)
     lods = []
     for n, step in TUBE_LODS:
         g = Mesh(inp["origin"])

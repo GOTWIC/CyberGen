@@ -1003,7 +1003,8 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   towers, ground stretches, a nexus platform, a sky station's elevator core) at the mode's
   span (`support_spacing_m` is now (span, longest): rail 30/45, monorail 25/40, maglev 50/80,
   sky tube 420/600), each moved at most `SPAN_MOVE` (15%) to free ground: a column under
-  the line (`form` column, `mast` for sky tubes), a pier in the water within `pier_reach` of
+  the line (`form` column; a sky tube's a plain pylon, `mast` with the sky tube fixes'
+  `supports: mast`), a pier in the water within `pier_reach` of
   the shore (the navigable channel down the middle, `CHANNEL_M` wide at most; the open sea
   has none), else a portal frame (`leg<n>a/b` columns either side within `FRAME_REACH_M`, a
   `beam` structure `cap<n>` under the deck, `attrs.frame`) or a cantilever bent (one column
@@ -1013,8 +1014,8 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   run (`_support_room`, `_Dry`) takes out the low removable buildings that alone keep a
   support off a gap. A gap still longer is a cable-stayed main span over a navigable channel
   or a raised road (`MAIN_SPAN_M`: rail 400, monorail 250, maglev 300), else a note; the
-  line's `attrs.spans` lists its truss, cable and gap spans; sky tube masts carry
-  `mast_top_m` and their `stays`.
+  line's `attrs.spans` lists its truss, cable and gap spans; sky tube masts (`mast` only)
+  carry `mast_top_m` and their `stays`.
 - **Checks:** `transit_supports` (lone columns within 0.5 m of the line, frames' beams under
   it at the deck's underside, none on a road embankment, piers clear of the channel, spans
   within the longest, an end overhanging half of it at most), `transit_clearance` (3D along
@@ -1024,7 +1025,21 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
 - **Blockout and stage 2:** beams in `transit_support`, masts (two legs, stays) and pier
   footings (`_mast`, `_pier_cap`); AG14 draws them all (`transit_column`, `transit_beam`).
   New structure kind `beam` in the model.
-Sample builds: `docs/progress/M19/`.
+- **Sky tube fixes** (issues #94 and #97, after run-through 2): spec
+  `transit.sky_tube.supports` and `lit_rings_every` (defaults for every sky tube line; a
+  line's own `supports` and `lit_rings_every` win; `TransitLine` validates them on sky tubes
+  only, `Transit.sky_tube_style`; mode defaults `presets.SKY_TUBE_SUPPORTS` "pylon",
+  `SKY_TUBE_LIT_RINGS_EVERY` 1; left out of the filled spec, so `spec_sha256` and every city
+  without sky tubes keep their bytes). With `pylon` every sky tube support is a plain pylon
+  at M19's positions (`_column`'s form `column`, `_masts` not run), drawn as before M19 (a
+  shaft and a cradle across the tube, blockout and AG7); `mast` gives M19's masts back
+  record for record. A tube's rings (`tube_rings`: n evenly spaced along the whole line
+  near `RING_M` 10 m, n a multiple of the frequency, a loop's from its seam, an open line's
+  half a spacing in; ring k lit when k is a multiple of it) are cut into the 400 m tube
+  pieces (`attrs.rings`: [distance along the piece's own line, lit] for its stretch
+  [s, e) of the line); the line's `attrs.support_style` and `attrs.rings` (count, lit,
+  every, spacing_m). AG7 draws the ribs there with an LED band on each lit one.
+Sample builds: `docs/progress/M19/`; the sky tube fixes: `docs/progress/sky_tubes/`.
 
 M21 (cyberpunk massing) is in place, in `citygen/forms.py` (with `massing.Plate`, and the
 neighbor rule in `buildout.select_forms`):
@@ -1695,7 +1710,9 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   their surface, a junction step over 0.15 m, any clash; reported only: props and plants
   (at the model's heights, M20's `prop_support`) and smaller steps.
 - **Streets** (AG7): M19's supports (`transit_column` 2: frame legs flat under their beam,
-  piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays;
+  piers on footings down to M16's bed, sky tube masts with crosshead, legs, tie and stays
+  where the model has them (`supports: mast`; plain pylons with their cradle by default,
+  issue #94);
   `transit_beam` 2: haunched cap beams, tapered cantilever arms); road columns in the water on
   footings (`column` 2, `structures.footing`); a bridge whose segment ids are empty finds the
   raised segments that carry it (`structures._carriers`) and draws no deck of its own;
@@ -1718,7 +1735,14 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   `envelope` `over_road`); canopies stop short of an inside corner. `GEN_VERSION` ag14.3.
 - **Exporter**: no code change (`docs/unreal_export.md`, "From AG14"); the packs' normals
   are kept on both import paths (`test_stage2_packs_keep_their_normals`).
-Results: `docs/progress/AG14/`.
+- **Sky tube rings** (issue #97, after run-through 2): `sky_tube` 2 draws the ribs at the
+  model's rings (`attrs.rings`, the line's evenly spaced rings in the piece's stretch; a
+  model without them every 10 m from 5 m in), each lit ring with an LED band on the rib's
+  outer face (`RIB_N` 12 beams, `LED_W` 0.2 m along the line) in the line's color at full
+  brightness (`streets.materials.led_slot`: slot `led.<hex>`, made on demand by
+  `slot_spec`, master `emissive`; AG6's catalog puts `led.` on `neon`, brighter by
+  `MPC_CityGen`'s `Night` in Unreal and in the Blender night previews).
+Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`.
 
 AG15 (cyberpunk facades and night, from the first run-through) is in place (tests
 `tests/assetgen/test_ag_night.py`):
