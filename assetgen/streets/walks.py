@@ -580,14 +580,15 @@ def _overlaps(cx: Ctx, j) -> list:
         a0, a1 = round(G.area1(me), 2), round(G.area1(polys[k]), 2)
         rec = {"id": o.id, "ring": [[C.m2(q[0]), C.m2(q[1])]
                                     for q in G.from_model_poly(o.polygon).exterior.coords[:-1]]}
+        # (its corners: the lanes this one paves keep off them, and where it owns the
+        # overlap this one's pads too)
+        rec["area"] = [[[C.m2(q[0]), C.m2(q[1])] for q in rg]
+                       for rg in BR.junction_area(cx, o)[1:]]
+        rec["by"] = sorted(BR._area_by(cx, o))
         if level and ar > OVERLAP_M2 and (a1 > a0 or (a1 == a0 and o.id < j.id)):
             sf = _surface(_junction_base(cx, o))
             rec["owner"] = True
-            rec["by"] = sorted(BR._area_by(cx, o))
             rec["drawn"] = [[x_, y_, C.m(sf["zfun"](x_, y_))] for x_, y_ in sf["cring"]]
-            # (and its corners: this one's pads keep off what it paves)
-            rec["area"] = [[[C.m2(q[0]), C.m2(q[1])] for q in rg]
-                           for rg in BR.junction_area(cx, o)[1:]]
         out.append(rec)
     return out
 
@@ -933,7 +934,8 @@ def make_junction(inp: dict) -> Out:
             gs = [G.qpoly(shapely.make_valid(shapely.Polygon(r, hs))) for r, hs in drawn]
             gs += [G.qpoly(shapely.make_valid(shapely.Polygon(o))) for o in others]
             gs += [G.qpoly(shapely.make_valid(shapely.Polygon(rg)))
-                   for o in inp.get("overlaps", ()) for rg in o.get("area", ())]
+                   for o in inp.get("overlaps", ()) if o.get("owner")
+                   for rg in o.get("area", ())]
             gs += [G.qpoly(shapely.make_valid(shapely.Polygon(w["ring"])))
                    for w in inp.get("walks", ())]
             block = G.union(gs) if gs else None
@@ -1192,8 +1194,8 @@ def _carriageway(inp: dict, sf: dict, sectors: list):
             sec = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(s["sector"])))
                            for s in sectors if "sector" in s])
             add = G.diff(G.inter(cor, sec), base)
-            # (not over its legs' sidewalks, another road or junction, or the corners of
-            # one that owns the overlap: they are drawn there; nor near a building)
+            # (not over its legs' sidewalks, another road or junction or its corners:
+            # they are drawn there; nor near a building)
             keep = [w["ring"] for w in inp.get("walks", ())] + \
                 [r["ring"] for r in inp.get("roads", ())] + \
                 [o["ring"] for o in inp.get("overlaps", ())] + \
@@ -1536,15 +1538,30 @@ def _near(p, line, closed: bool, tol: float = 0.03) -> bool:
 
 
 def _chains(edges: list) -> list[list]:
-    """Edges (p, q) joined end to start into polylines, in their order."""
+    """Edges (p, q) joined end to start into polylines, each edge once: a line from each edge
+    no other ends at (in the edges' order), then the closed loops. (#82: in any order: a
+    corner drawn in parts gives its edges part by part, and two lines meeting end to end
+    fold their end faces into each other.)"""
+    starts: dict = {}
+    for k, (p, _) in enumerate(edges):
+        starts.setdefault(p, []).append(k)
+    ends = {q for _, q in edges}
+    used = [False] * len(edges)
+
+    def run(k):
+        line = [edges[k][0]]
+        while k is not None:
+            used[k] = True
+            line.append(edges[k][1])
+            k = next((c for c in starts.get(edges[k][1], ()) if not used[c]), None)
+        return line
     out: list[list] = []
-    for p, q in edges:
-        if out and out[-1][-1] == p:
-            out[-1].append(q)
-        else:
-            out.append([p, q])
-    if len(out) > 1 and out[-1][-1] == out[0][0]:
-        out[0] = out.pop() + out[0][1:]
+    for k, (p, _) in enumerate(edges):
+        if not used[k] and p not in ends:
+            out.append(run(k))
+    for k in range(len(edges)):
+        if not used[k]:
+            out.append(run(k))
     return out
 
 
