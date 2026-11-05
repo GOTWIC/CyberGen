@@ -123,6 +123,9 @@ def gather(cx: Ctx, s) -> Piece:
         inputs["embankments"] = [[st.attrs["s0_m"], st.attrs["s1_m"]] for st in emb]
     # (#95: where each barrier runs and how it ends, `barriers.road_runs`)
     from . import barriers as BR
+    clip = _median_clip(cx, s)
+    if clip:
+        inputs["median_clip"] = clip
     if BR.runs_of(inputs["seg"], inputs["cls"]):
         by: set = set()
         inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)  # (none: no room for them)
@@ -130,6 +133,37 @@ def gather(cx: Ctx, s) -> Piece:
         inputs["barriers_by"] = sorted(by - {s.id})
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
                  cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
+
+
+def _median_clip(cx: Ctx, s) -> list:
+    """#82: the outlines of the junctions (at its height) a road's median would reach into
+    (its own where its cut is skewed, another that overlaps them): it is drawn only off
+    them."""
+    m = s.cross_section.median_m or 0.0
+    if m < 1.0 or street_class(s) not in ("avenue", "street", "service"):
+        return []
+    import shapely
+
+    from citygen import geom as G
+
+    from . import barriers as BR
+    from .walks import CLIP_M, CLIP_M2
+    band = shapely.LineString([(p[0], p[1]) for p in s.centerline]).buffer(
+        m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
+    _, _, _, jtree, jns, polys, _ = BR._index(cx)
+    out = []
+    for k in sorted(jtree.query(band).tolist()):
+        j = jns[k]
+        inner = polys[k].buffer(-CLIP_M, join_style="mitre")
+        x = shapely.intersection(band, inner) if not inner.is_empty else None
+        if x is None or x.is_empty or x.area <= CLIP_M2:
+            continue
+        c = x.representative_point()
+        if not BR._near_z(BR._road_z(s, c.x, c.y), BR._junction_z(cx, j)):
+            continue
+        out.append({"id": j.id, "ring": [[C.m2(p[0]), C.m2(p[1])] for p in
+                                         G.from_model_poly(j.polygon).exterior.coords[:-1]]})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -535,6 +569,20 @@ def _median(rd: Road, mesh: Mesh, inp: dict, stops: dict):
     if sb - sa < 3.0:
         return
     hm = m / 2.0
+    if inp.get("median_clip"):
+        # (#82: only where it is off the junctions it would cross: a road between two
+        # junctions that overlap runs through one of them)
+        from .walks import _clear_spans
+        for a, b in _clear_spans(rd.path, -hm, hm, [c["ring"] for c in inp["median_clip"]]):
+            a, b = max(a, sa), min(b, sb)
+            if b - a >= 3.0:
+                _median_run(rd, mesh, inp, a, b, hm)
+        return
+    _median_run(rd, mesh, inp, sa, sb, hm)
+
+
+def _median_run(rd: Road, mesh: Mesh, inp: dict, sa: float, sb: float, hm: float):
+    m = 2.0 * hm
     curb = MT.curb(inp["style"]["archetype"])
     top = "lawn" if m >= 2.0 and inp["style"]["era"] not in ("industrial", "aerospace") \
         else "concrete"

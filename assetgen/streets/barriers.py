@@ -548,10 +548,17 @@ def junction_area(cx, j) -> list[list]:
     cache = cx.__dict__.setdefault("_junction_areas", {})
     if j.id in cache:
         return cache[j.id]
-    from .walks import _sectors
+    from .walks import _bulb, _sectors
     ring, legs = _legs(cx, j)
     out = [list(ring)]
     node = cx.node.get(j.node_id)
+    if j.shape == "cul_de_sac" and len(legs) == 1:
+        # (#82: a turning bulb's sidewalk round it, `walks._bulb`)
+        lg = legs[0]
+        side = 0.0 if _cls(lg["seg"]) in PEDESTRIAN else lg["seg"].cross_section.sidewalk_m[0]
+        for sc in _bulb(ring, {"exit": lg["exit"], "side": side, "path": lg["path"],
+                               "row": lg["seg"].width_m / 2.0}):
+            out.append(sc["sector"])
     if node is not None and len(legs) >= 2 and j.shape != "cul_de_sac":
         P = (node.position[0], node.position[1])
         wl = []

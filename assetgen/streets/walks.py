@@ -41,9 +41,9 @@ CURB_STONE_M = 0.18
 PIT_M = 1.2
 CUT_ALONG_M = 1.0       # AG14: how far along a leg an outline vertex still lies on its cut
                         # (a road piece ends on its cut edge within `roads.CUT_TOL_M`)
-CLIP_M = 0.05           # #82: a sidewalk's slab stops this far into a junction's carriageway
+CLIP_M = 0.02           # #82: a sidewalk's slab stops this far into a junction's carriageway
 RAISED_M = 0.5          # #89: a junction this far over its ground is raised (`barriers.RAISED_M`)
-CLIP_M2 = 0.05          # ... where it reaches over this much of it
+CLIP_M2 = 0.0005        # ... where it reaches over this much of it
 
 
 def _road_inputs(cx: Ctx, s) -> dict:
@@ -212,54 +212,67 @@ def _carriage_poly(cx: Ctx, s):
     return poly if poly.is_valid else shapely.make_valid(poly)
 
 
-def _clear_spans(P: Path, t0: float, t1: float, rings: list, step: float = 0.25) -> list:
-    """#82: the stretches [(a, b)] of a sidewalk (its line P, its slab across t0..t1) whose
-    cross-section stays clear of the rings (more than `CLIP_M` inside one is not), each end
-    found to the centimeter; stretches under 0.3 m are left out."""
-    from .barriers import _inside, _seg_dist
-    boxes = []
-    for r in rings:
-        xs = [p[0] for p in r]
-        ys = [p[1] for p in r]
-        boxes.append((r, min(xs), min(ys), max(xs), max(ys)))
-    ts = [t0 + (t1 - t0) * f for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
-
-    def clear(s: float) -> bool:
-        x, y, nx, ny, _ = P.frame(s)
-        for t in ts:
-            px, py = x + nx * t, y + ny * t
-            for r, x0, y0, x1, y1 in boxes:
-                if x0 <= px <= x1 and y0 <= py <= y1 and _inside(r, px, py) and \
-                        min(_seg_dist(px, py, r[i - 1], r[i]) for i in range(len(r))) > CLIP_M:
-                    return False
-        return True
-
-    n = max(1, int(math.ceil(P.L / step)))
-    ss = [P.L * k / n for k in range(n + 1)]
-    ok = [clear(s) for s in ss]
-
-    def edge(a: float, b: float) -> float:
-        # (a clear, b not: the last clear point to a centimeter)
-        while abs(b - a) > 0.01:
-            m = (a + b) / 2.0
-            if clear(m):
-                a = m
-            else:
-                b = m
-        return a
+def _clear_spans(P: Path, t0: float, t1: float, rings: list) -> list:
+    """#82: the stretches [(a, b)] of a strip along a line P (a sidewalk's slab, a median:
+    offsets t0..t1 either side of it) that are off the rings: the strip (P grown by its
+    half width, mitred as it is drawn) less the rings shrunk by `CLIP_M`, each piece of the
+    overlap blocking the stretch of P its points project onto (a centimeter more each
+    way); stretches under 0.3 m are left out."""
+    from citygen import geom as G
+    half = max(abs(t0), abs(t1))
+    with G.canonical():
+        band = shapely.LineString(P.p).buffer(half, cap_style="flat", join_style="mitre",
+                                              mitre_limit=2.0)
+        inner = [shapely.make_valid(shapely.Polygon(r)).buffer(-CLIP_M, join_style="mitre")
+                 for r in rings if len(r) >= 3]
+        inner = [g for g in inner if not g.is_empty]
+        x = shapely.intersection(band, shapely.union_all(inner)) if inner else None
+    blocked = []
+    if x is not None and not x.is_empty:
+        for part in shapely.get_parts(x):
+            if part.is_empty or part.area <= 1e-6:
+                continue
+            ss = [P.project(q[0], q[1])[0] for q in shapely.get_coordinates(part)]
+            blocked.append((max(0.0, min(ss) - 0.01), min(P.L, max(ss) + 0.01)))
+    blocked.sort()
+    spans, at = [], 0.0
+    for lo, hi in blocked:
+        if lo - at >= 0.3:
+            spans.append((C.m2(at), C.m2(lo)))
+        at = max(at, hi)
+    if P.L - at >= 0.3:
+        spans.append((C.m2(at), P.L))
+    if x is None or x.is_empty:
+        return spans
+    # (each stretch as drawn, mitred at the line's vertices, where the grown line is not:
+    # shortened 10 cm at a time at the end nearer what it still covers)
+    u = shapely.union_all(inner)
     out = []
-    start = None
-    for k, f in enumerate(ok):
-        if f and start is None:
-            start = 0.0 if k == 0 else edge(ss[k], ss[k - 1])
-        if not f and start is not None:
-            end = edge(ss[k - 1], ss[k])
-            if end - start >= 0.3:
-                out.append((C.m2(start), C.m2(end)))
-            start = None
-    if start is not None and P.L - start >= 0.3:
-        out.append((C.m2(start), P.L))
+    for a, b in spans:
+        while b - a >= 0.3:
+            ov = shapely.intersection(_drawn(P, a, b, t0, t1), u)
+            if ov.is_empty or ov.area <= 1e-4:
+                out.append((a, b))
+                break
+            c = ov.representative_point()
+            sc, _ = P.project(c.x, c.y)
+            if sc - a <= b - sc:
+                a = C.m2(a + 0.1)
+            else:
+                b = C.m2(b - 0.1)
     return out
+
+
+def _drawn(P: Path, a: float, b: float, t0: float, t1: float):
+    """A strip along P from a to b between offsets t0 and t1, as its rows draw it (square at
+    its ends, mitred at the line's vertices), shapely."""
+    left, right = [], []
+    for sv, vi in P.stations(a, b, 1e9):
+        x, y, nx, ny, k = P.frame(sv, vi)
+        left.append((x + nx * k * t1, y + ny * k * t1))
+        right.append((x + nx * k * t0, y + ny * k * t0))
+    g = shapely.Polygon(left + right[::-1])
+    return g if g.is_valid else shapely.make_valid(g)
 
 
 def _drop_f(s: float, drops) -> float:
@@ -527,15 +540,23 @@ def _overlaps(cx: Ctx, j) -> list:
         return []
     me = polys[k0]
     zj = BR._junction_z(cx, j)
+    area = BR.junction_area(cx, j)
+    sec = None
+    if len(area) >= 2:
+        with G.canonical():
+            sec = G.diff(G.union([G.qpoly(shapely.make_valid(shapely.Polygon(r)))
+                                  for r in area[1:]]), me)
     out = []
-    for k in sorted(jtree.query(me).tolist()):
+    for k in sorted(jtree.query(me if sec is None else G.union([me, sec])).tolist()):
         o = jns[k]
         if o.id == j.id:
             continue
         with G.canonical():
             x = G.inter(me, polys[k])
             ar = G.area1(x) if not x.is_empty else 0.0
-        if ar <= OVERLAP_M2:
+            # (or one that reaches into its corners: its pads keep off it)
+            reach = 0.0 if sec is None else G.area1(G.inter(sec, polys[k]))
+        if ar <= OVERLAP_M2 and reach <= CLIP_M2:
             continue
         zo = BR._junction_z(cx, o)
         if zo[0] - BR.Z_NEAR_M > zj[1] or zo[1] + BR.Z_NEAR_M < zj[0]:
@@ -543,7 +564,7 @@ def _overlaps(cx: Ctx, j) -> list:
         a0, a1 = round(G.area1(me), 2), round(G.area1(polys[k]), 2)
         rec = {"id": o.id, "ring": [[C.m2(q[0]), C.m2(q[1])]
                                     for q in G.from_model_poly(o.polygon).exterior.coords[:-1]]}
-        if a1 > a0 or (a1 == a0 and o.id < j.id):
+        if ar > OVERLAP_M2 and (a1 > a0 or (a1 == a0 and o.id < j.id)):
             sf = _surface(_junction_base(cx, o))
             rec["owner"] = True
             rec["by"] = sorted(BR._area_by(cx, o))
@@ -567,10 +588,9 @@ def _roads_near(cx: Ctx, j) -> list:
         return []
     with G.canonical():
         sec = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(r))) for r in area[1:]])
-    legs = {s.id for s in cx.seg_at_node.get(j.node_id, ())}
     zj = BR._junction_z(cx, j)
     out = []
-    for o, poly in _carriageways(cx, sec, legs):
+    for o, poly in _carriageways(cx, sec, set()):
         x = shapely.intersection(sec, poly)
         if x.is_empty or x.area <= CLIP_M2:
             continue
@@ -586,9 +606,10 @@ def _roads_near(cx: Ctx, j) -> list:
 
 
 def _walks_in(cx: Ctx, j) -> list:
-    """#82: the sidewalks of a junction's legs whose slab reaches into its corners (by over
-    `CLIP_M2`: a leg's own sidewalk beside a ramp it runs on inside the junction), as
-    {"id", "ring"}: its pads keep off them (the sidewalk piece paves them)."""
+    """#82: the sidewalks whose slab reaches into a junction's corners at its height (by over
+    `CLIP_M2`: a leg's own sidewalk beside a ramp it runs on inside the junction, or a
+    neighboring road's beside a corner), as {"id", "ring"}: its pads and paved lanes keep
+    off them (the sidewalk piece paves them)."""
     from citygen import geom as G
 
     from . import barriers as BR
@@ -598,20 +619,19 @@ def _walks_in(cx: Ctx, j) -> list:
     with G.canonical():
         sec = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(r))) for r in area[1:]])
         sec = G.diff(sec, G.from_model_poly(j.polygon))
-    legs = {s.id for s in cx.seg_at_node.get(j.node_id, ())}
-    by = cx.__dict__.get("_sidewalks_of")
-    if by is None:
-        by = {}
-        for w in cx.m.sidewalks:
-            by.setdefault(w.segment_id, []).append(w)
-        cx._sidewalks_of = by
+    if sec.is_empty:
+        return []
+    tree, walks, bands = _walk_index(cx)
+    zj = BR._junction_z(cx, j)
     out = []
-    for w in sorted((w for sid in legs for w in by.get(sid, ())), key=lambda w: w.id):
-        if len(w.line) < 2:
+    for k in sorted(tree.query(sec).tolist()):
+        w, band = walks[k], bands[k]
+        x = shapely.intersection(band, sec)
+        if x.is_empty or x.area <= CLIP_M2:
             continue
-        band = shapely.LineString([(p[0], p[1]) for p in w.line]).buffer(
-            w.width_m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
-        if band.is_empty or shapely.intersection(band, sec).area <= CLIP_M2:
+        c = x.representative_point()
+        s = cx.seg.get(w.segment_id)
+        if s is None or not BR._near_z(BR._road_z(s, c.x, c.y), zj):
             continue
         with G.canonical():
             parts = sorted(G.parts(G.qpoly(band)), key=lambda q: (G.qbounds(q), G.area1(q)))
@@ -619,6 +639,21 @@ def _walks_in(cx: Ctx, j) -> list:
             out.append({"id": w.id, "ring": [[C.m2(q[0]), C.m2(q[1])]
                                              for q in part.exterior.coords[:-1]]})
     return out
+
+
+def _walk_index(cx: Ctx):
+    """Every sidewalk's slab (its line grown by half its width), indexed; cached."""
+    got = cx.__dict__.get("_walk_index")
+    if got is None:
+        walks, bands = [], []
+        for w in sorted(cx.m.sidewalks, key=lambda w: w.id):
+            if len(w.line) < 2:
+                continue
+            walks.append(w)
+            bands.append(shapely.LineString([(p[0], p[1]) for p in w.line]).buffer(
+                w.width_m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0))
+        got = cx._walk_index = (shapely.STRtree(bands), walks, bands)
+    return got
 
 
 def _lanes_off(cx: Ctx, j) -> list:
@@ -1112,6 +1147,15 @@ def _carriageway(inp: dict, sf: dict, sectors: list):
             sec = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(s["sector"])))
                            for s in sectors if "sector" in s])
             add = G.diff(G.inter(cor, sec), base)
+            # (not over its legs' sidewalks, another road or junction, or the corners of
+            # one that owns the overlap: they are drawn there)
+            keep = [w["ring"] for w in inp.get("walks", ())] + \
+                [r["ring"] for r in inp.get("roads", ())] + \
+                [o["ring"] for o in inp.get("overlaps", ())] + \
+                [rg for o in inp.get("overlaps", ()) for rg in o.get("area", ())]
+            if keep and not add.is_empty:
+                add = G.diff(add, G.union([G.qpoly(shapely.make_valid(shapely.Polygon(q)))
+                                           for q in keep]))
             parts = [p for p in G.parts(add) if G.area1(p) >= CAR_MIN_M2]
             add = G.union(parts) if parts else None
         if add is None and not own:
