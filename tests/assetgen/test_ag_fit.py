@@ -163,8 +163,8 @@ def test_curved_walls_are_smooth_and_glazed():
 
 def test_small_city_passes_the_fit_checks():
     """The small test city: no clash; every roof item, dunnage frame and column resting on
-    something. (One road's side runs along a junction it overlaps past its cut, M17's
-    shared pavement at a fork: a step the check finds, the model's open item.)"""
+    something; no step where a road meets its junction (#89: a road's side that runs along
+    a junction past its cut, M17's shared pavement at a fork, left one)."""
     import json
     rep = small_assets_report()
     assert rep["fit"]["clashes"] == 0, rep["fit"]
@@ -173,5 +173,5 @@ def test_small_city_passes_the_fit_checks():
     assert c["ok"]
     bad = {k: v for k, v in g["by_kind"].items() if k.startswith(("roof.", "street."))}
     assert not bad, bad
-    assert g["seams"]["legs"] > 1000 and g["seams"]["steps"] <= 1
+    assert g["seams"]["legs"] > 1000 and g["seams"]["steps"] == 0, g["seams"]["worst"]
     assert g["ok"] and rep["fit"]["ok"] and rep["ok"]
