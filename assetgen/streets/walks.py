@@ -505,6 +505,9 @@ def gather_junction(cx: Ctx, j) -> Piece:
     ln = _lanes_off(cx, j)
     if ln:
         inputs["lanes"] = ln
+        ms = _masses_near(cx, j)
+        if ms:
+            inputs["masses"] = ms
     rd = _roads_near(cx, j)
     if rd:
         inputs["roads"] = rd
@@ -668,6 +671,34 @@ def _walk_index(cx: Ctx):
                 w.width_m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0))
         got = cx._walk_index = (shapely.STRtree(bands), walks, bands)
     return got
+
+
+MASS_CLEAR_M = 2.0      # #82: paved lanes keep this off a building (its balconies, canopies)
+
+
+def _masses_near(cx: Ctx, j) -> list:
+    """#82: the building masses in a junction's corners (`barriers.junction_area`, grown by
+    `MASS_CLEAR_M`) from its height up to `HEAD_M` over it, as {"id", "ring"}: the lanes it
+    paves keep `MASS_CLEAR_M` off them (a lane M2 laid past the curb ran into a building or
+    under its balconies)."""
+    from citygen import geom as G
+
+    from . import barriers as BR
+    area = BR.junction_area(cx, j)
+    with G.canonical():
+        reach = G.union([G.qpoly(shapely.make_valid(shapely.Polygon(r))) for r in area])
+    tree, polys, rows = BR._masses(cx)
+    if tree is None:
+        return []
+    zj = BR._junction_z(cx, j)
+    out = []
+    for k in sorted(tree.query(reach.buffer(MASS_CLEAR_M)).tolist()):
+        bid, _, z0, z1 = rows[k]
+        if z0 > zj[1] + HEAD_M or z1 < zj[0]:
+            continue
+        out.append({"id": bid, "ring": [[C.m2(q[0]), C.m2(q[1])]
+                                        for q in polys[k].exterior.coords[:-1]]})
+    return out
 
 
 def _lanes_off(cx: Ctx, j) -> list:
@@ -1162,14 +1193,17 @@ def _carriageway(inp: dict, sf: dict, sectors: list):
                            for s in sectors if "sector" in s])
             add = G.diff(G.inter(cor, sec), base)
             # (not over its legs' sidewalks, another road or junction, or the corners of
-            # one that owns the overlap: they are drawn there)
+            # one that owns the overlap: they are drawn there; nor near a building)
             keep = [w["ring"] for w in inp.get("walks", ())] + \
                 [r["ring"] for r in inp.get("roads", ())] + \
                 [o["ring"] for o in inp.get("overlaps", ())] + \
                 [rg for o in inp.get("overlaps", ()) for rg in o.get("area", ())]
-            if keep and not add.is_empty:
-                add = G.diff(add, G.union([G.qpoly(shapely.make_valid(shapely.Polygon(q)))
-                                           for q in keep]))
+            gs = [G.qpoly(shapely.make_valid(shapely.Polygon(q))) for q in keep]
+            gs += [G.qpoly(shapely.make_valid(shapely.Polygon(m_["ring"])).buffer(
+                MASS_CLEAR_M, join_style="mitre", mitre_limit=2.0))
+                for m_ in inp.get("masses", ())]
+            if gs and not add.is_empty:
+                add = G.diff(add, G.union(gs))
             parts = [p for p in G.parts(add) if G.area1(p) >= CAR_MIN_M2]
             add = G.union(parts) if parts else None
         if add is None and not own:

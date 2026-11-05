@@ -197,21 +197,41 @@ class _Fit:
 
 
 RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
-# #89: a plant's foot on a terrain city (its lowest vertices, as AG14 finds them): a share of
-# its crown for those without a trunk, else a trunk's half width
-FOOT_R = {"shrub": 0.9, "overgrowth": 0.9}
-TRUNK_R_M = 0.35
-FOOT_SINK_M = 0.5       # ... at most this under the ground at its middle
+SEAT_SINK_M = 0.05      # #89: a plant's foot set this far into the ground at its middle
 
 
-def _foot_ground(gd, x: float, y: float, r: float) -> float:
-    """#89: the ground a plant on a slope stands on: the lowest of the ground at its middle
-    and at eight points round its foot (radius r), at most `FOOT_SINK_M` under the middle's
-    (AG14 rests it when three of five points of its foot are on a surface within 2 cm)."""
-    z0 = gd.at(x, y)
-    zs = [z0] + [gd.at(x + r * M.cos(M.PI * k / 4.0), y + r * M.sin(M.PI * k / 4.0))
-                 for k in range(8)]
-    return C.m(max(min(zs), z0 - FOOT_SINK_M))
+def _foot(feet: dict, sp: str, k: int):
+    """A plant variant's foot as AG14 takes it (`fit.build.feet`): the middle of the plan box
+    of its lowest vertices and their height, in its frame (m); made once per variant."""
+    key = (sp, k)
+    if key not in feet:
+        from .trees import make
+        m = make(sp, k)
+        pts = [q for sl in m.slots.values() for q in sl.pos]
+        if not pts:
+            feet[key] = None
+        else:
+            z0 = min(q[2] for q in pts)
+            low = [q for q in pts if q[2] <= z0 + 10]
+            xs, ys = [q[0] for q in low], [q[1] for q in low]
+            feet[key] = ((min(xs) + max(xs)) / 2000.0, (min(ys) + max(ys)) / 2000.0,
+                         z0 / 1000.0)
+    return feet[key]
+
+
+def _seat(gd, feet: dict, sp: str, k: int, x: float, y: float, yaw: float, sc) -> float:
+    """#89: the height of a plant on a terrain city's ground (its instance's z): its foot
+    (`_foot`, turned and scaled as placed) `SEAT_SINK_M` into the ground under the foot's
+    middle. A shrub's foot is its crown's underside, off its pivot, over a hillside green's
+    slope: at the ground under its pivot it floated a few centimeters over the slope."""
+    f = _foot(feet, sp, k)
+    if f is None:
+        return C.m(gd.at(x, y))
+    u, v, z0 = f
+    a = M.radians(yaw)
+    c, s = M.cos(a), M.sin(a)
+    g = gd.at(x + c * u * sc[0] - s * v * sc[1], y + s * u * sc[0] + c * v * sc[1])
+    return C.m(g - SEAT_SINK_M - z0 * sc[2])
 
 
 def _quay_tops(model, gd) -> dict:
@@ -522,6 +542,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             brackets += 1
     # -- plants
     species_used = set()
+    feet: dict = {}
     for p in sorted(model.plants, key=lambda p: p.id):
         typ = p.type.split(".", 1)[1]
         sp = p.species if p.species in ST.PLANT_VARIANTS else ST.SPECIES_OF_TYPE.get(typ, "oak")
@@ -529,13 +550,8 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         species_used.add(sp)
         x, y, z = p.position
         bid = (p.attrs or {}).get("building")
-        if not gd.flat and z == 0.0 and bid is None and typ not in ("facade_greenery",):
-            # (#89: on a terrain city a plant on the ground stands on the lowest ground under
-            # its foot: a shrub's foot is its crown's underside, as wide as the crown, which
-            # floated over the downhill side of a hillside green; a tree's is its trunk)
-            z = _foot_ground(gd, x, y, FOOT_R.get(typ, TRUNK_R_M) * (
-                p.crown_radius_m if typ in FOOT_R else 1.0))
-        else:
+        seat = not gd.flat and z == 0.0 and bid is None and typ != "facade_greenery"
+        if not seat:
             z = z + lift(x, y, z, bid)
         t = tile_of(x, y)
         key = f"plant.{typ}.{t}"
@@ -556,9 +572,13 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             continue
         k = ST.pick(ST.PLANT_VARIANTS[sp], "ag8.plant", p.id)
         yaw = C.deg(360.0 * ST.u("ag8.yaw", p.id) - 180.0)
+        sc = (C.m(p.crown_radius_m / r0), C.m(p.crown_radius_m / r0), C.m(p.height_m / h0))
+        if seat:
+            # (#89: on a terrain city a plant on the ground stands with its foot on the
+            # slope, `_seat`)
+            z = _seat(gd, feet, sp, k, x, y, yaw, sc)
         add(key, typ, "plant", t, ST.plant_name(sp, k),
-            [C.m(x - cx), C.m(y - cy), C.m(z), yaw, C.m(p.crown_radius_m / r0),
-             C.m(p.crown_radius_m / r0), C.m(p.height_m / h0)], p.id)
+            [C.m(x - cx), C.m(y - cy), C.m(z), yaw, *sc], p.id)
     g.families = sorted([("prop", k) for k in kinds_used | {kk for kk in g.kinds
                                                              if kk in ST.PROP_VARIANTS}]) + \
         sorted(("plant", s) for s in species_used)
