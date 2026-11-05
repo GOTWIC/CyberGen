@@ -12,13 +12,13 @@ junctions".
 
 Measured with the new check (`assetgen fit`, `asset_clash`) on main's packs:
 
-| | Count | Cause |
+| | Count | Cause (by kind; one crossing can hold more than one kind) |
 |---|---|---|
-| Barriers in a junction | 141 | a raised road's parapets drawn the whole segment (`roads._deck`, 0 to L) through the junction at each end: 98 in their own junction, 7 in the next; a footbridge's railings drawn its whole road (30); a highway's median and guard walls ending open at a skewed cut (6) |
-| Barriers on a crosswalk | 75 | the same parapets across the other legs' crosswalks (58); a highway's median barrier (57) and an at-grade highway's guard walls (10) swept cut to cut through the crosswalks of its signalized junctions (a crosswalk can hold more than one) |
-| Barriers on another road's carriageway | 11 | parapets and guard walls running past a junction onto the next leg (8), a footbridge's railing onto a street (1), guard walls (2) |
-| Barriers through each other | 10 | two legs' parapets crossing where they meet a junction at an angle |
-| Props on a carriageway, junction or crosswalk | 108 | M6's quay railings, which had no keep-outs at all, across quay roads' junctions and roads ending at the water (93); AG8's variants larger than M6's placement radii (a bench 2.0 m to M6's 1.8, a dumpster 2.5 by 1.8 to 2.0 by 1.2, a bollard 0.5 to 0.2): 6 benches, 4 dumpsters, 3 bollards, a trash can, a traffic signal |
+| Barriers in a junction | 139 | a raised road's parapets drawn the whole segment (`roads._deck`, 0 to L) through the junction at each end (97 in their own junction, 7 in the next); a footbridge's railings drawn its whole road (30); a highway's guard walls and median ending open at a skewed cut (6) |
+| Barriers on a crosswalk | 75 | those parapets across the other legs' crosswalks (58); a highway's median barrier (57) and an at-grade highway's guard walls (10) swept cut to cut through the crosswalks of its signalized junctions |
+| Barriers on another road's carriageway | 11 | parapets running on past a junction onto the next leg or a road beside it (8), guard walls (2), a footbridge's railing (1) |
+| Barriers through each other | 10 | two legs' parapets crossing where they meet at a junction |
+| Props on a carriageway, junction or crosswalk | 108 | M6's quay railings, which had no keep-outs at all, across a street's junction at the quay or a road ending at the water (93); AG8's variants larger than M6's placement radii (a bench 2.0 m to M6's 1.8, a dumpster 2.5 by 1.8 to 2.0 by 1.2, a bollard 0.5 to 0.2): 6 benches, 4 dumpsters, 3 bollards, a trash can, a traffic signal |
 | Props through a barrier | 0 | |
 
 Leads from the issue: AG7's `_median` (confirmed: medians and guard walls cut to cut, open
@@ -59,11 +59,12 @@ drew them).
 | | Main | This fix |
 |---|---|---|
 | Barriers on another road's carriageway | 11 | 0 |
-| Barriers in a junction | 141 | 0 |
+| Barriers in a junction | 139 | 0 |
 | Barriers on a crosswalk | 75 | 0 |
 | Barriers through each other | 10 | 0 |
 | Props on a carriageway, junction or crosswalk | 108 | 0 |
 | Props through a barrier | 0 | 0 |
+| All | 343 | 0 |
 | Full-city tries | 2 | 2 |
 
 ## Every sample

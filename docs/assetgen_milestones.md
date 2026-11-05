@@ -1995,7 +1995,7 @@ the junctions made it hard to tell whether the road geometry itself was still wr
 
 - **What crossed what, and why** (Delta on main, measured with the new check): a raised
   road's parapets ran the whole segment (`roads._deck`, 0 to L), through the junction at
-  each end and across the other legs' parapets and crosswalks (98 parapets in their own
+  each end and across the other legs' parapets and crosswalks (97 parapets in their own
   junction, 7 in another, 58 on crosswalks); a highway's median barrier and an at-grade
   highway's guard walls ran cut to cut with open ends (`roads._median`), through the
   crosswalks of a signalized junction (57 medians, 10 guard walls) and a few metres into a
@@ -2027,7 +2027,7 @@ the junctions made it hard to tell whether the road geometry itself was still wr
   its lanes), on a crosswalk, or through another piece's barrier; any standing prop on a
   vehicle carriageway, junction or crosswalk or through a barrier. It fails on any.
 - **Numbers** (Delta Megacity, the same check on main's packs and this fix's): barriers on
-  another road 11 to 0, in a junction 141 to 0, on a crosswalk 75 to 0, through each other
+  another road 11 to 0, in a junction 139 to 0, on a crosswalk 75 to 0, through each other
   10 to 0; props on a carriageway 108 to 0 (93 quay railings, 6 benches, 4 dumpsters, 3
   bollards, a trash can, a traffic signal); the city builds on the same two full-city tries.
   Every sample: `docs/progress/barriers/README.md`.

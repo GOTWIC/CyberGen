@@ -497,8 +497,43 @@ def near_of_junction(cx, j) -> dict:
             by.add(bid)
     # (`by`: the entities all this was taken from, so a change to any of them explains a
     # change to the junction's piece: `seam`)
+    # the props standing there at its height (a trash can on a raised corner's pad)
+    props = []
+    ptree, prow = _props(cx)
+    if ptree is not None:
+        node = cx.node.get(j.node_id)
+        zn = node.position[2] if node is not None else 0.0
+        for k in sorted(ptree.query(zone).tolist()):
+            pid, x, y, z, r = prow[k]
+            if abs(z - zn) <= Z_NEAR_M:
+                props.append([C.m2(x), C.m2(y), C.m2(r)])
+                by.add(pid)
     return {"roads": roads, "junctions": rings, "xwalks": xws, "lanes": lanes,
-            "buildings": blds, "by": sorted(by)}
+            "buildings": blds, "props": props, "by": sorted(by)}
+
+
+PROP_SKIP = {"awning", "wall_light", "ac_unit", "overhead_cable", "cable", "boat", "sign",
+             "scaffolding", "gate", "parked_vehicle", "barrier", "railing"}
+
+
+def _props(cx):
+    """The model's standing props (not mounted, hung, afloat or on the carriageway), each
+    with the radius a junction's barriers keep from it (half the diagonal of its blockout
+    box, AG8's variants a little larger), indexed."""
+    got = cx.__dict__.get("_barrier_props")
+    if got is None:
+        from citygen.props import KINDS
+        rows, pts = [], []
+        for p in sorted(cx.m.props, key=lambda p: p.id):
+            kind = p.type.split(".", 1)[1]
+            if kind in PROP_SKIP or kind not in KINDS:
+                continue
+            L, W, _ = KINDS[kind][1]
+            r = max(0.6, 0.5 * math.hypot(1.4 * L * p.scale[0], 2.0 * W * p.scale[1]))
+            rows.append((p.id, p.position[0], p.position[1], p.position[2], r))
+            pts.append(shapely.Point(p.position[0], p.position[1]).buffer(r, quad_segs=4))
+        got = cx._barrier_props = (shapely.STRtree(pts) if pts else None, rows)
+    return got
 
 
 def _area_by(cx, j) -> set:
@@ -668,6 +703,7 @@ class Keepout:
             xs = [p[0] for p in rg]
             ys = [p[1] for p in rg]
             self.rings.append((rg, min(xs), min(ys), max(xs), max(ys)))
+        self.props = [(p[0], p[1], p[2]) for p in near.get("props", ())]
         self.xw = []
         for c in xwalks:
             a, b = c["line"][0], c["line"][-1]
@@ -702,6 +738,9 @@ class Keepout:
                 if _inside(rg, x, y) or any(
                         _seg_dist(x, y, rg[i - 1], rg[i]) < CLEAR_M for i in range(len(rg))):
                     return True
+        for px, py, r in self.props:
+            if (x - px) * (x - px) + (y - py) * (y - py) < r * r:
+                return True
         for a, u, L, hw in self.xw:
             dx, dy = x - a[0], y - a[1]
             along = dx * u[0] + dy * u[1]
@@ -718,18 +757,18 @@ def clip_line(pts, offsets, keep: Keepout, step: float = 0.25) -> list[list]:
         path = Path(pts)
     except ValueError:
         return []
-    n = max(1, int(math.ceil(path.L / step)))
+    # (at the stations `draw_line` draws, mitred at the line's vertices as it draws them)
+    sts = path.stations(0.0, path.L, step)
     free = []
-    for k in range(n + 1):
-        s = path.L * k / n
-        x, y, nx, ny, _ = path.frame(s)
-        free.append(not any(keep.blocked(x + nx * o, y + ny * o) for o in offsets))
+    for s, vi in sts:
+        x, y, nx, ny, k = path.frame(s, vi)
+        free.append(not any(keep.blocked(x + nx * k * o, y + ny * k * o) for o in offsets))
     out, start = [], None
-    for k, ok in enumerate(free + [False]):
+    for i, ok in enumerate(free + [False]):
         if ok and start is None:
-            start = k
+            start = i
         elif not ok and start is not None:
-            a, b = path.L * start / n, path.L * (k - 1) / n
+            a, b = sts[start][0], sts[i - 1][0]
             if b - a >= MIN_SPAN_M:
                 out.append(path.sub(a, b) if (a > 0.0 or b < path.L) else list(path.p))
             start = None
