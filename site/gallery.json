@@ -375,8 +375,8 @@
       "milestone": "AG7",
       "milestone_name": "Street elements",
       "title": "Ramps on four levels",
-      "image": "docs/progress/AG7/vesper_bay_stacks/streets_interchange.jpg",
-      "caption": "The stack interchange's ramps, parapets, columns and lane markings, around blockout buildings."
+      "image": "docs/progress/gallery_refresh/stack_interchange.jpg",
+      "caption": "The stack interchange of Vesper Bay Stacks: ramps on their tiers, columns and lane markings, among its towers."
     },
     {
       "id": "ag1-unreal",
@@ -395,8 +395,8 @@
       "milestone": "AG2",
       "milestone_name": "Facades",
       "title": "The tallest tower of every era",
-      "image": "docs/progress/AG2/towers.jpg",
-      "caption": "The tallest building of each era, each in its own facade style."
+      "image": "docs/progress/gallery_refresh/towers_by_era.jpg",
+      "caption": "The tallest building of each era across the sample cities, each in its own facade style."
     },
     {
       "id": "ag2-sheet",
@@ -405,8 +405,8 @@
       "milestone": "AG2",
       "milestone_name": "Facades",
       "title": "64 buildings drawn at random",
-      "image": "docs/progress/AG2/vesper_bay/contact_sheet.jpg",
-      "caption": "64 of Vesper Bay's buildings, picked at random."
+      "image": "docs/progress/gallery_refresh/contact_sheet_greyhook.jpg",
+      "caption": "64 of Greyhook's buildings, picked at random."
     },
     {
       "id": "ag3-fronts",
@@ -455,8 +455,8 @@
       "milestone": "AG4",
       "milestone_name": "Roofs and connections",
       "title": "A sky station inside a tower",
-      "image": "docs/progress/AG4/vesper_bay/8k/sky_station.jpg",
-      "caption": "A sky tube passing through a tower, with a station platform inside."
+      "image": "docs/progress/gallery_refresh/sky_station_night.jpg",
+      "caption": "On a sky station's platform inside a tower at night, the tube's lit rings running out of the portal."
     },
     {
       "id": "ag4-unreal",
@@ -465,8 +465,8 @@
       "milestone": "AG4",
       "milestone_name": "Roofs and connections",
       "title": "A shopping street in Unreal",
-      "image": "docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg",
-      "caption": "A shopping street in Greyhook in Unreal, all stage 2 assets."
+      "image": "docs/progress/gallery_refresh/unreal/shopping_street_day.jpg",
+      "caption": "Greyhook's Lantern Strip in Unreal, all stage 2 assets, the wheel over its roofs."
     },
     {
       "id": "ag5-landmarks",
@@ -567,6 +567,16 @@
       "title": "The whole city by night",
       "image": "docs/progress/gallery_refresh/vesper_bay_city_full_night.jpg",
       "caption": "Vesper Bay after dark, every building lit on its own schedule."
+    },
+    {
+      "id": "ag15-unreal-night",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG15",
+      "milestone_name": "Cyberpunk facades and night",
+      "title": "The shopping street by night",
+      "image": "docs/progress/gallery_refresh/unreal/shopping_street_night.jpg",
+      "caption": "The same street in Unreal after dark: neon signs, lit shopfronts, colored washes on the walls."
     },
     {
       "id": "fix-sky-tubes",
