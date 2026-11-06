@@ -89,7 +89,7 @@ def load(path: Path) -> dict:
     if not g.get("entries"):
         errors.append("no entries")
     show = g.get("showcase", {})
-    for f in ("kicker", "heading"):
+    for f in ("heading",):
         if not isinstance(show.get(f), str) or not show[f].strip():
             errors.append(f"showcase: missing {f}")
     if not show.get("items"):
@@ -326,7 +326,9 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     """The showcase's cards: one picture each, or a pair (day and night) behind a slider."""
     by_id = {e["id"]: e for e in g["entries"]}
     labels = stage_labels(g)
+    names = {s["key"]: s["name"] for s in g["stages"]}
     out = []
+    stage = None
     for it in g["showcase"]["items"]:
         refs = it.get("entries") or [it["entry"]]
         first = by_id[refs[0]]
@@ -349,6 +351,13 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
                      f'<span class="cmp-line" aria-hidden="true"></span>'
                      f'<span class="cmp-handle" role="slider" tabindex="0" aria-label="{esc(la)} and {esc(lb)}: '
                      f'drag or use the arrow keys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></span></div>')
+        if first["stage"] != stage:
+            if stage is not None:
+                out.append("\n  </ul>")
+            stage = first["stage"]
+            out.append(f"""
+  {section_head(labels[stage], names[stage], f"stage-{stage}")}
+  <ul class="showcase">""")
         out.append(f"""
     <li class="entry{' wide' if wide else ''}{' pair' if len(refs) > 1 else ''}" id="show-{esc(refs[0])}" data-stage="{esc(first['stage'])}">
       <article class="card">
@@ -360,7 +369,15 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
         </div>
       </article>
     </li>""")
+    out.append("\n  </ul>")
     return "".join(out)
+
+
+def section_head(label: str, name: str, anchor: str) -> str:
+    """A showcase section's heading: its label, its name if any, then a rule to the edge."""
+    sub = f'<span class="sec-name">{esc(name)}</span>' if name else ""
+    return f'<h2 class="sec-head" id="{esc(anchor)}"><span class="sec-label">{esc(label)}</span>{sub}</h2>'
+
 
 
 DEVICE_ORDER = ("mac", "windows", "cloud")
@@ -563,6 +580,7 @@ def render_usage(us: list[dict]) -> str:
                  f"{'its' if len(pending) == 1 else 'their'} next usage update.")
     newest = max(u["updated"] for u in us)
     return f"""
+  {section_head("Usage", "", "usage-head")}
   <section class="usage glass" id="usage" data-view="all" aria-label="Claude Code usage">
     <div class="usage-head">
       <span class="lbl"><span class="dot"></span>Claude Code usage on CyberGen</span>
@@ -633,7 +651,7 @@ def build(out: Path) -> None:
         **common,
         "TITLE": esc(f"{g['title']}: {show['heading'].lower()}"),
         "PAGE_URL": esc(g["site"]),
-        "KICKER": esc(show["kicker"]),
+        "NAME": esc(g["title"]),
         "HEADING": esc(show["heading"]),
         "LEDE": esc(g["lede"]),
         "STAGE_KEYS": render_stage_keys(g),
