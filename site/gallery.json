@@ -466,8 +466,8 @@
       "milestone": "AG4",
       "milestone_name": "Roofs and connections",
       "title": "A shopping street in Unreal",
-      "image": "docs/progress/AG4/unreal/greyhook/8k/shopfront_street.jpg",
-      "caption": "A shopping street in Greyhook in Unreal, all stage 2 assets."
+      "image": "docs/progress/gallery_refresh/unreal/shopping_street_day.jpg",
+      "caption": "Greyhook's Lantern Strip in Unreal, all stage 2 assets, the wheel over its roofs."
     },
     {
       "id": "ag5-landmarks",
@@ -568,6 +568,16 @@
       "title": "The whole city by night",
       "image": "docs/progress/gallery_refresh/vesper_bay_city_full_night.jpg",
       "caption": "Vesper Bay after dark, every building lit on its own schedule."
+    },
+    {
+      "id": "ag15-unreal-night",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG15",
+      "milestone_name": "Cyberpunk facades and night",
+      "title": "The shopping street by night",
+      "image": "docs/progress/gallery_refresh/unreal/shopping_street_night.jpg",
+      "caption": "The same street in Unreal after dark: neon signs, lit shopfronts, colored washes on the walls."
     },
     {
       "id": "fix-sky-tubes",

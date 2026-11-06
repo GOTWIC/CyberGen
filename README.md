@@ -212,30 +212,30 @@ Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 
 ### Cities
 
-Every building modelled and textured, in one of nineteen facade styles per district, owner
+Every building modelled and textured, in one of twenty-six facade styles per district, owner
 and building, with its roof, roof equipment and skybridges, on textured streets, bridges and
 transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K; open one for full
 size).
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/AG10/cities/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/nexus_city/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/vesper_bay_city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/nexus_city/city_full.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/AG10/cities/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/archipelago_free_port/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/cities/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/archipelago_free_port/city_full.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/AG10/cities/greyhook/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/vesper_bay_pinned/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/cities/greyhook/city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/vesper_bay_pinned/city_full.jpg" width="420"> |
 
 | Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
 |---|---|
-| <img src="docs/progress/AG10/cities/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/cragmouth/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/cities/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/cragmouth/city_full.jpg" width="420"> |
 
 | Vesper Bay Decks (a deck over Highcrest) | |
 |---|---|
-| <img src="docs/progress/AG10/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
+| <img src="docs/progress/gallery_refresh/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
 
 ### Up close
 
