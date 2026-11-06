@@ -338,7 +338,8 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
     open to its walkway: a ground walkway of its building's level within `REACH_M`, reached
     by stepping `STEP_M` out of the doorway (else further out, `STEPS_M`, past a corner of
     its own beside it) and walking straight to the walkway's nearest point, crossing no other
-    building of its level (its own only within `OWN_M` of the door, under an arcade). An
+    building of its level (its own only within `OWN_M` of the door, under an arcade; a path
+    that grazes a wall by `GRAZE_M` crosses neither). An
     entrance keeps the model's walkway when that one is open to it; otherwise, and for
     every unit's door, the door takes the nearest open one (the smallest id among
     equals), written into its record (`walkway_id`, `walkway_from`: model or front) for
@@ -379,7 +380,11 @@ def access(model, records: dict, briefs: dict | None = None) -> dict:
             if flev[i] != level.get(bid, 0):
                 continue                       # (M14: under or on a deck, not in the way)
             if fids[i] != bid:
-                return False
+                # (#88: nor one that only grazes a neighbor's wall, as Nexus City's site door
+                # whose walkway ends on the corner its party neighbor touches)
+                if seg.intersects(inner(fids[i])):
+                    return False
+                continue
             # its own building only near the door (an arcade, a recess; AG5: a colonnade's
             # depth more behind one); a path that only grazes its own wall (along it, round
             # its corner: AG10, a door on a wall at the map's edge) is not walled off

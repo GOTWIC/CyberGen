@@ -1138,6 +1138,47 @@ class ShellBuilder:
             r += SLOPE_SLACK
         return r
 
+    def _corner_road(self, fa: Facade, s: int, reach: int) -> bool:
+        """#88: whether something reaching `reach` off this facade at s, within that of one
+        of its brief edge's ends, would reach round the corner in front of the next brief
+        edge of its ring where that one faces a road with no sidewalk (its lane nearer than
+        `LANE_NEAR` at that end, or a region on the carriageway): Saltreach's angled fins at
+        a podium's corner, over a 2 m edge whose lane was 0.47 m out."""
+        if fa.j is None:
+            return False
+        edges = self.br["edges"]
+        rec = edges[fa.j]
+        L = int(round(rec["length_m"] * 1000))
+        sb = fa.soff + s
+        if reach < sb < L - reach:
+            return False
+        idx = self.__dict__.setdefault("_ring_idx", {})
+        if not idx:
+            for j, e in enumerate(edges):
+                idx.setdefault((e["mass"], e.get("ring", 0)), {})[e.get("i", j)] = j
+        ring = idx.get((rec["mass"], rec.get("ring", 0)), {})
+        n = len(ring)
+        i = rec.get("i")
+        if i is None or n < 3:
+            return False
+        for side, k in (("start", (i - 1) % n), ("end", (i + 1) % n)):
+            if (side == "start" and sb > reach) or (side == "end" and sb < L - reach):
+                continue
+            e = edges[ring[k]] if k in ring else None
+            if e is None:
+                continue
+            lane = e.get("lane_m")
+            if lane is not None and lane * 1000.0 < LANE_NEAR:
+                sp = e.get("lane_s") or [0.0, e["length_m"]]
+                r = reach / 1000.0
+                if (side == "start" and sp[1] >= e["length_m"] - r) or \
+                        (side == "end" and sp[0] <= r):
+                    return True
+            if any(on_carriageway(g) and g["z"][0] * 1000.0 < PT.ROAD_CLEAR
+                   for g in e.get("regions") or ()):
+                return True
+        return False
+
     def _lane_near(self, ms: dict, i: int, z: int | None = None) -> bool:
         """AG14: whether ring edge i of a mass faces a lane within a strip's reach: its own
         brief edge's lane, or (an upper mass's edges carry none) the lane of any brief edge
@@ -1790,7 +1831,10 @@ class ShellBuilder:
             if h >= 2000:
                 d = PT.q(cont[f"{g}.fin_m"] * 1000)
                 ang = int(genes.get(f"{g}.fin_deg", 0))
+                low = z0f < self.ground + ROAD_CLEAR + self.rise_of(fa)
                 for s in lines:
+                    if low and self._corner_road(fa, s, d + 100):
+                        continue               # (#88: it would reach round a corner, over a lane)
                     if free(s, d, z0f, z0f + h):
                         P.on(fa, "fin", {"t": 100, "d": d, "h": h}, s, z0f, extra_deg=ang)
                 used.add("fins")
@@ -2138,7 +2182,9 @@ class ShellBuilder:
                     continue
                 if led:
                     P.on(fa, "led", {"dir": "v", "L": H, "t": SK.LED_T, "slot": slot}, s, z0)
-                elif feat == "fins" and not curved and z0 >= self._low(fa, s):
+                elif feat == "fins" and not curved and z0 >= self._low(fa, s) and not (
+                        z0 < self.ground + ROAD_CLEAR + self.rise_of(fa) and
+                        self._corner_road(fa, s, PT.q(cont[f"{g}.fin_m"] * 1000) + 100)):
                     P.on(fa, "fin", {"t": 100, "d": PT.q(cont[f"{g}.fin_m"] * 1000), "h": H},
                          s, z0)
                 else:

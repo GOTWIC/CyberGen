@@ -69,7 +69,30 @@ def _near(p, c, r):
     return (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 <= r * r
 
 
-def _signs(model, signs: dict, assets: Path, center, r) -> list[dict]:
+class _Lift:
+    """#90: what a model height is over on M13's terrain (nothing on a flat city): a sign
+    slot's over its building's base, a street light's over the ground at its foot (as the
+    blockout and AG8 lift them)."""
+
+    def __init__(self, model):
+        from ..streets.ctx import Ground
+        self.gd = Ground(model)
+        self.base = {} if self.gd.flat else {
+            b.id: float(b.base_m) for b in model.buildings
+            if getattr(b, "base_m", None) is not None}
+
+    def slot(self, s) -> float:
+        if self.gd.flat:
+            return 0.0
+        if s.building_id in self.base:
+            return self.base[s.building_id]
+        return self.gd.at(s.position[0], s.position[1])
+
+    def ground(self, x, y) -> float:
+        return 0.0 if self.gd.flat else self.gd.at(x, y)
+
+
+def _signs(model, signs: dict, assets: Path, center, r, lift=None) -> list[dict]:
     out = []
     for s in model.sign_slots:
         if not _near(s.position, center, r):
@@ -79,7 +102,9 @@ def _signs(model, signs: dict, assets: Path, center, r) -> list[dict]:
         if cell is None:
             continue
         f = signs["files"][cell["page"]]["file"]
-        out.append({"id": s.id, "pos": list(s.position), "yaw": s.yaw_deg, "w": s.width_m,
+        z = s.position[2] + (lift.slot(s) if lift is not None else 0.0)
+        out.append({"id": s.id, "pos": [s.position[0], s.position[1], z], "yaw": s.yaw_deg,
+                    "w": s.width_m,
                     "h": s.height_m, "two": bool(s.two_sided), "mount": s.mount,
                     "kind": s.kind, "file": str((assets / f).resolve()), "uv": cell["uv"]})
     return out
@@ -163,14 +188,16 @@ def _ground(adir: Path, views: list) -> dict | None:
             "materials": con.get("materials", {}), "textures": con.get("textures", {})}
 
 
-def _lights(model, center, r) -> list[list[float]]:
+def _lights(model, center, r, lift=None) -> list[list[float]]:
     """Street lights near a view: the lamp (8 m high, M6's prototype) over each pole (AG15:
-    the preview hangs a spot light under it, pointing down)."""
+    the preview hangs a spot light under it, pointing down; on M13's terrain over the ground
+    at its foot)."""
     out = []
     for p in model.props:
         if p.type != "prop.street_light" or not _near(p.position, center, r):
             continue
-        out.append([p.position[0], p.position[1], p.position[2] + 7.6 * p.scale[2]])
+        g = lift.ground(p.position[0], p.position[1]) if lift is not None else 0.0
+        out.append([p.position[0], p.position[1], g + p.position[2] + 7.6 * p.scale[2]])
     out.sort(key=lambda q: ((q[0] - center[0]) ** 2 + (q[1] - center[1]) ** 2, q[0], q[1]))
     return out[:MAX_LIGHTS]
 
@@ -180,10 +207,10 @@ WASH_KINDS = ("billboard", "banner", "holo_ad")
 MAX_WASHES = 40
 
 
-def _washes(model, center, r) -> list[dict]:
+def _washes(model, center, r, lift=None) -> list[dict]:
     """AG15: M20's large facade signs near a view (billboards, banners, holo-boards in front
     of a facade): a light 1.5 m in front of each, in a neon color by its id, so it washes
-    its facade by night."""
+    its facade by night (#90: over its building's base on M13's terrain)."""
     import hashlib
     from ..buildings import systems as SY
     out = []
@@ -195,8 +222,9 @@ def _washes(model, center, r) -> list[dict]:
         h = int.from_bytes(hashlib.blake2b(s.id.encode("utf-8"), digest_size=4).digest(),
                            "little")
         c = SY.ACCENTS[h % len(SY.ACCENTS)]
+        z = s.position[2] + (lift.slot(s) if lift is not None else 0.0)
         out.append({"pos": [s.position[0] + 1.5 * math.cos(a), s.position[1] +
-                            1.5 * math.sin(a), s.position[2]],
+                            1.5 * math.sin(a), z],
                     "color": [int(c[k:k + 2], 16) / 255.0 for k in (0, 2, 4)],
                     "size": max(s.width_m, s.height_m)})
     out.sort(key=lambda q: ((q["pos"][0] - center[0]) ** 2 + (q["pos"][1] - center[1]) ** 2,
@@ -301,6 +329,7 @@ def run(args, progress=None) -> dict:
                       "h": int(args.width * 9 / 16), "shell_tiles": sorted(near)})
     stiles = sorted({e["tile"] for e in con["entries"]})
     ctiles = sorted(man.get("connections") or {})
+    lift = _Lift(model)
     with P.stage("views", total=len(views)) as st:
         for v in views:
             tgt = v["target"]
@@ -316,14 +345,14 @@ def run(args, progress=None) -> dict:
                 # (AG15: the core from the air: its streets, lamps and signs round the
                 # middle it looks at)
                 v["street_tiles"] = [t for t in stiles if _tile_near(t, tgt, 650.0)]
-                v["signs"] = _signs(model, signs, adir, tgt, 450.0)
-                v["lights"] = _lights(model, tgt, 450.0)
-                v["washes"] = _washes(model, tgt, 450.0)
+                v["signs"] = _signs(model, signs, adir, tgt, 450.0, lift)
+                v["lights"] = _lights(model, tgt, 450.0, lift)
+                v["washes"] = _washes(model, tgt, 450.0, lift)
             else:
                 v["street_tiles"] = [t for t in stiles if _tile_near(t, v["eye"], STREET_R)]
-                v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R)
-                v["lights"] = _lights(model, v["eye"], LIGHT_R)
-                v["washes"] = _washes(model, v["eye"], WASH_R)
+                v["signs"] = _signs(model, signs, adir, v["eye"], SIGN_R, lift)
+                v["lights"] = _lights(model, v["eye"], LIGHT_R, lift)
+                v["washes"] = _washes(model, v["eye"], WASH_R, lift)
             st.advance()
         ag8 = _ag8(adir, views)
         wat = _water(adir, views)

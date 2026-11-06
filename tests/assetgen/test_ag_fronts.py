@@ -103,6 +103,26 @@ def test_a_door_at_every_entrance_and_unit():
         assert d["walkway_id"] is None or d["walkway_id"].startswith("wk.test")
 
 
+def test_a_moved_main_entrance_shares_a_shopfront_that_fills_its_facade():
+    """#88 (Nexus City's shanty): a main entrance on a wall a neighbor stands against, its
+    building's one street facade all shopfront, comes in through that shopfront's door, not
+    a door on a far wall facing nothing."""
+    era = dict(ERA, systems={"punched_brick": 1.0})
+    br = brief_of([mass(rect(-5.0, -2.5, 5.0, 2.5), 0.0, 9.0, 3)],
+                  btype="building.shopfront_row", era=era,
+                  classes={(0, 0, 0): "party", (0, 0, 2): "party", (0, 0, 3): "party"})
+    br["building"]["use"] = "mixed"
+    S, E = ([-5.0, -2.5], [5.0, -2.5]), ([5.0, -2.5], [5.0, 2.5])
+    br["units"] = [_unit(1, 2.5, 5.0, "arcade", *E)]
+    br["entrances"] = [_entrance(0, 9.2, "main", *S)]
+    res = SH.build(br, GN.make(br))
+    main = next(d for d in res["doors"] if d["entrance"] == 0)
+    assert main["unit"] == 0 and main["moved"] and main["edge"] == 1
+    assert main["class"] not in ("party", "hidden")
+    assert res["checks"]["access"]["missing"] == 0
+    assert res["stats"].get("entrances_shared") == 1
+
+
 def test_the_band_is_its_own_closed_mesh_inside_the_envelope():
     br = row()
     res = SH.build(br, GN.make(br))

@@ -2165,6 +2165,111 @@ end (#103's median stops 0.15 m off the junction's outline). `_roads_near` now t
 corner's roads (`junction_area(..., every=True)`), the leg's own among them; a junction
 paves less only where a road draws its carriageway anyway. Results: Nexus City's fit passes (a full assetgen build: no clash, nothing off its surface); on #104's six cities (main's models, this fix's streets, props and fit) streets and props pass, no clash and no step over 2 cm (roof plants aside: those runs build no roofs).
 
+## Fix: asset checks, AG15's follow-ups, roof traces and the Unreal tests (issues #83, #85, #88, #90)
+
+A fix between milestones, from run-through 2's open items. Tests:
+`tests/assetgen/test_ag_night.py`, `test_ag_brief.py`, `test_ag_props.py`,
+`tests/test_unreal_play.py`, `tests/test_unreal.py`; outputs `docs/progress/fix_assets/`.
+
+- **AC units and ivy on slopes** (#88, Cragmouth): M20 hangs AC units and facade greenery on
+  a floor's facade at a height over the ground where they hang (`props.Ctx.facade_spot` adds
+  what the building's frame stands over the ground there), but the briefs took that height as
+  one in the building's frame, and AG8 lifted it by the building's `base_m`: on a slope they
+  stood off by the ground's rise from the base (the AC unit "on glass" hung 1.4 m low in front
+  of a window; the 64 ivy patches "off their walls" were over or under every wall of the edge
+  the brief read them on). The briefs now give them their height in the frame
+  (`brief.frame_z`, `FLOOR_MOUNTS`), so AG3's panels and trellises sit where they are and the
+  mount check reads them there, and AG8 lifts them by the ground where they hang; M20 puts
+  none on a wall the ground buries at its spot (`facade_spot`: 31 ivy patches and 12 AC
+  units were under the ground; Cragmouth's model loses them, nothing else moves). The 68
+  counted off their walls now are ivy whose middle stands 1 to 4 mm over the top of the wall
+  the brief locates it on (M20 hangs it at a floor equal to a mass's top), counted apart.
+  The ground floor's shop signs, awnings, wall lights and cables keep their heights over the
+  base: M20 measures them over the street too, but AG3 and AG5 build the shopfronts under them
+  from the base (lowered to the street on a slope with their band opening kept), and at the
+  street's heights they cut those shopfronts on downhill facades (a first try here turned
+  hundreds of Cragmouth's shopfronts into flush doors). Matching the two is open.
+- **A unit's door that faced a neighbor** (#88, Cragmouth's blocked door, Nexus City's two):
+  M3's unit edge cut a corner the footprint's tidying moved, so the unit's nearest wall was
+  an end wall facing another building, and its door opened onto it; a unit whose nearest
+  wall faces another building now sits on a facade within `brief.UNIT_REACH_M` (2 m) more
+  that faces its own street (`unit_loc`; 220 Cragmouth, 208 Nexus and 174 Decks buildings
+  move a unit). A main entrance on a wall a neighbor stands against whose building's one
+  street facade is all shopfront comes in through that shopfront's door (`Band._share_shop`,
+  Nexus City's shanty `d07.lot.w84s879.bld`); a path that grazes a neighbor's wall is not
+  walled off (Nexus City's site door, its walkway ending on the corner its party neighbor
+  touches). Doors facing a neighbor (counted apart): Cragmouth 325 to 276, Nexus 322 to 263,
+  Saltreach 241 to 199, Decks 374 to 302.
+- **A hero's system** (#88, Nexus City's `asset_unique`): the neighbor rule goes tallest
+  first, and a landmark's system is its kind's (`systems.LANDMARK_SYSTEM`), so Nexus City's
+  166 m spire, after a 192 m tower beside it, kept the curtain wall that tower had drawn. A
+  hero's or a type's system drawn from weights is now drawn again past its neighbors'
+  systems within those weights (`genome.make`).
+- **Vesper Bay Decks** (#88): `d05.lot.w576n1053.bld` is gone with #106's layout (the city
+  builds on its first try); every check passes on main and here.
+- **Saltreach Free Port** (#88, from #103): an angled fin at the end of a podium facade
+  reached round the corner in front of a 2 m edge whose lane is 0.47 m out (no sidewalk),
+  4.25 m up (`over_road`); no fin near a facade's end now reaches in front of the next edge
+  where that faces such a road under the headroom (`shell._corner_road`).
+- **Nexus City's `asset_clash`** (#114, a median under a paved lane): fixed on main by #117
+  (above), merged into this branch.
+- **The neighbor rule in a regeneration** (#90): a tower's genome depends on its neighbors
+  within 150 m, so a district regeneration could change towers outside the district. As
+  M21 holds forms (`Frame.old_towers`), in a city its build state says a regeneration made,
+  every tower outside the last edit's district whose brief is unchanged keeps the genome
+  its record has (`neighbors.held_towers`: drawn again past what it avoided, which the
+  records now keep, `ag15.avoided`; `ag15.held`), those go first and the rest avoid them.
+  The old genomes come from the assets in the build folder (a regeneration in place; with
+  `--base` into another folder, copy the base's `assets/manifest.json` there first).
+  `assetgen brief seam BASE REGEN --district NAME` sorts a regeneration's changes in the
+  briefs and the genomes (`briefdiff.genome_seam`). Nexus City with Midtown regenerated in
+  place: 192 towers held, 0 genomes changed outside it among the 5,746 buildings whose briefs
+  are the same; with Corporate Core, 103 held. On these two the rule without the hold would
+  have moved none either; the unit test builds a city where it does.
+- **Sign washes and lamps on terrain** (#90): the play features' sign washes stood at the
+  slot's height over 0, not over the building's base (`unreal_play.sign_washes`); the
+  Blender previews' lamp lights, washes and sign pages likewise (`materials.preview._Lift`).
+  The lamp values were checked by night in Unreal on the test suite's small terrain and deck
+  cities (each a blockout import into a throwaway project of its own, `--check` with night
+  views; a stage 2 import of those went past the memory watchdog): 191 lamps lit and 768
+  light pools in each, a hillside billboard washed at its own height, the deck's streets lit
+  under the slab and on it, every roof and facade trace hit (36 and 48). Street lamps
+  1500 cd, wall lamps 400, washes 600 and `PoolStrength` 1.0 are kept. Both checks fail only
+  on streaming (the small cities lie within the view range, as #85 found).
+- **Roof traces** (#83): run-through 2's five Industrial Port misses (four yards, one open
+  shed beside the player start) had their roof hulls: a stage 2 shell's actor starts at its
+  street front's top (one storey under 7.5 m: the front's band), so a yard's shell spans
+  7.5 to 10 m and its roof stands 2.5 m over its bounds' bottom, and an open shed's shell is
+  its roof slab alone; the check counted a hit only 3 m over that bottom. It now counts 3 m
+  over the ground the building stands on, a stage 2 building's pivot (its base) where that
+  is lower (`check_city.collision`). Checked offline against Delta's packs (the hulls, the
+  street fronts' complex collision and the shells' where they have no hulls, traced at the
+  check's points): the old rule misses exactly those five of the 12 buildings around the
+  start, the new one none; on Cragmouth's 7,068 buildings 26 to 0. Delta's own `--check`
+  could not run on the Windows PC within the session's memory limit (2 GB of RAM kept free:
+  its stage 2 import loads about 53,000 meshes, #84); the stage 2 small city's `--check`
+  passes (#85's test).
+- **The Unreal tests** (#85): `test_unreal_import_stage2_small_city` switched the small city
+  from stage 2 back to the blockout and found another actor digest: the importer updates an
+  actor in place when both layers have its key (the same class, as `manifest_changes`
+  counts it), and the blockout's update set the mesh, location and tags but left what stage
+  2 had set (slot materials, collision profile, cull distances, shadow, HLOD, rotation).
+  `import_city.unstage` gives such an actor the blockout's settings again; the digests then
+  match (5,727 actors, every row the same; `CITYGEN_UE_DIGEST_ROWS=1` writes them, and the
+  test names the rows that differ). `test_unreal_import_small_city` failed on streaming: the
+  small city (2.4 km) lies within the default 1.5 km view range from anywhere, so a teleport
+  loads nothing new; it streams at 600 m now (`SMALL_VIEW_M`). Both pass on the Windows PC
+  (42 and 10 minutes).
+- **Goldens**: `GEN_VERSION` fixassets.4. Citygen: Cragmouth's model and blockout plan (M20
+  leaves out the 31 ivy patches and 12 AC units under the ground; nothing else moves); every
+  other city is main's byte for byte. Assetgen (`tests/assetgen/goldens.py`): the small
+  city's and the samples' briefs (units on their own street, AC units in the frame), the
+  small city's asset manifest, files and materials, and the Vesper Bay shells (the neighbor
+  rule, the fins). Left for the Mac: Nexus City's brief golden (since the moorings fix the
+  Windows PC builds a Nexus City model other than its golden, the same on main) and the props
+  golden (#92). The streets, ground and water goldens do not move (this fix changes none of
+  those stages and no flat city's model).
+
 ## Order
 
 ```

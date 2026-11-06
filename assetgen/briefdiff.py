@@ -131,6 +131,30 @@ def seam(model_a: dict, model_b: dict, briefs_a, briefs_b, district_id: str) -> 
             "seam_farthest_m": round(far, 1)}
 
 
+def genome_seam(man_a: dict, man_b: dict, sm: dict) -> dict:
+    """#90: what a district regeneration changed in the buildings' genomes (two builds'
+    `assets/manifest.json`, after `seam`'s brief sort `sm`): the buildings outside the
+    district whose brief is the same in both builds but whose genes (`genome.effective`) or
+    AG15 signatures differ, which the neighbor rule's hold keeps at none, and the towers it
+    held."""
+    ra, rb = man_a.get("buildings") or {}, man_b.get("buildings") or {}
+    briefs_changed = set(sm["seam_ids"]) | set(sm["unexplained"])
+    moved, same, held = [], 0, 0
+    for bid in sorted(set(ra) & set(rb)):
+        a, b = ra[bid], rb[bid]
+        if bid in briefs_changed or a.get("brief") != b.get("brief") or \
+                a.get("district") == sm["district"]:
+            continue
+        held += int(bool((b.get("ag15") or {}).get("held")))
+        sa = (a.get("ag15") or {}).get("sig")
+        sb = (b.get("ag15") or {}).get("sig")
+        if C.dumps(a.get("genes")) != C.dumps(b.get("genes")) or C.dumps(sa) != C.dumps(sb):
+            moved.append(bid)
+        else:
+            same += 1
+    return {"outside_same_brief": same + len(moved), "genome_changed": moved, "held": held}
+
+
 def _dist_out(ring, p) -> float:
     best = math.inf
     n = len(ring)
