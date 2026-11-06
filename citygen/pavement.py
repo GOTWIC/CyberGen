@@ -539,9 +539,13 @@ class Road:
         ss = self.path.stations(a, b)
         line = shapely.LineString([self.path.frame(st)[:2] for st in ss])
         g = shapely.buffer(line, w, cap_style="flat", join_style="round", quad_segs=4)
-        e = min(END_STRIP_M, (b - a) / 2.0)
-        return _ov(shapely.union, g, union([self.strip_poly(a, a + e, -w, w),
-                                            self.strip_poly(b - e, b, -w, w)]))
+        # (each end strip short of the path's first vertex inside the stretch, whose mitre
+        # may be the fold itself)
+        inside = [c for c in self.path.cum[1:-1] if a + 1e-6 < c < b - 1e-6]
+        ea = min(END_STRIP_M, (b - a) / 2.0, (inside[0] - a) / 2.0 if inside else math.inf)
+        eb = min(END_STRIP_M, (b - a) / 2.0, (b - inside[-1]) / 2.0 if inside else math.inf)
+        return _ov(shapely.union, g, union([self.strip_poly(a, a + ea, -w, w),
+                                            self.strip_poly(b - eb, b, -w, w)]))
 
     def band_poly(self, s0: float, s1: float, w: float):
         """The ground its right of way (w either side) covers from s0 to s1: strips, and

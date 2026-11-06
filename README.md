@@ -65,7 +65,7 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 |---|---|
 | <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M20/vesper_bay/preview_props.png" width="420"> |
 
-| The pavement map: every road, junction, corner and sidewalk surface, edges shared | Two junctions on a ramp between bridges, drawn from the map (Delta Megacity, 8K) |
+| The pavement map: every road, junction, corner and sidewalk surface, edges shared | A ramp between two raised junctions, one surface in the map (Delta Megacity, 8K) |
 |---|---|
 | <img src="docs/progress/M22/vesper_bay/preview_pavement.png" width="420"> | <img src="docs/progress/M22/delta_megacity/render_junction_ramp.jpg" width="420"> |
 
