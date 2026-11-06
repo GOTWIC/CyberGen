@@ -345,16 +345,26 @@ def check_junction_levels(spec: CitySpec, m: CityModel):
                                   f"level across the leg there within its class's cross slope "
                                   f"(2.5% on primary roads, 3% on the others), its curb between "
                                   f"two legs running evenly from one's height to the other's "
-                                  f"(footbridge stairs stand on it)")
+                                  f"(footbridge stairs stand on it; M22: a junction no height "
+                                  f"fits, kept as M18 left it, has its curb and cross slope "
+                                  f"noted)")
     at: dict = {}
     for s in m.road_segments:
         at.setdefault(s.start, []).append(s)
         if s.end != s.start:
             at.setdefault(s.end, []).append(s)
     ground = {n.id: (n.position[2], n.ground_m) for n in m.road_nodes}
+    held: dict = {}       # (M22: a junction no height fits, its surface noted, not failed)
     for j in m.junctions:
         if j.polygon is None or j.node_id not in ground:
             continue
+        hold = bool((j.attrs or {}).get("unbuildable"))
+
+        def bad(msg: str, j=j, hold=hold) -> None:
+            if hold:
+                held.setdefault(j.id, msg)
+            else:
+                _lim(c, msg)
         ring, hz, legs = junction_surface(m, j, at, ground)
         n = len(ring)
         if len(hz) != n:
@@ -378,8 +388,8 @@ def check_junction_levels(spec: CitySpec, m: CityModel):
                   JN.ON_CUT_M]
             cs = CROSS_SLOPE.get(lg["cls"], 0.03)
             if vs and max(vs) - min(vs) > cs * 2.0 * h + 0.01:
-                _lim(c, f"junction {j.id}: {(max(vs) - min(vs)) / (2.0 * h):.1%} across leg "
-                        f"{lg['id']} ({lg['cls']}), over {cs:.1%}")
+                bad(f"junction {j.id}: {(max(vs) - min(vs)) / (2.0 * h):.1%} across leg "
+                    f"{lg['id']} ({lg['cls']}), over {cs:.1%}")
         anchors = [v for v in range(n) if on[v]]
         for i, a in enumerate(anchors):
             b = anchors[(i + 1) % len(anchors)]
@@ -387,10 +397,15 @@ def check_junction_levels(spec: CitySpec, m: CityModel):
             v = (a + 1) % n
             while v != b:
                 if not lo <= hz[v] <= hi:
-                    _lim(c, f"junction {j.id}: its curb at ({ring[v][0]:.0f}, {ring[v][1]:.0f}) "
-                            f"at {hz[v]:.2f} m, outside its legs' {hz[a]:.2f} to {hz[b]:.2f} m")
+                    bad(f"junction {j.id}: its curb at ({ring[v][0]:.0f}, {ring[v][1]:.0f}) "
+                        f"at {hz[v]:.2f} m, outside its legs' {hz[a]:.2f} to {hz[b]:.2f} m")
                     break
                 v = (v + 1) % n
+    if held:
+        c.notes.append(f"{len(held)} junctions no surface fits, kept as M18 left them (M22: "
+                       f"`pavement_junctions` says what holds each), their curbs or cross "
+                       f"slopes past this check's: " + "; ".join(
+                           held[k] for k in sorted(held)[:6]))
     return c
 
 

@@ -355,6 +355,13 @@ def _coords(node, inside=False):
 
 def test_every_coordinate_on_the_grid(small_built):
     data = json.loads(small_built.model.to_json())
+    # (M22: a junction's polygon is its carriageway face's outline, on the pavement map's
+    # 1 mm grid, as the map's vertices are)
+    mm = [v for j in data["junctions"] for v in _coords(j["polygon"], True)]
+    mm += [v for x in data["pavement_net"]["vertices"] for v in x["p"]]
+    assert mm and not [v for v in mm if abs(v * 1000 - round(v * 1000)) > 1e-6]
+    for j in data["junctions"]:
+        j.pop("polygon")
     values = list(_coords(data))
     assert len(values) > 10_000
     off = [v for v in values if abs(v * 100 - round(v * 100)) > 1e-6]

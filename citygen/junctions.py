@@ -491,8 +491,10 @@ def overlap_cuts(legs: list[Leg], cap: bool = True) -> None:
     ramp leaves), as far as 0.45 of the leg, so two roads overlap only inside the junction
     polygon (`junction_polygon` adds a bent leg's carriageway out to its cut). M22 (`cap`
     False): as far along the whole leg as the overlap that reaches the node goes (one that
-    does not reach it is another junction's); where a road's two cuts meet, its junctions
-    are one (`plan_units`)."""
+    does not reach it is another junction's), along each leg to the end of the overlap's
+    run from the node (an overlap the leg comes back to after a gap, a loop ramp's foot
+    under the deck it climbs to, is a crossing, not this junction's); where a road's two
+    cuts meet, its junctions are one (`plan_units`)."""
     reach = [CUT_SHARE * lg.L if cap else lg.L for lg in legs]
     rows = [strip(lg, r, lg.row) for lg, r in zip(legs, reach)]
     lines = [LineString(lg.pts) for lg in legs]
@@ -512,14 +514,43 @@ def overlap_cuts(legs: list[Leg], cap: bool = True) -> None:
                 if not near:
                     continue
                 ov = G.union(near)
-            pts = shapely.points(shapely.get_coordinates(ov))
+                # (its outline every OVERLAP_STEP_M, so a run along a leg shows its gaps)
+                pts = shapely.points(shapely.get_coordinates(
+                    shapely.segmentize(ov, OVERLAP_STEP_M)))
+            else:
+                pts = shapely.points(shapely.get_coordinates(ov))
             for k in (i, j):
-                far = float(shapely.line_locate_point(lines[k], pts).max())
+                if cap:
+                    far = float(shapely.line_locate_point(lines[k], pts).max())
+                else:
+                    far = _run_end(shapely.line_locate_point(lines[k], pts).tolist(),
+                                   legs[i].row + legs[j].row)
+                    if far is None:
+                        continue
                 legs[k].cut = max(legs[k].cut, G.q(far + 0.5))
                 legs[k].cut_row = max(legs[k].cut_row, legs[k].cut)
                 legs[k].need = max(legs[k].need, G.q(far + 0.5))
                 if far >= reach[k] - 1.0:
                     legs[k].capped = True    # (they overlap on past its reach)
+
+
+OVERLAP_STEP_M = 2.0     # M22: an overlap's outline sampled this often along a leg
+OVERLAP_GAP_M = 6.0      # M22: a gap in an overlap's run along a leg longer than this ends it
+
+
+def _run_end(ss: list, start: float) -> float | None:
+    """The end of the run of stations `ss` (an overlap's outline along a leg) that starts
+    within `start` of the node and has no gap over OVERLAP_GAP_M; None where it starts
+    farther out (a crossing along the leg, not an overlap at the node)."""
+    ss = sorted(ss)
+    if not ss or ss[0] > start:
+        return None
+    end = ss[0]
+    for s in ss[1:]:
+        if s - end > OVERLAP_GAP_M:
+            break
+        end = s
+    return end
 
 
 def run_along(lg: Leg, c: float) -> float:
@@ -2064,8 +2095,6 @@ def one_way_stranded(net) -> list[str]:
             L = s["z_profile"][-1]["s"] if s["z_profile"] else 0.0
             s["z_profile"] = [{"s": G.q(L - p["s"]), "z": p["z"]}
                               for p in reversed(s["z_profile"])]
-            if s["attrs"].get("cuts"):
-                s["attrs"]["cuts"] = s["attrs"]["cuts"][::-1]     # (M22)
         s["one_way"] = True
         out.append(s["id"])
     return out
@@ -2517,6 +2546,14 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                  "corner_radius_m": min(x.r for x in allg), "archetype": node_arch[nid0],
                  "classes": sorted({x.cls for x in ext or allg},
                                    key=lambda c: (-ST.RANK[c], c))}
+        # (M22: its legs' cuts, [road, "a" its start or "b" its end, cut], so the pavement
+        # map can be made again from the rows; on the junction, not the road, so a district
+        # regeneration that changes a seam junction leaves the held roads as they were)
+        cuts = sorted([x.seg["id"], "a" if x.at_start else "b",
+                       cutx[(x.seg["id"], x.at_start)]] for x in ext
+                      if cutx.get((x.seg["id"], x.at_start), 0.0) > 0.0)
+        if cuts:
+            attrs["cuts"] = cuts
         if len(nodes) > 1:
             attrs["nodes"] = list(nodes)
             attrs["inner"] = list(u["inner"])
@@ -2617,12 +2654,6 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
                     c = corner_of.get((nid, s["id"], sd))
                     if c is not None and c != _pt(*end):
                         W.add("path", [end, c], 2.0)
-    # M22: each road's cuts (at its start and end) in the model, so the pavement map can be
-    # made again from the rows (`pavement.units_from_rows`)
-    for s in net.segments:
-        a, b = cutx.get((s["id"], True), 0.0), cutx.get((s["id"], False), 0.0)
-        if s["road_class"] != "footbridge" and (a or b):
-            s["attrs"]["cuts"] = [a, b]
     stranded = one_way_stranded(net)
     T.detail("junctions/stranded", stranded)
     lanes = build_lanes(net, legs, cut)

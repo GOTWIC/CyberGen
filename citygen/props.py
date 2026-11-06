@@ -983,7 +983,9 @@ def highway_barriers(c: Ctx) -> list[Cand]:
     return out
 
 
-ROAD_IN_M = 0.05        # a railing or a median barrier reaches at most this onto a road
+ROAD_IN_M = 0.03        # a railing or a median barrier reaches at most this onto a road
+                        # (M22: 2 cm under #95's 5 cm, which a placed prop's rounded
+                        # position and yaw can reach on a junction's 1 mm outline)
 ROAD_XWALK_M = 1.0      # ... and keeps this off a crosswalk
 ROAD_Z_M = 1.5          # a road or junction counts within this of the thing's height
 

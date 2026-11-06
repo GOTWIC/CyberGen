@@ -553,6 +553,11 @@ def _pave_walls(pv: _Pave, f, top: float, bottom, mat: str, which) -> dict | Non
     return part
 
 
+def _side(band: str) -> str:
+    """The side of a road a pavement band is on (`cll`, `cll_b`: left)."""
+    return "left" if band.split("_")[0].endswith("l") else "right"
+
+
 def _streets_map(P: _Plan) -> None:
     """M22: roads, junctions, sidewalks, corner pads and medians drawn from the pavement
     map's faces, in the objects the ribbons were in (keys unchanged: a road's faces go
@@ -655,7 +660,7 @@ def _streets_map(P: _Plan) -> None:
                 parts.append(w)
         if s is not None:
             if cat.startswith("road_") or cat == "deck_road":
-                side = "left" if f.band.endswith("l") else "right"
+                side = _side(f.band)
                 wk = walk_of.get((s.id, side)) if not top else None
                 did = s.district_ids[0] if s.district_ids else None
                 for pt in parts:
@@ -667,8 +672,8 @@ def _streets_map(P: _Plan) -> None:
                         P.join(did, cat, cx, cy, pt, s.id)
             else:
                 mid = s.centerline[len(s.centerline) // 2]
-                if not top and (s.id, "left" if f.band.endswith("l") else "right") in walk_of:
-                    wk = walk_of[(s.id, "left" if f.band.endswith("l") else "right")]
+                if not top and (s.id, _side(f.band)) in walk_of:
+                    wk = walk_of[(s.id, _side(f.band))]
                     did = s.district_ids[0] if s.district_ids else None
                     wx, wy = _center(wk.line)
                     for pt in parts:
@@ -680,12 +685,15 @@ def _streets_map(P: _Plan) -> None:
             for pt in parts:
                 P.join(P.district_at(cx, cy), cat, cx, cy, pt, f.owner_id)
     # raised roads: their fills and piers (the deck is the faces' slab)
+    from . import pavement as PV
+
+    rcuts = PV.road_cuts(m.junctions)
     for s in m.road_segments:
         cat = by_road.get(s.id)
         if cat not in ("elevated", "bridge"):
             continue
         pts = _dedupe([(x, y) for x, y in s.centerline])
-        cuts = s.attrs.get("cuts") or [0.0, 0.0]
+        cuts = rcuts.get(s.id) or [0.0, 0.0]
         L = sum(_dist(a, b) for a, b in zip(pts, pts[1:]))
         if L - cuts[0] - cuts[1] < 0.5:
             continue

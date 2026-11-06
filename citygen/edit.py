@@ -237,9 +237,9 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
                    prior=ID.priors(O))
     model, info = splice(old, new.model, dd.id, poly, frame, O)
     if new.model.pavement_net is not None:
-        # M22: the pavement map of the spliced city (each road's cuts and each junction's
-        # region are in its rows: a held road keeps its ports, so outside the district and
-        # its seam the map comes back as it was)
+        # M22: the pavement map of the spliced city (each junction's legs' cuts and region
+        # are in its rows, held roads are as they were, and the map breaks its ties by
+        # geometry, so outside the district and its seam it comes back as it was)
         model = B.pavement_of(spec, model)
     if ov:
         model, notes = OV.apply(model, ov, old=old, district=dd.id)

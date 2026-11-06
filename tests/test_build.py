@@ -164,7 +164,10 @@ def test_small_city_passes(small_built):
                        # M20
                        "prop_support", "plant_headroom",
                        # park paths fix
-                       "park_access", "walkway_building_clash"}
+                       "park_access", "walkway_building_clash",
+                       # M22
+                       "pavement_edges", "pavement_tiling", "pavement_heights",
+                       "pavement_junctions"}
 
 
 def test_check_geometry_invalid(small_built):

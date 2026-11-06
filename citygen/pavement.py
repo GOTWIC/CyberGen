@@ -50,6 +50,7 @@ from shapely.geometry import Point, Polygon
 
 from . import dmath as M
 from . import streets as ST
+from .model import CrossSection
 
 GRID = 0.001            # the map's plan grid (1 mm)
 STEP_M = 4.0            # band edge samples along a road, at most this far apart
@@ -58,6 +59,9 @@ SAMPLE_IN_M = 0.5       # ... at least this far inside its boundary
 TOL_MM = 0.75           # a vertex this near another face's edge lies on it (snap rounding)
 SAME_Z_M = 4.5          # faces nearer than this in height are one level (no road passes under
                         # another with less clearance)
+RESOLVE_M = 1.0         # overlaps are cut up to this past SAME_Z_M: the map tells levels
+                        # apart by estimates (`Assembly.zf`), the check by the finished
+                        # vertices, so a pair near the line is cut, never left overlapping
 STEP_Z_M = 0.3          # faces of roads or junctions that do not meet, this far apart in
 #                         height where they touch, keep a vertex each there (a step)
 MITER_MAX = 2.0         # a mitre longer than this (a turn over 120 degrees) folds the band
@@ -220,11 +224,22 @@ def unit_layer(legs) -> str:
     return "u1" if any(s.get("tunnel") for s in segs) else "g0"
 
 
+def road_cuts(junctions) -> dict:
+    """{road id: [its cut at its start, at its end]} from the junctions' `attrs.cuts` (rows
+    or model entities; 0 where no junction cuts it)."""
+    out: dict = {}
+    for j in junctions:
+        a = (j.get("attrs") if isinstance(j, dict) else j.attrs) or {}
+        for sid, end, c in a.get("cuts") or []:
+            out.setdefault(sid, [0.0, 0.0])[0 if end == "a" else 1] = c
+    return out
+
+
 def units_from_rows(segments: list[dict], nodes: list[dict], junctions: list[dict],
                     darch: dict) -> list:
-    """The junction regions of a network from its rows (`junctions.build` stores each road's
-    cuts in `attrs.cuts` and a cluster's nodes and inner roads in its junction's attrs), so
-    the map can be made again from a model (a regenerated district, overrides)."""
+    """The junction regions of a network from its rows (`junctions.build` stores each
+    junction's legs' cuts and a cluster's nodes and inner roads in its attrs), so the map can
+    be made again from a model (a regenerated district, overrides)."""
     from types import SimpleNamespace
 
     from . import junctions as JN
@@ -236,9 +251,10 @@ def units_from_rows(segments: list[dict], nodes: list[dict], junctions: list[dic
         ids = s.get("district_ids") or []
         return darch.get(ids[0]) if ids else None
     legs = JN.legs_at(SimpleNamespace(segments=segments), arch_of)
+    cuts = road_cuts(junctions)
     for lg in legs.values():
         for x in lg:
-            c = (x.seg["attrs"].get("cuts") or [0.0, 0.0])[0 if x.at_start else 1]
+            c = cuts.get(x.seg["id"], (0.0, 0.0))[0 if x.at_start else 1]
             x.cut = x.cut_row = c
     node = {n["id"]: n for n in nodes}
     out = []
@@ -254,6 +270,10 @@ def units_from_rows(segments: list[dict], nodes: list[dict], junctions: list[dic
         out.append(Unit(j["id"], ns, ext, inner, head, unit_layer(ext),
                         {n: legs.get(n, []) for n in ns}, heads=heads))
     return out
+
+
+# a cross-section's fields at the model's defaults (`model.CrossSection`)
+_CS_DEFAULT = {k: f.default for k, f in CrossSection.model_fields.items()}
 
 
 def bands(seg: dict) -> list[tuple[float, float, str, str]]:
@@ -272,8 +292,11 @@ def bands(seg: dict) -> list[tuple[float, float, str, str]]:
         return [(-row, row, "walk", "wk")]
     out = []
     if side > 0.005:
-        curb = min(cs.get("curb_m", 0.15), side)
-        furn = min(max(cs.get("furniture_m", 0.0), 0.0), side - curb) \
+        # (a field a row leaves out reads as the model's default for it, so the map made in
+        # M2 from the rows is the map made again from the model: M1b's roads carry no
+        # furniture zone, which the model gives as 1.5 m)
+        curb = min(cs.get("curb_m", _CS_DEFAULT["curb_m"]), side)
+        furn = min(max(cs.get("furniture_m", _CS_DEFAULT["furniture_m"]), 0.0), side - curb) \
             if cls in ("avenue", "street") else 0.0
         e1, e2 = h + curb, h + curb + furn
         for lo, hi, kind, band in ((e2, row, "sidewalk", "cl"), (e1, e2, "sidewalk", "fn"),
@@ -792,12 +815,12 @@ def _sharp(P, a, b, ha: float, hb: float):
 
 def unit_regions(u: Unit, roads: dict, pos: dict) -> tuple:
     """(carriageway, right of way, corner pads) of a junction's region, each on the map's
-    grid, less its legs' ribbons (so each ends on its ports)."""
+    grid, less its legs' ribbons (so each ends on its ports) where they are at its level."""
     ext = [x for x in u.legs if x.seg["id"] in roads and x.cls != "footbridge"]
     beyond = []
     for x in ext:
         rd = roads[x.seg["id"]]
-        s0, s1 = rd.a, rd.path.L - rd.b
+        s0, s1 = level_stretch(rd, rd.a, rd.path.L - rd.b, x.at_start)
         if s1 - s0 > 0.0005:
             beyond.append(rd.band_poly(s0, s1, rd.row))
     cw, rw = [], []
@@ -841,6 +864,25 @@ def unit_regions(u: Unit, roads: dict, pos: dict) -> tuple:
         R = _ov(shapely.difference, R, B)
     pads = _ov(shapely.difference, R, C) if not R.is_empty else Polygon()
     return C, R, pads
+
+
+def level_stretch(rd: "Road", s0: float, s1: float, at_start: bool) -> tuple:
+    """The stretch of a leg's ribbon [s0, s1] from its port at a junction (s0 at its start,
+    else s1) on while it stays within SAME_Z_M of the port's height: past that the road is
+    on another level (its own profile over the ground: a ramp passing under the junction's
+    deck), and the junction's region there is not its."""
+    if s1 - s0 <= 0.0005:
+        return s0, s1
+    z0 = prof(rd.zp, s0 if at_start else s1)
+    n = max(1, math.ceil((s1 - s0) / LEVEL_STEP_M))
+    for k in range(1, n + 1):
+        s = s0 + (s1 - s0) * k / n if at_start else s1 - (s1 - s0) * k / n
+        if abs(prof(rd.zp, s) - z0) > SAME_Z_M:
+            return (s0, s) if at_start else (s, s1)
+    return s0, s1
+
+
+LEVEL_STEP_M = 2.0      # a leg's ribbon tested for its junction's level this often
 
 
 def _fill_small(g):
@@ -1165,18 +1207,32 @@ class Assembly:
                 continue
             c = ov.representative_point()
             if not self.related(F, Gf) and \
-                    abs(self.zf(F, c.x, c.y) - self.zf(Gf, c.x, c.y)) > SAME_Z_M:
+                    abs(self.zf(F, c.x, c.y) - self.zf(Gf, c.x, c.y)) > SAME_Z_M + RESOLVE_M:
                 continue        # (one over the other: an overpass, a tunnel under a road)
             hi, lo = (fi, fj) if self.above(F, Gf) else (fj, fi)
             out.append((hi, lo, area))
         return out
 
-    @staticmethod
-    def above(f: Face, g: Face) -> bool:
-        """Whether f keeps an overlap with g (priority, then the lesser id)."""
+    def above(self, f: Face, g: Face) -> bool:
+        """Whether f keeps an overlap with g (priority, then the owner's place, then the
+        band: by geometry, not by ids, which M10's renaming changes, so the map made again
+        from a finished model's rows is the map M2 made)."""
         if f.prio != g.prio:
             return f.prio > g.prio
-        return f.fid < g.fid
+        return (self._anchor(f), f.band) < (self._anchor(g), g.band)
+
+    def _anchor(self, f: Face) -> tuple:
+        """A face's owner's place: a junction's nodes, a road's ends and middle vertex, in
+        order (on the 1 mm grid)."""
+        if f.unit is not None and f.unit in self.units:
+            u = self.units[f.unit]
+            ps = [x.p for x in u.legs] + [x.p for lg in u.by_node.values() for x in lg]
+        elif f.road is not None and f.road in self.roads:
+            p = self.roads[f.road].path.p
+            ps = [p[0], p[-1], p[len(p) // 2]]
+        else:
+            ps = []
+        return tuple(sorted({(round(q[0], 3), round(q[1], 3)) for q in ps}))
 
     def resolve(self) -> None:
         """Faces at one level that overlap: the lesser loses the overlap to the greater

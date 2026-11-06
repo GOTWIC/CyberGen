@@ -875,6 +875,11 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     from . import tunnel_checks as TNC
 
     late = {c.id: c for c in TNC.run(spec, m) + TGC.run(spec, m)}
+    if m.pavement_net is not None:
+        # (M22: the map's checks again on the finished city, their notes by its stable ids)
+        from . import pavement_checks as PVC
+
+        late.update({c.id: c for c in PVC.run(spec, m)})
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
         NC.run_finished(spec, m) + TC.run(spec, m) + \

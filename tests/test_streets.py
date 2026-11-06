@@ -141,13 +141,18 @@ def test_grid_angle_followed(small):
     """The corporate core grid runs at its grid angle (45 degrees by preset)."""
     m = small.model
     did = next(d.id for d in m.districts if d.name == "Core")
-    angles = []
+    on, total = 0.0, 0.0
     for s in m.road_segments:
         if s.attrs.get("district") == did and s.attrs.get("role") in ("grid_u", "grid_v"):
-            (x0, y0), (x1, y1) = s.centerline[0], s.centerline[-1]
-            angles.append(M.degrees(M.atan2(y1 - y0, x1 - x0)) % 90.0)
-    assert angles
-    assert sum(1 for a in angles if abs(a - 45.0) < 3.0) >= 0.8 * len(angles)
+            # (by piece: a grid street merged across a corner of the grid, where a cross
+            # street ended, turns 90 degrees and its ends' chord runs at neither)
+            for (x0, y0), (x1, y1) in zip(s.centerline, s.centerline[1:]):
+                L = M.hypot(x1 - x0, y1 - y0)
+                total += L
+                if abs(M.degrees(M.atan2(y1 - y0, x1 - x0)) % 90.0 - 45.0) < 3.0:
+                    on += L
+    assert total
+    assert on >= 0.8 * total
 
 
 # --- footbridges, junctions ----------------------------------------------------------------
@@ -173,12 +178,16 @@ def test_footbridge_spacing():
 
 def test_junction_geometry(small):
     m = small.model
-    assert m.junctions and all(j.legs >= 3 or j.shape in ("cul_de_sac", "bend")
+    # (M22: a cluster of bends, two corners joined by a short road, has two legs)
+    assert m.junctions and all(j.legs >= 3 or j.shape in ("cul_de_sac", "bend") or
+                               (j.legs == 2 and len(j.attrs.get("nodes") or []) > 1)
                                for j in m.junctions)
     pos = {n.id: n.position[:2] for n in m.road_nodes}
     for j in m.junctions[:200]:
         poly = G.from_model_poly(j.polygon)
-        assert poly.is_valid and poly.buffer(1.0).contains(Point(pos[j.node_id]))
+        assert poly.is_valid
+        for nid in j.attrs.get("nodes") or [j.node_id]:
+            assert poly.buffer(1.0).contains(Point(pos[nid])), (j.id, nid)
     sig = [j for j in m.junctions if j.signalized]
     assert sig and all(j.crosswalk_ids for j in sig)
     assert all(sw.clear_path_m >= 1.8 for sw in m.sidewalks)

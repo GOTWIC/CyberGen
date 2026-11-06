@@ -1288,17 +1288,24 @@ checks `pavement_checks.py`, preview `preview_pavement.py`):
   curb, outer, seam).
 - **Cuts** (`junctions.py`, in M2): one cut per road end, where every band, sidewalk,
   crosswalk and lane ends (`cutbacks(..., one=True)`): past every overlap of the legs' rights
-  of way that reaches the node however far (`overlap_cuts(..., cap=False)`), past a fold or a
-  corner's inner mitre near it (`fold_cuts`, until stable), clear of a lock (`lock_cuts`).
-  A road whose two cuts leave under `pavement.MIN_ROAD_M` joins its junctions into one, a
-  cluster (`plan_units`: junction `attrs.nodes`, `inner`; nodes within `CLUSTER_DZ_M` in
-  height). M13's grade lines keep M17's runs (`runs17`).
+  of way that reaches the node however far, to the end of its run from the node along each
+  leg (`overlap_cuts(..., cap=False)`, `_run_end`: a loop ramp's foot passing under the deck
+  it climbs to is a crossing, not the junction's), past a fold or a corner's inner mitre near
+  it (`fold_cuts`, until stable), clear of a lock (`lock_cuts`). Each junction keeps its legs'
+  cuts (`attrs.cuts`: [road, `a` its start or `b` its end, cut]; `pavement.road_cuts`), so a
+  regeneration's seam junction leaves the held roads as they were. A road whose two cuts leave
+  under `pavement.MIN_ROAD_M` joins its junctions into one, a cluster (`plan_units`: junction
+  `attrs.nodes`, `inner`; nodes within `CLUSTER_DZ_M` in height). M13's grade lines keep
+  M17's runs (`runs17`).
 - **Faces:** ribbons by the cross-section between the cuts, one mitred frame per station;
   bend faces where a band would fold (`Road.folds`, `fold_poly`: never a mitre's spike); a
-  junction's carriageway (core, legs' stubs, inner roads, a bulb) less the ribbons, corner pads
-  the right of way less the carriageway; overlaps cut by priority (`KIND_RANK`), slivers under
-  `GAP_M2` filled, every vertex within `TOL_MM` of an edge put into it, so every interior edge
-  is shared exactly.
+  junction's carriageway (core, legs' stubs, inner roads, a bulb) less the ribbons where they
+  are at its level (`level_stretch`), corner pads the right of way less the carriageway;
+  overlaps cut by priority (`KIND_RANK`, ties by the owners' places, never their ids) up to
+  `RESOLVE_M` past `SAME_Z_M` (the map's heights there are estimates), slivers under `GAP_M2`
+  filled, every vertex within `TOL_MM` of an edge put into it, so every interior edge is
+  shared exactly. The map made again from a finished model's rows (`build.pavement_of`) is
+  the one M2 made (a row's missing cross-section field reads as the model's default).
 - **Heights:** a road's at each vertex's station (a ribbon vertex a junction face shares at
   its port's height); a port line where two roads go on as each other one height; a junction's
   curbs between its ports by length along its outline (a cluster's long curbs along its inner
@@ -1313,15 +1320,18 @@ checks `pavement_checks.py`, preview `preview_pavement.py`):
   two bounds that clash (`why_text`); one the map draws steeper than the fit foresaw (a gore
   inside a cluster) is kept with its drawn grade (`build.add_local`, `pavement_checks.
   drawn_steep`). Both are noted by the checks and listed in the report (`held_junctions`).
-- **Checks** (four, 106 on a flat sample, 111 with decks): `pavement_edges`,
-  `pavement_tiling` (faces on one layer within `SAME_Z_M` 4.5 m of each other never overlap,
-  every face on its owner's right of way), `pavement_heights` (a bend face across a fold
-  noted), `pavement_junctions`; `road_overlaps`, `junction_surface`, the crosswalk, signal and
-  dead end checks, column placement, props and decks read clusters.
+- **Checks** (four, 106 on a flat sample, 111 with decks; run again on the finished city,
+  so their notes name its stable ids): `pavement_edges`, `pavement_tiling` (faces on one layer
+  within `SAME_Z_M` 4.5 m of each other never overlap, every face on its owner's right of
+  way), `pavement_heights` (a bend face across a fold noted), `pavement_junctions`;
+  `road_overlaps`, `junction_surface`, the crosswalk, signal and dead end checks, column
+  placement, props (railings and median barriers 3 cm clear of a junction's outline,
+  `props.ROAD_IN_M`) and decks read clusters.
 - **Stage 2 today:** a junction's `polygon` is its carriageway face's outline, `edge_z` the
   map's heights there, so AG7 draws today's pieces on the map until AG17.
 - **Blockout:** roads, junctions, pads, medians and sidewalks drawn from the faces into the
-  objects they were in (keys unchanged), curbs as walls; `preview_pavement.png`.
+  objects they were in (keys unchanged; a band's side from its name before a split suffix,
+  `blockout._side`), curbs as walls; `preview_pavement.png`.
 - **With M10, M13, M14:** ids from owners, the splice makes the map again on the spliced city
   (`build.pavement_of`); heights over M13's ground; a deck's streets on layer d1.
 Sample builds: `docs/progress/M22/`.

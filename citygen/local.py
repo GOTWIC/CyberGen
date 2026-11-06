@@ -366,6 +366,7 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             "legs": a["legs"], "signalized": j["signalized"],
             "corner_radius_m": a["corner_radius_m"], "crosswalk_ids": j["crosswalk_ids"],
             "attrs": {"classes": a["classes"], "archetype": a["archetype"],
+                      **({"cuts": a["cuts"]} if a.get("cuts") else {}),
                       **({k: a[k] for k in ("nodes", "inner", "signals", "bulbs") if k in a}
                          if a.get("nodes") else {}),
                       **({"unbuildable": a["unbuildable"]} if a.get("unbuildable") else {})}})

@@ -34,6 +34,18 @@ def _map(nodes: dict, segs: list, junctions: list) -> CityModel:
     as a model the checks read."""
     nrows = [{"id": k, "position": list(p), "attrs": {}} for k, p in nodes.items()]
     jrows = [dict(j, attrs=dict(j.get("attrs") or {})) for j in junctions]
+    # (the segments' cuts onto the junctions at their ends, as `junctions.build` stores them)
+    for j in jrows:
+        ns = set(j["attrs"].get("nodes") or [j["node_id"]])
+        inner = set(j["attrs"].get("inner") or [])
+        cuts = sorted([s["id"], end, c] for s in segs if s["id"] not in inner
+                      for end, nid, c in (("a", s["start"], s["attrs"]["cuts"][0]),
+                                          ("b", s["end"], s["attrs"]["cuts"][1]))
+                      if nid in ns and c > 0.0)
+        if cuts:
+            j["attrs"]["cuts"] = cuts
+    for s in segs:
+        s["attrs"].pop("cuts", None)
     mp = PV.make(segs, nrows, jrows, {})
     for j in jrows:
         if not isinstance(j["polygon"], dict):
@@ -212,8 +224,9 @@ def test_sample_passes_the_map_checks():
     for j in m.junctions:
         if j.id in faces and len([f for f in m.pavement if f.owner_id == j.id and
                                   f.kind == "junction"]) == 1:
-            assert abs(Polygon(j.polygon.exterior).area - faces[j.id].area) < 0.05 * \
-                faces[j.id].area + 1.0
+            # (holes too: a cluster's carriageway can ring an island)
+            face = Polygon(j.polygon.exterior, j.polygon.holes)
+            assert abs(face.area - faces[j.id].area) < 0.05 * faces[j.id].area + 1.0
     # (every junction kept as M18 left it says what holds it)
     from citygen.junctions import why_text
 
@@ -221,3 +234,12 @@ def test_sample_passes_the_map_checks():
         if j.attrs.get("unbuildable"):
             assert why_text(j.attrs["unbuildable"])
     assert math.isfinite(sum(v.z for v in m.pavement_net.vertices))
+    # (the map made again from the finished model's rows, as a district regeneration makes
+    # it, is the map M2 made: its ties go by geometry, never by the ids M10 renames)
+    from citygen import build as B
+    from citygen import geom as G
+
+    with G.canonical():
+        again = B.pavement_of(b.spec, m)
+    assert again.pavement == m.pavement and again.pavement_net == m.pavement_net
+    assert [j.polygon for j in again.junctions] == [j.polygon for j in m.junctions]

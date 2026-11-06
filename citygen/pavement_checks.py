@@ -303,8 +303,9 @@ def _on_owner(c: Check, m, N: Net, ids: list) -> None:
     line = {sid: LineString([p[:2] for p in s.centerline]) for sid, s in seg.items()}
     node = {n.id: n for n in m.road_nodes}
     at: dict = {}
+    rcuts = PV.road_cuts(m.junctions)
     for s in m.road_segments:
-        cuts = s.attrs.get("cuts") or [0.0, 0.0]
+        cuts = rcuts.get(s.id) or [0.0, 0.0]
         at.setdefault(s.start, []).append(cuts[0] + PV.MITER_MAX * s.width_m / 2.0)
         at.setdefault(s.end, []).append(cuts[1] + PV.MITER_MAX * s.width_m / 2.0)
     reach: dict = {}

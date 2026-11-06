@@ -64,7 +64,12 @@ def test_plan_covers_the_model(small, small_plan):
     tiles = {t["name"] for t in plan["tiles"]}
     assert {o["tile"] for o in plan["objects"]} <= tiles
     joined_ids = ";".join(o["props"].get("citygen_ids", "") for o in plan["objects"])
-    for s in small.sidewalks[:50]:
+    # (M22: a cluster's inner road has no pavement faces of its own, its ground the
+    # cluster's carriageway and corner pads, so its sidewalk records are drawn by those)
+    inner = {r for j in small.junctions for r in j.attrs.get("inner") or []}
+    walks = [s for s in small.sidewalks if s.segment_id not in inner]
+    assert len(walks) > 0.9 * len(small.sidewalks)
+    for s in walks:
         assert s.id in joined_ids
     used = {p["m"] for o in plan["objects"] for p in o["parts"] if p["k"] != "inst"}
     used |= {p["m"] for parts in plan.get("prototypes", {}).values() for p in parts}
