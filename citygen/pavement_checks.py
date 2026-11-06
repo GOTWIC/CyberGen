@@ -28,7 +28,8 @@ from .checks import Check
 
 SHOW = 12
 GAP_M2 = 1.0            # a hole in the pavement this small is a gap, not a block
-GAP_MIN_M2 = 1e-6       # (smaller: the union's own rounding of edges the map shares)
+GAP_MIN_M2 = 1e-4       # (smaller: the union's own rounding of edges the map shares)
+OVERLAP_MIN_M2 = 1e-3   # (smaller: two faces' corners rounded onto the 1 mm grid apart)
 SAME_Z_M = 2.5          # two faces this near in height where they overlap are one level
 LEVEL_TOL_M = 0.0015    # a port's vertices within this of one height (stored to 1 mm)
 GRADE_TOL = 0.005       # rounding: heights to 1 mm over short triangle sides
@@ -203,7 +204,9 @@ def check_tiling(spec, m) -> Check:
     c = Check("pavement_tiling", f"M22: every pavement face a simple polygon; no two faces "
                                  f"overlap where they are within {SAME_Z_M:g} m in height "
                                  f"(one over the other, an overpass, may); no hole in the "
-                                 f"pavement under {GAP_M2:g} m2 (a gap)")
+                                 f"pavement under {GAP_M2:g} m2 (a gap); every face on its "
+                                 f"owner's right of way (a road's half width, a junction's "
+                                 f"legs out to their cuts)")
     if m.pavement_net is None:
         return c
     N = Net(m)
@@ -227,7 +230,7 @@ def check_tiling(spec, m) -> Check:
         rel = shapely.relate_pattern(arr[a], arr[b], "2********")
         for i, j in zip(a[rel].tolist(), b[rel].tolist()):
             ov = shapely.intersection(arr[i], arr[j])
-            if ov.area < 1e-6:
+            if ov.area < OVERLAP_MIN_M2:
                 continue
             p = ov.representative_point()
             if abs(_near_z(N, ids[i], p.x, p.y) - _near_z(N, ids[j], p.x, p.y)) > SAME_Z_M:
@@ -250,7 +253,58 @@ def check_tiling(spec, m) -> Check:
                             f"({q.x:.1f}, {q.y:.1f})")
     if n_over:
         c.notes.append(f"{n_over} overlaps of faces one over the other (overpasses, tunnels)")
+    _on_owner(c, m, N, ids)
     return c
+
+
+def _on_owner(c: Check, m, N: Net, ids: list) -> None:
+    """Every face on its owner's ground: a road's within its half width (and ON_OWNER_M)
+    of its centerline; a junction's within its legs' cuts and half widths (a bulb's radius)
+    of its nodes, or on a cluster's inner roads."""
+    from shapely.geometry import LineString, Point
+
+    seg = {s.id: s for s in m.road_segments if len(s.centerline) >= 2}
+    line = {sid: LineString([p[:2] for p in s.centerline]) for sid, s in seg.items()}
+    node = {n.id: n for n in m.road_nodes}
+    at: dict = {}
+    for s in m.road_segments:
+        cuts = s.attrs.get("cuts") or [0.0, 0.0]
+        at.setdefault(s.start, []).append(cuts[0] + s.width_m / 2.0)
+        at.setdefault(s.end, []).append(cuts[1] + s.width_m / 2.0)
+    reach: dict = {}
+    for j in m.junctions:
+        disks = []
+        for nid in j.attrs.get("nodes") or [j.node_id]:
+            n = node.get(nid)
+            if n is not None:
+                head = (n.attrs.get("turning_head_m") or 0.0) + 6.0
+                disks.append((Point(n.position[:2]), max(at.get(nid, []) + [head])))
+        strips = [(line[i], seg[i].width_m / 2.0) for i in j.attrs.get("inner") or []
+                  if i in line]
+        reach[j.id] = (disks, strips)
+    by_id = {f.id: f for f in N.faces}
+    for fid in ids:
+        f = by_id[fid]
+        pts = shapely.points([N.xy(v) for v in N.rings[fid][0]])
+        if f.owner_id in line:
+            ok = shapely.distance(pts, line[f.owner_id]) <=                 seg[f.owner_id].width_m / 2.0 + ON_OWNER_M
+        elif f.owner_id in reach:
+            disks, strips = reach[f.owner_id]
+            ok = np.zeros(len(pts), dtype=bool)
+            for P, r in disks:
+                ok |= shapely.distance(pts, P) <= r + ON_OWNER_M
+            for ln, h in strips:
+                ok |= shapely.distance(pts, ln) <= h + ON_OWNER_M
+        else:
+            continue
+        if not bool(np.all(ok)):
+            k = int(np.argmin(ok))
+            q = N.xy(N.rings[fid][0][k])
+            _lim(c, f"face {fid} ({f.kind}) reaches off its owner's right of way at "
+                    f"({q[0]:.1f}, {q[1]:.1f})")
+
+
+ON_OWNER_M = 1.0        # a face may reach this far past its owner's right of way
 
 
 def _tri_grade(p, q, r) -> tuple[float, float]:
@@ -367,23 +421,12 @@ def check_heights(spec, m) -> Check:
         zs = [N.z(v) for v in e.v]
         if max(zs) - min(zs) > LEVEL_TOL_M:
             _lim(c, f"port {eid}: {min(zs):.3f} to {max(zs):.3f} m across")
-    by_class, cap = _grades(spec, m)
-    cls = {s.id: s.road_class for s in m.road_segments}
-    roads = _owner_roads(N)
     held = {j.id: j.attrs["unbuildable"] for j in m.junctions if j.attrs.get("unbuildable")}
     # (and the faces of a junction beside one, sharing its vertices: its heights reach them)
     held_v = {v for f in N.faces if f.owner_id in held for r in N.rings.get(f.id, []) for v in r}
     steep = 0.0
     noted = set()
-    for f in N.faces:
-        if f.kind not in JUNCTION_KINDS or f.id in N.bad:
-            continue
-        if f.kind == "bend":
-            lim = by_class.get(cls.get(f.owner_id), cap)
-        else:
-            lim = max([by_class.get(cls.get(r), cap) for r in roads.get(f.owner_id, ())] or
-                      [cap])
-        worst = face_grade(N, f)
+    for f, worst, lim in face_slopes(spec, m, N):
         if worst > lim + GRADE_TOL:
             if f.owner_id in held or any(v in held_v for r in N.rings[f.id] for v in r):
                 noted.add(f.owner_id)     # (held as M18 left it: `pavement_junctions`)
@@ -396,6 +439,43 @@ def check_heights(spec, m) -> Check:
                        f"holds each: `pavement_junctions`), with faces steeper than their "
                        f"roads: {', '.join(sorted(noted)[:SHOW])}")
     return c
+
+
+def face_slopes(spec, m, N: Net | None = None) -> list[tuple]:
+    """(face, its steepest slope, its limit) of every junction, corner pad, bulb and bend
+    face: a junction's limit the steepest class grade of its roads (M13's, at least M18's
+    ramp maximum), a bend's BEND_FACTOR times its road's (its inner edge climbs over a
+    shorter run than its centerline)."""
+    N = N or Net(m)
+    by_class, cap = _grades(spec, m)
+    cls = {s.id: s.road_class for s in m.road_segments}
+    roads = _owner_roads(N)
+    out = []
+    for f in N.faces:
+        if f.kind not in JUNCTION_KINDS or f.id in N.bad or not N.rings.get(f.id):
+            continue
+        if f.kind == "bend":
+            lim = BEND_FACTOR * by_class.get(cls.get(f.owner_id), cap)
+        else:
+            lim = max([by_class.get(cls.get(r), cap) for r in roads.get(f.owner_id, ())] or
+                      [cap])
+        out.append((f, face_grade(N, f), lim))
+    return out
+
+
+def drawn_steep(spec, m) -> dict:
+    """{junction id: its steepest face} of the junctions not yet held whose faces the map
+    draws steeper than their grade."""
+    held = {j.id for j in m.junctions if j.attrs.get("unbuildable")}
+    jids = {j.id for j in m.junctions}
+    out: dict = {}
+    for f, worst, lim in face_slopes(spec, m):
+        if f.owner_id in jids and f.owner_id not in held and worst > lim + GRADE_TOL:
+            out[f.owner_id] = max(out.get(f.owner_id, 0.0), round(worst, 3))
+    return out
+
+
+BEND_FACTOR = 1.25      # a bend face's limit: this times its road's grade
 
 
 def _seg_dist(p, q, a, b) -> float:

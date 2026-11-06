@@ -34,7 +34,6 @@ footbridges, alleys and service lanes (shared with vehicles), and paths into ope
 from __future__ import annotations
 
 import math
-import os
 
 import numpy as np
 import shapely
@@ -189,19 +188,20 @@ def legs_at(net, arch_of) -> dict[str, list[Leg]]:
     return out
 
 
-def cutbacks(legs: list[Leg], cap: bool = True) -> None:
+def cutbacks(legs: list[Leg], cap: bool = True, one: bool = False) -> None:
     """Each leg's cut-back at a node; `cap` limits it to 0.45 of the leg (else `share_cuts`
-    shares each road between its two junctions)."""
+    shares each road between its two junctions); `one` (M22): one cut per leg, past every
+    overlap that reaches the node however far (`overlap_cuts(..., cap=False)`)."""
     n = len(legs)
     if n == 2:
         # M17: a bend between two roads (an avenue that ends in a street, a street that goes
         # on as a promenade) cuts back where their rights of way overlap
-        overlap_cuts(legs, cap)
+        overlap_cuts(legs, not one)
         if any(lg.cut > 0.0 for lg in legs):
             for lg in legs:
                 lg.cut = min(lg.cut + 1.0, 0.45 * lg.L) if cap else lg.cut + 1.0
                 lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L) if cap else lg.cut_row + 0.5
-                if not cap:
+                if one:
                     lg.cut = lg.cut_row = max(lg.cut, lg.cut_row)     # (M22: one cut)
         return
     if n < 3:
@@ -223,11 +223,11 @@ def cutbacks(legs: list[Leg], cap: bool = True) -> None:
         if c2 is not None:
             a.cut_row = max(a.cut_row, c2[0])
             b.cut_row = max(b.cut_row, c2[1])
-    overlap_cuts(legs, cap)
+    overlap_cuts(legs, not one)
     for lg in legs:
         lg.cut = min(lg.cut + 1.0, 0.45 * lg.L) if cap else lg.cut + 1.0
         lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L) if cap else lg.cut_row + 0.5
-        if not cap:
+        if one:
             # M22: one cut per leg, where every band, sidewalk, crosswalk and lane ends
             lg.cut = lg.cut_row = max(lg.cut, lg.cut_row)
 
@@ -260,6 +260,21 @@ FOLD_REACH = 3.0        # M22: a fold this many half widths past a cut is the ju
 
 
 def fold_cuts(net, legs: dict) -> int:
+    """M22: `_fold_cuts` until no cut moves (a cut moved past one fold or corner can land
+    in the next), at most FOLD_ROUNDS times."""
+    n = 0
+    for _ in range(FOLD_ROUNDS):
+        k = _fold_cuts(net, legs)
+        n += k
+        if not k:
+            break
+    return n
+
+
+FOLD_ROUNDS = 6         # M22: rounds of `_fold_cuts`
+
+
+def _fold_cuts(net, legs: dict) -> int:
     """M22: a leg whose right of way folds (a turn tighter than its half width:
     `pavement.Road.folds`) within FOLD_REACH half widths past its cut is cut past the fold,
     so the junction takes the bend and no bend face meets a port. Returns how many."""
@@ -1539,8 +1554,6 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
                                   "high": [ups[0][1][0], ups[0][1][1], round(ups[0][0], 2)]}
         else:
             out["held"][first] = {"grade": True}
-    if os.environ.get("M22_DEBUG"):
-        out["debug"] = whys
     by_id = {x["id"]: x for x in net.segments}
     for sid, new in sorted(plan_new.items()):
         if _changed(by_id[sid]["z_profile"], new):
@@ -1649,6 +1662,10 @@ def why_text(why: dict) -> str:
     """M22: what holds a junction the height fit kept (`attrs.unbuildable`), in words."""
     if why.get("grade"):
         return "its roads cannot reach its ports within their grade"
+    if why.get("drawn"):
+        return (f"its faces drawn from its ports reach {why['drawn']:.1%} where the fit's "
+                f"estimate did not (two of its roads parting at different grades inside it, "
+                f"a concave outline)")
 
     def one(kind, ref):
         return {"local cap": f"M7's {ST.LOCAL_JUNCTION_Z_M:g} m limit at local junction {ref}",
@@ -2359,12 +2376,22 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     Ws = {0: WalkGraph()}
     nlev = {n["id"]: DK.walk_level(n) for n in net.nodes}
     corner_of: dict = {}   # (node, seg id, side) -> walk node
+    # (M13's grade lines hold each junction's height out to M17's cut on its legs, as before
+    # M22: out to M22's, longer, a hillside's short streets go flat; `local.py`)
+    legs17 = legs_at(net, arch_of)
+    for nid in sorted(legs17):
+        cutbacks(legs17[nid], cap=False)
+    share_cuts(legs17)
+    runs17 = {(x.seg["id"], nid): run_along(x, max(x.cut, x.cut_row))
+              for nid, lg in legs17.items() for x in lg
+              if len(lg) >= 3 or (len(lg) == 2 and any(y.cut > 0.0 for y in lg))}
     for nid in sorted(legs):
-        cutbacks(legs[nid], cap=False)
+        cutbacks(legs[nid], cap=False, one=True)
     # M22: the junctions as regions of the pavement map, one cut per leg (where its bands,
     # sidewalks, crosswalks and lanes end); a road whose two cuts meet joins its junctions
     fold_cuts(net, legs)
     lock_cuts(net, legs)
+    fold_cuts(net, legs)        # (a lock's cut can land in a fold)
     units = plan_units(net, legs, heads, gr)
     inner = {sid for u in units for sid in u["inner"]}
     unit_of = {n: k for k, u in enumerate(units) for n in u["nodes"]}
@@ -2584,7 +2611,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     return {"junctions": junctions, "crosswalks": crosswalks, "sidewalks": sidewalks,
             "lanes": lanes, "walk": Ws[0], "walk_levels": {k: v for k, v in Ws.items() if k},
             "corners": corner_of, "cut": cut, "cut_row": cut_row, "one_way": n_oneway,
-            "legs": legs, "level": lev, "exits": exits, "units": units}
+            "legs": legs, "level": lev, "exits": exits, "units": units, "runs17": runs17}
 
 
 def walkways(W: WalkGraph) -> list[dict]:

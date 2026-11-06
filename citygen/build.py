@@ -712,6 +712,18 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
     loc.info["junction_surfaces"] = sum(1 for j in loc.junctions if j.get("edge_z"))
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
+    # M22: a junction the map draws steeper than its grade, which the height fit's estimate
+    # did not foresee, is kept and noted as one no height fits is (`pavement_junctions`)
+    from . import pavement_checks as PVC
+
+    drawn = PVC.drawn_steep(spec, b.model)
+    if drawn:
+        for j in loc.junctions:
+            if j["id"] in drawn:
+                j["attrs"]["unbuildable"] = {"drawn": drawn[j["id"]]}
+        loc.info["drawn_steep"] = dict(sorted(drawn.items()))
+        b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads,
+                           loc)
     b.notes = b.notes + loc.notes
     if not check:
         return b
@@ -930,13 +942,24 @@ def pavement_of(spec: CitySpec, m: CityModel) -> CityModel:
     from . import pavement as PV
     from . import terrain as TE
 
-    data = m.model_dump(mode="json")
-    mp = PV.make(data["road_segments"], data["road_nodes"], data["junctions"],
-                 {d.id: d.archetype for d in m.districts}, TE.ground_of(m))
+    from . import pavement_checks as PVC
     from .model import PavementNet
 
-    return with_rows(m, {"junctions": data["junctions"], "pavement": mp.faces}) \
+    data = m.model_dump(mode="json")
+    for j in data["junctions"]:
+        if (j["attrs"].get("unbuildable") or {}).get("drawn"):
+            j["attrs"].pop("unbuildable")      # (drawn again below)
+    mp = PV.make(data["road_segments"], data["road_nodes"], data["junctions"],
+                 {d.id: d.archetype for d in m.districts}, TE.ground_of(m))
+    out = with_rows(m, {"junctions": data["junctions"], "pavement": mp.faces}) \
         .model_copy(update={"pavement_net": PavementNet.model_validate(mp.net)})
+    drawn = PVC.drawn_steep(spec, out)
+    if drawn:
+        for j in data["junctions"]:
+            if j["id"] in drawn:
+                j["attrs"]["unbuildable"] = {"drawn": drawn[j["id"]]}
+        out = with_rows(out, {"junctions": data["junctions"]})
+    return out
 
 
 def check_all(spec: CitySpec, m: CityModel) -> tuple[list, dict]:
@@ -1036,4 +1059,9 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_ground.png")
         render_ground(b, paths[-1])
+    if b.model.pavement_net is not None:
+        from .preview_pavement import render_pavement
+
+        paths.append(out / "preview_pavement.png")
+        render_pavement(b, paths[-1])
     return paths

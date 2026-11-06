@@ -348,8 +348,12 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             # (M18: a primary road LEVEL_OUT_M past it too; a local road's run stays M13's:
             # longer, the grade lines of a hillside's short streets go flat and its fills pass
             # FILL_MAX_M, as Cragmouth showed)
-            r = min(JN.run_along(x, max(x.cut, x.cut_row)) +
-                    (JN.LEVEL_OUT_M if x.cls in ("highway", "avenue") else 0.0),
+            # (M22: M17's cut, `junctions.build`'s runs17: M22's reaches the whole of a
+            # cluster's roads)
+            run = jx["runs17"].get((x.seg["id"], nid))
+            if run is None:
+                continue
+            r = min(run + (JN.LEVEL_OUT_M if x.cls in ("highway", "avenue") else 0.0),
                     0.45 * x.L)
             k = (x.seg["id"], nid)
             if r > out.cuts.get(k, 0.0):
@@ -420,11 +424,11 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                 "unbuildable_junctions": jx["level"].get("unbuildable", 0),
                 "levelled_further": jx["level"].get("levelled_further", 0),
                 "unresolved_junctions": jx["level"].get("unresolved", []),
-                "unresolved_why": jx["level"].get("why", []),
+                "held_junctions": {k: v for k, v in sorted(jx["level"].get("held", {}).items())
+                                   if k in set(jx["level"].get("unresolved", []))},
                 "nodes_moved": jx["level"].get("nodes_moved", 0),
                 "no_fit": jx["level"].get("no_fit", 0),
-                "steep": jx["level"].get("steep", 0),
-                **({"debug": jx["level"]["debug"]} if jx["level"].get("debug") else {})}
+                "steep": jx["level"].get("steep", 0)}
     if dplan.decks:
         out.info["decks"] = DK.info(dplan, dko)
     return out
