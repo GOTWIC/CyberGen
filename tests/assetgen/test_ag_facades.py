@@ -261,3 +261,22 @@ def test_building_glb_holds_its_instanced_parts():
     for x in res["parts"]:
         assert x["node"].encode() in data
     assert data == BD.building_glb(br["id"], copy.deepcopy(br), gm)
+
+
+def test_nothing_reaches_round_a_corner_over_a_lane():
+    """#88 (Saltreach): something reaching off a facade near one of its ends stays off where
+    the edge round that corner faces a road with no sidewalk (its lane nearer than
+    `LANE_NEAR` at that end); away from the ends, or with the corner's lane far, it may."""
+    from types import SimpleNamespace
+    br = brief_of([mass(rect(-20.0, -10.0, 20.0, 10.0), 0.0, 30.0, 10)],
+                  btype="building.tower")
+    e1 = br["edges"][1]                                 # (the east wall, after the south)
+    e1.update(lane_m=0.4, lane_s=[0.0, e1["length_m"]], lane_z_m=0.0)
+    sb = SH.ShellBuilder(br, GN.make(br))
+    south = SimpleNamespace(j=0, soff=0)
+    L = int(round(br["edges"][0]["length_m"] * 1000))
+    assert sb._corner_road(south, L - 300, 550)          # (its end, at the east corner)
+    assert not sb._corner_road(south, L // 2, 550)
+    assert not sb._corner_road(south, 300, 550)          # (its start: the west wall, no lane)
+    e1["lane_m"] = 3.0
+    assert not sb._corner_road(south, L - 300, 550)

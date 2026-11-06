@@ -1,31 +1,30 @@
 {
   "title": "CyberGen",
   "subtitle": "Build log gallery",
-  "lede": "Generators for cyberpunk open cities, from one text prompt to a city you can fly through in Unreal Engine.",
+  "lede": "A set of generators that turn a text prompt into a fully playable open-world city, in five stages: the layout (coast, districts, roads, buildings, transit), a 3D model for every building and street element, light and atmosphere, traffic and crowds, then story. An exporter imports each stage into Unreal Engine 5. The first two stages are built.",
   "repo": "https://github.com/GOTWIC/CyberGen",
   "branch": "main",
   "site": "https://gotwic.github.io/CyberGen/",
-  "backdrop": {"dark": "ag15-night", "light": "ag15-day"},
+  "backdrop": {"dark": "ag15-night"},
   "next": "Next: stage 3, atmosgen (light, sky and weather), stage 4, lifegen (crowds, traffic, trains and aircraft), then stage 5, storygen.",
   "showcase": {
-    "kicker": "Cyberpunk city generator",
     "heading": "Cyberpunk cities from a single prompt",
     "items": [
-      {"entry": "m2-streets", "title": "Street plan", "caption": "Each district laid out in its own street pattern, down to the lot."},
-      {"entry": "m3-buildings", "title": "Massing", "caption": "Nexus City's buildings, shaped and sized by district."},
-      {"entry": "m5-transit", "title": "Transit network", "caption": "Metro, elevated rail, monorail, maglev and sky tubes across Delta Megacity."},
-      {"entry": "m7b-city", "title": "First whole city", "caption": "Vesper Bay's first complete blockout, seen from the south."},
-      {"entry": "m11-gameplay", "title": "Gameplay layer", "caption": "Faction turf, places to go, wealth, danger, traffic and crowds."},
-      {"entry": "m13-terrain", "title": "Cragmouth", "caption": "A port city on hills, its plateau standing on a cliff over the bay."},
-      {"entry": "m20-city", "title": "Complete layout", "caption": "Vesper Bay with every tower, transit line, prop and sign in place.", "wide": true},
-      {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props in Greyhook, in Unreal Engine."},
-      {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel, lit up at night."},
+      {"entry": "m2-streets", "title": "Street plan", "caption": "Each district laid out in its own street pattern, down to the lot.", "crop": [0.016, 0.104, 0.721, 0.971]},
+      {"entry": "m3-buildings", "title": "Massing", "caption": "Buildings shaped and sized by district, from low old quarters to a core of towers.", "crop": [0.0, 0.115, 0.885, 0.62]},
+      {"entry": "m5-transit", "title": "Transit network", "caption": "Metro, elevated rail, monorail, maglev and sky tubes across a generated city.", "crop": [0.0, 0.091, 1.0, 0.882]},
+      {"entry": "m7b-city", "title": "First whole city", "caption": "The first complete blockout of a generated city, seen from the south."},
+      {"entry": "m11-gameplay", "title": "Gameplay layer", "caption": "Faction turf, places to go, wealth, danger, traffic and crowds.", "crop": [0.0, 0.1, 1.0, 1.0]},
+      {"entry": "m13-terrain", "title": "Hills and cliffs", "caption": "A port city on hills, its plateau standing on a cliff over the bay."},
+      {"entry": "m20-city", "title": "Complete layout", "caption": "An example of a generated city, with every tower, transit line, prop and sign in place.", "wide": true},
+      {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props on a shopping street, in Unreal Engine."},
+      {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "A megatower, a cluster of spires, an arcology and an observation wheel, lit up at night."},
       {"entry": "ag8-props", "title": "Street props", "caption": "Every street prop and vehicle in the neon style, laid out.", "wide": true},
-      {"entries": ["ag10-city", "ag15-city-night"], "labels": ["Day", "Night"], "title": "Vesper Bay, modelled", "caption": "Every building with a model and textures of its own, by day and lit up at night.", "wide": true},
-      {"entry": "ag12-canal", "title": "Canal at night", "caption": "Neon and lit windows on a Vesper Bay canal.", "wide": true},
-      {"entries": ["ag15-day", "ag15-night"], "labels": ["Day", "Night"], "title": "Day and night", "caption": "Delta Megacity's core, every tower lit its own way after dark.", "wide": true},
-      {"entry": "ag15-street", "title": "Core street", "caption": "Street level in Delta Megacity's core at night."},
-      {"entry": "fix-sky-tubes", "title": "Crown Loop", "caption": "A sky tube loop through the Corporate Core, its rings lit at night."}
+      {"entries": ["ag10-city", "ag15-city-night"], "labels": ["Day", "Night"], "title": "A whole city, modelled", "caption": "An example of a generated city, every building with a model and textures of its own, by day and lit up at night.", "wide": true},
+      {"entry": "ag12-canal", "title": "Canal at night", "caption": "Neon signs and lit windows reflected in a canal at night.", "wide": true},
+      {"entries": ["ag15-day", "ag15-night"], "labels": ["Day", "Night"], "title": "Day and night", "caption": "A city core, every tower lit its own way after dark.", "wide": true},
+      {"entry": "ag15-street", "title": "Core street", "caption": "Street level in a city core at night."},
+      {"entry": "fix-sky-tubes", "title": "Sky tubes", "caption": "A sky tube curving in toward a city core, every ring lit at night."}
     ]
   },
   "stages": [
@@ -116,8 +115,8 @@
       "milestone": "M3",
       "milestone_name": "Buildings",
       "title": "A building on every lot",
-      "image": "docs/progress/M3/nexus_city/preview_massing.png",
-      "caption": "Nexus City with a building on every lot, shaped and sized by district."
+      "image": "docs/progress/M3/delta_megacity/preview_massing.png",
+      "caption": "Delta Megacity with a building on every lot, shaped and sized by district."
     },
     {
       "id": "m3p-megablocks",
@@ -506,8 +505,8 @@
       "milestone": "AG12",
       "milestone_name": "Water",
       "title": "A canal by night",
-      "image": "docs/progress/fix_moorings/vesper_bay/8k/water_canal_night_after.jpg",
-      "caption": "A canal in Vesper Bay at night, neon on the water."
+      "image": "docs/progress/gallery_refresh/canal_night.jpg",
+      "caption": "A canal in Vesper Bay's Neon Strand at night, neon on the water."
     },
     {
       "id": "ag13-park",
@@ -585,9 +584,9 @@
       "stage": "2",
       "milestone": "Fix",
       "milestone_name": "Sky tube pylons and rings",
-      "title": "Lit rings on the Crown Loop",
-      "image": "docs/progress/gallery_refresh/crown_loop_night.jpg",
-      "caption": "The Crown Loop's lit rings winding through the Corporate Core at night."
+      "title": "Lit rings over the core",
+      "image": "docs/progress/gallery_refresh/sky_tube_night.jpg",
+      "caption": "Delta Megacity's Skyline Loop curving in toward its Corporate Core at night, every ring lit."
     },
     {
       "id": "ue-fly",

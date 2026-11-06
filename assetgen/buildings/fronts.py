@@ -54,6 +54,7 @@ GAP_MIN = 60
 EDGE_CLEAR = 60
 INNER = ("courtyard", "atrium")  # a court's walls: no door moves there
 MAIN_KEEP = 1300             # half the room a main entrance between shopfronts keeps
+SHARE_MM = 1500              # #88: how far off a shopfront a moved main entrance may share it
 SHOP_MIN = 1500              # a unit narrower than this after its piers takes a door only
 DOOR_SHIFT = 1200            # how far a door may move along the facade from its entrance
 HEAD_GAP = 150               # wall left over every opening under the band's top
@@ -413,6 +414,10 @@ class Band:
                 taken = [o for o in ops if o.kind != "win"]
                 op = self._door(fa, k, en, t, taken, self._mounts(fa), True)
                 self.boxes = keep
+                if op is None and k is not None and en["kind"] == "main" and \
+                        self._share_shop(ops, t, k, en, fa):
+                    sb.done_ents.add(k)
+                    break
                 if op is None or fa.cls((op.a + op.b) // 2, self.z0 + 1200) in INNER:
                     continue                   # (nor slid along the facade into one)
                 op.info["moved"] = True
@@ -425,6 +430,21 @@ class Band:
                 else:
                     sb.done_units.add(en["unit"])
                 break
+
+    def _share_shop(self, ops: list, t: int, k: int, en: dict, fa) -> bool:
+        """#88: a main entrance with no room for a door of its own on the facade it moves to
+        (a shopfront takes all of it: Nexus City's shanty, its entrance on a party wall)
+        comes in through the door of a shopfront there that has no entrance yet, within
+        `SHARE_MM` of where it would stand."""
+        for op in sorted(ops, key=lambda o: (abs((o.a + o.b) // 2 - t), o.a)):
+            if op.kind != "shop" or "entrance" in op.info or \
+                    not op.a - SHARE_MM <= t <= op.b + SHARE_MM or \
+                    fa.cls((op.a + op.b) // 2, self.z0 + 1200) in INNER:
+                continue
+            op.info.update(entrance=k, en=en, moved=True)
+            self.sb.stats["entrances_shared"] = self.sb.stats.get("entrances_shared", 0) + 1
+            return True
+        return False
 
     def _mounts(self, fa) -> list:
         so = fa.soff

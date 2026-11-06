@@ -1,25 +1,25 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-05T23:48:27Z",
- "sessions": 29,
- "worktree_sessions": 28,
+ "updated": "2026-11-06T06:29:23Z",
+ "sessions": 31,
+ "worktree_sessions": 29,
  "subagents": 1,
  "totals": {
-  "total": 6413877463,
-  "input": 36596,
-  "output": 15558983,
+  "total": 6635293586,
+  "input": 38140,
+  "output": 15872442,
   "cache_write_5m": 155522,
-  "cache_write_1h": 56519982,
-  "cache_read": 6341606380
+  "cache_write_1h": 57397155,
+  "cache_read": 6561830327
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 36464,
-   "output": 15511331,
+   "input": 38008,
+   "output": 15824790,
    "cache_write_5m": 155522,
-   "cache_write_1h": 56349935,
-   "cache_read": 6331407992
+   "cache_write_1h": 57227108,
+   "cache_read": 6551631939
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -81,27 +81,32 @@
    "sessions": 1
   },
   "2026-11-05": {
-   "total": 240300701,
-   "output": 516779,
+   "total": 364844941,
+   "output": 707342,
+   "sessions": 4
+  },
+  "2026-11-06": {
+   "total": 96871883,
+   "output": 122896,
    "sessions": 3
   }
  },
  "stats": {
   "totals": {
-   "total": 15302196402,
-   "input": 85384,
-   "output": 43632052,
+   "total": 15718995175,
+   "input": 88152,
+   "output": 44426604,
    "cache_write_5m": 321890,
-   "cache_write_1h": 161095983,
-   "cache_read": 15097061093
+   "cache_write_1h": 163038465,
+   "cache_read": 15511120064
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 85078,
-    "output": 43510887,
+    "input": 87846,
+    "output": 44305439,
     "cache_write_5m": 321890,
-    "cache_write_1h": 160644100,
-    "cache_read": 15073271569
+    "cache_write_1h": 162586582,
+    "cache_read": 15487330540
    },
    "claude-sonnet-5-5": {
     "input": 306,
@@ -163,8 +168,13 @@
     "sessions": 1
    },
    "2026-11-05": {
-    "total": 547728588,
-    "output": 1424293,
+    "total": 785072584,
+    "output": 1906855,
+    "sessions": 4
+   },
+   "2026-11-06": {
+    "total": 179454777,
+    "output": 311990,
     "sessions": 3
    }
   },

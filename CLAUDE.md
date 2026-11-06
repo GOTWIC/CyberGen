@@ -1404,7 +1404,8 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
   sidewalk corners (`walks.py`), bridges by kind, road columns, tunnels, portals, approach
   trenches, underpass stairs, vents (`structures.py`), guideways, sky tubes (glass as a
   non-Nanite LOD chain), transit columns and station structures, M13's retaining walls
-  (`transit.py`), quays and canal walls (`water.py`), megasite elements with containers as
+  (`transit.py`), quays (stairs down to the water every 60 m, each flight a closed solid from
+  the wall's foot, #131) and canal walls (`water.py`), megasite elements with containers as
   instanced parts (`sites.py`). Meshes on integer millimeters in each piece's frame
   (`kit.py`: grids, sweeps, exact polygons; folds dropped); lean glTF.
 - **Outputs**: `BUILD/assets/streets/<tile>.glb` (a node per piece, the blockout's tile of
@@ -1882,6 +1883,29 @@ AG15 (cyberpunk facades and night, from the first run-through) is in place (test
   spot lights under the 192 nearest lamps, `M_CgLightPool` decals under 768 more, sign
   washes (`docs/unreal_export.md`, "From AG15").
 Results: `docs/progress/AG15/`.
+The asset fixes (issues #83, #85, #88, #90, after run-through 2) are in place:
+- **AC units and ivy in the building's frame** (`brief.frame_z`, `FLOOR_MOUNTS`): M20 hangs
+  them on a floor's facade at a height over the ground where they hang
+  (`props.Ctx.facade_spot`); the briefs give them their height over the building's base (AG3's
+  panels and trellises and the mount check read it there), AG8 lifts them by the ground where
+  they hang (`props.gather.over`), and M20 puts none on a wall the ground buries at its spot.
+  The ground floor's shop signs, awnings, wall lights and cables keep their heights over the
+  base, under which AG3 and AG5 build the shopfronts.
+- **Doors**: a unit whose nearest wall faces another building sits on a facade within
+  `brief.UNIT_REACH_M` 2 m more facing its own street (`unit_loc`); a moved main entrance
+  with no room for its door shares a shopfront's (`fronts.Band._share_shop`, stat
+  `entrances_shared`); `asset_access` lets a path graze a neighbor's wall (`GRAZE_M`).
+- **Neighbor rule**: a hero's or type's weighted system draws past its neighbors' within its
+  weights (`genome.make`); in a city a regeneration made (`city_state.json`'s edits) the
+  towers outside the last edit's district keep their records' genomes
+  (`neighbors.held_towers`, records `ag15.avoided`, `ag15.held`; the old manifest in the
+  build folder); `assetgen brief seam BASE REGEN --district NAME` (`briefdiff.genome_seam`).
+- **Fins round a corner** (`shell._corner_road`): no fin near a facade's end reaches in front
+  of the next edge where that faces a road with no sidewalk, under the headroom.
+- **Exporter**: roof traces count 3 m over the building's pivot (#83); `import_city.unstage`
+  resets an actor going back to the blockout, `CITYGEN_UE_DIGEST_ROWS` (#85); sign washes
+  over the building's base (#90); the small city's import test streams at 600 m.
+  `GEN_VERSION` fixassets.4. Results: `docs/progress/fix_assets/`.
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
@@ -1929,8 +1953,11 @@ again (new renders go in `docs/progress/gallery_refresh/`), `stage` 1, 2 or `ue`
 necessarily a full sentence, saying only what is needed to explain the picture: no extra
 detail, no hashes, goldens, check counts or test talk) and the showcase's `items`
 (`entry`, or `entries` and `labels` for a pair, by log id, `title`, `caption`, `wide` for
-the full width). `site/index.html` and `site/log.html` are the templates `site/build.py`
-fills in, beside `style.css` (the Neon Terminal look with glass panels, light and dark) and
+the full width, `crop` [left, top, right, bottom] fractions to show a cut of the entry's
+image). The showcase names no city, district or line, in its text or its pictures (a preview's
+title band and legend cropped off; a new viewer has no context for the names); the log keeps
+them. `site/index.html` and `site/log.html` are the templates `site/build.py`
+fills in, beside `style.css` (the Neon Terminal look with glass panels, dark only) and
 `app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
 it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px and 640 px
 JPEGs) and deploys; resized images are never committed. Preview with `.venv/bin/python

@@ -7,8 +7,10 @@ Reads site/gallery.json, resizes each entry's image from the repo (a file under
 docs/progress/) into DIR/img/<id>.jpg (at most 2000 px wide) and DIR/thumb/<id>.jpg
 (640 px wide), and writes two pages from their templates: DIR/index.html, the showcase
 (gallery.json's "showcase": a curated few of the entries with titles and captions of
-their own), and DIR/log.html, the build log (every entry), beside style.css, app.js and
-gallery.json. Needs Pillow only.
+their own; an item's "crop", [left, top, right, bottom] as fractions, shows a cut of its
+entry's image, made as DIR/img/show-<id>.jpg, so a preview's title band stays off the
+showcase and whole in the log), and DIR/log.html, the build log (every entry), beside
+style.css, app.js and gallery.json. Needs Pillow only.
 
 The resized images are build output: never commit them. The Pages workflow
 (.github/workflows/pages.yml) runs this on every change to site/. Run it locally into
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import html
 import json
 import re
@@ -89,7 +92,7 @@ def load(path: Path) -> dict:
     if not g.get("entries"):
         errors.append("no entries")
     show = g.get("showcase", {})
-    for f in ("kicker", "heading"):
+    for f in ("heading",):
         if not isinstance(show.get(f), str) or not show[f].strip():
             errors.append(f"showcase: missing {f}")
     if not show.get("items"):
@@ -104,6 +107,15 @@ def load(path: Path) -> dict:
                 errors.append(f"{where}: no entry {r!r}")
         if "labels" in it and len(it["labels"]) != len(refs):
             errors.append(f"{where}: one label per entry")
+        if "crop" in it:
+            c = it["crop"]
+            if len(refs) != 1:
+                errors.append(f"{where}: a crop needs a single entry")
+            elif not (isinstance(c, list) and len(c) == 4 and
+                      all(isinstance(v, (int, float)) for v in c) and
+                      0 <= c[0] < c[2] <= 1 and 0 <= c[1] < c[3] <= 1):
+                errors.append(f"{where}: crop is [left, top, right, bottom] as fractions, "
+                              "left < right and top < bottom")
         for f in ("title", "caption"):
             if not isinstance(it.get(f), str) or not it[f].strip():
                 errors.append(f"{where}: missing {f}")
@@ -141,12 +153,15 @@ def make_images(e: dict, out: Path, cache: dict) -> tuple[int, int, bool]:
     """The entry's full-size and thumbnail JPEGs; returns the full size and whether made.
 
     `cache` maps an id to the source it was made from, so an entry pointed at another
-    image is made again even when the old output is newer than the new source."""
+    image is made again even when the old output is newer than the new source. `crop`
+    ([left, top, right, bottom] as fractions of the source) cuts the source first (a
+    showcase picture without the title band a preview carries)."""
     src = ROOT / e["image"]
     full = out / "img" / f"{e['id']}.jpg"
     thumb = out / "thumb" / f"{e['id']}.jpg"
     me = Path(__file__)
-    stamp = [e["image"], src.stat().st_size, int(src.stat().st_mtime)]
+    crop = e.get("crop")
+    stamp = [e["image"], src.stat().st_size, int(src.stat().st_mtime)] + ([crop] if crop else [])
     if cache.get(e["id"]) == stamp and fresh(full, src, me) and fresh(thumb, src, me):
         with Image.open(full) as im:
             return im.size[0], im.size[1], False
@@ -154,6 +169,10 @@ def make_images(e: dict, out: Path, cache: dict) -> tuple[int, int, bool]:
     sharp = src.suffix.lower() == ".png"
     with Image.open(src) as im:
         im = flatten(im)
+        if crop:
+            w, h = im.size
+            im = im.crop((round(crop[0] * w), round(crop[1] * h),
+                          round(crop[2] * w), round(crop[3] * h)))
         im.thumbnail(FULL, Image.LANCZOS)
         save_jpeg(im, full, sharp)
         w, h = im.size
@@ -319,25 +338,36 @@ def render_stage_keys(g: dict) -> str:
     names = {s["key"]: s for s in g["stages"]}
     keys = "".join(f'<span class="key" data-stage="{esc(k)}"><i></i>{esc(names[k]["label"])} · {esc(names[k]["name"])}</span>'
                    for k in shown)
-    return keys + '<a class="btn" href="log.html">Build log</a>'
+    return keys
+
+
+def shown_entry(it: dict, e: dict) -> dict:
+    """The picture a showcase item shows: its entry's, or (with `crop`) a cut of that image
+    made under its own id, `show-<entry>`, so the build log keeps the whole picture."""
+    if not it.get("crop"):
+        return e
+    return {"id": f"show-{e['id']}", "image": e["image"], "crop": it["crop"]}
 
 
 def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     """The showcase's cards: one picture each, or a pair (day and night) behind a slider."""
     by_id = {e["id"]: e for e in g["entries"]}
     labels = stage_labels(g)
+    names = {s["key"]: s["name"] for s in g["stages"]}
     out = []
+    stage = None
     for it in g["showcase"]["items"]:
         refs = it.get("entries") or [it["entry"]]
         first = by_id[refs[0]]
+        shown = shown_entry(it, first)
         wide = bool(it.get("wide"))
         sizes = "(max-width: 900px) calc(100vw - 58px), " + ("1130px" if wide else "560px")
         if len(refs) == 1:
             src_url = f"{g['repo']}/blob/{g['branch']}/{quote(first['image'])}"
             # Maps and charts (PNG) are shown whole in their frame; renders fill it.
             fit = " fit" if first["image"].lower().endswith(".png") else ""
-            media = (f'<a class="shot frame{fit}" href="img/{esc(first["id"])}.jpg" data-src="{esc(src_url)}" '
-                     f'aria-label="{esc(it["title"])}, full size">{picture(first, dims[first["id"]], sizes)}</a>')
+            media = (f'<a class="shot frame{fit}" href="img/{esc(shown["id"])}.jpg" data-src="{esc(src_url)}" '
+                     f'aria-label="{esc(it["title"])}, full size">{picture(shown, dims[shown["id"]], sizes)}</a>')
         else:
             a, b = (by_id[r] for r in refs)
             la, lb = it.get("labels", ["Before", "After"])
@@ -349,6 +379,13 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
                      f'<span class="cmp-line" aria-hidden="true"></span>'
                      f'<span class="cmp-handle" role="slider" tabindex="0" aria-label="{esc(la)} and {esc(lb)}: '
                      f'drag or use the arrow keys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></span></div>')
+        if first["stage"] != stage:
+            if stage is not None:
+                out.append("\n  </ul>")
+            stage = first["stage"]
+            out.append(f"""
+  {section_head(labels[stage], names[stage], f"stage-{stage}", stage)}
+  <ul class="showcase">""")
         out.append(f"""
     <li class="entry{' wide' if wide else ''}{' pair' if len(refs) > 1 else ''}" id="show-{esc(refs[0])}" data-stage="{esc(first['stage'])}">
       <article class="card">
@@ -360,7 +397,17 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
         </div>
       </article>
     </li>""")
+    out.append("\n  </ul>")
     return "".join(out)
+
+
+def section_head(label: str, name: str, anchor: str, stage: str = "") -> str:
+    """A showcase section's heading: its label (in its stage's color), its name if any, then a
+    rule to the edge."""
+    sub = f'<span class="sec-name">{esc(name)}</span>' if name else ""
+    st = f' data-stage="{esc(stage)}"' if stage else ""
+    return f'<h2 class="sec-head" id="{esc(anchor)}"{st}><span class="sec-label">{esc(label)}</span>{sub}</h2>'
+
 
 
 DEVICE_ORDER = ("mac", "windows", "cloud")
@@ -563,6 +610,7 @@ def render_usage(us: list[dict]) -> str:
                  f"{'its' if len(pending) == 1 else 'their'} next usage update.")
     newest = max(u["updated"] for u in us)
     return f"""
+  {section_head("Usage", "", "usage-head")}
   <section class="usage glass" id="usage" data-view="all" aria-label="Claude Code usage">
     <div class="usage-head">
       <span class="lbl"><span class="dot"></span>Claude Code usage on CyberGen</span>
@@ -584,7 +632,14 @@ def render_usage(us: list[dict]) -> str:
   </section>"""
 
 
+def asset_version(name: str) -> str:
+    """A short hash of a site file, put in its URL (style.css?v=...) so a browser never
+    keeps an old stylesheet or script under a new page (Pages lets it cache them 10 min)."""
+    return hashlib.sha256((SITE / name).read_bytes()).hexdigest()[:10]
+
+
 def fill(name: str, out: Path, values: dict[str, str]) -> None:
+    values = {**values, "CSS_V": asset_version("style.css"), "JS_V": asset_version("app.js")}
     page = (SITE / name).read_text(encoding="utf-8")
     missing = sorted(set(TOKEN_RE.findall(page)) - values.keys())
     if missing:
@@ -607,14 +662,23 @@ def build(out: Path) -> None:
         dims[e["id"]] = (w, h)
         made += did
         print(f"[{k:2d}/{len(g['entries'])}] {'made' if did else 'kept'} {e['id']}", flush=True)
+    by_id = {e["id"]: e for e in g["entries"]}
+    ids = {e["id"] for e in g["entries"]}
+    # The showcase's cropped pictures (a preview without its title band)
+    for it in g["showcase"]["items"]:
+        if it.get("crop"):
+            s = shown_entry(it, by_id[it["entry"]])
+            w, h, did = make_images(s, out, cache)
+            dims[s["id"]] = (w, h)
+            ids.add(s["id"])
+            made += did
+            print(f"        {'made' if did else 'kept'} {s['id']} (showcase crop)", flush=True)
     cache_file.write_text(json.dumps(cache, indent=1, sort_keys=True), encoding="utf-8")
     # Images of entries no longer in the gallery
-    ids = {e["id"] for e in g["entries"]}
     for folder in ("img", "thumb"):
         for p in (out / folder).glob("*.jpg"):
             if p.stem not in ids:
                 p.unlink()
-    by_id = {e["id"]: e for e in g["entries"]}
     for theme, key in g.get("backdrop", {}).items():
         make_backdrop(ROOT / by_id[key]["image"], out / f"bg-{theme}.jpg")
 
@@ -633,7 +697,7 @@ def build(out: Path) -> None:
         **common,
         "TITLE": esc(f"{g['title']}: {show['heading'].lower()}"),
         "PAGE_URL": esc(g["site"]),
-        "KICKER": esc(show["kicker"]),
+        "NAME": esc(g["title"]),
         "HEADING": esc(show["heading"]),
         "LEDE": esc(g["lede"]),
         "STAGE_KEYS": render_stage_keys(g),
@@ -653,6 +717,7 @@ def build(out: Path) -> None:
     })
     for name in ("style.css", "app.js", "gallery.json"):
         shutil.copyfile(SITE / name, out / name)
+    shutil.copytree(SITE / "fonts", out / "fonts", dirs_exist_ok=True)
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())

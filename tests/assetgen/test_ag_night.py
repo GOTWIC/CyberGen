@@ -164,6 +164,81 @@ def test_neighbor_rule_draws_neighboring_towers_apart():
     assert nb["towers"] == 12 and nb["pairs"] > 0 and nb["failures"] == 0, (nb["same"], nb["first"])
 
 
+def test_a_hero_draws_past_its_neighbors_systems():
+    """#88: a landmark's (or a type's) system drawn from its kind's weights is drawn again
+    past the systems its neighboring towers took, within those weights (Nexus City's spire
+    went after a taller tower beside it that had its curtain wall); the rest of the rule as
+    before."""
+    br = tower(bid="d01.lm.w98n1260.bld", h=166.0)
+    br["building"]["type"] = "building.landmark.spire"
+    first = GN.make(br)["genes"]["body.system"]
+    opts = set(SY.LANDMARK_SYSTEM["spire"])
+    assert first in opts
+    none = {k: set() for k in NB.KINDS}
+    gm = GN.make(br, dict(none, system={first}, vacant=False))
+    assert gm["genes"]["body.system"] in opts - {first}
+    # every option taken: it keeps its own
+    gm = GN.make(br, dict(none, system=set(opts), vacant=False))
+    assert gm["genes"]["body.system"] == first
+
+
+def test_regeneration_holds_the_towers_outside_its_district():
+    """#90: in a city a district regeneration made (its build state's edits), the towers
+    outside that district whose briefs are unchanged keep their genomes (drawn again past
+    what their records say they avoided), and the district's new towers avoid them."""
+    from assetgen import brief as B
+
+    def city(two_salt):
+        briefs = {}
+        for k in range(12):
+            d = ("d01", "One") if k < 6 else ("d02", "Two")
+            # (the second district's towers are the taller: they go first, so what they draw
+            # moves the first district's draws when nothing holds them)
+            b = tower(bid=f"{d[0]}.lot.e{k * 30}n{two_salt if k >= 6 else 0}.bld",
+                      x=k * 30.0, y=0.0, h=96.0 + (40.0 if k >= 6 else 0.0) + k)
+            b["district"] = {"id": d[0], "name": d[1], "archetype": "corporate_core",
+                             "wealth": 0.8, "danger": 0.2}
+            b["building"]["district_id"] = d[0]
+            briefs[b["id"]] = b
+        return briefs
+
+    old = city(0)
+    og = {b: GN.make(old[b]) for b in sorted(old)}
+    oav = NB.assign(old, og)
+    recs = {b: {"brief": B.brief_hash(old[b]),
+                "ag15": {"tower": True, "avoided": oav.get(b)}} for b in old}
+    new = city(7)                                   # (Two regenerated: other towers there)
+    hashes = {b: B.brief_hash(new[b]) for b in new}
+    names = {"One": "d01", "Two": "d02"}
+    state = {"edits": [{"district": "Two"}]}
+    held = NB.held_towers(new, hashes, recs, state, names)
+    assert sorted(held) == sorted(b for b in new if b.startswith("d01."))
+    ng = {b: GN.make(new[b]) for b in sorted(new)}
+    nav = NB.assign(new, ng, held)
+    for b in held:
+        assert ng[b] == og[b] and nav.get(b) == oav.get(b), b
+    sig = {b: NB.signature(ng[b]) for b in new}
+    ids = sorted(new)
+    for i, a in enumerate(ids):
+        for b in ids[i + 1:]:
+            if abs(new[a]["origin"][0] - new[b]["origin"][0]) <= NB.RADIUS_M:
+                for kind in NB.KINDS:
+                    assert sig[a][kind] != sig[b][kind], (a, b, kind)
+    # without the hold the first district's towers would have moved
+    free = {b: GN.make(new[b]) for b in sorted(new)}
+    NB.assign(new, free)
+    assert any(free[b] != og[b] for b in held)
+    # a fresh city (no edits), a record from before the rule (no `avoided`), a changed brief
+    # or the last edit's own district: nothing held
+    assert NB.held_towers(new, hashes, recs, {"edits": []}, names) == {}
+    bare = {b: {"brief": r["brief"], "ag15": {"tower": True}} for b, r in recs.items()}
+    assert NB.held_towers(new, hashes, bare, state, names) == {}
+    one = next(iter(sorted(held)))
+    moved = dict(hashes, **{one: "other"})
+    assert one not in NB.held_towers(new, moved, recs, state, names)
+    assert NB.held_towers(new, hashes, recs, {"edits": [{"district": "One"}]}, names) == {}
+
+
 def test_night_by_schedule():
     # offices: a whole band of floors on or off
     on = [[NT.lit(0.123, 0.6, 1, 3, c, f, 21.0) > 0 for c in range(40)] for f in range(30)]

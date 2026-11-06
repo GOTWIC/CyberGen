@@ -383,8 +383,9 @@ class Ctx:
         terrain; an upper floor that overhangs the ground floor's wall: its own facade), with
         the wall's outward normal, its direction and what the building's frame stands over
         the ground at the point (a thing there is at z0 plus it over the ground: 0 on a flat
-        city): (x, y, nx, ny, ux, uy, lift); None where no such wall is within reach, or
-        something over the spot comes down lower than z1."""
+        city): (x, y, nx, ny, ux, uy, lift); None where no such wall is within reach, the
+        ground there stands over z0 (#88: a wall uphill of the building's base, buried
+        there), or something over the spot comes down lower than z1."""
         tree, rings, rows = self.walls()
         if tree is None:
             return None
@@ -424,6 +425,8 @@ class Ctx:
             from . import terrain as TE
 
             lift = base - TE.ground_of(self.m).at(px, py)
+            if z0 + lift < 0.0:
+                return None   # (#88: uphill of its base the ground buries the wall there)
         u = float(V.overhead(self).under(np.array([[px, py]], dtype=np.float64),
                                          np.array([0.0]), np.array([z0 + lift]),
                                          tol=0.005)[0])
