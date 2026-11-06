@@ -1953,7 +1953,7 @@ necessarily a full sentence, saying only what is needed to explain the picture: 
 detail, no hashes, goldens, check counts or test talk) and the showcase's `items`
 (`entry`, or `entries` and `labels` for a pair, by log id, `title`, `caption`, `wide` for
 the full width). `site/index.html` and `site/log.html` are the templates `site/build.py`
-fills in, beside `style.css` (the Neon Terminal look with glass panels, light and dark) and
+fills in, beside `style.css` (the Neon Terminal look with glass panels, dark only) and
 `app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
 it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px and 640 px
 JPEGs) and deploys; resized images are never committed. Preview with `.venv/bin/python

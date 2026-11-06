@@ -1,8 +1,8 @@
 /* CyberGen gallery: the Neon Terminal design language (cold ink, hairlines, mono for
    machine and sans for human, glow only for state) with a glass layer: translucent
-   panels over a dim, blurred city behind the page. Dark first, with a light theme. */
+   panels over a dim, blurred city behind the page. Dark only. */
 
-/* ---- Tokens: dark (default) -------------------------------------------- */
+/* ---- Tokens ------------------------------------------------------------- */
 :root {
   color-scheme: dark;
   --ink-000: #07090c; --ink-050: #0a0c10; --ink-100: #10141a; --ink-200: #151a22;
@@ -31,41 +31,8 @@
   --top: 52px;
 }
 
-/* ---- Tokens: light ------------------------------------------------------ */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
-    --ink-000: #e6eaf0; --ink-050: #eef1f5; --ink-100: #e7ebf1; --ink-200: #ffffff;
-    --ink-300: #f2f4f8; --ink-400: #e3e8ef; --ink-500: #d5dce5;
-    --line-soft: #e1e6ec; --line: #d0d8e1; --line-strong: #b3bfcc;
-    --text: #0e1520; --text-muted: #445366; --text-dim: #627184; --text-inverse: #ffffff;
-    --signal: #00799a; --signal-good: #13874a;
-    --stage-1: #00799a; --stage-2: #c0207a; --stage-ue: #9a6000;
-    --glass: color-mix(in srgb, #ffffff 70%, transparent);
-    --glass-strong: color-mix(in srgb, var(--ink-050) 76%, transparent);
-    --glass-edge: inset 0 1px 0 rgb(255 255 255 / .7);
-    --veil: color-mix(in srgb, var(--ink-050) 74%, transparent);
-    --grid: rgb(40 70 110 / .05);
-    --backdrop: url("bg-light.jpg");
-    --shadow-3: 0 16px 48px rgb(20 30 50 / .25);
-  }
-}
-:root[data-theme="light"] {
-  color-scheme: light;
-  --ink-000: #e6eaf0; --ink-050: #eef1f5; --ink-100: #e7ebf1; --ink-200: #ffffff;
-  --ink-300: #f2f4f8; --ink-400: #e3e8ef; --ink-500: #d5dce5;
-  --line-soft: #e1e6ec; --line: #d0d8e1; --line-strong: #b3bfcc;
-  --text: #0e1520; --text-muted: #445366; --text-dim: #627184; --text-inverse: #ffffff;
-  --signal: #00799a; --signal-good: #13874a;
-  --stage-1: #00799a; --stage-2: #c0207a; --stage-ue: #9a6000;
-  --glass: color-mix(in srgb, #ffffff 70%, transparent);
-  --glass-strong: color-mix(in srgb, var(--ink-050) 76%, transparent);
-  --glass-edge: inset 0 1px 0 rgb(255 255 255 / .7);
-  --veil: color-mix(in srgb, var(--ink-050) 74%, transparent);
-  --grid: rgb(40 70 110 / .05);
-  --backdrop: url("bg-light.jpg");
-  --shadow-3: 0 16px 48px rgb(20 30 50 / .25);
-}
+/* The showcase title's face: Stormax (Burntilldead, demo license), in fonts/. */
+@font-face { font-family: Stormax; src: url("fonts/stormax.otf") format("opentype"); font-display: swap; }
 
 /* ---- Base --------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
@@ -278,8 +245,28 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 
 /* ---- Showcase (the landing page) ---------------------------------------- */
 .page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
-.show-hero { max-width: none; margin-bottom: 28px; }
-.show-hero h1 { font-size: 30px; }
+.show-hero { max-width: none; margin-bottom: 28px; padding: 44px 28px 30px; text-align: center; }
+.show-hero h1 {
+  margin: 0 0 10px; font-family: Stormax, var(--font-mono); font-size: 76px; font-weight: 400;
+  letter-spacing: .06em; line-height: 1.05; text-transform: uppercase;
+  /* The gradient repeats (cyan, blue, violet, pink, back to cyan) over twice the text's
+     width and slides one period, so the loop has no seam. */
+  background: linear-gradient(90deg, #00f0ff 0%, #4d7cff 19%, #c04dff 33%, #ff2fb4 50%,
+    #c04dff 67%, #4d7cff 81%, #00f0ff 100%) 0 0 / 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 6px rgb(0 220 255 / .55)) drop-shadow(0 0 22px rgb(255 47 180 / .35));
+  animation: neon-flow 6s linear infinite;
+}
+@keyframes neon-flow { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .show-hero h1 { animation: none; } }
+.show-hero .subhead { margin: 0 0 16px; font-size: 22px; font-weight: 500; color: var(--text); }
+.show-hero .lede { margin: 0 auto 22px; max-width: 68ch; }
+.show-hero .stage-keys { justify-content: center; }
+.page > .usage { margin: 0 0 32px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; margin: 40px 0 16px; font-size: 20px; font-weight: 600; line-height: 1.2; }
+.sec-head::after { content: ""; flex: 1; align-self: center; height: 1px; background: var(--line); }
+.sec-head .sec-label { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--signal); }
+.sec-head .sec-name { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--text-muted); }
 .stage-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
 .stage-keys .key { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
 .stage-keys .key i { width: 10px; height: 7px; border-radius: 1px; background: var(--h); }
@@ -290,7 +277,7 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
   height: 100%; padding: 8px 8px 14px; background: var(--glass); border: 1px solid var(--line);
   border-radius: var(--r-lg); box-shadow: var(--glass-edge);
 }
-/* Pictures sit on a dark screen whatever the theme: maps and night renders blend into it. */
+/* Pictures sit on a dark screen: maps and night renders blend into it. */
 .frame { aspect-ratio: 16 / 9; background: #07090c; }
 .frame img { object-fit: cover; }
 .frame.fit img { object-fit: contain; }
@@ -410,7 +397,9 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
   .filters { order: 5; width: 100%; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
   .tabs + .filters { margin-left: 0; padding-left: 0; border-left: 0; }
   .page { padding: 20px 16px 64px; }
-  .show-hero h1 { font-size: 22px; }
+  .show-hero { padding: 28px 16px 20px; }
+  .show-hero h1 { font-size: 42px; letter-spacing: .05em; }
+  .show-hero .subhead { font-size: 17px; }
   .usage { padding: 12px 14px 10px; }
   .usage-kpis { gap: 8px 22px; }
   .usage-kpis dd { font-size: 18px; }

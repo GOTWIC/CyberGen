@@ -1,14 +1,13 @@
 {
   "title": "CyberGen",
   "subtitle": "Build log gallery",
-  "lede": "Generators for cyberpunk open cities, from one text prompt to a city you can fly through in Unreal Engine.",
+  "lede": "A set of generators that turn a text prompt into a fully playable open-world city, in five stages: the layout (coast, districts, roads, buildings, transit), a 3D model for every building and street element, light and atmosphere, traffic and crowds, then story. An exporter imports each stage into Unreal Engine 5. The first two stages are built.",
   "repo": "https://github.com/GOTWIC/CyberGen",
   "branch": "main",
   "site": "https://gotwic.github.io/CyberGen/",
-  "backdrop": {"dark": "ag15-night", "light": "ag15-day"},
+  "backdrop": {"dark": "ag15-night"},
   "next": "Next: stage 3, atmosgen (light, sky and weather), stage 4, lifegen (crowds, traffic, trains and aircraft), then stage 5, storygen.",
   "showcase": {
-    "kicker": "Cyberpunk city generator",
     "heading": "Cyberpunk cities from a single prompt",
     "items": [
       {"entry": "m2-streets", "title": "Street plan", "caption": "Each district laid out in its own street pattern, down to the lot."},
