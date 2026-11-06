@@ -205,7 +205,8 @@ def _near_z(N: Net, fid: str, x: float, y: float) -> float:
 def check_tiling(spec, m) -> Check:
     c = Check("pavement_tiling", f"M22: every pavement face a simple polygon; no two faces "
                                  f"overlap where they are within {SAME_Z_M:g} m in height "
-                                 f"(one over the other, an overpass, may); no hole in the "
+                                 f"(one over the other on another layer, an overpass, may); "
+                                 f"no hole in the "
                                  f"pavement under {GAP_M2:g} m2 (a gap); every face on its "
                                  f"owner's right of way (a road's half width, a junction's "
                                  f"legs out to their cuts)")
@@ -223,6 +224,7 @@ def check_tiling(spec, m) -> Check:
     if not geoms:
         return c
     arr = np.array(geoms, dtype=object)
+    layer_of = {f.id: f.layer for f in N.faces}
     tree = shapely.STRtree(arr)
     a, b = tree.query(arr, predicate="intersects")
     keep = a < b
@@ -235,8 +237,9 @@ def check_tiling(spec, m) -> Check:
             if ov.area < OVERLAP_MIN_M2 or 2.0 * ov.area < SLIVER_W_M * ov.length:
                 continue        # (rounding: tiny, or a seam under SLIVER_W_M wide)
             p = ov.representative_point()
-            if abs(_near_z(N, ids[i], p.x, p.y) - _near_z(N, ids[j], p.x, p.y)) > SAME_Z_M:
-                n_over += 1
+            dz = abs(_near_z(N, ids[i], p.x, p.y) - _near_z(N, ids[j], p.x, p.y))
+            if layer_of[ids[i]] != layer_of[ids[j]] or dz > SAME_Z_M:
+                n_over += 1         # (one over the other: two layers, or far apart in height)
                 continue
             _lim(c, f"faces {ids[i]} and {ids[j]} overlap ({ov.area:.4f} m2 at "
                     f"({p.x:.1f}, {p.y:.1f}))")

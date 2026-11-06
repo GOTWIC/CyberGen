@@ -137,6 +137,14 @@ def test_a_sloped_junction_takes_its_heights_from_its_ports():
         if e.kind == "port":
             hs = [N.z(v) for v in e.v]
             assert max(hs) - min(hs) <= PVC.LEVEL_TOL_M
+    # (a face's triangles, its boundary and samples, cover it exactly: what AG17 draws)
+    for f in m.pavement:
+        if f.kind != "junction":
+            continue
+        tris = PVC.face_triangles(N, f)
+        area = sum(abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2.0
+                   for a, b, c in tris)
+        assert abs(area - N.poly(f.id).area) < 1e-3
 
 
 def test_two_junctions_too_close_are_one():
