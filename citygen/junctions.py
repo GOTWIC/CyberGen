@@ -1363,10 +1363,15 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
     of = {k: jk for jk, ks in group.items() for k in ks}
     roads = []
     for sg in net.segments:
-        if sg["road_class"] == "footbridge":
-            continue
         rd = plan.roads.get(sg["id"])
-        if rd is None:
+        if sg["road_class"] == "footbridge" or rd is None:
+            # (a road the map does not draw keeps its profile: its nodes stay where its ends
+            # are, so it meets them at their height, `level_continuity`)
+            prof = sg["z_profile"]
+            if prof:
+                why = ("fixed", sg["id"])
+                anchors.append((var[sg["start"]], prof[0]["z"], 0.0, "both", why))
+                anchors.append((var[sg["end"]], prof[-1]["z"], 0.0, "both", why))
             continue
         L = rd.path.L
         prof = sg["z_profile"]
@@ -1661,11 +1666,11 @@ WHY_REACH_M = 40.0      # M22: how far in height `_why_kept` searches for a bind
 def why_text(why: dict) -> str:
     """M22: what holds a junction the height fit kept (`attrs.unbuildable`), in words."""
     if why.get("grade"):
-        return "its roads cannot reach its ports within their grade"
+        return "its roads, which cannot reach its ports within their grade"
     if why.get("drawn"):
-        return (f"its faces drawn from its ports reach {why['drawn']:.1%} where the fit's "
-                f"estimate did not (two of its roads parting at different grades inside it, "
-                f"a concave outline)")
+        return (f"its faces, which the map draws at {why['drawn']:.1%} from its ports where "
+                f"the fit's estimate did not (two of its roads parting at different grades "
+                f"inside it, a concave outline)")
 
     def one(kind, ref):
         return {"local cap": f"M7's {ST.LOCAL_JUNCTION_Z_M:g} m limit at local junction {ref}",
@@ -2557,21 +2562,16 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
             furn = min(max(cs.get("furniture_m", 1.5 if cls == "avenue" else 0.0), 0.0),
                        side - curb)
             rd = plan.roads.get(s["id"])
-            if s["id"] in inner or rd is None:
-                # (M22: a road inside a cluster has no face of its own: its walkers cross
-                # the junction along it, with no sidewalk record)
-                for sd, sign in (("L", 1.0), ("R", -1.0)):
-                    line = _offset(pts, sign * h)
-                    if len(line) < 2:
-                        continue
-                    c0 = corner_of.get((s["start"], s["id"], sd))
-                    c1 = corner_of.get((s["end"], s["id"], sd))
-                    W.add("sidewalk", ([c0] if c0 else []) + line + ([c1] if c1 else []),
-                          side, segment=s["id"])
-                continue
-            # (M22: the sidewalk's middle on the pavement map's stations, port to port)
+            # (M22: the sidewalk's middle from port to port, square to the road at its ends
+            # as its right of way ends: the map's mitred frame where a road goes on as
+            # another reaches past it, into the lots there; a road inside a cluster, whose
+            # sidewalks are its junction's corner pads, end to end, as stations' stairs and
+            # the props find sidewalks by their records)
+            L = ST._plen(pts)
+            ra, rb = (0.0, 0.0) if s["id"] in inner or rd is None else (rd.a, rd.b)
+            base = ST._substring(pts, ra, L - rb) if L - ra - rb > 1.0 else pts
             for sd, sign in (("L", 1.0), ("R", -1.0)):
-                line = PV.line_m(rd.path, rd.a, rd.path.L - rd.b, sign * h)
+                line = _offset(base, sign * h)
                 if len(line) < 2:
                     continue
                 sid = f"sw{len(sidewalks) + 1:06d}"

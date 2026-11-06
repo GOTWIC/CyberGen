@@ -1099,7 +1099,8 @@ def deck_view(m, dk):
     segs = _deck_streets(m, dk)
     nodes = {s.start for s in m.road_segments if s.id in segs} | \
         {s.end for s in m.road_segments if s.id in segs}
-    jns = {j.id for j in m.junctions if j.node_id in nodes}
+    jns = {j.id for j in m.junctions
+           if any(n in nodes for n in j.attrs.get("nodes") or [j.node_id])}
     blds = {b.id for b in m.buildings if b.level and b.attrs.get("deck") == dk.id}
     lots = {lt.id for lt in m.lots if lt.level and lt.attrs.get("deck") == dk.id}
 

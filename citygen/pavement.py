@@ -69,6 +69,7 @@ GAP_M2 = 1.0            # a hole in a layer's pavement this small is a sliver, f
 END_STRIP_M = 0.5       # a bend face's ends: strips this long on its road's frames
 LONG_CURB_M = 40.0      # a cluster's curb this long between two ports follows its inner roads
 STEP_TOL_M = 0.02       # a step this high between two vertices under 1 m apart is no grade
+DEGENERATE_M = 0.05     # a road this short has no direction (no corner, no strip)
 LONG_MARGIN_M = 15.0    # a long curb follows its inner roads this far from its ports on
 INNER_NEAR_M = 1.0      # ... where it is within this of an inner road's right of way
 PINCH_MM2 = 1000        # a loop of a ring this small (mm2) where it touches itself is cut out
@@ -203,16 +204,6 @@ class Path:
             if best is None or d < best[0] - 1e-12:
                 best = (d, self.cum[i] + t * (self.cum[i + 1] - self.cum[i]))
         return min(max(best[1], s0), s1)
-
-
-def line_m(path: Path, s0: float, s1: float, w: float) -> list[tuple[float, float]]:
-    """The line at offset w from s0 to s1 on the map's stations, in meters."""
-    out: list = []
-    for t in path.stations(s0, s1):
-        q = path.point(t, w)
-        if not out or q != out[-1]:
-            out.append(q)
-    return [(m(x), m(y)) for x, y in out]
 
 
 def unit_layer(legs) -> str:
@@ -737,6 +728,8 @@ def _core(P, lg: list, roads: dict, row: bool, cut_of) -> object:
     fillets)."""
     from . import junctions as JN
 
+    # (a road of no length, a layout's leftover, has no direction to build a corner on)
+    lg = [x for x in lg if x.L >= DEGENERATE_M]
     n = len(lg)
     if n < 2:
         return Polygon()

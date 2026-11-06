@@ -258,9 +258,10 @@ def check_tiling(spec, m) -> Check:
 
 
 def _on_owner(c: Check, m, N: Net, ids: list) -> None:
-    """Every face on its owner's ground: a road's within its half width (and ON_OWNER_M)
-    of its centerline; a junction's within its legs' cuts and half widths (a bulb's radius)
-    of its nodes, or on a cluster's inner roads."""
+    """Every face on its owner's ground: a road's within its half width (MITER_MAX times
+    it at a mitred corner, and ON_OWNER_M) of its centerline; a junction's within its legs'
+    cuts and half widths (a bulb's radius) of its nodes, or on a cluster's inner roads. (A
+    hairpin's mitre once drew a face hundreds of meters off its road.)"""
     from shapely.geometry import LineString, Point
 
     seg = {s.id: s for s in m.road_segments if len(s.centerline) >= 2}
@@ -269,8 +270,8 @@ def _on_owner(c: Check, m, N: Net, ids: list) -> None:
     at: dict = {}
     for s in m.road_segments:
         cuts = s.attrs.get("cuts") or [0.0, 0.0]
-        at.setdefault(s.start, []).append(cuts[0] + s.width_m / 2.0)
-        at.setdefault(s.end, []).append(cuts[1] + s.width_m / 2.0)
+        at.setdefault(s.start, []).append(cuts[0] + PV.MITER_MAX * s.width_m / 2.0)
+        at.setdefault(s.end, []).append(cuts[1] + PV.MITER_MAX * s.width_m / 2.0)
     reach: dict = {}
     for j in m.junctions:
         disks = []
@@ -279,15 +280,16 @@ def _on_owner(c: Check, m, N: Net, ids: list) -> None:
             if n is not None:
                 head = (n.attrs.get("turning_head_m") or 0.0) + 6.0
                 disks.append((Point(n.position[:2]), max(at.get(nid, []) + [head])))
-        strips = [(line[i], seg[i].width_m / 2.0) for i in j.attrs.get("inner") or []
-                  if i in line]
+        strips = [(line[i], PV.MITER_MAX * seg[i].width_m / 2.0)
+                  for i in j.attrs.get("inner") or [] if i in line]
         reach[j.id] = (disks, strips)
     by_id = {f.id: f for f in N.faces}
     for fid in ids:
         f = by_id[fid]
         pts = shapely.points([N.xy(v) for v in N.rings[fid][0]])
         if f.owner_id in line:
-            ok = shapely.distance(pts, line[f.owner_id]) <=                 seg[f.owner_id].width_m / 2.0 + ON_OWNER_M
+            lim = PV.MITER_MAX * seg[f.owner_id].width_m / 2.0 + ON_OWNER_M
+            ok = shapely.distance(pts, line[f.owner_id]) <= lim
         elif f.owner_id in reach:
             disks, strips = reach[f.owner_id]
             ok = np.zeros(len(pts), dtype=bool)

@@ -721,7 +721,7 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
         for j in loc.junctions:
             if j["id"] in drawn:
                 j["attrs"]["unbuildable"] = {"drawn": drawn[j["id"]]}
-        loc.info["drawn_steep"] = dict(sorted(drawn.items()))
+        loc.info["drawn_steep"] = len(drawn)
         b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads,
                            loc)
     b.notes = b.notes + loc.notes

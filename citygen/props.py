@@ -769,7 +769,9 @@ def bus_stops(c: Ctx) -> list[Cand]:
 
 def bollards(c: Ctx) -> list[Cand]:
     out = []
-    junc = {j.node_id: G.from_model_poly(j.polygon) for j in c.m.junctions}
+    # (M22: every node of a cluster is its junction's)
+    junc = {n: G.from_model_poly(j.polygon) for j in c.m.junctions
+            for n in j.attrs.get("nodes") or [j.node_id]}
     for s in c.m.road_segments:
         if s.road_class != "pedestrian" or len(s.centerline) < 2:
             continue
@@ -1001,7 +1003,7 @@ def _road_keep(c: Ctx):
     vehicle = {n for s in c.m.road_segments if s.road_class not in walk
                for n in (s.start, s.end)}
     for j in c.m.junctions:
-        if j.node_id not in vehicle:
+        if not any(n in vehicle for n in j.attrs.get("nodes") or [j.node_id]):
             continue
         shapes.append(G.from_model_poly(j.polygon).buffer(-ROAD_IN_M, join_style="mitre"))
         rows.append(("junction", j.id, node_z.get(j.node_id, 0.0)))

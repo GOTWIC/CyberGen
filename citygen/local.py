@@ -424,8 +424,9 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                 "unbuildable_junctions": jx["level"].get("unbuildable", 0),
                 "levelled_further": jx["level"].get("levelled_further", 0),
                 "unresolved_junctions": jx["level"].get("unresolved", []),
-                "held_junctions": {k: v for k, v in sorted(jx["level"].get("held", {}).items())
-                                   if k in set(jx["level"].get("unresolved", []))},
+                # (each by its stable id and what holds it: `pavement_junctions`' notes)
+                "held_junctions": sum(1 for k in jx["level"].get("held", {})
+                                      if k in set(jx["level"].get("unresolved", []))),
                 "nodes_moved": jx["level"].get("nodes_moved", 0),
                 "no_fit": jx["level"].get("no_fit", 0),
                 "steep": jx["level"].get("steep", 0)}
