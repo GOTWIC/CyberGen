@@ -7,8 +7,10 @@ Reads site/gallery.json, resizes each entry's image from the repo (a file under
 docs/progress/) into DIR/img/<id>.jpg (at most 2000 px wide) and DIR/thumb/<id>.jpg
 (640 px wide), and writes two pages from their templates: DIR/index.html, the showcase
 (gallery.json's "showcase": a curated few of the entries with titles and captions of
-their own), and DIR/log.html, the build log (every entry), beside style.css, app.js and
-gallery.json. Needs Pillow only.
+their own; an item's "crop", [left, top, right, bottom] as fractions, shows a cut of its
+entry's image, made as DIR/img/show-<id>.jpg, so a preview's title band stays off the
+showcase and whole in the log), and DIR/log.html, the build log (every entry), beside
+style.css, app.js and gallery.json. Needs Pillow only.
 
 The resized images are build output: never commit them. The Pages workflow
 (.github/workflows/pages.yml) runs this on every change to site/. Run it locally into
@@ -105,6 +107,15 @@ def load(path: Path) -> dict:
                 errors.append(f"{where}: no entry {r!r}")
         if "labels" in it and len(it["labels"]) != len(refs):
             errors.append(f"{where}: one label per entry")
+        if "crop" in it:
+            c = it["crop"]
+            if len(refs) != 1:
+                errors.append(f"{where}: a crop needs a single entry")
+            elif not (isinstance(c, list) and len(c) == 4 and
+                      all(isinstance(v, (int, float)) for v in c) and
+                      0 <= c[0] < c[2] <= 1 and 0 <= c[1] < c[3] <= 1):
+                errors.append(f"{where}: crop is [left, top, right, bottom] as fractions, "
+                              "left < right and top < bottom")
         for f in ("title", "caption"):
             if not isinstance(it.get(f), str) or not it[f].strip():
                 errors.append(f"{where}: missing {f}")
@@ -142,12 +153,15 @@ def make_images(e: dict, out: Path, cache: dict) -> tuple[int, int, bool]:
     """The entry's full-size and thumbnail JPEGs; returns the full size and whether made.
 
     `cache` maps an id to the source it was made from, so an entry pointed at another
-    image is made again even when the old output is newer than the new source."""
+    image is made again even when the old output is newer than the new source. `crop`
+    ([left, top, right, bottom] as fractions of the source) cuts the source first (a
+    showcase picture without the title band a preview carries)."""
     src = ROOT / e["image"]
     full = out / "img" / f"{e['id']}.jpg"
     thumb = out / "thumb" / f"{e['id']}.jpg"
     me = Path(__file__)
-    stamp = [e["image"], src.stat().st_size, int(src.stat().st_mtime)]
+    crop = e.get("crop")
+    stamp = [e["image"], src.stat().st_size, int(src.stat().st_mtime)] + ([crop] if crop else [])
     if cache.get(e["id"]) == stamp and fresh(full, src, me) and fresh(thumb, src, me):
         with Image.open(full) as im:
             return im.size[0], im.size[1], False
@@ -155,6 +169,10 @@ def make_images(e: dict, out: Path, cache: dict) -> tuple[int, int, bool]:
     sharp = src.suffix.lower() == ".png"
     with Image.open(src) as im:
         im = flatten(im)
+        if crop:
+            w, h = im.size
+            im = im.crop((round(crop[0] * w), round(crop[1] * h),
+                          round(crop[2] * w), round(crop[3] * h)))
         im.thumbnail(FULL, Image.LANCZOS)
         save_jpeg(im, full, sharp)
         w, h = im.size
@@ -323,6 +341,14 @@ def render_stage_keys(g: dict) -> str:
     return keys
 
 
+def shown_entry(it: dict, e: dict) -> dict:
+    """The picture a showcase item shows: its entry's, or (with `crop`) a cut of that image
+    made under its own id, `show-<entry>`, so the build log keeps the whole picture."""
+    if not it.get("crop"):
+        return e
+    return {"id": f"show-{e['id']}", "image": e["image"], "crop": it["crop"]}
+
+
 def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     """The showcase's cards: one picture each, or a pair (day and night) behind a slider."""
     by_id = {e["id"]: e for e in g["entries"]}
@@ -333,14 +359,15 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     for it in g["showcase"]["items"]:
         refs = it.get("entries") or [it["entry"]]
         first = by_id[refs[0]]
+        shown = shown_entry(it, first)
         wide = bool(it.get("wide"))
         sizes = "(max-width: 900px) calc(100vw - 58px), " + ("1130px" if wide else "560px")
         if len(refs) == 1:
             src_url = f"{g['repo']}/blob/{g['branch']}/{quote(first['image'])}"
             # Maps and charts (PNG) are shown whole in their frame; renders fill it.
             fit = " fit" if first["image"].lower().endswith(".png") else ""
-            media = (f'<a class="shot frame{fit}" href="img/{esc(first["id"])}.jpg" data-src="{esc(src_url)}" '
-                     f'aria-label="{esc(it["title"])}, full size">{picture(first, dims[first["id"]], sizes)}</a>')
+            media = (f'<a class="shot frame{fit}" href="img/{esc(shown["id"])}.jpg" data-src="{esc(src_url)}" '
+                     f'aria-label="{esc(it["title"])}, full size">{picture(shown, dims[shown["id"]], sizes)}</a>')
         else:
             a, b = (by_id[r] for r in refs)
             la, lb = it.get("labels", ["Before", "After"])
@@ -635,14 +662,23 @@ def build(out: Path) -> None:
         dims[e["id"]] = (w, h)
         made += did
         print(f"[{k:2d}/{len(g['entries'])}] {'made' if did else 'kept'} {e['id']}", flush=True)
+    by_id = {e["id"]: e for e in g["entries"]}
+    ids = {e["id"] for e in g["entries"]}
+    # The showcase's cropped pictures (a preview without its title band)
+    for it in g["showcase"]["items"]:
+        if it.get("crop"):
+            s = shown_entry(it, by_id[it["entry"]])
+            w, h, did = make_images(s, out, cache)
+            dims[s["id"]] = (w, h)
+            ids.add(s["id"])
+            made += did
+            print(f"        {'made' if did else 'kept'} {s['id']} (showcase crop)", flush=True)
     cache_file.write_text(json.dumps(cache, indent=1, sort_keys=True), encoding="utf-8")
     # Images of entries no longer in the gallery
-    ids = {e["id"] for e in g["entries"]}
     for folder in ("img", "thumb"):
         for p in (out / folder).glob("*.jpg"):
             if p.stem not in ids:
                 p.unlink()
-    by_id = {e["id"]: e for e in g["entries"]}
     for theme, key in g.get("backdrop", {}).items():
         make_backdrop(ROOT / by_id[key]["image"], out / f"bg-{theme}.jpg")
 

@@ -1953,7 +1953,10 @@ again (new renders go in `docs/progress/gallery_refresh/`), `stage` 1, 2 or `ue`
 necessarily a full sentence, saying only what is needed to explain the picture: no extra
 detail, no hashes, goldens, check counts or test talk) and the showcase's `items`
 (`entry`, or `entries` and `labels` for a pair, by log id, `title`, `caption`, `wide` for
-the full width). `site/index.html` and `site/log.html` are the templates `site/build.py`
+the full width, `crop` [left, top, right, bottom] fractions to show a cut of the entry's
+image). The showcase names no city, district or line, in its text or its pictures (a preview's
+title band and legend cropped off; a new viewer has no context for the names); the log keeps
+them. `site/index.html` and `site/log.html` are the templates `site/build.py`
 fills in, beside `style.css` (the Neon Terminal look with glass panels, dark only) and
 `app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
 it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px and 640 px

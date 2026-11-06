@@ -10,11 +10,11 @@
   "showcase": {
     "heading": "Cyberpunk cities from a single prompt",
     "items": [
-      {"entry": "m2-streets", "title": "Street plan", "caption": "Each district laid out in its own street pattern, down to the lot."},
-      {"entry": "m3-buildings", "title": "Massing", "caption": "Buildings shaped and sized by district, from low old quarters to a core of towers."},
-      {"entry": "m5-transit", "title": "Transit network", "caption": "Metro, elevated rail, monorail, maglev and sky tubes across a generated city."},
+      {"entry": "m2-streets", "title": "Street plan", "caption": "Each district laid out in its own street pattern, down to the lot.", "crop": [0.016, 0.104, 0.721, 0.971]},
+      {"entry": "m3-buildings", "title": "Massing", "caption": "Buildings shaped and sized by district, from low old quarters to a core of towers.", "crop": [0.0, 0.115, 0.885, 0.62]},
+      {"entry": "m5-transit", "title": "Transit network", "caption": "Metro, elevated rail, monorail, maglev and sky tubes across a generated city.", "crop": [0.0, 0.091, 1.0, 0.882]},
       {"entry": "m7b-city", "title": "First whole city", "caption": "The first complete blockout of a generated city, seen from the south."},
-      {"entry": "m11-gameplay", "title": "Gameplay layer", "caption": "Faction turf, places to go, wealth, danger, traffic and crowds."},
+      {"entry": "m11-gameplay", "title": "Gameplay layer", "caption": "Faction turf, places to go, wealth, danger, traffic and crowds.", "crop": [0.0, 0.1, 1.0, 1.0]},
       {"entry": "m13-terrain", "title": "Hills and cliffs", "caption": "A port city on hills, its plateau standing on a cliff over the bay."},
       {"entry": "m20-city", "title": "Complete layout", "caption": "An example of a generated city, with every tower, transit line, prop and sign in place.", "wide": true},
       {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props on a shopping street, in Unreal Engine."},
@@ -115,8 +115,8 @@
       "milestone": "M3",
       "milestone_name": "Buildings",
       "title": "A building on every lot",
-      "image": "docs/progress/M3/nexus_city/preview_massing.png",
-      "caption": "Nexus City with a building on every lot, shaped and sized by district."
+      "image": "docs/progress/M3/delta_megacity/preview_massing.png",
+      "caption": "Delta Megacity with a building on every lot, shaped and sized by district."
     },
     {
       "id": "m3p-megablocks",
