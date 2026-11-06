@@ -246,10 +246,16 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .show-hero h1 {
   margin: 0 0 10px; font-family: Orbitron, var(--font-mono); font-size: 76px; font-weight: 900;
   letter-spacing: .08em; line-height: 1.05; text-transform: uppercase;
-  background: linear-gradient(90deg, #00f0ff 0%, #4d7cff 38%, #c04dff 66%, #ff2fb4 100%);
+  /* The gradient repeats (cyan, blue, violet, pink, back to cyan) over twice the text's
+     width and slides one period, so the loop has no seam. */
+  background: linear-gradient(90deg, #00f0ff 0%, #4d7cff 19%, #c04dff 33%, #ff2fb4 50%,
+    #c04dff 67%, #4d7cff 81%, #00f0ff 100%) 0 0 / 200% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 0 6px rgb(0 220 255 / .55)) drop-shadow(0 0 22px rgb(255 47 180 / .35));
+  animation: neon-flow 6s linear infinite;
 }
+@keyframes neon-flow { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .show-hero h1 { animation: none; } }
 .show-hero .subhead { margin: 0 0 16px; font-size: 22px; font-weight: 500; color: var(--text); }
 .show-hero .lede { margin: 0 auto 22px; max-width: 68ch; }
 .show-hero .stage-keys { justify-content: center; }
