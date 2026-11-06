@@ -202,6 +202,34 @@ def _near_z(N: Net, fid: str, x: float, y: float) -> float:
     return best[1] if best else 0.0
 
 
+def _face_z(N: Net, f, x: float, y: float) -> float:
+    """A face's height at a plan point as the map tells levels apart (`pavement.Assembly.
+    zf`): a junction's from its ports, blended by inverse square distance; else its nearest
+    vertex's."""
+    if f.kind in ("junction", "corner", "bulb"):      # (a junction's faces)
+        if not hasattr(N, "_ports"):
+            N._ports = {}
+            for g in N.faces:
+                if g.kind in ("junction", "corner", "bulb"):
+                    for refs in g.rings:
+                        for ref in refs:
+                            e = N.edge.get(ref.lstrip("-"))
+                            if e is not None and e.kind == "port":
+                                N._ports.setdefault(g.owner_id, {})[e.id] = list(e.v)
+        num = den = 0.0
+        for eid, vs in sorted(N._ports.get(f.owner_id, {}).items()):
+            z = sum(N.z(v) for v in vs) / len(vs)
+            d2 = min(_seg_dist((x, y), (x, y), N.xy(a), N.xy(b)) for a, b in
+                     zip(vs, vs[1:])) ** 2
+            if d2 < 1e-6:
+                return z
+            num += z / d2
+            den += 1.0 / d2
+        if den:
+            return num / den
+    return _near_z(N, f.id, x, y)
+
+
 def check_tiling(spec, m) -> Check:
     c = Check("pavement_tiling", f"M22: every pavement face a simple polygon; no two faces "
                                  f"overlap where they are within {SAME_Z_M:g} m in height "
@@ -225,6 +253,7 @@ def check_tiling(spec, m) -> Check:
         return c
     arr = np.array(geoms, dtype=object)
     layer_of = {f.id: f.layer for f in N.faces}
+    face_of = {f.id: f for f in N.faces}
     tree = shapely.STRtree(arr)
     a, b = tree.query(arr, predicate="intersects")
     keep = a < b
@@ -237,7 +266,8 @@ def check_tiling(spec, m) -> Check:
             if ov.area < OVERLAP_MIN_M2 or 2.0 * ov.area < SLIVER_W_M * ov.length:
                 continue        # (rounding: tiny, or a seam under SLIVER_W_M wide)
             p = ov.representative_point()
-            dz = abs(_near_z(N, ids[i], p.x, p.y) - _near_z(N, ids[j], p.x, p.y))
+            dz = abs(_face_z(N, face_of[ids[i]], p.x, p.y) -
+                     _face_z(N, face_of[ids[j]], p.x, p.y))
             if layer_of[ids[i]] != layer_of[ids[j]] or dz > SAME_Z_M:
                 n_over += 1         # (one over the other: two layers, or far apart in height)
                 continue
