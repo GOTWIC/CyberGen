@@ -33,15 +33,15 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/M20/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/nexus_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/nexus_city/render_iso_city.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/M20/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/archipelago_free_port/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/archipelago_free_port/render_iso_city.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M20/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
@@ -49,7 +49,7 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
 |---|---|
-| <img src="docs/progress/M20/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_decks/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
@@ -65,9 +65,9 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 |---|---|
 | <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M20/vesper_bay/preview_props.png" width="420"> |
 
-| The pavement map: every road, junction, corner and sidewalk surface, edges shared | A ramp between two raised junctions, one surface in the map (Delta Megacity, 8K) |
-|---|---|
-| <img src="docs/progress/M22/vesper_bay/preview_pavement.png" width="420"> | <img src="docs/progress/M22/delta_megacity/render_junction_ramp.jpg" width="420"> |
+The pavement map: every road, junction, corner pad and sidewalk surface as faces that share their edges, with clusters, turning bulbs and bends up close.
+
+<img src="docs/progress/M22/vesper_bay/preview_pavement.png" width="840">
 
 Neon billboards and banners on the Corporate Core's facades, from the street (8K).
 

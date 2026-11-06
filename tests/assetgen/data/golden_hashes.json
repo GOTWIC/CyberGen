@@ -1,24 +1,23 @@
 {
   "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation; (AG1, under ag1, with AG2's parts) the small city's asset manifest and the digest of its asset files (shells, proxies, part packs), and a few Vesper Bay buildings as GLB (shell and instanced parts). AG0 and AG1's made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86); AG2's on the Mac (the x86 check is deferred, docs/determinism_check.md).",
-  "testport_briefs": "ae5798e6751e7d68608b3cf213b5d52ba490fecde0a607635969306ddf2ffa2a",
+  "testport_briefs": "36cfe6b4c59b641f1f85f0fbba9027fc3fa25e364fc26b0d590383ca44ef3a80",
   "triangulate": "b45c256a71c471e59d9c38b5e3be4c994ee36bf5da2d3fa23b2d81596dac1464",
   "buildings": {
     "vesper_bay": {
-      "d01.lm.e809n273.bld": "897fa9d260a2fe18109e87905e303d76d39d676443fbcd2964e19df671f02aac",
-      "d01.lot.e1000n46.bld": "be11ad4d24703e1f5665392a78bae6773b85979a27b74439a750970fe384223a",
-      "d01.lot.e1052n362.bld": "ef99b49eba1a667e102261e9e53eaaa3813fb66f3862b4db4a76be1a82a3f032",
-      "d02.lot.e139n981.bld": "7f07abda1b954f1bb8feab32737a5f6411b2ed6854056e31624ff608a6fb2c2b",
-      "d03.lot.e1002n1579.bld": "3b81c28ec4b0a2879526ad6da1d7cebe7d846bfde20f2c6ce996f5defcbe0be5",
-      "d04.lot.e1000s1326.bld": "bfc7b374b7d9066df5bd62999241ebf58df5e670bb9e7928876a8eaefeb64e2b",
-      "d04.lot.e1000s1475.bld": "cd48f23f4897c7b2f905f994fdea80871c710189265b3b1a132e0ebde8949345"
+      "d01.lm.e852s10.bld": "43cc1bdf809c1f4cffc31f939eed30bded93ca69059c4e4fc367eab3b908c6df",
+      "d01.lot.e1007s16.bld": "191182449e3802fd5784af999bd3ef3be0b2717edf72b1217bae5908893289f1",
+      "d02.lot.e139n981.bld": "5ffb919246ea5df8b714f05c7436e1b6b88b09f8045e267f9a5c987936c988c4",
+      "d03.lot.e1002n1579.bld": "014e17e5d26b0b0eb7a17eedfb80f2b67a0bfcd2a38430f44abf7302329f8404",
+      "d04.lot.e1000s1394.bld": "7ab9228b082ca4ab5607b0874c5ab5d40f92700925134b70de9ce7483902c2d9",
+      "d04.lot.e1001s1257.bld": "2137ca937a4c581ba70f3cb30c9a051f9538110fc7d1dfd764272df87f73635a"
     }
   },
   "samples": {
-    "archipelago_free_port": "0a45d40891c0495e97c77dc7825c407c7a6cd0f4c2314b67e5e16cbe3cebe878",
-    "delta_megacity": "2d2374f257a457d681994cf96827229a95309bf8ac1c50547a1e969540986f12",
-    "nexus_city": "63a259ab89ee8ffed39a4a07e23ea840530d8ca0adbf59cc4f5da283245f5bf2",
-    "peninsula_city": "8eba6ab3745abd3022d16e532663e407d5d29221223425276b67196fe4740286",
-    "vesper_bay": "1e2290ceb6a4879835dcc6dba32db58254fadb30774242901a5100e19c475188"
+    "archipelago_free_port": "d75ff10b494e03ec90a3675c713ed276a9ba0d0b2952e4c7bf2470d03c56e681",
+    "delta_megacity": "4f352f6d274bf48605a0bf642a607a06f721efe2384c3531c9d42df0180e275b",
+    "nexus_city": "62bdffbb10927b8a4b4b0761758439c7cd0a4274a2d1bf481ab745165765a545",
+    "peninsula_city": "a0775d95ce9b1d5d0c2c55625ca3659a8f730a0a3483b7dcf99cbfdcab8f938f",
+    "vesper_bay": "74a9b7367b5a7612a1c52f93782994c3ae5d33d297d6655a6c6233a4055d74fc"
   },
   "spike": {
     "shopfront_row": "f23a2f816caf8edb6e5ebd46b70d96a7fc9e205c5c979b9eda1c88f6abe5276e",
@@ -31,19 +30,19 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "bc5347ad948ef0259d72930324c2dc6f0582ef853c17e8f2b3a94bd58349a9ca",
-    "testport_files": "1f1939433d66064c0f15427a1cbe07e0567147bdc1ab6d45892139dbf3c126fe",
+    "testport_manifest": "7e3c71a81690a8f16b28ae7bfe96b0e1ff7cb7a61210cee131e114be2c379311",
+    "testport_files": "f04bc1dd35e88108fa24d9632bc0151e8a214b04eb81a2aab28ed0a16683f1b1",
     "buildings": {
       "vesper_bay": {
-        "d01.lm.e809n273.bld": "e712cb725ad2b7934d68a9abb56aaa02d9faad8ec70509f143296dfb0636392a",
-        "d01.lot.e1000n46.bld": "e1dff2c1e44fec177d2c76afe4c9af9b920dc020d77b826d14c2ba489655d7ca",
-        "d01.lot.e1038n563.bld": "e748ea57fdf3af0869d49f6a6d4410ed0adab4f31f30c49c382e92557925f839",
-        "d01.lot.e1285n188.bld": "c1b4a9c7527273661bb510801d5ff817a30890d8287b43d8afcdd947567e9486",
-        "d02.lot.e139n981.bld": "5d6734f4e55242373b40838c95469f7dece71a426e74e9aa25ad5962e6277927",
-        "d03.lot.e1002n1579.bld": "0dbd88312a18aea8d8339cb9a21c9a8228612efb58c34d5c91da40105d619f79",
-        "d04.lot.e1000s1326.bld": "4ce8084bfd2f583e503cfe1f075af6dfcdbcfeeb3595ff035453c13c95061f84",
-        "d04.lot.e1000s1475.bld": "5c1f7462d5a830fb6d4c58a6f14f2e7845a6aca9214ed029fa7a3326e41c2e87",
-        "d06.lot.e141s573.bld": "8fb443bca2fcf81ca73d943ac856026f897dfe3f1527a67be398f452662e9d3e"
+        "d01.lm.e852s10.bld": "47016f8ce5886e2897706b20eddf824f709d2a65a6bd162ebf4ca172970b351c",
+        "d01.lot.e1007s16.bld": "c6e38e88de63d9eae7a733c3a629cdd7c96bd7dd84cf32141546582c1188765e",
+        "d01.lot.e1026n186.bld": "0296c243ad20b2ad491bc342490c9af760c1f9026eae6700f3751b461b16c4f6",
+        "d01.lot.e1312n189.bld": "8248d8c669d2f12e3f91366a8a6c8265cdbeb3bc8978dec524dcd83e19b1af59",
+        "d02.lot.e139n981.bld": "8902a51575ab7fdf4350dceced2baf1851bc98aeebcfdb9c21196f5b4de772a3",
+        "d03.lot.e1002n1579.bld": "ea5d6387b1cbd76feb760b88a4502e368ecc12efbb5a17bdddcbf3ebbafdca5b",
+        "d04.lot.e1000s1394.bld": "f2b64ba702345c4e76c6a6a03d7bb16c5b4f1d5ddf96f357d7cb1f802fbe5ea5",
+        "d04.lot.e1001s1257.bld": "a5a55ac389836889179e9649d16144dcd036553820f31a3c21bfcea8752c2c87",
+        "d06.lot.e143s1668.bld": "4a3ecb104bdd620bb818a92ed0680cb4eece98aec03fa3c2081db3ea5d2a6bf3"
       }
     }
   },
@@ -57,6 +56,6 @@
       "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
       "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
     },
-    "testport_materials": "a27df0b5d98b2477e540bcd3603ffcf324f9c3581c3d2c013c010e934dca27c5"
+    "testport_materials": "45c3cbacac9ce25bb2424f5cb48dbc6cb2d299dbf7ce21569951c0260223b86e"
   }
 }
