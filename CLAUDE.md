@@ -49,6 +49,13 @@ check earns its place by what it can find, not by habit.
   main, in the background, and fixes or files what it finds. It does not validate a PR again
   (it reviews the outputs and the diff, and has the PR merge the latest main first when they
   overlap).
+- **Test runs show their progress** (Swagnik, 2026-11-06): write pytest's output straight to
+  a log file as it runs, never only through `| tail` or another filter that holds it back
+  until the end:
+  - use `-rfE --durations=25`, and `-v` for a run of a few files;
+  - say where the log is, so anyone can see how far a long run has got and which test is
+    slow;
+  - the same for long builds: their progress lines go to a log, not a pipe.
 
 Nothing more: no x86, Docker, Windows or other cross-platform comparisons, no stage-trace
 diffs, no `lock --verify` runs, no seed sweeps (unless the work is about robustness), no
