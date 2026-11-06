@@ -19,7 +19,7 @@ longer stands.
 | City | Failing on main | Failing here | Doors blocked | Doors facing a neighbor (counted apart) | Mounts on glass |
 |---|---|---|---|---|---|
 | Cragmouth | `asset_access`, `asset_mounts` | none | 1 to 0 | 325 to 276 | 1 to 0 |
-| Nexus City | `asset_access`, `asset_unique`, `asset_clash` | `asset_clash` (#104's, below) | 2 to 0 | 322 to 263 | 0 |
+| Nexus City | `asset_access`, `asset_unique`, `asset_clash` | `asset_clash` (#114's, fixed on main by #117, below) | 2 to 0 | 322 to 263 | 0 |
 | Saltreach Free Port | `asset_envelope` (a fin over a lane) | none | 0 | 241 to 199 | 0 |
 | Vesper Bay Decks | none | none | 0 | 374 to 302 | 0 |
 | Delta Megacity | none (run-through 2) | none | 0 | 274 | 0 |
@@ -59,9 +59,8 @@ longer stands.
 - **Saltreach's fin**: an angled fin at the end of a podium facade reached round the corner in
   front of a 2 m edge whose lane is 0.47 m out (no sidewalk), 4.25 m up; fins near a facade's
   end stay off where the next edge faces such a road.
-- **Nexus City's `asset_clash`** (on main too, after #103 and #104, not in #104's six cities):
-  the median of highway `rs.e230s1005` runs 0.3 m deep over asphalt its junction
-  `jn.e211s944` paves up to 2.4 m past its outline (#82's connector lane runs). Left open: it
-  is #104's junction drawing (issue draft in the PR).
+- **Nexus City's `asset_clash`** (on main too, after #103 and #104): the median of highway
+  `rs.e230s1005` ran 0.3 m deep over asphalt its junction `jn.e211s944` paves past its outline.
+  That is issue #114, fixed on main by #117 while this branch was open; merged here.
 
 FILL

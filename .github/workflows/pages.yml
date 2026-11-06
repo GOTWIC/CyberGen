@@ -1,0 +1,65 @@
+# The gallery site (https://gotwic.github.io/CyberGen/): site/build.py resizes the images
+# that site/gallery.json lists and writes the page; the result is published to GitHub
+# Pages. Only site/ and those images are checked out, so the run stays small. Resized
+# images are never committed.
+name: Gallery site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out site/ alone
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            /site/
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check out the gallery's images
+        run: |
+          python -c "import json; print('\n'.join('/' + e['image'] for e in json.load(open('site/gallery.json'))['entries']))" > "$RUNNER_TEMP/images.txt"
+          git sparse-checkout add --stdin < "$RUNNER_TEMP/images.txt"
+          echo "$(wc -l < "$RUNNER_TEMP/images.txt") images, $(du -sh docs | cut -f1) checked out"
+
+      - name: Resize the images and write the page
+        run: |
+          python -m pip install --quiet "pillow>=10"
+          python site/build.py --out "$RUNNER_TEMP/site"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

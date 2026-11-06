@@ -1,0 +1,8 @@
+{
+ "device": "cloud",
+ "label": "Cloud",
+ "manual": true,
+ "cost_usd": 250,
+ "note": "cloud sessions' credit spent",
+ "updated": "2026-11-05T23:00:00Z"
+}

@@ -1,0 +1,174 @@
+{
+ "device": "mac",
+ "label": "Mac",
+ "updated": "2026-11-05T23:48:27Z",
+ "sessions": 29,
+ "worktree_sessions": 28,
+ "subagents": 1,
+ "totals": {
+  "total": 6413877463,
+  "input": 36596,
+  "output": 15558983,
+  "cache_write_5m": 155522,
+  "cache_write_1h": 56519982,
+  "cache_read": 6341606380
+ },
+ "models": {
+  "claude-opus-5-5": {
+   "input": 36464,
+   "output": 15511331,
+   "cache_write_5m": 155522,
+   "cache_write_1h": 56349935,
+   "cache_read": 6331407992
+  },
+  "claude-sonnet-5-5": {
+   "input": 132,
+   "output": 47652,
+   "cache_write_5m": 0,
+   "cache_write_1h": 170047,
+   "cache_read": 10198388
+  }
+ },
+ "days": {
+  "2026-10-23": {
+   "total": 23800578,
+   "output": 122430,
+   "sessions": 1
+  },
+  "2026-10-24": {
+   "total": 99800459,
+   "output": 126758,
+   "sessions": 1
+  },
+  "2026-10-25": {
+   "total": 501846066,
+   "output": 1374153,
+   "sessions": 1
+  },
+  "2026-10-26": {
+   "total": 552502088,
+   "output": 1094211,
+   "sessions": 4
+  },
+  "2026-10-27": {
+   "total": 1716945857,
+   "output": 4997663,
+   "sessions": 10
+  },
+  "2026-10-28": {
+   "total": 1576018996,
+   "output": 3802173,
+   "sessions": 13
+  },
+  "2026-10-29": {
+   "total": 1025685215,
+   "output": 2176527,
+   "sessions": 9
+  },
+  "2026-10-30": {
+   "total": 506405259,
+   "output": 992746,
+   "sessions": 4
+  },
+  "2026-10-31": {
+   "total": 142034686,
+   "output": 288389,
+   "sessions": 3
+  },
+  "2026-11-04": {
+   "total": 28537558,
+   "output": 67154,
+   "sessions": 1
+  },
+  "2026-11-05": {
+   "total": 240300701,
+   "output": 516779,
+   "sessions": 3
+  }
+ },
+ "stats": {
+  "totals": {
+   "total": 15302196402,
+   "input": 85384,
+   "output": 43632052,
+   "cache_write_5m": 321890,
+   "cache_write_1h": 161095983,
+   "cache_read": 15097061093
+  },
+  "models": {
+   "claude-opus-5-5": {
+    "input": 85078,
+    "output": 43510887,
+    "cache_write_5m": 321890,
+    "cache_write_1h": 160644100,
+    "cache_read": 15073271569
+   },
+   "claude-sonnet-5-5": {
+    "input": 306,
+    "output": 121165,
+    "cache_write_5m": 0,
+    "cache_write_1h": 451883,
+    "cache_read": 23789524
+   }
+  },
+  "days": {
+   "2026-10-23": {
+    "total": 118408488,
+    "output": 870330,
+    "sessions": 1
+   },
+   "2026-10-24": {
+    "total": 399545402,
+    "output": 619486,
+    "sessions": 1
+   },
+   "2026-10-25": {
+    "total": 2170154736,
+    "output": 7016672,
+    "sessions": 1
+   },
+   "2026-10-26": {
+    "total": 1391443294,
+    "output": 3119995,
+    "sessions": 4
+   },
+   "2026-10-27": {
+    "total": 3631316579,
+    "output": 12258847,
+    "sessions": 10
+   },
+   "2026-10-28": {
+    "total": 3401774159,
+    "output": 9610608,
+    "sessions": 13
+   },
+   "2026-10-29": {
+    "total": 2204753018,
+    "output": 5359215,
+    "sessions": 9
+   },
+   "2026-10-30": {
+    "total": 1074842307,
+    "output": 2444136,
+    "sessions": 4
+   },
+   "2026-10-31": {
+    "total": 310994049,
+    "output": 757059,
+    "sessions": 3
+   },
+   "2026-11-04": {
+    "total": 51235782,
+    "output": 151411,
+    "sessions": 1
+   },
+   "2026-11-05": {
+    "total": 547728588,
+    "output": 1424293,
+    "sessions": 3
+   }
+  },
+  "complete": true,
+  "unknown_rows": 0
+ }
+}

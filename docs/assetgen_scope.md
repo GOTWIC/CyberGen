@@ -4,7 +4,7 @@ Stage 2 (assetgen) of CyberGen's five stages. A built citygen city in; a 3D mode
 for every building, plus the street elements, props, plants and texture library the city
 needs, out, and into Unreal through the shared exporter (`docs/unreal_export.md`), which
 every assetgen milestone updates for what it adds. Like citygen it is city-agnostic, offline and
-deterministic. Its milestones carry the prefix AG (AG0 to AG16, section 14), so their
+deterministic. Its milestones carry the prefix AG (AG0 to AG17, section 14), so their
 folders in `docs/progress/` never clash with stage 1's M folders or a later stage's; their
 full record is `docs/assetgen_milestones.md`. The decisions that need Swagnik before AG1
 starts are in section 13.
@@ -706,7 +706,8 @@ docker image; Windows joins in AG9.
 | AG13 | Ground cover and grass (14.14) | M16; AG6, AG8; decision 13.9 | AG4, AG5, AG12 |
 | AG14 | Fit and finish (14.15) | AG4, AG7, AG8; M17 to M21 | AG12, AG13 |
 | AG15 | Cyberpunk facades and night (14.16) | AG14, AG6; M20, M21 | AG12, AG13 |
-| AG16 | Performance (14.17) | AG15; the first run-through's fixes | |
+| AG16 | Performance (14.17) | AG15; the first run-through's fixes; AG17 | |
+| AG17 | Road surfaces by construction (14.18) | M22; AG14 | |
 
 ### 14.1 AG0: Contract and spike
 
@@ -877,6 +878,7 @@ docker image; Windows joins in AG9.
       ├─> AG7 ──────────────────────────────┼─> AG9 ─> AG10 (after M14), AG11
       └─> AG8 ──────────────────────────────┤
  M17 to M21 ─> AG14 ─> AG15 ─> AG16 (perf) ─┤
+ M22 (pavement map) ─> AG17 (roads) ────────┤
  M16 ─┬─> AG12 (water) ─────────────────────┤
       └─> AG13 (ground cover, grass) ───────┘
 ```
@@ -904,6 +906,10 @@ docker image; Windows joins in AG9.
 - **Performance** (AG16) comes after the first run-through's fixes and before AG9 and stage
   3: what it fixes is stage 1 and 2 content that atmosgen will not change, and its benchmark
   is then the baseline every later milestone, in any stage, is measured against.
+- **Road surfaces** (M22, then AG17; 14.18) come from run-through 2's road recheck: one
+  pavement map in the model, with shared edges and one height per point, so pieces meet by
+  construction. They come before AG16 (Swagnik, 2026-11-05), so its benchmark measures the
+  final street pieces.
 - **Stage 1 milestones assetgen waits on:** M15 and the exporter's move to its own package
   before AG0's Unreal part, M13 for AG5's slopes and AG7's grades (until then flat ground at
   z 0), M14 for AG10. The asks of section 4.5 go to citygen sessions; each milestone derives
@@ -1067,6 +1073,165 @@ stage 3.
 - **Later stages:** atmosgen tunes its lighting, shadows, fog and volumetrics against this
   benchmark in its own milestones; lifegen's crowds and traffic (CPU) get a pass of their own
   after it.
+
+### 14.18 M22 and AG17: Road surfaces by construction
+
+From run-through 2's road recheck (Swagnik, 2026-11-05): after #82, #89, #95, #103 and #104,
+roads still fail to meet their junctions in places. Each fix aligned one more case, because
+each piece finds its own edge and the pieces agree only within tolerances:
+- **Three exit finders:** `JN.leg_exit`, `path.first_exit` and AG14's shapely crossing, which
+  can disagree.
+- **Two cuts:** `Leg.cut` places sidewalks, crosswalks and lanes, while the polygon exit
+  (after `shared_pavement` and `absorb_shared`) places roads and surfaces. So sidewalks run
+  into junctions and are clipped after the fact.
+- **Matching by tolerance:** citygen's cut line spans the right of way and the ring sits at
+  the curb, and AG7 matches the two within 3 cm across and 1 m along (`_with_corners`,
+  `_cut_run`).
+- **No interior points:** a junction is triangulated from its outline alone, with
+  inverse-distance heights off the vertices, so it cannot follow legs far apart in height
+  (`jn.e217s328`, #105).
+- **Seams never checked:** sidewalk to corner pad, sidewalk to crosswalk and median ends are
+  computed independently and never compared.
+
+This milestone pair replaces matching with sharing. One exact map of the pavement in the
+model, with the boundaries stored once and read by every piece, so a seam is correct by
+construction. The fit checks stay, as tripwires that must read zero.
+
+**The guarantee.** On every surface layer (the ground's roads, each raised network, each
+deck), the pavement is a set of faces (carriageway, median, curb, sidewalk, corner pad,
+cul-de-sac bulb) with these invariants:
+1. **Tiling:** the faces' interiors are pairwise disjoint and their union is the right of
+   way, exactly on the 1 mm grid.
+2. **Shared edges:** where two faces meet, the boundary is one stored polyline, a leg's
+   port (road to junction) or a band edge (carriageway to curb, curb to sidewalk). Both faces
+   reference it by id; neither keeps a copy.
+3. **One height per vertex:** every map vertex has one stored height, and every piece reads
+   it.
+4. **Conforming meshes:** no mesher splits a stored edge; extra points go strictly inside a
+   face. Two faces then draw a shared edge between the same vertices,
+   $p(t) = (1-t)\,v_i + t\,v_{i+1}$ for $t \in [0,1]$ on both sides. The gap, the step and
+   any T-junction are zero, in plan and in height.
+
+   With 1 and 2, every interior edge of the surface lies in exactly two faces, so each layer
+   is a closed surface with boundary whose only open edges are the right of way's outer
+   edges.
+5. **Buildable junctions:** a junction's ports lie within what one surface can carry. The
+   slope between any two of its ports (their height difference over the shortest path between
+   them across the face) is at most the class's grade. A junction that breaks this is
+   repaired at layout or fails the build (M22).
+6. **Simple faces:** every face is a simple polygon (holes allowed); a road's band never folds
+   on a tight bend.
+
+**M22 (citygen): the pavement map**
+- **Model:** a `pavement` collection per surface layer:
+  - **Vertices:** 1 mm plan positions, and a height over the ground as every z in the model.
+  - **Edges:** polylines of vertex ids, of kind port, band, curb or outer.
+  - **Faces:** a kind, an owner (the road segment or junction id), a band, the boundary as
+    oriented edge ids with holes, and interior sample vertices where the face is not planar.
+
+  Ids come from the owner and band (`<segment>.pv.cw`, `<junction>.pv.c2`, M10); they go
+  into `ids.REFS` and `ids.ORDER`.
+- **Construction** (after M18's grading and `surfaces`, before the props):
+  1. **Ribbons:** each road's cross-section bands as exact offsets of its centerline: median,
+     carriageway each way, curb, furniture zone and clear path, from `CrossSection`. A bend
+     whose offset would fold (turning angle against half width) becomes a bend face (M17's
+     `bend` shape generalized), not a mitre. This retires AG7's `MITER_CAP` rows and the
+     hairpin bulge.
+  2. **One cut per leg:** each road end gets a single cut, the farthest of:
+     - the corner fillet's tangent point;
+     - the last place its right of way overlaps another leg's (M17's `overlap_cuts`);
+     - the far edge of its crosswalk.
+
+     Crosswalks lie wholly on a junction face or wholly on a road face, never across a
+     port. Every band of the road ends on this one port. It replaces `Leg.cut`, the polygon
+     exit, `path.first_exit` and AG14's crossing finder, and sidewalks, crosswalks and lanes
+     are trimmed at it.
+  3. **Clusters:** where a road's two cuts meet or cross (two junctions too close: today's
+     overlapping junctions, `absorb_shared`'s convex-hull bridges, M17's long cuts), the road
+     gets no face. Its two junctions become one junction face, with the road's lanes and
+     walkways running across it. This retires the owner rule (`_overlaps`, the `_carriageway`
+     seam).
+  4. **Junction faces:** a carriageway face bounded by its legs' ports and the curb arcs
+     between them. A corner pad is bounded by two legs' sidewalk ports, the corner's curb arc
+     and the property line. A cul-de-sac bulb starts at its road's port, so there is no
+     wedge.
+  5. **Heights:**
+     - **Ports:** port vertices take the road's height at the cut, ground plus profile.
+     - **Curb arcs:** linear by arc length between their ports' ends, as M18 does.
+     - **Interiors:** a junction's interior comes from its boundary by mean value coordinates
+       (closed form, `dmath`), sampled on a 2 m grid strictly inside, rounded to 1 mm and
+       stored. The blockout and AG7 then draw one surface, and a junction can follow legs at
+       different heights.
+     - **Bands:** a road's band edges are sampled every 4 m or less along it. These samples
+       are the shared vertices between neighboring bands.
+  6. **Buildable junctions:** a junction that breaks invariant 5 is first levelled further by
+     M18 (longer runs within the grade). Where that is not enough, the road stage separates
+     its levels: the high legs pass over as an overpass, and the low ones tee elsewhere, as
+     M7 classifies a `cross`. Where neither fits, the build fails `pavement_junctions` and
+     `build_city` retries. Delta's `jn.e217s328` (legs 0.8 to 12.3 m) is the test case.
+- **Checks:** exact, and expected never to fail on a correct build; they are the invariants'
+  proof obligations:
+  - `pavement_tiling`: areas sum to the right of way's; no overlap.
+  - `pavement_edges`: every interior edge in exactly two faces, with identical vertex lists.
+  - `pavement_heights`: one height per vertex; every face within its class's grade and cross
+    slope.
+  - `pavement_junctions`: invariant 5.
+- **Blockout:** roads, junctions, sidewalks and medians drawn from the faces. This replaces
+  `_trimmed`, and the 1 cm overlap of a road under a flat junction.
+- **With M10:** in a regeneration, the ports on held roads are held, vertex ids and heights
+  included, so the new district meets the old city on the same edges.
+- **With M13 and M14:** heights stay ground plus profile. A deck's streets are a layer of
+  their own, and a deck ramp meets the ground and the deck at ports. Faces of different
+  layers may overlap in plan only with clearance (M17's `road_overlaps`, `bridge_clash`), and
+  they share no edge.
+- **Not here:** camber and cross slope. The model has none, and it stays level across a road.
+  The band edges carry their own heights, so a camber can come later (rain runoff, atmosgen)
+  without changing the map's shape.
+
+**AG17 (assetgen): street surfaces from the map**
+- **Meshing:** AG7's road, junction, sidewalk, median and corner pieces are meshed from their
+  faces:
+  - the boundary is the face's stored vertices in order, never split;
+  - the interior uses the face's stored samples, by a constrained triangulation with Steiner
+    points strictly inside (`assetgen/triangulate.py` extended);
+  - curbs are vertical faces between a carriageway edge and the sidewalk edge above it, the
+    same stored polyline at two heights.
+- **Barriers:** they run along stored edges and end at a port by construction. That replaces
+  most of #95's keep-out spans in `streets/barriers.py`.
+- **Markings and crosswalks:** decals on the face that holds them, at its height.
+- **Decks:** a raised road's girder and parapets follow its face. A raised junction's slab
+  sits under its face, with no girder running under the junction.
+- **Retired:** `path.first_exit`, `Road._edge`, `_with_corners`, `_cut_run`, `_run_z`,
+  `_surface`'s inverse-distance heights, the duplicate `_corner` in `_sectors`, `_fills`,
+  `_overlaps` and the `_carriageway` seam, `_clear_spans`, and most of AG14's tolerance code.
+- **Checks:**
+  - AG14's step and strip checks stay, and must read exactly 0.
+  - `street_watertight`, new and exact on integer millimeters: every mesh edge on an interior
+    map edge appears in exactly two pieces, at the same positions. It also measures plan
+    gaps, which the step check never did.
+- **Pieces and keys:** as today (owner ids), so the exporter needs no change. Pieces in their
+  own frames meet within float32 rounding (under 0.1 mm at tile scale). Merging a tile's
+  pavement into one mesh is AG16's call.
+- **Unreal:** no code change. The check's walk crosses junctions with no step.
+
+**Done when:**
+- every sample, the pinned, stack and deck demos and Cragmouth build with every check
+  passing;
+- the invariants hold on every city: tiling exact, every interior edge shared, no step and no
+  gap;
+- Delta's `jn.e217s328` is rebuilt within invariant 5, as one junction or as separate levels;
+- #105's leftovers are gone: the cul-de-sac wedge, the hairpin bulge, sidewalk slivers,
+  girders under junctions;
+- the goldens are rewritten for every city (every model gains the map).
+
+**Shows:** before and after renders of `jn.e217s328`, a cul-de-sac, a hairpin, a raised
+junction and a corner with its pad and crosswalk; a seam close up in Unreal.
+
+**Order and size:** M22, then AG17, then AG16 (Swagnik, 2026-11-05), each one session.
+M22's larger parts are the map and the level separation. AG17 rewrites the junction and walk
+makers and reuses most of the road maker. Roads come first so AG16 measures the final street
+pieces: Delta has 10,489 today, and clusters and bend faces change that count, which AG16 may
+merge further.
 
 ## 15. Running it
 

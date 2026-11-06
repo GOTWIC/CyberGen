@@ -142,6 +142,40 @@ def test_check_boats_fails(city):
     assert not _rerun(_mutate(city.model, fn))["boats_afloat"].passed
 
 
+def test_boats_moor_off_the_quay(city):
+    """#113: a moored boat's hull lies past its quay's band (half of `width_m` over the
+    water, as the blockout and AG7 draw it), clear of every quay and of the shore's walls;
+    a boat moved onto its quay's band fails `boats_afloat`."""
+    from shapely.geometry import LineString, Point
+
+    boats = [p for p in city.model.props if p.type == "prop.boat"]
+    if not boats:
+        pytest.skip("no boats in the small city")
+    moor = PR.Moorings(city.model)
+    ww = {w.id: G.from_model_poly(w.polygon) for w in city.model.waterways}
+    quays = {qy.id: qy for qy in city.model.quays}
+    for p in boats:
+        hull = PR.boat_hull(p.position[0], p.position[1], p.yaw_deg, p.scale)
+        assert moor.quay_hit(hull) is None, p.id
+        assert G.dist(hull, ww[p.attrs["waterway"]].boundary) >= PR.SHORE_CLEAR_M, p.id
+        qy = quays[p.attrs["quay"]]
+        half = PR.KINDS["boat"][1][1] / 2.0 * p.scale[1]
+        # (so its middle lies the half beam past the band)
+        assert G.dist(Point(p.position[:2]), LineString(qy.line)) >= \
+            qy.width_m / 2.0 + half, p.id
+
+    def onto(d):
+        b = next(x for x in d["props"] if _kind(x) == "boat")
+        line = LineString(quays[b["attrs"]["quay"]].line)
+        x, y = b["position"][:2]
+        f = line.interpolate(line.project(Point(x, y)))
+        dx, dy = f.x - x, f.y - y
+        k = (PR.MOOR_GAP_M + 1.0) / (dx * dx + dy * dy) ** 0.5
+        b["position"][:2] = [round(x + dx * k, 2), round(y + dy * k, 2)]
+    ch = _rerun(_mutate(city.model, onto))["boats_afloat"]
+    assert not ch.passed and "quay" in ch.failures[0], ch.failures
+
+
 # --- M20: on their surfaces, under what is over them -----------------------------------
 
 M20_CHECKS = {"prop_support", "plant_headroom"}
