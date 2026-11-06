@@ -1875,6 +1875,29 @@ AG15 (cyberpunk facades and night, from the first run-through) is in place (test
   spot lights under the 192 nearest lamps, `M_CgLightPool` decals under 768 more, sign
   washes (`docs/unreal_export.md`, "From AG15").
 Results: `docs/progress/AG15/`.
+The asset fixes (issues #83, #85, #88, #90, after run-through 2) are in place:
+- **AC units and ivy in the building's frame** (`brief.frame_z`, `FLOOR_MOUNTS`): M20 hangs
+  them on a floor's facade at a height over the ground where they hang
+  (`props.Ctx.facade_spot`); the briefs give them their height over the building's base (AG3's
+  panels and trellises and the mount check read it there), AG8 lifts them by the ground where
+  they hang (`props.gather.over`), and M20 puts none on a wall the ground buries at its spot.
+  The ground floor's shop signs, awnings, wall lights and cables keep their heights over the
+  base, under which AG3 and AG5 build the shopfronts.
+- **Doors**: a unit whose nearest wall faces another building sits on a facade within
+  `brief.UNIT_REACH_M` 2 m more facing its own street (`unit_loc`); a moved main entrance
+  with no room for its door shares a shopfront's (`fronts.Band._share_shop`, stat
+  `entrances_shared`); `asset_access` lets a path graze a neighbor's wall (`GRAZE_M`).
+- **Neighbor rule**: a hero's or type's weighted system draws past its neighbors' within its
+  weights (`genome.make`); in a city a regeneration made (`city_state.json`'s edits) the
+  towers outside the last edit's district keep their records' genomes
+  (`neighbors.held_towers`, records `ag15.avoided`, `ag15.held`; the old manifest in the
+  build folder); `assetgen brief seam BASE REGEN --district NAME` (`briefdiff.genome_seam`).
+- **Fins round a corner** (`shell._corner_road`): no fin near a facade's end reaches in front
+  of the next edge where that faces a road with no sidewalk, under the headroom.
+- **Exporter**: roof traces count 3 m over the building's pivot (#83); `import_city.unstage`
+  resets an actor going back to the blockout, `CITYGEN_UE_DIGEST_ROWS` (#85); sign washes
+  over the building's base (#90); the small city's import test streams at 600 m.
+  `GEN_VERSION` fixassets.4. Results: `docs/progress/fix_assets/`.
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
