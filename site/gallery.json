@@ -19,9 +19,9 @@
       {"entry": "m13-terrain", "title": "Cragmouth", "caption": "A port city on hills, its plateau standing on a cliff over the bay."},
       {"entry": "m20-city", "title": "Complete layout", "caption": "Vesper Bay with every tower, transit line, prop and sign in place.", "wide": true},
       {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props in Greyhook, in Unreal Engine."},
-      {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel."},
+      {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel, lit up at night."},
       {"entry": "ag8-props", "title": "Street props", "caption": "Every street prop and vehicle in the neon style, laid out.", "wide": true},
-      {"entry": "ag10-city", "title": "Vesper Bay, modelled", "caption": "Every building with a model and textures of its own.", "wide": true},
+      {"entries": ["ag10-city", "ag15-city-night"], "labels": ["Day", "Night"], "title": "Vesper Bay, modelled", "caption": "Every building with a model and textures of its own, by day and lit up at night.", "wide": true},
       {"entry": "ag12-canal", "title": "Canal at night", "caption": "Neon and lit windows on a Vesper Bay canal.", "wide": true},
       {"entries": ["ag15-day", "ag15-night"], "labels": ["Day", "Night"], "title": "Day and night", "caption": "Delta Megacity's core, every tower lit its own way after dark.", "wide": true},
       {"entry": "ag15-street", "title": "Core street", "caption": "Street level in Delta Megacity's core at night."},
@@ -426,7 +426,7 @@
       "milestone": "AG6",
       "milestone_name": "Materials and textures",
       "title": "Textured, and lit at night",
-      "image": "docs/progress/AG6/vesper_bay/8k/street_2_night.jpg",
+      "image": "docs/progress/gallery_refresh/street_the_stacks_night.jpg",
       "caption": "A textured street in The Stacks at night, windows and shop signs lit."
     },
     {
@@ -477,7 +477,7 @@
       "milestone_name": "Building types and landmarks",
       "title": "Landmarks as hero buildings",
       "image": "docs/progress/gallery_refresh/landmarks_8k.jpg",
-      "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel."
+      "caption": "The megatower, Nexus City's spires, an arcology and Greyhook's wheel, by night."
     },
     {
       "id": "ag10-city",
@@ -558,6 +558,16 @@
       "title": "A core street under its lamps",
       "image": "docs/progress/AG15/delta_megacity/core_street_night.jpg",
       "caption": "A street in Delta Megacity's core at night."
+    },
+    {
+      "id": "ag15-city-night",
+      "date": "2026-11-03",
+      "stage": "2",
+      "milestone": "AG15",
+      "milestone_name": "Cyberpunk facades and night",
+      "title": "The whole city by night",
+      "image": "docs/progress/gallery_refresh/vesper_bay_city_full_night.jpg",
+      "caption": "Vesper Bay after dark, every building lit on its own schedule."
     },
     {
       "id": "fix-sky-tubes",
