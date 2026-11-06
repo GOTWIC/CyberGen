@@ -2229,7 +2229,13 @@ A fix between milestones, from run-through 2's open items. Tests:
 - **Sign washes and lamps on terrain** (#90): the play features' sign washes stood at the
   slot's height over 0, not over the building's base (`unreal_play.sign_washes`); the
   Blender previews' lamp lights, washes and sign pages likewise (`materials.preview._Lift`).
-  FILL (lamp values by night on Cragmouth and Vesper Bay Decks).
+  The lamp values were checked by night in Unreal on the test suite's small terrain and deck
+  cities (each a blockout import into a throwaway project of its own, `--check` with night
+  views; a stage 2 import of those went past the memory watchdog): 191 lamps lit and 768
+  light pools in each, a hillside billboard washed at its own height, the deck's streets lit
+  under the slab and on it, every roof and facade trace hit (36 and 48). Street lamps
+  1500 cd, wall lamps 400, washes 600 and `PoolStrength` 1.0 are kept. Both checks fail only
+  on streaming (the small cities lie within the view range, as #85 found).
 - **Roof traces** (#83): run-through 2's five Industrial Port misses (four yards, one open
   shed beside the player start) had their roof hulls: a stage 2 shell's actor starts at its
   street front's top (one storey under 7.5 m: the front's band), so a yard's shell spans
@@ -2254,7 +2260,15 @@ A fix between milestones, from run-through 2's open items. Tests:
   small city (2.4 km) lies within the default 1.5 km view range from anywhere, so a teleport
   loads nothing new; it streams at 600 m now (`SMALL_VIEW_M`). Both pass on the Windows PC
   (42 and 10 minutes).
-- **Goldens**: `GEN_VERSION` fixassets.4; FILL.
+- **Goldens**: `GEN_VERSION` fixassets.4. Citygen: Cragmouth's model and blockout plan (M20
+  leaves out the 31 ivy patches and 12 AC units under the ground; nothing else moves); every
+  other city is main's byte for byte. Assetgen (`tests/assetgen/goldens.py`): the small
+  city's and the samples' briefs (units on their own street, AC units in the frame), the
+  small city's asset manifest, files and materials, and the Vesper Bay shells (the neighbor
+  rule, the fins). Left for the Mac: Nexus City's brief golden (since the moorings fix the
+  Windows PC builds a Nexus City model other than its golden, the same on main) and the props
+  golden (#92). The streets, ground and water goldens do not move (this fix changes none of
+  those stages and no flat city's model).
 
 ## Order
 
