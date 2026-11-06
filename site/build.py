@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import html
 import json
 import re
@@ -602,7 +603,14 @@ def render_usage(us: list[dict]) -> str:
   </section>"""
 
 
+def asset_version(name: str) -> str:
+    """A short hash of a site file, put in its URL (style.css?v=...) so a browser never
+    keeps an old stylesheet or script under a new page (Pages lets it cache them 10 min)."""
+    return hashlib.sha256((SITE / name).read_bytes()).hexdigest()[:10]
+
+
 def fill(name: str, out: Path, values: dict[str, str]) -> None:
+    values = {**values, "CSS_V": asset_version("style.css"), "JS_V": asset_version("app.js")}
     page = (SITE / name).read_text(encoding="utf-8")
     missing = sorted(set(TOKEN_RE.findall(page)) - values.keys())
     if missing:
