@@ -84,6 +84,16 @@ checks. A view of one's own is `assetgen materials preview OUT --views none --ey
   `assetgen preview OUT --views sheets --only random` on Greyhook, whose draw has the fewest
   shanty stacks (16% of its buildings, about 30% in the other cities).
 
+**Found on the way** (not fixed here):
+- Nexus City's north-east corner: the blockout's sea sheet covers all of the map that is not
+  land, but the model's sea polygon stops short of the strip of water between the land and an
+  islet at the map edge there; AG12 replaces the blockout's sea tiles (`city.sea.t+05+05` and
+  its neighbors) and draws no water on that strip, so it shows the background in the whole-city
+  render (and would be a hole in Unreal).
+- On the builds before #125 (main at `21528ae`), Nexus City failed `asset_unique` and
+  `asset_access`, Saltreach Free Port `asset_envelope` (one part over a road) and Cragmouth
+  `asset_access` and `asset_mounts`; on main with #125 every city passes every check.
+
 **Preview fix.** The whole-city views (`city`, `city_full`) drew AG7's streets, AG12's water
 and AG13's ground only on the tiles with a building, while the blockout's pieces they replace
 were taken out everywhere: open sea came out as a checkerboard of missing tiles, the delta's
