@@ -357,7 +357,7 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
                 out.append("\n  </ul>")
             stage = first["stage"]
             out.append(f"""
-  {section_head(labels[stage], names[stage], f"stage-{stage}")}
+  {section_head(labels[stage], names[stage], f"stage-{stage}", stage)}
   <ul class="showcase">""")
         out.append(f"""
     <li class="entry{' wide' if wide else ''}{' pair' if len(refs) > 1 else ''}" id="show-{esc(refs[0])}" data-stage="{esc(first['stage'])}">
@@ -374,10 +374,12 @@ def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
     return "".join(out)
 
 
-def section_head(label: str, name: str, anchor: str) -> str:
-    """A showcase section's heading: its label, its name if any, then a rule to the edge."""
+def section_head(label: str, name: str, anchor: str, stage: str = "") -> str:
+    """A showcase section's heading: its label (in its stage's color), its name if any, then a
+    rule to the edge."""
     sub = f'<span class="sec-name">{esc(name)}</span>' if name else ""
-    return f'<h2 class="sec-head" id="{esc(anchor)}"><span class="sec-label">{esc(label)}</span>{sub}</h2>'
+    st = f' data-stage="{esc(stage)}"' if stage else ""
+    return f'<h2 class="sec-head" id="{esc(anchor)}"{st}><span class="sec-label">{esc(label)}</span>{sub}</h2>'
 
 
 
