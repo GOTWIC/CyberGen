@@ -19,14 +19,24 @@ of the repo: a folder that no longer exists that some log file also holding line
 in the repo ran in (a session resumed after the repo moved or was renamed carries its
 earlier lines with it). Subagent logs sit in their parent session's folder and carry
 its working folder, so they count with it.
-Each API response is counted once (message id and request id, as ccusage does).
+Two counts of the same responses:
+- **Billed** (`totals`, `models`, `days`): each API response counted once (message id and
+  request id, as ccusage does and Anthropic's cost-tracking guide asks), which is what
+  Anthropic bills: the dashboard's "Billable tokens", which its API cost prices.
+- **Stats** (`stats`: `totals`, `models`, `days`, `complete`): what Claude Code's own
+  usage statistics (`/usage` -> stats) show. Claude Code writes a response into its log
+  once per content block (thinking, text, each tool call), every line with the whole
+  response's usage, and its stats add up every line, about twice the billed count: the
+  dashboard's "Claude stats tokens", which its chart shows.
 
 The ledger, site/usage/ledger/<device>/<YYYY-MM>.csv, keeps every response ever
 recorded, so a log Claude Code deletes later still counts and a session still running
 adds its later responses at the next run. A row holds nothing of the conversation:
 a hash of the message and request ids, the UTC time, hashes of the session and
-subagent ids, whether the session ran in a worktree, the model and its five token
-counts. The device's summary is made from the whole ledger.
+subagent ids, whether the session ran in a worktree, the model, its five token counts
+and `lines`, the number of log lines that carry it (empty in rows recorded before the
+column existed and no longer in the logs; such a row counts once in the stats count, and
+`stats.complete` is false). The device's summary is made from the whole ledger.
 """
 
 from __future__ import annotations
@@ -49,7 +59,7 @@ OUT = SITE / "usage"
 LEDGER = OUT / "ledger"
 LABELS = {"mac": "Mac", "windows": "Windows PC"}
 KINDS = ("input", "output", "cache_write_5m", "cache_write_1h", "cache_read")
-COLUMNS = ("key", "time", "session", "agent", "worktree", "model") + KINDS
+COLUMNS = ("key", "time", "session", "agent", "worktree", "model") + KINDS + ("lines",)
 
 
 def kinds_of(u: dict) -> dict[str, int]:
@@ -170,8 +180,10 @@ def weight(row: dict) -> int:
 def log_rows(sessions: dict[str, dict], ids: list[str]) -> dict[str, dict]:
     """The ledger's rows from the logs: one per API response, ids hashed, no content.
     A response logged more than once (a line per content block, a resumed session's
-    copy) keeps its largest record."""
+    copy) keeps its largest record, and `lines` counts every line that carries it (what
+    Claude Code's own stats add up)."""
     rows: dict[str, dict] = {}
+    lines: Counter = Counter()
     for sid in ids:
         s = sessions[sid]
         wt = int(any(WORKTREES in c for _, c in s["cwds"]))
@@ -182,12 +194,24 @@ def log_rows(sessions: dict[str, dict], ids: list[str]) -> dict[str, dict]:
                 model += ":fast"
             n = kinds_of(u)
             key = short(f"{mid}|{rid}" if (mid or rid) else f"{sid}|{ts}|{sorted(n.items())}", 16)
+            lines[key] += 1
             row = {"key": key, "time": utc(ts), "session": short(sid, 12),
                    "agent": short(agent, 12) if agent else "", "worktree": str(wt), "model": model,
                    **{k: str(v) for k, v in n.items()}}
             if key not in rows or weight(row) > weight(rows[key]):
                 rows[key] = row
+    for key, row in rows.items():
+        row["lines"] = str(lines[key])
     return rows
+
+
+def line_count(row: dict) -> int:
+    """How many log lines carry a response: 0 when unknown (a row recorded before the
+    column existed whose logs are gone)."""
+    try:
+        return int(row.get("lines") or 0)
+    except ValueError:
+        return 0
 
 
 def read_ledger(device: str) -> dict[str, dict]:
@@ -201,11 +225,15 @@ def read_ledger(device: str) -> dict[str, dict]:
 
 def merge(old: dict[str, dict], new: dict[str, dict]) -> dict[str, dict]:
     """Every row ever recorded: a row the logs no longer hold stays; a response
-    still being logged takes its largest record."""
+    still being logged takes its largest record and the most lines seen."""
     out = dict(old)
     for key, row in new.items():
-        if key not in out or weight(row) > weight(out[key]):
-            out[key] = row
+        prev = out.get(key)
+        if prev is None or weight(row) > weight(prev):
+            out[key] = dict(row)
+        if prev is not None:
+            out[key]["lines"] = str(max(line_count(prev), line_count(row))) if (
+                line_count(prev) or line_count(row)) else ""
     return out
 
 
@@ -232,26 +260,46 @@ def write_ledger(device: str, rows: dict[str, dict]) -> list[Path]:
 
 
 def summarize(rows: dict[str, dict], device: str, label: str) -> dict:
-    totals: Counter = Counter()
-    models: dict[str, Counter] = defaultdict(Counter)
-    days: dict[str, Counter] = defaultdict(Counter)
+    """The device's summary, in both counts: billed (each response once) at the top level,
+    and `stats` (each response once per log line that carries it, as Claude Code's own
+    usage statistics add it up)."""
+    count = {"billed": (Counter(), defaultdict(Counter), defaultdict(Counter)),
+             "stats": (Counter(), defaultdict(Counter), defaultdict(Counter))}
     day_sessions: dict[str, set] = defaultdict(set)
     sessions: set = set()
     worktree: set = set()
     agents: set = set()
+    unknown = 0
     for row in rows.values():
         n = {k: int(row[k]) for k in KINDS}
+        lines = line_count(row)
+        if not lines:
+            unknown += 1
         day = local_day(row["time"])
-        totals.update(n)
-        days[day].update(n)
-        models[row["model"]].update(n)
+        for view, times in (("billed", 1), ("stats", lines or 1)):
+            totals, models, days = count[view]
+            m = {k: v * times for k, v in n.items()}
+            totals.update(m)
+            days[day].update(m)
+            models[row["model"]].update(m)
         day_sessions[day].add(row["session"])
         sessions.add(row["session"])
         if row["worktree"] == "1":
             worktree.add(row["session"])
         if row["agent"]:
             agents.add(row["agent"])
-    totals["total"] = sum(totals[k] for k in KINDS)
+
+    def view(name: str) -> dict:
+        totals, models, days = count[name]
+        totals["total"] = sum(totals[k] for k in KINDS)
+        return {
+            "totals": {k: totals[k] for k in ("total",) + KINDS},
+            "models": {m: {k: c[k] for k in KINDS}
+                       for m, c in sorted(models.items(), key=lambda kv: -sum(kv[1].values()))},
+            "days": {d: {"total": sum(c[k] for k in KINDS), "output": c["output"],
+                         "sessions": len(day_sessions[d])} for d, c in sorted(days.items())},
+        }
+
     return {
         "device": device,
         "label": label,
@@ -259,11 +307,8 @@ def summarize(rows: dict[str, dict], device: str, label: str) -> dict:
         "sessions": len(sessions),
         "worktree_sessions": len(worktree),
         "subagents": len(agents),
-        "totals": {k: totals[k] for k in ("total",) + KINDS},
-        "models": {m: {k: c[k] for k in KINDS}
-                   for m, c in sorted(models.items(), key=lambda kv: -sum(kv[1].values()))},
-        "days": {d: {"total": sum(c[k] for k in KINDS), "output": c["output"],
-                     "sessions": len(day_sessions[d])} for d, c in sorted(days.items())},
+        **view("billed"),
+        "stats": {**view("stats"), "complete": unknown == 0, "unknown_rows": unknown},
     }
 
 
@@ -283,10 +328,11 @@ def main() -> None:
     old = read_ledger(device)
     rows = merge(old, log_rows(sessions, ids))
     data = summarize(rows, device, args.label or LABELS.get(device, device))
-    t = data["totals"]
+    t, s = data["totals"], data["stats"]
     print(f"{data['label']}: {data['sessions']} sessions ({data['worktree_sessions']} in worktrees), "
-          f"{data['subagents']} subagents, {t['total']:,} tokens ({t['output']:,} output), "
-          f"{len(data['days'])} days")
+          f"{data['subagents']} subagents, {len(data['days'])} days; tokens as Claude Code's stats "
+          f"count them {s['totals']['total']:,}, billed {t['total']:,} ({t['output']:,} output)"
+          + ("" if s["complete"] else f"; {s['unknown_rows']:,} older rows without a line count"))
     print(f"ledger: {len(rows):,} responses ({len(rows) - len(old):,} new)")
     if args.dry_run:
         return

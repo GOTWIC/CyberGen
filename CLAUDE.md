@@ -267,7 +267,11 @@ accepts them in a fixed order; randomness is a blake2b hash of ids (`props._u`);
 fitted to facades and overhead decks. Six checks in `prop_checks.py`, `preview_props.png`
 (`preview_props.py`). The blockout draws props and plants as geometry-nodes instances of
 per-kind prototypes (one object per kind and tile; USD point instancers; left out of the glTF
-tiles, which `props.csv` complements). Sample builds: `docs/progress/M6/`.
+tiles, which `props.csv` complements). Boats moor past their quay's band (`width_m` across
+its line, half over the water) by `MOOR_GAP_M`, their hull (`boat_hull`, AG8's 8 x 3 m)
+clear of every quay band and `SHORE_CLEAR_M` off the shore (`Moorings`; issue #113, they lay
+in the quay wall), which `boats_afloat` checks with M16's banks. Sample builds:
+`docs/progress/M6/`.
 
 M7a (elevated highways) is in place: at the end of M1b, `citygen/elevated.py` lifts highway
 windows chosen by ramp room and district density (`highways.elevated_share`) onto viaducts
@@ -1937,11 +1941,19 @@ no refresh on every push or milestone.
 Claude Code session logs (`~/.claude/projects`), keeps the sessions that ran in this repo
 (worktree sessions, their subagents and an earlier location of the repo included), merges
 their API responses into the device's ledger (`site/usage/ledger/<device>/<YYYY-MM>.csv`: one
-row per response, hashed ids, time, model and token counts, nothing of the conversation;
-rows are never removed, so logs Claude Code deletes still count) and writes
-`site/usage/<device>.json` from the whole ledger (`mac` or `windows` by platform: tokens by
-model and type, sessions, a per-day series, the time it ran); `build.py` adds the device files up, with each device and its last
-update behind a "By device" toggle. Each machine writes only its own file.
+row per response, hashed ids, time, model, token counts and `lines`, how many log lines carry
+it, nothing of the conversation; rows are never removed, so logs Claude Code deletes still
+count) and writes `site/usage/<device>.json` from the whole ledger (`mac` or `windows` by
+platform: tokens by model and type, sessions, a per-day series, the time it ran) in two counts.
+**Stats** (`stats`), what Claude Code's own `/usage` stats show: every log line, and Claude
+Code logs a response once per content block with the whole response's usage on each line, so
+about twice the billed count. **Billed** (`totals`, `models`, `days`): each request once, as
+Anthropic bills it. `build.py` adds the device files up and shows both: "Claude stats tokens",
+"Billable tokens" and "API cost" (the billable tokens at API prices, `PRICES`) at the top, the
+chart a column a day in the stats count, both counts and the cost per model and type behind
+"By model" and per device (with sessions, days and last update) behind "By device". A device file or ledger row from before the stats count counts once per
+request in it until that device's next run fills in its line counts (said in the panel). Each
+machine writes only its own file.
 **After every PR is closed (merged or not), on every machine:** the session that closed it
 (or merged it) runs `python site/usage.py` on its own machine (`.venv/bin/python` on the Mac,
 `.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` and its ledger folder to main
