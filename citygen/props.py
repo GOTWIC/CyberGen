@@ -53,6 +53,7 @@ from shapely.geometry import LineString, Point
 
 from . import dmath as M
 from . import geom as G
+from .water import WALL_W
 
 q = G.q
 
@@ -110,6 +111,13 @@ STANDING = ("railing", "barrier")   # things on the ground or a road with no gro
 CABLE_REACH_M = 1.7      # an overhead cable's end to the wall it is tied to, at most
 CABLE_SLACK_M = 0.05     # (placing: that reach less this, so the check's rounding holds)
 CABLE_MIN_Z_M = 4.5      # its height over the street, at least
+# a moored boat (#113): its hull (KINDS' 8 x 3 m at its base size, AG8's boats fill it) lies
+# off the quay's band (`width_m` across its line, half of it over the water, as the blockout
+# and AG7 draw it) by this gap, its fenders
+MOOR_GAP_M = 0.4
+# and keeps the thickest wall M16 stands at the water's edge off its waterway's shore (a
+# canal wall's 0.6 m, a quay's 1 m where its bank runs on past the quay's line)
+SHORE_CLEAR_M = max(WALL_W.values())
 
 
 def _u(*key) -> float:
@@ -906,34 +914,73 @@ def quay_props(c: Ctx) -> list[Cand]:
             if w is not None and w.kind in ("canal", "basin", "marina") and \
                     _u("boat", qy.id, k) < (0.7 if w.kind == "marina" else 0.35):
                 small = w.kind == "canal"
-                beam = 2.4 if small else 3.0
-                out.append(Cand("boat", x - nx * (beam / 2 + 1.0), y - ny * (beam / 2 + 1.0),
-                                yaw=yaw_of(ux, uy), r=0.0, keep=0,
-                                scale=(0.75, 0.8, 0.8) if small else (1.0, 1.0, 1.0),
+                scale = (0.75, 0.8, 0.8) if small else (1.0, 1.0, 1.0)
+                # (#113: past the quay's band, which reaches width_m / 2 over the water; the
+                # boat lay its beam / 2 + 1 m off the line, in the quay wall)
+                off = qy.width_m / 2.0 + MOOR_GAP_M + KINDS["boat"][1][1] / 2.0 * scale[1]
+                out.append(Cand("boat", x - nx * off, y - ny * off,
+                                yaw=yaw_of(ux, uy), r=0.0, keep=0, scale=scale,
                                 attrs={"quay": qy.id, "waterway": w.id, "moored": True}))
     return out
 
 
+def boat_hull(x: float, y: float, yaw_deg: float, scale) -> shapely.Polygon:
+    """A boat's hull in plan: KINDS' 8 x 3 m at its base size (AG8's boats fill it), scaled
+    and turned as placed."""
+    hx, hy = KINDS["boat"][1][0] / 2.0 * scale[0], KINDS["boat"][1][1] / 2.0 * scale[1]
+    a = math.radians(yaw_deg)
+    ca, sa = math.cos(a), math.sin(a)
+    return shapely.Polygon([(x + ca * u - sa * v, y + sa * u + ca * v)
+                            for u, v in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))])
+
+
+class Moorings:
+    """Every quay's band (`width_m` across its line, half of it over the water), which a
+    boat's hull keeps clear of (`boats_in_water` also keeps it `SHORE_CLEAR_M` off its
+    waterway's shore, `check_boats` off M16's banks)."""
+
+    def __init__(self, m):
+        self.quays = [(qy.id, LineString(qy.line), qy.width_m / 2.0) for qy in m.quays
+                      if len(qy.line) >= 2]
+        self.tree = shapely.STRtree([x[1] for x in self.quays]) if self.quays else None
+        self.reach = max((x[2] for x in self.quays), default=0.0)
+
+    def quay_hit(self, hull) -> str | None:
+        """The id of the first quay (by its index in the model's quays) whose band the hull
+        reaches into, else None."""
+        if self.tree is None:
+            return None
+        for k in sorted(int(i) for i in self.tree.query(hull, predicate="dwithin",
+                                                         distance=self.reach)):
+            qid, line, half = self.quays[k]
+            if G.dist(hull, line) < half:
+                return qid
+        return None
+
+
 def boats_in_water(c: Ctx, cands: list[Cand]) -> list[Cand]:
-    """Boats whose hull lies in its waterway, clear of bridges and each other."""
+    """Boats whose hull lies in its waterway, clear of the quays' bands, the shore's walls,
+    bridges and each other."""
     ww = {w.id: G.from_model_poly(w.polygon) for w in c.m.waterways}
+    shore = {k: p.boundary for k, p in ww.items()}
+    moor = Moorings(c.m)
     bridges = [LineString(s.centerline).buffer(s.width_m / 2.0 + 3.0)
                for s in c.m.road_segments if s.bridge]
     btree = shapely.STRtree(bridges) if bridges else None
     out = []
     for b in cands:
         poly = ww.get(b.attrs["waterway"])
-        a = math.radians(b.yaw)
-        hx, hy = 4.0 * b.scale[0], 1.5 * b.scale[1]
-        ca, sa = math.cos(a), math.sin(a)
-        hull = shapely.Polygon([(b.x + ca * u - sa * v, b.y + sa * u + ca * v)
-                                for u, v in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))])
+        # (the hull where the model will have it, on the 1 cm grid, as the check sees it)
+        b.x, b.y = q(b.x), q(b.y)
+        hull = boat_hull(b.x, b.y, b.yaw, b.scale)
         if poly is None or not poly.contains(hull):
+            continue
+        if G.dist(hull, shore[b.attrs["waterway"]]) < SHORE_CLEAR_M or \
+                moor.quay_hit(hull) is not None:
             continue
         if btree is not None and len(btree.query(hull, predicate="intersects")):
             continue
-        b.r = hx
-        b.x, b.y = q(b.x), q(b.y)
+        b.r = KINDS["boat"][1][0] / 2.0 * b.scale[0]
         b.z = c.water_z(b.attrs["waterway"], b.x, b.y)
         if c.fits(b):
             c.occupy(b)

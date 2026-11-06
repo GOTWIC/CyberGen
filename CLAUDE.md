@@ -267,7 +267,11 @@ accepts them in a fixed order; randomness is a blake2b hash of ids (`props._u`);
 fitted to facades and overhead decks. Six checks in `prop_checks.py`, `preview_props.png`
 (`preview_props.py`). The blockout draws props and plants as geometry-nodes instances of
 per-kind prototypes (one object per kind and tile; USD point instancers; left out of the glTF
-tiles, which `props.csv` complements). Sample builds: `docs/progress/M6/`.
+tiles, which `props.csv` complements). Boats moor past their quay's band (`width_m` across
+its line, half over the water) by `MOOR_GAP_M`, their hull (`boat_hull`, AG8's 8 x 3 m)
+clear of every quay band and `SHORE_CLEAR_M` off the shore (`Moorings`; issue #113, they lay
+in the quay wall), which `boats_afloat` checks with M16's banks. Sample builds:
+`docs/progress/M6/`.
 
 M7a (elevated highways) is in place: at the end of M1b, `citygen/elevated.py` lifts highway
 windows chosen by ramp room and district density (`highways.elevated_share`) onto viaducts
