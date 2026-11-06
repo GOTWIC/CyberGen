@@ -1340,7 +1340,7 @@ class Assembly:
                 out.append(Face(fid, f.owner, f.kind, band, f.layer, f.prio, rs, f.road,
                                 f.unit, f.legs, f.span))
         self.faces = out
-        self.stats["faces_split"] = n
+        self.stats["faces_split"] = self.stats.get("faces_split", 0) + n
         return n
 
     def _fresh(self, F: Face) -> tuple[str, str]:
@@ -2011,9 +2011,11 @@ def build_map(segments: list[dict], nodes: list[dict], units: list[Unit],
     junc = [i for i, f in enumerate(A.faces) if f.kind in JUNCTION_KINDS]
     n_fix = A.tfix(idx, junc, all_segs=True, src_ports=True)
     A.resolve()
-    if A.fill_gaps():
-        A.resolve()         # (what the gaps' own shared-edge pass leaves overlapping)
-    A.split_invalid()
+    for _ in range(3):
+        if A.fill_gaps():
+            A.resolve()     # (what the gaps' own shared-edge pass leaves overlapping)
+        if not A.split_invalid():
+            break           # (a face split at a touch can leave a sliver to fill again)
     A.extract()
     A.heights()
     n_samp = A.samples()
