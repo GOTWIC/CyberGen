@@ -283,7 +283,32 @@ def fold_cuts(net, legs: dict) -> int:
             if far is not None and far + 0.5 > x.cut:
                 x.cut = x.cut_row = far + 0.5
                 n += 1
+            # (a turn inside the cut whose inner corner reaches back past it: the cut past
+            # that corner, half the width times tan(half the turn), sin / (1 + cos))
+            acc = 0.0
+            for i in range(1, len(x.pts) - 1):
+                a, v, b = x.pts[i - 1], x.pts[i], x.pts[i + 1]
+                acc += ST._dist(a, v)
+                if acc >= x.cut or acc >= x.L - 1.0:
+                    break
+                la, lb = ST._dist(a, v), ST._dist(v, b)
+                if la <= 0.0 or lb <= 0.0:
+                    continue
+                ux, uy = (v[0] - a[0]) / la, (v[1] - a[1]) / la
+                wx, wy = (b[0] - v[0]) / lb, (b[1] - v[1]) / lb
+                cr, dt = abs(ux * wy - uy * wx), ux * wx + uy * wy
+                if cr < MITRE_TAN_MIN * (1.0 + dt):
+                    continue        # (a gentle turn, a curve's vertices: no corner)
+                t = MITRE_TAN_MAX if 1.0 + dt <= cr / MITRE_TAN_MAX else cr / (1.0 + dt)
+                back = acc + x.row * t
+                if back > x.cut:
+                    x.cut = x.cut_row = min(G.q(back + 0.5), max(x.L - 1.0, x.cut))
+                    n += 1
     return n
+
+
+MITRE_TAN_MAX = 6.0     # M22: tan(half a turn) counted at most (a turn near a reversal)
+MITRE_TAN_MIN = 0.2679  # M22: tan(half a turn) of a corner (a turn of 30 degrees or more)
 
 
 def plan_units(net, legs: dict, heads: dict, gr=None) -> list[dict]:
@@ -1292,6 +1317,29 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
                 L = ST._plen([tuple(q) for q in sg["centerline"]])
                 ties.append((var[sg["start"]], var[sg["end"]],
                              max(catch_grade(sg, gr), _steepest(sg["z_profile"])) * L, jk))
+            # (a port beside an inner road: within the junction's grade of the inner road's
+            # surface beside it, so within that and the inner road's own climb from its
+            # nearer node; a long cluster, a bridge landing beside a ramp inside it)
+            rd_in = plan.roads.get(sid)
+            if sg is None or rd_in is None:
+                continue
+            g_in = max(catch_grade(sg, gr), _steepest(sg["z_profile"]))
+            L_in = rd_in.path.L
+            for nd, x, sp, a0, a1 in lines:
+                best = None
+                for q in (a0, a1):
+                    st = rd_in.path.project(q[0], q[1], 0.0, L_in)
+                    cx, cy = rd_in.path.point(st, 0.0)
+                    gap = max(math.hypot(q[0] - cx / 1000.0, q[1] - cy / 1000.0) - rd_in.row,
+                              0.0)
+                    if best is None or gap < best[0]:
+                        best = (gap, st)
+                gap, st = best
+                if gap > BESIDE_M or not (0.0 < st < L_in):
+                    continue
+                near, sd = (sg["start"], st) if st <= L_in - st else (sg["end"], L_in - st)
+                ties.append((("p", x.seg["id"], x.at_start), var[near],
+                             g_in * sd + ulim[u["nodes"][0]] * PORT_SHARE * gap, jk))
     group: dict = {}            # a junction (its first node) or plain node -> its variables
     ends = {x["id"]: (x["start"], x["end"]) for x in net.segments}
     for k in target:
@@ -1456,8 +1504,6 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
         if not steep:
             break
         flat |= steep
-    if os.environ.get("M22_DEBUG"):
-        out["debug"] = _why_kept(ties, anchors, group, kept, flat)
     # (the roads changed: a junction one of whose roads still cannot be run kept too, until
     # every road runs)
     for _ in range(KEEP_ROUNDS):
@@ -1483,6 +1529,18 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
         for jk in more:
             for k in group[jk]:
                 zv[k] = target[k]
+    # (what holds each junction kept: the two bounds that clash on it)
+    out["held"] = {}
+    whys = _why_kept(ties, anchors, group, kept, flat) if kept else []
+    for first, k, ups, los in whys:
+        # (ids in lists, so M10's renaming finds them: `ids.Renamer._attrs`)
+        if ups and los and los[0][0] > ups[0][0] + 1e-6:
+            out["held"][first] = {"low": [los[0][1][0], los[0][1][1], round(los[0][0], 2)],
+                                  "high": [ups[0][1][0], ups[0][1][1], round(ups[0][0], 2)]}
+        else:
+            out["held"][first] = {"grade": True}
+    if os.environ.get("M22_DEBUG"):
+        out["debug"] = whys
     by_id = {x["id"]: x for x in net.segments}
     for sid, new in sorted(plan_new.items()):
         if _changed(by_id[sid]["z_profile"], new):
@@ -1530,49 +1588,79 @@ def _window(prof: list, x, sp: float) -> list:
     return [p for p in prof if a - 1e-9 <= p["s"] <= b + 1e-9]
 FLAT_ROUNDS = 6         # M22: rounds that make the junctions whose faces would be steep flat
 PORT_SHARE = 0.98       # M22: two ports of a junction within this share of its grade
+BESIDE_M = 6.0          # M22: a port this near an inner road's right of way is tied to it
 CROSS_TOL_M = 0.02      # M22: cones that cross by more than this: no height fits there
 
 
 def _why_kept(ties, anchors, group, kept, flat) -> list:
-    """M22 (debugging, `M22_DEBUG`): for each junction the fit kept, the anchors that bind
-    it from below and above (with the junctions made flat flat)."""
+    """M22: for each junction the fit kept, the two anchors that clash on it: of its
+    variables, the one whose lowest bound from above (an anchor's value plus its distance
+    on the graph) is furthest under its highest bound from below; (first node, variable,
+    [(bound, why, anchor variable)] from above, the same from below). Bounds within
+    WHY_REACH_M of height are searched (a farther anchor binds nothing here)."""
     import heapq
 
-    bad = kept
     adj: dict = {}
     for u, v, w, jk in ties:
         if jk is not None and jk in flat and u[0] == "p" and v[0] == "p":
             w = 0.0
         adj.setdefault(u, []).append((v, w))
         adj.setdefault(v, []).append((u, w))
+    at: dict = {}
+    for v, val, w, kind, why in anchors:
+        at.setdefault(v, []).append((val, w, kind, why))
 
-    def dist_from(src):
+    def bounds(src):
         dist = {src: 0.0}
         hq = [(0.0, src)]
+        up, lo = None, None
         while hq:
             d, k = heapq.heappop(hq)
             if d > dist.get(k, math.inf):
                 continue
+            for val, w, kind, why in at.get(k, []):
+                if up is None or val + w + d < up[0]:
+                    up = (val + w + d, why, k)
+                if kind == "both" and (lo is None or val - w - d > lo[0]):
+                    lo = (val - w - d, why, k)
             for nb, w in adj.get(k, []):
-                if d + w < dist.get(nb, math.inf) - 1e-12:
-                    dist[nb] = d + w
-                    heapq.heappush(hq, (d + w, nb))
-        return dist
+                nd = d + w
+                if nd <= WHY_REACH_M and nd < dist.get(nb, math.inf) - 1e-12:
+                    dist[nb] = nd
+                    heapq.heappush(hq, (nd, nb))
+        return up, lo
     out = []
-    for jk in sorted(bad)[:40]:
-        k = sorted(group[jk])[0]
-        dist = dist_from(k)
-        ups, los = [], []
-        for v, val, w, kind, why in anchors:
-            if v not in dist:
-                continue
-            ups.append((val + w + dist[v], why, v))
-            if kind == "both":
-                los.append((val - w - dist[v], why, v))
-        ups.sort()
-        los.sort(reverse=True)
-        out.append((jk[1], k, ups[:2], los[:2]))
+    for jk in sorted(kept):
+        best = None
+        for k in sorted(group[jk]):
+            up, lo = bounds(k)
+            gap = (lo[0] if lo else -math.inf) - (up[0] if up else math.inf)
+            if best is None or gap > best[0]:
+                best = (gap, k, up, lo)
+        _, k, up, lo = best
+        out.append((jk[1], k, [up] if up else [], [lo] if lo else []))
     return out
+
+
+WHY_REACH_M = 40.0      # M22: how far in height `_why_kept` searches for a binding anchor
+
+
+def why_text(why: dict) -> str:
+    """M22: what holds a junction the height fit kept (`attrs.unbuildable`), in words."""
+    if why.get("grade"):
+        return "its roads cannot reach its ports within their grade"
+
+    def one(kind, ref):
+        return {"local cap": f"M7's {ST.LOCAL_JUNCTION_Z_M:g} m limit at local junction {ref}",
+                "lock": f"the locked stretch of {ref}",
+                "lock in window": f"the locked stretch of {ref} reaching into a junction",
+                "inner fixed": f"fixed road {ref}",
+                "fixed": f"fixed road {ref}",
+                "exit": f"map exit {ref}",
+                "under": f"the road over {ref}"}.get(kind, f"{kind} {ref}")
+    lo, hi = why["low"], why["high"]
+    return (f"{one(lo[0], lo[1])} ({lo[2]:.2f} m at least) against {one(hi[0], hi[1])} "
+            f"({hi[2]:.2f} m at most)")
 
 
 def _port_heights(u: dict, legs: dict, plan) -> dict:
@@ -2416,8 +2504,14 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     fr = getattr(getattr(net, "builder", None), "frame", None)
     held = None if fr is None else (lambda s: fr.match(s["centerline"], s) is not None)
     lev = level_legs(net, legs, gr, held, exits)
-    # M22: a junction whose ports one surface cannot carry is levelled further
+    # M22: a junction whose ports one surface cannot carry is levelled further; one that
+    # stays so, held by what the levelling may not move, says so
     lev.update(buildable(net, units, legs, gr, held, plan, lev))
+    first_of = {u["nodes"][0]: u["id"] for u in units}
+    for j in junctions:
+        why = lev.get("held", {}).get(j["node_id"])
+        if why and j["node_id"] in first_of and j["node_id"] in set(lev.get("unresolved", [])):
+            j["attrs"]["unbuildable"] = why
     # sidewalks and centerline walkways
     for s in net.segments:
         if s["attrs"].get("role") == "deck_ramp":

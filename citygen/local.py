@@ -365,7 +365,8 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             "corner_radius_m": a["corner_radius_m"], "crosswalk_ids": j["crosswalk_ids"],
             "attrs": {"classes": a["classes"], "archetype": a["archetype"],
                       **({k: a[k] for k in ("nodes", "inner", "signals", "bulbs") if k in a}
-                         if a.get("nodes") else {})}})
+                         if a.get("nodes") else {}),
+                      **({"unbuildable": a["unbuildable"]} if a.get("unbuildable") else {})}})
     out.junctions = [j for j in out.junctions if j["polygon"] is not None]
     out.crosswalks = jx["crosswalks"]
     out.sidewalks = jx["sidewalks"]

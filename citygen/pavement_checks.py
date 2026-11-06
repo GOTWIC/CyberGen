@@ -22,6 +22,7 @@ import numpy as np
 import shapely
 from shapely.geometry import Polygon
 
+from . import pavement as PV
 from . import pavetri as PT
 from .checks import Check
 
@@ -300,7 +301,8 @@ def face_grade(N: Net, f) -> float:
             d = math.dist(a, b)
             pts.append((a[0], a[1], N.z(r[i])))
             if d >= 0.25:
-                worst = max(worst, (abs(N.z(r[i]) - N.z(r[(i + 1) % k])) - 0.002) / d)
+                dz = abs(N.z(r[i]) - N.z(r[(i + 1) % k]))
+                worst = max(worst, (dz - PV.step_tol(d)) / d)
     if not f.samples:
         if len(pts) >= 3:
             p0 = pts[0]
@@ -351,8 +353,9 @@ def check_heights(spec, m) -> Check:
     c = Check("pavement_heights", "M22: one height per pavement vertex; every port level "
                                   "across its road; every junction, corner pad, bulb and "
                                   "bend face, drawn from its boundary and samples, within "
-                                  "the grade of its roads (M18's ramp maximum, a terrain "
-                                  "city's class grades)")
+                                  "the grade of its roads (M13's class grades, at least "
+                                  "M18's ramp maximum; a junction the levelling keeps as M18 "
+                                  "left it noted)")
     if m.pavement_net is None:
         return c
     N = Net(m)
@@ -367,7 +370,11 @@ def check_heights(spec, m) -> Check:
     by_class, cap = _grades(spec, m)
     cls = {s.id: s.road_class for s in m.road_segments}
     roads = _owner_roads(N)
+    held = {j.id: j.attrs["unbuildable"] for j in m.junctions if j.attrs.get("unbuildable")}
+    # (and the faces of a junction beside one, sharing its vertices: its heights reach them)
+    held_v = {v for f in N.faces if f.owner_id in held for r in N.rings.get(f.id, []) for v in r}
     steep = 0.0
+    noted = set()
     for f in N.faces:
         if f.kind not in JUNCTION_KINDS or f.id in N.bad:
             continue
@@ -377,10 +384,17 @@ def check_heights(spec, m) -> Check:
             lim = max([by_class.get(cls.get(r), cap) for r in roads.get(f.owner_id, ())] or
                       [cap])
         worst = face_grade(N, f)
-        steep = max(steep, worst)
         if worst > lim + GRADE_TOL:
+            if f.owner_id in held or any(v in held_v for r in N.rings[f.id] for v in r):
+                noted.add(f.owner_id)     # (held as M18 left it: `pavement_junctions`)
+                continue
             _lim(c, f"face {f.id} ({f.kind}): {worst:.1%} steep (its roads {lim:.0%})")
+        steep = max(steep, worst)
     c.notes.append(f"steepest junction face {steep:.1%}")
+    if noted:
+        c.notes.append(f"{len(noted)} junctions held as M18 left them, or beside one (what "
+                       f"holds each: `pavement_junctions`), with faces steeper than their "
+                       f"roads: {', '.join(sorted(noted)[:SHOW])}")
     return c
 
 
@@ -448,16 +462,32 @@ def check_junctions(spec, m) -> Check:
     c = Check("pavement_junctions", "M22: every junction is buildable: the slope between any "
                                     "two of its ports (their height difference over the least "
                                     "distance between them across it) within the grade of its "
-                                    "roads (M18's ramp maximum, a terrain city's class grades)")
+                                    "roads (M13's class grades, at least M18's ramp maximum); "
+                                    "a junction the levelling can make so only by moving a "
+                                    "bridge span, a fixed road or M7's local junction limit is "
+                                    "kept as M18 left it and noted with what holds it")
     if m.pavement_net is None:
         return c
     worst = 0.0
+    held = {j.id: j.attrs["unbuildable"] for j in m.junctions if j.attrs.get("unbuildable")}
+    noted: dict = {}
     for fid, ra, za, rb, zb, d, slope, lim in junction_slopes(spec, m):
-        worst = max(worst, slope)
         if slope > lim + GRADE_TOL:
+            jid = fid.split(".pv.")[0]
+            if jid in held:
+                noted[jid] = max(noted.get(jid, 0.0), slope)
+                continue
             _lim(c, f"{fid}: ports of {ra} at {za:.2f} m and {rb} at {zb:.2f} m, {d:.1f} m "
                     f"apart: {slope:.1%} (its roads {lim:.0%})")
+        worst = max(worst, slope)
     c.notes.append(f"steepest between two ports of a junction {worst:.1%}")
+    # (a junction the levelling cannot make buildable without moving what it may not move:
+    # a bridge's locked approach, a fixed road, M7's limit for a local junction)
+    from .junctions import why_text
+
+    for jid in sorted(noted):
+        c.notes.append(f"{jid}: {noted[jid]:.1%} between ports, held as M18 left it by "
+                       f"{why_text(held[jid])}")
     return c
 
 

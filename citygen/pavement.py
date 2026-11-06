@@ -66,6 +66,11 @@ SNAP_MM = 1             # junction vertices this near (each axis) are one (overl
 FLAT_MM = 1             # a face whose boundary lies on one plane within this is planar
 CELL_MM = 2000          # spatial hash cell of the shared-edge pass
 GAP_M2 = 1.0            # a hole in a layer's pavement this small is a sliver, filled
+END_STRIP_M = 0.5       # a bend face's ends: strips this long on its road's frames
+LONG_CURB_M = 40.0      # a cluster's curb this long between two ports follows its inner roads
+STEP_TOL_M = 0.02       # a step this high between two vertices under 1 m apart is no grade
+LONG_MARGIN_M = 15.0    # a long curb follows its inner roads this far from its ports on
+INNER_NEAR_M = 1.0      # ... where it is within this of an inner road's right of way
 PINCH_MM2 = 1000        # a loop of a ring this small (mm2) where it touches itself is cut out
 JUNCTION_KINDS = ("junction", "corner", "bulb", "bend")
 ROAD_KINDS = ("carriageway", "median", "curb", "sidewalk", "walk")
@@ -500,6 +505,8 @@ class Road:
         self.h = self.row if self.cls in ST.PEDESTRIAN else max(self.row - side, 0.0)
         self.a = 0.0            # cut at its start
         self.b = 0.0            # cut at its end (from its end)
+        self.unit_a = None      # the junction at its start (its id), if any
+        self.unit_b = None      # ... at its end
 
     def z(self, s: float) -> float:
         """Its surface over sea level at s (ground plus profile; the profile alone on a
@@ -532,6 +539,30 @@ class Road:
         if not p.is_valid:
             p = union(polys(shapely.make_valid(p)))
         return p
+
+    def fold_poly(self, a: float, b: float, w: float):
+        """The ground a stretch that folds covers, w either side: its centerline buffered
+        (round at its turns), its ends square on its frames (short strips there, not the
+        whole stretch, whose mitres at a turn near a reversal reach hundreds of meters out)."""
+        ss = self.path.stations(a, b)
+        line = shapely.LineString([self.path.frame(st)[:2] for st in ss])
+        g = shapely.buffer(line, w, cap_style="flat", join_style="round", quad_segs=4)
+        e = min(END_STRIP_M, (b - a) / 2.0)
+        return _ov(shapely.union, g, union([self.strip_poly(a, a + e, -w, w),
+                                            self.strip_poly(b - e, b, -w, w)]))
+
+    def band_poly(self, s0: float, s1: float, w: float):
+        """The ground its right of way (w either side) covers from s0 to s1: strips, and
+        `fold_poly` where it folds."""
+        parts, cur = [], s0
+        for a, b in self.folds(s0, s1):
+            if a > cur + 0.001:
+                parts.append(self.strip_poly(cur, a, -w, w))
+            parts.append(self.fold_poly(a, b, w))
+            cur = b
+        if s1 > cur + 0.001:
+            parts.append(self.strip_poly(cur, s1, -w, w))
+        return union([q for q in parts if not q.is_empty])
 
     def folds(self, s0: float, s1: float) -> list[tuple[float, float]]:
         """Stretches between s0 and s1 where an edge of its right of way would fold back
@@ -769,7 +800,7 @@ def unit_regions(u: Unit, roads: dict, pos: dict) -> tuple:
         rd = roads[x.seg["id"]]
         s0, s1 = rd.a, rd.path.L - rd.b
         if s1 - s0 > 0.0005:
-            beyond.append(rd.strip_poly(s0, s1, -rd.row, rd.row))
+            beyond.append(rd.band_poly(s0, s1, rd.row))
     cw, rw = [], []
     inner = set(u.inner)
     for nid in u.nodes:
@@ -793,8 +824,8 @@ def unit_regions(u: Unit, roads: dict, pos: dict) -> tuple:
         rd = roads.get(sid)
         if rd is None:
             continue
-        cw.append(rd.strip_poly(0.0, rd.path.L, -rd.h, rd.h))
-        rw.append(rd.strip_poly(0.0, rd.path.L, -rd.row, rd.row))
+        cw.append(rd.band_poly(0.0, rd.path.L, rd.h))
+        rw.append(rd.band_poly(0.0, rd.path.L, rd.row))
     heads = dict(u.heads)
     if u.head:
         heads[u.nodes[0]] = u.head
@@ -864,16 +895,13 @@ def bend_faces(rd: Road, bends: list) -> list[Face]:
                 rd.known.setdefault(q, st)
             rd.ends.append((st, pts))
     for k, (a, b) in enumerate(bends):
-        ss = rd.path.stations(a, b)
-        line = shapely.LineString([rd.path.frame(s)[:2] for s in ss])
-        g = shapely.buffer(line, rd.row, cap_style="flat", join_style="round", quad_segs=4)
+        g = rd.fold_poly(a, b, rd.row)
         side = []
         if a > rd.a + 0.001:
             side.append(rd.strip_poly(max(rd.a, a - 3.0 * rd.row), a, -rd.row, rd.row))
         if b < rd.path.L - rd.b - 0.001:
             side.append(rd.strip_poly(b, min(rd.path.L - rd.b, b + 3.0 * rd.row),
                                       -rd.row, rd.row))
-        g = _ov(shapely.union, g, union([rd.strip_poly(a, b, -rd.row, rd.row)]))
         if side:
             g = _ov(shapely.difference, g, union(side))
         parts = sorted((rs for rs in mm_polys(g) if _rs_area(rs) >= 100), key=_rs_key)
@@ -986,6 +1014,23 @@ class Assembly:
             if best is None or d < best[0]:
                 best = (d, z)
         return best[1] if best else 0.0
+
+    def _inner_z(self, u: Unit, x: float, y: float, near: float | None = None):
+        """A cluster's height at a plan point: its nearest inner road's at its station (None
+        where `near` is given and no inner road's right of way is within it)."""
+        best = None
+        for sid in sorted(u.inner):
+            rd = self.roads.get(sid)
+            if rd is None:
+                continue
+            s = rd.path.project(x, y, 0.0, rd.path.L)
+            px, py = rd.path.point(s, 0.0)
+            d = (m(px) - x) ** 2 + (m(py) - y) ** 2
+            if near is not None and math.sqrt(d) > rd.row + near:
+                continue
+            if best is None or d < best[0]:
+                best = (d, rd.z(s))
+        return best[1] if best else (None if near is not None else 0.0)
 
     def compatible(self, f: Face, g: Face, v) -> bool:
         if self.related(f, g):
@@ -1437,6 +1482,19 @@ class Assembly:
         corner pad's property line likewise."""
         z: dict = {}
         faces = self.faces
+        # (a ribbon vertex a junction's face shares, where the junction reaches over the
+        # ribbon short of its port: the junction's surface there, its port's height)
+        jv: dict = {}
+        for fi, f in enumerate(faces):
+            if f.kind in JUNCTION_KINDS and f.road is None:
+                for ids in self.vrings[fi]:
+                    for name in ids:
+                        jv.setdefault(name, set()).add(f.unit)
+
+        def at_port(rd, name, s):
+            ends = [st for st, uid in ((rd.a, rd.unit_a), (rd.path.L - rd.b, rd.unit_b))
+                    if uid is not None and uid in jv.get(name, ())]
+            return min(ends, key=lambda st: abs(st - s)) if ends else s
         for fi, f in enumerate(faces):
             if f.road is None or f.kind == "bend":
                 continue
@@ -1451,16 +1509,19 @@ class Assembly:
                         continue
                     s = rd.known.get(v)
                     if s is not None:
-                        z[name] = rd.z(s)
+                        z[name] = rd.z(at_port(rd, name, s))
         for fi, f in enumerate(faces):
             if f.road is None or f.kind == "bend":
                 continue
             rd = self.roads[f.road]
-            s0, s1 = f.span if f.span else (0.0, rd.path.L)
+            # (a ribbon lies between its road's cuts: a vertex of one past a bend in the road
+            # inside its junction projects onto its port, not beyond it)
+            s0, s1 = f.span if f.span else (rd.a, max(rd.a, rd.path.L - rd.b))
             for r, ids in zip(f.rings, self.vrings[fi]):
                 for v, name in zip(r, ids):
                     if name not in z:
-                        z[name] = rd.z(rd.path.project(m(v[0]), m(v[1]), s0, s1))
+                        s = rd.path.project(m(v[0]), m(v[1]), s0, s1)
+                        z[name] = rd.z(at_port(rd, name, s))
         # (a port no ribbon reaches, a bend's end at its junction: its road's height there)
         for fi, f in enumerate(faces):
             if f.kind not in JUNCTION_KINDS:
@@ -1476,6 +1537,13 @@ class Assembly:
                         if s is not None:
                             z[name] = rd.z(s)
                             break
+        # (a cluster's curbs longer than LONG_CURB_M between two ports, along its inner
+        # roads: their heights there, kept between the two ports' heights)
+        for fi, f in enumerate(faces):
+            u = self.units.get(f.unit) if f.road is None else None
+            if f.kind == "junction" and u is not None and u.inner:
+                for r, ids in zip(f.rings, self.vrings[fi]):
+                    self._long_curbs(u, r, ids, z)
         for kinds in (("junction", "bulb", "bend"), ("corner",)):
             for fi, f in enumerate(faces):
                 if f.kind not in kinds:
@@ -1489,9 +1557,44 @@ class Assembly:
                         z[name] = self.zf(f, m(v[0]), m(v[1]))
         self.abs = z
 
+    def _long_curbs(self, u: Unit, r, ids, z: dict) -> None:
+        k = len(ids)
+        known = [i for i in range(k) if ids[i] in z]
+        if len(known) < 2:
+            return
+        cum = [0.0]
+        for i in range(k):
+            a, b = r[i], r[(i + 1) % k]
+            cum.append(cum[-1] + math.hypot((b[0] - a[0]) / 1000.0, (b[1] - a[1]) / 1000.0))
+        per = cum[-1]
+        new = {}
+        for j, a in enumerate(known):
+            b = known[(j + 1) % len(known)]
+            span = (cum[b] - cum[a]) % per if b != a else per
+            if span < LONG_CURB_M:
+                continue
+            lo, hi = sorted((z[ids[a]], z[ids[b]]))
+            i = (a + 1) % k
+            while i != b:
+                t = (cum[i] - cum[a]) % per
+                if ids[i] not in z and LONG_MARGIN_M <= t <= span - LONG_MARGIN_M:
+                    zi = self._inner_z(u, m(r[i][0]), m(r[i][1]), INNER_NEAR_M)
+                    if zi is not None:
+                        new[ids[i]] = min(max(zi, lo), hi)
+                i = (i + 1) % k
+        z.update(new)
+
     def _along_ring(self, f: Face, r, ids, z: dict) -> None:
         k = len(ids)
         known = [i for i in range(k) if ids[i] in z]
+        u = self.units.get(f.unit) if f.road is None else None
+        if len(known) < 2 and u is not None and u.inner:
+            # (a ring no two ports anchor, a hole in a cluster between its inner roads: the
+            # nearest inner road's height at each vertex)
+            for v, name in zip(r, ids):
+                if name not in z:
+                    z[name] = self._inner_z(u, m(v[0]), m(v[1]))
+            return
         if not known:
             for v, name in zip(r, ids):
                 z[name] = self.zf(f, m(v[0]), m(v[1]))
@@ -1582,6 +1685,12 @@ def ring_heights(r: list, known: dict) -> list:
     return out
 
 
+def step_tol(d: float) -> float:
+    """How much of a height difference between two boundary vertices d m apart is a step
+    on the 1 mm grid, not a grade: 2 mm, STEP_TOL_M under a meter (a step, not a slope)."""
+    return STEP_TOL_M if d < 1.0 else 0.002
+
+
 def unit_grade(plan, jid: str, port_z: dict) -> float:
     """How steep a junction's carriageway face would be with its ports at these heights
     ({(segment id, at start): z}): its curbs along its outline between the ports, its
@@ -1622,7 +1731,7 @@ def unit_grade(plan, jid: str, port_z: dict) -> float:
                 d = math.dist(a, b) / 1000.0
                 bpts.append((a[0] / 1000.0, a[1] / 1000.0, hh[i]))
                 if d >= 0.25:
-                    worst = max(worst, (abs(hh[i] - hh[(i + 1) % len(r)]) - 0.002) / d)
+                    worst = max(worst, (abs(hh[i] - hh[(i + 1) % len(r)]) - step_tol(d)) / d)
         if max(p[2] for p in bpts) - min(p[2] for p in bpts) <= 0.005:
             continue
         inner = poly.buffer(-SAMPLE_IN_M, join_style="mitre")
@@ -1750,9 +1859,9 @@ class Plan:
                 if rd is None or x.seg["id"] in self.inner:
                     continue
                 if x.at_start:
-                    rd.a = x.cut
+                    rd.a, rd.unit_a = x.cut, u.jid
                 else:
-                    rd.b = x.cut
+                    rd.b, rd.unit_b = x.cut, u.jid
         end_frames(self.roads, at, jnodes)
         self.at, self.pos = at, pos
         self.units = {u.jid: u for u in units}

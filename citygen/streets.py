@@ -3980,7 +3980,7 @@ def _held(B: Builder, pts) -> bool:
 
 PIN_CLEAR_M = 15.0              # street centerline to a traced building (a 20 m street keeps 5 m)
 LOCAL_JUNCTION_Z_M = 3.0      # M7: highest primary road a local street ramps up to
-APPROACH_PAD_M = 30.0         # M22: no local junction this near a stretch higher than that
+APPROACH_PAD_M = 60.0         # M22: no local junction this near a stretch higher than that
 LOCAL_GRADE = 0.05            # M7: local streets ramping to a raised junction
 
 
