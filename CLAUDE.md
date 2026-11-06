@@ -1404,7 +1404,8 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
   sidewalk corners (`walks.py`), bridges by kind, road columns, tunnels, portals, approach
   trenches, underpass stairs, vents (`structures.py`), guideways, sky tubes (glass as a
   non-Nanite LOD chain), transit columns and station structures, M13's retaining walls
-  (`transit.py`), quays and canal walls (`water.py`), megasite elements with containers as
+  (`transit.py`), quays (stairs down to the water every 60 m, each flight a closed solid from
+  the wall's foot, #131) and canal walls (`water.py`), megasite elements with containers as
   instanced parts (`sites.py`). Meshes on integer millimeters in each piece's frame
   (`kit.py`: grids, sweeps, exact polygons; folds dropped); lean glTF.
 - **Outputs**: `BUILD/assets/streets/<tile>.glb` (a node per piece, the blockout's tile of

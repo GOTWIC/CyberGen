@@ -2165,6 +2165,17 @@ end (#103's median stops 0.15 m off the junction's outline). `_roads_near` now t
 corner's roads (`junction_area(..., every=True)`), the leg's own among them; a junction
 paves less only where a road draws its carriageway anyway. Results: Nexus City's fit passes (a full assetgen build: no clash, nothing off its surface); on #104's six cities (main's models, this fix's streets, props and fit) streets and props pass, no clash and no step over 2 cm (roof plants aside: those runs build no roofs).
 
+## Fix: quay stairs closed (issue #131)
+
+Found in a gallery render of a canal: AG7's quay stairs (`streets/water.py`, `_stair`) had
+both ends open and an outer side that ran straight above the treads, so from along the water
+one looked into a flight's top end and through it. A flight is now a solid from the quay
+wall's foot: a tread per step, a riser per step but the first (it starts one step under the
+paving), its outer side one polygon up to each tread, and both ends closed. Test
+`test_quay_stairs_are_closed`. Results: `assetgen streets` and `fit` pass on all nine cities
+with quays (main's builds); the street goldens are written again. Before and after:
+`docs/progress/fix_quay_stairs/`.
+
 ## Fix: asset checks, AG15's follow-ups, roof traces and the Unreal tests (issues #83, #85, #88, #90)
 
 A fix between milestones, from run-through 2's open items. Tests:
