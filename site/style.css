@@ -264,8 +264,9 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .show-hero .stage-keys { justify-content: center; }
 .page > .usage { margin: 0 0 32px; }
 .sec-head { display: flex; align-items: baseline; gap: 12px; margin: 40px 0 16px; font-size: 20px; font-weight: 600; line-height: 1.2; }
-.sec-head::after { content: ""; flex: 1; align-self: center; height: 1px; background: var(--line); }
-.sec-head .sec-label { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--signal); }
+.sec-head:not([data-stage]) { --h: var(--signal); }
+.sec-head .sec-label { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--h); }
+.sec-head::after { content: ""; flex: 1; align-self: center; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--h) 45%, var(--line)), var(--line) 40%); }
 .sec-head .sec-name { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--text-muted); }
 .stage-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
 .stage-keys .key { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
@@ -276,6 +277,11 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .showcase .card {
   height: 100%; padding: 8px 8px 14px; background: var(--glass); border: 1px solid var(--line);
   border-radius: var(--r-lg); box-shadow: var(--glass-edge);
+}
+/* Each section's cards lean a little toward its stage's color. */
+.showcase [data-stage] > .card {
+  background: color-mix(in srgb, var(--h) 6%, var(--glass));
+  border-color: color-mix(in srgb, var(--h) 22%, var(--line));
 }
 /* Pictures sit on a dark screen: maps and night renders blend into it. */
 .frame { aspect-ratio: 16 / 9; background: #07090c; }
