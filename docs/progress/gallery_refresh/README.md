@@ -24,6 +24,9 @@ with `assetgen materials preview OUT ...` (8K, 7680 px wide).
 - [`crown_loop_night.jpg`](crown_loop_night.jpg): the Crown Loop's lit rings winding through
   the Corporate Core at night, its towers behind (`--only-night --eye 1440 600 140 --target
   1150 0 100 --lens 28`).
+- The canal by night is the moorings fix's 8K render
+  ([`../fix_moorings/vesper_bay/8k/water_canal_night_after.jpg`](../fix_moorings/vesper_bay/8k/water_canal_night_after.jpg),
+  AG12's `--views water --night` camera): the boats float clear of the quay walls.
 - [`street_the_stacks_night.jpg`](street_the_stacks_night.jpg): a street in The Stacks at
   night, lit by AG15's schedules (`--views street_2 --only-night`; the layout has moved since
   AG6's `street_2_night.jpg`, so the camera stands elsewhere in the same district).

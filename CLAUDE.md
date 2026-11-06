@@ -1920,8 +1920,8 @@ only LG8 waits for atmosgen's hour and weather.
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
 swagnik.org/CyberGen/). Two pages: the landing page, a showcase (`index.html`): a curated
 few pictures, each with a title of its own, a one-line caption and a Stage 1 or Stage 2
-label (no dates), the day and night core behind a slider; and the build log (`log.html`, a
-tab): a timeline of pictures from `docs/progress/`, grouped by stage. `site/gallery.json`
+label (no dates), day and night pairs (Vesper Bay, Delta's core) behind a slider; and the
+build log (`log.html`, a tab): a timeline of pictures from `docs/progress/`, grouped by stage. `site/gallery.json`
 holds the log's entries (`id`, `date` the first commit of the step's first picture, `git log
 --follow --diff-filter=A --format=%as -- <path> | tail -1`, kept when a picture is rendered
 again (new renders go in `docs/progress/gallery_refresh/`), `stage` 1, 2 or `ue`, `milestone`,
