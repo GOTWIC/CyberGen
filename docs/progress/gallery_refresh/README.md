@@ -48,8 +48,12 @@ checks. A view of one's own is `assetgen materials preview OUT --views none --ey
 - **Cities** ([`cities/<city>/city_full.jpg`](cities/)): the whole of each sample city at 8K,
   `assetgen materials preview OUT --views city_full --width 7680`, for the README's stage 2
   Cities gallery (Vesper Bay's is [`vesper_bay_city_full.jpg`](vesper_bay_city_full.jpg)
-  above). About 25 minutes a city alone on the M4 Mac, an hour for the bigger ones; each
-  needs 11 GB or more, so one at a time.
+  above). About 25 minutes a city alone on the M4 Mac, an hour for the bigger ones; one at a
+  time. EEVEE renders on the GPU, and at 8K a city of more than about 80 million drawn
+  triangles needs more GPU-wired memory than the Mac allows (Nexus City asked for 21 GB of
+  its 19 GB, and macOS killed Blender), so Nexus City, Delta Megacity, Vesper Bay Pinned,
+  Cragmouth and Vesper Bay Decks are at 3840 px (`--width 3840`); Greyhook, Saltreach Free
+  Port and Vesper Bay Stacks are at 8K.
 - **Shopping street in Unreal** ([`unreal/shopping_street_day.jpg`](unreal/shopping_street_day.jpg),
   [`unreal/shopping_street_night.jpg`](unreal/shopping_street_night.jpg)): Greyhook's Lantern
   Strip looking west from its east end, the wheel over the roofs, by day and by night (the

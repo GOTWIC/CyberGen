@@ -214,8 +214,8 @@ Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 
 Every building modelled and textured, in one of twenty-six facade styles per district, owner
 and building, with its roof, roof equipment and skybridges, on textured streets, bridges and
-transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K; open one for full
-size).
+transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K, the five largest
+at 4K; open one for full size).
 
 | Vesper Bay | Nexus City |
 |---|---|
