@@ -31,6 +31,9 @@
   --top: 52px;
 }
 
+/* The showcase title's face: Stormax (Burntilldead, demo license), in fonts/. */
+@font-face { font-family: Stormax; src: url("fonts/stormax.otf") format("opentype"); font-display: swap; }
+
 /* ---- Base --------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-padding-top: calc(var(--top) + 16px); -webkit-text-size-adjust: 100%; }
@@ -244,8 +247,8 @@ figcaption { margin-top: 11px; font-size: 14px; line-height: 1.6; color: color-m
 .page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
 .show-hero { max-width: none; margin-bottom: 28px; padding: 44px 28px 30px; text-align: center; }
 .show-hero h1 {
-  margin: 0 0 10px; font-family: Orbitron, var(--font-mono); font-size: 76px; font-weight: 900;
-  letter-spacing: .08em; line-height: 1.05; text-transform: uppercase;
+  margin: 0 0 10px; font-family: Stormax, var(--font-mono); font-size: 76px; font-weight: 400;
+  letter-spacing: .06em; line-height: 1.05; text-transform: uppercase;
   /* The gradient repeats (cyan, blue, violet, pink, back to cyan) over twice the text's
      width and slides one period, so the loop has no seam. */
   background: linear-gradient(90deg, #00f0ff 0%, #4d7cff 19%, #c04dff 33%, #ff2fb4 50%,

@@ -671,6 +671,7 @@ def build(out: Path) -> None:
     })
     for name in ("style.css", "app.js", "gallery.json"):
         shutil.copyfile(SITE / name, out / name)
+    shutil.copytree(SITE / "fonts", out / "fonts", dirs_exist_ok=True)
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
