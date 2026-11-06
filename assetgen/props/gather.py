@@ -15,12 +15,12 @@ district's style, its variant, its instance transform, and for the meshes made p
   same draw its sign pages make), the page cell that shows it when the city's pages are made
   (`BUILD/assets/signs.json`), the body AG8 makes it as and the gap to its wall.
 - **Ground** (M13): a model z is measured from the ground where it stands, so every
-  placement is lifted by its building's `base_m` when it stands on its roof (AG1's shells
-  stand there), else by the finished ground at its point, a wall mount too (#88: M20 hangs
-  it at its floor's height over the ground there), as the blockout lifts M15's instances; a
-  sign slot by its building's base (its z is over it); nothing on a flat city. A boat (its
-  waterline at its z) floats on M16's water (AG12: the body's surface, 1.5 m under the
-  ground on a flat city).
+  placement is lifted by its building's `base_m` when it hangs on a building or stands on
+  its roof (AG1's shells stand there), else by the finished ground at its point (as the
+  blockout lifts M15's instances); an AC unit or facade greenery by the ground at its point
+  (#88: M20 hangs it on a floor's facade at a height over the ground there); nothing on a
+  flat city. A boat (its waterline at its z) floats on M16's water (AG12: the body's
+  surface, 1.5 m under the ground on a flat city).
 """
 
 from __future__ import annotations
@@ -200,6 +200,7 @@ class _Fit:
 
 RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
 SEAT_SINK_M = 0.05      # #89: a plant's foot set this far into the ground at its middle
+FLOOR_MOUNTS = ("ac_unit",)   # #88: wall mounts M20 hangs on a floor, over the ground there
 
 
 def _foot(feet: dict, sp: str, k: int):
@@ -490,12 +491,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             return bases[bid]
         return gd.at(x, y)
 
-    def over(x, y, z) -> float:
-        """#88: what a prop's or plant's z is over: its building's base where it stands on a
-        roof (over a footprint, 0.6 m up or more), else the ground at its point (M20 measures
-        a wall mount from the ground where it hangs, `props.Ctx.facade_spot`), as the blockout
-        lifts M15's instances (`blockout._lift`'s `building_base`)."""
-        return lift(x, y, z)
+    def over(x, y) -> float:
+        """#88: what an AC unit's or facade greenery's z is over: the ground where it hangs,
+        under a floor that overhangs a lower one too (M20 hangs it on a floor's facade at a
+        height over the ground there, `props.Ctx.facade_spot`)."""
+        return 0.0 if gd.flat else gd.at(x, y)
 
     def near_foot(x, y):
         if ftree is None:
@@ -577,8 +577,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             # draws it, its ground sampled at the quay line's vertices: M13's ground at the
             # railing's own point stood off it on a slope)
             z = z + quays[p.attrs["quay"]](x, y)
+        elif kind in FLOOR_MOUNTS:
+            z = z + over(x, y)
         else:
-            z = z + over(x, y, z)
+            z = z + lift(x, y, z, (mm or {}).get("building") or
+                         (p.attrs or {}).get("building"))
         if kind in ST.EXACT:
             item = {"prop": {"id": p.id, "position": [C.m2(x), C.m2(y), C.m2(z)],
                              "yaw_deg": C.deg(p.yaw_deg), "scale": [C.m2(v) for v in p.scale],
@@ -699,7 +702,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         bid = (p.attrs or {}).get("building")
         seat = not gd.flat and z == 0.0 and bid is None and typ != "facade_greenery"
         if not seat:
-            z = z + over(x, y, z)
+            z = z + (over(x, y) if typ == "facade_greenery" else lift(x, y, z, bid))
         t = tile_of(x, y)
         key = f"plant.{typ}.{t}"
         cx, cy = tile_center(t)

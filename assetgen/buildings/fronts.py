@@ -451,50 +451,24 @@ class Band:
         return [(m0 - so, m1 - so, a, b) for m0, m1, a, b in
                 (self.sb.mounts_raw.get(fa.j, []) if fa.j is not None else [])]
 
-    def _foot(self, fa, a: int, b: int) -> int:
-        """#88: where an opening a..b of this facade will stand: the band's foot, or on
-        M13's slopes the ground under its middle where AG5 lowers it there (`slopes.DOWN`
-        or more under the base: `slopes.adjust`), so a sign or an awning M20 hangs over that
-        street, under the band's foot's height plus a door's, still leaves it room."""
-        if getattr(self.sb, "slope", None) is None or (fa.j is None and
-                                                      not self.sb.slope.edges):
-            return self.z0
-        gs = getattr(fa, "grade", None) or SL.facade_grade(self.sb, fa)
-        fa.grade = gs
-        g = SL._interp(gs, (a + b) // 2)
-        return min(self.z0, int(g // 10) * 10) if g <= -SL.DOWN else self.z0
-
     def _head(self, fa, a: int, b: int, mounts, kind: str, un=None) -> int | None:
-        """An opening's head: under the band's top and under anything mounted over it. #88:
-        on a slope where AG5 lowers the opening and keeps its band opening (it ends over the
-        base: `slopes.adjust`), measured from the street it will stand on (`_foot`)."""
+        """An opening's head: under the band's top and under anything mounted over it."""
         H = self.zb - self.z0
         if kind == "shop":
             fz = max(450, min(900, H // 5))
-            head0 = self.z0 + H - fz
+            head = self.z0 + H - fz
             if un is not None and un.get("awning_m", 0) > 0:
-                head0 = min(head0, self.z0 + 3200 - 200)
-            head0 = min(head0, self.z0 + 4800)
+                head = min(head, self.z0 + 3200 - 200)
+            head = min(head, self.z0 + 4800)
         else:
-            head0 = self.zb - HEAD_GAP
-
-        def under(foot):
-            head = head0
-            for m0, m1, za, zz in mounts:
-                if m0 < b and m1 > a and za > foot + 1800:
-                    head = min(head, za - MOUNT_GAP)
-            head = min(head, self.zb - HEAD_GAP)
-            return None if head - foot < 2100 else head
-        foot = self._foot(fa, a, b)
-        if foot < self.z0:
-            # (AG5 keeps the band opening where it ends over the base, from the street up
-            # to the head; one it moves whole into the plinth keeps the band's height, so
-            # the band's own rule stands there)
-            head = under(foot)
-            if head is not None and head - self.z0 >= SL.DOWN and \
-                    foot + (head - self.z0) + 300 > self.z0:
-                return head
-        return under(self.z0)
+            head = self.zb - HEAD_GAP
+        for m0, m1, za, zz in mounts:
+            if m0 < b and m1 > a and za > self.z0 + 1800:
+                head = min(head, za - MOUNT_GAP)
+        head = min(head, self.zb - HEAD_GAP)
+        if head - self.z0 < 2100:
+            return None
+        return head
 
     def _door(self, fa, k, en, s: int, taken, mounts, ok: bool) -> Op | None:
         """The door of an entrance (or of a unit too narrow for a shopfront)."""

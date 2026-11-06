@@ -334,25 +334,3 @@ def test_a_hero_gets_materials_of_its_own():
     assert "materials" not in out["entries"][1] and out["materials"]["wall"] == mats["wall"]
     flat = UC.heroes(con(), man, False)            # (no library: the accent only)
     assert flat["entries"][0]["materials"] == {"hero_light": "hero_light#h"}
-
-
-def test_a_sign_over_a_downhill_street_leaves_its_shopfront_room():
-    """#88: M20 hangs a shop sign 4 m over the street, which on the downhill side of a slope
-    lies under the base (the brief's frame: 4 m plus the ground's fall); AG5 lowers the
-    shopfront under it to that street, so the street front measures its room from there
-    (`fronts.Band._foot`): a shopfront under the sign, not a door alone, and no sign on
-    glass."""
-    from test_ag_fronts import _unit
-    br = _slope_brief()
-    S = ([-12.0, -8.0], [12.0, -8.0])                  # (the south wall, x -6: 1.2 m down)
-    br["units"] = [_unit(0, 6.0, 6.0, "food", *S)]
-    g = 0.12 * (-6.0 - 4.0)
-    br["props"] = [{"at": {"d": 0.0, "edge": 0, "mass": 0, "s": 6.0}, "attrs": {},
-                    "gap_m": 0.0, "id": "d01.prop.sign.test", "kind": "sign",
-                    "on_wall": True, "position": [-6.0, -8.0, round(4.0 + g, 2)],
-                    "scale": [1.0, 1.0, 1.0], "yaw_deg": 0.0}]
-    sh = SH.build(br, GN.make(br))
-    door = next(d for d in sh["doors"] if d["unit"] == 0)
-    assert not door["flush"] and sh["stats"].get("storefronts", 0) == 1
-    assert sh["checks"]["mounts"]["on_glass"] == 0
-    assert sh["stats"].get("openings_lowered", 0) >= 1

@@ -674,11 +674,17 @@ def mount_points(p) -> list[tuple]:
     return [(None, x, y, z, reach)]
 
 
+FLOOR_MOUNTS = ("ac_unit",)   # #88: the wall mounts M20 hangs on a floor (`facade_spot`)
+
+
 def frame_z(model: CityModel, ground, k: int, x: float, y: float, z: float) -> float:
-    """#88: a facade prop's or plant's height in building k's frame. M20 measures it over the
-    ground where it stands (`props.Ctx.facade_spot`: the floor's height plus what the frame
-    stands over the ground there), the masses from the building's base (M13's `base_m`): on a
-    slope the two differ by the ground's rise from the base; on a flat city they are one."""
+    """#88: the height in building k's frame of an AC unit or facade greenery, which M20
+    hangs on a floor's facade and measures over the ground where it hangs
+    (`props.Ctx.facade_spot`: the floor's height plus what the frame stands over the ground
+    there), the masses from the building's base (M13's `base_m`): on a slope the two differ
+    by the ground's rise from the base; on a flat city they are one. (The ground floor's shop
+    signs, awnings, wall lights and cables keep their heights over the base, the shopfronts'
+    under them, as AG3 and AG5 build the street front.)"""
     base = getattr(model.buildings[k], "base_m", None)
     if ground is None or getattr(ground, "flat", True) or base is None:
         return z
@@ -692,8 +698,8 @@ def mount_props(city: City, edges_by_b: list[list[Edge]],
     point is within 0.5 m of a facade whose mass spans its height; one up to 2 m off, or
     beside a wall that ends below it (M6 places by ground-floor units and floor numbers,
     not by the mass at that height), is still the building's, with `on_wall` false and its
-    gap, for AG3 to bracket or drop. Ties go to the smaller id. Heights in each building's
-    frame (`frame_z`: on M13's slopes the model's are over the ground at the prop)."""
+    gap, for AG3 to bracket or drop. Ties go to the smaller id. An AC unit's height in each
+    building's frame (`frame_z`: on M13's slopes the model's is over the ground there)."""
     out: dict[int, list[dict]] = {}
     m = city.m
     stats: dict[str, list[int]] = {}
@@ -717,7 +723,7 @@ def mount_props(city: City, edges_by_b: list[list[Edge]],
                 if k in seen:
                     continue
                 seen.add(k)
-                z = frame_z(m, ground, k, p.position[0], p.position[1], z0)
+                z = frame_z(m, ground, k, p.position[0], p.position[1], z0)                     if kind in FLOOR_MOUNTS else z0
                 loc = locate(edges_by_b[k], x, y, z)
                 gap = None if loc is None else max(loc[0] - reach, 0.0)
                 on = gap is not None and gap <= MOUNT_M
@@ -746,8 +752,10 @@ def _prop_entry(city: City, k: int, p, end, loc, on: bool, gap: float,
                 ground=None) -> dict:
     ox, oy = city.origins[k]
     x, y, z = p.position
-    e = {"id": p.id, "kind": p.type.split(".")[1],
-         "position": C.pt3((x, y, frame_z(city.m, ground, k, x, y, z)), ox, oy),
+    kind = p.type.split(".")[1]
+    if kind in FLOOR_MOUNTS:
+        z = frame_z(city.m, ground, k, x, y, z)
+    e = {"id": p.id, "kind": kind, "position": C.pt3((x, y, z), ox, oy),
          "yaw_deg": C.deg(p.yaw_deg), "scale": [C.m(v) for v in p.scale],
          "attrs": p.attrs, "at": at(loc), "on_wall": on, "gap_m": C.m(gap)}
     if end is not None:
