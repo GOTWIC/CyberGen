@@ -315,6 +315,8 @@ def barrier_clash(pk, model, tg: Targets | None = None) -> dict:
                                                           ln.centerline]), ln.width_m / 2.0))
 
     def shared(pa: str, pb: str) -> bool:
+        if ".slab." in pa and pa.split(".slab.")[0] == pb.split(".slab.")[0]:
+            return True     # (one deck's slab cut into tiles: its rails meet at the seams)
         na = seg_nodes.get(pa, set()) | set(nodes_of_j.get(pa, ()))
         nb = seg_nodes.get(pb, set()) | set(nodes_of_j.get(pb, ()))
         return bool(na & nb)

@@ -1733,6 +1733,12 @@ def _sectors(ring, P, legs, j) -> list:
         if _twins(a, b):
             out.append({"i": i, "skip": "twin legs", "sidewalk": side})
             continue
+        pa, pb = a["path"].p[0], b["path"].p[0]
+        if abs(pa[0] - pb[0]) > 0.05 or abs(pa[1] - pb[1]) > 0.05:
+            # (M22: two legs of a cluster at two of its nodes: the carriageway between them,
+            # no corner; until AG17 draws the map's own corner pads)
+            out.append({"i": i, "skip": "two nodes of a cluster", "sidewalk": side})
+            continue
         ea, eb = a["exit"][1], b["exit"][1]
         if ea == eb:
             out.append({"i": i, "skip": "same edge", "sidewalk": side})

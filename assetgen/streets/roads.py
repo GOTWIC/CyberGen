@@ -126,7 +126,11 @@ def gather(cx: Ctx, s) -> Piece:
     clip = _median_clip(cx, s)
     if clip:
         inputs["median_clip"] = clip
-    if BR.runs_of(inputs["seg"], inputs["cls"]):
+    inner = any(s.id in (cx.junction_at[n].attrs.get("inner") or [])
+                for n in (s.start, s.end) if n in cx.junction_at)
+    if inner:
+        inputs["barriers"] = []     # (M22: a cluster's inner road, wholly inside it, none)
+    elif BR.runs_of(inputs["seg"], inputs["cls"]):
         by: set = set()
         inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)  # (none: no room for them)
         # (what they were taken from, for `seam`)
