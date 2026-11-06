@@ -12,7 +12,8 @@ textured Blender renders.
   (`--night`) the windows lit by each building's lit ratio, the signs and neon, a point
   light at every street light near the camera. Views: the districts (`iso_<id>`), the
   street cameras (`street_<n>`), the city (from the proxies; `city_full`, AG4: every shell,
-  part, skybridge and street piece at once), the section across the biggest M14 deck
+  part, skybridge and street piece at once; both with every water and ground tile, open sea
+  and parks too), the section across the biggest M14 deck
   (`deck`, AG10: the blockout's deck camera, its near clip on the cut), AG12's water shows
   (`water`: a canal and a river bank up close, the harbor from above), or cameras of one's
   own (`--eye`, `--target`). AG12's water (surfaces, beds, banks, riprap stones) comes into
@@ -141,7 +142,8 @@ def _ground(adir: Path, views: list) -> dict | None:
     grass = {e["tile"]: e for e in con["entries"] if e.get("parts")}
     for v in views:
         if v["ortho"] or v.get("section"):
-            v["ground_tiles"] = sorted(set(v["shell_tiles"]) & set(gtiles))
+            v["ground_tiles"] = (list(gtiles) if v.get("whole") else
+                                 sorted(set(v["shell_tiles"]) & set(gtiles)))
             continue
         v["ground_tiles"] = [t for t in gtiles if _tile_near(t, v["eye"], STREET_R)]
         pts = v.setdefault("ag8", {}).setdefault("points", {})
@@ -304,9 +306,11 @@ def run(args, progress=None) -> dict:
             tgt = v["target"]
             v["parts"] = PV.instances(man, v["shell_tiles"])
             # (AG4: the skybridges of the shells' tiles)
-            v["connection_tiles"] = sorted(set(v["shell_tiles"]) & set(ctiles))
+            v["connection_tiles"] = (list(ctiles) if v.get("whole") else
+                                     sorted(set(v["shell_tiles"]) & set(ctiles)))
             if v["ortho"] or v.get("section"):
-                v["street_tiles"] = sorted(set(v["shell_tiles"]) & set(stiles))
+                v["street_tiles"] = (list(stiles) if v.get("whole") else
+                                     sorted(set(v["shell_tiles"]) & set(stiles)))
                 v["signs"], v["lights"], v["washes"] = [], [], []
             elif v.get("far") and v["name"] == "core":
                 # (AG15: the core from the air: its streets, lamps and signs round the
@@ -473,7 +477,9 @@ def _water(adir: Path, views: list) -> dict | None:
         r = WATER_R * (2.0 if v.get("far") else 1.0)
         v["water_tiles"] = [t for t in wtiles if _tile_near(t, v["eye"], r) or
                             _tile_near(t, v["target"], r)]
-        if v["ortho"]:
+        if v.get("whole"):
+            v["water_tiles"] = list(wtiles)
+        elif v["ortho"]:
             v["water_tiles"] = sorted(set(v["water_tiles"]) | (set(v["shell_tiles"]) &
                                                                set(wtiles)))
         pts: dict[str, list] = {}
