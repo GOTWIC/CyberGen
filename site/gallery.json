@@ -375,8 +375,8 @@
       "milestone": "AG7",
       "milestone_name": "Street elements",
       "title": "Ramps on four levels",
-      "image": "docs/progress/AG7/vesper_bay_stacks/streets_interchange.jpg",
-      "caption": "The stack interchange's ramps, parapets, columns and lane markings, around blockout buildings."
+      "image": "docs/progress/gallery_refresh/stack_interchange.jpg",
+      "caption": "The stack interchange of Vesper Bay Stacks: ramps on their tiers, columns and lane markings, among its towers."
     },
     {
       "id": "ag1-unreal",
@@ -455,8 +455,8 @@
       "milestone": "AG4",
       "milestone_name": "Roofs and connections",
       "title": "A sky station inside a tower",
-      "image": "docs/progress/AG4/vesper_bay/8k/sky_station.jpg",
-      "caption": "A sky tube passing through a tower, with a station platform inside."
+      "image": "docs/progress/gallery_refresh/sky_station_night.jpg",
+      "caption": "On a sky station's platform inside a tower at night, the tube's lit rings running out of the portal."
     },
     {
       "id": "ag4-unreal",
