@@ -146,6 +146,41 @@ def test_regenerated_district_changes_only_its_district_and_seam():
     assert r["own"] > 0 and r["same"] > 0
 
 
+def test_seam_cli(capsys):
+    """#90: `assetgen brief seam BASE REGEN --district NAME` sorts the briefs as `seam` does
+    (and the genomes where both builds have their assets: `genome_seam`)."""
+    base, regen = small_build() / "base", small_regen()
+    assert main(["brief", "seam", str(base), str(regen), "--district", "Old Quarter"]) == \
+        EXIT_OK
+    out = capsys.readouterr().out
+    assert "in Old Quarter" in out and "0 unexplained" in out
+    sm = {"district": "d09", "seam_ids": ["b2"], "unexplained": []}
+    a = {"buildings": {"b1": {"brief": "h1", "district": "d01", "genes": {"x": 1},
+                              "ag15": {"sig": {"system": "s"}}},
+                       "b2": {"brief": "h2", "district": "d01", "genes": {"x": 1}},
+                       "b3": {"brief": "h3", "district": "d01", "genes": {"x": 1}}}}
+    b = json.loads(json.dumps(a))
+    b["buildings"]["b2"]["genes"] = {"x": 2}                 # (on the seam: explained)
+    b["buildings"]["b3"]["genes"] = {"x": 2}                 # (same brief, other genes)
+    b["buildings"]["b1"]["ag15"]["held"] = True
+    g = D.genome_seam(a, b, sm)
+    assert g == {"outside_same_brief": 2, "genome_changed": ["b3"], "held": 1}
+
+
+def test_wall_mounts_in_the_building_frame():
+    """#88: a facade prop's height in its building's frame: M20 measures it over the ground
+    where it hangs, the masses from the building's base (M13); one and the same on a flat
+    city or a building with no base."""
+    from types import SimpleNamespace
+    m = SimpleNamespace(buildings=[SimpleNamespace(base_m=10.0), SimpleNamespace(base_m=None)])
+    hill = SimpleNamespace(flat=False, at=lambda x, y: 12.5)
+    flat = SimpleNamespace(flat=True, at=lambda x, y: 0.0)
+    assert B.frame_z(m, hill, 0, 1.0, 2.0, 4.0) == 6.5
+    assert B.frame_z(m, flat, 0, 1.0, 2.0, 4.0) == 4.0
+    assert B.frame_z(m, hill, 1, 1.0, 2.0, 4.0) == 4.0
+    assert B.frame_z(m, None, 0, 1.0, 2.0, 4.0) == 4.0
+
+
 def test_load_model_from_dir_and_file():
     base = small_build() / "base"
     m1, h1, d1 = B.load_model(base)

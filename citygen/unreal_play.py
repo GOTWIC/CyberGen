@@ -285,20 +285,36 @@ WASH_COLORS = ("ff2a6d", "05d9e8", "b967ff", "ffb000", "39ff8a", "f2f6ff")
 WASH_OUT_M = 1.5
 
 
+def _bases(build: Path) -> dict[str, float]:
+    """{building id: base_m} of the buildings M13 seats on a slope (city_model.json beside
+    the plan; empty on a flat city or without the model)."""
+    model = build / "city_model.json"
+    if not model.is_file():
+        return {}
+    data = json.loads(model.read_text(encoding="utf-8"))
+    return {b["id"]: float(b["base_m"]) for b in data.get("buildings", [])
+            if b.get("base_m") is not None}
+
+
 def sign_washes(build: Path) -> tuple[list[float], list[float]]:
     """AG15: where M20's large facade signs (billboards, banners, holo-boards in front of a
     facade) wash their facade by night: a point WASH_OUT_M in front of each (flat x, y, z,
-    meters, heights as the slots'), and its neon color by its id (flat r, g, b)."""
+    meters; a slot's z is over its building's base, as the blockout lifts the signs, so on a
+    terrain city the building's `base_m` is added), and its neon color by its id (flat r, g,
+    b)."""
     path = build / "gameplay.json"
     if not path.is_file():
         return [], []
     gp = json.loads(path.read_text(encoding="utf-8"))
+    base = _bases(build) if any(s.get("kind") in WASH_KINDS
+                                for s in gp.get("sign_slots") or []) else {}
     pts, cols = [], []
     for s in sorted(gp.get("sign_slots") or [], key=lambda s: s["id"]):
         if s.get("kind") not in WASH_KINDS or s.get("mount") not in ("facade", "front"):
             continue
         a = math.radians(float(s.get("yaw_deg", 0.0)))
         x, y, z = s["position"]
+        z += base.get(s.get("building_id"), 0.0)
         pts += [round(x + WASH_OUT_M * math.cos(a), 2), round(y + WASH_OUT_M * math.sin(a), 2),
                 round(z, 2)]
         c = WASH_COLORS[int(hashlib.sha256(s["id"].encode("utf-8")).hexdigest()[:8], 16)

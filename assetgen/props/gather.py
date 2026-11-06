@@ -17,8 +17,10 @@ district's style, its variant, its instance transform, and for the meshes made p
 - **Ground** (M13): a model z is measured from the ground where it stands, so every
   placement is lifted by its building's `base_m` when it hangs on a building or stands on
   its roof (AG1's shells stand there), else by the finished ground at its point (as the
-  blockout lifts M15's instances); nothing on a flat city. A boat (its waterline at its z)
-  floats on M16's water (AG12: the body's surface, 1.5 m under the ground on a flat city).
+  blockout lifts M15's instances); an AC unit or facade greenery by the ground at its point
+  (#88: M20 hangs it on a floor's facade at a height over the ground there); nothing on a
+  flat city. A boat (its waterline at its z) floats on M16's water (AG12: the body's
+  surface, 1.5 m under the ground on a flat city).
 """
 
 from __future__ import annotations
@@ -201,6 +203,7 @@ class _Fit:
 
 RAISED_Z_M = 1.0        # #89: a thing within this of a raised junction's heights is on it
 SEAT_SINK_M = 0.05      # #89: a plant's foot set this far into the ground at its middle
+FLOOR_MOUNTS = ("ac_unit",)   # #88: wall mounts M20 hangs on a floor, over the ground there
 
 
 def _foot(feet: dict, sp: str, k: int):
@@ -491,6 +494,12 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             return bases[bid]
         return gd.at(x, y)
 
+    def over(x, y) -> float:
+        """#88: what an AC unit's or facade greenery's z is over: the ground where it hangs,
+        under a floor that overhangs a lower one too (M20 hangs it on a floor's facade at a
+        height over the ground there, `props.Ctx.facade_spot`)."""
+        return 0.0 if gd.flat else gd.at(x, y)
+
     def near_foot(x, y):
         if ftree is None:
             return None
@@ -571,6 +580,8 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             # draws it, its ground sampled at the quay line's vertices: M13's ground at the
             # railing's own point stood off it on a slope)
             z = z + quays[p.attrs["quay"]](x, y)
+        elif kind in FLOOR_MOUNTS:
+            z = z + over(x, y)
         else:
             z = z + lift(x, y, z, (mm or {}).get("building") or
                          (p.attrs or {}).get("building"))
@@ -694,7 +705,7 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
         bid = (p.attrs or {}).get("building")
         seat = not gd.flat and z == 0.0 and bid is None and typ != "facade_greenery"
         if not seat:
-            z = z + lift(x, y, z, bid)
+            z = z + (over(x, y) if typ == "facade_greenery" else lift(x, y, z, bid))
         t = tile_of(x, y)
         key = f"plant.{typ}.{t}"
         cx, cy = tile_center(t)

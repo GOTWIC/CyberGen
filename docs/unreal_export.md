@@ -108,6 +108,12 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   nearest its middle up to 42,000 of them, for every view (`SHOT_MESHES`): every Nanite
   mesh in memory takes a root page, the pool stops at 49,152 on the Mac (2 GB), where the
   editor quits on a fatal error, and an actor unloaded between views keeps its meshes'.
+- **Roof traces** (#83): the collision check's trace down onto a building counts when it
+  stops 3 m over the ground the building stands on, the bottom of its actor's bounds or,
+  for a stage 2 building, its pivot (its base) where that is lower: a stage 2 shell starts
+  at its street front's top (7.5 m up on a one-storey shed or yard, its roof 2.5 m over
+  that) or is an open shed's roof slab alone, so Delta's Industrial Port sheds and yards
+  missed with their hulls in place (31 of 36 roofs in run-through 2).
 - **Nanite's root pages** bound how big a city can be on this route: Cragmouth's 63,700
   Nanite meshes (stage 2 and blockout) overrun them in play, and the editor quits before
   the first frame (the far view's instanced HLODs and the view range make no difference;
@@ -129,6 +135,13 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   (`CITYGEN_UE_OFFLOAD`); Delta's first import on the Windows PC (32 GB, other apps open)
   ran out of memory at 61,000 of its 73,293 actors ("The paging file is too small"), and
   `CITYGEN_UE_OFFLOAD=500` imported the rest.
+- **Back to the blockout** (#85): `--blockout-only` over a stage 2 import updates in place
+  the actors whose keys both layers have (the same class, so `manifest_changes` counts them
+  as updated); each is given the blockout's settings again (`import_city.unstage`: its
+  rotation, no slot materials, collision profile `BlockAll`, cull distances, shadow, HLOD),
+  as a freshly spawned one has them. `CITYGEN_UE_DIGEST_ROWS=1` writes what an import's
+  digests hash (each actor's tags, mesh, location and yaw; each asset's hash) to
+  `unreal/digest_rows.json`, to tell two imports apart.
 - **Nanite in the editor on the Mac**: UE 5.8 renders these levels with Nanite off
   (`UseNanite(METAL_SM6) returned false`), so every Nanite mesh draws its fallback; an
   entry whose small parts must show and collide asks for a full one (`fallback_full`:
@@ -273,7 +286,9 @@ imports without the play features.
   and underpass walkways left out; each street and wall light's lamp head, its prototype's
   `prop_light` part placed by the instance's transform; AG15: a point 1.5 m in front of each
   of M20's large facade signs and its neon color by its id, from `gameplay.json`'s sign
-  slots (`washes`, `wash_colors`; `version` 2); a point inside each district from
+  slots (`washes`, `wash_colors`; `version` 2), its height over the building's base on
+  M13's terrain as the blockout lifts the signs (#90: it was over 0, metres under the sign on
+  a hill); a point inside each district from
   `city_model.json`, else the gameplay layer's zones).
 - **Console commands** (in the play window): `CityGen.Map [0|1]`, `CityGen.FreeCam
   [0|1]`, `CityGen.Menu [0|1]`, `CityGen.Night [0|1]` (each toggles without an argument),
@@ -1242,4 +1257,5 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | #93 (a fix on its own) | Water drew as the default checkerboard in UE 5.8 (run-through 2): the Single Layer Water output's inputs are named by their properties (`ScatteringCoefficients`, `AbsorptionCoefficients`, `PhaseG`; the editor's graph shows them with spaces), so `M_CgWater` connected none, fell back to opaque water and left the unconnected output node in the graph, which failed the compile ("No inputs to Single Layer Water Material"). The water links by those names (`link` matches an input name with spaces and case aside), the fallback deletes the output node, `STAGE2_VERSION` 9 rebuilds the masters; test `test_water_master_links_single_layer_water_by_ue58_names` | Not run here: import over CityRunThrough2 to see it |
 | #95 (a fix on its own) | No code change: the packs' content changes under the same keys. AG7's road pieces end their median barriers, guard walls, parapets and deck ramp barriers at their junctions (ramped or capped ends), a junction piece carries its corner parapets, guard walls and a median across, a footbridge's railings end short of its junctions; AG8 leaves out a prop no variant of which keeps clear of the carriageways (its group's instance lists shorter), and M6's quay railings and median barrier prototypes keep off junctions and crosswalks in the blockout. No new kind, part, slot or master | None needed (no importer change) |
 | #82, #89 (a fix on its own) | No code change: the packs' content changes under the same keys. AG7's junction pieces draw an overlap only once (a junction wholly inside a larger one it overlaps has no mesh, declared as covered like a road inside its junctions, its blockout object still replaced), pave the turning lanes round their corners, follow their surface with the slab under a raised junction and draw a cul-de-sac's sidewalk; sidewalk and road pieces leave out the stretches over a junction's carriageway (a sidewalk wholly inside its junctions has no mesh, declared); AG8 leaves out a prop with no pad under it on a raised junction's corner and seats a terrain city's quay railings and plants on the surfaces drawn. No new kind, part, slot or master | None needed (no importer change) |
+| #83, #85, #88, #90 (a fix on its own) | The collision check's roof traces count 3 m over the ground a building stands on (a stage 2 building's pivot where its shell's bounds start higher: one-storey sheds and yards over their street fronts, open sheds' roof slabs; Delta's Industrial Port missed 5 of 36 roofs with their hulls in place). An import back to the blockout gives the actors stage 2 had updated in place the blockout's settings again (`unstage`: rotation, slot materials, collision profile, cull distances, shadow, HLOD); `CITYGEN_UE_DIGEST_ROWS=1` writes the digests' rows. The play features' sign washes stand over their building's base on a terrain city (`unreal/play.json`'s `washes`). No version bump: an import's output changes only where an actor goes back to the blockout (which was wrong) and on terrain cities' play data (its own hash). The small city's import test streams at 600 m (`SMALL_VIEW_M`), smaller than the city | The test suite's small terrain and deck cities imported (blockout) into throwaway projects and checked with night views (`docs/progress/fix_assets/`): 36 of 36 and 48 of 48 roofs, 191 lamps lit and 768 light pools each, the washes at their buildings' height; both fail only on streaming (smaller than the view range). `test_unreal_import_small_city` and `test_unreal_import_stage2_small_city` pass. Delta's `--check` was not run: its stage 2 import goes past the PC's memory (#84) |
 | M22 | No code change. The blockout draws a city's roads, junctions, corner pads, medians, curbs and sidewalks from the pavement map's faces into the objects they were in (keys unchanged: `<district>.road_<class>.<tile>`, `.junction`, `.sidewalk`, `<segment>.deck`, `.ramp`, `.tunnel_road`, the deck objects), so their plan entries and their actors' hashes move and an import over an earlier one updates them in place. A junction's `polygon` is its carriageway face's outline and its `edge_z` the map's heights there, which the blockout draws as before; `graphs.json` keeps its format. The map itself (`pavement`, `pavement_net`) stays in `city_model.json` for stage 2 (AG17); the exporter does not read it. | Not needed (no new kind of actor, no manifest change) |

@@ -240,3 +240,30 @@ def test_texel_density_check_fails_when_the_library_is_too_coarse():
     assert not res["ok"] and res["flagged"]
     ok = CK.texel_density(base / "assets", lib, DENSITY, DENSITY // 2)
     assert ok["ok"], ok["meets_share"]
+
+
+def test_whole_city_views_take_every_water_and_ground_tile(tmp_path):
+    """The textured preview's whole-city views (`city`, `city_full`) draw every water and
+    ground tile, open sea and parks with no shell among them; a district view only its
+    shell tiles' (the blockout's water and cover objects are taken out everywhere)."""
+    from assetgen import previews as PV
+    from assetgen.materials import preview as MV
+    cams = {"districts": [{"id": "d01", "box": [0.0, 0.0, 0.0, 512.0, 512.0, 40.0]}],
+            "street": []}
+    man = {"tiles": ["t+00+00"],
+           "buildings": {"b": {"tile": "t+00+00", "district": "d01",
+                               "bounds": [[0, 0, 0], [10, 10, 40.0]]}}}
+    views = PV.plan_views(man, cams, 640, {"city", "city_full", "districts"})
+    assert [v["name"] for v in views] == ["city", "city_full", "iso_d01"]
+    sea = ["t+00+00", "t+01+00", "t+05+05"]          # (two tiles of open sea)
+    (tmp_path / "unreal_contribution.water.json").write_text(json.dumps(
+        {"entries": [{"key": f"water.{t}", "tile": t} for t in sea]}))
+    (tmp_path / "unreal_contribution.ground.json").write_text(json.dumps(
+        {"entries": [{"key": f"ground.{t}", "tile": t, "glb": "g.glb"} for t in sea]}))
+    MV._water(tmp_path, views)
+    MV._ground(tmp_path, views)
+    by = {v["name"]: v for v in views}
+    for name in ("city", "city_full"):
+        assert by[name]["water_tiles"] == sea and by[name]["ground_tiles"] == sea
+    assert "t+05+05" not in by["iso_d01"]["water_tiles"]     # (only the water near it)
+    assert by["iso_d01"]["ground_tiles"] == ["t+00+00"]

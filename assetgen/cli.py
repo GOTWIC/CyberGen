@@ -1,7 +1,9 @@
 """Command line: `assetgen spec validate|schema`, `assetgen brief BUILD`, `assetgen brief
-diff A B`, `assetgen brief schema`, `assetgen spike OUT`, `assetgen build BUILD` (the
-building shells, then the street stage), `assetgen preview BUILD`, `assetgen streets BUILD`,
-`assetgen streets seam BASE REGEN`, `assetgen library [OUT]` (AG6's texture library),
+diff A B`, `assetgen brief seam BASE REGEN --district NAME` (#90: a regeneration's seam in
+the briefs and the genomes), `assetgen brief schema`, `assetgen spike OUT`, `assetgen build
+BUILD` (the building shells, then the street stage), `assetgen preview BUILD`, `assetgen
+streets BUILD`, `assetgen streets seam BASE REGEN`, `assetgen library [OUT]` (AG6's texture
+library),
 `assetgen materials preview|board` (textured Blender previews and material boards),
 `assetgen props BUILD`.
 
@@ -116,6 +118,43 @@ def cmd_brief_diff(args: argparse.Namespace) -> int:
                                    newline="\n")
     sys.stdout.write(D.text(d, None if args.all else 20))
     return EXIT_OK if not (d["added"] or d["removed"] or d["changed"]) else EXIT_INVALID
+
+
+def cmd_brief_seam(args: argparse.Namespace) -> int:
+    """#90: a district regeneration's seam in the briefs and, where both builds have their
+    assets, in the genomes (`briefdiff.seam`, `genome_seam`)."""
+    from . import briefdiff as D
+    try:
+        a, b = Path(args.base), Path(args.regen)
+        ma = json.loads((a / "city_model.json").read_text(encoding="utf-8"))
+        mb = json.loads((b / "city_model.json").read_text(encoding="utf-8"))
+        did = next(d["id"] for d in mb["districts"] if d["name"] == args.district)
+        r = D.seam(ma, mb, a, b, did)
+        del ma, mb
+        out = {"briefs": r}
+        fa, fb = a / "assets" / "manifest.json", b / "assets" / "manifest.json"
+        if fa.is_file() and fb.is_file():
+            out["genomes"] = D.genome_seam(json.loads(fa.read_text(encoding="utf-8")),
+                                           json.loads(fb.read_text(encoding="utf-8")), r)
+    except (OSError, ValueError, KeyError, StopIteration) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    if args.json:
+        Path(args.json).write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8",
+                                   newline="\n")
+    print(f"briefs: {r['own']} in {args.district}, {r['seam']} on its seam (farthest "
+          f"{r['seam_farthest_m']} m out), {len(r['unexplained'])} unexplained; "
+          f"{r['same']} the same")
+    if r["unexplained"]:
+        print("  unexplained: " + ", ".join(r["unexplained"][:20]))
+    g = out.get("genomes")
+    if g is not None:
+        print(f"genomes: {g['outside_same_brief']} buildings outside it with the same brief, "
+              f"{len(g['genome_changed'])} with another genome, {g['held']} towers held")
+        if g["genome_changed"]:
+            print("  another genome: " + ", ".join(g["genome_changed"][:20]))
+    bad = r["unexplained"] or (g is not None and g["genome_changed"])
+    return EXIT_INVALID if bad else EXIT_OK
 
 
 def cmd_brief_schema(args: argparse.Namespace) -> int:
@@ -451,6 +490,14 @@ def build_parser() -> argparse.ArgumentParser:
     bd.add_argument("--json", metavar="FILE", help="also write the diff as JSON")
     bd.add_argument("--all", action="store_true", help="list every id")
     bd.set_defaults(func=cmd_brief_diff)
+    bsm = bsub.add_parser("seam", help="what a district regeneration changed outside its "
+                                       "district: briefs, and genomes where both builds "
+                                       "have their assets")
+    bsm.add_argument("base", help="the build before (a citygen build directory)")
+    bsm.add_argument("regen", help="the regenerated build")
+    bsm.add_argument("--district", required=True, help="the regenerated district's name")
+    bsm.add_argument("--json", metavar="FILE", help="also write the result as JSON")
+    bsm.set_defaults(func=cmd_brief_seam)
     bs = bsub.add_parser("schema", help="print or write the brief JSON Schema")
     bs.add_argument("out", nargs="?")
     bs.set_defaults(func=cmd_brief_schema)
@@ -622,8 +669,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     # `assetgen brief BUILD` is short for `assetgen brief make BUILD`
-    if len(argv) >= 2 and argv[0] == "brief" and argv[1] not in ("make", "diff", "schema",
-                                                                 "-h", "--help"):
+    if len(argv) >= 2 and argv[0] == "brief" and argv[1] not in ("make", "diff", "seam",
+                                                                 "schema", "-h", "--help"):
         argv.insert(1, "make")
     # `assetgen streets BUILD` is short for `assetgen streets make BUILD`
     if len(argv) >= 2 and argv[0] == "streets" and argv[1] not in ("make", "seam", "-h",

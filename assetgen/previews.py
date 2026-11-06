@@ -170,15 +170,18 @@ def plan_views(man: dict, cams: dict, width: int, which: set[str]) -> list[dict]
     if boxes:
         box = [min(b[i] for b in boxes) for i in range(3)] + \
             [max(b[i] for b in boxes) for i in range(3, 5)] + [tall]
+        # `whole`: the textured preview draws every street, skybridge, water and ground tile
+        # in these views, not only those of the shell tiles (a tile of open sea or park has
+        # no shell, and the blockout's pieces there are taken out all the same)
         if "city" in which:
             views.append({"name": "city", **_ortho(box, width, 1.6, 8000.0),
-                          "shell_tiles": []})
+                          "shell_tiles": [], "whole": True})
         if "city_full" in which:
             # every shell and part at once (AG2: 26 to 28 M unique triangles, about a
             # million part instances); 16 samples, since EEVEE redraws the whole city each
             # sample and the view is meant to be seen scaled down
             views.append({"name": "city_full", **_ortho(box, width, 1.6, 8000.0),
-                          "shell_tiles": sorted(man["tiles"]), "samples": 16})
+                          "shell_tiles": sorted(man["tiles"]), "samples": 16, "whole": True})
     by_d: dict[str, set] = {}
     for r in man["buildings"].values():
         if r["district"]:

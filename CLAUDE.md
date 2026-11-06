@@ -49,6 +49,13 @@ check earns its place by what it can find, not by habit.
   main, in the background, and fixes or files what it finds. It does not validate a PR again
   (it reviews the outputs and the diff, and has the PR merge the latest main first when they
   overlap).
+- **Test runs show their progress** (Swagnik, 2026-11-06): write pytest's output straight to
+  a log file as it runs, never only through `| tail` or another filter that holds it back
+  until the end:
+  - use `-rfE --durations=25`, and `-v` for a run of a few files;
+  - say where the log is, so anyone can see how far a long run has got and which test is
+    slow;
+  - the same for long builds: their progress lines go to a log, not a pipe.
 
 Nothing more: no x86, Docker, Windows or other cross-platform comparisons, no stage-trace
 diffs, no `lock --verify` runs, no seed sweeps (unless the work is about robustness), no
@@ -267,7 +274,11 @@ accepts them in a fixed order; randomness is a blake2b hash of ids (`props._u`);
 fitted to facades and overhead decks. Six checks in `prop_checks.py`, `preview_props.png`
 (`preview_props.py`). The blockout draws props and plants as geometry-nodes instances of
 per-kind prototypes (one object per kind and tile; USD point instancers; left out of the glTF
-tiles, which `props.csv` complements). Sample builds: `docs/progress/M6/`.
+tiles, which `props.csv` complements). Boats moor past their quay's band (`width_m` across
+its line, half over the water) by `MOOR_GAP_M`, their hull (`boat_hull`, AG8's 8 x 3 m)
+clear of every quay band and `SHORE_CLEAR_M` off the shore (`Moorings`; issue #113, they lay
+in the quay wall), which `boats_afloat` checks with M16's banks. Sample builds:
+`docs/progress/M6/`.
 
 M7a (elevated highways) is in place: at the end of M1b, `citygen/elevated.py` lifts highway
 windows chosen by ramp room and district density (`highways.elevated_share`) onto viaducts
@@ -1459,7 +1470,8 @@ AG7 (street elements) is in place, in `assetgen/streets/` (tests
   sidewalk corners (`walks.py`), bridges by kind, road columns, tunnels, portals, approach
   trenches, underpass stairs, vents (`structures.py`), guideways, sky tubes (glass as a
   non-Nanite LOD chain), transit columns and station structures, M13's retaining walls
-  (`transit.py`), quays and canal walls (`water.py`), megasite elements with containers as
+  (`transit.py`), quays (stairs down to the water every 60 m, each flight a closed solid from
+  the wall's foot, #131) and canal walls (`water.py`), megasite elements with containers as
   instanced parts (`sites.py`). Meshes on integer millimeters in each piece's frame
   (`kit.py`: grids, sweeps, exact polygons; folds dropped); lean glTF.
 - **Outputs**: `BUILD/assets/streets/<tile>.glb` (a node per piece, the blockout's tile of
@@ -1937,6 +1949,29 @@ AG15 (cyberpunk facades and night, from the first run-through) is in place (test
   spot lights under the 192 nearest lamps, `M_CgLightPool` decals under 768 more, sign
   washes (`docs/unreal_export.md`, "From AG15").
 Results: `docs/progress/AG15/`.
+The asset fixes (issues #83, #85, #88, #90, after run-through 2) are in place:
+- **AC units and ivy in the building's frame** (`brief.frame_z`, `FLOOR_MOUNTS`): M20 hangs
+  them on a floor's facade at a height over the ground where they hang
+  (`props.Ctx.facade_spot`); the briefs give them their height over the building's base (AG3's
+  panels and trellises and the mount check read it there), AG8 lifts them by the ground where
+  they hang (`props.gather.over`), and M20 puts none on a wall the ground buries at its spot.
+  The ground floor's shop signs, awnings, wall lights and cables keep their heights over the
+  base, under which AG3 and AG5 build the shopfronts.
+- **Doors**: a unit whose nearest wall faces another building sits on a facade within
+  `brief.UNIT_REACH_M` 2 m more facing its own street (`unit_loc`); a moved main entrance
+  with no room for its door shares a shopfront's (`fronts.Band._share_shop`, stat
+  `entrances_shared`); `asset_access` lets a path graze a neighbor's wall (`GRAZE_M`).
+- **Neighbor rule**: a hero's or type's weighted system draws past its neighbors' within its
+  weights (`genome.make`); in a city a regeneration made (`city_state.json`'s edits) the
+  towers outside the last edit's district keep their records' genomes
+  (`neighbors.held_towers`, records `ag15.avoided`, `ag15.held`; the old manifest in the
+  build folder); `assetgen brief seam BASE REGEN --district NAME` (`briefdiff.genome_seam`).
+- **Fins round a corner** (`shell._corner_road`): no fin near a facade's end reaches in front
+  of the next edge where that faces a road with no sidewalk, under the headroom.
+- **Exporter**: roof traces count 3 m over the building's pivot (#83); `import_city.unstage`
+  resets an actor going back to the blockout, `CITYGEN_UE_DIGEST_ROWS` (#85); sign washes
+  over the building's base (#90); the small city's import test streams at 600 m.
+  `GEN_VERSION` fixassets.4. Results: `docs/progress/fix_assets/`.
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
@@ -1975,16 +2010,20 @@ only LG8 waits for atmosgen's hour and weather.
 `site/` is the public gallery at https://gotwic.github.io/CyberGen/ (served at
 swagnik.org/CyberGen/). Two pages: the landing page, a showcase (`index.html`): a curated
 few pictures, each with a title of its own, a one-line caption and a Stage 1 or Stage 2
-label (no dates), the day and night core behind a slider; and the build log (`log.html`, a
-tab): a timeline of pictures from `docs/progress/`, grouped by stage. `site/gallery.json`
-holds the log's entries (`id`, `date` the image's first commit: `git log --follow
---diff-filter=A --format=%as -- <path> | tail -1`, `stage` 1, 2 or `ue`, `milestone`,
+label (no dates), day and night pairs (Vesper Bay, Delta's core) behind a slider; and the
+build log (`log.html`, a tab): a timeline of pictures from `docs/progress/`, grouped by stage. `site/gallery.json`
+holds the log's entries (`id`, `date` the first commit of the step's first picture, `git log
+--follow --diff-filter=A --format=%as -- <path> | tail -1`, kept when a picture is rendered
+again (new renders go in `docs/progress/gallery_refresh/`), `stage` 1, 2 or `ue`, `milestone`,
 `milestone_name`, `title`, `image` a repo path, `caption` a one-liner where possible, not
 necessarily a full sentence, saying only what is needed to explain the picture: no extra
 detail, no hashes, goldens, check counts or test talk) and the showcase's `items`
 (`entry`, or `entries` and `labels` for a pair, by log id, `title`, `caption`, `wide` for
-the full width). `site/index.html` and `site/log.html` are the templates `site/build.py`
-fills in, beside `style.css` (the Neon Terminal look with glass panels, light and dark) and
+the full width, `crop` [left, top, right, bottom] fractions to show a cut of the entry's
+image). The showcase names no city, district or line, in its text or its pictures (a preview's
+title band and legend cropped off; a new viewer has no context for the names); the log keeps
+them. `site/index.html` and `site/log.html` are the templates `site/build.py`
+fills in, beside `style.css` (the Neon Terminal look with glass panels, dark only) and
 `app.js`. `.github/workflows/pages.yml` runs on changes to `site/` only:
 it checks out `site/` and the listed images, resizes them (`build.py`: 2000 px and 640 px
 JPEGs) and deploys; resized images are never committed. Preview with `.venv/bin/python
@@ -1995,11 +2034,19 @@ no refresh on every push or milestone.
 Claude Code session logs (`~/.claude/projects`), keeps the sessions that ran in this repo
 (worktree sessions, their subagents and an earlier location of the repo included), merges
 their API responses into the device's ledger (`site/usage/ledger/<device>/<YYYY-MM>.csv`: one
-row per response, hashed ids, time, model and token counts, nothing of the conversation;
-rows are never removed, so logs Claude Code deletes still count) and writes
-`site/usage/<device>.json` from the whole ledger (`mac` or `windows` by platform: tokens by
-model and type, sessions, a per-day series, the time it ran); `build.py` adds the device files up, with each device and its last
-update behind a "By device" toggle. Each machine writes only its own file.
+row per response, hashed ids, time, model, token counts and `lines`, how many log lines carry
+it, nothing of the conversation; rows are never removed, so logs Claude Code deletes still
+count) and writes `site/usage/<device>.json` from the whole ledger (`mac` or `windows` by
+platform: tokens by model and type, sessions, a per-day series, the time it ran) in two counts.
+**Stats** (`stats`), what Claude Code's own `/usage` stats show: every log line, and Claude
+Code logs a response once per content block with the whole response's usage on each line, so
+about twice the billed count. **Billed** (`totals`, `models`, `days`): each request once, as
+Anthropic bills it. `build.py` adds the device files up and shows both: "Claude stats tokens",
+"Billable tokens" and "API cost" (the billable tokens at API prices, `PRICES`) at the top, the
+chart a column a day in the stats count, both counts and the cost per model and type behind
+"By model" and per device (with sessions, days and last update) behind "By device". A device file or ledger row from before the stats count counts once per
+request in it until that device's next run fills in its line counts (said in the panel). Each
+machine writes only its own file.
 **After every PR is closed (merged or not), on every machine:** the session that closed it
 (or merged it) runs `python site/usage.py` on its own machine (`.venv/bin/python` on the Mac,
 `.venv\Scripts\python` on Windows), commits only `site/usage/<device>.json` and its ledger folder to main

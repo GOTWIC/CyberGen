@@ -14,7 +14,8 @@ from . import geom as G
 from . import vegetation as V
 from .checks import Check
 from .model import CityModel
-from .props import EXCEPT, KEEP_R, KINDS, REQUIRED, Cand, Ctx
+from .props import (EXCEPT, KEEP_R, KINDS, REQUIRED, SHORE_CLEAR_M, Cand, Ctx, Moorings,
+                    boat_hull)
 
 LIMIT = 12
 LIGHT_REACH_M = 25.0
@@ -185,20 +186,40 @@ def check_parks(m: CityModel) -> Check:
 
 
 def check_boats(c: Ctx, m: CityModel) -> Check:
-    ch = _check("boats_afloat", "Boats lie in their waterway, clear of bridges")
+    ch = _check("boats_afloat", "Boats lie in their waterway, their hull clear of every "
+                                "quay's band (width_m across its line, half of it over the "
+                                "water) and of their water's banks (a wall's thickness, a "
+                                "slope's run to the waterline)")
     ww = {w.id: G.from_model_poly(w.polygon) for w in m.waterways}
+    moor = Moorings(m)
+    banks: dict = {}
+    for k in m.banks:
+        if len(k.line) >= 2:
+            banks.setdefault(k.water_id, []).append((k.id, LineString(k.line), k.width_m))
+    n = 0
     for p in m.props:
         if _kind(p) != "boat":
             continue
-        poly = ww.get((p.attrs or {}).get("waterway"))
-        a = math.radians(p.yaw_deg)
-        hx, hy = 4.0 * p.scale[0], 1.5 * p.scale[1]
-        ca, sa = math.cos(a), math.sin(a)
-        x, y = p.position[0], p.position[1]
-        hull = shapely.Polygon([(x + ca * u - sa * v, y + sa * u + ca * v)
-                                for u, v in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))])
+        n += 1
+        wid = (p.attrs or {}).get("waterway")
+        poly = ww.get(wid)
+        hull = boat_hull(p.position[0], p.position[1], p.yaw_deg, p.scale)
         if poly is None or not poly.buffer(0.05).contains(hull):
             _limit(ch, f"{p.id}: not in its waterway")
+            continue
+        qid = moor.quay_hit(hull)
+        if qid is not None:
+            _limit(ch, f"{p.id}: its hull on quay {qid}'s band")
+            continue
+        # (M16's banks, from the land's edge out to the waterline; a city built before M16
+        # has none: then its waterway's shore by the walls M16 would stand there)
+        if wid in banks:
+            hit = next((bid for bid, line, w in banks[wid] if G.dist(hull, line) < w), None)
+            if hit is not None:
+                _limit(ch, f"{p.id}: its hull on bank {hit}")
+        elif not m.banks and G.dist(hull, poly.boundary) < SHORE_CLEAR_M:
+            _limit(ch, f"{p.id}: its hull within {SHORE_CLEAR_M:g} m of its waterway's shore")
+    ch.notes.append(f"{n} boats")
     return ch
 
 

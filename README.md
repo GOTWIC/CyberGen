@@ -216,30 +216,30 @@ Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 
 ### Cities
 
-Every building modelled and textured, in one of nineteen facade styles per district, owner
+Every building modelled and textured, in one of twenty-six facade styles per district, owner
 and building, with its roof, roof equipment and skybridges, on textured streets, bridges and
-transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K; open one for full
-size).
+transit structures; Vesper Bay Decks adds a deck city over Highcrest (8K, the five largest
+at 4K; open one for full size).
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/AG10/cities/vesper_bay/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/nexus_city/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/vesper_bay_city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/nexus_city/city_full.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/AG10/cities/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/archipelago_free_port/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/cities/delta_megacity/city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/archipelago_free_port/city_full.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/AG10/cities/greyhook/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/vesper_bay_pinned/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/cities/greyhook/city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/vesper_bay_pinned/city_full.jpg" width="420"> |
 
 | Vesper Bay Stacks | Cragmouth (buildings on its slopes) |
 |---|---|
-| <img src="docs/progress/AG10/cities/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/AG10/cities/cragmouth/city_full.jpg" width="420"> |
+| <img src="docs/progress/gallery_refresh/cities/vesper_bay_stacks/city_full.jpg" width="420"> | <img src="docs/progress/gallery_refresh/cities/cragmouth/city_full.jpg" width="420"> |
 
 | Vesper Bay Decks (a deck over Highcrest) | |
 |---|---|
-| <img src="docs/progress/AG10/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
+| <img src="docs/progress/gallery_refresh/cities/vesper_bay_decks/city_full.jpg" width="420"> | |
 
 ### Up close
 
@@ -338,9 +338,9 @@ Asian and Indic scripts. Each prop and plant picks its variant from its id, and 
 variants replace the blockout's stand-ins as instances. Sheets of every style and the
 plants, and street views: [`docs/progress/AG8`](docs/progress/AG8).
 
-| A street in The Stacks, Vesper Bay (8K) | The same street by night (8K) |
+| A street in The Stacks, Vesper Bay (8K) | Another street in The Stacks by night (8K) |
 |---|---|
-| <img src="docs/progress/AG6/vesper_bay/8k/street_2.jpg" width="420"> | <img src="docs/progress/AG6/vesper_bay/8k/street_2_night.jpg" width="420"> |
+| <img src="docs/progress/AG6/vesper_bay/8k/street_2.jpg" width="420"> | <img src="docs/progress/gallery_refresh/street_the_stacks_night.jpg" width="420"> |
 
 Every building and street piece textured: a library of tileable surfaces in each era's look
 (concrete, plaster, brick, panels, cladding, roofs, asphalt, paving, metals), a room behind
@@ -385,9 +385,9 @@ tubes pass through towers in portals, with platforms where a station stands. In 
 each skybridge replaces its blockout piece and the roof equipment is instanced per tile.
 More: [`docs/progress/AG4`](docs/progress/AG4).
 
-<img src="docs/progress/AG5/landmarks_8k.jpg" width="840">
+<img src="docs/progress/gallery_refresh/landmarks_8k.jpg" width="840">
 
-Landmarks as hero buildings (8K): the megatower over Vesper Bay's Corporate Core, Nexus
+Landmarks as hero buildings by night (8K): the megatower over Vesper Bay's Corporate Core, Nexus
 City's spires, an arcology and Greyhook's wheel.
 
 Every landmark is a hero building, built by kind: the megatower's three arms with light seams
@@ -425,10 +425,10 @@ elevators. The deck's streets lie on the slab and climb to it on solid ramps; th
 undercity's roofs close up to the soffit, its fronts lit and grimy as a covered street.
 More: [`docs/progress/AG10`](docs/progress/AG10).
 
-<img src="docs/progress/AG12/vesper_bay/8k/water_canal_night.jpg" width="840">
+<img src="docs/progress/gallery_refresh/canal_night.jpg" width="840">
 
-A quayed canal in Vesper Bay by night (8K): the neon and lit windows on its water, the quay
-walls with their stairs down to it, moored boats.
+A quayed canal in Vesper Bay's Neon Strand by night (8K): the neon and lit windows on its
+water, the quay walls with their stairs down to it.
 
 | | |
 |---|---|
