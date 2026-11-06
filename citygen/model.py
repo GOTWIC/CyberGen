@@ -392,6 +392,55 @@ class Lane(Entity):
     level: int = _level()
 
 
+# --- the pavement map (M22) ------------------------------------------------------------
+
+PavementKind = Literal["carriageway", "median", "curb", "sidewalk", "walk", "junction",
+                       "corner", "bulb", "bend"]
+
+
+class PavementVertex(_Model):
+    """A vertex of the pavement map: its 1 mm cell is its id (`e1234567n89012`, a second
+    level at the same cell `.2`), its height the one every face that meets it reads."""
+    id: Annotated[str, Field(pattern=ID_PATTERN)]
+    p: Point2
+    z: float = Field(description="Height over the finished ground at the vertex, as every z "
+                                 "in the model (on a flat city over the ground datum): a "
+                                 "road's surface at its station, a junction's curb lines "
+                                 "between its ports.")
+
+
+class PavementEdge(_Model):
+    """A boundary of the pavement map, stored once: a polyline of vertex ids from its
+    lesser end. `port`: a road face meets a junction, bend or the road it goes on as;
+    `band`: two bands of one road; `curb`: a junction's carriageway meets a corner pad;
+    `outer`: the right of way's edge; `seam`: two faces that overlapped, cut apart."""
+    id: Annotated[str, Field(pattern=ID_PATTERN)]
+    kind: Literal["port", "band", "curb", "outer", "seam"]
+    v: Annotated[list[str], Field(min_length=2)]
+
+
+class PavementNet(_Model):
+    """M22: the vertices and edges of the pavement map (its faces are `pavement`)."""
+    vertices: list[PavementVertex] = Field(default_factory=list)
+    edges: list[PavementEdge] = Field(default_factory=list)
+
+
+class PavementFace(Entity):
+    """M22: a face of the pavement map, owned by a road segment (its bands, a bend) or a
+    junction (its carriageway, corner pads, a cul-de-sac's bulb). `rings`: its boundary as
+    edge ids in order, counterclockwise, then its holes clockwise (`-` before an id: the
+    edge runs the other way); `samples`: points strictly inside where its boundary is not
+    one plane (mean value coordinates of the boundary's heights); `layer`: the ground's
+    roads g0, raised networks g1 to g3 (M7's levels), a deck d1, tunnels u1."""
+    TYPE_PREFIX: ClassVar[str] = "pavement"
+    owner_id: str
+    kind: PavementKind
+    band: str
+    layer: str
+    rings: list[list[str]]
+    samples: list[Point3] = Field(default_factory=list, exclude_if=lambda v: not v)
+
+
 class Walkway(Entity):
     """Pedestrian graph edge (for crowds); edges meet at shared end points."""
     TYPE_PREFIX: ClassVar[str] = "walkway"
@@ -950,7 +999,7 @@ COLLECTIONS: dict[str, type[Entity]] = {
     "channels": Channel, "waterways": Waterway, "quays": Quay, "bridges": Bridge,
     "districts": District, "places": Place, "road_nodes": RoadNode, "road_segments": RoadSegment,
     "junctions": Junction, "crosswalks": Crosswalk, "sidewalks": Sidewalk, "lanes": Lane,
-    "walkways": Walkway, "structures": Structure, "decks": Deck, "tunnels": Tunnel,
+    "pavement": PavementFace, "walkways": Walkway, "structures": Structure, "decks": Deck, "tunnels": Tunnel,
     "transit_lines": TransitLine, "stations": Station, "megasites": Megasite, "blocks": Block,
     "lots": Lot, "open_spaces": OpenSpace, "properties": Property, "buildings": Building,
     "skybridges": Skybridge, "site_elements": SiteElement, "plants": Plant, "green_areas": GreenArea, "props": Prop,
@@ -1016,6 +1065,11 @@ class CityModel(_Model):
     crosswalks: list[Crosswalk] = Field(default_factory=list)
     sidewalks: list[Sidewalk] = Field(default_factory=list)
     lanes: list[Lane] = Field(default_factory=list)
+    pavement: list[PavementFace] = Field(default_factory=list, exclude_if=lambda v: not v,
+                                         description="M22: the pavement map's faces.")
+    pavement_net: PavementNet | None = Field(None, exclude_if=lambda v: v is None,
+                                             description="M22: the pavement map's vertices "
+                                                         "and edges.")
     walkways: list[Walkway] = Field(default_factory=list)
     structures: list[Structure] = Field(default_factory=list)
     decks: list[Deck] = Field(default_factory=list, exclude_if=lambda v: not v,

@@ -325,7 +325,10 @@ def check_crosswalks(spec: CitySpec, m: CityModel, n: _Net):
     for j in m.junctions:
         if j.shape in ("cul_de_sac", "bend") or not j.signalized:
             continue
-        legs = n.at.get(j.node_id, [])
+        # (M22: a cluster's legs from all its nodes, not the roads inside it)
+        inner = set(j.attrs.get("inner") or [])
+        legs = [(s, e) for nid in (j.attrs.get("nodes") or [j.node_id])
+                for s, e in n.at.get(nid, []) if s.id not in inner]
         # (the junction's district as M2 takes it: the first of its legs' districts)
         dids = sorted(d for d in (s.attrs.get("district") or
                                   (s.district_ids[0] if s.district_ids else None)

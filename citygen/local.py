@@ -48,6 +48,8 @@ class Local:
     # past the curb and sidewalk corners), level on the grade lines of local roads
     # (`terrain.grade`)
     cuts: dict = field(default_factory=dict)
+    pavement: list = field(default_factory=list)     # M22: the pavement map's faces
+    pavement_net: dict | None = None                 # M22: its vertices and edges
 
 
 def join_walk_islands(W: JN.WalkGraph, landmasses: list, segments: list,
@@ -361,7 +363,9 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             else "multi",
             "legs": a["legs"], "signalized": j["signalized"],
             "corner_radius_m": a["corner_radius_m"], "crosswalk_ids": j["crosswalk_ids"],
-            "attrs": {"classes": a["classes"], "archetype": a["archetype"]}})
+            "attrs": {"classes": a["classes"], "archetype": a["archetype"],
+                      **({k: a[k] for k in ("nodes", "inner", "signals", "bulbs") if k in a}
+                         if a.get("nodes") else {})}})
     out.junctions = [j for j in out.junctions if j["polygon"] is not None]
     out.crosswalks = jx["crosswalks"]
     out.sidewalks = jx["sidewalks"]
@@ -410,7 +414,16 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
                 "angles": {did[n]: a for n, a in net.angles.items()},
                 "levelled_legs": jx["level"]["levelled"],
                 "unlevelled_legs": jx["level"]["kept"],
-                "raised_junctions": jx["level"]["raised"]}
+                "raised_junctions": jx["level"]["raised"],
+                # M22: junctions one surface could not carry, levelled further, left
+                "unbuildable_junctions": jx["level"].get("unbuildable", 0),
+                "levelled_further": jx["level"].get("levelled_further", 0),
+                "unresolved_junctions": jx["level"].get("unresolved", []),
+                "unresolved_why": jx["level"].get("why", []),
+                "nodes_moved": jx["level"].get("nodes_moved", 0),
+                "no_fit": jx["level"].get("no_fit", 0),
+                "steep": jx["level"].get("steep", 0),
+                **({"debug": jx["level"]["debug"]} if jx["level"].get("debug") else {})}
     if dplan.decks:
         out.info["decks"] = DK.info(dplan, dko)
     return out

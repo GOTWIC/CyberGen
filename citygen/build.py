@@ -219,6 +219,9 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
                     "lots", "places"):
             data[key] = getattr(local, key)
+        if local.pavement_net is not None:      # M22
+            data["pavement"] = local.pavement
+            data["pavement_net"] = local.pavement_net
         if local.decks:     # M14
             data["decks"] = local.decks
             data["structures"] = list(data.get("structures", [])) + local.structures
@@ -690,8 +693,23 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
                        "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
         T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
         ps.finish()
-    # M18: the surface of every junction not flat at its node's height (on the grade lines)
-    loc.info["junction_surfaces"] = JN.surfaces(loc.segments, loc.nodes, loc.junctions)
+    # M22: the pavement map on the graded roads; every junction's polygon is its carriageway
+    # face's outline and its surface (`edge_z`, M18) the map's heights
+    from . import pavement as PV
+
+    ground = None
+    if loc.terrain is not None:
+        from . import terrain as TE
+
+        import numpy as np
+
+        fin = loc.terrain["ground"]
+        ground = TE.Field(fin.x0, fin.y0, fin.cell, np.round(fin.arr, 2))
+    mp = PV.make(loc.segments, loc.nodes, loc.junctions,
+                 {did[d.name]: d.archetype for d in spec.districts}, ground)
+    loc.pavement, loc.pavement_net = mp.faces, mp.net
+    loc.info["pavement"] = mp.stats
+    loc.info["junction_surfaces"] = sum(1 for j in loc.junctions if j.get("edge_z"))
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
     b.notes = b.notes + loc.notes
@@ -904,6 +922,21 @@ def water_ground(m: CityModel) -> tuple[CityModel, dict]:
         rows["ground_cover"] = co.rows
         m = with_rows(m, {"ground_cover": co.rows})
     return m, rows
+
+
+def pavement_of(spec: CitySpec, m: CityModel) -> CityModel:
+    """M22: a finished city's pavement map made again from its rows (a spliced
+    regeneration), the junctions' polygons and surfaces from it."""
+    from . import pavement as PV
+    from . import terrain as TE
+
+    data = m.model_dump(mode="json")
+    mp = PV.make(data["road_segments"], data["road_nodes"], data["junctions"],
+                 {d.id: d.archetype for d in m.districts}, TE.ground_of(m))
+    from .model import PavementNet
+
+    return with_rows(m, {"junctions": data["junctions"], "pavement": mp.faces}) \
+        .model_copy(update={"pavement_net": PavementNet.model_validate(mp.net)})
 
 
 def check_all(spec: CitySpec, m: CityModel) -> tuple[list, dict]:

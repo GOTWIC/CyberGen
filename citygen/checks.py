@@ -920,6 +920,11 @@ def run_checks(spec: CitySpec, m: CityModel, roads: bool | None = None
         from . import street_checks as SC
 
         checks += SC.run(spec, m, g) + NC.run_streets(spec, m)
+    if m.pavement_net is not None:
+        # (M22: the pavement map's invariants)
+        from . import pavement_checks as PVC
+
+        checks += PVC.run(spec, m)
     if m.buildings:
         from . import building_checks as BC
         from . import network_checks as NC

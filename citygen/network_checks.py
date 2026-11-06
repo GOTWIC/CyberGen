@@ -103,6 +103,8 @@ def check_dead_ends(spec: CitySpec, m: CityModel):
     opens += [G.from_model_poly(p.polygon) for p in m.places if p.polygon is not None]
     otree = shapely.STRtree(opens) if opens else None
     bulbs = {j.node_id for j in m.junctions if j.shape == "cul_de_sac"}
+    # (M22: a cul-de-sac a cluster took in keeps its bulb in the cluster's region)
+    bulbs |= {n for j in m.junctions for n in j.attrs.get("bulbs") or []}
     for n in m.road_nodes:
         if deg.get(n.id) != 1:
             continue
@@ -316,7 +318,13 @@ def junction_surface(m: CityModel, j, at: dict, ground: dict):
     n = ground[j.node_id]
     ring = [tuple(p) for p in j.polygon.exterior]
     hz = list(j.edge_z) if j.edge_z else [n[0]] * len(ring)
-    return ring, hz, JN.model_legs(at.get(j.node_id, []), j.node_id, n[1])
+    # (M22: a cluster's legs leave it from all its nodes; the roads inside it are not legs)
+    inner = set(j.attrs.get("inner") or [])
+    legs = []
+    for nid in j.attrs.get("nodes") or [j.node_id]:
+        legs += [lg for lg in JN.model_legs(at.get(nid, []), nid, n[1])
+                 if lg["id"] not in inner]
+    return ring, hz, legs
 
 
 def check_junction_levels(spec: CitySpec, m: CityModel):
@@ -433,12 +441,17 @@ def check_crossing_spacing(spec: CitySpec, m: CityModel):
         node_arch[nid] = archs[0] if archs else None
         dids = sorted(d for d in (did_of(x.seg) for x in lg) if d)
         node_ctl[nid] = ctl.get(dids[0], ("auto", "auto")) if dids else ("auto", "auto")
-    sig = {j.node_id for j in m.junctions if j.signalized}
+    # (M22: a cluster's signals at the nodes M18 gave them, `attrs.signals`)
+    sig = set()
+    for j in m.junctions:
+        if j.signalized:
+            sig.update(j.attrs.get("signals") if j.attrs.get("nodes") else [j.node_id])
     marked = {}
     for x in m.crosswalks:
         marked.setdefault(x.junction_id, []).append(x)
     by_j = {j.id: j for j in m.junctions}
-    av = {by_j[k].node_id for k, xs in marked.items() if k in by_j and not by_j[k].signalized}
+    av = {x.attrs.get("node") or by_j[k].node_id for k, xs in marked.items()
+          if k in by_j and not by_j[k].signalized for x in xs}
     for nid in sorted(sig):
         lg = legs.get(nid, [])
         sigs = node_ctl.get(nid, ("auto", "auto"))[0]

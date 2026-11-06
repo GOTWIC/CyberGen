@@ -2789,6 +2789,199 @@
       "title": "Parking",
       "type": "object"
     },
+    "PavementEdge": {
+      "additionalProperties": false,
+      "description": "A boundary of the pavement map, stored once: a polyline of vertex ids from its\nlesser end. `port`: a road face meets a junction, bend or the road it goes on as;\n`band`: two bands of one road; `curb`: a junction's carriageway meets a corner pad;\n`outer`: the right of way's edge; `seam`: two faces that overlapped, cut apart.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "port",
+            "band",
+            "curb",
+            "outer",
+            "seam"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "v": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "V",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "v"
+      ],
+      "title": "PavementEdge",
+      "type": "object"
+    },
+    "PavementFace": {
+      "additionalProperties": false,
+      "description": "M22: a face of the pavement map, owned by a road segment (its bands, a bend) or a\njunction (its carriageway, corner pads, a cul-de-sac's bulb). `rings`: its boundary as\nedge ids in order, counterclockwise, then its holes clockwise (`-` before an id: the\nedge runs the other way); `samples`: points strictly inside where its boundary is not\none plane (mean value coordinates of the boundary's heights); `layer`: the ground's\nroads g0, raised networks g1 to g3 (M7's levels), a deck d1, tunnels u1.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic type; left out it becomes the class prefix.",
+          "title": "Type"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "owner_id": {
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "carriageway",
+            "median",
+            "curb",
+            "sidewalk",
+            "walk",
+            "junction",
+            "corner",
+            "bulb",
+            "bend"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "band": {
+          "title": "Band",
+          "type": "string"
+        },
+        "layer": {
+          "title": "Layer",
+          "type": "string"
+        },
+        "rings": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Rings",
+          "type": "array"
+        },
+        "samples": {
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Samples",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "owner_id",
+        "kind",
+        "band",
+        "layer",
+        "rings"
+      ],
+      "title": "PavementFace",
+      "type": "object"
+    },
+    "PavementNet": {
+      "additionalProperties": false,
+      "description": "M22: the vertices and edges of the pavement map (its faces are `pavement`).",
+      "properties": {
+        "vertices": {
+          "items": {
+            "$ref": "#/$defs/PavementVertex"
+          },
+          "title": "Vertices",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/PavementEdge"
+          },
+          "title": "Edges",
+          "type": "array"
+        }
+      },
+      "title": "PavementNet",
+      "type": "object"
+    },
+    "PavementVertex": {
+      "additionalProperties": false,
+      "description": "A vertex of the pavement map: its 1 mm cell is its id (`e1234567n89012`, a second\nlevel at the same cell `.2`), its height the one every face that meets it reads.",
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "p": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "P",
+          "type": "array"
+        },
+        "z": {
+          "description": "Height over the finished ground at the vertex, as every z in the model (on a flat city over the ground datum): a road's surface at its station, a junction's curb lines between its ports.",
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "p",
+        "z"
+      ],
+      "title": "PavementVertex",
+      "type": "object"
+    },
     "Place": {
       "additionalProperties": false,
       "description": "A named place of the spec, built as a labeled sub-area (M2): a plaza, park, garden or\nmarket carved out of lots; a named promenade, waterfront or street; a waterway; a shore\nstrip (pier, docks, beach); a gate where an avenue enters; a neighborhood of blocks; or\na megasite.",
@@ -6088,6 +6281,26 @@
       },
       "title": "Lanes",
       "type": "array"
+    },
+    "pavement": {
+      "description": "M22: the pavement map's faces.",
+      "items": {
+        "$ref": "#/$defs/PavementFace"
+      },
+      "title": "Pavement",
+      "type": "array"
+    },
+    "pavement_net": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PavementNet"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "M22: the pavement map's vertices and edges."
     },
     "walkways": {
       "items": {
