@@ -348,11 +348,9 @@ def _build_local(spec, b, did: dict, mapper=None) -> Local:
             # (M18: a primary road LEVEL_OUT_M past it too; a local road's run stays M13's:
             # longer, the grade lines of a hillside's short streets go flat and its fills pass
             # FILL_MAX_M, as Cragmouth showed)
-            # (M22: M17's cut, `junctions.build`'s runs17: M22's reaches the whole of a
-            # cluster's roads)
-            run = jx["runs17"].get((x.seg["id"], nid))
-            if run is None:
-                continue
+            # (M22: out to its port, the pavement map's cut, so a junction's ports on a hill
+            # are at one height as its surface needs; M17's run where that is longer)
+            run = max(JN.run_along(x, x.cut), jx["runs17"].get((x.seg["id"], nid), 0.0))
             r = min(run + (JN.LEVEL_OUT_M if x.cls in ("highway", "avenue") else 0.0),
                     0.45 * x.L)
             k = (x.seg["id"], nid)

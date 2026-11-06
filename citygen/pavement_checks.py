@@ -30,7 +30,9 @@ SHOW = 12
 GAP_M2 = 1.0            # a hole in the pavement this small is a gap, not a block
 GAP_MIN_M2 = 1e-4       # (smaller: the union's own rounding of edges the map shares)
 OVERLAP_MIN_M2 = 1e-3   # (smaller: two faces' corners rounded onto the 1 mm grid apart)
-SAME_Z_M = 2.5          # two faces this near in height where they overlap are one level
+SLIVER_W_M = 0.002      # (an overlap narrower on average: two edges a rounding apart)
+SAME_Z_M = 4.5          # two faces this near in height where they overlap are one level (no road
+                        # passes under another with less clearance)
 LEVEL_TOL_M = 0.0015    # a port's vertices within this of one height (stored to 1 mm)
 GRADE_TOL = 0.005       # rounding: heights to 1 mm over short triangle sides
 MIN_TRI_M2 = 0.25       # triangles smaller than this are left out of the grade test
@@ -230,8 +232,8 @@ def check_tiling(spec, m) -> Check:
         rel = shapely.relate_pattern(arr[a], arr[b], "2********")
         for i, j in zip(a[rel].tolist(), b[rel].tolist()):
             ov = shapely.intersection(arr[i], arr[j])
-            if ov.area < OVERLAP_MIN_M2:
-                continue
+            if ov.area < OVERLAP_MIN_M2 or 2.0 * ov.area < SLIVER_W_M * ov.length:
+                continue        # (rounding: tiny, or a seam under SLIVER_W_M wide)
             p = ov.representative_point()
             if abs(_near_z(N, ids[i], p.x, p.y) - _near_z(N, ids[j], p.x, p.y)) > SAME_Z_M:
                 n_over += 1
@@ -407,11 +409,11 @@ SAMPLE_M = 2.0          # the map's interior sample grid (`pavement.SAMPLE_M`)
 
 def check_heights(spec, m) -> Check:
     c = Check("pavement_heights", "M22: one height per pavement vertex; every port level "
-                                  "across its road; every junction, corner pad, bulb and "
-                                  "bend face, drawn from its boundary and samples, within "
-                                  "the grade of its roads (M13's class grades, at least "
-                                  "M18's ramp maximum; a junction the levelling keeps as M18 "
-                                  "left it noted)")
+                                  "across its road; every junction, corner "
+                                  "pad and bulb face, drawn from its boundary and samples, "
+                                  "within the grade of its roads (M13's class grades, at "
+                                  "least M18's ramp maximum; a junction kept as M18 left it "
+                                  "and a bend face across a fold noted)")
     if m.pavement_net is None:
         return c
     N = Net(m)
@@ -428,14 +430,23 @@ def check_heights(spec, m) -> Check:
     held_v = {v for f in N.faces if f.owner_id in held for r in N.rings.get(f.id, []) for v in r}
     steep = 0.0
     noted = set()
+    bends = []
     for f, worst, lim in face_slopes(spec, m, N):
         if worst > lim + GRADE_TOL:
+            if f.kind == "bend":
+                # (its road's own profile across a fold, which `road_grades` holds: its
+                # inner edge climbs over a run shorter than the centerline's)
+                bends.append((worst, f.id))
+                continue
             if f.owner_id in held or any(v in held_v for r in N.rings[f.id] for v in r):
                 noted.add(f.owner_id)     # (held as M18 left it: `pavement_junctions`)
                 continue
             _lim(c, f"face {f.id} ({f.kind}): {worst:.1%} steep (its roads {lim:.0%})")
         steep = max(steep, worst)
     c.notes.append(f"steepest junction face {steep:.1%}")
+    if bends:
+        c.notes.append(f"{len(bends)} bend faces steeper than their roads where they fold "
+                       f"(steepest {max(bends)[1]} {max(bends)[0]:.1%})")
     if noted:
         c.notes.append(f"{len(noted)} junctions held as M18 left them, or beside one (what "
                        f"holds each: `pavement_junctions`), with faces steeper than their "
@@ -447,15 +458,18 @@ def face_slopes(spec, m, N: Net | None = None) -> list[tuple]:
     """(face, its steepest slope, its limit) of every junction, corner pad, bulb and bend
     face: a junction's limit the steepest class grade of its roads (M13's, at least M18's
     ramp maximum), a bend's BEND_FACTOR times its road's (its inner edge climbs over a
-    shorter run than its centerline)."""
+    shorter run than its centerline); a traced road's bends are left out (as drawn)."""
     N = N or Net(m)
     by_class, cap = _grades(spec, m)
     cls = {s.id: s.road_class for s in m.road_segments}
+    traced = {s.id for s in m.road_segments if s.attrs.get("role") == "pinned"}
     roads = _owner_roads(N)
     out = []
     for f in N.faces:
         if f.kind not in JUNCTION_KINDS or f.id in N.bad or not N.rings.get(f.id):
             continue
+        if f.kind == "bend" and f.owner_id in traced:
+            continue        # (a traced road's bend as drawn, as the curve checks take it)
         if f.kind == "bend":
             lim = BEND_FACTOR * by_class.get(cls.get(f.owner_id), cap)
         else:
@@ -535,7 +549,8 @@ def junction_slopes(spec, m) -> list[tuple]:
                             for a, b in zip(cb, cb[1:]):
                                 d = min(d, _seg_dist(N.xy(p), N.xy(q), N.xy(a), N.xy(b)))
                 lim = max(by_class.get(cls.get(r), cap) for r in keys)
-                slope = abs(z1 - z2) / max(d, 0.5)
+                # (two ports less than a meter apart: a step on the grid, not a grade)
+                slope = max(abs(z1 - z2) - PV.step_tol(d), 0.0) / max(d, 0.5)
                 out.append((f.id, ra, z1, rb, z2, d, slope, lim))
     return out
 

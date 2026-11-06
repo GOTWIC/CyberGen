@@ -56,7 +56,8 @@ STEP_M = 4.0            # band edge samples along a road, at most this far apart
 SAMPLE_M = 2.0          # interior samples of a face that is not planar
 SAMPLE_IN_M = 0.5       # ... at least this far inside its boundary
 TOL_MM = 0.75           # a vertex this near another face's edge lies on it (snap rounding)
-SAME_Z_M = 2.5          # two faces this near in height at a point are one level there
+SAME_Z_M = 4.5          # faces nearer than this in height are one level (no road passes under
+                        # another with less clearance)
 STEP_Z_M = 0.3          # faces of roads or junctions that do not meet, this far apart in
 #                         height where they touch, keep a vertex each there (a step)
 MITER_MAX = 2.0         # a mitre longer than this (a turn over 120 degrees) folds the band
@@ -702,10 +703,11 @@ def _leg_port(rd: Road, lg, c: float | None = None, carriageway: bool = False) -
 
 
 def _stub(rd: Road, lg, c: float, w: float):
-    """A leg's band of half width w from its node to c along it."""
+    """A leg's band of half width w from its node to c along it (`Road.band_poly`: a turn
+    inside the cut that folds the band is its centerline buffered, not a mitre's spike)."""
     if lg.at_start:
-        return rd.strip_poly(0.0, min(c, rd.path.L), -w, w)
-    return rd.strip_poly(max(rd.path.L - c, 0.0), rd.path.L, -w, w)
+        return rd.band_poly(0.0, min(c, rd.path.L), w)
+    return rd.band_poly(max(rd.path.L - c, 0.0), rd.path.L, w)
 
 
 def _ring_poly(pts):
@@ -995,18 +997,22 @@ class Assembly:
 
     def zf(self, f: Face, x: float, y: float) -> float:
         """A face's height at a plan point, roughly (to tell levels apart where faces meet
-        in plan): a road's at its station, a junction's at its nearest port."""
+        in plan): a road's at its station, a junction's from its ports."""
         if f.road is not None:
             rd = self.roads[f.road]
             s0, s1 = f.span if f.span else (0.0, rd.path.L)
             return rd.z(rd.path.project(x, y, s0, s1))
+        # (a junction's: its ports' heights blended by inverse square distance, so a face
+        # near its low ports reads low though a raised leg's port is the nearest one)
         u = self.units.get(f.unit)
-        best = None
+        num = den = 0.0
         for _, z, a, b in (u.ports if u is not None else []):
-            d = _seg_d2(a, b, (x, y))
-            if best is None or d < best[0]:
-                best = (d, z)
-        return best[1] if best else 0.0
+            d2 = _seg_d2(a, b, (x, y))
+            if d2 < 1e-6:
+                return z
+            num += z / d2
+            den += 1.0 / d2
+        return num / den if den else 0.0
 
     def _inner_z(self, u: Unit, x: float, y: float, near: float | None = None):
         """A cluster's height at a plan point: its nearest inner road's at its station (None
@@ -1381,6 +1387,15 @@ class Assembly:
                     ring_refs.append(eid if fwd else "-" + eid)
                 refs.append(ring_refs)
             face_refs.append(refs)
+        # (an edge two faces use is no right of way's edge, whichever face named it first)
+        uses: dict = {}
+        for refs in face_refs:
+            for ring_refs in refs:
+                for ref in ring_refs:
+                    uses[ref.lstrip("-")] = uses.get(ref.lstrip("-"), 0) + 1
+        for eid, (kind, canon) in list(edges.items()):
+            if kind == "outer" and uses.get(eid, 0) >= 2:
+                edges[eid] = ("seam", canon)
         self.edges = edges
         self.face_refs = face_refs
         self.vrings = rings
