@@ -38,9 +38,14 @@ def report(model, cx, manifest: dict, pieces) -> dict:
             n += 1
             r = recs.get(e.id)
             if r is None and covers.get(e.id):
-                # (a deck: covered when every piece standing for it has a mesh)
+                # (a deck: covered when every piece standing for it has a mesh; an
+                # embankment under a road wholly inside its junction (M22: a cluster's inner
+                # road) declared with it)
                 if all(recs[p].get("triangles", 0) > 0 for p in covers[e.id]):
                     with_mesh += 1
+                elif all(recs[p].get("triangles", 0) > 0 or recs[p].get("empty") in DECLARED
+                         for p in covers[e.id]):
+                    declared += 1
                 else:
                     missing.append(e.id)
                 continue

@@ -337,8 +337,7 @@ class _Deck:
         segs = [s for s in m.road_segments if s.attrs.get("deck") == dk.id]
         self.ramps = [s for s in segs if s.attrs.get("role") == "deck_ramp"]
         nodes = {s.start for s in segs} | {s.end for s in segs}
-        self.junctions = [j for j in m.junctions if j.level and
-                          any(n in nodes for n in j.attrs.get("nodes") or [j.node_id])]
+        self.junctions = [j for j in m.junctions if j.level and j.node_id in nodes]
         self.links = [s for s in m.structures if (s.attrs or {}).get("deck") == dk.id and
                       s.kind in ("stair", "elevator")]
 
@@ -631,6 +630,11 @@ def _colonnade(cx: Ctx, D: _Deck, rings, kinds) -> list:
                     all(math.hypot(x - p[0], y - p[1]) > 1.0 for p in things)
                 if ok and ftree is not None and len(ftree.query(Point(x, y).buffer(0.8),
                                                                   predicate="intersects")):
+                    ok = False
+                # (one column where two runs meet at a spot: a ring's edge and a hole's
+                # touching, M22's new deck outlines)
+                if ok and any(math.hypot(x - q[0], y - q[1]) < COLONNADE_STEP / 2.0
+                              for q in out):
                     ok = False
                 if ok:
                     out.append([C.m2(x), C.m2(y), C.m(cx.ground.at(x, y))])
