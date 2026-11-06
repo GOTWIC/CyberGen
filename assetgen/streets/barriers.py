@@ -194,21 +194,20 @@ def _legs(cx, j) -> tuple[list, list[dict]]:
         ys = [p[1] for p in ring]
         P = ((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
     legs = []
-    for s in sorted(cx.seg_at_node.get(j.node_id, ()), key=lambda s: s.id):
-        for at_start in ((True, False) if s.start == s.end else (s.start == j.node_id,)):
-            pts = s.centerline if at_start else s.centerline[::-1]
-            try:
-                path = Path(pts)
-            except ValueError:
-                continue
-            d = _leg_dir(path.p, P)
-            from .roads import street_class
-            cls = street_class(s)
-            h = s.width_m / 2.0 if cls in PEDESTRIAN else (
-                s.width_m / 2.0 - s.cross_section.sidewalk_m[0])
-            legs.append({"key": leg_key(s.id, at_start), "seg": s, "at_start": at_start,
-                         "d": d, "exit": first_exit(path.p, ring), "path": path, "h": h,
-                         "ang": M.atan2(d[1], d[0]), "id": s.id})
+    for s, at_start in cx.legs_of(j):
+        pts = s.centerline if at_start else s.centerline[::-1]
+        try:
+            path = Path(pts)
+        except ValueError:
+            continue
+        d = _leg_dir(path.p, P)
+        from .roads import street_class
+        cls = street_class(s)
+        h = s.width_m / 2.0 if cls in PEDESTRIAN else (
+            s.width_m / 2.0 - s.cross_section.sidewalk_m[0])
+        legs.append({"key": leg_key(s.id, at_start), "seg": s, "at_start": at_start,
+                     "d": d, "exit": first_exit(path.p, ring), "path": path, "h": h,
+                     "ang": M.atan2(d[1], d[0]), "id": s.id})
     legs.sort(key=lambda r: (r["ang"], r["id"]))
     return ring, legs
 
@@ -298,7 +297,8 @@ def junction_plan(cx, j) -> dict:
         if cosab <= M.cos(M.radians(MEDIAN_ANGLE_DEG)):
             ma = median_end(ring, A["exit"], A["path"], A["h"])
             mb = median_end(ring, B["exit"], B["path"], B["h"])
-            if _clear_of_connectors(cx, j.node_id, ma, mb) and _inside_ring(ring, ma, mb):
+            clear = all(_clear_of_connectors(cx, n, ma, mb) for n in cx.nodes_of(j))
+            if clear and _inside_ring(ring, ma, mb):
                 median = [A["key"], B["key"]]
                 joins[A["key"]]["m"] = True
                 joins[B["key"]]["m"] = True
@@ -443,7 +443,7 @@ def near_of_junction(cx, j) -> dict:
     poly = G.from_model_poly(j.polygon)
     zone = poly.buffer(NEAR_M)
     zj = _junction_z(cx, j)
-    legs = {s.id for s in cx.seg_at_node.get(j.node_id, ())}
+    legs = {s.id for s, _ in cx.legs_of(j)}
     by: set = set()
     roads = []
     for k in sorted(tree.query(zone).tolist()):
@@ -480,7 +480,8 @@ def near_of_junction(cx, j) -> dict:
             xws.append({"line": [list(c.line[0][:2]), list(c.line[-1][:2])],
                         "width": c.width_m})
             by.add(c.id)
-    cons = [ln for ln in sorted(_connectors(cx, j.node_id), key=lambda ln: ln.id)
+    cons = [ln for ln in sorted((c for n in cx.nodes_of(j) for c in _connectors(cx, n)),
+                                key=lambda ln: ln.id)
             if len(ln.centerline) >= 2]
     lanes = [{"line": [[C.m2(q[0]), C.m2(q[1])] for q in ln.centerline],
               "h": C.m(ln.width_m / 2.0)} for ln in cons]
@@ -538,7 +539,7 @@ def _props(cx):
 
 def _area_by(cx, j) -> set:
     """What a junction's area (`junction_area`) is taken from: it and its legs."""
-    return {j.id, j.node_id} | {s.id for s in cx.seg_at_node.get(j.node_id, ())}
+    return {j.id, *cx.nodes_of(j)} | {s.id for s, _ in cx.legs_of(j)}
 
 
 def junction_area(cx, j, every: bool = False) -> list[list]:
@@ -592,7 +593,8 @@ def leg_ends(cx, j) -> dict:
     by leg key; a leg whose road cannot be made is left out."""
     from .roads import Road, street_class
     out = {}
-    for s in sorted(cx.seg_at_node.get(j.node_id, ()), key=lambda s: s.id):
+    legs = cx.legs_of(j)
+    for s in sorted({x.id: x for x, _ in legs}.values(), key=lambda s: s.id):
         ends = []
         for which, nid in (("start", s.start), ("end", s.end)):
             jj = cx.junction_at.get(nid)
@@ -605,7 +607,7 @@ def leg_ends(cx, j) -> dict:
                        "cls": street_class(s), "ends": ends})
         except ValueError:
             continue
-        for at_start in ((True, False) if s.start == s.end else (s.start == j.node_id,)):
+        for at_start in [a for x, a in legs if x.id == s.id]:
             sc = rd.s0 if at_start else rd.s1
             R, L_ = rd.at(sc, -rd.h), rd.at(sc, rd.h)
             out[leg_key(s.id, at_start)] = [[C.m(R[0]), C.m(R[1])], [C.m(L_[0]), C.m(L_[1])]]

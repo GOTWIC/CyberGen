@@ -48,7 +48,7 @@ def strips(pk, model) -> list[tuple[str, str, np.ndarray, set]]:
     segs = {s.id: s for s in model.road_segments}
     walk_seg = {w.id: w.segment_id for w in model.sidewalks}
     legs: dict[str, set] = defaultdict(set)
-    jnode = {j.node_id: j.id for j in model.junctions}
+    jnode = {n: j.id for j in model.junctions for n in j.attrs.get("nodes") or [j.node_id]}
     for s in model.road_segments:
         for n in (s.start, s.end):
             if n in jnode:

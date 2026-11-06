@@ -484,7 +484,8 @@ def seams(pk: Packs, model=None) -> dict:
     ring_of, own, cut = {}, {}, {}
     if model is not None:
         from citygen import geom as G
-        jat = {j.node_id: j for j in model.junctions}
+        # (M22: every node of a cluster is its junction's)
+        jat = {n: j for j in model.junctions for n in j.attrs.get("nodes") or [j.node_id]}
         for j in model.junctions:
             ring_of[j.id] = G.from_model_poly(j.polygon).exterior
         for s in model.road_segments:

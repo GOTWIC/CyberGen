@@ -127,7 +127,10 @@ class Ctx:
                 self.seg_at_node[s.end].append(s)
         self.junction_at = {}
         for j in m.junctions:
-            self.junction_at.setdefault(j.node_id, j)
+            # (M22: every node of a cluster is its junction's; its inner roads, wholly inside
+            # its outline, draw no carriageway of their own)
+            for nid in j.attrs.get("nodes") or [j.node_id]:
+                self.junction_at.setdefault(nid, j)
         self.lanes: dict[str, list] = defaultdict(list)
         for ln in m.lanes:
             if ln.kind == "lane" and ln.segment_id:
@@ -186,6 +189,28 @@ class Ctx:
 
     # -- helpers ---------------------------------------------------------------------------
 
+
+    def legs_of(self, j) -> list:
+        """A junction's legs, (segment, at its start), by segment id: the roads at its node,
+        or at every node of a cluster (M22) less the roads inside it."""
+        nodes = set(j.attrs.get("nodes") or [j.node_id])
+        inner = set(j.attrs.get("inner") or [])
+        segs = {}
+        for nid in nodes:
+            for s in self.seg_at_node.get(nid, ()):
+                if s.id not in inner:
+                    segs[s.id] = s
+        out = []
+        for sid in sorted(segs):
+            s = segs[sid]
+            for at_start in (True, False):
+                if (s.start if at_start else s.end) in nodes:
+                    out.append((s, at_start))
+        return out
+
+    def nodes_of(self, j) -> list:
+        """A junction's nodes (a cluster's all, M22)."""
+        return list(j.attrs.get("nodes") or [j.node_id])
     def bed_z(self, x: float, y: float) -> float | None:
         """M16's bed under a point of the water (absolute), None over land or without M16."""
         if self.beds is None:

@@ -558,22 +558,21 @@ def _junction_base(cx: Ctx, j) -> dict:
     """What a junction's surface is made from (`_surface`): itself, its node and its legs."""
     node = cx.node.get(j.node_id)
     legs = []
-    for s in sorted(cx.seg_at_node.get(j.node_id, ()), key=lambda s: s.id):
-        for at_start in ((True, False) if s.start == s.end else (s.start == j.node_id,)):
-            leg = {"id": s.id, "at_start": at_start, "line": [list(p) for p in s.centerline],
-                   "z_profile": [z.model_dump() for z in s.z_profile],
-                   "width": s.width_m, "side": s.cross_section.sidewalk_m[0],
-                   "cls": street_class(s)}
-            g = getattr(s, "ground", None)
-            if g:
-                leg["ground"] = [z.model_dump() for z in g]
-            elif not cx.ground.flat:
-                leg["ground_pts"] = cx.ground.samples(s.centerline)
-            # (#89: the junction at its far end, where its road piece's far cut is)
-            far = cx.junction_at.get(s.end if at_start else s.start)
-            if far is not None and far.id != j.id:
-                leg["far"] = {"id": far.id, "ring": [list(q) for q in far.polygon.exterior]}
-            legs.append(leg)
+    for s, at_start in cx.legs_of(j):
+        leg = {"id": s.id, "at_start": at_start, "line": [list(p) for p in s.centerline],
+               "z_profile": [z.model_dump() for z in s.z_profile],
+               "width": s.width_m, "side": s.cross_section.sidewalk_m[0],
+               "cls": street_class(s)}
+        g = getattr(s, "ground", None)
+        if g:
+            leg["ground"] = [z.model_dump() for z in g]
+        elif not cx.ground.flat:
+            leg["ground_pts"] = cx.ground.samples(s.centerline)
+        # (#89: the junction at its far end, where its road piece's far cut is)
+        far = cx.junction_at.get(s.end if at_start else s.start)
+        if far is not None and far.id != j.id:
+            leg["far"] = {"id": far.id, "ring": [list(q) for q in far.polygon.exterior]}
+        legs.append(leg)
     cxy = bbox_center(j.polygon.exterior)
     return {"junction": dump(j), "node": list(node.position) if node else [*cxy, 0.0],
             "node_ground": getattr(node, "ground_m", None) or 0.0, "legs": legs}
@@ -796,7 +795,8 @@ def _lanes_off(cx: Ctx, j) -> list:
     from citygen import geom as G
 
     from . import barriers as BR
-    lanes = [ln for ln in sorted(BR._connectors(cx, j.node_id), key=lambda ln: ln.id)
+    lanes = [ln for ln in sorted((c for n in cx.nodes_of(j) for c in BR._connectors(cx, n)),
+                                 key=lambda ln: ln.id)
              if len(ln.centerline) >= 2 and ln.width_m / 2.0 - LANE_IN_M > 0.5]
     if not lanes:
         return []
@@ -818,7 +818,7 @@ def _off_deck(cx: Ctx, j) -> list:
 
     from .decks import _rings, deck_of
     dk = None
-    for s in cx.seg_at_node.get(j.node_id, ()):
+    for s, _ in cx.legs_of(j):
         did = s.attrs.get("deck")
         if did:
             dk = next((d for d in cx.m.decks if d.id == did), None)
