@@ -329,10 +329,10 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
                   if K.GRASS[it["kind"]][0] > 0.0 and (it["mode"] != "piece") == want]
         allowed = shapely.union_all(grassy, grid_size=FINE_M) if grassy else Polygon()
         if cutg is not None and not allowed.is_empty:
-            allowed = shapely.difference(allowed, cutg, grid_size=FINE_M)
+            allowed = _areal(shapely.difference(allowed, cutg, grid_size=FINE_M)) or Polygon()
         if rowg is not None and not want and not allowed.is_empty:
             # (a verge lies in its road's right of way: only the pieces keep off it)
-            allowed = shapely.difference(allowed, rowg, grid_size=FINE_M)
+            allowed = _areal(shapely.difference(allowed, rowg, grid_size=FINE_M)) or Polygon()
         sel = np.nonzero(verge == want)[0]
         if allowed.is_empty or not len(sel):
             continue
