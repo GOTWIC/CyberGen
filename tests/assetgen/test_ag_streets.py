@@ -209,6 +209,44 @@ def test_kit_drops_folds_and_checks_clean():
     assert not any(K.check(b.slots).values())
 
 
+def test_quay_stairs_are_closed():
+    """#131: each flight down a quay wall is a closed solid: its only open edges lie on the
+    quay wall's face (where it stands against the wall) or at the wall's foot, and its faces
+    point up (treads), down the flight (risers, its foot), back along the wall (its top end)
+    or out to the water (its side), for the water on either side of the quay's line."""
+    from assetgen.streets import water as SW
+    for side in (1, -1):
+        inp = {"quay": {"line": [[0.0, 0.0], [100.0, 0.0]], "width_m": 5.0}, "side": side,
+               "water_z": -1.5, "origin": [0.0, 0.0], "style": {"archetype": "old_town"}}
+        out = SW.make_quay(inp)
+        assert not any(K.check(out.mesh.slots).values())
+        sl = out.mesh.slots["stone.quay"]
+        t0, t1, bot = side * 2500, side * 3900, -3000
+        for s0 in (30000, 90000):
+            tris = []
+            for k in range(0, len(sl.idx), 3):
+                t = [sl.pos[i] for i in sl.idx[k:k + 3]]
+                if all(s0 - 10 <= p[0] <= s0 + 2710 and
+                       min(t0, t1) - 10 <= p[1] <= max(t0, t1) + 10 for p in t):
+                    tris.append(t)
+            assert tris, (side, s0)
+            used: dict = {}
+            dirs = set()
+            for a, b, c in tris:
+                for e in ((a, b), (b, c), (c, a)):
+                    k = tuple(sorted(e))
+                    used[k] = used.get(k, 0) + 1
+                n = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+                     (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+                     (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])]
+                i = max(range(3), key=lambda j: abs(n[j]))
+                dirs.add((i, 1 if n[i] > 0 else -1))
+            open_ = [e for e, k in used.items() if k == 1]
+            assert all((p[1] == t0 and q[1] == t0) or (p[2] == bot and q[2] == bot)
+                       for p, q in open_), (side, s0, open_[:4])
+            assert dirs == {(2, 1), (0, 1), (0, -1), (1, side)}, (side, s0, dirs)
+
+
 def _golden() -> dict:
     return json.loads(GOLDEN.read_text(encoding="utf-8"))
 

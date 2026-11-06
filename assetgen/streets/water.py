@@ -123,7 +123,7 @@ def make_quay(inp: dict) -> Out:
     if P.L > 30.0:
         s = STAIR_STEP / 2.0
         while s + 4.0 < P.L:
-            _stair(mesh, P, s, ws, h, g(s) + 0.02, wz)
+            _stair(mesh, P, s, ws, h, g(s) + 0.02, wz, bot)
             s += STAIR_STEP
     out = Out(mesh=mesh)
     if "toe" in inp:
@@ -143,33 +143,53 @@ def _along(rows, uvs):
     return out
 
 
-def _stair(mesh: Mesh, P: Path, s0: float, ws: int, h: float, ztop: float, wz: float):
-    """A flight down the quay wall into the water, along the wall on the water side."""
+def _stair(mesh: Mesh, P: Path, s0: float, ws: int, h: float, ztop: float, wz: float,
+           bot: float):
+    """A flight down the quay wall into the water, along the wall on the water side: a solid
+    from the quay wall's foot `bot` whose top steps down from one step under the paving at
+    s0 to just over the water, a tread and (but the first) a riser per step, its outer side
+    stepping with the treads and both its ends closed (#131: the ends were open, so from
+    along the water one looked into the flight and through it, and the side stood above the
+    treads as a sheet with no back)."""
     drop = ztop - (wz + 0.15)
     if drop < 0.3:
         return
     n = max(2, int(drop / 0.17 + 0.999))
     run = 0.3
     t0, t1 = ws * h, ws * (h + 1.4)
+    lo, hi = (t0, t1) if ws > 0 else (t1, t0)
+    steps = []                                  # (start, end, top) down the flight
     for i in range(n):
         a, b = s0 + run * i, s0 + run * (i + 1)
         if b > P.L:
             break
-        zt = ztop - drop * (i + 1) / n
-        lo, hi = (t0, t1) if ws > 0 else (t1, t0)
+        steps.append((a, b, ztop - drop * (i + 1) / n))
+    if not steps:
+        return
+    for i, (a, b, zt) in enumerate(steps):
         ring = [(a, lo), (b, lo), (b, hi), (a, hi)]
         mesh.poly_map("stone.quay", ring, (), lambda u, v, zt=zt: (
             *_xy(P, u, v), zt))
-        p, q = _xy(P, a, lo), _xy(P, a, hi)
-        # the riser up to the step before, facing down the flight (+s)
-        mesh.wall("stone.quay", p, q, zt, zt + drop / n, zt, zt + drop / n)
-    # the stair's outer side wall
-    a, b = s0, min(s0 + run * n, P.L)
-    p0, p1 = _xy(P, a, t1), _xy(P, b, t1)
+        if i:
+            # the riser up to the step before, facing down the flight (+s)
+            up = steps[i - 1][2]
+            mesh.wall("stone.quay", _xy(P, a, lo), _xy(P, a, hi), zt, up, zt, up)
+    # the outer side, facing the water: one polygon in (s, z) from the foot up to each tread,
+    # so it meets every tread and riser on their own edges (u = -ws s keeps the handedness
+    # that makes it face the water side)
+    a0, z0 = steps[0][0], steps[0][2]
+    b1, z1 = steps[-1][1], steps[-1][2]
+    side = [(a0, bot), (b1, bot)]
+    for a, b, zt in reversed(steps):
+        side += [(b, zt), (a, zt)]
     if ws > 0:
-        mesh.wall("stone.quay", p1, p0, wz - 1.0, ztop - drop / n * (n - 1), wz - 1.0, ztop)
-    else:
-        mesh.wall("stone.quay", p0, p1, wz - 1.0, ztop, wz - 1.0, ztop - drop / n * (n - 1))
+        side = side[::-1]
+    x, y, nx, ny, _ = P.frame((a0 + b1) / 2.0)
+    mesh.poly_map("stone.quay", [(-ws * s, z) for s, z in side], (),
+                  lambda u, v: (*_xy(P, -ws * u, t1), v), expect=(ws * nx, ws * ny, 0.0))
+    # its top end, facing back along the wall (-s), and its foot, facing on (+s)
+    mesh.wall("stone.quay", _xy(P, a0, hi), _xy(P, a0, lo), bot, z0, bot, z0)
+    mesh.wall("stone.quay", _xy(P, b1, lo), _xy(P, b1, hi), bot, z1, bot, z1)
 
 
 def _xy(P: Path, s: float, t: float):
