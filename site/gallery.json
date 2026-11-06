@@ -17,7 +17,7 @@
       {"entry": "m11-gameplay", "title": "Gameplay layer", "caption": "Faction turf, places to go, wealth, danger, traffic and crowds.", "crop": [0.0, 0.1, 1.0, 1.0]},
       {"entry": "m13-terrain", "title": "Hills and cliffs", "caption": "A port city on hills, its plateau standing on a cliff over the bay."},
       {"entry": "m20-city", "title": "Complete layout", "caption": "An example of a generated city, with every tower, transit line, prop and sign in place.", "wide": true},
-      {"entry": "ag4-unreal", "title": "Shopping street", "caption": "Street fronts, signs and props on a shopping street, in Unreal Engine."},
+      {"entries": ["ag4-unreal", "ag15-unreal-night"], "labels": ["Day", "Night"], "title": "Shopping street", "caption": "Street fronts, signs and props on a shopping street in Unreal Engine, by day and at night."},
       {"entry": "ag5-landmarks", "title": "Landmarks", "caption": "A megatower, a cluster of spires, an arcology and an observation wheel, lit up at night."},
       {"entry": "ag8-props", "title": "Street props", "caption": "Every street prop and vehicle in the neon style, laid out.", "wide": true},
       {"entries": ["ag10-city", "ag15-city-night"], "labels": ["Day", "Night"], "title": "A whole city, modelled", "caption": "An example of a generated city, every building with a model and textures of its own, by day and lit up at night.", "wide": true},
