@@ -1,7 +1,6 @@
-// CyberGen gallery: theme switch, stage filter, rail highlight and the image viewer.
+// CyberGen gallery: stage filter, rail highlight and the image viewer.
 // The page works without this script (every picture links to its full size).
 (() => {
-  const root = document.documentElement;
   const body = document.body;
   const hashId = () => decodeURIComponent(location.hash.slice(1));
 
@@ -10,21 +9,6 @@
     location.replace("log.html" + location.hash);
     return;
   }
-
-  // ---- Theme: auto (follow the system), light, dark -----------------------
-  const themeBtn = document.getElementById("theme");
-  const THEMES = ["auto", "light", "dark"];
-  let theme = "auto";
-  try { theme = localStorage.getItem("cg-theme") || "auto"; } catch (e) { /* storage blocked */ }
-  if (!THEMES.includes(theme)) theme = "auto";
-  function applyTheme(t) {
-    theme = t;
-    if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
-    (themeBtn.querySelector(".theme-val") || themeBtn).textContent = t;
-    try { if (t === "auto") localStorage.removeItem("cg-theme"); else localStorage.setItem("cg-theme", t); } catch (e) { /* ignore */ }
-  }
-  applyTheme(theme);
-  themeBtn.addEventListener("click", () => applyTheme(THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]));
 
   // ---- Stage filter --------------------------------------------------------
   const filterBtns = [...document.querySelectorAll("[data-filter]")];

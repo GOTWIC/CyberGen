@@ -5,7 +5,7 @@
   "repo": "https://github.com/GOTWIC/CyberGen",
   "branch": "main",
   "site": "https://gotwic.github.io/CyberGen/",
-  "backdrop": {"dark": "ag15-night", "light": "ag15-day"},
+  "backdrop": {"dark": "ag15-night"},
   "next": "Next: stage 3, atmosgen (light, sky and weather), stage 4, lifegen (crowds, traffic, trains and aircraft), then stage 5, storygen.",
   "showcase": {
     "heading": "Cyberpunk cities from a single prompt",

@@ -319,7 +319,7 @@ def render_stage_keys(g: dict) -> str:
     names = {s["key"]: s for s in g["stages"]}
     keys = "".join(f'<span class="key" data-stage="{esc(k)}"><i></i>{esc(names[k]["label"])} · {esc(names[k]["name"])}</span>'
                    for k in shown)
-    return keys + '<a class="btn" href="log.html">Build log</a>'
+    return keys
 
 
 def render_showcase(g: dict, dims: dict[str, tuple[int, int]]) -> str:
