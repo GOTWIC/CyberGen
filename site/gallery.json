@@ -395,8 +395,8 @@
       "milestone": "AG2",
       "milestone_name": "Facades",
       "title": "The tallest tower of every era",
-      "image": "docs/progress/AG2/towers.jpg",
-      "caption": "The tallest building of each era, each in its own facade style."
+      "image": "docs/progress/gallery_refresh/towers_by_era.jpg",
+      "caption": "The tallest building of each era across the sample cities, each in its own facade style."
     },
     {
       "id": "ag2-sheet",
@@ -405,8 +405,8 @@
       "milestone": "AG2",
       "milestone_name": "Facades",
       "title": "64 buildings drawn at random",
-      "image": "docs/progress/AG2/vesper_bay/contact_sheet.jpg",
-      "caption": "64 of Vesper Bay's buildings, picked at random."
+      "image": "docs/progress/gallery_refresh/contact_sheet_greyhook.jpg",
+      "caption": "64 of Greyhook's buildings, picked at random."
     },
     {
       "id": "ag3-fronts",
