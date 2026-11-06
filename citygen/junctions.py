@@ -1481,12 +1481,13 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
                 zv[k] = target[k]
                 continue
             lo_h, up_h = LA.get(k, -math.inf), UA.get(k, math.inf)
-            if lo_h > up_h + 1e-6:
+            if lo_h > up_h + CROSS_TOL_M:
                 bad.add(of[k])
                 zv[k] = target[k]
                 continue
             z = (U.get(k, target[k]) + Lo.get(k, target[k])) / 2.0
-            z = min(max(z, lo_h), up_h)
+            # (bounds a rounding apart, CROSS_TOL_M at most: between them)
+            z = min(max(z, lo_h), up_h) if lo_h <= up_h else (lo_h + up_h) / 2.0
             if up_h >= 0.0:
                 z = max(z, 0.0)     # (none under the ground: tunnels are fixed roads)
             zv[k] = G.q(z)
@@ -1554,7 +1555,7 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
     whys = _why_kept(ties, anchors, group, kept, flat) if kept else []
     for first, k, ups, los in whys:
         # (ids in lists, so M10's renaming finds them: `ids.Renamer._attrs`)
-        if ups and los and los[0][0] > ups[0][0] + 1e-6:
+        if ups and los and los[0][0] > ups[0][0] + CROSS_TOL_M:
             out["held"][first] = {"low": [los[0][1][0], los[0][1][1], round(los[0][0], 2)],
                                   "high": [ups[0][1][0], ups[0][1][1], round(ups[0][0], 2)]}
         else:
@@ -2570,20 +2571,39 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
             L = ST._plen(pts)
             ra, rb = (0.0, 0.0) if s["id"] in inner or rd is None else (rd.a, rd.b)
             base = ST._substring(pts, ra, L - rb) if L - ra - rb > 1.0 else pts
+            cw = None
+            if s["id"] in inner and s["start"] in unit_of:
+                # (an inner road's sidewalk records lie on its cluster's corner pads, off its
+                # carriageway, where AG7 draws them; its walkers go on along it)
+                cw = plan.regions.get(units[unit_of[s["start"]]]["id"], (None, None))[0]
             for sd, sign in (("L", 1.0), ("R", -1.0)):
                 line = _offset(base, sign * h)
                 if len(line) < 2:
                     continue
-                sid = f"sw{len(sidewalks) + 1:06d}"
-                sidewalks.append({"id": sid, "segment_id": s["id"], "side":
-                                  "left" if sd == "L" else "right",
-                                  "line": line, "width_m": side,
-                                  "clear_path_m": G.q(side - furn - curb), "curb_m": curb,
-                                  "furniture_m": furn})
+                pieces = [line]
+                if cw is not None and not cw.is_empty:
+                    ln = LineString(line)
+                    left = shapely.difference(ln, cw.buffer(side / 2.0), grid_size=G.GRID_M)
+                    # (in order along the line: no GEOS order reaches the model)
+                    got = sorted((ln.project(shapely.Point(g.coords[0])), g)
+                                 for g in shapely.get_parts(left)
+                                 if g.geom_type == "LineString" and g.length >= 1.0)
+                    pieces = [[tuple(map(G.q, c[:2])) for c in g.coords] for _, g in got]
+                sid = None
+                for piece in pieces:
+                    sid = f"sw{len(sidewalks) + 1:06d}"
+                    sidewalks.append({"id": sid, "segment_id": s["id"], "side":
+                                      "left" if sd == "L" else "right",
+                                      "line": piece, "width_m": side,
+                                      "clear_path_m": G.q(side - furn - curb), "curb_m": curb,
+                                      "furniture_m": furn})
                 c0 = corner_of.get((s["start"], s["id"], sd))
                 c1 = corner_of.get((s["end"], s["id"], sd))
                 chain = ([c0] if c0 else []) + line + ([c1] if c1 else [])
-                W.add("sidewalk", chain, side, sidewalk=sid, segment=s["id"])
+                if cw is not None:
+                    W.add("sidewalk", chain, side, segment=s["id"])
+                else:
+                    W.add("sidewalk", chain, side, sidewalk=sid, segment=s["id"])
         elif cls != "highway":
             kind = {"pedestrian": "pedestrian_street", "footbridge": "footbridge"}.get(
                 cls, "alley" if cls in ("alley", "service") else "path")

@@ -1313,10 +1313,11 @@ checks `pavement_checks.py`, preview `preview_pavement.py`):
   two bounds that clash (`why_text`); one the map draws steeper than the fit foresaw (a gore
   inside a cluster) is kept with its drawn grade (`build.add_local`, `pavement_checks.
   drawn_steep`). Both are noted by the checks and listed in the report (`held_junctions`).
-- **Checks** (four): `pavement_edges`, `pavement_tiling` (also every face on its owner's
-  right of way), `pavement_heights` (bend faces 1.25 times their road's grade),
-  `pavement_junctions`; `road_overlaps`, `junction_surface`, the crosswalk, signal and dead end
-  checks read clusters.
+- **Checks** (four, 106 on a flat sample, 111 with decks): `pavement_edges`,
+  `pavement_tiling` (faces on one layer within `SAME_Z_M` 4.5 m of each other never overlap,
+  every face on its owner's right of way), `pavement_heights` (a bend face across a fold
+  noted), `pavement_junctions`; `road_overlaps`, `junction_surface`, the crosswalk, signal and
+  dead end checks, column placement, props and decks read clusters.
 - **Stage 2 today:** a junction's `polygon` is its carriageway face's outline, `edge_z` the
   map's heights there, so AG7 draws today's pieces on the map until AG17.
 - **Blockout:** roads, junctions, pads, medians and sidewalks drawn from the faces into the
