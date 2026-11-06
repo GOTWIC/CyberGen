@@ -465,7 +465,8 @@ def overlap_cuts(legs: list[Leg], cap: bool = True) -> None:
             if not cap:
                 # (the overlap that reaches the node, or runs on near it: two roads that part
                 # from it at a small angle and run together a while)
-                reach_n = max(NODE_REACH_M, legs[i].row + legs[j].row)
+                reach_n = max(NODE_REACH_M, legs[i].row + legs[j].row,
+                              0.5 * min(legs[i].L, legs[j].L))
                 near = [p for p in G.parts(ov) if p.distance(P) <= reach_n and
                         G.area1(p) >= 0.5]
                 if not near:
@@ -1470,7 +1471,9 @@ def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
             new, crossed = _conform(sg["z_profile"], rd.path.L, ca, cb,
                                     nodez(sg["start"], zv, kept), zv[va], zv[vb],
                                     nodez(sg["end"], zv, kept), g, lk)
-            if crossed:
+            # (and within the grade checks: `road_grades`, `ramp_grades`)
+            cap = max(catch_grade(sg, gr) / G_SAFE, _steepest(sg["z_profile"]))
+            if crossed or _steepest(new) > cap + 1e-4:
                 more |= {of[v] for v in vs} - kept
             else:
                 plan_new[sg["id"]] = new

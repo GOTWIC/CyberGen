@@ -236,7 +236,8 @@ def check_tiling(spec, m) -> Check:
                     f"({p.x:.1f}, {p.y:.1f}))")
     layer = {f.id: f.layer for f in N.faces}
     for lv in sorted({layer[i] for i in ids}):
-        u = shapely.union_all([g for i, g in zip(ids, geoms) if layer[i] == lv])
+        u = shapely.union_all([g for i, g in zip(ids, geoms) if layer[i] == lv],
+                              grid_size=0.001)
         for g in [u] if u.geom_type == "Polygon" else list(getattr(u, "geoms", [])):
             if g.geom_type != "Polygon":
                 continue

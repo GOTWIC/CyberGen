@@ -65,6 +65,8 @@ ISLAND_M2 = 4.0         # a hole in a junction's region smaller than this is fil
 SNAP_MM = 1             # junction vertices this near (each axis) are one (overlay rounding)
 FLAT_MM = 1             # a face whose boundary lies on one plane within this is planar
 CELL_MM = 2000          # spatial hash cell of the shared-edge pass
+GAP_M2 = 1.0            # a hole in a layer's pavement this small is a sliver, filled
+PINCH_MM2 = 1000        # a loop of a ring this small (mm2) where it touches itself is cut out
 JUNCTION_KINDS = ("junction", "corner", "bulb", "bend")
 ROAD_KINDS = ("carriageway", "median", "curb", "sidewalk", "walk")
 # priority of a face where two at one level overlap (higher keeps the overlap)
@@ -372,6 +374,19 @@ def _clean(r) -> list:
                 out.pop(i)
                 changed = True
                 break
+        if changed:
+            continue
+        # (a pinch: a vertex twice, the loop between under PINCH_MM2 cut out)
+        seen: dict = {}
+        for i, v in enumerate(out):
+            j = seen.get(v)
+            if j is not None:
+                loop = out[j:i]
+                if len(loop) < 3 or abs(_ring_area2(loop)) < 2 * PINCH_MM2:
+                    del out[j:i]
+                    changed = True
+                    break
+            seen[v] = i
     return out
 
 
@@ -1159,6 +1174,46 @@ class Assembly:
         self.stats.update({"overlaps_cut": n_pairs, "overlap_m2": round(area, 3),
                            "faces_cut": n_cut})
 
+    def fill_gaps(self) -> int:
+        """A hole in a layer's pavement smaller than GAP_M2 (where faces built apart leave
+        a sliver between them) joins the face around it it shares most boundary with."""
+        n = 0
+        layers = sorted({f.layer for f in self.faces if f.rings})
+        for lv in layers:
+            idx = [i for i, f in enumerate(self.faces) if f.rings and f.layer == lv]
+            geoms = list(self._geoms(idx))
+            u = union(geoms)
+            holes = []
+            for p in polys(u):
+                for h in p.interiors:
+                    hp = Polygon(h)
+                    if 1e-6 <= hp.area < GAP_M2:
+                        holes.append(hp)
+            if not holes:
+                continue
+            tree = shapely.STRtree(geoms)
+            for hp in sorted(holes, key=lambda h: h.bounds):
+                best = None
+                for k in sorted(tree.query(hp.buffer(0.01)).tolist()):
+                    shared = shapely.intersection(geoms[k].boundary, hp.buffer(0.002)).length
+                    if shared > 0 and (best is None or shared > best[0] + 1e-9):
+                        best = (shared, k)
+                if best is None:
+                    continue
+                fi = idx[best[1]]
+                F = self.faces[fi]
+                g = _ov(shapely.union, geoms[best[1]], hp)
+                ps = sorted((rs for rs in mm_polys(g) if _rs_area(rs) >= 100), key=_rs_key)
+                if ps:
+                    F.rings = ps[0]
+                    geoms[best[1]] = F.poly()
+                    n += 1
+        if n:
+            near = list(range(len(self.faces)))
+            self.tfix(near, near, all_segs=True)
+        self.stats["gaps_filled"] = n
+        return n
+
     def split_invalid(self) -> int:
         """A face the shared-edge pass left self-touching is split at the touch."""
         out = []
@@ -1263,7 +1318,9 @@ class Assembly:
             refs = []
             for ids in rr:
                 k = len(ids)
-                lab = [(fi, twin(ids[i], ids[(i + 1) % k])) for i in range(k)]
+                pp = [self._portish(ids[i]) for i in range(k)]
+                lab = [(fi, twin(ids[i], ids[(i + 1) % k]), pp[i] and pp[(i + 1) % k])
+                       for i in range(k)]
                 brk = [i for i in range(k) if lab[i - 1] != lab[i] or len(nbr[ids[i]]) != 2]
                 if not brk:
                     i0 = min(range(k), key=lambda i: self._vkey(ids[i]))
@@ -1279,7 +1336,10 @@ class Assembly:
                     eid = f"{canon[0]}.{canon[1]}"
                     if eid not in edges:
                         g = twin(chain[0], chain[1])
-                        edges[eid] = (self._kind(fi, g), canon)
+                        kind = self._kind(fi, g)
+                        if kind == "port" and not all(self._portish(v) for v in chain):
+                            kind = "seam"     # (a face reaching past a port, along the road)
+                        edges[eid] = (kind, canon)
                     ring_refs.append(eid if fwd else "-" + eid)
                 refs.append(ring_refs)
             face_refs.append(refs)
@@ -1287,6 +1347,12 @@ class Assembly:
         self.face_refs = face_refs
         self.vrings = rings
         self.stats.update({"split_vertices": split, "duplicate_segments": dup})
+
+    def _portish(self, name: str) -> bool:
+        """Whether a vertex is a port point (of a road's end, a bend's end, a port line two
+        roads share)."""
+        p = self.vpos[name]
+        return p in self.ports or p in self.level
 
     def _levels(self, v, fis) -> list[list[int]]:
         """The faces using a point, grouped by level (faces that meet are one level)."""
@@ -1768,6 +1834,8 @@ def build_map(segments: list[dict], nodes: list[dict], units: list[Unit],
     junc = [i for i, f in enumerate(A.faces) if f.kind in JUNCTION_KINDS]
     n_fix = A.tfix(idx, junc, all_segs=True, src_ports=True)
     A.resolve()
+    if A.fill_gaps():
+        A.resolve()         # (what the gaps' own shared-edge pass leaves overlapping)
     A.split_invalid()
     A.extract()
     A.heights()

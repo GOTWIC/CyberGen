@@ -151,6 +151,15 @@ def road_overlaps(m: CityModel) -> list[tuple]:
         return []
     lines, rows = _rows(m)
     jpolys = [G.from_model_poly(j.polygon).buffer(JUNCTION_PAD_M) for j in m.junctions]
+    if m.pavement_net is not None:
+        # (M22: every face a junction owns in the pavement map is inside it: a cluster's
+        # carriageway in parts, its corner pads)
+        from . import pavement_checks as PVC
+
+        N = PVC.Net(m)
+        jids = {j.id for j in m.junctions}
+        jpolys += [N.poly(f.id).buffer(JUNCTION_PAD_M) for f in N.faces
+                   if f.owner_id in jids and f.id not in N.bad and N.rings.get(f.id)]
     jtree = shapely.STRtree(jpolys) if jpolys else None
     tree = shapely.STRtree(rows)
     a_idx, b_idx = tree.query(rows, predicate="intersects")
