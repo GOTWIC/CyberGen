@@ -1062,6 +1062,22 @@ def _top_of(ms: dict) -> int:
     return ms["z1"]
 
 
+def _fits(sb, it: dict, x: int, y: int, z: int) -> bool:
+    """Whether an item's whole footprint stands on a roof of the shell at z (a mass whose
+    top is within 60 mm of it, not a halo's screen)."""
+    sa, sc = (max(int(round(v * 1000)), 100) for v in it["size"][:2])
+    a = M.radians(float(it["yaw_deg"]))
+    ux, uy = float(M.cos(a)), float(M.sin(a))
+    for ms in sb.masses:
+        if ms.get("screen") or abs(_top_of(ms) - z) > 60:
+            continue
+        if all(RG.in_poly((int(round(x + ux * sx * sa / 2 - uy * sy * sc / 2)),
+                           int(round(y + uy * sx * sa / 2 + ux * sy * sc / 2))),
+                          ms["rings"]) == 1 for sx in (-1, 1) for sy in (-1, 1)):
+            return True
+    return False
+
+
 def _pull_in(sb, it: dict, x: int, y: int, z: int) -> tuple[int, int] | None:
     """AG14: an item whose point fell off the roof the model gave it (a crown's tier or a
     setback stepped in under it): moved toward that roof's middle, 0.25 m at a time up to
@@ -1151,6 +1167,12 @@ def items(sb) -> None:
                     sb.stats["roof_items_pulled"] = sb.stats.get("roof_items_pulled", 0) + 1
                 else:
                     z = max(tops)
+                    # (M22's layouts: its whole footprint on that roof, pulled in where a
+                    # corner is off it, as a curved wall's chords run near its point)
+                    if not _fits(sb, it, x, y, z):
+                        at = _pull_in(sb, it, x, y, z)
+                        if at is not None:
+                            x, y = at
                     sb.stats["roof_items_dropped"] = sb.stats.get("roof_items_dropped", 0) + 1
         sa, sc, sz = (max(int(round(v * 1000)), 100) for v in it["size"])
         a = M.radians(float(it["yaw_deg"]))
