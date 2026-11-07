@@ -1102,6 +1102,10 @@ class ShellBuilder:
         if not placed:
             return True
         pts = np.concatenate([np.unique(a["pos"], axis=0) for a in placed.values()])
+        # (and its box's corners, as the envelope reads an instanced part: a folded glass
+        # bay's V meets the wall at its ends, its box stands out there)
+        pts = np.concatenate([pts, EN.part_points(
+            [{"family": family, "params": p, "at": [(x, y, z, fa.ux, fa.uy)]}])[0][0]])
         if family == "member":
             # (a flush member: low down near a lane, nothing of it past the masses' plan
             # by more than a quarter meter, the fit check's relief less a margin)
