@@ -1287,7 +1287,7 @@ class Assembly:
         self.stats.update({"overlaps_cut": n_pairs, "overlap_m2": round(area, 3),
                            "faces_cut": n_cut})
 
-    def fill_gaps(self) -> int:
+    def fill_gaps(self, first: bool = False) -> int:
         """A hole in a layer's pavement smaller than GAP_M2 (where faces built apart leave
         a sliver between them) joins the face around it it shares most boundary with."""
         n = 0
@@ -1321,12 +1321,15 @@ class Assembly:
                     F.rings = ps[0]
                     geoms[best[1]] = F.poly()
                     n += 1
-        # (every face's vertices onto the edges they lie on, filled or not: run only where a
-        # gap was filled somewhere, a face's ring would depend on the rest of the city, and a
-        # district regeneration would move a junction half a kilometer from it by a vertex)
-        near = list(range(len(self.faces)))
-        self.tfix(near, near, all_segs=True)
-        self.stats["gaps_filled"] = n
+        # (every face's vertices onto the edges they lie on: on the first pass always, filled
+        # or not, since run only where a gap was filled somewhere a face's ring would depend
+        # on the rest of the city, and a district regeneration would move a junction half a
+        # kilometer from it by a vertex; on a later pass only after a fill; the overlaps it
+        # leaves are cut after it, build_map)
+        if n or first:
+            near = list(range(len(self.faces)))
+            self.tfix(near, near, all_segs=True)
+        self.stats["gaps_filled"] = self.stats.get("gaps_filled", 0) + n
         return n
 
     def split_invalid(self) -> int:
@@ -2028,9 +2031,11 @@ def build_map(segments: list[dict], nodes: list[dict], units: list[Unit],
     junc = [i for i, f in enumerate(A.faces) if f.kind in JUNCTION_KINDS]
     n_fix = A.tfix(idx, junc, all_segs=True, src_ports=True)
     A.resolve()
-    for _ in range(3):
-        if A.fill_gaps():
-            A.resolve()     # (what the gaps' own shared-edge pass leaves overlapping)
+    for it in range(3):
+        if A.fill_gaps(first=it == 0) or it == 0:
+            # (what the gaps' own shared-edge pass leaves overlapping: a vertex put into an
+            # edge it lies within TOL_MM of moves the edge by as much)
+            A.resolve()
         if not A.split_invalid():
             break           # (a face split at a touch can leave a sliver to fill again)
     A.extract()
