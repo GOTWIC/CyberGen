@@ -1226,12 +1226,12 @@
         "no_fit": 0,
         "steep": 0,
         "pavement": {
-          "faces": 9971,
+          "faces": 9970,
           "faces_by_kind": {
             "bend": 25,
             "bulb": 24,
             "carriageway": 1875,
-            "corner": 1935,
+            "corner": 1934,
             "curb": 1682,
             "junction": 699,
             "median": 279,
@@ -1239,11 +1239,11 @@
             "walk": 174
           },
           "vertices": 182966,
-          "edges": 27891,
+          "edges": 27888,
           "edges_by_kind": {
             "band": 6095,
-            "curb": 1935,
-            "outer": 5539,
+            "curb": 1934,
+            "outer": 5537,
             "port": 13999,
             "seam": 323
           },
@@ -1253,9 +1253,9 @@
           "shared_points": 876,
           "samples": 4354,
           "bends": 25,
-          "overlaps_cut": 31,
-          "overlap_m2": 55.402,
-          "faces_cut": 30,
+          "overlaps_cut": 4,
+          "overlap_m2": 0.001,
+          "faces_cut": 4,
           "gaps_filled": 0,
           "faces_split": 0,
           "split_vertices": 5,

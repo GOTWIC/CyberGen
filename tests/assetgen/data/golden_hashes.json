@@ -1,6 +1,6 @@
 {
   "about": "sha256 goldens of assetgen (AG0): the small test city's briefs.json (tests/conftest.py SMALL built by the citygen CLI), brief hashes of a few Vesper Bay buildings, the five samples' briefs.json, the two small spike buildings' glTF files and a triangulation; (AG1, under ag1, with AG2's parts) the small city's asset manifest and the digest of its asset files (shells, proxies, part packs), and a few Vesper Bay buildings as GLB (shell and instanced parts). AG0 and AG1's made on the M4 Mac and confirmed on x86_64 Linux (docker image citygen-x86); AG2's on the Mac (the x86 check is deferred, docs/determinism_check.md).",
-  "testport_briefs": "b667da025343880a95d513731e0b89211c1bbfc9a2810345fa030c9e73c6f192",
+  "testport_briefs": "0a4540b8253c74062b13e3010b7f9e43904e8ab2e864ff97eee9f0b5119f06b1",
   "triangulate": "b45c256a71c471e59d9c38b5e3be4c994ee36bf5da2d3fa23b2d81596dac1464",
   "buildings": {
     "vesper_bay": {
@@ -13,10 +13,10 @@
     }
   },
   "samples": {
-    "archipelago_free_port": "fdce583f1604c7c63e404f8ab54d69137644b56a304773da5bc328af54956392",
+    "archipelago_free_port": "d40dedccac89bbfdae0aedefe3bdc108a956378d4aa578f90fac46eac1fcff30",
     "delta_megacity": "7dd8b827ca4e6efafcfd2fc6670f463458063568e57599de2297f2e608ed584a",
     "nexus_city": "a57b7a464779b269aa4e18917a08296306b174fe741b71fd44cf1045fb7f3a2b",
-    "peninsula_city": "21740e91d0a1d082fa9addf0ea282496ac97288e5d84b87aa7514d0157b7b180",
+    "peninsula_city": "22a18df805559a515d24587c0f6d7e05bc0a53d31e4084d06c721cffb47f2a54",
     "vesper_bay": "20e02091f1133534d3e9f276b3623a6afe7094405ec8fd3933722e0612df38bb"
   },
   "spike": {
@@ -30,8 +30,8 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "83a3022882802ac27fcc1343d550140e706209127f7272e5d7d7087b46b1d98c",
-    "testport_files": "5199dd21832d2083ba6388dbd624f81d805bffbc538246c2cee9917fef0eed1f",
+    "testport_manifest": "045f76b65122c3096ca401eaf490902a643d89386bd88392c5b8d59c7c7fd0c3",
+    "testport_files": "4deac4aa26d110a8e64b66ca16ddca47de429f8c63fc97ca82911f68f824b3c0",
     "buildings": {
       "vesper_bay": {
         "d01.lm.e852s10.bld": "58c93f2a51d710abae2a260a61448da87d39bbed7ec71bd912a46a09b7b2211f",
@@ -56,6 +56,6 @@
       "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
       "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
     },
-    "testport_materials": "224a48abfc568de7710bb381880715c62dd62334864460163597471026f35e64"
+    "testport_materials": "c02f955c004120c6216faceab36cba21921282811633d9b622905c1ba1153316"
   }
 }

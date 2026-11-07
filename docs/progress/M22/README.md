@@ -34,9 +34,9 @@ holds it, and noted by the checks (not failed).
 |---|---|---|---|---|---|
 | Delta Megacity | all 106 pass (1) | 11 + 4 | 6 | 13: 5 M7's 3 m limit beside a bridge span, 4 drawn steep, 3 bridge spans or a fixed road, 1 its roads' grade | 18,208 faces, 137 clusters, 74 bends |
 | Vesper Bay | all 106 pass (1) | 14 + 2 | 12 | 6: 4 bridge spans, 2 drawn steep | 19,645 faces, 124 clusters, 81 bends |
-| Saltreach Free Port | all 106 pass (1) | 13 | 6 | 7: 3 bridge spans, 3 M7's limit beside a bridge span, 1 its roads' grade | 10,391 faces, 112 clusters, 44 bends |
+| Saltreach Free Port | all 106 pass (1) | 13 | 6 | 7: 3 bridge spans, 3 M7's limit beside a bridge span, 1 its roads' grade | 10,389 faces, 112 clusters, 44 bends |
 | Nexus City | all 106 pass (1) | 12 + 1 | 8 | 7: 3 its roads' grade, 2 drawn steep, 1 bridge span, 1 M7's limit beside a bridge span | 20,838 faces, 172 clusters, 80 bends |
-| Greyhook | all 106 pass (2) | 4 | 4 | 0 | 9,971 faces, 57 clusters, 25 bends |
+| Greyhook | all 106 pass (2) | 4 | 4 | 0 | 9,970 faces, 57 clusters, 25 bends |
 | Vesper Bay Pinned | all 106 pass (2) | 16 + 3 | 16 | 5: 2 drawn steep, 2 bridge spans, 1 M7's limit beside a bridge span | 21,996 faces, 135 clusters, 80 bends |
 | Vesper Bay Stacks | 105 of 106 (9): `transit_curves` | 15 + 1 | 14 | 1: a bridge span | 22,305 faces, 155 clusters, 80 bends |
 | Vesper Bay Decks | all 111 pass (1) | 14 + 3 | 12 | 7: 4 bridge spans, 2 drawn steep, 1 fixed road | 20,400 faces, 127 clusters, 82 bends |
@@ -68,3 +68,8 @@ Sample builds: the five samples, the pinned, stack and deck demos and Cragmouth,
 `report.txt` and `preview_pavement.png` (the five samples also `report.json` and the
 gameplay and transit previews the tests compare); 8K whole-city renders
 (`render_iso_city.jpg`). Work in progress: `wip/`.
+
+The map's last fix (its shared-edge pass on the first gap pass, with the overlap cut after it)
+leaves Delta Megacity, Vesper Bay, Nexus City and Vesper Bay Decks as they were byte for byte
+and moves a few faces of Saltreach, Greyhook and Cragmouth (their reports here are from after
+it); the pinned and stack demos' reports and the 8K renders are from the builds before it.

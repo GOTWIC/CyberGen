@@ -1392,7 +1392,7 @@
           "overlaps_cut": 7,
           "overlap_m2": 0.001,
           "faces_cut": 7,
-          "gaps_filled": 0,
+          "gaps_filled": 1,
           "faces_split": 1,
           "split_vertices": 29,
           "duplicate_segments": 0
