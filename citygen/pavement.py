@@ -1321,9 +1321,11 @@ class Assembly:
                     F.rings = ps[0]
                     geoms[best[1]] = F.poly()
                     n += 1
-        if n:
-            near = list(range(len(self.faces)))
-            self.tfix(near, near, all_segs=True)
+        # (every face's vertices onto the edges they lie on, filled or not: run only where a
+        # gap was filled somewhere, a face's ring would depend on the rest of the city, and a
+        # district regeneration would move a junction half a kilometer from it by a vertex)
+        near = list(range(len(self.faces)))
+        self.tfix(near, near, all_segs=True)
         self.stats["gaps_filled"] = n
         return n
 
