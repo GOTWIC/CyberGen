@@ -103,6 +103,8 @@ def check_dead_ends(spec: CitySpec, m: CityModel):
     opens += [G.from_model_poly(p.polygon) for p in m.places if p.polygon is not None]
     otree = shapely.STRtree(opens) if opens else None
     bulbs = {j.node_id for j in m.junctions if j.shape == "cul_de_sac"}
+    # (M22: a cul-de-sac a cluster took in keeps its bulb in the cluster's region)
+    bulbs |= {n for j in m.junctions for n in j.attrs.get("bulbs") or []}
     for n in m.road_nodes:
         if deg.get(n.id) != 1:
             continue
@@ -149,6 +151,15 @@ def road_overlaps(m: CityModel) -> list[tuple]:
         return []
     lines, rows = _rows(m)
     jpolys = [G.from_model_poly(j.polygon).buffer(JUNCTION_PAD_M) for j in m.junctions]
+    if m.pavement_net is not None:
+        # (M22: every face a junction owns in the pavement map is inside it: a cluster's
+        # carriageway in parts, its corner pads)
+        from . import pavement_checks as PVC
+
+        N = PVC.Net(m)
+        jids = {j.id for j in m.junctions}
+        jpolys += [N.poly(f.id).buffer(JUNCTION_PAD_M) for f in N.faces
+                   if f.owner_id in jids and f.id not in N.bad and N.rings.get(f.id)]
     jtree = shapely.STRtree(jpolys) if jpolys else None
     tree = shapely.STRtree(rows)
     a_idx, b_idx = tree.query(rows, predicate="intersects")
@@ -316,7 +327,13 @@ def junction_surface(m: CityModel, j, at: dict, ground: dict):
     n = ground[j.node_id]
     ring = [tuple(p) for p in j.polygon.exterior]
     hz = list(j.edge_z) if j.edge_z else [n[0]] * len(ring)
-    return ring, hz, JN.model_legs(at.get(j.node_id, []), j.node_id, n[1])
+    # (M22: a cluster's legs leave it from all its nodes; the roads inside it are not legs)
+    inner = set(j.attrs.get("inner") or [])
+    legs = []
+    for nid in j.attrs.get("nodes") or [j.node_id]:
+        legs += [lg for lg in JN.model_legs(at.get(nid, []), nid, n[1])
+                 if lg["id"] not in inner]
+    return ring, hz, legs
 
 
 def check_junction_levels(spec: CitySpec, m: CityModel):
@@ -328,16 +345,26 @@ def check_junction_levels(spec: CitySpec, m: CityModel):
                                   f"level across the leg there within its class's cross slope "
                                   f"(2.5% on primary roads, 3% on the others), its curb between "
                                   f"two legs running evenly from one's height to the other's "
-                                  f"(footbridge stairs stand on it)")
+                                  f"(footbridge stairs stand on it; M22: a junction no height "
+                                  f"fits, kept as M18 left it, has its curb and cross slope "
+                                  f"noted)")
     at: dict = {}
     for s in m.road_segments:
         at.setdefault(s.start, []).append(s)
         if s.end != s.start:
             at.setdefault(s.end, []).append(s)
     ground = {n.id: (n.position[2], n.ground_m) for n in m.road_nodes}
+    held: dict = {}       # (M22: a junction no height fits, its surface noted, not failed)
     for j in m.junctions:
         if j.polygon is None or j.node_id not in ground:
             continue
+        hold = bool((j.attrs or {}).get("unbuildable"))
+
+        def bad(msg: str, j=j, hold=hold) -> None:
+            if hold:
+                held.setdefault(j.id, msg)
+            else:
+                _lim(c, msg)
         ring, hz, legs = junction_surface(m, j, at, ground)
         n = len(ring)
         if len(hz) != n:
@@ -361,8 +388,8 @@ def check_junction_levels(spec: CitySpec, m: CityModel):
                   JN.ON_CUT_M]
             cs = CROSS_SLOPE.get(lg["cls"], 0.03)
             if vs and max(vs) - min(vs) > cs * 2.0 * h + 0.01:
-                _lim(c, f"junction {j.id}: {(max(vs) - min(vs)) / (2.0 * h):.1%} across leg "
-                        f"{lg['id']} ({lg['cls']}), over {cs:.1%}")
+                bad(f"junction {j.id}: {(max(vs) - min(vs)) / (2.0 * h):.1%} across leg "
+                    f"{lg['id']} ({lg['cls']}), over {cs:.1%}")
         anchors = [v for v in range(n) if on[v]]
         for i, a in enumerate(anchors):
             b = anchors[(i + 1) % len(anchors)]
@@ -370,10 +397,15 @@ def check_junction_levels(spec: CitySpec, m: CityModel):
             v = (a + 1) % n
             while v != b:
                 if not lo <= hz[v] <= hi:
-                    _lim(c, f"junction {j.id}: its curb at ({ring[v][0]:.0f}, {ring[v][1]:.0f}) "
-                            f"at {hz[v]:.2f} m, outside its legs' {hz[a]:.2f} to {hz[b]:.2f} m")
+                    bad(f"junction {j.id}: its curb at ({ring[v][0]:.0f}, {ring[v][1]:.0f}) "
+                        f"at {hz[v]:.2f} m, outside its legs' {hz[a]:.2f} to {hz[b]:.2f} m")
                     break
                 v = (v + 1) % n
+    if held:
+        c.notes.append(f"{len(held)} junctions no surface fits, kept as M18 left them (M22: "
+                       f"`pavement_junctions` says what holds each), their curbs or cross "
+                       f"slopes past this check's: " + "; ".join(
+                           held[k] for k in sorted(held)[:6]))
     return c
 
 
@@ -433,12 +465,17 @@ def check_crossing_spacing(spec: CitySpec, m: CityModel):
         node_arch[nid] = archs[0] if archs else None
         dids = sorted(d for d in (did_of(x.seg) for x in lg) if d)
         node_ctl[nid] = ctl.get(dids[0], ("auto", "auto")) if dids else ("auto", "auto")
-    sig = {j.node_id for j in m.junctions if j.signalized}
+    # (M22: a cluster's signals at the nodes M18 gave them, `attrs.signals`)
+    sig = set()
+    for j in m.junctions:
+        if j.signalized:
+            sig.update(j.attrs.get("signals") if j.attrs.get("nodes") else [j.node_id])
     marked = {}
     for x in m.crosswalks:
         marked.setdefault(x.junction_id, []).append(x)
     by_j = {j.id: j for j in m.junctions}
-    av = {by_j[k].node_id for k, xs in marked.items() if k in by_j and not by_j[k].signalized}
+    av = {x.attrs.get("node") or by_j[k].node_id for k, xs in marked.items()
+          if k in by_j and not by_j[k].signalized for x in xs}
     for nid in sorted(sig):
         lg = legs.get(nid, [])
         sigs = node_ctl.get(nid, ("auto", "auto"))[0]

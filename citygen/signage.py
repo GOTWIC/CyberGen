@@ -490,7 +490,32 @@ def place(pl: Placer, b, lo_of: float, sky_clear, band, corp: bool) -> list[dict
             out.append(_row(b, "holo_ad", "front", x, y, zc, _yaw(*f.n), w, h, f.sid,
                             f.aud, content, {"edge": f.i, "off_m": HOLO_OFF_M}, two=True))
             break
-    return _apart(out)
+    return _apart(_unique(out))
+
+
+def _unique(rows: list[dict]) -> list[dict]:
+    """Ids made unique in order: two ads of a building in one 1 m cell at one height (two
+    banners at one corner of two facades) get `.2`, `.3`, ... after the first; a wrapped
+    pair's names follow (its two rows stand together)."""
+    seen: dict = {}
+    old = []
+    for r in rows:
+        i = r["id"]
+        old.append(i)
+        if i in seen:
+            seen[i] += 1
+            r["id"] = f"{i}.{seen[i]}"
+        else:
+            seen[i] = 1
+    wraps = [r["attrs"].get("wrap") for r in rows]
+    for k, r in enumerate(rows):
+        if not wraps[k]:
+            continue
+        for j in (k - 1, k + 1):
+            if 0 <= j < len(rows) and old[j] == wraps[k] and wraps[j] == old[k]:
+                r["attrs"]["wrap"] = rows[j]["id"]
+                break
+    return rows
 
 
 def _apart(rows: list[dict]) -> list[dict]:

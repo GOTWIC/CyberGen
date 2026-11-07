@@ -313,8 +313,10 @@ def test_junction_legs_meet_at_one_height(hilly):
                 s.road_class in TE.PRIMARY or s.type.endswith(".ramp") for s in at[j.node_id]):
             continue
         poly = G.from_model_poly(j.polygon)
+        # (M22: a cluster's inner roads join its nodes, each at its own height, inside it)
+        inner = set(j.attrs.get("inner") or [])
         for s in at[j.node_id]:
-            if not s.ground:
+            if not s.ground or s.id in inner:
                 continue
             line = LineString(s.centerline)
             at_start = line.project(Point(nd.position[:2])) < line.length / 2

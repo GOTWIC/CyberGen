@@ -631,6 +631,11 @@ def _colonnade(cx: Ctx, D: _Deck, rings, kinds) -> list:
                 if ok and ftree is not None and len(ftree.query(Point(x, y).buffer(0.8),
                                                                   predicate="intersects")):
                     ok = False
+                # (one column where two runs meet at a spot: a ring's edge and a hole's
+                # touching, M22's new deck outlines)
+                if ok and any(math.hypot(x - q[0], y - q[1]) < COLONNADE_STEP / 2.0
+                              for q in out):
+                    ok = False
                 if ok:
                     out.append([C.m2(x), C.m2(y), C.m(cx.ground.at(x, y))])
                 s += COLONNADE_STEP

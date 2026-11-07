@@ -3816,7 +3816,25 @@ class Builder:
         best = _nearest_on(self.gtree, self.glines, self.walks, self.gi, self.land_of,
                            Point(p), lm)
         f = _foot(self.glines, self.walks, self.gi, best, p)
-        if not self.masses.clear(p, f, 0):
+        host = self.masses.inside(p, 0)
+        if host is not None:
+            # (an elevator core standing in a building: out through it, round every other
+            # one, to the nearest walkway that way reaches; M22's layouts put a core on the
+            # wall two buildings share)
+            ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
+                                                   distance=reach(self.gtree, self.glines,
+                                                                  Point(p)))]
+            ks = [h for h in ks if lm < 0 or self.land_of[h] == lm]
+            for h in sorted(ks, key=lambda h: (G.dist(self.glines[h], Point(p)),
+                                               self.walks[self.gi[h]]["id"])):
+                f2 = _foot(self.glines, self.walks, self.gi, h, p)
+                r = self.masses.inside_round(p, f2, 0, host)
+                if r is not None:
+                    best, f = h, f2
+                    if len(r) > 2:
+                        self.rounds[(tuple(map(q, p[:2])), tuple(map(q, f2[:2])))] = r
+                    break
+        elif not self.masses.clear(p, f, 0):
             # (park paths fix: the nearest ground walkway it reaches with no building between)
             ks = [int(i) for i in self.gtree.query(Point(p), predicate="dwithin",
                                                    distance=reach(self.gtree, self.glines,

@@ -240,6 +240,15 @@ def _mask(job, items, polys, gr: _Ground, X, Y):
             "corridors": corridors, "decks": decks, "trunks": trunks}
 
 
+def _areal(g):
+    """A union's polygons only (a keep-out ring clipped to its tile can close on a line,
+    whose union with the rest an overlay refuses as mixed-dimension)."""
+    parts = [p for p in shapely.get_parts(g) if p.geom_type in ("Polygon", "MultiPolygon")]
+    if len(parts) == len(shapely.get_parts(g)):
+        return g
+    return shapely.union_all(parts, grid_size=FINE_M) if parts else None
+
+
 def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
     n, c = K.MASK_PX, K.CELL_M
     x0, y0, x1, y1 = job["box"]
@@ -311,8 +320,8 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
     ko = job.get("keep_out") or {}
     hard = [_poly(r) for r in ko.get("hard", [])] + [_poly(r) for r in job["water"]]
     row = [_poly(r) for r in ko.get("row", [])]
-    cutg = shapely.union_all(cut + hard, grid_size=FINE_M) if cut or hard else None
-    rowg = shapely.union_all(row, grid_size=FINE_M) if row else None
+    cutg = _areal(shapely.union_all(cut + hard, grid_size=FINE_M)) if cut or hard else None
+    rowg = _areal(shapely.union_all(row, grid_size=FINE_M)) if row else None
     ok = np.zeros(len(px), dtype=bool)
     verge = np.array([it["mode"] != "piece" for it in items])[it_k]
     for want in (False, True):
@@ -320,10 +329,10 @@ def _scatter(job, items, polys, mk, gr: _Ground, X, Y):
                   if K.GRASS[it["kind"]][0] > 0.0 and (it["mode"] != "piece") == want]
         allowed = shapely.union_all(grassy, grid_size=FINE_M) if grassy else Polygon()
         if cutg is not None and not allowed.is_empty:
-            allowed = shapely.difference(allowed, cutg, grid_size=FINE_M)
+            allowed = _areal(shapely.difference(allowed, cutg, grid_size=FINE_M)) or Polygon()
         if rowg is not None and not want and not allowed.is_empty:
             # (a verge lies in its road's right of way: only the pieces keep off it)
-            allowed = shapely.difference(allowed, rowg, grid_size=FINE_M)
+            allowed = _areal(shapely.difference(allowed, rowg, grid_size=FINE_M)) or Polygon()
         sel = np.nonzero(verge == want)[0]
         if allowed.is_empty or not len(sel):
             continue

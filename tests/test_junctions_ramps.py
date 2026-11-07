@@ -68,10 +68,14 @@ def test_junctions_meet_their_legs():
             ends = (hz[k], hz[(k + 1) % len(ring)])
             worst = max(worst, max(abs(z - lg["z"](s)) for z in ends))
     assert worst <= NC.LEG_TOL_M
+    # (M22: the blockout draws every junction from the pavement map's faces, a mesh through
+    # the map's vertices at their heights, so one that carries a surface is drawn through it)
     plan = BO.make_plan(m)
-    drapes = [p for o in plan["objects"] if o["category"] == "junction"
-              for p in o["parts"] if p["k"] == "drape"]
-    assert len(drapes) == len(carry)
+    drawn = {i for o in plan["objects"] if o["category"] == "junction"
+             for i in (o["props"].get("citygen_ids") or "").split(";")}
+    meshes = [p for o in plan["objects"] if o["category"] == "junction"
+              for p in o["parts"] if p["k"] == "mesh"]
+    assert {j.id for j in carry} <= drawn and len(meshes) >= len(carry)
 
 
 def test_levelled_profile():

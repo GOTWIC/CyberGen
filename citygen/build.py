@@ -219,6 +219,9 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
         for key in ("junctions", "crosswalks", "sidewalks", "lanes", "walkways", "blocks",
                     "lots", "places"):
             data[key] = getattr(local, key)
+        if local.pavement_net is not None:      # M22
+            data["pavement"] = local.pavement
+            data["pavement_net"] = local.pavement_net
         if local.decks:     # M14
             data["decks"] = local.decks
             data["structures"] = list(data.get("structures", [])) + local.structures
@@ -690,10 +693,37 @@ def add_local(b: Built, explicit: set[str], run: _Runner | None = None,
                        "walls": gr.walls, "bores": gr.bores, "viaducts": gr.viaducts}
         T.stage("terrain/graded", [loc.segments, gr.walls, gr.bores])
         ps.finish()
-    # M18: the surface of every junction not flat at its node's height (on the grade lines)
-    loc.info["junction_surfaces"] = JN.surfaces(loc.segments, loc.nodes, loc.junctions)
+    # M22: the pavement map on the graded roads; every junction's polygon is its carriageway
+    # face's outline and its surface (`edge_z`, M18) the map's heights
+    from . import pavement as PV
+
+    ground = None
+    if loc.terrain is not None:
+        from . import terrain as TE
+
+        import numpy as np
+
+        fin = loc.terrain["ground"]
+        ground = TE.Field(fin.x0, fin.y0, fin.cell, np.round(fin.arr, 2))
+    mp = PV.make(loc.segments, loc.nodes, loc.junctions,
+                 {did[d.name]: d.archetype for d in spec.districts}, ground)
+    loc.pavement, loc.pavement_net = mp.faces, mp.net
+    loc.info["pavement"] = mp.stats
+    loc.info["junction_surfaces"] = sum(1 for j in loc.junctions if j.get("edge_z"))
     b.local = loc
     b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads, loc)
+    # M22: a junction the map draws steeper than its grade, which the height fit's estimate
+    # did not foresee, is kept and noted as one no height fits is (`pavement_junctions`)
+    from . import pavement_checks as PVC
+
+    drawn = PVC.drawn_steep(spec, b.model)
+    if drawn:
+        for j in loc.junctions:
+            if j["id"] in drawn:
+                j["attrs"]["unbuildable"] = {"drawn": drawn[j["id"]]}
+        loc.info["drawn_steep"] = len(drawn)
+        b.model = assemble(spec, b.hydro, b.layout, b.waterways, explicit, b.sites, b.roads,
+                           loc)
     b.notes = b.notes + loc.notes
     if not check:
         return b
@@ -845,6 +875,11 @@ def add_buildings(b: Built, explicit: set[str], run: _Runner | None = None) -> B
     from . import tunnel_checks as TNC
 
     late = {c.id: c for c in TNC.run(spec, m) + TGC.run(spec, m)}
+    if m.pavement_net is not None:
+        # (M22: the map's checks again on the finished city, their notes by its stable ids)
+        from . import pavement_checks as PVC
+
+        late.update({c.id: c for c in PVC.run(spec, m)})
     checks = [SC.check_walkway_graph(m, None, lms) if c.id == "walkway_graph" else
               late.get(c.id, c) for c in early["checks"]] + BC.run(spec, m, None, bx) + \
         NC.run_finished(spec, m) + TC.run(spec, m) + \
@@ -904,6 +939,32 @@ def water_ground(m: CityModel) -> tuple[CityModel, dict]:
         rows["ground_cover"] = co.rows
         m = with_rows(m, {"ground_cover": co.rows})
     return m, rows
+
+
+def pavement_of(spec: CitySpec, m: CityModel) -> CityModel:
+    """M22: a finished city's pavement map made again from its rows (a spliced
+    regeneration), the junctions' polygons and surfaces from it."""
+    from . import pavement as PV
+    from . import terrain as TE
+
+    from . import pavement_checks as PVC
+    from .model import PavementNet
+
+    data = m.model_dump(mode="json")
+    for j in data["junctions"]:
+        if (j["attrs"].get("unbuildable") or {}).get("drawn"):
+            j["attrs"].pop("unbuildable")      # (drawn again below)
+    mp = PV.make(data["road_segments"], data["road_nodes"], data["junctions"],
+                 {d.id: d.archetype for d in m.districts}, TE.ground_of(m))
+    out = with_rows(m, {"junctions": data["junctions"], "pavement": mp.faces}) \
+        .model_copy(update={"pavement_net": PavementNet.model_validate(mp.net)})
+    drawn = PVC.drawn_steep(spec, out)
+    if drawn:
+        for j in data["junctions"]:
+            if j["id"] in drawn:
+                j["attrs"]["unbuildable"] = {"drawn": drawn[j["id"]]}
+        out = with_rows(out, {"junctions": data["junctions"]})
+    return out
 
 
 def check_all(spec: CitySpec, m: CityModel) -> tuple[list, dict]:
@@ -1003,4 +1064,9 @@ def write_outputs(b: Built, out_dir: str | Path, dpi: int = 110) -> list[Path]:
 
         paths.append(out / "preview_ground.png")
         render_ground(b, paths[-1])
+    if b.model.pavement_net is not None:
+        from .preview_pavement import render_pavement
+
+        paths.append(out / "preview_pavement.png")
+        render_pavement(b, paths[-1])
     return paths

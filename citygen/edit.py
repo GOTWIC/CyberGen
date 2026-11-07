@@ -236,6 +236,11 @@ def _regenerate_once(state: dict, old: CityModel, district: str, base, cur, d_ol
     new = B.replay(base, state["choices"], workers, spec=spec, frame=frame, held_lines=held,
                    prior=ID.priors(O))
     model, info = splice(old, new.model, dd.id, poly, frame, O)
+    if new.model.pavement_net is not None:
+        # M22: the pavement map of the spliced city (each junction's legs' cuts and region
+        # are in its rows, held roads are as they were, and the map breaks its ties by
+        # geometry, so outside the district and its seam it comes back as it was)
+        model = B.pavement_of(spec, model)
     if ov:
         model, notes = OV.apply(model, ov, old=old, district=dd.id)
         info["notes"] += notes
@@ -386,7 +391,8 @@ class _Owner:
 
 
 KEEP_BLOCK_M2 = 1.0   # a neighbor block a seam junction moves less than this stays
-M16 = ("banks", "ground_cover")
+# (M16's rows and M22's pavement map are made again on the spliced city)
+M16 = ("banks", "ground_cover", "pavement")
 
 # collections that follow the ground: those on the district's ground, or on a block one of
 # its seam junctions cuts, come from the new build
@@ -531,6 +537,7 @@ def splice(old: CityModel, new: CityModel, did: str, poly, frame,
     for k in ("spec_sha256", "terrain"):
         if k in N or k in out:
             out[k] = N.get(k)
+    out.pop("pavement_net", None)     # (M22: made again on the spliced city)
     _fields(out, O, N, did, zone)
     _factions(out, io["factions"], inn["factions"])
     _turfs(out)

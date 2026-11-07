@@ -93,10 +93,27 @@ def test_junctions_stay_at_their_node(city):
     m = city.model
     at = {n.id: n.position for n in m.road_nodes}
     assert any(s.attrs.get("role") == "ramp" for s in m.road_segments)
+    # (M22: a cluster's polygon from the box of its nodes; past 120 m only as far as its
+    # legs' cuts reach, where two roads part at a small angle and their rights of way overlap
+    # that far)
+    from citygen import pavement as PV
+
+    rcuts = PV.road_cuts(m.junctions)
+    ends: dict = {}
+    for s in m.road_segments:
+        cuts = rcuts.get(s.id) or [0.0, 0.0]
+        ends.setdefault(s.start, []).append((s, cuts[0]))
+        ends.setdefault(s.end, []).append((s, cuts[1]))
     for j in m.junctions:
-        x, y = at[j.node_id][:2]
+        nodes = j.attrs.get("nodes") or [j.node_id]
+        inner = set(j.attrs.get("inner") or [])
+        xs = [at[n][0] for n in nodes]
+        ys = [at[n][1] for n in nodes]
         x0, y0, x1, y1 = G.from_model_poly(j.polygon).bounds
-        assert max(x - x0, x1 - x, y - y0, y1 - y) < 120.0, j.id
+        reach = max((c + s.width_m / 2.0 for n in nodes for s, c in ends.get(n, [])
+                     if s.id not in inner), default=0.0)
+        assert max(min(xs) - x0, x1 - max(xs), min(ys) - y0, y1 - max(ys)) < \
+            max(120.0, reach + 2.0), j.id
 
 
 def test_report_has_elevated_stats(city):

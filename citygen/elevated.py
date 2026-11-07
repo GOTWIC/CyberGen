@@ -2969,7 +2969,9 @@ def support_context(m) -> dict:
     tstruct = [p for p, _ in tst]
     tracks = [(LineString([(p[0], p[1]) for p in t.path]), [p[2] for p in t.path], t.mode)
               for t in m.transit_lines if t.mode != "metro" and len(t.path) >= 2]
-    junc = [(G.from_model_poly(j.polygon), j.node_id) for j in m.junctions]
+    # (M22: a cluster's nodes, all of them its road's own junction)
+    junc = [(G.from_model_poly(j.polygon), j.node_id,
+             frozenset(j.attrs.get("nodes") or [j.node_id])) for j in m.junctions]
     nz = {n.id: n.position[2] for n in m.road_nodes}
     # (access fix: a park's path under a viaduct, which its columns keep off)
     paths = [(LineString([p[:2] for p in w.line]), w.width_m) for w in m.walkways
@@ -3094,8 +3096,9 @@ def column_free(cx: dict, s, p, size: float, top: float) -> bool:
                 return False      # (a park's path passing under the deck)
     if cx["jtree"] is not None:
         for i in sorted(int(x) for x in cx["jtree"].query(sq, predicate="intersects")):
-            poly, nid = cx["junc"][i]
-            if nid not in (s.start, s.end) and cx["nz"].get(nid, 0.0) < top - 1.0:
+            poly, nid, nodes = cx["junc"][i]
+            low = min(cx["nz"].get(n, 0.0) for n in nodes)
+            if s.start not in nodes and s.end not in nodes and low < top - 1.0:
                 return False
     for line, zs, mode in cx["tracks"]:
         if G.apart(line, pt, 12.0):

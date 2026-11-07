@@ -249,14 +249,19 @@ def opening(sb, fa, ms: dict, g: str, sysname: str, row: tuple, a_: int, b_: int
             _free(mounts, a_ - 50, b_ + 50, lo, hi):
         d = FOLD_D[0] if int(cont.get(f"{g}.fin_m", 0.3) * 1000) < 400 else FOLD_D[1]
         off = 0 if genes.get(f"{g}.rhythm") == "even" else PT.q(w // 4)
-        P.on(fa, "fold", {"w": qw, "h": qh, "d": d, "off": off}, mid, lo)
-        used.add("fold")
+        fp = {"w": qw, "h": qh, "d": d, "off": off}
+        # (AG14's rule for what leaves a wall near a lane under its headroom: M22's
+        # layouts put a lane 0.3 m off a front)
+        if sb._clear_of_lanes(fa, "fold", fp, mid, lo):
+            P.on(fa, "fold", fp, mid, lo)
+            used.add("fold")
     elif feat == "mesh" and lo - 150 >= sb._low(fa, mid) and \
             (f + (0 if _u(key, "mesh.par") < 0.5 else 1)) % 2 == 0 and \
             _free(mounts, a_ - 100, b_ + 100, lo - 150, hi + 150):
-        P.on(fa, "mesh", {"w": PT.q(w + 200), "h": PT.q(h + 300), "off": MESH_OFF}, mid,
-             lo - 150)
-        used.add("mesh")
+        mp = {"w": PT.q(w + 200), "h": PT.q(h + 300), "off": MESH_OFF}
+        if sb._clear_of_lanes(fa, "mesh", mp, mid, lo - 150):
+            P.on(fa, "mesh", mp, mid, lo - 150)
+            used.add("mesh")
     if genes.get("skin") == "frit" and g == "body" and full <= lo + 200:
         P.on(fa, "frit", {"w": qw, "h": PT.q(h * 4 // 10), "r": reveal}, mid, lo)
         sb.used["skin"] = True

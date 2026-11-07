@@ -9,7 +9,7 @@ your machine.
 
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
-| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M21 done, M22 planned |
+| 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
 | 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15 done, the rest to come |
 | 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | Planned ([draft plan](docs/atmosgen_scope.md)) |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
@@ -33,15 +33,15 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Vesper Bay | Nexus City |
 |---|---|
-| <img src="docs/progress/M20/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/nexus_city/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/vesper_bay/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/nexus_city/render_iso_city.jpg" width="420"> |
 
 | Delta Megacity | Saltreach Free Port |
 |---|---|
-| <img src="docs/progress/M20/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/archipelago_free_port/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/delta_megacity/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/archipelago_free_port/render_iso_city.jpg" width="420"> |
 
 | Greyhook | Vesper Bay with the hand-traced Corporate Core |
 |---|---|
-| <img src="docs/progress/M20/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/peninsula_city/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/vesper_bay_pinned/render_iso_city.jpg" width="420"> |
 
 | Vesper Bay Stacks (stack interchange demo) | The traced Corporate Core up close |
 |---|---|
@@ -49,7 +49,7 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 
 | Cragmouth (hills and cliffs) | Vesper Bay Decks (a deck city over Highcrest) |
 |---|---|
-| <img src="docs/progress/M20/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M20/vesper_bay_decks/render_iso_city.jpg" width="420"> |
+| <img src="docs/progress/M22/cragmouth/render_iso_city.jpg" width="420"> | <img src="docs/progress/M22/vesper_bay_decks/render_iso_city.jpg" width="420"> |
 
 ### Layers
 
@@ -64,6 +64,10 @@ Whole cities in the Blender blockout, seen from the south (8K; open one for full
 | Street level: lanes, sidewalks, crosswalks | Props and plants |
 |---|---|
 | <img src="docs/progress/M18/vesper_bay/preview_detail.png" width="420"> | <img src="docs/progress/M20/vesper_bay/preview_props.png" width="420"> |
+
+The pavement map: every road, junction, corner pad and sidewalk surface as faces that share their edges, with clusters, turning bulbs and bends up close.
+
+<img src="docs/progress/M22/vesper_bay/preview_pavement.png" width="840">
 
 Neon billboards and banners on the Corporate Core's facades, from the street (8K).
 
@@ -151,7 +155,7 @@ The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edg
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans (columns, portal frames, piers, sky tube masts), more room over the streets | ✅ Done |
 | M20 | Props, plants and signs | Nothing floating or growing through a road: every lamp, bench, railing, sign and tree on the ground, a road deck, a quay, a roof or its wall; many more large neon billboards, banners and holo-boards on the sides and tops of buildings, set per district (`signage`) | ✅ Done |
 | M21 | Cyberpunk massing | Towers twisted, tapered, leaning, stacked, cantilevered, split, cut through by sky gardens, in exoskeletons or covered in pods, with sloped, cut and halo crowns; curved slabs; true curves; no two neighboring towers alike; a `variety` per district | ✅ Done |
-| M22 | Pavement map | One exact map of every road, junction, sidewalk and median surface, with shared edges and one height per point, so roads and junctions meet with no gap or step | Planned |
+| M22 | Pavement map | One exact map of every road, junction, sidewalk and median surface, with shared edges and one height per point, so roads and junctions meet with no gap or step | Done |
 
 ### Run it
 

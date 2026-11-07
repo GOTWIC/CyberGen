@@ -780,7 +780,9 @@ def bus_stops(c: Ctx) -> list[Cand]:
 
 def bollards(c: Ctx) -> list[Cand]:
     out = []
-    junc = {j.node_id: G.from_model_poly(j.polygon) for j in c.m.junctions}
+    # (M22: every node of a cluster is its junction's)
+    junc = {n: G.from_model_poly(j.polygon) for j in c.m.junctions
+            for n in j.attrs.get("nodes") or [j.node_id]}
     for s in c.m.road_segments:
         if s.road_class != "pedestrian" or len(s.centerline) < 2:
             continue
@@ -1031,7 +1033,9 @@ def highway_barriers(c: Ctx) -> list[Cand]:
     return out
 
 
-ROAD_IN_M = 0.05        # a railing or a median barrier reaches at most this onto a road
+ROAD_IN_M = 0.03        # a railing or a median barrier reaches at most this onto a road
+                        # (M22: 2 cm under #95's 5 cm, which a placed prop's rounded
+                        # position and yaw can reach on a junction's 1 mm outline)
 ROAD_XWALK_M = 1.0      # ... and keeps this off a crosswalk
 ROAD_Z_M = 1.5          # a road or junction counts within this of the thing's height
 
@@ -1051,7 +1055,7 @@ def _road_keep(c: Ctx):
     vehicle = {n for s in c.m.road_segments if s.road_class not in walk
                for n in (s.start, s.end)}
     for j in c.m.junctions:
-        if j.node_id not in vehicle:
+        if not any(n in vehicle for n in j.attrs.get("nodes") or [j.node_id]):
             continue
         shapes.append(G.from_model_poly(j.polygon).buffer(-ROAD_IN_M, join_style="mitre"))
         rows.append(("junction", j.id, node_z.get(j.node_id, 0.0)))

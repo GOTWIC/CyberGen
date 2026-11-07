@@ -87,4 +87,5 @@ def test_all_scope_entities_present():
                  "travel_points", "sign_slots"}
     expected |= {"decks"}   # M14: layered districts
     expected |= {"banks", "ground_cover"}   # M16: water and ground detail
+    expected |= {"pavement"}                # M22: the pavement map's faces
     assert set(COLLECTIONS) == expected

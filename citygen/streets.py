@@ -514,6 +514,18 @@ class Frame:
         shapely.prepare(self.zone)
         shapely.prepare(self.core)
         pos = {n.id: (G.q(n.position[0]), G.q(n.position[1])) for n in model.road_nodes}
+        # M22: the old city's junctions at their nodes' places and heights (a junction whose
+        # roads are all held takes back its cuts, cluster and tag: `junctions.held_units`)
+        zat = {n.id: n.position[2] for n in model.road_nodes}
+        self.old_junctions: dict[tuple, dict] = {}
+        for j in model.junctions:
+            ns = j.attrs.get("nodes") or [j.node_id]
+            rec = {"id": j.id, "nodes": [(pos[n], zat[n]) for n in ns if n in pos],
+                   "inner": set(j.attrs.get("inner") or []),
+                   "cuts": {(c[0], c[1]): c[2] for c in j.attrs.get("cuts") or []},
+                   "unbuildable": j.attrs.get("unbuildable")}
+            for p, _ in rec["nodes"]:
+                self.old_junctions.setdefault(p, []).append(rec)
         self.rows: dict[tuple, object] = {}       # held segments by centerline
         self.m1b: dict[str, list[tuple]] = {}     # M1b id -> centerlines of its held pieces
         self.pinned_local = []                    # pinned streets of the district itself
@@ -998,7 +1010,10 @@ class Builder:
             for bid in s["bridge_ids"]:
                 b = bridges[bid]
                 forbid.append((b["s0"], b["s1"]))
-            forbid += _raised_spans(s["z_profile"], LOCAL_JUNCTION_Z_M)
+            # (M22: and not within APPROACH_PAD_M of it either, where its junction would
+            # reach up the ramp and no one surface could carry it)
+            forbid += [(a - APPROACH_PAD_M, b + APPROACH_PAD_M)
+                       for a, b in _raised_spans(s["z_profile"], LOCAL_JUNCTION_Z_M)]
             # M9: nor where it runs below the ground (a tunnel and its approaches)
             forbid += [(a - 20.0, b + 20.0) for a, b in _sunk_spans(s["z_profile"])]
             # (M9: a tunnel road's right of way covers its box and 2 m past its walls: no
@@ -3977,6 +3992,7 @@ def _held(B: Builder, pts) -> bool:
 
 PIN_CLEAR_M = 15.0              # street centerline to a traced building (a 20 m street keeps 5 m)
 LOCAL_JUNCTION_Z_M = 3.0      # M7: highest primary road a local street ramps up to
+APPROACH_PAD_M = 60.0         # M22: no local junction this near a stretch higher than that
 LOCAL_GRADE = 0.05            # M7: local streets ramping to a raised junction
 
 

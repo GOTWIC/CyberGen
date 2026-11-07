@@ -43,6 +43,7 @@ from shapely.geometry import LineString, Point, Polygon
 from . import decks as DK
 from . import dmath as M
 from . import geom as G
+from . import pavement as PV
 from . import streets as ST
 from . import trace as T
 
@@ -51,6 +52,8 @@ CORNER_R = {"highway": 15.0, "avenue": 12.0, "service": 6.0, "alley": 3.0, "pede
 ROW_CORNER_MIN_M = 1.0
 CORNER_RUN_MAX_M = 60.0      # longest corner (fillet or sharp) along a leg
 CUT_SHARE = 0.9              # M17: the cut-backs at a road's two ends take at most this of it
+NODE_REACH_M = 0.5           # M22: an overlap of two legs this near their node is the node's
+XWALK_PAD_M = 0.25           # M22: a crosswalk keeps this far off a port (wholly on one face)
 CROSSWALK_SETBACK_M = 1.5
 # M18: crossings by need. Crosswalk widths by the class of the road crossed (4 m on every
 # crosswalk before; none on alleys and service roads), 5 m on a downtown avenue
@@ -119,6 +122,7 @@ class Leg:
         self.cut = 0.0
         self.cut_row = 0.0
         self.capped = False     # M17: its cut is short of where it parts from a neighbor
+        self.need = 0.0         # M22: the cut its overlaps with other legs need
 
 
 def _corner(P, a: Leg, b: Leg, ha: float, hb: float, r: float):
@@ -184,18 +188,21 @@ def legs_at(net, arch_of) -> dict[str, list[Leg]]:
     return out
 
 
-def cutbacks(legs: list[Leg], cap: bool = True) -> None:
+def cutbacks(legs: list[Leg], cap: bool = True, one: bool = False) -> None:
     """Each leg's cut-back at a node; `cap` limits it to 0.45 of the leg (else `share_cuts`
-    shares each road between its two junctions)."""
+    shares each road between its two junctions); `one` (M22): one cut per leg, past every
+    overlap that reaches the node however far (`overlap_cuts(..., cap=False)`)."""
     n = len(legs)
     if n == 2:
         # M17: a bend between two roads (an avenue that ends in a street, a street that goes
         # on as a promenade) cuts back where their rights of way overlap
-        overlap_cuts(legs)
+        overlap_cuts(legs, not one)
         if any(lg.cut > 0.0 for lg in legs):
             for lg in legs:
                 lg.cut = min(lg.cut + 1.0, 0.45 * lg.L) if cap else lg.cut + 1.0
                 lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L) if cap else lg.cut_row + 0.5
+                if one:
+                    lg.cut = lg.cut_row = max(lg.cut, lg.cut_row)     # (M22: one cut)
         return
     if n < 3:
         return
@@ -216,10 +223,291 @@ def cutbacks(legs: list[Leg], cap: bool = True) -> None:
         if c2 is not None:
             a.cut_row = max(a.cut_row, c2[0])
             b.cut_row = max(b.cut_row, c2[1])
-    overlap_cuts(legs)
+    overlap_cuts(legs, not one)
     for lg in legs:
         lg.cut = min(lg.cut + 1.0, 0.45 * lg.L) if cap else lg.cut + 1.0
         lg.cut_row = min(lg.cut_row + 0.5, 0.45 * lg.L) if cap else lg.cut_row + 0.5
+        if one:
+            # M22: one cut per leg, where every band, sidewalk, crosswalk and lane ends
+            lg.cut = lg.cut_row = max(lg.cut, lg.cut_row)
+
+
+def lock_cuts(net, legs: dict) -> int:
+    """M22: a leg's cut stops LOCK_GAP_M short of the nearest locked stretch on it (a
+    bridge span, a road crossing over or under: `_locks`) where only its corner fillets ask
+    for more (its overlaps with other legs still have it), so a junction does not reach onto
+    a bridge and its port can be levelled. Returns how many cuts it shortened."""
+    locks = _locks(net)
+    n = 0
+    for nid in sorted(legs):
+        for x in legs[nid]:
+            lk = locks.get(x.seg["id"])
+            if not lk or x.cls == "footbridge":
+                continue
+            L = x.L
+            near = min((s0 if x.at_start else L - s1) for s0, s1 in lk)
+            if near <= 0.0:
+                continue
+            c = max(x.need + 1.0, near - LOCK_GAP_M)
+            if c < x.cut - 0.0005:
+                x.cut = x.cut_row = c
+                n += 1
+    return n
+
+
+LOCK_GAP_M = 1.0        # M22: a junction's port this far short of a locked stretch
+FOLD_REACH = 3.0        # M22: a fold this many half widths past a cut is the junction's
+
+
+def fold_cuts(net, legs: dict) -> int:
+    """M22: `_fold_cuts` until no cut moves (a cut moved past one fold or corner can land
+    in the next), at most FOLD_ROUNDS times."""
+    n = 0
+    for _ in range(FOLD_ROUNDS):
+        k = _fold_cuts(net, legs)
+        n += k
+        if not k:
+            break
+    return n
+
+
+FOLD_ROUNDS = 6         # M22: rounds of `_fold_cuts`
+
+
+def _fold_cuts(net, legs: dict) -> int:
+    """M22: a leg whose right of way folds (a turn tighter than its half width:
+    `pavement.Road.folds`) within FOLD_REACH half widths past its cut is cut past the fold,
+    so the junction takes the bend and no bend face meets a port. Returns how many."""
+    n = 0
+    for nid in sorted(legs):
+        lg = legs[nid]
+        if len(lg) < 2 or not any(x.cut > 0.0 for x in lg):
+            continue
+        for x in lg:
+            if x.cls == "footbridge":
+                continue
+            rd = PV.Road(x.seg)
+            L = rd.path.L
+            reach = x.cut + FOLD_REACH * rd.row
+            if x.at_start:
+                fs = rd.folds(min(x.cut, L), min(reach, L))
+                far = max((b for a, b in fs), default=None)
+            else:
+                fs = rd.folds(max(L - reach, 0.0), max(L - x.cut, 0.0))
+                far = max((L - a for a, b in fs), default=None)
+            if far is not None and far + 0.5 > x.cut:
+                x.cut = x.cut_row = far + 0.5
+                n += 1
+            # (a turn inside the cut whose inner corner reaches back past it: the cut past
+            # that corner, half the width times tan(half the turn), sin / (1 + cos))
+            acc = 0.0
+            for i in range(1, len(x.pts) - 1):
+                a, v, b = x.pts[i - 1], x.pts[i], x.pts[i + 1]
+                acc += ST._dist(a, v)
+                if acc >= x.cut or acc >= x.L - 1.0:
+                    break
+                la, lb = ST._dist(a, v), ST._dist(v, b)
+                if la <= 0.0 or lb <= 0.0:
+                    continue
+                ux, uy = (v[0] - a[0]) / la, (v[1] - a[1]) / la
+                wx, wy = (b[0] - v[0]) / lb, (b[1] - v[1]) / lb
+                cr, dt = abs(ux * wy - uy * wx), ux * wx + uy * wy
+                if cr < MITRE_TAN_MIN * (1.0 + dt):
+                    continue        # (a gentle turn, a curve's vertices: no corner)
+                t = MITRE_TAN_MAX if 1.0 + dt <= cr / MITRE_TAN_MAX else cr / (1.0 + dt)
+                back = acc + x.row * t
+                if back > x.cut:
+                    x.cut = x.cut_row = min(G.q(back + 0.5), max(x.L - 1.0, x.cut))
+                    n += 1
+    return n
+
+
+MITRE_TAN_MAX = 6.0     # M22: tan(half a turn) counted at most (a turn near a reversal)
+MITRE_TAN_MIN = 0.2679  # M22: tan(half a turn) of a corner (a turn of 30 degrees or more)
+
+
+def plan_units(net, legs: dict, heads: dict, gr=None, force: dict | None = None
+               ) -> list[dict]:
+    """M22: the junctions of a network as regions. A cul-de-sac's leg is cut where its
+    carriageway and sidewalks meet the bulb; a road whose two cuts leave less than
+    `pavement.MIN_ROAD_M` has no face of its own: its two junctions (or a junction and the
+    plain node it reaches) are one, a cluster, the road inside it. Cuts are put on the 1 mm
+    grid, so the model's copy is the cut itself. Returns [{nodes, inner, head}] by first
+    node (`force`: road id -> whether it is inside a cluster, decided before: M10's held
+    junctions, `held_units`)."""
+    from .pavement import MIN_ROAD_M
+
+    for nid in sorted(legs):
+        lg = legs[nid]
+        r = heads.get(nid, 0.0)
+        if len(lg) == 1 and r:
+            x = lg[0]
+            x.cut = x.cut_row = math.sqrt(max((r + x.sw) ** 2 - x.row ** 2, r * r - x.h * x.h,
+                                              0.0)) + 0.5
+        for x in lg:
+            x.cut = x.cut_row = math.floor(x.cut * 1000.0 + 0.5) / 1000.0
+    jn = {nid for nid, lg in legs.items()
+          if len(lg) >= 3 or (len(lg) == 2 and any(x.cut > 0.0 for x in lg)) or
+          (len(lg) == 1 and heads.get(nid, 0.0) > 0.0)}
+    g = gr.ramp_max if gr is not None else None
+    for _ in range(CLUSTER_ROUNDS):
+        groups, inner = _clusters(net, legs, jn, MIN_ROAD_M, g, force)
+        # (the legs of a cluster that leave it from different nodes: their cuts past where
+        # their rights of way overlap near it, as at one node; that may join more)
+        if not _cluster_overlaps(legs, groups, inner):
+            break
+    groups, inner = _clusters(net, legs, jn, MIN_ROAD_M, g, force)
+    out = []
+    for ns in groups:
+        if not any(n in jn for n in ns):
+            continue
+        inn = sorted(sid for sid in inner
+                     if any(x.seg["id"] == sid for n in ns for x in legs.get(n, [])))
+        out.append({"nodes": ns, "inner": inn,
+                    "head": heads.get(ns[0], 0.0) if len(ns) == 1 and len(legs[ns[0]]) == 1
+                    else 0.0,
+                    # (a cul-de-sac's node a cluster takes in keeps its bulb)
+                    "heads": {n: heads[n] for n in ns if len(ns) > 1 and
+                              len(legs.get(n, [])) == 1 and heads.get(n, 0.0) > 0.0}})
+    out.sort(key=lambda u: u["nodes"][0])
+    return out
+
+
+def held_units(net, legs: dict, fr) -> tuple[dict, dict, set]:
+    """M10 with M22: in a district regeneration, the nodes whose roads are all held roads
+    of the old city ({node id: the old junction's record}, `streets.Frame.old_junctions`:
+    every node of that junction held so), each held road's old row ({road id: row}), and the
+    held nodes that were no junction. Such a junction takes back its old cuts, cluster and
+    tag (its legs' heights are the old city's levelled ones, which the cut, cluster and fit
+    rules would read differently from the first build's), so it comes back as it was."""
+    recs = getattr(fr, "old_junctions", None)
+    if recs is None:
+        return {}, {}, set()
+    old_of = {}
+    for s in net.segments:
+        r = fr.match(s["centerline"], s)
+        if r is not None:
+            old_of[s["id"]] = r
+    pos = {n["id"]: (G.q(n["position"][0]), G.q(n["position"][1]), n["position"][2])
+           for n in net.nodes}
+    held = {nid for nid, lg in legs.items()
+            if lg and all(x.seg["id"] in old_of for x in lg)}
+
+    def rec_of(nid):
+        # (by place; where junctions of two levels share it, the one nearest in height: a
+        # node's height here is not yet M18's)
+        x, y, z = pos[nid]
+        best = None
+        for rec in recs.get((x, y), []):
+            for p, zz in rec["nodes"]:
+                if p == (x, y) and (best is None or abs(zz - z) < best[0]):
+                    best = (abs(zz - z), rec)
+        return best[1] if best is not None else None
+    by_rec: dict = {}
+    plain = set()
+    for nid in sorted(held):
+        rec = rec_of(nid)
+        if rec is None:
+            plain.add(nid)
+        else:
+            by_rec.setdefault(rec["id"], (rec, []))[1].append(nid)
+    out = {}
+    for rec, nids in by_rec.values():
+        if len(nids) == len(rec["nodes"]):       # (every node of it held)
+            for nid in nids:
+                out[nid] = rec
+    return out, old_of, plain
+
+
+def _old_cut(x, rec: dict, r) -> float:
+    """A held leg's cut at its old junction (0 where it had none)."""
+    p0 = x.seg["centerline"][0]
+    same = abs(p0[0] - r.centerline[0][0]) < 0.02 and abs(p0[1] - r.centerline[0][1]) < 0.02
+    end = ("a" if x.at_start else "b") if same else ("b" if x.at_start else "a")
+    return rec["cuts"].get((r.id, end), 0.0)
+
+
+CLUSTER_ROUNDS = 4
+CLUSTER_DZ_M = 3.0      # M22: junctions this far apart in height are not joined for it
+
+
+def _clusters(net, legs: dict, jn: set, min_road: float, g=None,
+              force: dict | None = None) -> tuple[list, set]:
+    """Groups of nodes joined by roads whose two cuts leave less than `min_road`, or (`g`)
+    less than the road needs to climb from one junction's height to the other's at that
+    grade (one with no bridge or tunnel on it, not a deck's): sorted lists, by first node;
+    and those roads."""
+    parent: dict = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    cut = {(x.seg["id"], x.at_start): x.cut for lg in legs.values() for x in lg}
+    inner = set()
+    for s in net.segments:
+        if s["road_class"] == "footbridge" or not (s["start"] in jn or s["end"] in jn):
+            continue
+        if force is not None and s["id"] in force:
+            if force[s["id"]]:
+                parent[find(s["start"])] = find(s["end"])
+                inner.add(s["id"])
+            continue
+        a = cut.get((s["id"], True), 0.0) if s["start"] in jn else 0.0
+        b = cut.get((s["id"], False), 0.0) if s["end"] in jn else 0.0
+        L = ST._plen([tuple(p) for p in s["centerline"]])
+        need = min_road
+        if g and s["start"] in jn and s["end"] in jn and not (
+                s.get("bridge") or s.get("bridge_ids") or _fixed22(s, None)):
+            zp = s["z_profile"]
+            dz = abs(_z_at(zp, L) - _z_at(zp, 0.0))
+            if dz <= CLUSTER_DZ_M:     # (never one surface across two levels)
+                need = max(need, dz / g)
+        if a + b > L - need:
+            parent[find(s["start"])] = find(s["end"])
+            inner.add(s["id"])
+    groups: dict = {}
+    for nid in sorted(jn | set(parent)):
+        groups.setdefault(find(nid), []).append(nid)
+    return sorted((sorted(g) for g in groups.values()), key=lambda g: g[0]), inner
+
+
+def _cluster_overlaps(legs: dict, groups: list, inner: set) -> bool:
+    """M22: in a cluster, each leg's cut past every stretch where its right of way overlaps
+    that of a leg leaving from another of its nodes, near the cluster (within NODE_REACH_M
+    of its nodes and inner roads). Whether a cut grew."""
+    grew = False
+    for ns in groups:
+        if len(ns) < 2:
+            continue
+        ext = [x for n in ns for x in legs.get(n, [])
+               if x.seg["id"] not in inner and x.cls != "footbridge"]
+        core = G.union([Point(x.p).buffer(0.5) for x in ext] +
+                       [strip(x, x.L, x.row) for n in ns for x in legs.get(n, [])
+                        if x.seg["id"] in inner])
+        rows = [strip(x, x.L, x.row) for x in ext]
+        for i in range(len(ext)):
+            for j in range(i + 1, len(ext)):
+                if ext[i].p == ext[j].p:
+                    continue        # (one node: `overlap_cuts` has them)
+                ov = G.inter(rows[i], rows[j])
+                if ov.is_empty or G.area1(ov) < 0.5:
+                    continue
+                near = [q for q in G.parts(ov) if G.area1(q) >= 0.5 and
+                        q.distance(core) <= NODE_REACH_M]
+                if not near:
+                    continue
+                pts = shapely.points(shapely.get_coordinates(G.union(near)))
+                for x in (ext[i], ext[j]):
+                    far = float(shapely.line_locate_point(LineString(x.pts), pts).max())
+                    c = math.floor((far + 1.5) * 1000.0 + 0.5) / 1000.0
+                    x.need = max(x.need, far + 0.5)
+                    if c > x.cut + 0.0005:
+                        x.cut = x.cut_row = c
+                        grew = True
+    return grew
 
 
 def share_cuts(legs: dict) -> None:
@@ -259,26 +547,72 @@ def strip(lg: Leg, s: float, h: float):
                                           mitre_limit=2.0))
 
 
-def overlap_cuts(legs: list[Leg]) -> None:
+def overlap_cuts(legs: list[Leg], cap: bool = True) -> None:
     """M17: each leg's cut reaches past every stretch where its right of way overlaps
     another leg's (an acute corner, a leg that bends inside the junction, a gore where a
     ramp leaves), as far as 0.45 of the leg, so two roads overlap only inside the junction
-    polygon (`junction_polygon` adds a bent leg's carriageway out to its cut)."""
-    reach = [CUT_SHARE * lg.L for lg in legs]
+    polygon (`junction_polygon` adds a bent leg's carriageway out to its cut). M22 (`cap`
+    False): as far along the whole leg as the overlap that reaches the node goes (one that
+    does not reach it is another junction's), along each leg to the end of the overlap's
+    run from the node (an overlap the leg comes back to after a gap, a loop ramp's foot
+    under the deck it climbs to, is a crossing, not this junction's); where a road's two
+    cuts meet, its junctions are one (`plan_units`)."""
+    reach = [CUT_SHARE * lg.L if cap else lg.L for lg in legs]
     rows = [strip(lg, r, lg.row) for lg, r in zip(legs, reach)]
     lines = [LineString(lg.pts) for lg in legs]
+    P = Point(legs[0].p) if legs else None
     for i in range(len(legs)):
         for j in range(i + 1, len(legs)):
             ov = G.inter(rows[i], rows[j])
             if ov.is_empty or G.area1(ov) < 0.5:
                 continue
-            pts = shapely.points(shapely.get_coordinates(ov))
+            if not cap:
+                # (the overlap that reaches the node, or runs on near it: two roads that part
+                # from it at a small angle and run together a while)
+                reach_n = max(NODE_REACH_M, legs[i].row + legs[j].row,
+                              0.5 * min(legs[i].L, legs[j].L))
+                near = [p for p in G.parts(ov) if p.distance(P) <= reach_n and
+                        G.area1(p) >= 0.5]
+                if not near:
+                    continue
+                ov = G.union(near)
+                # (its outline every OVERLAP_STEP_M, so a run along a leg shows its gaps)
+                pts = shapely.points(shapely.get_coordinates(
+                    shapely.segmentize(ov, OVERLAP_STEP_M)))
+            else:
+                pts = shapely.points(shapely.get_coordinates(ov))
             for k in (i, j):
-                far = float(shapely.line_locate_point(lines[k], pts).max())
+                if cap:
+                    far = float(shapely.line_locate_point(lines[k], pts).max())
+                else:
+                    far = _run_end(shapely.line_locate_point(lines[k], pts).tolist(),
+                                   legs[i].row + legs[j].row)
+                    if far is None:
+                        continue
                 legs[k].cut = max(legs[k].cut, G.q(far + 0.5))
                 legs[k].cut_row = max(legs[k].cut_row, legs[k].cut)
+                legs[k].need = max(legs[k].need, G.q(far + 0.5))
                 if far >= reach[k] - 1.0:
                     legs[k].capped = True    # (they overlap on past its reach)
+
+
+OVERLAP_STEP_M = 2.0     # M22: an overlap's outline sampled this often along a leg
+OVERLAP_GAP_M = 6.0      # M22: a gap in an overlap's run along a leg longer than this ends it
+
+
+def _run_end(ss: list, start: float) -> float | None:
+    """The end of the run of stations `ss` (an overlap's outline along a leg) that starts
+    within `start` of the node and has no gap over OVERLAP_GAP_M; None where it starts
+    farther out (a crossing along the leg, not an overlap at the node)."""
+    ss = sorted(ss)
+    if not ss or ss[0] > start:
+        return None
+    end = ss[0]
+    for s in ss[1:]:
+        if s - end > OVERLAP_GAP_M:
+            break
+        end = s
+    return end
 
 
 def run_along(lg: Leg, c: float) -> float:
@@ -728,9 +1062,10 @@ def _fixed(s: dict, held) -> bool:
 def catch_grade(s: dict, gr) -> float:
     """M18: the grade a levelled leg rejoins its profile at (`highways.grades`): a ramp's
     maximum on ramps and local streets (M7's raised joins), a run's on primary roads."""
+    # (M22: G_SAFE of it, so a cone sampled on the 1 cm grid stays within the grade)
     if s["attrs"].get("role") == "ramp" or s["road_class"] not in ("highway", "avenue"):
-        return gr.ramp_max
-    return gr.run_max
+        return gr.ramp_max * G_SAFE
+    return gr.run_max * G_SAFE
 
 
 def _crossings(segments) -> dict[str, list[tuple[float, tuple]]]:
@@ -949,7 +1284,576 @@ def level_legs(net, legs: dict, gr, held=None, exits: dict | None = None) -> dic
             n_lev += 1
         else:
             n_kept += 1
-    return {"held": held_runs, "levelled": n_lev, "kept": n_kept, "raised": raised}
+    return {"held": held_runs, "levelled": n_lev, "kept": n_kept, "raised": raised,
+            "runs": runs, "fits": fits}
+
+
+BUILD_TOL = 0.005       # M22: slope rounding (heights on the 1 cm grid)
+
+
+def junction_grade(legs, gr) -> float:
+    """M22: the grade a junction's surface may have: the steepest its roads' classes may
+    climb (M13's class grades: highway 6%, avenue 8%, street 12%, alley 15%), never less
+    than M18's ramp maximum."""
+    from .terrain import MAX_GRADE
+
+    g = gr.ramp_max
+    for x in legs:
+        g = max(g, MAX_GRADE.get(x.cls if hasattr(x, "cls") else x, gr.ramp_max))
+    return g
+
+
+def _fixed22(s: dict, held) -> bool:
+    """M22: the roads whose profile no levelling moves: tunnels (M9), a deck's streets and
+    ramps (M14), footbridge stairs, held roads (M10). Viaducts and ramps may be held level
+    over a junction their ports leave (where M18's locks allow)."""
+    a = s["attrs"]
+    return bool(s.get("tunnel") or "deck" in a or a.get("role") == "deck_ramp" or
+                s["road_class"] == "footbridge" or (held is not None and held(s)))
+
+
+def port_slopes(ports: list) -> float:
+    """The steepest slope between two of a junction's ports [(z, end a, end b)] (ends in
+    meters): their heights over the least distance between their lines."""
+    worst = 0.0
+    for i in range(len(ports)):
+        for j in range(i + 1, len(ports)):
+            za, a0, a1 = ports[i]
+            zb, b0, b1 = ports[j]
+            d = min(_pseg(a0, b0, b1), _pseg(a1, b0, b1), _pseg(b0, a0, a1), _pseg(b1, a0, a1))
+            worst = max(worst, abs(za - zb) / max(d, 0.5))
+    return worst
+
+
+def _pseg(p, a, b) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    x, y = a[0] + t * dx - p[0], a[1] + t * dy - p[1]
+    return math.sqrt(x * x + y * y)
+
+
+def buildable(net, units: list, legs: dict, gr, held, plan, lev: dict) -> dict:
+    """M22: invariant 5 of the pavement map, the slope between any two ports of a junction
+    within the grade one surface can carry (M18's ramp maximum), levelled further where
+    M18's levelling leaves it broken.
+
+    The heights of every junction (its nodes are one), of each of its ports and of every
+    plain node are fitted on one graph, M13's grade-line fit on the network: a port lies
+    within PORT_SHARE of the grade times half its least distance to another port of its
+    junction (and the leg's run to it) from the junction's height, so two ports are always
+    within the grade of each other; two ports joined by a road within the road's catch grade
+    times its length between them. The fit is the one closest in the largest deviation to
+    the heights as they are: per variable U = min over all (target + distance), Lo = max
+    (target - distance), their mean, clamped between the anchors' bounds: a fixed road's
+    ports (`_fixed22`) and a road whose locked stretch (a bridge span, a road crossing
+    over or under: `_locks`) reaches into a junction as they are, a locked stretch's ends,
+    a map exit; a node under another road not raised, a junction of a local road at most
+    LOCAL_JUNCTION_Z_M up (M7), none under the ground. A junction no height fits (or whose
+    roads that fit cannot reach within their grade) is kept as it was, its own ties cut so
+    it holds nothing else back, and the fit made again, until none is left. Each road
+    changed is then run from its node's height to its ports' and clamped between the cones
+    from its ports and locks (`_conform`). Returns counts: junctions over the grade before
+    and after (first nodes; they fail `pavement_junctions`), junctions kept."""
+    import heapq
+
+    out = {"unbuildable": 0, "levelled_further": 0, "unresolved": []}
+    if gr is None:
+        return out
+    lim = gr.ramp_max
+    _GR[0] = gr
+    ulim = {u["nodes"][0]: junction_grade([x for nd in u["nodes"] for x in legs[nd]
+                                           if x.seg["id"] not in set(u["inner"]) and
+                                           x.cls != "footbridge"], gr)
+            for u in units}
+    before = _port_report(net, units, legs, plan, lim)
+    out["unbuildable"] = len(before)
+    # (and the junctions whose faces, drawn as the map will draw them, would be too steep)
+    steep0 = [u["nodes"][0] for u in units if not u["head"] and
+              u["nodes"][0] not in before and
+              PV.unit_grade(plan, u["id"], _port_heights(u, legs, plan)) >
+              ulim[u["nodes"][0]] + BUILD_TOL]
+    out["steep"] = len(steep0)
+    if not before and not steep0:
+        return out
+    gj = lim * PORT_SHARE
+    node = {n["id"]: n for n in net.nodes}
+    inner_all = {sid for u in units for sid in u["inner"]}
+    var = {nid: ("j", nid) for nid in node}    # every node its own variable
+    unit_first = {nd: u["nodes"][0] for u in units for nd in u["nodes"]}
+    locks = _locks(net)
+    over = _overhead(net)
+    target: dict = {}
+    for nid in sorted(node):
+        target[var[nid]] = node[nid]["position"][2]
+    ties: list = []             # (variable, variable, weight, junction or None)
+    anchors: list = []          # (variable, value, distance, kind: both | up)
+    port_var: dict = {}         # (segment id, at start) -> variable
+    for u in units:
+        if u["head"]:
+            continue
+        inner = set(u["inner"])
+        ext = [(nd, x) for nd in u["nodes"] for x in legs[nd] if x.seg["id"] not in inner and
+               x.cls != "footbridge" and x.seg["id"] in plan.roads]
+        lines = []
+        for nd, x in ext:
+            rd = plan.roads[x.seg["id"]]
+            sp, pts = rd.port("start" if x.at_start else "end")
+            lines.append((nd, x, sp, (pts[0][1][0] / 1000.0, pts[0][1][1] / 1000.0),
+                          (pts[-1][1][0] / 1000.0, pts[-1][1][1] / 1000.0)))
+        jk = ("j", u["nodes"][0])
+        for i, (nd, x, sp, a0, a1) in enumerate(lines):
+            pv = ("p", x.seg["id"], x.at_start)
+            port_var[(x.seg["id"], x.at_start)] = pv
+            target[pv] = _z_at(x.seg["z_profile"], sp)
+            # (no steeper from its node to its port than its road's catch grade, or than it
+            # is there already)
+            gw = max(catch_grade(x.seg, gr), _steepest(_window(x.seg["z_profile"],
+                                                                       x, sp)))
+            ties.append((var[nd], pv, gw * max(x.cut, 0.0), jk))
+            for j in range(i):
+                _, y, _, b0, b1 = lines[j]
+                d = min(_pseg(a0, b0, b1), _pseg(a1, b0, b1), _pseg(b0, a0, a1),
+                        _pseg(b1, a0, a1))
+                # (invariant 5: two ports of a junction within its grade of each other)
+                ties.append((pv, ("p", y.seg["id"], y.at_start),
+                             ulim[u["nodes"][0]] * PORT_SHARE * d, jk))
+        for sid in inner:
+            sg = next((x.seg for nd in u["nodes"] for x in legs[nd] if x.seg["id"] == sid),
+                      None)
+            if sg is not None and not _fixed22(sg, held) and not locks.get(sid):
+                L = ST._plen([tuple(q) for q in sg["centerline"]])
+                ties.append((var[sg["start"]], var[sg["end"]],
+                             max(catch_grade(sg, gr), _steepest(sg["z_profile"])) * L, jk))
+            # (a port beside an inner road: within the junction's grade of the inner road's
+            # surface beside it, so within that and the inner road's own climb from its
+            # nearer node; a long cluster, a bridge landing beside a ramp inside it)
+            rd_in = plan.roads.get(sid)
+            if sg is None or rd_in is None:
+                continue
+            g_in = max(catch_grade(sg, gr), _steepest(sg["z_profile"]))
+            L_in = rd_in.path.L
+            for nd, x, sp, a0, a1 in lines:
+                best = None
+                for q in (a0, a1):
+                    st = rd_in.path.project(q[0], q[1], 0.0, L_in)
+                    cx, cy = rd_in.path.point(st, 0.0)
+                    gap = max(math.hypot(q[0] - cx / 1000.0, q[1] - cy / 1000.0) - rd_in.row,
+                              0.0)
+                    if best is None or gap < best[0]:
+                        best = (gap, st)
+                gap, st = best
+                if gap > BESIDE_M or not (0.0 < st < L_in):
+                    continue
+                near, sd = (sg["start"], st) if st <= L_in - st else (sg["end"], L_in - st)
+                ties.append((("p", x.seg["id"], x.at_start), var[near],
+                             g_in * sd + ulim[u["nodes"][0]] * PORT_SHARE * gap, jk))
+    group: dict = {}            # a junction (its first node) or plain node -> its variables
+    ends = {x["id"]: (x["start"], x["end"]) for x in net.segments}
+    for k in target:
+        nd = k[1] if k[0] == "j" else ends[k[1]][0 if k[2] else 1]
+        group.setdefault(("j", unit_first.get(nd, nd)), set()).add(k)
+    of = {k: jk for jk, ks in group.items() for k in ks}
+    roads = []
+    for sg in net.segments:
+        rd = plan.roads.get(sg["id"])
+        if sg["road_class"] == "footbridge" or rd is None:
+            # (a road the map does not draw keeps its profile: its nodes stay where its ends
+            # are, so it meets them at their height, `level_continuity`)
+            prof = sg["z_profile"]
+            if prof:
+                why = ("fixed", sg["id"])
+                anchors.append((var[sg["start"]], prof[0]["z"], 0.0, "both", why))
+                anchors.append((var[sg["end"]], prof[-1]["z"], 0.0, "both", why))
+            continue
+        L = rd.path.L
+        prof = sg["z_profile"]
+        va = port_var.get((sg["id"], True), var[sg["start"]])
+        vb = port_var.get((sg["id"], False), var[sg["end"]])
+        if sg["id"] in inner_all:
+            if _fixed22(sg, held) or locks.get(sg["id"]):
+                anchors.append((var[sg["start"]], _z_at(prof, 0.0), 0.0, "both",
+                                ("inner fixed", sg["id"])))
+                anchors.append((var[sg["end"]], _z_at(prof, L), 0.0, "both",
+                                ("inner fixed", sg["id"])))
+            continue
+        ca, cb = rd.a, L - rd.b
+        g = max(catch_grade(sg, gr), _steepest(prof))
+        lk = sorted((max(s0, 0.0), min(s1, L)) for s0, s1 in locks.get(sg["id"], [])
+                    if s1 > s0)
+        if _fixed22(sg, held) or any(s0 < ca or s1 > cb for s0, s1 in lk):
+            # (a fixed road, or one whose locked stretch reaches into a junction, as it is)
+            why = ("fixed" if _fixed22(sg, held) else "lock in window", sg["id"])
+            anchors.append((va, _z_at(prof, ca), 0.0, "both", why))
+            anchors.append((vb, _z_at(prof, cb), 0.0, "both", why))
+            if va[0] == "p":
+                anchors.append((var[sg["start"]], _z_at(prof, 0.0), 0.0, "both", why))
+            if vb[0] == "p":
+                anchors.append((var[sg["end"]], _z_at(prof, L), 0.0, "both", why))
+            continue
+        cur_s, cur_v = ca, ("var", va)
+        free = []
+        for s0, s1 in lk:
+            free.append((cur_s, cur_v, s0, ("val", _z_at(prof, s0))))
+            cur_s, cur_v = s1, ("val", _z_at(prof, s1))
+        free.append((cur_s, cur_v, cb, ("var", vb)))
+        for s0, p0, s1, p1 in free:
+            w = g * max(s1 - s0, 0.0)
+            if p0[0] == "var" and p1[0] == "var":
+                ties.append((p0[1], p1[1], w, None))
+            elif p0[0] == "var":
+                anchors.append((p0[1], p1[1], w, "both", ("lock", sg["id"])))
+            elif p1[0] == "var":
+                anchors.append((p1[1], p0[1], w, "both", ("lock", sg["id"])))
+        roads.append((sg, rd, va, vb, ca, cb, g, lk))
+    deg: dict = {}
+    loc: dict = {}
+    for sg in net.segments:
+        for e in (sg["start"], sg["end"]):
+            deg[e] = deg.get(e, 0) + 1
+            if sg["road_class"] not in ST.PRIMARY:
+                loc[e] = True
+    for nid, n in sorted(node.items()):
+        v = var[nid]
+        z = n["position"][2]
+        if (n.get("attrs") or {}).get("kind") == "exit":
+            anchors.append((v, z, 0.0, "both", ("exit", nid)))
+        elif over(n, z + 0.5):
+            anchors.append((v, z, 0.0, "up", ("under", nid)))  # (not raised under a road)
+        if deg.get(nid, 0) >= 3 and loc.get(nid):
+            anchors.append((v, max(z, ST.LOCAL_JUNCTION_Z_M), 0.0, "up", ("local cap", nid)))
+
+    def spread(adj: dict, seeds: dict) -> dict:
+        """Multi-source shortest paths: value(v) = min over seeds (seed + distance)."""
+        dist = dict(seeds)
+        hq = [(d, k) for k, d in sorted(seeds.items())]
+        heapq.heapify(hq)
+        while hq:
+            d, k = heapq.heappop(hq)
+            if d > dist.get(k, math.inf):
+                continue
+            for nb, w in adj.get(k, []):
+                nd = d + w
+                if nd < dist.get(nb, math.inf) - 1e-12:
+                    dist[nb] = nd
+                    heapq.heappush(hq, (nd, nb))
+        return dist
+
+    def nodez(nid, zv, kept):
+        """A node's height (as it was where its junction is kept)."""
+        return node[nid]["position"][2] if of[var[nid]] in kept else zv[var[nid]]
+
+    def solve(kept: set, flat: set = frozenset()) -> tuple[dict, set]:
+        adj: dict = {}
+        for u, v, w, jk in ties:
+            if jk is not None and jk in kept:
+                continue        # (a kept junction's own ties cut)
+            if jk is not None and jk in flat and u[0] == "p" and v[0] == "p":
+                w = 0.0         # (a junction whose face would be too steep: flat)
+            adj.setdefault(u, []).append((v, w))
+            adj.setdefault(v, []).append((u, w))
+        up_seed: dict = {}
+        lo_seed: dict = {}
+        for v, val, w, kind, _ in anchors:
+            up_seed[v] = min(up_seed.get(v, math.inf), val + w)
+            if kind == "both":
+                lo_seed[v] = min(lo_seed.get(v, math.inf), -(val - w))
+        for jk in kept:
+            for k in group[jk]:
+                up_seed[k] = min(up_seed.get(k, math.inf), target[k])
+                lo_seed[k] = min(lo_seed.get(k, math.inf), -target[k])
+        UA = spread(adj, up_seed)
+        LA = {k: -x for k, x in spread(adj, lo_seed).items()}
+        U = spread(adj, {k: min(z, UA.get(k, math.inf)) for k, z in target.items()})
+        Lo = {k: -x for k, x in spread(adj, {k: -max(z, LA.get(k, -math.inf))
+                                              for k, z in target.items()}).items()}
+        zv = {}
+        bad = set()
+        for k in sorted(target):
+            if of[k] in kept:
+                zv[k] = target[k]
+                continue
+            lo_h, up_h = LA.get(k, -math.inf), UA.get(k, math.inf)
+            if lo_h > up_h + CROSS_TOL_M:
+                bad.add(of[k])
+                zv[k] = target[k]
+                continue
+            z = (U.get(k, target[k]) + Lo.get(k, target[k])) / 2.0
+            # (bounds a rounding apart, CROSS_TOL_M at most: between them)
+            z = min(max(z, lo_h), up_h) if lo_h <= up_h else (lo_h + up_h) / 2.0
+            if up_h >= 0.0:
+                z = max(z, 0.0)     # (none under the ground: tunnels are fixed roads)
+            zv[k] = G.q(z)
+        for sg, rd, va, vb, ca, cb, g, lk in roads:
+            vs = (var[sg["start"]], va, vb, var[sg["end"]])
+            if all(of[v] in kept for v in vs):
+                continue
+            _, crossed = _conform(sg["z_profile"], rd.path.L, ca, cb,
+                                  nodez(sg["start"], zv, kept), zv[va], zv[vb],
+                                  nodez(sg["end"], zv, kept), g, lk)
+            if crossed:
+                bad |= {of[v] for v in vs if of[v] not in kept}
+        return zv, bad
+    kept: set = set()
+    flat: set = set()
+    ulist = [u for u in units if not u["head"]]
+    for _ in range(FLAT_ROUNDS):
+        for _ in range(KEEP_ROUNDS):
+            zv, bad = solve(kept, flat)
+            if not bad:
+                break
+            kept |= bad
+        else:
+            zv, _ = solve(kept, flat)
+        # (a junction whose carriageway face, drawn as the map will draw it, would be steeper
+        # than its grade is made flat, and the fit made again)
+        steep = set()
+        for u in ulist:
+            jk = ("j", u["nodes"][0])
+            if jk in kept or jk in flat:
+                continue
+            pz = {(k[1], k[2]): zv[k] for k in group[jk] if k[0] == "p"}
+            if PV.unit_grade(plan, u["id"], pz) > ulim[u["nodes"][0]] + BUILD_TOL:
+                steep.add(jk)
+        if not steep:
+            break
+        flat |= steep
+    # (the roads changed: a junction one of whose roads still cannot be run kept too, until
+    # every road runs)
+    for _ in range(KEEP_ROUNDS):
+        hit = {k for k in zv if abs(zv[k] - target[k]) > 0.005}
+        plan_new = {}
+        more = set()
+        for sg, rd, va, vb, ca, cb, g, lk in roads:
+            vs = (var[sg["start"]], va, vb, var[sg["end"]])
+            if not (set(vs) & hit) or all(of[v] in kept for v in vs):
+                continue
+            new, crossed = _conform(sg["z_profile"], rd.path.L, ca, cb,
+                                    nodez(sg["start"], zv, kept), zv[va], zv[vb],
+                                    nodez(sg["end"], zv, kept), g, lk)
+            # (and within the grade checks: `road_grades`, `ramp_grades`)
+            cap = max(catch_grade(sg, gr) / G_SAFE, _steepest(sg["z_profile"]))
+            if crossed or _steepest(new) > cap + 1e-4:
+                more |= {of[v] for v in vs} - kept
+            else:
+                plan_new[sg["id"]] = new
+        if not more:
+            break
+        kept |= more
+        for jk in more:
+            for k in group[jk]:
+                zv[k] = target[k]
+    # (what holds each junction kept: the two bounds that clash on it)
+    out["held"] = {}
+    whys = _why_kept(ties, anchors, group, kept, flat) if kept else []
+    for first, k, ups, los in whys:
+        # (ids in lists, so M10's renaming finds them: `ids.Renamer._attrs`)
+        if ups and los and los[0][0] > ups[0][0] + CROSS_TOL_M:
+            out["held"][first] = {"low": [los[0][1][0], los[0][1][1], round(los[0][0], 2)],
+                                  "high": [ups[0][1][0], ups[0][1][1], round(ups[0][0], 2)]}
+        else:
+            out["held"][first] = {"grade": True}
+    by_id = {x["id"]: x for x in net.segments}
+    for sid, new in sorted(plan_new.items()):
+        if _changed(by_id[sid]["z_profile"], new):
+            by_id[sid]["z_profile"] = new
+    for sid in sorted(inner_all):
+        sg = next((x for x in net.segments if x["id"] == sid), None)
+        if sg is None or _fixed22(sg, held) or sg["road_class"] == "footbridge" or \
+                locks.get(sid):
+            continue
+        if of[var[sg["start"]]] in kept:
+            continue
+        L = G.q(ST._plen([tuple(p) for p in sg["centerline"]]))
+        z0, z1 = zv[var[sg["start"]]], zv[var[sg["end"]]]
+        flat = [{"s": 0.0, "z": z0}, {"s": L, "z": z1}]
+        if _changed(sg["z_profile"], flat):
+            sg["z_profile"] = flat
+    moved = 0
+    for nid, n in node.items():
+        pos = n["position"]
+        if of[var[nid]] in kept:
+            continue            # (a kept junction's nodes as they were, each its own)
+        z = zv[var[nid]]
+        if abs(pos[2] - z) > 0.005:
+            n["position"] = (pos[0], pos[1], z)
+            moved += 1
+    after = _port_report(net, units, legs, plan, lim)
+    after += [u["nodes"][0] for u in units if not u["head"] and
+              u["nodes"][0] not in after and
+              PV.unit_grade(plan, u["id"], _port_heights(u, legs, plan)) >
+              ulim[u["nodes"][0]] + BUILD_TOL]
+    out["levelled_further"] = len(set(before) | set(steep0)) - len(after)
+    out["unresolved"] = sorted(after)
+    out["nodes_moved"] = moved
+    out["no_fit"] = len(kept)
+    return out
+
+
+KEEP_ROUNDS = 12        # M22: rounds of the fit, each keeping the junctions no height fits
+G_SAFE = 0.985          # M22: the fit keeps this share of a grade (profiles on the 1 cm grid)
+
+
+def _window(prof: list, x, sp: float) -> list:
+    """The stretch of a profile between a leg's node and its port at sp."""
+    a, b = (0.0, sp) if x.at_start else (sp, prof[-1]["s"] if prof else sp)
+    return [p for p in prof if a - 1e-9 <= p["s"] <= b + 1e-9]
+FLAT_ROUNDS = 6         # M22: rounds that make the junctions whose faces would be steep flat
+PORT_SHARE = 0.98       # M22: two ports of a junction within this share of its grade
+BESIDE_M = 6.0          # M22: a port this near an inner road's right of way is tied to it
+CROSS_TOL_M = 0.02      # M22: cones that cross by more than this: no height fits there
+
+
+def _why_kept(ties, anchors, group, kept, flat) -> list:
+    """M22: for each junction the fit kept, the two anchors that clash on it: of its
+    variables, the one whose lowest bound from above (an anchor's value plus its distance
+    on the graph) is furthest under its highest bound from below; (first node, variable,
+    [(bound, why, anchor variable)] from above, the same from below). Bounds within
+    WHY_REACH_M of height are searched (a farther anchor binds nothing here)."""
+    import heapq
+
+    adj: dict = {}
+    for u, v, w, jk in ties:
+        if jk is not None and jk in flat and u[0] == "p" and v[0] == "p":
+            w = 0.0
+        adj.setdefault(u, []).append((v, w))
+        adj.setdefault(v, []).append((u, w))
+    at: dict = {}
+    for v, val, w, kind, why in anchors:
+        at.setdefault(v, []).append((val, w, kind, why))
+
+    def bounds(src):
+        dist = {src: 0.0}
+        hq = [(0.0, src)]
+        up, lo = None, None
+        while hq:
+            d, k = heapq.heappop(hq)
+            if d > dist.get(k, math.inf):
+                continue
+            for val, w, kind, why in at.get(k, []):
+                if up is None or val + w + d < up[0]:
+                    up = (val + w + d, why, k)
+                if kind == "both" and (lo is None or val - w - d > lo[0]):
+                    lo = (val - w - d, why, k)
+            for nb, w in adj.get(k, []):
+                nd = d + w
+                if nd <= WHY_REACH_M and nd < dist.get(nb, math.inf) - 1e-12:
+                    dist[nb] = nd
+                    heapq.heappush(hq, (nd, nb))
+        return up, lo
+    out = []
+    for jk in sorted(kept):
+        best = None
+        for k in sorted(group[jk]):
+            up, lo = bounds(k)
+            gap = (lo[0] if lo else -math.inf) - (up[0] if up else math.inf)
+            if best is None or gap > best[0]:
+                best = (gap, k, up, lo)
+        _, k, up, lo = best
+        out.append((jk[1], k, [up] if up else [], [lo] if lo else []))
+    return out
+
+
+WHY_REACH_M = 40.0      # M22: how far in height `_why_kept` searches for a binding anchor
+
+
+def why_text(why: dict) -> str:
+    """M22: what holds a junction the height fit kept (`attrs.unbuildable`), in words."""
+    if why.get("grade"):
+        return "its roads, which cannot reach its ports within their grade"
+    if why.get("drawn"):
+        return (f"its faces, which the map draws at {why['drawn']:.1%} from its ports where "
+                f"the fit's estimate did not (two of its roads parting at different grades "
+                f"inside it, a concave outline)")
+
+    def one(kind, ref):
+        return {"local cap": f"M7's {ST.LOCAL_JUNCTION_Z_M:g} m limit at local junction {ref}",
+                "lock": f"the locked stretch of {ref}",
+                "lock in window": f"the locked stretch of {ref} reaching into a junction",
+                "inner fixed": f"fixed road {ref}",
+                "fixed": f"fixed road {ref}",
+                "exit": f"map exit {ref}",
+                "under": f"the road over {ref}"}.get(kind, f"{kind} {ref}")
+    lo, hi = why["low"], why["high"]
+    return (f"{one(lo[0], lo[1])} ({lo[2]:.2f} m at least) against {one(hi[0], hi[1])} "
+            f"({hi[2]:.2f} m at most)")
+
+
+def _port_heights(u: dict, legs: dict, plan) -> dict:
+    """{(segment id, at start): height} of a junction's ports on the profiles as they are."""
+    inner = set(u["inner"])
+    out = {}
+    for nd in u["nodes"]:
+        for x in legs[nd]:
+            if x.seg["id"] in inner or x.cls == "footbridge" or x.seg["id"] not in plan.roads:
+                continue
+            rd = plan.roads[x.seg["id"]]
+            sp, _ = rd.port("start" if x.at_start else "end")
+            out[(x.seg["id"], x.at_start)] = _z_at(x.seg["z_profile"], sp)
+    return out
+
+
+def _port_report(net, units: list, legs: dict, plan, lim: float) -> list:
+    """The junctions (their first nodes) whose ports break invariant 5 (`port_slopes`) on
+    the profiles as they are."""
+    bad = []
+    for u in units:
+        if u["head"]:
+            continue
+        inner = set(u["inner"])
+        ext = [x for nd in u["nodes"] for x in legs[nd] if x.seg["id"] not in inner and
+               x.cls != "footbridge" and x.seg["id"] in plan.roads]
+        if len(ext) < 2:
+            continue
+        ps = []
+        for x in ext:
+            rd = plan.roads[x.seg["id"]]
+            sp, pts = rd.port("start" if x.at_start else "end")
+            a, b = pts[0][1], pts[-1][1]
+            ps.append((_z_at(x.seg["z_profile"], sp), (a[0] / 1000.0, a[1] / 1000.0),
+                       (b[0] / 1000.0, b[1] / 1000.0)))
+        if port_slopes(ps) > junction_grade([x for x in ext], _GR[0]) + BUILD_TOL:
+            bad.append(u["nodes"][0])
+    return bad
+
+
+_GR = [None]            # (the grades `buildable` runs with, for `_port_report`)
+
+
+def _conform(prof: list, L: float, ca: float, cb: float, n0: float, za: float, zb: float,
+             n1: float, g: float, locks: list):
+    """M22: a road's profile run from its start node's height n0 to its port's za at ca
+    (straight), likewise from zb at cb to its end node's n1, its locked stretches as they
+    are, and the rest clamped between the cones of slope g from its ports and locks (the
+    fit `buildable` found keeps them within reach). None where they cross (no change)."""
+    fixed = [(ca, za), (cb, zb)]
+    for s0, s1 in locks:
+        fixed += [(s0, _z_at(prof, s0)), (s1, _z_at(prof, s1))]
+    n = max(int(math.ceil(L / LEVEL_STEP_M)), 1)
+    ss = sorted({G.q(L * k / n) for k in range(n + 1)} | {G.q(p["s"]) for p in prof} |
+                {G.q(min(max(x, 0.0), L)) for x, _ in fixed} | {0.0, G.q(L)})
+    out = []
+    crossed = False
+    for t in ss:
+        if t <= ca:
+            out.append((t, n0 + (za - n0) * (t / ca) if ca > 0 else za))
+            continue
+        if t >= cb:
+            out.append((t, zb + (n1 - zb) * ((t - cb) / (L - cb)) if L > cb else zb))
+            continue
+        if any(s0 <= t <= s1 for s0, s1 in locks):
+            out.append((t, _z_at(prof, t)))
+            continue
+        lo = max(zf - g * abs(t - sf) for sf, zf in fixed)
+        hi = min(zf + g * abs(t - sf) for sf, zf in fixed)
+        if lo > hi:
+            crossed = crossed or lo > hi + CROSS_TOL_M
+            out.append((t, (lo + hi) / 2.0))    # (rounding: the middle)
+            continue
+        out.append((t, min(max(_z_at(prof, t), lo), hi)))
+    from .elevated import compress
+
+    return [{"s": t, "z": G.q(z)} for t, z in compress(out)], crossed
 
 
 def _held_heights(net, legs: dict, gr, held, want: dict, runs: dict, node: dict,
@@ -1565,14 +2469,65 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     cut: dict = {}
     cut_row: dict = {}
     junctions, crosswalks, sidewalks = [], [], []
-    turnarounds = []
     # M14: one walk graph per level (a deck's corners lie over the ground's)
     Ws = {0: WalkGraph()}
     nlev = {n["id"]: DK.walk_level(n) for n in net.nodes}
     corner_of: dict = {}   # (node, seg id, side) -> walk node
+    # (M13's grade lines hold each junction's height out to M17's cut on its legs, as before
+    # M22: out to M22's, longer, a hillside's short streets go flat; `local.py`)
+    legs17 = legs_at(net, arch_of)
+    for nid in sorted(legs17):
+        cutbacks(legs17[nid], cap=False)
+    share_cuts(legs17)
+    runs17 = {(x.seg["id"], nid): run_along(x, max(x.cut, x.cut_row))
+              for nid, lg in legs17.items() for x in lg
+              if len(lg) >= 3 or (len(lg) == 2 and any(y.cut > 0.0 for y in lg))}
     for nid in sorted(legs):
-        cutbacks(legs[nid], cap=False)
-    share_cuts(legs)
+        cutbacks(legs[nid], cap=False, one=True)
+    # M22: the junctions as regions of the pavement map, one cut per leg (where its bands,
+    # sidewalks, crosswalks and lanes end); a road whose two cuts meet joins its junctions
+    fold_cuts(net, legs)
+    lock_cuts(net, legs)
+    fold_cuts(net, legs)        # (a lock's cut can land in a fold)
+    # (M10 with M22: a regeneration's junctions whose roads are all held as they were)
+    fr0 = getattr(getattr(net, "builder", None), "frame", None)
+    hu, old_of, plain = held_units(net, legs, fr0) if fr0 is not None else ({}, {}, set())
+
+    def restore():
+        for nid, rec in hu.items():
+            for x in legs[nid]:
+                if x.seg["id"] not in rec["inner"] and \
+                        old_of[x.seg["id"]].id not in rec["inner"]:
+                    x.cut = x.cut_row = _old_cut(x, rec, old_of[x.seg["id"]])
+        for nid in plain:
+            for x in legs[nid]:
+                x.cut = x.cut_row = 0.0
+    restore()
+    force = {}
+    for s in net.segments:
+        a, b = hu.get(s["start"]), hu.get(s["end"])
+        if s["id"] in old_of and (a is not None or s["start"] in plain) and \
+                (b is not None or s["end"] in plain):
+            force[s["id"]] = a is not None and a is b and old_of[s["id"]].id in a["inner"]
+    units = plan_units(net, legs, heads, gr, force)
+    restore()
+    inner = {sid for u in units for sid in u["inner"]}
+    unit_of = {n: k for k, u in enumerate(units) for n in u["nodes"]}
+    pvu = []
+    for k, u in enumerate(units):
+        u["id"] = f"jn{k + 1:05d}"
+        ext = [x for n in u["nodes"] for x in legs[n] if x.seg["id"] not in inner]
+        pvu.append(PV.Unit(u["id"], u["nodes"], ext, u["inner"], u["head"], PV.unit_layer(ext),
+                           {n: legs[n] for n in u["nodes"]}, heads=u["heads"]))
+    plan = PV.Plan(net.segments, pos, pvu)
+    jrows = {}
+    for u in units:
+        _, R = plan.regions[u["id"]]
+        g = G.qpoly(R.buffer(-ROW_IN_M, join_style="mitre")) if not R.is_empty else R
+        if not g.is_empty:
+            shapely.prepare(g)
+            jrows[u["id"]] = g
+    cutx = {(x.seg["id"], x.at_start): x.cut for lg in legs.values() for x in lg}
     signals, _ = plan_signals(legs, node_arch, lambda nid: node_ctl[nid])
     av_marked = plan_crossings(legs, node_arch, lambda nid: node_ctl[nid], signals)
     for nid in sorted(legs):
@@ -1588,76 +2543,113 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
             q = W.node(P)
             corner_of[(nid, x.seg["id"], "L")] = q
             corner_of[(nid, x.seg["id"], "R")] = q
-            r = heads.get(nid, 0.0)
-            if r:
-                # (M17: a cul-de-sac or a quay end with room for its turning bulb)
-                ring = [(P[0] + r * M.cos(a), P[1] + r * M.sin(a))
-                        for a in [k * 2 * M.PI / 24 for k in range(24)]]
-                turnarounds.append((nid, G.qpoly(Polygon(ring))))
             continue
         # corners between neighbors (sidewalk center points)
-        jrow = _jrow(lg)
+        k = unit_of.get(nid)
+        jrow = jrows.get(units[k]["id"]) if k is not None else None
         for i in range(n):
             a, b = lg[i], lg[(i + 1) % n]
             c, _, _ = _corner_point(P, a, b, jrow)
             q = W.node(c)
             corner_of[(nid, a.seg["id"], "L" if a.at_start else "R")] = q
             corner_of[(nid, b.seg["id"], "R" if b.at_start else "L")] = q
-        if n < 3 and not (n == 2 and any(x.cut > 0.0 for x in lg)):
+    for u in units:
+        jid, nodes = u["id"], u["nodes"]
+        C, R = plan.regions[jid]
+        poly = max(PV.polys(C), key=lambda p: (p.area, p.bounds), default=Polygon())
+        if poly.is_empty:
+            poly = G.qpoly(Point(pos[nodes[0]]).buffer(1.0))
+        nid0 = nodes[0]
+        if u["head"]:
+            # (M17: a cul-de-sac or a quay end with room for its turning bulb)
+            cls = ST.street_class(legs[nid0][0].seg)
+            x0 = legs[nid0][0]
+            c0 = cutx.get((x0.seg["id"], x0.at_start), 0.0)
+            junctions.append({"id": jid, "node_id": nid0, "polygon": poly,
+                              "signalized": False, "crosswalk_ids": [], "row_polygon": R,
+                              "attrs": {"type": cls, "shape": "cul_de_sac", "legs": 1,
+                                        "corner_radius_m": heads[nid0],
+                                        "archetype": node_arch[nid0], "classes": [cls],
+                                        # (M22: its leg's cut, where the bulb begins)
+                                        **({"cuts": [[x0.seg["id"], "a" if x0.at_start
+                                                      else "b", c0]]} if c0 > 0.0 else {})}})
             continue
-        kind, shape, _ = classify(lg, node_arch[nid])
-        sig = nid in signals
-        jid = f"jn{len(junctions) + 1:05d}"
-        poly = shared_pavement(lg, junction_polygon(lg))
-        row_poly = junction_polygon(lg, row=True)
+        allg = [x for nd in nodes for x in legs[nd]]
+        ext = [x for x in allg if x.seg["id"] not in inner]
+        kind, shape, _ = classify(ext or allg, node_arch[nid0])
+        if len(nodes) > 1:
+            shape = "multi"
+        sig = any(nd in signals for nd in nodes)
         xw_ids = []
-        walkable = any(x.cls != "highway" for x in lg)
-        xws = node_ctl[nid][1]
-        # M18: crosswalks on the approaches of signalized junctions; at an unsignalized one,
-        # across its avenue where no signalized junction or marked crossing is within the
-        # district's spacing along it; elsewhere unmarked crossings
-        av = nid in av_marked
-        for i, x in enumerate(lg if walkable else []):
-            if x.cls in ST.PEDESTRIAN:
-                continue
-            if x.cls == "highway" and not sig:
-                continue
-            xw = crosswalk_w(x.cls, node_arch[nid])
-            marked = xw > 0.0 and xws != "none" and (sig or (av and x.cls == "avenue"))
-            s = x.cut + CROSSWALK_SETBACK_M + (xw / 2 if marked else 2.0)
-            s = min(s, 0.45 * x.L)
-            p, t = ST._along(x.pts, s)
-            nrm = _left(t)
-            a_ = _pt(p[0] - nrm[0] * x.h, p[1] - nrm[1] * x.h)
-            b_ = _pt(p[0] + nrm[0] * x.h, p[1] + nrm[1] * x.h)
-            prev = lg[i - 1]
-            nxt = lg[(i + 1) % n]
-            right_corner = W.node(_corner_point(P, prev, x, jrow)[0])
-            left_corner = W.node(_corner_point(P, x, nxt, jrow)[0])
-            if marked:
-                cid = f"cw{len(crosswalks) + 1:05d}"
-                crosswalks.append({"id": cid, "junction_id": jid, "segment_id": x.seg["id"],
-                                   "line": [a_, b_], "width_m": xw,
-                                   "signalized": sig, "attrs": {"road_class": x.cls}})
-                xw_ids.append(cid)
-            W.add("crosswalk" if marked else "crossing",
-                  [right_corner, a_, b_, left_corner], xw if marked else 2.0,
-                  junction=jid, crosswalk=marked)
-        junctions.append({"id": jid, "node_id": nid, "polygon": poly, "signalized": sig,
-                          "crosswalk_ids": xw_ids, "row_polygon": row_poly,
-                          "attrs": {"type": kind, "shape": shape, "legs": n,
-                                    "corner_radius_m": min(x.r for x in lg),
-                                    "archetype": node_arch[nid],
-                                    "classes": sorted({x.cls for x in lg},
-                                                      key=lambda c: (-ST.RANK[c], c))}})
-    for nid, poly in turnarounds:
-        cls = ST.street_class(legs[nid][0].seg)
-        junctions.append({"id": f"jn{len(junctions) + 1:05d}", "node_id": nid, "polygon": poly,
-                          "signalized": False, "crosswalk_ids": [], "row_polygon": poly,
-                          "attrs": {"type": cls, "shape": "cul_de_sac", "legs": 1,
-                                    "corner_radius_m": heads[nid],
-                                    "archetype": node_arch[nid], "classes": [cls]}})
-    absorb_shared(net, junctions)
+        jrow = jrows.get(jid)
+        walkable = any(x.cls != "highway" for x in allg)
+        for nd in nodes:
+            lg = legs[nd]
+            n = len(lg)
+            P = pos[nd]
+            W = Ws.setdefault(nlev.get(nd, 0), WalkGraph())
+            xws = node_ctl[nd][1]
+            # M18: crosswalks on the approaches of signalized junctions; at an unsignalized
+            # one, across its avenue where no signalized junction or marked crossing is
+            # within the district's spacing along it; elsewhere unmarked crossings. M22: on
+            # the road's face between its cuts (none on a road inside a cluster; unmarked
+            # where the road's face is too short for it)
+            av = nd in av_marked
+            for i, x in enumerate(lg if walkable else []):
+                if x.cls in ST.PEDESTRIAN or x.seg["id"] in inner:
+                    continue
+                if x.cls == "highway" and not sig:
+                    continue
+                far = cutx.get((x.seg["id"], not x.at_start), 0.0)
+                xw = crosswalk_w(x.cls, node_arch[nid0])
+                marked = xw > 0.0 and xws != "none" and (sig or (av and x.cls == "avenue"))
+                s = x.cut + CROSSWALK_SETBACK_M + (xw / 2 if marked else 2.0)
+                if marked and s + xw / 2 > x.L - far - XWALK_PAD_M:
+                    # (no room on the road's face between its cuts: on the junction's face,
+                    # inside its port)
+                    s = max(x.cut - xw / 2 - XWALK_PAD_M, xw / 2)
+                s = min(s, max(x.L - far - 0.5, x.cut), 0.95 * x.L)
+                p, t = ST._along(x.pts, s)
+                nrm = _left(t)
+                a_ = _pt(p[0] - nrm[0] * x.h, p[1] - nrm[1] * x.h)
+                b_ = _pt(p[0] + nrm[0] * x.h, p[1] + nrm[1] * x.h)
+                prev = lg[i - 1]
+                nxt = lg[(i + 1) % n]
+                right_corner = W.node(_corner_point(P, prev, x, jrow)[0])
+                left_corner = W.node(_corner_point(P, x, nxt, jrow)[0])
+                if marked:
+                    cid = f"cw{len(crosswalks) + 1:05d}"
+                    xa = {"road_class": x.cls}
+                    if len(nodes) > 1:
+                        xa["node"] = nd
+                    crosswalks.append({"id": cid, "junction_id": jid,
+                                       "segment_id": x.seg["id"], "line": [a_, b_],
+                                       "width_m": xw, "signalized": sig,
+                                       "attrs": xa})
+                    xw_ids.append(cid)
+                W.add("crosswalk" if marked else "crossing",
+                      [right_corner, a_, b_, left_corner], xw if marked else 2.0,
+                      junction=jid, crosswalk=marked)
+        attrs = {"type": kind, "shape": shape, "legs": len(ext),
+                 "corner_radius_m": min(x.r for x in allg), "archetype": node_arch[nid0],
+                 "classes": sorted({x.cls for x in ext or allg},
+                                   key=lambda c: (-ST.RANK[c], c))}
+        # (M22: its legs' cuts, [road, "a" its start or "b" its end, cut], so the pavement
+        # map can be made again from the rows; on the junction, not the road, so a district
+        # regeneration that changes a seam junction leaves the held roads as they were)
+        cuts = sorted([x.seg["id"], "a" if x.at_start else "b",
+                       cutx[(x.seg["id"], x.at_start)]] for x in ext
+                      if cutx.get((x.seg["id"], x.at_start), 0.0) > 0.0)
+        if cuts:
+            attrs["cuts"] = cuts
+        if len(nodes) > 1:
+            attrs["nodes"] = list(nodes)
+            attrs["inner"] = list(u["inner"])
+            attrs["signals"] = [nd for nd in nodes if nd in signals]
+            if u["heads"]:
+                attrs["bulbs"] = sorted(u["heads"])
+        junctions.append({"id": jid, "node_id": nid0, "polygon": poly, "signalized": sig,
+                          "crosswalk_ids": xw_ids, "row_polygon": R, "attrs": attrs})
     # M18: the legs of every junction held level out past where they leave its polygon (the
     # lanes take their heights)
     exits = {}
@@ -1668,8 +2660,25 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
         for x in legs.get(j["node_id"], []):
             exits[(x.seg["id"], x.at_start)] = leg_exit(x.pts, ring)[0]
     fr = getattr(getattr(net, "builder", None), "frame", None)
-    lev = level_legs(net, legs, gr, None if fr is None else
-                     (lambda s: fr.match(s["centerline"], s) is not None), exits)
+    held = None if fr is None else (lambda s: fr.match(s["centerline"], s) is not None)
+    lev = level_legs(net, legs, gr, held, exits)
+    # M22: a junction whose ports one surface cannot carry is levelled further; one that
+    # stays so, held by what the levelling may not move, says so
+    lev.update(buildable(net, units, legs, gr, held, plan, lev))
+    first_of = {u["nodes"][0]: u["id"] for u in units}
+    for j in junctions:
+        why = lev.get("held", {}).get(j["node_id"])
+        if why and j["node_id"] in first_of and j["node_id"] in set(lev.get("unresolved", [])):
+            j["attrs"]["unbuildable"] = why
+        # (M10: a junction whose roads are all held keeps its old tag)
+        ns = j["attrs"].get("nodes") or [j["node_id"]]
+        recs = {id(hu[n]) for n in ns if n in hu}
+        if len(recs) == 1 and all(n in hu for n in ns):
+            old = hu[ns[0]]["unbuildable"]
+            if old:
+                j["attrs"]["unbuildable"] = old
+            else:
+                j["attrs"].pop("unbuildable", None)
     # sidewalks and centerline walkways
     for s in net.segments:
         if s["attrs"].get("role") == "deck_ramp":
@@ -1683,24 +2692,52 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
         cs = s["cross_section"]
         side = cs["sidewalk_m"][0] if cs.get("sidewalk_m") else 0.0
         if cls in ("avenue", "street") and side > 0:
-            base = ST._substring(pts, a, L - b) if L - a - b > 1.0 else pts
             h = s["width_m"] / 2 - side / 2
-            furn = cs.get("furniture_m", 1.5 if cls == "avenue" else 0.0)
-            curb = cs.get("curb_m", 0.15)
+            curb = min(cs.get("curb_m", 0.15), side)
+            furn = min(max(cs.get("furniture_m", 1.5 if cls == "avenue" else 0.0), 0.0),
+                       side - curb)
+            rd = plan.roads.get(s["id"])
+            # (M22: the sidewalk's middle from port to port, square to the road at its ends
+            # as its right of way ends: the map's mitred frame where a road goes on as
+            # another reaches past it, into the lots there; a road inside a cluster, whose
+            # sidewalks are its junction's corner pads, end to end, as stations' stairs and
+            # the props find sidewalks by their records)
+            L = ST._plen(pts)
+            ra, rb = (0.0, 0.0) if s["id"] in inner or rd is None else (rd.a, rd.b)
+            base = ST._substring(pts, ra, L - rb) if L - ra - rb > 1.0 else pts
+            cw = None
+            if s["id"] in inner and s["start"] in unit_of:
+                # (an inner road's sidewalk records lie on its cluster's corner pads, off its
+                # carriageway, where AG7 draws them; its walkers go on along it)
+                cw = plan.regions.get(units[unit_of[s["start"]]]["id"], (None, None))[0]
             for sd, sign in (("L", 1.0), ("R", -1.0)):
                 line = _offset(base, sign * h)
                 if len(line) < 2:
                     continue
-                sid = f"sw{len(sidewalks) + 1:06d}"
-                sidewalks.append({"id": sid, "segment_id": s["id"], "side":
-                                  "left" if sd == "L" else "right",
-                                  "line": line, "width_m": side,
-                                  "clear_path_m": G.q(side - furn - curb), "curb_m": curb,
-                                  "furniture_m": furn})
+                pieces = [line]
+                if cw is not None and not cw.is_empty:
+                    ln = LineString(line)
+                    left = shapely.difference(ln, cw.buffer(side / 2.0), grid_size=G.GRID_M)
+                    # (in order along the line: no GEOS order reaches the model)
+                    got = sorted((ln.project(shapely.Point(g.coords[0])), g)
+                                 for g in shapely.get_parts(left)
+                                 if g.geom_type == "LineString" and g.length >= 1.0)
+                    pieces = [[tuple(map(G.q, c[:2])) for c in g.coords] for _, g in got]
+                sid = None
+                for piece in pieces:
+                    sid = f"sw{len(sidewalks) + 1:06d}"
+                    sidewalks.append({"id": sid, "segment_id": s["id"], "side":
+                                      "left" if sd == "L" else "right",
+                                      "line": piece, "width_m": side,
+                                      "clear_path_m": G.q(side - furn - curb), "curb_m": curb,
+                                      "furniture_m": furn})
                 c0 = corner_of.get((s["start"], s["id"], sd))
                 c1 = corner_of.get((s["end"], s["id"], sd))
                 chain = ([c0] if c0 else []) + line + ([c1] if c1 else [])
-                W.add("sidewalk", chain, side, sidewalk=sid, segment=s["id"])
+                if cw is not None:
+                    W.add("sidewalk", chain, side, segment=s["id"])
+                else:
+                    W.add("sidewalk", chain, side, sidewalk=sid, segment=s["id"])
         elif cls != "highway":
             kind = {"pedestrian": "pedestrian_street", "footbridge": "footbridge"}.get(
                 cls, "alley" if cls in ("alley", "service") else "path")
@@ -1722,7 +2759,7 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     return {"junctions": junctions, "crosswalks": crosswalks, "sidewalks": sidewalks,
             "lanes": lanes, "walk": Ws[0], "walk_levels": {k: v for k, v in Ws.items() if k},
             "corners": corner_of, "cut": cut, "cut_row": cut_row, "one_way": n_oneway,
-            "legs": legs, "level": lev, "exits": exits}
+            "legs": legs, "level": lev, "exits": exits, "units": units, "runs17": runs17}
 
 
 def walkways(W: WalkGraph) -> list[dict]:

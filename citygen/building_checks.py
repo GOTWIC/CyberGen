@@ -348,10 +348,17 @@ def check_clear_zones(m: CityModel, bx: _B):
             site = elems[owner].megasite_id
         if lab in ("reserve", "cone") and site == zid:
             continue
-        a = G.area1(G.inter(poly, zones[k]))
-        if a > AREA_TOL_M2:
+        ov = G.inter(poly, zones[k])
+        a = G.area1(ov)
+        # (a sliver along an edge the two share, under SLIVER_W_M wide on average, is the
+        # 1 cm grid's rounding of a mass that follows its lot's edge: M22's layouts showed one
+        # 6 mm wide along 60 m of a plaza)
+        if a > AREA_TOL_M2 and 2.0 * a >= SLIVER_W_M * ov.length:
             _limit(c, c.failures, f"{owner}: {role} mass on {lab} {zid} ({a:.1f} m2)")
     return c
+
+
+SLIVER_W_M = 0.02       # an overlap narrower than this on average is rounding
 
 
 def check_overlaps(m: CityModel, bx: _B):

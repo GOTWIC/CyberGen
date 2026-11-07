@@ -298,7 +298,9 @@ def barrier_clash(pk, model, tg: Targets | None = None) -> dict:
     "worst"}."""
     tg = tg if tg is not None else Targets(pk, model)
     br = Barriers(pk, model)
-    node_of_j = {j.id: j.node_id for j in model.junctions}
+    # (M22: a cluster's every node)
+    nodes_of_j = {j.id: sorted(set(j.attrs.get("nodes") or [j.node_id]))
+                  for j in model.junctions}
     seg_nodes = _ends(model)
     counts = {k: 0 for k in KEYS}
     rows: dict[str, list] = {k: [] for k in KEYS}
@@ -313,8 +315,10 @@ def barrier_clash(pk, model, tg: Targets | None = None) -> dict:
                                                           ln.centerline]), ln.width_m / 2.0))
 
     def shared(pa: str, pb: str) -> bool:
-        na = seg_nodes.get(pa, set()) | ({node_of_j[pa]} if pa in node_of_j else set())
-        nb = seg_nodes.get(pb, set()) | ({node_of_j[pb]} if pb in node_of_j else set())
+        if ".slab." in pa and pa.split(".slab.")[0] == pb.split(".slab.")[0]:
+            return True     # (one deck's slab cut into tiles: its rails meet at the seams)
+        na = seg_nodes.get(pa, set()) | set(nodes_of_j.get(pa, ()))
+        nb = seg_nodes.get(pb, set()) | set(nodes_of_j.get(pb, ()))
         return bool(na & nb)
     foot_polys, foot_pid, tops, samples = [], [], {}, {}
     for pid, T in zip(br.pids, br.T):
@@ -336,13 +340,14 @@ def barrier_clash(pk, model, tg: Targets | None = None) -> dict:
             if dd > r[1]:
                 r[1], r[2] = dd, a
             r[3].add(what[a])
-        if pid in node_of_j and lanes.get(node_of_j[pid]):
+        jl = [x for n in nodes_of_j.get(pid, ()) for x in lanes.get(n, ())]
+        if jl:
             mine = [a for a, oo, _ in tg.on_pavement(P, set(), BELOW_M, ABOVE_M) if oo in own]
             if mine:
                 idx = np.array(sorted(set(mine)), dtype=np.int64)
                 pts = shapely.points(P[idx, 0], P[idx, 1])
                 inl = np.zeros(len(idx), dtype=bool)
-                for ln, hw in lanes[node_of_j[pid]]:
+                for ln, hw in jl:
                     inl |= shapely.distance(ln, pts) < hw - INSET_M
                 if inl.any():
                     a = int(idx[np.nonzero(inl)[0][0]])
@@ -352,8 +357,9 @@ def barrier_clash(pk, model, tg: Targets | None = None) -> dict:
             junction = tg.kind_of.get(oo) == "street.junction"
             key = "barrier_in_junction" if junction else "barrier_on_road"
             if junction:
+                own_end = set(nodes_of_j.get(tpid, ())) & seg_nodes.get(pid, set())
                 cause = "its own lanes" if tpid == pid else "its own end" \
-                    if node_of_j.get(tpid) in seg_nodes.get(pid, ()) else "another junction"
+                    if own_end else "another junction"
             else:
                 cause = "a road at a node it shares" if shared(pid, tpid) else "another road"
             counts[key] += 1

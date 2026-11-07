@@ -454,8 +454,279 @@ def _junction_part(j, node, terrain: bool) -> dict:
     return part
 
 
+RAISED_M = 0.5          # M22: a face this far over the ground stands on a slab (DECK_M)
+TOP_KINDS = ("carriageway", "median", "walk", "junction", "bulb", "bend")   # at Z_ROAD
+CURB_KINDS = ("curb", "sidewalk", "corner")                                 # at CURB_M
+
+
+class _Pave:
+    """M22: the pavement map of a model as the blockout draws it: every vertex's height
+    over sea level, every face's rings as vertices."""
+
+    def __init__(self, m):
+        from . import terrain as TE
+
+        g = TE.ground_of(m)
+        self.terrain = g is not None
+        self.ground = g
+        net = m.pavement_net
+        self.v = {}
+        for x in net.vertices:
+            gz = g.at(x.p[0], x.p[1]) if g is not None else 0.0
+            self.v[x.id] = (x.p[0], x.p[1], x.z + gz, x.z)
+        self.e = {e.id: e for e in net.edges}
+        self.edge_faces: dict = {}
+        for f in m.pavement:
+            for refs in f.rings:
+                for r in refs:
+                    self.edge_faces.setdefault(r.lstrip("-"), []).append(f)
+
+    def ring(self, refs) -> list:
+        out = []
+        for ref in refs:
+            fwd = not ref.startswith("-")
+            vs = list(self.e[ref.lstrip("-")].v)
+            vs = vs if fwd else vs[::-1]
+            out += vs if not out else vs[1:]
+        return out[:-1]
+
+    def mesh(self, f, dz: float) -> dict | None:
+        """A face as a mesh part (heights over sea level on a terrain city, `abs`; over
+        the ground datum on a flat one): its boundary, its samples, triangles that never
+        split a boundary edge."""
+        from . import pavetri as PT
+
+        rings = [self.ring(refs) for refs in f.rings]
+        mm = [[(int(round(self.v[v][0] * 1000)), int(round(self.v[v][1] * 1000))) for v in r]
+              for r in rings]
+        z: dict = {}
+        for r, ids in zip(mm, rings):
+            for p, v in zip(r, ids):
+                z[p] = self.v[v][2] if self.terrain else self.v[v][3]
+        smp = []
+        for x, y, zz in f.samples:
+            k = (int(round(x * 1000)), int(round(y * 1000)))
+            z[k] = zz + (self.ground.at(x, y) if self.terrain else 0.0)
+            smp.append(k)
+        pts, tris = PT.triangulate(mm, smp)
+        if not tris:
+            return None
+        part = {"k": "mesh", "v": [[q(x / 1000.0), q(y / 1000.0), q(z[(x, y)] + dz)]
+                                   for x, y in pts],
+                "f": [list(t) for t in tris]}
+        if self.terrain:
+            part["abs"] = True
+        return part
+
+    def raised(self, f) -> bool:
+        return any(self.v[v][3] > RAISED_M for refs in f.rings for v in self.ring(refs))
+
+
+def _pave_walls(pv: _Pave, f, top: float, bottom, mat: str, which) -> dict | None:
+    """Vertical faces under the edges of a face for which `which(edge, other faces)` holds,
+    from `top` over its surface down to `bottom` (over it, or "ground")."""
+    verts, faces = [], []
+    for refs in f.rings:
+        for ref in refs:
+            eid = ref.lstrip("-")
+            others = [g for g in pv.edge_faces.get(eid, []) if g.id != f.id]
+            if not which(pv.e[eid], others):
+                continue
+            vs = list(pv.e[eid].v)
+            vs = vs if not ref.startswith("-") else vs[::-1]
+            for a, b in zip(vs, vs[1:]):
+                pa, pb = pv.v[a], pv.v[b]
+                za, zb = (pa[2], pb[2]) if pv.terrain else (pa[3], pb[3])
+                ga = (pa[2] - pa[3]) if pv.terrain else 0.0
+                gb = (pb[2] - pb[3]) if pv.terrain else 0.0
+                lo_a = ga - 0.3 if bottom == "ground" else za + bottom
+                lo_b = gb - 0.3 if bottom == "ground" else zb + bottom
+                k = len(verts)
+                verts += [[q(pa[0]), q(pa[1]), q(za + top)], [q(pb[0]), q(pb[1]), q(zb + top)],
+                          [q(pb[0]), q(pb[1]), q(lo_b)], [q(pa[0]), q(pa[1]), q(lo_a)]]
+                faces.append([k, k + 3, k + 2, k + 1])
+    if not faces:
+        return None
+    part = {"k": "mesh", "m": mat, "v": verts, "f": faces}
+    if pv.terrain:
+        part["abs"] = True
+    return part
+
+
+def _side(band: str) -> str:
+    """The side of a road a pavement band is on (`cll`, `cll_b`: left)."""
+    return "left" if band.split("_")[0].endswith("l") else "right"
+
+
+def _streets_map(P: _Plan) -> None:
+    """M22: roads, junctions, sidewalks, corner pads and medians drawn from the pavement
+    map's faces, in the objects the ribbons were in (keys unchanged: a road's faces go
+    where its ribbon went, a sidewalk's where it went, a junction's carriageway and corner
+    pads in its junction object). Carriageways at Z_ROAD over the surface, curbs, sidewalks
+    and pads at CURB_M with their curb faces; a face over the ground stands on a slab
+    DECK_M deep (a raised junction too: no girder runs under it), a low raised road's on a
+    fill down to the ground."""
+    m = P.m
+    pv = _Pave(m)
+    seg = {s.id: s for s in m.road_segments}
+    jn = {j.id: j for j in m.junctions}
+    walk_of = {(w.segment_id, w.side): w for w in m.sidewalks}
+    nz = {n.id: n.position[2] for n in m.road_nodes}
+    embank: dict = {}
+    for st in m.structures:
+        if st.kind == "embankment" and len(st.line) >= 2:
+            embank.setdefault((st.attrs or {}).get("road_id"), []).append(st)
+    objs: dict = {}
+
+    def road_cat(s):
+        zfull = [z.z for z in s.z_profile] or [0.0]
+        if "deck" in s.attrs:
+            return "deck_ramp" if s.attrs.get("role") == "deck_ramp" else "deck_road"
+        if s.tunnel:
+            return "tunnel_road"
+        if max(zfull) > 0.5 or s.bridge:
+            elev = bool(s.attrs.get("elevated")) or s.attrs.get("role") == "ramp"
+            low = not elev and not s.bridge and max(zfull) <= EMBANKMENT_M
+            return "elevated" if elev else ("embankment" if low else "bridge")
+        return f"road_{s.road_class}"
+
+    def own(s, cat, mid):
+        did = s.district_ids[0] if s.district_ids else None
+        key = (s.id, cat)
+        if key not in objs:
+            name, coll = {"deck_ramp": (f"{s.id}.ramp", "Decks"),
+                          "tunnel_road": (f"{s.id}.tunnel_road", "Tunnels"),
+                          "elevated": (f"{s.id}.deck", "Elevated"),
+                          "embankment": (f"{s.id}.deck", "Waterfront"),
+                          "bridge": (f"{s.id}.deck", "Waterfront")}[cat]
+            objs[key] = P.add(name, P.collection(did, coll), tile_key(*mid), cat, [],
+                              {"citygen_id": s.id, "citygen_type": s.type,
+                               "road_class": s.road_class, "name": s.name or "",
+                               **({"clearance_m": s.clearance_m or 0.0}
+                                  if cat in ("elevated", "embankment", "bridge") else {}),
+                               "level": s.level})
+        return objs[key]
+
+    def curb_edge(e, others):
+        return any(g.kind in TOP_KINDS for g in others)
+
+    def outer(e, others):
+        return not others
+
+    def slab_edge(e, others):
+        return not others or all(not pv.raised(g) for g in others)
+    by_road: dict = {}
+    for f in sorted(m.pavement, key=lambda f: f.id):
+        top = f.kind in TOP_KINDS
+        dz = Z_ROAD if top else CURB_M
+        part = pv.mesh(f, dz)
+        if part is None:
+            continue
+        raised = pv.raised(f)
+        parts = [part]
+        s = seg.get(f.owner_id)
+        if s is not None:
+            cat = road_cat(s)
+            mat = f"road_{s.road_class}" if top else "sidewalk"
+            part["m"] = mat
+            by_road.setdefault(s.id, cat)
+            # (in the tile its ribbon was in: the middle vertex of its centerline)
+            cx, cy = s.centerline[len(s.centerline) // 2]
+        elif f.owner_id in jn:
+            mat = "junction" if top else "sidewalk"
+            part["m"] = mat
+            cat = "deck_junction" if jn[f.owner_id].level else "junction"
+            cx, cy = _center(_poly_rings(jn[f.owner_id].polygon)[0])
+        else:
+            continue
+        if not top:
+            w = _pave_walls(pv, f, CURB_M, Z_ROAD, "sidewalk", curb_edge)
+            if w:
+                parts.append(w)
+            w = _pave_walls(pv, f, CURB_M, 0.0, "sidewalk", outer)
+            if w:
+                parts.append(w)
+        if s is not None and cat in ("embankment", "deck_ramp"):
+            w = _pave_walls(pv, f, dz, "ground", "embankment", outer)
+            if w:
+                parts.append(w)
+        elif raised and not (s is not None and cat == "tunnel_road"):
+            b = dict(part, m="bridge_deck" if cat != "deck_junction" else "deck_slab")
+            b["v"] = [[x, y, q(zz - DECK_M)] for x, y, zz in part["v"]]
+            b["f"] = [t[::-1] for t in part["f"]]
+            parts.append(b)
+            w = _pave_walls(pv, f, dz, -DECK_M, b["m"], slab_edge)
+            if w:
+                parts.append(w)
+        if s is not None:
+            if cat.startswith("road_") or cat == "deck_road":
+                side = _side(f.band)
+                wk = walk_of.get((s.id, side)) if not top else None
+                did = s.district_ids[0] if s.district_ids else None
+                for pt in parts:
+                    if wk is not None:
+                        wx, wy = _center(wk.line)
+                        P.join(did, "deck_sidewalk" if wk.level else "sidewalk", wx, wy, pt,
+                               wk.id)
+                    else:
+                        P.join(did, cat, cx, cy, pt, s.id)
+            else:
+                mid = s.centerline[len(s.centerline) // 2]
+                if not top and (s.id, _side(f.band)) in walk_of:
+                    wk = walk_of[(s.id, _side(f.band))]
+                    did = s.district_ids[0] if s.district_ids else None
+                    wx, wy = _center(wk.line)
+                    for pt in parts:
+                        P.join(did, "deck_sidewalk" if wk.level else "sidewalk", wx, wy, pt,
+                               wk.id)
+                else:
+                    own(s, cat, mid)["parts"].extend(parts)
+        else:
+            for pt in parts:
+                P.join(P.district_at(cx, cy), cat, cx, cy, pt, f.owner_id)
+    # raised roads: their fills and piers (the deck is the faces' slab)
+    from . import pavement as PV
+
+    rcuts = PV.road_cuts(m.junctions)
+    for s in m.road_segments:
+        cat = by_road.get(s.id)
+        if cat not in ("elevated", "bridge"):
+            continue
+        pts = _dedupe([(x, y) for x, y in s.centerline])
+        cuts = rcuts.get(s.id) or [0.0, 0.0]
+        L = sum(_dist(a, b) for a, b in zip(pts, pts[1:]))
+        if L - cuts[0] - cuts[1] < 0.5:
+            continue
+        from . import streets as ST
+
+        sub = _dedupe(ST._substring(pts, cuts[0], L - cuts[1]))
+        zs = [_z_on(s.z_profile, cuts[0] + d) for d in _cum2(sub)]
+        mid = s.centerline[len(s.centerline) // 2]
+        o = own(s, cat, mid)
+        o["parts"].extend(f for f in (_fill(s, st, cuts[0], cuts[1]) for st in sorted(
+            embank.get(s.id, []), key=lambda st: st.id)) if f is not None)
+        o["parts"].extend(_piers(sub, zs, P.wet_at, P.bed_at))
+    # crosswalks: on the face that holds them, at its height
+    for c in m.crosswalks:
+        s = seg.get(c.segment_id)
+        cx, cy = _center(c.line)
+        z = 0.0
+        if s is not None:
+            from . import streets as ST
+
+            z = _z_on(s.z_profile, ST._project([tuple(p) for p in s.centerline], (cx, cy))[0])
+        r = ribbon(c.line, c.width_m, z=q(Z_CROSSWALK + z))
+        if r is None:
+            continue
+        P.join(P.district_at(cx, cy), "deck_crosswalk" if c.level else "crosswalk", cx, cy,
+               {"k": "ribbon", "m": "crosswalk", "l": r[0], "rr": r[1], "t": 0.0}, c.id)
+
+
 def _streets(P: _Plan) -> None:
     m = P.m
+    if m.pavement_net is not None:
+        _streets_map(P)
+        return
     seg_district = {}
     terrain = m.terrain is not None
     # (M18: the junctions drawn from their surfaces, which their roads end on)

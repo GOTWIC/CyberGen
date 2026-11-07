@@ -121,11 +121,14 @@ class _Fit:
         car = ("pedestrian", "footbridge")
         with G.canonical():
             for j in model.junctions:
-                if all(street_class(s) in car for s in legs.get(j.node_id, ())):
+                if all(street_class(s) in car for n in j.attrs.get("nodes") or [j.node_id]
+                       for s in legs.get(n, ())):
                     continue
                 shapes.append(G.from_model_poly(j.polygon))
                 rows.append(("junction", None, node_z.get(j.node_id, 0.0)))
-            jring = {j.node_id: [list(p) for p in j.polygon.exterior] for j in model.junctions}
+            # (M22: every node of a cluster is its junction's)
+            jring = {n: [list(p) for p in j.polygon.exterior] for j in model.junctions
+                     for n in j.attrs.get("nodes") or [j.node_id]}
             for s in model.road_segments:
                 if street_class(s) in car or len(s.centerline) < 2:
                     continue

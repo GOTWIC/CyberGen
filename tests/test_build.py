@@ -73,12 +73,11 @@ def test_sample_city_builds_and_passes(path):
 
 
 def test_committed_reports_match(tmp_path):
-    """docs/progress/fix_access/<city>/report.json (the access fixes, #86, #87 and #91: every
-    open space and entrance has a way in, the checks fail one without, on the barriers fix)
-    is committed, passes and matches a fresh build."""
+    """docs/progress/M22/<city>/report.json (M22, the pavement map: every road surface one
+    exact map, its four checks) is committed, passes and matches a fresh build."""
     for path in CITIES:
         slug = path.parent.name
-        folder = ROOT / "docs" / "progress" / "fix_access" / slug
+        folder = ROOT / "docs" / "progress" / "M22" / slug
         committed = folder / "report.json"
         assert committed.is_file(), committed
         rep = json.loads(committed.read_text())
@@ -164,7 +163,10 @@ def test_small_city_passes(small_built):
                        # M20
                        "prop_support", "plant_headroom",
                        # park paths fix
-                       "park_access", "walkway_building_clash"}
+                       "park_access", "walkway_building_clash",
+                       # M22
+                       "pavement_edges", "pavement_tiling", "pavement_heights",
+                       "pavement_junctions"}
 
 
 def test_check_geometry_invalid(small_built):

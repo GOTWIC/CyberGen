@@ -59,6 +59,7 @@ REFS: dict[str, tuple[str, ...]] = {
     "crosswalks": ("junction_id", "segment_id"),
     "sidewalks": ("segment_id",),
     "lanes": ("segment_id", "node_id", "successors[]", "adjacent_ids[]"),
+    "pavement": ("owner_id",),                                                    # M22
     "walkways": ("neighbors[]",),
     "structures": ("supports[]",),
     "decks": ("district_id", "segment_ids[]", "well_ids[]", "column_ids[]",
@@ -99,7 +100,7 @@ DERIVED = ("zones", "pois", "densities", "parking", "travel_points", "sign_slots
 ORDER = ("land", "seas", "districts", "fields", "tiles", "factions", "landmasses", "islands",
          "rivers", "channels", "waterways", "quays", "megasites", "places", "open_spaces",
          "bridges", "road_nodes", "road_segments", "junctions", "crosswalks", "sidewalks",
-         "lanes", "walkways", "tunnels", "transit_lines", "stations", "blocks", "lots",
+         "lanes", "pavement", "walkways", "tunnels", "transit_lines", "stations", "blocks", "lots",
          "properties", "buildings", "skybridges", "decks", "structures", "site_elements",
          "green_areas", "plants", "props") + DERIVED + ("banks", "ground_cover")
 NAMED = {"islands": "isl", "rivers": "rv", "transit_lines": "tl", "stations": "stn"}
