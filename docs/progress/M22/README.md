@@ -50,6 +50,10 @@ bridge decks whose locked spans are 1.27 m apart in height: no surface joins the
 moving a bridge. Cragmouth's hillside junctions are on ground steeper than 4%, where a
 primary road keeps its grade through its junctions (M18).
 
+Delta Megacity is the review city: `delta_megacity/render_jn_e170s444.jpg` (the twin-ramp
+cluster that holds `jn.e217s328`, its steep gore beside the ramp) and `render_jn_e8s46.jpg`
+(the junction between two bridge decks) show them in the blockout up close.
+
 ## Open
 
 - Vesper Bay Stacks fails `transit_curves` on every layout: its Crown Line sky tube leaves its

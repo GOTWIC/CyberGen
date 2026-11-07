@@ -235,12 +235,14 @@ def test_sample_passes_the_map_checks():
             assert why_text(j.attrs["unbuildable"])
     assert math.isfinite(sum(v.z for v in m.pavement_net.vertices))
     # (the map made again from the finished model's rows, as a district regeneration makes
-    # it, is the map M2 made: its ties go by geometry, never by the ids M10 renames)
+    # it, is the map M2 made: its ties go by geometry, never by the ids M10 renames; the
+    # same faces, which a finished model keeps in build order and the remade map by id)
     from citygen import build as B
     from citygen import geom as G
 
     m = CityModel.from_json(m.to_json())      # (as the splice reads it: its rows)
     with G.canonical():
         again = B.pavement_of(b.spec, m)
-    assert again.pavement == m.pavement and again.pavement_net == m.pavement_net
+    assert {f.id: f for f in again.pavement} == {f.id: f for f in m.pavement}
+    assert again.pavement_net == m.pavement_net
     assert [j.polygon for j in again.junctions] == [j.polygon for j in m.junctions]
