@@ -527,14 +527,18 @@ PIER_FOOT = (1.8, -2.0, 1.2)    # a pier's footing (M19's blockout): times the c
                                 # width, bottom and top over the ground (m)
 
 
-def footing(mesh: Mesh, ring, g: float, bed: float | None = None):
+def footing(mesh: Mesh, ring, g: float, bed: float | None = None,
+            h_max: float | None = None):
     """AG14: the footing under a pier (M19's transit piers, a road column in the water): a block wider than
     the column from `BED_EMBED_M` into M16's bed (or 2 m under the ground) to 1.2 m over the
-    ground, a chamfered top."""
+    ground, a chamfered top (`h_max`: its half width at most, where a building stands
+    nearer, `foot_room`)."""
     cx_ = sum(p[0] for p in ring) / len(ring)
     cy_ = sum(p[1] for p in ring) / len(ring)
     h = max(max(abs(p[0] - cx_) for p in ring), max(abs(p[1] - cy_) for p in ring)) * \
         PIER_FOOT[0]
+    if h_max is not None:
+        h = min(h, h_max)
     z0, z1 = g + PIER_FOOT[1], g + PIER_FOOT[2]
     if bed is not None:
         z0 = min(z0, bed - BED_EMBED_M)

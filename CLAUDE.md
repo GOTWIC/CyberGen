@@ -1307,7 +1307,8 @@ checks `pavement_checks.py`, preview `preview_pavement.py`):
   regeneration's seam junction leaves the held roads as they were. A road whose two cuts leave
   under `pavement.MIN_ROAD_M` joins its junctions into one, a cluster (`plan_units`: junction
   `attrs.nodes`, `inner`; nodes within `CLUSTER_DZ_M` in height). M13's grade lines keep
-  M17's runs (`runs17`).
+  M17's runs (`runs17`). M2 lays no local junction within `streets.APPROACH_PAD_M` 60 m of a
+  primary road's stretch over M7's 3 m, where no one surface could carry it.
 - **Faces:** ribbons by the cross-section between the cuts, one mitred frame per station;
   bend faces where a band would fold (`Road.folds`, `fold_poly`: never a mitre's spike); a
   junction's carriageway (core, legs' stubs, inner roads, a bulb) less the ribbons where they

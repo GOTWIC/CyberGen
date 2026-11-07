@@ -80,6 +80,11 @@ def gather_structure(cx: Ctx, st, maker_name: str) -> Piece:
             bz = cx.bed_z(c[0], c[1]) if cx.beds is not None else None
             inputs["bed"] = bz if bz is not None else \
                 C.m(cx.ground.water_level(None, -1.5) - 4.0)
+        if inputs.get("bed") is not None or a.get("form") == "pier" or a.get("pier"):
+            # (M22's layouts: a pier's footing stops short of a building beside it)
+            room = foot_room(cx, pts)
+            if room is not None:
+                inputs["foot_max"] = room
     if a.get("role") == "platform" and st.footprint is not None:
         # AG14: a platform stops at the tracks running beside it (it reached into the
         # guideway or the tube by the model's margins)
@@ -90,6 +95,37 @@ def gather_structure(cx: Ctx, st, maker_name: str) -> Piece:
         else f"street.structure.{st.kind}"
     return Piece(st.id, kind, maker_name, cx.tile_for(st.id, pts), cx.keys.get(st.id, []),
                  inputs)
+
+
+def foot_room(cx: Ctx, ring) -> float | None:
+    """The largest half width a pier's square footing (`structures.footing`) may have about
+    its column's middle without reaching a building's footprint, where that is less than the
+    footing's own; never under the column's half width. None where nothing is that near."""
+    import shapely
+    from shapely.geometry import box
+
+    from citygen import geom as G
+    from .structures import PIER_FOOT
+
+    tree = cx.__dict__.get("_bld_tree")
+    if tree is None:
+        polys = [G.from_model_poly(b.footprint) for b in cx.m.buildings
+                 if b.footprint is not None]
+        tree = cx.__dict__["_bld_tree"] = (shapely.STRtree(polys) if polys else None, polys)
+    t, polys = tree
+    if t is None:
+        return None
+    x0 = sum(p[0] for p in ring) / len(ring)
+    y0 = sum(p[1] for p in ring) / len(ring)
+    h0 = max(max(abs(p[0] - x0) for p in ring), max(abs(p[1] - y0) for p in ring))
+    h = h0 * PIER_FOOT[0]
+    near = [polys[i] for i in t.query(box(x0 - h, y0 - h, x0 + h, y0 + h),
+                                      predicate="intersects").tolist()]
+    if not near:
+        return None
+    while h > h0 and any(p.intersects(box(x0 - h, y0 - h, x0 + h, y0 + h)) for p in near):
+        h = round(h - 0.05, 2)
+    return max(h, round(h0, 2))
 
 
 _TRACKS: dict = {}
@@ -320,7 +356,7 @@ def make_transit_column(inp: dict) -> Out:
     c = inp["origin"]
     pier = a.get("form") == "pier" or bool(a.get("pier")) or inp.get("bed") is not None
     if pier:
-        footing(mesh, ring, g, inp.get("bed"))
+        footing(mesh, ring, g, inp.get("bed"), inp.get("foot_max"))
         z0 = max(z0, g + PIER_FOOT[2] - 0.05)       # the shaft from the footing's top
     if a.get("frame"):
         mesh.prism("concrete.column", ring, z0, z1)
