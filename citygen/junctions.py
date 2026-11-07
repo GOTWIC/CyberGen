@@ -326,13 +326,15 @@ MITRE_TAN_MAX = 6.0     # M22: tan(half a turn) counted at most (a turn near a r
 MITRE_TAN_MIN = 0.2679  # M22: tan(half a turn) of a corner (a turn of 30 degrees or more)
 
 
-def plan_units(net, legs: dict, heads: dict, gr=None) -> list[dict]:
+def plan_units(net, legs: dict, heads: dict, gr=None, force: dict | None = None
+               ) -> list[dict]:
     """M22: the junctions of a network as regions. A cul-de-sac's leg is cut where its
     carriageway and sidewalks meet the bulb; a road whose two cuts leave less than
     `pavement.MIN_ROAD_M` has no face of its own: its two junctions (or a junction and the
     plain node it reaches) are one, a cluster, the road inside it. Cuts are put on the 1 mm
     grid, so the model's copy is the cut itself. Returns [{nodes, inner, head}] by first
-    node."""
+    node (`force`: road id -> whether it is inside a cluster, decided before: M10's held
+    junctions, `held_units`)."""
     from .pavement import MIN_ROAD_M
 
     for nid in sorted(legs):
@@ -349,12 +351,12 @@ def plan_units(net, legs: dict, heads: dict, gr=None) -> list[dict]:
           (len(lg) == 1 and heads.get(nid, 0.0) > 0.0)}
     g = gr.ramp_max if gr is not None else None
     for _ in range(CLUSTER_ROUNDS):
-        groups, inner = _clusters(net, legs, jn, MIN_ROAD_M, g)
+        groups, inner = _clusters(net, legs, jn, MIN_ROAD_M, g, force)
         # (the legs of a cluster that leave it from different nodes: their cuts past where
         # their rights of way overlap near it, as at one node; that may join more)
         if not _cluster_overlaps(legs, groups, inner):
             break
-    groups, inner = _clusters(net, legs, jn, MIN_ROAD_M, g)
+    groups, inner = _clusters(net, legs, jn, MIN_ROAD_M, g, force)
     out = []
     for ns in groups:
         if not any(n in jn for n in ns):
@@ -371,11 +373,66 @@ def plan_units(net, legs: dict, heads: dict, gr=None) -> list[dict]:
     return out
 
 
+def held_units(net, legs: dict, fr) -> tuple[dict, dict, set]:
+    """M10 with M22: in a district regeneration, the nodes whose roads are all held roads
+    of the old city ({node id: the old junction's record}, `streets.Frame.old_junctions`:
+    every node of that junction held so), each held road's old row ({road id: row}), and the
+    held nodes that were no junction. Such a junction takes back its old cuts, cluster and
+    tag (its legs' heights are the old city's levelled ones, which the cut, cluster and fit
+    rules would read differently from the first build's), so it comes back as it was."""
+    recs = getattr(fr, "old_junctions", None)
+    if recs is None:
+        return {}, {}, set()
+    old_of = {}
+    for s in net.segments:
+        r = fr.match(s["centerline"], s)
+        if r is not None:
+            old_of[s["id"]] = r
+    pos = {n["id"]: (G.q(n["position"][0]), G.q(n["position"][1]), n["position"][2])
+           for n in net.nodes}
+    held = {nid for nid, lg in legs.items()
+            if lg and all(x.seg["id"] in old_of for x in lg)}
+
+    def rec_of(nid):
+        # (by place; where junctions of two levels share it, the one nearest in height: a
+        # node's height here is not yet M18's)
+        x, y, z = pos[nid]
+        best = None
+        for rec in recs.get((x, y), []):
+            for p, zz in rec["nodes"]:
+                if p == (x, y) and (best is None or abs(zz - z) < best[0]):
+                    best = (abs(zz - z), rec)
+        return best[1] if best is not None else None
+    by_rec: dict = {}
+    plain = set()
+    for nid in sorted(held):
+        rec = rec_of(nid)
+        if rec is None:
+            plain.add(nid)
+        else:
+            by_rec.setdefault(rec["id"], (rec, []))[1].append(nid)
+    out = {}
+    for rec, nids in by_rec.values():
+        if len(nids) == len(rec["nodes"]):       # (every node of it held)
+            for nid in nids:
+                out[nid] = rec
+    return out, old_of, plain
+
+
+def _old_cut(x, rec: dict, r) -> float:
+    """A held leg's cut at its old junction (0 where it had none)."""
+    p0 = x.seg["centerline"][0]
+    same = abs(p0[0] - r.centerline[0][0]) < 0.02 and abs(p0[1] - r.centerline[0][1]) < 0.02
+    end = ("a" if x.at_start else "b") if same else ("b" if x.at_start else "a")
+    return rec["cuts"].get((r.id, end), 0.0)
+
+
 CLUSTER_ROUNDS = 4
 CLUSTER_DZ_M = 3.0      # M22: junctions this far apart in height are not joined for it
 
 
-def _clusters(net, legs: dict, jn: set, min_road: float, g=None) -> tuple[list, set]:
+def _clusters(net, legs: dict, jn: set, min_road: float, g=None,
+              force: dict | None = None) -> tuple[list, set]:
     """Groups of nodes joined by roads whose two cuts leave less than `min_road`, or (`g`)
     less than the road needs to climb from one junction's height to the other's at that
     grade (one with no bridge or tunnel on it, not a deck's): sorted lists, by first node;
@@ -392,6 +449,11 @@ def _clusters(net, legs: dict, jn: set, min_road: float, g=None) -> tuple[list, 
     inner = set()
     for s in net.segments:
         if s["road_class"] == "footbridge" or not (s["start"] in jn or s["end"] in jn):
+            continue
+        if force is not None and s["id"] in force:
+            if force[s["id"]]:
+                parent[find(s["start"])] = find(s["end"])
+                inner.add(s["id"])
             continue
         a = cut.get((s["id"], True), 0.0) if s["start"] in jn else 0.0
         b = cut.get((s["id"], False), 0.0) if s["end"] in jn else 0.0
@@ -2427,7 +2489,28 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
     fold_cuts(net, legs)
     lock_cuts(net, legs)
     fold_cuts(net, legs)        # (a lock's cut can land in a fold)
-    units = plan_units(net, legs, heads, gr)
+    # (M10 with M22: a regeneration's junctions whose roads are all held as they were)
+    fr0 = getattr(getattr(net, "builder", None), "frame", None)
+    hu, old_of, plain = held_units(net, legs, fr0) if fr0 is not None else ({}, {}, set())
+
+    def restore():
+        for nid, rec in hu.items():
+            for x in legs[nid]:
+                if x.seg["id"] not in rec["inner"] and \
+                        old_of[x.seg["id"]].id not in rec["inner"]:
+                    x.cut = x.cut_row = _old_cut(x, rec, old_of[x.seg["id"]])
+        for nid in plain:
+            for x in legs[nid]:
+                x.cut = x.cut_row = 0.0
+    restore()
+    force = {}
+    for s in net.segments:
+        a, b = hu.get(s["start"]), hu.get(s["end"])
+        if s["id"] in old_of and (a is not None or s["start"] in plain) and \
+                (b is not None or s["end"] in plain):
+            force[s["id"]] = a is not None and a is b and old_of[s["id"]].id in a["inner"]
+    units = plan_units(net, legs, heads, gr, force)
+    restore()
     inner = {sid for u in units for sid in u["inner"]}
     unit_of = {n: k for k, u in enumerate(units) for n in u["nodes"]}
     pvu = []
@@ -2480,11 +2563,16 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
         if u["head"]:
             # (M17: a cul-de-sac or a quay end with room for its turning bulb)
             cls = ST.street_class(legs[nid0][0].seg)
+            x0 = legs[nid0][0]
+            c0 = cutx.get((x0.seg["id"], x0.at_start), 0.0)
             junctions.append({"id": jid, "node_id": nid0, "polygon": poly,
                               "signalized": False, "crosswalk_ids": [], "row_polygon": R,
                               "attrs": {"type": cls, "shape": "cul_de_sac", "legs": 1,
                                         "corner_radius_m": heads[nid0],
-                                        "archetype": node_arch[nid0], "classes": [cls]}})
+                                        "archetype": node_arch[nid0], "classes": [cls],
+                                        # (M22: its leg's cut, where the bulb begins)
+                                        **({"cuts": [[x0.seg["id"], "a" if x0.at_start
+                                                      else "b", c0]]} if c0 > 0.0 else {})}})
             continue
         allg = [x for nd in nodes for x in legs[nd]]
         ext = [x for x in allg if x.seg["id"] not in inner]
@@ -2582,6 +2670,15 @@ def build(net, district_arch: dict, did_by_name: dict, seed: int, gr=None,
         why = lev.get("held", {}).get(j["node_id"])
         if why and j["node_id"] in first_of and j["node_id"] in set(lev.get("unresolved", [])):
             j["attrs"]["unbuildable"] = why
+        # (M10: a junction whose roads are all held keeps its old tag)
+        ns = j["attrs"].get("nodes") or [j["node_id"]]
+        recs = {id(hu[n]) for n in ns if n in hu}
+        if len(recs) == 1 and all(n in hu for n in ns):
+            old = hu[ns[0]]["unbuildable"]
+            if old:
+                j["attrs"]["unbuildable"] = old
+            else:
+                j["attrs"].pop("unbuildable", None)
     # sidewalks and centerline walkways
     for s in net.segments:
         if s["attrs"].get("role") == "deck_ramp":

@@ -1344,7 +1344,11 @@ checks `pavement_checks.py`, preview `preview_pavement.py`):
   objects they were in (keys unchanged; a band's side from its name before a split suffix,
   `blockout._side`), curbs as walls; `preview_pavement.png`.
 - **With M10, M13, M14:** ids from owners, the splice makes the map again on the spliced city
-  (`build.pavement_of`); heights over M13's ground; a deck's streets on layer d1.
+  (`build.pavement_of`); in a regeneration a junction whose roads are all held takes back its
+  old cuts, cluster and tag (`junctions.held_units`, `streets.Frame.old_junctions`: its roads
+  come back with the old city's levelled heights, which the cut, cluster and fit rules would
+  read otherwise), and a held node that was no junction stays none; heights over M13's
+  ground; a deck's streets on layer d1.
 Sample builds: `docs/progress/M22/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)

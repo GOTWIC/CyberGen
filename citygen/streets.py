@@ -514,6 +514,19 @@ class Frame:
         shapely.prepare(self.zone)
         shapely.prepare(self.core)
         pos = {n.id: (G.q(n.position[0]), G.q(n.position[1])) for n in model.road_nodes}
+        # M22: the old city's junctions at their nodes' places and heights (a junction whose
+        # roads are all held takes back its cuts, cluster and tag: `junctions.held_units`);
+        # the places of the old nodes that were no junction
+        zat = {n.id: n.position[2] for n in model.road_nodes}
+        self.old_junctions: dict[tuple, dict] = {}
+        for j in model.junctions:
+            ns = j.attrs.get("nodes") or [j.node_id]
+            rec = {"id": j.id, "nodes": [(pos[n], zat[n]) for n in ns if n in pos],
+                   "inner": set(j.attrs.get("inner") or []),
+                   "cuts": {(c[0], c[1]): c[2] for c in j.attrs.get("cuts") or []},
+                   "unbuildable": j.attrs.get("unbuildable")}
+            for p, _ in rec["nodes"]:
+                self.old_junctions.setdefault(p, []).append(rec)
         self.rows: dict[tuple, object] = {}       # held segments by centerline
         self.m1b: dict[str, list[tuple]] = {}     # M1b id -> centerlines of its held pieces
         self.pinned_local = []                    # pinned streets of the district itself

@@ -1221,6 +1221,15 @@ class Assembly:
             return f.prio > g.prio
         return (self._anchor(f), f.band) < (self._anchor(g), g.band)
 
+    def _road_place(self, sid: str) -> tuple:
+        """A road's ends and middle vertex, in order (on the 1 mm grid)."""
+        rd = self.roads.get(sid)
+        if rd is None:
+            return ()
+        p = rd.path.p
+        return tuple(sorted({(round(q[0], 3), round(q[1], 3))
+                             for q in (p[0], p[-1], p[len(p) // 2])}))
+
     def _anchor(self, f: Face) -> tuple:
         """A face's owner's place: a junction's nodes, a road's ends and middle vertex, in
         order (on the 1 mm grid)."""
@@ -1550,10 +1559,15 @@ class Assembly:
         corner pad's property line likewise."""
         z: dict = {}
         faces = self.faces
+        # (faces in an order of their own geometry, priority first: a vertex two faces share
+        # takes the first one's height, never by build order or ids, which M10 changes)
+        order = sorted(range(len(faces)), key=lambda i: (
+            tuple(-x for x in faces[i].prio), self._anchor(faces[i]), faces[i].kind,
+            faces[i].band))
         # (a ribbon vertex a junction's face shares, where the junction reaches over the
         # ribbon short of its port: the junction's surface there, its port's height)
         jv: dict = {}
-        for fi, f in enumerate(faces):
+        for fi, f in ((i, faces[i]) for i in order):
             if f.kind in JUNCTION_KINDS and f.road is None:
                 for ids in self.vrings[fi]:
                     for name in ids:
@@ -1563,7 +1577,7 @@ class Assembly:
             ends = [st for st, uid in ((rd.a, rd.unit_a), (rd.path.L - rd.b, rd.unit_b))
                     if uid is not None and uid in jv.get(name, ())]
             return min(ends, key=lambda st: abs(st - s)) if ends else s
-        for fi, f in enumerate(faces):
+        for fi, f in ((i, faces[i]) for i in order):
             if f.road is None or f.kind == "bend":
                 continue
             rd = self.roads[f.road]
@@ -1578,7 +1592,7 @@ class Assembly:
                     s = rd.known.get(v)
                     if s is not None:
                         z[name] = rd.z(at_port(rd, name, s))
-        for fi, f in enumerate(faces):
+        for fi, f in ((i, faces[i]) for i in order):
             if f.road is None or f.kind == "bend":
                 continue
             rd = self.roads[f.road]
@@ -1591,10 +1605,11 @@ class Assembly:
                         s = rd.path.project(m(v[0]), m(v[1]), s0, s1)
                         z[name] = rd.z(at_port(rd, name, s))
         # (a port no ribbon reaches, a bend's end at its junction: its road's height there)
-        for fi, f in enumerate(faces):
+        for fi, f in ((i, faces[i]) for i in order):
             if f.kind not in JUNCTION_KINDS:
                 continue
-            own = [f.road] if f.road is not None else sorted(f.legs)
+            own = [f.road] if f.road is not None else sorted(
+                f.legs, key=lambda sid: (self._road_place(sid), sid))
             for r, ids in zip(f.rings, self.vrings[fi]):
                 for v, name in zip(r, ids):
                     if name in z:
@@ -1607,18 +1622,18 @@ class Assembly:
                             break
         # (a cluster's curbs longer than LONG_CURB_M between two ports, along its inner
         # roads: their heights there, kept between the two ports' heights)
-        for fi, f in enumerate(faces):
+        for fi, f in ((i, faces[i]) for i in order):
             u = self.units.get(f.unit) if f.road is None else None
             if f.kind == "junction" and u is not None and u.inner:
                 for r, ids in zip(f.rings, self.vrings[fi]):
                     self._long_curbs(u, r, ids, z)
         for kinds in (("junction", "bulb", "bend"), ("corner",)):
-            for fi, f in enumerate(faces):
+            for fi, f in ((i, faces[i]) for i in order):
                 if f.kind not in kinds:
                     continue
                 for r, ids in zip(f.rings, self.vrings[fi]):
                     self._along_ring(f, r, ids, z)
-        for fi, f in enumerate(faces):
+        for fi, f in ((i, faces[i]) for i in order):
             for r, ids in zip(f.rings, self.vrings[fi]):
                 for v, name in zip(r, ids):
                     if name not in z:
