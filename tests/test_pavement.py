@@ -239,6 +239,7 @@ def test_sample_passes_the_map_checks():
     from citygen import build as B
     from citygen import geom as G
 
+    m = CityModel.from_json(m.to_json())      # (as the splice reads it: its rows)
     with G.canonical():
         again = B.pavement_of(b.spec, m)
     assert again.pavement == m.pavement and again.pavement_net == m.pavement_net
