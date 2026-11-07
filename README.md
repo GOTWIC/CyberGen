@@ -155,7 +155,7 @@ The harbor drained: basins, the sea's bed by depth, banks, the marsh and its edg
 | M19 | Transit structures | Lines clear of buildings, supports under the track at even spans (columns, portal frames, piers, sky tube masts), more room over the streets | ✅ Done |
 | M20 | Props, plants and signs | Nothing floating or growing through a road: every lamp, bench, railing, sign and tree on the ground, a road deck, a quay, a roof or its wall; many more large neon billboards, banners and holo-boards on the sides and tops of buildings, set per district (`signage`) | ✅ Done |
 | M21 | Cyberpunk massing | Towers twisted, tapered, leaning, stacked, cantilevered, split, cut through by sky gardens, in exoskeletons or covered in pods, with sloped, cut and halo crowns; curved slabs; true curves; no two neighboring towers alike; a `variety` per district | ✅ Done |
-| M22 | Pavement map | One exact map of every road, junction, sidewalk and median surface, with shared edges and one height per point, so roads and junctions meet with no gap or step | Done |
+| M22 | Pavement map | One exact map of every road, junction, sidewalk and median surface, with shared edges and one height per point, so roads and junctions meet with no gap or step | ✅ Done |
 
 ### Run it
 
