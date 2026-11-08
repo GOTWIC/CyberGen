@@ -163,6 +163,31 @@ def map_stations(seg: dict, cuts) -> list[float]:
     return sorted({round(v, 4) for v in out})
 
 
+def row_uvs(seg: dict, stations) -> dict:
+    """UV0 of a road's ribbon vertices: {(x, y) mm: (station, offset)}, each the map's point
+    at a station and a band offset (`citygen.pavement.Road`, as the map lays them), so a
+    face's UV runs along the road without the squeeze a projection onto the centerline has
+    outside a turn."""
+    from citygen import pavement as CPV
+    try:
+        r = CPV.Road(seg)
+    except (ValueError, ZeroDivisionError):
+        return {}
+    out = {}
+    for sv in stations:
+        for w in r.ws:
+            out.setdefault(r.path.point(sv, w), (sv, w))
+    return out
+
+
+def face_uv(path: Path, rows: dict):
+    """UV0 of a road face's vertex: its row's (station, offset), else its projection."""
+    def uv(x, y):
+        got = rows.get((int(round(x * 1000.0)), int(round(y * 1000.0))))
+        return got if got is not None else path.project(x, y)
+    return uv
+
+
 def gather(cx: Ctx, s) -> Piece:
     did = s.district_ids[0] if s.district_ids else s.attrs.get("district")
     ends = []
@@ -415,10 +440,7 @@ def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
     curb = MT.curb(style["archetype"])
     med = rd.cs.get("median_m", 0.0) or 0.0
 
-    def uv(x, y):
-        s, t = rd.path.project(x, y)
-        return (s, t)
-
+    uv = face_uv(rd.path, row_uvs(rd.seg, inp.get("stations") or ()))
     bottom, out_slot = PV.bottoms(dk, rd.path, embs)
     specs: list = []
     for fi in inp.get("faces", ()):
@@ -426,7 +448,8 @@ def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
         slot = face_slot(fi, rd.cls, style)
         if fi["kind"] == "bend" and rd.cls not in PEDESTRIAN and rd.h < rd.W / 2.0 - 0.05:
             fi, slot = _bend(rd, fi, slot, MT.paving(style["archetype"]))
-        tris = PV.draw(mesh, fi, slot, uv)
+        # (a bend's UV in plan: no row runs through a fold)
+        tris = PV.draw(mesh, fi, slot, None if fi["kind"] == "bend" else uv)
         for t in tris:
             surf.add(t)
         wslot = out_slot or (slot if isinstance(slot, str) else curb)

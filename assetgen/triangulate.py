@@ -104,6 +104,16 @@ def _bridge(pts, ring: list[int], hole: list[int], others: list[list[int]]) -> l
 
 
 def triangulate(outer, holes=(), keep_straight: bool = False) -> list[tuple[int, int, int]]:
+    got = _prepare(outer, holes)
+    if got is None:
+        return []
+    pts, ring = got
+    return _clip(pts, ring, keep_straight)
+
+
+def _prepare(outer, holes):
+    """(points, the one ring with its holes bridged in, as point indices), or None where
+    the outer ring has fewer than three vertices."""
     pts = [tuple(int(c) for c in p) for p in outer]
     rings = [_clean(outer, 0)]
     base = len(pts)
@@ -113,7 +123,7 @@ def triangulate(outer, holes=(), keep_straight: bool = False) -> list[tuple[int,
         base += len(h)
     ring = rings[0]
     if len(ring) < 3:
-        return []
+        return None
     if area2([pts[i] for i in ring]) < 0:
         ring = ring[::-1]
     hs = []
@@ -127,7 +137,7 @@ def triangulate(outer, holes=(), keep_straight: bool = False) -> list[tuple[int,
     hs.sort(key=lambda h: (-max(pts[i][0] for i in h), min(h)))
     for k, h in enumerate(hs):
         ring = _bridge(pts, ring, h, hs[k + 1:])
-    return _clip(pts, ring, keep_straight)
+    return pts, ring
 
 
 def _clip(pts, ring: list[int], keep: bool = False) -> list[tuple[int, int, int]]:
@@ -321,7 +331,7 @@ class _Tri:
 
     def _legalize(self, todo: list) -> None:
         guard = 0
-        limit = 64 * (len(self.t) + 16)
+        limit = 256 * (len(self.t) + 16)
         while todo and guard < limit:
             guard += 1
             u, v = todo.pop()
@@ -376,10 +386,69 @@ def _touching(rings: list) -> list:
     return [outer] + holes
 
 
+def _clip_best(pts, ring: list[int]) -> list[tuple[int, int, int]]:
+    """Ear clipping that always takes the ear with the shortest new diagonal (ties by
+    position in the ring): a long ribbon comes out as a zigzag strip, not a fan of slivers
+    from one vertex (which Delaunay flips would need O(n^2) steps to undo). Every vertex is
+    kept (straight runs too, as `triangulate(..., keep_straight=True)`); where no ear is
+    left, the rest goes to `_clip`."""
+    import heapq
+    n = len(ring)
+    if n < 3:
+        return []
+    prev = [(k - 1) % n for k in range(n)]
+    nxt = [(k + 1) % n for k in range(n)]
+    alive = [True] * n
+    count = n
+    ver = [0] * n
+
+    def ear(k):
+        p, q = prev[k], nxt[k]
+        a, b, c = pts[ring[p]], pts[ring[k]], pts[ring[q]]
+        if orient(a, b, c) <= 0 or not _empty(pts, ring, nxt, k, p, q, a, b, c):
+            return None
+        return (c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2
+    heap: list = []
+    for k in range(n):
+        d = ear(k)
+        if d is not None:
+            heap.append((d, k, 0))
+    heapq.heapify(heap)
+    out: list[tuple[int, int, int]] = []
+    while count > 3 and heap:
+        d, k, v = heapq.heappop(heap)
+        if not alive[k] or v != ver[k]:
+            continue
+        p, q = prev[k], nxt[k]
+        out.append((ring[p], ring[k], ring[q]))
+        alive[k] = False
+        nxt[p], prev[q] = q, p
+        count -= 1
+        for m in (p, q):
+            ver[m] += 1
+            dm = ear(m)
+            if dm is not None:
+                heapq.heappush(heap, (dm, m, ver[m]))
+    if count > 3:
+        k = next(i for i in range(n) if alive[i])
+        rest = [k]
+        j = nxt[k]
+        while j != k:
+            rest.append(j)
+            j = nxt[j]
+        out += _clip(pts, [ring[i] for i in rest], True)
+    elif count == 3:
+        k = next(i for i in range(n) if alive[i])
+        p, q = prev[k], nxt[k]
+        if orient(pts[ring[p]], pts[ring[k]], pts[ring[q]]) > 0:
+            out.append((ring[p], ring[k], ring[q]))
+    return out
+
+
 def triangulate_face(rings, steiner=()) -> tuple[list, list[tuple[int, int, int]]]:
     """AG17: triangles of a face of M22's pavement map on its integer millimeters: the
     boundary's vertices in order and never split (every one a corner, straight runs too;
-    holes bridged), Steiner points (the face's interior samples) inserted strictly inside,
+    holes bridged; the ear with the shortest diagonal first, `_clip_best`), Steiner points (the face's interior samples) inserted strictly inside,
     and the Delaunay condition restored by flips across every edge that is not boundary.
     Returns (points, triangles): the rings' vertices in order (outer ring, then each hole),
     then the Steiner points kept (those not strictly inside are left out); triangles
@@ -389,7 +458,8 @@ def triangulate_face(rings, steiner=()) -> tuple[list, list[tuple[int, int, int]
         return [], []
     rings = _touching(rings)
     pts = [p for r in rings for p in r]
-    tris = triangulate(rings[0], rings[1:], keep_straight=True)
+    got = _prepare(rings[0], rings[1:])
+    tris = _clip_best(got[0], got[1]) if got is not None else []
     fixed = set()
     base = 0
     for r in rings:

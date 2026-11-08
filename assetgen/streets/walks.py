@@ -104,6 +104,8 @@ def gather_sidewalk(cx: Ctx, w) -> Piece:
               "trees": sorted(trees), "origin": list(bbox_center(w.line))}
     if cx.pave.on:
         inputs["faces"] = [cx.pave.face_input(f) for f in sidewalk_face_ids(cx, w)]
+        from .roads import map_stations
+        inputs["stations"] = map_stations(road["seg"], road["cuts"])
     emb = sorted((st for st in cx.m.structures if st.kind == "embankment" and
                   (st.attrs or {}).get("road_id") == s.id), key=lambda st: st.id)
     if emb:
@@ -136,8 +138,8 @@ def make_sidewalk(inp: dict) -> Out:
     bottom, out_slot = PV.bottoms(dk, rd.path, embs)
     surf = PV.Surface()
 
-    def uv(x, y):
-        return rd.path.project(x, y)
+    from .roads import face_uv, row_uvs
+    uv = face_uv(rd.path, row_uvs(rd.seg, inp.get("stations") or ()))
     specs: list = []
     for fi in faces:
         slot = curb_slot if fi["band"].startswith("cr") else pave

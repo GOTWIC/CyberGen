@@ -619,6 +619,8 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
 
 
 BAND_STEP_M = 2.0       # stations of the band a run's holes are found on
+MIN_HOLE_M = 0.1        # a hole shorter than this along the road is none (two spans of a run
+                        # never meet end to end)
 OWN_PAD_M = 0.08        # a run stands on its road's faces within this (the map's mitres and
                         # the run's own differ by millimeters; AG14's check allows 0.1 m)
 
@@ -691,7 +693,9 @@ def _holes(P: Path, run: Run, s0: float, s1: float, own, xws) -> list:
                 if p.area < 0.01:
                     continue
                 ss = [P.project(x, y)[0] for x, y in p.exterior.coords]
-                out.append((max(min(ss), s0), min(max(ss), s1)))
+                a, b = max(min(ss), s0), min(max(ss), s1)
+                if b - a >= MIN_HOLE_M:
+                    out.append((a, b))
     return sorted(out)
 
 
