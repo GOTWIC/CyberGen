@@ -10,8 +10,9 @@ AG17: a road's faces end on its ports and never overlap another road's or a junc
 map tiles the pavement, `pave.py`), so a run needs no keep-outs round its junctions:
 
 - **Spans** (`road_runs`, at gather time, so a road's inputs hold them): a run goes from cut
-  to cut (where the road's faces end), less within `XWALK_CLEAR_M` of a crosswalk it would
-  cross; spans under `MIN_SPAN_M` are left out.
+  to cut (where the road's faces end), less where it would leave the road's own faces (M22
+  cuts them where another road's overlap them) or come within `XWALK_CLEAR_M` of a
+  crosswalk; spans under `MIN_SPAN_M` are left out.
 - **Ends**, each on the road's port line at its cut (`Road.port_frame`): `join` where its
   junction carries the run on (the junction's barrier starts on the same line), `open`
   where the road goes on as another (whose run starts there), else `stop` (a jersey slopes
@@ -28,7 +29,8 @@ map tiles the pavement, `pave.py`), so a run needs no keep-outs round its juncti
     apart), with no connector lane across the line between their ports' middles, carries
     the median across; their medians join it.
   Each junction barrier starts and ends on its legs' port lines, so it meets the legs' runs
-  on the same section.
+  on the same section; it keeps out of the junction's connector lanes (cut there and
+  capped, `_off_lanes`) and is split where its edge turns back (`_split_sharp`).
 
 Every value handed on is rounded to the centimeter (heights to the millimeter).
 """
@@ -378,8 +380,8 @@ def _corner(corners, joins, legs, A, B, kind, ka, kb, pts, first, last) -> None:
         joins[B][_side(lgb, pts[-1][0] / 1000.0, pts[-1][1] / 1000.0)] = True
 
 
-LANE_IN_M = 0.1         # a junction's barrier keeps out of its connector lanes but this
-                        # (AG14's check: within the lane's half width less `INSET_M`)
+LANE_IN_M = 0.0         # a junction's barrier keeps out of its connector lanes' whole width
+                        # (AG14's check: within the lane's half width less 0.1 m)
 
 
 def _lane_corridors(cx, j):
@@ -573,14 +575,14 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
             on = [o for o in cx.seg_at_node.get(nid, ()) if o.id != s.id]
             joins[at] = "open" if on else None
     xws = []
-    for c in sorted(cx.cross_on.get(s.id, ()), key=lambda c: c.id):
-        if len(c.line) < 2:
-            continue
-        a, b = c.line[0], c.line[-1]
-        ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
-        if ln.length >= 0.5:
-            xws.append(ln.buffer(c.width_m / 2.0 + XWALK_CLEAR_M, cap_style="flat"))
-            by.add(c.id)
+    tree, xs = _crosswalks(cx)
+    if tree is not None:
+        reach = shapely.LineString([(p[0], p[1]) for p in s.centerline]).buffer(
+            s.width_m / 2.0 + XWALK_CLEAR_M + 1.0)
+        for k in sorted(tree.query(reach, predicate="intersects").tolist()):
+            cid, g = xs[k]
+            xws.append(g)
+            by.add(cid)
     own = _faces_union(cx, s.id)
     out = []
     for run in runs:
@@ -617,6 +619,23 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
 BAND_STEP_M = 2.0       # stations of the band a run's holes are found on
 OWN_PAD_M = 0.08        # a run stands on its road's faces within this (the map's mitres and
                         # the run's own differ by millimeters; AG14's check allows 0.1 m)
+
+
+def _crosswalks(cx):
+    """Every crosswalk's rectangle grown by `XWALK_CLEAR_M` (a run keeps off any road's
+    crosswalk: one across a road beside it reaches its edge), indexed; cached."""
+    got = cx.__dict__.get("_xwalk_index")
+    if got is None:
+        xs = []
+        for c in sorted(cx.m.crosswalks, key=lambda c: c.id):
+            if len(c.line) < 2:
+                continue
+            a, b = c.line[0], c.line[-1]
+            ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
+            if ln.length >= 0.5:
+                xs.append((c.id, ln.buffer(c.width_m / 2.0 + XWALK_CLEAR_M, cap_style="flat")))
+        got = cx._xwalk_index = (shapely.STRtree([g for _, g in xs]) if xs else None, xs)
+    return got
 
 
 def _faces_union(cx, sid: str):

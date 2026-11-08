@@ -355,7 +355,7 @@ def make_junction(inp: dict) -> Out:
     up = not j.get("level") and any(PV.is_raised(fi) for fi in faces)
     if j.get("level"):
         def bottom(v):
-            return v[3] - PV.GROUND_SINK_MM
+            return v[3]         # (down to its deck's slab top)
     elif up:
         def bottom(v):
             # (a raised junction's slab D deep, down to the ground where it is lower)

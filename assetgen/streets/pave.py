@@ -412,8 +412,8 @@ def bottoms(dk: str, path=None, embs=()):
     (bottom(vertex) in millimeters or None, the walls' slot (a name, or slot(a, b) by the
     wall's ends) or None for the face's own).
     A viaduct's or bridge's fascia `FASCIA_MM` under its grade line (into the ground on
-    M18's embankment stretches), an embankment's into the ground, a deck street's onto its
-    slab, a deck ramp's none (its walls are its own), else into the ground."""
+    M18's embankment stretches), an embankment's into the ground, a deck street's down to its
+    slab's top, a deck ramp's none (its walls are its own), else into the ground."""
     def in_emb(v) -> bool:
         if not embs or path is None:
             return False
@@ -432,7 +432,7 @@ def bottoms(dk: str, path=None, embs=()):
     if dk == "embankment":
         return (lambda v: v[3] - v[4] - EMBANK_SINK_MM), "concrete"
     if dk == "slab":
-        return (lambda v: v[3] - GROUND_SINK_MM), "concrete"
+        return (lambda v: v[3]), "concrete"
     if dk == "ramp":
         return None, "concrete"
     return ground_bottom, None

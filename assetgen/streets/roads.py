@@ -459,12 +459,12 @@ def _bend(rd: Road, fi: dict, asphalt: str, paving: str):
             if z is not None:
                 extra.append([PV.mm(x), PV.mm(y), PV.mm(z)])
     fi = dict(fi, samples=list(fi.get("samples", ())) + extra)
-    h = rd.h + 0.01
+    h = rd.h + 0.05
 
     def slot(tri):
-        x = (tri[0][0] + tri[1][0] + tri[2][0]) / 3000.0
-        y = (tri[0][1] + tri[1][1] + tri[2][1]) / 3000.0
-        return asphalt if abs(rd.path.project(x, y)[1]) <= h else paving
+        # (asphalt only where the whole triangle is within the carriageway's half width)
+        far = max(abs(rd.path.project(p[0] / 1000.0, p[1] / 1000.0)[1]) for p in tri)
+        return asphalt if far <= h else paving
     return fi, slot
 
 
