@@ -300,18 +300,15 @@ def gather_junction(cx: Ctx, j) -> Piece:
               "style": cx.style(did), "origin": list(cxy), "top": top, "deck_d": D}
     if cx.pave.on:
         inputs["faces"] = [cx.pave.face_input(f) for f in cx.pave.faces_of(j.id)]
-        # (a part of its carriageway apart from the main one that no connector lane runs
-        # through is drawn in paving, as the space between the lanes it is)
-        from . import barriers as BR
-        corr = None
-        for fi in inputs["faces"]:
-            if fi["kind"] != "junction" or fi["band"] == "jn":
-                continue
-            if corr is None:
-                corr = BR._lane_corridors(cx, j) or False
-            g = _poly_of(fi)
-            if g is not None and (corr is False or shapely.intersection(g, corr).area < 1.0):
-                fi["paved"] = True
+        # (a part of its carriageway apart from the main one is asphalt only where its
+        # connector lanes run, `LANE_PAD_M` wider; paving elsewhere, as the space between
+        # the lanes it is)
+        if any(fi["kind"] == "junction" and fi["band"] != "jn" for fi in inputs["faces"]):
+            from . import barriers as BR
+            lanes = sorted((ln for n in cx.nodes_of(j) for ln in BR._connectors(cx, n)),
+                           key=lambda ln: ln.id)
+            inputs["lanes"] = [{"line": [[q[0], q[1]] for q in ln.centerline],
+                                "width": ln.width_m} for ln in lanes if len(ln.centerline) >= 2]
     if j.level:
         # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
         # ramp's top) a slab of its own carries it
@@ -325,17 +322,6 @@ def gather_junction(cx: Ctx, j) -> Piece:
                               "median": plan["median"]}
     return Piece(j.id, "street.junction", "junction", cx.tile_for(j.id, ext),
                  cx.keys.get(j.id, []), inputs)
-
-
-def _poly_of(fi: dict):
-    """A face input's outline as a shapely polygon (meters), or None."""
-    r = fi["rings"]
-    if not r or len(r[0]) < 3:
-        return None
-    g = shapely.Polygon([(p[0] / 1000.0, p[1] / 1000.0) for p in r[0]],
-                        [[(p[0] / 1000.0, p[1] / 1000.0) for p in h] for h in r[1:]
-                         if len(h) >= 3])
-    return g if g.is_valid else shapely.make_valid(g)
 
 
 def _off_deck(cx: Ctx, j) -> list:
@@ -392,14 +378,29 @@ def make_junction(inp: dict) -> Out:
     surf = PV.Surface()
     pads = 0
     specs: list = []
+    corr = None
+    if inp.get("lanes"):
+        from .roads import LANE_PAD_M
+        corr = shapely.union_all([shapely.LineString([(q[0], q[1]) for q in ln["line"]]).buffer(
+            ln["width"] / 2.0 + LANE_PAD_M) for ln in inp["lanes"]])
+        shapely.prepare(corr)
+
+    def lanes_or_paving(tri):
+        if corr is not None and all(shapely.contains_xy(corr, q[0] / 1000.0, q[1] / 1000.0)
+                                    for q in tri):
+            return slot
+        return pave
     for fi in faces:
-        sl = slot if fi["cls"] == "top" and not fi.get("paved") else pave
+        sl = slot if fi["cls"] == "top" else pave
+        if fi["kind"] == "junction" and fi["band"] != "jn" and fi["cls"] == "top":
+            sl = lanes_or_paving
         tris = PV.draw(mesh, fi, sl)
         for t in tris:
             surf.add(t)
         if fi["kind"] == "corner" and tris:
             pads += 1
-        out_slot = "concrete.deck" if up else (sl if fi["cls"] == "top" else pave)
+        out_slot = "concrete.deck" if up else (sl if isinstance(sl, str) and fi["cls"] == "top"
+                                               else pave)
         PV.walls(mesh, fi, out_slot, bottom, curb_slot=curb, out=specs)
         if up:
             # (the slab's edge on its ports, from `SKIRT_MM` under the surface to its foot:

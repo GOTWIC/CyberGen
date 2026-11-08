@@ -10,7 +10,7 @@ your machine.
 | Stage | Generator | What it makes | Status |
 |---|---|---|---|
 | 1 | [layoutgen](#stage-1-layoutgen) (`citygen`) | The city's layout: water, districts, roads, buildings, transit, props and gameplay data, as a Blender blockout and an Unreal Engine level | M0 to M22 done |
-| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15 done, the rest to come |
+| 2 | [assetgen](#stage-2-assetgen) | A unique 3D model for every building, plus street elements and textures | AG0 to AG8, AG10, AG12 to AG15, AG17 done, the rest to come |
 | 3 | [atmosgen](#stage-3-atmosgen) | Lighting, sky, weather and atmospherics | Planned ([draft plan](docs/atmosgen_scope.md)) |
 | 4 | [lifegen](#stage-4-lifegen) | Traffic, crowds, trains and aircraft, generated | Planned ([draft plan](docs/lifegen_scope.md)) |
 | 5 | [storygen](#stage-5-storygen) | Story, characters and cutscenes | Planned |
@@ -212,7 +212,7 @@ into Unreal through the same exporter as stage 1's city, replacing the blockout 
 
 Spec: [`docs/assetgen_scope.md`](docs/assetgen_scope.md) · Full milestone log:
 [`docs/assetgen_milestones.md`](docs/assetgen_milestones.md) · Builds:
-[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG12`](docs/progress/AG12), [`AG13`](docs/progress/AG13), [`AG15`](docs/progress/AG15)
+[`docs/progress/AG1`](docs/progress/AG1), [`AG2`](docs/progress/AG2), [`AG3`](docs/progress/AG3), [`AG4`](docs/progress/AG4), [`AG5`](docs/progress/AG5), [`AG6`](docs/progress/AG6), [`AG7`](docs/progress/AG7), [`AG10`](docs/progress/AG10), [`AG12`](docs/progress/AG12), [`AG13`](docs/progress/AG13), [`AG15`](docs/progress/AG15), [`AG17`](docs/progress/AG17)
 
 ### Cities
 
@@ -502,7 +502,7 @@ over the blockout, each replacing its blockout piece, with tinted materials and 
 | AG14 | Fit and finish | Junctions that meet their roads, smooth glazed curved walls, roof equipment on its roofs, transit frames, piers and cable-stayed masts, embankments under low decks, bridges drawn once, nothing hanging over the lanes; checks that everything rests on something and nothing passes through anything else | Done |
 | AG15 | Cyberpunk facades and night | Seven new facade styles and window patterns beyond grids, two or three finishes a building, neighboring towers never alike; every building lit its own way at night with crown lights and logos; lamps that light the streets in Unreal | Done |
 | AG16 | Performance | A benchmark through each city in Unreal, frame time, memory and import targets, and the fixes that meet them: fewer distinct meshes and actors, more instancing, streaming and HLODs tuned | Planned |
-| AG17 | Road surfaces | Roads, junctions, sidewalks, medians and barriers drawn from the pavement map, joined seamlessly | Planned |
+| AG17 | Road surfaces | Roads, junctions, sidewalks, medians and barriers drawn from the pavement map, joined seamlessly | Done |
 
 ---
 

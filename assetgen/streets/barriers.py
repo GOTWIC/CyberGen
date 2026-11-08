@@ -424,8 +424,8 @@ def _lane_corridors(cx, j):
             h = ln.width_m / 2.0 - LANE_IN_M
             if h <= 0.1:
                 continue
-            gs.append(shapely.LineString([(p[0], p[1]) for p in ln.centerline]).buffer(
-                h, cap_style="flat"))
+            # (round caps: the fit check measures a barrier's distance to the lane's line)
+            gs.append(shapely.LineString([(p[0], p[1]) for p in ln.centerline]).buffer(h))
     if not gs:
         return None
     with G.canonical():
@@ -441,7 +441,8 @@ def _off_lanes(pts, corr, reach: float) -> list:
     line = shapely.LineString([(p[0] / 1000.0, p[1] / 1000.0) for p in pts])
     if line.length < 0.01:
         return [(pts, True, True)]
-    strip = line.buffer(reach, single_sided=True)
+    # (the section's reach, doubled: a sweep mitres its frames up to `MITER_CAP`)
+    strip = line.buffer(reach * MITER_CAP, single_sided=True)
     hit = shapely.intersection(strip, corr)
     if hit.is_empty or hit.area < 0.005:
         return [(pts, True, True)]
