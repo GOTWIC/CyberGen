@@ -490,7 +490,6 @@ def _median_across(cx, j, PI, legs: dict, fids) -> dict | None:
     if corr is not None and shapely.intersection(
             shapely.LineString([pa, pb]).buffer(0.3, cap_style="flat"), corr).area > 0.01:
         return None     # (a lane runs along it: no room for a median there)
-    import shapely
     tops = [f for f in fids if PI.cls[f] == "top"]
     polys = []
     for f in tops:

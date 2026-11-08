@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import math
 
+import shapely
+
 from .. import canon as C
 from . import materials as MT
 from . import pave as PV
@@ -298,6 +300,18 @@ def gather_junction(cx: Ctx, j) -> Piece:
               "style": cx.style(did), "origin": list(cxy), "top": top, "deck_d": D}
     if cx.pave.on:
         inputs["faces"] = [cx.pave.face_input(f) for f in cx.pave.faces_of(j.id)]
+        # (a part of its carriageway apart from the main one that no connector lane runs
+        # through is drawn in paving, as the space between the lanes it is)
+        from . import barriers as BR
+        corr = None
+        for fi in inputs["faces"]:
+            if fi["kind"] != "junction" or fi["band"] == "jn":
+                continue
+            if corr is None:
+                corr = BR._lane_corridors(cx, j) or False
+            g = _poly_of(fi)
+            if g is not None and (corr is False or shapely.intersection(g, corr).area < 1.0):
+                fi["paved"] = True
     if j.level:
         # M14 (AG10): a deck's junction lies on its slab; where it reaches past it (at a
         # ramp's top) a slab of its own carries it
@@ -311,6 +325,17 @@ def gather_junction(cx: Ctx, j) -> Piece:
                               "median": plan["median"]}
     return Piece(j.id, "street.junction", "junction", cx.tile_for(j.id, ext),
                  cx.keys.get(j.id, []), inputs)
+
+
+def _poly_of(fi: dict):
+    """A face input's outline as a shapely polygon (meters), or None."""
+    r = fi["rings"]
+    if not r or len(r[0]) < 3:
+        return None
+    g = shapely.Polygon([(p[0] / 1000.0, p[1] / 1000.0) for p in r[0]],
+                        [[(p[0] / 1000.0, p[1] / 1000.0) for p in h] for h in r[1:]
+                         if len(h) >= 3])
+    return g if g.is_valid else shapely.make_valid(g)
 
 
 def _off_deck(cx: Ctx, j) -> list:
@@ -367,7 +392,7 @@ def make_junction(inp: dict) -> Out:
     pads = 0
     specs: list = []
     for fi in faces:
-        sl = slot if fi["cls"] == "top" else pave
+        sl = slot if fi["cls"] == "top" and not fi.get("paved") else pave
         tris = PV.draw(mesh, fi, sl)
         for t in tris:
             surf.add(t)
