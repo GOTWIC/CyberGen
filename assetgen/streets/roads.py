@@ -202,7 +202,9 @@ def gather(cx: Ctx, s) -> Piece:
         inputs["embankments"] = [[st.attrs["s0_m"], st.attrs["s1_m"]] for st in emb]
     # (#95, AG17: where each barrier runs and how it ends, `barriers.road_runs`)
     from . import barriers as BR
-    if BR.runs_of(inputs["seg"], inputs["cls"]):
+    if cx.pave.on and not cx.pave.faces_of(s.id):
+        inputs["barriers"] = []     # (no faces: a cluster's inner road, wholly inside it)
+    elif BR.runs_of(inputs["seg"], inputs["cls"]):
         by: set = set()
         inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)
         inputs["barriers_by"] = sorted(by - {s.id})
@@ -411,6 +413,8 @@ def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
     for fi in inp.get("faces", ()):
         fi = dict(fi, median_m=med)
         slot = face_slot(fi, rd.cls, style)
+        if fi["kind"] == "bend" and rd.cls not in PEDESTRIAN and rd.h < rd.W / 2.0 - 0.05:
+            fi, slot = _bend(rd, fi, slot, MT.paving(style["archetype"]))
         tris = PV.draw(mesh, fi, slot, uv)
         for t in tris:
             surf.add(t)
@@ -418,6 +422,50 @@ def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
         PV.walls(mesh, fi, wslot, bottom, curb_slot=curb, out=specs)
     PV.draw_walls(mesh, specs)
     return surf
+
+
+CURB_STEP_M = 1.0       # a bend's curb lines as Steiner points this far apart
+
+
+def _bend(rd: Road, fi: dict, asphalt: str, paving: str):
+    """A bend face (M22: a road's stretch where a band would fold, its whole right of way
+    one face at the carriageway's height): its curb lines (the road's offsets at its
+    carriageway's half width) as Steiner points strictly inside, so its triangles part
+    there; asphalt between them, the district's paving outside (its sidewalks, level with
+    the road: no building or barrier check takes them for the carriageway)."""
+    import shapely
+    rings = [[(p[0] / 1000.0, p[1] / 1000.0) for p in r] for r in fi["rings"]]
+    g = shapely.Polygon(rings[0], rings[1:])
+    if not g.is_valid:
+        g = shapely.make_valid(g)
+    inner = g.buffer(-0.05)
+    ss = [rd.path.project(x, y)[0] for r in rings for x, y in r]
+    a, b = min(ss), max(ss)
+    if inner.is_empty or b - a < 0.5:
+        return fi, asphalt
+    base = PV.Surface()
+    P_, tris = PV.triangles(fi)
+    for t in tris:
+        base.add((P_[t[0]], P_[t[1]], P_[t[2]]))
+    extra = []
+    n = max(1, int((b - a) / CURB_STEP_M))
+    for k in range(n + 1):
+        s = a + (b - a) * k / n
+        for t in (-rd.h, rd.h):
+            x, y = rd.at(s, t)
+            if not inner.contains(shapely.Point(x, y)):
+                continue
+            z = base.z(x, y)
+            if z is not None:
+                extra.append([PV.mm(x), PV.mm(y), PV.mm(z)])
+    fi = dict(fi, samples=list(fi.get("samples", ())) + extra)
+    h = rd.h + 0.01
+
+    def slot(tri):
+        x = (tri[0][0] + tri[1][0] + tri[2][0]) / 3000.0
+        y = (tri[0][1] + tri[1][1] + tri[2][1]) / 3000.0
+        return asphalt if abs(rd.path.project(x, y)[1]) <= h else paving
+    return fi, slot
 
 
 # -- markings -------------------------------------------------------------------------

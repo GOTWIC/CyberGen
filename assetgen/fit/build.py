@@ -476,7 +476,8 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
 
 def seams(pk: Packs, model=None) -> dict:
     """A road meets its junctions (AG17: on M22's pavement map): at every vertex of a port
-    between a road's face and a junction's face, the heights the two pieces draw there
+    between a road's face and a junction's face of one class (a carriageway and the
+    junction's carriageway, a sidewalk band and a corner pad), the heights the two pieces draw there
     (their up-facing triangles' vertices at that position, on the millimeter) differ by at
     most `GAP_M`; a port vertex one of them does not draw is a step of the other's height
     over its ground (a gap). Without a map, nothing to compare."""
@@ -514,8 +515,8 @@ def seams(pk: Packs, model=None) -> dict:
         fs = PI.edge_faces.get(eid, ())
         rf = [f for f in fs if PI.F[f].owner_id in sids]
         jf = [f for f in fs if PI.F[f].owner_id in jids]
-        if not rf or not jf:
-            continue
+        if not rf or not jf or PI.cls[rf[0]] != PI.cls[jf[0]]:
+            continue        # (a sidewalk ending on a carriageway: a curb, by design)
         a, b = piece[rf[0]], piece[jf[0]]
         legs.add((PI.F[rf[0]].owner_id, PI.F[jf[0]].owner_id))
         ha, hb = heights(a), heights(b)

@@ -39,7 +39,10 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 
+import shapely
+
 from citygen import dmath as M
+from citygen import geom as G
 
 from .. import canon as C
 from .path import Path, dist, seg_cross, unit
@@ -296,6 +299,12 @@ def junction_plan(cx, j) -> dict:
         PI.V[v][3] > RAISED_M * 1000 for f in fids for r in PI.rings(f) for v in r)
     joins = {k: {"l": False, "r": False, "m": False} for k in legs}
     corners = []
+    got_lanes: list = []
+
+    def lanes():
+        if not got_lanes:
+            got_lanes.append(_lane_corridors(cx, j))
+        return got_lanes[0]
     if fids and len(legs) >= 1 and j.shape != "cul_de_sac":
         tops = [f for f in fids if PI.cls[f] == "top"]
         for kind, S in (("parapet", fids), ("guard", tops)):
@@ -335,30 +344,112 @@ def junction_plan(cx, j) -> dict:
                             cur = []
                     if cur:
                         pieces.append(cur)
+                    reach = PARAPET_W if kind == "parapet" else GUARD_IN_M + 0.3
                     for pc in pieces:
                         vs = [loop[pc[0]][0]] + [loop[q][1] for q in pc]
-                        pts = [[PI.V[v][0], PI.V[v][1], _top_of(PI, S, v)] for v in vs]
-                        L = sum(math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
-                                for a, b in zip(pts, pts[1:])) / 1000.0
-                        if L < (CORNER_MIN_M if kind == "guard" else 0.05):
-                            continue
-                        first, last = pc[0] == run[0], pc[-1] == run[-1]
-                        lga, lgb = legs[A], legs[B]
-                        fa = _port_frame(lga, pts[0], lga["seg"].width_m) if first else None
-                        fb = _port_frame(lgb, pts[-1], lgb["seg"].width_m) if last else None
-                        corners.append({"a": A, "b": B, "kind": kind, "pts": pts,
-                                        "ends": [fa, fb]})
-                        if first and ka[kind]:
-                            joins[A][_side(lga, pts[0][0] / 1000.0, pts[0][1] / 1000.0)] = True
-                        if last and kb[kind]:
-                            joins[B][_side(lgb, pts[-1][0] / 1000.0,
-                                           pts[-1][1] / 1000.0)] = True
+                        whole = [[PI.V[v][0], PI.V[v][1], _top_of(PI, S, v)] for v in vs]
+                        for pts, at0, at1 in _off_lanes(whole, lanes(), reach):
+                            L = sum(math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+                                    for a, b in zip(pts, pts[1:])) / 1000.0
+                            if L < (CORNER_MIN_M if kind == "guard" else 0.05):
+                                continue
+                            first = pc[0] == run[0] and at0
+                            last = pc[-1] == run[-1] and at1
+                            _corner(corners, joins, legs, A, B, kind, ka, kb, pts, first, last)
     median = _median_across(cx, j, PI, legs, fids)
     if median is not None:
         joins[median["a"]]["m"] = True
         joins[median["b"]]["m"] = True
     out = {"raised": raised, "corners": corners, "median": median, "joins": joins}
     cache[j.id] = out
+    return out
+
+
+def _corner(corners, joins, legs, A, B, kind, ka, kb, pts, first, last) -> None:
+    """A corner barrier along pts (millimeters), on its legs' port lines where it reaches
+    them (first, last); the legs' runs on those sides join it."""
+    lga, lgb = legs[A], legs[B]
+    fa = _port_frame(lga, pts[0], lga["seg"].width_m) if first else None
+    fb = _port_frame(lgb, pts[-1], lgb["seg"].width_m) if last else None
+    corners.append({"a": A, "b": B, "kind": kind, "pts": pts, "ends": [fa, fb]})
+    if first and ka[kind]:
+        joins[A][_side(lga, pts[0][0] / 1000.0, pts[0][1] / 1000.0)] = True
+    if last and kb[kind]:
+        joins[B][_side(lgb, pts[-1][0] / 1000.0, pts[-1][1] / 1000.0)] = True
+
+
+LANE_IN_M = 0.1         # a junction's barrier keeps out of its connector lanes but this
+                        # (AG14's check: within the lane's half width less `INSET_M`)
+
+
+def _lane_corridors(cx, j):
+    """The junction's connector lanes as corridors (half their width less `LANE_IN_M`),
+    one shape (meters), or None."""
+    gs = []
+    for n in cx.nodes_of(j):
+        for ln in sorted(_connectors(cx, n), key=lambda ln: ln.id):
+            if len(ln.centerline) < 2:
+                continue
+            h = ln.width_m / 2.0 - LANE_IN_M
+            if h <= 0.1:
+                continue
+            gs.append(shapely.LineString([(p[0], p[1]) for p in ln.centerline]).buffer(
+                h, cap_style="flat"))
+    if not gs:
+        return None
+    with G.canonical():
+        return G.union([G.qpoly(g) for g in gs])
+
+
+def _off_lanes(pts, corr, reach: float) -> list:
+    """A junction barrier's chain (points in millimeters) less where its section (`reach`
+    to the left of travel) would stand in a connector lane's corridor: [(points, reaches
+    its first point, reaches its last)], the cut ends on the chain at 1 mm."""
+    if corr is None or len(pts) < 2:
+        return [(pts, True, True)]
+    line = shapely.LineString([(p[0] / 1000.0, p[1] / 1000.0) for p in pts])
+    if line.length < 0.01:
+        return [(pts, True, True)]
+    strip = line.buffer(reach, single_sided=True)
+    hit = shapely.intersection(strip, corr)
+    if hit.is_empty or hit.area < 0.005:
+        return [(pts, True, True)]
+    cut = []
+    for g in shapely.get_parts(hit):
+        if g.geom_type != "Polygon" or g.area < 0.005:
+            continue
+        ds = [line.project(shapely.Point(c)) for c in g.exterior.coords]
+        cut.append((min(ds), max(ds)))
+    if not cut:
+        return [(pts, True, True)]
+    cut.sort()
+    keep, at = [], 0.0
+    for a, b in cut:
+        if a > at:
+            keep.append((at, a))
+        at = max(at, b)
+    if at < line.length:
+        keep.append((at, line.length))
+    cum = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        cum.append(cum[-1] + math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) / 1000.0)
+
+    def at_d(d):
+        for k in range(len(pts) - 1):
+            if cum[k] <= d <= cum[k + 1]:
+                f = 0.0 if cum[k + 1] == cum[k] else (d - cum[k]) / (cum[k + 1] - cum[k])
+                a, b = pts[k], pts[k + 1]
+                return [int(round(a[0] + (b[0] - a[0]) * f)), int(round(a[1] + (b[1] - a[1]) * f)),
+                        int(round(a[2] + (b[2] - a[2]) * f))]
+        return list(pts[-1])
+    out = []
+    for a, b in keep:
+        if b - a < 0.05:
+            continue
+        inner = [list(p) for k, p in enumerate(pts) if a + 1e-6 < cum[k] < b - 1e-6]
+        part = [at_d(a) if a > 1e-6 else list(pts[0])] + inner + \
+            [at_d(b) if b < line.length - 1e-6 else list(pts[-1])]
+        out.append((part, a <= 1e-6, b >= line.length - 1e-6))
     return out
 
 
@@ -486,15 +577,14 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
         if len(c.line) < 2:
             continue
         a, b = c.line[0], c.line[-1]
-        sa, ta = P.project(a[0], a[1])
-        sb, tb = P.project(b[0], b[1])
-        sc = (sa + sb) / 2.0
-        xws.append((sc - c.width_m / 2.0 - XWALK_CLEAR_M, sc + c.width_m / 2.0 + XWALK_CLEAR_M,
-                    min(ta, tb), max(ta, tb)))
-        by.add(c.id)
+        ln = shapely.LineString([(a[0], a[1]), (b[0], b[1])])
+        if ln.length >= 0.5:
+            xws.append(ln.buffer(c.width_m / 2.0 + XWALK_CLEAR_M, cap_style="flat"))
+            by.add(c.id)
+    own = _faces_union(cx, s.id)
     out = []
     for run in runs:
-        holes = sorted((a, b) for a, b, t0, t1 in xws if t0 < run.t1 and t1 > run.t0)
+        holes = _holes(P, run, s0, s1, own, xws)
         spans, cur = [], s0
         for a, b in holes:
             if a > cur:
@@ -522,6 +612,66 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
         if rows:
             out.append({"name": run.name, "spans": rows})
     return out
+
+
+BAND_STEP_M = 2.0       # stations of the band a run's holes are found on
+OWN_PAD_M = 0.08        # a run stands on its road's faces within this (the map's mitres and
+                        # the run's own differ by millimeters; AG14's check allows 0.1 m)
+
+
+def _faces_union(cx, sid: str):
+    """The union of a road's faces of the map (all of them: its sidewalk bands too), meters,
+    grown by `OWN_PAD_M`; None without any."""
+    PI = cx.pave
+    if not PI.on:
+        return None
+    gs = []
+    for fid in PI.faces_of(sid):
+        rs = PI.rings(fid)
+        if not rs or len(rs[0]) < 3:
+            continue
+        g = shapely.Polygon([(PI.V[v][0] / 1000.0, PI.V[v][1] / 1000.0) for v in rs[0]],
+                            [[(PI.V[v][0] / 1000.0, PI.V[v][1] / 1000.0) for v in h]
+                             for h in rs[1:] if len(h) >= 3])
+        gs.append(g if g.is_valid else shapely.make_valid(g))
+    if not gs:
+        return None
+    with G.canonical():
+        return G.qpoly(G.union([G.qpoly(g) for g in gs]).buffer(OWN_PAD_M))
+
+
+def _band(P: Path, t0: float, t1: float, s0: float, s1: float):
+    """The plan strip of offsets t0..t1 from s0 to s1 (mitred at the path's vertices, as a
+    run is swept), shapely."""
+    left, right = [], []
+    for s, vi in P.stations(s0, s1, BAND_STEP_M):
+        x, y, nx, ny, k = P.frame(s, vi)
+        right.append((x + nx * k * t0, y + ny * k * t0))
+        left.append((x + nx * k * t1, y + ny * k * t1))
+    g = shapely.Polygon(right + left[::-1])
+    return g if g.is_valid else shapely.make_valid(g)
+
+
+def _holes(P: Path, run: Run, s0: float, s1: float, own, xws) -> list:
+    """Stretches [a, b] of a run that would stand off its road's own faces (where M22 cut
+    them at a seam with another road) or within `XWALK_CLEAR_M` of a crosswalk."""
+    band = _band(P, run.t0, run.t1, s0, s1)
+    if band.is_empty:
+        return []
+    bad = []
+    with G.canonical():
+        if own is not None:
+            bad.append(G.diff(G.qpoly(band), own))
+        for x in xws:
+            bad.append(G.inter(G.qpoly(band), G.qpoly(x)))
+        out = []
+        for g in bad:
+            for p in G.parts(g):
+                if p.area < 0.01:
+                    continue
+                ss = [P.project(x, y)[0] for x, y in p.exterior.coords]
+                out.append((max(min(ss), s0), min(max(ss), s1)))
+    return sorted(out)
 
 
 # ---------------------------------------------------------------------------

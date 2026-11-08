@@ -737,6 +737,28 @@ master is added.
 **What the exporter does with them**: no code change; the packs' hashes move, so an import
 over an earlier one updates the actors and meshes whose entries changed.
 
+### From AG17: road surfaces from the pavement map
+
+AG17 draws AG7's road, junction and sidewalk pieces from M22's pavement map (each face on
+its stored vertices at their stored heights, a curb's wall between faces at two heights, a
+raised junction on its own slab, barriers ending on the roads' port lines). It changes what
+the street packs hold, not how they are imported:
+
+- **Keys and kinds as before**: one entry per road segment (`street.road`), junction
+  (`street.junction`), sidewalk (`street.sidewalk`) and crosswalk (`street.crosswalk`), keyed
+  by the same citygen id, with the same `replaces` (the blockout objects they stand for) and
+  level. A road or sidewalk with no faces of the map (a cluster's inner road, wholly inside
+  its junction) has no mesh and is declared covered, as a road inside its junctions was.
+- **Slots**: no new slot or master. The faces use the street slots they used (asphalt by
+  class, the district's paving and curb stone, a median's lawn or concrete, the deck's
+  concrete for a raised road's fascia and girder and a raised junction's slab).
+- **Seams**: two pieces that meet share their edge's vertices exactly, so in Unreal they
+  meet within float32 rounding (under 0.1 mm at tile scale) with no step; the import keeps
+  the packs' normals as before (`test_stage2_packs_keep_their_normals`).
+
+**What the exporter does with them**: no code change; the street packs' hashes move, so an
+import over an earlier one updates the street actors and meshes in place.
+
 ### From AG15: cyberpunk facades and night
 
 - **New parts and slots**, through AG2's instancing as before (instanced kinds, or merged
@@ -1259,3 +1281,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | #82, #89 (a fix on its own) | No code change: the packs' content changes under the same keys. AG7's junction pieces draw an overlap only once (a junction wholly inside a larger one it overlaps has no mesh, declared as covered like a road inside its junctions, its blockout object still replaced), pave the turning lanes round their corners, follow their surface with the slab under a raised junction and draw a cul-de-sac's sidewalk; sidewalk and road pieces leave out the stretches over a junction's carriageway (a sidewalk wholly inside its junctions has no mesh, declared); AG8 leaves out a prop with no pad under it on a raised junction's corner and seats a terrain city's quay railings and plants on the surfaces drawn. No new kind, part, slot or master | None needed (no importer change) |
 | #83, #85, #88, #90 (a fix on its own) | The collision check's roof traces count 3 m over the ground a building stands on (a stage 2 building's pivot where its shell's bounds start higher: one-storey sheds and yards over their street fronts, open sheds' roof slabs; Delta's Industrial Port missed 5 of 36 roofs with their hulls in place). An import back to the blockout gives the actors stage 2 had updated in place the blockout's settings again (`unstage`: rotation, slot materials, collision profile, cull distances, shadow, HLOD); `CITYGEN_UE_DIGEST_ROWS=1` writes the digests' rows. The play features' sign washes stand over their building's base on a terrain city (`unreal/play.json`'s `washes`). No version bump: an import's output changes only where an actor goes back to the blockout (which was wrong) and on terrain cities' play data (its own hash). The small city's import test streams at 600 m (`SMALL_VIEW_M`), smaller than the city | The test suite's small terrain and deck cities imported (blockout) into throwaway projects and checked with night views (`docs/progress/fix_assets/`): 36 of 36 and 48 of 48 roofs, 191 lamps lit and 768 light pools each, the washes at their buildings' height; both fail only on streaming (smaller than the view range). `test_unreal_import_small_city` and `test_unreal_import_stage2_small_city` pass. Delta's `--check` was not run: its stage 2 import goes past the PC's memory (#84) |
 | M22 | No code change. The blockout draws a city's roads, junctions, corner pads, medians, curbs and sidewalks from the pavement map's faces into the objects they were in (keys unchanged: `<district>.road_<class>.<tile>`, `.junction`, `.sidewalk`, `<segment>.deck`, `.ramp`, `.tunnel_road`, the deck objects), so their plan entries and their actors' hashes move and an import over an earlier one updates them in place. A junction's `polygon` is its carriageway face's outline and its `edge_z` the map's heights there, which the blockout draws as before; `graphs.json` keeps its format. The map itself (`pavement`, `pavement_net`) stays in `city_model.json` for stage 2 (AG17); the exporter does not read it. | Not needed (no new kind of actor, no manifest change) |
+| AG17 | No code change: the street packs' content changes under the same keys ("From AG17" above). AG7's road, junction and sidewalk pieces are drawn from M22's pavement map (stored vertices and heights, curbs as walls between faces, a raised junction on its own slab with no girder under it, barriers ending on the roads' port lines), so pieces meet exactly; a road or sidewalk with no faces (a cluster's inner road) has no mesh, declared as before. No new kind, part, slot or master | Not run here (the coordinating session's call; the check's walk should cross junctions with no step) |

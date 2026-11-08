@@ -376,28 +376,26 @@ def walls(mesh, fi: dict, slot: str, bottom=None, curb_slot: str | None = None,
 
 
 def draw_walls(mesh, specs: list) -> None:
-    """Walls collected by `walls`. Where outer walls of a piece meet at a vertex where its
-    faces only touch (two of them arrive at it, or leave it), each steps 1 mm back from it,
-    so no two run up the same vertical edge the same way (the map's shapes allow a junction
-    region pinched at a point)."""
-    from collections import Counter
-    starts, ends = Counter(), Counter()
-    for sp in specs:
-        if sp[7]:
-            starts[sp[1]] += 1
-            ends[sp[2]] += 1
-    pinch = {p for p, n in starts.items() if n > 1} | {p for p, n in ends.items() if n > 1}
+    """Walls collected by `walls`. Where walls of a piece's faces meet at a vertex the
+    faces only touch at (two arrive at it, or two leave it: the map's shapes allow a region
+    pinched at a point, two pads meeting at one curb vertex), the second and later take a
+    vertex on that end's vertical edge (`Mesh.wall_mm`'s split), so no two run up the same
+    edge the same way; every position stays the map's."""
+    ends: dict = {}
+    starts: dict = {}
     u = 0.0
     for slot, a, b, za0, za1, zb0, zb1, outer in specs:
         L = math.sqrt(float(b[0] - a[0]) ** 2 + float(b[1] - a[1]) ** 2)
-        if outer and pinch and (a in pinch or b in pinch):
-            if L < 3.0:
-                continue
-            fx, fy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
-            a2 = (a[0] + int(round(fx)), a[1] + int(round(fy))) if a in pinch else a
-            b2 = (b[0] - int(round(fx)), b[1] - int(round(fy))) if b in pinch else b
-            a, b = a2, b2
-        mesh.wall_mm(slot, a, b, za0, za1, zb0, zb1, u)
+        sa = sb = None
+        if za1 > za0:
+            k = starts.get((a, za0, za1), 0)
+            starts[(a, za0, za1)] = k + 1
+            sa = 1.0 / (k + 1) if k else None
+        if zb1 > zb0:
+            k = ends.get((b, zb0, zb1), 0)
+            ends[(b, zb0, zb1)] = k + 1
+            sb = 1.0 / (k + 1) if k else None
+        mesh.wall_mm(slot, a, b, za0, za1, zb0, zb1, u, split_a=sa, split_b=sb)
         u += L / 1000.0
 
 

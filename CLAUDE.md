@@ -1375,10 +1375,10 @@ Sample builds: `docs/progress/M22/`.
 ## Asset generator (assetgen)
 
 `docs/assetgen_scope.md` is the spec for stage 2 (milestones AG0 to AG17, section 14; planned:
-AG16 performance, a benchmark and structural fixes before stage 3; AG17 road surfaces by
-construction from stage 1's M22 pavement map, section 14.18), its log
+AG16 performance, a benchmark and structural fixes before stage 3; AG17, road surfaces by
+construction from stage 1's M22 pavement map, section 14.18, is done), its log
 `docs/assetgen_milestones.md`. Package `assetgen/` beside `citygen/`, which it imports read
-only (`model`, `dmath`, `geom`); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
+only (`model`, `dmath`, `geom`; AG17's street stage also `pavement` for the cuts and stations); tests in `tests/assetgen/` (`test_ag_*.py`, helpers in
 `agtools.py`, never a second `conftest.py`, which would shadow `tests/conftest.py`).
 
 AG0 (contract and spike) is in place:
@@ -1977,6 +1977,48 @@ The asset fixes (issues #83, #85, #88, #90, after run-through 2) are in place:
   resets an actor going back to the blockout, `CITYGEN_UE_DIGEST_ROWS` (#85); sign washes
   over the building's base (#90); the small city's import test streams at 600 m.
   `GEN_VERSION` fixassets.4. Results: `docs/progress/fix_assets/`.
+
+AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
+`assetgen/streets/pave.py` (tests `tests/assetgen/test_ag_junctions.py`, `test_ag_triangulate.py`):
+- **Faces:** AG7's road, junction and sidewalk pieces draw M22's pavement map (keys as before):
+  a road piece its carriageway faces, bends, walking surface and median (and a side's sidewalk
+  bands where no sidewalk piece draws them), a sidewalk piece its side's curb band, furniture
+  zone and clear path, a junction piece its carriageway, corner pads and bulb (a cluster's whole
+  surface, unbuildable ones as they are). Each face on its stored vertices in order, never split;
+  its interior by `triangulate.triangulate_face` (exact ear clipping keeping every boundary
+  vertex, holes that touch at a vertex joined, the face's samples as Steiner points strictly
+  inside, Delaunay flips across every edge that is not boundary).
+- **Heights** (`Index`, built once on `Ctx.pave`; a piece's inputs carry every vertex as
+  [x, y, top, z, z over ground] in mm): a vertex's height over sea level (the map's z plus
+  `Ctx.ground`) plus its face's lift: carriageway, junction, bulb, bend and walk 50 mm
+  (`ROAD_DZ_MM`); curb band, sidewalk and corner pad 200, 70 at a curb ramp (`Index.ramps`: the
+  curb band's vertices beside a crosswalk's end or a garage, loading or gate entrance, at least
+  the one nearest each); an avenue's, street's or service road's median of 1 m or more an
+  island at 200, level with the road under a crosswalk and from it on to a road end within
+  40 m (`mdrop`). Marks and details lie on the faces as drawn (`Surface`; lane rows at the map's
+  stations, `roads.map_stations`).
+- **Curbs and walls:** where two faces meet at different lifts the higher face's piece draws
+  the wall between them, the same stored polyline at two heights (`walls`); outer edges walled
+  down (`bottoms`: into the ground, a raised road's 0.45 m fascia, an embankment's fill, a deck
+  street onto its slab); outer walls meeting at a vertex where faces only touch step 1 mm back
+  (`draw_walls`). A raised road's girder runs between its cuts only, capped on its port lines;
+  a raised junction stands on a slab of its own (`deck_d`, down to the ground where low).
+- **Barriers** (`barriers.py` reworked): spans between the cuts less crosswalks, every end at a
+  cut on the road's port line (`Road.port_frame`, `port_lines`): `join`, `open`, `stop`; a
+  junction's corner parapets (raised) and guard walls (at grade) along its faces' boundary
+  (`_loops`) between two legs' outer port vertices, split where the edge turns back
+  (`_split_sharp`), the median across between port middles (`junction_plan`).
+- **Checks:** `street_watertight` (`streets/watertight.py`, on the packs read back): every
+  segment of every edge two faces share drawn by both faces' pieces on the same millimeters, in
+  exactly two triangles (a face's and its neighbor's, or its curb's). AG14's step check
+  (`fit.seams`) compares a road's and its junction's pieces at the map's port vertices exactly.
+- **Retired:** `path.first_exit`, `Road._edge`, `CUT_TOL_M`, `_with_corners`, `_cut_run`,
+  `_run_z`, `_surface`, the duplicate `_corner`, `_fills`, `_overlaps`, `_carriageway`,
+  `_clear_spans`, `Keepout`, `clip_line`, `roads._median_clip`, `_make`'s tidied line.
+- **AG8:** props keep off the map's carriageway faces (`_Fit`) and stand on a raised junction's
+  pads as AG7 draws them (`_RaisedCorners`), both from the map. No exporter change.
+Results: `docs/progress/AG17/`.
+
 Progress output: `assetgen build`, `preview`, `materials preview|board`, `library`, `streets`,
 `water`, `props` and `ground` print a line per stage, a bar (n of N, time left) where the count is known and
 the time per stage on stderr (`assetgen/progress.py`, stage 1's `Progress` interface; one
