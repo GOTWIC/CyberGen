@@ -56,6 +56,19 @@ check earns its place by what it can find, not by habit.
   - say where the log is, so anyone can see how far a long run has got and which test is
     slow;
   - the same for long builds: their progress lines go to a log, not a pipe.
+- **Every test run can be paused** (Swagnik, 2026-11-08). `tests/conftest.py` loads
+  `tests/testctl.py`, so every pytest run in a checkout gets a folder in its
+  `.pytest_runs/` (a journal of each finished test, flushed as it goes). From that checkout:
+  - `python tests/testctl.py status`: the runs, newest first, how far each got, the test
+    running now, and the command to continue a run that stopped;
+  - `python tests/testctl.py pause`: freezes the run now, pytest and every process it started
+    (no CPU; the memory is kept, and nothing survives a restart); `resume` thaws it;
+  - `python tests/testctl.py stop`: ends the run after the test running now;
+    `python -m pytest <same arguments> --resume` continues it later, leaving out every test
+    that passed or was skipped (failures run again). This also works after a crash, a kill or
+    a reboot.
+
+  Tell Swagnik where a run is and how to pause it; never pause or stop one unasked.
 
 Nothing more: no x86, Docker, Windows or other cross-platform comparisons, no stage-trace
 diffs, no `lock --verify` runs, no seed sweeps (unless the work is about robustness), no

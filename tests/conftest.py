@@ -4,6 +4,13 @@ from pathlib import Path
 
 import pytest
 
+# Every run can be paused, stopped and resumed (`python tests/testctl.py`; Swagnik,
+# 2026-11-08): the hooks live in testctl.py and are registered here by name.
+from testctl import (  # noqa: F401
+    pytest_addoption, pytest_collection_modifyitems, pytest_runtest_logfinish,
+    pytest_runtest_logreport, pytest_runtest_logstart, pytest_sessionfinish,
+    pytest_sessionstart, pytest_terminal_summary)
+
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = sorted((ROOT / "docs" / "progress" / "M0").glob("*/city_spec.json"))
 # The build samples: the four M0 cities (specs as adjusted for M1a and M1a2) and Vesper Bay.
