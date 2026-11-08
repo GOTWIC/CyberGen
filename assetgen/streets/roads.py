@@ -97,32 +97,43 @@ def road_face_ids(cx: Ctx, s) -> list[str]:
 
 def port_lines(cx: Ctx, s, path: Path, cuts) -> dict:
     """The road's ports at its two ends as the map stores them: {"start"|"end": [right
-    point, left point]} (the outermost port vertices [x, y, z over sea level], meters),
-    from its faces' port edges at its cuts."""
+    point, left point]} (the outermost vertices [x, y, z over sea level], meters) of the
+    edges its faces share with the faces at that end: its junction's, or those of the
+    road it goes on as (port edges, and seams where M22 cut an overlap with them), within
+    a road's width of its cut there. A port at a centerline vertex is mitred, so skewed."""
     PI = cx.pave
     L = path.L
     want = {"start": cuts[0], "end": L - cuts[1]}
-    got: dict = {"start": {}, "end": {}}
-    for fid in PI.faces_of(s.id):
-        f = PI.F[fid]
-        for refs in f.rings:
-            for ref in refs:
-                kind, vs = PI.E[ref.lstrip("-")]
-                if kind != "port":
-                    continue
-                for v in vs:
-                    x, y = PI.V[v][0] / 1000.0, PI.V[v][1] / 1000.0
-                    sv, t = path.project(x, y)
-                    for at, sw in want.items():
-                        if abs(sv - sw) <= 0.5:
-                            got[at][v] = (t, x, y, PI.V[v][2] / 1000.0)
     out = {}
-    for at in ("start", "end"):
-        g = got[at]
-        if len(g) < 2:
+    for at, nid in (("start", s.start), ("end", s.end)):
+        j = cx.junction_at.get(nid)
+        owners = {j.id} if j is not None else             {o.id for o in cx.seg_at_node.get(nid, ()) if o.id != s.id}
+        if not owners:
             continue
-        lo = min(g.values())
-        hi = max(g.values())
+        other = want["end" if at == "start" else "start"]
+        rows = {}
+        for fid in PI.faces_of(s.id):
+            for refs in PI.F[fid].rings:
+                for ref in refs:
+                    eid = ref.lstrip("-")
+                    kind, vs = PI.E[eid]
+                    if kind == "outer" or not any(
+                            PI.F[g].owner_id in owners for g in PI.edge_faces.get(eid, ())
+                            if g != fid):
+                        continue
+                    for v in vs:
+                        if v in rows:
+                            continue
+                        x, y = PI.V[v][0] / 1000.0, PI.V[v][1] / 1000.0
+                        sv, t = path.project(x, y)
+                        # (within a road's width of the cut, a skewed port's ends too, and
+                        # nearer this end than the other: a loop ramp passes beside its
+                        # own end junction, a road may meet one junction at both ends)
+                        if abs(sv - want[at]) <= max(s.width_m, 2.0) and                                 abs(sv - want[at]) <= abs(sv - other):
+                            rows[v] = (t, x, y, PI.V[v][2] / 1000.0)
+        if len(rows) < 2:
+            continue
+        lo, hi = min(rows.values()), max(rows.values())
         if hi[0] - lo[0] < 0.5:
             continue
         out[at] = [[lo[1], lo[2], lo[3]], [hi[1], hi[2], hi[3]]]
@@ -818,19 +829,6 @@ def _embankment_ends(rd: Road, mesh: Mesh, s0: float, s1: float):
         pa, pb = rd.at(s, -W2), rd.at(s, W2)
         a_, b_ = (pa, pb) if sgn > 0 else (pb, pa)
         mesh.wall("concrete", a_, b_, bot, top, bot, top)
-
-
-def walkway_fix(rd: Road, line, curb: float) -> list:
-    """A walkway's line put on its road's deck (z over the ground, as the model's)."""
-    out = []
-    for p in line:
-        s, _ = rd.path.project(p[0], p[1])
-        out.append([p[0], p[1], C.m(rd.zp(s) + ROAD_DZ + curb)])
-    return out
-
-
-def heading_of(dx: float, dy: float) -> float:
-    return M.degrees(M.atan2(dy, dx))
 
 
 __all__ = ["gather", "make", "Road", "street_class", "deck_kind", "ROAD_DZ", "unit",

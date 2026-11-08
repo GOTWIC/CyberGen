@@ -27,10 +27,8 @@ from .ctx import Ctx, bbox_center, dump
 from .kit import Mesh, ccw
 from .path import Path, dist, unit
 from .pieces import Out, Piece, maker
-from .roads import DECK_D, PEDESTRIAN, RANK, ROAD_DZ, Road, deck_kind, raised, street_class
+from .roads import DECK_D, PEDESTRIAN, RANK, Road, deck_kind, raised, street_class
 
-DROP_Z = 0.02
-RAMP_M = 1.2
 PIT_M = 1.2
 XWALK_DZ = 0.006        # crosswalk paint over the faces
 TACTILE_DZ = 0.004

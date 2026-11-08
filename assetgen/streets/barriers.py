@@ -353,7 +353,9 @@ def junction_plan(cx, j) -> dict:
                         for pts, at0, at1 in _off_lanes(whole, lanes(), reach):
                             L = sum(math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
                                     for a, b in zip(pts, pts[1:])) / 1000.0
-                            if L < (CORNER_MIN_M if kind == "guard" else 0.05):
+                            # (a piece a lane cut short under `MIN_SPAN_M` is left out)
+                            least = CORNER_MIN_M if kind == "guard" else                                 (0.05 if at0 and at1 else MIN_SPAN_M)
+                            if L < least:
                                 continue
                             first = pc[0] == run[0] and at0
                             last = pc[-1] == run[-1] and at1
