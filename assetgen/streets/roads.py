@@ -451,8 +451,9 @@ def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
     for fi in inp.get("faces", ()):
         fi = dict(fi, median_m=med)
         slot = face_slot(fi, rd.cls, style)
-        if fi["kind"] == "bend" and rd.cls not in PEDESTRIAN and rd.h < rd.W / 2.0 - 0.05:
-            fi, slot = _bend(rd, fi, slot, MT.paving(style["archetype"]))
+        if fi["kind"] == "bend" and rd.cls not in PEDESTRIAN:
+            fi, slot = _bend(rd, fi, slot, MT.paving(style["archetype"])
+                             if rd.h < rd.W / 2.0 - 0.05 else "concrete", inp.get("lanes"))
         # (a bend's UV in plan: no row runs through a fold)
         tris = PV.draw(mesh, fi, slot, None if fi["kind"] == "bend" else uv)
         for t in tris:
@@ -466,13 +467,24 @@ def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
 CURB_STEP_M = 1.0       # a bend's curb lines as Steiner points this far apart
 
 
-def _bend(rd: Road, fi: dict, asphalt: str, paving: str):
+LANE_PAD_M = 0.5        # a bend's asphalt: its lanes' corridors grown by this
+
+
+def _bend(rd: Road, fi: dict, asphalt: str, paving: str, lanes=None):
     """A bend face (M22: a road's stretch where a band would fold, its whole right of way
     one face at the carriageway's height): its curb lines (the road's offsets at its
     carriageway's half width) as Steiner points strictly inside, so its triangles part
-    there; asphalt between them, the district's paving outside (its sidewalks, level with
-    the road: no building or barrier check takes them for the carriageway)."""
+    there; asphalt where a triangle lies within the carriageway's half width and its lanes'
+    corridors (`LANE_PAD_M` wider), the district's paving outside (its sidewalks, level
+    with the road), concrete on a road with no sidewalk (the inside of the fold no lane
+    crosses: no building or barrier check takes it for the carriageway)."""
     import shapely
+    corr = None
+    ls = [shapely.LineString([(q[0], q[1]) for q in ln["line"]]).buffer(
+        ln["width"] / 2.0 + LANE_PAD_M) for ln in (lanes or ()) if len(ln["line"]) >= 2]
+    if ls:
+        corr = shapely.union_all(ls)
+        shapely.prepare(corr)
     rings = [[(p[0] / 1000.0, p[1] / 1000.0) for p in r] for r in fi["rings"]]
     g = shapely.Polygon(rings[0], rings[1:])
     if not g.is_valid:
@@ -501,9 +513,15 @@ def _bend(rd: Road, fi: dict, asphalt: str, paving: str):
     h = rd.h + 0.05
 
     def slot(tri):
-        # (asphalt only where the whole triangle is within the carriageway's half width)
+        # (asphalt only where the whole triangle is within the carriageway's half width
+        # and its lanes' corridors)
         far = max(abs(rd.path.project(p[0] / 1000.0, p[1] / 1000.0)[1]) for p in tri)
-        return asphalt if far <= h else paving
+        if far > h:
+            return paving
+        if corr is not None and not all(shapely.contains_xy(corr, p[0] / 1000.0,
+                                                              p[1] / 1000.0) for p in tri):
+            return paving
+        return asphalt
     return fi, slot
 
 
