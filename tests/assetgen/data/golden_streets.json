@@ -1,17 +1,17 @@
 {
   "about": "sha256 goldens of assetgen's street stage (AG7): the small test city's packs (tests/conftest.py SMALL, built by the citygen CLI) and Vesper Bay's, as `assetgen.streets.build.outputs_digest` measures them (every tile pack, the parts pack and the Unreal contribution; `all` hashes them together), with the tiles of Vesper Bay that hold the most triangles, the contribution with AG6's textures (the 512 px/m library). Made on the M4 Mac; x86 deferred (docs/determinism_check.md).",
   "testport": {
-    "all": "1dcceba98016793ec17942cb9478c7508250aa09640e48098ce801c3d6107b07"
+    "all": "e4865130491d4d25039897f08f3b14f1e537d695597a1baadfb0310af883bae8"
   },
   "vesper_bay": {
-    "all": "4d3733f2b42457c91db4b41eeba31c62d8fbb21c91613602af844b5bfe85bfcf",
+    "all": "4eddf091a9129e68c2d1b47a3f88b2ed232ae3490e248875959339ceed9a39db",
     "tiles": {
-      "t+01-05": "c408ba34d88e0a07df49fc3592908ecbc9729d263d21b952358b71bc72b9d2bc",
-      "t+02-05": "beed3ad7a8cb1d7e7da4e80533491add8c8e039aaae11912c8df36a20dc8a7b4",
-      "t+03+00": "b20ca5cd47f128867cceeb7bd0f9ccf868089f1389a86143d9b4504de0bd99fe",
-      "t+03+03": "8b044daaa31f6d4c265567ee5530729916f1be5431e5b024469bd2f211df8d79",
-      "t+03-04": "0cb9e03fbc0e5fb4a17a2d5b4b68e835f745ad7a67d4c621264e0619a8dacd00",
-      "t+04+00": "05d1e7c1ad41dea3e55d1191cf102d056edf1e1ca49105751b6da4a21dbc4551"
+      "t+01-05": "954ee41d86990c340efb6707c1a5f68b8691e983b6e55fe04b36e73ba8042c23",
+      "t+02-04": "4f32f0b70e9fbbcf8ec1a124a78893d511ff47f2bb38e5537d4ab9499df1da42",
+      "t+02-05": "0047a8474bbdf026d5461cbd9aee7d40f6f6a58bda77c006815855b93d2eb29d",
+      "t+03+00": "924b6b4f06949fd8dba271450cb2be554bd2d20494d50f4a06525528fe7651f7",
+      "t+03+03": "f4241b84c8e85b775682d9b056b4556d408f9e6146668d3934435a35ed909e9d",
+      "t+03-05": "dc0b3d2630c2aae11ecd638d2dc0e0c3f0dbb744e45e54778bf6314ece60069f"
     }
   }
 }

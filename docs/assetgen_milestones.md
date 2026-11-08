@@ -2384,10 +2384,53 @@ outputs `docs/progress/AG17/`.
   (a cluster's inner road) is left out.
 - **Exporter**: no change (`docs/unreal_export.md`, "From AG17").
 
-CITY_TABLE
+Every sample, the pinned, stack and deck demos and Cragmouth with the final code
+(`assetgen build`, models from M22's main): street pieces, triangles, the watertight
+check's shared segments and its not drawn / open / twice, AG14's steps and strips, every
+clash, and the assetgen checks that fail (all of buildings or water, whose code AG17 leaves
+as it was: Delta's #144, Vesper Bay Pinned's two buildings with one thumbnail, Nexus's water
+gap on main's water stage, Cragmouth's skybridge clearance and landings and a roof vent).
+
+| City | Pieces | Triangles | Segments | Not drawn / open / twice | Steps | Strips | Clashes | Failing |
+|---|---|---|---|---|---|---|---|---|
+| Delta Megacity | 8,827 | 1,585,472 | 196,763 | 0 / 0 / 0 | 0 | 0 | 0 | asset_envelope, asset_unique, asset_grounded |
+| Vesper Bay | 9,019 | 1,457,345 | 210,886 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Saltreach Free Port | 5,484 | 815,302 | 118,555 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Nexus City | 9,617 | 1,468,900 | 223,841 | 0 / 0 / 0 | 0 | 0 | 0 | water_gaps |
+| Greyhook | 4,450 | 833,577 | 128,893 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Pinned | 9,817 | 1,459,272 | 219,929 | 0 / 0 / 0 | 0 | 0 | 0 | asset_unique |
+| Vesper Bay Stacks | 9,790 | 1,487,985 | 217,981 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Decks | 9,945 | 1,605,658 | 219,812 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Cragmouth | 11,119 | 1,803,165 | 228,098 | 0 / 0 / 0 | 0 | 0 | 0 | asset_clearance, asset_landings, asset_grounded |
+
+Delta before (M22's main) and after: 8,827 street pieces both; 1,288,343 triangles to
+1,585,472 (roads 261,668 to 357,439, junctions 217,036 to 362,476, sidewalks 346,999 to
+373,423, crosswalks 20,202 to 50,284); roads inside their junctions with no mesh 8 to 246
+(the clusters' inner roads); corner pads 3,248 (269 left out) to 3,594 (none). The
+watertight check on M22's own packs: 361,103 sides of shared segments not drawn, 29,306
+open (the old pieces found their own edges, off the map's vertices); after: 0 and 0.
+Goldens: `golden_streets.json`, `golden_props.json` and `golden_ground.json` rewritten (the
+street tiles drawn from the map, props keeping off its faces, the ground stage's code hash
+holding `streets/path.py`, from which `first_exit` went); `golden_water.json` unchanged.
 
 Open:
-- OPEN_ITEMS
+- AG14's grounded rule (#105's last leftover): `fit.build.grounded` takes a thing's
+  smallest foot gap where fewer than three of its five feet touch, so one foot is enough.
+  The third smallest, as its description says, finds roof equipment AG4 seats on fewer
+  than three feet (Vesper Bay 4 AC units, Delta an AC unit and a second roof vent); a fix
+  of AG4's seating first, then the rule.
+- A junction's corner barrier ends square to its own edge where its leg's port line is not
+  straight within 2 cm (a curved port), not on the port.
+- Curb ramps lower the curb band's stored vertices, which are never split, so a ramp slopes
+  across the furniture zone to its far edge; a short flared ramp needs ramp vertices in
+  M22's map.
+- Junctions M22 keeps as M18 left them (`attrs.unbuildable`) and Cragmouth's steep hillside
+  junctions are drawn as their faces are, steep where the map is: Delta's `jn.e170s444`
+  (drawn grade 0.9) has a corner pad folded up between the road at grade and its ramp 10 m
+  up (`docs/progress/AG17/`); a surface there is M22's to fit.
+- Street triangles rose by a quarter (bends' curb lines as Steiner points every meter, the
+  map's interior samples, curbs as walls), within the budgets; AG16's to weigh.
+- The Unreal check after AG17 (an import over M22's, shots of `jn.e170s444`).
 
 ## Order
 
