@@ -342,7 +342,7 @@ def build(model, model_sha: str, out_dir: Path, spec=None, workers: int | None =
     con_written = _write_text(out_dir / "unreal_contribution.streets.json", con_text)
     t_write = time.perf_counter()
     from .checks import report
-    rep = report(model, cx, manifest, pieces)
+    rep = report(model, cx, manifest, pieces, out_dir)
     rep["files"] = {"tiles_made": len(todo), "tiles_kept": len(keep),
                     "tiles_written": len(written), "tiles_same_bytes": unchanged_files,
                     "tiles_removed": len(stale), "parts_written": parts_written,

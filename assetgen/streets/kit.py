@@ -68,6 +68,50 @@ class Mesh:
     def P(self, x: float, y: float, z: float) -> tuple[int, int, int]:
         return (mmr(x) - self.ox, mmr(y) - self.oy, mmr(z) - self.oz)
 
+    def Pmm(self, x: int, y: int, z: int) -> tuple[int, int, int]:
+        """AG17: a world point given on the millimeter grid (exact, no rounding)."""
+        return (x - self.ox, y - self.oy, z - self.oz)
+
+    def tris_mm(self, slot: str, pts, tris, uvs, expect=None) -> int:
+        """AG17: triangles over world points on the millimeter grid (x, y, z ints), shared
+        vertices and smooth normals within the call; `uvs` one (u, v) in meters per point.
+        Returns how many were kept (a triangle that is a line is dropped)."""
+        sl = self._slot(slot)
+        used = sorted({i for t in tris for i in t})
+        where = {}
+        for i in used:
+            where[i] = self._add(sl, self.Pmm(*pts[i]), None, uvs[i])
+        n = 0
+        for a, b, c in tris:
+            if self._tri(sl, where[a], where[b], where[c], expect):
+                n += 1
+        return n
+
+    def wall_mm(self, slot: str, a, b, za0: int, za1: int, zb0: int, zb1: int,
+                u0: float = 0.0) -> None:
+        """AG17: a vertical wall from plan point a to b (millimeters; outward to the right of
+        a -> b), bottom and top heights at each end in millimeters: a quad, or the triangle
+        left where top and bottom meet at one end."""
+        if a[0] == b[0] and a[1] == b[1]:
+            return
+        if za1 <= za0 and zb1 <= zb0:
+            return
+        sl = self._slot(slot)
+        L = math.sqrt(float(b[0] - a[0]) ** 2 + float(b[1] - a[1]) ** 2) / 1000.0
+        q = [self.Pmm(a[0], a[1], za0), self.Pmm(b[0], b[1], zb0), self.Pmm(b[0], b[1], zb1),
+             self.Pmm(a[0], a[1], za1)]
+        uv = ((u0, za0 / 1000.0), (u0 + L, zb0 / 1000.0), (u0 + L, zb1 / 1000.0),
+              (u0, za1 / 1000.0))
+        nx, ny = float(b[1] - a[1]), float(a[0] - b[0])
+        ln = math.sqrt(nx * nx + ny * ny)
+        nf = (nx / ln, ny / ln, 0.0)
+        ids = [self._add(sl, q[k], nf, uv[k]) for k in range(4)]
+        ex = (int(b[1] - a[1]), int(a[0] - b[0]), 0)
+        if zb1 > zb0:
+            self._tri(sl, ids[0], ids[1], ids[2], ex)
+        if za1 > za0:
+            self._tri(sl, ids[0], ids[2], ids[3], ex)
+
     def _slot(self, name: str) -> _Slot:
         s = self.slots.get(name)
         if s is None:

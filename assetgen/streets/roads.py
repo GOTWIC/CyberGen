@@ -1,8 +1,13 @@
-"""Road segments: the carriageway between its junctions' cut-backs, lane markings from the
-model's lanes (lane lines, center lines, edge lines, stop lines, arrows), patches, manholes
-and drains, medians (curbed islands with lawn, or a barrier on highways), and under a
-raised road its deck (a box girder with parapets, expansion joints and underside lights)
-or, for a low street ramp, an embankment.
+"""Road segments: the road's faces of M22's pavement map (AG17: its carriageway each way, a
+bend, a walking surface, its median, and its sidewalk bands where no sidewalk piece draws
+them; `pave.py`), lane markings from the model's lanes (lane lines, center lines, edge lines,
+stop lines, arrows), patches, manholes and drains on them, its barriers (`barriers.py`), and
+under a raised road its deck (a box girder between its cuts, with expansion joints and
+underside lights) or, for a low street ramp, an embankment.
+
+Every face is drawn on its stored vertices at their stored heights (`pave.draw`), so the
+road meets its junctions, its sidewalks and the road it goes on as with no gap and no step.
+Markings and details lie on the faces as drawn (`Surface`), 4 mm over them.
 
 UV0 runs along the road: u the distance along the centerline, v the offset across it
 (meters), as AG6's road atlases expect.
@@ -14,18 +19,18 @@ from citygen import dmath as M
 
 from .. import canon as C
 from . import materials as MT
+from . import pave as PV
 from .ctx import Ctx, bbox_center, dump
-from .kit import Mesh, ccw
-from .kit import check as mesh_check
-from .path import Path, Profile, first_exit, unit
+from .kit import Mesh
+from .path import Path, Profile, unit
 from .pieces import Out, Piece, maker, rnd
 
-ROAD_DZ = 0.05          # road surface over its grade line (the blockout's ground is at 0)
+ROAD_DZ = 0.05          # road surface over its grade line (`pave.ROAD_DZ_MM`)
 MARK_DZ = 0.004         # paint over the asphalt
 PATCH_DZ = 0.002
 STEP_M = 6.0
-CUT_TOL_M = 1.0         # a junction's cut edge within this of the carriageway's edges
 EMBANKMENT_M = 3.0      # a raised street no higher than this stands on an embankment
+GIRDER_LIP_M = 0.01     # a deck's soffit reaches this past its fascia
 DECK_D = {"highway": 1.8, "avenue": 1.6, "street": 1.2, "alley": 1.0, "service": 1.0,
           "pedestrian": 0.7, "footbridge": 0.6}
 RANK = {"highway": 5, "avenue": 4, "street": 3, "service": 2, "alley": 1, "pedestrian": 0,
@@ -78,9 +83,77 @@ def deck_kind(seg: dict) -> str:
 # Gather
 # ---------------------------------------------------------------------------
 
+def walk_sides(cx: Ctx, sid: str) -> set:
+    """The sides (l, r) of a road whose sidewalk bands a sidewalk piece draws."""
+    return {w.side[0] for w in cx.walks_on.get(sid, ())}
+
+
+def road_face_ids(cx: Ctx, s) -> list[str]:
+    """The faces of the map a road piece draws: its own, less the sidewalk bands of the
+    sides a sidewalk piece draws."""
+    sides = walk_sides(cx, s.id)
+    return [f for f in cx.pave.faces_of(s.id) if PV.side_of(cx.pave.F[f].band) not in sides]
+
+
+def port_lines(cx: Ctx, s, path: Path, cuts) -> dict:
+    """The road's ports at its two ends as the map stores them: {"start"|"end": [right
+    point, left point]} (the outermost port vertices [x, y, z over sea level], meters),
+    from its faces' port edges at its cuts."""
+    PI = cx.pave
+    L = path.L
+    want = {"start": cuts[0], "end": L - cuts[1]}
+    got: dict = {"start": {}, "end": {}}
+    for fid in PI.faces_of(s.id):
+        f = PI.F[fid]
+        for refs in f.rings:
+            for ref in refs:
+                kind, vs = PI.E[ref.lstrip("-")]
+                if kind != "port":
+                    continue
+                for v in vs:
+                    x, y = PI.V[v][0] / 1000.0, PI.V[v][1] / 1000.0
+                    sv, t = path.project(x, y)
+                    for at, sw in want.items():
+                        if abs(sv - sw) <= 0.5:
+                            got[at][v] = (t, x, y, PI.V[v][2] / 1000.0)
+    out = {}
+    for at in ("start", "end"):
+        g = got[at]
+        if len(g) < 2:
+            continue
+        lo = min(g.values())
+        hi = max(g.values())
+        if hi[0] - lo[0] < 0.5:
+            continue
+        out[at] = [[lo[1], lo[2], lo[3]], [hi[1], hi[2], hi[3]]]
+    return out
+
+
+def map_stations(seg: dict, cuts) -> list[float]:
+    """The stations the map lays a road's ribbons on (`citygen.pavement.road_faces`: its
+    vertices and every `pavement.STEP_M` or less between its cuts, each ribbon piece
+    between the bends where a band folds), to the millimeter."""
+    from citygen import pavement as CPV
+    try:
+        r = CPV.Road(seg)
+    except (ValueError, ZeroDivisionError):
+        return []
+    L = r.path.L
+    s0, s1 = cuts[0], L - cuts[1]
+    if s1 - s0 < 0.001:
+        return []
+    out, cur = [], s0
+    for a, b in r.folds(s0, s1):
+        if a > cur + 0.001:
+            out += r.path.stations(cur, a)
+        cur = b
+    if s1 > cur + 0.001:
+        out += r.path.stations(cur, s1)
+    return sorted({round(v, 4) for v in out})
+
+
 def gather(cx: Ctx, s) -> Piece:
     did = s.district_ids[0] if s.district_ids else s.attrs.get("district")
-    others = []
     ends = []
     for which, nid in (("start", s.start), ("end", s.end)):
         node = cx.node.get(nid)
@@ -89,13 +162,11 @@ def gather(cx: Ctx, s) -> Piece:
         if j is not None:
             legs = cx.seg_at_node[nid]
             top = max((RANK[street_class(o)] for o in legs if o.id != s.id), default=0)
-            e["junction"] = {"id": j.id, "ring": [list(p) for p in j.polygon.exterior],
-                             "signalized": j.signalized, "legs": j.legs, "shape": j.shape,
-                             "minor": RANK[street_class(s)] < top}
+            e["junction"] = {"id": j.id, "signalized": j.signalized, "legs": j.legs,
+                             "shape": j.shape, "minor": RANK[street_class(s)] < top}
         if node is not None:
             e["node_z"] = node.position[2]
         ends.append(e)
-        others.append(nid)
     xings = []
     for c in sorted(cx.cross_on.get(s.id, ()), key=lambda c: c.id):
         j = cx.idx.get(c.junction_id)
@@ -107,11 +178,19 @@ def gather(cx: Ctx, s) -> Piece:
                       "line": [[p[0], p[1]] for p in ln.centerline]})
     seg = dump(s)
     seg.pop("district_ids", None)
+    cuts = list(cx.cuts.get(s.id, (0.0, 0.0)))
     inputs = {"seg": seg, "cls": street_class(s), "ends": ends, "crossings": xings,
               "lanes": lanes, "style": cx.style(did), "start": s.start, "end": s.end,
-              "origin": list(bbox_center(s.centerline))}
+              "origin": list(bbox_center(s.centerline)), "cuts": cuts}
     if "ground" not in seg and not cx.ground.flat:
         inputs["ground_pts"] = cx.ground.samples(s.centerline)
+    if cx.pave.on:
+        inputs["faces"] = [cx.pave.face_input(f) for f in road_face_ids(cx, s)]
+        try:
+            inputs["ports"] = port_lines(cx, s, Path(s.centerline), cuts)
+        except ValueError:
+            pass
+        inputs["stations"] = map_stations(seg, cuts)
     if s.attrs.get("role") == "deck_ramp":
         # M14 (AG10): the walkways beside a deck's ramp, which the ramp carries
         inputs["ramp_walks"] = [{"id": w.id, "line": [list(p) for p in w.line]}
@@ -121,54 +200,14 @@ def gather(cx: Ctx, s) -> Piece:
                   (st.attrs or {}).get("road_id") == s.id), key=lambda st: st.id)
     if emb:
         inputs["embankments"] = [[st.attrs["s0_m"], st.attrs["s1_m"]] for st in emb]
-    # (#95: where each barrier runs and how it ends, `barriers.road_runs`)
+    # (#95, AG17: where each barrier runs and how it ends, `barriers.road_runs`)
     from . import barriers as BR
-    clip = _median_clip(cx, s)
-    if clip:
-        inputs["median_clip"] = clip
-    inner = any(s.id in (cx.junction_at[n].attrs.get("inner") or [])
-                for n in (s.start, s.end) if n in cx.junction_at)
-    if inner:
-        inputs["barriers"] = []     # (M22: a cluster's inner road, wholly inside it, none)
-    elif BR.runs_of(inputs["seg"], inputs["cls"]):
+    if BR.runs_of(inputs["seg"], inputs["cls"]):
         by: set = set()
-        inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)  # (none: no room for them)
-        # (what they were taken from, for `seam`)
+        inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)
         inputs["barriers_by"] = sorted(by - {s.id})
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
                  cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
-
-
-def _median_clip(cx: Ctx, s) -> list:
-    """#82: the outlines of the junctions (at its height) a road's median would reach into
-    (its own where its cut is skewed, another that overlaps them): it is drawn only off
-    them."""
-    m = s.cross_section.median_m or 0.0
-    if m < 1.0 or street_class(s) not in ("avenue", "street", "service"):
-        return []
-    import shapely
-
-    from citygen import geom as G
-
-    from . import barriers as BR
-    from .walks import CLIP_M, CLIP_M2, _under
-    band = shapely.LineString([(p[0], p[1]) for p in s.centerline]).buffer(
-        m / 2.0, cap_style="flat", join_style="mitre", mitre_limit=2.0)
-    _, _, _, jtree, jns, polys, _ = BR._index(cx)
-    out = []
-    for k in sorted(jtree.query(band).tolist()):
-        j = jns[k]
-        inner = polys[k].buffer(-CLIP_M, join_style="mitre")
-        x = shapely.intersection(band, inner) if not inner.is_empty else None
-        if x is None or x.is_empty or x.area <= CLIP_M2:
-            continue
-        c = x.representative_point()
-        zm = BR._road_z(s, c.x, c.y)
-        if not _under((zm, zm), BR._junction_z(cx, j)):
-            continue
-        out.append({"id": j.id, "ring": [[C.m2(p[0]), C.m2(p[1])] for p in
-                                         G.from_model_poly(j.polygon).exterior.coords[:-1]]})
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +215,10 @@ def _median_clip(cx: Ctx, s) -> list:
 # ---------------------------------------------------------------------------
 
 class Road:
-    """A segment's geometry: its path, heights and the carriageway's ends."""
+    """A segment's geometry: its path, its cuts (where its faces end, M22), its port lines,
+    and the heights of its faces as drawn (`surf`, else its profile)."""
 
-    def __init__(self, inp: dict, tidy: bool = False):
+    def __init__(self, inp: dict):
         self.inp = inp
         self.seg = seg = inp["seg"]
         self.cls = inp["cls"]
@@ -193,66 +233,40 @@ class Road:
                 if len(inp["ground_pts"]) == len(self.path.p) else Profile([])
         else:
             self.gp = Profile([])
-        if tidy:
-            self.path = self.path.tidied()      # after the ground samples, which go by its vertices
         self.W = seg["width_m"]
         self.side = cs["sidewalk_m"][0]
         self.h = self.W / 2.0 if self.cls in PEDESTRIAN else self.W / 2.0 - self.side
         self.L = self.path.L
-        self.s0, self.s1 = 0.0, self.L
-        self.cut = {}
-        for e in inp["ends"]:
-            j = e.get("junction")
-            if j is None:
-                continue
-            ring = ccw(j["ring"])
-            pp = self.path.p if e["at"] == "start" else self.path.p[::-1]
-            r = first_exit(pp, ring)
-            if r is None:
-                continue
-            s, i, _ = r
-            a, b = ring[i], ring[(i + 1) % len(ring)]
-            s = min(s, self.L)
-            if e["at"] == "start":
-                self.s0 = s
-                self.cut["start"] = self._edge(s, a, b)
-            else:
-                self.s1 = self.L - s
-                self.cut["end"] = self._edge(self.L - s, a, b)
-
-    def _edge(self, s, a, b):
-        """The junction's cut edge as (right point, left point) when it spans the
-        carriageway, else None (a perpendicular cut)."""
-        x, y = self.path.point(s)
-        tx, ty = self.path.tangent(s)
-        ta = -ty * (a[0] - x) + tx * (a[1] - y)
-        tb = -ty * (b[0] - x) + tx * (b[1] - y)
-        L, R = (a, b) if ta > tb else (b, a)
-        tl, tr = max(ta, tb), min(ta, tb)
-        # (AG14: up to 1 m off the carriageway's edge, so a cut along a junction's skewed
-        # or wider edge still ends on it, at the height the junction's surface has there)
-        if abs(tl - self.h) > CUT_TOL_M or abs(tr + self.h) > CUT_TOL_M:
-            return None
-        return (R, L)
+        cuts = inp.get("cuts") or (0.0, 0.0)
+        self.s0 = min(max(float(cuts[0]), 0.0), self.L)
+        self.s1 = max(self.L - float(cuts[1]), self.s0)
+        self.ports = inp.get("ports") or {}
+        self.surf = None
+        # (the map's stations along it, where its faces' heights turn, so marks and
+        # barriers drawn row by row follow them exactly)
+        self.map_s = list(inp.get("stations") or ())
 
     def z(self, s: float) -> float:
+        """Its surface at s from its profile (ground plus profile plus `ROAD_DZ`)."""
         return self.gp(s) + self.zp(s) + ROAD_DZ
+
+    def zxy(self, x: float, y: float) -> float:
+        """Its surface at a point as drawn (its faces), else from its profile."""
+        if self.surf:
+            z = self.surf.z(x, y)
+            if z is not None:
+                return z
+        return self.z(self.path.project(x, y)[0])
 
     def ground(self, s: float) -> float:
         return self.gp(s)
 
     def knots(self, s0: float, s1: float) -> list[float]:
+        if self.map_s:
+            return [s for s in self.map_s if s0 < s < s1]
         return self.zp.knots(s0, s1) + self.gp.knots(s0, s1)
 
     def at(self, s: float, t: float, vi=None):
-        """World (x, y) at distance s and offset t; at the carriageway's ends on the
-        junction's cut edge."""
-        for key, se in (("start", self.s0), ("end", self.s1)):
-            e = self.cut.get(key)
-            if e is not None and abs(s - se) < 1e-9 and abs(t) <= self.h + 1e-9:
-                R, Lp = e
-                f = (t + self.h) / (2.0 * self.h)
-                return R[0] + (Lp[0] - R[0]) * f, R[1] + (Lp[1] - R[1]) * f
         x, y, nx, ny, k = self.path.frame(s, vi)
         return x + nx * k * t, y + ny * k * t
 
@@ -261,84 +275,149 @@ class Road:
         x, y, nx, ny, _ = self.path.frame(s)
         return x + nx * t, y + ny * t
 
+    def port_frame(self, at: str, z: float):
+        """The frame on the road's port at one end (its section offsets land on the port
+        line the map stores), or None where the map has none there."""
+        pl = self.ports.get(at)
+        if not pl:
+            return None
+        R, Lp = pl
+        dx, dy = Lp[0] - R[0], Lp[1] - R[1]
+        n = (dx * dx + dy * dy) ** 0.5
+        if n < 1e-6:
+            return None
+        k = n / self.W
+        s = self.s0 if at == "start" else self.s1
+        return ((R[0] + Lp[0]) / 2.0, (R[1] + Lp[1]) / 2.0, z, dx / n, dy / n, k, s)
+
     def stations(self, s0, s1, step=STEP_M, extra=()):
         return self.path.stations(s0, s1, step, list(extra) + self.knots(s0, s1))
 
     def strip(self, mesh: Mesh, slot: str, s0: float, s1: float, t0: float, t1: float,
-              dz: float = 0.0, step: float = STEP_M, flip: bool = False):
-        """A surface from s0 to s1 between offsets t0 < t1, dz over the road."""
+              dz: float = 0.0, step: float = STEP_M, flip: bool = False, drawn: bool = True):
+        """A surface from s0 to s1 between offsets t0 < t1, dz over the road (its faces as
+        drawn, or its profile: `drawn` False)."""
         if s1 - s0 < 0.01:
             return
         rows, uvs = [], []
         for s, vi in self.stations(s0, s1, step):
-            z = self.z(s) + dz
-            rows.append([(*self.at(s, t, vi), z) for t in (t0, t1)])
+            row = []
+            for t in (t0, t1):
+                x, y = self.at(s, t, vi)
+                row.append((x, y, (self.zxy(x, y) if drawn else self.z(s)) + dz))
+            rows.append(row)
             uvs.append([(s, t0), (s, t1)])
         mesh.grid(slot, rows, uvs, flip=flip, expect=(0.0, 0.0, -1.0 if flip else 1.0))
 
     def decal(self, mesh: Mesh, slot: str, ring_st, dz: float):
-        """A flat mark given in (s, t) on the road."""
-        mesh.poly_map(slot, ring_st, (), lambda s, t: (*self.xy(s, t), self.z(s) + dz))
+        """A flat mark given in (s, t) on the road, on its faces as drawn."""
+        def fmap(s, t):
+            x, y = self.xy(s, t)
+            return x, y, self.zxy(x, y) + dz
+        mesh.poly_map(slot, ring_st, (), fmap)
 
     def sweep(self, mesh: Mesh, slot: str, s0: float, s1: float, profile, base=0.0,
-              tc: float = 0.0, step: float = STEP_M):
+              tc: float = 0.0, step: float = STEP_M, drawn: bool = False, ends=None):
         """A cross-section (t, dz) swept from s0 to s1 around offset tc, dz over the road
-        plus base."""
+        plus base (its faces as drawn at the section's middle where `drawn`); `ends`: frames
+        to put at its first and last station (a port line)."""
         frames = []
         for s, vi in self.stations(s0, s1, step):
             x, y, nx, ny, k = self.path.frame(s, vi)
-            frames.append((x + nx * k * tc, y + ny * k * tc, self.z(s) + base, nx, ny, k, s))
+            px, py = x + nx * k * tc, y + ny * k * tc
+            z = (self.zxy(px, py) if drawn else self.z(s)) + base
+            frames.append((px, py, z, nx, ny, k, s))
+        if ends:
+            for idx, fr in ((0, ends[0]), (-1, ends[1])):
+                if fr is not None:
+                    frames[idx] = fr
         if len(frames) >= 2:
             mesh.sweep(slot, frames, profile)
+        return frames
 
 
-@maker("road", 2)
+def face_slot(fi: dict, cls: str, style: dict):
+    """The slot a road face is drawn in (a raised median: its top, asphalt where it is level
+    with the road)."""
+    k = fi["kind"]
+    if k == "median" and fi["cls"] == "median":
+        top = "lawn" if _median_w(fi) >= 2.0 and style["era"] not in ("industrial",
+                                                                     "aerospace") \
+            else "concrete"
+        asph = asphalt_slot(cls, style)
+        level = {(p[0], p[1]) for r in fi["rings"] for p in r
+                 if p[2] - p[3] == PV.ROAD_DZ_MM}
+
+        def by_tri(tri):
+            return asph if all((p[0], p[1]) in level for p in tri) else top
+        return by_tri
+    if k in ("curb",):
+        return MT.curb(style["archetype"])
+    if k in ("sidewalk",):
+        return MT.paving(style["archetype"])
+    if k == "walk":
+        return asphalt_slot(cls, style) if cls in PEDESTRIAN else MT.paving(style["archetype"])
+    return asphalt_slot(cls, style)
+
+
+def _median_w(fi: dict) -> float:
+    return float(fi.get("median_m", 2.0))
+
+
+@maker("road", 3)
 def make(inp: dict) -> Out:
-    """The road from its centerline as given; a road whose mesh fails the winding check (a
-    micro-kink in the line folds its curb's offset lines over each other) is made again
-    from the line without its micro-kinks."""
-    out = _make(inp, False)
-    if out.mesh is not None and mesh_check(out.mesh.slots)["winding"]:
-        out = _make(inp, True)
-    return out
-
-
-def _make(inp: dict, tidy: bool) -> Out:
     try:
-        rd = Road(inp, tidy)
+        rd = Road(inp)
     except ValueError:
         return Out(empty="degenerate centerline")
     seg, cls, style = rd.seg, rd.cls, inp["style"]
     mesh = Mesh(inp["origin"])
     dk = deck_kind(seg)
     out = Out(mesh=mesh)
-    if rd.s1 - rd.s0 >= 0.3:
-        rows, uvs = [], []
-        for s, vi in rd.stations(rd.s0, rd.s1):
-            z = rd.z(s)
-            rows.append([(*rd.at(s, t, vi), z) for t in (-rd.h, rd.h)])
-            uvs.append([(s, -rd.h), (s, rd.h)])
-        mesh.grid(asphalt_slot(cls, style), rows, uvs, expect=UP)
-        if cls not in PEDESTRIAN:
-            stops = _markings(rd, mesh, inp)
-            _details(rd, mesh, inp, stops)
-            _median(rd, mesh, inp, stops)
+    embs = [(max(a, rd.s0), min(b, rd.s1)) for a, b in inp.get("embankments", ())
+            if min(b, rd.s1) - max(a, rd.s0) >= 0.5]
+    rd.surf = _faces(rd, mesh, inp, dk, embs)
+    if rd.surf and rd.s1 - rd.s0 >= 0.3 and cls not in PEDESTRIAN:
+        stops = _markings(rd, mesh, inp)
+        _details(rd, mesh, inp, stops)
     _barriers(rd, mesh, inp)
     if dk == "deck":
         # AG14: M18's embankments carry the road where it is low; the deck's girder only
-        # between them (it ran through the fill, its sides on the fill's walls)
-        embs = [(max(a, rd.s0), min(b, rd.s1)) for a, b in inp.get("embankments", ())
-                if min(b, rd.s1) - max(a, rd.s0) >= 0.5]
-        _deck(rd, mesh, inp, _spans(0.0, rd.L, embs))
+        # between them, and (AG17) only between its cuts: a raised junction stands on its
+        # own slab
+        _deck(rd, mesh, inp, _spans(rd.s0, rd.s1, embs))
         for a, b in embs:
-            _embankment(rd, mesh, a, b, ends=True)
-    elif dk == "embankment":
-        _embankment(rd, mesh)
+            _embankment_ends(rd, mesh, a, b)
     elif dk == "ramp":
         out.notes["walkways"] = _deck_ramp(rd, mesh, inp)
     if not mesh.triangles:
         return Out(empty="inside its junctions")
     return out
+
+
+def _faces(rd: Road, mesh: Mesh, inp: dict, dk: str, embs) -> PV.Surface:
+    """The road's faces (`pave.draw`) with their curbs and outer walls; their triangles."""
+    surf = PV.Surface()
+    style = inp["style"]
+    curb = MT.curb(style["archetype"])
+    med = rd.cs.get("median_m", 0.0) or 0.0
+
+    def uv(x, y):
+        s, t = rd.path.project(x, y)
+        return (s, t)
+
+    bottom, out_slot = PV.bottoms(dk, rd.path, embs)
+    specs: list = []
+    for fi in inp.get("faces", ()):
+        fi = dict(fi, median_m=med)
+        slot = face_slot(fi, rd.cls, style)
+        tris = PV.draw(mesh, fi, slot, uv)
+        for t in tris:
+            surf.add(t)
+        wslot = out_slot or (slot if isinstance(slot, str) else curb)
+        PV.walls(mesh, fi, wslot, bottom, curb_slot=curb, out=specs)
+    PV.draw_walls(mesh, specs)
+    return surf
 
 
 # -- markings -------------------------------------------------------------------------
@@ -402,7 +481,7 @@ def _stop_s(rd: Road, inp: dict, at: str) -> float | None:
 
 def _markings(rd: Road, mesh: Mesh, inp: dict) -> dict:
     """Lane lines, center lines, edge lines, stop lines and arrows; returns the stop line
-    positions (the medians stop there too)."""
+    positions."""
     cls = rd.cls
     lanes = _lanes(rd, inp)
     shared = rd.cs.get("shared") or cls == "alley"
@@ -538,69 +617,27 @@ def _details(rd: Road, mesh: Mesh, inp: dict, stops: dict):
                                          (s1, t + ac / 2.0), (s0, t + ac / 2.0)], PATCH_DZ)
 
 
-# -- medians -------------------------------------------------------------------------
+# -- barriers --------------------------------------------------------------------------
 
 def _barriers(rd: Road, mesh: Mesh, inp: dict):
     """The road's barriers (a highway's median barrier and an at-grade highway's guard
     walls, a raised road's parapets, a deck ramp's barriers and parapets) over the spans
-    `barriers.road_runs` gave them, with their ends (#95); a road gathered without them (a
-    bridge's own deck) from cut to cut, closed at both ends."""
+    `barriers.road_runs` gave them, ending on its ports (AG17); a road gathered without
+    them (a bridge's own deck) from cut to cut, closed at both ends."""
     from . import barriers as BR
     runs = BR.runs_of(rd.seg, rd.cls)
     if not runs:
         return
     given = {r["name"]: r for r in inp.get("barriers", ())}
     for run in runs:
-        ends = None
         if "barriers" in inp:
             g = given.get(run.name)
             if not g:
                 continue
-            spans, ends = g["spans"], g.get("frames")
+            spans = g["spans"]
         else:
             spans = [[rd.s0, rd.s1, "stop", "stop"]]
-        BR.draw_run(mesh, rd, run, spans, ends=ends)
-
-
-def _median(rd: Road, mesh: Mesh, inp: dict, stops: dict):
-    m = rd.cs.get("median_m", 0.0)
-    cls = rd.cls
-    if cls == "highway":
-        return          # (its median barrier and guard walls: `_barriers`)
-    if m < 1.0 or cls not in ("avenue", "street", "service"):
-        return
-    sa = stops.get("start", rd.s0 + 1.0) + 1.0
-    sb = stops.get("end", rd.s1 - 1.0) - 1.0
-    if sb - sa < 3.0:
-        return
-    hm = m / 2.0
-    if inp.get("median_clip"):
-        # (#82: only where it is off the junctions it would cross: a road between two
-        # junctions that overlap runs through one of them)
-        from .walks import _clear_spans
-        for a, b in _clear_spans(rd.path, -hm, hm, [c["ring"] for c in inp["median_clip"]]):
-            a, b = max(a, sa), min(b, sb)
-            if b - a >= 3.0:
-                _median_run(rd, mesh, inp, a, b, hm)
-        return
-    _median_run(rd, mesh, inp, sa, sb, hm)
-
-
-def _median_run(rd: Road, mesh: Mesh, inp: dict, sa: float, sb: float, hm: float):
-    m = 2.0 * hm
-    curb = MT.curb(inp["style"]["archetype"])
-    top = "lawn" if m >= 2.0 and inp["style"]["era"] not in ("industrial", "aerospace") \
-        else "concrete"
-    rd.sweep(mesh, curb, sa, sb, [(-hm, 0.0), (-hm, 0.15), (-hm + 0.2, 0.15)])
-    rd.sweep(mesh, curb, sa, sb, [(hm - 0.2, 0.15), (hm, 0.15), (hm, 0.0)])
-    rd.sweep(mesh, top, sa, sb, [(-hm + 0.2, 0.16), (hm - 0.2, 0.16)])
-    for s, flip in ((sa, True), (sb, False)):
-        a = rd.xy(s, -hm)
-        b = rd.xy(s, hm)
-        z = rd.z(s)
-        if flip:
-            a, b = b, a
-        mesh.wall(curb, a, b, z, z + 0.16, z, z + 0.16)
+        BR.draw_run(mesh, rd, run, spans)
 
 
 # -- decks and embankments -------------------------------------------------------------
@@ -618,18 +655,40 @@ def _spans(s0: float, s1: float, holes) -> list[tuple[float, float]]:
 
 
 def _deck(rd: Road, mesh: Mesh, inp: dict, spans=None):
+    """A raised road's box girder under its faces (whose outer edges carry the fascia,
+    `_faces`), from cut to cut, closed at both ends; its expansion joints and underside
+    lights."""
     cls = rd.cls
-    W2 = rd.W / 2.0
+    # (its soffit from the fascia's foot, `GIRDER_LIP_M` past it, so no slit shows between
+    # the two where the map's mitres and the girder's differ by a millimeter)
+    W2 = rd.W / 2.0 + GIRDER_LIP_M
     a = rd.seg.get("attrs", {})
     # viaducts and ramps stand on M7's columns, whose tops are 1.8 m under the road
     D = 1.8 if a.get("elevated") or a.get("role") == "ramp" else DECK_D.get(cls, 1.2)
     B = max(rd.W * 0.55, 2.0)
-    prof = [(W2, 0.0), (W2, -0.45), (B / 2.0, -min(0.7, D * 0.6)), (B / 2.0 - 0.25, -D),
-            (-(B / 2.0 - 0.25), -D), (-B / 2.0, -min(0.7, D * 0.6)), (-W2, -0.45),
-            (-W2, 0.0)]
-    for a, b in (spans if spans is not None else [(0.0, rd.L)]):
-        rd.sweep(mesh, "concrete.deck", a, b, prof, base=-ROAD_DZ)
-    # (its parapets: `_barriers`, between its junctions' corners, #95)
+    F = PV.FASCIA_MM / 1000.0
+    prof = [(W2, -F), (B / 2.0, -max(min(0.7, D * 0.6), F + 0.05)),
+            (B / 2.0 - 0.25, -D), (-(B / 2.0 - 0.25), -D),
+            (-B / 2.0, -max(min(0.7, D * 0.6), F + 0.05)), (-W2, -F)]
+    from . import barriers as BR
+    for a_, b_ in (spans if spans is not None else [(rd.s0, rd.s1)]):
+        if b_ - a_ < 0.05:
+            continue
+        ends = []
+        for s_ in (a_, b_):
+            at = "start" if abs(s_ - rd.s0) < 1e-6 else ("end" if abs(s_ - rd.s1) < 1e-6
+                                                         else None)
+            fr = None
+            if at is not None:
+                x, y = rd.path.point(s_)
+                fr = rd.port_frame(at, rd.zxy(x, y) - ROAD_DZ)
+            ends.append(fr)
+        frames = rd.sweep(mesh, "concrete.deck", a_, b_, prof, base=-ROAD_DZ, drawn=True,
+                          ends=ends)
+        if len(frames) >= 2:
+            ring = prof + [prof[0]]
+            BR.cap(mesh, "concrete.deck", frames[0], ring[:-1], 1.0, -1.0)
+            BR.cap(mesh, "concrete.deck", frames[-1], ring[:-1], 1.0, 1.0)
     sid = inp["seg"]["id"]
     if cls not in PEDESTRIAN and rd.s1 - rd.s0 > 10.0:
         s = rd.s0 + 45.0 * rnd(sid, "joint")
@@ -639,10 +698,11 @@ def _deck(rd: Road, mesh: Mesh, inp: dict, spans=None):
                                                (s + 0.15, rd.h), (s - 0.15, rd.h)],
                          MARK_DZ - 0.001)
             s += 45.0
-    s = 7.5
-    while s < rd.L - 1.0:
+    s = rd.s0 + 7.5
+    while s < rd.s1 - 1.0:
         if rd.zp(s) > 4.0:
-            z = rd.z(s) - ROAD_DZ - D - 0.02
+            x, y = rd.path.point(s)
+            z = rd.zxy(x, y) - ROAD_DZ - D - 0.02
             ring = [(s - 0.4, -0.15), (s - 0.4, 0.15), (s + 0.4, 0.15), (s + 0.4, -0.15)]
             mesh.poly_map("light", ring, (), lambda u, v, z=z: (*rd.xy(u, v), z))
         s += 15.0
@@ -662,9 +722,8 @@ def _deck_ramp(rd: Road, mesh: Mesh, inp: dict) -> dict:
     W2 = rd.W / 2.0
     pave = MT.paving(inp["style"]["archetype"])
     wi, wo = W2 + RAMP_WALK_M, W2 + RAMP_WALK_M + RAMP_PARAPET_M
-    # (its barriers and parapets: `_barriers`, #95; the walls below carry the walkways)
-    rd.strip(mesh, pave, rd.s0, rd.s1, W2, wi, 0.15)
-    rd.strip(mesh, pave, rd.s0, rd.s1, -wi, -W2, 0.15)
+    rd.strip(mesh, pave, rd.s0, rd.s1, W2, wi, 0.15, drawn=False)
+    rd.strip(mesh, pave, rd.s0, rd.s1, -wi, -W2, 0.15, drawn=False)
     for side in (1.0, -1.0):
         rows, uvs, exp = [], [], []
         for s, vi in rd.stations(rd.s0, rd.s1):
@@ -696,37 +755,21 @@ def _deck_ramp(rd: Road, mesh: Mesh, inp: dict) -> dict:
     return out
 
 
-def _embankment(rd: Road, mesh: Mesh, s0: float = 0.0, s1: float | None = None,
-                ends: bool = False):
-    """Retained fill under the road from s0 to s1 (all of it by default): its two faces
-    from the road's edge down into the ground; `ends` (AG14, M18's embankments under a
-    deck): its faces across where the deck's girder goes on (where the road is raised
-    0.3 m or more there)."""
+def _embankment_ends(rd: Road, mesh: Mesh, s0: float, s1: float):
+    """AG14: an M18 embankment's faces across a deck road where its girder goes on (where
+    the road is raised 0.3 m or more there); its sides are the faces' outer walls."""
     W2 = rd.W / 2.0
-    s1 = rd.L if s1 is None else s1
-    if ends:
-        for s, sgn in ((s0, -1.0), (s1, 1.0)):
-            if (sgn < 0 and s <= 0.05) or (sgn > 0 and s >= rd.L - 0.05):
-                continue
-            top = rd.z(s) - ROAD_DZ
-            bot = rd.ground(s) - 0.1
-            if top - bot < 0.4:
-                continue
-            pa, pb = rd.at(s, -W2), rd.at(s, W2)
-            a_, b_ = (pa, pb) if sgn > 0 else (pb, pa)
-            mesh.wall("concrete", a_, b_, bot, top, bot, top)
-    for side in (1.0, -1.0):
-        rows, uvs, exp = [], [], []
-        for s, vi in rd.stations(s0, s1):
-            x, y = rd.at(s, side * W2, vi)
-            _, _, nx, ny, _ = rd.path.frame(s, vi)
-            top = rd.z(s) + (0.15 if rd.side > 0 else 0.0)
-            bot = rd.ground(s) - 0.1
-            col = [(x, y, top), (x, y, bot)] if side > 0 else [(x, y, bot), (x, y, top)]
-            rows.append(col)
-            uvs.append([(s, top), (s, bot)] if side > 0 else [(s, bot), (s, top)])
-            exp.append((side * nx, side * ny, 0.0))
-        mesh.grid("concrete", rows, uvs, expect=exp)
+    for s, sgn in ((s0, -1.0), (s1, 1.0)):
+        if (sgn < 0 and s <= rd.s0 + 0.05) or (sgn > 0 and s >= rd.s1 - 0.05):
+            continue
+        x, y = rd.path.point(s)
+        top = rd.zxy(x, y) - ROAD_DZ
+        bot = rd.ground(s) - 0.1
+        if top - bot < 0.4:
+            continue
+        pa, pb = rd.at(s, -W2), rd.at(s, W2)
+        a_, b_ = (pa, pb) if sgn > 0 else (pb, pa)
+        mesh.wall("concrete", a_, b_, bot, top, bot, top)
 
 
 def walkway_fix(rd: Road, line, curb: float) -> list:
@@ -742,4 +785,5 @@ def heading_of(dx: float, dy: float) -> float:
     return M.degrees(M.atan2(dy, dx))
 
 
-__all__ = ["gather", "make", "Road", "street_class", "deck_kind", "ROAD_DZ", "unit"]
+__all__ = ["gather", "make", "Road", "street_class", "deck_kind", "ROAD_DZ", "unit",
+           "road_face_ids", "walk_sides", "port_lines"]

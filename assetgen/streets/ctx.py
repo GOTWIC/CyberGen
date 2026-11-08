@@ -177,6 +177,14 @@ class Ctx:
         else:
             self.wet = None
         self.keys, self.key_tile = _blockout_keys(m)
+        # AG17: M22's pavement map (every street surface is drawn from it) and the roads'
+        # cuts (where their faces end)
+        from citygen import pavement as CPV
+
+        from . import pave as PV
+        self.cuts = CPV.road_cuts(m.junctions)
+        self.pave = PV.Index(m, self.ground)
+        self.pave.ramps(m)
         # AG12: M16's beds (bridge piers stand on them; quay and canal walls reach them)
         self.beds = None
         if m.banks:
