@@ -30,6 +30,7 @@ from .pieces import Out, Piece, maker
 from .roads import DECK_D, PEDESTRIAN, RANK, Road, deck_kind, raised, street_class
 
 PIT_M = 1.2
+SKIRT_MM = 450          # a raised junction's slab edge on its ports starts this far under it
 XWALK_DZ = 0.006        # crosswalk paint over the faces
 TACTILE_DZ = 0.004
 DECAL_STEP_M = 2.0      # a mark draped on its faces row by row at most this far apart
@@ -372,6 +373,17 @@ def make_junction(inp: dict) -> Out:
             pads += 1
         out_slot = "concrete.deck" if up else (sl if fi["cls"] == "top" else pave)
         PV.walls(mesh, fi, out_slot, bottom, curb_slot=curb, out=specs)
+        if up:
+            # (the slab's edge on its ports, from `SKIRT_MM` under the surface to its foot:
+            # a road's girder there is shallower at its edges than this slab is deep)
+            for _, _, a, b, rec in PV.segments(fi):
+                if len(rec) < 2 or rec[1] == j["id"]:
+                    continue
+                ta, tb = min(a[2], rec[4]) - SKIRT_MM, min(b[2], rec[5]) - SKIRT_MM
+                ba, bb = bottom(a), bottom(b)
+                if ta > ba or tb > bb:
+                    specs.append(("concrete.deck", (a[0], a[1]), (b[0], b[1]), min(ba, ta),
+                                  ta, min(bb, tb), tb, False))
         if up and tris:
             # (the slab's underside, under the face: no girder runs under a junction)
             low = []
