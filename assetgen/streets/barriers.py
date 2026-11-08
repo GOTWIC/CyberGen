@@ -271,9 +271,9 @@ def _port_frame(lg: dict, v, W: float):
     """A junction barrier's frame at a leg's outer port vertex v (x, y mm): inward along
     the port line, stretched as the leg's runs are (`Road.port_frame`)."""
     pl = lg["port"]
-    if not pl:
-        return None
-    R, Lp = pl
+    if not pl or (len(pl) > 2 and pl[2] > PORT_STRAIGHT_M):
+        return None     # (a port not straight: the barrier ends square to its own edge)
+    R, Lp = pl[0], pl[1]
     x, y = v[0] / 1000.0, v[1] / 1000.0
     dR, dL = dist((x, y), R), dist((x, y), Lp)
     far = R if dL < dR else Lp
@@ -382,6 +382,7 @@ def _corner(corners, joins, legs, A, B, kind, ka, kb, pts, first, last) -> None:
         joins[B][_side(lgb, pts[-1][0] / 1000.0, pts[-1][1] / 1000.0)] = True
 
 
+PORT_STRAIGHT_M = 0.02  # a junction barrier ends on its leg's port line where it is this straight
 LANE_IN_M = 0.0         # a junction's barrier keeps out of its connector lanes' whole width
                         # (AG14's check: within the lane's half width less 0.1 m)
 
@@ -476,6 +477,8 @@ def _median_across(cx, j, PI, legs: dict, fids) -> dict | None:
     if len(med) != 2 or not fids:
         return None
     A, B = (legs[k] for k in med)
+    if any(len(lg["port"]) > 2 and lg["port"][2] > PORT_STRAIGHT_M for lg in (A, B)):
+        return None
     pa = [(A["port"][0][0] + A["port"][1][0]) / 2.0, (A["port"][0][1] + A["port"][1][1]) / 2.0]
     pb = [(B["port"][0][0] + B["port"][1][0]) / 2.0, (B["port"][0][1] + B["port"][1][1]) / 2.0]
     da, db = _leg_dir(A), _leg_dir(B)
@@ -483,6 +486,10 @@ def _median_across(cx, j, PI, legs: dict, fids) -> dict | None:
         return None
     if not all(_clear_of_connectors(cx, n, pa, pb) for n in cx.nodes_of(j)):
         return None
+    corr = _lane_corridors(cx, j)
+    if corr is not None and shapely.intersection(
+            shapely.LineString([pa, pb]).buffer(0.3, cap_style="flat"), corr).area > 0.01:
+        return None     # (a lane runs along it: no room for a median there)
     import shapely
     tops = [f for f in fids if PI.cls[f] == "top"]
     polys = []
@@ -499,7 +506,7 @@ def _median_across(cx, j, PI, legs: dict, fids) -> dict | None:
         return None
     ends = []
     for lg, p in ((A, pa), (B, pb)):
-        R, Lp = lg["port"]
+        R, Lp = lg["port"][0], lg["port"][1]
         dx, dy = Lp[0] - R[0], Lp[1] - R[1]
         n = math.sqrt(dx * dx + dy * dy)
         k = n / lg["seg"].width_m
@@ -709,7 +716,7 @@ def _port_z(rd, at: str, run: Run) -> float | None:
     pl = rd.ports.get(at)
     if not pl or len(pl[0]) < 3:
         return None
-    R, Lp = pl
+    R, Lp = pl[0], pl[1]
     if run.side == "l":
         z = Lp[2]
     elif run.side == "r":

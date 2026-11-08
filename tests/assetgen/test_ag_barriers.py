@@ -179,7 +179,7 @@ def test_small_city_runs_end_at_their_junctions():
                     if fr is None:
                         continue
                     ported += 1
-                    R, L = rd.ports[at]
+                    R, L = rd.ports[at][0], rd.ports[at][1]
                     assert abs(fr[0] - (R[0] + L[0]) / 2.0) < 1e-9
     assert spans and ported
 

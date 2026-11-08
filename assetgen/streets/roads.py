@@ -136,7 +136,12 @@ def port_lines(cx: Ctx, s, path: Path, cuts) -> dict:
         lo, hi = min(rows.values()), max(rows.values())
         if hi[0] - lo[0] < 0.5:
             continue
-        out[at] = [[lo[1], lo[2], lo[3]], [hi[1], hi[2], hi[3]]]
+        # (how far its vertices lie off the line between its ends: a port M22 cut in part
+        # at a seam is not straight)
+        dx, dy = hi[1] - lo[1], hi[2] - lo[2]
+        n = (dx * dx + dy * dy) ** 0.5
+        off = max(abs((r[1] - lo[1]) * dy - (r[2] - lo[2]) * dx) / n for r in rows.values())
+        out[at] = [[lo[1], lo[2], lo[3]], [hi[1], hi[2], hi[3]], round(off, 3)]
     return out
 
 
@@ -319,7 +324,7 @@ class Road:
         pl = self.ports.get(at)
         if not pl:
             return None
-        R, Lp = pl
+        R, Lp = pl[0], pl[1]
         dx, dy = Lp[0] - R[0], Lp[1] - R[1]
         n = (dx * dx + dy * dy) ** 0.5
         if n < 1e-6:
@@ -382,12 +387,12 @@ def face_slot(fi: dict, cls: str, style: dict):
         top = "lawn" if _median_w(fi) >= 2.0 and style["era"] not in ("industrial",
                                                                      "aerospace") \
             else "concrete"
-        asph = asphalt_slot(cls, style)
+        # (its cut-throughs, level with the road, in concrete: a crossing, not a lane)
         level = {(p[0], p[1]) for r in fi["rings"] for p in r
                  if p[2] - p[3] == PV.ROAD_DZ_MM}
 
         def by_tri(tri):
-            return asph if all((p[0], p[1]) in level for p in tri) else top
+            return "concrete" if all((p[0], p[1]) in level for p in tri) else top
         return by_tri
     if k in ("curb",):
         return MT.curb(style["archetype"])

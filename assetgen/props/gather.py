@@ -580,6 +580,11 @@ def gather(model, spec, briefs: dict | None, out_dir: Path, pages: bool = False)
             exact[t][key].append(item)
             g.covered[p.id] = "exact"
             continue
+        if kind == "barrier" and PI.on and (p.attrs or {}).get("segment") in segs and                 not PI.faces_of(p.attrs["segment"]):
+            # (AG17: on a cluster's inner road, which has no faces: on its junction)
+            g.dropped[p.id] = "on a road wholly inside its junction (M22)"
+            groups.setdefault(key, {"cls": "prop", "kind": kind, "tile": t, "parts": {}})
+            continue
         if kind == "barrier":
             sid = (p.attrs or {}).get("segment")
             s = segs.get(sid)

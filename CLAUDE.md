@@ -1986,8 +1986,10 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
   zone and clear path, a junction piece its carriageway, corner pads and bulb (a cluster's whole
   surface, unbuildable ones as they are). Each face on its stored vertices in order, never split;
   its interior by `triangulate.triangulate_face` (exact ear clipping keeping every boundary
-  vertex, holes that touch at a vertex joined, the face's samples as Steiner points strictly
-  inside, Delaunay flips across every edge that is not boundary).
+  vertex, the shortest diagonal first so a long ribbon is a strip, `_clip_best`; holes that
+  touch at a vertex joined; the face's samples as Steiner points strictly inside; Delaunay
+  flips across every edge that is not boundary). UV0 along the road from the map's rows
+  (`roads.row_uvs`: a vertex's station and offset), bends and junctions in plan.
 - **Heights** (`Index`, built once on `Ctx.pave`; a piece's inputs carry every vertex as
   [x, y, top, z, z over ground] in mm): a vertex's height over sea level (the map's z plus
   `Ctx.ground`) plus its face's lift: carriageway, junction, bulb, bend and walk 50 mm
