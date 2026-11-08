@@ -96,3 +96,61 @@ def test_golden():
              int(rnd.randint(500, 1000) * M.sin(2 * M.PI * i / n))) for i in range(n)]
     t2 = triangulate(star, [rect(-50, -50, 50, 50)])
     assert C.digest([t1, t2]) == golden()["triangulate"]
+
+
+# -- AG17: a face of M22's pavement map ----------------------------------------------------
+
+def _face_check(rings, steiner=()):
+    from assetgen.triangulate import triangulate_face
+    pts, tris = triangulate_face(rings, steiner)
+    total = sum(orient(pts[a], pts[b], pts[c]) for a, b, c in tris)
+    assert total == abs(area2(rings[0])) - sum(abs(area2(h)) for h in rings[1:])
+    assert all(orient(pts[a], pts[b], pts[c]) > 0 for a, b, c in tris)
+    # every boundary segment is a triangle edge, never split
+    edges = {}
+    for a, b, c in tris:
+        for u, v in ((a, b), (b, c), (c, a)):
+            edges[(pts[u], pts[v])] = edges.get((pts[u], pts[v]), 0) + 1
+    for r in rings:
+        rr = r if (area2(r) > 0) == (r is rings[0]) else r[::-1]
+        for k in range(len(rr)):
+            p, q = tuple(rr[k]), tuple(rr[(k + 1) % len(rr)])
+            assert edges.get((p, q), 0) == 1, (p, q)
+    return pts, tris
+
+
+def test_a_face_keeps_every_boundary_vertex_and_its_samples():
+    # a band with vertices along both long edges (collinear runs) and interior samples
+    ring = [(x, 0) for x in range(0, 40001, 4000)] + \
+        [(x, 7000) for x in range(40000, -1, -4000)]
+    ring = [p for i, p in enumerate(ring) if i == 0 or p != ring[i - 1]]
+    smp = [(x, 3500) for x in range(2000, 40000, 4000)] + [(0, 3500), (40000, 0)]
+    pts, tris = _face_check([ring], smp)
+    used = {pts[i] for t in tris for i in t}
+    assert set(ring) <= used                                   # nothing dropped
+    assert {(x, 3500) for x in range(2000, 40000, 4000)} <= used   # inside: inserted
+    assert (0, 3500) not in used                               # on the boundary: left out
+    # Delaunay: no sliver fans along the band
+    assert max(len([t for t in tris if i in t]) for i in range(len(pts))) <= 8
+
+
+def test_a_face_with_holes_touching_at_a_vertex():
+    outer = rect(0, 0, 20000, 20000)
+    h1 = [(5000, 5000), (5000, 10000), (10000, 10000), (10000, 5000)]
+    h2 = [(10000, 10000), (10000, 15000), (15000, 15000), (15000, 10000)]
+    _face_check([outer, h1, h2], [(2000, 2000), (17000, 3000)])
+    # a hole touching the outer ring at one of its vertices
+    h3 = [(0, 8000), (4000, 12000), (4000, 8000)]
+    _face_check([[(0, 0), (20000, 0), (20000, 20000), (0, 20000), (0, 8000)], h3])
+
+
+def test_face_triangles_are_the_same_every_time():
+    from assetgen.triangulate import triangulate_face
+    rnd = random.Random(7)
+    ring = [(int(20000 * M.cos(2 * M.PI * k / 40)) + rnd.randrange(-300, 300),
+             int(20000 * M.sin(2 * M.PI * k / 40)) + rnd.randrange(-300, 300)) for k in range(40)]
+    smp = [(x, y) for x in range(-16000, 16001, 2000) for y in range(-16000, 16001, 2000)
+           if x * x + y * y < 15000 ** 2]
+    a = triangulate_face([ring], smp)
+    assert a == triangulate_face([ring], smp)
+    _face_check([ring], smp)

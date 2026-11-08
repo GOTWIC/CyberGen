@@ -1,5 +1,5 @@
 """AG7, street elements (scope 5.3, 9, 14.8): every street element of the small test city
-has a valid mesh, packs are kept by hash (a second build writes nothing), the bytes do not
+has a valid mesh and (AG17) the pieces drawn from M22's pavement map meet with no gap, packs are kept by hash (a second build writes nothing), the bytes do not
 depend on the worker count or the hash seed, a regenerated district rewrites only its own
 tiles' packs and its seam's, the Unreal contribution matches the packs, M13's ground lifts
 everything, and the goldens hold (made on the Mac, confirmed in the `citygen-x86` image;
@@ -169,8 +169,10 @@ def test_sky_tube_rings_and_led_bands():
 
 
 def test_m13_ground_lifts_roads_and_structures():
-    """M13's contract: a road's surface is its grade line plus its z profile; anything else
-    stands on the terrain grid at its point (bilinear)."""
+    """M13's contract: anything stands on the terrain grid at its point (bilinear); AG17: a
+    vertex of M22's pavement map stands at its height over that ground, and a road draws its
+    faces there (`ROAD_DZ` over it)."""
+    from assetgen.streets import pave as PV
     from assetgen.streets.roads import make as make_road
     t = SimpleNamespace(x0=0.0, y0=0.0, cell_m=10.0, natural=[[0.0] * 3] * 3,
                         ground=[[0.0, 10.0, 20.0], [0.0, 10.0, 20.0], [0.0, 10.0, 20.0]],
@@ -181,17 +183,32 @@ def test_m13_ground_lifts_roads_and_structures():
     assert g.at(5.0, 5.0) == 5.0 and g.at(15.0, 0.0) == 15.0
     assert abs(g.at(30.0, 30.0) - 20.0) < 1e-3       # clamped to the grid, as M13 samples
     assert Ground(SimpleNamespace(**dry)).samples([(1.0, 2.0)]) is None
+    pts = {"a": (0.0, -4.0), "b": (20.0, -4.0), "c": (20.0, 4.0), "d": (0.0, 4.0)}
+    net = SimpleNamespace(vertices=[SimpleNamespace(id=k, p=p, z=0.5) for k, p in pts.items()],
+                          edges=[SimpleNamespace(id=f"e{u}{v}", kind="outer", v=[u, v])
+                                 for u, v in (("a", "b"), ("b", "c"), ("c", "d"), ("d", "a"))])
+    face = SimpleNamespace(id="rs.e0n0.pv.cw", owner_id="rs.e0n0", kind="carriageway",
+                           band="cw", layer="g0", rings=[["eab", "ebc", "ecd", "eda"]],
+                           samples=[])
+    m = SimpleNamespace(pavement_net=net, pavement=[face], road_segments=[], **dry)
+    PI = PV.Index(m, g)
+    assert PI.V["b"][2:] == (20500, 500)              # 20 m of ground and 0.5 m over it
     seg = {"id": "rs.e0n0", "centerline": [[0.0, 0.0], [20.0, 0.0]],
-           "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 20.0, "z": 0.0}],
-           "ground": [{"s": 0.0, "z": 30.0}, {"s": 20.0, "z": 31.0}], "width_m": 8.0,
+           "z_profile": [{"s": 0.0, "z": 0.5}, {"s": 20.0, "z": 0.5}],
+           "ground": [{"s": 0.0, "z": 0.0}, {"s": 20.0, "z": 20.0}], "width_m": 8.0,
            "road_class": "street", "attrs": {},
            "cross_section": {"sidewalk_m": [0.0, 0.0], "median_m": 0.0, "shared": False}}
     inp = {"seg": seg, "cls": "street", "ends": [], "crossings": [], "lanes": [],
            "style": {"archetype": None, "era": "mixed_modern", "grime": 0.0, "wealth": 0.5,
-                     "wear": 1.0}, "start": "a", "end": "b", "origin": [10.0, 0.0]}
-    mesh = make_road(inp).mesh
-    zs = sorted({p[2] for p in mesh.slots["asphalt.street"].pos})
-    assert zs[0] == 30050 and zs[-1] == 31050
+                     "wear": 1.0}, "start": "a", "end": "b", "origin": [10.0, 0.0],
+           "faces": [PI.face_input("rs.e0n0.pv.cw")]}
+    sl = make_road(inp).mesh.slots["asphalt.street"]
+    up = set()
+    for k in range(0, len(sl.idx), 3):
+        a, b, c = (sl.pos[i] for i in sl.idx[k:k + 3])
+        if (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0:
+            up |= {a[2], b[2], c[2]}
+    assert sorted(up) == [550, 20550]           # (its outer walls reach into the ground)
 
 
 def test_kit_drops_folds_and_checks_clean():
@@ -265,16 +282,3 @@ def test_vesper_bay_tiles_golden(tmp_path):
     got = SB.outputs_digest(tmp_path)
     assert {t: got["tiles"][t] for t in want["tiles"]} == want["tiles"]
     assert got["all"] == want["all"]
-
-
-def test_road_with_a_micro_kink_is_made_again_from_a_tidied_line():
-    """Greyhook's `rs.w1338n148` (its inputs, tests/assetgen/data/road_micro_kink.json): two
-    vertices 6 and 8 cm apart, 5 mm off the line, swing the 9 m curb offsets over each other
-    and leave a directed edge in two triangles; `make` remakes such a road from its line
-    without the kink."""
-    from assetgen.streets import roads
-    inp = json.loads((HERE / "data" / "road_micro_kink.json").read_text(encoding="utf-8"))
-    assert K.check(roads._make(inp, False).mesh.slots)["winding"] == 1
-    out = roads.make(inp)
-    assert not any(K.check(out.mesh.slots).values())
-    assert out.mesh.triangles == 266

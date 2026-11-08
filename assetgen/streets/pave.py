@@ -367,8 +367,8 @@ def walls(mesh, fi: dict, slot: str, bottom=None, curb_slot: str | None = None,
         elif bottom is not None:
             ba, bb = bottom(a), bottom(b)
             if ba is not None and bb is not None:
-                specs.append((slot, (a[0], a[1]), (b[0], b[1]), min(ba, a[2]), a[2],
-                              min(bb, b[2]), b[2], True))
+                specs.append((slot(a, b) if callable(slot) else slot, (a[0], a[1]),
+                              (b[0], b[1]), min(ba, a[2]), a[2], min(bb, b[2]), b[2], True))
     if out is not None:
         out.extend(specs)
     else:
@@ -411,7 +411,8 @@ def ground_bottom(v) -> int:
 
 def bottoms(dk: str, path=None, embs=()):
     """How far a road's faces' outer walls reach down, by its deck kind (`roads.deck_kind`):
-    (bottom(vertex) in millimeters or None, the walls' slot or None for the face's own).
+    (bottom(vertex) in millimeters or None, the walls' slot (a name, or slot(a, b) by the
+    wall's ends) or None for the face's own).
     A viaduct's or bridge's fascia `FASCIA_MM` under its grade line (into the ground on
     M18's embankment stretches), an embankment's into the ground, a deck street's onto its
     slab, a deck ramp's none (its walls are its own), else into the ground."""
@@ -426,7 +427,10 @@ def bottoms(dk: str, path=None, embs=()):
             if in_emb(v):
                 return v[3] - v[4] - EMBANK_SINK_MM
             return v[3] - FASCIA_MM
-        return deck, "concrete.deck"
+
+        def slot(a, b):
+            return "concrete" if in_emb(a) and in_emb(b) else "concrete.deck"
+        return deck, slot
     if dk == "embankment":
         return (lambda v: v[3] - v[4] - EMBANK_SINK_MM), "concrete"
     if dk == "slab":
