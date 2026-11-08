@@ -1997,19 +1997,25 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
   curb band's vertices beside a crosswalk's end or a garage, loading or gate entrance, at least
   the one nearest each); an avenue's, street's or service road's median of 1 m or more an
   island at 200, level with the road under a crosswalk and from it on to a road end within
-  40 m (`mdrop`). Marks and details lie on the faces as drawn (`Surface`; lane rows at the map's
-  stations, `roads.map_stations`).
+  40 m (`mdrop`, its cut-through concrete). A bend face's asphalt follows its lanes, its sidewalk
+  part paving; a junction's carriageway part no lane runs through, paving. Marks and details
+  lie on the faces as drawn (`Surface`; lane rows at the map's stations, `roads.map_stations`).
 - **Curbs and walls:** where two faces meet at different lifts the higher face's piece draws
   the wall between them, the same stored polyline at two heights (`walls`); outer edges walled
   down (`bottoms`: into the ground, a raised road's 0.45 m fascia, an embankment's fill, a deck
-  street onto its slab); outer walls meeting at a vertex where faces only touch step 1 mm back
-  (`draw_walls`). A raised road's girder runs between its cuts only, capped on its port lines;
-  a raised junction stands on a slab of its own (`deck_d`, down to the ground where low).
+  street onto its slab); walls of several faces meeting at a vertex the faces only touch at
+  take a vertex on that edge (`draw_walls`, `Mesh.wall_mm`'s split). A raised road's girder
+  runs between its cuts only, capped on its port lines; a raised junction stands on a slab of
+  its own (`deck_d`, down to the ground where low, 0.1 m under it in a cut), its edge on its
+  ports from 0.45 m under the seam.
 - **Barriers** (`barriers.py` reworked): spans between the cuts less crosswalks, every end at a
   cut on the road's port line (`Road.port_frame`, `port_lines`): `join`, `open`, `stop`; a
   junction's corner parapets (raised) and guard walls (at grade) along its faces' boundary
-  (`_loops`) between two legs' outer port vertices, split where the edge turns back
-  (`_split_sharp`), the median across between port middles (`junction_plan`).
+  (`_loops`) between two legs' outer port vertices (on the port line where it is straight,
+  else square and a section's width short), out of its connector lanes (`_off_lanes`), split
+  where the edge turns back (`_split_sharp`); the median across between port middles where
+  no lane crosses or runs along it (`junction_plan`). Spans keep to the road's own faces
+  and off every crosswalk; a road with no faces has none.
 - **Checks:** `street_watertight` (`streets/watertight.py`, on the packs read back): every
   segment of every edge two faces share drawn by both faces' pieces on the same millimeters, in
   exactly two triangles (a face's and its neighbor's, or its curb's). AG14's step check
