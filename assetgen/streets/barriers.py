@@ -451,7 +451,12 @@ def _off_lanes(pts, corr, reach: float) -> list:
         if g.geom_type != "Polygon" or g.area < 0.005:
             continue
         ds = [line.project(shapely.Point(c)) for c in g.exterior.coords]
-        cut.append((min(ds), max(ds)))
+        a, b = min(ds), max(ds)
+        if b - a < 0.02:
+            # (a hit outside a sharp turn projects onto its vertex: cut 1 cm either side,
+            # so the two parts' caps never share an edge, as `_split_sharp` does)
+            a, b = a - 0.01, b + 0.01
+        cut.append((a, b))
     if not cut:
         return [(pts, True, True)]
     cut.sort()

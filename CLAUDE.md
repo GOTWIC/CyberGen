@@ -1998,7 +1998,8 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
   the one nearest each); an avenue's, street's or service road's median of 1 m or more an
   island at 200, level with the road under a crosswalk and from it on to a road end within
   40 m (`mdrop`, its cut-through concrete). A bend face's asphalt follows its lanes, its sidewalk
-  part paving; a junction's carriageway part no lane runs through, paving. Marks and details
+  part paving; a junction's carriageway part apart from its main one asphalt only along its
+  connector lanes, paving elsewhere. Marks and details
   lie on the faces as drawn (`Surface`; lane rows at the map's stations, `roads.map_stations`).
 - **Curbs and walls:** where two faces meet at different lifts the higher face's piece draws
   the wall between them, the same stored polyline at two heights (`walls`); outer edges walled

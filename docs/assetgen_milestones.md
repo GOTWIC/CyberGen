@@ -27,7 +27,7 @@ as it lands, as in [`citygen_milestones.md`](citygen_milestones.md).
 | AG15 | Cyberpunk facades and night, from the first run-through: seven new facade systems, window patterns and skins past the grid, two or three finishes a building, the neighbor rule (towers within 150 m never alike by day or night); every building lit its own way by use and hour, crown and edge light, logos; spot lamps, light pools and sign washes in Unreal | Done | [`docs/progress/AG15`](progress/AG15) |
 | Sky tube fixes | Fixes between milestones (issues #94, #97): sky tubes on plain pylons drawn as before M19 (masts an option), ribs at citygen's rings along the whole line, an LED band in the line's color on each lit one (neon, brighter by night) | Done | [`docs/progress/sky_tubes`](progress/sky_tubes) |
 | AG16 | Performance (scope 14.17, issue #96): a benchmark in a standalone game process, frame time, VRAM, RAM and import targets for Delta on the Windows PC, structural fixes from what it shows, budgets in the build; upscaling measured, DLSS later | Planned | |
-| AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Planned | |
+| AG17 | Road surfaces by construction (scope 14.18), with stage 1's M22: AG7's road, junction, sidewalk, median and corner pieces meshed from M22's pavement map, their boundaries the map's stored vertices never split, interiors by constrained triangulation, barriers along stored edges, decals on the face that holds them; a `street_watertight` check (every interior map edge in exactly two pieces at the same positions); AG14's step and strip checks reading 0 | Done | [`docs/progress/AG17`](progress/AG17) |
 
 ## AG0: contract and spike
 
@@ -2344,8 +2344,9 @@ outputs `docs/progress/AG17/`.
   every meter, asphalt where a triangle lies within the carriageway's half width and its
   lanes' corridors (0.5 m wider), the district's paving outside, concrete on a road with
   no sidewalk (the inside of a fold no lane crosses: no building or barrier check takes it
-  for the carriageway). A junction's carriageway part apart from its main one that no
-  connector lane runs through is drawn in paving.
+  for the carriageway). A junction's carriageway part apart from its main one (a cluster's
+  gore between two roads) is asphalt only where its triangles lie in its connector lanes'
+  corridors (0.5 m wider), paving elsewhere.
 - **Barriers** (`barriers.py` reworked): a run's spans go from cut to cut, less where its
   band would leave the road's own faces (M22 cuts them where another road's overlap) or come
   within 1 m of any crosswalk (spans never meet end to end); every end at a cut lies on the
@@ -2356,9 +2357,11 @@ outputs `docs/progress/AG17/`.
   parapets (raised) and guard walls (at grade) run along the boundary of its faces
   (`_loops`) from one leg's outer port vertex to the next, on their port lines where those
   are straight (within 2 cm; else square to their own edge), out of the junction's
-  connector lanes (cut and capped, `_off_lanes`), split where the edge turns back or passes
-  a vertex twice (`_split_sharp`); the median across runs between the two port middles
-  where no connector lane crosses or runs along it.
+  connector lanes (cut and capped where the section, at twice its reach for the sweep's
+  mitres, meets a lane's corridor with round ends, `_off_lanes`; a hit outside a sharp turn
+  cut 1 cm either side of its vertex), split where the edge
+  turns back or passes a vertex twice (`_split_sharp`); the median across runs between the
+  two port middles where no connector lane crosses or runs along it.
 - **Retired**: `path.first_exit`, `Road._edge` and `CUT_TOL_M`, `_with_corners`,
   `_cut_run`, `_run_z`, `_road_rows`, `_surface` (inverse-distance heights), `_sectors` and
   its duplicate `_corner`, `_fills`, `_fill`, `_clear_spans`, `_clip_rings`, `_overlaps` and

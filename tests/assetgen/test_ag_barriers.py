@@ -5,9 +5,11 @@ prop on a carriageway, a junction or a crosswalk or through another barrier, AG8
 prop variant that keeps off the carriageway, and M6's quay railings and median barriers keep
 off the junctions."""
 
+import math
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 import shapely
 
 from assetgen.fit.barriers import barrier_clash
@@ -91,6 +93,21 @@ def test_a_junction_chain_splits_where_its_edge_turns_back():
     f = BR.chain_frames([[0.0, 0.0, 1.0], [10.0, 0.0, 1.0]], 0.0,
                         ([0.0, 0.0, 0.0, 1.0, 1.25], None))
     assert f[0][3:6] == (0.0, 1.0, 1.25) and f[0][2] == 1.0
+
+
+def test_a_lane_hit_outside_a_sharp_turn_cuts_both_sides():
+    """AG17: a connector lane's corridor met only outside a sharp turn of a junction's
+    barrier (it projects onto the turn's vertex) cuts the chain 1 cm either side of the
+    vertex, so the two parts' caps never share an edge."""
+    pts = [[0, 0, 0], [10000, 0, 0], [5000, -3000, 0]]      # (mm; a sharp right turn)
+    corr = shapely.Point(10.3, 0.0).buffer(0.15)            # (outside the turn, meters)
+    parts = BR._off_lanes(pts, corr, 0.35)
+    assert len(parts) == 2
+    (a, _, _), (b, _, _) = parts
+    assert a[-1] != b[0]
+    assert abs(a[-1][0] - 9990) <= 1 and a[-1][1] == 0
+    assert math.hypot(b[0][0] - 10000, b[0][1]) == pytest.approx(10, abs=1)
+    assert b[0][1] < 0                                      # (on the leg after the turn)
 
 
 def _fake_packs(pieces: dict):
