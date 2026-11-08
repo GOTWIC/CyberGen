@@ -375,6 +375,15 @@ def _corner(corners, joins, legs, A, B, kind, ka, kb, pts, first, last) -> None:
     lga, lgb = legs[A], legs[B]
     fa = _port_frame(lga, pts[0], lga["seg"].width_m) if first else None
     fb = _port_frame(lgb, pts[-1], lgb["seg"].width_m) if last else None
+    # (an end at a port that is not straight ends square to the barrier's own edge: back
+    # from the port by the section's width, so it never reaches over the port)
+    reach = int(PARAPET_W * 1000) if kind == "parapet" else int((GUARD_IN_M + 0.3) * 1000)
+    if first and fa is None:
+        pts = _trim(pts, reach)
+    if last and fb is None:
+        pts = _trim(pts[::-1], reach)[::-1]
+    if len(pts) < 2:
+        return
     corners.append({"a": A, "b": B, "kind": kind, "pts": pts, "ends": [fa, fb]})
     if first and ka[kind]:
         joins[A][_side(lga, pts[0][0] / 1000.0, pts[0][1] / 1000.0)] = True
@@ -383,6 +392,23 @@ def _corner(corners, joins, legs, A, B, kind, ka, kb, pts, first, last) -> None:
 
 
 PORT_STRAIGHT_M = 0.02  # a junction barrier ends on its leg's port line where it is this straight
+def _trim(pts, d: int) -> list:
+    """A chain (millimeters) less its first d millimeters (shorter: [])."""
+    out = [list(p) for p in pts]
+    left = float(d)
+    while len(out) >= 2:
+        a, b = out[0], out[1]
+        L = math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+        if L > left:
+            f = left / L
+            out[0] = [int(round(a[0] + (b[0] - a[0]) * f)), int(round(a[1] + (b[1] - a[1]) * f)),
+                      int(round(a[2] + (b[2] - a[2]) * f))]
+            return out
+        left -= L
+        out.pop(0)
+    return []
+
+
 LANE_IN_M = 0.0         # a junction's barrier keeps out of its connector lanes' whole width
                         # (AG14's check: within the lane's half width less 0.1 m)
 

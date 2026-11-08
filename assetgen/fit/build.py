@@ -478,7 +478,7 @@ def seams(pk: Packs, model=None) -> dict:
     """A road meets its junctions (AG17: on M22's pavement map): at every vertex of a port
     between a road's face and a junction's face of one class (a carriageway and the
     junction's carriageway, a sidewalk band and a corner pad), the heights the two pieces draw there
-    (their up-facing triangles' vertices at that position, on the millimeter) differ by at
+    (their triangles' vertices at that position, on the millimeter) differ by at
     most `GAP_M`; a port vertex one of them does not draw is a step of the other's height
     over its ground (a gap). Without a map, nothing to compare."""
     out = {"legs": 0, "steps": 0, "max_m": 0.0, "worst": []}
@@ -499,10 +499,9 @@ def seams(pk: Packs, model=None) -> dict:
             T, _ = pk.street_tris(pid)
             got = drawn[pid] = defaultdict(set)
             if len(T):
-                n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])
-                L = np.linalg.norm(n, axis=1)
-                up = (L > 1e-9) & (n[:, 2] > 0.5 * np.maximum(L, 1e-12))
-                P = np.rint(T[up].reshape(-1, 3) * 1000.0).astype(np.int64)
+                # (every triangle's vertices: a hillside junction's faces can be steeper
+                # than any "up-facing" cut; the pair of heights nearest each other counts)
+                P = np.rint(T.reshape(-1, 3) * 1000.0).astype(np.int64)
                 for x, y, z in P.tolist():
                     got[(x, y)].add(z)
         return got

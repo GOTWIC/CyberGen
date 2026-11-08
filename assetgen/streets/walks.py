@@ -384,8 +384,9 @@ def make_junction(inp: dict) -> Out:
             return v[3]         # (down to its deck's slab top)
     elif up:
         def bottom(v):
-            # (a raised junction's slab D deep, down to the ground where it is lower)
-            return max(v[3] - int(D * 1000), v[3] - v[4] - 100)
+            # (a raised junction's slab D deep, down to the ground where it is lower; at
+            # least 0.1 m under the face where a part lies in a cut)
+            return min(v[3] - 100, max(v[3] - int(D * 1000), v[3] - v[4] - 100))
     else:
         bottom = PV.ground_bottom
     surf = PV.Surface()
