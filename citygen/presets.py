@@ -162,6 +162,12 @@ class ModePreset:
     support_spacing_m: tuple[float, float] | None
     station_spacing_m: tuple[float, float]
     palette: tuple[str, ...] = field(default=())
+    # #124: a profile of long ramps and vertical curves (`transit._curved`): the grade it
+    # climbs at where it can (`max_grade` the limit), the length of its vertical curves and
+    # the longest sag between two crests it fills; None and 0: the grade envelope alone
+    design_grade: float | None = None
+    curve_m: float = 0.0
+    fill_m: float = 0.0
 
 
 TRANSIT_MODES: dict[str, ModePreset] = {
@@ -175,7 +181,8 @@ TRANSIT_MODES: dict[str, ModePreset] = {
     "maglev": ModePreset((15, 60), (25, 45), 0.10, 500, (50, 80), (1200, 2500),
                          ("#ff2bd6", "#ff7ae6", "#b0009a")),
     "sky_tube": ModePreset((40, 150), (70, 120), 0.08, 300, (420, 600), (800, 1600),
-                           ("#22e5ff", "#8ff3ff", "#0aa6bd")),
+                           ("#22e5ff", "#8ff3ff", "#0aa6bd"),
+                           design_grade=0.035, curve_m=300.0, fill_m=500.0),
 }
 
 # Sky tubes' look (#94, #97; spec `transit.sky_tube` and each line's own): plain pylons under

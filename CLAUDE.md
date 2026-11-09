@@ -1413,6 +1413,26 @@ district regeneration only (a fresh build is unchanged):
   the map); the street now bends onto the old node, as the old city's did.
 Outputs: `docs/progress/fix_core_regen/`.
 
+The sky tube profile fix (issue #124) is in place, in `citygen/transit.py` (`_curved`,
+`_window`, `_box`), `presets.py` and `transit_checks.py`: sky tubes climb and descend in long
+ramps and vertical curves, not in steps and humps.
+- **Per mode** (`ModePreset.design_grade`, `curve_m`, `fill_m`): sky tubes 3.5%, 300 m and
+  500 m, `max_grade` (8%) kept as the limit. The other modes have none, so their profiles are
+  as before.
+- **Profile** (`_profile_pass`, then `_curved`): every need and cap is held level for half a
+  curve and a vertex either side, then lifted and lowered at the design grade. Only where the
+  two meet does it climb steeper, up to the limit grade (0.95 of `max_grade`). A closing by a
+  level stretch of `fill_m` fills a sag between crests closer than that at the lower crest's
+  height, and leaves a wider one a floor at least that long. A moving average over `curve_m`
+  (M7's way) makes every grade change a parabolic vertical curve. Held level that long, the
+  average stays over every need and under every cap; it is last clamped between the needs
+  and caps lifted and lowered at the limit grade, as before.
+- **Check** `transit_profile_smooth` (one more on every city with transit lines: 107 on a
+  flat sample, 112 with decks): measured every 10 m, a sky tube's grade changes no faster
+  than a 300 m curve allows (two limit grades over it), and no sag is narrower than 200 m
+  (the fill length less a curve).
+Outputs: `docs/progress/fix_sky_tube_profile/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
