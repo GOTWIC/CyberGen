@@ -153,3 +153,18 @@ def test_summarize_combine_and_table(tmp_path):
     B.write_results(comb, tmp_path / "out", [tmp_path / "run1"])
     assert json.loads((tmp_path / "out" / "bench.json").read_text(encoding="utf-8")) == comb
     assert (tmp_path / "out" / "frame_times_day_tsr67.png").is_file()
+
+
+def test_side_by_side(tmp_path):
+    from PIL import Image
+    for label, color in (("before", (200, 0, 0)), ("after", (0, 0, 200))):
+        d = tmp_path / label / "shots"
+        d.mkdir(parents=True)
+        Image.new("RGB", (160, 90), color).save(d / "day_tsr67_walk_d01.jpg")
+    Image.new("RGB", (160, 90)).save(tmp_path / "before" / "shots" / "only_before.jpg")
+    out = B.side_by_side(tmp_path / "before", tmp_path / "after", tmp_path / "pairs", width=320)
+    assert [p.name for p in out] == ["day_tsr67_walk_d01.jpg"]
+    im = Image.open(out[0])
+    assert im.size == (328, 90 + 28)
+    # before on the left, after on the right
+    assert im.getpixel((40, 70))[0] > 150 and im.getpixel((200, 70))[2] > 150

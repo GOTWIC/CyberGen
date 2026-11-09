@@ -737,3 +737,31 @@ def graphs(rd: Path, dest: Path, res: dict) -> None:
         fig.subplots_adjust(left=0.05, right=0.99, top=0.9, bottom=0.14)
         fig.savefig(dest / f"frame_times_{name}.png")
         plt.close(fig)
+
+
+def side_by_side(before: Path, after: Path, dest: Path, width: int = 1600) -> list[Path]:
+    """The shots two benchmarks share (`<label>/shots/<pass>_<segment>.jpg`), before on the
+    left and after on the right, each `width` / 2 wide, a label over each, as
+    `dest/<pass>_<segment>.jpg`: the same views before and after a change."""
+    from PIL import Image, ImageDraw
+    out = []
+    names = sorted({p.name for p in (before / "shots").glob("*.jpg")} &
+                   {p.name for p in (after / "shots").glob("*.jpg")})
+    if names:
+        dest.mkdir(parents=True, exist_ok=True)
+    half = width // 2
+    for n in names:
+        ims = []
+        for d in (before, after):
+            im = Image.open(d / "shots" / n).convert("RGB")
+            ims.append(im.resize((half, round(im.height * half / im.width)), Image.LANCZOS))
+        h = max(im.height for im in ims)
+        sheet = Image.new("RGB", (half * 2 + 8, h + 28), (255, 255, 255))
+        draw = ImageDraw.Draw(sheet)
+        for k, (im, label) in enumerate(zip(ims, (before.name, after.name))):
+            sheet.paste(im, (k * (half + 8), 28))
+            draw.text((k * (half + 8) + 6, 6), f"{label}: {n[:-4]}", fill=(20, 20, 20))
+        o = dest / n
+        sheet.save(o, quality=85)
+        out.append(o)
+    return out
