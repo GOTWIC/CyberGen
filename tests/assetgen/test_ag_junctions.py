@@ -180,6 +180,32 @@ def test_a_prop_in_a_raised_corner_with_no_pad_is_left_out():
     assert abs(rc.pad_top(15.0, 2.5, 8.1) - 8.2) < 1e-9
 
 
+def test_a_footbridge_draws_its_walking_surface():
+    """M22 keeps footbridges out of its map (no faces): AG7 draws a footbridge's walking
+    surface on its profile from where it leaves its junctions (`walk_span`, as before AG17)
+    and its girder under that stretch, closed up to the surface; nothing below the deck."""
+    from assetgen.streets import roads as RD
+    from assetgen.streets.kit import check
+    seg = {"id": "rs.fb", "centerline": [[0.0, 0.0], [30.0, 0.0]], "width_m": 4.0,
+           "road_class": "footbridge", "bridge": True, "attrs": {},
+           "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 4.0, "z": 3.8}, {"s": 26.0, "z": 3.8},
+                         {"s": 30.0, "z": 0.0}],
+           "cross_section": {"sidewalk_m": [0.0, 0.0], "median_m": 0.0, "curb_m": 0.15}}
+    inp = {"seg": seg, "cls": "footbridge", "ends": [], "crossings": [], "lanes": [],
+           "style": STYLE, "origin": [15.0, 0.0], "cuts": [7.0, 7.0], "faces": [],
+           "walk": [5.0, 25.0], "barriers": []}
+    out = RD.make(inp)
+    assert not any(check(out.mesh.slots).values())
+    walk = out.mesh.slots[RD.asphalt_slot("footbridge", STYLE)]
+    P = np.array(walk.pos)
+    assert P[:, 0].min() == 5000 - 15000 and P[:, 0].max() == 25000 - 15000
+    assert (P[:, 2] == 3800 + RD.PV.ROAD_DZ_MM).all()
+    assert P[:, 1].min() == -2000 and P[:, 1].max() == 2000
+    deck = np.array(out.mesh.slots["concrete.deck"].pos)
+    assert deck[:, 0].min() == P[:, 0].min() and deck[:, 0].max() == P[:, 0].max()
+    assert deck[:, 2].max() == P[:, 2].max()            # (its sides up to the surface)
+
+
 def test_a_bulb_is_drawn_whole():
     """A cul-de-sac's bulb (its own face of the map, starting at its road's port: no wedge)
     is drawn whole at the carriageway's height."""

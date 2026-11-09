@@ -231,7 +231,11 @@ def gather(cx: Ctx, s) -> Piece:
             inputs["ports"] = port_lines(cx, s, Path(s.centerline), cuts)
         except ValueError:
             pass
-        inputs["stations"] = map_stations(seg, cuts)
+        if s.road_class == "footbridge":
+            # (out of the map: its surface and deck on its own profile's knots)
+            inputs["walk"] = walk_span(cx, s)
+        else:
+            inputs["stations"] = map_stations(seg, cuts)
     if s.attrs.get("role") == "deck_ramp":
         # M14 (AG10): the walkways beside a deck's ramp, which the ramp carries
         inputs["ramp_walks"] = [{"id": w.id, "line": [list(p) for p in w.line]}
@@ -244,13 +248,43 @@ def gather(cx: Ctx, s) -> Piece:
     # (#95, AG17: where each barrier runs and how it ends, `barriers.road_runs`)
     from . import barriers as BR
     if cx.pave.on and not cx.pave.faces_of(s.id):
-        inputs["barriers"] = []     # (no faces: a cluster's inner road, wholly inside it)
+        inputs["barriers"] = []     # (no faces: a cluster's inner road, or a footbridge)
     elif BR.runs_of(inputs["seg"], inputs["cls"]):
         by: set = set()
         inputs["barriers"] = BR.road_runs(cx, s, inputs, by=by)
         inputs["barriers_by"] = sorted(by - {s.id})
     return Piece(s.id, "street.road", "road", cx.tile_for(s.id, s.centerline),
                  cx.keys.get(s.id, []), inputs, covers=[st.id for st in emb])
+
+
+def walk_span(cx, s) -> list[float]:
+    """A footbridge's walking surface, [s0, s1] along its line: M22 keeps footbridges out of
+    its map (they have no faces), so AG7 draws its surface from where its line leaves the
+    junction at each end (its carriageway face's outline, `Junction.polygon`), as before
+    AG17; to the mm."""
+    import shapely
+    line = shapely.LineString([(p[0], p[1]) for p in s.centerline])
+    L = Path(s.centerline).L
+    out = [0.0, L]
+    for k, nid in ((0, s.start), (1, s.end)):
+        j = cx.junction_at.get(nid)
+        if j is None:
+            continue
+        poly = shapely.Polygon([(p[0], p[1]) for p in j.polygon.exterior],
+                               [[(p[0], p[1]) for p in h] for h in j.polygon.holes])
+        if not poly.is_valid:
+            poly = shapely.make_valid(poly)
+        end = shapely.Point(s.centerline[0 if k == 0 else -1][:2])
+        for g in shapely.get_parts(line.intersection(poly)):
+            if g.is_empty or g.distance(end) > 1e-6:
+                continue
+            ds = [line.project(shapely.Point(c)) for c in g.coords] \
+                if g.geom_type == "LineString" else [line.project(g)]
+            if k == 0:
+                out[0] = max(out[0], max(ds))
+            else:
+                out[1] = min(out[1], min(ds))
+    return [round(out[0], 3), round(out[1], 3)]
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +454,10 @@ def make(inp: dict) -> Out:
     embs = [(max(a, rd.s0), min(b, rd.s1)) for a, b in inp.get("embankments", ())
             if min(b, rd.s1) - max(a, rd.s0) >= 0.5]
     rd.surf = _faces(rd, mesh, inp, dk, embs)
+    if inp.get("walk") and inp["walk"][1] - inp["walk"][0] >= 0.3:
+        # (a footbridge, out of M22's map: its walking surface from its profile, `walk_span`)
+        rd.strip(mesh, asphalt_slot(cls, style), inp["walk"][0], inp["walk"][1], -rd.h,
+                 rd.h, drawn=False)
     if rd.surf and rd.s1 - rd.s0 >= 0.3 and cls not in PEDESTRIAN:
         stops = _markings(rd, mesh, inp)
         _details(rd, mesh, inp, stops)
@@ -427,8 +465,9 @@ def make(inp: dict) -> Out:
     if dk == "deck":
         # AG14: M18's embankments carry the road where it is low; the deck's girder only
         # between them, and (AG17) only between its cuts: a raised junction stands on its
-        # own slab
-        _deck(rd, mesh, inp, _spans(rd.s0, rd.s1, embs))
+        # own slab (a footbridge's under its walking surface, `walk_span`)
+        a_, b_ = inp["walk"] if inp.get("walk") else (rd.s0, rd.s1)
+        _deck(rd, mesh, inp, _spans(a_, b_, embs))
         for a, b in embs:
             _embankment_ends(rd, mesh, a, b)
     elif dk == "ramp":
@@ -772,9 +811,15 @@ def _deck(rd: Road, mesh: Mesh, inp: dict, spans=None):
     D = 1.8 if a.get("elevated") or a.get("role") == "ramp" else DECK_D.get(cls, 1.2)
     B = max(rd.W * 0.55, 2.0)
     F = PV.FASCIA_MM / 1000.0
+    if "walk" in inp:
+        W2 = rd.W / 2.0
     prof = [(W2, -F), (B / 2.0, -max(min(0.7, D * 0.6), F + 0.05)),
             (B / 2.0 - 0.25, -D), (-(B / 2.0 - 0.25), -D),
             (-B / 2.0, -max(min(0.7, D * 0.6), F + 0.05)), (-W2, -F)]
+    if "walk" in inp:
+        # (a footbridge, out of M22's map: no faces carry its fascia, so its girder's sides
+        # rise to its walking surface, `walk_span`)
+        prof = [(W2, ROAD_DZ)] + prof + [(-W2, ROAD_DZ)]
     from . import barriers as BR
     for a_, b_ in (spans if spans is not None else [(rd.s0, rd.s1)]):
         if b_ - a_ < 0.05:
