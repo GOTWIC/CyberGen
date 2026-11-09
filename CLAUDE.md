@@ -1012,8 +1012,13 @@ M19 (transit structures, from the first run-through) is in place, in `citygen/tr
   towers in its way out (`Line.cut`, `TOWER_CUT_W`; Vesper Bay's Crown Loop, whose two stops
   are walls of 130 to 216 m towers). Lines are routed apart, so a tube whose host another
   line takes out is routed again with those towers barred as hosts (`_reroute_hosts`,
-  `Line.no_hosts`). A tower hosts one station (`Builder.hosted`); a pylon
-  station slides along its line until its elevator core is clear of other lines
+  `Line.no_hosts`). A tube whose track still turns tighter than its radius as
+  `transit_curves` measures it (`_fails`) is routed again with each tower `_hosts` chose
+  (`Line.chosen`) barred in turn, the best kept (`_rehost`, issue #143: the stack demo's
+  Crown Line left its Corporate Core tower on a 25 m hook toward a Stacks tower passed only
+  east to west); a line that passes is never touched. A tower hosts one station
+  (`Builder.hosted`); a pylon station slides along its line until its elevator core is
+  clear of other lines
   (`_core_spot`, round a loop's seam).
 - **Clearances:** `SIDE_PAD_M` 6 m (2 before) from buildings in plan, or their clearance
   in height; roof items a line passes too close over go (`_roof_hits`); the profile never

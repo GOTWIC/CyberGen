@@ -783,3 +783,77 @@ def test_check_clearance_fails_side(lines):
     c = _rerun(_mutate(lines.model, fn))["transit_clearance"]
     assert not c.passed and any("test.tower" in f for f in c.failures)
 
+
+
+def test_rehost_bars_station_towers(monkeypatch):
+    """#143: a sky tube still too tight is routed again with each tower `_hosts` chose for a
+    station barred in turn, in stop order; a clean route ends the search, the best is kept
+    and searched again from while still too tight, and the line stays as it was when no
+    barring helps. (`_fresh`, `_route_cut` and `_fails` stubbed: the keys by barred set.)"""
+    stops = [TR.Stop(n, (0.0, 0.0), None, "district") for n in ("West", "Mid", "East")]
+    base = TR.Line("tl01", "Test Tube", "sky_tube", "#fff", False, (60.0, 120.0), 87.0, True,
+                   stops=stops, chosen={0: "tw.a", 1: "tw.b"},
+                   hosts=frozenset({"tw.a", "tw.b"}))
+    clean, tight = ((0, 0, 0), 0, 0), ((0, 0, 0), 1, 0)
+    tried = []
+
+    def run(keys):
+        def fresh(c, ln, tl, **kw):
+            return replace(ln, notes=[], **kw)
+
+        def route_cut(c, ln, tl):
+            tried.append(sorted(ln.no_hosts))
+            ln.hosts = frozenset({"tw.a", "tw.b"}) - ln.no_hosts
+            return ln
+        monkeypatch.setattr(TR, "_fresh", fresh)
+        monkeypatch.setattr(TR, "_route_cut", route_cut)
+        monkeypatch.setattr(TR, "_fails", lambda c, ln: keys[ln.no_hosts])
+        tried.clear()
+        return TR._rehost(None, base, None)
+
+    # barring the first stop's tower makes it clean: the second is never tried
+    out = run({frozenset(): tight, frozenset({"tw.a"}): clean,
+               frozenset({"tw.b"}): clean})
+    assert tried == [["tw.a"]] and out.no_hosts == {"tw.a"}
+    assert any("without tw.a" in n and "West" in n for n in out.notes)
+    # neither helps: the line as it was
+    out = run({frozenset(): tight, frozenset({"tw.a"}): ((0, 1, 0), 0, 0),
+               frozenset({"tw.b"}): tight})
+    assert out is base and tried == [["tw.a"], ["tw.b"]]
+    # barring tw.b is better but still tight (fewer buildings in the way); from it, barring
+    # tw.a as well is clean
+    out = run({frozenset(): ((0, 0, 0), 1, 3), frozenset({"tw.a"}): ((0, 0, 0), 1, 4),
+               frozenset({"tw.b"}): ((0, 0, 0), 1, 1),
+               frozenset({"tw.a", "tw.b"}): clean})
+    assert out.no_hosts == {"tw.a", "tw.b"}
+    assert tried == [["tw.a"], ["tw.b"], ["tw.a", "tw.b"]]
+    assert sum("routed again without" in n for n in out.notes) == 2
+
+
+def test_fails_measures_curves_as_the_check(lines):
+    """#143: `_fails` finds a curve too tight exactly where `transit_curves` does (it
+    decides whether a sky tube is routed again without a station tower)."""
+    m, spec = lines.model, lines.spec
+    t = next(x for x in m.transit_lines if x.mode == "sky_tube")
+    tl = next(x for x in spec.transit.lines if x.name == t.name)
+    c = TR.context(spec, m)
+
+    alt = tuple(t.attrs["altitude_m"])
+
+    def line(path):
+        ln = TR._fresh(c, TR.Line(t.id, t.name, t.mode, t.color, t.loop, alt,
+                                  TR.base_z(t.mode, alt), True), tl)
+        ln.pts = [(p[0], p[1]) for p in path]
+        return ln
+    assert TR._fails(c, line(t.path))[1] == 0 and _rerun(m)["transit_curves"].passed
+    kinked = {}
+
+    def fn(d):
+        p = _line(d, "sky_tube")["path"]
+        k = len(p) // 2
+        (x0, y0, _), (x, y, z), (x1, y1, _) = p[k - 1:k + 2]
+        L = math.hypot(x1 - x0, y1 - y0)
+        p[k] = [x - (y1 - y0) / L * 25.0, y + (x1 - x0) / L * 25.0, z]
+        kinked["path"] = p
+    assert not _rerun(_mutate(m, fn))["transit_curves"].passed
+    assert TR._fails(c, line(kinked["path"]))[1] == 1
