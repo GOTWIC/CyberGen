@@ -1396,6 +1396,23 @@ The pavement map fixes (issue #147, after AG17) are in place, in `citygen/paveme
   `jn.e170s444` is drawn at 0.225 (0.896 on M22; five vertices move by the gore).
 Every sample has new goldens (footbridges' faces). Outputs: `docs/progress/fix_pavement_map/`.
 
+The Corporate Core regeneration fix (issue #126) is in place, in `citygen/streets.py`, for a
+district regeneration only (a fresh build is unchanged):
+- **Held runs** (`held_runs`, before the noding): a held street of the regenerated district (a
+  boundary street, a pinned one) whose end lies inside a held segment of the old city that
+  goes on past it is laid on along that segment to its end, as the old city's M17 run-on had
+  it. Nexus City's Corporate Core boundary street ran on to the end of an avenue; the
+  district's new streets no longer reached its group, so it was taken for an island and made
+  pedestrian before the run-on, and the avenue was left a dead end with no bulb.
+- **Hooks come loose** (`Builder.attach`, `_hooked_at`, `_unhook`, `HOOK_M` 3 m): new
+  streets of the district hooked onto another new street's free end (the fill left two of
+  them ending side by side) no longer keep it from bending onto a road it may meet only at an
+  old node (`_attach_to`'s `keep`); where it bends, they let go and are joined later as any
+  dead end. The two had made a corner beside a held boundary street, its right of way 103 m2
+  into the street's, which `_overlaps` could not drop (the held road, nor a street leaving
+  the map); the street now bends onto the old node, as the old city's did.
+Outputs: `docs/progress/fix_core_regen/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.

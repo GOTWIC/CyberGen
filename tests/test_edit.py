@@ -406,3 +406,65 @@ def test_cli_build_district_and_lock(tmp_path):
     lk = json.loads((out / "city.lock.json").read_text())
     assert lk["release"] == "2" and lk["model_sha256"] == st["model_sha256"]
     assert main(["build", str(spec), str(out), "--district", "Nowhere"]) == 2
+
+
+# --- #126: a held boundary street laid on, a new street cut back off a held road -------
+
+def test_held_street_runs_on_along_its_old_course():
+    """A held street of the regenerated district whose end lies inside a held segment of the
+    old city that goes on past it is laid on along that segment to its end
+    (`streets.held_runs`: the old city's M17 run-on); not another district's street, nor where
+    another line runs there already."""
+    from types import SimpleNamespace as NS
+    from citygen import streets as ST
+    olds = [[(0.0, 0.0), (2.0, 20.0), (0.0, 40.0)],
+            [(100.0, 0.0), (102.0, 20.0), (100.0, 40.0)],
+            [(200.0, 0.0), (202.0, 20.0), (200.0, 40.0)]]
+    fr = NS(local=sorted(ST._ckey(c) for c in olds), name="Core", free_local=lambda ln: False)
+    b = NS(frame=fr, lines=[], index=ST.SegIndex())
+
+    def add(pts, district="Core"):
+        b.lines.append(ST.Line(list(pts), "street", 12.0, "district_boundary", district))
+        b.index.add(len(b.lines) - 1, b.lines[-1].pts)
+        return b.lines[-1]
+
+    mine = add([(2.0, 20.0), (0.0, 40.0), (0.0, 100.0)])
+    other = add([(102.0, 20.0), (100.0, 40.0), (100.0, 100.0)], district="Harbor")
+    covered = add([(202.0, 20.0), (200.0, 40.0), (200.0, 100.0)])
+    add([(200.0, 0.0), (202.0, 20.0)])
+    assert ST.held_runs(b) == 1
+    assert mine.pts == [(0.0, 0.0), (2.0, 20.0), (0.0, 40.0), (0.0, 100.0)]
+    assert mine.attached[0]
+    assert other.pts[0] == (102.0, 20.0) and covered.pts[0] == (202.0, 20.0)
+
+
+def test_hooked_streets_come_loose():
+    """Two new streets the fill left ending side by side, one hooked onto the other's free
+    end: the hook is found (`Builder._hooked_at`) only where it is all that joined there and
+    the hooked street is new, and letting go (`Builder._unhook`) drops the hook and frees
+    the street's end, so the other may bend onto a held road at an old node (#126)."""
+    from types import SimpleNamespace as NS
+    from citygen import streets as ST
+    p = (0.0, 0.0)
+
+    def stub(renewed=True, joins=1):
+        b = NS(lines=[], index=ST.SegIndex())
+        b._renewed = lambda ln: renewed or ln.role == "grid_v"
+        b.replace_pts = lambda li, pts: ST.Builder.replace_pts(b, li, pts)
+        for pts, role in (([(100.0, -100.0), p], "grid_v"),
+                          ([p, (-0.4, -2.45), (30.0, -30.0)], "grid_u")):
+            b.lines.append(ST.Line(list(pts), "street", 12.0, role, "Core"))
+            b.index.add(len(b.lines) - 1, pts)
+        b.lines[0].inserts = [p] * joins
+        b.lines[0].junctions = [p]
+        b.lines[1].attached = [True, False]
+        return b
+
+    b = stub()
+    loose = ST.Builder._hooked_at(b, 0, p)
+    assert loose == [(1, 0)]
+    assert ST.Builder._hooked_at(stub(renewed=False), 0, p) == []    # a held street's join
+    assert ST.Builder._hooked_at(stub(joins=2), 0, p) == []          # another road there too
+    ST.Builder._unhook(b, 0, p, loose)
+    assert b.lines[1].pts == [(-0.4, -2.45), (30.0, -30.0)] and not b.lines[1].attached[0]
+    assert p not in b.lines[0].inserts and p not in b.lines[0].junctions

@@ -469,6 +469,8 @@ class SegIndex:
 BORE_PAD_M = 20.0     # M10 on M13: no new junction this close to an old bored stretch
 FRAME_SNAP_M = 25.0   # M10: a street of a regenerated district meets a held road at an old
                       # node at most this far from where it would have met it
+HOOK_M = 3.0          # M10 (#126): a street's last stretch this short onto another's free end
+                      # is a hook (`Builder._hooked_at`)
 
 
 def _ckey(pts) -> tuple:
@@ -1079,18 +1081,25 @@ class Builder:
             if gap <= reach and gap < best.get(tj, math.inf):
                 best[tj] = gap
         held = self.frame is not None and not self._renewed(ln)
+        loose = self._hooked_at(li, p) if self._renewed(ln) else []
         for tj in sorted(best, key=lambda j: (best[j], j)):
             t = self.lines[tj]
             if t.no_junction and not (allow_highway and t.cls == "highway"):
                 continue
             if held and self._laid_anew(tj):
                 continue    # M10: a held street meets the district only where it did
-            new = self._attach_to(pts, t, angle, reach, ln.inserts, self._renewed(ln))
+            # M10 (#126): new streets hooked onto this end (`_hooked_at`) do not keep it from
+            # bending onto a road it may meet only at an old node; they come loose if it does
+            keep = [x for x in ln.inserts if x != p] if loose and not self._renewed(t) \
+                else ln.inserts
+            new = self._attach_to(pts, t, angle, reach, keep, self._renewed(ln))
             if new is None:
                 continue
             q = new[-1]
             if held and t.no_junction and q not in self.frame.nodes:
                 continue    # (nor a highway access the old city did not have)
+            if keep is not ln.inserts and p not in new:
+                self._unhook(li, p, loose)
             if end == 0:
                 new = new[::-1]
             self.replace_pts(li, new)
@@ -1099,6 +1108,32 @@ class Builder:
             ln.attached[0 if end == 0 else 1] = True
             return True
         return False
+
+    def _hooked_at(self, li: int, p) -> list[tuple[int, int]]:
+        """M10 (#126): the new streets of the district whose end was hooked onto line li's
+        free end p (`attach` within HOOK_M: the fill left two of its streets ending side by
+        side), as (line, end index); empty unless every road that joined li at p is one."""
+        out = []
+        for tj in sorted({t for t, _ in self.index.near(p, pad=0.5)}):
+            t = self.lines[tj]
+            if tj == li or t.dead or len(t.pts) < 3 or not self._renewed(t):
+                continue
+            for k, (a, b) in enumerate(((t.pts[0], t.pts[1]), (t.pts[-1], t.pts[-2]))):
+                if a == p and t.attached[k] and _dist(a, b) <= HOOK_M:
+                    out.append((tj, k))
+        return out if out and self.lines[li].inserts.count(p) == len(out) else []
+
+    def _unhook(self, li: int, p, loose: list) -> None:
+        """The streets hooked onto line li's end p let go of it (their hook dropped, their
+        end free again: they are joined later, as any dead end)."""
+        ln = self.lines[li]
+        ln.inserts = [x for x in ln.inserts if x != p]
+        ln.junctions = [x for x in ln.junctions if x != p]
+        ln.fresh.discard(p)
+        for tj, k in loose:
+            t = self.lines[tj]
+            self.replace_pts(tj, t.pts[1:] if k == 0 else t.pts[:-1])
+            t.attached[k] = False
 
     def extend_ray(self, li: int, end: int, max_len: float) -> bool:
         """A dead end continues straight ahead to the first road it meets (up to max_len),
@@ -2779,6 +2814,64 @@ def _locate(pts, P) -> tuple[int, Fraction] | None:
     return None
 
 
+def held_runs(B: Builder) -> int:
+    """M10 (#126): a held street of the regenerated district (a boundary street, a pinned
+    one) whose end lies inside a held segment of the old city that goes on past it on its own
+    course is laid on along that segment to its end, as it was. The old city ran the
+    street's dead end on there (M17's run-on, `settle_dead_ends`: a boundary street on to
+    the end of the avenue ahead); the regeneration's network need not do it again (a group
+    of held streets the district's new streets no longer reach is taken for an island and
+    made pedestrian first, and the avenue left with a dead end), and the piece is a held
+    road, which comes back as it was. The other districts' streets are laid as in the old
+    city and their clean-up runs them on as it did. Returns how many it laid on."""
+    fr = B.frame
+    if fr is None or not fr.local:
+        return 0
+    inner: dict = {}
+    for c in fr.local:
+        for i in range(1, len(c) - 1):
+            inner.setdefault(c[i], []).append((c, i))
+    n = 0
+    for li, ln in enumerate(B.lines):
+        if ln.dead or ln.primary is not None or len(ln.pts) < 2 or ln.cls == "footbridge" or \
+                ln.district != fr.name or fr.free_local(ln):
+            continue
+        for at_start in (True, False):
+            p = ln.pts[0] if at_start else ln.pts[-1]
+            run = None
+            for c, i in inner.get(p, ()):
+                back, ahead = c[i - 1], c[i + 1]
+                if _locate(ln.pts, back) is not None and _locate(ln.pts, ahead) is None:
+                    run = list(c[i:])
+                elif _locate(ln.pts, ahead) is not None and _locate(ln.pts, back) is None:
+                    run = list(c[i::-1])
+                if run is not None:
+                    break
+            if run is None:
+                continue
+            # (not where another line runs already: through the middle of its first stretch
+            # and its end)
+            mid = _pt((run[0][0] + run[1][0]) / 2.0, (run[0][1] + run[1][1]) / 2.0)
+            if any(tj != li and not B.lines[tj].dead and
+                   _locate(B.lines[tj].pts, mid) is not None and
+                   _locate(B.lines[tj].pts, run[-1]) is not None
+                   for tj in sorted({t for t, _ in B.index.near(mid, pad=1.0)})):
+                continue
+            if at_start:
+                d = _plen(run)
+                ln.pts = run[::-1] + ln.pts[1:]
+                ln.forbid = [(a + d, b + d) for a, b in ln.forbid]
+                ln.bored = [(a + d, b + d) for a, b in ln.bored]
+                ln.attached[0] = True
+            else:
+                ln.pts = ln.pts[:-1] + run
+                ln.attached[1] = True
+            B.index.remove_line(li)
+            B.index.add(li, ln.pts)
+            n += 1
+    return n
+
+
 def node_lines(B: Builder) -> tuple[list[tuple[list, int]], list[str]]:
     """Split every line where another line meets or crosses it. Returns edges as (points,
     line index)."""
@@ -4312,6 +4405,10 @@ def build_streets(spec: CitySpec, h, polygons: dict, district_ids: dict, waterwa
     for _ in range(3):
         if not join_islands(B):
             break
+    n_runs = held_runs(B)
+    if n_runs:
+        B.notes.append(f"{n_runs} held streets laid on along their old course to where the "
+                       "old city ran them on")
     edges, n1 = node_lines(B)
     edges, n2 = clean_graph(B, edges)
     build_output(B, edges)
