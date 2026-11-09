@@ -50,7 +50,7 @@ public:
 	virtual TStatId GetStatId() const override;
 
 private:
-	enum class EStage : uint8 { Start, Pass, Load, Settle, Move, Teleport, Hold, Done };
+	enum class EStage : uint8 { Start, Pass, Load, Settle, Shot, Move, Teleport, Hold, Done };
 
 	bool ReadJob();
 	void Begin();
@@ -77,6 +77,8 @@ private:
 	double StartWaitS = 10.0;
 	int32 StreamEvery = 5;
 	int32 MemoryEvery = 15;
+	bool bShots = false;          // a screenshot at each segment's start, once loaded
+	int32 ShotFrames = 0;
 
 	EStage Stage = EStage::Start;
 	int32 PassIndex = 0;

@@ -96,6 +96,7 @@ bool UCityGenBench::ReadJob()
 	J->TryGetNumberField(TEXT("start_wait_s"), StartWaitS);
 	J->TryGetNumberField(TEXT("stream_every"), StreamEvery);
 	J->TryGetNumberField(TEXT("memory_every"), MemoryEvery);
+	J->TryGetBoolField(TEXT("shots"), bShots);
 	double M = 0.0;
 	if (J->TryGetNumberField(TEXT("load_radius_m"), M)) { LoadRadiusCm = M * 100.0; }
 	if (J->TryGetNumberField(TEXT("stream_radius_m"), M)) { StreamRadiusCm = M * 100.0; }
@@ -433,6 +434,28 @@ void UCityGenBench::Tick(float DeltaTime)
 			}
 		}
 		else if (Now - StageStart >= SettleS)
+		{
+			if (bShots)
+			{
+				// (the view as it stands once loaded: the same view before and after a change)
+				const FString Shot = FPaths::Combine(OutDir, TEXT("shots"), FString::Printf(TEXT("%s_%s.png"),
+					*Passes[PassIndex].Name, *S.Name));
+				FScreenshotRequest::RequestScreenshot(Shot, false, false);
+				Event(FString::Printf(TEXT("\"op\": \"shot\", \"file\": \"%s\""), *Esc(Shot)));
+				Stage = EStage::Shot;
+				ShotFrames = 0;
+				return;
+			}
+			Event(TEXT("\"op\": \"move\""));
+			Stage = EStage::Move;
+			StageStart = Now;
+		}
+		return;
+	}
+	case EStage::Shot:
+	{
+		Record(Dt, 1, false);
+		if (++ShotFrames >= 3)
 		{
 			Event(TEXT("\"op\": \"move\""));
 			Stage = EStage::Move;

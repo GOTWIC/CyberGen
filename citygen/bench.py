@@ -250,7 +250,7 @@ def route(build: str | Path, man: dict | None = None) -> dict:
 
 
 def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
-        csv_name: str = "profile.csv", resolution=RESOLUTION) -> dict:
+        csv_name: str = "profile.csv", resolution=RESOLUTION, shots: bool = False) -> dict:
     """The game process's job: the route, the passes (warm-up passes first: the flight
     across the city by day and by night, which meets most of the city's materials and
     lights, so the first measured pass does not pay for their first use alone; recorded and
@@ -269,6 +269,9 @@ def job(route_: dict, out_dir: Path, passes=PASSES, warm: bool = True,
             "settle_s": 1.5, "load_timeout_s": 120.0,
             "load_radius_m": LOAD_RADIUS_M, "stream_radius_m": STREAM_RADIUS_M,
             "start_wait_s": 10.0, "stream_every": 5, "memory_every": 15,
+            # a screenshot of each segment's start once loaded (`shots/<pass>_<segment>.png`):
+            # the same views before and after a change
+            "shots": shots,
             "passes": ps, "segments": route_["segments"]}
 
 
@@ -363,7 +366,7 @@ def bench(build_dir: str | Path, uproject: str | Path, engine: str | None = None
         if rd.exists():
             shutil.rmtree(rd)
         rd.mkdir(parents=True)
-        jb = job(rt, rd, passes, resolution=resolution)
+        jb = job(rt, rd, passes, resolution=resolution, shots=k == 0)
         jp = rd / "job.json"
         jp.write_text(json.dumps(jb, indent=1) + "\n", encoding="utf-8", newline="\n")
         say(f"bench: run {k + 1} of {runs} ({len(jb['passes'])} passes, "
@@ -663,6 +666,27 @@ def write_results(res: dict, dest: Path, run_dirs: list[Path]) -> None:
         graphs(run_dirs[0], dest, res)
     except Exception as e:          # noqa: BLE001 (a graph is not worth failing the run)
         (dest / "graph_error.txt").write_text(str(e) + "\n", encoding="utf-8")
+    shots(run_dirs[0], dest)
+
+
+SHOT_W = 1600
+
+
+def shots(rd: Path, dest: Path) -> list[Path]:
+    """The first run's screenshots (each segment's start in each pass) as JPEGs SHOT_W
+    wide in `dest/shots`."""
+    from PIL import Image
+    out = []
+    src = sorted((rd / "shots").glob("*.png")) if (rd / "shots").is_dir() else []
+    if src:
+        (dest / "shots").mkdir(parents=True, exist_ok=True)
+    for f in src:
+        im = Image.open(f).convert("RGB")
+        h = round(im.height * SHOT_W / im.width)
+        o = dest / "shots" / (f.stem + ".jpg")
+        im.resize((SHOT_W, h), Image.LANCZOS).save(o, quality=85)
+        out.append(o)
+    return out
 
 
 def graphs(rd: Path, dest: Path, res: dict) -> None:

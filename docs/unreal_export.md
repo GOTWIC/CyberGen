@@ -850,7 +850,9 @@ imported before; `citygen/bench.py`, the driver `UCityGenBench` in the play plug
   spread of p50 and p95 (min to max). Written as `bench.json`, `bench.md` (the table and the
   targets met or missed) and a frame-time graph per pass along the route
   (`frame_times_<pass>.png`) in `docs/progress/AG16/bench/<city>/<label>` (`--bench-label`,
-  default `bench`); the raw files of each run in `BUILD/unreal/bench/<label>/run<k>`.
+  default `bench`), with the first run's screenshot of each segment's start in each pass
+  once loaded (`shots/<pass>_<segment>.jpg`, 1600 px wide: the same views before and after
+  a change); the raw files of each run in `BUILD/unreal/bench/<label>/run<k>`.
 - **Hygiene**: before each run it waits while another Unreal editor, Blender, a citygen
   build or sweep, assetgen or pytest runs (`bench.busy`, Windows), so the numbers are the
   city's alone; the play plugin is built first if its source changed.
