@@ -434,7 +434,8 @@ def test_nanite_pool(tmp_path, monkeypatch):
     assert U.nanite_pool_mb(man) == U.NANITE_POOL_MAX_MB      # (a small city)
     assert U.set_nanite_pool(up, man)
     assert ini.read_text() == ("[/Script/Engine.RendererSettings]\nr.Lumen=1\n\n"
-                               "[SystemSettings]\nr.Nanite.Streaming.StreamingPoolSize=1024\n")
+                               "[SystemSettings]\nr.Nanite.Streaming.StreamingPoolSize=1024\n"
+                               "r.TextureStreaming=0\n")
     assert not U.set_nanite_pool(up, man)
     # Delta Megacity at AG16 (44,667 meshes, its parts and signs shared across tiles) gets
     # the engine's 512 MB; before (53,911), the minimum

@@ -1337,10 +1337,20 @@ def nanite_pool_mb(man: dict) -> int:
 
 
 def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
-    """The city's Nanite streaming pool (`nanite_pool_mb`) in the project's [SystemSettings].
-    True when the file changed."""
+    """The city's Nanite streaming pool (`nanite_pool_mb`) and `PROJECT_SETTINGS` in the
+    project's [SystemSettings]. True when the file changed."""
     return set_engine_ini(uproject, SYSTEM_SECTION,
-                          [("r.Nanite.Streaming.StreamingPoolSize", str(nanite_pool_mb(man)))])
+                          [("r.Nanite.Streaming.StreamingPoolSize", str(nanite_pool_mb(man)))]
+                          + PROJECT_SETTINGS)
+
+
+# AG16: what every import sets in the project beside the pool. Texture streaming off: the
+# render asset streaming manager keeps a manager per streamed level and processes every
+# component a level adds, and with World Partition's cells (and their HLODs) coming and
+# going it made 36 to 48 ms frames at 256 m cells and 1 to 2.8 s ones at 128 m (AG16's hitch
+# dumps on Delta Megacity); a city's textures (AG6's library sets and its sign pages, a few
+# hundred) fit whole: Delta's VRAM stayed at 7 GB.
+PROJECT_SETTINGS = [("r.TextureStreaming", "0")]
 
 
 def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]]) -> bool:
