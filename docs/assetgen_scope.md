@@ -1022,6 +1022,8 @@ checks on the generated meshes.
 
 ### 14.17 AG16: Performance
 
+Done (`docs/assetgen_milestones.md`, AG16).
+
 A whole city's runtime and import cost in Unreal, measured, then cut at its source (issue
 #96). Delta at run-through 2 on the Windows PC (RTX 4070 Ti, 32 GB: decision 13.4's target):
 73,293 actors, 53,790 distinct Nanite meshes, about 31,000 actors loaded at the player start;

@@ -919,7 +919,32 @@ play-in-editor and `-game` run). So the fixes cut what the level holds and strea
   (`CITYGEN_UE_PACK_CHUNK`, 0 for all at once), and the meshes let go of between chunks
   (and every fourth actor offload): the importer holds asset paths (`Meshes`) and loads a
   mesh when an actor asks for it. Delta's first import had held every one of its 58,501
-  meshes to the end, 39 GB committed in the editor.
+  meshes to the end, 39 GB committed in the editor. An import over an earlier level still
+  loads all its actors first (to compare hashes and delete the old ones): Delta's import of
+  the fixes over the "before" level peaked near 37 GB committed.
+- **Streaming** (`import_city.MAIN_CELL_M`, `VIEW_M`): World Partition's main cells 128 m
+  (256 m before), loaded 768 m around the player (1,500 m before). Each main cell has its
+  HLOD actor, and when the cell goes its HLOD actor's components take their render state in
+  one frame: a dense 256 m cell's 1,400 made 50 to 64 ms frames. Past the range the
+  instanced HLODs draw the same meshes and materials, each building's Custom Primitive Data
+  with it (above), so the city looks the same (the benchmark's shots, before and after side
+  by side).
+- **Texture streaming off** (`unreal.PROJECT_SETTINGS`, `r.TextureStreaming=0` in the
+  project's `[SystemSettings]`, written with the Nanite pool by every import): the render
+  asset streaming manager keeps a manager per streamed level and processes every component a
+  level adds; with the cells and their HLODs coming and going it made 36 to 48 ms frames at
+  256 m cells and 1 to 2.8 s frames at 128 m. A city's textures (AG6's library sets and its
+  sign pages, a few hundred) fit whole: Delta's VRAM stayed at 7 GB.
+- **Tried and left out**: UE 5.8's experimental switches for physics bodies made off the
+  game thread (`p.Chaos.EnableAsyncInitBody`) and incremental garbage collection
+  (`gc.AllowIncrementalReachability`, `gc.AllowIncrementalGather`), no forced collection
+  after a level streams out (`s.ForceGCAfterLevelStreamedOut=0`) and actor clustering for
+  garbage collection: none helped, and the garbage collection ones made it far worse
+  (collections of 0.7 to 2.9 s).
+- **What is left** (`stat dumphitches` on a day pass): garbage collection, the engine's
+  reachability analysis over every object of an uncooked game, 70 to 350 ms about every 40
+  s while the city streams (a cooked game marks far fewer objects); at most one moving
+  frame over 100 ms in a pass.
 
 ## assetgen's street contribution (AG7)
 
