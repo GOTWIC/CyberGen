@@ -1,25 +1,25 @@
 {
  "device": "mac",
  "label": "Mac",
- "updated": "2026-11-09T18:52:11Z",
+ "updated": "2026-11-09T21:12:23Z",
  "sessions": 33,
  "worktree_sessions": 31,
  "subagents": 1,
  "totals": {
-  "total": 7295819015,
-  "input": 41718,
-  "output": 17072946,
+  "total": 7410056059,
+  "input": 42228,
+  "output": 17262076,
   "cache_write_5m": 155522,
-  "cache_write_1h": 61198847,
-  "cache_read": 7217349982
+  "cache_write_1h": 61548964,
+  "cache_read": 7331047269
  },
  "models": {
   "claude-opus-5-5": {
-   "input": 41586,
-   "output": 17025294,
+   "input": 42096,
+   "output": 17214424,
    "cache_write_5m": 155522,
-   "cache_write_1h": 61028800,
-   "cache_read": 7207151594
+   "cache_write_1h": 61378917,
+   "cache_read": 7320848881
   },
   "claude-sonnet-5-5": {
    "input": 132,
@@ -91,27 +91,27 @@
    "sessions": 3
   },
   "2026-11-09": {
-   "total": 520758254,
-   "output": 1085418,
+   "total": 634995298,
+   "output": 1274548,
    "sessions": 3
   }
  },
  "stats": {
   "totals": {
-   "total": 17721874593,
-   "input": 98898,
-   "output": 48944155,
+   "total": 17982843633,
+   "input": 100066,
+   "output": 49423758,
    "cache_write_5m": 321890,
-   "cache_write_1h": 176494028,
-   "cache_read": 17496015622
+   "cache_write_1h": 177303092,
+   "cache_read": 17755694827
   },
   "models": {
    "claude-opus-5-5": {
-    "input": 98592,
-    "output": 48822990,
+    "input": 99760,
+    "output": 49302593,
     "cache_write_5m": 321890,
-    "cache_write_1h": 176042145,
-    "cache_read": 17472226098
+    "cache_write_1h": 176851209,
+    "cache_read": 17731905303
    },
    "claude-sonnet-5-5": {
     "input": 306,
@@ -183,8 +183,8 @@
     "sessions": 3
    },
    "2026-11-09": {
-    "total": 1087218582,
-    "output": 2704179,
+    "total": 1348187622,
+    "output": 3183782,
     "sessions": 3
    }
   },
