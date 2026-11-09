@@ -77,12 +77,20 @@ STEP_TOL_M = 0.02       # a step this high between two vertices under 1 m apart 
 DEGENERATE_M = 2.0      # a road this short has no direction to build a junction corner on
 LONG_MARGIN_M = 15.0    # a long curb follows its inner roads this far from its ports on
 INNER_NEAR_M = 1.0      # ... where it is within this of an inner road's right of way
+FOLD_TOL = 0.02         # #147: a junction folds where its boundary is this much steeper than
+#                         its anchors allow (`Assembly._unfold`)
+FOLD_MIN_M = 0.25       # ... between vertices at least this far apart (as `face_grade`)
+FOLD_REACH_M = 4.0      # ... and at most this far apart in plan, on one face (across a strip)
+UNFOLD_ROUNDS = 12      # ... the free vertices it moves grown this many times at most
+EDGE_STEP_M = 1.0       # ... measured against points this far apart along its edges too
+UNFOLD_SLACK = 0.002    # ... a face drawn steeper or less steep by more than this changes
 PINCH_MM2 = 1000        # a loop of a ring this small (mm2) where it touches itself is cut out
 JUNCTION_KINDS = ("junction", "corner", "bulb", "bend")
 ROAD_KINDS = ("carriageway", "median", "curb", "sidewalk", "walk")
 # priority of a face where two at one level overlap (higher keeps the overlap)
 KIND_RANK = {"junction": 6, "bulb": 6, "bend": 5, "carriageway": 4, "median": 4, "walk": 3,
              "curb": 2, "corner": 1, "sidewalk": 1}
+FOOT_RANK = 7           # #147: a footbridge's faces over every other (its stairs stand there)
 
 
 def mm(v: float) -> int:
@@ -142,6 +150,7 @@ class Path:
         self.L = self.cum[-1]
         self.start = None       # (nx, ny, k) at s = 0 where it goes on as another road
         self.end = None
+        self.knots: list = []   # (#147) stations its profile turns at (a footbridge's stairs)
 
     def seg(self, s: float) -> int:
         i = bisect.bisect_right(self.cum, s) - 1
@@ -183,7 +192,7 @@ class Path:
         return self.frame(s)[4]
 
     def stations(self, a: float, b: float) -> list[float]:
-        key = [a] + [c for c in self.cum[1:-1] if a < c < b] + [b]
+        key = [a] + sorted({c for c in self.cum[1:-1] + self.knots if a < c < b}) + [b]
         out = [key[0]]
         for u, v in zip(key, key[1:]):
             n = max(1, math.ceil((v - u) / STEP_M - 1e-9))
@@ -255,6 +264,8 @@ def units_from_rows(segments: list[dict], nodes: list[dict], junctions: list[dic
     for lg in legs.values():
         for x in lg:
             c = cuts.get(x.seg["id"], (0.0, 0.0))[0 if x.at_start else 1]
+            if x.cls == "footbridge":
+                c = min(c, JN.stair_foot(x.seg, x.at_start))     # (#147)
             x.cut = x.cut_row = c
     node = {n["id"]: n for n in nodes}
     out = []
@@ -511,6 +522,9 @@ class Road:
         self.ws = offsets(self.bands)
         self.row = seg["width_m"] / 2.0
         self.zp = [(p["s"], p["z"]) for p in seg.get("z_profile") or []]
+        if self.cls == "footbridge":
+            # (#147: its faces turn where its stairs do, on the stations of its profile)
+            self.path.knots = sorted({s for s, _ in self.zp if 0.0 < s < self.path.L})
         g = seg.get("ground") or []
         self.gp = [(p["s"], p["z"]) for p in g]
         self.layer = layer_of(seg)
@@ -684,9 +698,9 @@ def road_faces(rd: Road) -> tuple[list[Face], list[tuple]]:
             ring = _clean(lo + hi[::-1])
             if len(ring) < 3 or _ring_area2(ring) <= 0:
                 continue
+            prio = (FOOT_RANK, rd.rank) if rd.cls == "footbridge" else (KIND_RANK[fk], rd.rank)
             out.append(Face(f"{rd.sid}.pv.{band}{suffix}", rd.sid, fk, band + suffix,
-                            rd.layer, (KIND_RANK[fk], rd.rank), [ring], road=rd.sid,
-                            span=(a, b)))
+                            rd.layer, prio, [ring], road=rd.sid, span=(a, b)))
     return out, bends
 
 
@@ -816,7 +830,7 @@ def _sharp(P, a, b, ha: float, hb: float):
 def unit_regions(u: Unit, roads: dict, pos: dict) -> tuple:
     """(carriageway, right of way, corner pads) of a junction's region, each on the map's
     grid, less its legs' ribbons (so each ends on its ports) where they are at its level."""
-    ext = [x for x in u.legs if x.seg["id"] in roads and x.cls != "footbridge"]
+    ext = [x for x in u.legs if x.seg["id"] in roads]
     beyond = []
     for x in ext:
         rd = roads[x.seg["id"]]
@@ -827,7 +841,7 @@ def unit_regions(u: Unit, roads: dict, pos: dict) -> tuple:
     inner = set(u.inner)
     for nid in u.nodes:
         P = pos[nid]
-        lg = [x for x in u.by_node[nid] if x.cls != "footbridge" and x.seg["id"] in roads]
+        lg = [x for x in u.by_node[nid] if x.seg["id"] in roads]
 
         def cut_of(x):
             if x.seg["id"] in inner:
@@ -1017,8 +1031,16 @@ class Assembly:
         self.adj = adj              # owner id -> owners it meets
         self.ground = ground        # the finished ground (terrain.Field) or None
         self.level = level or {}    # point -> (road id, station): one height on a port line
+        # (#147: footbridges, whose faces meet other owners' at their ports only: their
+        # stairs' sides stand beside a junction's slot, walls, not shared edges)
+        self.foot = {sid for sid, rd in roads.items() if rd.cls == "footbridge"}
+        # (its port lines, from port point to port point: a vertex put into one, a
+        # junction's beside it, is on its port, not beside its stairs)
+        self.foot_ports = [(pts[k], pts[k + 1]) for sid in sorted(self.foot)
+                           for _, pts in roads[sid].ends for k in range(len(pts) - 1)]
         self.ports: set = set()
         self.port_owner: dict = {}
+        self.bracket: dict = {}     # (#147) vertex -> (lo, hi) the curb rule ran it between
         for fi, f in enumerate(faces):
             if f.road is None or f.kind == "bend":
                 continue
@@ -1482,7 +1504,8 @@ class Assembly:
         return p in self.ports or p in self.level
 
     def _levels(self, v, fis) -> list[list[int]]:
-        """The faces using a point, grouped by level (faces that meet are one level)."""
+        """The faces using a point, grouped by level (faces that meet are one level; #147: a
+        footbridge's faces and another owner's only on the footbridge's port lines)."""
         if len(fis) == 1:
             return [list(fis)]
         par = {fi: fi for fi in fis}
@@ -1492,9 +1515,11 @@ class Assembly:
                 par[x] = par[par[x]]
                 x = par[x]
             return x
+        port = v in self.ports or self._on_foot_port(v)
         for i in range(len(fis)):
             for j in range(i + 1, len(fis)):
-                if self.related(self.faces[fis[i]], self.faces[fis[j]]):
+                f, g = self.faces[fis[i]], self.faces[fis[j]]
+                if self.related(f, g) and (port or not self._apart(f, g)):
                     par[find(fis[i])] = find(fis[j])
         comps: dict = {}
         for fi in fis:
@@ -1502,16 +1527,44 @@ class Assembly:
         if len(comps) == 1:
             return [list(fis)]
         x, y = m(v[0]), m(v[1])
-        cs = sorted((self.zf(self.faces[g[0]], x, y), sorted(g)) for g in comps.values())
-        out = [list(cs[0][1])]
-        z0 = cs[0][0]
-        for z, g in cs[1:]:
-            if z - z0 <= STEP_Z_M:
-                out[-1] += g
-            else:
-                out.append(list(g))
-                z0 = z
-        return [sorted(g) for g in out]
+        out = []
+        for foot in (False, True):
+            cs = sorted((self.zf(self.faces[g[0]], x, y), sorted(g)) for g in comps.values()
+                        if any(self.faces[fi].road in self.foot for fi in g) == foot)
+            if not cs:
+                continue
+            grp = [(cs[0][0], list(cs[0][1]))]
+            z0 = cs[0][0]
+            for z, g in cs[1:]:
+                if z - z0 <= STEP_Z_M:
+                    grp[-1][1].extend(g)
+                else:
+                    grp.append((z, list(g)))
+                    z0 = z
+            out += grp
+        out.sort(key=lambda zg: (zg[0], sorted(zg[1])))
+        return [sorted(g) for _, g in out]
+
+    def _on_foot_port(self, v) -> bool:
+        """#147: a point on a footbridge's port line, within TOL_MM."""
+        for a, b in self.foot_ports:
+            if not (min(a[0], b[0]) - 1 <= v[0] <= max(a[0], b[0]) + 1 and
+                    min(a[1], b[1]) - 1 <= v[1] <= max(a[1], b[1]) + 1):
+                continue
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            L2 = dx * dx + dy * dy
+            if L2 == 0:
+                continue
+            cross = (v[0] - a[0]) * dy - (v[1] - a[1]) * dx
+            if cross * cross <= (TOL_MM * TOL_MM) * L2:
+                return True
+        return False
+
+    def _apart(self, f: Face, g: Face) -> bool:
+        """#147: a footbridge's face and another owner's (they share its port points
+        only)."""
+        return (f.road in self.foot) != (g.road in self.foot) and \
+            self.owner_key(f) != self.owner_key(g)
 
     def _vkey(self, name: str):
         p = self.vpos[name]
@@ -1620,6 +1673,8 @@ class Assembly:
                     if name in z:
                         continue
                     for sid in own:
+                        if sid in self.foot and v not in self.ports:
+                            continue    # (#147: beside its stairs, the slot's own height)
                         rd = self.roads.get(sid)
                         s = rd.known.get(v) if rd is not None else None
                         if s is not None:
@@ -1632,12 +1687,14 @@ class Assembly:
             if f.kind == "junction" and u is not None and u.inner:
                 for r, ids in zip(f.rings, self.vrings[fi]):
                     self._long_curbs(u, r, ids, z)
+        fixed = set(z)
         for kinds in (("junction", "bulb", "bend"), ("corner",)):
             for fi, f in ((i, faces[i]) for i in order):
                 if f.kind not in kinds:
                     continue
                 for r, ids in zip(f.rings, self.vrings[fi]):
                     self._along_ring(f, r, ids, z)
+        self.stats["unfolded"] = self._unfold(z, fixed)
         for fi, f in ((i, faces[i]) for i in order):
             for r, ids in zip(f.rings, self.vrings[fi]):
                 for v, name in zip(r, ids):
@@ -1702,8 +1759,211 @@ class Assembly:
                 if ids[i] not in z and ids[i] not in new:
                     t = ((cum[i] - cum[a]) % per) / span if span > 0 else 0.0
                     new[ids[i]] = z[ids[a]] + t * (z[ids[b]] - z[ids[a]])
+                    self.bracket[ids[i]] = (min(z[ids[a]], z[ids[b]]),
+                                            max(z[ids[a]], z[ids[b]]))
                 i = (i + 1) % k
         z.update(new)
+
+    def _unfold(self, z: dict, fixed: set) -> int:
+        """#147: a junction whose faces the curb rule folds, mended where it folds. The
+        curb rule runs heights linearly along each ring from port to port, so where a ring
+        goes the long way round an island that meets the outline through a narrow neck (a
+        gore between a road and its ramp in a cluster no height fits, Delta Megacity's
+        `jn.e170s444`), two vertices a stride apart get the heights of points the whole
+        island apart, and the faces across the neck fold up between them. K is the
+        steepest slope between two of the junction's anchored vertices (its ports, a
+        cluster's long curbs: `fixed`) in plan; a fold is two vertices of one of its faces,
+        FOLD_MIN_M to FOLD_REACH_M apart across the face, more than FOLD_TOL steeper than
+        K, one of them free (the curb rule gave it its height, and only this junction's
+        faces use it), or a free vertex and a point of an edge of the face (`_folds`: a
+        thin strip whose far side is one long edge). The free vertices of the folds take
+        the inverse distance weighted height of every vertex of the junction they leave as
+        it is and of the points along its edges between two of them, kept within the two
+        envelopes of its anchors, min(z_a + K d) and max(z_a - K d) over the anchors a at
+        plan distance d, and between the two heights the curb rule ran it between (so a
+        curb stays between its legs' heights, `junction_levels`); while that leaves folds at
+        other free vertices, those join them
+        (UNFOLD_ROUNDS at most). Everything else keeps the curb rule, and so does the whole
+        junction unless the faces whose drawn grade that changes (`_drawn_faces`, by more
+        than UNFOLD_SLACK) are then drawn less steep at the steepest of them, or none
+        changes and no fold is left. Returns how many junctions were unfolded."""
+        by_unit: dict = {}
+        users: dict = {}
+        for fi, f in enumerate(self.faces):
+            for ids in self.vrings[fi]:
+                for name in ids:
+                    users.setdefault(name, set()).add(self.owner_key(f))
+            if f.road is None and f.unit is not None and f.kind in ("junction", "bulb",
+                                                                     "corner"):
+                by_unit.setdefault(f.unit, []).append(fi)
+        n = 0
+        for uid in sorted(by_unit):
+            fis = sorted(by_unit[uid], key=lambda i: self.faces[i].fid)
+            names = sorted({name for fi in fis for ids in self.vrings[fi] for name in ids})
+            anchors = [v for v in names if v in fixed]
+            free = {v for v in names if v not in fixed and v in z and users[v] == {uid}}
+            if len(anchors) < 2 or not free or any(v not in z for v in names):
+                continue
+            P = np.array([self.vpos[v] for v in anchors], dtype=np.float64) / 1000.0
+            Z = np.array([z[v] for v in anchors], dtype=np.float64)
+            D = np.sqrt((P[:, None, 0] - P[None, :, 0]) ** 2 +
+                        (P[:, None, 1] - P[None, :, 1]) ** 2)
+            far = D >= FOLD_MIN_M
+            if not far.any():
+                continue
+            dz = np.abs(Z[:, None] - Z[None, :]) - np.where(D < 1.0, STEP_TOL_M, 0.002)
+            K = float(np.max(np.where(far, np.maximum(dz, 0.0) / np.maximum(D, 1e-9), 0.0)))
+            folds = self._folds(fis, z, K + FOLD_TOL, free)
+            if not folds:
+                continue
+            before = self._drawn_faces(fis, z)
+            old = {v: z[v] for v in free}
+            moved: set = set()
+            for _ in range(UNFOLD_ROUNDS):
+                if folds <= moved:
+                    break
+                moved |= folds
+                keep = [v for v in names if v not in moved]
+                eq, ew = self._edge_points(fis, z, moved)
+                Q = np.concatenate([np.array([self.vpos[v] for v in keep],
+                                             dtype=np.float64).reshape(-1, 2) / 1000.0, eq])
+                W = np.concatenate([np.array([z[v] for v in keep], dtype=np.float64), ew])
+                for v in sorted(moved):
+                    x, y = self.vpos[v][0] / 1000.0, self.vpos[v][1] / 1000.0
+                    e = np.sqrt((Q[:, 0] - x) ** 2 + (Q[:, 1] - y) ** 2)
+                    w = 1.0 / np.maximum(e, 1e-3) ** 2
+                    zi = math.fsum((w * W).tolist()) / math.fsum(w.tolist())
+                    d = np.sqrt((P[:, 0] - x) ** 2 + (P[:, 1] - y) ** 2)
+                    lo, hi = float(np.max(Z - K * d)), float(np.min(Z + K * d))
+                    z[v] = min(max(zi, lo), hi) if lo <= hi else (lo + hi) / 2.0
+                    if v in self.bracket:
+                        # (between the heights the curb rule ran it between, as
+                        # `junction_levels` holds a curb between two legs' heights)
+                        z[v] = min(max(z[v], self.bracket[v][0]), self.bracket[v][1])
+                folds = self._folds(fis, z, K + FOLD_TOL, free)
+            after = self._drawn_faces(fis, z)
+            ch = [i for i, (a, b) in enumerate(zip(before, after)) if abs(a - b) > UNFOLD_SLACK]
+            if (max([after[i] for i in ch], default=0.0) < max([before[i] for i in ch],
+                                                                default=0.0)
+                    or (not ch and not folds)):
+                n += 1
+            else:
+                z.update(old)       # (steeper, or folded still: the curb rule's heights stay)
+        return n
+
+    def _folds(self, fis: list, z: dict, lim: float, free: set) -> set:
+        """#147: every free vertex of one of these faces steeper than lim to another vertex of
+        the face or a point of one of its edges (the edge's straight line, as AG17 draws it),
+        FOLD_MIN_M to FOLD_REACH_M apart in plan with the line between them on the face
+        (along a ring, or across a strip; never across a notch)."""
+        out: set = set()
+        for fi in fis:
+            vs = sorted({name for ids in self.vrings[fi] for name in ids})
+            fr = [i for i, v in enumerate(vs) if v in free]
+            if not fr:
+                continue
+            Q = np.array([self.vpos[v] for v in vs], dtype=np.float64) / 1000.0
+            W = np.array([z[v] for v in vs], dtype=np.float64)
+            eq, ew = self._edge_points([fi], z, set())
+            C, Cz = np.concatenate([Q, eq]), np.concatenate([W, ew])
+            R, Rz = Q[fr], W[fr]
+            E = np.sqrt((R[:, None, 0] - C[None, :, 0]) ** 2 +
+                        (R[:, None, 1] - C[None, :, 1]) ** 2)
+            near = (E >= FOLD_MIN_M) & (E <= FOLD_REACH_M)
+            s = (np.abs(Rz[:, None] - Cz[None, :]) - np.where(E < 1.0, STEP_TOL_M, 0.002)) \
+                / np.maximum(E, 1e-9)
+            ii, jj = np.nonzero(near & (s > lim))
+            pairs = [(i, j) for i, j in zip(ii.tolist(), jj.tolist()) if vs[fr[i]] not in out]
+            if not pairs:
+                continue
+            segs = shapely.linestrings([[R[i], C[j]] for i, j in pairs])
+            ok = shapely.covers(self.faces[fi].poly().buffer(0.01), segs).tolist()
+            for (i, j), inside in zip(pairs, ok):
+                if inside:
+                    out.add(vs[fr[i]])
+        return out
+
+    def _edge_points(self, fis: list, z: dict, skip: set) -> tuple:
+        """#147: points every EDGE_STEP_M along the edges of these faces' rings (their ends
+        left out), at heights straight between the edge's two vertices: (n, 2) positions
+        and (n,) heights; none on an edge with a vertex in skip."""
+        seen = set()
+        pts, zs = [], []
+        for fi in fis:
+            for ids in self.vrings[fi]:
+                k = len(ids)
+                for i in range(k):
+                    a, b = ids[i], ids[(i + 1) % k]
+                    if a == b or a in skip or b in skip or (min(a, b), max(a, b)) in seen:
+                        continue
+                    seen.add((min(a, b), max(a, b)))
+                    pa, pb = self.vpos[a], self.vpos[b]
+                    d = math.hypot(pb[0] - pa[0], pb[1] - pa[1]) / 1000.0
+                    n = int(d / EDGE_STEP_M)
+                    for j in range(1, n + 1):
+                        t = j / (n + 1)
+                        pts.append(((pa[0] + t * (pb[0] - pa[0])) / 1000.0,
+                                    (pa[1] + t * (pb[1] - pa[1])) / 1000.0))
+                        zs.append(z[a] + t * (z[b] - z[a]))
+        return (np.array(pts, dtype=np.float64).reshape(-1, 2),
+                np.array(zs, dtype=np.float64))
+
+    def _drawn(self, fis: list, z: dict) -> float:
+        """#147: how steep these faces are drawn with heights z, at the steepest of them."""
+        return max(self._drawn_faces(fis, z), default=0.0)
+
+    def _drawn_faces(self, fis: list, z: dict) -> list:
+        """#147: how steep each of these faces is drawn with heights z, as the checks
+        measure it (`pavement_checks.face_grade`): between neighboring boundary vertices,
+        between neighboring interior samples and from each sample to the boundary vertices
+        within SAMPLE_M of it, across the face."""
+        out = []
+        for fi in fis:
+            worst = 0.0
+            out.append(worst)
+            f = self.faces[fi]
+            rings = [[(m(v[0]), m(v[1]), z[name]) for v, name in zip(r, ids)]
+                     for r, ids in zip(f.rings, self.vrings[fi])]
+            pts = [p for r in rings for p in r]
+            for r in rings:
+                k = len(r)
+                for i in range(k):
+                    p, q = r[i], r[(i + 1) % k]
+                    d = math.hypot(q[0] - p[0], q[1] - p[1])
+                    if d >= FOLD_MIN_M:
+                        worst = max(worst, (abs(q[2] - p[2]) - step_tol(d)) / d)
+            out[-1] = worst
+            if _planar(pts):
+                continue
+            grid = self._grid(fi)
+            if grid is None:
+                continue
+            gx, gy = grid
+            zs = mvc(rings, gx, gy)
+            at = {(int(round(x / SAMPLE_M)), int(round(y / SAMPLE_M))): (x, y, zz)
+                  for x, y, zz in zip(gx.tolist(), gy.tolist(), zs.tolist())}
+            pairs = []
+            for (i, j), a in at.items():
+                for di, dj in ((1, 0), (0, 1), (1, 1), (1, -1)):
+                    o = at.get((i + di, j + dj))
+                    if o is not None:
+                        pairs.append((a, o))
+            B = np.array(pts, dtype=np.float64)
+            for a in at.values():
+                d = np.sqrt((B[:, 0] - a[0]) ** 2 + (B[:, 1] - a[1]) ** 2)
+                for kk in np.nonzero((d <= SAMPLE_M) & (d >= FOLD_MIN_M))[0].tolist():
+                    pairs.append((a, tuple(B[kk])))
+            if not pairs:
+                continue
+            g = f.poly()
+            segs = shapely.linestrings([[p[:2], q[:2]] for p, q in pairs])
+            ok = shapely.covers(g.buffer(0.01), segs).tolist()
+            for (p, q), inside in zip(pairs, ok):
+                if inside:
+                    worst = max(worst, (abs(p[2] - q[2]) - 0.002) /
+                                math.hypot(p[0] - q[0], p[1] - q[1]))
+            out[-1] = worst
+        return out
 
     # -- interior samples --------------------------------------------------------------
 
@@ -1720,30 +1980,38 @@ class Assembly:
                    for r, ids in zip(f.rings, self.vrings[fi]) for v, name in zip(r, ids)]
             if _planar(pts):
                 continue
-            g = f.poly()
-            if not g.is_valid:
+            grid = self._grid(fi)
+            if grid is None:
                 continue
-            inner = g.buffer(-SAMPLE_IN_M, join_style="mitre")
-            if inner.is_empty:
-                continue
-            x0, y0, x1, y1 = inner.bounds
-            i0, i1 = math.ceil(x0 / SAMPLE_M), math.floor(x1 / SAMPLE_M)
-            j0, j1 = math.ceil(y0 / SAMPLE_M), math.floor(y1 / SAMPLE_M)
-            if i1 < i0 or j1 < j0:
-                continue
-            gx, gy = np.meshgrid(np.arange(i0, i1 + 1) * SAMPLE_M,
-                                 np.arange(j0, j1 + 1) * SAMPLE_M)
-            gx, gy = gx.ravel(), gy.ravel()
-            ins = shapely.contains_xy(inner, gx, gy)
-            gx, gy = gx[ins], gy[ins]
-            if not len(gx):
-                continue
+            gx, gy = grid
             rings = [[(m(v[0]), m(v[1]), self.abs[name]) for v, name in zip(r, ids)]
                      for r, ids in zip(f.rings, self.vrings[fi])]
             zs = mvc(rings, gx, gy)
             f.samples = [(float(x), float(y), float(zz)) for x, y, zz in zip(gx, gy, zs)]
             n += len(gx)
         return n
+
+    def _grid(self, fi: int):
+        """A face's interior sample points (x, y arrays), or None."""
+        g = self.faces[fi].poly()
+        if not g.is_valid:
+            return None
+        inner = g.buffer(-SAMPLE_IN_M, join_style="mitre")
+        if inner.is_empty:
+            return None
+        x0, y0, x1, y1 = inner.bounds
+        i0, i1 = math.ceil(x0 / SAMPLE_M), math.floor(x1 / SAMPLE_M)
+        j0, j1 = math.ceil(y0 / SAMPLE_M), math.floor(y1 / SAMPLE_M)
+        if i1 < i0 or j1 < j0:
+            return None
+        gx, gy = np.meshgrid(np.arange(i0, i1 + 1) * SAMPLE_M,
+                             np.arange(j0, j1 + 1) * SAMPLE_M)
+        gx, gy = gx.ravel(), gy.ravel()
+        ins = shapely.contains_xy(inner, gx, gy)
+        gx, gy = gx[ins], gy[ins]
+        if not len(gx):
+            return None
+        return gx, gy
 
 
 def ring_heights(r: list, known: dict) -> list:
@@ -1934,8 +2202,6 @@ class Plan:
         self.roads: dict = {}
         at: dict = {}
         for s in segments:
-            if s["road_class"] == "footbridge":
-                continue
             self.roads[s["id"]] = Road(s)
             at.setdefault(s["start"], []).append((s["id"], "start"))
             at.setdefault(s["end"], []).append((s["id"], "end"))

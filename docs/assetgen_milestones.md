@@ -2386,6 +2386,7 @@ outputs `docs/progress/AG17/`.
   (`barriers.road_runs`, #95's rule; M22's cuts fall about 2 m further in, past the top of
   the stairs). Found on the materials golden: the first AG17 build left
   footbridges with an open girder, no surface and their railings 2 m short at each end.
+  (Faces of the map since #147, below; `walk_span` retired.)
 - **AG8** (`props/gather.py`): props keep off the map's carriageway faces (`_Fit`, at the
   height of the nearest vertex); a raised junction's corner is its faces (`_RaisedCorners`:
   a standing thing in its reach at its height on no face of the map is left out, one on a
@@ -2440,10 +2441,40 @@ Open:
 - Junctions M22 keeps as M18 left them (`attrs.unbuildable`) and Cragmouth's steep hillside
   junctions are drawn as their faces are, steep where the map is: Delta's `jn.e170s444`
   (drawn grade 0.9) has a corner pad folded up between the road at grade and its ramp 10 m
-  up (`docs/progress/AG17/`); a surface there is M22's to fit.
+  up (`docs/progress/AG17/`); a surface there is M22's to fit. (Unfolded by the pavement
+  map fixes, #147, below.)
 - Street triangles rose by a quarter (bends' curb lines as Steiner points every meter, the
   map's interior samples, curbs as walls), within the budgets; AG16's to weigh.
 - The Unreal check after AG17 (an import over M22's, shots of `jn.e170s444`).
+
+## Fix: footbridges and folds on the pavement map (issue #147)
+
+M22's map had two gaps AG17 drew around (stage 1's log has the map's side,
+`docs/citygen_milestones.md`, "Pavement map fixes (#147)"): footbridges outside it, and a
+corner pad folded up in Delta's `jn.e170s444`. Both are the map's now, so AG17 draws them as
+it draws everything else:
+- **Footbridges** (`streets/roads.py`, `barriers.py`): a footbridge's road piece draws its
+  walk face as stored, up its stairs on the stations of its profile's knots, its outer
+  edges walled down as a raised road's fascia and its girder under it from cut to cut (its
+  ports, at its stairs' feet); `roads.walk_span` and the piece's `walk` input are retired.
+  Its railings run within its cuts, `FOOT_CLEAR_M` off the junctions at its ends at their
+  own offset as #95 kept them, so they begin where it leaves the junction whose slot its
+  stairs stand in. `street_watertight` covers its seams with its junctions: Delta's 17
+  footbridges meet their junctions in 34 shared edges, 40 segments, each drawn by both
+  pieces on the same millimeters in exactly two triangles.
+- **`jn.e170s444`**: its pads drawn from the unfolded map (drawn grade 0.896 to 0.225); its
+  steepest street triangle 75 to 36 degrees (0.85 m2 at the gore's tip, 34 on main), its
+  triangles over 10 degrees 103 to 42.
+
+Delta Megacity with the fix (`assetgen streets`, `fit`): 8,827 street pieces, 1,588,948
+triangles (1,586,582 on AG17's main), 196,813 shared segments checked (196,763), 0 not
+drawn, open or drawn twice; no road steps onto its junction (4,430 legs), no clash, every
+grounded thing on its surface. Goldens rewritten (every city's model moves with its
+footbridges' faces, so do their briefs and packs): `golden_streets.json` (the small city and
+Vesper Bay), `golden_props.json`, `golden_ground.json`, `golden_water.json` (Vesper Bay's;
+the small city's water is unchanged) and `golden_hashes.json`'s small city briefs, AG1 files
+and AG6 materials and the five samples' briefs; the Vesper Bay buildings, the spike and the
+triangulation are unchanged.
 
 ## Order
 

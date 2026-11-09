@@ -201,16 +201,14 @@ def test_small_city_runs_end_at_their_junctions():
     assert spans and ported
 
 
-def test_small_city_footbridge_railings_run_along_the_walk():
-    """M22's map leaves footbridges out: a footbridge's railings (the bridge piece's) run
-    along its walking surface (`roads.walk_span`, from the junction's outline at each end),
-    within it and starting at most a meter in (`FOOT_CLEAR_M` off the junction at the
-    railing's own offset), not from M22's cuts about 2 m further in, past the top of its
-    stairs."""
+def test_small_city_footbridge_railings_run_along_its_faces():
+    """#147: a footbridge's faces are the map's, from its ports (its cuts, at its stairs'
+    feet): its railings (the bridge piece's) run along them from cut to cut, off the
+    junctions at its ends (`FOOT_CLEAR_M` at the railing's own offset, as #95 kept them),
+    so they begin where it leaves a junction whose slot its stairs stand in."""
     from assetgen import brief as B
     from assetgen.streets import structures as ST
     from assetgen.streets.ctx import Ctx
-    from assetgen.streets.roads import gather
 
     model, _, _ = B.load_model(small_build() / "base")
     cx = Ctx(model)
@@ -220,13 +218,14 @@ def test_small_city_footbridge_railings_run_along_the_walk():
         if not inp.get("rails"):
             continue
         ids = list(b.segment_ids) or ST._carriers(cx, b)
-        walk = gather(cx, cx.seg[ids[0]]).inputs.get("walk")
-        assert walk, b.id
+        s = cx.seg[ids[0]]
+        assert s.road_class == "footbridge" and cx.pave.faces_of(s.id), b.id
+        L = Path(s.centerline).L
+        c0, c1 = cx.cuts.get(s.id, (0.0, 0.0))
         for r in inp["rails"]:
             assert r["spans"], (b.id, r["name"])
             a, e = r["spans"][0][0], r["spans"][-1][1]
-            assert walk[0] - 1e-3 <= a < e <= walk[1] + 1e-3, (b.id, r, walk)
-            assert a - walk[0] < 1.0 and walk[1] - e < 1.0, (b.id, r, walk)
+            assert c0 - 1e-3 <= a < e <= L - c1 + 1e-3, (b.id, r, c0, c1)
             n += 1
     assert n
 

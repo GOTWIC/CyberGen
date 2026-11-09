@@ -1370,6 +1370,32 @@ checks `pavement_checks.py`, preview `preview_pavement.py`):
   ground; a deck's streets on layer d1.
 Sample builds: `docs/progress/M22/`.
 
+The pavement map fixes (issue #147, after AG17) are in place, in `citygen/pavement.py` and
+`citygen/junctions.py`:
+- **Footbridges in the map:** `Plan` lays a footbridge as any road (its walk face between
+  its cuts, on stations that take its profile's knots, `Path.knots`, so its faces turn where
+  its stairs do) with ports on its junctions: its cut no farther out than its stairs' foot
+  (`junctions.stair_foot`, `foot_cuts`; M2 starts most stairs at the node), so its port is at
+  the junction's level and the stairs rise past it, in a slot of the junction's region
+  (`unit_regions` keeps footbridge legs; its faces over every other, `FOOT_RANK`). Its faces
+  meet another owner's only on its port lines (`Assembly._apart`, `_on_foot_port` in
+  `_levels`: a vertex put into a port line between its port points is on it; the stairs'
+  sides and the slot's are outer edges, walls, at two heights), and a junction vertex beside
+  the stairs keeps the slot's height. The blockout draws footbridges from their faces again
+  (`<segment>.deck`; on M22 they had no faces and were left out).
+- **Folds** (`Assembly._unfold`): where the curb rule (heights by length along a ring from
+  port to port) folds a junction (a gore's narrow neck between a road and its ramp in a
+  cluster no height fits: a free vertex and another vertex of one face, or a point every
+  `EDGE_STEP_M` along one of its edges, 0.25 to 4 m apart across it, more than `FOLD_TOL`
+  steeper than the junction's ports allow), the free vertices there take the inverse
+  distance weighted height of the vertices and edge points left as they are, within the
+  ports' envelopes and the two heights the curb rule ran it between (`Assembly.bracket`: a
+  curb stays between its legs' heights, as `junction_levels` holds it), grown while folds
+  remain (`UNFOLD_ROUNDS`); kept when the faces it
+  changes are drawn less steep at the steepest of them (`_drawn_faces`). Delta Megacity's
+  `jn.e170s444` is drawn at 0.225 (0.896 on M22; five vertices move by the gore).
+Every sample has new goldens (footbridges' faces). Outputs: `docs/progress/fix_pavement_map/`.
+
 ### Rules for sessions building citygen milestones (local; no cloud credits)
 
 - **Validation:** as in "Validation" above; nothing beyond it.
@@ -2042,10 +2068,10 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
 - **Retired:** `path.first_exit`, `Road._edge`, `CUT_TOL_M`, `_with_corners`, `_cut_run`,
   `_run_z`, `_surface`, the duplicate `_corner`, `_fills`, `_overlaps`, `_carriageway`,
   `_clear_spans`, `Keepout`, `clip_line`, `roads._median_clip`, `_make`'s tidied line.
-- **Footbridges** (no faces in M22's map): the road piece draws the walking surface on the
-  bridge's own profile from junction outline to junction outline (`roads.walk_span`) and its
-  girder closed under it; the bridge piece's railings run along it, `barriers.FOOT_CLEAR_M`
-  off the junctions.
+- **Footbridges** (faces of M22's map since #147): the road piece draws a footbridge's walk
+  faces as any road's, from its stairs' feet at its ports, and its girder under them between
+  its cuts; the bridge piece's railings run along them, `barriers.FOOT_CLEAR_M` off the
+  junctions; `street_watertight` covers their seams.
 - **AG8:** props keep off the map's carriageway faces (`_Fit`) and stand on a raised junction's
   pads as AG7 draws them (`_RaisedCorners`), both from the map. No exporter change.
 Results: `docs/progress/AG17/`.

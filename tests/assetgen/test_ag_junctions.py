@@ -180,30 +180,48 @@ def test_a_prop_in_a_raised_corner_with_no_pad_is_left_out():
     assert abs(rc.pad_top(15.0, 2.5, 8.1) - 8.2) < 1e-9
 
 
-def test_a_footbridge_draws_its_walking_surface():
-    """M22 keeps footbridges out of its map (no faces): AG7 draws a footbridge's walking
-    surface on its profile from where it leaves its junctions (`walk_span`, as before AG17)
-    and its girder under that stretch, closed up to the surface; nothing below the deck."""
+def test_a_footbridge_draws_its_faces():
+    """#147: a footbridge's faces are the map's (M22 put them in it, from port to port): AG7
+    draws them as stored, up its stairs on its profile's knots, its outer edges walled down
+    as a raised road's fascia, its girder under them from cut to cut."""
+    from assetgen.streets import pave as PV
     from assetgen.streets import roads as RD
+    from assetgen.streets.ctx import Ground
     from assetgen.streets.kit import check
     seg = {"id": "rs.fb", "centerline": [[0.0, 0.0], [30.0, 0.0]], "width_m": 4.0,
            "road_class": "footbridge", "bridge": True, "attrs": {},
            "z_profile": [{"s": 0.0, "z": 0.0}, {"s": 4.0, "z": 3.8}, {"s": 26.0, "z": 3.8},
                          {"s": 30.0, "z": 0.0}],
-           "cross_section": {"sidewalk_m": [0.0, 0.0], "median_m": 0.0, "curb_m": 0.15}}
+           "cross_section": {"sidewalk_m": [2.0, 2.0], "median_m": 0.0, "curb_m": 0.0}}
+    # (its one face, a ribbon on the stations of its profile: ends at 0 and 30 m)
+    xs, zs = (0.0, 4.0, 26.0, 30.0), (0.0, 3.8, 3.8, 0.0)
+    V = [SimpleNamespace(id=f"{k}{side}", p=(x, y), z=z) for k, (x, z) in enumerate(zip(xs, zs))
+         for side, y in (("r", -2.0), ("l", 2.0))]
+    ring = [f"{k}r" for k in range(4)] + [f"{k}l" for k in range(3, -1, -1)]
+    E = [SimpleNamespace(id=f"e{u}.{v}", kind="outer", v=[u, v])
+         for u, v in zip(ring, ring[1:] + ring[:1])]
+    face = SimpleNamespace(id="rs.fb.pv.wk", owner_id="rs.fb", kind="walk", band="wk",
+                           layer="g0", rings=[[e.id for e in E]], samples=[])
+    m = SimpleNamespace(pavement_net=SimpleNamespace(vertices=V, edges=E), pavement=[face],
+                        road_segments=[], junctions=[], crosswalks=[], buildings=[],
+                        parking=[])
+    PI = PV.Index(m, Ground(SimpleNamespace(seas=[], rivers=[], channels=[], waterways=[])))
+    PI.ramps(m)
     inp = {"seg": seg, "cls": "footbridge", "ends": [], "crossings": [], "lanes": [],
-           "style": STYLE, "origin": [15.0, 0.0], "cuts": [7.0, 7.0], "faces": [],
-           "walk": [5.0, 25.0], "barriers": []}
+           "style": STYLE, "origin": [15.0, 0.0], "cuts": [0.0, 0.0],
+           "faces": [PI.face_input(face.id)], "stations": [0.0, 4.0, 26.0, 30.0],
+           "barriers": []}
     out = RD.make(inp)
     assert not any(check(out.mesh.slots).values())
     walk = out.mesh.slots[RD.asphalt_slot("footbridge", STYLE)]
     P = np.array(walk.pos)
-    assert P[:, 0].min() == 5000 - 15000 and P[:, 0].max() == 25000 - 15000
-    assert (P[:, 2] == 3800 + RD.PV.ROAD_DZ_MM).all()
-    assert P[:, 1].min() == -2000 and P[:, 1].max() == 2000
+    tops = {(int(p[0]), int(p[2])) for p in P if p[2] >= RD.PV.ROAD_DZ_MM}
+    for x, z in zip(xs, zs):
+        assert (int(x * 1000) - 15000, int(z * 1000) + RD.PV.ROAD_DZ_MM) in tops
     deck = np.array(out.mesh.slots["concrete.deck"].pos)
-    assert deck[:, 0].min() == P[:, 0].min() and deck[:, 0].max() == P[:, 0].max()
-    assert deck[:, 2].max() == P[:, 2].max()            # (its sides up to the surface)
+    assert deck[:, 0].min() >= -15000 - 1 and deck[:, 0].max() <= 15000 + 1
+    # (the fascia: its outer walls 0.45 m under the faces)
+    assert (P[:, 2] <= 3800 + RD.PV.ROAD_DZ_MM - RD.PV.FASCIA_MM).any()
 
 
 def test_a_bulb_is_drawn_whole():
