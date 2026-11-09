@@ -2377,6 +2377,12 @@ outputs `docs/progress/AG17/`.
   (`fit.seams`) compares a road's and its junction's pieces exactly at the map's port
   vertices, faces of one class (a sidewalk ending on a carriageway is a curb); its strip
   check reads the packs as before.
+- **Footbridges** (out of M22's map, which has no faces for them): a footbridge's road
+  piece draws its walking surface on its own profile from where its line leaves the
+  junction at each end (`roads.walk_span`, the junction's outline) and its girder under it,
+  the sides rising to the surface (no face draws a fascia there); the railings stay the
+  bridge piece's. Found on the materials golden: the first AG17 build left footbridges with
+  an open girder and no surface.
 - **AG8** (`props/gather.py`): props keep off the map's carriageway faces (`_Fit`, at the
   height of the nearest vertex); a raised junction's corner is its faces (`_RaisedCorners`:
   a standing thing in its reach at its height on no face of the map is left out, one on a
@@ -2393,25 +2399,29 @@ gap on main's water stage, Cragmouth's skybridge clearance and landings and a ro
 
 | City | Pieces | Triangles | Segments | Not drawn / open / twice | Steps | Strips | Clashes | Failing |
 |---|---|---|---|---|---|---|---|---|
-| Delta Megacity | 8,827 | 1,585,472 | 196,763 | 0 / 0 / 0 | 0 | 0 | 0 | asset_envelope, asset_unique, asset_grounded |
-| Vesper Bay | 9,019 | 1,457,345 | 210,886 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Saltreach Free Port | 5,484 | 815,302 | 118,555 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Nexus City | 9,617 | 1,468,900 | 223,841 | 0 / 0 / 0 | 0 | 0 | 0 | water_gaps |
-| Greyhook | 4,450 | 833,577 | 128,893 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Vesper Bay Pinned | 9,817 | 1,459,272 | 219,929 | 0 / 0 / 0 | 0 | 0 | 0 | asset_unique |
-| Vesper Bay Stacks | 9,790 | 1,487,985 | 217,981 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Vesper Bay Decks | 9,945 | 1,605,658 | 219,812 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Cragmouth | 11,119 | 1,803,165 | 228,098 | 0 / 0 / 0 | 0 | 0 | 0 | asset_clearance, asset_landings, asset_grounded |
+| Delta Megacity | 8,827 | 1,586,006 | 196,763 | 0 / 0 / 0 | 0 | 0 | 0 | asset_envelope, asset_unique, asset_grounded |
+| Vesper Bay | 9,019 | 1,457,545 | 210,886 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Saltreach Free Port | 5,484 | 815,404 | 118,555 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Nexus City | 9,617 | 1,469,552 | 223,841 | 0 / 0 / 0 | 0 | 0 | 0 | water_gaps |
+| Greyhook | 4,450 | 833,621 | 128,893 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Pinned | 9,817 | 1,459,331 | 219,929 | 0 / 0 / 0 | 0 | 0 | 0 | asset_unique |
+| Vesper Bay Stacks | 9,790 | 1,488,007 | 217,981 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Decks | 9,945 | 1,605,858 | 219,812 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Cragmouth | 11,119 | 1,803,407 | 228,098 | 0 / 0 / 0 | 0 | 0 | 0 | asset_clearance, asset_landings, asset_grounded |
 
 Delta before (M22's main) and after: 8,827 street pieces both; 1,288,343 triangles to
-1,585,472 (roads 261,668 to 357,439, junctions 217,036 to 362,476, sidewalks 346,999 to
+1,586,006 (roads 261,668 to 357,973, junctions 217,036 to 362,476, sidewalks 346,999 to
 373,423, crosswalks 20,202 to 50,284); roads inside their junctions with no mesh 8 to 246
 (the clusters' inner roads); corner pads 3,248 (269 left out) to 3,594 (none). The
 watertight check on M22's own packs: 361,103 sides of shared segments not drawn, 29,306
 open (the old pieces found their own edges, off the map's vertices); after: 0 and 0.
 Goldens: `golden_streets.json`, `golden_props.json` and `golden_ground.json` rewritten (the
 street tiles drawn from the map, props keeping off its faces, the ground stage's code hash
-holding `streets/path.py`, from which `first_exit` went); `golden_water.json` unchanged.
+holding `streets/path.py`, from which `first_exit` went), and `golden_hashes.json`'s
+`ag6.testport_materials` (the small city's street contribution: entries, hashes, triangles
+and walkway lines drawn from the map, no entry for the clusters' inner roads and sidewalks,
+which have no mesh); `golden_water.json` unchanged. The materials golden moved with AG17,
+not with the suite's order: run alone, main passes its own and AG17's code its new one.
 
 Open:
 - AG14's grounded rule (#105's last leftover): `fit.build.grounded` takes a thing's

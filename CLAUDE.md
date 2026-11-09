@@ -2037,6 +2037,9 @@ AG17 (road surfaces by construction, after M22; scope 14.18) is in place, in
 - **Retired:** `path.first_exit`, `Road._edge`, `CUT_TOL_M`, `_with_corners`, `_cut_run`,
   `_run_z`, `_surface`, the duplicate `_corner`, `_fills`, `_overlaps`, `_carriageway`,
   `_clear_spans`, `Keepout`, `clip_line`, `roads._median_clip`, `_make`'s tidied line.
+- **Footbridges** (no faces in M22's map): the road piece draws the walking surface on the
+  bridge's own profile from junction outline to junction outline (`roads.walk_span`) and its
+  girder closed under it; the railings stay the bridge piece's.
 - **AG8:** props keep off the map's carriageway faces (`_Fit`) and stand on a raised junction's
   pads as AG7 draws them (`_RaisedCorners`), both from the map. No exporter change.
 Results: `docs/progress/AG17/`.
