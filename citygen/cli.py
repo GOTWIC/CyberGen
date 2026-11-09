@@ -642,9 +642,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "Person character in a --new-project project)")
     ue.add_argument("--fly-speed", type=float, default=50.0, metavar="M_PER_S",
                     help="the fly pawn's top speed in m/s (default 50)")
-    ue.add_argument("--view-range", type=float, default=1500.0, metavar="M",
+    ue.add_argument("--view-range", type=float, default=768.0, metavar="M",
                     help="how far around the player the level streams in, in meters "
-                         "(default 1500)")
+                         "(default 768; past it the instanced HLODs draw the city)")
     ue.add_argument("--no-hlod", action="store_true",
                     help="skip building the level's HLODs after the import (default: built, "
                          "the far view beyond --view-range while flying; minutes for a "

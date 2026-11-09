@@ -82,6 +82,7 @@ INSTANCE_VARS = [("Ids", "[name"), ("Kind", "name")]
 PLAY_KEY = "play"                           # citygen.unreal.PLAY_KEY: the play actor's key
 FLY_PAWN = f"{CORE}/BP_CityGenFlyPawn"      # what Play puts you in with `--play fly`
 FLY_MODE = f"{CORE}/GM_CityGenFly"
+VIEW_M = 768.0          # citygen.unreal.VIEW_M: how far the level streams in around the player
 # stage 2 (assetgen, layer 2): the masters' version (Core/M_Cg<Master>, rebuilt in place when
 # it changes), the meshes' and the actors' (stored hashes "<version>.<content hash>", as
 # MESH_VERSION and ACTOR_VERSION)
@@ -3040,10 +3041,12 @@ class Importer:
         """World Partition for flying over the city: the main partition's cells a tile wide
         (256 m), loaded `view_m` around the player; the far view (the HLODs `citygen unreal`
         builds after the import) the level's instanced HLOD layer alone, the city's own
-        meshes and materials in cells twice as wide out to the whole city, nothing baked
-        (the merged layer the engine puts over it is cut off), the last HLOD partition left
+        meshes and materials in cells as wide as the main ones (AG16: twice as wide before,
+        and when one became visible its 1,400 components took their render state in one
+        frame, 50 to 64 ms on Delta Megacity) out to the whole city, nothing baked (the
+        merged layer the engine puts over it is cut off), the last HLOD partition left
         unused at twice that. Set only where they differ."""
-        view = int(round(float(JOB.get("view_m", 1500.0)) * 100.0))
+        view = int(round(float(JOB.get("view_m", VIEW_M)) * 100.0))
         b = self.man["bounds"]
         span = int(math.ceil(math.hypot(b[2] - b[0], b[3] - b[1]) * 100.0))
         wp = self.world_settings().get_editor_property("world_partition")
@@ -3055,11 +3058,11 @@ class Importer:
             log(f"streaming: {len(parts)} grid partitions, not the main and two HLOD ones; "
                 "left as they are")
             return
-        # the main partition has the smallest cells, each HLOD one twice its parent's
+        # the main partition has the smallest cells (the first by name where the first HLOD
+        # one has cells as wide), the last HLOD one twice the first's
         parts.sort(key=lambda p: (p.get_editor_property("CellSize"), p.get_name()))
         cell = int(self.man["tile_size_m"] * 100.0)
-        want = [(cell, view), (2 * cell, max(2 * view, span)),
-                (4 * cell, max(4 * view, span))]
+        want = [(cell, view), (cell, max(2 * view, span)), (2 * cell, max(4 * view, span))]
         changed = 0
         for p, (c, r) in zip(parts, want):
             if p.get_editor_property("CellSize") != c or p.get_editor_property("LoadingRange") != r:

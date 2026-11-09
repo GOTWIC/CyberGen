@@ -87,7 +87,10 @@ UE_DIR = Path(__file__).parent / "ue"
 # mode and pawn (the First Person template's character with --new-project)
 PLAY_MODES = ("fly", "walk")
 FLY_SPEED_M_S = 50.0          # the fly pawn's top speed (a 4 km city in about 80 s)
-VIEW_M = 1500.0               # how far the level streams in around the player
+# how far the level streams in around the player (AG16: 1,500 m before, most of Delta
+# Megacity loaded at once; past it the instanced HLODs draw the same meshes, materials and
+# Custom Primitive Data, so the city looks the same)
+VIEW_M = 768.0
 
 
 # --- names and hashes ---------------------------------------------------------------------
