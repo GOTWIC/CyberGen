@@ -569,11 +569,13 @@ def test_without_assets_the_manifest_is_the_blockouts(build, manifest, tmp_path)
     assert _dump(written) == _dump(man)
 
 
-def test_stage2_layer(build, manifest, tmp_path):
+def test_stage2_layer(build, manifest, tmp_path, monkeypatch):
     """Stage 2 over the blockout: its entries' actors at their pivots, the blockout actors of
     their keys and `replaces` dropped, parts as instanced actors per entry and kind, a LOD
     chain, materials per part and slot, the walkway lines; `manifest_changes` from the
-    blockout alone is exactly that."""
+    blockout alone is exactly that. (With an actor per record, `CITYGEN_UE_GROUP=0`; AG16's
+    groups at the end.)"""
+    monkeypatch.setattr(U, "GROUP", False)
     man, _, graphs = manifest
     raw = json.loads((build / "graphs.json").read_text())
     fake, blds, road, walk, lifted = _fake(man, raw)
@@ -639,6 +641,30 @@ def test_stage2_layer(build, manifest, tmp_path):
     fake["buildings"]["entries"][1]["hash"] = "h9"
     m3 = U.build_manifest(_with_contributions(build, tmp_path / "s3", fake))[0]
     assert U.manifest_changes(m2, m3) == {"created": [], "updated": [blds[1]],
+                                          "deleted": []}
+    # AG16 (the default): the same records as components of fewer actors: the street pieces
+    # (the road and the tube's glass) in their tile's streets group by 64 m cell, the
+    # container stack's parts on a group actor at its pivot (it has no mesh of its own)
+    monkeypatch.setattr(U, "GROUP", True)
+    mg = U.build_manifest(staged)[0]
+    sg = mg["stage2"]
+    assert [a["key"] for a in sg["actors"]] == keys
+    hold = {a["key"]: a.get("holder") for a in sg["actors"] + sg["instances"]}
+    (cell,) = [g["key"] for g in sg["groups"] if g["key"].startswith("group.streets.")]
+    assert cell.startswith("group.streets.t+00+00.c")
+    assert hold["rs.test1"] == hold["tl.test.tb.glass"] == cell
+    assert hold["site.test.el.part.container.c3"] == "site.test.el"
+    assert all(hold[k] is None for k in blds)
+    assert [g["key"] for g in sg["groups"]] == sorted([cell, "site.test.el"])
+    assert {g["key"]: g["members"] for g in sg["groups"]} == {cell: 2, "site.test.el": 1}
+    assert U.manifest_changes(man, mg) == {"created": sorted([cell, "site.test.el"]),
+                                           "updated": sorted(blds), "deleted": [road]}
+    assert mg["counts"]["actors"] == len(U.actor_hashes(mg)) == len(U.actor_hashes(man)) + 1
+    assert U.actor_kinds(mg)[cell] == U.actor_kinds(mg)["site.test.el"] == "group"
+    # a member's hash moves its holder only
+    fake["streets"]["entries"][0]["hash"] = "s9"
+    m4 = U.build_manifest(_with_contributions(build, tmp_path / "s4", fake))[0]
+    assert U.manifest_changes(mg, m4) == {"created": [], "updated": sorted([blds[1], cell]),
                                           "deleted": []}
 
 
@@ -846,15 +872,20 @@ def test_stage2_heroes_and_plinths(build, manifest, tmp_path):
     assert 'f"cg.hero={r[\'hero\']}"' in src and 'f"cg.plinth={r[\'plinth_m\']}"' in src
 
 
-def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
+def test_stage2_props_replace_prototypes(build, manifest, tmp_path, monkeypatch):
     """AG8 over M15's prototype actors: an entry keyed by a prototype actor's key replaces
     it with its variants (transforms with a scale, an id per instance; plants as Nanite
     foliage without collision), a `drop` entry only removes one, a sign replaces its tile's
     sign prototypes through `replaces`, a holo-ad's image is a LOD chain on the `holo`
     master; the importer skips the replaced prototype actors."""
+    monkeypatch.setattr(U, "GROUP", False)       # (an actor per record; AG16's at the end)
     man = manifest[0]
     insts = sorted(i["key"] for i in man["instances"])
-    props_k = next(k for k in insts if k.startswith("prop."))
+    cats = {i["key"]: i["category"] for i in man["instances"]}
+    # (a prop that keeps its collision: AG16 drops it on awnings, AC units, wall lights and
+    # litter, `unreal.NO_COLLISION`)
+    props_k = next(k for k in insts if k.startswith("prop.") and
+                   cats[k] not in U.NO_COLLISION)
     plant_k = next(k for k in insts if k.startswith("plant."))
     drop_k = next(k for k in insts if k.startswith("prop.") and k != props_k)
     sign_k = next((k for k in insts if k.startswith("prop.sign.")), insts[-1])
@@ -927,6 +958,27 @@ def test_stage2_props_replace_prototypes(build, manifest, tmp_path):
     assert 'if inst["key"] in self.skip:' in src and "xf[4:7]" in src
     assert 'r.get("ids")' in src and "NaniteShapePreservation" in src
     assert src.count('if r.get("no_collision"):') == 2
+    # AG16, grouped (the default): each entry's parts on a group actor of the prototype's
+    # key (another class: deleted and created again), the signs in their tile's signs group
+    monkeypatch.setattr(U, "GROUP", True)
+    mg = U.build_manifest(staged)[0]
+    sg = mg["stage2"]
+    kg = U.actor_kinds(mg)
+    assert kg[props_k] == kg[plant_k] == "group" and not {drop_k, sign_k} & set(kg)
+    hold = {a["key"]: a.get("holder") for a in sg["actors"] + sg["instances"]}
+    assert hold[f"{props_k}.prop.test.civic.v0"] == props_k
+    assert hold["a.holo.slot.holo"].startswith("group.signs.t+00+00.c")
+    chg = U.manifest_changes(man, mg)
+    assert {props_k, plant_k} <= set(chg["created"]) & set(chg["deleted"])
+    assert sorted(set(chg["deleted"]) - set(chg["created"])) == sorted({drop_k, sign_k})
+    # no collision on the prop kinds no one touches
+    nc = [k for k in insts if cats[k] in U.NO_COLLISION]
+    assert nc
+    con = {"version": 1, "stage": "assetgen", "part": "props", "layer": 2,
+           "materials": props["materials"], "entries": [dict(props["entries"][0], key=nc[0])]}
+    m5 = U.build_manifest(_with_contributions(build, tmp_path / "nc", {"props": con}))[0]
+    (a5,) = [a for a in m5["stage2"]["instances"] if a["entry"] == nc[0]]
+    assert a5["no_collision"]
 
 
 @pytest.fixture(scope="module")
@@ -954,10 +1006,12 @@ def staged(small, build, manifest, tmp_path_factory):
     return out
 
 
-def test_stage2_from_assetgen(staged, manifest):
+def test_stage2_from_assetgen(staged, manifest, monkeypatch):
     """assetgen's real contributions for the small city: every building replaces its blockout
     actor by key, every `replaces` names a blockout object, one mesh per node of the packs,
-    and an import over the blockout's changes exactly the replaced keys and the new ones."""
+    and an import over the blockout's changes exactly the replaced keys and the new ones.
+    (With an actor per record; AG16's groups at the end.)"""
+    monkeypatch.setattr(U, "GROUP", False)
     man = manifest[0]
     m2, _, g2 = U.build_manifest(staged)
     s2 = m2["stage2"]
@@ -1012,6 +1066,26 @@ def test_stage2_from_assetgen(staged, manifest):
     assert era and all(v in {m["asset"] for m in s2["materials"].values()}
                        for a in era for v in a["materials"].values())
     assert _dump(U.build_manifest(staged)[0]) == _dump(m2)
+    # AG16, grouped (the default): every record a holder takes is a component of an actor the
+    # import makes (its entry's, its building's or its tile's group), the records otherwise
+    # as they were; far fewer actors, and an import over the blockout's makes exactly them
+    monkeypatch.setattr(U, "GROUP", True)
+    mg = U.build_manifest(staged)[0]
+    sg = mg["stage2"]
+    tops = {a["key"] for a in sg["actors"] if not a.get("holder")} | \
+        {g["key"] for g in sg["groups"]}
+    held = [r for r in sg["actors"] + sg["instances"] if r.get("holder")]
+    assert held and all(r["holder"] in tops for r in held)
+    assert all(r.get("holder") for r in sg["instances"])
+    assert [a["key"] for a in sg["actors"]] == [a["key"] for a in s2["actors"]]
+    assert len(tops) < len(s2keys) - len(s2["underwater"])
+    hg = U.actor_hashes(mg)
+    assert tops | {u["key"] for u in sg["underwater"]} <= set(hg)
+    assert not {r["key"] for r in held} & set(hg)
+    assert sum(g["members"] for g in sg["groups"]) + sum(
+        a.get("members", 0) for a in sg["actors"]) == len(held)
+    assert mg["counts"]["actors"] == len(hg)
+    assert _dump(U.build_manifest(staged)[0]) == _dump(mg)
 
 
 def test_stage2_takes_assetgen_parts(staged):
@@ -1032,11 +1106,18 @@ def test_stage2_takes_assetgen_parts(staged):
         assert a["key"] == f"{key}.{kind}" and a["xforms"] == p["xforms"]
         assert a["pivot"] == [float(v) for v in e["pivot"]] and a["cpd"] == e["cpd"]
         assert a["mesh"].endswith("/" + U.asset_name(p["node"]))
+    # (AG16: a mesh several tiles' part packs hold under one name is imported once, from
+    # the first of them by folder, `share_meshes`; a pack left with none goes)
     packs = {pk["glb"]: pk for pk in s2["packs"]}
-    for e, p in want.values():
-        pk = packs[f"{U.ASSETS_DIR}/{p['glb']}"]
-        assert pk["use"] == "part" and U.asset_name(p["node"]) in {m["asset"]
-                                                                  for m in pk["meshes"]}
+    folders = {pk["folder"]: pk for pk in s2["packs"]}
+    for (key, kind), (e, p) in want.items():
+        pk = packs.get(f"{U.ASSETS_DIR}/{p['glb']}")
+        assert pk is None or pk["use"] == "part"
+        mine = pk is not None and U.asset_name(p["node"]) in {m["asset"] for m in pk["meshes"]}
+        folder = got[(key, kind)]["mesh"].rsplit("/", 1)[0]
+        assert mine == (pk is not None and folder == pk["folder"])
+        assert folders[folder]["use"] == "part"
+    assert s2["counts"]["shared_meshes"] > 0
     assert {f"{con['part']}.{m}" for m in con["materials"]} <= set(s2["materials"])
     assert {"frame", "balcony", "dado"} <= set(con["materials"])
     assert sum(len(a["xforms"]) for a in got.values()) == sum(e.get("instances", 0)

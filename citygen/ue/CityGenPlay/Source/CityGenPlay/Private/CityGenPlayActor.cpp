@@ -707,6 +707,40 @@ void ACityGenPlay::UpdateUnderwater()
 	UnderwaterOn = On;
 }
 
+FString ACityGenPlay::GetLampReport(int32 Count) const
+{
+	const FVector View = ViewLocation();
+	TArray<TPair<double, int32>> Near;
+	for (int32 i = 0; i < LampPoints.Num(); ++i)
+	{
+		Near.Add(TPair<double, int32>(FVector::DistSquared(LampPoints[i], View), i));
+	}
+	Near.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
+	FString Out = TEXT("[");
+	for (int32 k = 0; k < FMath::Min(Count, Near.Num()); ++k)
+	{
+		const FVector P = LampPoints[Near[k].Value];
+		// the light standing under this lamp, if any
+		int32 Li = INDEX_NONE;
+		for (int32 j = 0; j < Lamps.Num(); ++j)
+		{
+			if (Lamps[j]->IsVisible() &&
+				FVector::Dist(Lamps[j]->GetComponentLocation(), P - FVector(0.0, 0.0, LampDropCm)) < 1.0)
+			{
+				Li = j;
+				break;
+			}
+		}
+		const USpotLightComponent* L = Li != INDEX_NONE ? Lamps[Li] : nullptr;
+		Out += FString::Printf(TEXT("%s{\"lamp\": %d, \"m\": %.1f, \"light\": %d, \"at\": [%.0f, %.0f, %.0f], "
+			"\"cd\": %.1f, \"shadows\": %s, \"registered\": %s}"),
+			k ? TEXT(", ") : TEXT(""), Near[k].Value, FMath::Sqrt(Near[k].Key) / 100.0, Li, P.X, P.Y, P.Z,
+			L ? L->Intensity : 0.f, (L && L->CastShadows) ? TEXT("true") : TEXT("false"),
+			(L && L->IsRegistered()) ? TEXT("true") : TEXT("false"));
+	}
+	return Out + TEXT("]");
+}
+
 FString ACityGenPlay::GetStatus() const
 {
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;

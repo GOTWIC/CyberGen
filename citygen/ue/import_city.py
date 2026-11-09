@@ -119,6 +119,7 @@ BAD_NAME_CHARS = "\"' ,/.:|&!~\n\r\t@#(){}[]=;^%$`"
 # the stage 2 packs being imported: glb path -> {asset name: the manifest's mesh record}
 PACK_PLAN = {}
 PACK_STEPS = []          # what the pack step did per pack (counts, for the result)
+PACK_BASE = [0]          # (the steps before this chunk's: its progress counts from there)
 TEXTURE_PLAN = {}        # texture file -> [(factory node setter, value)]
 TEXTURE_STEPS = []       # the texture files the texture step found in TEXTURE_PLAN
 
@@ -156,8 +157,8 @@ if hasattr(unreal, "InterchangePythonPipelineBase"):
             step = {"pack": source_datas[0].get_filename(), "nodes": len(nodes),
                     "matched": found, "skipped": 0}
             PACK_STEPS.append(step)
-            REPORT.update(len(PACK_STEPS), len(PACK_PLAN), detail="packs imported, their "
-                          "meshes building")
+            REPORT.update(len(PACK_STEPS) - PACK_BASE[0], len(PACK_PLAN),
+                          detail="packs imported, their meshes building")
             if found != len(plan):
                 # (a name this step cannot match: leave the pack as the generic pipeline
                 # made it; finish2 sets the settings and prune_meshes deletes the extras)
@@ -237,6 +238,16 @@ class Meshes:
 def let_go():
     """The objects nothing holds any more unloaded (the meshes saved and no longer used)."""
     unreal.SystemLibrary.collect_garbage()
+
+
+def actor_guids(actors):
+    """The World Partition guids of `actors` (each actor's `ActorGuid`, its descriptor's), or
+    None where the engine does not show them."""
+    try:
+        return [a.get_editor_property("actor_guid") for a in actors]
+    except Exception as ex:
+        log(f"actor guids: {ex}")
+        return None
 
 
 # progress lines `citygen unreal` draws as a bar (citygen.progress.MARKER and its Relay ops)
@@ -1754,6 +1765,7 @@ class Importer:
         step), then waited for: Interchange runs half the worker threads' worth at a time,
         and each mesh's build goes to the asset compiling pool as its import ends."""
         tasks = []
+        PACK_BASE[0] = len(PACK_STEPS)
         for pk, folder, entries, fresh in todo:
             glb = os.path.join(self.build, pk["glb"])
             PACK_PLAN[pack_key(glb)] = {m["asset"]: m for m in pk["meshes"]}
@@ -2453,7 +2465,7 @@ class Importer:
         update(a, h)
         self.add_sub("actors.update", time.perf_counter() - t0)
         if self.offload_n and created:
-            self.live.append(key)
+            self.live.append((key, a))
             if len(self.live) >= self.offload_n:
                 self.offload()
         return a
@@ -2464,14 +2476,19 @@ class Importer:
         through the editor's placement path labels the new actor uniquely by collecting the
         label of every actor in the world first, so a first import that keeps all its actors
         loaded spends time growing with the square of their number; few loaded, it stays
-        linear."""
+        linear. The actors are taken by their own guids, never by label: an actor whose class
+        changed (AG8's exact props over M15's instanced ones) is destroyed and made again
+        under the same label, its key, and the destroyed one's descriptor taken by label was
+        loaded back from disk once AG16's garbage collection had let go of it."""
         if not self.live:
             return
         t = time.perf_counter()
         self.save()
-        want = set(self.live)
         WPL = unreal.WorldPartitionBlueprintLibrary
-        guids = [d.guid for d in WPL.get_actor_descs() if str(d.label) in want]
+        guids = actor_guids([a for _, a in self.live])
+        if guids is None:              # (an engine whose actors do not show their guid)
+            want = {k for k, _ in self.live}
+            guids = [d.guid for d in WPL.get_actor_descs() if str(d.label) in want]
         if guids:
             WPL.load_actors(guids)          # (the library's references, then let go of them)
             WPL.unload_actors(guids)
@@ -2516,6 +2533,7 @@ class Importer:
                     if unstage(a, [c]):
                         self.stats["actors"]["unstaged"] = \
                             self.stats["actors"].get("unstaged", 0) + 1
+                        self.drop_members(a)
                     c.set_static_mesh(sm)
                     c.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location(origin, False, False)
@@ -2600,6 +2618,8 @@ class Importer:
                     doors + links + more
                 if grouped:
                     self.member_components(a, ms)
+                else:
+                    self.drop_members(a)
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
@@ -2690,6 +2710,18 @@ class Importer:
                 comp.set_material(i, mi)
         if r.get("no_collision"):
             comp.set_collision_profile_name("NoCollision")
+
+    def drop_members(self, a):
+        """An actor's member components (`cg.member`) taken off when it holds none any more:
+        an import back to the blockout, or one without groups (`CITYGEN_UE_GROUP=0`) over one
+        with them, would otherwise keep a building's parts and street front on it beside
+        the actors made for them."""
+        for c in a.get_components_by_class(unreal.PrimitiveComponent):
+            if "cg.member" in [str(t) for t in c.component_tags]:
+                self.member_components(a, [])
+                self.stats["actors"]["members_dropped"] = \
+                    self.stats["actors"].get("members_dropped", 0) + 1
+                return
 
     def member_components(self, a, recs):
         """AG16: the records an actor holds (the manifest's `holder`) as its own components:
@@ -3138,8 +3170,18 @@ class Importer:
             if isinstance(a, unreal.StaticMeshActor):
                 sm = a.static_mesh_component.static_mesh
                 mesh = sm.get_path_name() if sm else ""
-            rows.append([tags, mesh, [round(loc.x, 2), round(loc.y, 2), round(loc.z, 2),
-                                      round(rot.yaw, 3)]])
+            row = [tags, mesh, [round(loc.x, 2), round(loc.y, 2), round(loc.z, 2),
+                                round(rot.yaw, 3)]]
+            # (AG16: the records it holds as components, by key, so an import back to the
+            # blockout that kept a building's parts on it differs from the first)
+            members = sorted(
+                str(t)[7:] for c in a.get_components_by_class(unreal.PrimitiveComponent)
+                for t in c.component_tags
+                if str(t).startswith("cg.key=") and "cg.member" in
+                [str(x) for x in c.component_tags])
+            if members:
+                row.append(members)
+            rows.append(row)
         rows.sort()
         assets = []
         for folder in ("Meshes", "Props", "Materials", "Data", STAGE2_FOLDER):

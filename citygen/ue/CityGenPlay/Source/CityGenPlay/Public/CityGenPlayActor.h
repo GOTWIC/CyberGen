@@ -187,6 +187,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CityGen")
 	FString GetStatus() const;
 
+	/** The lit lamps nearest the view, a JSON array: lamp index, distance (m), light index,
+	 *  place (cm), intensity (cd), shadows (the benchmark logs it with each shot). */
+	FString GetLampReport(int32 Count = 12) const;
+
 	bool IsMapOpen() const { return bMapOpen; }
 	bool IsDevMenuOpen() const { return bDevOpen; }
 	bool IsFreeCam() const;
