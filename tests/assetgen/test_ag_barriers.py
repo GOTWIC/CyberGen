@@ -201,6 +201,36 @@ def test_small_city_runs_end_at_their_junctions():
     assert spans and ported
 
 
+def test_small_city_footbridge_railings_run_along_the_walk():
+    """M22's map leaves footbridges out: a footbridge's railings (the bridge piece's) run
+    along its walking surface (`roads.walk_span`, from the junction's outline at each end),
+    within it and starting at most a meter in (`FOOT_CLEAR_M` off the junction at the
+    railing's own offset), not from M22's cuts about 2 m further in, past the top of its
+    stairs."""
+    from assetgen import brief as B
+    from assetgen.streets import structures as ST
+    from assetgen.streets.ctx import Ctx
+    from assetgen.streets.roads import gather
+
+    model, _, _ = B.load_model(small_build() / "base")
+    cx = Ctx(model)
+    n = 0
+    for b in sorted(model.bridges, key=lambda b: b.id):
+        inp = ST.gather_bridge(cx, b).inputs
+        if not inp.get("rails"):
+            continue
+        ids = list(b.segment_ids) or ST._carriers(cx, b)
+        walk = gather(cx, cx.seg[ids[0]]).inputs.get("walk")
+        assert walk, b.id
+        for r in inp["rails"]:
+            assert r["spans"], (b.id, r["name"])
+            a, e = r["spans"][0][0], r["spans"][-1][1]
+            assert walk[0] - 1e-3 <= a < e <= walk[1] + 1e-3, (b.id, r, walk)
+            assert a - walk[0] < 1.0 and walk[1] - e < 1.0, (b.id, r, walk)
+            n += 1
+    assert n
+
+
 def test_a_prop_variant_keeps_off_the_carriageway():
     """AG8 draws the first variant of a prop's family that stands clear of the carriageways
     (#95); a bench on a road's centerline has none."""

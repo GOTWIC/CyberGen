@@ -2380,9 +2380,12 @@ outputs `docs/progress/AG17/`.
 - **Footbridges** (out of M22's map, which has no faces for them): a footbridge's road
   piece draws its walking surface on its own profile from where its line leaves the
   junction at each end (`roads.walk_span`, the junction's outline) and its girder under it,
-  the sides rising to the surface (no face draws a fascia there); the railings stay the
-  bridge piece's. Found on the materials golden: the first AG17 build left footbridges with
-  an open girder and no surface.
+  the sides rising to the surface (no face draws a fascia there); the bridge piece's
+  railings and stone parapets run along that surface too, each `FOOT_CLEAR_M` (0.15 m) off
+  the faces of the junction at its ends (corner pads too) at its own offset
+  (`barriers.road_runs`, #95's rule; M22's cuts fall about 2 m further in, past the top of
+  the stairs). Found on the materials golden: the first AG17 build left
+  footbridges with an open girder, no surface and their railings 2 m short at each end.
 - **AG8** (`props/gather.py`): props keep off the map's carriageway faces (`_Fit`, at the
   height of the nearest vertex); a raised junction's corner is its faces (`_RaisedCorners`:
   a standing thing in its reach at its height on no face of the map is left out, one on a
@@ -2399,18 +2402,18 @@ gap on main's water stage, Cragmouth's skybridge clearance and landings and a ro
 
 | City | Pieces | Triangles | Segments | Not drawn / open / twice | Steps | Strips | Clashes | Failing |
 |---|---|---|---|---|---|---|---|---|
-| Delta Megacity | 8,827 | 1,586,006 | 196,763 | 0 / 0 / 0 | 0 | 0 | 0 | asset_envelope, asset_unique, asset_grounded |
-| Vesper Bay | 9,019 | 1,457,545 | 210,886 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Saltreach Free Port | 5,484 | 815,404 | 118,555 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Nexus City | 9,617 | 1,469,552 | 223,841 | 0 / 0 / 0 | 0 | 0 | 0 | water_gaps |
-| Greyhook | 4,450 | 833,621 | 128,893 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Vesper Bay Pinned | 9,817 | 1,459,331 | 219,929 | 0 / 0 / 0 | 0 | 0 | 0 | asset_unique |
-| Vesper Bay Stacks | 9,790 | 1,488,007 | 217,981 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Vesper Bay Decks | 9,945 | 1,605,858 | 219,812 | 0 / 0 / 0 | 0 | 0 | 0 | none |
-| Cragmouth | 11,119 | 1,803,407 | 228,098 | 0 / 0 / 0 | 0 | 0 | 0 | asset_clearance, asset_landings, asset_grounded |
+| Delta Megacity | 8,827 | 1,586,582 | 196,763 | 0 / 0 / 0 | 0 | 0 | 0 | asset_envelope, asset_unique, asset_grounded |
+| Vesper Bay | 9,019 | 1,457,809 | 210,886 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Saltreach Free Port | 5,484 | 815,542 | 118,555 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Nexus City | 9,617 | 1,471,296 | 223,841 | 0 / 0 / 0 | 0 | 0 | 0 | water_gaps |
+| Greyhook | 4,450 | 833,821 | 128,893 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Pinned | 9,817 | 1,459,583 | 219,929 | 0 / 0 / 0 | 0 | 0 | 0 | asset_unique |
+| Vesper Bay Stacks | 9,790 | 1,488,107 | 217,981 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Vesper Bay Decks | 9,945 | 1,606,122 | 219,812 | 0 / 0 / 0 | 0 | 0 | 0 | none |
+| Cragmouth | 11,119 | 1,803,719 | 228,098 | 0 / 0 / 0 | 0 | 0 | 0 | asset_clearance, asset_landings, asset_grounded |
 
 Delta before (M22's main) and after: 8,827 street pieces both; 1,288,343 triangles to
-1,586,006 (roads 261,668 to 357,973, junctions 217,036 to 362,476, sidewalks 346,999 to
+1,586,582 (roads 261,668 to 357,973, junctions 217,036 to 362,476, sidewalks 346,999 to
 373,423, crosswalks 20,202 to 50,284); roads inside their junctions with no mesh 8 to 246
 (the clusters' inner roads); corner pads 3,248 (269 left out) to 3,594 (none). The
 watertight check on M22's own packs: 361,103 sides of shared segments not drawn, 29,306

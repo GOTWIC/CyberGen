@@ -52,6 +52,7 @@ from .path import Path, dist, seg_cross, unit
 RAISED_M = 0.5          # a junction this far over its ground stands on a slab of its own
 XWALK_CLEAR_M = 1.0     # a run keeps this off a crosswalk on its road
 MIN_SPAN_M = 1.0        # shorter spans are left out
+FOOT_CLEAR_M = 0.15     # a footbridge's railing keeps this off the junctions at its ends (#95)
 END_M = 3.0             # a jersey's ramped end
 TOE_F = 0.12            # ... down to this share of its height
 CORNER_MIN_M = 2.0      # an at-grade corner shorter than this carries no guard wall
@@ -601,6 +602,11 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
         return []
     cuts = inputs.get("cuts") or list(cx.cuts.get(s.id, (0.0, 0.0)))
     s0, s1 = cuts[0], P.L - cuts[1]
+    if inputs.get("walk"):
+        # (a footbridge, out of M22's map: its railings run along its walking surface from
+        # the junction's outline at each end, `roads.walk_span`; M22's cuts fall further in,
+        # past the top of its stairs)
+        s0, s1 = inputs["walk"]
     if s1 - s0 < MIN_SPAN_M:
         return []
     by = set() if by is None else by
@@ -623,6 +629,15 @@ def road_runs(cx, s, inputs: dict, runs: list[Run] | None = None,
             cid, g = xs[k]
             xws.append(g)
             by.add(cid)
+    if inputs.get("walk"):
+        # (each footbridge railing keeps `FOOT_CLEAR_M` off the junctions at its ends at its
+        # own offset, as #95 kept it: their faces of the map, corner pads too, else outline)
+        for nid in (s.start, s.end):
+            j = cx.junction_at.get(nid)
+            if j is not None:
+                g = _faces_union(cx, j.id, FOOT_CLEAR_M)
+                xws.append(g if g is not None else
+                           G.from_model_poly(j.polygon).buffer(FOOT_CLEAR_M))
     own = _faces_union(cx, s.id)
     out = []
     for run in runs:
@@ -680,9 +695,9 @@ def _crosswalks(cx):
     return got
 
 
-def _faces_union(cx, sid: str):
-    """The union of a road's faces of the map (all of them: its sidewalk bands too), meters,
-    grown by `OWN_PAD_M`; None without any."""
+def _faces_union(cx, sid: str, pad: float = OWN_PAD_M):
+    """The union of a road's (or a junction's) faces of the map (all of them: its sidewalk
+    bands, corner pads too), meters, grown by `pad`; None without any."""
     PI = cx.pave
     if not PI.on:
         return None
@@ -698,7 +713,7 @@ def _faces_union(cx, sid: str):
     if not gs:
         return None
     with G.canonical():
-        return G.qpoly(G.union([G.qpoly(g) for g in gs]).buffer(OWN_PAD_M))
+        return G.qpoly(G.union([G.qpoly(g) for g in gs]).buffer(pad))
 
 
 def _band(P: Path, t0: float, t1: float, s0: float, s1: float):
