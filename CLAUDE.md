@@ -2040,8 +2040,19 @@ AG14 (fit and finish, from the first run-through) is in place (tests
   `_Tops`) and ground plants with their foot's middle 5 cm into the ground (`_seat`).
   `asset_clash` also fails on a sidewalk, junction corner or median over a carriageway at
   its height (`fit/strips.py`).
+- **Grounded rule** (#105): a thing rests on three of its five feet (`fit.build.rest_gaps`,
+  the third smallest gap; a frame's own top never holds it up); #89's railings and shrubs
+  fail with no foot on their surface, reported on fewer than three. AG4 seats every roof
+  part on all its feet on the roof the shell drew (`roofs.Stand`: items laid out and tested
+  with their frames, `_lay`, moved in 0.25 m at a time up to 6 m, `_inward`; huts, vents and
+  skylights only where they stand). `GEN_VERSION` fix105.1.
+- **One-building fixes** (#144): `rings.tidy` closes a spike the way that keeps nearest the
+  outline; open sheds roofed and columned in their cladding, thumbnails drawing pillars and
+  roof equipment; type clutter off the corridors; a skybridge end over 1.5 m from every wall
+  lands on a roof (`connections.wall_of`, `on_roof`) or none. `GEN_VERSION` fix144.1.
 Results: `docs/progress/AG14/`; the sky tube fixes: `docs/progress/sky_tubes/`; the junctions
-fix: `docs/progress/fix_junctions/`.
+fix: `docs/progress/fix_junctions/`; the grounded rule: `docs/progress/fix_grounded/`; the
+one-building fixes: `docs/progress/fix_one_building/`.
 
 AG15 (cyberpunk facades and night, from the first run-through) is in place (tests
 `tests/assetgen/test_ag_night.py`):

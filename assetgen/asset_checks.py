@@ -569,7 +569,8 @@ def landings(records: dict, skybridges: dict | None = None) -> dict:
     """AG4: a landing door in each building a skybridge meets (`connections.landings`), and
     every skybridge an asset of its own (the skybridge stage's records). An end that lands
     in an open portal, or at the ground floor where the street front meets it (M13's
-    slopes), needs none; one that meets no wall of the building, or whose deck is
+    slopes), or on a roof of the building at its deck (#144: a podium's open deck, `roof`),
+    needs none; one that meets no wall of the building, or whose deck is
     on no floor line of the mass it meets (M3's floor grids apart), is counted apart, the
     city's to change; a failure is a landing on a floor line that got no door."""
     n = doors = 0
@@ -588,6 +589,7 @@ def landings(records: dict, skybridges: dict | None = None) -> dict:
     ok = why.get("no_room", 0) == 0
     return {"name": "asset_landings", "ok": ok, "landings": n, "doors": doors,
             "into_portal": why.get("portal", 0), "at_ground": why.get("ground", 0),
+            "on_roof": why.get("roof", 0),
             "no_edge": why.get("no_edge", 0), "off_floor": why.get("off_floor", 0),
             "no_room": why.get("no_room", 0),
             "skybridges": len(skybridges or {}), "first": first}

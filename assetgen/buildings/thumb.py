@@ -38,7 +38,11 @@ SUN = (0.42, -0.58, 0.70)       # toward the sun
 DRAWN = ("balcony", "fin", "shade", "panel", "member", "pod", "ac", "dish", "column",
          "canopy", "shutter", "balconette", "mast",
          # AG15: honeycombs, folded glass, mesh screens, media screens, logos, LED strips
-         "hex", "fold", "mesh", "media", "logo", "led")
+         "hex", "fold", "mesh", "media", "logo", "led",
+         # #144: what an open shed or a roof shows (AG5's pillars, AG4's roof equipment):
+         # an open shed drew as its roof plane alone, so two of one size drew alike
+         "pillar", "ac_unit", "water_tank", "antenna", "pad", "hut", "dunnage",
+         "roof_vent", "skylight")
 # AG15's night thumbnail: what glows (the neon master's slots), the glass whose rooms light
 # by the building's night (`night.lit`), the rest dark
 NIGHT_DARK = 0.012
