@@ -435,3 +435,71 @@ def test_cli_build_fails_on_failed_check(tmp_path, capsys):
 def test_variant_zero_is_default():
     spec = validate_spec(copy.deepcopy(SMALL)).filled
     assert build_variant(spec, set(), 0).variant == 0
+
+
+# --- every part of the map's water a body's (#140) -------------------------------------------
+
+def test_water_pieces_give_every_part_of_the_water_a_body():
+    """A river's piece the map's edge cuts off stays the river's (a further piece of it),
+    land the opening took beside the sea joins the sea and beside the river the river (no
+    body holds them: the nearest), and so does a sliver along the shore."""
+    from shapely.geometry import LineString
+
+    from citygen.build import piece_line, water_pieces
+
+    canvas = box(0, 0, 1000, 1000)
+    sea = box(0, 0, 1000, 200)
+    main_ = box(480, 200, 540, 1000)
+    cut = box(940, 700, 1000, 760)           # the river back from beyond the east edge
+    by_sea = box(100, 200, 140, 260)         # land the opening took
+    by_river = box(540, 500, 580, 540)
+    sliver = box(300, 200, 330, 201)
+    line = LineString([(510, 200), (510, 900), (700, 1100), (1050, 900), (970, 730),
+                       (1050, 600)])
+    river = H.WaterBody("r01", "river", "River", line, [60.0] * 6,
+                        G.union([main_, cut]), mouth="sea")
+    water = G.union([sea, main_, cut, by_sea, by_river, sliver])
+    h = H.Hydro(canvas=canvas, sea=sea, bodies=[river], islands=[], rings=Polygon(),
+                water=water, land=G.diff(canvas, water))
+    sea2, pieces = water_pieces(h, sea, {"r01": main_})
+    assert G.area(sea2) == G.area(sea) + G.area(by_sea) + G.area(sliver)
+    first, extra = pieces["r01"][0], pieces["r01"][1:]
+    assert G.area(first) == G.area(main_) + G.area(by_river)
+    assert len(extra) == 1 and G.area(extra[0]) == G.area(cut)
+    kept = G.union([sea2, *pieces["r01"]])
+    assert G.area(G.diff(water, kept)) == 0.0
+    # (the cut-off piece's centerline: its stretch of the river's, the way the river runs)
+    pts, ws = piece_line([tuple(p) for p in line.coords], [60.0] * 6, extra[0])
+    assert len(pts) >= 3 and ws == [60.0] * len(pts)
+    assert all(extra[0].buffer(0.02).contains(Point(p)) for p in pts)
+    s = [line.project(Point(p)) for p in pts]
+    assert s == sorted(s)
+
+
+def test_nexus_river_keeps_its_piece_past_the_map_edge():
+    """Nexus City's Kurosawa River (hydrology variant 11, the city's) leaves the map at its
+    east edge and comes back: the model kept only its larger piece, so its first stretch in
+    the north-east was water of no body, which AG12 drew nothing over. That piece is a river
+    row of its own (`rv.kurosawa_river.part2`, running off the map), and no part of the map's
+    water is outside the sea and the bodies (but crumbs of the model's 1 cm rounding)."""
+    from citygen import ids
+    from citygen.validate import load_spec
+
+    r = load_spec(ROOT / "docs" / "progress" / "M1a2" / "nexus_city" / "city_spec.json")
+    b = build_variant(r.filled, {d.name for d in r.spec.districts if d.area_share is not None},
+                      11)
+    m = b.model
+    parts = [x for x in [*m.rivers, *m.channels] if x.attrs.get("part")]
+    assert [(x.name, x.attrs["part"], x.mouth, x.flows_into) for x in parts] == \
+        [("Kurosawa River", 2, "edge", None)]
+    poly = G.from_model_poly(parts[0].polygon)
+    assert G.area(poly) > 30_000.0
+    assert poly.buffer(0.05).covers(shapely.geometry.LineString(parts[0].centerline))
+    kept = G.union([G.from_model_poly(p) for s in m.seas for p in s.polygons] +
+                   [G.from_model_poly(x.polygon) for x in [*m.rivers, *m.channels]])
+    left = [G.area(p) for p in G.parts(G.diff(b.hydro.water, kept))]
+    assert max(left, default=0.0) < 0.5, sorted(left)[-3:]
+    _, names = ids.rename(m)
+    river = next(x for x in m.rivers if x.name == "Kurosawa River" and not x.attrs.get("part"))
+    assert names[river.id] == "rv.kurosawa_river"
+    assert names[parts[0].id] == "rv.kurosawa_river.part2"

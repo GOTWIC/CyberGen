@@ -89,6 +89,115 @@ def _district_ids(spec: CitySpec) -> dict[str, str]:
     return {d.name: f"d{i + 1:02d}" for i, d in enumerate(spec.districts)}
 
 
+WATER_CRUMB_M2 = 0.01    # #140: water outside every body smaller than this is the grid's
+
+
+def water_pieces(h: H.Hydro, sea, firsts: dict) -> tuple[object, dict]:
+    """#140: every part of the map's water (`h.water`) goes to a water body.
+
+    `firsts` holds each body's main piece (its polygon on the map's water less the sea, its
+    largest part). The water outside the sea and those pieces (a body's other parts, as a
+    river that leaves the map and comes back; land the hydrology's opening took between the
+    bodies or beside one, down to a sliver along a shore) joins the water whose piece it
+    touches (the one holding most of it, as the sea or a body's polygon on the map's water,
+    ties by id; again while parts join, so a part touching only another part follows it).
+    A part touching none goes to the water holding most of it, else to the nearest, ties by
+    id (the road stage's rule for the parts it takes as water, `roads.Net`): it is a further
+    piece of the body (a river that leaves the map and comes back). Returns the sea and each
+    body's pieces, the main one first."""
+    out = {i: [p] for i, p in firsts.items()}
+    rest = [p for p in G.parts(G.diff(h.water, G.union([sea, *firsts.values()])))
+            if G.area(p) >= WATER_CRUMB_M2]
+    waters = []
+    s0 = G.polygonal(h.sea.intersection(h.water))
+    if not s0.is_empty:
+        waters.append(("sea", s0))
+    for b in h.bodies:
+        poly = G.polygonal(b.polygon.intersection(h.water))
+        if not poly.is_empty:
+            waters.append((b.id, poly))
+    if not rest or not waters:
+        return sea, out
+
+    def held(part, w) -> float:
+        return G.area(G.inter(part, w[1]))
+
+    at = {"sea": [sea] if not sea.is_empty else []}
+    at.update({i: [p] for i, p in firsts.items()})
+    to: dict[str, list] = {}
+    todo = rest
+    while todo:
+        left = []
+        for part in todo:
+            near = [w for w in waters if any(G.dist(g, part) <= 0.01 for g in at.get(w[0], []))]
+            if not near:
+                left.append(part)
+                continue
+            best = min(near, key=lambda w: (-held(part, w), w[0]))
+            to.setdefault(best[0], []).append(part)
+            at.setdefault(best[0], []).append(part)
+        if len(left) == len(todo):
+            break
+        todo = left
+    for part in todo:
+        best = min(waters, key=lambda w: (-held(part, w), w[0]))
+        if held(part, best) < 1.0:
+            best = min(waters, key=lambda w: (G.dist(w[1], part), w[0]))
+        to.setdefault(best[0], []).append(part)
+    with G.canonical():
+        for wid in sorted(to):
+            parts = to[wid]
+            if wid == "sea":
+                sea = G.clean(G.union([sea, *parts]))
+                continue
+            first = firsts.get(wid)
+            ps = G.parts(G.clean(G.union([first, *parts] if first is not None else parts)))
+            k = 0 if first is None else \
+                max(range(len(ps)), key=lambda i: G.area(G.inter(ps[i], first)))
+            out[wid] = [ps[k]] + [p for i, p in enumerate(ps) if i != k]
+    return sea, out
+
+
+def piece_line(line: list, widths: list, piece) -> tuple[list, list]:
+    """#140: a body's centerline and widths within one of its further pieces: the longest
+    stretch of the line inside it, the way the line runs; where the line misses the piece, a
+    line along its longer side through its middle at the body's narrowest width."""
+    from shapely.geometry import LineString, Point
+
+    L = LineString(line)
+    cut = L.intersection(piece)
+    segs = [g for g in getattr(cut, "geoms", [cut]) if g.geom_type == "LineString"
+            and not g.is_empty]
+    segs = [g for g in segs if g.length > 0.01]
+    if not segs:
+        x0, y0, x1, y1 = piece.bounds
+        cx, cy = G.q((x0 + x1) / 2.0), G.q((y0 + y1) / 2.0)
+        pts = [(G.q(x0), cy), (G.q(x1), cy)] if x1 - x0 >= y1 - y0 else \
+            [(cx, G.q(y0)), (cx, G.q(y1))]
+        return pts, [G.q(min(widths))] * 2
+    best = max(segs, key=lambda g: (round(g.length, 6), [round(c, 2) for p in g.coords
+                                                          for c in p]))
+    pts = []
+    for x, y in best.coords:
+        p = (G.q(x), G.q(y))
+        if not pts or p != pts[-1]:
+            pts.append(p)
+    cum = [0.0]
+    for (ax, ay), (bx, by) in zip(line, line[1:]):
+        cum.append(cum[-1] + ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5)
+    s = [L.project(Point(p)) for p in pts]
+    if s[-1] < s[0]:
+        pts, s = pts[::-1], s[::-1]
+    ws = []
+    for v in s:
+        k = max(0, min(len(cum) - 2, next((i for i in range(len(cum) - 1)
+                                           if cum[i + 1] >= v), len(cum) - 2)))
+        t = 0.0 if cum[k + 1] <= cum[k] else min(1.0, max(0.0, (v - cum[k]) /
+                                                          (cum[k + 1] - cum[k])))
+        ws.append(G.q(widths[k] + (widths[k + 1] - widths[k]) * t))
+    return pts, ws
+
+
 def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
              explicit: set[str], sites: list | None = None,
              roads: RD.RoadNet | None = None, local: LC.Local | None = None,
@@ -119,27 +228,43 @@ def assemble(spec: CitySpec, h: H.Hydro, lay: D.Layout, ww: W.Waterways,
                         "landmass_id": lm_ids.get(k),
                         "attrs": {"target_area_m2": round(isl.target_m2, 1)}})
     sea = G.clean(h.sea.intersection(h.water))
-    seas = [{"id": "sea", "name": spec.water.coast.name, "polygons": G.to_model_polys(sea)}] \
-        if not sea.is_empty else []
-    rivers, channels = [], []
+    firsts = {}
     for b in h.bodies:
         poly = b.polygon
         if b.kind != "separation":
             poly = unary_union([poly] + [r for r in G.parts(h.rings) if r.intersects(poly)])
         poly = G.clean(poly.intersection(h.water).difference(sea))
         part = G.parts(poly)
-        if not part:
-            continue
+        if part:
+            firsts[b.id] = part[0]
+    sea, pieces = water_pieces(h, sea, firsts)
+    seas = [{"id": "sea", "name": spec.water.coast.name, "polygons": G.to_model_polys(sea)}] \
+        if not sea.is_empty else []
+    rivers, channels = [], []
+    for b in h.bodies:
         line = G.line_coords(b.centerline)
         widths = list(b.widths)[:len(line)] + [b.widths[-1]] * max(0, len(line) - len(b.widths))
-        base = {"id": b.id, "centerline": line, "width_m": widths, "polygon": P(part[0]),
-                "attrs": {k: v for k, v in b.attrs.items() if not k.startswith("_")}}
-        if b.kind == "river":
-            rivers.append({**base, "name": b.name, "mouth": b.mouth, "flows_into": b.flows_into})
-        else:
-            channels.append({**base, "name": b.name, "kind": b.kind,
-                             "type": f"channel.{b.kind}",
-                             "river_id": b.parent_id, "flows_into": b.flows_into})
+        attrs = {k: v for k, v in b.attrs.items() if not k.startswith("_")}
+        for k, piece in enumerate(pieces.get(b.id, [])):
+            mouth, flows_into = b.mouth, b.flows_into
+            if k == 0:
+                base = {"id": b.id, "centerline": line, "width_m": widths,
+                        "polygon": P(piece), "attrs": attrs}
+            else:
+                # #140: a further piece of the body on the map (a river that leaves the map
+                # and comes back): its stretch of the centerline; cut off by the map's edge,
+                # it runs off the map there
+                pl, pw = piece_line(line, widths, piece)
+                base = {"id": f"{b.id}.part{k + 1}", "centerline": pl, "width_m": pw,
+                        "polygon": P(piece), "attrs": {**attrs, "part": k + 1}}
+                if G.dist(h.canvas.exterior, piece) < 0.05:
+                    mouth, flows_into = "edge", None
+            if b.kind == "river":
+                rivers.append({**base, "name": b.name, "mouth": mouth, "flows_into": flows_into})
+            else:
+                channels.append({**base, "name": b.name, "kind": b.kind,
+                                 "type": f"channel.{b.kind}",
+                                 "river_id": b.parent_id, "flows_into": flows_into})
     waterways = [{"id": w.id, "type": f"waterway.{w.style}", "kind": w.kind, "name": w.name,
                   "district_id": did[w.district],
                   "centerline": G.line_coords(w.centerline) if w.centerline is not None else [],
