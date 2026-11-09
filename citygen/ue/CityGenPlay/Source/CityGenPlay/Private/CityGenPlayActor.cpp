@@ -30,9 +30,12 @@ DEFINE_LOG_CATEGORY_STATIC(LogCityGenPlay, Log, All);
 namespace
 {
 	constexpr double LampEvery = 0.2;         // s between choosing the lamps that get lights
+	constexpr double UnderwaterEvery = 0.25;  // s between switching the underwater volumes
+	constexpr double UnderwaterNearCm = 100.0; // past a volume's blend radius, still on
 	constexpr double StreamWaitMax = 90.0;    // s a teleported player is held at most
 	constexpr float FlyClearance = 3000.f;    // cm over the walkway a flying teleport keeps
 	const FName SunKey(TEXT("cg.key=lighting.sun"));
+	const FName UnderwaterTag(TEXT("cg.type=underwater"));
 	const FName SkyKey(TEXT("cg.key=lighting.sky"));
 }
 
@@ -669,6 +672,39 @@ void ACityGenPlay::Tick(float DeltaSeconds)
 		LampsAt = Now;
 		UpdateLamps();
 	}
+	if (UnderwaterAt < 0.0 || Now - UnderwaterAt > UnderwaterEvery)
+	{
+		UnderwaterAt = Now;
+		UpdateUnderwater();
+	}
+}
+
+void ACityGenPlay::UpdateUnderwater()
+{
+	// AG16: the engine weighs every enabled post-process volume against the view every frame
+	// by its brush's distance (a physics query each): AG12's 660 underwater volumes of Delta
+	// Megacity took 1.3 to 1.5 ms of the game thread a frame. Only a volume within its blend
+	// radius of the view stays enabled (a box test a few times a second); the rest the engine
+	// skips at once (`DoPostProcessVolume`: a disabled volume returns first)
+	const FVector View = ViewLocation();
+	int32 On = 0;
+	for (TActorIterator<APostProcessVolume> It(GetWorld()); It; ++It)
+	{
+		APostProcessVolume* V = *It;
+		if (V == NightVolume || !V->Tags.Contains(UnderwaterTag))
+		{
+			continue;
+		}
+		const FBox Box = V->GetComponentsBoundingBox(true);
+		const double D = FMath::Sqrt(Box.ComputeSquaredDistanceToPoint(View));
+		const bool bOn = D <= double(V->BlendRadius) + UnderwaterNearCm;
+		if (bool(V->bEnabled) != bOn)
+		{
+			V->bEnabled = bOn;
+		}
+		On += bOn ? 1 : 0;
+	}
+	UnderwaterOn = On;
 }
 
 FString ACityGenPlay::GetStatus() const
