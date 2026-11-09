@@ -440,13 +440,12 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         fl = np.where(P[:, 2] + R >= fl, fl, np.nan)     # (nan over the water too)
         zs = np.fmax(S.under(P, R, ex), fl)
         g = (P[:, 2] - zs).reshape(-1, 5)
-        ok = g <= GAP_M
+        # (a thing rests where three of its five feet do: its gap is the third smallest
+        # of its feet's, a foot with no surface under it counting as none; #105: the
+        # smallest let one foot on a surface hold the rest up)
+        third = np.sort(np.where(np.isnan(g), np.inf, g), axis=1)[:, 2]
         for j, i in enumerate(ids):
-            row = g[j]
-            if ok[j].sum() >= 3:
-                gaps[i] = float(np.nanmax(np.where(ok[j], row, -np.inf)))
-            else:
-                gaps[i] = float(np.nanmin(row)) if not np.all(np.isnan(row)) else np.inf
+            gaps[i] = float(third[j])
     steps = seams(pk, model)
     floating = [i for i in range(len(things)) if not gaps[i] <= GAP_M]
     by_what: dict[str, list] = defaultdict(lambda: [0, 0])
