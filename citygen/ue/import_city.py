@@ -858,7 +858,8 @@ def hour(m, x, y):
                 parameter_name="Hour")
 
 
-LIGHT_POOL_VERSION = "2"
+LIGHT_POOL_VERSION = "4"            # 3, 4: PoolStrength 0.2, then 0.08, as the lamps
+                                    # (a near-white disc at 1.0)
 LIGHT_POOL_CODE = """
 float2 d = UV * 2.0 - 1.0;
 float r = saturate(1.0 - dot(d, d));
@@ -886,7 +887,7 @@ def light_pool_material():
     link(uv, "", fall, "UV")
     col = expr(m, unreal.MaterialExpressionVectorParameter, -650, 200,
                parameter_name="PoolColor", default_value=unreal.LinearColor(1.0, 0.7, 0.42, 1.0))
-    st = sparam(m, "PoolStrength", -650, 320, 1.0)
+    st = sparam(m, "PoolStrength", -650, 320, 0.08)
     nt = night(m, -650, 400)
     k = custom(m, -400, 200, "return Col.rgb * Fall * Strength * Night;",
                ["Col", "Fall", "Strength", "Night"], cmot(F3), "CgPoolEmit")

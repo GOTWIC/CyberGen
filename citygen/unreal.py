@@ -62,8 +62,12 @@ from . import progress as PG
 MANIFEST_VERSION = 1
 OUT_DIR = "unreal"            # BUILD_DIR/unreal (beside corporate_core_plan.json)
 CONTENT_ROOT = "/Game/CityGen"
-EMISSIVE = {"prop_light": 6.0, "prop_neon": 10.0, "prop_signal": 2.0, "sign_ad": 6.0,
-            "sign_banner": 6.0, "sign_rim": 8.0, "sign_holo": 4.0}   # (M20: the large ads)
+# What glows, set against the play features' fixed night exposure (-3 EV100, about 6.7 times
+# the scene), under which an emissive much over 1 clips to white: a sign's text and a neon
+# tube's color are lost in it (Swagnik, 2026-11-09: the lamps and neon too harsh, the text
+# on the signs unreadable). The blockout's (M20: the large ads):
+EMISSIVE = {"prop_light": 2.0, "prop_neon": 1.25, "prop_signal": 2.0, "sign_ad": 0.75,
+            "sign_banner": 0.75, "sign_rim": 1.0, "sign_holo": 0.6}
 ROUGHNESS = {"sea": 0.35, "water": 0.35, "prop_glass": 0.2}  # else 0.85, as in Blender
 DOME_STEPS = [(1.0, 0.0), (0.92388, 0.382683), (0.707107, 0.707107), (0.382683, 0.92388)]
 PLAYER_Z_M = 1.2              # player start above the walkway (capsule half height 0.96 m)
@@ -518,7 +522,26 @@ STAGE2_FOLDER = "Assets"                    # under the city's content root
 # read a color at each: AG1's wall, trim, glass, roof, spandrel and patch tints)
 TINT_CPD = (0, 8, 11, 14, 17, 20)
 SRGB_PARTS = ("streets", "water")          # AG7 and AG12 write their slot colors as sRGB
-EMISSIVE2 = {"neon": 8.0, "emissive": 4.0, "holo": 3.0}  # a master's instances' emissive
+# a master's instances' emissive (as EMISSIVE, for the night's exposure; neon and the
+# holo-ads were 8 and 3, the plain emissive 4)
+EMISSIVE2 = {"neon": 1.0, "emissive": 2.0, "holo": 0.6}
+# assetgen's own strengths (AG6: a sign page's SignStrength 4, an ad page's 2, a holo-ad's
+# Emissive 3) scaled for the same exposure here, so stage 2's bytes stay as they are
+SIGN_GLOW = 0.125
+HOLO_GLOW = 0.2
+
+
+def _glow(master: str, scalars: dict) -> dict:
+    """A stage 2 material's scalars with its glow scaled for Unreal's night (`SIGN_GLOW`,
+    `HOLO_GLOW`)."""
+    out = {}
+    for k, v in sorted(scalars.items()):
+        if k == "SignStrength":
+            v = round(v * SIGN_GLOW, 6)
+        elif k == "Emissive" and master == "holo":
+            v = round(v * HOLO_GLOW, 6)
+        out[k] = v
+    return out
 # AG6: textures imported once per project (the shared library, `set.` and `atlas.`) or per
 # city (its sign pages, `city.`), by pixel hash
 TEXTURE_FOLDER_CORE = "Textures"            # under CONTENT_ROOT/Core
@@ -655,7 +678,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 mats[f"{part}.{name}"].update(
                     textures={k: {"texture": t, "hash": textures[t]["hash"]}
                               for k, t in sorted((p.get("textures") or {}).items())},
-                    scalars=dict(sorted((p.get("scalars") or {}).items())),
+                    scalars=_glow(p["master"], p.get("scalars") or {}),
                     vectors=dict(sorted((p.get("vectors") or {}).items())))
         for e in c["entries"]:
             k = e["key"]

@@ -118,18 +118,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	float LampOuterConeDeg = 78.f;
 
+	/** 0.08 of the run-through's 1,500 and 400 (Swagnik, 2026-11-09): under the night's
+	 *  fixed exposure those left near-white pools on the road. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float StreetLampCandela = 1500.f;
+	float StreetLampCandela = 120.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WallLampCandela = 400.f;
+	float WallLampCandela = 32.f;
 
 	/** How many of the large signs nearest the camera wash their facade with a light. */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	int32 WashLights = 32;
 
+	/** (600 before 2026-11-09: it painted whole facades in the sign's color) */
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
-	float WashCandela = 600.f;
+	float WashCandela = 120.f;
 
 	UPROPERTY(EditAnywhere, Category = "CityGen|Settings")
 	float WashRadiusM = 25.f;
