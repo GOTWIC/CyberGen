@@ -1606,3 +1606,15 @@ def test_water_master_links_single_layer_water_by_ue58_names():
     assert m.props["shading_model"] == "MSM_DEFAULT_LIT" and logged
     made = [e for e in mel.made if e.name == slw]
     assert made and made == mel.deleted
+
+
+def test_glow_set_for_the_night():
+    """What glows is set against the play features' night exposure (Swagnik, 2026-11-09:
+    lamps and neon too harsh, a sign's text unreadable): assetgen's sign and holo-ad
+    strengths scaled in the manifest, every other scalar as assetgen gave it."""
+    assert U._glow("sign", {"SignStrength": 4.0, "Masked": 0.0}) == {
+        "Masked": 0.0, "SignStrength": 0.5}
+    assert U._glow("holo", {"Emissive": 3.0, "Opacity": 0.6, "Textured": 1.0}) == {
+        "Emissive": 0.6, "Opacity": 0.6, "Textured": 1.0}
+    assert U._glow("neon", {"Emissive": 3.0, "TileM": 2.0}) == {"Emissive": 3.0, "TileM": 2.0}
+    assert max(U.EMISSIVE2.values()) <= 2.0 and max(U.EMISSIVE.values()) <= 2.0

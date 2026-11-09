@@ -270,9 +270,9 @@ imports without the play features.
   rectangle of its corners, the walkway points, the lamp heads and kinds, the sign wash
   points and colors, district label points, `MPC_CityGen`, `M_CgLightPool`; settings
   (minimap radius 250 m, free camera speed 30 m/s; AG15: `LampLights` 192 spot lights of
-  `StreetLampCandela` 1,500 cd and `WallLampCandela` 400, `ShadowedLamps` 8,
+  `StreetLampCandela` 120 cd and `WallLampCandela` 32, `ShadowedLamps` 8,
   `LampRadiusM` 30, `LampDropCm` 45, cones `LampInnerConeDeg` 50 and `LampOuterConeDeg` 78,
-  `LampPools` 768 decals of `PoolRadiusM` 7, `WashLights` 32 of `WashCandela` 600 and
+  `LampPools` 768 decals of `PoolRadiusM` 7, `WashLights` 32 of `WashCandela` 120 and
   `WashRadiusM` 25, `NightHour` 21; night exposure -3 EV100, the moon at 3% of the sun,
   start at night, show the minimap) are its properties, editable on the actor in the level.
   `CityGen.Status` also gives `lamps_shadowed` and `light_pools`.
@@ -795,7 +795,15 @@ import over an earlier one updates the street actors and meshes in place.
   hidden actor's components do not render; the actor now sets `SetHidden(false)`. Lit, the
   first values blew the streets out under that exposure, so they are a quarter: 1,500 cd
   for a street light, 400 for a wall light, `WashCandela` 600, `PoolStrength` 1.0
-  (`LIGHT_POOL_VERSION` 2). `NightGain` stays 1. `CITYGEN_UE_LAMP_DEBUG=1` with
+  (`LIGHT_POOL_VERSION` 2). `NightGain` stays 1. Seen in Unreal (2026-11-09), those still
+  left near-white pools on the roads and clipped every sign to white, its text unreadable,
+  so the lamps are 0.08 of those (120 cd, 32 for a wall light, chosen by Swagnik from night
+  views at several strengths), `WashCandela` 120, `PoolStrength` 0.08 (`LIGHT_POOL_VERSION`
+  4), and what glows is set for the exposure in
+  `citygen/unreal.py`: the blockout's `EMISSIVE` and stage 2's `EMISSIVE2` (neon 1, the
+  plain emissive 2, holo-ads 0.6) and, scaling assetgen's own strengths so its bytes stay,
+  `SIGN_GLOW` (0.125: a sign page's `SignStrength` 4 to 0.5, an ad page's 2 to 0.25) and
+  `HOLO_GLOW` (0.2: a holo-ad's `Emissive` 3 to 0.6). `CITYGEN_UE_LAMP_DEBUG=1` with
   `--check --shots` and `night_*` views logs the lamps near each view and shoots it again
   at the scales in `CITYGEN_UE_LAMP_SCALES` (comma separated), skipping the walk's checks.
 
@@ -1282,3 +1290,4 @@ spec of the library and masters: `assetgen/materials/catalog.py`):
 | #83, #85, #88, #90 (a fix on its own) | The collision check's roof traces count 3 m over the ground a building stands on (a stage 2 building's pivot where its shell's bounds start higher: one-storey sheds and yards over their street fronts, open sheds' roof slabs; Delta's Industrial Port missed 5 of 36 roofs with their hulls in place). An import back to the blockout gives the actors stage 2 had updated in place the blockout's settings again (`unstage`: rotation, slot materials, collision profile, cull distances, shadow, HLOD); `CITYGEN_UE_DIGEST_ROWS=1` writes the digests' rows. The play features' sign washes stand over their building's base on a terrain city (`unreal/play.json`'s `washes`). No version bump: an import's output changes only where an actor goes back to the blockout (which was wrong) and on terrain cities' play data (its own hash). The small city's import test streams at 600 m (`SMALL_VIEW_M`), smaller than the city | The test suite's small terrain and deck cities imported (blockout) into throwaway projects and checked with night views (`docs/progress/fix_assets/`): 36 of 36 and 48 of 48 roofs, 191 lamps lit and 768 light pools each, the washes at their buildings' height; both fail only on streaming (smaller than the view range). `test_unreal_import_small_city` and `test_unreal_import_stage2_small_city` pass. Delta's `--check` was not run: its stage 2 import goes past the PC's memory (#84) |
 | M22 | No code change. The blockout draws a city's roads, junctions, corner pads, medians, curbs and sidewalks from the pavement map's faces into the objects they were in (keys unchanged: `<district>.road_<class>.<tile>`, `.junction`, `.sidewalk`, `<segment>.deck`, `.ramp`, `.tunnel_road`, the deck objects), so their plan entries and their actors' hashes move and an import over an earlier one updates them in place. A junction's `polygon` is its carriageway face's outline and its `edge_z` the map's heights there, which the blockout draws as before; `graphs.json` keeps its format. The map itself (`pavement`, `pavement_net`) stays in `city_model.json` for stage 2 (AG17); the exporter does not read it. | Not needed (no new kind of actor, no manifest change) |
 | AG17 | No code change: the street packs' content changes under the same keys ("From AG17" above). AG7's road, junction and sidewalk pieces are drawn from M22's pavement map (stored vertices and heights, curbs as walls between faces, a raised junction on its own slab with no girder under it, barriers ending on the roads' port lines), so pieces meet exactly; a road or sidewalk with no faces (a cluster's inner road) has no mesh, declared as before. No new kind, part, slot or master | Not run here (the coordinating session's call; the check's walk should cross junctions with no step) |
+| Night lights (a fix on its own, 2026-11-09) | The lamps 0.08 of what they were (`StreetLampCandela` 120, `WallLampCandela` 32), `WashCandela` 120, `PoolStrength` 0.08 (`LIGHT_POOL_VERSION` 4); what glows set for the night's fixed exposure (-3 EV100): `EMISSIVE` and `EMISSIVE2` (neon 8 to 1, emissive 4 to 2, holo 3 to 0.6), assetgen's `SignStrength` times `SIGN_GLOW` 0.125 and a holo-ad's `Emissive` times `HOLO_GLOW` 0.2 in the manifest (`unreal._glow`; stage 2's bytes unchanged). An import over an earlier one makes the light pool's master and the glowing materials' instances again and builds the plugin again | Delta Megacity imported over its AG17 import (CityM22Check); the lamps' strength chosen from night views of a Midtown and an Old Town avenue and the core from the air at several strengths (`CITYGEN_UE_LAMP_SCALES`); the city walked in the editor. The tests were not run (numbers only) |
