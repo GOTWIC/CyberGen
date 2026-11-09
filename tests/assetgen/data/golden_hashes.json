@@ -30,19 +30,19 @@
     "shanty_stack_ubx": "ce18b5f4c3e4d3e55e21fb71976ed1c58caf5bf0bf219ac4a303cdec8d3b4a78"
   },
   "ag1": {
-    "testport_manifest": "dffffa4901898d5033ffb3d143aa2b2d4cf788c5c58c04ba63d26cbb93de2575",
-    "testport_files": "aabab1b0b38550ee7073cafed23d67272ff2d13d219a56df34faf2b772c29901",
+    "testport_manifest": "828dc201511a81a93e99dd49f944a2b7ae604aceee777c726ea4ef107fa1fb1f",
+    "testport_files": "e265178556043fffcdfa6218f6a8e03056a21c0aaac2bd7e5766f9245946337b",
     "buildings": {
       "vesper_bay": {
-        "d01.lm.e852s10.bld": "1c0d11bd5691cdc4d1ab3af2bafff5d35d252eb31d5c3f5e510b4495f74de352",
-        "d01.lot.e1007s16.bld": "41c9bbdd0568328a5471526b6b1606227daee5b7c9db25e36df8e7281f44eddb",
-        "d01.lot.e1026n186.bld": "e561c480fd5a858ac2ca3e7c346bb90bcb587944f8621665efce74570d49b249",
-        "d01.lot.e1312n189.bld": "7debc73afdc8864cd40b441ccf14a5f567df1742d605dc78fb7447cc33dbd293",
-        "d02.lot.e139n981.bld": "94533e28193489e51c652128fe90cd8e686f0b428edb698684bc435531b4afc6",
-        "d03.lot.e1002n1579.bld": "652f20593c73774778e077e978bf026a4abade6fb907c045c76580bec5184939",
-        "d04.lot.e1000s1394.bld": "57351654ca0ef29e20f3f93220484ff1f9b390b7818a7d04fa9e739a3572e8b4",
-        "d04.lot.e1001s1252.bld": "06304a6896f94f51e4124d9f10a0c768d1cc79de765eaf00f5d8d5e20e3dc438",
-        "d06.lot.e143s1668.bld": "4902535d6000d6396ec512483df26d3bb3253ec8d9d94513bd9eea9bb748e4f6"
+        "d01.lm.e852s10.bld": "778f810eea91543236962aaaeceef4c68444f2c739c0bba2eebbe3371c0d1b36",
+        "d01.lot.e1007s16.bld": "b23548286f94beba22cb66762dfbf50371964cf388e9cc3f2e64bbc77f481c42",
+        "d01.lot.e1026n186.bld": "3b559d336b637e6c2ef132ccfbb973a29da2cd497c1fd2e5e864f6b28de9e614",
+        "d01.lot.e1312n189.bld": "332161b3165f3ccbd301e69c2f9db98cbe5e1b89357d7f81e41340ef1ac38e58",
+        "d02.lot.e139n981.bld": "fb33f515f7819fce9bc9a36b2a323d7371003024aebe7de29fd12c390e6ecf81",
+        "d03.lot.e1002n1579.bld": "c46cc3e128066d900c6e4082d2ed95c1db1ec92e6c19096d469f0dfff933d47c",
+        "d04.lot.e1000s1394.bld": "6d820da3155c56427b6b1b11b558ce2828391583f9b031b6db0339c5d15ed13e",
+        "d04.lot.e1001s1252.bld": "ed681f3027eeb39f8ae02a56297d24ed11ffb26f680a9c6bf0a3e60e3e63f45e",
+        "d06.lot.e143s1668.bld": "b69cfac0b060200cd23af6e31271d581e3ccc0413882eaec8bcda1c10d89c085"
       }
     }
   },
@@ -56,6 +56,6 @@
       "atlases.road.base": "fb094feb3c47fbb0200b2458252b590b8f7160b2bb7732db4a6d96b04e3f4c34",
       "atlases.trim_heritage.base": "64fa683152efc6b1ea7373aeeb366116518f007213ac3411029361fbf48eeec8"
     },
-    "testport_materials": "760909bcebb69f29166c1841e5573aa4f34325013cd1aafb640db381403cdda6"
+    "testport_materials": "bbddaef84803a7c806b97e1333be885f423d8eb0165e0a0ea8553f956e330969"
   }
 }

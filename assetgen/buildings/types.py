@@ -356,6 +356,11 @@ def shanty_post(sb) -> None:
         # a water barrel on a flat roof
         if not ms.get("roof") and _u(f"{key}|{ms['k']}", "barrel") < 0.35:
             spots = _free_roof(sb, ms, 900, 900, u[0], u[1], 300, 800, taken)
+            # (#144: off a skybridge's, guideway's or tube's corridor over the roof, as
+            # `put` keeps the type's other parts: a barrel stood in a skybridge's)
+            spots = [(x, y) for x, y in spots
+                     if not sb.clear.hits(*RF._bbox(x, y, u[0], u[1], 900, 900), ms["z1"],
+                                          ms["z1"] + 1100)]
             if spots:
                 x, y = spots[int(_u(key, f"barrel.at{ms['k']}") * len(spots)) % len(spots)]
                 ceil = DK.ceiling_mm(sb.br)
@@ -457,6 +462,9 @@ def megablock_post(sb) -> None:
                 st = ("lattice", "whip", "dish")[k % 3]
                 if st == "lattice" and h < 9000:
                     st = "whip"
+                if sb.clear.hits(*RF._bbox(x, y, u[0], u[1], 1200, 1200), ms["z1"],
+                                 ms["z1"] + h):
+                    continue        # (#144: off the corridors over the roof, as `put`)
                 RF._place(sb, "antenna", {"h": h, "style": st}, x, y, ms["z1"], u[0], u[1])
                 _count(sb, "antenna_farm")
         if role == "tower" and ms["floors"] >= 8:
@@ -559,7 +567,8 @@ def shed_mass(sb, ms) -> bool:
     if top - ms["z0"] < 3500:
         return False
     sb.buf.new_part()
-    if not sb._extrude(ring, None, top - slab, top, "roof_metal"):
+    # (#144: its roof in its cladding, `roofs.open_shed`)
+    if not sb._extrude(ring, None, top - slab, top, "hangar"):
         return False
     n = len(ring)
     walls = 0
@@ -595,8 +604,9 @@ def shed_mass(sb, ms) -> bool:
                 # (on M13's slopes: down to the ground at its foot, 0.3 m into it)
                 z0 = min(z0, int(g) - 300)
                 sb.stats["columns_to_grade"] = sb.stats.get("columns_to_grade", 0) + 1
+            # (#144: painted in the building's wall color, so its wall genes show)
             if put(sb, "pillar", {"r": r, "h": PT.q(top - slab - z0),
-                                  "style": "steel"}, x, y, z0, ux, uy, "open_column"):
+                                  "style": "painted"}, x, y, z0, ux, uy, "open_column"):
                 cols += 1
     if ms.get("roof"):
         RF.build_form(sb, ms, "hangar")

@@ -395,6 +395,32 @@ def tidy(ring) -> tuple[list, list[int]]:
             a, v, b = pts[cut - 1], pts[cut], pts[(cut + 1) % m]
             keep = idx[cut - 1] if (v[0] - a[0]) ** 2 + (v[1] - a[1]) ** 2 >= \
                 (b[0] - v[0]) ** 2 + (b[1] - v[1]) ** 2 else idx[cut]
+            # #144: where one leg runs on past the other (a slit beside a wall), the
+            # shorter leg's end moves onto the longer leg's line rather than a chord
+            # from end to end, which leaves the wall up to the slit's width off its line
+            # (outside the footprint); the way whose new edges keep nearest the ring wins
+            ia, ib = (cut - 1) % m, (cut + 1) % m
+            opts = [(None, None)]
+            if _dist_line(a, v, b) < SPIKE_MM:
+                opts.append((ia, _foot(a, v, b)))
+            if _dist_line(b, a, v) < SPIKE_MM:
+                opts.append((ib, _foot(b, a, v)))
+            best = None
+            for k, q in opts:
+                trial = list(pts)
+                if k is not None:
+                    trial[k] = q
+                del trial[cut]
+                dev = _deviation(trial, cut, pts)
+                if best is None or dev < best[0]:
+                    best = (dev, k, q)
+            _, k, q = best
+            if k is not None:
+                pts[k] = q
+                if k == ia:
+                    keep = idx[cut]         # (the edge left runs along the longer leg)
+                else:
+                    keep = idx[cut - 1]
             idx[cut - 1] = keep
             del pts[cut]
             del idx[cut]
@@ -411,6 +437,41 @@ def tidy(ring) -> tuple[list, list[int]]:
             pts, idx = [x] + pts[i + 1:j + 1], [idx[i]] + idx[i + 1:j + 1]
         pts, idx = _dedupe(pts, idx)
     return pts, idx
+
+
+def _foot(p, a, b) -> tuple[int, int]:
+    """p's foot on the line a-b, to the millimeter."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2 if L2 else 0.0
+    return (int(round(a[0] + t * dx)), int(round(a[1] + t * dy)))
+
+
+def _deviation(trial, cut: int, ring) -> float:
+    """#144: how far the edges a spike's removal changed (the two round its place in
+    `trial`, and their neighbors) stray from `ring`'s outline, sampled every 0.1 m."""
+    m = len(trial)
+    if m < 3:
+        return math.inf
+    worst = 0.0
+    n = len(ring)
+    for i in (cut - 3, cut - 2, cut - 1, cut):
+        a, b = trial[i % m], trial[(i + 1) % m]
+        L = math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+        k = max(1, int(L // 100))
+        for j in range(k + 1):
+            p = (a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k)
+            d = min(_dist_seg(p, ring[e], ring[(e + 1) % n]) for e in range(n))
+            worst = max(worst, d)
+    return worst
+
+
+def _dist_seg(p, a, b) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    x, y = a[0] + t * dx - p[0], a[1] + t * dy - p[1]
+    return math.sqrt(x * x + y * y)
 
 
 def _dedupe(pts, idx):

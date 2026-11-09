@@ -482,10 +482,20 @@ def build_form(sb, ms: dict, wall: str) -> bool:
 
 def slope_slot(sb) -> str:
     era = sb.gm.get("era")
+    if open_shed(sb):
+        return "hangar"
     if sb.br["building"]["type"] in SY.SHED_TYPES or era in ("industrial", "aerospace"):
         return "roof_metal"
     return "tile" if era in ("heritage", "suburban_modern") else \
         ("tile" if sb.gm["genes"].get("roof_finish") == "tile" else "roof_metal")
+
+
+def open_shed(sb) -> bool:
+    """#144: a shed open on its sides (AG5's open shed on columns, `types.shed_mass`) has no
+    walls: its roof is its cladding, in its walls' color (`hangar`, tinted by the wall
+    gene), so the genes that tell two open sheds apart show; in its roof's color alone, two
+    of one size drew alike."""
+    return "body" in (sb.used.get("open") or ())
 
 
 def _ring_form(sb, rf: dict) -> bool:

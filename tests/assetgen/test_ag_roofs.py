@@ -188,6 +188,10 @@ def _bridged():
         dict(end, id="sb.off_floor", z_m=6 * 3.4 + 1.5,
              at={"mass": 0, "edge": 3, "s": 10.0, "d": 0.0}),
         dict(end, id="sb.no_edge", z_m=6 * 3.4, at=None),
+        # (#144: an open deck landing on the roof, far from every wall the brief filed it
+        # under: no door, counted apart)
+        dict(end, id="sb.roof", kind="open_deck", z_m=10 * 3.4, end=[3.0, 2.0],
+             at={"mass": 0, "edge": 1, "s": 5.0, "d": 9.0}),
         # a cable bridge's narrow deck, landing in a corner pier: still a door
         dict(end, id="sb.cable", kind="cable", width_m=1.2, z_m=3 * 3.4,
              at={"mass": 0, "edge": 0, "s": 1.0, "d": 0.0})]
@@ -202,11 +206,13 @@ def test_landing_doors_where_a_skybridge_meets_a_floor_line():
     assert ld["sb.on_floor"]["door"] and ld["sb.cable"]["door"]
     assert not ld["sb.off_floor"]["door"] and ld["sb.off_floor"]["why"] == "off_floor"
     assert ld["sb.no_edge"]["why"] == "no_edge"
+    assert not ld["sb.roof"]["door"] and ld["sb.roof"]["why"] == "roof"
     assert any(x["family"] == "landing" for x in res["parts"]) or \
         res["stats"].get("parts_merged", 0) > 0
     rec = {"b": {"landings": res["landings"]}}
     c = AC.landings(rec)
-    assert c["ok"] and c["doors"] == 2 and c["off_floor"] == 1 and c["no_edge"] == 1
+    assert c["ok"] and c["doors"] == 2 and c["off_floor"] == 1 and c["no_edge"] == 1 and \
+        c["on_roof"] == 1
 
 
 def _portal(station: bool):
