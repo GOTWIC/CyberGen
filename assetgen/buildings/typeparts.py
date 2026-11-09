@@ -123,7 +123,9 @@ def gen_pillar(p: dict, b) -> None:
         prism(b, "column", ngon(0, 0, r, 12, 0.5), [], 300, h - 250, "z")
         prism(b, "column", ngon(0, 0, r + 100, 12, 0.5), [], h - 250, h, "z")
     else:
-        box(b, "steel", -r, r, -r, r, 0, h)
+        # ("painted": #144, an open shed's columns in its wall's color, the walls it has not)
+        sl = "hangar" if st == "painted" else "steel"
+        box(b, sl, -r, r, -r, r, 0, h)
         box(b, "steel", -r - 80, r + 80, -r - 80, r + 80, 0, 30)
         box(b, "steel", -r - 80, r + 80, -r - 80, r + 80, h - 30, h)
 

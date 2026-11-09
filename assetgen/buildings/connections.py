@@ -59,6 +59,7 @@ DECK_T = 600                 # deck slab
 GIRDER_T = 400               # box girder under it (the deck structure: 1.0 m in all)
 COLLAR = 250
 LANDING_TOL = 400            # a landing's deck within this of a floor line: a door row
+LANDING_REACH = 1.5          # #144: a skybridge's end within this (m) of a wall lands on it
 LANDING_THIN = 500           # mass behind a wall too thin for windows that takes a door
 DOOR_MIN = 900               # a landing door at least this wide
 LANDING_CORNER = 400         # and at least this far from a corner (a reveal and 6 cm)
@@ -199,7 +200,7 @@ def landings_of(sb) -> dict[int, list[dict]]:
     width, height, id."""
     out: dict[int, list] = {}
     for s in sb.br["skybridges"]:
-        at = s.get("at")
+        at = wall_of(s)
         if at is None:
             continue
         h = int(max(s["levels"], 1) * s["level_height_m"] * 1000)
@@ -207,6 +208,33 @@ def landings_of(sb) -> dict[int, list[dict]]:
             "id": s["id"], "s": int(round(at["s"] * 1000)), "z": int(round(s["z_m"] * 1000)),
             "w": int(round(s["width_m"] * 1000)), "h": h, "kind": s["kind"]})
     return out
+
+
+def wall_of(s: dict) -> dict | None:
+    """#144: a skybridge end's place on the building's wall (the brief's `at`), or None
+    where its end lies farther than `LANDING_REACH` from every wall: an open deck that lands
+    on a podium's roof (M3's podium decks) meets no wall, though the brief files it under the
+    nearest one (Cragmouth's `d05.sb.e1557s268`, 26.6 m off a tower's 0.38 m chord)."""
+    at = s.get("at")
+    return at if at is not None and at["d"] <= LANDING_REACH else None
+
+
+def _on_roof(sb, s: dict) -> bool:
+    """#144: a skybridge whose end stands on a roof of the building at its deck's height
+    (a mass of the brief whose top is within `LANDING_TOL` of the deck, the end inside its
+    footprint or within `LANDING_REACH` of it): it lands on that roof, no door needed."""
+    import numpy as np
+    from ..planar import dist_polyline, inside_poly
+    x, y = np.array([s["end"][0]]), np.array([s["end"][1]])
+    for m in sb.br["masses"]:
+        if abs(m["z"][1] - s["z_m"]) * 1000 > LANDING_TOL:
+            continue
+        ext = [tuple(p) for p in m["footprint"]["exterior"]]
+        holes = [[tuple(p) for p in h] for h in m["footprint"]["holes"]]
+        if bool(inside_poly(x, y, ext, holes)[0]) or \
+                float(dist_polyline(x, y, ext + ext[:1])[0]) <= LANDING_REACH:
+            return True
+    return False
 
 
 def door_floors(sb, ms: dict) -> set[int]:
@@ -276,7 +304,8 @@ def _into_portal(sb, s: dict) -> bool:
 
 def landing_records(sb) -> list[dict]:
     """Per skybridge of the brief: its landing door, else why none (`no_edge`: its end
-    meets none of the building's walls; `portal`: it lands in an open portal; `ground`: at
+    meets none of the building's walls; `roof` (#144): it meets none, its deck on a roof of
+    the building under its end; `portal`: it lands in an open portal; `ground`: at
     the ground floor, where the street front meets it (M13's slopes); `off_floor`:
     its deck is on no floor line of the mass it meets, M3's floor grids apart; `no_room`:
     the wall leaves no door's width)."""
@@ -285,9 +314,9 @@ def landing_records(sb) -> list[dict]:
         rec = sb.landed.get(s["id"])
         r = {"id": s["id"], "door": bool(rec), "z_m": round(s["z_m"], 3)}
         if not rec:
-            at = s.get("at")
+            at = wall_of(s)
             if at is None:
-                r["why"] = "no_edge"
+                r["why"] = "roof" if s.get("end") and _on_roof(sb, s) else "no_edge"
             elif _into_portal(sb, s):
                 r["why"] = "portal"
             elif sb.band_z is not None and s["z_m"] * 1000 < sb.band_z - LANDING_TOL:

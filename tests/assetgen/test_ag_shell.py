@@ -247,6 +247,27 @@ def test_tidy_removes_spikes_and_crossings_and_keeps_edge_indices():
     assert RG.is_simple(pts)
 
 
+def test_tidy_closes_a_slit_beside_a_wall_on_the_wall():
+    """#144: a 4 cm slit between a wall and a bump (Delta's d02.lot.e465n764.bld): its tip
+    goes and the bump's end moves onto the wall's line, not a chord from the bump to the
+    wall's far end, which stood up to 4 cm outside the footprint."""
+    ring = [(-7570, 9360), (-7180, -9440), (-6580, -9450), (-6470, -2650), (190, -9290),
+            (7570, -9130), (7180, 9460), (-300, 9410), (-6370, 3210), (-6330, 5300),
+            (-6930, 5310), (-6970, 3160), (-6970, 9360)]
+    pts, idx = RG.tidy(ring)
+    assert RG.is_simple(pts) and (-6970, 3160) not in pts
+    assert pts[-2:] == [(-6970, 5310), (-6970, 9360)] and idx[-2] == 11
+    # every edge left on the outline (within 2 mm, the envelope's tolerance) but the slit's
+    # 4 cm mouth
+    n = len(ring)
+    for i in range(len(pts)):
+        a, b = pts[i], pts[(i + 1) % len(pts)]
+        for t in (0.25, 0.5, 0.75):
+            q = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+            d = min(RG._dist_seg(q, ring[e], ring[(e + 1) % n]) for e in range(n))
+            assert d <= 2.0 or (a, b) == ((-6330, 5300), (-6970, 5310)), (a, b, d)
+
+
 def test_shell_survives_a_spiked_footprint():
     ext = [[0.0, 0.0], [12.0, 0.0], [12.0, 5.0], [20.0, 5.0], [12.0, 5.01], [12.0, 10.0],
            [0.0, 10.0]]
