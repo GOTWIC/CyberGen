@@ -59,7 +59,8 @@ import unreal
 
 JOB = json.load(open(os.environ["CITYGEN_UE_JOB"], encoding="utf-8"))
 CORE = "/Game/CityGen/Core"
-CORE_VERSION = "2"  # of the core assets (BP_CityGenInstances, BP_CityGenGraph)
+CORE_VERSION = "3"  # of the core assets (BP_CityGenInstances, BP_CityGenGraph; 3, AG16:
+                    # BP_CityGenGroup's root static in the Blueprint itself)
 NEVER = unreal.PropertyAccessChangeNotifyMode.NEVER
 T0 = time.time()
 EAL = unreal.EditorAssetLibrary
@@ -99,6 +100,8 @@ PRUNE_FILES = 50
 EMPTY_LEVEL = "/Engine/Maps/Entry"
 STAGE2_MESH_VERSION = "2"
 STAGE2_ACTOR_VERSION = "2"
+# AG16's group actors (BP_CityGenGroup): 2, their components added again on the static root
+GROUP_ACTOR_VERSION = "2"
 TINT_CPD = (0, 8, 11, 14, 17, 20)    # citygen.unreal.TINT_CPD: the tints a master reads
 LIT_CPD = 6                          # the lit-window ratio (AG1's cpd_layout)
 # AG6's Custom Primitive Data (assetgen/materials/params.py): wear, dirt height, seed (AG0),
@@ -311,9 +314,13 @@ def pin_type(spec):
     return BEL.get_array_type(t) if arr else t
 
 
-def blueprint(path, parent, variables, hism=False):
+def blueprint(path, parent, variables, hism=False, static_root=False):
     """A Blueprint class with the given member variables (instance editable; added when
-    missing or when the class is of an older CORE_VERSION), compiled."""
+    missing or when the class is of an older CORE_VERSION), compiled. `static_root` (AG16's
+    group actors): its root component's template static, so the static components the
+    importer adds to a placed actor attach to it when the level loads (set on the placed
+    actor alone, the root is still movable while they attach: "is not static, cannot
+    attach", 160,000 times in a Delta Megacity game)."""
     bp = unreal.load_asset(path) if EAL.does_asset_exist(path) else None
     if bp is not None and meta(bp, "cg.core") == CORE_VERSION:
         return BEL.generated_class(bp)
@@ -328,6 +335,13 @@ def blueprint(path, parent, variables, hism=False):
                 new_class=unreal.HierarchicalInstancedStaticMeshComponent,
                 blueprint_context=bp))
             sds.rename_subobject(h, "Instances")
+    if static_root:
+        sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+        lib = unreal.SubobjectDataBlueprintFunctionLibrary
+        for hd in sds.k2_gather_subobject_data_for_blueprint(bp):
+            obj = lib.get_object_for_blueprint(lib.get_data(hd), bp)
+            if isinstance(obj, unreal.SceneComponent):
+                obj.set_editor_property("mobility", unreal.ComponentMobility.STATIC)
     have = {str(n) for n in BEL.list_member_variable_names(bp)} if not fresh else set()
     for name, spec in variables:
         if name not in have:
@@ -2590,7 +2604,7 @@ class Importer:
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
         if grouped:
-            gcls = blueprint(f"{CORE}/BP_CityGenGroup", unreal.Actor, [])
+            gcls = blueprint(f"{CORE}/BP_CityGenGroup", unreal.Actor, [], static_root=True)
             for g in self.s2["groups"]:
                 loc = ue_loc(*g["pivot"])
                 rot = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-g["yaw_deg"])
@@ -2612,7 +2626,7 @@ class Importer:
                     self.member_components(a, rs)
 
                 self.place(have, g["key"], g["hash"], gcls, make, update,
-                           f"CityGen/{g['category']}", STAGE2_ACTOR_VERSION)
+                           f"CityGen/{g['category']}", GROUP_ACTOR_VERSION)
             return
         cls = blueprint(f"{CORE}/BP_CityGenInstances", unreal.Actor, INSTANCE_VARS, hism=True)
         for r in self.s2["instances"]:
