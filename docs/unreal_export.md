@@ -90,14 +90,18 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   usual.
 - **Switching without importing again:** the level's World Settings, GameMode Override:
   `GM_CityGenFly` flies, None walks. Shift+F1 frees the mouse while playing, Esc stops.
-- **Streaming.** The city loads in 256 m cells within 1500 m of you (`--view-range`), far
-  enough ahead for flying. Beyond that you see the far view, World Partition's HLODs (the
-  city's own meshes and materials, instanced in 512 m cells, out to the whole city), which
-  each import builds after the city: about 2 minutes for a blockout city and 10 with stage
-  2's buildings on a Mac the first time, under a minute when nothing changed (only the cells
-  whose actors changed are built again).
+- **Streaming.** The city loads in 128 m cells within 768 m of you (`--view-range`; 256 m cells to 1,500
+  m before AG16, which loaded most of a sample city at once and streamed it all the time).
+  Beyond that you see the far view, World Partition's HLODs (the city's own meshes and
+  materials, instanced in 256 m cells, out to the whole city, each building with its own
+  Custom Primitive Data, so it looks as the city does up close), which each import builds
+  after the city: about 2 minutes for a blockout city and 10 with stage 2's buildings on a
+  Mac the first time, under a minute when nothing changed (only the cells whose actors
+  changed are built again).
   `--no-hlod` skips them, and the city then ends at the view range. A sample city is about
-  3.5 km across: `--view-range 3000` loads most of it around you, for more memory.
+  3.5 km across: `--view-range 3000` loads most of it around you, for more memory and
+  streaming (AG16's benchmark: the 95th percentile frame went from 27 to 49 ms to 9 to 13 ms
+  on Delta Megacity with the shorter range and AG16's other fixes).
 - **`--check`** plays the level twice in the editor, without saving it: walking with the
   project's character whatever `--play` set (streaming, collision, a walk along a sidewalk),
   then flying with the fly pawn (its speed, no collision, the city loaded where it ends).
@@ -156,7 +160,7 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
 |---|---|---|
 | `--play fly` or `walk` | `fly` | what Play puts you in |
 | `--fly-speed M_PER_S` | 50 | the fly pawn's top speed |
-| `--view-range M` | 1500 | how far around you the city streams in |
+| `--view-range M` | 768 | how far around you the city streams in (AG16; 1500 before) |
 | `--no-hlod` | off | skip building the far view (HLODs) after the import |
 | `--no-startup` | off | leave the project's startup and default map as they are |
 | `--new-project` | off | make the project from the First Person template if it is missing |
@@ -197,8 +201,8 @@ version's Interchange misbehaves with concurrent imports; it needs a little less
 - **The first Play** of a large city takes minutes, not seconds: Unreal shows nothing until
   every cell within `--view-range` of the player has loaded (Delta Megacity's middle: about
   46,000 meshes), and Windows marks the editor "Not Responding" meanwhile. It is loading, not
-  frozen; later Plays in the same editor session are much faster. `--view-range 800` loads a
-  smaller ring (the far view shows the rest).
+  frozen; later Plays in the same editor session are much faster. The 768 m default (AG16)
+  loads a quarter of what 1,500 m did.
 - **On Windows**, add the project folder and the engine folder to Windows Security's
   exclusions (Virus & threat protection, Manage settings, Exclusions): Defender otherwise
   scans each of the level's files (one per actor, over 100,000 for a big city) as Unreal

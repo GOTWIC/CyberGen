@@ -647,7 +647,7 @@ makes the city the project's startup and default map (`unreal.set_startup_map`;
 `--no-startup`) and sets what Play puts you in: the fly pawn (`--play fly`, the default;
 `Core/BP_CityGenFlyPawn`, a SpectatorPawn with no collision at `--fly-speed`, spawned by
 `GM_CityGenFly`, the level's game mode override) or the project's own (`--play walk`);
-World Partition's main grid is 256 m cells loaded `--view-range` (1500 m) around the
+World Partition's main grid is 256 m cells loaded `--view-range` (768 m since AG16) around the
 player and the level's instanced HLOD layer reaches the whole city (its merged parent
 layer cut off; partitions set by C++ property name, `CellSize`, `LoadingRange`; every
 master `used_with_instanced_static_meshes`, or the HLODs draw flat gray), and the HLODs are
