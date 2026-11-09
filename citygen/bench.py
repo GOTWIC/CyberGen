@@ -314,9 +314,11 @@ def run_game(root: Path, uproject: Path, level: str, job_path: Path, log: Path,
            f"-ResX={resolution[0]}", f"-ResY={resolution[1]}", "-WinX=0", "-WinY=0",
            f"-CityGenBench={job_path.as_posix()}", "-csvGpuStats", "-NoSound", "-nosplash",
            "-unattended", "-NoLoadingScreen", "-stdout", "-FullStdOutLogOutput",
-           # (unattended, Windows leaves a process DPI-unaware and a 1440p screen at 125%
-           # gives it a 2048 x 1152 window; the engine's own switch keeps it aware)
-           "-ini:Engine:[/Script/Engine.UserInterfaceSettings]:bAllowHighDpiWhenUnattended=True",
+           # (a DPI-unaware process on a 1440p screen at 125% gets a 2048 x 1152 window: the
+           # engine leaves a game DPI-unaware, BaseEngine.ini's bAllowHighDPIInGameMode, and
+           # an unattended one too, bAllowHighDpiWhenUnattended)
+           "-ini:Engine:[/Script/Engine.UserInterfaceSettings]:bAllowHighDPIInGameMode=True,"
+           "[/Script/Engine.UserInterfaceSettings]:bAllowHighDpiWhenUnattended=True",
            "-NoScreenMessages"]
     with open(log, "wb") as f:
         proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)

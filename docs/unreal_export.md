@@ -123,10 +123,14 @@ Then open the project: the editor opens on the city, and Play (Alt+P) puts you i
   GPU buffer of at most 2,048 MB with Nanite's streaming pool (512 MB by default), so there
   are 49,152 of them. Delta Megacity with AG15's parts places 53,790 Nanite meshes, and its
   first Play on the Windows PC quit on "Cannot allocate more root pages 49152/49152".
-  Every import of a city with more than 42,000 Nanite meshes (`unreal.NANITE_MANY`, counted
-  as the check counts them, `unreal.nanite_meshes`) sets
-  `r.Nanite.Streaming.StreamingPoolSize=256` in the project's `[SystemSettings]`
-  (`set_nanite_pool`): 57,344 root pages, and Delta plays. The check's editor views still
+  Since AG16 every import sets the pool from the city (`unreal.nanite_pool_mb`,
+  `set_nanite_pool`, in the project's `[SystemSettings]`): what its distinct Nanite meshes'
+  root pages (`unreal.nanite_meshes`, counted as the check counts them, times
+  `ROOT_MARGIN` 1.1: a mesh keeps its root page while it stays loaded, and over a route
+  nearly every one does, 52,224 in use of Delta's 53,911 in AG16's benchmark) leave of the
+  2,048 MB, in 64 MB steps, from 256 MB (57,344 root pages: a city with more meshes is over
+  `asset_budget`) to 1,024 MB. Delta with AG16's shared meshes (44,667) gets the engine's
+  512 MB; before, 256 MB (`NANITE_MANY` 42,000 then set 256 MB). The check's editor views still
   load up to 42,000 meshes that keep their root pages into the walk, so on such a city
   `CITYGEN_UE_PLAY_SHOTS_ONLY=1` leaves them out (only the play window's shots and the
   `pday_*` and `night_*` views, rendered from the free camera in the play world, by day and
