@@ -418,6 +418,13 @@ def _dunnage(pk: Packs) -> dict[str, list]:
     return out
 
 
+def rest_gaps(g: np.ndarray) -> np.ndarray:
+    """Each thing's gap from its five feet's (n, 5; nan: no surface under a foot): a thing
+    rests where three of its feet do, so its gap is the third smallest (#105: the smallest
+    let one foot on a surface hold the rest up)."""
+    return np.sort(np.where(np.isnan(g), np.inf, g), axis=1)[:, 2]
+
+
 def grounded(pk: Packs, model, floor: Floor) -> dict:
     things = _things(pk, model)
     dun = _dunnage(pk)
@@ -443,10 +450,7 @@ def grounded(pk: Packs, model, floor: Floor) -> dict:
         fl = np.where(P[:, 2] + R >= fl, fl, np.nan)     # (nan over the water too)
         zs = np.fmax(S.under(P, R, ex), fl)
         g = (P[:, 2] - zs).reshape(-1, 5)
-        # (a thing rests where three of its five feet do: its gap is the third smallest
-        # of its feet's, a foot with no surface under it counting as none; #105: the
-        # smallest let one foot on a surface hold the rest up)
-        third = np.sort(np.where(np.isnan(g), np.inf, g), axis=1)[:, 2]
+        third = rest_gaps(g)
         for j, i in enumerate(ids):
             gaps[i] = float(third[j])
     steps = seams(pk, model)
