@@ -718,18 +718,20 @@ def graphs(rd: Path, dest: Path, res: dict) -> None:
                 label="game")
         ax.axhline(TARGET_MS, color="#555", ls="--", lw=0.8)
         ax.axhline(FLOOR_MS, color="#999", ls=":", lw=0.8)
+        top = max(60.0, min(150.0, _pct([f["frame_ms"] for f in fs], 0.999) * 1.2))
+        ax.set_ylim(0, top)
         last = None
         for k, f in enumerate(fs):
             if int(f["seg"]) != last:
                 last = int(f["seg"])
-                ax.axvline(k, color="#ccc", lw=0.6)
-                ax.text(k, ax.get_ylim()[1] * 0.98, segs[last]["name"], fontsize=7,
-                        va="top", ha="left", color="#444")
-        ax.set_ylim(0, max(60.0, min(150.0, _pct([f["frame_ms"] for f in fs], 0.999) * 1.2)))
+                ax.axvline(k, color="#999", lw=0.6)
+                ax.text(k + 20, top * 0.97, segs[last]["name"], fontsize=7, va="top",
+                        ha="left", color="#222",
+                        bbox={"facecolor": "white", "edgecolor": "none", "pad": 1})
         ax.set_xlabel("frame along the route")
         ax.set_ylabel("ms")
         ax.set_title(f"{res['city']} {res['label']}: {name}")
-        ax.legend(loc="upper right", fontsize=7)
-        fig.tight_layout()
+        ax.legend(loc="lower right", fontsize=7)
+        fig.subplots_adjust(left=0.05, right=0.99, top=0.9, bottom=0.14)
         fig.savefig(dest / f"frame_times_{name}.png")
         plt.close(fig)

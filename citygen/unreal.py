@@ -775,9 +775,11 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
             for p in e.get("parts") or []:
                 glb = p.get("glb") or e["glb"]
                 # a building's parts have none (AG2: its simple collision covers its masses;
-                # a body per instance, 1.3 M in Vesper Bay, is more than play can stream)
+                # a body per instance, 1.3 M in Vesper Bay, is more than play can stream),
+                # nor the props no one walks into (AG16: `NO_COLLISION`)
                 pcol = p.get("collision") or ({"none": True} if base["category"] in
-                                              ("building", "landmark") else {"complex": True})
+                                              ("building", "landmark") + NO_COLLISION
+                                              else {"complex": True})
                 mp, mh = mesh(pack(part, glb, "part"), p["node"], file_sha(glb), pcol,
                               p.get("nanite", True), p.get("shape_preservation"))
                 a = {"key": f"{k}.{p['kind']}", "entry": k, "kind": p["kind"], "mesh": mp,
@@ -821,7 +823,7 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
                 else:
                     missing += 1
     shared = share_meshes(packs, actors + insts)
-    groups = group_parts(actors, insts) if GROUP_PARTS else None
+    groups = group_actors(actors, insts, man) if GROUP else None
     out_packs = []
     for k in sorted(packs):
         pk = packs[k]
@@ -864,46 +866,100 @@ def stage2(man: dict, build: Path, contribs: list) -> dict:
     if groups is not None:
         out["groups"] = groups
         out["counts"]["group_actors"] = len(groups)
+        out["counts"]["actors"] = sum(1 for a in actors if not a.get("holder"))
+        out["counts"]["grouped_actors"] = sum(1 for a in actors if a.get("holder"))
     return out
 
 
-# AG16: an entry's instanced parts as components of one actor (its own mesh actor where it
-# has one, else a group actor keyed by the entry), not an actor per entry and part kind:
-# Delta Megacity's 33,310 instancer actors become 1,902 group actors. CITYGEN_UE_GROUP=0
-# keeps an actor per part kind (the manifest then has no `groups`).
-GROUP_PARTS = os.environ.get("CITYGEN_UE_GROUP", "1") != "0"
+# AG16: fewer actors, the same components. An entry's instanced parts are components of its
+# own actor (else of a group actor at the entry's pivot), a building's street front (AG3) a
+# component of the building's actor, and the many small single-mesh pieces of a tile (signs,
+# street pieces, water pieces, ground cover) components of one actor per tile and kind
+# (`TILE_GROUPS`): a level of Delta Megacity's 73,772 actors holds about 17,000. Each
+# component keeps its own mesh, transform, Custom Primitive Data, materials, collision and
+# its record's key and ids as tags. CITYGEN_UE_GROUP=0 keeps an actor per record (the
+# manifest then has no `groups`).
+GROUP = os.environ.get("CITYGEN_UE_GROUP", "1") != "0"
 
 
-def group_parts(actors: list[dict], insts: list[dict]) -> list[dict]:
-    """Each instanced part record (`insts`) given the key of the actor that holds it as a
-    component (`holder`: its entry's), the holder's hash taken again over its parts' hashes
-    (so it changes when any of them does), and a group actor for each entry with parts and
-    no mesh actor of its own (at the entry's pivot, its category, tile, district and level).
-    The group actors, by key."""
-    by: dict[str, list[dict]] = {}
-    for r in insts:
-        by.setdefault(r["entry"], []).append(r)
+def tile_group(category: str) -> str | None:
+    """The kind of tile group a stage 2 actor of `category` goes into, or None (its own
+    actor): AG8's signs, AG7's street pieces, AG12's water pieces and AG13's ground cover."""
+    if category == "prop_sign" or category.startswith("sign"):
+        return "signs"
+    if category in ("sidewalk", "junction", "crosswalk", "street") or \
+            category.startswith(("road_", "deck_")):
+        return "streets"
+    if category in ("bed", "water", "sea") or category.startswith("bank_"):
+        return "water"
+    if category.startswith("cover_"):
+        return "cover"
+    return None
+
+
+def _tile_mid(man: dict | None, tile: str, first: list[float]) -> list[float]:
+    b = next((t["bounds"] for t in (man or {}).get("tiles", []) if t["name"] == tile), None)
+    if b is None:
+        return [float(first[0]), float(first[1]), 0.0]
+    return [round((b[0] + b[2]) / 2.0, 3), round((b[1] + b[3]) / 2.0, 3), 0.0]
+
+
+def group_actors(actors: list[dict], insts: list[dict], man: dict | None = None) -> list[dict]:
+    """Every record that becomes a component of another actor gets that actor's key as its
+    `holder`: an instanced part its entry's; a street front (`<building>.front`) its
+    building's; a single-mesh actor of a `tile_group` kind the tile group's
+    (`group.<kind>.<tile>`, `.l<level>` on a deck). A holder's hash is taken again over its
+    members' hashes (it changes when any of them does). Returns the group actors: one for
+    each entry with parts and no mesh actor of its own (at the entry's pivot) and one per
+    tile group (at the tile's middle), by key."""
     own = {a["key"]: a for a in actors}
-    groups = []
-    for entry in sorted(by):
-        rs = sorted(by[entry], key=lambda r: r["key"])
-        ph = content_hash([r["hash"] for r in rs])
-        for r in rs:
-            r["holder"] = entry
-        if entry in own:
-            a = own[entry]
-            a["parts"] = len(rs)
-            a["hash"] = content_hash([a["hash"], ph])
-            continue
-        r0 = rs[0]
-        g = {"key": entry, "pivot": r0["pivot"], "yaw_deg": r0["yaw_deg"],
-             "category": r0["category"], "type": r0.get("entry_type", r0["type"]),
-             "tile": r0["tile"], "district": r0["district"], "ids": [entry], "parts": len(rs)}
-        if r0.get("level"):
-            g["level"] = r0["level"]
-        g["hash"] = content_hash([g, ph])
-        groups.append(g)
-    return groups
+    members: dict[str, list[dict]] = {}
+    groups: dict[str, dict] = {}
+    for a in actors:
+        k = a["key"]
+        if a.get("type") == "building.front" and k.endswith(".front") and k[:-6] in own:
+            a["holder"] = k[:-6]
+        else:
+            g = tile_group(a["category"])
+            if g is None:
+                continue
+            hk = f"group.{g}.{a['tile']}" + (f".l{a['level']}" if a.get("level") else "")
+            a["holder"] = hk
+            if hk not in groups:
+                groups[hk] = {"key": hk, "pivot": _tile_mid(man, a["tile"], a["pivot"]),
+                              "yaw_deg": 0.0, "category": g, "type": f"group.{g}",
+                              "tile": a["tile"], "district": "", "ids": []}
+                if a.get("level"):
+                    groups[hk]["level"] = a["level"]
+        members.setdefault(a["holder"], []).append(a)
+    for r in insts:
+        r["holder"] = r["entry"]
+        members.setdefault(r["entry"], []).append(r)
+        if r["entry"] not in own and r["entry"] not in groups:
+            groups[r["entry"]] = {
+                "key": r["entry"], "pivot": r["pivot"], "yaw_deg": r["yaw_deg"],
+                "category": r["category"], "type": r.get("entry_type", r["type"]),
+                "tile": r["tile"], "district": r["district"], "ids": [r["entry"]]}
+            if r.get("level"):
+                groups[r["entry"]]["level"] = r["level"]
+    for hk in sorted(members):
+        ms = sorted(members[hk], key=lambda m: m["key"])
+        mh = content_hash([m["hash"] for m in ms])
+        if hk in own:
+            h = own[hk]
+            h["members"] = len(ms)
+            h["hash"] = content_hash([h["hash"], mh])
+        else:
+            g = groups[hk]
+            g["members"] = len(ms)
+            g["hash"] = content_hash([g, mh])
+    return [groups[k] for k in sorted(groups)]
+
+
+# AG16: instanced props with no collision: overhead or on a wall (awnings, facade AC units,
+# wall lights) or litter. A body per instance (Delta Megacity: 39,500 of its 71,000 prop
+# bodies), made and dropped as their cells stream, which no player stands on or walks into.
+NO_COLLISION = ("prop_awning", "prop_ac_unit", "prop_wall_light", "prop_trash")
 
 
 # AG16: the packs whose node names are their content (AG2's parts named by the hash of their
@@ -1076,8 +1132,9 @@ def actor_hashes(man: dict) -> dict[str, str]:
         # stage 2's actors over the blockout's: the keys it replaces dropped, its own added
         for k in s2["replaced"]:
             out.pop(k, None)
-        # (AG16: with `groups` an entry's parts are components of its actor or group actor)
-        out.update({a["key"]: a["hash"] for a in s2["actors"] +
+        # (AG16: with `groups`, a record with a `holder` is a component of that actor)
+        out.update({a["key"]: a["hash"] for a in s2["actors"] if not a.get("holder")})
+        out.update({a["key"]: a["hash"] for a in
                     (s2["groups"] if "groups" in s2 else s2["instances"])})
         out.update({u["key"]: u["hash"] for u in s2.get("underwater", [])})
     out["player_start"] = content_hash(man["player_start"])
@@ -1097,7 +1154,7 @@ def actor_kinds(man: dict) -> dict[str, str]:
     if s2:
         for k in s2["replaced"]:
             out.pop(k, None)
-        out.update({a["key"]: "mesh" for a in s2["actors"]})
+        out.update({a["key"]: "mesh" for a in s2["actors"] if not a.get("holder")})
         if "groups" in s2:
             out.update({g["key"]: "group" for g in s2["groups"]})
         else:
@@ -1222,14 +1279,21 @@ def set_startup_map(uproject: str | Path, level: str) -> bool:
                           [("EditorStartupMap", ref), ("GameDefaultMap", ref)])
 
 
-# Nanite keeps a root page for every Nanite mesh in memory, in one GPU buffer of at most
-# 2048 MB that the streaming pool (r.Nanite.Streaming.StreamingPoolSize, 512 MB by default)
-# shares: 1536 MB, 49,152 root pages, and the engine quits on a fatal error when they run
-# out. Delta Megacity with AG15's parts (53,790 meshes) ran out in its first Play on the
-# Windows PC (run-through 2), so a city with more Nanite meshes than NANITE_MANY gets a
-# smaller streaming pool, NANITE_POOL_MB: 256 MB leaves 57,344 root pages.
-NANITE_MANY = 42000
-NANITE_POOL_MB = 256
+# Nanite keeps a root page (32 KB) for every Nanite mesh in memory, in one GPU buffer of at
+# most NANITE_BUFFER_MB (2 GB on NVIDIA) that the streaming pool
+# (r.Nanite.Streaming.StreamingPoolSize, 512 MB by default) shares, and the engine quits on a
+# fatal error when they run out (Delta Megacity's 53,790 meshes in its first Play, run-through
+# 2). A mesh loaded keeps its root page while it stays loaded, which over a city's route is
+# nearly every mesh (AG16's benchmark on Delta: 52,224 root pages in use of its 53,911 Nanite
+# meshes). So the pool is sized from the city (AG16): what its meshes' root pages, with
+# ROOT_MARGIN, leave of the buffer, in 64 MB steps, at least NANITE_POOL_MIN_MB (which leaves
+# 57,344 root pages: a city of more Nanite meshes is over `asset_budget`) and at most
+# NANITE_POOL_MAX_MB (a small city streams its geometry in a larger pool).
+NANITE_BUFFER_MB = 2048
+ROOT_PAGE_KB = 32
+ROOT_MARGIN = 1.1
+NANITE_POOL_MIN_MB = 256
+NANITE_POOL_MAX_MB = 1024
 SYSTEM_SECTION = "[SystemSettings]"
 
 
@@ -1247,14 +1311,18 @@ def nanite_meshes(man: dict) -> int:
     return len({v for v in out.values() if v})
 
 
+def nanite_pool_mb(man: dict) -> int:
+    """The Nanite streaming pool for the city of `man` (MB; see NANITE_BUFFER_MB)."""
+    roots = nanite_meshes(man) * ROOT_MARGIN * ROOT_PAGE_KB / 1024.0
+    free = int((NANITE_BUFFER_MB - roots) // 64) * 64
+    return max(NANITE_POOL_MIN_MB, min(NANITE_POOL_MAX_MB, free))
+
+
 def set_nanite_pool(uproject: str | Path, man: dict) -> bool:
-    """A smaller Nanite streaming pool in the project's [SystemSettings] for a city of more
-    than NANITE_MANY Nanite meshes (more root pages; see NANITE_MANY). True when the file
-    changed; a smaller city leaves the project as it is."""
-    if nanite_meshes(man) <= NANITE_MANY:
-        return False
+    """The city's Nanite streaming pool (`nanite_pool_mb`) in the project's [SystemSettings].
+    True when the file changed."""
     return set_engine_ini(uproject, SYSTEM_SECTION,
-                          [("r.Nanite.Streaming.StreamingPoolSize", str(NANITE_POOL_MB))])
+                          [("r.Nanite.Streaming.StreamingPoolSize", str(nanite_pool_mb(man)))])
 
 
 def set_engine_ini(uproject: str | Path, section: str, want: list[tuple[str, str]]) -> bool:
@@ -1588,6 +1656,7 @@ def import_city(build_dir: str | Path, uproject: str | Path, engine: str | None 
     if res.get("ok"):
         man = json.loads(man_path.read_text(encoding="utf-8"))
         res["nanite_meshes"] = nanite_meshes(man)
+        res["nanite_pool_mb"] = nanite_pool_mb(man)
         res["nanite_pool_changed"] = set_nanite_pool(up, man)
         Path(job["result"]).write_text(json.dumps(res, indent=1) + "\n",
                                        encoding="utf-8", newline="\n")

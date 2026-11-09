@@ -2305,9 +2305,9 @@ class Importer:
         n += sum(1 for i in self.man["instances"] if i["key"] not in self.skip)
         n += len(self.man.get("swim", []))
         if self.s2:
-            # (AG16: with groups an entry's parts are components, its group actor one actor)
-            n += len(self.s2["actors"]) + len(self.s2["groups"] if "groups" in self.s2
-                                              else self.s2["instances"])
+            # (AG16: with groups a record with a holder is a component, not an actor)
+            n += sum(1 for a in self.s2["actors"] if not a.get("holder"))
+            n += len(self.s2["groups"] if "groups" in self.s2 else self.s2["instances"])
             n += len(self.s2.get("underwater", []))       # (AG12)
         n += int(self.plays())           # (the play features' actor)
         return n + 1 + 3                 # (the sun, the sky light, the atmosphere)
@@ -2450,11 +2450,16 @@ class Importer:
         sma = unreal.StaticMeshActor.static_class()
         stage = unreal.Name("cg.stage=2")
         grouped = "groups" in self.s2
-        parts_of = {}
+        members_of = {}
         if grouped:
+            for r in self.s2["actors"]:
+                if r.get("holder"):
+                    members_of.setdefault(r["holder"], []).append(r)
             for r in self.s2["instances"]:
-                parts_of.setdefault(r["holder"], []).append(r)
+                members_of.setdefault(r["holder"], []).append(r)
         for r in self.s2["actors"]:
+            if r.get("holder"):
+                continue                 # (a component of its holder, placed with it)
             sm = self.meshes_s2[r["mesh"]]
             loc = ue_loc(*r["pivot"])
             rot = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-r["yaw_deg"])
@@ -2477,8 +2482,11 @@ class Importer:
                         c.set_material(i, mi)
                 if r.get("no_collision"):
                     c.set_collision_profile_name("NoCollision")
-                # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's)
-                doors = [unreal.Name(f"cg.door={d}") for d in r.get("doors", [])]
+                # (AG3: a street front's doors, `cg.door=<door id>@<walkway id>`, stage 4's;
+                # AG16: a front that is a component of its building's actor gives it its doors)
+                ms = members_of.get(r["key"], [])
+                doors = [unreal.Name(f"cg.door={d}") for d in
+                         list(r.get("doors", [])) + [d for m in ms for d in m.get("doors", [])]]
                 # (AG4: what a skybridge joins, `cg.link=building:<id>` or `walkway:<id>`)
                 links = [unreal.Name(f"cg.link={x}") for x in r.get("links", [])]
                 # (AG5: a landmark's or the wheel's hero, `cg.hero=<kind>`; a building on a
@@ -2489,7 +2497,7 @@ class Importer:
                                    r["tile"], r["district"], r.get("level", 0)) + [stage] + \
                     doors + links + more
                 if grouped:
-                    self.part_components(a, parts_of.get(r["key"], []))
+                    self.member_components(a, ms)
 
             self.place(have, r["key"], r["hash"], sma, make, update,
                        f"CityGen/{r['category']}", STAGE2_ACTOR_VERSION)
@@ -2505,7 +2513,7 @@ class Importer:
                 def update(a, h, g=g, loc=loc, rot=rot):
                     a.root_component.set_mobility(unreal.ComponentMobility.STATIC)
                     a.set_actor_location_and_rotation(loc, rot, False, False)
-                    rs = parts_of.get(g["key"], [])
+                    rs = members_of.get(g["key"], [])
                     if rs and all(x.get("no_hlod") for x in rs):
                         try:
                             a.set_editor_property("enable_auto_lod_generation", False)
@@ -2513,7 +2521,7 @@ class Importer:
                             log(f"{g['key']}: enable_auto_lod_generation: {ex}")
                     a.tags = self.tags(g["key"], h, g["ids"], g["type"], g["category"],
                                        g["tile"], g["district"], g.get("level", 0)) + [stage]
-                    self.part_components(a, rs)
+                    self.member_components(a, rs)
 
                 self.place(have, g["key"], g["hash"], gcls, make, update,
                            f"CityGen/{g['category']}", STAGE2_ACTOR_VERSION)
@@ -2581,13 +2589,17 @@ class Importer:
         if r.get("no_collision"):
             comp.set_collision_profile_name("NoCollision")
 
-    def part_components(self, a, recs):
-        """AG16: an actor's instanced parts as its own components, one per part record (an
-        instanced static mesh component for a Nanite mesh, which Nanite culls per instance;
-        a hierarchical one, with its cluster tree, for the rest), each tagged `cg.part`,
-        `cg.key=<record key>`, `cg.kind=<part kind>` and `cg.id=` per citygen id; the ones
-        it had before go first. Added as the editor adds a component to a placed actor (the
-        subobject data subsystem), so they are saved with it."""
+    def member_components(self, a, recs):
+        """AG16: the records an actor holds (the manifest's `holder`) as its own components:
+        an instanced part as an instanced static mesh component (for a Nanite mesh, which
+        Nanite culls per instance; a hierarchical one, with its cluster tree, for the rest),
+        its transforms relative to the actor; a single-mesh record (a street front, a sign, a
+        street, water or ground cover piece) as a static mesh component at its own pivot and
+        yaw. Each keeps its mesh, Custom Primitive Data, slot materials and collision and is
+        tagged `cg.member`, `cg.key=<record key>`, `cg.type=`, `cg.category=`, `cg.kind=` (a
+        part's) and `cg.id=` per citygen id (and a front's `cg.door=`); the ones the actor had
+        go first. Added as the editor adds a component to a placed actor (the subobject data
+        subsystem), so they are saved with it."""
         sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
         lib = unreal.SubobjectDataBlueprintFunctionLibrary
         handles = sds.k2_gather_subobject_data_for_instance(a)
@@ -2596,28 +2608,53 @@ class Importer:
         old = []
         for hd in handles[1:]:
             obj = lib.get_object(lib.get_data(hd))
-            if isinstance(obj, unreal.InstancedStaticMeshComponent) and \
-                    "cg.part" in [str(t) for t in obj.component_tags]:
+            if isinstance(obj, unreal.PrimitiveComponent) and \
+                    "cg.member" in [str(t) for t in obj.component_tags]:
                 old.append(hd)
         if old:
             sds.delete_subobjects(handles[0], old, None)
+        st = self.stats["stage2"]
         for r in sorted(recs, key=lambda r: r["key"]):
             sm = self.meshes_s2[r["mesh"]]
-            nanite = bool(sm.get_editor_property("nanite_settings").get_editor_property("enabled"))
-            cls = unreal.InstancedStaticMeshComponent if nanite else \
-                unreal.HierarchicalInstancedStaticMeshComponent
+            part = "entry" in r
+            if part:
+                nanite = bool(sm.get_editor_property("nanite_settings")
+                              .get_editor_property("enabled"))
+                cls = unreal.InstancedStaticMeshComponent if nanite else \
+                    unreal.HierarchicalInstancedStaticMeshComponent
+            else:
+                cls = unreal.StaticMeshComponent
             hd, why = sds.add_new_subobject(unreal.AddNewSubobjectParams(
                 parent_handle=handles[0], new_class=cls))
             comp = lib.get_object(lib.get_data(hd))
             if comp is None:
                 raise RuntimeError(f"{r['key']}: no component added ({why})")
-            self.set_parts(comp, r, sm)
-            comp.set_editor_property("component_tags", [
-                unreal.Name("cg.part"), unreal.Name(f"cg.key={r['key']}"),
-                unreal.Name(f"cg.kind={r['kind']}")] +
-                [unreal.Name(f"cg.id={i}") for i in (r.get("ids") or [r["entry"]])])
-            self.stats["stage2"]["part_components"] = \
-                self.stats["stage2"].get("part_components", 0) + 1
+            if part:
+                self.set_parts(comp, r, sm)
+                st["part_components"] = st.get("part_components", 0) + 1
+            else:
+                comp.set_static_mesh(sm)
+                comp.set_mobility(unreal.ComponentMobility.STATIC)
+                comp.set_world_location_and_rotation(
+                    ue_loc(*r["pivot"]), unreal.Rotator(roll=0.0, pitch=0.0,
+                                                        yaw=-r["yaw_deg"]), False, False)
+                comp.set_default_custom_primitive_data_float_array(
+                    0, [float(v) for v in r["cpd"]])
+                for slot, asset in sorted((r.get("materials") or {}).items()):
+                    mi = self.mi2.get(asset)
+                    i = comp.get_material_index(unreal.Name(slot))
+                    if mi is not None and i >= 0:
+                        comp.set_material(i, mi)
+                comp.set_collision_profile_name("NoCollision" if r.get("no_collision")
+                                                else "BlockAll")
+                st["mesh_components"] = st.get("mesh_components", 0) + 1
+            tags = ["cg.member", f"cg.key={r['key']}", f"cg.type={r['type']}",
+                    f"cg.category={r['category']}"]
+            if part:
+                tags.append(f"cg.kind={r['kind']}")
+            tags += [f"cg.id={i}" for i in (r.get("ids") or [r.get("entry", r["key"])])]
+            tags += [f"cg.door={d}" for d in r.get("doors", [])]
+            comp.set_editor_property("component_tags", [unreal.Name(t) for t in tags])
 
     def xforms_file(self, r):
         """AG13: an instance actor's transforms from its tile's file (read once a file)."""

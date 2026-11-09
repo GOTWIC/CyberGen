@@ -418,8 +418,9 @@ def test_startup_map(tmp_path):
 
 
 def test_nanite_pool(tmp_path, monkeypatch):
-    """A city of more Nanite meshes than NANITE_MANY gets a smaller Nanite streaming pool in
-    the project's [SystemSettings] (more root pages); a smaller one leaves the file alone."""
+    """AG16: the Nanite streaming pool sized from the city: what its distinct Nanite meshes'
+    root pages leave of Nanite's buffer, in 64 MB steps, between the minimum and maximum, set
+    in the project's [SystemSettings] (the rest of the file as it was)."""
     up = tmp_path / "P" / "P.uproject"
     (tmp_path / "P" / "Config").mkdir(parents=True)
     ini = tmp_path / "P" / "Config" / "DefaultEngine.ini"
@@ -430,13 +431,19 @@ def test_nanite_pool(tmp_path, monkeypatch):
                       "actors": [{"key": "k0", "mesh": "s0"}, {"key": "x", "mesh": "lod"}],
                       "instances": [{"key": "p", "mesh": "s0"}]}}
     assert U.nanite_meshes(man) == 5      # k1..k4's own, k0's and p's s0; x a LOD chain
-    monkeypatch.setattr(U, "NANITE_MANY", 5)
-    assert not U.set_nanite_pool(up, man)
-    monkeypatch.setattr(U, "NANITE_MANY", 4)
+    assert U.nanite_pool_mb(man) == U.NANITE_POOL_MAX_MB      # (a small city)
     assert U.set_nanite_pool(up, man)
     assert ini.read_text() == ("[/Script/Engine.RendererSettings]\nr.Lumen=1\n\n"
-                               "[SystemSettings]\nr.Nanite.Streaming.StreamingPoolSize=256\n")
+                               "[SystemSettings]\nr.Nanite.Streaming.StreamingPoolSize=1024\n")
     assert not U.set_nanite_pool(up, man)
+    # Delta Megacity at AG16 (44,667 meshes, its parts and signs shared across tiles) gets
+    # the engine's 512 MB; before (53,911), the minimum
+    monkeypatch.setattr(U, "nanite_meshes", lambda m: 44667)
+    assert U.nanite_pool_mb(man) == 512
+    monkeypatch.setattr(U, "nanite_meshes", lambda m: 53911)
+    assert U.nanite_pool_mb(man) == U.NANITE_POOL_MIN_MB == 256
+    assert U.set_nanite_pool(up, man)
+    assert "r.Nanite.Streaming.StreamingPoolSize=256\n" in ini.read_text()
 
 
 def test_play_flags(tmp_path):
