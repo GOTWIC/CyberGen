@@ -103,6 +103,26 @@ point it shares with the next, and two of them rounded to (-105.03, 103.48) and
 ring would cross itself (`_unstep`), so every valid ring stays as it was. No built city has
 an invalid mass footprint, and the recorded models keep their bytes with it.
 
+## A sidewalk ring counted as bare land
+
+On the same layout M16's `ground_cover` check failed: "252 m2 of open land in d01 uncovered
+at (-387, 786)". That is cul-de-sac `jn.w374n788`'s ring of sidewalk round its bulb, 4 m
+wide, a corner pad in M22's map (`jn.w374n788.pv.pad_a`, 286 m2). M16's right of way takes a
+junction's polygon, its carriageway since M22, so the ring lies outside it, and the generator
+(`cover.pieces`) covers the land between its sources only where a part measures
+`SLIVER_M` (3 m) wide. Most rings it covers, as meadow (eight in the small test city). This
+one a hairline joined to a curb strip 90 m along the street, so the whole measured 1.5 m wide
+and was left out; the check, cutting the stored pieces, saw the ring alone, 3.7 m wide.
+
+The ring is pavement, not open land, so the check now cuts a failing part of open land by the
+junctions' faces on the ground (`water_checks._junction_faces`, `_bare`) and fails it only if
+it is still wide past them. Only a failing part is cut: cutting first made Delta Megacity and
+the pinned demo fail, a narrow part split into a wide one the generator, measuring it whole,
+rightly left out. No model moves; every city's `ground_cover` passes as before.
+
+That the generator lays meadow on sidewalk rings at all is M16's right of way missing M22's
+junction faces; changing that moves most cities' ground cover, so it is left open.
+
 ## Results
 
 Every city built on the final code, one at a time (citygen with the blockout, then `assetgen

@@ -1477,6 +1477,13 @@ The water coverage fixes (issue #140 and #144's Nexus `water_gaps`) are in place
   ring that would cross itself drops such steps (a valid ring stays as it was). The small
   city's `water_required` layout, moved by the water, had a circle plate turned 45 degrees
   cross itself and a sloped crown's overlay fail.
+- **Junction faces in `ground_cover`** (`water_checks._junction_faces`, `_bare`): M16's
+  right of way takes a junction's carriageway only, so a cul-de-sac's ring of sidewalk round
+  its bulb (a corner pad of M22's map) lies outside it. The generator covers it (meadow) where
+  it measures 3 m wide as a piece, and left it out on that layout, where a hairline joins it
+  to a curb strip; the check counted it as open land left bare. A part of open land that
+  fails is now cut by the junctions' faces on the ground first (only then: cut first, a
+  narrow part could split into a wide one). No city's model moves.
 Outputs: `docs/progress/fix_nexus_water/`.
 
 ### Rules for sessions building citygen milestones (local; no cloud credits)
