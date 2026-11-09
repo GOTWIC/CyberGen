@@ -293,7 +293,10 @@ class Plate:
         return [(hw, -hd), (hw, hd), (-hw, hd), (-hw, -hd)], arcs
 
     def ring(self) -> list:
-        """The plate's points in world coordinates (grid, no repeats)."""
+        """The plate's points in world coordinates (grid, no repeats). Two arcs meeting
+        tangent each give their shared end, and the two may round to grid points a step
+        apart, the second behind the first: where the ring would cross itself there, such
+        steps go (`_unstep`; every valid ring stays as it is)."""
         pts, _ = self._local()
         out = []
         for u, v in pts:
@@ -302,6 +305,8 @@ class Plate:
                 out.append(p)
         if len(out) > 1 and out[0] == out[-1]:
             out.pop()
+        if len(out) >= 4 and not Polygon(out).is_valid:
+            out = _unstep(out)
         return out
 
     def polygon(self) -> Polygon:
@@ -316,6 +321,24 @@ class Plate:
             x, y = f.ox + (cu * f.c - cv * f.s), f.oy + (cu * f.s + cv * f.c)
             out.append(arc_rec(x, y, r, f.angle + a0, sw))
         return out
+
+
+STEP_M = 0.015       # two ring points this close are one point rounded two ways
+
+
+def _unstep(ring: list) -> list:
+    """A plate ring without the points within `STEP_M` of the point before them (#140: an
+    oval's arcs met at (-105.03, 103.48) and (-105.02, 103.47), a step back that crossed the
+    ring and broke a crown's overlay on the small city's `water_required` layout)."""
+    out = []
+    for p in ring:
+        if out and abs(p[0] - out[-1][0]) <= STEP_M and abs(p[1] - out[-1][1]) <= STEP_M:
+            continue
+        out.append(p)
+    while len(out) > 3 and abs(out[0][0] - out[-1][0]) <= STEP_M and \
+            abs(out[0][1] - out[-1][1]) <= STEP_M:
+        out.pop()
+    return out
 
 
 def sector(cx: float, cy: float, r_in: float, r_out: float, a0: float,
